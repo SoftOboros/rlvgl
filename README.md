@@ -42,4 +42,4 @@ lvgl/ – C submodule (reference only)
 
 ## Status
 
-Initial development. See ./TODO.md for component-by-component progress.
+Initial development. See `docs/TODO.md` for component-by-component progress.
