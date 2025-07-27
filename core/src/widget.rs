@@ -18,5 +18,6 @@ pub struct Color(pub u8, pub u8, pub u8);
 pub trait Widget {
     fn bounds(&self) -> Rect;
     fn draw(&self, renderer: &mut dyn Renderer);
-    fn handle_event(&mut self, event: &Event);
+    /// Handle an event and return `true` if it was consumed.
+    fn handle_event(&mut self, event: &Event) -> bool;
 }

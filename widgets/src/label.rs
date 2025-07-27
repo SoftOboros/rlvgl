@@ -31,5 +31,7 @@ impl Widget for Label {
         renderer.draw_text((self.bounds.x, self.bounds.y), &self.text, self.text_color);
     }
 
-    fn handle_event(&mut self, _event: &Event) {}
+    fn handle_event(&mut self, _event: &Event) -> bool {
+        false
+    }
 }

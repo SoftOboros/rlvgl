@@ -4,8 +4,8 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 
 | ✔ | Order | Test ID | Description | Depends on | Automation |
 |---|-------|---------|-------------|-----------|------------|
-| [ ] | 1 | T-01 | **Core unit tests** – Widget trait invariants, tree mutations, panic‑free drop | TODO#1 | Automated (Codex + `cargo test`) |
-| [ ] | 2 | T-02 | **Event‑dispatch tests** – capture/bubble order, stop‑propagation | T-01 | Automated |
+| [x] | 1 | T-01 | **Core unit tests** – Widget trait invariants, tree mutations, panic‑free drop | TODO#1 | Automated (Codex + `cargo test`) |
+| [x] | 2 | T-02 | **Event‑dispatch tests** – capture/bubble order, stop‑propagation | T-01 | Automated |
 | [ ] | 3 | T-03 | **Style builder tests** – builder pattern produces expected structs & default fall‑backs | T-01 | Automated |
 | [ ] | 4 | T-04 | **Dummy DisplayDriver & Renderer smoke test** – render a solid‑color frame into a RAM buffer | TODO#3 | Automated (headless) |
 | [ ] | 5 | T-05 | **InputDevice stub tests** – key/mouse event marshaling | TODO#3 | Automated |
