@@ -10,6 +10,7 @@ extern crate alloc;
 pub mod event;
 pub mod renderer;
 pub mod style;
+pub mod theme;
 pub mod widget;
 
 use alloc::rc::Rc;

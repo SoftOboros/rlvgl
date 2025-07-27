@@ -6,9 +6,9 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 |---|-------|---------|-------------|-----------|------------|
 | [x] | 1 | T-01 | **Core unit tests** – Widget trait invariants, tree mutations, panic‑free drop | TODO#1 | Automated (Codex + `cargo test`) |
 | [x] | 2 | T-02 | **Event‑dispatch tests** – capture/bubble order, stop‑propagation | T-01 | Automated |
-| [ ] | 3 | T-03 | **Style builder tests** – builder pattern produces expected structs & default fall‑backs | T-01 | Automated |
-| [ ] | 4 | T-04 | **Dummy DisplayDriver & Renderer smoke test** – render a solid‑color frame into a RAM buffer | TODO#3 | Automated (headless) |
-| [ ] | 5 | T-05 | **InputDevice stub tests** – key/mouse event marshaling | TODO#3 | Automated |
+| [x] | 3 | T-03 | **Style builder tests** – builder pattern produces expected structs & default fall‑backs | T-01 | Automated |
+| [x] | 4 | T-04 | **Dummy DisplayDriver & Renderer smoke test** – render a solid‑color frame into a RAM buffer | TODO#3 | Automated (headless) |
+| [x] | 5 | T-05 | **InputDevice stub tests** – key/mouse event marshaling | TODO#3 | Automated |
 | [ ] | 6 | T-06 | **SPI `st7789` integration smoke** on STM32H7 NUCLEO board | T-04, hardware | **Human** (visual & scope) |
 | [ ] | 7 | T-07 | **Tier‑1 widget golden render** – Label, Button, Container PNG diff vs goldens | TODO#4, T-04 | Automated (sim headless) |
 | [ ] | 8 | T-08 | **Layout stress‑test** – fuzz container sizes & assert no panic / wrong bounds | T-07 | Automated |
