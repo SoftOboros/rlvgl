@@ -1,3 +1,10 @@
+#![no_std]
+
+extern crate alloc;
+
+#[cfg(feature = "simulator")]
+extern crate std;
+
 pub mod display;
 pub mod input;
 #[cfg(feature = "simulator")]

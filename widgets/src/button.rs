@@ -1,3 +1,4 @@
+use alloc::{boxed::Box, string::String};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};

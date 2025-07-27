@@ -1,10 +1,15 @@
+#![no_std]
+
+extern crate alloc;
+
 pub mod event;
 pub mod renderer;
 pub mod style;
 pub mod widget;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use core::cell::RefCell;
+use alloc::rc::Rc;
+use alloc::vec::Vec;
 
 /// Node in the widget hierarchy
 pub struct WidgetNode {

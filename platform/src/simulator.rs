@@ -1,6 +1,9 @@
 #[cfg(feature = "simulator")]
 use crate::{display::DisplayDriver, input::InputDevice};
 #[cfg(feature = "simulator")]
+use alloc::vec;
+use alloc::vec::Vec;
+#[cfg(feature = "simulator")]
 use minifb::{MouseButton, MouseMode, Window, WindowOptions};
 #[cfg(feature = "simulator")]
 use rlvgl_core::{
