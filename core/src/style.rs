@@ -19,9 +19,17 @@ pub struct StyleBuilder {
     style: Style,
 }
 
+impl Default for StyleBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StyleBuilder {
     pub fn new() -> Self {
-        Self { style: Style::default() }
+        Self {
+            style: Style::default(),
+        }
     }
 
     pub fn bg_color(mut self, color: crate::widget::Color) -> Self {

@@ -9,7 +9,9 @@ pub trait InputDevice {
 pub struct DummyInput;
 
 impl InputDevice for DummyInput {
-    fn poll(&mut self) -> Option<Event> { None }
+    fn poll(&mut self) -> Option<Event> {
+        None
+    }
 }
 
 /// Alias used by platform backends for standard events

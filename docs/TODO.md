@@ -20,6 +20,7 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [x] Size-check script (`arm-none-eabi-size`)
 - [x] Clippy + Rust-fmt gating
 - [x] Pre-commit hook template
+- [x] CI environment bootstrap script + workflow integration
 ## 3 Display & Input HAL layer
 
 - [x] Define `DisplayDriver` trait (`flush(Rect, &[Color])`)

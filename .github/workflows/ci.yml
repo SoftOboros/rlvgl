@@ -5,12 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        target: thumbv7em-none-eabihf
-        profile: minimal
+    - name: Prepare build environment
+      run: bash scripts/setup-ci-env.sh
     - run: rustup component add rustfmt clippy
     - run: cargo build --workspace --verbose
     - run: cargo fmt --all -- --check
