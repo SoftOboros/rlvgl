@@ -1,0 +1,11 @@
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1            # Faster builds but less optimized
+debug = true             # Keep symbols for simulator debugging
