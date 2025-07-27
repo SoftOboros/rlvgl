@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     cargo \
     cmake \
-    ninja \
+    ninja-build \
     llvm-dev \
     libclang-dev \
     clang \
@@ -45,16 +45,16 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Cache dependencies
-COPY rust/Cargo.toml rust/Cargo.lock ./rust/
-RUN cd rust && cargo fetch
+COPY Cargo.toml .
+#RUN cargo fetch
 
 # Copy everything and build
 COPY . .
 RUN git submodule update --init --recursive
-RUN cd py && pip install -r requirements.txt && cd ..
-RUN cd rust && cargo build --release
+#RUN pip install -r requirements.txt && cd ..
+#RUN cargo build --release
 
 # build compiled items.
-RUN cd rust && cargo clean && cargo fetch && cargo build -Znext-lockfile-bump --locked && cd ..
+#RUN cargo clean && cargo fetch && cargo build -Znext-lockfile-bump --locked && cd ..
 
 CMD ["bash"]
