@@ -11,5 +11,5 @@ opt-level = 1            # Faster builds but less optimized
 debug = true             # Keep symbols for simulator debugging
 
 [workspace]
-members = ["core", "platform"]
+members = ["core", "platform", "widgets"]
 resolver = "2"
