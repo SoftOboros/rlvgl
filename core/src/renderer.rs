@@ -1,4 +1,4 @@
-use crate::widget::{Rect, Color};
+use crate::widget::{Color, Rect};
 
 /// Target-agnostic drawing interface
 pub trait Renderer {
