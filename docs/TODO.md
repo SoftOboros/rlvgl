@@ -41,11 +41,11 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [ ] CI step: run example, dump PNG for diff
 
 ## 6 Tier 2 widget translations
-- [ ] Checkbox
-- [ ] Slider
-- [ ] Arc / Progress bar
-- [ ] List
-- [ ] Image (embedded-graphics backend)
+- [x] Checkbox
+- [x] Slider
+- [x] Arc / Progress bar
+- [x] List
+- [x] Image (embedded-graphics backend)
 
 ## 7 Theming & Animations
 - [ ] Global Theme trait (color scheme, style cascading)
