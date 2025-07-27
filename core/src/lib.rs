@@ -14,11 +14,16 @@ pub struct WidgetNode {
 
 impl WidgetNode {
     /// Propagate an event to this node and its children
-    pub fn dispatch_event(&mut self, event: &event::Event) {
-        self.widget.borrow_mut().handle_event(event);
-        for child in &mut self.children {
-            child.dispatch_event(event);
+    pub fn dispatch_event(&mut self, event: &event::Event) -> bool {
+        if self.widget.borrow_mut().handle_event(event) {
+            return true;
         }
+        for child in &mut self.children {
+            if child.dispatch_event(event) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Recursively draw the node tree

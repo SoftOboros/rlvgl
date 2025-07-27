@@ -72,13 +72,15 @@ impl Widget for List {
         }
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::PointerUp { x, y } = event {
             if *x >= self.bounds.x && *x < self.bounds.x + self.bounds.width {
                 if let Some(idx) = self.index_at(*y) {
                     self.selected = Some(idx);
+                    return true;
                 }
             }
         }
+        false
     }
 }

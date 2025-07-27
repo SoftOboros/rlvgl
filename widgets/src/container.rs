@@ -26,5 +26,7 @@ impl Widget for Container {
         renderer.fill_rect(self.bounds, self.style.bg_color);
     }
 
-    fn handle_event(&mut self, _event: &Event) {}
+    fn handle_event(&mut self, _event: &Event) -> bool {
+        false
+    }
 }

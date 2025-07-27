@@ -46,6 +46,7 @@ impl<'a> Widget for Image<'a> {
         }
     }
 
-    fn handle_event(&mut self, _event: &Event) {}
+    fn handle_event(&mut self, _event: &Event) -> bool {
+        false
+    }
 }
-
