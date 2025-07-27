@@ -32,7 +32,7 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [x] Label (text-only)
 - [x] Button (extends Label props)
 - [x] Container (flex-like layout)
-- [ ] Unit tests + golden screenshots via dummy driver
+- [x] Unit tests + golden screenshots via dummy driver
 
 ## 5 Simulation backend
 - [x] Add simulator feature flag (`std`, pixels, or minifb)
@@ -48,7 +48,7 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [x] Image (embedded-graphics backend)
 
 ## 7 Theming & Animations
-- [ ] Global Theme trait (color scheme, style cascading)
+ - [x] Global Theme trait (color scheme, style cascading)
 - [ ] Animation manager (`tick()` hook → style/position interpolation)
 - [ ] Port basic fade/slide from LVGL as proof
 

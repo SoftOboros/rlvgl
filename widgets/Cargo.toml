@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 rlvgl-core = { path = "../core" }
+
+[dev-dependencies]
+platform = { path = "../platform" }

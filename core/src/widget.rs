@@ -11,7 +11,7 @@ pub struct Rect {
 }
 
 /// RGB color used by the renderer
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color(pub u8, pub u8, pub u8);
 
 /// Base trait implemented by all widgets
