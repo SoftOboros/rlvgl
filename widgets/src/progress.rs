@@ -60,6 +60,7 @@ impl Widget for ProgressBar {
         renderer.fill_rect(bar_rect, self.bar_color);
     }
 
-    fn handle_event(&mut self, _event: &Event) {}
+    fn handle_event(&mut self, _event: &Event) -> bool {
+        false
+    }
 }
-

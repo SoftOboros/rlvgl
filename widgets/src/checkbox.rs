@@ -68,7 +68,7 @@ impl Widget for Checkbox {
         renderer.draw_text(text_pos, &self.text, self.text_color);
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::PointerUp { x, y } = event {
             let inside = *x >= self.bounds.x
                 && *x < self.bounds.x + self.bounds.width
@@ -76,7 +76,9 @@ impl Widget for Checkbox {
                 && *y < self.bounds.y + self.bounds.height;
             if inside {
                 self.checked = !self.checked;
+                return true;
             }
         }
+        false
     }
 }

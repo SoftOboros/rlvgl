@@ -73,7 +73,7 @@ impl Widget for Slider {
         renderer.fill_rect(knob_rect, self.knob_color);
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::PointerUp { x, y } = event {
             if *y >= self.bounds.y
                 && *y < self.bounds.y + self.bounds.height
@@ -84,7 +84,9 @@ impl Widget for Slider {
                 let ratio = relative as f32 / self.bounds.width as f32;
                 let new_value = self.min + ((self.max - self.min) as f32 * ratio) as i32;
                 self.set_value(new_value);
+                return true;
             }
         }
+        false
     }
 }

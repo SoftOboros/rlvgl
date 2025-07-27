@@ -37,14 +37,16 @@ impl Widget for Button {
         self.label.draw(renderer);
     }
 
-    fn handle_event(&mut self, event: &Event) {
+    fn handle_event(&mut self, event: &Event) -> bool {
         match event {
             Event::PointerUp { x, y } if self.inside_bounds(*x, *y) => {
                 if let Some(cb) = self.on_click.as_mut() {
                     cb();
                 }
+                return true;
             }
             _ => {}
         }
+        false
     }
 }
