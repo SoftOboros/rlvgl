@@ -7,9 +7,9 @@ pub mod renderer;
 pub mod style;
 pub mod widget;
 
-use core::cell::RefCell;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 /// Node in the widget hierarchy
 pub struct WidgetNode {

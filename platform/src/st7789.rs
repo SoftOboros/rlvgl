@@ -1,10 +1,10 @@
 #![cfg(feature = "st7789")]
+use crate::display::DisplayDriver;
+use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
+use display_interface_spi::SPIInterface;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::SpiDevice;
 use rlvgl_core::widget::{Color, Rect};
-use crate::display::DisplayDriver;
-use display_interface::{DisplayError, DataFormat, WriteOnlyDataCommand};
-use display_interface_spi::SPIInterface;
 
 pub struct St7789Display<SPI, DC> {
     interface: SPIInterface<SPI, DC>,
@@ -19,7 +19,11 @@ where
 {
     pub fn new(spi: SPI, dc: DC, width: u16, height: u16) -> Result<Self, DisplayError> {
         let interface = SPIInterface::new(spi, dc);
-        Ok(Self { interface, width, height })
+        Ok(Self {
+            interface,
+            width,
+            height,
+        })
     }
 
     fn set_window(&mut self, area: Rect) -> Result<(), DisplayError> {
