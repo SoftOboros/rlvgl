@@ -26,7 +26,7 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [x] Define `DisplayDriver` trait (`flush(Rect, &[Color])`)
 - [x] Define `InputDevice` trait (`poll() -> Option<InputEvent>`)
 - [x] Provide dummy stub driver for headless tests
-- [ ] SPI-based example driver (`st7789`) using `embedded-hal`
+- [x] SPI-based example driver (`st7789`) using `embedded-hal`
 
 ## 4 Tier 1 widget translations
 - [x] Label (text-only)
@@ -35,9 +35,9 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [ ] Unit tests + golden screenshots via dummy driver
 
 ## 5 Simulation backend
-- [ ] Add simulator feature flag (`std`, pixels, or minifb)
-- [ ] Map `DisplayDriver` to desktop window
-- [ ] Connect keyboard/mouse to `InputDevice` trait
+- [x] Add simulator feature flag (`std`, pixels, or minifb)
+- [x] Map `DisplayDriver` to desktop window
+- [x] Connect keyboard/mouse to `InputDevice` trait
 - [ ] CI step: run example, dump PNG for diff
 
 ## 6 Tier 2 widget translations

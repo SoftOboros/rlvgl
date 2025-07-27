@@ -5,3 +5,15 @@ edition = "2021"
 
 [dependencies]
 rlvgl-core = { path = "../core" }
+embedded-hal = { version = "1.0", optional = true }
+display-interface = { version = "0.5", optional = true }
+display-interface-spi = { version = "0.5", optional = true }
+
+[features]
+default = []
+simulator = ["minifb"]
+st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
+
+[dependencies.minifb]
+version = "0.24"
+optional = true
