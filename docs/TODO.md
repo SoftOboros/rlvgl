@@ -29,9 +29,9 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [ ] SPI-based example driver (`st7789`) using `embedded-hal`
 
 ## 4 Tier 1 widget translations
-- [ ] Label (text-only)
-- [ ] Button (extends Label props)
-- [ ] Container (flex-like layout)
+- [x] Label (text-only)
+- [x] Button (extends Label props)
+- [x] Container (flex-like layout)
 - [ ] Unit tests + golden screenshots via dummy driver
 
 ## 5 Simulation backend
