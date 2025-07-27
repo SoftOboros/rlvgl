@@ -1,4 +1,9 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+
+// When running tests, pull in the standard library so the test
+// harness can link successfully.
+#[cfg(test)]
+extern crate std;
 
 extern crate alloc;
 
@@ -7,9 +12,9 @@ pub mod renderer;
 pub mod style;
 pub mod widget;
 
-use core::cell::RefCell;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 /// Node in the widget hierarchy
 pub struct WidgetNode {
