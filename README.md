@@ -7,38 +7,24 @@ rlvgl preserves the widget-based UI paradigm of LVGL while eliminating unsafe C-
 The C version of LVGL is included as a git submodule for reference and test vector extraction, but not linked or compiled into this library.
 
 ## Goals
-
-Preserve LVGL architecture and layout system
-
-Replace C memory handling with idiomatic Rust ownership
-
-Support embedded display flush/input via embedded-hal
-
-Enable widget hierarchy, styles, and events using Rust traits
-
-Use existing Rust crates where possible (e.g., embedded-graphics, heapless, tinybmp)
+- Preserve LVGL architecture and layout system
+- Replace C memory handling with idiomatic Rust ownership
+- Support embedded display flush/input via embedded-hal
+- Enable widget hierarchy, styles, and events using Rust traits
+- Use existing Rust crates where possible (e.g., embedded-graphics, heapless, tinybmp)
 
 ## Features
-
-no_std + allocator support
-
-Component-based module layout (core, widgets, platform)
-
-Simulatable via std-enabled feature flag
-
-Pluggable display and input backends
+- no_std + allocator support
+- Component-based module layout (core, widgets, platform)
+- Simulatable via std-enabled feature flag
+- Pluggable display and input backends
 
 ## Project Structure
-
-core/ – Widget base trait, layout, event dispatch
-
-widgets/ – Rust-native reimplementations of LVGL widgets
-
-platform/ – Display/input traits and HAL adapters
-
-support/ – Fonts, geometry, style, color utils
-
-lvgl/ – C submodule (reference only)
+- [core](https://github.com/SoftOboros/rlvgl/blob/main/core/README.md)/ – Widget base trait, layout, event dispatch
+- [widgets](https://github.com/SoftOboros/rlvgl/blob/main/widgets/widgets/README.md)/ – Rust-native reimplementations of LVGL widgets
+- [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
+- [support](https://github.com/SoftOboros/rlvgl/blob/main/support/README.md)/ – Fonts, geometry, style, color utils
+- [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
 
 ## Status
 
