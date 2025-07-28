@@ -7,3 +7,4 @@ edition = "2021"
 
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }
+doc-comment = "0.3"

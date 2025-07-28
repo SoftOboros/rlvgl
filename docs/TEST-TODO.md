@@ -18,10 +18,10 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 | [x] | 12 | T-12 | **Animation timeline test** – fade/slide produce expected keyframes (hash diff over time) | TODO#7, T-11 | *Automated* (frame hash) + **Human** for smoothness |
 | [ ] | 13 | T-13 | **LVGL parity demo diff** – render C demo & rlvgl, perceptual image diff ≤ ε | TODO#9, T-10 | Automated (CI) + **Human** on diff > ε |
 | [x] | 14 | T-14 | **Event‑fuzz regression** – random taps/drags against widgets for 1k iterations w/ MIRI | T-07 | Automated |
-| [ ] | 15 | T-15 | **Embedded size regression** – `arm-none-eabi-size` + linker map check in CI | TODO#2 | Automated |
-| [ ] | 16 | T-16 | **Memory/leak detection** with valgrind/asan under simulator | T-09 | Automated |
+| [x] | 15 | T-15 | **Embedded size regression** – `arm-none-eabi-size` + linker map check in CI | TODO#2 | Automated |
+| [x] | 16 | T-16 | **Memory/leak detection** with valgrind/asan under simulator | T-09 | Automated |
 | [ ] | 17 | T-17 | **Performance benchmark** – FPS @ 240×320 on desktop & H7 board | T-09, T-06 | **Human-assisted** (hardware timing) |
-| [ ] | 18 | T-18 | **Docs code‑snippet compile test** – `doctest` all README/Examples | TODO#8 | Automated |
+| [x] | 18 | T-18 | **Docs code‑snippet compile test** – `doctest` all README/Examples | TODO#8 | Automated |
 
 ---
 
