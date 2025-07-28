@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rlvgl-core = { path = "../core" }
+rlvgl-core = { version = "0.1.0", path = "../core", default-features = false }
 embedded-hal = { version = "1.0", optional = true }
 display-interface = { version = "0.5", optional = true }
 display-interface-spi = { version = "0.5", optional = true }
