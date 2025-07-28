@@ -1,10 +1,10 @@
 use platform::display::{BufferDisplay, DisplayDriver};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rlvgl_core::{
+    WidgetNode,
     event::Event,
     renderer::Renderer,
     widget::{Color, Rect},
-    WidgetNode,
 };
 use rlvgl_widgets::{button::Button, container::Container};
 use std::cell::RefCell;

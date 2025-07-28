@@ -1,7 +1,7 @@
 #[cfg(feature = "simulator")]
-use platform::display::DisplayDriver;
-#[cfg(feature = "simulator")]
 use platform::MinifbDisplay;
+#[cfg(feature = "simulator")]
+use platform::display::DisplayDriver;
 #[cfg(feature = "simulator")]
 use rlvgl_core::widget::{Color, Rect};
 

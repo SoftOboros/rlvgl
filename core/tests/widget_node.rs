@@ -1,8 +1,8 @@
 use rlvgl_core::{
+    WidgetNode,
     event::Event,
     renderer::Renderer,
     widget::{Color, Rect, Widget},
-    WidgetNode,
 };
 use std::cell::RefCell;
 use std::rc::Rc;

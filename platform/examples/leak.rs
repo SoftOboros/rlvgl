@@ -1,7 +1,7 @@
+use rlvgl_core::WidgetNode;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
-use rlvgl_core::WidgetNode;
 use std::cell::RefCell;
 use std::rc::Rc;
 
