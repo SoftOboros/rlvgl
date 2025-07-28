@@ -7,11 +7,13 @@ edition = "2021"
 
 png = { version = "0.18.0-rc.3", optional = true }
 jpeg-decoder = { version = "0.3", optional = true }
+qrcode = { version = "0.14", default-features = false, optional = true }
 
 [features]
 default = []
 png = ["dep:png"]
 jpeg = ["dep:jpeg-decoder"]
+qrcode = ["dep:qrcode"]
 
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }

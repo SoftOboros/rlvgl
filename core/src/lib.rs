@@ -9,7 +9,7 @@
 
 // When running tests, pull in the standard library so the test
 // harness can link successfully.
-#[cfg(any(test, feature = "png", feature = "jpeg"))]
+#[cfg(any(test, feature = "png", feature = "jpeg", feature = "qrcode"))]
 extern crate std;
 
 extern crate alloc;
@@ -26,6 +26,8 @@ pub mod widget;
 pub use plugins::jpeg;
 #[cfg(feature = "png")]
 pub use plugins::png;
+#[cfg(feature = "qrcode")]
+pub use plugins::qrcode;
 
 // Pull doc tests from the workspace README
 #[cfg(doctest)]
