@@ -13,7 +13,6 @@ keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
 categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
-
 [dependencies]
 rlvgl-core = { version = "0.1.0", path = "../core", default-features = false }
 
