@@ -12,6 +12,14 @@ documentation = "https://docs.rs/rlvgl"
 keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
 categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
+exclude = [
+  "lvgl/**",
+  "docs/**",
+  "examples/**",
+  ".github/**",
+  "scripts/**",
+  "target/**"
+]
 
 [dependencies]
 rlvgl-core = { version = "0.1.0", path = "../core", default-features = false }
