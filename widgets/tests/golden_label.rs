@@ -1,7 +1,7 @@
-use rlvgl_widgets::label::Label;
-use rlvgl_core::widget::{Color, Rect, Widget};
-use rlvgl_core::renderer::Renderer;
 use platform::display::{BufferDisplay, DisplayDriver};
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_widgets::label::Label;
 
 struct DisplayRenderer<'a> {
     display: &'a mut BufferDisplay,
@@ -19,8 +19,18 @@ impl<'a> Renderer for DisplayRenderer<'a> {
 #[test]
 fn label_background_render() {
     let mut display = BufferDisplay::new(10, 10);
-    let mut renderer = DisplayRenderer { display: &mut display };
-    let mut label = Label::new("hi", Rect { x: 0, y: 0, width: 10, height: 10 });
+    let mut renderer = DisplayRenderer {
+        display: &mut display,
+    };
+    let mut label = Label::new(
+        "hi",
+        Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+    );
     label.style.bg_color = Color(1, 2, 3);
     label.draw(&mut renderer);
 

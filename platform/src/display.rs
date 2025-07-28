@@ -1,6 +1,6 @@
-use rlvgl_core::widget::{Color, Rect};
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
+use rlvgl_core::widget::{Color, Rect};
 
 /// Trait implemented by display drivers
 pub trait DisplayDriver {
