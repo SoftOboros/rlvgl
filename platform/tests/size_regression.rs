@@ -28,7 +28,7 @@ fn embedded_size_regression() {
     let widgets_size = fs::metadata(target.join("librlvgl_widgets.rlib"))
         .expect("missing widgets rlib")
         .len();
-    let platform_size = fs::metadata(target.join("libplatform.rlib"))
+    let platform_size = fs::metadata(target.join("librlvgl_platform.rlib"))
         .expect("missing platform rlib")
         .len();
 
