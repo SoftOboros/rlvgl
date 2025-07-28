@@ -42,7 +42,14 @@ lvgl/ – C submodule (reference only)
 
 ## Status
 
-As-built. See `docs/TODO.md` for component-by-component progress.
+As-built. See  for component-by-component progress.
+- [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md)
+- [TEST-TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TEST-TODO.md)
+- [TODO-PLUGINS](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-PLUGINS.md)
+
+As of 0.1.0 many features are implemented and an 87% unit test coverage
+is achived, but functional testing has and bare metal testing have not
+occured.
 
 ## Quick Example
 
@@ -70,3 +77,6 @@ fn main() {
 LLVM coverage instrumentation is configured via `.cargo/config.toml` and the
 `coverage` target in the `Makefile`. Run `make coverage` to execute the tests
 with instrumentation and generate an HTML report under `./coverage/`.
+
+## License
+rlvgl is licensed under the MIT license.  See [LICENSE](https://github.com/SoftOboros/rlvgl/blob/main/LICENSE) for more details.
