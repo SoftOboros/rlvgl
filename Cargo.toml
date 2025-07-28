@@ -1,4 +1,4 @@
-[package]
+[[package]
 name = "rlvgl"
 version = "0.1.0"
 authors = ["Ira Abbott <ira@softobotos.com>"]
@@ -17,9 +17,9 @@ publish = true
 path = "src/lib.rs"
 
 [dependencies]
-rlvgl-core = { path = "core", default-features = false }
-rlvgl-widgets = { path = "widgets", default-features = false }
-platform = { path = "platform", default-features = false }
+rlvgl-core = { version = "0.1.0", path = "core", default-features = false }
+rlvgl-widgets = { version = "0.1.0", path = "widgets", default-features = false }
+platform = { version = "0.1.0", path = "platform", default-features = false }
 
 [features]
 default = []
