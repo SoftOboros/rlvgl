@@ -1,7 +1,7 @@
-use platform::display::{BufferDisplay, DisplayDriver};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_platform::display::{BufferDisplay, DisplayDriver};
 use rlvgl_widgets::list::List;
 
 struct DisplayRenderer<'a> {

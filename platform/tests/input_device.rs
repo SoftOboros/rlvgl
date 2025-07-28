@@ -1,5 +1,5 @@
-use platform::input::{DummyInput, InputDevice};
 use rlvgl_core::event::Event;
+use rlvgl_platform::input::{DummyInput, InputDevice};
 
 struct VecInput {
     events: Vec<Event>,
