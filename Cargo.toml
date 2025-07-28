@@ -19,15 +19,15 @@ path = "src/lib.rs"
 [dependencies]
 rlvgl-core = { version = "0.1.0", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.0", path = "widgets", default-features = false }
-platform = { version = "0.1.0", path = "platform", default-features = false }
+rlvgl-platform = { version = "0.1.0", path = "platform", default-features = false }
 
 [features]
 default = []
 png = ["rlvgl-core/png"]
 jpeg = ["rlvgl-core/jpeg"]
 qrcode = ["rlvgl-core/qrcode"]
-simulator = ["platform/simulator"]
-st7789 = ["platform/st7789"]
+simulator = ["rlvgl-platform/simulator"]
+st7789 = ["rlvgl-platform/st7789"]
 
 [profile.release]
 opt-level = "z"
@@ -44,3 +44,4 @@ debug = true
 [workspace]
 members = ["core", "platform", "widgets"]
 resolver = "2"
+
