@@ -21,3 +21,4 @@ git submodule update --init --recursive
 curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
 rustup component add rust-src llvm-tools-preview
 rustup target add thumbv7em-none-eabihf
+cargo install grcov

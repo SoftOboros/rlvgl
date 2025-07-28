@@ -44,3 +44,19 @@ lvgl/ – C submodule (reference only)
 
 As-built. See ./docs/TODO.md for component-by-component progress.
 
+## Coverage Notes
+
+LLVM coverage is available using `grcov`. Run `make coverage` to build the tests
+with instrumentation and generate an HTML report in `./coverage`. When
+collecting coverage, ensure the following environment variables are set (they're
+also present in `.cargo/config.toml`):
+
+```
+CARGO_INCREMENTAL=0
+RUSTFLAGS="-Zinstrument-coverage"
+LLVM_PROFILE_FILE="coverage-%p-%m.profraw"
+```
+
+Future Codex runs should focus on measurable coverage and use these variables
+when generating tests.
+
