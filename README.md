@@ -43,3 +43,9 @@ lvgl/ – C submodule (reference only)
 ## Status
 
 As-built. See `docs/TODO.md` for component-by-component progress.
+
+## Coverage
+
+LLVM coverage instrumentation is configured via `.cargo/config.toml` and the
+`coverage` target in the `Makefile`. Run `make coverage` to execute the tests
+with instrumentation and generate an HTML report under `./coverage/`.
