@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -26,6 +26,6 @@ jpeg = ["dep:jpeg-decoder"]
 qrcode = ["dep:qrcode"]
 
 [dev-dependencies]
-rlvgl-widgets = { path = "../widgets" }
+rlvgl-widgets = { version = "0.1.1", path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"

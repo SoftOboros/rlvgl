@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-widgets"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -17,5 +17,5 @@ publish = true
 rlvgl-core = { version = "0.1.0", path = "../core", default-features = false }
 
 [dev-dependencies]
-platform = { path = "../platform" }
+platform = { version = "0.1.0", path = "../platform" }
 rand = "0.8"

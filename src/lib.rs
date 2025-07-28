@@ -2,6 +2,6 @@
 
 extern crate alloc;
 
-pub use platform;
+pub use rlvgl_platform as platform;
 pub use rlvgl_core as core;
 pub use rlvgl_widgets as widgets;
