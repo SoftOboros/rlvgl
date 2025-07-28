@@ -8,3 +8,4 @@ rlvgl-core = { path = "../core" }
 
 [dev-dependencies]
 platform = { path = "../platform" }
+rand = "0.8"
