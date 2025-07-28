@@ -15,7 +15,7 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 | [x] | 9 | T-09 | **Simulator backend window test** – open SDL/minifb window & render frame | TODO#5 | Automated (CI headless‑X) |
 | [x] | 10 | T-10 | **Tier‑2 widget goldens** – Checkbox, Slider, Arc, List, Image | TODO#6, T-09 | Automated |
 | [x] | 11 | T-11 | **Theme application test** – light/dark scheme cascade correctness | TODO#7, T-10 | Automated |
-| [ ] | 12 | T-12 | **Animation timeline test** – fade/slide produce expected keyframes (hash diff over time) | TODO#7, T-11 | *Automated* (frame hash) + **Human** for smoothness |
+| [x] | 12 | T-12 | **Animation timeline test** – fade/slide produce expected keyframes (hash diff over time) | TODO#7, T-11 | *Automated* (frame hash) + **Human** for smoothness |
 | [ ] | 13 | T-13 | **LVGL parity demo diff** – render C demo & rlvgl, perceptual image diff ≤ ε | TODO#9, T-10 | Automated (CI) + **Human** on diff > ε |
 | [ ] | 14 | T-14 | **Event‑fuzz regression** – random taps/drags against widgets for 1k iterations w/ MIRI | T-07 | Automated |
 | [ ] | 15 | T-15 | **Embedded size regression** – `arm-none-eabi-size` + linker map check in CI | TODO#2 | Automated |
