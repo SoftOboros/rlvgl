@@ -13,6 +13,22 @@ keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
 categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+rlvgl-core = { path = "core", default-features = false }
+rlvgl-widgets = { path = "widgets", default-features = false }
+platform = { path = "platform", default-features = false }
+
+[features]
+default = []
+png = ["rlvgl-core/png"]
+jpeg = ["rlvgl-core/jpeg"]
+qrcode = ["rlvgl-core/qrcode"]
+simulator = ["platform/simulator"]
+st7789 = ["platform/st7789"]
+
 [profile.release]
 opt-level = "z"
 lto = true
@@ -22,8 +38,8 @@ panic = "abort"
 strip = true
 
 [profile.dev]
-opt-level = 1            # Faster builds but less optimized
-debug = true             # Keep symbols for simulator debugging
+opt-level = 1
+debug = true
 
 [workspace]
 members = ["core", "platform", "widgets"]
