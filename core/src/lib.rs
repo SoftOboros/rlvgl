@@ -7,6 +7,7 @@ extern crate std;
 
 extern crate alloc;
 
+pub mod animation;
 pub mod event;
 pub mod renderer;
 pub mod style;
