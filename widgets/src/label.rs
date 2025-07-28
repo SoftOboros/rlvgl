@@ -4,6 +4,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
+/// Simple text element.
 pub struct Label {
     bounds: Rect,
     text: String,
@@ -12,6 +13,7 @@ pub struct Label {
 }
 
 impl Label {
+    /// Create a new label with the provided text and bounds.
     pub fn new(text: impl Into<String>, bounds: Rect) -> Self {
         Self {
             bounds,

@@ -1,3 +1,4 @@
+//! Collection of built-in widgets for the `rlvgl` toolkit.
 #![no_std]
 
 extern crate alloc;

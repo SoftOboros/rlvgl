@@ -4,6 +4,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
+/// Standard checkbox widget with label text.
 pub struct Checkbox {
     bounds: Rect,
     text: String,
@@ -14,6 +15,7 @@ pub struct Checkbox {
 }
 
 impl Checkbox {
+    /// Create a new checkbox.
     pub fn new(text: impl Into<String>, bounds: Rect) -> Self {
         Self {
             bounds,
@@ -25,10 +27,12 @@ impl Checkbox {
         }
     }
 
+    /// Return whether the checkbox is currently checked.
     pub fn is_checked(&self) -> bool {
         self.checked
     }
 
+    /// Set the checked state programmatically.
     pub fn set_checked(&mut self, value: bool) {
         self.checked = value;
     }
@@ -68,6 +72,7 @@ impl Widget for Checkbox {
         renderer.draw_text(text_pos, &self.text, self.text_color);
     }
 
+    /// Toggle the checked state when clicked.
     fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::PointerUp { x, y } = event {
             let inside = *x >= self.bounds.x

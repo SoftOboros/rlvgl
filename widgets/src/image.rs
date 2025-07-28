@@ -3,6 +3,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
+/// Display a raw pixel buffer.
 pub struct Image<'a> {
     bounds: Rect,
     pub style: Style,
@@ -12,6 +13,7 @@ pub struct Image<'a> {
 }
 
 impl<'a> Image<'a> {
+    /// Create an image widget backed by a slice of pixels.
     pub fn new(bounds: Rect, width: i32, height: i32, pixels: &'a [Color]) -> Self {
         Self {
             bounds,
@@ -46,6 +48,7 @@ impl<'a> Widget for Image<'a> {
         }
     }
 
+    /// Images are purely visual and do not handle events.
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
     }

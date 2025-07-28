@@ -4,6 +4,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
+/// Scrollable list of selectable text items.
 pub struct List {
     bounds: Rect,
     pub style: Style,
@@ -13,6 +14,7 @@ pub struct List {
 }
 
 impl List {
+    /// Create an empty list widget.
     pub fn new(bounds: Rect) -> Self {
         Self {
             bounds,
@@ -23,18 +25,22 @@ impl List {
         }
     }
 
+    /// Append an item to the end of the list.
     pub fn add_item(&mut self, text: impl Into<String>) {
         self.items.push(text.into());
     }
 
+    /// Return a slice of all list items.
     pub fn items(&self) -> &[String] {
         &self.items
     }
 
+    /// Index of the currently selected item, if any.
     pub fn selected(&self) -> Option<usize> {
         self.selected
     }
 
+    /// Translate a y coordinate into a list index.
     fn index_at(&self, y: i32) -> Option<usize> {
         let row_height = 16;
         if y < self.bounds.y || y >= self.bounds.y + self.bounds.height {
@@ -73,6 +79,7 @@ impl Widget for List {
         }
     }
 
+    /// Select an item when the pointer is released over it.
     fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::PointerUp { x, y } = event {
             if *x >= self.bounds.x && *x < self.bounds.x + self.bounds.width {

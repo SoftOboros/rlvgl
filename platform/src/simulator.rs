@@ -12,6 +12,7 @@ use rlvgl_core::{
 };
 
 #[cfg(feature = "simulator")]
+/// Desktop simulator display backed by the `minifb` crate.
 pub struct MinifbDisplay {
     window: Window,
     width: usize,
@@ -23,6 +24,7 @@ pub struct MinifbDisplay {
 
 #[cfg(feature = "simulator")]
 impl MinifbDisplay {
+    /// Create a new window with the given size.
     pub fn new(width: usize, height: usize) -> Self {
         let window = Window::new("rlvgl simulator", width, height, WindowOptions::default())
             .expect("failed to create window");
@@ -37,6 +39,7 @@ impl MinifbDisplay {
         }
     }
 
+    /// Present the internal buffer to the window.
     fn update(&mut self) {
         let _ = self
             .window
@@ -46,6 +49,7 @@ impl MinifbDisplay {
 
 #[cfg(feature = "simulator")]
 impl DisplayDriver for MinifbDisplay {
+    /// Copy a region of pixels into the window buffer.
     fn flush(&mut self, area: Rect, colors: &[Color]) {
         for y in 0..area.height as usize {
             for x in 0..area.width as usize {
@@ -61,6 +65,7 @@ impl DisplayDriver for MinifbDisplay {
 
 #[cfg(feature = "simulator")]
 impl InputDevice for MinifbDisplay {
+    /// Convert window input into [`Event`]s understood by the core runtime.
     fn poll(&mut self) -> Option<Event> {
         let pos = self
             .window
