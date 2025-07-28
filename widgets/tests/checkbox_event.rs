@@ -3,7 +3,12 @@ use rlvgl_widgets::checkbox::Checkbox;
 
 #[test]
 fn checkbox_toggle_and_bounds() {
-    let rect = Rect { x: 0, y: 0, width: 20, height: 20 };
+    let rect = Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 20,
+    };
     let mut cb = Checkbox::new("cb", rect);
     assert_eq!(cb.bounds().x, rect.x);
     assert_eq!(cb.bounds().y, rect.y);

@@ -1,6 +1,6 @@
 use platform::display::{BufferDisplay, DisplayDriver};
-use rlvgl_core::renderer::Renderer;
 use rlvgl_core::event::Event;
+use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_widgets::list::List;
 
@@ -20,9 +20,16 @@ impl<'a> Renderer for DisplayRenderer<'a> {
 
 fn list_draw_selected_highlight() {
     let mut display = BufferDisplay::new(20, 16);
-    let mut renderer = DisplayRenderer { display: &mut display };
+    let mut renderer = DisplayRenderer {
+        display: &mut display,
+    };
 
-    let mut list = List::new(Rect { x: 0, y: 0, width: 20, height: 16 });
+    let mut list = List::new(Rect {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 16,
+    });
     list.add_item("a");
     list.add_item("b");
 

@@ -3,7 +3,12 @@ use rlvgl_widgets::slider::Slider;
 
 #[test]
 fn slider_zero_range_behavior() {
-    let rect = Rect { x: 10, y: 10, width: 30, height: 10 };
+    let rect = Rect {
+        x: 10,
+        y: 10,
+        width: 30,
+        height: 10,
+    };
     let mut s = Slider::new(rect, 5, 5);
     assert_eq!(s.bounds().x, rect.x);
     assert_eq!(s.bounds().y, rect.y);

@@ -1,4 +1,8 @@
-use rlvgl_core::{event::Event, renderer::Renderer, widget::{Color, Rect, Widget}};
+use rlvgl_core::{
+    event::Event,
+    renderer::Renderer,
+    widget::{Color, Rect, Widget},
+};
 use rlvgl_widgets::progress::ProgressBar;
 
 struct CaptureRenderer {
@@ -14,7 +18,12 @@ impl Renderer for CaptureRenderer {
 
 #[test]
 fn progress_clamp_and_zero_range() {
-    let rect = Rect { x: 0, y: 0, width: 50, height: 4 };
+    let rect = Rect {
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 4,
+    };
     let mut bar = ProgressBar::new(rect, 10, 10);
     bar.set_value(20);
     assert_eq!(bar.value(), 10);
@@ -27,7 +36,12 @@ fn progress_clamp_and_zero_range() {
 
 #[test]
 fn progress_value_clamp() {
-    let rect = Rect { x: 0, y: 0, width: 10, height: 2 };
+    let rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 2,
+    };
     let mut bar = ProgressBar::new(rect, 0, 5);
     bar.set_value(-5);
     assert_eq!(bar.value(), 0);
