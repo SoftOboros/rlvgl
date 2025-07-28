@@ -90,8 +90,8 @@ matrix:
 
 | ✔︎  | Component                   | Adopted Rust crate(s)                                        | Task(s)                                                                                                                                      | Depends on |
 | --- | --------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [ ] | **PNG decoder**             | `png` crate citeturn241136297508662                       | • Write `rlvgl_png::decode()` wrapper that converts to `embedded-graphics::ImageRaw`.• Add compile-time feature flag `png`.                  | –          |
-| [ ] | **JPEG decoder / SJPG**     | `jpeg-decoder` crate citeturn655888278065328              | • Add basic JPEG wrapper.• Investigate tiled‐stream (“SJPG”) support → may require small fork or port of tinyjpeg C core (partial refactor). | PNG        |
+| [x] | **PNG decoder**             | `png` crate citeturn241136297508662                       | • Write `rlvgl_png::decode()` wrapper that converts to `embedded-graphics::ImageRaw`.• Add compile-time feature flag `png`.                  | –          |
+| [x] | **JPEG decoder / SJPG**     | `jpeg-decoder` crate citeturn655888278065328              | • Add basic JPEG wrapper.• Investigate tiled‐stream (“SJPG”) support → may require small fork or port of tinyjpeg C core (partial refactor). | PNG        |
 | [ ] | **GIF animation**           | `gif` crate citeturn764961070150154                       | • Streaming frame decoder into `ImageRaw`.• Expose `Image::play()` widget util.• Needs timer tick integration.                               | PNG        |
 | [ ] | **QR-code generator**       | `qrcode` crate citeturn811324940056358                    | • Wrap `QrCode::new()` → bitmap.• Provide `QrWidget` using embedded-graphics draw-target.                                                    | PNG        |
 | [ ] | **Dynamic font rasteriser** | `fontdue` (no\_std) or `rusttype` citeturn451122131593768 | • Select crate (pref `fontdue`).• Create `FontProvider` trait.• Replace stub bitmap fonts in Label/Text.                                     | –          |
@@ -127,5 +127,5 @@ matrix:
 
 -
 
-*Last updated {{DATE}}*
+*Last updated 2025-07-28*
 

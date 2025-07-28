@@ -5,6 +5,15 @@ edition = "2021"
 
 [dependencies]
 
+png = { version = "0.18.0-rc.3", optional = true }
+jpeg-decoder = { version = "0.3", optional = true }
+
+[features]
+default = []
+png = ["dep:png"]
+jpeg = ["dep:jpeg-decoder"]
+
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }
 doc-comment = "0.3"
+base64 = "0.22"
