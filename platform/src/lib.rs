@@ -1,3 +1,4 @@
+//! Hardware and simulator backends for `rlvgl`.
 #![no_std]
 
 extern crate alloc;

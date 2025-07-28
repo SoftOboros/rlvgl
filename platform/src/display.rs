@@ -2,23 +2,23 @@ use alloc::vec;
 use alloc::vec::Vec;
 use rlvgl_core::widget::{Color, Rect};
 
-/// Trait implemented by display drivers
+/// Trait implemented by display drivers.
 pub trait DisplayDriver {
-    /// Flush a rectangular region of pixels to the display
+    /// Flush a rectangular region of pixels to the display.
     fn flush(&mut self, area: Rect, colors: &[Color]);
 
-    /// Optional vertical sync hook
+    /// Optional vertical sync hook.
     fn vsync(&mut self) {}
 }
 
-/// Dummy headless driver used for tests
+/// Dummy headless driver used for tests.
 pub struct DummyDisplay;
 
 impl DisplayDriver for DummyDisplay {
     fn flush(&mut self, _area: Rect, _colors: &[Color]) {}
 }
 
-/// In-memory framebuffer driver for tests and headless rendering
+/// In-memory framebuffer driver for tests and headless rendering.
 pub struct BufferDisplay {
     pub width: usize,
     pub height: usize,
@@ -26,6 +26,7 @@ pub struct BufferDisplay {
 }
 
 impl BufferDisplay {
+    /// Create a framebuffer with the specified dimensions.
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             width,

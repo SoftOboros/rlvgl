@@ -1,3 +1,4 @@
+/// Visual appearance attributes applied to widgets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
     pub bg_color: crate::widget::Color,
@@ -15,6 +16,7 @@ impl Default for Style {
     }
 }
 
+/// Builder pattern for constructing [`Style`] instances.
 pub struct StyleBuilder {
     style: Style,
 }
@@ -26,27 +28,32 @@ impl Default for StyleBuilder {
 }
 
 impl StyleBuilder {
+    /// Create a new builder with [`Style::default`] values.
     pub fn new() -> Self {
         Self {
             style: Style::default(),
         }
     }
 
+    /// Set the background color.
     pub fn bg_color(mut self, color: crate::widget::Color) -> Self {
         self.style.bg_color = color;
         self
     }
 
+    /// Set the border color.
     pub fn border_color(mut self, color: crate::widget::Color) -> Self {
         self.style.border_color = color;
         self
     }
 
+    /// Set the border width in pixels.
     pub fn border_width(mut self, width: u8) -> Self {
         self.style.border_width = width;
         self
     }
 
+    /// Consume the builder and return the constructed [`Style`].
     pub fn build(self) -> Style {
         self.style
     }

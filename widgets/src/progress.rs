@@ -3,6 +3,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
+/// Simple progress bar widget.
 pub struct ProgressBar {
     bounds: Rect,
     pub style: Style,
@@ -13,6 +14,7 @@ pub struct ProgressBar {
 }
 
 impl ProgressBar {
+    /// Create a new progress bar with a value range.
     pub fn new(bounds: Rect, min: i32, max: i32) -> Self {
         Self {
             bounds,
@@ -24,14 +26,17 @@ impl ProgressBar {
         }
     }
 
+    /// Current progress value.
     pub fn value(&self) -> i32 {
         self.value
     }
 
+    /// Set the progress value, clamped to the configured range.
     pub fn set_value(&mut self, val: i32) {
         self.value = val.clamp(self.min, self.max);
     }
 
+    /// Convert the current value to a filled width in pixels.
     fn width_from_value(&self) -> i32 {
         let range = self.max - self.min;
         if range == 0 {
@@ -60,6 +65,7 @@ impl Widget for ProgressBar {
         renderer.fill_rect(bar_rect, self.bar_color);
     }
 
+    /// Progress bars are display only and ignore events.
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
     }

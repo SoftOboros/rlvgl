@@ -1,7 +1,11 @@
 use crate::style::Style;
 use crate::widget::{Color, Rect};
 
-/// Simple linear fade animation for a style's background color
+/// Simple linear fade animation for a style's background color.
+///
+/// The animation owns a mutable pointer to the [`Style`] being modified. This
+/// keeps the API lightweight for `no_std` targets at the cost of requiring
+/// unsafe access internally.
 pub struct Fade {
     style: *mut Style,
     start: Color,
@@ -11,6 +15,7 @@ pub struct Fade {
 }
 
 impl Fade {
+    /// Create a new fade animation.
     pub fn new(style: &mut Style, start: Color, end: Color, duration_ms: u32) -> Self {
         Self {
             style: style as *mut Style,
@@ -21,7 +26,7 @@ impl Fade {
         }
     }
 
-    /// Advance the animation by `delta_ms` milliseconds
+    /// Advance the animation by `delta_ms` milliseconds.
     pub fn tick(&mut self, delta_ms: u32) {
         self.elapsed = core::cmp::min(self.elapsed + delta_ms, self.duration_ms);
         let progress = self.elapsed as f32 / self.duration_ms as f32;
@@ -35,12 +40,13 @@ impl Fade {
         }
     }
 
+    /// Returns `true` when the animation has reached its end point.
     pub fn finished(&self) -> bool {
         self.elapsed >= self.duration_ms
     }
 }
 
-/// Simple linear slide animation for a Rect
+/// Simple linear slide animation for a [`Rect`].
 pub struct Slide {
     rect: *mut Rect,
     start: Rect,
@@ -50,6 +56,7 @@ pub struct Slide {
 }
 
 impl Slide {
+    /// Create a new slide animation.
     pub fn new(rect: &mut Rect, start: Rect, end: Rect, duration_ms: u32) -> Self {
         Self {
             rect: rect as *mut Rect,
@@ -60,6 +67,7 @@ impl Slide {
         }
     }
 
+    /// Advance the animation by `delta_ms` milliseconds.
     pub fn tick(&mut self, delta_ms: u32) {
         self.elapsed = core::cmp::min(self.elapsed + delta_ms, self.duration_ms);
         let p = self.elapsed as f32 / self.duration_ms as f32;
@@ -74,18 +82,20 @@ impl Slide {
         }
     }
 
+    /// Returns `true` once the slide has finished.
     pub fn finished(&self) -> bool {
         self.elapsed >= self.duration_ms
     }
 }
 
-/// Animation timeline that updates multiple animations at once
+/// Animation timeline that updates multiple animations at once.
 pub struct Timeline {
     fades: alloc::vec::Vec<Fade>,
     slides: alloc::vec::Vec<Slide>,
 }
 
 impl Timeline {
+    /// Create an empty timeline.
     pub fn new() -> Self {
         Self {
             fades: alloc::vec::Vec::new(),
@@ -93,13 +103,16 @@ impl Timeline {
         }
     }
 
+    /// Add a [`Fade`] animation to the timeline.
     pub fn add_fade(&mut self, fade: Fade) {
         self.fades.push(fade);
     }
+    /// Add a [`Slide`] animation to the timeline.
     pub fn add_slide(&mut self, slide: Slide) {
         self.slides.push(slide);
     }
 
+    /// Advance all animations by `delta_ms` milliseconds.
     pub fn tick(&mut self, delta_ms: u32) {
         for fade in &mut self.fades {
             fade.tick(delta_ms);
@@ -111,6 +124,7 @@ impl Timeline {
         self.slides.retain(|s| !s.finished());
     }
 
+    /// Returns `true` if no animations remain in the timeline.
     pub fn is_empty(&self) -> bool {
         self.fades.is_empty() && self.slides.is_empty()
     }

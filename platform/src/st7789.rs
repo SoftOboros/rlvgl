@@ -6,6 +6,7 @@ use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::SpiDevice;
 use rlvgl_core::widget::{Color, Rect};
 
+/// Display driver for the ST7789 LCD controller.
 pub struct St7789Display<SPI, DC> {
     interface: SPIInterface<SPI, DC>,
     width: u16,
@@ -17,6 +18,7 @@ where
     SPI: SpiDevice,
     DC: OutputPin,
 {
+    /// Create a new driver instance.
     pub fn new(spi: SPI, dc: DC, width: u16, height: u16) -> Result<Self, DisplayError> {
         let interface = SPIInterface::new(spi, dc);
         Ok(Self {
@@ -26,6 +28,7 @@ where
         })
     }
 
+    /// Configure the address window for subsequent pixel writes.
     fn set_window(&mut self, area: Rect) -> Result<(), DisplayError> {
         // simplified set column/row addresses
         self.interface.send_commands(DataFormat::U8(&[
@@ -51,6 +54,7 @@ where
     SPI: SpiDevice,
     DC: OutputPin,
 {
+    /// Write a pixel buffer to the display at the given rectangle.
     fn flush(&mut self, area: Rect, colors: &[Color]) {
         if let Ok(()) = self.set_window(area) {
             let mut buf: [u8; 2] = [0; 2];

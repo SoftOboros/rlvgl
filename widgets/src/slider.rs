@@ -3,6 +3,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
+/// Horizontal slider allowing selection of a value within a range.
 pub struct Slider {
     bounds: Rect,
     pub style: Style,
@@ -13,6 +14,7 @@ pub struct Slider {
 }
 
 impl Slider {
+    /// Create a new slider.
     pub fn new(bounds: Rect, min: i32, max: i32) -> Self {
         Self {
             bounds,
@@ -24,14 +26,17 @@ impl Slider {
         }
     }
 
+    /// Current slider value.
     pub fn value(&self) -> i32 {
         self.value
     }
 
+    /// Set the slider value, clamped to the valid range.
     pub fn set_value(&mut self, val: i32) {
         self.value = val.clamp(self.min, self.max);
     }
 
+    /// Convert the current value into a pixel position for the knob.
     fn position_from_value(&self) -> i32 {
         let range = self.max - self.min;
         if range == 0 {
@@ -73,6 +78,7 @@ impl Widget for Slider {
         renderer.fill_rect(knob_rect, self.knob_color);
     }
 
+    /// Update the slider value based on pointer release position.
     fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::PointerUp { x, y } = event {
             if *y >= self.bounds.y
