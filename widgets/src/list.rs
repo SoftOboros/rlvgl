@@ -81,14 +81,19 @@ impl Widget for List {
 
     /// Select an item when the pointer is released over it.
     fn handle_event(&mut self, event: &Event) -> bool {
-        if let Event::PointerUp { x, y } = event {
-            if *x >= self.bounds.x && *x < self.bounds.x + self.bounds.width {
-                if let Some(idx) = self.index_at(*y) {
-                    self.selected = Some(idx);
-                    return true;
-                }
-            }
+        let Event::PointerUp { x, y } = event else {
+            return false;
+        };
+
+        if *x < self.bounds.x || *x >= self.bounds.x + self.bounds.width {
+            return false;
         }
-        false
+
+        let Some(idx) = self.index_at(*y) else {
+            return false;
+        };
+
+        self.selected = Some(idx);
+        true
     }
 }
