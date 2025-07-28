@@ -4,6 +4,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
 
 use crate::label::Label;
+use rlvgl_core::style::Style;
 
 pub struct Button {
     label: Label,
@@ -16,6 +17,14 @@ impl Button {
             label: Label::new(text, bounds),
             on_click: None,
         }
+    }
+
+    pub fn style(&self) -> &Style {
+        &self.label.style
+    }
+
+    pub fn style_mut(&mut self) -> &mut Style {
+        &mut self.label.style
     }
 
     pub fn set_on_click<F: FnMut() + 'static>(&mut self, handler: F) {

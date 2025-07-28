@@ -15,3 +15,13 @@ impl Theme for LightTheme {
         style.border_color = Color(0, 0, 0);
     }
 }
+
+/// Simple dark theme implementation
+pub struct DarkTheme;
+
+impl Theme for DarkTheme {
+    fn apply(&self, style: &mut Style) {
+        style.bg_color = Color(0, 0, 0);
+        style.border_color = Color(255, 255, 255);
+    }
+}
