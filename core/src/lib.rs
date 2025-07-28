@@ -21,6 +21,10 @@ pub mod style;
 pub mod theme;
 pub mod widget;
 
+// Pull doc tests from the workspace README
+#[cfg(doctest)]
+doc_comment::doctest!("../../README.md");
+
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;

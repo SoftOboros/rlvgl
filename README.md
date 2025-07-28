@@ -44,6 +44,27 @@ lvgl/ – C submodule (reference only)
 
 As-built. See `docs/TODO.md` for component-by-component progress.
 
+## Quick Example
+
+```rust
+use rlvgl_core::widget::Rect;
+use rlvgl_widgets::label::Label;
+
+fn main() {
+    let mut label = Label::new(
+        "hello",
+        Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 20,
+        },
+    );
+    label.style.bg_color = rlvgl_core::widget::Color(0, 0, 255);
+    // Rendering would use a DisplayDriver implementation.
+}
+```
+
 ## Coverage
 
 LLVM coverage instrumentation is configured via `.cargo/config.toml` and the
