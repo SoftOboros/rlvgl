@@ -1,6 +1,8 @@
-# rlvgl
+<p align="center">
+  <img src="./rlvgl-logo.png" alt="rlvgl" />
+</p>
 
-A modular, idiomatic Rust reimplementation of LVGL (Light and Versatile Graphics Library).
+<span style="font-size:26px"><b>rlvgl</b></span> is a modular, idiomatic Rust reimplementation of LVGL (Light and Versatile Graphics Library).
 
 rlvgl preserves the widget-based UI paradigm of LVGL while eliminating unsafe C-style memory management and global state. This library is structured to support no_std environments, embedded targets (e.g., STM32H7), and simulator backends for rapid prototyping.
 
@@ -25,7 +27,7 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
 - [support](https://github.com/SoftOboros/rlvgl/blob/main/support/README.md)/ – Fonts, geometry, style, color utils
 - [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
-
+git pul
 ## Status
 
 As-built. See  for component-by-component progress.
