@@ -30,6 +30,8 @@ pub mod style;
 pub mod theme;
 pub mod widget;
 
+#[cfg(feature = "canvas")]
+pub use plugins::canvas;
 #[cfg(feature = "fontdue")]
 pub use plugins::fontdue;
 #[cfg(feature = "gif")]
@@ -42,8 +44,6 @@ pub use plugins::lottie;
 pub use plugins::png;
 #[cfg(feature = "qrcode")]
 pub use plugins::qrcode;
-#[cfg(feature = "canvas")]
-pub use plugins::canvas;
 
 // Pull doc tests from the workspace README
 #[cfg(doctest)]

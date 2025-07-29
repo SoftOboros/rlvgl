@@ -1,3 +1,5 @@
+#[cfg(feature = "canvas")]
+pub mod canvas;
 #[cfg(feature = "fontdue")]
 pub mod fontdue;
 #[cfg(feature = "gif")]
@@ -10,5 +12,3 @@ pub mod lottie;
 pub mod png;
 #[cfg(feature = "qrcode")]
 pub mod qrcode;
-#[cfg(feature = "canvas")]
-pub mod canvas;

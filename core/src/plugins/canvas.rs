@@ -1,10 +1,10 @@
-use alloc::vec::Vec;
+use crate::widget::Color;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::iter;
 use embedded_canvas::Canvas as EcCanvas;
-use embedded_graphics::prelude::{Point, Size, Pixel, DrawTarget, OriginDimensions, RgbColor};
 use embedded_graphics::pixelcolor::Rgb888;
-use crate::widget::Color;
+use embedded_graphics::prelude::{DrawTarget, OriginDimensions, Pixel, Point, RgbColor, Size};
 
 pub struct Canvas {
     inner: EcCanvas<Rgb888>,
@@ -12,7 +12,9 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn new(width: u32, height: u32) -> Self {
-        Self { inner: EcCanvas::new(Size::new(width, height)) }
+        Self {
+            inner: EcCanvas::new(Size::new(width, height)),
+        }
     }
 
     pub fn draw_pixel(&mut self, point: Point, color: Color) {
