@@ -29,13 +29,33 @@ rlvgl-core = { version = "0.1.0", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.1", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.1.0", path = "platform", default-features = false }
 
+[dependencies.gif]
+version = "*"
+optional = true
+[dependencies.fontdue]
+version = "*"
+optional = true
+[dependencies.dotlottie-rs]
+version = "0.1.0-alpha.1"
+optional = true
+[dependencies.embedded-canvas]
+version = "0.3.1"
+optional = true
+[dependencies.embedded-graphics]
+version = "0.8"
+optional = true
+
 [features]
 default = []
 png = ["rlvgl-core/png"]
 jpeg = ["rlvgl-core/jpeg"]
+gif = ["rlvgl-core/gif", "dep:gif"]
 qrcode = ["rlvgl-core/qrcode"]
 simulator = ["rlvgl-platform/simulator"]
 st7789 = ["rlvgl-platform/st7789"]
+fontdue = ["rlvgl-core/fontdue", "dep:fontdue"]
+lottie = ["rlvgl-core/lottie", "dep:dotlottie-rs"]
+canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
 
 [profile.release]
 opt-level = "z"
