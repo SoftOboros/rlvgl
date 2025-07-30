@@ -11,5 +11,7 @@ pub use rlvgl_core::fontdue;
 pub use rlvgl_core::gif;
 #[cfg(feature = "lottie")]
 pub use rlvgl_core::lottie;
+#[cfg(feature = "pinyin")]
+pub use rlvgl_core::pinyin;
 pub use rlvgl_platform as platform;
 pub use rlvgl_widgets as widgets;

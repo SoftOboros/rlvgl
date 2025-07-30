@@ -12,3 +12,5 @@ pub mod lottie;
 pub mod png;
 #[cfg(feature = "qrcode")]
 pub mod qrcode;
+#[cfg(feature = "pinyin")]
+pub mod pinyin;

@@ -16,7 +16,8 @@
     feature = "qrcode",
     feature = "gif",
     feature = "fontdue",
-    feature = "lottie"
+    feature = "lottie",
+    feature = "pinyin"
 ))]
 extern crate std;
 
@@ -44,6 +45,8 @@ pub use plugins::lottie;
 pub use plugins::png;
 #[cfg(feature = "qrcode")]
 pub use plugins::qrcode;
+#[cfg(feature = "pinyin")]
+pub use plugins::pinyin;
 
 // Pull doc tests from the workspace README
 #[cfg(doctest)]
