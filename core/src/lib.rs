@@ -16,7 +16,8 @@
     feature = "qrcode",
     feature = "gif",
     feature = "fontdue",
-    feature = "lottie"
+    feature = "lottie",
+    feature = "pinyin"
 ))]
 extern crate std;
 
@@ -40,6 +41,8 @@ pub use plugins::gif;
 pub use plugins::jpeg;
 #[cfg(feature = "lottie")]
 pub use plugins::lottie;
+#[cfg(feature = "pinyin")]
+pub use plugins::pinyin;
 #[cfg(feature = "png")]
 pub use plugins::png;
 #[cfg(feature = "qrcode")]

@@ -26,7 +26,7 @@ fontdue = ["dep:fontdue"]
 # Level 2
 lottie = ["dep:dotlottie"]
 canvas = ["dep:embedded-canvas"]
-pinyin = ["dep:pinyin"]
+pinyin = []
 fatfs = ["dep:fatfs-embedded"]
 nes = ["dep:yane"]
 ```
@@ -106,7 +106,7 @@ matrix:
 | --- | --------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------- |
 | [x] | **Lottie / dotLottie animations** | `dotlottie-rs` (player) citeturn236649155616415 | • Evaluate WASM/thorvg backend footprint.• Expose `LottiePlayer` widget.• Might need feature gate `lottie` (std-only). | GIF, Font  |
 | [x] | **Sketchpad / Canvas widget**     | `embedded-canvas` citeturn184290798726883       | • Add `CanvasWidget` integrating pan/zoom.• Provide to-PNG export using PNG feature.                                   | PNG        |
-| [ ] | **IME – Pinyin support**          | `pinyin` crate citeturn137135872219639          | • Build `PinyinInputMethod` service.• Hook into TextField once implemented.                                            | Font       |
+| [x] | **IME – Pinyin support**          | `pinyin` crate citeturn137135872219639          | • Build `PinyinInputMethod` service.• Hook into TextField once implemented.                                            | Font       |
 | [ ] | **File-explorer (SD/FAT)**        | `fatfs-embedded` citeturn791986641516626        | • Implement `BlockDevice` for target flash/SD.• Add `FilePicker` widget demo.                                          | Canvas     |
 | [ ] | **Example cartridge (NES)**       | `yane` crate citeturn794589435371464            | • Optional showcase app; embed emulator surface via `CanvasWidget`.• Demonstrates real-time framebuffer streaming.     | Canvas     |
 
