@@ -3,7 +3,7 @@ name: Publish
 on:
   push:
     branches:
-      - list
+      - dist
   workflow_dispatch:
 
 jobs:
