@@ -13,5 +13,9 @@ pub use rlvgl_core::gif;
 pub use rlvgl_core::lottie;
 #[cfg(feature = "pinyin")]
 pub use rlvgl_core::pinyin;
+#[cfg(feature = "fatfs")]
+pub use rlvgl_core::fatfs;
+#[cfg(feature = "nes")]
+pub use rlvgl_core::nes;
 pub use rlvgl_platform as platform;
 pub use rlvgl_widgets as widgets;

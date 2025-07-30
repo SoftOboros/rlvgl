@@ -44,6 +44,19 @@ optional = true
 [dependencies.embedded-graphics]
 version = "0.8"
 optional = true
+[dependencies.pinyin]
+version = "*"
+optional = true
+[dependencies.fatfs]
+version = "0.3"
+optional = true
+[dependencies.fscommon]
+version = "0.1"
+optional = true
+[dependencies.yane]
+version = "1"
+default-features = false
+optional = true
 
 [features]
 default = []
@@ -57,6 +70,8 @@ fontdue = ["rlvgl-core/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "dep:dotlottie-rs"]
 canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin"]
+fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
+nes = ["rlvgl-core/nes", "dep:yane"]
 
 [profile.release]
 opt-level = "z"
