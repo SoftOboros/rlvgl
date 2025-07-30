@@ -37,7 +37,7 @@ qrcode = ["dep:qrcode"]
 fontdue = ["dep:fontdue"]
 lottie = ["dep:dotlottie-rs"]
 canvas = ["dep:embedded-canvas", "dep:embedded-graphics"]
-pinyin = []
+pinyin = ["dep:pinyin"]
 fatfs = ["dep:fatfs", "dep:fscommon"]
 nes = ["dep:yane"]
 
