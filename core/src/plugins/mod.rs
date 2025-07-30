@@ -8,9 +8,9 @@ pub mod gif;
 pub mod jpeg;
 #[cfg(feature = "lottie")]
 pub mod lottie;
+#[cfg(feature = "pinyin")]
+pub mod pinyin;
 #[cfg(feature = "png")]
 pub mod png;
 #[cfg(feature = "qrcode")]
 pub mod qrcode;
-#[cfg(feature = "pinyin")]
-pub mod pinyin;

@@ -41,12 +41,12 @@ pub use plugins::gif;
 pub use plugins::jpeg;
 #[cfg(feature = "lottie")]
 pub use plugins::lottie;
+#[cfg(feature = "pinyin")]
+pub use plugins::pinyin;
 #[cfg(feature = "png")]
 pub use plugins::png;
 #[cfg(feature = "qrcode")]
 pub use plugins::qrcode;
-#[cfg(feature = "pinyin")]
-pub use plugins::pinyin;
 
 // Pull doc tests from the workspace README
 #[cfg(doctest)]

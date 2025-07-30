@@ -60,3 +60,6 @@ LLVM_PROFILE_FILE="coverage-%p-%m.profraw"
 Future Codex runs should focus on measurable coverage and use these variables
 when generating tests.
 
+Always run `cargo fmt --all` and fix formatting errors before preparing a
+pull request. Verify formatting with `cargo fmt --all -- --check`.
+
