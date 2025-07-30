@@ -26,7 +26,7 @@ fontdue = ["dep:fontdue"]
 # Level 2
 lottie = ["dep:dotlottie"]
 canvas = ["dep:embedded-canvas"]
-pinyin = ["dep:pinyin"]
+pinyin = []
 fatfs = ["dep:fatfs-embedded"]
 nes = ["dep:yane"]
 ```
