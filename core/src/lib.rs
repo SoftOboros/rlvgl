@@ -35,6 +35,8 @@ pub mod widget;
 
 #[cfg(feature = "canvas")]
 pub use plugins::canvas;
+#[cfg(feature = "fatfs")]
+pub use plugins::fatfs;
 #[cfg(feature = "fontdue")]
 pub use plugins::fontdue;
 #[cfg(feature = "gif")]
@@ -43,18 +45,14 @@ pub use plugins::gif;
 pub use plugins::jpeg;
 #[cfg(feature = "lottie")]
 pub use plugins::lottie;
+#[cfg(feature = "nes")]
+pub use plugins::nes;
 #[cfg(feature = "pinyin")]
 pub use plugins::pinyin;
 #[cfg(feature = "png")]
 pub use plugins::png;
 #[cfg(feature = "qrcode")]
 pub use plugins::qrcode;
-#[cfg(feature = "pinyin")]
-pub use plugins::pinyin;
-#[cfg(feature = "fatfs")]
-pub use plugins::fatfs;
-#[cfg(feature = "nes")]
-pub use plugins::nes;
 
 // Pull doc tests from the workspace README
 #[cfg(doctest)]
