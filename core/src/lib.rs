@@ -17,7 +17,9 @@
     feature = "gif",
     feature = "fontdue",
     feature = "lottie",
-    feature = "pinyin"
+    feature = "pinyin",
+    feature = "fatfs",
+    feature = "nes"
 ))]
 extern crate std;
 
@@ -47,6 +49,12 @@ pub use plugins::pinyin;
 pub use plugins::png;
 #[cfg(feature = "qrcode")]
 pub use plugins::qrcode;
+#[cfg(feature = "pinyin")]
+pub use plugins::pinyin;
+#[cfg(feature = "fatfs")]
+pub use plugins::fatfs;
+#[cfg(feature = "nes")]
+pub use plugins::nes;
 
 // Pull doc tests from the workspace README
 #[cfg(doctest)]

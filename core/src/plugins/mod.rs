@@ -14,3 +14,9 @@ pub mod pinyin;
 pub mod png;
 #[cfg(feature = "qrcode")]
 pub mod qrcode;
+#[cfg(feature = "pinyin")]
+pub mod pinyin;
+#[cfg(feature = "fatfs")]
+pub mod fatfs;
+#[cfg(feature = "nes")]
+pub mod nes;
