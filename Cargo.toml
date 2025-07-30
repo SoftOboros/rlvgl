@@ -69,7 +69,7 @@ st7789 = ["rlvgl-platform/st7789"]
 fontdue = ["rlvgl-core/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "dep:dotlottie-rs"]
 canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
-pinyin = ["rlvgl-core/pinyin"]
+pinyin = ["rlvgl-core/pinyin", "dep:pinyin"]
 fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
 nes = ["rlvgl-core/nes", "dep:yane"]
 

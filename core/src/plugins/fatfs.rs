@@ -1,13 +1,13 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use std::io::{Read, Seek, Write};
 use fatfs::{FileSystem, FsOptions};
 use fscommon::BufStream;
+use std::io::{Read, Seek, Write};
 
 #[cfg(test)]
-use std::io::{Cursor, SeekFrom};
-#[cfg(test)]
 use fatfs::FormatVolumeOptions;
+#[cfg(test)]
+use std::io::{Cursor, SeekFrom};
 
 /// List files in the root directory of a FAT image.
 /// The image must be formatted before calling this function.
@@ -40,7 +40,11 @@ mod tests {
             let buf_stream = BufStream::new(&mut img);
             let fs = FileSystem::new(buf_stream, FsOptions::new()).unwrap();
             fs.root_dir().create_dir("testdir").unwrap();
-            fs.root_dir().create_file("foo.txt").unwrap().write_all(b"hello").unwrap();
+            fs.root_dir()
+                .create_file("foo.txt")
+                .unwrap()
+                .write_all(b"hello")
+                .unwrap();
         }
         img.seek(SeekFrom::Start(0)).unwrap();
         let names = list_root(&mut img).unwrap();
