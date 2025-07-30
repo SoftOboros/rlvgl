@@ -18,12 +18,28 @@ publish = true
 png = { version = "0.18.0-rc.3", optional = true }
 jpeg-decoder = { version = "0.3", optional = true }
 qrcode = { version = "0.14", default-features = false, optional = true }
+gif = { version = "0.13", optional = true }
+fontdue = { version = "0.8", default-features = false, optional = true }
+dotlottie-rs = { version = "0.1.0-alpha.1", optional = true }
+embedded-canvas = { version = "0.3.1", default-features = true, optional = true }
+embedded-graphics = { version = "0.8", optional = true }
+pinyin = { version = "0.10", optional = true }
+fatfs = { version = "0.3", optional = true }
+fscommon = { version = "0.1", optional = true }
+yane = { version = "1", default-features = false, optional = true }
 
 [features]
 default = []
 png = ["dep:png"]
 jpeg = ["dep:jpeg-decoder"]
+gif = ["dep:gif"]
 qrcode = ["dep:qrcode"]
+fontdue = ["dep:fontdue"]
+lottie = ["dep:dotlottie-rs"]
+canvas = ["dep:embedded-canvas", "dep:embedded-graphics"]
+pinyin = ["dep:pinyin"]
+fatfs = ["dep:fatfs", "dep:fscommon"]
+nes = ["dep:yane"]
 
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }
