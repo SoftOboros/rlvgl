@@ -1,6 +1,7 @@
 //! Minimal Lottie animation utilities.
 use dotlottie_rs::fms::{DotLottieError, DotLottieManager, Manifest};
 
+/// Extract the animation manifest from a Lottie archive in memory.
 pub fn manifest_from_bytes(data: &[u8]) -> Result<Manifest, DotLottieError> {
     let manager = DotLottieManager::new(data)?;
     Ok(manager.manifest().clone())

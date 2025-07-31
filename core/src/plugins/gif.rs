@@ -5,11 +5,15 @@ use gif::{ColorOutput, DecodeOptions, DecodingError, Frame};
 use std::io::Cursor;
 
 #[derive(Debug, Clone)]
+/// A single frame decoded from a GIF image.
 pub struct GifFrame {
+    /// Pixel data for the frame in RGB format.
     pub pixels: Vec<Color>,
+    /// Delay time for this frame in hundredths of a second.
     pub delay: u16,
 }
 
+/// Decode a GIF byte stream and return the frames with image dimensions.
 pub fn decode(data: &[u8]) -> Result<(Vec<GifFrame>, u16, u16), DecodingError> {
     let mut options = DecodeOptions::new();
     options.set_color_output(ColorOutput::RGBA);
