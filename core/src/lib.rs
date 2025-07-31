@@ -57,6 +57,12 @@ pub use plugins::jpeg;
 
 #[cfg(feature = "lottie")]
 #[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
+pub use plugins::dash_lottie;
+#[cfg(feature = "lottie")]
+#[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
+pub use plugins::dash_lottie_render;
+#[cfg(feature = "lottie")]
+#[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
 pub use plugins::lottie;
 
 #[cfg(feature = "nes")]
@@ -64,7 +70,7 @@ pub use plugins::lottie;
 pub use plugins::nes;
 
 #[cfg(feature = "pinyin")]
-#[cfg_attr(docsrs, doc(cfg(feature = "pinyan")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "pinyin")))]
 pub use plugins::pinyin;
 
 #[cfg(feature = "png")]
