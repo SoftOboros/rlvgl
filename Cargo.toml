@@ -25,7 +25,7 @@ exclude = [
 path = "src/lib.rs"
 
 [dependencies]
-rlvgl-core = { version = "0.1.0", path = "core", default-features = false }
+rlvgl-core = { version = "0.1.1", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.1", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.1.0", path = "platform", default-features = false }
 
