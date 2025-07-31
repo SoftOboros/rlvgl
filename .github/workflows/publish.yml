@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 10
+          ref: ${{ github.sha }}
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:

@@ -1,3 +1,4 @@
+//! JPEG decoder for Color pixel arrays.
 use crate::widget::Color;
 use alloc::vec::Vec;
 use jpeg_decoder::{Decoder, Error, PixelFormat};

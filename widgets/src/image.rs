@@ -1,3 +1,4 @@
+//! Simple pixel-buffer image widget.
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -6,6 +7,7 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 /// Display a raw pixel buffer.
 pub struct Image<'a> {
     bounds: Rect,
+    /// Styling for the image background.
     pub style: Style,
     width: i32,
     height: i32,

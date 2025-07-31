@@ -1,3 +1,4 @@
+//! Canvas wrapper based on `embedded_canvas`.
 use crate::widget::Color;
 use alloc::vec;
 use alloc::vec::Vec;

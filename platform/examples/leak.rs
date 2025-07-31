@@ -1,3 +1,4 @@
+//! Example to detect memory leaks in the widget tree.
 use rlvgl_core::WidgetNode;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;

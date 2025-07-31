@@ -1,8 +1,13 @@
-/// Visual appearance attributes applied to widgets.
+//! Visual appearance attributes applied to widgets.
+
+/// Collection of styling properties for a widget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
+    /// Background color of the widget.
     pub bg_color: crate::widget::Color,
+    /// Border color of the widget.
     pub border_color: crate::widget::Color,
+    /// Border width in pixels.
     pub border_width: u8,
 }
 

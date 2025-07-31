@@ -1,3 +1,4 @@
+//! Traits and helpers for display drivers.
 use alloc::vec;
 use alloc::vec::Vec;
 use rlvgl_core::widget::{Color, Rect};
@@ -20,8 +21,11 @@ impl DisplayDriver for DummyDisplay {
 
 /// In-memory framebuffer driver for tests and headless rendering.
 pub struct BufferDisplay {
+    /// Width of the framebuffer in pixels.
     pub width: usize,
+    /// Height of the framebuffer in pixels.
     pub height: usize,
+    /// Pixel buffer stored in row-major order.
     pub buffer: Vec<Color>,
 }
 

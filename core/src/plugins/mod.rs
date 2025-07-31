@@ -1,3 +1,5 @@
+//! Feature-gated plugin modules for asset handling.
+
 #[cfg(feature = "canvas")]
 pub mod canvas;
 #[cfg(feature = "fatfs")]

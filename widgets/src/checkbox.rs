@@ -1,3 +1,4 @@
+//! Binary checkbox widget.
 use alloc::string::String;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
@@ -8,8 +9,11 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 pub struct Checkbox {
     bounds: Rect,
     text: String,
+    /// Visual styling for the checkbox box and label.
     pub style: Style,
+    /// Color used when rendering the label text.
     pub text_color: Color,
+    /// Color of the check mark when selected.
     pub check_color: Color,
     checked: bool,
 }

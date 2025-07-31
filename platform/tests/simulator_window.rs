@@ -1,3 +1,4 @@
+//! Tests for the minifb simulator window.
 #[cfg(feature = "simulator")]
 use rlvgl_core::widget::{Color, Rect};
 #[cfg(feature = "simulator")]

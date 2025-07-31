@@ -1,3 +1,4 @@
+//! Basic text label.
 use alloc::string::String;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
@@ -8,7 +9,9 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 pub struct Label {
     bounds: Rect,
     text: String,
+    /// Visual style of the label background.
     pub style: Style,
+    /// Color used to render the text.
     pub text_color: Color,
 }
 

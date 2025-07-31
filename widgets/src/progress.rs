@@ -1,3 +1,4 @@
+//! Horizontal progress indicator.
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -6,7 +7,9 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 /// Simple progress bar widget.
 pub struct ProgressBar {
     bounds: Rect,
+    /// Background and border style of the bar.
     pub style: Style,
+    /// Color of the filled portion representing progress.
     pub bar_color: Color,
     min: i32,
     max: i32,

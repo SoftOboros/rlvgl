@@ -1,3 +1,4 @@
+//! Verifies list draws highlight for selected item.
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};

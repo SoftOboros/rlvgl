@@ -1,3 +1,4 @@
+//! Utilities for parsing iNES cartridge headers.
 use alloc::string::String;
 use yane::core::Cartridge;
 

@@ -1,3 +1,4 @@
+//! Tests for input device implementations.
 use rlvgl_core::event::Event;
 use rlvgl_platform::input::{DummyInput, InputDevice};
 

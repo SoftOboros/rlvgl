@@ -1,3 +1,4 @@
+//! Glyph rasterization using `fontdue`.
 use crate::widget::Color;
 use alloc::vec::Vec;
 use fontdue::{Font, FontError, FontSettings};

@@ -1,3 +1,4 @@
+//! Fuzz tests for random widget events.
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rlvgl_core::{
     WidgetNode,

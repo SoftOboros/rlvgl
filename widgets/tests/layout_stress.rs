@@ -1,3 +1,4 @@
+//! Stress tests for random widget layouts.
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rlvgl_core::renderer::Renderer;

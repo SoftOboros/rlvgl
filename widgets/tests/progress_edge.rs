@@ -1,3 +1,4 @@
+//! Tests edge cases for ProgressBar.
 use rlvgl_core::{
     event::Event,
     renderer::Renderer,

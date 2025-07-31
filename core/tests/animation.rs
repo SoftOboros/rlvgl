@@ -1,3 +1,4 @@
+//! Tests for animation primitives.
 use rlvgl_core::animation::{Fade, Slide, Timeline};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect};

@@ -1,3 +1,4 @@
+//! Generate QR codes as pixel buffers.
 use crate::widget::Color;
 use alloc::vec::Vec;
 use qrcode::{

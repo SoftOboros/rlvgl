@@ -1,3 +1,8 @@
+//! Animation primitives such as fades and slides.
+//!
+//! These helpers mirror LVGL's animation system while using safe Rust
+//! abstractions where possible.
+
 use crate::style::Style;
 use crate::widget::{Color, Rect};
 
