@@ -49,8 +49,8 @@ This document tracks the high-level work streams and tasks for rlvgl development
 
 ## 7 Theming & Animations
  - [x] Global Theme trait (color scheme, style cascading)
-- [ ] Animation manager (`tick()` hook → style/position interpolation)
-- [ ] Port basic fade/slide from LVGL as proof
+ - [x] Animation manager (`tick()` hook → style/position interpolation)
+ - [x] Port basic fade/slide from LVGL as proof
 
 ## 8 Docs & Examples
 - [ ] Auto-doc each public API with `#![doc = include_str!(…)]`
