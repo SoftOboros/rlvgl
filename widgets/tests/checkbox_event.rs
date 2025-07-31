@@ -1,3 +1,4 @@
+//! Tests for checkbox event handling.
 use rlvgl_core::{event::Event, widget::Rect, widget::Widget};
 use rlvgl_widgets::checkbox::Checkbox;
 

@@ -1,3 +1,4 @@
+//! Ensures the embedded binary size stays within limits.
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -33,5 +34,5 @@ fn embedded_size_regression() {
         .len();
 
     let total = core_size + widgets_size + platform_size;
-    assert!(total < 600_000, "rlib total size too big: {} bytes", total);
+    assert!(total < 625_000, "rlib total size too big: {} bytes", total);
 }

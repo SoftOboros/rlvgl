@@ -1,3 +1,4 @@
+//! PNG decoder yielding raw color pixels.
 use crate::widget::Color;
 use alloc::vec::Vec;
 use png::{ColorType, Decoder, DecodingError};

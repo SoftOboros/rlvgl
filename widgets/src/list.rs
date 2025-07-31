@@ -1,3 +1,4 @@
+//! Vertical scrolling list of selectable strings.
 use alloc::{string::String, vec::Vec};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
@@ -7,7 +8,9 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 /// Scrollable list of selectable text items.
 pub struct List {
     bounds: Rect,
+    /// Style used for list items.
     pub style: Style,
+    /// Color for item text.
     pub text_color: Color,
     items: Vec<String>,
     selected: Option<usize>,

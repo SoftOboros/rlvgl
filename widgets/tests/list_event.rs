@@ -1,3 +1,4 @@
+//! Tests for list selection events.
 use rlvgl_core::widget::Widget;
 use rlvgl_core::{event::Event, widget::Rect};
 use rlvgl_widgets::list::List;

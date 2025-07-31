@@ -1,3 +1,4 @@
+//! Runs the leak example under valgrind.
 use std::process::Command;
 
 #[test]

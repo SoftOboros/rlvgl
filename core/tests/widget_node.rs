@@ -1,3 +1,4 @@
+//! Tests for the WidgetNode container.
 use rlvgl_core::{
     WidgetNode,
     event::Event,

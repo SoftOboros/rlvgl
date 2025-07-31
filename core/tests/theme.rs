@@ -1,3 +1,4 @@
+//! Theme application tests.
 use rlvgl_core::style::Style;
 use rlvgl_core::theme::{DarkTheme, LightTheme, Theme};
 use rlvgl_core::widget::Color;

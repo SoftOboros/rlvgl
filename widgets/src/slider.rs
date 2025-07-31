@@ -1,3 +1,4 @@
+//! Horizontal slider widget.
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -6,7 +7,9 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 /// Horizontal slider allowing selection of a value within a range.
 pub struct Slider {
     bounds: Rect,
+    /// Style for the track and background.
     pub style: Style,
+    /// Color of the draggable knob.
     pub knob_color: Color,
     min: i32,
     max: i32,

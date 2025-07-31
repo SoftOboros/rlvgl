@@ -1,3 +1,4 @@
+//! Driver for the ST7789 LCD controller.
 #![cfg(feature = "st7789")]
 use crate::display::DisplayDriver;
 use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};

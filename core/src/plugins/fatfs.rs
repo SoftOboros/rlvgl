@@ -1,3 +1,4 @@
+//! Utilities for working with FAT filesystem images.
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use fatfs::{FileSystem, FsOptions};

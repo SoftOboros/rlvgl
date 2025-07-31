@@ -1,3 +1,4 @@
+//! Tests for the StyleBuilder API.
 use rlvgl_core::style::{Style, StyleBuilder};
 use rlvgl_core::widget::Color;
 
