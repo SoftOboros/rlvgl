@@ -1,5 +1,6 @@
 //! Collection of built-in widgets for the `rlvgl` toolkit.
 #![no_std]
+#![deny(missing_docs)]
 
 extern crate alloc;
 

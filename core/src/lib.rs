@@ -6,6 +6,7 @@
 //! tree of [`WidgetNode`] values which receive [`Event`]s and draw themselves via
 //! a [`Renderer`] implementation.
 #![cfg_attr(not(test), no_std)]
+#![deny(missing_docs)]
 
 // When running tests, pull in the standard library so the test
 // harness can link successfully.

@@ -1,5 +1,6 @@
 //! Hardware and simulator backends for `rlvgl`.
 #![no_std]
+#![deny(missing_docs)]
 
 extern crate alloc;
 
