@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use jpeg_decoder::{Decoder, Error, PixelFormat};
 use std::io::Cursor;
 
+/// Decode a JPEG image into a vector of RGB [`Color`]s.
 pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u16, u16), Error> {
     let mut decoder = Decoder::new(Cursor::new(data));
     let pixels_raw = decoder.decode()?;

@@ -7,22 +7,26 @@ use embedded_canvas::Canvas as EcCanvas;
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::{DrawTarget, OriginDimensions, Pixel, Point, RgbColor, Size};
 
+/// In-memory pixel buffer that can be drawn on using [`embedded_canvas`].
 pub struct Canvas {
     inner: EcCanvas<Rgb888>,
 }
 
 impl Canvas {
+    /// Create a new canvas with the given dimensions in pixels.
     pub fn new(width: u32, height: u32) -> Self {
         Self {
             inner: EcCanvas::new(Size::new(width, height)),
         }
     }
 
+    /// Draw a single pixel at the provided point using the given color.
     pub fn draw_pixel(&mut self, point: Point, color: Color) {
         let rgb = Rgb888::new(color.0, color.1, color.2);
         let _ = self.inner.draw_iter(iter::once(Pixel(point, rgb)));
     }
 
+    /// Return the raw color buffer of the canvas.
     pub fn pixels(&self) -> Vec<Color> {
         self.inner
             .pixels
@@ -34,6 +38,7 @@ impl Canvas {
             .collect()
     }
 
+    /// Encode the canvas contents into a PNG image.
     #[cfg(feature = "png")]
     pub fn to_png(&self) -> Result<Vec<u8>, png::EncodingError> {
         use png::{ColorType, Encoder};
