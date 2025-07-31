@@ -2,6 +2,7 @@
 //!
 //! These modules are included conditionally via features such as 'gif', 'jpeg', 'qrcode', etc.
 // Auto-generated plugin exports
+#![deny(missing_docs)]
 
 #[cfg(feature = "canvas")]
 pub mod canvas;
@@ -52,4 +53,3 @@ pub use png::*;
 pub mod qrcode;
 #[cfg(feature = "qrcode")]
 pub use qrcode::*;
-
