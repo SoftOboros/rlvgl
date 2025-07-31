@@ -7,6 +7,7 @@
 //! a [`Renderer`] implementation.
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
+#![cfg_attr(all(docsrs, nightly), feature(doc_cfg))]
 
 // When running tests, pull in the standard library so the test
 // harness can link successfully.
@@ -35,24 +36,43 @@ pub mod theme;
 pub mod widget;
 
 #[cfg(feature = "canvas")]
+#[cfg_attr(docsrs, doc(cfg(feature = "canvas")))]
 pub use plugins::canvas;
+
 #[cfg(feature = "fatfs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fatfs")))]
 pub use plugins::fatfs;
+
 #[cfg(feature = "fontdue")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fontdue")))]
 pub use plugins::fontdue;
+
 #[cfg(feature = "gif")]
+#[cfg_attr(docsrs, doc(cfg(feature = "gif")))]
 pub use plugins::gif;
+
 #[cfg(feature = "jpeg")]
+#[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
 pub use plugins::jpeg;
+
 #[cfg(feature = "lottie")]
+#[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
 pub use plugins::lottie;
+
 #[cfg(feature = "nes")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nes")))]
 pub use plugins::nes;
+
 #[cfg(feature = "pinyin")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pinyan")))]
 pub use plugins::pinyin;
+
 #[cfg(feature = "png")]
+#[cfg_attr(docsrs, doc(cfg(feature = "png")))]
 pub use plugins::png;
+
 #[cfg(feature = "qrcode")]
+#[cfg_attr(docsrs, doc(cfg(feature = "qrcode")))]
 pub use plugins::qrcode;
 
 // Pull doc tests from the workspace README
