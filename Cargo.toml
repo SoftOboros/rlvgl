@@ -25,15 +25,15 @@ exclude = [
 path = "src/lib.rs"
 
 [dependencies]
-rlvgl-core = { version = "0.1.0", path = "core", default-features = false }
+rlvgl-core = { version = "0.1.1", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.1", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.1.0", path = "platform", default-features = false }
 
 [dependencies.gif]
-version = "*"
+version = "0.13.3"
 optional = true
 [dependencies.fontdue]
-version = "*"
+version = "0.9.3"
 optional = true
 [dependencies.dotlottie-rs]
 version = "0.1.0-alpha.1"
@@ -45,7 +45,7 @@ optional = true
 version = "0.8"
 optional = true
 [dependencies.pinyin]
-version = "*"
+version = "0.10.0"
 optional = true
 [dependencies.fatfs]
 version = "0.3"
