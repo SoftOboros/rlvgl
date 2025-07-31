@@ -6,6 +6,7 @@ use qrcode::{
     types::{Color as QrColor, QrError},
 };
 
+/// Generate a QR code bitmap for the provided data.
 pub fn generate(data: &[u8]) -> Result<(Vec<Color>, u32, u32), QrError> {
     let code = QrCode::new(data)?;
     let width = code.width() as u32;

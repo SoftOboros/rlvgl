@@ -3,6 +3,8 @@
 //! These modules are included conditionally via features such as 'gif', 'jpeg', 'qrcode', etc.
 // Auto-generated plugin exports
 #![deny(missing_docs)]
+#![allow(ambiguous_glob_reexports)]
+#![allow(unused_imports)]
 
 #[cfg(feature = "canvas")]
 pub mod canvas;

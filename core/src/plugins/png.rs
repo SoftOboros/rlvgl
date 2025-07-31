@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use png::{ColorType, Decoder, DecodingError};
 use std::io::Cursor;
 
+/// Decode a PNG image into a vector of RGB [`Color`]s and return dimensions.
 pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
     let decoder = Decoder::new(Cursor::new(data));
     let mut reader = decoder.read_info()?;
