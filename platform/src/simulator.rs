@@ -1,3 +1,4 @@
+//! Simple simulator backend using minifb.
 #[cfg(feature = "simulator")]
 use crate::{display::DisplayDriver, input::InputDevice};
 #[cfg(feature = "simulator")]

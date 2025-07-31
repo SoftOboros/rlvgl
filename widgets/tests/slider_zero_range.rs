@@ -1,3 +1,4 @@
+//! Regression tests for zero-range sliders.
 use rlvgl_core::{event::Event, widget::Rect, widget::Widget};
 use rlvgl_widgets::slider::Slider;
 

@@ -1,3 +1,5 @@
+//! Theme trait and basic implementations.
+
 use crate::style::Style;
 use crate::widget::Color;
 

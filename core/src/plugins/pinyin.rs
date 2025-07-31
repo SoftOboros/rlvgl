@@ -1,3 +1,4 @@
+//! Minimal Pinyin input method dictionary.
 use alloc::vec::Vec;
 
 /// Simplified Pinyin input method that maps Latin pinyin syllables to Chinese

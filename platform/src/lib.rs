@@ -7,7 +7,9 @@ extern crate alloc;
 #[cfg(feature = "simulator")]
 extern crate std;
 
+/// Display driver traits and implementations.
 pub mod display;
+/// Input device abstractions.
 pub mod input;
 #[cfg(feature = "simulator")]
 pub mod simulator;

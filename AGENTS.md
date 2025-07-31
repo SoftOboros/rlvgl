@@ -63,3 +63,9 @@ when generating tests.
 Always run `cargo fmt --all` and fix formatting errors before preparing a
 pull request. Verify formatting with `cargo fmt --all -- --check`.
 
+Public APIs must be documented. The `#![deny(missing_docs)]` lint is enabled in
+all crates, so compilation will fail if any public item lacks a meaningful
+docstring. These crates are published to crates.io and require clear
+documentation for users.
+All files must include a descriptive file header summarizing their purpose.
+

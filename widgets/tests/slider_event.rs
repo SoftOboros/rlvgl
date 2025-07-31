@@ -1,3 +1,4 @@
+//! Tests for slider event handling.
 use rlvgl_core::widget::Widget;
 use rlvgl_core::{event::Event, widget::Rect};
 use rlvgl_widgets::slider::Slider;

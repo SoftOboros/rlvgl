@@ -1,3 +1,4 @@
+//! Interactive button widget with callback support.
 use alloc::{boxed::Box, string::String};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;

@@ -69,7 +69,9 @@ use core::cell::RefCell;
 /// Events are dispatched depth‑first and drawing occurs in the same order.
 /// This mirrors the behaviour of common retained‑mode UI frameworks.
 pub struct WidgetNode {
+    /// The widget instance held by this node.
     pub widget: Rc<RefCell<dyn widget::Widget>>,
+    /// Child nodes that make up this widget's hierarchy.
     pub children: Vec<WidgetNode>,
 }
 

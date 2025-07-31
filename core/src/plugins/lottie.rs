@@ -1,3 +1,4 @@
+//! Minimal Lottie animation utilities.
 use dotlottie_rs::fms::{DotLottieError, DotLottieManager, Manifest};
 
 pub fn manifest_from_bytes(data: &[u8]) -> Result<Manifest, DotLottieError> {

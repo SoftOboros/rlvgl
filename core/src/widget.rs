@@ -1,3 +1,5 @@
+//! Basic widget traits and geometry types.
+
 use crate::event::Event;
 use crate::renderer::Renderer;
 
@@ -7,22 +9,35 @@ use crate::renderer::Renderer;
 /// integers to simplify layout calculations.
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
+    /// X coordinate relative to the parent widget.
     pub x: i32,
+    /// Y coordinate relative to the parent widget.
     pub y: i32,
+    /// Width in pixels.
     pub width: i32,
+    /// Height in pixels.
     pub height: i32,
 }
 
 /// RGB color used by the renderer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Color(pub u8, pub u8, pub u8);
+pub struct Color(
+    /// Red component in the range `0..=255`.
+    pub u8,
+    /// Green component in the range `0..=255`.
+    pub u8,
+    /// Blue component in the range `0..=255`.
+    pub u8,
+);
 
 /// Base trait implemented by all widgets.
 ///
 /// A widget is expected to provide its bounds, draw itself using a
 /// [`Renderer`], and optionally handle input [`Event`]s.
 pub trait Widget {
+    /// Return the area this widget occupies relative to its parent.
     fn bounds(&self) -> Rect;
+    /// Render the widget using the provided [`Renderer`].
     fn draw(&self, renderer: &mut dyn Renderer);
     /// Handle an event and return `true` if it was consumed.
     ///
