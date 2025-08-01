@@ -55,4 +55,4 @@ cd ../..
 # Export environment variables to future steps
 echo "PATH=/opt/venv/bin:$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"
 echo "PKG_CONFIG_PATH=$INSTALL_PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
-echo "BINDGEN_EXTRA_CLANG_ARGS=-I${{ GITHUB_WORKSPACE }}/install/include" >> "$GITHUB_ENV"
+echo "BINDGEN_EXTRA_CLANG_ARGS=-I${GITHUB_WORKSPACE}/install/include" >> "$GITHUB_ENV"
