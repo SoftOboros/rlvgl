@@ -54,6 +54,11 @@ optional = true
 version = "1"
 default-features = false
 optional = true
+[dependencies.image]
+version = "0.25"
+default-features = false
+features = ["png"]
+optional = true
 
 [features]
 default = []
@@ -69,6 +74,7 @@ canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin"]
 fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
 nes = ["rlvgl-core/nes", "dep:yane"]
+apng = ["rlvgl-core/apng", "dep:image"]
 
 [profile.release]
 opt-level = "z"
