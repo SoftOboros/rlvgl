@@ -24,8 +24,6 @@ pub mod jpeg;
 #[cfg(feature = "lottie")]
 pub mod dash_lottie;
 #[cfg(feature = "lottie")]
-pub mod dash_lottie_render;
-#[cfg(feature = "lottie")]
 pub mod lottie;
 
 #[cfg(feature = "nes")]

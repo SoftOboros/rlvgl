@@ -18,7 +18,7 @@ pub fn render_lottie_frame(
     frame: usize,
     width: usize,
     height: usize,
-) -> Option<Vec<Color>> {
+) -> Option<alloc::vec::Vec<Color>> {
     let mut anim = Animation::from_data(json, "mem", ".")?;
     let mut surface = Surface::new(Size::new(width, height));
     anim.render(frame, &mut surface);
