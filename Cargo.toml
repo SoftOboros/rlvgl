@@ -35,8 +35,8 @@ optional = true
 [dependencies.fontdue]
 version = "0.9.3"
 optional = true
-[dependencies.dotlottie-rs]
-version = "0.1.0-alpha.1"
+[dependencies.rlottie]
+version = "0.5.2"
 optional = true
 [dependencies.embedded-canvas]
 version = "0.3.1"
@@ -69,7 +69,7 @@ qrcode = ["rlvgl-core/qrcode"]
 simulator = ["rlvgl-platform/simulator"]
 st7789 = ["rlvgl-platform/st7789"]
 fontdue = ["rlvgl-core/fontdue", "dep:fontdue"]
-lottie = ["rlvgl-core/lottie", "dep:dotlottie-rs"]
+lottie = ["rlvgl-core/lottie", "dep:rlottie"]
 canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin"]
 fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]

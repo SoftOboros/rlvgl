@@ -41,10 +41,6 @@ pub use lottie::*;
 pub mod dash_lottie;
 #[cfg(feature = "lottie")]
 pub use dash_lottie::*;
-#[cfg(feature = "lottie")]
-pub mod dash_lottie_render;
-#[cfg(feature = "lottie")]
-pub use dash_lottie_render::*;
 
 #[cfg(feature = "nes")]
 pub mod nes;
