@@ -8,12 +8,9 @@ sudo apt-get install -y \
     curl \
     wget \
     git \
-    nano \
-    vim \
     python3 \
     python3-venv \
     python3-pip \
-    cargo \
     cmake \
     ninja-build \
     llvm-dev \
@@ -25,6 +22,7 @@ sudo apt-get install -y \
     libfreetype6-dev \
     libx11-dev \
     libxext-dev \
+    pkg-config \
     && sudo rm -rf /var/lib/apt/lists/*
 
 git submodule update --init --recursive
@@ -38,16 +36,22 @@ rustup target add thumbv7em-none-eabihf
 # Create Python virtual environment
 sudo python3 -m venv /opt/venv
 
-# install lottie to system
+# Set install prefix path (GitHub Actions uses this convention)
+INSTALL_PREFIX="${GITHUB_WORKSPACE:-$PWD}/install"
+
+# Build and install rlottie locally
 git clone https://github.com/Samsung/rlottie
 cd rlottie && mkdir build && cd build
 cmake .. \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+    -DLIB_INSTALL_DIR=lib \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-make -j$(sysctl -n hw.ncpu)
-make install && cd ../..
+make -j"$(nproc)"
+make install
+cd ../..
 
-# Propagate environment updates to subsequent workflow steps
+# Export environment variables to future steps
 echo "PATH=/opt/venv/bin:$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"
+echo "PKG_CONFIG_PATH=$INSTALL_PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
