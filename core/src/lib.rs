@@ -21,7 +21,8 @@
     feature = "lottie",
     feature = "pinyin",
     feature = "fatfs",
-    feature = "nes"
+    feature = "nes",
+    feature = "apng"
 ))]
 extern crate std;
 
@@ -50,6 +51,10 @@ pub use plugins::fontdue;
 #[cfg(feature = "gif")]
 #[cfg_attr(docsrs, doc(cfg(feature = "gif")))]
 pub use plugins::gif;
+
+#[cfg(feature = "apng")]
+#[cfg_attr(docsrs, doc(cfg(feature = "apng")))]
+pub use plugins::apng;
 
 #[cfg(feature = "jpeg")]
 #[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]

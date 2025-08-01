@@ -95,7 +95,7 @@ matrix:
 | [x] | **GIF animation**           | `gif` crate citeturn764961070150154                       | • Streaming frame decoder into `ImageRaw`.• Expose `Image::play()` widget util.• Needs timer tick integration.                               | PNG        |
 | [x] | **QR-code generator**       | `qrcode` crate citeturn811324940056358                    | • Wrap `QrCode::new()` → bitmap.• Provide `QrWidget` using embedded-graphics draw-target.                                                    | PNG        |
 | [x] | **Dynamic font rasteriser** | `fontdue` (no\_std) or `rusttype` citeturn451122131593768 | • Select crate (pref `fontdue`).• Create `FontProvider` trait.• Replace stub bitmap fonts in Label/Text. |  FONTDUE                        | 
-| [ ] | **APNG Decoder** | `apng` crate | • Create `apng` trait / devoder feature. | APNG
+| [x] | **APNG Decoder** | `apng` crate | • Create `apng` trait / devoder feature. | APNG
 
 --
 

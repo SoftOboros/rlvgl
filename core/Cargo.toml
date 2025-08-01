@@ -26,6 +26,7 @@ embedded-graphics = { version = "0.8", optional = true }
 fatfs = { version = "0.3", optional = true }
 fscommon = { version = "0.1", optional = true }
 yane = { version = "1", default-features = false, optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 
 [features]
 default = []
@@ -39,11 +40,14 @@ canvas = ["dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = []
 fatfs = ["dep:fatfs", "dep:fscommon"]
 nes = ["dep:yane"]
+apng = ["dep:image"]
 
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"
+apng = "0.3"
+png = "0.17.7"
 
 [package.metadata.docs.rs]
 all-features = true

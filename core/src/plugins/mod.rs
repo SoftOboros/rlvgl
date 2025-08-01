@@ -23,6 +23,11 @@ pub mod gif;
 #[cfg(feature = "gif")]
 pub use gif::*;
 
+#[cfg(feature = "apng")]
+pub mod apng;
+#[cfg(feature = "apng")]
+pub use apng::*;
+
 #[cfg(feature = "jpeg")]
 pub mod jpeg;
 #[cfg(feature = "jpeg")]
