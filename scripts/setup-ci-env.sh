@@ -47,7 +47,7 @@ cmake .. \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 make -j$(sysctl -n hw.ncpu)
-sudo make install && cd ../..
+make install && cd ../..
 
 # Propagate environment updates to subsequent workflow steps
 echo "PATH=/opt/venv/bin:$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"

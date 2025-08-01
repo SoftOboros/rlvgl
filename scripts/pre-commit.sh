@@ -18,5 +18,5 @@ export ARTIFACTS_LIB_DIR="$(pwd)/scripts/artifacts/lib"
 export ARTIFACTS_LIB64_DIR="$ARTIFACTS_LIB_DIR"
 RUSTDOCFLAGS="--cfg docsrs --cfg nightly" \
     cargo +nightly doc \
-    --features "canvas,fatfs,fontdue,gif,jpeg,nes,png,pinyin,qrcode" \
+    --all-features \
     --no-deps --target x86_64-unknown-linux-gnu
