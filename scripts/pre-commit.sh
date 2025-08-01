@@ -11,3 +11,6 @@ cargo clippy --workspace \
 cargo check --workspace --all-targets \
     --features "canvas,fatfs,fontdue,gif,jpeg,nes,png,pinyin,qrcode" \
     --target x86_64-unknown-linux-gnu
+
+# check document generation
+RUSTDOCFLAGS="--cfg docsrs --cfg nightly" cargo +nightly doc --all-features --no-deps
