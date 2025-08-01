@@ -14,8 +14,6 @@ pub use rlvgl_core::apng;
 pub use rlvgl_core::canvas;
 #[cfg(feature = "lottie")]
 pub use rlvgl_core::dash_lottie;
-#[cfg(feature = "lottie")]
-pub use rlvgl_core::dash_lottie_render;
 #[cfg(feature = "fatfs")]
 pub use rlvgl_core::fatfs;
 #[cfg(feature = "fontdue")]

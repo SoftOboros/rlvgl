@@ -20,8 +20,8 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - Component-based module layout (core, widgets, platform)
 - Simulatable via std-enabled feature flag
 - Pluggable display and input backends
-- Optional Lottie parsing via `dotlottie-rs` (std only). Embedded platforms
-  should pre-render frames rather than decode animations at runtime.
+- Optional Lottie support via the `rlottie` crate for dynamic playback.
+  Embedded targets should pre-render animations to APNG for minimal size.
 
 ## Project Structure
 - [core](https://github.com/SoftOboros/rlvgl/blob/main/core/README.md)/ – Widget base trait, layout, event dispatch
