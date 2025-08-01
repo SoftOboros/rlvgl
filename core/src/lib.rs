@@ -65,9 +65,6 @@ pub use plugins::jpeg;
 pub use plugins::dash_lottie;
 #[cfg(feature = "lottie")]
 #[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
-pub use plugins::dash_lottie_render;
-#[cfg(feature = "lottie")]
-#[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
 pub use plugins::lottie;
 
 #[cfg(feature = "nes")]
