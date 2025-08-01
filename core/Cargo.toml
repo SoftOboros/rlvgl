@@ -47,7 +47,7 @@ rlvgl-widgets = { path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"
 apng = "0.3"
-png = "0.17.7"
+png = "0.18.0-rc.3"
 
 [package.metadata.docs.rs]
 all-features = true

@@ -13,4 +13,10 @@ cargo check --workspace --all-targets \
     --target x86_64-unknown-linux-gnu
 
 # check document generation
-RUSTDOCFLAGS="--cfg docsrs --cfg nightly" cargo +nightly doc --all-features --no-deps
+export ARTIFACTS_INCLUDE_DIR="$(pwd)/scripts/artifacts/include"
+export ARTIFACTS_LIB_DIR="$(pwd)/scripts/artifacts/lib"
+export ARTIFACTS_LIB64_DIR="$ARTIFACTS_LIB_DIR"
+RUSTDOCFLAGS="--cfg docsrs --cfg nightly" \
+    cargo +nightly doc \
+    --all-features \
+    --no-deps --target x86_64-unknown-linux-gnu
