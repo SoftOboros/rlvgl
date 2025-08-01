@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
