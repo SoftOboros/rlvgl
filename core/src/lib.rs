@@ -4,7 +4,7 @@
 //! platform backends. It is intended to be usable in `no_std` environments and
 //! therefore avoids allocations where possible.
 //!
-//! Widgets are organized into a tree of `WidgetNode` values which receive 
+//! Widgets are organized into a tree of `WidgetNode` values which receive
 //! `Event`s and draw themselves via a `Renderer` implementation.
 //!
 //! **Note:** `Event` and `Renderer` are externally supplied types, not defined
