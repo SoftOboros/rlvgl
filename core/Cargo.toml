@@ -47,7 +47,7 @@ base64 = "0.22"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "nightly"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ["cfg(nightly)"] }

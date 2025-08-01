@@ -3,3 +3,4 @@
 **/*.rs.bk
 /coverage
 .envrc
+venv
