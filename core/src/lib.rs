@@ -1,10 +1,14 @@
 //! Core runtime types and utilities for the `rlvgl` UI toolkit.
 //!
-//! This crate exposes the building blocks used by higher level widgets and
+//! This crate exposes the building blocks used by higher-level widgets and
 //! platform backends. It is intended to be usable in `no_std` environments and
-//! therefore avoids allocations where possible. Widgets are organised into a
-//! tree of [`WidgetNode`] values which receive [`Event`]s and draw themselves via
-//! a [`Renderer`] implementation.
+//! therefore avoids allocations where possible.
+//!
+//! Widgets are organized into a tree of `WidgetNode` values which receive 
+//! `Event`s and draw themselves via a `Renderer` implementation.
+//!
+//! **Note:** `Event` and `Renderer` are externally supplied types, not defined
+//! in this crate.
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
 #![cfg_attr(all(docsrs, nightly), feature(doc_cfg))]
