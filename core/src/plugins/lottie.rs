@@ -1,4 +1,9 @@
 //! Minimal Lottie animation utilities.
+//!
+//! **Note:** `dotlottie-rs` pulls in heavy dependencies and uses a `build.rs`
+//! script which is undesirable for `no_std` targets. Embedded platforms should
+//! pre-render animations and stream keyframes instead of decoding Lottie files
+//! at runtime.
 use dotlottie_rs::fms::{DotLottieError, DotLottieManager, Manifest};
 
 /// Extract the animation manifest from a Lottie archive in memory.

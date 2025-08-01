@@ -104,11 +104,13 @@ matrix:
 
 | ✔︎  | Component                         | Rust crate / source                                | Task(s)                                                                                                                | Depends on |
 | --- | --------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [x] | **Lottie / dotLottie animations** | `dotlottie-rs` (player) citeturn236649155616415 | • Evaluate WASM/thorvg backend footprint.• Expose `LottiePlayer` widget.• Might need feature gate `lottie` (std-only). | GIF, Font  |
+| [x] | **Lottie / dotLottie animations** | `dotlottie-rs` (player) citeturn236649155616415 | • Evaluate WASM/thorvg backend footprint.• Expose `LottiePlayer` widget.• **For embedded targets, pre-render keyframes in the platform instead of decoding with `dotlottie-rs`.** | GIF, Font  |
 | [x] | **Sketchpad / Canvas widget**     | `embedded-canvas` citeturn184290798726883       | • Add `CanvasWidget` integrating pan/zoom.• Provide to-PNG export using PNG feature.                                   | PNG        |
 | [x] | **IME – Pinyin support**          | `pinyin` crate citeturn137135872219639          | • Build `PinyinInputMethod` service.• Hook into TextField once implemented.                                            | Font       |
 | [x] | **File-explorer (SD/FAT)**        | `fatfs-embedded` citeturn791986641516626        | • Implement `BlockDevice` for target flash/SD.• Add `FilePicker` widget demo.                                          | Canvas     |
 | [x] | **Example cartridge (NES)**       | `yane` crate citeturn794589435371464            | • Optional showcase app; embed emulator surface via `CanvasWidget`.• Demonstrates real-time framebuffer streaming.     | Canvas     |
+| [x] | **Dash Lottie player**            | stand-alone                   | • standalone Dash Lottie player (rendered Lottie key files)                                           | Lottie     |
+| [x] | **Dash Lottie renderer**          | `dotlottie-rs`                | • dotlottie-rs-based renderer to create its keyframes (rendered files)                              | Lottie     |
 
 ---
 
