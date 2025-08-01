@@ -38,5 +38,16 @@ rustup target add thumbv7em-none-eabihf
 # Create Python virtual environment
 sudo python3 -m venv /opt/venv
 
+# install lottie to system
+git clone https://github.com/Samsung/rlottie
+cd rlottie && mkdir build && cd build
+cmake .. \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+make -j$(sysctl -n hw.ncpu)
+sudo make install && cd ../..
+
 # Propagate environment updates to subsequent workflow steps
 echo "PATH=/opt/venv/bin:$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"
