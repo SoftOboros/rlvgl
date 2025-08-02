@@ -25,7 +25,3 @@ winit = { version = "0.29", optional = true }
 default = []
 simulator = ["pixels", "winit"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
-
-[[bin]]
-name = "rlvgl-sim"
-path = "examples/sim/main.rs"
