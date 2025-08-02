@@ -1,10 +1,10 @@
 //! Runs the rlvgl simulator in a desktop window.
 use rlvgl::core::widget::{Color, Rect};
-use rlvgl::platform::{display::DisplayDriver, input::InputDevice, MinifbDisplay};
+use rlvgl::platform::{display::DisplayDriver, input::InputDevice, PixelsDisplay};
 
 fn main() {
     // Create a small simulator window.
-    let mut display = MinifbDisplay::new(64, 64);
+    let mut display = PixelsDisplay::new(64, 64);
     let area = Rect { x: 0, y: 0, width: 64, height: 64 };
     let colors = vec![Color(0, 0, 0); (area.width * area.height) as usize];
 

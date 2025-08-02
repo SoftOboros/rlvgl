@@ -1,19 +1,19 @@
-//! Tests for the minifb simulator window.
+//! Tests for the pixels simulator window.
 #[cfg(feature = "simulator")]
 use rlvgl_core::widget::{Color, Rect};
 #[cfg(feature = "simulator")]
-use rlvgl_platform::MinifbDisplay;
+use rlvgl_platform::PixelsDisplay;
 #[cfg(feature = "simulator")]
 use rlvgl_platform::display::DisplayDriver;
 
 #[cfg(feature = "simulator")]
 #[test]
-fn minifb_window_draws() {
+fn pixels_window_draws() {
     if std::env::var_os("DISPLAY").is_none() && std::env::var_os("WAYLAND_DISPLAY").is_none() {
-        eprintln!("skipping minifb_window_draws: no display");
+        eprintln!("skipping pixels_window_draws: no display");
         return;
     }
-    let mut disp = MinifbDisplay::new(4, 4);
+    let mut disp = PixelsDisplay::new(4, 4);
     let area = Rect {
         x: 0,
         y: 0,
@@ -27,7 +27,7 @@ fn minifb_window_draws() {
 
 #[cfg(not(feature = "simulator"))]
 #[test]
-fn minifb_window_draws() {
+fn pixels_window_draws() {
     // Simulator feature not enabled; nothing to test
     assert!(true);
 }
