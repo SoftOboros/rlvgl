@@ -1,0 +1,8 @@
+[package]
+name = "rlvgl-sim"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# Currently empty; examples will depend on core crates directly.

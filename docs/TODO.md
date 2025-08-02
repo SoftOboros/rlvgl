@@ -62,3 +62,7 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [ ] Render same UI in rlvgl, image-diff in CI
 - [ ] Fuzz events (rapid taps, drags) to catch borrow/lifetime panics
 
+## 10 Simulator examples
+- [ ] Update samples/sim (rlvds-sim) to run rlvds in a window using std and the "simulator" feature
+- [ ] Demonstrate core / widget features in examples/sim (use placeholder assets) using hierarchy matching the upper package
+- [ ] Demonstrate plugin features (use placeholder assets) using hierarchy matching the upper package
