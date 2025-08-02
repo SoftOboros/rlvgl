@@ -4,3 +4,4 @@
 /coverage
 .envrc
 venv
+.DS_Store
