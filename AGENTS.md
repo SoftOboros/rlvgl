@@ -69,3 +69,4 @@ docstring. These crates are published to crates.io and require clear
 documentation for users.
 All files must include a descriptive file header summarizing their purpose.
 
+Run ./scripts/pre-commit.sh and ensure it succeeds before opening a pull request. This script enforces formatting, runs clippy, builds with all features, and verifies documentation generation using nightly.

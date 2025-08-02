@@ -8,6 +8,8 @@
 extern crate alloc;
 
 pub use rlvgl_core as core;
+#[cfg(feature = "apng")]
+pub use rlvgl_core::apng;
 #[cfg(feature = "canvas")]
 pub use rlvgl_core::canvas;
 #[cfg(feature = "fatfs")]

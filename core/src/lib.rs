@@ -1,10 +1,14 @@
 //! Core runtime types and utilities for the `rlvgl` UI toolkit.
 //!
-//! This crate exposes the building blocks used by higher level widgets and
+//! This crate exposes the building blocks used by higher-level widgets and
 //! platform backends. It is intended to be usable in `no_std` environments and
-//! therefore avoids allocations where possible. Widgets are organised into a
-//! tree of [`WidgetNode`] values which receive [`Event`]s and draw themselves via
-//! a [`Renderer`] implementation.
+//! therefore avoids allocations where possible.
+//!
+//! Widgets are organized into a tree of `WidgetNode` values which receive
+//! `Event`s and draw themselves via a `Renderer` implementation.
+//!
+//! **Note:** `Event` and `Renderer` are externally supplied types, not defined
+//! in this crate.
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
 #![cfg_attr(all(docsrs, nightly), feature(doc_cfg))]
@@ -21,7 +25,8 @@
     feature = "lottie",
     feature = "pinyin",
     feature = "fatfs",
-    feature = "nes"
+    feature = "nes",
+    feature = "apng"
 ))]
 extern crate std;
 
@@ -51,10 +56,14 @@ pub use plugins::fontdue;
 #[cfg_attr(docsrs, doc(cfg(feature = "gif")))]
 pub use plugins::gif;
 
+#[cfg(feature = "apng")]
+#[cfg_attr(docsrs, doc(cfg(feature = "apng")))]
+pub use plugins::apng;
+
 #[cfg(feature = "jpeg")]
 #[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
 pub use plugins::jpeg;
-
 #[cfg(feature = "lottie")]
 #[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
 pub use plugins::lottie;
@@ -64,7 +73,7 @@ pub use plugins::lottie;
 pub use plugins::nes;
 
 #[cfg(feature = "pinyin")]
-#[cfg_attr(docsrs, doc(cfg(feature = "pinyan")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "pinyin")))]
 pub use plugins::pinyin;
 
 #[cfg(feature = "png")]

@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -20,12 +20,13 @@ jpeg-decoder = { version = "0.3", optional = true }
 qrcode = { version = "0.14", default-features = false, optional = true }
 gif = { version = "0.13", optional = true }
 fontdue = { version = "0.8", default-features = false, optional = true }
-dotlottie-rs = { version = "0.1.0-alpha.1", optional = true }
+rlottie = { version = "0.5.2", optional = true }
 embedded-canvas = { version = "0.3.1", default-features = true, optional = true }
 embedded-graphics = { version = "0.8", optional = true }
 fatfs = { version = "0.3", optional = true }
 fscommon = { version = "0.1", optional = true }
 yane = { version = "1", default-features = false, optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 
 [features]
 default = []
@@ -34,20 +35,23 @@ jpeg = ["dep:jpeg-decoder"]
 gif = ["dep:gif"]
 qrcode = ["dep:qrcode"]
 fontdue = ["dep:fontdue"]
-lottie = ["dep:dotlottie-rs"]
+lottie = ["dep:rlottie"]
 canvas = ["dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = []
 fatfs = ["dep:fatfs", "dep:fscommon"]
 nes = ["dep:yane"]
+apng = ["dep:image"]
 
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"
+apng = "0.3"
+png = "0.18.0-rc.3"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "nightly"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ["cfg(nightly)"] }

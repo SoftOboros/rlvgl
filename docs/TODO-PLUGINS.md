@@ -24,7 +24,7 @@ qrcode = ["dep:qrcode"]
 fontdue = ["dep:fontdue"]
 
 # Level 2
-lottie = ["dep:dotlottie"]
+lottie = ["dep:rlottie"]
 canvas = ["dep:embedded-canvas"]
 pinyin = []
 fatfs = ["dep:fatfs-embedded"]
@@ -94,9 +94,10 @@ matrix:
 | [x] | **JPEG decoder / SJPG**     | `jpeg-decoder` crate citeturn655888278065328              | • Add basic JPEG wrapper.• Investigate tiled‐stream (“SJPG”) support → may require small fork or port of tinyjpeg C core (partial refactor). | PNG        |
 | [x] | **GIF animation**           | `gif` crate citeturn764961070150154                       | • Streaming frame decoder into `ImageRaw`.• Expose `Image::play()` widget util.• Needs timer tick integration.                               | PNG        |
 | [x] | **QR-code generator**       | `qrcode` crate citeturn811324940056358                    | • Wrap `QrCode::new()` → bitmap.• Provide `QrWidget` using embedded-graphics draw-target.                                                    | PNG        |
-| [x] | **Dynamic font rasteriser** | `fontdue` (no\_std) or `rusttype` citeturn451122131593768 | • Select crate (pref `fontdue`).• Create `FontProvider` trait.• Replace stub bitmap fonts in Label/Text.                                     | –          |
+| [x] | **Dynamic font rasteriser** | `fontdue` (no\_std) or `rusttype` citeturn451122131593768 | • Select crate (pref `fontdue`).• Create `FontProvider` trait.• Replace stub bitmap fonts in Label/Text. |  FONTDUE                        | 
+| [x] | **APNG Decoder** | `apng` crate | • Create `apng` trait / devoder feature. | APNG
 
----
+--
 
 ## ◻️ Level 2 – Extended & UX Enhancements
 
@@ -104,12 +105,12 @@ matrix:
 
 | ✔︎  | Component                         | Rust crate / source                                | Task(s)                                                                                                                | Depends on |
 | --- | --------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [x] | **Lottie / dotLottie animations** | `dotlottie-rs` (player) citeturn236649155616415 | • Evaluate WASM/thorvg backend footprint.• Expose `LottiePlayer` widget.• Might need feature gate `lottie` (std-only). | GIF, Font  |
+| [x] | **Lottie animations**             | `rlottie` crate            | • Dynamic playback via rlottie. • **For embedded targets, pre-render to APNG using platform tools.** | GIF, Font |
 | [x] | **Sketchpad / Canvas widget**     | `embedded-canvas` citeturn184290798726883       | • Add `CanvasWidget` integrating pan/zoom.• Provide to-PNG export using PNG feature.                                   | PNG        |
 | [x] | **IME – Pinyin support**          | `pinyin` crate citeturn137135872219639          | • Build `PinyinInputMethod` service.• Hook into TextField once implemented.                                            | Font       |
 | [x] | **File-explorer (SD/FAT)**        | `fatfs-embedded` citeturn791986641516626        | • Implement `BlockDevice` for target flash/SD.• Add `FilePicker` widget demo.                                          | Canvas     |
 | [x] | **Example cartridge (NES)**       | `yane` crate citeturn794589435371464            | • Optional showcase app; embed emulator surface via `CanvasWidget`.• Demonstrates real-time framebuffer streaming.     | Canvas     |
-
+| [x] | **Dash Lottie player**            | stand-alone                   | • standalone Dash Lottie player (rendered Lottie key files)                                           | Lottie     |
 ---
 
 ### Sequencing summary

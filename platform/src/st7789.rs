@@ -7,7 +7,9 @@ use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::SpiDevice;
 use rlvgl_core::widget::{Color, Rect};
 
+#[allow(dead_code)]
 /// Display driver for the ST7789 LCD controller.
+/// ***Note:*** width and height included for custom implementation.
 pub struct St7789Display<SPI, DC> {
     interface: SPIInterface<SPI, DC>,
     width: u16,

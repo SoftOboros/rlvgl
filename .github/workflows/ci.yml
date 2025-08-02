@@ -12,3 +12,4 @@ jobs:
     - run: cargo fmt --all -- --check
     - run: cargo clippy --workspace -- -D warnings
     - run: cargo test --workspace --target x86_64-unknown-linux-gnu --verbose
+    - run: RUSTDOCFLAGS="--cfg docsrs --cfg nightly" cargo +nightly doc --all-features --no-deps --target x86_64-unknown-linux-gnu
