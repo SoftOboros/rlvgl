@@ -5,4 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
-# Currently empty; examples will depend on core crates directly.
+rlvgl= { version = "0.1.4", path = "../..", features = ["simulator"], default-features = false }
+
+[[bin]]
+name = "rlvgl-sim"
+path = "main.rs"
