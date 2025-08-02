@@ -1,0 +1,10 @@
+{
+  "rust-analyzer.cargo.extraArgs": [
+    "--target",
+    "x86_64-apple-darwin"
+  ],
+  "rust-analyzer.check.extraArgs": [
+    "--target",
+    "x86_64-apple-darwin"
+  ]
+}

@@ -28,6 +28,7 @@ path = "src/lib.rs"
 rlvgl-core = { version = "0.1.4", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.1", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.1.2", path = "platform", default-features = false }
+rlvgl-sim = { version = "0.1.0", path="examples/sim", default-features = false }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -89,6 +90,6 @@ opt-level = 1
 debug = true
 
 [workspace]
-members = ["core", "platform", "widgets"]
+members = ["core", "examples/sim", "platform", "widgets"]
 resolver = "2"
 
