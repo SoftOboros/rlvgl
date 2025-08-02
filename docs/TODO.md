@@ -35,7 +35,7 @@ This document tracks the high-level work streams and tasks for rlvgl development
 - [x] Unit tests + golden screenshots via dummy driver
 
 ## 5 Simulation backend
-- [x] Add simulator feature flag (`std`, pixels, or minifb)
+- [x] Add simulator feature flag (`std`, pixels)
 - [x] Map `DisplayDriver` to desktop window
 - [x] Connect keyboard/mouse to `InputDevice` trait
 - [ ] CI step: run example, dump PNG for diff
