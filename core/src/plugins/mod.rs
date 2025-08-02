@@ -22,8 +22,6 @@ pub mod apng;
 pub mod jpeg;
 
 #[cfg(feature = "lottie")]
-pub mod dash_lottie;
-#[cfg(feature = "lottie")]
 pub mod lottie;
 
 #[cfg(feature = "nes")]
@@ -37,3 +35,5 @@ pub mod png;
 
 #[cfg(feature = "qrcode")]
 pub mod qrcode;
+#[cfg(feature = "qrcode")]
+pub use qrcode::*;

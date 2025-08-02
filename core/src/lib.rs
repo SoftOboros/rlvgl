@@ -44,13 +44,16 @@ pub mod widget;
 #[cfg_attr(docsrs, doc(cfg(feature = "canvas")))]
 pub use plugins::canvas;
 
+
 #[cfg(feature = "fatfs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fatfs")))]
 pub use plugins::fatfs;
 
+
 #[cfg(feature = "fontdue")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fontdue")))]
 pub use plugins::fontdue;
+
 
 #[cfg(feature = "gif")]
 #[cfg_attr(docsrs, doc(cfg(feature = "gif")))]
@@ -62,26 +65,27 @@ pub use plugins::apng;
 
 #[cfg(feature = "jpeg")]
 #[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
 pub use plugins::jpeg;
-
-#[cfg(feature = "lottie")]
-#[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
-pub use plugins::dash_lottie;
 #[cfg(feature = "lottie")]
 #[cfg_attr(docsrs, doc(cfg(feature = "lottie")))]
 pub use plugins::lottie;
+
 
 #[cfg(feature = "nes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "nes")))]
 pub use plugins::nes;
 
+
 #[cfg(feature = "pinyin")]
 #[cfg_attr(docsrs, doc(cfg(feature = "pinyin")))]
 pub use plugins::pinyin;
 
+
 #[cfg(feature = "png")]
 #[cfg_attr(docsrs, doc(cfg(feature = "png")))]
 pub use plugins::png;
+
 
 #[cfg(feature = "qrcode")]
 #[cfg_attr(docsrs, doc(cfg(feature = "qrcode")))]

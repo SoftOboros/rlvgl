@@ -13,15 +13,13 @@ pub use rlvgl_core::apng;
 #[cfg(feature = "canvas")]
 pub use rlvgl_core::canvas;
 #[cfg(feature = "lottie")]
-pub use rlvgl_core::dash_lottie;
+pub use rlvgl_core::lottie;
 #[cfg(feature = "fatfs")]
 pub use rlvgl_core::fatfs;
 #[cfg(feature = "fontdue")]
 pub use rlvgl_core::fontdue;
 #[cfg(feature = "gif")]
 pub use rlvgl_core::gif;
-#[cfg(feature = "lottie")]
-pub use rlvgl_core::lottie;
 #[cfg(feature = "nes")]
 pub use rlvgl_core::nes;
 #[cfg(feature = "pinyin")]
