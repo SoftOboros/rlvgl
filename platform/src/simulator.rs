@@ -1,4 +1,7 @@
 //! Simple simulator backend using the `pixels` crate.
+//!
+//! The window can be resized by the user and will scale the simulated
+//! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
 use alloc::boxed::Box;
 #[cfg(feature = "simulator")]
@@ -17,6 +20,8 @@ use crate::input::InputEvent;
 #[cfg(feature = "simulator")]
 /// Desktop simulator display backed by the `pixels` crate.
 pub struct PixelsDisplay {
+    width: usize,
+    height: usize,
     event_loop: EventLoop<()>,
     pixels: Pixels<'static>,
     window: &'static winit::window::Window,
@@ -38,6 +43,8 @@ impl PixelsDisplay {
             .expect("failed to create pixel buffer");
         let window: &'static winit::window::Window = &*window;
         Self {
+            width,
+            height,
             event_loop,
             pixels,
             window,
@@ -55,6 +62,8 @@ impl PixelsDisplay {
         mut event_callback: impl FnMut(InputEvent) + 'static,
     ) {
         let PixelsDisplay {
+            width,
+            height,
             event_loop,
             mut pixels,
             window,
@@ -63,6 +72,8 @@ impl PixelsDisplay {
 
         let mut pointer_pos = (0i32, 0i32);
         let mut pointer_down = false;
+        let mut surface_size = (width as u32, height as u32);
+        let aspect_ratio = width as f64 / height as f64;
 
         event_loop
             .run(move |event, target| match event {
@@ -78,10 +89,32 @@ impl PixelsDisplay {
                     pixels.render().unwrap();
                 }
                 Event::WindowEvent {
+                    event: WindowEvent::Resized(size),
+                    ..
+                } => {
+                    let mut w = size.width;
+                    let mut h = size.height;
+                    if (w as f64 / h as f64 - aspect_ratio).abs() > f64::EPSILON {
+                        if w as f64 / h as f64 > aspect_ratio {
+                            w = (h as f64 * aspect_ratio).round() as u32;
+                        } else {
+                            h = (w as f64 / aspect_ratio).round() as u32;
+                        }
+                        let _ = window.request_inner_size(LogicalSize::new(w as f64, h as f64));
+                    }
+                    pixels
+                        .resize_surface(w, h)
+                        .expect("failed to resize surface");
+                    surface_size = (w, h);
+                }
+                Event::WindowEvent {
                     event: WindowEvent::CursorMoved { position, .. },
                     ..
                 } => {
-                    pointer_pos = (position.x as i32, position.y as i32);
+                    pointer_pos = (
+                        (position.x * width as f64 / surface_size.0 as f64) as i32,
+                        (position.y * height as f64 / surface_size.1 as f64) as i32,
+                    );
                     if pointer_down {
                         event_callback(InputEvent::PointerMove {
                             x: pointer_pos.0,
