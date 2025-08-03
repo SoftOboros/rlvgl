@@ -118,6 +118,15 @@ impl PixelsDisplay {
                         } else {
                             h = (w as f64 / aspect_ratio).round() as u32;
                         }
+                    }
+                    let max_dim = pixels.device().limits().max_texture_dimension_2d;
+                    let max_current = w.max(h);
+                    if max_current > max_dim {
+                        let scale = max_dim as f64 / max_current as f64;
+                        w = (w as f64 * scale).round() as u32;
+                        h = (h as f64 * scale).round() as u32;
+                    }
+                    if w != size.width || h != size.height {
                         let _ = window.request_inner_size(LogicalSize::new(w as f64, h as f64));
                     }
                     pixels
