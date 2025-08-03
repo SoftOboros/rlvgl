@@ -5,8 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-rlvgl= { version = "0.1.4", path = "../..", features = ["simulator"], default-features = false }
+rlvgl= { version = "0.1.4", path = "../..", features = ["simulator", "qrcode"], default-features = false }
+embedded-graphics = "0.8"
 
-[[bin]]
-name = "rlvgl-sim"
-path = "main.rs"
