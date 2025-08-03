@@ -22,6 +22,7 @@ sudo apt-get install -y \
     libfreetype6-dev \
     libx11-dev \
     libxext-dev \
+    libgtk-3-dev \
     pkg-config \
     && sudo rm -rf /var/lib/apt/lists/*
 
