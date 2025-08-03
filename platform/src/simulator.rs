@@ -124,6 +124,7 @@ impl PixelsDisplay {
                         .resize_surface(w, h)
                         .expect("failed to resize surface");
                     surface_size = (w, h);
+                    window.request_redraw();
                 }
                 Event::WindowEvent {
                     event: WindowEvent::CursorMoved { position, .. },
