@@ -3,9 +3,13 @@
 //! The window can be resized by the user and will scale the simulated
 //! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
-use alloc::boxed::Box;
+use alloc::{boxed::Box, format};
 #[cfg(feature = "simulator")]
 use pixels::{Pixels, SurfaceTexture};
+#[cfg(feature = "simulator")]
+use rfd::{MessageButtons, MessageDialog};
+#[cfg(feature = "simulator")]
+use std::{backtrace::Backtrace, panic};
 #[cfg(feature = "simulator")]
 use winit::{
     dpi::LogicalSize,
@@ -30,7 +34,21 @@ pub struct PixelsDisplay {
 #[cfg(feature = "simulator")]
 impl PixelsDisplay {
     /// Create a new window with the given size.
+    ///
+    /// Any panic during simulator execution triggers a message dialog
+    /// displaying the panic and a captured call stack. Selecting **OK** in
+    /// the dialog terminates the process.
     pub fn new(width: usize, height: usize) -> Self {
+        panic::set_hook(Box::new(|info| {
+            let backtrace = Backtrace::force_capture();
+            let message = format!("{info}\n\n{backtrace}");
+            let _ = MessageDialog::new()
+                .set_title("rlvgl panic")
+                .set_description(&message)
+                .set_buttons(MessageButtons::Ok)
+                .show();
+            std::process::exit(1);
+        }));
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let window = WindowBuilder::new()
             .with_title("rlvgl simulator")
