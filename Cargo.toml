@@ -93,11 +93,3 @@ members = ["core", "examples/sim", "platform", "widgets"]
 resolver = "2"
 
 # Only build the simulator example when the `simulator` feature is enabled.
-[[example]]
-name = "sim"
-path = "examples/sim/main.rs"
-required-features = ["simulator"]
-
-#[[bin]]
-#name = "rlvgl-sim"
-#path = "examples/sim/main.rs"
