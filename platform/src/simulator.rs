@@ -3,7 +3,7 @@
 //! The window can be resized by the user and will scale the simulated
 //! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
-use alloc::{boxed::Box, format};
+use alloc::{boxed::Box, format, vec::Vec};
 #[cfg(feature = "simulator")]
 use pixels::{Pixels, SurfaceTexture};
 #[cfg(feature = "simulator")]
@@ -12,14 +12,52 @@ use rfd::{MessageButtons, MessageDialog};
 use std::{backtrace::Backtrace, panic};
 #[cfg(feature = "simulator")]
 use winit::{
-    dpi::LogicalSize,
-    event::{ElementState, Event, MouseButton, WindowEvent},
+    dpi::{LogicalSize, PhysicalSize},
+    event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
+    keyboard::{KeyCode, PhysicalKey},
+    window::{Fullscreen, WindowBuilder},
 };
 
 #[cfg(feature = "simulator")]
 use crate::input::InputEvent;
+
+#[cfg(feature = "simulator")]
+#[allow(dead_code)]
+/// Region of the window that fits within GPU texture limits.
+struct Tile {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+#[cfg(feature = "simulator")]
+/// Generate tiles covering the window where each tile is no larger than
+/// `max_tile_size` in either dimension.
+fn generate_tiles_from_window(window: &winit::window::Window, max_tile_size: u32) -> Vec<Tile> {
+    let PhysicalSize { width, height } = window.inner_size();
+    let mut tiles = Vec::new();
+    let x_tiles = width.div_ceil(max_tile_size);
+    let y_tiles = height.div_ceil(max_tile_size);
+
+    for y in 0..y_tiles {
+        for x in 0..x_tiles {
+            let tile_x = x * max_tile_size;
+            let tile_y = y * max_tile_size;
+            let tile_w = (width - tile_x).min(max_tile_size);
+            let tile_h = (height - tile_y).min(max_tile_size);
+            tiles.push(Tile {
+                x: tile_x,
+                y: tile_y,
+                width: tile_w,
+                height: tile_h,
+            });
+        }
+    }
+
+    tiles
+}
 
 #[cfg(feature = "simulator")]
 /// Desktop simulator display backed by the `pixels` crate.
@@ -92,6 +130,9 @@ impl PixelsDisplay {
         let mut pointer_down = false;
         let mut surface_size = (width as u32, height as u32);
         let aspect_ratio = width as f64 / height as f64;
+        let max_dim = pixels.device().limits().max_texture_dimension_2d;
+        let mut _tiles = generate_tiles_from_window(window, max_dim);
+        let mut fullscreen = false;
 
         event_loop
             .run(move |event, target| match event {
@@ -118,12 +159,33 @@ impl PixelsDisplay {
                         } else {
                             h = (w as f64 / aspect_ratio).round() as u32;
                         }
-                        let _ = window.request_inner_size(LogicalSize::new(w as f64, h as f64));
                     }
+                    _tiles = generate_tiles_from_window(window, max_dim);
                     pixels
-                        .resize_surface(w, h)
+                        .resize_surface(w.min(max_dim), h.min(max_dim))
                         .expect("failed to resize surface");
                     surface_size = (w, h);
+                    window.request_redraw();
+                }
+                Event::WindowEvent {
+                    event:
+                        WindowEvent::KeyboardInput {
+                            event:
+                                KeyEvent {
+                                    physical_key: PhysicalKey::Code(KeyCode::F11),
+                                    state: ElementState::Pressed,
+                                    ..
+                                },
+                            ..
+                        },
+                    ..
+                } => {
+                    fullscreen = !fullscreen;
+                    if fullscreen {
+                        window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                    } else {
+                        window.set_fullscreen(None);
+                    }
                 }
                 Event::WindowEvent {
                     event: WindowEvent::CursorMoved { position, .. },
