@@ -7,10 +7,12 @@ use rlvgl_core::widget::{Rect, Widget};
 use crate::label::Label;
 use rlvgl_core::style::Style;
 
+type ClickHandler = Box<dyn FnMut(&mut Button)>;
+
 /// Clickable button widget.
 pub struct Button {
     label: Label,
-    on_click: Option<Box<dyn FnMut()>>,
+    on_click: Option<ClickHandler>,
 }
 
 impl Button {
@@ -32,8 +34,18 @@ impl Button {
         &mut self.label.style
     }
 
+    /// Update the label displayed on the button.
+    pub fn set_text(&mut self, text: impl Into<String>) {
+        self.label.set_text(text);
+    }
+
+    /// Retrieve the current button label.
+    pub fn text(&self) -> &str {
+        self.label.text()
+    }
+
     /// Register a callback invoked when the button is released.
-    pub fn set_on_click<F: FnMut() + 'static>(&mut self, handler: F) {
+    pub fn set_on_click<F: FnMut(&mut Self) + 'static>(&mut self, handler: F) {
         self.on_click = Some(Box::new(handler));
     }
 
@@ -57,8 +69,9 @@ impl Widget for Button {
     fn handle_event(&mut self, event: &Event) -> bool {
         match event {
             Event::PointerUp { x, y } if self.inside_bounds(*x, *y) => {
-                if let Some(cb) = self.on_click.as_mut() {
-                    cb();
+                if let Some(mut cb) = self.on_click.take() {
+                    cb(self);
+                    self.on_click = Some(cb);
                 }
                 return true;
             }

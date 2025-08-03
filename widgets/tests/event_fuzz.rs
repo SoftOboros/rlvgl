@@ -35,7 +35,7 @@ fn make_button(x: i32, y: i32, counter: Rc<RefCell<usize>>) -> WidgetNode {
         },
     );
     let c = counter.clone();
-    button.set_on_click(move || {
+    button.set_on_click(move |_: &mut Button| {
         *c.borrow_mut() += 1;
     });
     WidgetNode {
