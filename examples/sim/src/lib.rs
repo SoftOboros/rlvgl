@@ -23,12 +23,26 @@ use rlvgl::core::{
 };
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
 
+/// State returned by [`build_demo`] containing the root widget tree and related
+/// bookkeeping used by the simulator.
+pub struct Demo {
+    /// Root of the demo widget tree.
+    pub root: Rc<RefCell<WidgetNode>>,
+    /// Counter incremented when the main button is clicked.
+    pub counter: Rc<RefCell<u32>>,
+    /// Widgets scheduled to be appended after event dispatch.
+    pub pending: Rc<RefCell<Vec<WidgetNode>>>,
+}
+
 /// Build a simple widget tree demonstrating basic rlvgl widgets.
 ///
-/// Returns the root [`WidgetNode`] and a counter incremented whenever the
-/// button is clicked.
-pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
+/// Returns a [`Demo`] struct containing the root [`WidgetNode`], a counter
+/// incremented whenever the button is clicked, and a queue of widgets that
+/// should be appended to the root after event dispatch. A `Plugins` button is
+/// included to showcase optional features.
+pub fn build_demo() -> Demo {
     let click_count = Rc::new(RefCell::new(0));
+    let pending = Rc::new(RefCell::new(Vec::new()));
 
     let button = Rc::new(RefCell::new(Button::new(
         "Clicks: 0",
@@ -49,7 +63,7 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
         });
     }
 
-    let mut root = WidgetNode {
+    let root = Rc::new(RefCell::new(WidgetNode {
         widget: Rc::new(RefCell::new(Container::new(Rect {
             x: 0,
             y: 0,
@@ -57,7 +71,7 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
             height: 240,
         }))),
         children: Vec::new(),
-    };
+    }));
 
     let label = Label::new(
         "rlvgl demo",
@@ -68,16 +82,70 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
             height: 20,
         },
     );
-    root.children.push(WidgetNode {
+    root.borrow_mut().children.push(WidgetNode {
         widget: Rc::new(RefCell::new(label)),
         children: Vec::new(),
     });
-    root.children.push(WidgetNode {
+    root.borrow_mut().children.push(WidgetNode {
         widget: button.clone(),
         children: Vec::new(),
     });
 
-    (root, click_count)
+    let plugins = Rc::new(RefCell::new(Button::new(
+        "Plugins",
+        Rect {
+            x: 100,
+            y: 40,
+            width: 80,
+            height: 20,
+        },
+    )));
+    {
+        let pending_ref = pending.clone();
+        plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
+            let mut menu = WidgetNode {
+                widget: Rc::new(RefCell::new(Container::new(Rect {
+                    x: 10,
+                    y: 70,
+                    width: 100,
+                    height: 80,
+                }))),
+                children: Vec::new(),
+            };
+
+            let qr_button = Rc::new(RefCell::new(Button::new(
+                "QR Code",
+                Rect {
+                    x: 20,
+                    y: 80,
+                    width: 80,
+                    height: 20,
+                },
+            )));
+            {
+                let pending_ref = pending_ref.clone();
+                qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
+                    pending_ref.borrow_mut().push(build_plugin_demo());
+                });
+            }
+            menu.children.push(WidgetNode {
+                widget: qr_button,
+                children: Vec::new(),
+            });
+
+            pending_ref.borrow_mut().push(menu);
+        });
+    }
+    root.borrow_mut().children.push(WidgetNode {
+        widget: plugins.clone(),
+        children: Vec::new(),
+    });
+
+    Demo {
+        root,
+        counter: click_count,
+        pending,
+    }
 }
 
 /// Build a widget demonstrating plugin features such as QR code generation.
@@ -98,6 +166,13 @@ pub fn build_plugin_demo() -> WidgetNode {
         ))),
         children: Vec::new(),
     }
+}
+
+/// Flush any widgets queued during event callbacks into the root tree.
+pub fn flush_pending(root: &Rc<RefCell<WidgetNode>>, pending: &Rc<RefCell<Vec<WidgetNode>>>) {
+    let mut root_ref = root.borrow_mut();
+    let mut pending_nodes = pending.borrow_mut();
+    root_ref.children.extend(pending_nodes.drain(..));
 }
 
 /// Renderer that draws into the pixel buffer supplied by [`PixelsDisplay`].
