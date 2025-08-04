@@ -1,3 +1,5 @@
+# Ignore build and temporary files
+
 /target
 /Cargo.lock
 **/*.rs.bk
@@ -5,3 +7,5 @@
 .envrc
 venv
 .DS_Store
+# Local demo assets
+examples/sim/assets/rlvgl-logo.png
