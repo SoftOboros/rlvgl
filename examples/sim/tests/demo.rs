@@ -4,7 +4,7 @@ use rlvgl::core::{
     renderer::Renderer,
     widget::{Color, Rect},
 };
-use rlvgl_sim::{Demo, build_demo, build_plugin_demo, flush_pending};
+use rlvgl_sim::{Demo, build_demo, build_plugin_demo, build_png_demo, flush_pending};
 
 struct CountRenderer(u32);
 
@@ -50,6 +50,14 @@ fn plugin_demo_renders_qrcode() {
 }
 
 #[test]
+fn png_demo_renders_logo() {
+    let node = build_png_demo();
+    let mut renderer = CountRenderer(0);
+    node.draw(&mut renderer);
+    assert!(renderer.0 > 0);
+}
+
+#[test]
 fn plugins_button_adds_demo() {
     let Demo { root, pending, .. } = build_demo();
     assert!(
@@ -60,6 +68,22 @@ fn plugins_button_adds_demo() {
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
+    );
+    flush_pending(&root, &pending);
+    assert!(root.borrow().children.len() > 3);
+}
+
+#[test]
+fn png_button_adds_demo() {
+    let Demo { root, pending, .. } = build_demo();
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
+    );
+    flush_pending(&root, &pending);
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 30, y: 120 })
     );
     flush_pending(&root, &pending);
     assert!(root.borrow().children.len() > 3);

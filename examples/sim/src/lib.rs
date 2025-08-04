@@ -17,7 +17,7 @@ use embedded_graphics::{
     text::Text,
 };
 use rlvgl::core::{
-    WidgetNode, qrcode,
+    WidgetNode, png, qrcode,
     renderer::Renderer,
     widget::{Color, Rect},
 };
@@ -133,6 +133,28 @@ pub fn build_demo() -> Demo {
                 children: Vec::new(),
             });
 
+            let png_button = Rc::new(RefCell::new(Button::new(
+                "PNG",
+                Rect {
+                    x: 20,
+                    y: 110,
+                    width: 80,
+                    height: 20,
+                },
+            )));
+            {
+                let pending_ref = pending_ref.clone();
+                png_button
+                    .borrow_mut()
+                    .set_on_click(move |_b: &mut Button| {
+                        pending_ref.borrow_mut().push(build_png_demo());
+                    });
+            }
+            menu.children.push(WidgetNode {
+                widget: png_button,
+                children: Vec::new(),
+            });
+
             pending_ref.borrow_mut().push(menu);
         });
     }
@@ -151,6 +173,30 @@ pub fn build_demo() -> Demo {
 /// Build a widget demonstrating plugin features such as QR code generation.
 pub fn build_plugin_demo() -> WidgetNode {
     let (pixels_vec, width, height) = qrcode::generate(b"Echo Go").unwrap();
+    let pixels: &'static [Color] = Box::leak(pixels_vec.into_boxed_slice());
+    WidgetNode {
+        widget: Rc::new(RefCell::new(Image::new(
+            Rect {
+                x: 150,
+                y: 40,
+                width: width as i32,
+                height: height as i32,
+            },
+            width as i32,
+            height as i32,
+            pixels,
+        ))),
+        children: Vec::new(),
+    }
+}
+
+/// Build a widget displaying the rlvgl logo decoded from a PNG asset.
+pub fn build_png_demo() -> WidgetNode {
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/rlvgl-logo.png"
+    ));
+    let (pixels_vec, width, height) = png::decode(data).unwrap();
     let pixels: &'static [Color] = Box::leak(pixels_vec.into_boxed_slice());
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
