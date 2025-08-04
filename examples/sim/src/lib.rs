@@ -7,7 +7,7 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, rc::Rc, vec::Vec};
+use alloc::{boxed::Box, format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
 use embedded_graphics::{
@@ -29,20 +29,25 @@ use rlvgl::widgets::{button::Button, container::Container, image::Image, label::
 /// button is clicked.
 pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
     let click_count = Rc::new(RefCell::new(0));
-    let counter = click_count.clone();
 
-    let mut button = Button::new(
-        "Click",
+    let button = Rc::new(RefCell::new(Button::new(
+        "Clicks: 0",
         Rect {
             x: 10,
             y: 40,
             width: 80,
             height: 20,
         },
-    );
-    button.set_on_click(move || {
-        *counter.borrow_mut() += 1;
-    });
+    )));
+
+    {
+        let counter = click_count.clone();
+        button.borrow_mut().set_on_click(move |btn: &mut Button| {
+            let mut count = counter.borrow_mut();
+            *count += 1;
+            btn.set_text(format!("Clicks: {}", *count));
+        });
+    }
 
     let mut root = WidgetNode {
         widget: Rc::new(RefCell::new(Container::new(Rect {
@@ -68,7 +73,7 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
         children: Vec::new(),
     });
     root.children.push(WidgetNode {
-        widget: Rc::new(RefCell::new(button)),
+        widget: button.clone(),
         children: Vec::new(),
     });
 

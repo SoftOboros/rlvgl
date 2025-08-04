@@ -1,6 +1,5 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
-use rlvgl::core::event::Event;
-use rlvgl::platform::PixelsDisplay;
+use rlvgl::platform::{InputEvent, PixelsDisplay};
 use rlvgl_sim::{PixelsRenderer, build_demo, build_plugin_demo};
 use std::{cell::RefCell, rc::Rc};
 
@@ -20,7 +19,7 @@ fn main() {
                 root.borrow().draw(&mut renderer);
             }
         },
-        move |evt: Event| {
+        move |evt: InputEvent| {
             root.borrow_mut().dispatch_event(&evt);
         },
     );
