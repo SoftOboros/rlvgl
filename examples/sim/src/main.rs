@@ -1,12 +1,14 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
 use rlvgl::platform::{InputEvent, PixelsDisplay};
-use rlvgl_sim::{PixelsRenderer, build_demo};
+use rlvgl_sim::{PixelsRenderer, build_demo, flush_pending};
 
 const WIDTH: usize = 320;
 const HEIGHT: usize = 240;
 
 fn main() {
-    let (root, _counter) = build_demo();
+    let demo = build_demo();
+    let root = demo.root.clone();
+    let pending = demo.pending.clone();
 
     PixelsDisplay::new(WIDTH, HEIGHT).run(
         {
@@ -18,8 +20,10 @@ fn main() {
         },
         {
             let root = root.clone();
+            let pending = pending.clone();
             move |evt: InputEvent| {
                 root.borrow_mut().dispatch_event(&evt);
+                flush_pending(&root, &pending);
             }
         },
     );
