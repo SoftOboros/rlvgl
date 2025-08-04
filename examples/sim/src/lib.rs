@@ -60,7 +60,7 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
     };
 
     let label = Label::new(
-        "Echo Go demo",
+        "rlvgl demo",
         Rect {
             x: 10,
             y: 10,
