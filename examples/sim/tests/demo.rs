@@ -21,15 +21,18 @@ impl Renderer for CountRenderer {
 fn demo_draws_widgets() {
     let (root, _counter) = build_demo();
     let mut renderer = CountRenderer(0);
-    root.draw(&mut renderer);
+    root.borrow().draw(&mut renderer);
     assert!(renderer.0 > 0);
 }
 
 #[test]
 fn button_click_increments_counter() {
-    let (mut root, counter) = build_demo();
+    let (root, counter) = build_demo();
     assert_eq!(*counter.borrow(), 0);
-    assert!(root.dispatch_event(&Event::PointerUp { x: 20, y: 50 }));
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 20, y: 50 })
+    );
     assert_eq!(*counter.borrow(), 1);
 }
 
@@ -39,4 +42,18 @@ fn plugin_demo_renders_qrcode() {
     let mut renderer = CountRenderer(0);
     node.draw(&mut renderer);
     assert!(renderer.0 > 0);
+}
+
+#[test]
+fn plugins_button_adds_demo() {
+    let (root, _counter) = build_demo();
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
+    );
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
+    );
+    assert!(root.borrow().children.len() > 3);
 }

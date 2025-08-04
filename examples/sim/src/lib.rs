@@ -25,9 +25,10 @@ use rlvgl::widgets::{button::Button, container::Container, image::Image, label::
 
 /// Build a simple widget tree demonstrating basic rlvgl widgets.
 ///
-/// Returns the root [`WidgetNode`] and a counter incremented whenever the
-/// button is clicked.
-pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
+/// Returns the root [`WidgetNode`] wrapped in [`Rc<RefCell<_>>`] and a counter
+/// incremented whenever the button is clicked. A `Plugins` button is included
+/// to showcase optional features.
+pub fn build_demo() -> (Rc<RefCell<WidgetNode>>, Rc<RefCell<u32>>) {
     let click_count = Rc::new(RefCell::new(0));
 
     let button = Rc::new(RefCell::new(Button::new(
@@ -49,7 +50,7 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
         });
     }
 
-    let mut root = WidgetNode {
+    let root = Rc::new(RefCell::new(WidgetNode {
         widget: Rc::new(RefCell::new(Container::new(Rect {
             x: 0,
             y: 0,
@@ -57,7 +58,7 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
             height: 240,
         }))),
         children: Vec::new(),
-    };
+    }));
 
     let label = Label::new(
         "rlvgl demo",
@@ -68,12 +69,62 @@ pub fn build_demo() -> (WidgetNode, Rc<RefCell<u32>>) {
             height: 20,
         },
     );
-    root.children.push(WidgetNode {
+    root.borrow_mut().children.push(WidgetNode {
         widget: Rc::new(RefCell::new(label)),
         children: Vec::new(),
     });
-    root.children.push(WidgetNode {
+    root.borrow_mut().children.push(WidgetNode {
         widget: button.clone(),
+        children: Vec::new(),
+    });
+
+    let plugins = Rc::new(RefCell::new(Button::new(
+        "Plugins",
+        Rect {
+            x: 100,
+            y: 40,
+            width: 80,
+            height: 20,
+        },
+    )));
+    {
+        let root_ref = root.clone();
+        plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
+            let mut menu = WidgetNode {
+                widget: Rc::new(RefCell::new(Container::new(Rect {
+                    x: 10,
+                    y: 70,
+                    width: 100,
+                    height: 80,
+                }))),
+                children: Vec::new(),
+            };
+
+            let qr_button = Rc::new(RefCell::new(Button::new(
+                "QR Code",
+                Rect {
+                    x: 20,
+                    y: 80,
+                    width: 80,
+                    height: 20,
+                },
+            )));
+            {
+                let root_ref = root_ref.clone();
+                qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
+                    root_ref.borrow_mut().children.push(build_plugin_demo());
+                });
+            }
+            menu.children.push(WidgetNode {
+                widget: qr_button,
+                children: Vec::new(),
+            });
+
+            root_ref.borrow_mut().children.push(menu);
+        });
+    }
+    root.borrow_mut().children.push(WidgetNode {
+        widget: plugins.clone(),
         children: Vec::new(),
     });
 

@@ -65,4 +65,4 @@ This document tracks the high-level work streams and tasks for rlvgl development
 ## 10 Simulator examples
 - [x] Update samples/sim (rlvds-sim) to run rlvds in a window using std and the "simulator" feature
 - [x] Demonstrate core / widget features in examples/sim (use placeholder assets) using hierarchy matching the upper package
-- [x] Demonstrate plugin features (use placeholder assets) using hierarchy matching the upper package
+- [x] Demonstrate plugin features (use placeholder assets) using hierarchy matching the upper package; add a `plugins` button to the demo to launch optional items and set all build options
