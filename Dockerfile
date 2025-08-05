@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y \
     libx11-dev \
     libxext-dev \
     libgtk-3-dev \
-    librlottie-ev \
+    librlottie-dev \
     pkg-config \
     && sudo rm -rf /var/lib/apt/lists/*
 

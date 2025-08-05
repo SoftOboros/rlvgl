@@ -237,7 +237,7 @@ pub fn build_plugin_demo() -> WidgetNode {
 
 /// Build a widget displaying the rlvgl logo decoded from a PNG asset.
 pub fn build_png_demo() -> WidgetNode {
-    let data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "../../../rlvgl-logo.png"));
+    let data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/rlvgl-logo.png"));
     let (pixels_vec, width, height) = png::decode(data).unwrap();
     let max_dim = 100u32;
     let scale = (max_dim as f32 / width as f32)
