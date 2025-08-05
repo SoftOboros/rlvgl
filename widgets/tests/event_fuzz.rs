@@ -70,18 +70,18 @@ fn event_fuzz_random() {
 
     let mut rng = StdRng::seed_from_u64(0);
     for _ in 0..1000 {
-        let event = match rng.gen_range(0..3) {
+        let event = match rng.random_range(0..3) {
             0 => Event::PointerDown {
-                x: rng.gen_range(0..64),
-                y: rng.gen_range(0..64),
+                x: rng.random_range(0..64),
+                y: rng.random_range(0..64),
             },
             1 => Event::PointerUp {
-                x: rng.gen_range(0..64),
-                y: rng.gen_range(0..64),
+                x: rng.random_range(0..64),
+                y: rng.random_range(0..64),
             },
             _ => Event::PointerMove {
-                x: rng.gen_range(0..64),
-                y: rng.gen_range(0..64),
+                x: rng.random_range(0..64),
+                y: rng.random_range(0..64),
             },
         };
         root.dispatch_event(&event);
