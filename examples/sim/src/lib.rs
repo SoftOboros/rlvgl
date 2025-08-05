@@ -10,18 +10,22 @@ extern crate alloc;
 use alloc::{boxed::Box, format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
+#[cfg(not(feature = "fontdue"))]
 use embedded_graphics::{
     mono_font::{MonoTextStyle, ascii::FONT_6X10},
-    pixelcolor::Rgb888,
-    prelude::*,
     text::Text,
 };
+use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use rlvgl::core::{
     WidgetNode, png, qrcode,
     renderer::Renderer,
     widget::{Color, Rect},
 };
+#[cfg(feature = "fontdue")]
+use rlvgl::fontdue::rasterize_glyph;
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
+#[cfg(feature = "fontdue")]
+const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
 
 /// State returned by [`build_demo`] containing the root widget tree and related
 /// bookkeeping used by the simulator.
@@ -192,10 +196,7 @@ pub fn build_plugin_demo() -> WidgetNode {
 
 /// Build a widget displaying the rlvgl logo decoded from a PNG asset.
 pub fn build_png_demo() -> WidgetNode {
-    let data = include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/assets/rlvgl-logo.png"
-    ));
+    let data = include_bytes!("../../../rlvgl-logo.png");
     let (pixels_vec, width, height) = png::decode(data).unwrap();
     let pixels: &'static [Color] = Box::leak(pixels_vec.into_boxed_slice());
     WidgetNode {
@@ -264,8 +265,31 @@ impl<'a> Renderer for PixelsRenderer<'a> {
     }
 
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
-        let style = MonoTextStyle::new(&FONT_6X10, Rgb888::new(color.0, color.1, color.2));
-        let _ = Text::new(text, Point::new(position.0, position.1), style).draw(self);
+        #[cfg(feature = "fontdue")]
+        {
+            let mut x_cursor = position.0;
+            for ch in text.chars() {
+                if let Ok((bitmap, w, h)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+                    for y in 0..h as i32 {
+                        for x in 0..w as i32 {
+                            let alpha = bitmap[y as usize * w + x as usize].0;
+                            if alpha > 0 {
+                                let r = (color.0 as u16 * alpha as u16 / 255) as u8;
+                                let g = (color.1 as u16 * alpha as u16 / 255) as u8;
+                                let b = (color.2 as u16 * alpha as u16 / 255) as u8;
+                                self.put_pixel(x_cursor + x, position.1 + y, Rgb888::new(r, g, b));
+                            }
+                        }
+                    }
+                    x_cursor += w as i32;
+                }
+            }
+        }
+        #[cfg(not(feature = "fontdue"))]
+        {
+            let style = MonoTextStyle::new(&FONT_6X10, Rgb888::new(color.0, color.1, color.2));
+            let _ = Text::new(text, Point::new(position.0, position.1), style).draw(self);
+        }
     }
 }
 
