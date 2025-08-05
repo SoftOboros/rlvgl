@@ -3,10 +3,9 @@ name = "rlvgl-sim"
 version = "0.1.0"
 edition = "2024"
 publish = false
-include = ["src/**", "assets/**", "tests/**"]
 
 [dependencies]
-rlvgl= { version = "0.1.4", path = "../..", features = ["simulator", "qrcode", "png", "fontdue"], default-features = false }
+rlvgl= { path = "../..", features = ["simulator", "qrcode", "png", "fontdue"], default-features = false }
 embedded-graphics = "0.8"
 
 [features]

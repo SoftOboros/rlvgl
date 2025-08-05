@@ -7,5 +7,3 @@
 .envrc
 venv
 .DS_Store
-# Local demo assets
-examples/sim/assets/rlvgl-logo.png
