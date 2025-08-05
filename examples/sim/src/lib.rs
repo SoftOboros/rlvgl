@@ -19,9 +19,12 @@ use embedded_graphics::{
 use rlvgl::core::{
     WidgetNode, png, qrcode,
     renderer::Renderer,
-    widget::{Color, Rect},
+    widget::{Color, Rect, Widget},
 };
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
+
+type WidgetHandle = Rc<RefCell<dyn Widget>>;
+type WidgetSlot = Rc<RefCell<Option<WidgetHandle>>>;
 
 /// State returned by [`build_demo`] containing the root widget tree and related
 /// bookkeeping used by the simulator.
@@ -100,62 +103,100 @@ pub fn build_demo() -> Demo {
             height: 20,
         },
     )));
+    let menu_widget: WidgetSlot = Rc::new(RefCell::new(None));
+    let qr_demo: WidgetSlot = Rc::new(RefCell::new(None));
+    let png_demo: WidgetSlot = Rc::new(RefCell::new(None));
     {
         let pending_ref = pending.clone();
+        let root_ref = root.clone();
+        let menu_ref = menu_widget.clone();
+        let qr_ref = qr_demo.clone();
+        let png_ref = png_demo.clone();
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
-            let mut menu = WidgetNode {
-                widget: Rc::new(RefCell::new(Container::new(Rect {
+            if let Some(menu_w) = menu_ref.borrow_mut().take() {
+                root_ref
+                    .borrow_mut()
+                    .children
+                    .retain(|n| !Rc::ptr_eq(&n.widget, &menu_w));
+            } else {
+                let menu_w: WidgetHandle = Rc::new(RefCell::new(Container::new(Rect {
                     x: 10,
                     y: 70,
                     width: 100,
                     height: 80,
-                }))),
-                children: Vec::new(),
-            };
+                })));
+                let mut menu = WidgetNode {
+                    widget: menu_w.clone(),
+                    children: Vec::new(),
+                };
 
-            let qr_button = Rc::new(RefCell::new(Button::new(
-                "QR Code",
-                Rect {
-                    x: 20,
-                    y: 80,
-                    width: 80,
-                    height: 20,
-                },
-            )));
-            {
-                let pending_ref = pending_ref.clone();
-                qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
-                    pending_ref.borrow_mut().push(build_plugin_demo());
-                });
-            }
-            menu.children.push(WidgetNode {
-                widget: qr_button,
-                children: Vec::new(),
-            });
-
-            let png_button = Rc::new(RefCell::new(Button::new(
-                "PNG",
-                Rect {
-                    x: 20,
-                    y: 110,
-                    width: 80,
-                    height: 20,
-                },
-            )));
-            {
-                let pending_ref = pending_ref.clone();
-                png_button
-                    .borrow_mut()
-                    .set_on_click(move |_b: &mut Button| {
-                        pending_ref.borrow_mut().push(build_png_demo());
+                let qr_button = Rc::new(RefCell::new(Button::new(
+                    "QR Code",
+                    Rect {
+                        x: 20,
+                        y: 80,
+                        width: 80,
+                        height: 20,
+                    },
+                )));
+                {
+                    let pending_ref = pending_ref.clone();
+                    let root = root_ref.clone();
+                    let qr_demo = qr_ref.clone();
+                    qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
+                        if let Some(qr_w) = qr_demo.borrow_mut().take() {
+                            root.borrow_mut()
+                                .children
+                                .retain(|n| !Rc::ptr_eq(&n.widget, &qr_w));
+                        } else {
+                            let demo = build_plugin_demo();
+                            let handle = demo.widget.clone();
+                            qr_demo.borrow_mut().replace(handle.clone());
+                            pending_ref.borrow_mut().push(demo);
+                        }
                     });
-            }
-            menu.children.push(WidgetNode {
-                widget: png_button,
-                children: Vec::new(),
-            });
+                }
+                menu.children.push(WidgetNode {
+                    widget: qr_button,
+                    children: Vec::new(),
+                });
 
-            pending_ref.borrow_mut().push(menu);
+                let png_button = Rc::new(RefCell::new(Button::new(
+                    "PNG",
+                    Rect {
+                        x: 20,
+                        y: 110,
+                        width: 80,
+                        height: 20,
+                    },
+                )));
+                {
+                    let pending_ref = pending_ref.clone();
+                    let root = root_ref.clone();
+                    let png_demo = png_ref.clone();
+                    png_button
+                        .borrow_mut()
+                        .set_on_click(move |_b: &mut Button| {
+                            if let Some(png_w) = png_demo.borrow_mut().take() {
+                                root.borrow_mut()
+                                    .children
+                                    .retain(|n| !Rc::ptr_eq(&n.widget, &png_w));
+                            } else {
+                                let demo = build_png_demo();
+                                let handle = demo.widget.clone();
+                                png_demo.borrow_mut().replace(handle.clone());
+                                pending_ref.borrow_mut().push(demo);
+                            }
+                        });
+                }
+                menu.children.push(WidgetNode {
+                    widget: png_button,
+                    children: Vec::new(),
+                });
+
+                menu_ref.borrow_mut().replace(menu_w);
+                pending_ref.borrow_mut().push(menu);
+            }
         });
     }
     root.borrow_mut().children.push(WidgetNode {
@@ -192,22 +233,34 @@ pub fn build_plugin_demo() -> WidgetNode {
 
 /// Build a widget displaying the rlvgl logo decoded from a PNG asset.
 pub fn build_png_demo() -> WidgetNode {
-    let data = include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/assets/rlvgl-logo.png"
-    ));
+    let data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../rlvgl-logo.png"));
     let (pixels_vec, width, height) = png::decode(data).unwrap();
-    let pixels: &'static [Color] = Box::leak(pixels_vec.into_boxed_slice());
+    let max_dim = 100u32;
+    let scale = (max_dim as f32 / width as f32)
+        .min(max_dim as f32 / height as f32)
+        .min(1.0);
+    let new_w = (width as f32 * scale).round() as u32;
+    let new_h = (height as f32 * scale).round() as u32;
+    let mut scaled = Vec::with_capacity((new_w * new_h) as usize);
+    for y in 0..new_h {
+        for x in 0..new_w {
+            let src_x = (x as f32 / scale).floor() as usize;
+            let src_y = (y as f32 / scale).floor() as usize;
+            let idx = src_y * width as usize + src_x;
+            scaled.push(pixels_vec[idx]);
+        }
+    }
+    let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
             Rect {
                 x: 150,
                 y: 40,
-                width: width as i32,
-                height: height as i32,
+                width: new_w as i32,
+                height: new_h as i32,
             },
-            width as i32,
-            height as i32,
+            new_w as i32,
+            new_h as i32,
             pixels,
         ))),
         children: Vec::new(),
