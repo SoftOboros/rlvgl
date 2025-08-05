@@ -6,6 +6,9 @@ publish = false
 include = ["src/**", "assets/**", "tests/**"]
 
 [dependencies]
-rlvgl= { version = "0.1.4", path = "../..", features = ["simulator", "qrcode", "png"], default-features = false }
+rlvgl= { version = "0.1.4", path = "../..", features = ["simulator", "qrcode", "png", "fontdue"], default-features = false }
 embedded-graphics = "0.8"
 
+[features]
+default = ["fontdue"]
+fontdue = []
