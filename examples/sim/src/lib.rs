@@ -326,28 +326,36 @@ impl<'a> Renderer for PixelsRenderer<'a> {
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
         #[cfg(feature = "fontdue")]
         {
-            let mut x_cursor = position.0;
+            let mut glyphs = Vec::new();
+            let mut max_height = 0i32;
             for ch in text.chars() {
                 if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
-                    let w = metrics.width as i32;
-                    let h = metrics.height as i32;
-                    for y in 0..h {
-                        for x in 0..w {
-                            let alpha = bitmap[y as usize * metrics.width + x as usize].0;
-                            if alpha > 0 {
-                                let r = (color.0 as u16 * alpha as u16 / 255) as u8;
-                                let g = (color.1 as u16 * alpha as u16 / 255) as u8;
-                                let b = (color.2 as u16 * alpha as u16 / 255) as u8;
-                                self.put_pixel(
-                                    x_cursor + metrics.xmin + x,
-                                    position.1 + y,
-                                    Rgb888::new(r, g, b),
-                                );
-                            }
+                    max_height = max_height.max(metrics.height as i32);
+                    glyphs.push((bitmap, metrics));
+                }
+            }
+
+            let mut x_cursor = position.0;
+            for (bitmap, metrics) in glyphs {
+                let w = metrics.width as i32;
+                let h = metrics.height as i32;
+                let y_offset = max_height - h;
+                for y in 0..h {
+                    for x in 0..w {
+                        let alpha = bitmap[y as usize * metrics.width + x as usize].0;
+                        if alpha > 0 {
+                            let r = (color.0 as u16 * alpha as u16 / 255) as u8;
+                            let g = (color.1 as u16 * alpha as u16 / 255) as u8;
+                            let b = (color.2 as u16 * alpha as u16 / 255) as u8;
+                            self.put_pixel(
+                                x_cursor + metrics.xmin + x,
+                                position.1 + y_offset + y,
+                                Rgb888::new(r, g, b),
+                            );
                         }
                     }
-                    x_cursor += metrics.advance_width.round() as i32;
                 }
+                x_cursor += metrics.advance_width.round() as i32;
             }
         }
         #[cfg(not(feature = "fontdue"))]
