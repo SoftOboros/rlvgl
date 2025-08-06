@@ -25,6 +25,16 @@ impl Label {
             text_color: Color(0, 0, 0),
         }
     }
+
+    /// Update the text displayed by the label.
+    pub fn set_text(&mut self, text: impl Into<String>) {
+        self.text = text.into();
+    }
+
+    /// Retrieve the current label text.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
 }
 
 impl Widget for Label {

@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Universal",
+      "type": "shell",
+      "command": "cargo build --release --target x86_64-apple-darwin && cargo build --release --target aarch64-apple-darwin && lipo -create -output target/universal/rlvgl-sim target/x86_64-apple-darwin/release/rlvgl-sim target/aarch64-apple-darwin/release/rlvgl-sim",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

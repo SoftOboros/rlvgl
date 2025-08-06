@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug sim",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/x86_64-apple-darwin/debug/rlvgl-sim",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "cargo": {
+        "args": ["build", "--package=rlvgl-sim", "--target=x86_64-apple-darwin"]
+      },
+      "sourceLanguages": ["rust"]
+    }
+  ]
+}

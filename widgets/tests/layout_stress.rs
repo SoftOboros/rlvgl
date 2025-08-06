@@ -27,10 +27,10 @@ fn container_layout_stress() {
     };
     let mut rng = StdRng::seed_from_u64(0);
     for _ in 0..100 {
-        let width = rng.gen_range(0..=20);
-        let height = rng.gen_range(0..=20);
-        let x = rng.gen_range(0..=20 - width);
-        let y = rng.gen_range(0..=20 - height);
+        let width = rng.random_range(0..=20);
+        let height = rng.random_range(0..=20);
+        let x = rng.random_range(0..=20 - width);
+        let y = rng.random_range(0..=20 - height);
         let rect = Rect {
             x,
             y,

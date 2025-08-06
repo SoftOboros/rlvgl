@@ -1,0 +1,13 @@
+[package]
+name = "rlvgl-sim"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+rlvgl= { path = "../..", features = ["simulator", "qrcode", "png", "fontdue"], default-features = false }
+embedded-graphics = "0.8"
+
+[features]
+default = ["fontdue"]
+fontdue = []
