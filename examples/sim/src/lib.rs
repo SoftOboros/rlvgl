@@ -328,19 +328,25 @@ impl<'a> Renderer for PixelsRenderer<'a> {
         {
             let mut x_cursor = position.0;
             for ch in text.chars() {
-                if let Ok((bitmap, w, h)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
-                    for y in 0..h as i32 {
-                        for x in 0..w as i32 {
-                            let alpha = bitmap[y as usize * w + x as usize].0;
+                if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+                    let w = metrics.width as i32;
+                    let h = metrics.height as i32;
+                    for y in 0..h {
+                        for x in 0..w {
+                            let alpha = bitmap[y as usize * metrics.width + x as usize].0;
                             if alpha > 0 {
                                 let r = (color.0 as u16 * alpha as u16 / 255) as u8;
                                 let g = (color.1 as u16 * alpha as u16 / 255) as u8;
                                 let b = (color.2 as u16 * alpha as u16 / 255) as u8;
-                                self.put_pixel(x_cursor + x, position.1 + y, Rgb888::new(r, g, b));
+                                self.put_pixel(
+                                    x_cursor + metrics.xmin + x,
+                                    position.1 + y,
+                                    Rgb888::new(r, g, b),
+                                );
                             }
                         }
                     }
-                    x_cursor += w as i32;
+                    x_cursor += metrics.advance_width.round() as i32;
                 }
             }
         }
