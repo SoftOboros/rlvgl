@@ -45,17 +45,17 @@ RUN rustup target add thumbv7em-none-eabihf
 
 # Create and activate Python venv
 WORKDIR /opt/rlvgl
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+#RUN python3 -m venv /opt/venv
+#ENV PATH="/opt/venv/bin:$PATH"
 
 # Cache dependencies
-COPY Cargo.toml .
+#COPY Cargo.toml .
 #RUN cargo fetch
 
 # Copy everything and build
-COPY . .
-RUN git submodule update --init --recursive
-RUN pip install -r requirements.txt && cd ..
+#COPY . .
+#RUN git submodule update --init --recursive
+#RUN pip install -r requirements.txt && cd ..
 #RUN cargo build --release
 
 # build compiled items.
