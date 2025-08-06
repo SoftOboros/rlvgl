@@ -27,7 +27,7 @@ path = "src/lib.rs"
 [dependencies]
 rlvgl-core = { version = "0.1.4", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.3", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.1.2", path = "platform", default-features = false }
+rlvgl-platform = { version = "0.1.3", path = "platform", default-features = false }
 
 [dependencies.gif]
 version = "0.13.3"
