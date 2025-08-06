@@ -1,6 +1,9 @@
+# Ignore build and temporary files
+
 /target
 /Cargo.lock
 **/*.rs.bk
 /coverage
 .envrc
 venv
+.DS_Store

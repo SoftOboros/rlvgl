@@ -25,13 +25,17 @@ RUN apt-get update && apt-get install -y \
     llvm-dev \
     libclang-dev \
     clang \
+    librlottie0-1 \
     libsdl2-dev \
     xvfb \
     libxrender1 \
     libfreetype6-dev \
     libx11-dev \
     libxext-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libgtk-3-dev \
+    librlottie-dev \
+    pkg-config \
+    && sudo rm -rf /var/lib/apt/lists/*
 
 # Install Rust from rustup (more control, avoids apt rustc issues)
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
@@ -41,16 +45,16 @@ RUN rustup target add thumbv7em-none-eabihf
 
 # Create and activate Python venv
 WORKDIR /opt/rlvgl
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+#RUN python3 -m venv /opt/venv
+#ENV PATH="/opt/venv/bin:$PATH"
 
 # Cache dependencies
-COPY Cargo.toml .
+#COPY Cargo.toml .
 #RUN cargo fetch
 
 # Copy everything and build
-COPY . .
-RUN git submodule update --init --recursive
+#COPY . .
+#RUN git submodule update --init --recursive
 #RUN pip install -r requirements.txt && cd ..
 #RUN cargo build --release
 

@@ -9,6 +9,8 @@ fn embedded_size_regression() {
         .args([
             "build",
             "--workspace",
+            "--exclude",
+            "rlvgl-sim",
             "--release",
             "--target",
             "thumbv7em-none-eabihf",
