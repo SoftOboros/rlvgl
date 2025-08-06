@@ -342,16 +342,31 @@ impl<'a> Renderer for PixelsRenderer<'a> {
                 let y_offset = max_height - h;
                 for y in 0..h {
                     for x in 0..w {
-                        let alpha = bitmap[y as usize * metrics.width + x as usize].0;
+                        let alpha = bitmap[y as usize * metrics.width + x as usize];
                         if alpha > 0 {
-                            let r = (color.0 as u16 * alpha as u16 / 255) as u8;
-                            let g = (color.1 as u16 * alpha as u16 / 255) as u8;
-                            let b = (color.2 as u16 * alpha as u16 / 255) as u8;
-                            self.put_pixel(
-                                x_cursor + metrics.xmin + x,
-                                position.1 + y_offset + y,
-                                Rgb888::new(r, g, b),
-                            );
+                            let px = x_cursor + metrics.xmin + x;
+                            let py = position.1 + y_offset + y;
+                            if px >= 0
+                                && py >= 0
+                                && (px as usize) < self.width
+                                && (py as usize) < self.height
+                            {
+                                let idx = ((py as usize) * self.width + px as usize) * 4;
+                                let bg_r = self.frame[idx];
+                                let bg_g = self.frame[idx + 1];
+                                let bg_b = self.frame[idx + 2];
+                                let inv_alpha = 255 - alpha as u16;
+                                let r = ((color.0 as u16 * alpha as u16 + bg_r as u16 * inv_alpha)
+                                    / 255) as u8;
+                                let g = ((color.1 as u16 * alpha as u16 + bg_g as u16 * inv_alpha)
+                                    / 255) as u8;
+                                let b = ((color.2 as u16 * alpha as u16 + bg_b as u16 * inv_alpha)
+                                    / 255) as u8;
+                                self.frame[idx] = r;
+                                self.frame[idx + 1] = g;
+                                self.frame[idx + 2] = b;
+                                self.frame[idx + 3] = 0xff;
+                            }
                         }
                     }
                 }
