@@ -67,10 +67,11 @@ impl Widget for Checkbox {
         let before = self.inner.is_checked();
         let handled = self.inner.handle_event(event);
         let after = self.inner.is_checked();
-        if handled && before != after {
-            if let Some(cb) = self.on_change.as_mut() {
-                cb(after);
-            }
+        if !handled || before == after {
+            return handled;
+        }
+        if let Some(cb) = self.on_change.as_mut() {
+            cb(after);
         }
         handled
     }
