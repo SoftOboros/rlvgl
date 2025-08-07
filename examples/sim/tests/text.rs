@@ -33,7 +33,8 @@ fn render_text_to_framebuffer(
     size: f32,
     bottom_y: i32,
 ) {
-    let baseline_y = bottom_y;
+    let vm = line_metrics(FONT_DATA, size).unwrap();
+    let baseline_y = bottom_y - vm.descent.round() as i32;
     let mut x_cursor = 0f32;
     for ch in text.chars() {
         if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, size) {
@@ -109,7 +110,8 @@ fn test_descenders_render_below_baseline() {
     let ascii = dump_ascii_frame(&fb, W, H);
     maybe_write_ascii("descenders", &ascii);
 
-    let baseline = bottom_y;
+    let vm = line_metrics(FONT_DATA, 16.0).unwrap();
+    let baseline = bottom_y - vm.descent.round() as i32;
     let mut top_line = baseline;
     let mut bottom_line = baseline;
     for (y, line) in ascii.lines().enumerate() {
@@ -138,6 +140,22 @@ fn test_descenders_render_below_baseline() {
 
     assert_eq!(observed_above, expected_above);
     assert!((observed_below - expected_below).abs() <= 1);
+
+    let lines: Vec<&str> = ascii.lines().collect();
+    let baseline_line = lines[baseline as usize].as_bytes();
+    let below_line = lines[(baseline + 1) as usize].as_bytes();
+    let mut x_cursor = 0f32;
+    for ch in TEXT.chars() {
+        if let Ok((_, m)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+            let start = (x_cursor as i32 + m.xmin).max(0) as usize;
+            let end = start + m.width;
+            assert!(baseline_line[start..end].iter().any(|&b| b != b' '));
+            if ch != 'b' {
+                assert!(below_line[start..end].iter().any(|&b| b != b' '));
+            }
+            x_cursor += m.advance_width;
+        }
+    }
 }
 
 #[test]
@@ -145,7 +163,8 @@ fn test_clipped_bottom_text_does_not_panic() {
     const W: usize = 320;
     const H: usize = 240;
     let mut fb = vec![0u8; W * H];
-    let bottom_y = H as i32 - 1;
+    let vm = line_metrics(FONT_DATA, 16.0).unwrap();
+    let bottom_y = H as i32 - 1 + vm.descent.round() as i32;
     render_text_to_framebuffer("pqgy", &mut fb, W, H, 16.0, bottom_y);
     let ascii = dump_ascii_frame(&fb, W, H);
     assert!(ascii.lines().last().unwrap().chars().any(|c| c != ' '));
@@ -158,8 +177,9 @@ fn test_top_aligned_text_differs_from_baseline() {
     let vm = line_metrics(FONT_DATA, 16.0).unwrap();
     let top_y = 5;
     let baseline = top_y + vm.ascent.round() as i32;
+    let bottom = baseline + vm.descent.round() as i32;
     let mut baseline_buf = vec![0u8; W * H];
-    render_text_to_framebuffer("Hi", &mut baseline_buf, W, H, 16.0, baseline);
+    render_text_to_framebuffer("Hi", &mut baseline_buf, W, H, 16.0, bottom);
     let mut top_buf = vec![0u8; W * H];
     render_text_top_aligned_to_framebuffer("Hi", &mut top_buf, W, H, 16.0, top_y);
     assert_ne!(baseline_buf, top_buf);
