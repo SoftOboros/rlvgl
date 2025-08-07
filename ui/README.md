@@ -145,6 +145,6 @@ pub fn build() {
 
 ## 6 ▸ License
 
-MIT-licensed: MIT — choose whichever you prefer.
+MIT-licensed: MIT.
 
 “Tiny screens deserve great UX, too.”
