@@ -164,7 +164,12 @@ impl PixelsDisplay {
                     pixels
                         .resize_surface(w.min(max_dim), h.min(max_dim))
                         .expect("failed to resize surface");
+                    let old = surface_size;
                     surface_size = (w, h);
+                    pointer_pos = (
+                        (pointer_pos.0 as f64 * old.0 as f64 / surface_size.0 as f64) as i32,
+                        (pointer_pos.1 as f64 * old.1 as f64 / surface_size.1 as f64) as i32,
+                    );
                     window.request_redraw();
                 }
                 Event::WindowEvent {
