@@ -22,7 +22,7 @@ use rlvgl::core::{
     widget::{Color, Rect, Widget},
 };
 #[cfg(feature = "fontdue")]
-use rlvgl::fontdue::{line_metrics, rasterize_glyph};
+use rlvgl::fontdue::rasterize_glyph;
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
@@ -326,11 +326,7 @@ impl<'a> Renderer for PixelsRenderer<'a> {
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
         #[cfg(feature = "fontdue")]
         {
-            let vm = match line_metrics(FONT_DATA, 16.0) {
-                Ok(m) => m,
-                Err(_) => return,
-            };
-            let baseline = position.1 + vm.descent.round() as i32;
+            let baseline = position.1;
             let mut x_cursor = position.0;
             for ch in text.chars() {
                 if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {

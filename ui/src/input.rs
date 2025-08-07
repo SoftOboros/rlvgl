@@ -11,6 +11,7 @@ use rlvgl_core::{
 use rlvgl_widgets::label::Label;
 
 /// Single-line text input component.
+#[allow(clippy::type_complexity)]
 pub struct Input {
     inner: Label,
     on_change: Option<Box<dyn FnMut(&str)>>,
