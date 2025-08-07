@@ -1,5 +1,4 @@
 //! Driver for the ST7789 LCD controller.
-#![cfg(feature = "st7789")]
 use crate::display::DisplayDriver;
 use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
 use display_interface_spi::SPIInterface;
@@ -38,15 +37,15 @@ where
             0x2A,
             (area.x >> 8) as u8,
             area.x as u8,
-            ((area.x + area.width as i32 - 1) >> 8) as u8,
-            (area.x + area.width as i32 - 1) as u8,
+            ((area.x + area.width - 1) >> 8) as u8,
+            (area.x + area.width - 1) as u8,
         ]))?;
         self.interface.send_commands(DataFormat::U8(&[
             0x2B,
             (area.y >> 8) as u8,
             area.y as u8,
-            ((area.y + area.height as i32 - 1) >> 8) as u8,
-            (area.y + area.height as i32 - 1) as u8,
+            ((area.y + area.height - 1) >> 8) as u8,
+            (area.y + area.height - 1) as u8,
         ]))?;
         self.interface.send_commands(DataFormat::U8(&[0x2C]))
     }
