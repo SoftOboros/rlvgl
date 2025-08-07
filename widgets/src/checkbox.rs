@@ -71,8 +71,11 @@ impl Widget for Checkbox {
             renderer.fill_rect(inner, self.check_color);
         }
 
-        // Draw label text to the right of the box
-        let text_pos = (self.bounds.x + square_size + 4, self.bounds.y);
+        // Draw label text to the right of the box with baseline at the bottom
+        let text_pos = (
+            self.bounds.x + square_size + 4,
+            self.bounds.y + self.bounds.height,
+        );
         renderer.draw_text(text_pos, &self.text, self.text_color);
     }
 

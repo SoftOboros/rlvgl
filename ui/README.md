@@ -116,7 +116,7 @@ Preserve public API signatures unless version number is bumped.
 All generated styles must compile to valid `lv_style_t` data.
 Token namespaces are fixed: spacing, colors, radii, fonts.
 Maximum source-line length: 100 columns.
-Dual-license header: MIT / Apache-2.0.
+MIT-license header: MIT / Apache-2.0.
 
 ## 5 ▸ Example (ui/examples/demo.rs)
 
@@ -145,6 +145,6 @@ pub fn build() {
 
 ## 6 ▸ License
 
-Dual-licensed: MIT OR Apache-2.0 — choose whichever you prefer.
+MIT-licensed: MIT — choose whichever you prefer.
 
 “Tiny screens deserve great UX, too.”

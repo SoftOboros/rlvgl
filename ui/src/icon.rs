@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Icon font helpers and Button extension for rlvgl-ui.
 //!
 //! Maps human-readable icon names to LVGL built-in symbol codepoints and

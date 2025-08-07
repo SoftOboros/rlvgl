@@ -32,4 +32,4 @@ This file tracks the tasks for building the high-level `rlvgl-ui` crate.
 
 ---
 
-Dual-licensed: MIT OR Apache-2.0.
+MIT-licensed: MIT.

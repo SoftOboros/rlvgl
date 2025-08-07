@@ -44,7 +44,11 @@ impl Widget for Label {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         renderer.fill_rect(self.bounds, self.style.bg_color);
-        renderer.draw_text((self.bounds.x, self.bounds.y), &self.text, self.text_color);
+        renderer.draw_text(
+            (self.bounds.x, self.bounds.y + self.bounds.height),
+            &self.text,
+            self.text_color,
+        );
     }
 
     fn handle_event(&mut self, _event: &Event) -> bool {

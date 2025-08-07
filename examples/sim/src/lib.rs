@@ -22,7 +22,7 @@ use rlvgl::core::{
     widget::{Color, Rect, Widget},
 };
 #[cfg(feature = "fontdue")]
-use rlvgl::fontdue::rasterize_glyph;
+use rlvgl::fontdue::{line_metrics, rasterize_glyph};
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
@@ -326,21 +326,47 @@ impl<'a> Renderer for PixelsRenderer<'a> {
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
         #[cfg(feature = "fontdue")]
         {
+            let vm = match line_metrics(FONT_DATA, 16.0) {
+                Ok(m) => m,
+                Err(_) => return,
+            };
+            let baseline = position.1 + vm.descent.round() as i32;
             let mut x_cursor = position.0;
             for ch in text.chars() {
-                if let Ok((bitmap, w, h)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
-                    for y in 0..h as i32 {
-                        for x in 0..w as i32 {
-                            let alpha = bitmap[y as usize * w + x as usize].0;
+                if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+                    let w = metrics.width as i32;
+                    let h = metrics.height as i32;
+                    for y in 0..h {
+                        let py = baseline + metrics.ymin + y;
+                        if py < 0 || (py as usize) >= self.height {
+                            continue;
+                        }
+                        for x in 0..w {
+                            let px = x_cursor + metrics.xmin + x;
+                            if px < 0 || (px as usize) >= self.width {
+                                continue;
+                            }
+                            let alpha = bitmap[y as usize * metrics.width + x as usize];
                             if alpha > 0 {
-                                let r = (color.0 as u16 * alpha as u16 / 255) as u8;
-                                let g = (color.1 as u16 * alpha as u16 / 255) as u8;
-                                let b = (color.2 as u16 * alpha as u16 / 255) as u8;
-                                self.put_pixel(x_cursor + x, position.1 + y, Rgb888::new(r, g, b));
+                                let idx = ((py as usize) * self.width + px as usize) * 4;
+                                let bg_r = self.frame[idx];
+                                let bg_g = self.frame[idx + 1];
+                                let bg_b = self.frame[idx + 2];
+                                let inv_alpha = 255 - alpha as u16;
+                                let r = ((color.0 as u16 * alpha as u16 + bg_r as u16 * inv_alpha)
+                                    / 255) as u8;
+                                let g = ((color.1 as u16 * alpha as u16 + bg_g as u16 * inv_alpha)
+                                    / 255) as u8;
+                                let b = ((color.2 as u16 * alpha as u16 + bg_b as u16 * inv_alpha)
+                                    / 255) as u8;
+                                self.frame[idx] = r;
+                                self.frame[idx + 1] = g;
+                                self.frame[idx + 2] = b;
+                                self.frame[idx + 3] = 0xff;
                             }
                         }
                     }
-                    x_cursor += w as i32;
+                    x_cursor += metrics.advance_width.round() as i32;
                 }
             }
         }

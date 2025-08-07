@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Button helpers and IconButton component for rlvgl-ui.
 //!
 //! Provides a convenient icon-only button wrapper built atop the base widget.

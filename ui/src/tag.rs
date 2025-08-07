@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Tag component for rlvgl-ui.
 //!
 //! Tags are lightweight buttons commonly used for categorization or filters.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Builder utilities for constructing styles.
 
 pub use rlvgl_core::widget::Color;

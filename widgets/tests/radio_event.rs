@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Event test ensuring Radio toggles when clicked.
 
 use rlvgl_core::{

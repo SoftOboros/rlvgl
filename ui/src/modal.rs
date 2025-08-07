@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Modal component for rlvgl-ui.
 //!
 //! Provides a full-screen container with centered text, useful for dialogs.

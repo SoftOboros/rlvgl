@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Radio button widget for mutually exclusive selections.
 
 use alloc::string::String;
@@ -73,8 +73,8 @@ impl Widget for Radio {
             renderer.fill_rect(inner, self.dot_color);
         }
 
-        // Draw label text to the right of the circle.
-        let text_pos = (self.bounds.x + size + 4, self.bounds.y);
+        // Draw label text to the right of the circle with baseline at the bottom.
+        let text_pos = (self.bounds.x + size + 4, self.bounds.y + self.bounds.height);
         renderer.draw_text(text_pos, &self.text, self.text_color);
     }
 

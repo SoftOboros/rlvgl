@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Badge component for rlvgl-ui.
 //!
 //! Provides a tiny label wrapper useful for status chips or counters.

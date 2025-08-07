@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Minimal rlvgl-ui style demo.
 //!
 //! Builds a style using tokens from a Material-like theme.
