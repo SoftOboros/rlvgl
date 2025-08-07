@@ -92,9 +92,15 @@ fn render_text_top_aligned_to_framebuffer(
 /// Optionally dump `ascii` to files for manual inspection.
 /// Set the `ASCII_OUT` environment variable to a directory to enable.
 fn maybe_write_ascii(name: &str, ascii: &str) {
+    println!("CWD: {:?}", std::env::current_dir());
     if let Ok(dir) = std::env::var("ASCII_OUT") {
         let path = std::path::Path::new(&dir).join(format!("{name}.txt"));
-        let _ = std::fs::write(path, ascii);
+        match std::fs::write(&path, ascii) {
+            Ok(_) => println!("Wrote ASCII to {:?}", path),
+            Err(e) => eprintln!("Failed to write ASCII to {:?}: {}", path, e),
+        }
+    } else {
+        eprintln!("ASCII_OUT not set — skipping output");
     }
 }
 
