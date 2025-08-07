@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! High-level style and theme utilities for rlvgl UI components.
 
 extern crate alloc;

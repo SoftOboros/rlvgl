@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Alert component for rlvgl-ui.
 //!
 //! Combines a simple container and label to display informational messages.

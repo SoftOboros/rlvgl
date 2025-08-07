@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Text and heading helpers for rlvgl-ui.
 //!
 //! Provides simple wrappers around the base label widget for body text and

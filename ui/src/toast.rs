@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Toast component for rlvgl-ui.
 //!
 //! Lightweight notification label that can be styled and dismissed.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT
 //! Radio component with change callbacks for rlvgl-ui.
 //!
 //! Wraps the base radio widget and exposes a builder-style `on_change`
