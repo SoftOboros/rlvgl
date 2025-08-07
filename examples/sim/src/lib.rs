@@ -327,7 +327,7 @@ impl<'a> Renderer for PixelsRenderer<'a> {
         #[cfg(feature = "fontdue")]
         {
             if let Ok(vm) = line_metrics(FONT_DATA, 16.0) {
-                let baseline = position.1 + vm.ascent.round() as i32;
+                let baseline = position.1 + vm.descent.round() as i32;
                 let mut x_cursor = position.0;
                 for ch in text.chars() {
                     if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
