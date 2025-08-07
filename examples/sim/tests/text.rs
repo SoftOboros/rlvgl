@@ -89,30 +89,55 @@ fn render_text_top_aligned_to_framebuffer(
     }
 }
 
+/// Optionally dump `ascii` to files for manual inspection.
+/// Set the `ASCII_OUT` environment variable to a directory to enable.
+fn maybe_write_ascii(name: &str, ascii: &str) {
+    if let Ok(dir) = std::env::var("ASCII_OUT") {
+        let path = std::path::Path::new(&dir).join(format!("{name}.txt"));
+        let _ = std::fs::write(path, ascii);
+    }
+}
+
 #[test]
-fn test_descenders_align_below_baseline() {
+fn test_descenders_render_below_baseline() {
     const W: usize = 320;
     const H: usize = 240;
     let mut fb = vec![0u8; W * H];
-    let baseline = 200i32;
-    render_text_to_framebuffer("gpq", &mut fb, W, H, 16.0, baseline);
+    let bottom_y = 200i32;
+    const TEXT: &str = "bgpq";
+    render_text_to_framebuffer(TEXT, &mut fb, W, H, 16.0, bottom_y);
     let ascii = dump_ascii_frame(&fb, W, H);
-    assert!(
-        ascii
-            .lines()
-            .nth(baseline as usize)
-            .unwrap()
-            .chars()
-            .any(|c| c != ' ')
-    );
-    assert!(
-        ascii
-            .lines()
-            .nth(baseline as usize + 1)
-            .unwrap()
-            .chars()
-            .any(|c| c != ' ')
-    );
+    maybe_write_ascii("descenders", &ascii);
+
+    let baseline = bottom_y;
+    let mut top_line = baseline;
+    let mut bottom_line = baseline;
+    for (y, line) in ascii.lines().enumerate() {
+        if line.chars().any(|c| c != ' ') {
+            let y = y as i32;
+            if y < top_line {
+                top_line = y;
+            }
+            if y > bottom_line {
+                bottom_line = y;
+            }
+        }
+    }
+
+    let observed_above = baseline - top_line;
+    let observed_below = bottom_line - baseline;
+
+    let mut expected_above = 0;
+    let mut expected_below = 0;
+    for ch in TEXT.chars() {
+        if let Ok((_, m)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+            expected_above = expected_above.max(-m.ymin);
+            expected_below = expected_below.max(m.height as i32 + m.ymin);
+        }
+    }
+
+    assert_eq!(observed_above, expected_above);
+    assert!((observed_below - expected_below).abs() <= 1);
 }
 
 #[test]
