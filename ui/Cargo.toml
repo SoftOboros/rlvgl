@@ -14,3 +14,4 @@ rlvgl-widgets = { path = "../widgets", version = "0.1.3", default-features = fal
 
 [features]
 view = []
+default = []
