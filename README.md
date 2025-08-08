@@ -29,13 +29,14 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
 - [support](https://github.com/SoftOboros/rlvgl/blob/main/support/README.md)/ – Fonts, geometry, style, color utils
 - [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
-- [rlvgl-sim](https://github.com/SoftOboros/rlvgl/tree/main/examples/sim)/ – Desktop simulator example
+- [rlvgl-sim](https://github.com/SoftOboros/rlvgl/tree/main/examples/sim/README.md)/ – Desktop simulator example
 ## Status
 
 As-built. See [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md) for component-by-component progress.
 - [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md)
 - [TEST-TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TEST-TODO.md)
 - [TODO-PLUGINS](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-PLUGINS.md)
+- [TODO-UI](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-UI.md)
 
 As of 0.1.0 many features are implemented and an 87% unit test coverage
 is achived, but functional testing has and bare metal testing have not

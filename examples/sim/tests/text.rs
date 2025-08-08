@@ -37,7 +37,7 @@ fn render_text_to_framebuffer(
     let baseline_y = bottom_y - vm.descent.round() as i32;
     let mut x_cursor = 0f32;
     for ch in text.chars() {
-        if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, size) {
+        if let Ok((metrics, bitmap)) = rasterize_glyph(FONT_DATA, ch, size) {
             let draw_y = baseline_y + metrics.ymin;
             for y in 0..metrics.height {
                 let py = draw_y + y as i32;
@@ -69,7 +69,7 @@ fn render_text_top_aligned_to_framebuffer(
 ) {
     let mut x_cursor = 0f32;
     for ch in text.chars() {
-        if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, size) {
+        if let Ok((metrics, bitmap)) = rasterize_glyph(FONT_DATA, ch, size) {
             let draw_y = top_y;
             for y in 0..metrics.height {
                 let py = draw_y + y as i32;
@@ -138,7 +138,7 @@ fn test_descenders_render_below_baseline() {
     let mut expected_above = 0;
     let mut expected_below = 0;
     for ch in TEXT.chars() {
-        if let Ok((_, m)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+        if let Ok((m, _)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
             expected_above = expected_above.max(-m.ymin);
             expected_below = expected_below.max(m.height as i32 + m.ymin);
         }
@@ -152,7 +152,7 @@ fn test_descenders_render_below_baseline() {
     let below_line = lines[(baseline + 1) as usize].as_bytes();
     let mut x_cursor = 0f32;
     for ch in TEXT.chars() {
-        if let Ok((_, m)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+        if let Ok((m, _)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
             let start = (x_cursor as i32 + m.xmin).max(0) as usize;
             let end = start + m.width;
             assert!(baseline_line[start..end].iter().any(|&b| b != b' '));
