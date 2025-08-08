@@ -345,7 +345,7 @@ impl<'a> Renderer for PixelsRenderer<'a> {
                             if px < 0 || (px as usize) >= self.width {
                                 continue;
                             }
-                            let alpha = bitmap[(h-1-y) as usize * metrics.width + x as usize];
+                            let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
                             if alpha > 0 {
                                 let idx = ((py as usize) * self.width + px as usize) * 4;
                                 let bg_r = self.frame[idx];

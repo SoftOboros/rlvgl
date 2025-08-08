@@ -23,7 +23,9 @@ fn get_cached_font(font_data: &[u8]) -> Font {
     let mut map = cache.lock().unwrap();
 
     map.entry(key)
-        .or_insert_with(|| Font::from_bytes(font_data, FontSettings::default()).expect("valid font"))
+        .or_insert_with(|| {
+            Font::from_bytes(font_data, FontSettings::default()).expect("valid font")
+        })
         .clone()
 }
 
@@ -38,7 +40,6 @@ pub fn rasterize_glyph(font_data: &[u8], ch: char, px: f32) -> FontResult<(Metri
     let font = get_cached_font(font_data);
     Ok(font.rasterize(ch, px))
 }
-
 
 /// Retrieve horizontal line metrics for `font_data` at `px` height.
 ///
