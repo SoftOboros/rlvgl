@@ -3,6 +3,7 @@
 //!
 //! These wrappers provide simple text fields backed by the base label widget.
 
+use alloc::boxed::Box;
 use rlvgl_core::{
     event::Event,
     renderer::Renderer,
@@ -10,10 +11,13 @@ use rlvgl_core::{
 };
 use rlvgl_widgets::label::Label;
 
+/// Callback type invoked when an input's text changes.
+type ChangeCallback = Box<dyn FnMut(&str)>;
+
 /// Single-line text input component.
 pub struct Input {
     inner: Label,
-    on_change: Option<Box<dyn FnMut(&str)>>,
+    on_change: Option<ChangeCallback>,
 }
 
 impl Input {

@@ -4,7 +4,8 @@
 //! Maps human-readable icon names to LVGL built-in symbol codepoints and
 //! provides a fluent `icon` method on buttons.
 
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
+use core::fmt::Write;
 use rlvgl_widgets::button::Button;
 
 /// Resolve a human-friendly icon name to an LVGL symbol string.
@@ -27,7 +28,10 @@ impl Icon for Button {
     fn icon(mut self, name: &str) -> Self {
         if let Some(sym) = lookup(name) {
             let text = self.text().to_string();
-            self.set_text(format!("{sym} {text}"));
+            let mut buf = String::new();
+            // Write formatted text into the buffer; writing to a String cannot fail.
+            let _ = write!(&mut buf, "{sym} {text}");
+            self.set_text(&buf);
         }
         self
     }

@@ -326,18 +326,16 @@ impl<'a> Renderer for PixelsRenderer<'a> {
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
         #[cfg(feature = "fontdue")]
         {
-            let vm = match line_metrics(FONT_DATA, 16.0) {
-                Ok(m) => m,
-                Err(_) => return,
-            };
-            let baseline = position.1 + vm.descent.round() as i32;
+            let vm = line_metrics(FONT_DATA, 16.0).unwrap();
+            let baseline = position.1 - vm.descent.round() as i32;
             let mut x_cursor = position.0;
             for ch in text.chars() {
                 if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
                     let w = metrics.width as i32;
                     let h = metrics.height as i32;
+                    let draw_y = baseline + metrics.ymin;
                     for y in 0..h {
-                        let py = baseline + metrics.ymin + y;
+                        let py = draw_y + y;
                         if py < 0 || (py as usize) >= self.height {
                             continue;
                         }
