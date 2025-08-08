@@ -80,10 +80,11 @@ impl Widget for Slider {
         let before = self.inner.value();
         let handled = self.inner.handle_event(event);
         let after = self.inner.value();
-        if handled && after != before {
-            if let Some(cb) = self.on_change.as_mut() {
-                cb(after);
-            }
+        if !handled || after == before {
+            return handled;
+        }
+        if let Some(cb) = self.on_change.as_mut() {
+            cb(after);
         }
         handled
     }

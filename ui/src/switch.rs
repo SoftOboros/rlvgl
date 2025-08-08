@@ -67,10 +67,11 @@ impl Widget for Switch {
         let before = self.inner.is_on();
         let handled = self.inner.handle_event(event);
         let after = self.inner.is_on();
-        if handled && before != after {
-            if let Some(cb) = self.on_change.as_mut() {
-                cb(after);
-            }
+        if !handled || before == after {
+            return handled;
+        }
+        if let Some(cb) = self.on_change.as_mut() {
+            cb(after);
         }
         handled
     }
