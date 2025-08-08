@@ -15,6 +15,7 @@ use rlvgl_widgets::label::Label;
 type ChangeCallback = Box<dyn FnMut(&str)>;
 
 /// Single-line text input component.
+#[allow(clippy::type_complexity)]
 pub struct Input {
     inner: Label,
     on_change: Option<ChangeCallback>,
