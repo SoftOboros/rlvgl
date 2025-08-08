@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! High-level style and theme utilities for rlvgl UI components.
 
+#![no_std]
+
 extern crate alloc;
 
 pub mod alert;
