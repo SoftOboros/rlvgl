@@ -22,7 +22,7 @@ use rlvgl::core::{
     widget::{Color, Rect, Widget},
 };
 #[cfg(feature = "fontdue")]
-use rlvgl::fontdue::rasterize_glyph;
+use rlvgl::fontdue::{line_metrics, rasterize_glyph};
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
