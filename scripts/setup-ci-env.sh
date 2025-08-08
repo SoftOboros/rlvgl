@@ -16,6 +16,7 @@ sudo apt-get install -y \
     llvm-dev \
     libclang-dev \
     clang \
+    librlottie0-1 \
     libsdl2-dev \
     xvfb \
     libxrender1 \
@@ -41,17 +42,17 @@ sudo python3 -m venv /opt/venv
 INSTALL_PREFIX="${GITHUB_WORKSPACE:-$PWD}/install"
 
 # Build and install rlottie locally
-git clone https://github.com/Samsung/rlottie
-cd rlottie && mkdir build && cd build
-cmake .. \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-    -DLIB_INSTALL_DIR=lib \
-    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-make -j"$(nproc)"
-make install
-cd ../..
+#git clone https://github.com/Samsung/rlottie
+#cd rlottie && mkdir build && cd build
+#cmake .. \
+#    -DCMAKE_C_COMPILER=clang \
+#    -DCMAKE_CXX_COMPILER=clang++ \
+#    -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+#    -DLIB_INSTALL_DIR=lib \
+#    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+#make -j"$(nproc)"
+#make install
+#cd ../..
 
 # Export environment variables to future steps
 echo "PATH=/opt/venv/bin:$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"

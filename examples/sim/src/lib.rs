@@ -81,7 +81,7 @@ pub fn build_demo() -> Demo {
     }));
 
     let label = Label::new(
-        "rlvgl demo",
+        "rlvgl Demo",
         Rect {
             x: 10,
             y: 10,
@@ -327,15 +327,16 @@ impl<'a> Renderer for PixelsRenderer<'a> {
         #[cfg(feature = "fontdue")]
         {
             let vm = line_metrics(FONT_DATA, 16.0).unwrap();
-            let baseline = position.1 - vm.descent.round() as i32;
+            let ascent = vm.ascent.round() as i32;
+            let baseline = position.1 + ascent;
             let mut x_cursor = position.0;
             for ch in text.chars() {
-                if let Ok((bitmap, metrics)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
+                if let Ok((metrics, bitmap)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
                     let w = metrics.width as i32;
                     let h = metrics.height as i32;
-                    let draw_y = baseline + metrics.ymin;
+                    let draw_y = baseline - ascent - metrics.ymin;
                     for y in 0..h {
-                        let py = draw_y + y;
+                        let py = draw_y - y;
                         if py < 0 || (py as usize) >= self.height {
                             continue;
                         }
@@ -344,7 +345,7 @@ impl<'a> Renderer for PixelsRenderer<'a> {
                             if px < 0 || (px as usize) >= self.width {
                                 continue;
                             }
-                            let alpha = bitmap[y as usize * metrics.width + x as usize];
+                            let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
                             if alpha > 0 {
                                 let idx = ((py as usize) * self.width + px as usize) * 4;
                                 let bg_r = self.frame[idx];
