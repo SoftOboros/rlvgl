@@ -9,7 +9,7 @@ use eframe::{self, egui};
 #[cfg(feature = "simulator")]
 use pixels::{Pixels, SurfaceTexture};
 #[cfg(feature = "simulator")]
-use std::{backtrace::Backtrace, panic};
+use std::{backtrace::Backtrace, eprintln, panic};
 #[cfg(feature = "simulator")]
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
@@ -112,6 +112,14 @@ fn show_panic_window(message: String) {
         ..Default::default()
     };
 
+    let msg_copy = message.clone();
+    if let Err(e) = eframe::run_native(
+        "rlvgl panic",
+        options,
+        Box::new(|_| Box::new(PanicApp { msg: message })),
+    ) {
+        eprintln!("{msg_copy}\nfailed to show panic window: {e}");
+    }
     let _ = eframe::run_native(
         "rlvgl panic",
         options,

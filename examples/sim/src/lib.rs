@@ -28,6 +28,8 @@ pub struct Demo {
     pub counter: Rc<RefCell<u32>>,
     /// Widgets scheduled to be appended after event dispatch.
     pub pending: Rc<RefCell<Vec<WidgetNode>>>,
+    /// Widget handles scheduled for removal after event dispatch.
+    pub to_remove: Rc<RefCell<Vec<WidgetHandle>>>,
 }
 
 /// Build a simple widget tree demonstrating basic rlvgl widgets.
@@ -39,6 +41,7 @@ pub struct Demo {
 pub fn build_demo() -> Demo {
     let click_count = Rc::new(RefCell::new(0));
     let pending = Rc::new(RefCell::new(Vec::new()));
+    let to_remove = Rc::new(RefCell::new(Vec::new()));
 
     let button = Rc::new(RefCell::new(Button::new(
         "Clicks: 0",
@@ -100,17 +103,14 @@ pub fn build_demo() -> Demo {
     let qr_demo: WidgetSlot = Rc::new(RefCell::new(None));
     let png_demo: WidgetSlot = Rc::new(RefCell::new(None));
     {
-        let pending_ref = pending.clone();
-        let root_ref = root.clone();
+        let pending_add = pending.clone();
+        let pending_rm = to_remove.clone();
         let menu_ref = menu_widget.clone();
         let qr_ref = qr_demo.clone();
         let png_ref = png_demo.clone();
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
             if let Some(menu_w) = menu_ref.borrow_mut().take() {
-                root_ref
-                    .borrow_mut()
-                    .children
-                    .retain(|n| !Rc::ptr_eq(&n.widget, &menu_w));
+                pending_rm.borrow_mut().push(menu_w);
             } else {
                 let menu_w: WidgetHandle = Rc::new(RefCell::new(Container::new(Rect {
                     x: 10,
@@ -133,19 +133,17 @@ pub fn build_demo() -> Demo {
                     },
                 )));
                 {
-                    let pending_ref = pending_ref.clone();
-                    let root = root_ref.clone();
+                    let pending_add = pending_add.clone();
+                    let pending_rm = pending_rm.clone();
                     let qr_demo = qr_ref.clone();
                     qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
                         if let Some(qr_w) = qr_demo.borrow_mut().take() {
-                            root.borrow_mut()
-                                .children
-                                .retain(|n| !Rc::ptr_eq(&n.widget, &qr_w));
+                            pending_rm.borrow_mut().push(qr_w);
                         } else {
                             let demo = build_plugin_demo();
                             let handle = demo.widget.clone();
                             qr_demo.borrow_mut().replace(handle.clone());
-                            pending_ref.borrow_mut().push(demo);
+                            pending_add.borrow_mut().push(demo);
                         }
                     });
                 }
@@ -164,21 +162,19 @@ pub fn build_demo() -> Demo {
                     },
                 )));
                 {
-                    let pending_ref = pending_ref.clone();
-                    let root = root_ref.clone();
+                    let pending_add = pending_add.clone();
+                    let pending_rm = pending_rm.clone();
                     let png_demo = png_ref.clone();
                     png_button
                         .borrow_mut()
                         .set_on_click(move |_b: &mut Button| {
                             if let Some(png_w) = png_demo.borrow_mut().take() {
-                                root.borrow_mut()
-                                    .children
-                                    .retain(|n| !Rc::ptr_eq(&n.widget, &png_w));
+                                pending_rm.borrow_mut().push(png_w);
                             } else {
                                 let demo = build_png_demo();
                                 let handle = demo.widget.clone();
                                 png_demo.borrow_mut().replace(handle.clone());
-                                pending_ref.borrow_mut().push(demo);
+                                pending_add.borrow_mut().push(demo);
                             }
                         });
                 }
@@ -188,7 +184,7 @@ pub fn build_demo() -> Demo {
                 });
 
                 menu_ref.borrow_mut().replace(menu_w);
-                pending_ref.borrow_mut().push(menu);
+                pending_add.borrow_mut().push(menu);
             }
         });
     }
@@ -201,6 +197,7 @@ pub fn build_demo() -> Demo {
         root,
         counter: click_count,
         pending,
+        to_remove,
     }
 }
 
@@ -211,7 +208,7 @@ pub fn build_plugin_demo() -> WidgetNode {
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
             Rect {
-                x: 150,
+                x: 200,
                 y: 40,
                 width: width as i32,
                 height: height as i32,
@@ -287,8 +284,17 @@ pub fn build_png_demo() -> WidgetNode {
 }
 
 /// Flush any widgets queued during event callbacks into the root tree.
-pub fn flush_pending(root: &Rc<RefCell<WidgetNode>>, pending: &Rc<RefCell<Vec<WidgetNode>>>) {
+pub fn flush_pending(
+    root: &Rc<RefCell<WidgetNode>>,
+    pending: &Rc<RefCell<Vec<WidgetNode>>>,
+    to_remove: &Rc<RefCell<Vec<WidgetHandle>>>,
+) {
     let mut root_ref = root.borrow_mut();
+    for handle in to_remove.borrow_mut().drain(..) {
+        root_ref
+            .children
+            .retain(|n| !Rc::ptr_eq(&n.widget, &handle));
+    }
     let mut pending_nodes = pending.borrow_mut();
     root_ref.children.extend(pending_nodes.drain(..));
 }
