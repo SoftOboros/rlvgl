@@ -19,6 +19,41 @@ impl Renderer for CountRenderer {
     }
 }
 
+struct FramebufferRenderer {
+    buf: Vec<Color>,
+    width: usize,
+    height: usize,
+}
+
+impl FramebufferRenderer {
+    fn new(width: usize, height: usize) -> Self {
+        Self {
+            buf: vec![Color(255, 255, 255); width * height],
+            width,
+            height,
+        }
+    }
+
+    fn pixel(&self, x: i32, y: i32) -> Color {
+        self.buf[y as usize * self.width + x as usize]
+    }
+}
+
+impl Renderer for FramebufferRenderer {
+    fn fill_rect(&mut self, rect: Rect, color: Color) {
+        let x0 = rect.x.max(0) as usize;
+        let y0 = rect.y.max(0) as usize;
+        let x1 = (rect.x + rect.width).min(self.width as i32) as usize;
+        let y1 = (rect.y + rect.height).min(self.height as i32) as usize;
+        for y in y0..y1 {
+            for x in x0..x1 {
+                self.buf[y * self.width + x] = color;
+            }
+        }
+    }
+    fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
+}
+
 #[test]
 fn demo_draws_widgets() {
     let Demo { root, .. } = build_demo();
@@ -33,13 +68,14 @@ fn button_click_increments_counter() {
         root,
         counter,
         pending,
+        to_remove,
     } = build_demo();
     assert_eq!(*counter.borrow(), 0);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 20, y: 50 })
     );
-    flush_pending(&root, &pending);
+    flush_pending(&root, &pending, &to_remove);
     assert_eq!(*counter.borrow(), 1);
 }
 
@@ -72,32 +108,73 @@ fn scaled_png_clamped_within_bounds() {
 
 #[test]
 fn plugins_button_adds_demo() {
-    let Demo { root, pending, .. } = build_demo();
+    let Demo {
+        root,
+        pending,
+        to_remove,
+        ..
+    } = build_demo();
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
     );
-    flush_pending(&root, &pending);
+    flush_pending(&root, &pending, &to_remove);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
     );
-    flush_pending(&root, &pending);
+    flush_pending(&root, &pending, &to_remove);
     assert!(root.borrow().children.len() > 3);
 }
 
 #[test]
 fn png_button_adds_demo() {
-    let Demo { root, pending, .. } = build_demo();
+    let Demo {
+        root,
+        pending,
+        to_remove,
+        ..
+    } = build_demo();
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
     );
-    flush_pending(&root, &pending);
+    flush_pending(&root, &pending, &to_remove);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 30, y: 120 })
     );
-    flush_pending(&root, &pending);
+    flush_pending(&root, &pending, &to_remove);
     assert!(root.borrow().children.len() > 3);
+}
+
+#[test]
+fn qr_button_toggles_qrcode() {
+    let Demo {
+        root,
+        pending,
+        to_remove,
+        ..
+    } = build_demo();
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
+    );
+    flush_pending(&root, &pending, &to_remove);
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
+    );
+    flush_pending(&root, &pending, &to_remove);
+    let mut fb = FramebufferRenderer::new(320, 240);
+    root.borrow().draw(&mut fb);
+    assert_ne!(fb.pixel(201, 41), Color(255, 255, 255));
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
+    );
+    flush_pending(&root, &pending, &to_remove);
+    let mut fb = FramebufferRenderer::new(320, 240);
+    root.borrow().draw(&mut fb);
+    assert_eq!(fb.pixel(201, 41), Color(255, 255, 255));
 }
