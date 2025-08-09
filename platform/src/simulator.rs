@@ -120,11 +120,6 @@ fn show_panic_window(message: String) {
     ) {
         eprintln!("{msg_copy}\nfailed to show panic window: {e}");
     }
-    let _ = eframe::run_native(
-        "rlvgl panic",
-        options,
-        Box::new(|_| Box::new(PanicApp { msg: message })),
-    );
 }
 
 #[cfg(feature = "simulator")]

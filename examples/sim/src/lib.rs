@@ -225,7 +225,7 @@ pub fn build_plugin_demo() -> WidgetNode {
 ///
 /// `scale` controls the desired scaling factor. The final image is clamped so
 /// it never exceeds the 320x240 screen bounds, and it is anchored to the lower
-/// left corner of the display.
+/// right corner of the display.
 pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     let data = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -260,7 +260,7 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     }
     let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
 
-    let x_pos = 0;
+    let x_pos = (root_w - new_w) as i32;
     let y_pos = (root_h - new_h) as i32;
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
@@ -278,9 +278,9 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     }
 }
 
-/// Build a PNG demo using the default scale of `1.0`.
+/// Build a PNG demo using the default scale of `0.5`.
 pub fn build_png_demo() -> WidgetNode {
-    build_png_demo_scaled(1.0)
+    build_png_demo_scaled(0.5)
 }
 
 /// Flush any widgets queued during event callbacks into the root tree.
