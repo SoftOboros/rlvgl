@@ -237,7 +237,6 @@ pub fn build_demo() -> Demo {
 /// Build a widget demonstrating plugin features such as QR code generation.
 pub fn build_plugin_demo() -> WidgetNode {
     let (pixels_vec, width, _) = qrcode::generate(b"https://github.com/SoftOboros/rlvgl").unwrap();
-    let width = width as u32;
     let target = 240u32;
     let scale = target as f32 / width as f32;
     let new_w = target;

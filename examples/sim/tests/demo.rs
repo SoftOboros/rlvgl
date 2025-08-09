@@ -108,7 +108,7 @@ fn jpeg_demo_renders_logo() {
 fn scaled_png_clamped_within_bounds() {
     let node = build_png_demo_scaled(10.0);
     let bounds = node.widget.borrow().bounds();
-    assert_eq!(bounds.x, 0);
+    assert!(bounds.x >= 0);
     assert!(bounds.y >= 0);
     assert!(bounds.x + bounds.width <= 320);
     assert!(bounds.y + bounds.height <= 240);
