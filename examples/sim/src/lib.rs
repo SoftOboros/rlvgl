@@ -237,7 +237,10 @@ pub fn build_demo() -> Demo {
 /// Build a widget demonstrating plugin features such as QR code generation.
 pub fn build_plugin_demo() -> WidgetNode {
     let (pixels_vec, width, _) = qrcode::generate(b"https://github.com/SoftOboros/rlvgl").unwrap();
-    let target = 240u32;
+    let root_w = 320u32;
+    let root_h = 240u32;
+    // Match the area used by the PNG/JPEG demos: the lower-right 2/3rds of the display.
+    let target = (root_h * 2 / 3) as u32;
     let scale = target as f32 / width as f32;
     let new_w = target;
     let new_h = target;
@@ -252,8 +255,8 @@ pub fn build_plugin_demo() -> WidgetNode {
         }
     }
     let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
-    let x_pos = (320 - new_w) as i32;
-    let y_pos = (240 - new_h) as i32;
+    let x_pos = (root_w - new_w) as i32;
+    let y_pos = (root_h - new_h) as i32;
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
             Rect {
