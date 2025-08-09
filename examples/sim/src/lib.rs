@@ -10,22 +10,11 @@ extern crate alloc;
 use alloc::{boxed::Box, format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
-#[cfg(not(feature = "fontdue"))]
-use embedded_graphics::{
-    mono_font::{MonoTextStyle, ascii::FONT_6X10},
-    text::Text,
-};
-use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use rlvgl::core::{
     WidgetNode, png, qrcode,
-    renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
-#[cfg(feature = "fontdue")]
-use rlvgl::fontdue::{line_metrics, rasterize_glyph};
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
-#[cfg(feature = "fontdue")]
-const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
 
 type WidgetHandle = Rc<RefCell<dyn Widget>>;
 type WidgetSlot = Rc<RefCell<Option<WidgetHandle>>>;
@@ -236,33 +225,51 @@ pub fn build_plugin_demo() -> WidgetNode {
 }
 
 /// Build a widget displaying the rlvgl logo decoded from a PNG asset.
-pub fn build_png_demo() -> WidgetNode {
+///
+/// `scale` controls the desired scaling factor. The final image is clamped so
+/// it never exceeds the 320x240 screen bounds, and it is anchored to the lower
+/// left corner of the display.
+pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     let data = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/assets/rlvgl-logo.png"
     ));
-    let (pixels_vec, width, height) = png::decode(data).unwrap();
-    let max_dim = 100u32;
-    let scale = (max_dim as f32 / width as f32)
-        .min(max_dim as f32 / height as f32)
-        .min(1.0);
-    let new_w = (width as f32 * scale).round() as u32;
-    let new_h = (height as f32 * scale).round() as u32;
+    let (pixels_vec, width, height) =
+        png::decode(data).expect("failed to decode built-in PNG asset");
+
+    let root_w = 320u32;
+    let root_h = 240u32;
+    let mut scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    scale = scale
+        .min(root_w as f32 / width as f32)
+        .min(root_h as f32 / height as f32);
+
+    let new_w = (width as f32 * scale).max(1.0).round() as u32;
+    let new_h = (height as f32 * scale).max(1.0).round() as u32;
+
     let mut scaled = Vec::with_capacity((new_w * new_h) as usize);
     for y in 0..new_h {
         for x in 0..new_w {
             let src_x = (x as f32 / scale).floor() as usize;
             let src_y = (y as f32 / scale).floor() as usize;
             let idx = src_y * width as usize + src_x;
-            scaled.push(pixels_vec[idx]);
+            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0));
+            scaled.push(color);
         }
     }
     let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
+
+    let x_pos = 0;
+    let y_pos = (root_h - new_h) as i32;
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
             Rect {
-                x: 150,
-                y: 40,
+                x: x_pos,
+                y: y_pos,
                 width: new_w as i32,
                 height: new_h as i32,
             },
@@ -274,128 +281,16 @@ pub fn build_png_demo() -> WidgetNode {
     }
 }
 
+/// Build a PNG demo using the default scale of `1.0`.
+pub fn build_png_demo() -> WidgetNode {
+    build_png_demo_scaled(1.0)
+}
+
 /// Flush any widgets queued during event callbacks into the root tree.
 pub fn flush_pending(root: &Rc<RefCell<WidgetNode>>, pending: &Rc<RefCell<Vec<WidgetNode>>>) {
     let mut root_ref = root.borrow_mut();
     let mut pending_nodes = pending.borrow_mut();
     root_ref.children.extend(pending_nodes.drain(..));
-}
-
-/// Renderer that draws into the pixel buffer supplied by [`PixelsDisplay`].
-pub struct PixelsRenderer<'a> {
-    frame: &'a mut [u8],
-    width: usize,
-    height: usize,
-}
-
-impl<'a> PixelsRenderer<'a> {
-    /// Create a new renderer for the given frame buffer.
-    pub fn new(frame: &'a mut [u8], width: usize, height: usize) -> Self {
-        Self {
-            frame,
-            width,
-            height,
-        }
-    }
-
-    fn put_pixel(&mut self, x: i32, y: i32, color: Rgb888) {
-        if x >= 0 && y >= 0 && (x as usize) < self.width && (y as usize) < self.height {
-            let idx = ((y as usize) * self.width + x as usize) * 4;
-            self.frame[idx] = color.r();
-            self.frame[idx + 1] = color.g();
-            self.frame[idx + 2] = color.b();
-            self.frame[idx + 3] = 0xff;
-        }
-    }
-}
-
-impl<'a> Renderer for PixelsRenderer<'a> {
-    fn fill_rect(&mut self, rect: Rect, color: Color) {
-        let rgb = Rgb888::new(color.0, color.1, color.2);
-        let x0 = rect.x.max(0);
-        let y0 = rect.y.max(0);
-        let x1 = (rect.x + rect.width).min(self.width as i32);
-        let y1 = (rect.y + rect.height).min(self.height as i32);
-        for y in y0..y1 {
-            for x in x0..x1 {
-                self.put_pixel(x, y, rgb);
-            }
-        }
-    }
-
-    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
-        #[cfg(feature = "fontdue")]
-        {
-            let vm = line_metrics(FONT_DATA, 16.0).unwrap();
-            let ascent = vm.ascent.round() as i32;
-            let baseline = position.1 + ascent;
-            let mut x_cursor = position.0;
-            for ch in text.chars() {
-                if let Ok((metrics, bitmap)) = rasterize_glyph(FONT_DATA, ch, 16.0) {
-                    let w = metrics.width as i32;
-                    let h = metrics.height as i32;
-                    let draw_y = baseline - ascent - metrics.ymin;
-                    for y in 0..h {
-                        let py = draw_y - y;
-                        if py < 0 || (py as usize) >= self.height {
-                            continue;
-                        }
-                        for x in 0..w {
-                            let px = x_cursor + metrics.xmin + x;
-                            if px < 0 || (px as usize) >= self.width {
-                                continue;
-                            }
-                            let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
-                            if alpha > 0 {
-                                let idx = ((py as usize) * self.width + px as usize) * 4;
-                                let bg_r = self.frame[idx];
-                                let bg_g = self.frame[idx + 1];
-                                let bg_b = self.frame[idx + 2];
-                                let inv_alpha = 255 - alpha as u16;
-                                let r = ((color.0 as u16 * alpha as u16 + bg_r as u16 * inv_alpha)
-                                    / 255) as u8;
-                                let g = ((color.1 as u16 * alpha as u16 + bg_g as u16 * inv_alpha)
-                                    / 255) as u8;
-                                let b = ((color.2 as u16 * alpha as u16 + bg_b as u16 * inv_alpha)
-                                    / 255) as u8;
-                                self.frame[idx] = r;
-                                self.frame[idx + 1] = g;
-                                self.frame[idx + 2] = b;
-                                self.frame[idx + 3] = 0xff;
-                            }
-                        }
-                    }
-                    x_cursor += metrics.advance_width.round() as i32;
-                }
-            }
-        }
-        #[cfg(not(feature = "fontdue"))]
-        {
-            let style = MonoTextStyle::new(&FONT_6X10, Rgb888::new(color.0, color.1, color.2));
-            let _ = Text::new(text, Point::new(position.0, position.1), style).draw(self);
-        }
-    }
-}
-
-impl<'a> DrawTarget for PixelsRenderer<'a> {
-    type Color = Rgb888;
-    type Error = core::convert::Infallible;
-
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = Pixel<Self::Color>>,
-    {
-        for Pixel(point, color) in pixels {
-            self.put_pixel(point.x, point.y, color);
-        }
-        Ok(())
-    }
-}
-
-impl<'a> OriginDimensions for PixelsRenderer<'a> {
-    fn size(&self) -> Size {
-        Size::new(self.width as u32, self.height as u32)
-    }
 }
 
 #[cfg(test)]
