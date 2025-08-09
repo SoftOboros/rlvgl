@@ -3,11 +3,11 @@
 //! The window can be resized by the user and will scale the simulated
 //! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
-use alloc::{boxed::Box, format, vec::Vec};
+use alloc::{boxed::Box, format, string::String, vec::Vec};
+#[cfg(feature = "simulator")]
+use eframe::{self, egui};
 #[cfg(feature = "simulator")]
 use pixels::{Pixels, SurfaceTexture};
-#[cfg(feature = "simulator")]
-use rfd::{MessageButtons, MessageDialog};
 #[cfg(feature = "simulator")]
 use std::{backtrace::Backtrace, panic};
 #[cfg(feature = "simulator")]
@@ -60,6 +60,66 @@ fn generate_tiles_from_window(window: &Window, max_tile_size: u32) -> Vec<Tile> 
 }
 
 #[cfg(feature = "simulator")]
+/// Display a panic message in a scrollable window limited to the screen size.
+fn show_panic_window(message: String) {
+    /// Simple `eframe` application rendering the panic text.
+    struct PanicApp {
+        msg: String,
+    }
+
+    impl eframe::App for PanicApp {
+        fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.heading("rlvgl panic");
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.add(egui::TextEdit::multiline(&mut self.msg).desired_width(f32::INFINITY));
+                });
+                ui.horizontal(|ui| {
+                    if ui.button("Copy").clicked() {
+                        ctx.output_mut(|o| o.copied_text = self.msg.clone());
+                    }
+                    if ui.button("Close").clicked() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                });
+            });
+        }
+    }
+
+    let event_loop = EventLoop::new().expect("failed to create event loop");
+    #[allow(deprecated)]
+    let hidden_window = event_loop
+        .create_window(Window::default_attributes().with_visible(false))
+        .expect("failed to create window");
+    let monitor_size = hidden_window
+        .current_monitor()
+        .map(|m| m.size())
+        .unwrap_or(PhysicalSize::new(800, 600));
+    drop(hidden_window);
+    drop(event_loop);
+
+    let max = egui::vec2(monitor_size.width as f32, monitor_size.height as f32);
+    let initial = egui::vec2(max.x * 0.8, max.y * 0.8);
+
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size(initial)
+        .with_max_inner_size(max)
+        .with_decorations(true)
+        .with_resizable(true);
+
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+
+    let _ = eframe::run_native(
+        "rlvgl panic",
+        options,
+        Box::new(|_| Box::new(PanicApp { msg: message })),
+    );
+}
+
+#[cfg(feature = "simulator")]
 /// Desktop simulator display backed by the `pixels` crate.
 pub struct PixelsDisplay {
     width: usize,
@@ -73,18 +133,16 @@ pub struct PixelsDisplay {
 impl PixelsDisplay {
     /// Create a new window with the given size.
     ///
-    /// Any panic during simulator execution triggers a message dialog
-    /// displaying the panic and a captured call stack. Selecting **OK** in
-    /// the dialog terminates the process.
+    /// Any panic during simulator execution opens a resizable window
+    /// displaying the panic and a captured call stack. The window is
+    /// constrained to the visible screen, provides a scrollbar for long
+    /// messages, and offers copy and close controls. Closing the window
+    /// terminates the process.
     pub fn new(width: usize, height: usize) -> Self {
         panic::set_hook(Box::new(|info| {
             let backtrace = Backtrace::force_capture();
             let message = format!("{info}\n\n{backtrace}");
-            let _ = MessageDialog::new()
-                .set_title("rlvgl panic")
-                .set_description(&message)
-                .set_buttons(MessageButtons::Ok)
-                .show();
+            show_panic_window(message);
             std::process::exit(1);
         }));
         let event_loop = EventLoop::new().expect("failed to create event loop");
