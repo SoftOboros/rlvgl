@@ -106,7 +106,7 @@ pub fn render_text<R: FontdueRenderTarget>(
 mod tests {
     use super::*;
 
-    const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
+    const FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/DejaVuSans.ttf");
 
     #[test]
     fn rasterize_a() {
