@@ -4,28 +4,13 @@
 //! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
 use alloc::{boxed::Box, format, vec::Vec};
-//! Simple simulator backend using the `pixels` crate.
-//!
-//! The window can be resized by the user and will scale the simulated
-//! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
-use alloc::{boxed::Box, format, vec::Vec};
-#[cfg(feature = "simulator")]
-use pixels::{Pixels, SurfaceTexture};
 use pixels::{Pixels, SurfaceTexture};
 #[cfg(feature = "simulator")]
 use rfd::{MessageButtons, MessageDialog};
-use rfd::{MessageButtons, MessageDialog};
 #[cfg(feature = "simulator")]
 use std::{backtrace::Backtrace, panic};
-use std::{backtrace::Backtrace, panic};
 #[cfg(feature = "simulator")]
-use winit::{
-    dpi::{LogicalSize, PhysicalSize},
-    event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    keyboard::{KeyCode, PhysicalKey},
-    window::{Fullscreen, WindowBuilder},
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
     event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
@@ -77,86 +62,21 @@ fn generate_tiles_from_window(window: &winit::window::Window, max_tile_size: u32
 #[cfg(feature = "simulator")]
 /// Desktop simulator display backed by the `pixels` crate.
 pub struct PixelsDisplay {
-use crate::input::InputEvent;
-
-#[cfg(feature = "simulator")]
-#[allow(dead_code)]
-/// Region of the window that fits within GPU texture limits.
-struct Tile {
-    x: u32,
-    y: u32,
-    width: u32,
-    height: u32,
-}
-
-#[cfg(feature = "simulator")]
-/// Generate tiles covering the window where each tile is no larger than
-/// `max_tile_size` in either dimension.
-fn generate_tiles_from_window(window: &winit::window::Window, max_tile_size: u32) -> Vec<Tile> {
-    let PhysicalSize { width, height } = window.inner_size();
-    let mut tiles = Vec::new();
-    let x_tiles = width.div_ceil(max_tile_size);
-    let y_tiles = height.div_ceil(max_tile_size);
-
-    for y in 0..y_tiles {
-        for x in 0..x_tiles {
-            let tile_x = x * max_tile_size;
-            let tile_y = y * max_tile_size;
-            let tile_w = (width - tile_x).min(max_tile_size);
-            let tile_h = (height - tile_y).min(max_tile_size);
-            tiles.push(Tile {
-                x: tile_x,
-                y: tile_y,
-                width: tile_w,
-                height: tile_h,
-            });
-        }
-    }
-
-    tiles
-}
-
-#[cfg(feature = "simulator")]
-/// Desktop simulator display backed by the `pixels` crate.
-pub struct PixelsDisplay {
     width: usize,
     height: usize,
     event_loop: EventLoop<()>,
     pixels: Pixels<'static>,
     window: &'static winit::window::Window,
-    event_loop: EventLoop<()>,
-    pixels: Pixels<'static>,
-    window: &'static winit::window::Window,
 }
 
 #[cfg(feature = "simulator")]
-impl PixelsDisplay {
 impl PixelsDisplay {
     /// Create a new window with the given size.
     ///
     /// Any panic during simulator execution triggers a message dialog
     /// displaying the panic and a captured call stack. Selecting **OK** in
     /// the dialog terminates the process.
-    ///
-    /// Any panic during simulator execution triggers a message dialog
-    /// displaying the panic and a captured call stack. Selecting **OK** in
-    /// the dialog terminates the process.
     pub fn new(width: usize, height: usize) -> Self {
-        panic::set_hook(Box::new(|info| {
-            let backtrace = Backtrace::force_capture();
-            let message = format!("{info}\n\n{backtrace}");
-            let _ = MessageDialog::new()
-                .set_title("rlvgl panic")
-                .set_description(&message)
-                .set_buttons(MessageButtons::Ok)
-                .show();
-            std::process::exit(1);
-        }));
-        let event_loop = EventLoop::new().expect("failed to create event loop");
-        let window = WindowBuilder::new()
-            .with_title("rlvgl simulator")
-            .with_inner_size(LogicalSize::new(width as f64, height as f64))
-            .build(&event_loop)
         panic::set_hook(Box::new(|info| {
             let backtrace = Backtrace::force_capture();
             let message = format!("{info}\n\n{backtrace}");
@@ -178,17 +98,9 @@ impl PixelsDisplay {
         let pixels = Pixels::new(width as u32, height as u32, surface)
             .expect("failed to create pixel buffer");
         let window: &'static winit::window::Window = &*window;
-        let window = Box::leak(Box::new(window));
-        let surface = SurfaceTexture::new(width as u32, height as u32, &*window);
-        let pixels = Pixels::new(width as u32, height as u32, surface)
-            .expect("failed to create pixel buffer");
-        let window: &'static winit::window::Window = &*window;
         Self {
             width,
             height,
-            event_loop,
-            pixels,
-            window,
             event_loop,
             pixels,
             window,
@@ -224,7 +136,7 @@ impl PixelsDisplay {
         let mut fullscreen = false;
 
         event_loop
-            .run(move |event, target| match event {
+            .run_app(move |event, target| match event {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     ..
@@ -319,27 +231,6 @@ impl PixelsDisplay {
                         y: pointer_pos.1,
                     });
                 }
-                Event::WindowEvent {
-                    event:
-                        WindowEvent::MouseInput {
-                            state: ElementState::Released,
-                            button: MouseButton::Left,
-                            ..
-                        },
-                    ..
-                } => {
-                    pointer_down = false;
-                    event_callback(InputEvent::PointerUp {
-                        x: pointer_pos.0,
-                        y: pointer_pos.1,
-                    });
-                }
-                Event::AboutToWait => {
-                    window.request_redraw();
-                }
-                _ => {}
-            })
-            .expect("event loop error");
                 Event::WindowEvent {
                     event:
                         WindowEvent::MouseInput {
