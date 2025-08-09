@@ -86,7 +86,19 @@ fn show_panic_window(message: String) {
         }
     }
 
-    let max = egui::vec2(800.0, 600.0);
+    let event_loop = EventLoop::new().expect("failed to create event loop");
+    #[allow(deprecated)]
+    let hidden_window = event_loop
+        .create_window(Window::default_attributes().with_visible(false))
+        .expect("failed to create window");
+    let monitor_size = hidden_window
+        .current_monitor()
+        .map(|m| m.size())
+        .unwrap_or(PhysicalSize::new(800, 600));
+    drop(hidden_window);
+    drop(event_loop);
+
+    let max = egui::vec2(monitor_size.width as f32, monitor_size.height as f32);
     let initial = egui::vec2(max.x * 0.8, max.y * 0.8);
 
     let viewport = egui::ViewportBuilder::default()
@@ -108,6 +120,11 @@ fn show_panic_window(message: String) {
     ) {
         eprintln!("{msg_copy}\nfailed to show panic window: {e}");
     }
+    let _ = eframe::run_native(
+        "rlvgl panic",
+        options,
+        Box::new(|_| Box::new(PanicApp { msg: message })),
+    );
 }
 
 #[cfg(feature = "simulator")]
