@@ -14,9 +14,9 @@ use std::{backtrace::Backtrace, panic};
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
     event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
-    window::{Fullscreen, WindowBuilder},
+    window::{Fullscreen, Window},
 };
 
 #[cfg(feature = "simulator")]
@@ -35,7 +35,7 @@ struct Tile {
 #[cfg(feature = "simulator")]
 /// Generate tiles covering the window where each tile is no larger than
 /// `max_tile_size` in either dimension.
-fn generate_tiles_from_window(window: &winit::window::Window, max_tile_size: u32) -> Vec<Tile> {
+fn generate_tiles_from_window(window: &Window, max_tile_size: u32) -> Vec<Tile> {
     let PhysicalSize { width, height } = window.inner_size();
     let mut tiles = Vec::new();
     let x_tiles = width.div_ceil(max_tile_size);
@@ -66,7 +66,7 @@ pub struct PixelsDisplay {
     height: usize,
     event_loop: EventLoop<()>,
     pixels: Pixels<'static>,
-    window: &'static winit::window::Window,
+    window: &'static Window,
 }
 
 #[cfg(feature = "simulator")]
@@ -88,16 +88,19 @@ impl PixelsDisplay {
             std::process::exit(1);
         }));
         let event_loop = EventLoop::new().expect("failed to create event loop");
-        let window = WindowBuilder::new()
-            .with_title("rlvgl simulator")
-            .with_inner_size(LogicalSize::new(width as f64, height as f64))
-            .build(&event_loop)
+        #[allow(deprecated)]
+        let window = event_loop
+            .create_window(
+                Window::default_attributes()
+                    .with_title("rlvgl simulator")
+                    .with_inner_size(LogicalSize::new(width as f64, height as f64)),
+            )
             .expect("failed to create window");
         let window = Box::leak(Box::new(window));
         let surface = SurfaceTexture::new(width as u32, height as u32, &*window);
         let pixels = Pixels::new(width as u32, height as u32, surface)
             .expect("failed to create pixel buffer");
-        let window: &'static winit::window::Window = &*window;
+        let window: &'static Window = &*window;
         Self {
             width,
             height,
@@ -135,8 +138,9 @@ impl PixelsDisplay {
         let mut _tiles = generate_tiles_from_window(window, max_dim);
         let mut fullscreen = false;
 
+        #[allow(deprecated)]
         event_loop
-            .run_app(move |event, target| match event {
+            .run(move |event, target: &ActiveEventLoop| match event {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     ..
