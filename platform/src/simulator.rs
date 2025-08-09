@@ -60,6 +60,15 @@ fn generate_tiles_from_window(window: &Window, max_tile_size: u32) -> Vec<Tile> 
 }
 
 #[cfg(feature = "simulator")]
+fn show_panic_window(message: &str) {
+    let _ = MessageDialog::new()
+        .set_title("rlvgl panic")
+        .set_description(message)
+        .set_buttons(MessageButtons::Ok)
+        .show();
+}
+
+#[cfg(feature = "simulator")]
 /// Desktop simulator display backed by the `pixels` crate.
 pub struct PixelsDisplay {
     width: usize,
@@ -80,11 +89,7 @@ impl PixelsDisplay {
         panic::set_hook(Box::new(|info| {
             let backtrace = Backtrace::force_capture();
             let message = format!("{info}\n\n{backtrace}");
-            let _ = MessageDialog::new()
-                .set_title("rlvgl panic")
-                .set_description(&message)
-                .set_buttons(MessageButtons::Ok)
-                .show();
+            show_panic_window(&message);
             std::process::exit(1);
         }));
         let event_loop = EventLoop::new().expect("failed to create event loop");
