@@ -6,7 +6,6 @@ publish = false
 
 [dependencies]
 rlvgl= { path = "../..", features = ["simulator", "qrcode", "png", "fontdue"], default-features = false }
-embedded-graphics = "0.8"
 
 [features]
 default = ["fontdue"]

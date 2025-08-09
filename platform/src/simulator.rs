@@ -129,6 +129,7 @@ impl PixelsDisplay {
         let mut pointer_pos = (0i32, 0i32);
         let mut pointer_down = false;
         let mut surface_size = (width as u32, height as u32);
+        let mut surface_offset = (0i32, 0i32);
         let aspect_ratio = width as f64 / height as f64;
         let max_dim = pixels.device().limits().max_texture_dimension_2d;
         let mut _tiles = generate_tiles_from_window(window, max_dim);
@@ -160,6 +161,10 @@ impl PixelsDisplay {
                             h = (w as f64 / aspect_ratio).round() as u32;
                         }
                     }
+                    surface_offset = (
+                        ((size.width as i32 - w as i32) / 2),
+                        ((size.height as i32 - h as i32) / 2),
+                    );
                     _tiles = generate_tiles_from_window(window, max_dim);
                     pixels
                         .resize_surface(w.min(max_dim), h.min(max_dim))
@@ -196,9 +201,13 @@ impl PixelsDisplay {
                     event: WindowEvent::CursorMoved { position, .. },
                     ..
                 } => {
+                    let adj_x = position.x - surface_offset.0 as f64;
+                    let adj_y = position.y - surface_offset.1 as f64;
                     pointer_pos = (
-                        (position.x * width as f64 / surface_size.0 as f64) as i32,
-                        (position.y * height as f64 / surface_size.1 as f64) as i32,
+                        (adj_x * width as f64 / surface_size.0 as f64)
+                            .clamp(0.0, width as f64 - 1.0) as i32,
+                        (adj_y * height as f64 / surface_size.1 as f64)
+                            .clamp(0.0, height as f64 - 1.0) as i32,
                     );
                     if pointer_down {
                         event_callback(InputEvent::PointerMove {

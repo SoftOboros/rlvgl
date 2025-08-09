@@ -4,7 +4,9 @@ use rlvgl::core::{
     renderer::Renderer,
     widget::{Color, Rect},
 };
-use rlvgl_sim::{Demo, build_demo, build_plugin_demo, build_png_demo, flush_pending};
+use rlvgl_sim::{
+    Demo, build_demo, build_plugin_demo, build_png_demo, build_png_demo_scaled, flush_pending,
+};
 
 struct CountRenderer(u32);
 
@@ -55,6 +57,17 @@ fn png_demo_renders_logo() {
     let mut renderer = CountRenderer(0);
     node.draw(&mut renderer);
     assert!(renderer.0 > 0);
+}
+
+#[test]
+fn scaled_png_clamped_within_bounds() {
+    let node = build_png_demo_scaled(10.0);
+    let bounds = node.widget.borrow().bounds();
+    assert_eq!(bounds.x, 0);
+    assert!(bounds.y >= 0);
+    assert!(bounds.x + bounds.width <= 320);
+    assert!(bounds.y + bounds.height <= 240);
+    assert_eq!(bounds.y, 240 - bounds.height);
 }
 
 #[test]
