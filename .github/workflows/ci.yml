@@ -6,11 +6,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: docker.io/iraa/rlvgl:latest
+      # Start as your non-root user right away
+      # options: --user ${{ vars.RLVGL_BUILDER_USER }}
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Prepare build environment
       run: bash scripts/setup-ci-env.sh
-    - run: rustup component add rustfmt clippy
     - run: cargo build --workspace --verbose
     - run: cargo fmt --all -- --check
     - run: cargo clippy --workspace -- -D warnings

@@ -9,7 +9,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install base languages and build tools
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends\
     build-essential \
     curl \
     wget \
@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     llvm-dev \
     libclang-dev \
     clang \
+    mold \
     librlottie0-1 \
     libsdl2-dev \
     xvfb \
@@ -34,31 +35,40 @@ RUN apt-get update && apt-get install -y \
     libxext-dev \
     libgtk-3-dev \
     librlottie-dev \
+    sccache \
     pkg-config \
-    && sudo rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Rust from rustup (more control, avoids apt rustc issues)
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
-ENV PATH="/root/.cargo/bin:$PATH"
-RUN rustup component add rust-src llvm-tools-preview
-RUN rustup target add thumbv7em-none-eabihf
+# set up python.
+COPY requirements.txt .
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Create and activate Python venv
-WORKDIR /opt/rlvgl
-#RUN python3 -m venv /opt/venv
-#ENV PATH="/opt/venv/bin:$PATH"
+# Put rustup/cargo in a neutral path
+ENV RUSTUP_HOME=/opt/rust/rustup
+ENV CARGO_HOME=/opt/rust/cargo
+ENV PATH=$CARGO_HOME/bin:$PATH
 
-# Cache dependencies
-#COPY Cargo.toml .
-#RUN cargo fetch
+# Install rustup without auto-default, then install & set the toolchain
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain none \
+ && rustup toolchain install nightly \
+ && rustup default nightly \
+ && rustup component add rust-src llvm-tools-preview rustfmt clippy \
+ && rustup target add thumbv7em-none-eabihf
 
-# Copy everything and build
-#COPY . .
-#RUN git submodule update --init --recursive
-#RUN pip install -r requirements.txt && cd ..
-#RUN cargo build --release
+# If you run as a non-root user at runtime, make sure they can read it
+ARG RLVGL_BUILDER_USER=rlvgl
+RUN useradd -m -s /bin/bash "$RLVGL_BUILDER_USER" || true \
+ && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /opt/rust
+RUN mkdir -p /opt/rlvgl && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /opt/rlvgl /opt/venv
 
-# build compiled items.
-#RUN cargo clean && cargo fetch && cargo build -Znext-lockfile-bump --locked && cd ..
+# set env vars
+ENV APP_HOME=/opt/rlvgl
+ENV CARGO_INCREMENTAL=1
+ENV RUSTFLAGS="-Cdebuginfo=0 -Ccodegen-units=32 -Clink-self-contained=no -Clink-arg=-fuse-ld=mold"
+
+# Default to non-root user for everything that follows
+USER ${RLVGL_BUILDER_USER}
+WORKDIR ${APP_HOME}
 
 CMD ["bash"]
