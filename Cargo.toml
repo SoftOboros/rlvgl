@@ -94,3 +94,4 @@ members = ["core", "examples/sim", "platform", "widgets", "ui"]
 resolver = "2"
 
 # Only build the simulator example when the `simulator` feature is enabled.
+# Only build the simulator example when the `simulator` feature is enabled.

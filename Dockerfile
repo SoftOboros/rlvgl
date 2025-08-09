@@ -26,7 +26,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends\
     libclang-dev \
     clang \
     mold \
-    librlottie0-1 \
     libsdl2-dev \
     xvfb \
     libxrender1 \
