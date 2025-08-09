@@ -1,5 +1,7 @@
 # rlvgl Demo
 ---
+Demonstrates core widgets alongside plugin features such as QR code generation
+and PNG/JPEG image decoding.
 ## Requirements
 The rlvgl demo requires libgtk-3-dev and librlotte-dev for display and support of Lottie creation (Not implemented).
 

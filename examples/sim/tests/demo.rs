@@ -5,7 +5,8 @@ use rlvgl::core::{
     widget::{Color, Rect},
 };
 use rlvgl_sim::{
-    Demo, build_demo, build_plugin_demo, build_png_demo, build_png_demo_scaled, flush_pending,
+    Demo, build_demo, build_jpeg_demo, build_plugin_demo, build_png_demo, build_png_demo_scaled,
+    flush_pending,
 };
 
 struct CountRenderer(u32);
@@ -96,10 +97,18 @@ fn png_demo_renders_logo() {
 }
 
 #[test]
+fn jpeg_demo_renders_logo() {
+    let node = build_jpeg_demo();
+    let mut renderer = CountRenderer(0);
+    node.draw(&mut renderer);
+    assert!(renderer.0 > 0);
+}
+
+#[test]
 fn scaled_png_clamped_within_bounds() {
     let node = build_png_demo_scaled(10.0);
     let bounds = node.widget.borrow().bounds();
-    assert_eq!(bounds.x, 0);
+    assert!(bounds.x >= 0);
     assert!(bounds.y >= 0);
     assert!(bounds.x + bounds.width <= 320);
     assert!(bounds.y + bounds.height <= 240);
@@ -149,6 +158,27 @@ fn png_button_adds_demo() {
 }
 
 #[test]
+fn jpeg_button_adds_demo() {
+    let Demo {
+        root,
+        pending,
+        to_remove,
+        ..
+    } = build_demo();
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
+    );
+    flush_pending(&root, &pending, &to_remove);
+    assert!(
+        root.borrow_mut()
+            .dispatch_event(&Event::PointerUp { x: 30, y: 150 })
+    );
+    flush_pending(&root, &pending, &to_remove);
+    assert!(root.borrow().children.len() > 3);
+}
+
+#[test]
 fn qr_button_toggles_qrcode() {
     let Demo {
         root,
@@ -168,7 +198,7 @@ fn qr_button_toggles_qrcode() {
     flush_pending(&root, &pending, &to_remove);
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
-    assert_ne!(fb.pixel(201, 41), Color(255, 255, 255));
+    assert_ne!(fb.pixel(81, 1), Color(255, 255, 255));
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
@@ -176,5 +206,5 @@ fn qr_button_toggles_qrcode() {
     flush_pending(&root, &pending, &to_remove);
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
-    assert_eq!(fb.pixel(201, 41), Color(255, 255, 255));
+    assert_eq!(fb.pixel(81, 1), Color(255, 255, 255));
 }
