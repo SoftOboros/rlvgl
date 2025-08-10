@@ -84,14 +84,13 @@ codegen-units = 1
 debug = false
 panic = "abort"
 strip = true
+incremental = false
 
 [profile.dev]
 opt-level = 1
 debug = true
+incremental = false
 
 [workspace]
 members = ["core", "examples/sim", "platform", "widgets", "ui"]
 resolver = "2"
-
-# Only build the simulator example when the `simulator` feature is enabled.
-# Only build the simulator example when the `simulator` feature is enabled.

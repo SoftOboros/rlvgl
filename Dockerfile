@@ -9,36 +9,38 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install base languages and build tools
-RUN apt-get update && apt-get install -y --no-install-recommends\
-    build-essential \
-    curl \
-    wget \
-    git \
-    nano \
-    vim \
-    python3 \
-    python3-venv \
-    python3-pip \
-    cargo \
-    cmake \
-    ninja-build \
-    llvm-dev \
-    libclang-dev \
-    clang \
-    mold \
-    libsdl2-dev \
-    xvfb \
-    libxrender1 \
-    libfreetype6-dev \
-    libx11-dev \
-    libxext-dev \
-    libgtk-3-dev \
-    librlottie-dev \
-    sccache \
-    pkg-config \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential      \
+    ca-certificates      \
+    cargo                \
+    clang                \
+    cmake                \
+    curl                 \
+    git                  \
+    openssh-client       \
+    libclang-dev         \
+    libfreetype6-dev     \
+    libgtk-3-dev         \
+    librlottie-dev       \
+    libsdl2-dev          \
+    libssl-dev           \
+    libx11-dev           \
+    libxext-dev          \
+    libxrender1          \
+    llvm-dev             \
+    mold                 \
+    nano                 \
+    ninja-build          \
+    pkg-config           \
+    python3              \
+    python3-pip          \
+    python3-venv         \
+    vim                  \
+    wget                 \
+    xvfb                 \
     && rm -rf /var/lib/apt/lists/*
 
-# set up python.
+    # set up python.
 COPY requirements.txt .
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -53,7 +55,8 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-too
  && rustup toolchain install nightly \
  && rustup default nightly \
  && rustup component add rust-src llvm-tools-preview rustfmt clippy \
- && rustup target add thumbv7em-none-eabihf
+ && rustup target add thumbv7em-none-eabihf \
+ && cargo install sccache --locked
 
 # If you run as a non-root user at runtime, make sure they can read it
 ARG RLVGL_BUILDER_USER=rlvgl
@@ -61,9 +64,27 @@ RUN useradd -m -s /bin/bash "$RLVGL_BUILDER_USER" || true \
  && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /opt/rust
 RUN mkdir -p /opt/rlvgl && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /opt/rlvgl /opt/venv
 
+RUN mkdir -p /home/rlvgl/.ssh && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /home/rlvgl/.ssh
+RUN mkdir -p /home/ubuntu/.ssh
+
+# S3 config comes from build args/env at build time below:
+# Otherwise, inject these environment variables.
+# --> See /scripts/docker-run.sh for an example.
+# ARG SCCACHE_BUCKET
+# ARG SCCACHE_REGION
+# ARG AWS_ACCESS_KEY_ID
+# ARG AWS_SECRET_ACCESS_KEY
+# ARG SCCACHE_S3_KEY_PREFIX
+# ENV SCCACHE_BUCKET=${SCCACHE_BUCKET}
+# ENV SCCACHE_REGION=${SCCACHE_REGION}
+# ENV AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+# ENV AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+# ENV SCCACHE_S3_KEY_PREFIX=${SCCACHE_S3_KEY_PREFIX}
+
 # set env vars
 ENV APP_HOME=/opt/rlvgl
 ENV CARGO_INCREMENTAL=1
+ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
 ENV RUSTFLAGS="-Cdebuginfo=0 -Ccodegen-units=32 -Clink-self-contained=no -Clink-arg=-fuse-ld=mold"
 
 # Default to non-root user for everything that follows
