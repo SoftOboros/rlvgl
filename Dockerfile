@@ -83,9 +83,11 @@ RUN mkdir -p /home/ubuntu/.ssh
 
 # set env vars
 ENV APP_HOME=/opt/rlvgl
-ENV CARGO_INCREMENTAL=1
-ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
 ENV RUSTFLAGS="-Cdebuginfo=0 -Ccodegen-units=32 -Clink-self-contained=no -Clink-arg=-fuse-ld=mold"
+# Comment these out to remove sccache.
+ENV CARGO_INCREMENTAL=0
+ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
+ENV SCCACHE_S3_KEY_PREFIX=/rlvgl
 
 # Default to non-root user for everything that follows
 USER ${RLVGL_BUILDER_USER}
