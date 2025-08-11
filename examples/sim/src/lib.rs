@@ -240,7 +240,7 @@ pub fn build_plugin_demo() -> WidgetNode {
     let root_w = 320u32;
     let root_h = 240u32;
     // Match the area used by the PNG/JPEG demos: the lower-right 2/3rds of the display.
-    let target = (root_h * 2 / 3) as u32;
+    let target = root_h * 2 / 3;
     let scale = target as f32 / width as f32;
     let new_w = target;
     let new_h = target;
@@ -250,7 +250,10 @@ pub fn build_plugin_demo() -> WidgetNode {
             let src_x = (x as f32 / scale).floor() as usize;
             let src_y = (y as f32 / scale).floor() as usize;
             let idx = src_y * width as usize + src_x;
-            let color = pixels_vec.get(idx).copied().unwrap_or(Color(255, 255, 255));
+            let color = pixels_vec
+                .get(idx)
+                .copied()
+                .unwrap_or(Color(255, 255, 255, 255));
             scaled.push(color);
         }
     }
@@ -306,7 +309,7 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
             let src_x = (x as f32 / scale).floor() as usize;
             let src_y = (y as f32 / scale).floor() as usize;
             let idx = src_y * width as usize + src_x;
-            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0));
+            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0, 255));
             scaled.push(color);
         }
     }
@@ -368,7 +371,7 @@ pub fn build_jpeg_demo_scaled(scale: f32) -> WidgetNode {
             let src_x = (x as f32 / scale).floor() as usize;
             let src_y = (y as f32 / scale).floor() as usize;
             let idx = src_y * width as usize + src_x;
-            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0));
+            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0, 255));
             scaled.push(color);
         }
     }

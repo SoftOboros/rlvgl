@@ -32,8 +32,8 @@ fn label_background_render() {
             height: 10,
         },
     );
-    label.style.bg_color = Color(1, 2, 3);
+    label.style.bg_color = Color(1, 2, 3, 255);
     label.draw(&mut renderer);
 
-    assert!(display.buffer.iter().all(|&c| c == Color(1, 2, 3)));
+    assert!(display.buffer.iter().all(|&c| c == Color(1, 2, 3, 255)));
 }

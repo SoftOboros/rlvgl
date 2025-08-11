@@ -22,7 +22,7 @@ impl ProgressBar {
         Self {
             bounds,
             style: Style::default(),
-            bar_color: Color(0, 0, 0),
+            bar_color: Color(0, 0, 0, 255),
             min,
             max,
             value: min,

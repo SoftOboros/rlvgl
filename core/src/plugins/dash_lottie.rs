@@ -55,7 +55,7 @@ pub fn load(data: &[u8]) -> Result<DashAnimation, &'static str> {
         }
         let mut pixels = Vec::with_capacity(width as usize * height as usize);
         for chunk in data[offset..offset + pixel_bytes].chunks_exact(3) {
-            pixels.push(Color(chunk[0], chunk[1], chunk[2]));
+            pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
         }
         offset += pixel_bytes;
         frames.push(DashFrame { pixels, delay });
@@ -100,15 +100,15 @@ mod tests {
         assert_eq!(anim.width, 1);
         assert_eq!(anim.height, 1);
         assert_eq!(anim.frames.len(), 2);
-        assert_eq!(anim.frames[0].pixels[0], Color(255, 0, 0));
-        assert_eq!(anim.frames[1].pixels[0], Color(0, 255, 0));
+        assert_eq!(anim.frames[0].pixels[0], Color(255, 0, 0, 255));
+        assert_eq!(anim.frames[1].pixels[0], Color(0, 255, 0, 255));
     }
 
     #[test]
     fn encode_roundtrip() {
         let anim = DashAnimation {
             frames: vec![DashFrame {
-                pixels: vec![Color(1, 2, 3)],
+                pixels: vec![Color(1, 2, 3, 255)],
                 delay: 10,
             }],
             width: 1,
@@ -116,7 +116,7 @@ mod tests {
         };
         let bytes = encode(&anim);
         let decoded = load(&bytes).unwrap();
-        assert_eq!(decoded.frames[0].pixels[0], Color(1, 2, 3));
+        assert_eq!(decoded.frames[0].pixels[0], Color(1, 2, 3, 255));
         assert_eq!(decoded.frames[0].delay, 10);
     }
 }

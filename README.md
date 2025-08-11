@@ -58,7 +58,7 @@ fn main() {
             height: 20,
         },
     );
-    label.style.bg_color = rlvgl_core::widget::Color(0, 0, 255);
+    label.style.bg_color = rlvgl_core::widget::Color(0, 0, 255, 255);
     // Rendering would use a DisplayDriver implementation.
 }
 ```

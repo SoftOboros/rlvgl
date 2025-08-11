@@ -32,8 +32,8 @@ impl Canvas {
             .pixels
             .iter()
             .map(|p| match p {
-                Some(c) => Color(c.r(), c.g(), c.b()),
-                None => Color(0, 0, 0),
+                Some(c) => Color(c.r(), c.g(), c.b(), 255),
+                None => Color(0, 0, 0, 255),
             })
             .collect()
     }
@@ -66,24 +66,24 @@ mod tests {
     #[test]
     fn draw_and_get_pixels() {
         let mut canvas = Canvas::new(1, 1);
-        canvas.draw_pixel(Point::new(0, 0), Color(255, 0, 0));
-        assert_eq!(canvas.pixels(), vec![Color(255, 0, 0)]);
+        canvas.draw_pixel(Point::new(0, 0), Color(255, 0, 0, 255));
+        assert_eq!(canvas.pixels(), vec![Color(255, 0, 0, 255)]);
     }
 
     #[test]
     fn blank_canvas_pixels() {
         let canvas = Canvas::new(1, 1);
-        assert_eq!(canvas.pixels(), vec![Color(0, 0, 0)]);
+        assert_eq!(canvas.pixels(), vec![Color(0, 0, 0, 255)]);
     }
 
     #[cfg(feature = "png")]
     #[test]
     fn export_png() {
         let mut canvas = Canvas::new(1, 1);
-        canvas.draw_pixel(Point::new(0, 0), Color(255, 0, 0));
+        canvas.draw_pixel(Point::new(0, 0), Color(255, 0, 0, 255));
         let data = canvas.to_png().unwrap();
         let (pixels, w, h) = crate::plugins::png::decode(&data).unwrap();
         assert_eq!((w, h), (1, 1));
-        assert_eq!(pixels, vec![Color(255, 0, 0)]);
+        assert_eq!(pixels, vec![Color(255, 0, 0, 255)]);
     }
 }

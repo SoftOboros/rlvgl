@@ -160,7 +160,7 @@ mod tests {
             FONT_DATA,
             (0, 0),
             "A",
-            Color(255, 255, 255),
+            Color(255, 255, 255, 255),
             16.0,
         )
         .unwrap();

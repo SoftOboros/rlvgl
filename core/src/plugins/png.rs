@@ -18,7 +18,7 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
     match info.color_type {
         ColorType::Rgb => {
             for chunk in pixels_raw.chunks_exact(3) {
-                pixels.push(Color(chunk[0], chunk[1], chunk[2]));
+                pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
             }
         }
         ColorType::Rgba => {
@@ -27,12 +27,12 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
                 let r = (chunk[0] as u32 * a + 127) / 255;
                 let g = (chunk[1] as u32 * a + 127) / 255;
                 let b = (chunk[2] as u32 * a + 127) / 255;
-                pixels.push(Color(r as u8, g as u8, b as u8));
+                pixels.push(Color(r as u8, g as u8, b as u8, 255));
             }
         }
         ColorType::Grayscale => {
             for &v in pixels_raw.iter() {
-                pixels.push(Color(v, v, v));
+                pixels.push(Color(v, v, v, 255));
             }
         }
         ColorType::GrayscaleAlpha => {
@@ -40,7 +40,7 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
                 let v = chunk[0] as u32;
                 let a = chunk[1] as u32;
                 let c = (v * a + 127) / 255;
-                pixels.push(Color(c as u8, c as u8, c as u8));
+                pixels.push(Color(c as u8, c as u8, c as u8, 255));
             }
         }
         _ => {
@@ -65,7 +65,7 @@ mod tests {
             .unwrap();
         let (pixels, w, h) = decode(&data).unwrap();
         assert_eq!((w, h), (1, 1));
-        assert_eq!(pixels, vec![Color(255, 0, 0)]);
+        assert_eq!(pixels, vec![Color(255, 0, 0, 255)]);
     }
 
     #[test]
@@ -75,6 +75,6 @@ mod tests {
             .unwrap();
         let (pixels, w, h) = decode(&data).unwrap();
         assert_eq!((w, h), (1, 1));
-        assert_eq!(pixels, vec![Color(128, 0, 0)]);
+        assert_eq!(pixels, vec![Color(128, 0, 0, 255)]);
     }
 }
