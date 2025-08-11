@@ -22,7 +22,7 @@ impl List {
         Self {
             bounds,
             style: Style::default(),
-            text_color: Color(0, 0, 0),
+            text_color: Color(0, 0, 0, 255),
             items: Vec::new(),
             selected: None,
         }

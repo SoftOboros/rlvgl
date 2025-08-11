@@ -30,7 +30,7 @@ pub fn decode(data: &[u8]) -> Result<(Vec<GifFrame>, u16, u16), DecodingError> {
 fn convert_frame(frame: &Frame<'_>, width: u16, height: u16) -> GifFrame {
     let mut pixels = Vec::with_capacity(width as usize * height as usize);
     for chunk in frame.buffer.chunks_exact(4) {
-        pixels.push(Color(chunk[0], chunk[1], chunk[2]));
+        pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
     }
     GifFrame {
         pixels,
@@ -53,6 +53,6 @@ mod tests {
         let (frames, w, h) = decode(&data).unwrap();
         assert_eq!((w, h), (1, 1));
         assert_eq!(frames.len(), 1);
-        assert_eq!(frames[0].pixels, vec![Color(255, 0, 0)]);
+        assert_eq!(frames[0].pixels, vec![Color(255, 0, 0, 255)]);
     }
 }

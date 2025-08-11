@@ -33,16 +33,16 @@ fn checkbox_checked_render() {
             height: 12,
         },
     );
-    cb.style.bg_color = Color(1, 1, 1);
-    cb.style.border_color = Color(2, 2, 2);
-    cb.check_color = Color(3, 3, 3);
+    cb.style.bg_color = Color(1, 1, 1, 255);
+    cb.style.border_color = Color(2, 2, 2, 255);
+    cb.check_color = Color(3, 3, 3, 255);
     cb.set_checked(true);
     cb.draw(&mut renderer);
 
     // border pixel
-    assert_eq!(display.buffer[1 * 12 + 1], Color(2, 2, 2));
+    assert_eq!(display.buffer[1 * 12 + 1], Color(2, 2, 2, 255));
     // inner check pixel
-    assert_eq!(display.buffer[5 * 12 + 5], Color(3, 3, 3));
+    assert_eq!(display.buffer[5 * 12 + 5], Color(3, 3, 3, 255));
     // background pixel
-    assert_eq!(display.buffer[0 * 12 + 11], Color(1, 1, 1));
+    assert_eq!(display.buffer[0 * 12 + 11], Color(1, 1, 1, 255));
 }

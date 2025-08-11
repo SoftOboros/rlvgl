@@ -22,7 +22,7 @@ impl Label {
             bounds,
             text: text.into(),
             style: Style::default(),
-            text_color: Color(0, 0, 0),
+            text_color: Color(0, 0, 0, 255),
         }
     }
 

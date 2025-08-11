@@ -30,10 +30,10 @@ fn list_background_render() {
         width: 20,
         height: 32,
     });
-    list.style.bg_color = Color(1, 1, 1);
+    list.style.bg_color = Color(1, 1, 1, 255);
     list.add_item("a");
     list.add_item("b");
     list.draw(&mut renderer);
 
-    assert!(display.buffer.iter().all(|&c| c == Color(1, 1, 1)));
+    assert!(display.buffer.iter().all(|&c| c == Color(1, 1, 1, 255)));
 }

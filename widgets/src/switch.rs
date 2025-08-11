@@ -21,7 +21,7 @@ impl Switch {
         Self {
             bounds,
             style: Style::default(),
-            knob_color: Color(0, 0, 0),
+            knob_color: Color(0, 0, 0, 255),
             on: false,
         }
     }

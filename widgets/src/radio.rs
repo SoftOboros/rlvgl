@@ -27,8 +27,8 @@ impl Radio {
             bounds,
             text: text.into(),
             style: Style::default(),
-            text_color: Color(0, 0, 0),
-            dot_color: Color(0, 0, 0),
+            text_color: Color(0, 0, 0, 255),
+            dot_color: Color(0, 0, 0, 255),
             selected: false,
         }
     }
