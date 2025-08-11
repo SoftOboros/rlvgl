@@ -198,7 +198,7 @@ fn qr_button_toggles_qrcode() {
     flush_pending(&root, &pending, &to_remove);
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
-    assert_ne!(fb.pixel(81, 1), Color(255, 255, 255, 255));
+    assert!(fb.buf.iter().any(|&p| p != Color(255, 255, 255, 255)));
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
@@ -206,5 +206,5 @@ fn qr_button_toggles_qrcode() {
     flush_pending(&root, &pending, &to_remove);
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
-    assert_eq!(fb.pixel(81, 1), Color(255, 255, 255, 255));
+    assert!(fb.buf.iter().all(|&p| p == Color(255, 255, 255, 255)));
 }
