@@ -11,7 +11,7 @@ use alloc::{boxed::Box, format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
 use rlvgl::core::{
-    WidgetNode, png, qrcode,
+    WidgetNode, jpeg, png, qrcode,
     widget::{Color, Rect, Widget},
 };
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
@@ -28,6 +28,8 @@ pub struct Demo {
     pub counter: Rc<RefCell<u32>>,
     /// Widgets scheduled to be appended after event dispatch.
     pub pending: Rc<RefCell<Vec<WidgetNode>>>,
+    /// Widget handles scheduled for removal after event dispatch.
+    pub to_remove: Rc<RefCell<Vec<WidgetHandle>>>,
 }
 
 /// Build a simple widget tree demonstrating basic rlvgl widgets.
@@ -39,6 +41,7 @@ pub struct Demo {
 pub fn build_demo() -> Demo {
     let click_count = Rc::new(RefCell::new(0));
     let pending = Rc::new(RefCell::new(Vec::new()));
+    let to_remove = Rc::new(RefCell::new(Vec::new()));
 
     let button = Rc::new(RefCell::new(Button::new(
         "Clicks: 0",
@@ -99,24 +102,23 @@ pub fn build_demo() -> Demo {
     let menu_widget: WidgetSlot = Rc::new(RefCell::new(None));
     let qr_demo: WidgetSlot = Rc::new(RefCell::new(None));
     let png_demo: WidgetSlot = Rc::new(RefCell::new(None));
+    let jpeg_demo: WidgetSlot = Rc::new(RefCell::new(None));
     {
-        let pending_ref = pending.clone();
-        let root_ref = root.clone();
+        let pending_add = pending.clone();
+        let pending_rm = to_remove.clone();
         let menu_ref = menu_widget.clone();
         let qr_ref = qr_demo.clone();
         let png_ref = png_demo.clone();
+        let jpeg_ref = jpeg_demo.clone();
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
             if let Some(menu_w) = menu_ref.borrow_mut().take() {
-                root_ref
-                    .borrow_mut()
-                    .children
-                    .retain(|n| !Rc::ptr_eq(&n.widget, &menu_w));
+                pending_rm.borrow_mut().push(menu_w);
             } else {
                 let menu_w: WidgetHandle = Rc::new(RefCell::new(Container::new(Rect {
                     x: 10,
                     y: 70,
                     width: 100,
-                    height: 80,
+                    height: 110,
                 })));
                 let mut menu = WidgetNode {
                     widget: menu_w.clone(),
@@ -133,19 +135,17 @@ pub fn build_demo() -> Demo {
                     },
                 )));
                 {
-                    let pending_ref = pending_ref.clone();
-                    let root = root_ref.clone();
+                    let pending_add = pending_add.clone();
+                    let pending_rm = pending_rm.clone();
                     let qr_demo = qr_ref.clone();
                     qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
                         if let Some(qr_w) = qr_demo.borrow_mut().take() {
-                            root.borrow_mut()
-                                .children
-                                .retain(|n| !Rc::ptr_eq(&n.widget, &qr_w));
+                            pending_rm.borrow_mut().push(qr_w);
                         } else {
                             let demo = build_plugin_demo();
                             let handle = demo.widget.clone();
                             qr_demo.borrow_mut().replace(handle.clone());
-                            pending_ref.borrow_mut().push(demo);
+                            pending_add.borrow_mut().push(demo);
                         }
                     });
                 }
@@ -164,21 +164,19 @@ pub fn build_demo() -> Demo {
                     },
                 )));
                 {
-                    let pending_ref = pending_ref.clone();
-                    let root = root_ref.clone();
+                    let pending_add = pending_add.clone();
+                    let pending_rm = pending_rm.clone();
                     let png_demo = png_ref.clone();
                     png_button
                         .borrow_mut()
                         .set_on_click(move |_b: &mut Button| {
                             if let Some(png_w) = png_demo.borrow_mut().take() {
-                                root.borrow_mut()
-                                    .children
-                                    .retain(|n| !Rc::ptr_eq(&n.widget, &png_w));
+                                pending_rm.borrow_mut().push(png_w);
                             } else {
                                 let demo = build_png_demo();
                                 let handle = demo.widget.clone();
                                 png_demo.borrow_mut().replace(handle.clone());
-                                pending_ref.borrow_mut().push(demo);
+                                pending_add.borrow_mut().push(demo);
                             }
                         });
                 }
@@ -187,8 +185,39 @@ pub fn build_demo() -> Demo {
                     children: Vec::new(),
                 });
 
+                let jpeg_button = Rc::new(RefCell::new(Button::new(
+                    "JPEG",
+                    Rect {
+                        x: 20,
+                        y: 140,
+                        width: 80,
+                        height: 20,
+                    },
+                )));
+                {
+                    let pending_add = pending_add.clone();
+                    let pending_rm = pending_rm.clone();
+                    let jpeg_demo = jpeg_ref.clone();
+                    jpeg_button
+                        .borrow_mut()
+                        .set_on_click(move |_b: &mut Button| {
+                            if let Some(jpeg_w) = jpeg_demo.borrow_mut().take() {
+                                pending_rm.borrow_mut().push(jpeg_w);
+                            } else {
+                                let demo = build_jpeg_demo();
+                                let handle = demo.widget.clone();
+                                jpeg_demo.borrow_mut().replace(handle.clone());
+                                pending_add.borrow_mut().push(demo);
+                            }
+                        });
+                }
+                menu.children.push(WidgetNode {
+                    widget: jpeg_button,
+                    children: Vec::new(),
+                });
+
                 menu_ref.borrow_mut().replace(menu_w);
-                pending_ref.borrow_mut().push(menu);
+                pending_add.borrow_mut().push(menu);
             }
         });
     }
@@ -201,23 +230,46 @@ pub fn build_demo() -> Demo {
         root,
         counter: click_count,
         pending,
+        to_remove,
     }
 }
 
 /// Build a widget demonstrating plugin features such as QR code generation.
 pub fn build_plugin_demo() -> WidgetNode {
-    let (pixels_vec, width, height) = qrcode::generate(b"Echo Go").unwrap();
-    let pixels: &'static [Color] = Box::leak(pixels_vec.into_boxed_slice());
+    let (pixels_vec, width, _) = qrcode::generate(b"https://github.com/SoftOboros/rlvgl").unwrap();
+    let root_w = 320u32;
+    let root_h = 240u32;
+    // Match the area used by the PNG/JPEG demos: the lower-right 2/3rds of the display.
+    let target = root_h * 2 / 3;
+    let scale = target as f32 / width as f32;
+    let new_w = target;
+    let new_h = target;
+    let mut scaled = Vec::with_capacity((new_w * new_h) as usize);
+    for y in 0..new_h {
+        for x in 0..new_w {
+            let src_x = (x as f32 / scale).floor() as usize;
+            let src_y = (y as f32 / scale).floor() as usize;
+            let idx = src_y * width as usize + src_x;
+            let color = pixels_vec
+                .get(idx)
+                .copied()
+                .unwrap_or(Color(255, 255, 255, 255));
+            scaled.push(color);
+        }
+    }
+    let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
+    let x_pos = (root_w - new_w) as i32;
+    let y_pos = (root_h - new_h) as i32;
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
             Rect {
-                x: 150,
-                y: 40,
-                width: width as i32,
-                height: height as i32,
+                x: x_pos,
+                y: y_pos,
+                width: new_w as i32,
+                height: new_h as i32,
             },
-            width as i32,
-            height as i32,
+            new_w as i32,
+            new_h as i32,
             pixels,
         ))),
         children: Vec::new(),
@@ -228,7 +280,7 @@ pub fn build_plugin_demo() -> WidgetNode {
 ///
 /// `scale` controls the desired scaling factor. The final image is clamped so
 /// it never exceeds the 320x240 screen bounds, and it is anchored to the lower
-/// left corner of the display.
+/// right corner of the display.
 pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     let data = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -257,13 +309,13 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
             let src_x = (x as f32 / scale).floor() as usize;
             let src_y = (y as f32 / scale).floor() as usize;
             let idx = src_y * width as usize + src_x;
-            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0));
+            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0, 255));
             scaled.push(color);
         }
     }
     let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
 
-    let x_pos = 0;
+    let x_pos = (root_w - new_w) as i32;
     let y_pos = (root_h - new_h) as i32;
     WidgetNode {
         widget: Rc::new(RefCell::new(Image::new(
@@ -281,14 +333,85 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     }
 }
 
-/// Build a PNG demo using the default scale of `1.0`.
+/// Build a PNG demo using the default scale of `0.5`.
 pub fn build_png_demo() -> WidgetNode {
-    build_png_demo_scaled(1.0)
+    build_png_demo_scaled(0.5)
+}
+
+/// Build a widget displaying the rlvgl logo decoded from a JPEG asset.
+///
+/// Mirrors [`build_png_demo_scaled`] but decodes a JPEG image instead.
+pub fn build_jpeg_demo_scaled(scale: f32) -> WidgetNode {
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/rlvgl-logo.jpg"
+    ));
+    let (pixels_vec, width, height) =
+        jpeg::decode(data).expect("failed to decode built-in JPEG asset");
+
+    let width = width as u32;
+    let height = height as u32;
+    let root_w = 320u32;
+    let root_h = 240u32;
+    let mut scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    scale = scale
+        .min(root_w as f32 / width as f32)
+        .min(root_h as f32 / height as f32);
+
+    let new_w = (width as f32 * scale).max(1.0).round() as u32;
+    let new_h = (height as f32 * scale).max(1.0).round() as u32;
+
+    let mut scaled = Vec::with_capacity((new_w * new_h) as usize);
+    for y in 0..new_h {
+        for x in 0..new_w {
+            let src_x = (x as f32 / scale).floor() as usize;
+            let src_y = (y as f32 / scale).floor() as usize;
+            let idx = src_y * width as usize + src_x;
+            let color = pixels_vec.get(idx).copied().unwrap_or(Color(0, 0, 0, 255));
+            scaled.push(color);
+        }
+    }
+    let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
+
+    let x_pos = (root_w - new_w) as i32;
+    let y_pos = (root_h - new_h) as i32;
+    WidgetNode {
+        widget: Rc::new(RefCell::new(Image::new(
+            Rect {
+                x: x_pos,
+                y: y_pos,
+                width: new_w as i32,
+                height: new_h as i32,
+            },
+            new_w as i32,
+            new_h as i32,
+            pixels,
+        ))),
+        children: Vec::new(),
+    }
+}
+
+/// Build a JPEG demo using the default scale of `0.5`.
+pub fn build_jpeg_demo() -> WidgetNode {
+    build_jpeg_demo_scaled(0.5)
 }
 
 /// Flush any widgets queued during event callbacks into the root tree.
-pub fn flush_pending(root: &Rc<RefCell<WidgetNode>>, pending: &Rc<RefCell<Vec<WidgetNode>>>) {
+pub fn flush_pending(
+    root: &Rc<RefCell<WidgetNode>>,
+    pending: &Rc<RefCell<Vec<WidgetNode>>>,
+    to_remove: &Rc<RefCell<Vec<WidgetHandle>>>,
+) {
     let mut root_ref = root.borrow_mut();
+    for handle in to_remove.borrow_mut().drain(..) {
+        root_ref
+            .children
+            .retain(|n| !Rc::ptr_eq(&n.widget, &handle));
+    }
     let mut pending_nodes = pending.borrow_mut();
     root_ref.children.extend(pending_nodes.drain(..));
 }

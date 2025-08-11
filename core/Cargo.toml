@@ -15,7 +15,7 @@ publish = true
 
 [dependencies]
 
-png = { version = "0.18.0-rc.3", optional = true }
+png = { version = "0.17", optional = true }
 jpeg-decoder = { version = "0.3", optional = true }
 qrcode = { version = "0.14", default-features = false, optional = true }
 gif = { version = "0.13", optional = true }
@@ -48,7 +48,7 @@ rlvgl-widgets = { path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"
 apng = "0.3"
-png = "0.18.0-rc.3"
+png = "0.17"
 
 [package.metadata.docs.rs]
 all-features = true

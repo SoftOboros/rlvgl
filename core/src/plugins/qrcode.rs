@@ -14,8 +14,8 @@ pub fn generate(data: &[u8]) -> Result<(Vec<Color>, u32, u32), QrError> {
     let mut pixels = Vec::with_capacity((width * width) as usize);
     for m in modules {
         match m {
-            QrColor::Dark => pixels.push(Color(0, 0, 0)),
-            QrColor::Light => pixels.push(Color(255, 255, 255)),
+            QrColor::Dark => pixels.push(Color(0, 0, 0, 255)),
+            QrColor::Light => pixels.push(Color(255, 255, 255, 255)),
         }
     }
     Ok((pixels, width, width))
@@ -30,6 +30,6 @@ mod tests {
         let (pixels, w, h) = generate(b"hello").unwrap();
         assert_eq!(w, h);
         assert_eq!(pixels.len(), (w * h) as usize);
-        assert_eq!(pixels[0], Color(0, 0, 0));
+        assert_eq!(pixels[0], Color(0, 0, 0, 255));
     }
 }

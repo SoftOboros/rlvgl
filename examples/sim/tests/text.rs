@@ -1,7 +1,7 @@
 //! Tests verifying text rendering alignment and clipping.
 use rlvgl::fontdue::{line_metrics, rasterize_glyph};
 
-const FONT_DATA: &[u8] = include_bytes!("../../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
+const FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/DejaVuSans.ttf");
 
 /// Convert a grayscale framebuffer into an ASCII art representation.
 fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {

@@ -41,6 +41,7 @@ impl Fade {
                 lerp(self.start.0, self.end.0) as u8,
                 lerp(self.start.1, self.end.1) as u8,
                 lerp(self.start.2, self.end.2) as u8,
+                lerp(self.start.3, self.end.3) as u8,
             );
         }
     }

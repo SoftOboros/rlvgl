@@ -90,9 +90,9 @@ pub struct Style {
 impl Default for Style {
     fn default() -> Self {
         Self {
-            bg_color: Color(255, 255, 255),
-            text_color: Color(0, 0, 0),
-            border_color: Color(0, 0, 0),
+            bg_color: Color(255, 255, 255, 255),
+            text_color: Color(0, 0, 0, 255),
+            border_color: Color(0, 0, 0, 255),
             border_width: 0,
             radius: 0,
             padding: 0,
@@ -170,18 +170,18 @@ mod tests {
     #[test]
     fn builder_sets_all_fields() {
         let style = StyleBuilder::new()
-            .bg(Color(1, 2, 3))
-            .text(Color(4, 5, 6))
-            .border_color(Color(7, 8, 9))
+            .bg(Color(1, 2, 3, 255))
+            .text(Color(4, 5, 6, 255))
+            .border_color(Color(7, 8, 9, 255))
             .border_width(2)
             .radius(3)
             .padding(4)
             .margin(5)
             .build();
 
-        assert_eq!(style.bg_color, Color(1, 2, 3));
-        assert_eq!(style.text_color, Color(4, 5, 6));
-        assert_eq!(style.border_color, Color(7, 8, 9));
+        assert_eq!(style.bg_color, Color(1, 2, 3, 255));
+        assert_eq!(style.text_color, Color(4, 5, 6, 255));
+        assert_eq!(style.border_color, Color(7, 8, 9, 255));
         assert_eq!(style.border_width, 2);
         assert_eq!(style.radius, 3);
         assert_eq!(style.padding, 4);

@@ -25,10 +25,10 @@ fn image_render() {
     };
 
     let pixels = [
-        Color(1, 0, 0),
-        Color(0, 1, 0),
-        Color(0, 0, 1),
-        Color(1, 1, 1),
+        Color(1, 0, 0, 255),
+        Color(0, 1, 0, 255),
+        Color(0, 0, 1, 255),
+        Color(1, 1, 1, 255),
     ];
     let image = Image::new(
         Rect {

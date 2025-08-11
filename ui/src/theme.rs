@@ -71,9 +71,9 @@ pub struct Colors {
 impl Default for Colors {
     fn default() -> Self {
         Self {
-            primary: Color(98, 0, 238),
-            background: Color(255, 255, 255),
-            text: Color(0, 0, 0),
+            primary: Color(98, 0, 238, 255),
+            background: Color(255, 255, 255, 255),
+            text: Color(0, 0, 0, 255),
         }
     }
 }

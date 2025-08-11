@@ -25,8 +25,8 @@ impl Checkbox {
             bounds,
             text: text.into(),
             style: Style::default(),
-            text_color: Color(0, 0, 0),
-            check_color: Color(0, 0, 0),
+            text_color: Color(0, 0, 0, 255),
+            check_color: Color(0, 0, 0, 255),
             checked: false,
         }
     }

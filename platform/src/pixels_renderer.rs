@@ -13,7 +13,7 @@ use rlvgl_core::{
 #[cfg(feature = "fontdue")]
 use rlvgl_core::fontdue::{FontdueRenderTarget, render_text};
 #[cfg(feature = "fontdue")]
-const FONT_DATA: &[u8] = include_bytes!("../../lvgl/scripts/built_in_font/DejaVuSans.ttf");
+const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
 #[cfg(not(feature = "fontdue"))]
 use embedded_graphics::{
     mono_font::{MonoTextStyle, ascii::FONT_6X10},

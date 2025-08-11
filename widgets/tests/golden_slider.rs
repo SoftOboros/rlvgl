@@ -34,17 +34,20 @@ fn slider_render() {
         0,
         10,
     );
-    slider.style.bg_color = Color(1, 1, 1);
-    slider.style.border_color = Color(2, 2, 2);
-    slider.knob_color = Color(3, 3, 3);
+    slider.style.bg_color = Color(1, 1, 1, 255);
+    slider.style.border_color = Color(2, 2, 2, 255);
+    slider.knob_color = Color(3, 3, 3, 255);
     slider.set_value(5);
     slider.draw(&mut renderer);
 
     // knob center pixel
-    assert_eq!(display.buffer[5 * 20 + 10], Color(3, 3, 3));
+    assert_eq!(display.buffer[5 * 20 + 10], Color(3, 3, 3, 255));
     // track pixel outside knob
     let track_y = 0 + (10 - 4) / 2 + 1; // middle of track
-    assert_eq!(display.buffer[track_y as usize * 20 + 2], Color(2, 2, 2));
+    assert_eq!(
+        display.buffer[track_y as usize * 20 + 2],
+        Color(2, 2, 2, 255)
+    );
     // background pixel above track
-    assert_eq!(display.buffer[0 * 20 + 0], Color(1, 1, 1));
+    assert_eq!(display.buffer[0 * 20 + 0], Color(1, 1, 1, 255));
 }
