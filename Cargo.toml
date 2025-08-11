@@ -15,7 +15,6 @@ publish = true
 exclude = [
   "lvgl/**",
   "docs/**",
-  "examples/**",
   ".github/**",
   "scripts/**",
   "target/**"
@@ -23,6 +22,11 @@ exclude = [
 
 [lib]
 path = "src/lib.rs"
+
+[[bin]]
+name = "rlvgl-sim"
+path = "examples/sim/src/main.rs"
+required-features = ["simulator", "qrcode", "png", "jpeg", "fontdue"]
 
 [dependencies]
 rlvgl-core = { version = "0.1.4", path = "core", default-features = false }
@@ -92,5 +96,5 @@ debug = true
 incremental = false
 
 [workspace]
-members = ["core", "examples/sim", "platform", "widgets", "ui"]
+members = ["core", "platform", "widgets", "ui"]
 resolver = "2"
