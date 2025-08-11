@@ -11,7 +11,7 @@ use std::io::Cursor;
 pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
     let decoder = Decoder::new(Cursor::new(data));
     let mut reader = decoder.read_info()?;
-    let mut buf = alloc::vec![0; reader.output_buffer_size().unwrap()];
+    let mut buf = alloc::vec![0; reader.output_buffer_size()];
     let info = reader.next_frame(&mut buf)?;
     let pixels_raw = &buf[..info.buffer_size()];
     let mut pixels = Vec::with_capacity(info.width as usize * info.height as usize);
