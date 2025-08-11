@@ -1,4 +1,6 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
+#[path = "lib.rs"]
+mod rlvgl_sim;
 use rlvgl::platform::{InputEvent, PixelsDisplay, PixelsRenderer};
 use rlvgl_sim::{build_demo, flush_pending};
 
