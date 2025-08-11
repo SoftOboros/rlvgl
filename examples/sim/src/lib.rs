@@ -284,7 +284,7 @@ pub fn build_plugin_demo() -> WidgetNode {
 pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     let data = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/assets/rlvgl-logo.png"
+        "/examples/sim/assets/rlvgl-logo.png"
     ));
     let (pixels_vec, width, height) =
         png::decode(data).expect("failed to decode built-in PNG asset");
@@ -344,7 +344,7 @@ pub fn build_png_demo() -> WidgetNode {
 pub fn build_jpeg_demo_scaled(scale: f32) -> WidgetNode {
     let data = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/assets/rlvgl-logo.jpg"
+        "/examples/sim/assets/rlvgl-logo.jpg"
     ));
     let (pixels_vec, width, height) =
         jpeg::decode(data).expect("failed to decode built-in JPEG asset");
