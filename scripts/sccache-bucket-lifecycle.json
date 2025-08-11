@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-old-sccache",
+      "Status": "Enabled",
+      "Prefix": "rlvgl/",
+      "Expiration": { "Days": 60 }
+    }
+  ]
+}

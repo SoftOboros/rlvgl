@@ -11,6 +11,8 @@ type ClickHandler = Box<dyn FnMut(&mut Button)>;
 
 /// Clickable button widget.
 pub struct Button {
+    /// Bounding rectangle defining the clickable area.
+    bounds: Rect,
     label: Label,
     on_click: Option<ClickHandler>,
 }
@@ -19,6 +21,7 @@ impl Button {
     /// Create a new button with the provided label text.
     pub fn new(text: impl Into<String>, bounds: Rect) -> Self {
         Self {
+            bounds,
             label: Label::new(text, bounds),
             on_click: None,
         }
@@ -51,14 +54,14 @@ impl Button {
 
     /// Check if the given coordinates are inside the button's bounds.
     fn inside_bounds(&self, x: i32, y: i32) -> bool {
-        let b = self.label.bounds();
+        let b = self.bounds;
         x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height
     }
 }
 
 impl Widget for Button {
     fn bounds(&self) -> Rect {
-        self.label.bounds()
+        self.bounds
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {

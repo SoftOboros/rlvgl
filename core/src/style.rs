@@ -14,8 +14,8 @@ pub struct Style {
 impl Default for Style {
     fn default() -> Self {
         Self {
-            bg_color: crate::widget::Color(255, 255, 255),
-            border_color: crate::widget::Color(0, 0, 0),
+            bg_color: crate::widget::Color(255, 255, 255, 255),
+            border_color: crate::widget::Color(0, 0, 0, 255),
             border_width: 0,
         }
     }

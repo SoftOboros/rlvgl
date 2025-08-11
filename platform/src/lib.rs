@@ -12,12 +12,16 @@ pub mod display;
 /// Input device abstractions.
 pub mod input;
 #[cfg(feature = "simulator")]
+pub mod pixels_renderer;
+#[cfg(feature = "simulator")]
 pub mod simulator;
 #[cfg(feature = "st7789")]
 pub mod st7789;
 
 pub use display::DisplayDriver;
 pub use input::{InputDevice, InputEvent};
+#[cfg(feature = "simulator")]
+pub use pixels_renderer::PixelsRenderer;
 #[cfg(feature = "simulator")]
 pub use simulator::PixelsDisplay;
 #[cfg(feature = "st7789")]

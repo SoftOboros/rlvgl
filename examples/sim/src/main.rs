@@ -1,6 +1,8 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
-use rlvgl::platform::{InputEvent, PixelsDisplay};
-use rlvgl_sim::{PixelsRenderer, build_demo, flush_pending};
+#[path = "lib.rs"]
+mod rlvgl_sim;
+use rlvgl::platform::{InputEvent, PixelsDisplay, PixelsRenderer};
+use rlvgl_sim::{build_demo, flush_pending};
 
 const WIDTH: usize = 320;
 const HEIGHT: usize = 240;
@@ -9,6 +11,7 @@ fn main() {
     let demo = build_demo();
     let root = demo.root.clone();
     let pending = demo.pending.clone();
+    let to_remove = demo.to_remove.clone();
 
     PixelsDisplay::new(WIDTH, HEIGHT).run(
         {
@@ -21,9 +24,10 @@ fn main() {
         {
             let root = root.clone();
             let pending = pending.clone();
+            let to_remove = to_remove.clone();
             move |evt: InputEvent| {
                 root.borrow_mut().dispatch_event(&evt);
-                flush_pending(&root, &pending);
+                flush_pending(&root, &pending, &to_remove);
             }
         },
     );

@@ -3,20 +3,20 @@
 //! The window can be resized by the user and will scale the simulated
 //! display while preserving the aspect ratio of the configured dimensions.
 #[cfg(feature = "simulator")]
-use alloc::{boxed::Box, format, vec::Vec};
+use alloc::{boxed::Box, format, string::String, vec::Vec};
+#[cfg(feature = "simulator")]
+use eframe::{self, egui};
 #[cfg(feature = "simulator")]
 use pixels::{Pixels, SurfaceTexture};
 #[cfg(feature = "simulator")]
-use rfd::{MessageButtons, MessageDialog};
-#[cfg(feature = "simulator")]
-use std::{backtrace::Backtrace, panic};
+use std::{backtrace::Backtrace, eprintln, panic};
 #[cfg(feature = "simulator")]
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
     event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
-    window::{Fullscreen, WindowBuilder},
+    window::{Fullscreen, Window},
 };
 
 #[cfg(feature = "simulator")]
@@ -35,7 +35,7 @@ struct Tile {
 #[cfg(feature = "simulator")]
 /// Generate tiles covering the window where each tile is no larger than
 /// `max_tile_size` in either dimension.
-fn generate_tiles_from_window(window: &winit::window::Window, max_tile_size: u32) -> Vec<Tile> {
+fn generate_tiles_from_window(window: &Window, max_tile_size: u32) -> Vec<Tile> {
     let PhysicalSize { width, height } = window.inner_size();
     let mut tiles = Vec::new();
     let x_tiles = width.div_ceil(max_tile_size);
@@ -60,44 +60,108 @@ fn generate_tiles_from_window(window: &winit::window::Window, max_tile_size: u32
 }
 
 #[cfg(feature = "simulator")]
+/// Display a panic message in a scrollable window limited to the screen size.
+fn show_panic_window(message: String) {
+    /// Simple `eframe` application rendering the panic text.
+    struct PanicApp {
+        msg: String,
+    }
+
+    impl eframe::App for PanicApp {
+        fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.heading("rlvgl panic");
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.add(egui::TextEdit::multiline(&mut self.msg).desired_width(f32::INFINITY));
+                });
+                ui.horizontal(|ui| {
+                    if ui.button("Copy").clicked() {
+                        ctx.output_mut(|o| o.copied_text = self.msg.clone());
+                    }
+                    if ui.button("Close").clicked() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                });
+            });
+        }
+    }
+
+    let event_loop = EventLoop::new().expect("failed to create event loop");
+    #[allow(deprecated)]
+    let hidden_window = event_loop
+        .create_window(Window::default_attributes().with_visible(false))
+        .expect("failed to create window");
+    let monitor_size = hidden_window
+        .current_monitor()
+        .map(|m| m.size())
+        .unwrap_or(PhysicalSize::new(800, 600));
+    drop(hidden_window);
+    drop(event_loop);
+
+    let max = egui::vec2(monitor_size.width as f32, monitor_size.height as f32);
+    let initial = egui::vec2(max.x * 0.8, max.y * 0.8);
+
+    let viewport = egui::ViewportBuilder::default()
+        .with_inner_size(initial)
+        .with_max_inner_size(max)
+        .with_decorations(true)
+        .with_resizable(true);
+
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+
+    let msg_copy = message.clone();
+    if let Err(e) = eframe::run_native(
+        "rlvgl panic",
+        options,
+        Box::new(|_| Box::new(PanicApp { msg: message })),
+    ) {
+        eprintln!("{msg_copy}\nfailed to show panic window: {e}");
+    }
+}
+
+#[cfg(feature = "simulator")]
 /// Desktop simulator display backed by the `pixels` crate.
 pub struct PixelsDisplay {
     width: usize,
     height: usize,
     event_loop: EventLoop<()>,
     pixels: Pixels<'static>,
-    window: &'static winit::window::Window,
+    window: &'static Window,
 }
 
 #[cfg(feature = "simulator")]
 impl PixelsDisplay {
     /// Create a new window with the given size.
     ///
-    /// Any panic during simulator execution triggers a message dialog
-    /// displaying the panic and a captured call stack. Selecting **OK** in
-    /// the dialog terminates the process.
+    /// Any panic during simulator execution opens a resizable window
+    /// displaying the panic and a captured call stack. The window is
+    /// constrained to the visible screen, provides a scrollbar for long
+    /// messages, and offers copy and close controls. Closing the window
+    /// terminates the process.
     pub fn new(width: usize, height: usize) -> Self {
         panic::set_hook(Box::new(|info| {
             let backtrace = Backtrace::force_capture();
             let message = format!("{info}\n\n{backtrace}");
-            let _ = MessageDialog::new()
-                .set_title("rlvgl panic")
-                .set_description(&message)
-                .set_buttons(MessageButtons::Ok)
-                .show();
+            show_panic_window(message);
             std::process::exit(1);
         }));
         let event_loop = EventLoop::new().expect("failed to create event loop");
-        let window = WindowBuilder::new()
-            .with_title("rlvgl simulator")
-            .with_inner_size(LogicalSize::new(width as f64, height as f64))
-            .build(&event_loop)
+        #[allow(deprecated)]
+        let window = event_loop
+            .create_window(
+                Window::default_attributes()
+                    .with_title("rlvgl simulator")
+                    .with_inner_size(LogicalSize::new(width as f64, height as f64)),
+            )
             .expect("failed to create window");
         let window = Box::leak(Box::new(window));
         let surface = SurfaceTexture::new(width as u32, height as u32, &*window);
         let pixels = Pixels::new(width as u32, height as u32, surface)
             .expect("failed to create pixel buffer");
-        let window: &'static winit::window::Window = &*window;
+        let window: &'static Window = &*window;
         Self {
             width,
             height,
@@ -128,14 +192,17 @@ impl PixelsDisplay {
 
         let mut pointer_pos = (0i32, 0i32);
         let mut pointer_down = false;
-        let mut surface_size = (width as u32, height as u32);
+        let mut surface_offset = (0.0f64, 0.0f64);
+        // Ratio between window pixels and logical display coordinates
+        let mut scale = (1.0f64, 1.0f64);
         let aspect_ratio = width as f64 / height as f64;
         let max_dim = pixels.device().limits().max_texture_dimension_2d;
         let mut _tiles = generate_tiles_from_window(window, max_dim);
         let mut fullscreen = false;
 
+        #[allow(deprecated)]
         event_loop
-            .run(move |event, target| match event {
+            .run(move |event, target: &ActiveEventLoop| match event {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     ..
@@ -160,11 +227,20 @@ impl PixelsDisplay {
                             h = (w as f64 / aspect_ratio).round() as u32;
                         }
                     }
+                    surface_offset = (
+                        (size.width as f64 - w as f64) / 2.0,
+                        (size.height as f64 - h as f64) / 2.0,
+                    );
                     _tiles = generate_tiles_from_window(window, max_dim);
                     pixels
                         .resize_surface(w.min(max_dim), h.min(max_dim))
                         .expect("failed to resize surface");
-                    surface_size = (w, h);
+                    let old_scale = scale;
+                    scale = (w as f64 / width as f64, h as f64 / height as f64);
+                    pointer_pos = (
+                        (pointer_pos.0 as f64 * old_scale.0 / scale.0) as i32,
+                        (pointer_pos.1 as f64 * old_scale.1 / scale.1) as i32,
+                    );
                     window.request_redraw();
                 }
                 Event::WindowEvent {
@@ -191,9 +267,11 @@ impl PixelsDisplay {
                     event: WindowEvent::CursorMoved { position, .. },
                     ..
                 } => {
+                    let adj_x = position.x - surface_offset.0;
+                    let adj_y = position.y - surface_offset.1;
                     pointer_pos = (
-                        (position.x * width as f64 / surface_size.0 as f64) as i32,
-                        (position.y * height as f64 / surface_size.1 as f64) as i32,
+                        (adj_x / scale.0).clamp(0.0, width as f64 - 1.0) as i32,
+                        (adj_y / scale.1).clamp(0.0, height as f64 - 1.0) as i32,
                     );
                     if pointer_down {
                         event_callback(InputEvent::PointerMove {

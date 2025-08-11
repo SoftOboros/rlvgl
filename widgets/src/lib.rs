@@ -18,5 +18,9 @@ pub mod label;
 pub mod list;
 /// Progress bar widget.
 pub mod progress;
+/// Radio button widget for mutually exclusive options.
+pub mod radio;
 /// Slider widget for numeric input.
 pub mod slider;
+/// Binary on/off switch widget.
+pub mod switch;

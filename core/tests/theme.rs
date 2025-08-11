@@ -8,25 +8,25 @@ use rlvgl_widgets::button::Button;
 #[test]
 fn light_theme_applies_defaults() {
     let mut style = Style::default();
-    style.bg_color = Color(10, 20, 30);
-    style.border_color = Color(5, 5, 5);
+    style.bg_color = Color(10, 20, 30, 255);
+    style.border_color = Color(5, 5, 5, 255);
 
     LightTheme.apply(&mut style);
 
-    assert_eq!(style.bg_color, Color(255, 255, 255));
-    assert_eq!(style.border_color, Color(0, 0, 0));
+    assert_eq!(style.bg_color, Color(255, 255, 255, 255));
+    assert_eq!(style.border_color, Color(0, 0, 0, 255));
 }
 
 #[test]
 fn dark_theme_applies_defaults() {
     let mut style = Style::default();
-    style.bg_color = Color(250, 250, 250);
-    style.border_color = Color(10, 10, 10);
+    style.bg_color = Color(250, 250, 250, 255);
+    style.border_color = Color(10, 10, 10, 255);
 
     DarkTheme.apply(&mut style);
 
-    assert_eq!(style.bg_color, Color(0, 0, 0));
-    assert_eq!(style.border_color, Color(255, 255, 255));
+    assert_eq!(style.bg_color, Color(0, 0, 0, 255));
+    assert_eq!(style.border_color, Color(255, 255, 255, 255));
 }
 
 #[test]
@@ -43,6 +43,6 @@ fn theme_updates_widget_style() {
 
     DarkTheme.apply(button.style_mut());
 
-    assert_eq!(button.style().bg_color, Color(0, 0, 0));
-    assert_eq!(button.style().border_color, Color(255, 255, 255));
+    assert_eq!(button.style().bg_color, Color(0, 0, 0, 255));
+    assert_eq!(button.style().border_color, Color(255, 255, 255, 255));
 }

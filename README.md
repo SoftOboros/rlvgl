@@ -29,12 +29,14 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
 - [support](https://github.com/SoftOboros/rlvgl/blob/main/support/README.md)/ – Fonts, geometry, style, color utils
 - [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
+- [rlvgl-sim](https://github.com/SoftOboros/rlvgl/tree/main/examples/sim/README.md)/ – Desktop simulator example
 ## Status
 
 As-built. See [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md) for component-by-component progress.
 - [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md)
 - [TEST-TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TEST-TODO.md)
 - [TODO-PLUGINS](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-PLUGINS.md)
+- [TODO-UI](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-UI.md)
 
 As of 0.1.0 many features are implemented and an 87% unit test coverage
 is achived, but functional testing has and bare metal testing have not
@@ -56,7 +58,7 @@ fn main() {
             height: 20,
         },
     );
-    label.style.bg_color = rlvgl_core::widget::Color(0, 0, 255);
+    label.style.bg_color = rlvgl_core::widget::Color(0, 0, 255, 255);
     // Rendering would use a DisplayDriver implementation.
 }
 ```
@@ -66,6 +68,31 @@ fn main() {
 LLVM coverage instrumentation is configured via `.cargo/config.toml` and the
 `coverage` target in the `Makefile`. Run `make coverage` to execute the tests
 with instrumentation and generate an HTML report under `./coverage/`.
+
+## [rlvgl crate](https://crates.io/crates/rlvgl)
+- The link above is for the top crate which bundles the others and include the simulator.
+- [rlvgl-core crate](https://crates.io/crates/rlvgl-core)
+- [rlvgl-widgets crate](https://crates.io/crates/rlvgl-widgets)
+- [rlvgl-platform crate](https://crates.io/crates/rlvgl-platform)
+
+Run the following Cargo command in your project directory:
+```bash
+cargo add rlvgl
+```
+Or add the following line to your Cargo.toml:
+```toml
+rlvgl = "0.1.5"
+```
+
+## Dockerhub
+The build image used by the Github worflow for this repo is publiclly available on [Dockerhub](https://hub.docker.com/r/iraa/rlvgl).
+```bash
+docker pull iraa/rlvgl:latest
+```
+
+Consult the [Dockerfile](https://github.com/SoftOboros/rlvgl/blob/main/Dockerfile) for details on the build environment.
+
+Other useful helper scripts may be found in [`/scripts`](https://github.com/SoftOboros/rlvgl/blob/main/scripts).
 
 ## License
 rlvgl is licensed under the MIT license.  See [LICENSE](https://github.com/SoftOboros/rlvgl/blob/main/LICENSE) for more details.

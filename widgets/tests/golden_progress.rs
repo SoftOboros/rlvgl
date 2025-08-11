@@ -34,13 +34,13 @@ fn progress_render() {
         0,
         10,
     );
-    bar.style.bg_color = Color(1, 1, 1);
-    bar.bar_color = Color(2, 2, 2);
+    bar.style.bg_color = Color(1, 1, 1, 255);
+    bar.bar_color = Color(2, 2, 2, 255);
     bar.set_value(5);
     bar.draw(&mut renderer);
 
     // pixel inside bar
-    assert_eq!(display.buffer[1 * 20 + 5], Color(2, 2, 2));
+    assert_eq!(display.buffer[1 * 20 + 5], Color(2, 2, 2, 255));
     // pixel outside bar
-    assert_eq!(display.buffer[1 * 20 + 15], Color(1, 1, 1));
+    assert_eq!(display.buffer[1 * 20 + 15], Color(1, 1, 1, 255));
 }

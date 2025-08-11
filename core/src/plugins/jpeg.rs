@@ -15,19 +15,19 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u16, u16), Error> {
     match info.pixel_format {
         PixelFormat::L8 => {
             for &v in &pixels_raw {
-                pixels.push(Color(v, v, v));
+                pixels.push(Color(v, v, v, 255));
             }
         }
         PixelFormat::L16 => {
             for chunk in pixels_raw.chunks_exact(2) {
                 let val = u16::from_be_bytes([chunk[0], chunk[1]]);
                 let v = (val / 257) as u8;
-                pixels.push(Color(v, v, v));
+                pixels.push(Color(v, v, v, 255));
             }
         }
         PixelFormat::RGB24 => {
             for chunk in pixels_raw.chunks_exact(3) {
-                pixels.push(Color(chunk[0], chunk[1], chunk[2]));
+                pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
             }
         }
         PixelFormat::CMYK32 => {
@@ -39,7 +39,7 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u16, u16), Error> {
                 let r = (1.0 - (c * (1.0 - k) + k)) * 255.0;
                 let g = (1.0 - (m * (1.0 - k) + k)) * 255.0;
                 let b = (1.0 - (y * (1.0 - k) + k)) * 255.0;
-                pixels.push(Color(r as u8, g as u8, b as u8));
+                pixels.push(Color(r as u8, g as u8, b as u8, 255));
             }
         }
     }

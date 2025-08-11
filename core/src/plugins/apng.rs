@@ -26,7 +26,7 @@ pub fn decode(data: &[u8]) -> Result<(Vec<ApngFrame>, u32, u32), ImageError> {
         let buffer = frame.into_buffer();
         let mut pixels = Vec::with_capacity((width * height) as usize);
         for chunk in buffer.into_raw().chunks_exact(4) {
-            pixels.push(Color(chunk[0], chunk[1], chunk[2]));
+            pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
         }
         frames_out.push(ApngFrame {
             pixels,
@@ -69,7 +69,7 @@ mod tests {
         let (frames, w, h) = decode(&data).unwrap();
         assert_eq!((w, h), (1, 1));
         assert_eq!(frames.len(), 2);
-        assert_eq!(frames[0].pixels[0], Color(255, 0, 0));
-        assert_eq!(frames[1].pixels[0], Color(0, 255, 0));
+        assert_eq!(frames[0].pixels[0], Color(255, 0, 0, 255));
+        assert_eq!(frames[1].pixels[0], Color(0, 255, 0, 255));
     }
 }

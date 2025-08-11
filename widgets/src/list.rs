@@ -22,7 +22,7 @@ impl List {
         Self {
             bounds,
             style: Style::default(),
-            text_color: Color(0, 0, 0),
+            text_color: Color(0, 0, 0, 255),
             items: Vec::new(),
             selected: None,
         }
@@ -72,7 +72,7 @@ impl Widget for List {
         let row_height = 16;
         for (i, item) in self.items.iter().enumerate() {
             let y = self.bounds.y + (i as i32 * row_height);
-            let pos = (self.bounds.x + 2, y);
+            let pos = (self.bounds.x + 2, y + row_height);
             let color = if self.selected == Some(i) {
                 self.style.border_color
             } else {

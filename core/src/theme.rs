@@ -18,8 +18,8 @@ pub struct LightTheme;
 
 impl Theme for LightTheme {
     fn apply(&self, style: &mut Style) {
-        style.bg_color = Color(255, 255, 255);
-        style.border_color = Color(0, 0, 0);
+        style.bg_color = Color(255, 255, 255, 255);
+        style.border_color = Color(0, 0, 0, 255);
     }
 }
 
@@ -28,7 +28,7 @@ pub struct DarkTheme;
 
 impl Theme for DarkTheme {
     fn apply(&self, style: &mut Style) {
-        style.bg_color = Color(0, 0, 0);
-        style.border_color = Color(255, 255, 255);
+        style.bg_color = Color(0, 0, 0, 255);
+        style.border_color = Color(255, 255, 255, 255);
     }
 }

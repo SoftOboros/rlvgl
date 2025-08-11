@@ -26,3 +26,4 @@ pub use rlvgl_core::nes;
 pub use rlvgl_core::pinyin;
 pub use rlvgl_platform as platform;
 pub use rlvgl_widgets as widgets;
+pub use rlvgl_ui as ui;

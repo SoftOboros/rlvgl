@@ -33,8 +33,8 @@ fn button_background_render() {
             height: 10,
         },
     );
-    button.style_mut().bg_color = Color(1, 2, 3);
+    button.style_mut().bg_color = Color(1, 2, 3, 255);
     button.draw(&mut renderer);
 
-    assert!(display.buffer.iter().all(|&c| c == Color(1, 2, 3)));
+    assert!(display.buffer.iter().all(|&c| c == Color(1, 2, 3, 255)));
 }

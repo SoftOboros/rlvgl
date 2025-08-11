@@ -30,8 +30,8 @@ fn container_background_render() {
         width: 10,
         height: 10,
     });
-    container.style.bg_color = Color(1, 2, 3);
+    container.style.bg_color = Color(1, 2, 3, 255);
     container.draw(&mut renderer);
 
-    assert!(display.buffer.iter().all(|&c| c == Color(1, 2, 3)));
+    assert!(display.buffer.iter().all(|&c| c == Color(1, 2, 3, 255)));
 }

@@ -19,7 +19,7 @@ pub struct Rect {
     pub height: i32,
 }
 
-/// RGB color used by the renderer.
+/// RGBA color used by the renderer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color(
     /// Red component in the range `0..=255`.
@@ -27,6 +27,10 @@ pub struct Color(
     /// Green component in the range `0..=255`.
     pub u8,
     /// Blue component in the range `0..=255`.
+    pub u8,
+    /// Alpha component in the range `0..=255`.
+    ///
+    /// A value of `255` is fully opaque and `0` is fully transparent.
     pub u8,
 );
 

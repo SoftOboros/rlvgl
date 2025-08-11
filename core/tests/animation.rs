@@ -6,17 +6,22 @@ use rlvgl_core::widget::{Color, Rect};
 #[test]
 fn fade_updates_bg_color() {
     let mut style = Style::default();
-    style.bg_color = Color(0, 0, 0);
+    style.bg_color = Color(0, 0, 0, 255);
     let start_color = style.bg_color;
     let mut timeline = Timeline::new();
-    timeline.add_fade(Fade::new(&mut style, start_color, Color(255, 0, 0), 100));
+    timeline.add_fade(Fade::new(
+        &mut style,
+        start_color,
+        Color(255, 0, 0, 255),
+        100,
+    ));
 
     timeline.tick(50);
-    assert_eq!(style.bg_color, Color(127, 0, 0));
+    assert_eq!(style.bg_color, Color(127, 0, 0, 255));
     assert!(!timeline.is_empty());
 
     timeline.tick(50);
-    assert_eq!(style.bg_color, Color(255, 0, 0));
+    assert_eq!(style.bg_color, Color(255, 0, 0, 255));
     assert!(timeline.is_empty());
 }
 

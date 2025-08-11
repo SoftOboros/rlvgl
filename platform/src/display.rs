@@ -35,7 +35,7 @@ impl BufferDisplay {
         Self {
             width,
             height,
-            buffer: vec![Color(0, 0, 0); width * height],
+            buffer: vec![Color(0, 0, 0, 255); width * height],
         }
     }
 }

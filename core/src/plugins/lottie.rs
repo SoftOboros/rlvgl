@@ -26,7 +26,7 @@ pub fn render_lottie_frame(
         surface
             .data()
             .iter()
-            .map(|px| Color(px.r, px.g, px.b))
+            .map(|px| Color(px.r, px.g, px.b, 255))
             .collect(),
     )
 }

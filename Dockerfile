@@ -9,56 +9,88 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install base languages and build tools
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    wget \
-    git \
-    nano \
-    vim \
-    python3 \
-    python3-venv \
-    python3-pip \
-    cargo \
-    cmake \
-    ninja-build \
-    llvm-dev \
-    libclang-dev \
-    clang \
-    librlottie0-1 \
-    libsdl2-dev \
-    xvfb \
-    libxrender1 \
-    libfreetype6-dev \
-    libx11-dev \
-    libxext-dev \
-    libgtk-3-dev \
-    librlottie-dev \
-    pkg-config \
-    && sudo rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential      \
+    ca-certificates      \
+    cargo                \
+    clang                \
+    cmake                \
+    curl                 \
+    git                  \
+    openssh-client       \
+    libclang-dev         \
+    libfreetype6-dev     \
+    libgtk-3-dev         \
+    librlottie-dev       \
+    libsdl2-dev          \
+    libssl-dev           \
+    libx11-dev           \
+    libxext-dev          \
+    libxrender1          \
+    llvm-dev             \
+    mold                 \
+    nano                 \
+    ninja-build          \
+    pkg-config           \
+    python3              \
+    python3-pip          \
+    python3-venv         \
+    vim                  \
+    wget                 \
+    xvfb                 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Rust from rustup (more control, avoids apt rustc issues)
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
-ENV PATH="/root/.cargo/bin:$PATH"
-RUN rustup component add rust-src llvm-tools-preview
-RUN rustup target add thumbv7em-none-eabihf
+    # set up python.
+COPY requirements.txt .
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Create and activate Python venv
-WORKDIR /opt/rlvgl
-#RUN python3 -m venv /opt/venv
-#ENV PATH="/opt/venv/bin:$PATH"
+# Put rustup/cargo in a neutral path
+ENV RUSTUP_HOME=/opt/rust/rustup
+ENV CARGO_HOME=/opt/rust/cargo
+ENV PATH=$CARGO_HOME/bin:$PATH
 
-# Cache dependencies
-#COPY Cargo.toml .
-#RUN cargo fetch
+# Install rustup without auto-default, then install & set the toolchain
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain none \
+ && rustup toolchain install nightly \
+ && rustup default nightly \
+ && rustup component add rust-src llvm-tools-preview rustfmt clippy \
+ && rustup target add thumbv7em-none-eabihf \
+ && cargo install sccache --locked
 
-# Copy everything and build
-#COPY . .
-#RUN git submodule update --init --recursive
-#RUN pip install -r requirements.txt && cd ..
-#RUN cargo build --release
+# If you run as a non-root user at runtime, make sure they can read it
+ARG RLVGL_BUILDER_USER=rlvgl
+RUN useradd -m -s /bin/bash "$RLVGL_BUILDER_USER" || true \
+ && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /opt/rust
+RUN mkdir -p /opt/rlvgl && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /opt/rlvgl /opt/venv
 
-# build compiled items.
-#RUN cargo clean && cargo fetch && cargo build -Znext-lockfile-bump --locked && cd ..
+RUN mkdir -p /home/rlvgl/.ssh && chown -R "$RLVGL_BUILDER_USER":"$RLVGL_BUILDER_USER" /home/rlvgl/.ssh
+RUN mkdir -p /home/ubuntu/.ssh
+
+# S3 config comes from build args/env at build time below:
+# Otherwise, inject these environment variables.
+# --> See /scripts/docker-run.sh for an example.
+# ARG SCCACHE_BUCKET
+# ARG SCCACHE_REGION
+# ARG AWS_ACCESS_KEY_ID
+# ARG AWS_SECRET_ACCESS_KEY
+# ARG SCCACHE_S3_KEY_PREFIX
+# ENV SCCACHE_BUCKET=${SCCACHE_BUCKET}
+# ENV SCCACHE_REGION=${SCCACHE_REGION}
+# ENV AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+# ENV AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+# ENV SCCACHE_S3_KEY_PREFIX=${SCCACHE_S3_KEY_PREFIX}
+
+# set env vars
+ENV APP_HOME=/opt/rlvgl
+ENV RUSTFLAGS="-Cdebuginfo=0 -Ccodegen-units=32 -Clink-self-contained=no -Clink-arg=-fuse-ld=mold"
+# Comment these out to remove sccache.
+ENV CARGO_INCREMENTAL=0
+ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
+ENV SCCACHE_S3_KEY_PREFIX=/rlvgl
+
+# Default to non-root user for everything that follows
+USER ${RLVGL_BUILDER_USER}
+WORKDIR ${APP_HOME}
 
 CMD ["bash"]
