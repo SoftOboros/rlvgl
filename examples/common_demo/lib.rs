@@ -2,16 +2,22 @@
 //!
 //! Provides a reusable widget tree for both simulator and hardware demos.
 //! The examples showcase core rlvgl widgets and plugin features using
-//! placeholder graphics.
-#![no_std]
+//! placeholder graphics. Designed for `no_std` builds so that the same
+//! module powers both simulator and embedded demonstrations.
 
 extern crate alloc;
 
 use alloc::{boxed::Box, format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
+#[cfg(feature = "jpeg")]
+use rlvgl::core::jpeg;
+#[cfg(feature = "png")]
+use rlvgl::core::png;
+#[cfg(feature = "qrcode")]
+use rlvgl::core::qrcode;
 use rlvgl::core::{
-    WidgetNode, jpeg, png, qrcode,
+    WidgetNode,
     widget::{Color, Rect, Widget},
 };
 use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
@@ -21,6 +27,7 @@ type WidgetSlot = Rc<RefCell<Option<WidgetHandle>>>;
 
 // 1x1 pixel PNG and JPEG images used to exercise the decoders without relying on
 // external binary assets.
+#[cfg(feature = "png")]
 const PNG_LOGO: &[u8] = &[
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
@@ -29,6 +36,7 @@ const PNG_LOGO: &[u8] = &[
     0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 ];
 
+#[cfg(feature = "jpeg")]
 const JPEG_LOGO: &[u8] = &[
     0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
     0x00, 0x01, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
@@ -153,15 +161,21 @@ pub fn build_demo() -> Demo {
         },
     )));
     let menu_widget: WidgetSlot = Rc::new(RefCell::new(None));
+    #[cfg(feature = "qrcode")]
     let qr_demo: WidgetSlot = Rc::new(RefCell::new(None));
+    #[cfg(feature = "png")]
     let png_demo: WidgetSlot = Rc::new(RefCell::new(None));
+    #[cfg(feature = "jpeg")]
     let jpeg_demo: WidgetSlot = Rc::new(RefCell::new(None));
     {
         let pending_add = pending.clone();
         let pending_rm = to_remove.clone();
         let menu_ref = menu_widget.clone();
+        #[cfg(feature = "qrcode")]
         let qr_ref = qr_demo.clone();
+        #[cfg(feature = "png")]
         let png_ref = png_demo.clone();
+        #[cfg(feature = "jpeg")]
         let jpeg_ref = jpeg_demo.clone();
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
             if let Some(menu_w) = menu_ref.borrow_mut().take() {
@@ -178,96 +192,105 @@ pub fn build_demo() -> Demo {
                     children: Vec::new(),
                 };
 
-                let qr_button = Rc::new(RefCell::new(Button::new(
-                    "QR Code",
-                    Rect {
-                        x: 20,
-                        y: 80,
-                        width: 80,
-                        height: 20,
-                    },
-                )));
+                #[cfg(feature = "qrcode")]
                 {
-                    let pending_add = pending_add.clone();
-                    let pending_rm = pending_rm.clone();
-                    let qr_demo = qr_ref.clone();
-                    qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
-                        if let Some(qr_w) = qr_demo.borrow_mut().take() {
-                            pending_rm.borrow_mut().push(qr_w);
-                        } else {
-                            let demo = build_plugin_demo();
-                            let handle = demo.widget.clone();
-                            qr_demo.borrow_mut().replace(handle.clone());
-                            pending_add.borrow_mut().push(demo);
-                        }
+                    let qr_button = Rc::new(RefCell::new(Button::new(
+                        "QR Code",
+                        Rect {
+                            x: 20,
+                            y: 80,
+                            width: 80,
+                            height: 20,
+                        },
+                    )));
+                    {
+                        let pending_add = pending_add.clone();
+                        let pending_rm = pending_rm.clone();
+                        let qr_demo = qr_ref.clone();
+                        qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
+                            if let Some(qr_w) = qr_demo.borrow_mut().take() {
+                                pending_rm.borrow_mut().push(qr_w);
+                            } else {
+                                let demo = build_plugin_demo();
+                                let handle = demo.widget.clone();
+                                qr_demo.borrow_mut().replace(handle.clone());
+                                pending_add.borrow_mut().push(demo);
+                            }
+                        });
+                    }
+                    menu.children.push(WidgetNode {
+                        widget: qr_button,
+                        children: Vec::new(),
                     });
                 }
-                menu.children.push(WidgetNode {
-                    widget: qr_button,
-                    children: Vec::new(),
-                });
 
-                let png_button = Rc::new(RefCell::new(Button::new(
-                    "PNG",
-                    Rect {
-                        x: 20,
-                        y: 110,
-                        width: 80,
-                        height: 20,
-                    },
-                )));
+                #[cfg(feature = "png")]
                 {
-                    let pending_add = pending_add.clone();
-                    let pending_rm = pending_rm.clone();
-                    let png_demo = png_ref.clone();
-                    png_button
-                        .borrow_mut()
-                        .set_on_click(move |_b: &mut Button| {
-                            if let Some(png_w) = png_demo.borrow_mut().take() {
-                                pending_rm.borrow_mut().push(png_w);
-                            } else {
-                                let demo = build_png_demo();
-                                let handle = demo.widget.clone();
-                                png_demo.borrow_mut().replace(handle.clone());
-                                pending_add.borrow_mut().push(demo);
-                            }
-                        });
+                    let png_button = Rc::new(RefCell::new(Button::new(
+                        "PNG",
+                        Rect {
+                            x: 20,
+                            y: 110,
+                            width: 80,
+                            height: 20,
+                        },
+                    )));
+                    {
+                        let pending_add = pending_add.clone();
+                        let pending_rm = pending_rm.clone();
+                        let png_demo = png_ref.clone();
+                        png_button
+                            .borrow_mut()
+                            .set_on_click(move |_b: &mut Button| {
+                                if let Some(png_w) = png_demo.borrow_mut().take() {
+                                    pending_rm.borrow_mut().push(png_w);
+                                } else {
+                                    let demo = build_png_demo();
+                                    let handle = demo.widget.clone();
+                                    png_demo.borrow_mut().replace(handle.clone());
+                                    pending_add.borrow_mut().push(demo);
+                                }
+                            });
+                    }
+                    menu.children.push(WidgetNode {
+                        widget: png_button,
+                        children: Vec::new(),
+                    });
                 }
-                menu.children.push(WidgetNode {
-                    widget: png_button,
-                    children: Vec::new(),
-                });
 
-                let jpeg_button = Rc::new(RefCell::new(Button::new(
-                    "JPEG",
-                    Rect {
-                        x: 20,
-                        y: 140,
-                        width: 80,
-                        height: 20,
-                    },
-                )));
+                #[cfg(feature = "jpeg")]
                 {
-                    let pending_add = pending_add.clone();
-                    let pending_rm = pending_rm.clone();
-                    let jpeg_demo = jpeg_ref.clone();
-                    jpeg_button
-                        .borrow_mut()
-                        .set_on_click(move |_b: &mut Button| {
-                            if let Some(jpeg_w) = jpeg_demo.borrow_mut().take() {
-                                pending_rm.borrow_mut().push(jpeg_w);
-                            } else {
-                                let demo = build_jpeg_demo();
-                                let handle = demo.widget.clone();
-                                jpeg_demo.borrow_mut().replace(handle.clone());
-                                pending_add.borrow_mut().push(demo);
-                            }
-                        });
+                    let jpeg_button = Rc::new(RefCell::new(Button::new(
+                        "JPEG",
+                        Rect {
+                            x: 20,
+                            y: 140,
+                            width: 80,
+                            height: 20,
+                        },
+                    )));
+                    {
+                        let pending_add = pending_add.clone();
+                        let pending_rm = pending_rm.clone();
+                        let jpeg_demo = jpeg_ref.clone();
+                        jpeg_button
+                            .borrow_mut()
+                            .set_on_click(move |_b: &mut Button| {
+                                if let Some(jpeg_w) = jpeg_demo.borrow_mut().take() {
+                                    pending_rm.borrow_mut().push(jpeg_w);
+                                } else {
+                                    let demo = build_jpeg_demo();
+                                    let handle = demo.widget.clone();
+                                    jpeg_demo.borrow_mut().replace(handle.clone());
+                                    pending_add.borrow_mut().push(demo);
+                                }
+                            });
+                    }
+                    menu.children.push(WidgetNode {
+                        widget: jpeg_button,
+                        children: Vec::new(),
+                    });
                 }
-                menu.children.push(WidgetNode {
-                    widget: jpeg_button,
-                    children: Vec::new(),
-                });
 
                 menu_ref.borrow_mut().replace(menu_w);
                 pending_add.borrow_mut().push(menu);
@@ -287,6 +310,7 @@ pub fn build_demo() -> Demo {
     }
 }
 
+#[cfg(feature = "qrcode")]
 /// Build a widget demonstrating plugin features such as QR code generation.
 pub fn build_plugin_demo() -> WidgetNode {
     let (pixels_vec, width, _) = qrcode::generate(b"https://github.com/SoftOboros/rlvgl").unwrap();
@@ -329,6 +353,7 @@ pub fn build_plugin_demo() -> WidgetNode {
     }
 }
 
+#[cfg(feature = "png")]
 /// Build a widget displaying the rlvgl logo decoded from an embedded PNG.
 ///
 /// `scale` controls the desired scaling factor. The final image is clamped so
@@ -382,11 +407,13 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
     }
 }
 
+#[cfg(feature = "png")]
 /// Build a PNG demo using the default scale of `0.5`.
 pub fn build_png_demo() -> WidgetNode {
     build_png_demo_scaled(0.5)
 }
 
+#[cfg(feature = "jpeg")]
 /// Build a widget displaying the rlvgl logo decoded from an embedded JPEG.
 ///
 /// Mirrors [`build_png_demo_scaled`] but decodes a JPEG image instead.
@@ -440,6 +467,7 @@ pub fn build_jpeg_demo_scaled(scale: f32) -> WidgetNode {
     }
 }
 
+#[cfg(feature = "jpeg")]
 /// Build a JPEG demo using the default scale of `0.5`.
 pub fn build_jpeg_demo() -> WidgetNode {
     build_jpeg_demo_scaled(0.5)
@@ -460,6 +488,3 @@ pub fn flush_pending(
     let mut pending_nodes = pending.borrow_mut();
     root_ref.children.extend(pending_nodes.drain(..));
 }
-
-#[cfg(test)]
-extern crate std;

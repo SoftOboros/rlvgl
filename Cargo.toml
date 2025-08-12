@@ -34,7 +34,7 @@ required-features = ["simulator", "qrcode", "png", "jpeg", "fontdue"]
 [[bin]]
 name = "rlvgl-stm32h747i-disco"
 path = "examples/stm32h747i-disco/src/main.rs"
-required-features = ["stm32h747i_disco", "qrcode", "png", "jpeg", "fontdue"]
+required-features = ["stm32h747i_disco"]
 doc = false
 
 [dependencies]
@@ -86,6 +86,10 @@ optional = true
 version = "0.2"
 optional = true
 
+[dependencies.embedded-alloc]
+version = "0.5"
+optional = true
+
 [features]
 default = []
 png = ["rlvgl-core/png"]
@@ -99,6 +103,7 @@ stm32h747i_disco = [
     "dep:cortex-m-rt",
     "dep:cortex-m",
     "dep:panic-halt",
+    "dep:embedded-alloc",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "dep:rlottie"]
