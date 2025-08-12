@@ -70,3 +70,15 @@ documentation for users.
 All files must include a descriptive file header summarizing their purpose.
 
 Run ./scripts/pre-commit.sh and ensure it succeeds before opening a pull request. This script enforces formatting, runs clippy, builds with all features, and verifies documentation generation using nightly.
+
+## Example linker scripts
+
+Each example project that provides a `memory.x` linker script must include a
+`build.rs` which:
+
+- copies the local `memory.x` into the Cargo build output directory,
+- emits `cargo:rustc-link-search` for that directory, and
+- emits `cargo:rustc-link-arg=-Tmemory.x`.
+
+This avoids relying on a global `.cargo/config.toml` for linker script
+configuration.
