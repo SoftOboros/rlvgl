@@ -31,6 +31,12 @@ name = "rlvgl-sim"
 path = "examples/sim/src/main.rs"
 required-features = ["simulator", "qrcode", "png", "jpeg", "fontdue"]
 
+[[bin]]
+name = "rlvgl-stm32h747i-disco"
+path = "examples/stm32h747i-disco/src/main.rs"
+required-features = ["stm32h747i_disco", "qrcode", "png", "jpeg", "fontdue"]
+doc = false
+
 [dependencies]
 rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.4", path = "widgets", default-features = false }
@@ -68,6 +74,18 @@ default-features = false
 features = ["png"]
 optional = true
 
+[dependencies.cortex-m-rt]
+version = "0.7"
+optional = true
+
+[dependencies.cortex-m]
+version = "0.7"
+optional = true
+
+[dependencies.panic-halt]
+version = "0.2"
+optional = true
+
 [features]
 default = []
 png = ["rlvgl-core/png"]
@@ -76,6 +94,12 @@ gif = ["rlvgl-core/gif", "dep:gif"]
 qrcode = ["rlvgl-core/qrcode"]
 simulator = ["rlvgl-platform/simulator"]
 st7789 = ["rlvgl-platform/st7789"]
+stm32h747i_disco = [
+    "rlvgl-platform/stm32h747i_disco",
+    "dep:cortex-m-rt",
+    "dep:cortex-m",
+    "dep:panic-halt",
+]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "dep:rlottie"]
 canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]

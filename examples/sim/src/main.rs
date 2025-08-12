@@ -1,8 +1,8 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
-#[path = "lib.rs"]
-mod rlvgl_sim;
+#[path = "../../common_demo/lib.rs"]
+mod common_demo;
+use common_demo::{build_demo, flush_pending};
 use rlvgl::platform::{InputEvent, PixelsDisplay, PixelsRenderer};
-use rlvgl_sim::{build_demo, flush_pending};
 
 const WIDTH: usize = 320;
 const HEIGHT: usize = 240;

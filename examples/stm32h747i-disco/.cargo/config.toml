@@ -1,0 +1,3 @@
+# Cargo configuration for the STM32H747I-DISCO example.
+[build]
+target = "thumbv7em-none-eabihf"
