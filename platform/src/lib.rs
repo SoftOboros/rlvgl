@@ -17,6 +17,8 @@ pub mod pixels_renderer;
 pub mod simulator;
 #[cfg(feature = "st7789")]
 pub mod st7789;
+#[cfg(feature = "stm32h747i_disco")]
+pub mod stm32h747i_disco;
 
 pub use display::DisplayDriver;
 pub use input::{InputDevice, InputEvent};
@@ -26,3 +28,5 @@ pub use pixels_renderer::PixelsRenderer;
 pub use simulator::PixelsDisplay;
 #[cfg(feature = "st7789")]
 pub use st7789::St7789Display;
+#[cfg(feature = "stm32h747i_disco")]
+pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};

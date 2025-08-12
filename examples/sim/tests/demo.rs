@@ -4,7 +4,9 @@ use rlvgl::core::{
     renderer::Renderer,
     widget::{Color, Rect},
 };
-use rlvgl_sim::{
+#[path = "../../common_demo/lib.rs"]
+mod common_demo;
+use common_demo::{
     Demo, build_demo, build_jpeg_demo, build_plugin_demo, build_png_demo, build_png_demo_scaled,
     flush_pending,
 };

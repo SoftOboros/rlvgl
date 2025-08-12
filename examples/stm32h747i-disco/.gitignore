@@ -1,0 +1,3 @@
+# Ignore build artifacts for the STM32H747I-DISCO example.
+/target
+/out

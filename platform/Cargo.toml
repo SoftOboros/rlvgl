@@ -27,4 +27,5 @@ embedded-graphics = { version = "0.8", optional = true }
 default = []
 simulator = ["pixels", "winit", "embedded-graphics", "eframe"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
+stm32h747i_disco = []
 fontdue = ["rlvgl-core/fontdue"]
