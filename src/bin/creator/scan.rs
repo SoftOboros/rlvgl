@@ -24,7 +24,11 @@ pub(crate) fn run(root: &Path, manifest_path: &Path) -> Result<()> {
 
     let mut changed = Vec::new();
 
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         if !entry.file_type().is_file() {
             continue;

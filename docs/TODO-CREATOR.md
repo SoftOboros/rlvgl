@@ -8,7 +8,7 @@ _A single markdown that structures the work as one **Epic** with sectioned user�
 **Epic:** Build **rlvgl-creator**, a UI + CLI tool that imports, normalizes, previews, and vendors assets for rlvgl projects while scaffolding dual‑mode assets crates and minimizing footprint on `no_std + alloc` targets.
 
 **Outcomes:**
-- Repeatable pipelines for PNG/APNG, fonts, and Lottie.
+- Repeatable pipelines for raw RGBA image sequences, fonts, and Lottie.
 - Strict naming/path policies with auto‑fix guidance.
 - Dual delivery (embed vs vendor) for asset packs.
 - A desktop UI for preview, sizing, and packaging.
@@ -22,9 +22,10 @@ _User story: As a maintainer, I want guardrails so teams can scale assets safely
 |---|---|---|---|
 | [x] | Enforce folder roots `icons/`, `fonts/`, `media/`; reject others with fix‑it guidance. | creator core | Policy checker + `--fix` rename.
 | [x] | Generate const/feature names; forbid manual edits (SCREAMING_SNAKE; `ICON_`, `FONT_`, `MEDIA_`). | creator core | Deterministic name map; diff output.
-| [ ] | Creator is `std`; targets are `no_std + alloc` friendly; pre‑size/pack assets. | N/A | Design constraint across features.
+| [x] | Creator is `std`; targets are `no_std + alloc` friendly; pre‑size/pack assets. | N/A | Design constraint across features.
+| [x] | Base assets stored as raw RGBA images/sequences; no PNG/APNG at runtime. | internal | Replaces std-dependent formats. |
 | [ ] | Support both direct Lottie playout and Lottie→APNG conversion. | rlottie (FFI) or Conan CLI | Per‑asset choice recorded in manifest.
-| [ ] | Optional bundle compression; core path can decode or uses tiny gated decoder. | miniz/deflate-lite (opt.) | Prefer build‑time inflate in vendor path.
+| [x] | Optional bundle compression using RLE + token table; core path decodes with a tiny gated decoder. | internal | no_std-friendly; prefer build-time compress in vendor path. |
 
 ---
 
@@ -35,15 +36,15 @@ _User story: As a developer, I can manage assets via clear commands with helpful
 |---|---|---|---|
 | [x] | `init` — bootstrap folders and default `manifest.yml`. | clap, anyhow | Idempotent; prints next steps.
 | [x] | `scan <path>` — discover new/changed assets and update manifest. | blake3, walkdir | Hash‑based; respects roots policy.
-| [x] | `convert` — normalize to PNG/APNG; pack fonts; write metadata. | image, apng, fontdue/ab_glyph | Deterministic outputs.
+| [x] | `convert` — normalize to raw RGBA sequences; pack fonts; write metadata. | image, fontdue/ab_glyph | Deterministic outputs. |
 | [x] | `vendor` — copy to `$OUT_DIR`/repo and generate `rlvgl_assets.rs`. | std fs, tera | Supports per‑target preset.
 | [x] | `scaffold assets-crate` — generate dual‑mode crate. | tera | Embed & vendor features.
 | [x] | `preview` — thumbnails/sprite sheets. | image | Stores in `assets/thumbs/`.
 | [x] | `add-target` — register local crate + `vendor_dir` and presets. | serde_yaml | Updates manifest.
 | [x] | `sync` — regenerate Cargo features, consts, index from manifest. | tera | Dry‑run mode prints diff.
-| [x] | `apng` — build APNG from frame groups; set timing/loops. | apng | First frame PNG export.
+| [x] | `apng` — build APNG from raw frame groups; set timing/loops. | apng | First frame PNG export. |
 | [ ] | `lottie import` — Lottie→frames/APNG; export timing map. | rlottie/CLI | Records chosen path.
-| [ ] | `fonts pack` — sizes, glyph sets, packing/metrics. | fontdue/ab_glyph | Optional subsetting.
+| [x] | `fonts pack` — sizes, glyph sets, packing/metrics. | fontdue/ab_glyph | Optional subsetting.
 | [x] | `check` — strict policy validation; `--fix` auto‑normalize. | creator core | Non‑zero exit on violations.
 | [ ] | `ui` — launch desktop UI. | Tauri or eframe/wgpu | Shares core libs.
 | [x] | Provide global flags and rich help with examples. | clap | Standardized exit codes.
@@ -74,10 +75,10 @@ _User story: As a user, I can consume assets by embedding bytes or vendoring fil
 | [x] | Generate `Cargo.toml` with `embed`, `vendor`, and group features. | tera | No default features.
 | [x] | Generate `src/lib.rs` — embed: `include_bytes!` consts. | tera | One const per exposed asset.
 | [x] | Generate `src/lib.rs` — vendor: `vendor_api::{copy_all, generate_rust_module}`. | std fs | `$OUT_DIR` safe paths.
-| [ ] | Optional `build.rs` self‑test for crate. | std | Smoke test in CI.
+| [x] | Optional `build.rs` self‑test for crate. | std | Smoke test in CI.
 | [x] | Generate README with embed vs vendor usage. | tera | Copy‑paste snippets.
-| [ ] | Snapshot tests for generated files. | insta | Guard regressions.
-| [ ] | `cargo publish --dry-run` passes. | cargo | CI gate.
+| [x] | Snapshot tests for generated files. | insta | Guard regressions.
+| [x] | `cargo publish --dry-run` passes. | cargo | CI gate.
 
 ---
 
@@ -86,13 +87,15 @@ _User story: As a designer, I can drop common formats and get normalized, fast�
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Raster→PNG normalization (RGBA8, premultiplied alpha opt., PoT trim/pad). | image | Deterministic encoder settings.
-| [ ] | SVG→sized PNGs (DPI list; monochrome/e‑ink thresholds). | resvg/usvg (opt.) | Fallback to external if needed.
-| [ ] | APNG builder with per‑frame delay and loop count; first‑frame PNG. | apng | Frame ordering checks.
+| [x] | Raw RGBA sequence format with max-frame header; per-frame size/position; single images drop frame headers. | internal | Replaces PNG/APNG base. |
+| [x] | Encode `.raw` files from common inputs. | creator core | Normalizes raster assets. |
+| [x] | Ingest `.raw` files into pipeline. | creator core | Parse header and frames. |
+| [ ] | SVG→sized raw images (DPI list; monochrome/e-ink thresholds). | resvg/usvg (opt.) | Fallback to external if needed. |
+| [x] | APNG builder from raw frames with per-frame delay and loop count; first-frame PNG. | apng | Frame ordering checks. |
 | [ ] | Lottie via FFI (`lottie-ffi`) using `rlottie`. | rlottie, Conan | Feature gate; platform notes.
 | [ ] | Lottie via external CLI (`lottie-cli`) to frames/APNG. | Conan recipe | Record path in manifest.
-| [ ] | Fonts: TTF/OTF→bitmap packs (`.bin`) + metrics (`.json`); optional subset. | fontdue/ab_glyph | Glyph set per target.
-| [ ] | Optional compression (gz/deflate) and build‑time inflate in vendor path. | miniz (opt.) | Keep runtime minimal.
+| [x] | Fonts: TTF/OTF→bitmap packs (`.bin`) + metrics (`.json`); optional subset. | fontdue/ab_glyph | Glyph set per target.
+| [x] | Simple RLE + token table compression for raw files. | internal | Tiny decoder for no_std targets. |
 
 ---
 
@@ -123,8 +126,8 @@ _User story: As an app author, I can choose embed or vendor and get identical by
 |---|---|---|---|
 | [ ] | Embed examples (`default-features=false`, per‑group features; const usage). | examples | CI builds them.
 | [ ] | Vendor examples (consumer `build.rs` + `include!(.../rlvgl_assets.rs)`). | examples | `$OUT_DIR` safe.
-| [ ] | Optional `get(path)` API in embed mode (path→bytes). | phf/lite map | Generated index.
-| [ ] | Byte‑equality test: embed vs vendor for same asset IDs. | tests | CI assertion.
+| [x] | Optional `get(path)` API in embed mode (path→bytes). | phf/lite map | Generated index.
+| [x] | Byte‑equality test: embed vs vendor for same asset IDs. | tests | CI assertion.
 
 ---
 
@@ -136,7 +139,7 @@ _User story: As a user, I want fast re‑runs with deterministic outputs._
 | [ ] | Content‑hash cache in `assets/.cache` (hash→outputs/timestamps/sizes). | blake3, serde | JSON/CBOR store.
 | [ ] | `--force` invalidation and smart rebuild by hash/mtime. | creator core | Clear messaging.
 | [ ] | Parallelize conversions with stable ordering. | rayon (opt.) | Guard race conditions.
-| [ ] | Emit `cargo:rerun-if-changed` hints for vendor/build steps. | build.rs API | Good DX for consumers.
+| [x] | Emit `cargo:rerun-if-changed` hints for vendor/build steps. | build.rs API | Good DX for consumers.
 
 ---
 
@@ -146,10 +149,10 @@ _User story: As a maintainer, I can trust every PR to enforce policy and stay gr
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
 | [ ] | `creator check` covers paths, names, license, duplicates, size thresholds. | creator core | Non‑zero exit.
-| [ ] | Pre‑commit hook template (scan/convert/check). | git hooks | Optional but encouraged.
+| [x] | Pre‑commit hook template (scan/convert/check). | git hooks | Optional but encouraged.
 | [ ] | CI job runs end‑to‑end: `scan → convert → sync → scaffold → vendor`. | GH Actions | Caches toolchains.
 | [ ] | Golden tests for APNG timing and font samples. | apng, fontdue | Deterministic fixtures.
-| [ ] | Snapshot tests for generated `Cargo.toml`, `lib.rs`, `rlvgl_assets.rs`. | insta | Stored in repo.
+| [x] | Snapshot tests for generated `Cargo.toml`, `lib.rs`, `rlvgl_assets.rs`. | insta | Stored in repo.
 
 ---
 
@@ -158,9 +161,9 @@ _User story: As a stakeholder, I can verify value quickly with a working vertica
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Dual‑mode assets crate compiles from scaffold. | cargo | smoke test.
+| [x] | Dual‑mode assets crate compiles from scaffold. | cargo | smoke test.
 | [ ] | `scan + convert + sync` match manifest; no stray files. | creator core | CI check.
-| [ ] | Vendor and embed yield identical bytes for same asset IDs. | tests | Byte compare.
+| [x] | Vendor and embed yield identical bytes for same asset IDs. | tests | Byte compare.
 | [ ] | APNG from simple frames plays with correct timing in a reference viewer. | apng | Viewer in CI (headless).
 | [ ] | `cargo publish --dry-run` for generated crate succeeds. | cargo | Versioning rules.
 | [ ] | Non‑conforming inputs get actionable errors and `--fix` resolves them. | creator core | Human‑friendly output.
@@ -199,7 +202,7 @@ _User story: As a newcomer, I can get productive with clear examples and guides.
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Example assets pack (icons/fonts/media) with manifest. | repo data | Used in tests.
+| [x] | Example assets pack (icons/fonts/media) with manifest. | repo data | Used in tests.
 | [ ] | Two consumer examples: **embed** and **vendor** patterns. | examples | CI builds & runs.
-| [ ] | User guide (README) with end‑to‑end workflow. | mdbook/README | Screenshots/gifs.
+| [x] | User guide (README) with end‑to‑end workflow. | mdbook/README | Screenshots/gifs.
 | [ ] | Developer docs for templates (Tera) and pipeline hooks. | rustdoc | API + templates directory.

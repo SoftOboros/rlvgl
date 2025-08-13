@@ -1,10 +1,10 @@
 //! rlvgl-creator binary entry point.
 //!
 //! Provides CLI utilities for managing rlvgl assets. Supports the `init`, `scan`, `check`,
-//! `vendor`, `convert`, `preview`, `add-target`, `sync`, `scaffold`, `apng`, and `schema`
-//! commands to bootstrap asset directories, update a manifest, validate asset policies,
+//! `vendor`, `convert`, `preview`, `add-target`, `sync`, `scaffold`, `apng`, `schema`, and
+//! `fonts` commands to bootstrap asset directories, update a manifest, validate asset policies,
 //! copy assets to build outputs, regenerate feature lists, generate thumbnails, register targets,
-//! build animations, and generate dual-mode crates.
+//! build animations, pack fonts, and generate dual-mode crates.
 
 use std::path::PathBuf;
 
@@ -15,9 +15,11 @@ mod add_target;
 mod apng;
 mod check;
 mod convert;
+mod fonts;
 mod init;
 mod manifest;
 mod preview;
+mod raw;
 mod scaffold;
 mod scan;
 mod schema;
@@ -131,6 +133,29 @@ enum Command {
     },
     /// Output a JSON schema for the manifest structure
     Schema,
+    /// Font-related commands
+    Fonts {
+        #[command(subcommand)]
+        cmd: FontsCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum FontsCommand {
+    /// Pack TTF/OTF fonts into bitmaps and metrics files
+    Pack {
+        /// Root path containing font files
+        path: PathBuf,
+        /// Point size for rasterization
+        #[arg(long, default_value_t = 32)]
+        size: u16,
+        /// Characters to include in the pack
+        #[arg(
+            long,
+            default_value = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        )]
+        chars: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -163,6 +188,11 @@ fn main() -> Result<()> {
             loops,
         } => apng::run(&frames, &out, delay, loops)?,
         Command::Schema => schema::run()?,
+        Command::Fonts { cmd } => match cmd {
+            FontsCommand::Pack { path, size, chars } => {
+                fonts::pack(&path, &cli.manifest, size as f32, &chars)?
+            }
+        },
     }
 
     Ok(())
