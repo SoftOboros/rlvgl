@@ -1,0 +1,48 @@
+---
+source: src/bin/creator/scaffold.rs
+expression: "read(\"build.rs\")"
+---
+// Build script for the assets crate.
+//
+// When built with the `vendor` feature this script copies asset files into the
+// build output directory and generates an `rlvgl_assets.rs` module with
+// `include_bytes!` declarations.
+
+fn main() -> std::io::Result<()> {
+    #[cfg(feature = "vendor")]
+    {
+        use std::path::Path;
+
+        fn copy_all(out_dir: &Path, assets: &[(&str, &str)]) -> std::io::Result<()> {
+            let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../");
+            for (_, path) in assets {
+                let src = root.join(path);
+                let dest = out_dir.join(path);
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::copy(&src, &dest)?;
+                println!("cargo:rerun-if-changed={}", src.display());
+            }
+            Ok(())
+        }
+
+        fn generate_rust_module(out_dir: &Path, assets: &[(&str, &str)]) -> std::io::Result<()> {
+            let mut module = String::from("//! Auto-generated asset constants\\n\\n");
+            for (name, path) in assets {
+                module.push_str(&format!("pub const {}: &[u8] = include_bytes!(\\\"{}\\\");\\n", name, path));
+            }
+            std::fs::write(out_dir.join("rlvgl_assets.rs"), module)?;
+            Ok(())
+        }
+
+        const ASSETS: &[(&str, &str)] = &[
+
+        ];
+
+        let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+        copy_all(&out, ASSETS)?;
+        generate_rust_module(&out, ASSETS)?;
+    }
+    Ok(())
+}
