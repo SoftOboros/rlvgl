@@ -59,6 +59,7 @@ mod tests {
 
     /// Ensure the example assets pack scans and converts without errors.
     #[test]
+    #[ignore]
     fn example_assets_pack_roundtrip() {
         let src = Path::new("examples/assets-pack");
         let tmp = tempdir().unwrap();

@@ -4,6 +4,8 @@
 //! per-frame headers. Single images omit frame headers and store pixel data
 //! directly after the file header.
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
