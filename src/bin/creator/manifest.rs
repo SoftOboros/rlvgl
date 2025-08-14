@@ -25,6 +25,8 @@ pub(crate) struct Manifest {
     pub(crate) targets: Vec<Target>,
     #[serde(default)]
     pub(crate) assets: Vec<Asset>,
+    #[serde(default)]
+    pub(crate) naming: Naming,
 }
 
 fn default_manifest_version() -> u8 {
@@ -41,8 +43,46 @@ impl Default for Manifest {
             expose: BTreeMap::new(),
             targets: Vec::new(),
             assets: Vec::new(),
+            naming: Naming::default(),
         }
     }
+}
+
+/// Naming configuration controlling generated identifiers.
+#[derive(Default, Serialize, Deserialize, JsonSchema)]
+pub(crate) struct Naming {
+    /// Mapping of root paths (e.g., `icons`) to constant prefixes.
+    #[serde(default)]
+    pub(crate) prefixes: BTreeMap<String, String>,
+    /// Case style applied to generated identifiers.
+    #[serde(default)]
+    pub(crate) case: Case,
+}
+
+/// Case policy for generated names.
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Case {
+    /// `SCREAMING_SNAKE` case.
+    ScreamingSnake,
+    /// `snake_case`.
+    Snake,
+}
+
+impl Default for Case {
+    fn default() -> Self {
+        Case::ScreamingSnake
+    }
+}
+
+/// Handling mode for Lottie animation assets.
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum LottieMode {
+    /// Play Lottie JSON directly at runtime via the `rlottie` crate.
+    Direct,
+    /// Convert Lottie JSON into an APNG during asset processing.
+    Apng,
 }
 
 /// Asset entry with path, hash, and generated constant name.
@@ -58,6 +98,9 @@ pub(crate) struct Asset {
     /// SPDX license identifier for this asset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) license: Option<String>,
+    /// Optional Lottie handling mode for animation assets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) lottie: Option<LottieMode>,
 }
 
 /// Group of assets sharing an optional license.
@@ -71,6 +114,20 @@ pub(crate) struct Group {
     pub(crate) license: Option<String>,
 }
 
+/// Hardware preset describing sizing and storage constraints.
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub(crate) struct Preset {
+    /// Screen width in pixels.
+    pub(crate) width: u16,
+    /// Screen height in pixels.
+    pub(crate) height: u16,
+    /// Color depth in bits per pixel.
+    pub(crate) color_depth: u8,
+    /// Storage backend identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) storage: Option<String>,
+}
+
 /// Target output configuration.
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub(crate) struct Target {
@@ -78,6 +135,9 @@ pub(crate) struct Target {
     pub(crate) name: String,
     /// Directory where assets will be vendored.
     pub(crate) vendor_dir: String,
+    /// Optional hardware preset for auto sizing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) preset: Option<Preset>,
 }
 
 /// Feature entry emitted by the `sync` command.

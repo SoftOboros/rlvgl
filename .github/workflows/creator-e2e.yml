@@ -1,0 +1,30 @@
+# GitHub Actions workflow to exercise the rlvgl-creator pipeline end-to-end.
+# Ensures scan, convert, sync, scaffold, and vendor commands all succeed on
+# the example assets pack.
+name: creator-e2e
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/iraa/rlvgl:latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      - name: Build rlvgl-creator
+        run: cargo build --bin rlvgl-creator --features creator,lottie
+      - name: Run creator pipeline
+        run: |
+          target/debug/rlvgl-creator scan examples/assets-pack --manifest examples/assets-pack/manifest.yml
+          target/debug/rlvgl-creator convert examples/assets-pack --manifest examples/assets-pack/manifest.yml
+          target/debug/rlvgl-creator sync --out examples/assets-pack/out --manifest examples/assets-pack/manifest.yml
+          target/debug/rlvgl-creator scaffold examples/assets-pack/crate --manifest examples/assets-pack/manifest.yml
+          target/debug/rlvgl-creator vendor examples/assets-pack --out examples/assets-pack/out --allow MIT --manifest examples/assets-pack/manifest.yml

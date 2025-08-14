@@ -8,11 +8,20 @@ groups:
   media:
     assets:
       - media/blue.raw
+      - media/spinner.json
     license: MIT
   fonts:
     assets:
       - fonts/unscii-8.ttf
     license: MIT
+targets:
+  - name: default
+    vendor_dir: vendor
+    preset:
+      width: 480
+      height: 272
+      color_depth: 16
+      storage: qspi
 assets:
   - name: ICON_RED_RAW
     path: icons/red.raw
@@ -22,7 +31,18 @@ assets:
     path: media/blue.raw
     hash: 90a7b7ff3b01b6debd72150b718e37ace1a6f64f6832f54af7a82ef9da98c6db
     license: MIT
+  - name: MEDIA_SPINNER_JSON
+    path: media/spinner.json
+    hash: 0000000000000000000000000000000000000000000000000000000000000000
+    license: MIT
+    lottie: apng
   - name: FONT_UNSCII_8_TTF
     path: fonts/unscii-8.ttf
     hash: f5828de359175367373ae57f21ddd53c8ace5084cd7d1602bcc20146415decd8
     license: MIT
+naming:
+  prefixes:
+    icons: ICON_
+    media: MEDIA_
+    fonts: FONT_
+  case: screaming_snake

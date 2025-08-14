@@ -124,6 +124,14 @@ optional = true
 version = "0.11"
 optional = true
 
+[dependencies.rayon]
+version = "1"
+optional = true
+
+[dependencies.resvg]
+version = "0.45.1"
+optional = true
+
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
@@ -158,6 +166,9 @@ creator = [
     "dep:serde_json",
     "dep:spdx",
     "dep:fontdue",
+    "dep:rlottie",
+    "dep:rayon",
+    "dep:resvg",
 ]
 
 [profile.release]

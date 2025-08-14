@@ -20,7 +20,14 @@ A command-line tool for normalizing assets and generating dual-mode assets crate
    ```sh
    cargo run --bin rlvgl-creator --features creator,fontdue -- convert
    ```
-   Raster images become raw RGBA sequences, and fonts are packed into bitmap binaries and metrics.
+   Raster images become raw RGBA sequences, and fonts are packed into bitmap binaries and metrics. Conversions run in parallel
+   with stable ordering. Use `--force` to rebuild all assets regardless of cache.
+
+   To render vector assets, the `svg` command converts an SVG into one or more raw images at chosen DPI values:
+   ```sh
+   cargo run --bin rlvgl-creator --features creator -- svg logo.svg out/ --dpi 96 --dpi 192
+   ```
+   Supply `--threshold <VAL>` to apply a monochrome cutoff suitable for e-ink displays.
 
 4. **Synchronize feature flags, constants, and index**
    ```sh
@@ -41,3 +48,8 @@ A command-line tool for normalizing assets and generating dual-mode assets crate
    Copies processed assets to `$OUT_DIR` and emits an `rlvgl_assets.rs` module for inclusion.
 
 The resulting crate can be built with `--features embed` to include raw bytes or `--features vendor` to copy files at build time while importing the generated module.
+
+## Developer Notes
+
+For details on customizing scaffold templates and extending the conversion pipeline, see
+[`docs/CREATOR-TEMPLATES.md`](../../../docs/CREATOR-TEMPLATES.md).

@@ -71,6 +71,7 @@ pub(crate) fn run(root: &Path, manifest_path: &Path) -> Result<()> {
                     path: rel_str.clone(),
                     hash: hash.clone(),
                     license: None,
+                    lottie: None,
                 });
                 changed.push(rel_str);
             }

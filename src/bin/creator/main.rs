@@ -1,10 +1,11 @@
 //! rlvgl-creator binary entry point.
 //!
 //! Provides CLI utilities for managing rlvgl assets. Supports the `init`, `scan`, `check`,
-//! `vendor`, `convert`, `preview`, `add-target`, `sync`, `scaffold`, `apng`, `schema`, and
-//! `fonts` commands to bootstrap asset directories, update a manifest, validate asset policies,
-//! copy assets to build outputs, regenerate feature lists, generate thumbnails, register targets,
-//! build animations, pack fonts, and generate dual-mode crates.
+//! `vendor`, `convert`, `preview`, `add-target`, `sync`, `scaffold`, `apng`, `schema`, `fonts`,
+//! `svg`, and `lottie` commands to bootstrap asset directories, update a manifest, validate
+//! asset policies, copy assets to build outputs, regenerate feature lists, generate thumbnails,
+//! register targets, build animations, pack fonts, render SVGs, import Lottie animations, and
+//! generate dual-mode crates.
 
 use std::path::PathBuf;
 
@@ -17,12 +18,14 @@ mod check;
 mod convert;
 mod fonts;
 mod init;
+mod lottie;
 mod manifest;
 mod preview;
 mod raw;
 mod scaffold;
 mod scan;
 mod schema;
+mod svg;
 mod sync;
 mod util;
 mod vendor;
@@ -92,6 +95,9 @@ enum Command {
     Convert {
         /// Root path containing assets
         path: PathBuf,
+        /// Rebuild all assets even if cached
+        #[arg(long)]
+        force: bool,
     },
     /// Generate thumbnails for quick previews
     Preview {
@@ -138,6 +144,24 @@ enum Command {
         #[command(subcommand)]
         cmd: FontsCommand,
     },
+    /// Lottie-related commands
+    Lottie {
+        #[command(subcommand)]
+        cmd: LottieCommand,
+    },
+    /// Render an SVG into raw images
+    Svg {
+        /// Path to the SVG file
+        svg: PathBuf,
+        /// Directory to write raw images into
+        out: PathBuf,
+        /// DPI values to render at
+        #[arg(long, value_name = "DPI", action = ArgAction::Append, default_values_t = [96.0])]
+        dpi: Vec<f32>,
+        /// Monochrome threshold (0-255)
+        #[arg(long)]
+        threshold: Option<u8>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -158,6 +182,33 @@ enum FontsCommand {
     },
 }
 
+#[derive(Subcommand)]
+enum LottieCommand {
+    /// Import a Lottie JSON into PNG frames and an optional APNG via rlottie FFI
+    Import {
+        /// Path to the Lottie JSON file
+        json: PathBuf,
+        /// Directory to write PNG frames into
+        out: PathBuf,
+        /// Optional APNG file to generate
+        #[arg(long)]
+        apng: Option<PathBuf>,
+    },
+    /// Use an external CLI to convert a Lottie JSON into frames and an optional APNG
+    Cli {
+        /// Path to the external CLI binary
+        #[arg(long, default_value = "lottie-cli")]
+        bin: PathBuf,
+        /// Path to the Lottie JSON file
+        json: PathBuf,
+        /// Directory to write PNG frames into
+        out: PathBuf,
+        /// Optional APNG file to generate
+        #[arg(long)]
+        apng: Option<PathBuf>,
+    },
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     if cli.verbose > 0 {
@@ -174,7 +225,7 @@ fn main() -> Result<()> {
             allow,
             deny,
         } => vendor::run(&path, &cli.manifest, &out, &allow, &deny)?,
-        Command::Convert { path } => convert::run(&path, &cli.manifest)?,
+        Command::Convert { path, force } => convert::run(&path, &cli.manifest, force)?,
         Command::Preview { path } => preview::run(&path, &cli.manifest)?,
         Command::AddTarget { name, vendor_dir } => {
             add_target::run(&cli.manifest, &name, &vendor_dir)?
@@ -193,6 +244,23 @@ fn main() -> Result<()> {
                 fonts::pack(&path, &cli.manifest, size as f32, &chars)?
             }
         },
+        Command::Lottie { cmd } => match cmd {
+            LottieCommand::Import { json, out, apng } => {
+                lottie::import(&json, &out, apng.as_deref())?
+            }
+            LottieCommand::Cli {
+                bin,
+                json,
+                out,
+                apng,
+            } => lottie::import_cli(&bin, &json, &out, apng.as_deref())?,
+        },
+        Command::Svg {
+            svg,
+            out,
+            dpi,
+            threshold,
+        } => svg::run(&svg, &out, &dpi, threshold)?,
     }
 
     Ok(())

@@ -70,3 +70,44 @@ pub(crate) fn pack(root: &Path, manifest_path: &Path, size: f32, chars: &str) ->
     check::run(root, manifest_path, true)?;
     Ok(())
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::manifest::{Group, Manifest};
+    use blake3::hash;
+    use tempfile::tempdir;
+
+    #[test]
+    fn pack_generates_stable_bin_and_json() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        let fonts_dir = root.join("fonts");
+        fs::create_dir_all(&fonts_dir).unwrap();
+        fs::copy(
+            Path::new("lvgl/scripts/built_in_font/Montserrat-Medium.ttf"),
+            fonts_dir.join("sample.ttf"),
+        )
+        .unwrap();
+
+        let mut manifest = Manifest::default();
+        manifest.groups.insert(
+            "sample".into(),
+            Group {
+                assets: vec![
+                    "fonts/sample.ttf".into(),
+                    "fonts/sample-12.bin".into(),
+                    "fonts/sample-12.json".into(),
+                ],
+                license: Some("MIT".into()),
+            },
+        );
+        let manifest_path = root.join("manifest.yml");
+        fs::write(&manifest_path, serde_yaml::to_string(&manifest).unwrap()).unwrap();
+
+        pack(root, &manifest_path, 12.0, "AB").unwrap();
+
+        let bin_hash = hash(&fs::read(fonts_dir.join("sample-12.bin")).unwrap()).to_hex();
+        let json_hash = hash(&fs::read(fonts_dir.join("sample-12.json")).unwrap()).to_hex();
+        insta::assert_snapshot!("font_hashes", format!("{}\n{}", bin_hash, json_hash));
+    }
+}
