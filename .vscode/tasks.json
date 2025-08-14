@@ -2,9 +2,37 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build Universal",
+      "label": "Build: rlvgl-stm32h747i-disco",
       "type": "shell",
-      "command": "cargo build --release --target x86_64-apple-darwin && cargo build --release --target aarch64-apple-darwin && lipo -create -output target/universal/rlvgl-sim target/x86_64-apple-darwin/release/rlvgl-sim target/aarch64-apple-darwin/release/rlvgl-sim",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--target", "thumbv7em-none-eabihf",
+        "--bin", "rlvgl-stm32h747i-disco",
+        "--features", "stm32h747i_disco"
+      ],
+      "options": {
+        "env": {
+          "RUSTFLAGS": "-C link-arg=-Tmemory_STM32H747XI.x --remap-path-prefix=$(pwd)=.",
+          "RLVGL_LINKER_SCRIPT": "examples/stm32h747i-disco/memory_STM32H747XI.x"
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Size: rlvgl-stm32h747i-disco",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "size",
+        "--target", "thumbv7em-none-eabihf",
+        "--bin", "rlvgl-stm32h747i-disco",
+        "--features", "stm32h747i_disco"
+      ],
       "group": "build",
       "problemMatcher": []
     }

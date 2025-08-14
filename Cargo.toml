@@ -35,7 +35,6 @@ required-features = ["simulator", "qrcode", "png", "jpeg", "fontdue"]
 name = "rlvgl-stm32h747i-disco"
 path = "examples/stm32h747i-disco/src/main.rs"
 required-features = ["stm32h747i_disco"]
-doc = false
 
 [dependencies]
 rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
@@ -80,14 +79,19 @@ optional = true
 
 [dependencies.cortex-m]
 version = "0.7"
+features = ["critical-section-single-core"]
 optional = true
 
 [dependencies.panic-halt]
-version = "0.2"
+version = "1.0.0"
 optional = true
 
 [dependencies.embedded-alloc]
-version = "0.5"
+version = "=0.5.1"
+optional = true
+
+[dependencies.critical-section]
+version = "1.1.2"
 optional = true
 
 [features]

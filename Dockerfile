@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3              \
     python3-pip          \
     python3-venv         \
+    sccache              \
     vim                  \
     wget                 \
     xvfb                 \
@@ -56,7 +57,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-too
  && rustup default nightly \
  && rustup component add rust-src llvm-tools-preview rustfmt clippy \
  && rustup target add thumbv7em-none-eabihf \
- && cargo install sccache --locked
+ && cargo install cargo-binutils
 
 # If you run as a non-root user at runtime, make sure they can read it
 ARG RLVGL_BUILDER_USER=rlvgl
@@ -84,10 +85,11 @@ RUN mkdir -p /home/ubuntu/.ssh
 # set env vars
 ENV APP_HOME=/opt/rlvgl
 ENV RUSTFLAGS="-Cdebuginfo=0 -Ccodegen-units=32 -Clink-self-contained=no -Clink-arg=-fuse-ld=mold"
-# Comment these out to remove sccache.
 ENV CARGO_INCREMENTAL=0
-ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
 ENV SCCACHE_S3_KEY_PREFIX=/rlvgl
+
+# Comment this out to remove sccache, or remove on run.
+ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
 
 # Default to non-root user for everything that follows
 USER ${RLVGL_BUILDER_USER}

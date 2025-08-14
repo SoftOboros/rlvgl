@@ -10,9 +10,35 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "cargo": {
-        "args": ["build", "--package=rlvgl-sim", "--target=x86_64-apple-darwin"]
+        "args": ["build", "--bin=rlvgl-sim", "--features=simulator,fontdue,qrcode,png,jpeg", "--target=x86_64-apple-darwin"]
       },
       "sourceLanguages": ["rust"]
     },
+    {
+      "name": "DISCO",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "device": "STM32H747XI",
+      "interface": "swd",
+      "configFiles": [
+        "interface/stlink.cfg",
+        "target/stm32h7x.cfg"
+      ],
+      "searchDir": ["/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts"],
+      "toolchainPrefix": "arm-none-eabi-",
+      "svdFile": "${workspaceFolder}/STM32H747.svd",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "Build: rlvgl-stm32h747i-disco",
+      "preLaunchCommands": [
+        "monitor reset init",
+        "load",
+        "monitor mdw 0x08000000 2",
+        "monitor reset init"
+      ],
+      "showDevDebugOutput": "raw"
+    }
   ]
 }
