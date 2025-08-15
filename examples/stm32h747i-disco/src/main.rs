@@ -14,7 +14,8 @@ use cortex_m_rt::entry;
 use embedded_alloc::Heap;
 #[cfg(not(doc))]
 use panic_halt as _;
-use rlvgl::platform::stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+#[cfg(not(doc))]
+use rlvgl::platform::stm32h747i_disco::Stm32h747iDiscoInput;
 
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
@@ -39,7 +40,7 @@ fn main() -> ! {
         ALLOC.init(start, HEAP_SIZE);
     }
 
-    let _display = Stm32h747iDiscoDisplay;
+    // TODO: initialize `Stm32h747iDiscoDisplay` with a concrete blitter
     let _touch = Stm32h747iDiscoInput;
     let _demo = build_demo();
 
