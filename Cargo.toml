@@ -41,6 +41,11 @@ name = "rlvgl-creator"
 path = "src/bin/creator/main.rs"
 required-features = ["creator"]
 
+[[bin]]
+name = "rlvgl-creator-ui"
+path = "src/bin/creator_ui/main.rs"
+required-features = ["creator_ui"]
+
 [dependencies]
 rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.4", path = "widgets", default-features = false }
@@ -87,7 +92,8 @@ version = "0.7"
 features = ["critical-section-single-core"]
 optional = true
 
-[dependencies.panic-halt]
+
+[target.'cfg(target_os = "none")'.dependencies.panic-halt]
 version = "1.0.0"
 optional = true
 
@@ -158,6 +164,18 @@ optional = true
 version = "0.45.1"
 optional = true
 
+[dependencies.eframe]
+version = "0.29"
+optional = true
+
+[dependencies.open]
+version = "5"
+optional = true
+
+[dependencies.notify]
+version = "6"
+optional = true
+
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
@@ -202,6 +220,20 @@ creator = [
     "dep:rlottie",
     "dep:rayon",
     "dep:resvg",
+]
+creator_ui = [
+    "dep:eframe",
+    "dep:anyhow",
+    "dep:serde",
+    "dep:serde_yaml",
+    "dep:image",
+    "dep:schemars",
+    "dep:walkdir",
+    "dep:blake3",
+    "dep:apng",
+    "dep:png",
+    "dep:open",
+    "dep:notify",
 ]
 
 [profile.release]
