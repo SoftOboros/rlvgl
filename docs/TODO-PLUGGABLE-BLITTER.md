@@ -5,14 +5,14 @@
 
 ---
 
-## A) Blitter Abstraction (core/support)
+## A) Blitter Abstraction (platform)
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Define `Blitter` trait: `caps()`, `fill()`, `blit()`, `blend()`, PFC support | `bitflags` (caps) | Keep rect+surface types in `support/graphics`. |
-| [ ] | Add `Surface` (buf/stride/fmt/w,h) + `PixelFmt` enum | none | Include ARGB8888, RGB565, L8/A8/A4. |
-| [ ] | Add `BlitPlanner` to batch dirty rects per frame | none | Optional: coalesce touching rects. |
-| [ ] | Thread through renderer → blitter (no API leak to widgets) | core renderer | Renderer owns a `&mut dyn Blitter`. |
+| [x] | Define `Blitter` trait: `caps()`, `fill()`, `blit()`, `blend()`, PFC support | `bitflags` (caps) | Rect + surface types live in `platform::blit`. |
+| [x] | Add `Surface` (buf/stride/fmt/w,h) + `PixelFmt` enum | none | Include ARGB8888, RGB565, L8/A8/A4. |
+| [x] | Add `BlitPlanner` to batch dirty rects per frame | none | Optional: coalesce touching rects. |
+| [x] | Thread through renderer → blitter (no API leak to widgets) | platform renderer | Renderer owns a `&mut dyn Blitter`. |
 
 ---
 
@@ -30,12 +30,12 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Create `Dma2dBlitter` with PAC register access | `stm32h7` PAC, `cortex-m` | HAL lacks full DMA2D; use PAC. |
-| [ ] | Init: clock, fore/back layer config, line offset | PAC | Keep safe wrapper; no `unsafe` in API. |
-| [ ] | Implement R2M (fill) | PAC | Blocking first; add IRQ later. |
-| [ ] | Implement M2M/PFC (copy + convert) | PAC | Common ARGB8888→RGB565 path. |
-| [ ] | Implement M2M blend (FG over BG, const/per‑pixel alpha) | PAC | Straight‑alpha assumption; doc it. |
-| [ ] | Optional: non‑blocking w/ interrupt/completion | EXTI/IRQ | Queue ops; fence before VSYNC. |
+| [x] | Create `Dma2dBlitter` with PAC register access | `stm32h7` PAC, `cortex-m` | HAL lacks full DMA2D; use PAC. |
+| [x] | Init: clock, fore/back layer config, line offset | PAC | Keep safe wrapper; no `unsafe` in API. |
+| [x] | Implement R2M (fill) | PAC | Blocking first; add IRQ later. |
+| [x] | Implement M2M/PFC (copy + convert) | PAC | Common ARGB8888→RGB565 path. |
+| [x] | Implement M2M blend (FG over BG, const/per‑pixel alpha) | PAC | Straight‑alpha assumption; doc it. |
+| [x] | Optional: non‑blocking w/ interrupt/completion | EXTI/IRQ | Queue ops; fence before VSYNC. |
 | [ ] | Reuse CPU tests to assert identical pixels | `std` test via host build | Use small test images, crops. |
 
 ---

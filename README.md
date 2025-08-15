@@ -27,7 +27,6 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - [core](https://github.com/SoftOboros/rlvgl/blob/main/core/README.md)/ – Widget base trait, layout, event dispatch
 - [widgets](https://github.com/SoftOboros/rlvgl/blob/main/widgets/widgets/README.md)/ – Rust-native reimplementations of LVGL widgets
 - [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
-- [support](https://github.com/SoftOboros/rlvgl/blob/main/support/README.md)/ – Fonts, geometry, style, color utils
 - [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
 - [rlvgl-sim](https://github.com/SoftOboros/rlvgl/tree/main/examples/sim/README.md)/ – Desktop simulator example
 ## Status
