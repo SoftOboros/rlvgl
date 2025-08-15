@@ -12,9 +12,9 @@ extern crate alloc;
 use core::ptr::addr_of_mut;
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
+#[cfg(target_os = "none")]
 #[cfg(not(doc))]
 use panic_halt as _;
-#[cfg(not(doc))]
 use rlvgl::platform::stm32h747i_disco::Stm32h747iDiscoInput;
 
 #[path = "../../common_demo/lib.rs"]
