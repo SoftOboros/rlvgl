@@ -168,6 +168,10 @@ optional = true
 version = "0.29"
 optional = true
 
+[dependencies.open]
+version = "5"
+optional = true
+
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
@@ -222,6 +226,9 @@ creator_ui = [
     "dep:schemars",
     "dep:walkdir",
     "dep:blake3",
+    "dep:apng",
+    "dep:png",
+    "dep:open",
 ]
 
 [profile.release]

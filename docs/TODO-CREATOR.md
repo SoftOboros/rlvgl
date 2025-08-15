@@ -113,7 +113,7 @@ _User story: As a developer/designer, I can preview, zoom/pan, group, and export
 | [x] | Inspector: Fonts (glyph set, sizes, hinting, packing). | fontdue | Preview pangrams.
 | [x] | Drag‑drop to `assets/raw/` with immediate `scan`. | notify | Shows toasts.
 | [x] | Size‑to‑screen presets (e.g., `stm32h7‑480x272`) with live preview. | presets | Renders bounding boxes.
-| [ ] | Actions: "Make APNG from selection", "Add to group", "Reveal in manifest". | UI kit | Multi‑select support.
+| [x] | Actions: "Make APNG from selection", "Add to group", "Reveal in manifest". | UI kit | Multi‑select support.
 | [ ] | Thumbnails pipeline + hot‑reload. | image, notify | Cache invalidation via hash.
 | [ ] | Future: layout preview/editor for quick UI prototyping. | later | Out of MVP.
 

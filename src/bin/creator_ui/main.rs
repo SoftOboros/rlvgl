@@ -5,7 +5,7 @@
 //! an rlvgl manifest.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File},
     path::{Path, PathBuf},
     time::{Duration, Instant},
@@ -17,6 +17,8 @@ use egui::{ColorImage, TextureHandle, Vec2};
 use image::GenericImageView;
 use serde_yaml::from_reader;
 
+#[path = "../creator/apng.rs"]
+mod apng;
 #[path = "../creator/manifest.rs"]
 mod manifest;
 #[path = "../creator/scan.rs"]
@@ -65,7 +67,10 @@ fn main() -> Result<()> {
 struct CreatorApp {
     manifest: manifest::Manifest,
     manifest_path: String,
-    selected: Option<usize>,
+    /// Indices of currently selected assets.
+    selection: BTreeSet<usize>,
+    /// Temporary group name for adding selected assets.
+    new_group: String,
     filter: String,
     show_unlicensed_only: bool,
     groups: Vec<GroupEntry>,
@@ -235,7 +240,8 @@ impl CreatorApp {
         Self {
             manifest,
             manifest_path,
-            selected: None,
+            selection: BTreeSet::new(),
+            new_group: String::new(),
             filter: String::new(),
             show_unlicensed_only: false,
             groups,
@@ -247,6 +253,89 @@ impl CreatorApp {
             offset: Vec2::ZERO,
             toasts: Vec::new(),
             screen_preset: None,
+        }
+    }
+
+    /// Return one selected asset index, if any.
+    fn selected(&self) -> Option<usize> {
+        self.selection.iter().next().copied()
+    }
+
+    /// Rebuild group mappings and metadata from the manifest.
+    fn rebuild_groups(&mut self) {
+        let mut path_index = BTreeMap::new();
+        for (idx, asset) in self.manifest.assets.iter().enumerate() {
+            path_index.insert(asset.path.clone(), idx);
+            self.meta[idx].groups.clear();
+        }
+        self.groups.clear();
+        let mut seen = vec![false; self.manifest.assets.len()];
+        for (name, group) in &self.manifest.groups {
+            let mut indices = Vec::new();
+            for path in &group.assets {
+                if let Some(&idx) = path_index.get(path) {
+                    indices.push(idx);
+                    seen[idx] = true;
+                    self.meta[idx].groups.push(name.clone());
+                    if self.meta[idx].license.is_none() {
+                        self.meta[idx].license = group.license.clone();
+                    }
+                }
+            }
+            self.groups.push(GroupEntry {
+                name: name.clone(),
+                assets: indices,
+            });
+        }
+        self.ungrouped.clear();
+        for (idx, flag) in seen.into_iter().enumerate() {
+            if !flag {
+                self.ungrouped.push(idx);
+            }
+        }
+    }
+
+    /// Build an APNG from PNG frames in the directory of the first selected asset.
+    fn make_apng_from_selection(&mut self) -> Result<()> {
+        let idx = self
+            .selected()
+            .ok_or_else(|| anyhow::anyhow!("no selection"))?;
+        let first_path = Path::new(&self.manifest.assets[idx].path);
+        let dir = first_path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("no parent directory"))?;
+        let out = dir.join("animation.apng");
+        apng::run(dir, &out, 100, 0)?;
+        self.toasts
+            .push((format!("Built {}", out.display()), Instant::now()));
+        Ok(())
+    }
+
+    /// Add selected assets to the group named in `self.new_group`.
+    fn add_selection_to_group(&mut self) {
+        let name = self.new_group.trim().to_string();
+        if name.is_empty() || self.selection.is_empty() {
+            return;
+        }
+        let group = self.manifest.groups.entry(name.clone()).or_default();
+        for idx in &self.selection {
+            let path = self.manifest.assets[*idx].path.clone();
+            if !group.assets.contains(&path) {
+                group.assets.push(path);
+            }
+        }
+        let _ = self.save_manifest();
+        self.rebuild_groups();
+        self.toasts
+            .push((format!("Added to group {}", name), Instant::now()));
+        self.new_group.clear();
+    }
+
+    /// Open the manifest file in the system's default handler.
+    fn reveal_in_manifest(&mut self) {
+        if let Err(e) = open::that(&self.manifest_path) {
+            self.toasts
+                .push((format!("Failed to open manifest: {}", e), Instant::now()));
         }
     }
 
@@ -383,6 +472,7 @@ impl CreatorApp {
                     let path = self.manifest_path.clone();
                     let mut new_app = Self::new(manifest, path);
                     new_app.toasts = self.toasts.clone();
+                    new_app.new_group = self.new_group.clone();
                     *self = new_app;
                 }
             }
@@ -392,10 +482,14 @@ impl CreatorApp {
     /// Render a row for an asset with license badge.
     fn asset_row(&mut self, ui: &mut egui::Ui, idx: usize) {
         let asset = &self.manifest.assets[idx];
-        let selected = self.selected == Some(idx);
+        let selected = self.selection.contains(&idx);
         ui.horizontal(|ui| {
             if ui.selectable_label(selected, &asset.path).clicked() {
-                self.selected = Some(idx);
+                if selected {
+                    self.selection.remove(&idx);
+                } else {
+                    self.selection.insert(idx);
+                }
             }
             let (text, color) = if let Some(ref lic) = self.meta[idx].license {
                 (lic.as_str(), egui::Color32::from_rgb(0, 128, 0))
@@ -418,6 +512,23 @@ impl App for CreatorApp {
                 ui.text_edit_singleline(&mut self.filter);
             });
             ui.checkbox(&mut self.show_unlicensed_only, "Unlicensed only");
+            if !self.selection.is_empty() {
+                ui.horizontal(|ui| {
+                    if ui.button("Make APNG").clicked() {
+                        if let Err(e) = self.make_apng_from_selection() {
+                            self.toasts
+                                .push((format!("APNG failed: {}", e), Instant::now()));
+                        }
+                    }
+                    ui.text_edit_singleline(&mut self.new_group);
+                    if ui.button("Add to group").clicked() {
+                        self.add_selection_to_group();
+                    }
+                    if ui.button("Reveal in manifest").clicked() {
+                        self.reveal_in_manifest();
+                    }
+                });
+            }
 
             for group in self.groups.clone() {
                 egui::CollapsingHeader::new(&group.name).show(ui, |ui| {
@@ -459,7 +570,7 @@ impl App for CreatorApp {
                         }
                     });
             });
-            if let Some(idx) = self.selected {
+            if let Some(idx) = self.selected() {
                 if self.texture_idx != Some(idx) {
                     if let Err(e) = self.load_texture(ctx, idx) {
                         ui.colored_label(egui::Color32::RED, e.to_string());
@@ -508,13 +619,15 @@ impl App for CreatorApp {
                     ui.label("Failed to load texture");
                 }
             } else {
+                self.texture = None;
+                self.texture_idx = None;
                 ui.label("Select an asset to preview");
             }
         });
 
         egui::SidePanel::right("inspector").show(ctx, |ui| {
             ui.heading("Inspector");
-            if let Some(idx) = self.selected {
+            if let Some(idx) = self.selected() {
                 let asset = &self.manifest.assets[idx];
                 let meta_snapshot = self.meta[idx].clone();
                 ui.label(format!("Path: {}", asset.path));
