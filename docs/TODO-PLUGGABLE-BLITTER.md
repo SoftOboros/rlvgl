@@ -59,9 +59,9 @@
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
 | [ ] | I²C init @ 400 kHz | `stm32h7xx-hal` I2C | Use board pins. |
-| [ ] | EXTI on INT line (optional) | HAL EXTI | Or poll in `poll()`. |
-| [ ] | Minimal FT5336 driver: read points | none | Convert to `Event` (down/move/up). |
-| [ ] | `Stm32h747iDiscoInput` integration | platform input | Coordinate flip/rotation config. |
+| [x] | EXTI on INT line (optional) | HAL EXTI | Or poll in `poll()`. |
+| [x] | Minimal FT5336 driver: read points | none | Convert to `Event` (down/move/up). |
+| [x] | `Stm32h747iDiscoInput` integration | platform input | Coordinate flip/rotation config. |
 
 ---
 

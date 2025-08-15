@@ -3,16 +3,20 @@
 //! Offers a minimal bring-up path for the discovery board's MIPI-DSI display
 //! and touch peripherals. The display driver enables LTDC and DSI clocks,
 //! issues a short initialization sequence to the OTM8009A panel, and configures
-//! layer 1 for an RGB565 framebuffer. Touch support remains a stub for the
-//! FT5336 controller. Backlight PWM and panel reset control are wired through
+//! layer 1 for an RGB565 framebuffer. Touch input is provided via the FT5336
+//! controller. Backlight PWM and panel reset control are wired through
 //! `embedded-hal` traits.
 
+#[cfg(feature = "stm32h747i_disco")]
+use crate::ft5336::Ft5336;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 use crate::otm8009a::Otm8009a;
 use crate::{Blitter, DisplayDriver, InputDevice};
+#[cfg(feature = "stm32h747i_disco")]
+use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 #[cfg(feature = "stm32h747i_disco")]
 use embedded_hal::{digital::OutputPin, pwm::PwmPin};
 use rlvgl_core::event::Event;
@@ -205,11 +209,128 @@ impl<B: Blitter> DisplayDriver for Stm32h747iDiscoDisplay<B> {
 
 /// Touch input driver for the STM32H747I-DISCO board.
 ///
-/// Polls the FT5336 capacitive controller over I²C when fully implemented.
-pub struct Stm32h747iDiscoInput;
+/// Polls the FT5336 capacitive controller over I²C.
+#[cfg(feature = "stm32h747i_disco")]
+pub struct Stm32h747iDiscoInput<I2C, INT = ()> {
+    touch: Ft5336<I2C>,
+    int: Option<INT>,
+    last: Option<(u16, u16)>,
+}
 
-impl InputDevice for Stm32h747iDiscoInput {
+#[cfg(feature = "stm32h747i_disco")]
+impl<I2C> Stm32h747iDiscoInput<I2C>
+where
+    I2C: I2c<SevenBitAddress>,
+{
+    /// Create a new input driver from an initialized I²C peripheral.
+    pub fn new(i2c: I2C) -> Self {
+        Self {
+            touch: Ft5336::new(i2c),
+            int: None,
+            last: None,
+        }
+    }
+}
+
+#[cfg(feature = "stm32h747i_disco")]
+impl<I2C, INT> Stm32h747iDiscoInput<I2C, INT>
+where
+    I2C: I2c<SevenBitAddress>,
+    INT: InputPin,
+{
+    /// Create a new input driver using an interrupt line.
+    pub fn new_with_int(i2c: I2C, int: INT) -> Self {
+        Self {
+            touch: Ft5336::new(i2c),
+            int: Some(int),
+            last: None,
+        }
+    }
+
+    fn int_active(&mut self) -> bool {
+        self.int
+            .as_mut()
+            .map(|p| p.is_low().unwrap_or(false))
+            .unwrap_or(true)
+    }
+}
+
+#[cfg(feature = "stm32h747i_disco")]
+impl<I2C> InputDevice for Stm32h747iDiscoInput<I2C>
+where
+    I2C: I2c<SevenBitAddress>,
+{
     fn poll(&mut self) -> Option<Event> {
-        todo!("touch polling not yet implemented");
+        let touch = self.touch.read_touch().ok()?;
+        match (touch, self.last) {
+            (Some((x, y)), Some((lx, ly))) => {
+                self.last = Some((x, y));
+                if (x, y) != (lx, ly) {
+                    Some(Event::PointerMove {
+                        x: x as i32,
+                        y: y as i32,
+                    })
+                } else {
+                    None
+                }
+            }
+            (Some((x, y)), None) => {
+                self.last = Some((x, y));
+                Some(Event::PointerDown {
+                    x: x as i32,
+                    y: y as i32,
+                })
+            }
+            (None, Some((lx, ly))) => {
+                self.last = None;
+                Some(Event::PointerUp {
+                    x: lx as i32,
+                    y: ly as i32,
+                })
+            }
+            (None, None) => None,
+        }
+    }
+}
+
+#[cfg(feature = "stm32h747i_disco")]
+impl<I2C, INT> InputDevice for Stm32h747iDiscoInput<I2C, INT>
+where
+    I2C: I2c<SevenBitAddress>,
+    INT: InputPin,
+{
+    fn poll(&mut self) -> Option<Event> {
+        if !self.int_active() {
+            return None;
+        }
+        let touch = self.touch.read_touch().ok()?;
+        match (touch, self.last) {
+            (Some((x, y)), Some((lx, ly))) => {
+                self.last = Some((x, y));
+                if (x, y) != (lx, ly) {
+                    Some(Event::PointerMove {
+                        x: x as i32,
+                        y: y as i32,
+                    })
+                } else {
+                    None
+                }
+            }
+            (Some((x, y)), None) => {
+                self.last = Some((x, y));
+                Some(Event::PointerDown {
+                    x: x as i32,
+                    y: y as i32,
+                })
+            }
+            (None, Some((lx, ly))) => {
+                self.last = None;
+                Some(Event::PointerUp {
+                    x: lx as i32,
+                    y: ly as i32,
+                })
+            }
+            (None, None) => None,
+        }
     }
 }

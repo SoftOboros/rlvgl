@@ -13,6 +13,11 @@ pub mod blit;
 pub mod display;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub mod dma2d;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub mod ft5336;
 /// Input device abstractions.
 pub mod input;
 #[cfg(all(
@@ -38,6 +43,11 @@ pub use blit::{
 pub use display::DisplayDriver;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub use dma2d::Dma2dBlitter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use ft5336::Ft5336;
 pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
