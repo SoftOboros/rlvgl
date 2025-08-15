@@ -81,7 +81,7 @@
 | --- | --------------------------------- | ---------------------------- | -------------------------------------------------- |
 | [x] | Define public API structs (C‑ABI) | Rust `#[repr(C)]`            | `InputEvent`, `NodeSpec` minimal first             |
 | [x] | Rust FFI functions                | `extern "C"`                 | `mp_rlvgl_notify_input`, `mp_rlvgl_stack_add`, ... |
-| [ ] | MicroPython module table + stubs  | `mp_obj_module_t`            | Small C wrapper that forwards to Rust              |
+| [x] | MicroPython module table + stubs  | `mp_obj_module_t`            | Small C wrapper that forwards to Rust              |
 | [ ] | Build system glue                 | MP `ports/stm32` makefiles   | Add Rust static lib + link flags                   |
 | [ ] | Error mapping                     | status→`mp_raise_ValueError` | Never let Rust panic across ABI                    |
 | [ ] | Basic smoke test from REPL        | MicroPython                  | Add/remove a solid‑color rect, call `present()`    |
