@@ -34,7 +34,7 @@
 | [x] | Init: clock, fore/back layer config, line offset | PAC | Keep safe wrapper; no `unsafe` in API. |
 | [x] | Implement R2M (fill) | PAC | Blocking first; add IRQ later. |
 | [x] | Implement M2M/PFC (copy + convert) | PAC | Common ARGB8888→RGB565 path. |
-| [ ] | Implement M2M blend (FG over BG, const/per‑pixel alpha) | PAC | Straight‑alpha assumption; doc it. |
+| [x] | Implement M2M blend (FG over BG, const/per‑pixel alpha) | PAC | Straight‑alpha assumption; doc it. |
 | [ ] | Optional: non‑blocking w/ interrupt/completion | EXTI/IRQ | Queue ops; fence before VSYNC. |
 | [ ] | Reuse CPU tests to assert identical pixels | `std` test via host build | Use small test images, crops. |
 
