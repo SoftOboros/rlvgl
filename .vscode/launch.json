@@ -1,7 +1,6 @@
 {
   "version": "0.2.0",
   "configurations": [
-
     {
       "name": "Debug sim",
       "type": "lldb",
@@ -11,6 +10,18 @@
       "cwd": "${workspaceFolder}",
       "cargo": {
         "args": ["build", "--bin=rlvgl-sim", "--features=simulator,fontdue,qrcode,png,jpeg", "--target=x86_64-apple-darwin"]
+      },
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "name": "Debug Creator",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/x86_64-apple-darwin/debug/rlvgl-creator",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "cargo": {
+        "args": ["build", "--bin=rlvgl-creator", "--all-features", "--target=x86_64-apple-darwin"]
       },
       "sourceLanguages": ["rust"]
     },
