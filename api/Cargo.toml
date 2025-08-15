@@ -1,0 +1,14 @@
+[package]
+name = "rlvgl-api"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ira Abbott <ira@softobotos.com>"]
+license = "MIT"
+description = "Shared API types for rlvgl bindings"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+
