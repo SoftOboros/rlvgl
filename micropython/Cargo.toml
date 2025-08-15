@@ -1,0 +1,18 @@
+[package]
+name = "rlvgl-micropython"
+version = "0.1.0"
+edition = "2024"
+authors = ["Ira Abbott <ira@softobotos.com>"]
+license = "MIT"
+description = "MicroPython bindings for rlvgl"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+rlvgl-api = { path = "../api", version = "0.1.0" }
+
+[features]
+default = []
+stm32h747i_disco = []
+
