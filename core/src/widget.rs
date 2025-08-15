@@ -34,6 +34,13 @@ pub struct Color(
     pub u8,
 );
 
+impl Color {
+    /// Convert this color to a packed ARGB8888 integer.
+    pub fn to_argb8888(self) -> u32 {
+        ((self.3 as u32) << 24) | ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32)
+    }
+}
+
 /// Base trait implemented by all widgets.
 ///
 /// A widget is expected to provide its bounds, draw itself using a

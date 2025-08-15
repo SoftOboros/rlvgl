@@ -1,5 +1,5 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(doc), no_std)]
+#![cfg_attr(not(doc), no_main)]
 
 //! Entry point for the STM32H747I-DISCO hardware demo.
 //!
@@ -12,6 +12,7 @@ extern crate alloc;
 use core::ptr::addr_of_mut;
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
+#[cfg(not(doc))]
 use panic_halt as _;
 use rlvgl::platform::stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
 
@@ -30,6 +31,7 @@ const HEAP_SIZE: usize = 64 * 1024;
 static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 
 /// Application entry point.
+#[cfg(not(doc))]
 #[entry]
 fn main() -> ! {
     unsafe {
@@ -45,3 +47,6 @@ fn main() -> ! {
         cortex_m::asm::nop();
     }
 }
+
+#[cfg(doc)]
+fn main() {}
