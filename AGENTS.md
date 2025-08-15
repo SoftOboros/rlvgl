@@ -36,8 +36,6 @@ widgets/ – Rust-native reimplementations of LVGL widgets
 
 platform/ – Display/input traits and HAL adapters
 
-support/ – Fonts, geometry, style, color utils
-
 lvgl/ – C submodule (reference only)
 
 ## Status

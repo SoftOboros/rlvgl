@@ -1,21 +1,203 @@
-//! STM32H747I-DISCO display and touch driver stubs.
+//! STM32H747I-DISCO display and touch drivers.
 //!
-//! Provides placeholder implementations of [`DisplayDriver`] and
-//! [`InputDevice`] for the STM32H747I-DISCO discovery board. These stubs
-//! establish the module structure for future integration with the board's
-//! MIPI-DSI LCD and FT5336 capacitive touch controller.
+//! Offers a minimal bring-up path for the discovery board's MIPI-DSI display
+//! and touch peripherals. The display driver enables LTDC and DSI clocks,
+//! issues a short initialization sequence to the OTM8009A panel, and configures
+//! layer 1 for an RGB565 framebuffer. Touch support remains a stub for the
+//! FT5336 controller. Backlight PWM and panel reset control are wired through
+//! `embedded-hal` traits.
 
-use crate::{DisplayDriver, InputDevice};
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::otm8009a::Otm8009a;
+use crate::{Blitter, DisplayDriver, InputDevice};
+#[cfg(feature = "stm32h747i_disco")]
+use embedded_hal::{digital::OutputPin, pwm::PwmPin};
 use rlvgl_core::event::Event;
 use rlvgl_core::widget::{Color, Rect};
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use stm32h7::stm32h747cm7::{DSIHOST, FMC, LTDC, RCC};
 
 /// Display driver for the STM32H747I-DISCO board.
 ///
-/// This placeholder forwards pixel buffers to the board's MIPI-DSI LCD
-/// controller once implemented.
-pub struct Stm32h747iDiscoDisplay;
+/// Wraps a [`Blitter`] and configures LTDC/DSI clocks. The actual flush path is
+/// still unimplemented and will eventually transfer pixel data over MIPI-DSI.
+pub struct Stm32h747iDiscoDisplay<B: Blitter, BL = (), RST = ()> {
+    blitter: B,
+    #[cfg(feature = "stm32h747i_disco")]
+    backlight: BL,
+    #[cfg(feature = "stm32h747i_disco")]
+    reset: RST,
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    ltdc: LTDC,
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    dsi: DSIHOST,
+}
 
-impl DisplayDriver for Stm32h747iDiscoDisplay {
+impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
+    /// Create a new display driver, enabling LTDC and DSI clocks and preparing
+    /// the panel control pins.
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    pub fn new(
+        blitter: B,
+        backlight: BL,
+        mut reset: RST,
+        ltdc: LTDC,
+        dsi: DSIHOST,
+        fmc: FMC,
+        rcc: &mut RCC,
+    ) -> Self
+    where
+        BL: PwmPin,
+        RST: OutputPin,
+    {
+        // Enable LTDC and DSI peripheral clocks
+        rcc.apb3enr
+            .modify(|_, w| w.ltdcen().set_bit().dsien().set_bit());
+        // Ensure the panel is held in reset and the backlight is off
+        let _ = reset.set_low();
+        let mut disp = Self {
+            blitter,
+            backlight,
+            reset,
+            ltdc,
+            dsi,
+        };
+        disp.backlight.disable();
+        disp.reset_panel();
+        Otm8009a::init(&mut disp.dsi);
+        let fb = Self::init_sdram(fmc, rcc);
+        disp.setup_ltdc_layer(fb, 800, 480);
+        disp
+    }
+
+    #[cfg(feature = "stm32h747i_disco")]
+    fn set_backlight(&mut self, level: BL::Duty)
+    where
+        BL: PwmPin,
+    {
+        self.backlight.set_duty(level);
+        self.backlight.enable();
+    }
+
+    #[cfg(feature = "stm32h747i_disco")]
+    fn reset_panel(&mut self)
+    where
+        RST: OutputPin,
+    {
+        let _ = self.reset.set_low();
+        // A real implementation would delay here to satisfy the reset timing
+        let _ = self.reset.set_high();
+    }
+
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    fn setup_ltdc_layer(&mut self, fb: u32, width: u16, height: u16) {
+        use stm32h7::stm32h747cm7::ltdc::layer::pfcr::PF;
+        let pitch = width * 2; // RGB565
+        self.ltdc.layer[0].cfbar.write(|w| w.cfbadd().bits(fb));
+        self.ltdc.layer[0]
+            .cfblr
+            .write(|w| w.cfbll().bits(pitch + 3).cfbp().bits(pitch));
+        self.ltdc.layer[0]
+            .cfblnr
+            .write(|w| unsafe { w.cfblnbr().bits(height) });
+        self.ltdc.layer[0]
+            .pfcr
+            .write(|w| w.pf().variant(PF::Rgb565));
+        self.ltdc.layer[0].cr.modify(|_, w| w.len().enabled());
+        self.ltdc.srcr.write(|w| w.imr().reload());
+    }
+
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    /// Initialize the external SDRAM and return its base address.
+    fn init_sdram(fmc: FMC, rcc: &mut RCC) -> u32 {
+        // Enable the FMC interface clock for SDRAM access
+        rcc.ahb3enr.modify(|_, w| w.fmcen().set_bit());
+
+        // Configure SDRAM control and timing registers for the IS42S32800G
+        fmc.sdcr[0].write(|w| {
+            w.nc()
+                .bits(0b01) // 9 column bits
+                .nr()
+                .bits(0b01) // 12 row bits
+                .mwid()
+                .bits(0b10) // 32-bit width
+                .nb()
+                .bits(0b01) // 4 internal banks
+                .cas()
+                .bits(0b11) // CAS latency 3
+                .wp()
+                .clear_bit()
+                .sdclk()
+                .bits(0b10) // SDRAM clock = HCLK/2
+                .rburst()
+                .set_bit()
+                .rpipe()
+                .bits(0)
+        });
+        fmc.sdtr[0].write(|w| {
+            w.tmrd()
+                .bits(2 - 1)
+                .txsr()
+                .bits(7 - 1)
+                .tras()
+                .bits(4 - 1)
+                .trc()
+                .bits(7 - 1)
+                .twr()
+                .bits(2 - 1)
+                .trp()
+                .bits(2 - 1)
+                .trcd()
+                .bits(2 - 1)
+        });
+
+        // Clock enable command
+        fmc.sdcmr
+            .write(|w| unsafe { w.mode().bits(1).ctb1().set_bit() });
+        while fmc.sdsr.read().busy().bit_is_set() {}
+        // Precharge all command
+        fmc.sdcmr
+            .write(|w| unsafe { w.mode().bits(2).ctb1().set_bit() });
+        while fmc.sdsr.read().busy().bit_is_set() {}
+        // Auto-refresh command
+        fmc.sdcmr
+            .write(|w| unsafe { w.mode().bits(3).ctb1().set_bit().nrfs().bits(8) });
+        while fmc.sdsr.read().busy().bit_is_set() {}
+        // Load mode register command with burst length =1, CAS=3
+        fmc.sdcmr
+            .write(|w| unsafe { w.mode().bits(4).ctb1().set_bit().mrd().bits(0x0231) });
+        while fmc.sdsr.read().busy().bit_is_set() {}
+
+        // Set refresh rate (approx. 64ms/4096 rows @100MHz)
+        fmc.sdrtr.write(|w| unsafe { w.count().bits(0x0606) });
+
+        // Return base address of SDRAM bank1
+        0xC000_0000
+    }
+}
+
+impl<B: Blitter> DisplayDriver for Stm32h747iDiscoDisplay<B> {
     fn flush(&mut self, _area: Rect, _colors: &[Color]) {
         todo!("MIPI-DSI flush not yet implemented");
     }
