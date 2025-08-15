@@ -1,0 +1,6 @@
+---
+source: src/bin/creator/apng.rs
+expression: "format!(\"{}\\n{}\", apng_hash, first_hash)"
+---
+9b3e4252389fa440ed64cf792b0c7269e42420bdcc9d1a0fd8de0a77d7e59400
+f458113cfcb3e97b7ee939416c6fce913b5842cba07477db90887c854507b4a0

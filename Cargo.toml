@@ -36,6 +36,11 @@ name = "rlvgl-stm32h747i-disco"
 path = "examples/stm32h747i-disco/src/main.rs"
 required-features = ["stm32h747i_disco"]
 
+[[bin]]
+name = "rlvgl-creator"
+path = "src/bin/creator/main.rs"
+required-features = ["creator"]
+
 [dependencies]
 rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.4", path = "widgets", default-features = false }
@@ -94,6 +99,69 @@ optional = true
 version = "1.1.2"
 optional = true
 
+[dependencies.apng]
+version = "0.3"
+optional = true
+
+[dependencies.png]
+version = "0.17"
+optional = true
+
+[dependencies.clap]
+version = "4.5.4"
+features = ["derive"]
+optional = true
+
+[dependencies.anyhow]
+version = "1"
+optional = true
+
+[dependencies.walkdir]
+version = "2"
+optional = true
+
+[dependencies.blake3]
+version = "1"
+optional = true
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+optional = true
+
+[dependencies.serde_yaml]
+version = "0.9"
+optional = true
+
+[dependencies.tera]
+version = "1"
+optional = true
+
+[dependencies.schemars]
+version = "0.8"
+features = ["derive"]
+optional = true
+
+[dependencies.serde_json]
+version = "1"
+optional = true
+
+[dependencies.spdx]
+version = "0.11"
+optional = true
+
+[dependencies.rayon]
+version = "1"
+optional = true
+
+[dependencies.resvg]
+version = "0.45.1"
+optional = true
+
+[dev-dependencies]
+insta = "1"
+tempfile = "3"
+
 [features]
 default = []
 png = ["rlvgl-core/png"]
@@ -116,6 +184,25 @@ pinyin = ["rlvgl-core/pinyin"]
 fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
 nes = ["rlvgl-core/nes", "dep:yane"]
 apng = ["rlvgl-core/apng", "dep:image"]
+creator = [
+    "dep:clap",
+    "dep:anyhow",
+    "dep:walkdir",
+    "dep:blake3",
+    "dep:serde",
+    "dep:serde_yaml",
+    "dep:image",
+    "dep:tera",
+    "dep:apng",
+    "dep:png",
+    "dep:schemars",
+    "dep:serde_json",
+    "dep:spdx",
+    "dep:fontdue",
+    "dep:rlottie",
+    "dep:rayon",
+    "dep:resvg",
+]
 
 [profile.release]
 opt-level = "z"
