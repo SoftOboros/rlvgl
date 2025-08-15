@@ -92,7 +92,6 @@ version = "0.7"
 features = ["critical-section-single-core"]
 optional = true
 
-
 [target.'cfg(target_os = "none")'.dependencies.panic-halt]
 version = "1.0.0"
 optional = true
@@ -192,7 +191,6 @@ stm32h747i_disco = [
     "rlvgl-platform/stm32h747i_disco",
     "dep:cortex-m-rt",
     "dep:cortex-m",
-    "dep:panic-halt",
     "dep:embedded-alloc",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
@@ -235,6 +233,9 @@ creator_ui = [
     "dep:open",
     "dep:notify",
 ]
+
+[dev-dependencies]
+panic-halt = "1.0.0"
 
 [profile.release]
 opt-level = "z"

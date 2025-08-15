@@ -1,5 +1,5 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(doc), no_std)]
+#![cfg_attr(not(doc), no_main)]
 
 //! Entry point for the STM32H747I-DISCO hardware demo.
 //!
@@ -13,8 +13,9 @@ use core::ptr::addr_of_mut;
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
 #[cfg(target_os = "none")]
+#[cfg(not(doc))]
 use panic_halt as _;
-use rlvgl::platform::stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+use rlvgl::platform::stm32h747i_disco::Stm32h747iDiscoInput;
 
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
@@ -31,6 +32,7 @@ const HEAP_SIZE: usize = 64 * 1024;
 static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 
 /// Application entry point.
+#[cfg(not(doc))]
 #[entry]
 fn main() -> ! {
     unsafe {
@@ -38,7 +40,7 @@ fn main() -> ! {
         ALLOC.init(start, HEAP_SIZE);
     }
 
-    let _display = Stm32h747iDiscoDisplay;
+    // TODO: initialize `Stm32h747iDiscoDisplay` with a concrete blitter
     let _touch = Stm32h747iDiscoInput;
     let _demo = build_demo();
 
@@ -46,3 +48,6 @@ fn main() -> ! {
         cortex_m::asm::nop();
     }
 }
+
+#[cfg(doc)]
+fn main() {}
