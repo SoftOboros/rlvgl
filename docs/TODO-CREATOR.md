@@ -24,7 +24,7 @@ _User story: As a maintainer, I want guardrails so teams can scale assets safely
 | [x] | Generate const/feature names; forbid manual edits (SCREAMING_SNAKE; `ICON_`, `FONT_`, `MEDIA_`). | creator core | Deterministic name map; diff output.
 | [x] | Creator is `std`; targets are `no_std + alloc` friendly; pre‑size/pack assets. | N/A | Design constraint across features.
 | [x] | Base assets stored as raw RGBA images/sequences; no PNG/APNG at runtime. | internal | Replaces std-dependent formats. |
-| [ ] | Support both direct Lottie playout and Lottie→APNG conversion. | rlottie (FFI) or Conan CLI | Per‑asset choice recorded in manifest.
+| [x] | Support both direct Lottie playout and Lottie→APNG conversion. | rlottie (FFI) or Conan CLI | Per‑asset choice recorded in manifest.
 | [x] | Optional bundle compression using RLE + token table; core path decodes with a tiny gated decoder. | internal | no_std-friendly; prefer build-time compress in vendor path. |
 
 ---
@@ -43,7 +43,7 @@ _User story: As a developer, I can manage assets via clear commands with helpful
 | [x] | `add-target` — register local crate + `vendor_dir` and presets. | serde_yaml | Updates manifest.
 | [x] | `sync` — regenerate Cargo features, consts, index from manifest. | tera | Dry‑run mode prints diff.
 | [x] | `apng` — build APNG from raw frame groups; set timing/loops. | apng | First frame PNG export. |
-| [ ] | `lottie import` — Lottie→frames/APNG; export timing map. | rlottie/CLI | Records chosen path.
+| [x] | `lottie import` — Lottie→frames/APNG; export timing map. | rlottie/CLI | Records chosen path.
 | [x] | `fonts pack` — sizes, glyph sets, packing/metrics. | fontdue/ab_glyph | Optional subsetting.
 | [x] | `check` — strict policy validation; `--fix` auto‑normalize. | creator core | Non‑zero exit on violations.
 | [ ] | `ui` — launch desktop UI. | Tauri or eframe/wgpu | Shares core libs.
@@ -62,8 +62,8 @@ _User story: As a maintainer, I want a machine‑owned manifest that encodes pol
 | [x] | Generate feature names from groups; emit `*_all` aggregates. | creator core | Stable order.
 | [x] | Generate const names from manifest entries; reject manual renames. | creator core | Diff prints old→new mapping.
 | [x] | License metadata per asset/group with allow/deny list. | SPDX table | Block vendor if missing.
-| [ ] | `naming` config (prefix map + case policy) for docs; generator is source of truth. | N/A | Keeps policy explicit.
-| [ ] | Per‑target presets (screen size, depth, storage) for auto sizing. | presets file | Hooked into `vendor`.
+| [x] | `naming` config (prefix map + case policy) for docs; generator is source of truth. | N/A | Keeps policy explicit.
+| [x] | Per‑target presets (screen size, depth, storage) for auto sizing. | presets file | Hooked into `vendor`.
 
 ---
 
@@ -90,10 +90,10 @@ _User story: As a designer, I can drop common formats and get normalized, fast�
 | [x] | Raw RGBA sequence format with max-frame header; per-frame size/position; single images drop frame headers. | internal | Replaces PNG/APNG base. |
 | [x] | Encode `.raw` files from common inputs. | creator core | Normalizes raster assets. |
 | [x] | Ingest `.raw` files into pipeline. | creator core | Parse header and frames. |
-| [ ] | SVG→sized raw images (DPI list; monochrome/e-ink thresholds). | resvg/usvg (opt.) | Fallback to external if needed. |
+| [x] | SVG→sized raw images (DPI list; monochrome/e-ink thresholds). | resvg/usvg (opt.) | Fallback to external if needed. |
 | [x] | APNG builder from raw frames with per-frame delay and loop count; first-frame PNG. | apng | Frame ordering checks. |
-| [ ] | Lottie via FFI (`lottie-ffi`) using `rlottie`. | rlottie, Conan | Feature gate; platform notes.
-| [ ] | Lottie via external CLI (`lottie-cli`) to frames/APNG. | Conan recipe | Record path in manifest.
+| [x] | Lottie via FFI (`lottie-ffi`) using `rlottie`. | rlottie, Conan | Feature gate; platform notes.
+| [x] | Lottie via external CLI (`lottie-cli`) to frames/APNG. | Conan recipe | Record path in manifest.
 | [x] | Fonts: TTF/OTF→bitmap packs (`.bin`) + metrics (`.json`); optional subset. | fontdue/ab_glyph | Glyph set per target.
 | [x] | Simple RLE + token table compression for raw files. | internal | Tiny decoder for no_std targets. |
 
@@ -136,9 +136,9 @@ _User story: As a user, I want fast re‑runs with deterministic outputs._
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Content‑hash cache in `assets/.cache` (hash→outputs/timestamps/sizes). | blake3, serde | JSON/CBOR store.
-| [ ] | `--force` invalidation and smart rebuild by hash/mtime. | creator core | Clear messaging.
-| [ ] | Parallelize conversions with stable ordering. | rayon (opt.) | Guard race conditions.
+| [x] | Content‑hash cache in `assets/.cache` (hash→outputs/timestamps/sizes). | blake3, serde | JSON/CBOR store.
+| [x] | `--force` invalidation and smart rebuild by hash/mtime. | creator core | Clear messaging.
+| [x] | Parallelize conversions with stable ordering. | rayon (opt.) | Guard race conditions.
 | [x] | Emit `cargo:rerun-if-changed` hints for vendor/build steps. | build.rs API | Good DX for consumers.
 
 ---
@@ -148,10 +148,10 @@ _User story: As a maintainer, I can trust every PR to enforce policy and stay gr
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | `creator check` covers paths, names, license, duplicates, size thresholds. | creator core | Non‑zero exit.
+| [x] | `creator check` covers paths, names, license, duplicates, size thresholds. | creator core | Non‑zero exit.
 | [x] | Pre‑commit hook template (scan/convert/check). | git hooks | Optional but encouraged.
-| [ ] | CI job runs end‑to‑end: `scan → convert → sync → scaffold → vendor`. | GH Actions | Caches toolchains.
-| [ ] | Golden tests for APNG timing and font samples. | apng, fontdue | Deterministic fixtures.
+| [x] | CI job runs end‑to‑end: `scan → convert → sync → scaffold → vendor`. | GH Actions | Caches toolchains.
+| [x] | Golden tests for APNG timing and font samples. | apng, fontdue | Deterministic fixtures.
 | [x] | Snapshot tests for generated `Cargo.toml`, `lib.rs`, `rlvgl_assets.rs`. | insta | Stored in repo.
 
 ---
@@ -205,4 +205,4 @@ _User story: As a newcomer, I can get productive with clear examples and guides.
 | [x] | Example assets pack (icons/fonts/media) with manifest. | repo data | Used in tests.
 | [ ] | Two consumer examples: **embed** and **vendor** patterns. | examples | CI builds & runs.
 | [x] | User guide (README) with end‑to‑end workflow. | mdbook/README | Screenshots/gifs.
-| [ ] | Developer docs for templates (Tera) and pipeline hooks. | rustdoc | API + templates directory.
+| [x] | Developer docs for templates (Tera) and pipeline hooks. | rustdoc | API + templates directory.

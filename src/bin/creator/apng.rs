@@ -57,3 +57,53 @@ pub(crate) fn run(frames_dir: &Path, out: &Path, delay: u16, loops: u32) -> Resu
     );
     Ok(())
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use blake3::hash;
+    use image::{Rgba, RgbaImage};
+    use tempfile::tempdir;
+
+    fn parse_delays(data: &[u8]) -> Vec<(u16, u16)> {
+        let mut pos = 8; // skip PNG signature
+        let mut delays = Vec::new();
+        while pos + 8 <= data.len() {
+            let len = u32::from_be_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
+            if pos + 8 + len + 4 > data.len() {
+                break;
+            }
+            let kind = &data[pos + 4..pos + 8];
+            if kind == b"fcTL" {
+                let start = pos + 8;
+                let delay_num =
+                    u16::from_be_bytes(data[start + 20..start + 22].try_into().unwrap());
+                let delay_den =
+                    u16::from_be_bytes(data[start + 22..start + 24].try_into().unwrap());
+                delays.push((delay_num, delay_den));
+            }
+            pos += len + 12;
+        }
+        delays
+    }
+
+    #[test]
+    fn apng_has_stable_output_and_timing() {
+        let dir = tempdir().unwrap();
+        let frame_dir = dir.path();
+        let colors = [Rgba([1, 2, 3, 4]), Rgba([5, 6, 7, 8])];
+        for (i, color) in colors.iter().enumerate() {
+            let img = RgbaImage::from_pixel(1, 1, *color);
+            img.save(frame_dir.join(format!("frame{i}.png"))).unwrap();
+        }
+        let out = dir.path().join("anim.apng");
+        run(frame_dir, &out, 123, 0).unwrap();
+
+        let data = std::fs::read(&out).unwrap();
+        let delays = parse_delays(&data);
+        assert_eq!(delays, vec![(123, 1000), (123, 1000)]);
+
+        let apng_hash = hash(&data).to_hex();
+        let first_hash = hash(&std::fs::read(out.with_extension("png")).unwrap()).to_hex();
+        insta::assert_snapshot!("apng_hashes", format!("{}\n{}", apng_hash, first_hash));
+    }
+}

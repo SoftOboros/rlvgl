@@ -29,6 +29,7 @@ pub(crate) fn run(manifest_path: &Path, name: &str, vendor_dir: &Path) -> Result
             manifest.targets.push(Target {
                 name: name.to_string(),
                 vendor_dir: dir_str.clone(),
+                preset: None,
             });
             println!("Added target `{}`", name);
         }
