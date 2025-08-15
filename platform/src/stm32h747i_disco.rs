@@ -18,7 +18,7 @@ use crate::{Blitter, DisplayDriver, InputDevice};
 #[cfg(feature = "stm32h747i_disco")]
 use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 #[cfg(feature = "stm32h747i_disco")]
-use embedded_hal::{digital::OutputPin, pwm::PwmPin};
+use embedded_hal::{digital::OutputPin, pwm::SetDutyCycle};
 use rlvgl_core::event::Event;
 use rlvgl_core::widget::{Color, Rect};
 #[cfg(all(
@@ -66,7 +66,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         rcc: &mut RCC,
     ) -> Self
     where
-        BL: PwmPin,
+        BL: SetDutyCycle,
         RST: OutputPin,
     {
         // Enable LTDC and DSI peripheral clocks
@@ -81,7 +81,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             ltdc,
             dsi,
         };
-        disp.backlight.disable();
+        let _ = disp.backlight.set_duty_cycle(0);
         disp.reset_panel();
         Otm8009a::init(&mut disp.dsi);
         let fb = Self::init_sdram(fmc, rcc);
@@ -90,12 +90,11 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     }
 
     #[cfg(feature = "stm32h747i_disco")]
-    fn set_backlight(&mut self, level: BL::Duty)
+    fn set_backlight(&mut self, level: u16)
     where
-        BL: PwmPin,
+        BL: SetDutyCycle,
     {
-        self.backlight.set_duty(level);
-        self.backlight.enable();
+        let _ = self.backlight.set_duty_cycle(level);
     }
 
     #[cfg(feature = "stm32h747i_disco")]
@@ -215,6 +214,38 @@ pub struct Stm32h747iDiscoInput<I2C, INT = ()> {
     touch: Ft5336<I2C>,
     int: Option<INT>,
     last: Option<(u16, u16)>,
+}
+
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// Initialize I2C4 on PD12/PD13 at 400 kHz for the FT5336 touch controller.
+pub fn init_touch_i2c(
+    i2c4: stm32h7xx_hal::pac::I2C4,
+    gpiod: stm32h7xx_hal::gpio::gpiod::Parts,
+    ccdr: &stm32h7xx_hal::rcc::Ccdr,
+) -> stm32h7xx_hal::i2c::I2c<
+    stm32h7xx_hal::pac::I2C4,
+    (
+        stm32h7xx_hal::gpio::gpiod::PD12<
+            stm32h7xx_hal::gpio::Alternate<4, stm32h7xx_hal::gpio::OpenDrain>,
+        >,
+        stm32h7xx_hal::gpio::gpiod::PD13<
+            stm32h7xx_hal::gpio::Alternate<4, stm32h7xx_hal::gpio::OpenDrain>,
+        >,
+    ),
+> {
+    use stm32h7xx_hal::prelude::*;
+    let scl = gpiod.pd12.into_alternate_open_drain();
+    let sda = gpiod.pd13.into_alternate_open_drain();
+    stm32h7xx_hal::i2c::I2c::i2c4(
+        i2c4,
+        (scl, sda),
+        400.kHz(),
+        ccdr.peripheral.I2C4,
+        &ccdr.clocks,
+    )
 }
 
 #[cfg(feature = "stm32h747i_disco")]
