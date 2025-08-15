@@ -12,6 +12,7 @@ extern crate alloc;
 use core::ptr::addr_of_mut;
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
+#[cfg(target_os = "none")]
 use panic_halt as _;
 use rlvgl::platform::stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
 
