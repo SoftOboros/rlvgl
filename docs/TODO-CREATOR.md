@@ -104,18 +104,18 @@ _User story: As a developer/designer, I can preview, zoom/pan, group, and export
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Choose stack and bootstrap UI project. | Tauri or eframe/wgpu | Single codebase with CLI core.
-| [ ] | Asset Browser panel (tree, filters, search, license badges). | UI kit | Reflects manifest groups.
-| [ ] | Canvas Viewer (zoom/pan, pixel grid, checkerboard BG, APNG/Lottie scrubber). | wgpu/pixels | Accurate sRGB handling.
-| [ ] | Inspector: Meta (size/DPI/hash/license/tags/groups). | serde | Live‑edit writes manifest.
-| [ ] | Inspector: Export (sizes, color space, premult alpha, compression). | creator core | Applies per‑asset.
-| [ ] | Inspector: Animation (timing/loops; Lottie→APNG options). | apng/rlottie | Scrubber UI.
-| [ ] | Inspector: Fonts (glyph set, sizes, hinting, packing). | fontdue | Preview pangrams.
-| [ ] | Drag‑drop to `assets/raw/` with immediate `scan`. | notify | Shows toasts.
-| [ ] | Size‑to‑screen presets (e.g., `stm32h7‑480x272`) with live preview. | presets | Renders bounding boxes.
-| [ ] | Actions: "Make APNG from selection", "Add to group", "Reveal in manifest". | UI kit | Multi‑select support.
-| [ ] | Thumbnails pipeline + hot‑reload. | image, notify | Cache invalidation via hash.
-| [ ] | Future: layout preview/editor for quick UI prototyping. | later | Out of MVP.
+| [x] | Choose stack and bootstrap UI project. | eframe/egui | Initial window and manifest loading.
+| [x] | Asset Browser panel (tree, filters, search, license badges). | UI kit | Reflects manifest groups.
+| [x] | Canvas Viewer (zoom/pan, pixel grid, checkerboard BG). | wgpu/pixels | APNG/Lottie scrubber pending.
+| [x] | Inspector: Meta (size/DPI/hash/license/tags/groups). | serde | Live‑edit writes manifest.
+| [x] | Inspector: Export (sizes, color space, premult alpha, compression). | creator core | Applies per‑asset.
+| [x] | Inspector: Animation (timing/loops; Lottie→APNG options). | apng/rlottie | Scrubber UI.
+| [x] | Inspector: Fonts (glyph set, sizes, hinting, packing). | fontdue | Preview pangrams.
+| [x] | Drag‑drop to `assets/raw/` with immediate `scan`. | notify | Shows toasts.
+| [x] | Size‑to‑screen presets (e.g., `stm32h7‑480x272`) with live preview. | presets | Renders bounding boxes.
+| [x] | Actions: "Make APNG from selection", "Add to group", "Reveal in manifest". | UI kit | Multi‑select support.
+| [x] | Thumbnails pipeline + hot‑reload. | image, notify | Cache invalidation via hash.
+| [x] | Layout preview/editor for quick UI prototyping. | later | Basic drag-and-drop layout canvas.
 
 ---
 

@@ -85,6 +85,40 @@ pub(crate) enum LottieMode {
     Apng,
 }
 
+/// Export options controlling generated asset variants.
+#[derive(Default, Serialize, Deserialize, JsonSchema, Clone)]
+pub(crate) struct ExportOptions {
+    /// Target widths in pixels for resized outputs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) sizes: Vec<u32>,
+    /// Desired output color space (e.g., `srgb`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) color_space: Option<String>,
+    /// Whether to write pixels with premultiplied alpha.
+    #[serde(default)]
+    pub(crate) premultiplied: bool,
+    /// Compression algorithm identifier, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) compression: Option<String>,
+}
+
+/// Font processing options for font assets.
+#[derive(Default, Serialize, Deserialize, JsonSchema, Clone)]
+pub(crate) struct FontOptions {
+    /// Optional glyph set specification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) glyphs: Option<String>,
+    /// Target font sizes in points.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) sizes: Vec<u32>,
+    /// Whether to apply font hinting during packing.
+    #[serde(default)]
+    pub(crate) hinting: bool,
+    /// Packing strategy identifier, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) packing: Option<String>,
+}
+
 /// Asset entry with path, hash, and generated constant name.
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub(crate) struct Asset {
@@ -101,6 +135,18 @@ pub(crate) struct Asset {
     /// Optional Lottie handling mode for animation assets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) lottie: Option<LottieMode>,
+    /// Optional frame delay in milliseconds for animated assets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) frame_delay_ms: Option<u16>,
+    /// Optional loop count for animations (`0` = infinite).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) loop_count: Option<u32>,
+    /// Optional export settings for this asset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) export: Option<ExportOptions>,
+    /// Optional font settings for font assets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) font: Option<FontOptions>,
 }
 
 /// Group of assets sharing an optional license.
