@@ -2,6 +2,12 @@
 #![deny(missing_docs)]
 
 //! Shared API definitions for rlvgl bindings.
+//!
+//! This crate is feature-flagged for multiple environments:
+//! - `micropython`
+//! - `cpython`
+//! - `cm4`
+//! - `sim`
 
 /// Z-index for stacking nodes.
 pub type ZIndex = i16;

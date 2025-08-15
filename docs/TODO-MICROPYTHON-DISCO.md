@@ -80,7 +80,7 @@
 | ✓   | Description                       | Dependencies                 | Notes                                              |
 | --- | --------------------------------- | ---------------------------- | -------------------------------------------------- |
 | [x] | Define public API structs (C‑ABI) | Rust `#[repr(C)]`            | `InputEvent`, `NodeSpec` minimal first             |
-| [ ] | Rust FFI functions                | `extern "C"`                 | `mp_rlvgl_notify_input`, `mp_rlvgl_stack_add`, ... |
+| [x] | Rust FFI functions                | `extern "C"`                 | `mp_rlvgl_notify_input`, `mp_rlvgl_stack_add`, ... |
 | [ ] | MicroPython module table + stubs  | `mp_obj_module_t`            | Small C wrapper that forwards to Rust              |
 | [ ] | Build system glue                 | MP `ports/stm32` makefiles   | Add Rust static lib + link flags                   |
 | [ ] | Error mapping                     | status→`mp_raise_ValueError` | Never let Rust panic across ABI                    |
@@ -116,7 +116,7 @@ ui.present()
 | ✓   | Description                                           | Dependencies                | Notes                                     |
 | --- | ----------------------------------------------------- | --------------------------- | ----------------------------------------- |
 | [x] | Create `rlvgl_api` crate with `no_std` core types     | `serde` (optional), `alloc` | `InputEvent`, `NodeSpec`, `ZIndex`        |
-| [ ] | Feature flags: `micropython`, `cpython`, `cm4`, `sim` | Cargo features              | Guard per‑env specifics                   |
+| [x] | Feature flags: `micropython`, `cpython`, `cm4`, `sim` | Cargo features              | Guard per‑env specifics                   |
 | [ ] | Stability & versioning                                | SemVer                      | This is the top‑level API for both worlds |
 
 ---

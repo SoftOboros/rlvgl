@@ -12,3 +12,9 @@ path = "src/lib.rs"
 [features]
 default = []
 
+# Target environment feature flags
+micropython = []
+cpython = []
+cm4 = []
+sim = []
+
