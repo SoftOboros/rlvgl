@@ -15,13 +15,21 @@ pub mod display;
 pub mod dma2d;
 /// Input device abstractions.
 pub mod input;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod otm8009a;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
 #[cfg(feature = "simulator")]
 pub mod simulator;
 #[cfg(feature = "st7789")]
 pub mod st7789;
-#[cfg(feature = "stm32h747i_disco")]
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 pub mod stm32h747i_disco;
 
 pub use blit::{
@@ -37,5 +45,8 @@ pub use pixels_renderer::PixelsRenderer;
 pub use simulator::PixelsDisplay;
 #[cfg(feature = "st7789")]
 pub use st7789::St7789Display;
-#[cfg(feature = "stm32h747i_disco")]
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};

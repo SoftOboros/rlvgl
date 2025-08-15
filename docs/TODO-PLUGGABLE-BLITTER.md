@@ -44,13 +44,13 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Bring‑up clocks for LTDC/DSI (RCC config) | `stm32h7xx-hal` (RCC) | Match panel timing. |
-| [ ] | SDRAM (FMC) if FB in external RAM | HAL FMC or PAC | AXI SRAM ok for small tests. |
-| [ ] | DSI host + OTM8009A init sequence (video mode) | PAC | Port from C BSP; factor `otm8009a.rs`. |
-| [ ] | LTDC layer setup (FB addr, stride, fmt) | PAC | Start RGB565 FB to save RAM. |
-| [ ] | Backlight PWM + panel RESET GPIO | HAL TIM/GPIO | Optional TE line for vsync. |
-| [ ] | `Stm32h747iDiscoDisplay<B: Blitter>` glue | sections A/C | Compose selected blitter. |
-| [ ] | Feature flag: `stm32h747i_disco` | Cargo features | Gate no‑std deps/panic handler. |
+| [x] | Bring‑up clocks for LTDC/DSI (RCC config) | `stm32h7xx-hal` (RCC) | Match panel timing. |
+| [x] | SDRAM (FMC) if FB in external RAM | HAL FMC or PAC | AXI SRAM ok for small tests. |
+| [x] | DSI host + OTM8009A init sequence (video mode) | PAC | Port from C BSP; factor `otm8009a.rs`. |
+| [x] | LTDC layer setup (FB addr, stride, fmt) | PAC | Start RGB565 FB to save RAM. |
+| [x] | Backlight PWM + panel RESET GPIO | HAL TIM/GPIO | Optional TE line for vsync. |
+| [x] | `Stm32h747iDiscoDisplay<B: Blitter>` glue | sections A/C | Compose selected blitter. |
+| [x] | Feature flag: `stm32h747i_disco` | Cargo features | Gate no‑std deps/panic handler. |
 
 ---
 
