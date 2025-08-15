@@ -11,6 +11,8 @@ extern crate std;
 pub mod blit;
 /// Display driver traits and implementations.
 pub mod display;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+pub mod dma2d;
 /// Input device abstractions.
 pub mod input;
 #[cfg(feature = "simulator")]
@@ -26,6 +28,8 @@ pub use blit::{
     BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
 };
 pub use display::DisplayDriver;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+pub use dma2d::Dma2dBlitter;
 pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;

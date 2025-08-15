@@ -30,9 +30,9 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Create `Dma2dBlitter` with PAC register access | `stm32h7` PAC, `cortex-m` | HAL lacks full DMA2D; use PAC. |
-| [ ] | Init: clock, fore/back layer config, line offset | PAC | Keep safe wrapper; no `unsafe` in API. |
-| [ ] | Implement R2M (fill) | PAC | Blocking first; add IRQ later. |
+| [x] | Create `Dma2dBlitter` with PAC register access | `stm32h7` PAC, `cortex-m` | HAL lacks full DMA2D; use PAC. |
+| [x] | Init: clock, fore/back layer config, line offset | PAC | Keep safe wrapper; no `unsafe` in API. |
+| [x] | Implement R2M (fill) | PAC | Blocking first; add IRQ later. |
 | [ ] | Implement M2M/PFC (copy + convert) | PAC | Common ARGB8888→RGB565 path. |
 | [ ] | Implement M2M blend (FG over BG, const/per‑pixel alpha) | PAC | Straight‑alpha assumption; doc it. |
 | [ ] | Optional: non‑blocking w/ interrupt/completion | EXTI/IRQ | Queue ops; fence before VSYNC. |
