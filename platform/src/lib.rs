@@ -7,6 +7,8 @@ extern crate alloc;
 #[cfg(feature = "simulator")]
 extern crate std;
 
+/// Blitter traits and helpers.
+pub mod blit;
 /// Display driver traits and implementations.
 pub mod display;
 /// Input device abstractions.
@@ -20,6 +22,9 @@ pub mod st7789;
 #[cfg(feature = "stm32h747i_disco")]
 pub mod stm32h747i_disco;
 
+pub use blit::{
+    BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
+};
 pub use display::DisplayDriver;
 pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]

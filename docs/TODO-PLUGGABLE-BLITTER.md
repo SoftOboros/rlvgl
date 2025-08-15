@@ -5,14 +5,14 @@
 
 ---
 
-## A) Blitter Abstraction (core/support)
+## A) Blitter Abstraction (platform)
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Define `Blitter` trait: `caps()`, `fill()`, `blit()`, `blend()`, PFC support | `bitflags` (caps) | Keep rect+surface types in `support/graphics`. |
-| [ ] | Add `Surface` (buf/stride/fmt/w,h) + `PixelFmt` enum | none | Include ARGB8888, RGB565, L8/A8/A4. |
-| [ ] | Add `BlitPlanner` to batch dirty rects per frame | none | Optional: coalesce touching rects. |
-| [ ] | Thread through renderer → blitter (no API leak to widgets) | core renderer | Renderer owns a `&mut dyn Blitter`. |
+| [x] | Define `Blitter` trait: `caps()`, `fill()`, `blit()`, `blend()`, PFC support | `bitflags` (caps) | Rect + surface types live in `platform::blit`. |
+| [x] | Add `Surface` (buf/stride/fmt/w,h) + `PixelFmt` enum | none | Include ARGB8888, RGB565, L8/A8/A4. |
+| [x] | Add `BlitPlanner` to batch dirty rects per frame | none | Optional: coalesce touching rects. |
+| [x] | Thread through renderer → blitter (no API leak to widgets) | platform renderer | Renderer owns a `&mut dyn Blitter`. |
 
 ---
 

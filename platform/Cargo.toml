@@ -22,6 +22,8 @@ pixels = { version = "0.15", optional = true }
 winit = { version = "0.30.12", optional = true }
 eframe = { version = "0.27", default-features = false, features = ["glow"], optional = true }
 embedded-graphics = { version = "0.8", optional = true }
+bitflags = { version = "2", default-features = false }
+heapless = { version = "0.8", default-features = false }
 
 [features]
 default = []
