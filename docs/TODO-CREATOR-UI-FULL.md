@@ -21,8 +21,7 @@ This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to 
 - [x] Expose font packer UI for size and character set; root path,
       size, and glyphs are configurable.
 - [x] Integrate Lottie importer (in-process and external CLI paths).
-- [ ] Add SVG renderer dialog with configurable DPI list and threshold (currently
-      fixed to 96 DPI with no threshold control).
+ - [x] Add SVG renderer dialog with configurable DPI list and threshold; both settings are user-configurable before rendering.
 
 ## Asset Browser
 - [ ] Replace flat list with hierarchical tree reflecting `assets/raw` (current view

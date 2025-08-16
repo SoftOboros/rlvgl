@@ -169,6 +169,16 @@ struct CreatorApp {
     fonts_pack_chars: String,
     /// Whether the font packer dialog is open.
     fonts_pack_open: bool,
+    /// Source SVG file path for rendering.
+    svg_input: String,
+    /// Output directory for rendered images.
+    svg_out_dir: String,
+    /// Comma-separated list of DPI values for rendering.
+    svg_dpis: String,
+    /// Monochrome threshold for rendering (0-255).
+    svg_threshold: String,
+    /// Whether the SVG renderer dialog is open.
+    svg_open: bool,
     filter: String,
     show_unlicensed_only: bool,
     groups: Vec<GroupEntry>,
@@ -384,6 +394,11 @@ impl CreatorApp {
             fonts_pack_chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
                 .to_string(),
             fonts_pack_open: false,
+            svg_input: String::new(),
+            svg_out_dir: String::new(),
+            svg_dpis: "96".to_string(),
+            svg_threshold: String::new(),
+            svg_open: false,
             filter: String::new(),
             show_unlicensed_only: false,
             groups,
@@ -971,12 +986,7 @@ impl CreatorApp {
 
     /// Handle the `svg` CLI command.
     fn handle_svg(&mut self) {
-        if let Some(svg_path) = FileDialog::new().add_filter("svg", &["svg"]).pick_file() {
-            if let Some(out) = FileDialog::new().pick_folder() {
-                let res = svg::run(&svg_path, &out, &[96.0], None);
-                self.show_feedback("Svg", res);
-            }
-        }
+        self.svg_open = true;
     }
 }
 
@@ -1406,6 +1416,60 @@ impl App for CreatorApp {
                     }
                 });
             self.fonts_pack_open = open;
+        }
+
+        if self.svg_open {
+            let mut open = self.svg_open;
+            egui::Window::new("Svg").open(&mut open).show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Input:");
+                    ui.text_edit_singleline(&mut self.svg_input);
+                    if ui.button("...").clicked() {
+                        if let Some(path) =
+                            FileDialog::new().add_filter("svg", &["svg"]).pick_file()
+                        {
+                            self.svg_input = path.display().to_string();
+                        }
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Output:");
+                    ui.text_edit_singleline(&mut self.svg_out_dir);
+                    if ui.button("...").clicked() {
+                        if let Some(path) = FileDialog::new().pick_folder() {
+                            self.svg_out_dir = path.display().to_string();
+                        }
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("DPIs:");
+                    ui.text_edit_singleline(&mut self.svg_dpis);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    ui.text_edit_singleline(&mut self.svg_threshold);
+                });
+                if ui.button("Render").clicked() {
+                    let dpis: Vec<f32> = self
+                        .svg_dpis
+                        .split(',')
+                        .filter_map(|s| s.trim().parse().ok())
+                        .collect();
+                    let threshold = if self.svg_threshold.trim().is_empty() {
+                        None
+                    } else {
+                        self.svg_threshold.trim().parse().ok()
+                    };
+                    let res = svg::run(
+                        Path::new(&self.svg_input),
+                        Path::new(&self.svg_out_dir),
+                        &dpis,
+                        threshold,
+                    );
+                    self.show_feedback("Svg", res);
+                }
+            });
+            self.svg_open = open;
         }
 
         if self.layout_open {
