@@ -126,7 +126,8 @@ fn main() {
         return;
     }
 
-    WgpuDisplay::new(width, height).run(frame_cb, {
+    flush_pending(&root, &pending, &to_remove);
+    WgpuDisplay::new(WIDTH, HEIGHT).run(frame_cb, {
         let root = root.clone();
         let pending = pending.clone();
         let to_remove = to_remove.clone();
