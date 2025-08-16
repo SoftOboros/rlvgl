@@ -251,11 +251,12 @@ impl WgpuDisplay {
     /// Run the simulator event loop.
     ///
     /// `frame_callback` is invoked whenever the window needs to be redrawn,
-    /// providing mutable access to the RGBA pixel buffer. `event_callback`
-    /// receives input events converted from the underlying `winit` window.
+    /// providing mutable access to the RGBA pixel buffer along with the current
+    /// framebuffer width and height. `event_callback` receives input events
+    /// converted from the underlying `winit` window.
     pub fn run(
         self,
-        mut frame_callback: impl FnMut(&mut [u8]) + 'static,
+        mut frame_callback: impl FnMut(&mut [u8], usize, usize) + 'static,
         mut event_callback: impl FnMut(InputEvent) + 'static,
     ) {
         let WgpuDisplay {
@@ -320,7 +321,9 @@ impl WgpuDisplay {
                     event: WindowEvent::RedrawRequested,
                     ..
                 } => {
-                    frame_callback(state.frame_mut());
+                    let w = state.config.width as usize;
+                    let h = state.config.height as usize;
+                    frame_callback(state.frame_mut(), w, h);
                     state.render();
                 }
                 Event::WindowEvent {
