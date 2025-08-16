@@ -18,8 +18,8 @@ This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to 
 - [x] Expand APNG builder to allow setting delay and loop count; frames directory,
       output path, delay, and loops are configurable.
 - [x] Add manifest schema export option running `schema::run()`.
-- [ ] Expose font packer UI for size and character set; root path selection is
-      supported but size defaults to 32 px and glyphs to alphanumeric ASCII.
+- [x] Expose font packer UI for size and character set; root path,
+      size, and glyphs are configurable.
 - [x] Integrate Lottie importer (in-process and external CLI paths).
 - [ ] Add SVG renderer dialog with configurable DPI list and threshold (currently
       fixed to 96 DPI with no threshold control).

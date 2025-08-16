@@ -161,6 +161,14 @@ struct CreatorApp {
     apng_delay_ms: String,
     /// APNG loop count for the builder (0 = infinite).
     apng_loops: String,
+    /// Root directory for font packing.
+    fonts_pack_root: String,
+    /// Font size for packing.
+    fonts_pack_size: String,
+    /// Character set for packing.
+    fonts_pack_chars: String,
+    /// Whether the font packer dialog is open.
+    fonts_pack_open: bool,
     filter: String,
     show_unlicensed_only: bool,
     groups: Vec<GroupEntry>,
@@ -371,6 +379,11 @@ impl CreatorApp {
             new_group: String::new(),
             apng_delay_ms: "100".to_string(),
             apng_loops: "0".to_string(),
+            fonts_pack_root: String::new(),
+            fonts_pack_size: "32".to_string(),
+            fonts_pack_chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                .to_string(),
+            fonts_pack_open: false,
             filter: String::new(),
             show_unlicensed_only: false,
             groups,
@@ -881,15 +894,7 @@ impl CreatorApp {
 
     /// Handle the `fonts pack` CLI command.
     fn handle_fonts_pack(&mut self) {
-        if let Some(root) = FileDialog::new().pick_folder() {
-            let res = fonts::pack(
-                &root,
-                Path::new(&self.manifest_path),
-                32.0,
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-            );
-            self.show_feedback("Fonts Pack", res);
-        }
+        self.fonts_pack_open = true;
     }
 
     /// Handle the `lottie import` CLI command.
@@ -1313,6 +1318,42 @@ impl App for CreatorApp {
                 ui.label("Select an asset");
             }
         });
+
+        if self.fonts_pack_open {
+            let mut open = self.fonts_pack_open;
+            egui::Window::new("Fonts Pack")
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Root:");
+                        ui.text_edit_singleline(&mut self.fonts_pack_root);
+                        if ui.button("...").clicked() {
+                            if let Some(path) = FileDialog::new().pick_folder() {
+                                self.fonts_pack_root = path.display().to_string();
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Size:");
+                        ui.text_edit_singleline(&mut self.fonts_pack_size);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Chars:");
+                        ui.text_edit_singleline(&mut self.fonts_pack_chars);
+                    });
+                    if ui.button("Pack").clicked() {
+                        let size = self.fonts_pack_size.trim().parse().unwrap_or(32.0);
+                        let res = fonts::pack(
+                            Path::new(&self.fonts_pack_root),
+                            Path::new(&self.manifest_path),
+                            size,
+                            &self.fonts_pack_chars,
+                        );
+                        self.show_feedback("Fonts Pack", res);
+                    }
+                });
+            self.fonts_pack_open = open;
+        }
 
         if self.layout_open {
             let mut open = self.layout_open;
