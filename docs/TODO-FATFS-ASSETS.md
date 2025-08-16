@@ -93,7 +93,7 @@ impl<S: AssetSource> AssetManager<S> {
 
 | ✓   | Description                    | Dependencies | Notes                                                                     |
 | --- | ------------------------------ | ------------ | ------------------------------------------------------------------------- |
-| [ ] | Pin/clock config in CubeMX     | CubeMX       | SDMMC1 4-bit wide, proper GPIO AF                                         |
+| [x] | Pin/clock config in CubeMX     | CubeMX       | SDMMC1 4-bit wide, proper GPIO AF                                         |
 | [x] | `DCache` strategy              | cortex-m     | Use non-cacheable region for DMA buffers or clean/invalidate around xfers |
 | [x] | Implement `DiscoSdBlockDevice` | HAL + LL     | Init card, read\_multi, write\_multi, block size=512                      |
 | [ ] | DMA double-buffering           | HAL DMA      | Optimize sequential reads                                                 |
