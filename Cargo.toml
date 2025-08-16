@@ -170,6 +170,10 @@ optional = true
 version = "6"
 optional = true
 
+[dependencies.rfd]
+version = "0.15"
+optional = true
+
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
@@ -229,6 +233,7 @@ creator_ui = [
     "dep:png",
     "dep:open",
     "dep:notify",
+    "dep:rfd",
 ]
 
 [profile.release]
