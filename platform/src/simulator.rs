@@ -266,6 +266,10 @@ impl WgpuDisplay {
             mut state,
         } = self;
         event_loop.set_control_flow(ControlFlow::Poll);
+        // Request an initial redraw so the window displays its first frame
+        // immediately on creation. Without this, some platforms may present
+        // a blank window until the next event triggers a redraw.
+        window.request_redraw();
 
         let mut pointer_pos = (0i32, 0i32);
         let mut pointer_down = false;
