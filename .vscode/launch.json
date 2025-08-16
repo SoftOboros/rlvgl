@@ -21,7 +21,7 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "cargo": {
-        "args": ["build", "--bin=rlvgl-creator", "--all-features", "--target=x86_64-apple-darwin"]
+        "args": ["build", "--bin=rlvgl-creator", "--features=creator,creator_ui", "--target=x86_64-apple-darwin"]
       },
       "sourceLanguages": ["rust"]
     },

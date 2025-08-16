@@ -37,8 +37,8 @@ path = "examples/stm32h747i-disco/src/main.rs"
 required-features = ["stm32h747i_disco"]
 
 [[bin]]
-name = "rlgvl-creator"
-path = "src/bin/rlgvl_creator/main.rs"
+name = "rlvgl-creator"
+path = "src/bin/rlvgl_creator/main.rs"
 required-features = ["creator", "creator_ui"]
 
 [dependencies]
@@ -230,11 +230,6 @@ creator_ui = [
     "dep:open",
     "dep:notify",
 ]
-
-[dev-dependencies]
-insta = "1"
-tempfile = "3"
-panic-halt = "1.0.0"
 
 [profile.release]
 opt-level = "z"
