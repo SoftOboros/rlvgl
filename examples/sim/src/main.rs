@@ -2,7 +2,7 @@
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
 use common_demo::{build_demo, flush_pending};
-use rlvgl::platform::{InputEvent, PixelsDisplay, PixelsRenderer};
+use rlvgl::platform::{InputEvent, PixelsRenderer, WgpuDisplay};
 
 const WIDTH: usize = 320;
 const HEIGHT: usize = 240;
@@ -13,7 +13,7 @@ fn main() {
     let pending = demo.pending.clone();
     let to_remove = demo.to_remove.clone();
 
-    PixelsDisplay::new(WIDTH, HEIGHT).run(
+    WgpuDisplay::new(WIDTH, HEIGHT).run(
         {
             let root = root.clone();
             move |frame| {

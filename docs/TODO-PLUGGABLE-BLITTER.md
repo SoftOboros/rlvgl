@@ -69,7 +69,7 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Replace/minimize `pixels/minifb` usage | `winit`, `wgpu` | "wine" was likely "winit"; we’ll use `winit` window + `wgpu` swapchain. |
+| [x] | Replace/minimize `pixels/minifb` usage | `winit`, `wgpu` | `winit` window + `wgpu` swapchain. |
 | [ ] | `WgpuBlitter` implementing `Blitter` | `wgpu` | Use render pass + textured quads or compute. |
 | [ ] | Upload tile/rect to texture; blit/blend in shader | `wgpu` | Match CPU/DMA2D semantics. |
 | [ ] | Present @ vsync; map keyboard/mouse → `InputDevice` | `winit` | DPI scaling; sRGB swapchain. |

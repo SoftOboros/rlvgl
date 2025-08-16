@@ -52,7 +52,7 @@ pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
 #[cfg(feature = "simulator")]
-pub use simulator::PixelsDisplay;
+pub use simulator::WgpuDisplay;
 #[cfg(feature = "st7789")]
 pub use st7789::St7789Display;
 #[cfg(all(

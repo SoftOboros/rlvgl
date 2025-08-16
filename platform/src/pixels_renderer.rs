@@ -1,7 +1,7 @@
 //! Renderer for drawing rlvgl widgets into a pixel buffer.
 //!
 //! This helper is used by the desktop simulator to flush the widget tree into
-//! the `pixels` frame buffer while providing optional text rendering via the
+//! an RGBA frame buffer while providing optional text rendering via the
 //! `fontdue` plugin.
 
 use embedded_graphics::{Pixel, pixelcolor::Rgb888, prelude::*};
