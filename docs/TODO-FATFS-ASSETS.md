@@ -25,7 +25,7 @@
 | [x] | Add `fs` feature to `rlvgl/core`                | `alloc`                | All FS code behind feature flag     |
 | [x] | FS traits (`BlockDevice`, `FsError`) in core     | —                     | Moved from standalone crate        |
 | [x] | New crate: `rlvgl-fs-sim` (std)                 | `fatfs`, `std`         | Simulator: file-backed block device |
-| [ ] | Platform module: `platform/stm32h747i_disco_sd` | HAL + DMA              | SDMMC + DMA + cache maintenance     |
+| [x] | Platform module: `platform/stm32h747i_disco_sd` | HAL + DMA              | SDMMC + DMA + cache maintenance     |
 
 > **FAT impl choice:** Prefer the Rust `fatfs` crate in `no_std` mode for consistent API across targets. `embedded-sdmmc` is an alternative; keep the abstraction thin so either can slot in later.
 
@@ -94,8 +94,8 @@ impl<S: AssetSource> AssetManager<S> {
 | ✓   | Description                    | Dependencies | Notes                                                                     |
 | --- | ------------------------------ | ------------ | ------------------------------------------------------------------------- |
 | [ ] | Pin/clock config in CubeMX     | CubeMX       | SDMMC1 4-bit wide, proper GPIO AF                                         |
-| [ ] | `DCache` strategy              | cortex-m     | Use non-cacheable region for DMA buffers or clean/invalidate around xfers |
-| [ ] | Implement `DiscoSdBlockDevice` | HAL + LL     | Init card, read\_multi, write\_multi, block size=512                      |
+| [x] | `DCache` strategy              | cortex-m     | Use non-cacheable region for DMA buffers or clean/invalidate around xfers |
+| [x] | Implement `DiscoSdBlockDevice` | HAL + LL     | Init card, read\_multi, write\_multi, block size=512                      |
 | [ ] | DMA double-buffering           | HAL DMA      | Optimize sequential reads                                                 |
 | [ ] | Mount FAT volume               | `fatfs`      | Provide `TimeProvider` (if required)                                      |
 | [ ] | Long runner test               | on-device    | Stream read assets for minutes; check CRC/errors                          |

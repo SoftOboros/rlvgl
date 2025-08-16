@@ -26,11 +26,13 @@ bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 [target.'cfg(any(target_arch = "arm", target_arch = "aarch64"))'.dependencies]
 stm32h7 = { version = "0.16", optional = true, features = ["stm32h747cm7", "rt"] }
+stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc"] }
+cortex-m = { version = "0.7", optional = true, features = ["critical-section-single-core", "cm7"] }
 
 [features]
 default = []
 simulator = ["pixels", "winit", "embedded-graphics", "eframe"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
-stm32h747i_disco = ["stm32h7", "embedded-hal"]
+stm32h747i_disco = ["stm32h7", "embedded-hal", "stm32h7xx-hal", "cortex-m", "rlvgl-core/fs"]
 dma2d = ["stm32h7"]
 fontdue = ["rlvgl-core/fontdue"]
