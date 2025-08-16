@@ -58,10 +58,10 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | I²C init @ 400 kHz | `stm32h7xx-hal` I2C | Use board pins. |
-| [ ] | EXTI on INT line (optional) | HAL EXTI | Or poll in `poll()`. |
-| [ ] | Minimal FT5336 driver: read points | none | Convert to `Event` (down/move/up). |
-| [ ] | `Stm32h747iDiscoInput` integration | platform input | Coordinate flip/rotation config. |
+| [x] | I²C init @ 400 kHz | `stm32h7xx-hal` I2C | Use board pins. |
+| [x] | EXTI on INT line (optional) | HAL EXTI | Or poll in `poll()`. |
+| [x] | Minimal FT5336 driver: read points | none | Convert to `Event` (down/move/up). |
+| [x] | `Stm32h747iDiscoInput` integration | platform input | Coordinate flip/rotation config. |
 
 ---
 
@@ -69,11 +69,11 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Replace/minimize `pixels/minifb` usage | `winit`, `wgpu` | "wine" was likely "winit"; we’ll use `winit` window + `wgpu` swapchain. |
-| [ ] | `WgpuBlitter` implementing `Blitter` | `wgpu` | Use render pass + textured quads or compute. |
+| [x] | Replace/minimize `pixels/minifb` usage | `winit`, `wgpu` | `winit` window + `wgpu` swapchain. |
+| [x] | `WgpuBlitter` implementing `Blitter` | `wgpu` | Use render pass + textured quads or compute. |
 | [ ] | Upload tile/rect to texture; blit/blend in shader | `wgpu` | Match CPU/DMA2D semantics. |
-| [ ] | Present @ vsync; map keyboard/mouse → `InputDevice` | `winit` | DPI scaling; sRGB swapchain. |
-| [ ] | Headless mode to dump PNGs for CI | `image` | Golden‑image regression tests. |
+| [x] | Present @ vsync; map keyboard/mouse → `InputDevice` | `winit` | DPI scaling; sRGB swapchain. |
+| [x] | Headless mode to dump PNGs for CI | `image` | Golden‑image regression tests. |
 
 ---
 
