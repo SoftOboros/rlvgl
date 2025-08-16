@@ -17,6 +17,9 @@
   - `stack_clear()`
   - `present()` (optional frame boundary)
   - `stats()` (optional)
+- **Crate layout:** `rlvgl-micropython` is a universal crate. Board‑specific
+  adaptations, such as STM32H747I‑DISCO, live behind feature flags like
+  `stm32h747i_disco`.
 
 ---
 
@@ -76,11 +79,11 @@
 
 | ✓   | Description                       | Dependencies                 | Notes                                              |
 | --- | --------------------------------- | ---------------------------- | -------------------------------------------------- |
-| [ ] | Define public API structs (C‑ABI) | Rust `#[repr(C)]`            | `InputEvent`, `NodeSpec` minimal first             |
-| [ ] | Rust FFI functions                | `extern "C"`                 | `mp_rlvgl_notify_input`, `mp_rlvgl_stack_add`, ... |
-| [ ] | MicroPython module table + stubs  | `mp_obj_module_t`            | Small C wrapper that forwards to Rust              |
-| [ ] | Build system glue                 | MP `ports/stm32` makefiles   | Add Rust static lib + link flags                   |
-| [ ] | Error mapping                     | status→`mp_raise_ValueError` | Never let Rust panic across ABI                    |
+| [x] | Define public API structs (C‑ABI) | Rust `#[repr(C)]`            | `InputEvent`, `NodeSpec` minimal first             |
+| [x] | Rust FFI functions                | `extern "C"`                 | `mp_rlvgl_notify_input`, `mp_rlvgl_stack_add`, ... |
+| [x] | MicroPython module table + stubs  | `mp_obj_module_t`            | Small C wrapper that forwards to Rust              |
+| [x] | Build system glue                 | MP `ports/stm32` makefiles   | Add Rust static lib + link flags                   |
+| [x] | Error mapping                     | status→`mp_raise_ValueError` | Never let Rust panic across ABI                    |
 | [ ] | Basic smoke test from REPL        | MicroPython                  | Add/remove a solid‑color rect, call `present()`    |
 
 **Example Python (device):**
@@ -112,9 +115,9 @@ ui.present()
 
 | ✓   | Description                                           | Dependencies                | Notes                                     |
 | --- | ----------------------------------------------------- | --------------------------- | ----------------------------------------- |
-| [ ] | Create `rlvgl_api` crate with `no_std` core types     | `serde` (optional), `alloc` | `InputEvent`, `NodeSpec`, `ZIndex`        |
-| [ ] | Feature flags: `micropython`, `cpython`, `cm4`, `sim` | Cargo features              | Guard per‑env specifics                   |
-| [ ] | Stability & versioning                                | SemVer                      | This is the top‑level API for both worlds |
+| [x] | Create `rlvgl_api` crate with `no_std` core types     | `serde` (optional), `alloc` | `InputEvent`, `NodeSpec`, `ZIndex`        |
+| [x] | Feature flags: `micropython`, `cpython`, `cm4`, `sim` | Cargo features              | Guard per‑env specifics                   |
+| [x] | Stability & versioning                                | SemVer                      | Expose `ApiVersion` and `API_VERSION` constant |
 
 ---
 
@@ -122,10 +125,10 @@ ui.present()
 
 | ✓   | Description                       | Dependencies  | Notes                           |
 | --- | --------------------------------- | ------------- | ------------------------------- |
-| [ ] | `NodeSpec.kind = {rect, text}`    | rlvgl core    | v0 keeps it tiny                |
-| [ ] | `RectSpec {x,y,w,h,color}`        | —             | packed RGB565 or ARGB8888 token |
-| [ ] | `TextSpec {x,y,text,fg,bg}`       | font pipeline | monospace first                 |
-| [ ] | `InputEvent {kind, x?, y?, key?}` | —             | tap/move/key/scroll minimal     |
+| [x] | `NodeSpec.kind = {rect, text}`    | rlvgl core    | v0 keeps it tiny                |
+| [x] | `RectSpec {x,y,w,h,color}`        | —             | packed RGB565 or ARGB8888 token |
+| [x] | `TextSpec {x,y,text,fg,bg}`       | font pipeline | monospace first                 |
+| [x] | `InputEvent {kind, x?, y?, key?}` | —             | tap/move/key/scroll minimal     |
 
 ---
 

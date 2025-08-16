@@ -246,5 +246,5 @@ debug = true
 incremental = false
 
 [workspace]
-members = ["core", "platform", "widgets", "ui", "fs-sim"]
+members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim"]
 resolver = "2"
