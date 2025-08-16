@@ -1,4 +1,4 @@
-//! rlvgl-creator binary entry point.
+//! rlgvl-creator CLI module.
 //!
 //! Provides CLI utilities for managing rlvgl assets. Supports the `init`, `scan`, `check`,
 //! `vendor`, `convert`, `preview`, `add-target`, `sync`, `scaffold`, `apng`, `schema`, `fonts`,
@@ -12,32 +12,32 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand};
 
-mod add_target;
-mod apng;
-mod check;
-mod convert;
-mod fonts;
-mod init;
-mod lottie;
-mod manifest;
-mod preview;
-mod raw;
-mod scaffold;
-mod scan;
-mod schema;
-mod svg;
-mod sync;
-mod util;
-mod vendor;
+pub mod add_target;
+pub mod apng;
+pub mod check;
+pub mod convert;
+pub mod fonts;
+pub mod init;
+pub mod lottie;
+pub mod manifest;
+pub mod preview;
+pub mod raw;
+pub mod scaffold;
+pub mod scan;
+pub mod schema;
+pub mod svg;
+pub mod sync;
+pub mod util;
+pub mod vendor;
 
-/// CLI arguments for rlvgl-creator.
+/// CLI arguments for rlgvl-creator.
 #[derive(Parser)]
 #[command(
     author,
     version,
     about,
     long_about = None,
-    after_help = "Example:\n  rlvgl-creator scan assets/\n  rlvgl-creator --manifest custom.yml check assets/",
+    after_help = "Example:\n  rlgvl-creator scan assets/\n  rlgvl-creator --manifest custom.yml check assets/",
     arg_required_else_help = true
 )]
 struct Cli {
@@ -209,7 +209,8 @@ enum LottieCommand {
     },
 }
 
-fn main() -> Result<()> {
+/// Run the rlgvl-creator command-line interface.
+pub fn run() -> Result<()> {
     let cli = Cli::parse();
     if cli.verbose > 0 {
         eprintln!("Using manifest {}", cli.manifest.display());

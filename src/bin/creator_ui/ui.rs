@@ -1,5 +1,4 @@
-#![cfg(feature = "creator_ui")]
-//! rlvgl Creator UI entry point.
+//! rlgvl-creator UI module.
 //!
 //! Provides a desktop interface for browsing and previewing assets defined in
 //! an rlvgl manifest.
@@ -46,8 +45,8 @@ const SCREEN_PRESETS: &[ScreenPreset] = &[ScreenPreset {
     height: 272,
 }];
 
-/// Launch the Creator UI application.
-fn main() -> Result<()> {
+/// Launch the rlgvl-creator desktop interface.
+pub fn run() -> Result<()> {
     let manifest_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "manifest.yml".into());
@@ -57,7 +56,7 @@ fn main() -> Result<()> {
     let options = NativeOptions::default();
     let manifest_path_clone = manifest_path.clone();
     eframe::run_native(
-        "rlvgl Creator",
+        "rlgvl Creator",
         options,
         Box::new(move |_cc| Ok(Box::new(CreatorApp::new(manifest, manifest_path_clone)))),
     )
