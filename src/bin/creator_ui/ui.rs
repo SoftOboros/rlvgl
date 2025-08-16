@@ -7,27 +7,51 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File},
     path::{Path, PathBuf},
-    sync::mpsc::{Receiver, channel},
+    sync::mpsc::{channel, Receiver},
     time::{Duration, Instant},
 };
 
 use anyhow::Result;
 use blake3;
-use eframe::{App, NativeOptions, egui};
+use eframe::{egui, App, NativeOptions};
 use egui::{ColorImage, TextureHandle, Vec2};
 use image::{GenericImageView, ImageFormat};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use rfd::{FileDialog, MessageButtons, MessageDialog, MessageDialogResult};
 use serde_yaml::from_reader;
 
+#[path = "../creator/add_target.rs"]
+mod add_target;
 #[path = "../creator/apng.rs"]
 mod apng;
+#[path = "../creator/check.rs"]
+mod check;
+#[path = "../creator/convert.rs"]
+mod convert;
+#[path = "../creator/fonts.rs"]
+mod fonts;
+#[path = "../creator/init.rs"]
+mod init;
+#[path = "../creator/lottie.rs"]
+mod lottie;
 #[path = "../creator/manifest.rs"]
 mod manifest;
+#[path = "../creator/preview.rs"]
+mod preview;
+#[path = "../creator/scaffold.rs"]
+mod scaffold;
 #[path = "../creator/scan.rs"]
 mod scan;
+#[path = "../creator/schema.rs"]
+mod schema;
+#[path = "../creator/svg.rs"]
+mod svg;
+#[path = "../creator/sync.rs"]
+mod sync;
 #[path = "../creator/util.rs"]
 mod util;
+#[path = "../creator/vendor.rs"]
+mod vendor;
 
 /// Predefined screen size presets for overlaying bounding boxes.
 struct ScreenPreset {
@@ -682,6 +706,193 @@ impl CreatorApp {
     }
 }
 
+impl CreatorApp {
+    /// Display a modal message and toast based on the command result.
+    fn show_feedback(&mut self, title: &str, res: Result<()>) {
+        match res {
+            Ok(()) => {
+                MessageDialog::new()
+                    .set_title(title)
+                    .set_description("Success")
+                    .set_buttons(MessageButtons::Ok)
+                    .show();
+                self.toasts
+                    .push((format!("{} succeeded", title), Instant::now()));
+            }
+            Err(e) => {
+                MessageDialog::new()
+                    .set_title(title)
+                    .set_description(&e.to_string())
+                    .set_buttons(MessageButtons::Ok)
+                    .show();
+                self.toasts
+                    .push((format!("{} failed: {}", title, e), Instant::now()));
+            }
+        }
+    }
+
+    /// Handle the `init` CLI command.
+    fn handle_init(&mut self) {
+        let manifest = Path::new(&self.manifest_path);
+        let res = init::run(manifest);
+        self.show_feedback("Init", res);
+    }
+
+    /// Handle the `scan` CLI command.
+    fn handle_scan(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            let res = scan::run(&root, Path::new(&self.manifest_path));
+            self.show_feedback("Scan", res);
+        }
+    }
+
+    /// Handle the `check` CLI command.
+    fn handle_check(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            let fix = matches!(
+                MessageDialog::new()
+                    .set_title("Apply fixes?")
+                    .set_buttons(MessageButtons::YesNo)
+                    .show(),
+                MessageDialogResult::Yes
+            );
+            let res = check::run(&root, Path::new(&self.manifest_path), fix);
+            self.show_feedback("Check", res);
+        }
+    }
+
+    /// Handle the `vendor` CLI command.
+    fn handle_vendor(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            if let Some(out) = FileDialog::new().pick_folder() {
+                let res = vendor::run(&root, Path::new(&self.manifest_path), &out, &[], &[]);
+                self.show_feedback("Vendor", res);
+            }
+        }
+    }
+
+    /// Handle the `convert` CLI command.
+    fn handle_convert(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            let force = matches!(
+                MessageDialog::new()
+                    .set_title("Force rebuild?")
+                    .set_buttons(MessageButtons::YesNo)
+                    .show(),
+                MessageDialogResult::Yes
+            );
+            let res = convert::run(&root, Path::new(&self.manifest_path), force);
+            self.show_feedback("Convert", res);
+        }
+    }
+
+    /// Handle the `preview` CLI command.
+    fn handle_preview(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            let res = preview::run(&root, Path::new(&self.manifest_path));
+            self.show_feedback("Preview", res);
+        }
+    }
+
+    /// Handle the `add-target` CLI command.
+    fn handle_add_target(&mut self) {
+        if let Some(vendor_dir) = FileDialog::new().pick_folder() {
+            if let Some(name) = vendor_dir.file_name().and_then(|n| n.to_str()) {
+                let res = add_target::run(Path::new(&self.manifest_path), name, &vendor_dir);
+                self.show_feedback("AddTarget", res);
+            }
+        }
+    }
+
+    /// Handle the `sync` CLI command.
+    fn handle_sync(&mut self) {
+        if let Some(out) = FileDialog::new().pick_folder() {
+            let dry_run = matches!(
+                MessageDialog::new()
+                    .set_title("Dry run?")
+                    .set_buttons(MessageButtons::YesNo)
+                    .show(),
+                MessageDialogResult::Yes
+            );
+            let res = sync::run(Path::new(&self.manifest_path), &out, dry_run);
+            self.show_feedback("Sync", res);
+        }
+    }
+
+    /// Handle the `scaffold` CLI command.
+    fn handle_scaffold(&mut self) {
+        if let Some(path) = FileDialog::new().pick_folder() {
+            let res = scaffold::run(&path, Path::new(&self.manifest_path));
+            self.show_feedback("Scaffold", res);
+        }
+    }
+
+    /// Handle the `apng` CLI command.
+    fn handle_apng(&mut self) {
+        if let Some(frames) = FileDialog::new().pick_folder() {
+            if let Some(out) = FileDialog::new()
+                .add_filter("apng", &["png"])
+                .set_file_name("animation.png")
+                .save_file()
+            {
+                let res = apng::run(&frames, &out, 100, 0);
+                self.show_feedback("Apng", res);
+            }
+        }
+    }
+
+    /// Handle the `schema` CLI command.
+    fn handle_schema(&mut self) {
+        let res = schema::run();
+        self.show_feedback("Schema", res);
+    }
+
+    /// Handle the `fonts pack` CLI command.
+    fn handle_fonts_pack(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            let res = fonts::pack(
+                &root,
+                Path::new(&self.manifest_path),
+                32.0,
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+            );
+            self.show_feedback("Fonts Pack", res);
+        }
+    }
+
+    /// Handle the `lottie import` CLI command.
+    fn handle_lottie_import(&mut self) {
+        if let Some(json) = FileDialog::new().add_filter("json", &["json"]).pick_file() {
+            if let Some(out) = FileDialog::new().pick_folder() {
+                let res = lottie::import(&json, &out, None);
+                self.show_feedback("Lottie Import", res);
+            }
+        }
+    }
+
+    /// Handle the `lottie cli` command.
+    fn handle_lottie_cli(&mut self) {
+        if let Some(bin) = FileDialog::new().pick_file() {
+            if let Some(json) = FileDialog::new().add_filter("json", &["json"]).pick_file() {
+                if let Some(out) = FileDialog::new().pick_folder() {
+                    let res = lottie::import_cli(&bin, &json, &out, None);
+                    self.show_feedback("Lottie CLI", res);
+                }
+            }
+        }
+    }
+
+    /// Handle the `svg` CLI command.
+    fn handle_svg(&mut self) {
+        if let Some(svg_path) = FileDialog::new().add_filter("svg", &["svg"]).pick_file() {
+            if let Some(out) = FileDialog::new().pick_folder() {
+                let res = svg::run(&svg_path, &out, &[96.0], None);
+                self.show_feedback("Svg", res);
+            }
+        }
+    }
+}
+
 impl App for CreatorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_dropped_files(ctx);
@@ -704,9 +915,57 @@ impl App for CreatorApp {
         }
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            if ui.button("Layout Editor").clicked() {
-                self.layout_open = !self.layout_open;
-            }
+            egui::menu::bar(ui, |ui| {
+                if ui.button("Init").clicked() {
+                    self.handle_init();
+                }
+                if ui.button("Scan").clicked() {
+                    self.handle_scan();
+                }
+                if ui.button("Check").clicked() {
+                    self.handle_check();
+                }
+                if ui.button("Vendor").clicked() {
+                    self.handle_vendor();
+                }
+                if ui.button("Convert").clicked() {
+                    self.handle_convert();
+                }
+                if ui.button("Preview").clicked() {
+                    self.handle_preview();
+                }
+                if ui.button("AddTarget").clicked() {
+                    self.handle_add_target();
+                }
+                if ui.button("Sync").clicked() {
+                    self.handle_sync();
+                }
+                if ui.button("Scaffold").clicked() {
+                    self.handle_scaffold();
+                }
+                if ui.button("Apng").clicked() {
+                    self.handle_apng();
+                }
+                if ui.button("Schema").clicked() {
+                    self.handle_schema();
+                }
+                if ui.button("Fonts Pack").clicked() {
+                    self.handle_fonts_pack();
+                }
+                if ui.button("Lottie Import").clicked() {
+                    self.handle_lottie_import();
+                }
+                if ui.button("Lottie CLI").clicked() {
+                    self.handle_lottie_cli();
+                }
+                if ui.button("Svg").clicked() {
+                    self.handle_svg();
+                }
+                ui.separator();
+                if ui.button("Layout Editor").clicked() {
+                    self.layout_open = !self.layout_open;
+                }
+            });
         });
 
         egui::SidePanel::left("asset_browser").show(ctx, |ui| {
