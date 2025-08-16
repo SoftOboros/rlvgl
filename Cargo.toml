@@ -37,14 +37,9 @@ path = "examples/stm32h747i-disco/src/main.rs"
 required-features = ["stm32h747i_disco"]
 
 [[bin]]
-name = "rlvgl-creator"
-path = "src/bin/creator/main.rs"
-required-features = ["creator"]
-
-[[bin]]
-name = "rlvgl-creator-ui"
-path = "src/bin/creator_ui/main.rs"
-required-features = ["creator_ui"]
+name = "rlgvl-creator"
+path = "src/bin/rlgvl_creator/main.rs"
+required-features = ["creator", "creator_ui"]
 
 [dependencies]
 rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
@@ -178,6 +173,7 @@ optional = true
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
+panic-halt = "1.0.0"
 
 [features]
 default = []
