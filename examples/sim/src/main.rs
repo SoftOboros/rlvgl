@@ -122,7 +122,8 @@ fn main() {
         fs::write(path, ascii).expect("failed to write ASCII output");
     if let Some(path) = path {
         flush_pending(&root, &pending, &to_remove);
-        WgpuDisplay::headless(width, height, frame_cb, path).expect("PNG dump failed");
+        WgpuDisplay::headless(WIDTH, HEIGHT, |fb| frame_cb(fb, WIDTH, HEIGHT), path)
+            .expect("PNG dump failed");
         return;
     }
 
