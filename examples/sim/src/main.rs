@@ -120,6 +120,9 @@ fn main() {
         let ascii = dump_ascii_frame(&frame, WIDTH, HEIGHT);
         let path = Path::new(&path);
         fs::write(path, ascii).expect("failed to write ASCII output");
+        return;
+    }
+
     if let Some(path) = path {
         flush_pending(&root, &pending, &to_remove);
         WgpuDisplay::headless(WIDTH, HEIGHT, |fb| frame_cb(fb, WIDTH, HEIGHT), path)

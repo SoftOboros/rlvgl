@@ -7,13 +7,13 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File},
     path::{Path, PathBuf},
-    sync::mpsc::{channel, Receiver},
+    sync::mpsc::{Receiver, channel},
     time::{Duration, Instant},
 };
 
 use anyhow::Result;
 use blake3;
-use eframe::{egui, App, NativeOptions};
+use eframe::{App, NativeOptions, egui};
 use egui::{ColorImage, TextureHandle, Vec2};
 use image::{GenericImageView, ImageFormat};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
@@ -529,6 +529,30 @@ impl CreatorApp {
         self.layout_open = true;
     }
 
+    /// Delete selected assets from disk and manifest.
+    fn delete_selection(&mut self) {
+        if self.selection.is_empty() {
+            return;
+        }
+        let mut indices: Vec<usize> = self.selection.iter().copied().collect();
+        indices.sort_unstable_by(|a, b| b.cmp(a));
+        for idx in indices {
+            let asset = self.manifest.assets.remove(idx);
+            let path = self.raw_dir.join(&asset.path);
+            let _ = fs::remove_file(path);
+            for group in self.manifest.groups.values_mut() {
+                group.assets.retain(|p| p != &asset.path);
+            }
+            self.meta.remove(idx);
+            self.thumbnails.remove(idx);
+        }
+        self.selection.clear();
+        self.texture = None;
+        self.texture_idx = None;
+        self.rebuild_groups();
+        let _ = self.save_manifest();
+    }
+
     /// Open the manifest file in the system's default handler.
     fn reveal_in_manifest(&mut self) {
         if let Err(e) = open::that(&self.manifest_path) {
@@ -992,6 +1016,17 @@ impl App for CreatorApp {
                     }
                     if ui.button("Reveal in manifest").clicked() {
                         self.reveal_in_manifest();
+                    }
+                    if ui.button("Delete").clicked() {
+                        if matches!(
+                            MessageDialog::new()
+                                .set_title("Delete selected assets?")
+                                .set_buttons(MessageButtons::YesNo)
+                                .show(),
+                            MessageDialogResult::Yes
+                        ) {
+                            self.delete_selection();
+                        }
                     }
                 });
             }
