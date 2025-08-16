@@ -15,8 +15,8 @@ This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to 
 - [x] Implement `scaffold` UI to generate a dual-mode assets crate.
 
 ## Conversion & Export Tools
-- [ ] Expand APNG builder to allow setting delay and loop count; frames directory and
-      output path are selectable via dialogs but always use a 100 ms delay and single loop.
+- [x] Expand APNG builder to allow setting delay and loop count; frames directory,
+      output path, delay, and loops are configurable.
 - [x] Add manifest schema export option running `schema::run()`.
 - [ ] Expose font packer UI for size and character set; root path selection is
       supported but size defaults to 32 px and glyphs to alphanumeric ASCII.

@@ -157,6 +157,10 @@ struct CreatorApp {
     selection: BTreeSet<usize>,
     /// Temporary group name for adding selected assets.
     new_group: String,
+    /// APNG frame delay in milliseconds for the builder.
+    apng_delay_ms: String,
+    /// APNG loop count for the builder (0 = infinite).
+    apng_loops: String,
     filter: String,
     show_unlicensed_only: bool,
     groups: Vec<GroupEntry>,
@@ -365,6 +369,8 @@ impl CreatorApp {
             manifest_path,
             selection: BTreeSet::new(),
             new_group: String::new(),
+            apng_delay_ms: "100".to_string(),
+            apng_loops: "0".to_string(),
             filter: String::new(),
             show_unlicensed_only: false,
             groups,
@@ -489,7 +495,9 @@ impl CreatorApp {
             .parent()
             .ok_or_else(|| anyhow::anyhow!("no parent directory"))?;
         let out = dir.join("animation.apng");
-        apng::run(dir, &out, 100, 0)?;
+        let delay = self.apng_delay_ms.trim().parse().unwrap_or(100);
+        let loops = self.apng_loops.trim().parse().unwrap_or(0);
+        apng::run(dir, &out, delay, loops)?;
         self.toasts
             .push((format!("Built {}", out.display()), Instant::now()));
         Ok(())
@@ -1001,12 +1009,18 @@ impl App for CreatorApp {
             ui.checkbox(&mut self.show_unlicensed_only, "Unlicensed only");
             if !self.selection.is_empty() {
                 ui.horizontal(|ui| {
+                    ui.label("Delay (ms):");
+                    ui.text_edit_singleline(&mut self.apng_delay_ms);
+                    ui.label("Loops (0=inf):");
+                    ui.text_edit_singleline(&mut self.apng_loops);
                     if ui.button("Make APNG").clicked() {
                         if let Err(e) = self.make_apng_from_selection() {
                             self.toasts
                                 .push((format!("APNG failed: {}", e), Instant::now()));
                         }
                     }
+                });
+                ui.horizontal(|ui| {
                     ui.text_edit_singleline(&mut self.new_group);
                     if ui.button("Add to group").clicked() {
                         self.add_selection_to_group();
