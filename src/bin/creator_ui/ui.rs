@@ -157,10 +157,30 @@ struct CreatorApp {
     selection: BTreeSet<usize>,
     /// Temporary group name for adding selected assets.
     new_group: String,
+    /// APNG frame delay in milliseconds for the builder.
+    apng_delay_ms: String,
+    /// APNG loop count for the builder (0 = infinite).
+    apng_loops: String,
+    /// Root directory for font packing.
+    fonts_pack_root: String,
+    /// Font size for packing.
+    fonts_pack_size: String,
+    /// Character set for packing.
+    fonts_pack_chars: String,
+    /// Whether the font packer dialog is open.
+    fonts_pack_open: bool,
+    /// Source SVG file path for rendering.
+    svg_input: String,
+    /// Output directory for rendered images.
+    svg_out_dir: String,
+    /// Comma-separated list of DPI values for rendering.
+    svg_dpis: String,
+    /// Monochrome threshold for rendering (0-255).
+    svg_threshold: String,
+    /// Whether the SVG renderer dialog is open.
+    svg_open: bool,
     filter: String,
     show_unlicensed_only: bool,
-    groups: Vec<GroupEntry>,
-    ungrouped: Vec<usize>,
     meta: Vec<AssetMeta>,
     texture: Option<TextureHandle>,
     texture_idx: Option<usize>,
@@ -185,11 +205,12 @@ struct CreatorApp {
     /// Items placed in the layout editor.
     layout_items: Vec<LayoutItem>,
 }
-
-/// Group entry mapping asset indices.
-#[derive(Clone)]
-struct GroupEntry {
-    name: String,
+/// Node within the asset directory tree.
+#[derive(Default)]
+struct DirNode {
+    /// Child directories keyed by name.
+    children: BTreeMap<String, DirNode>,
+    /// Asset indices contained directly in this directory.
     assets: Vec<usize>,
 }
 
@@ -234,8 +255,6 @@ impl CreatorApp {
             path_index.insert(asset.path.clone(), idx);
         }
 
-        let mut groups = Vec::new();
-        let mut seen = vec![false; manifest.assets.len()];
         let mut meta = manifest
             .assets
             .iter()
@@ -317,21 +336,14 @@ impl CreatorApp {
             .collect::<Vec<_>>();
 
         for (name, group) in &manifest.groups {
-            let mut indices = Vec::new();
             for path in &group.assets {
                 if let Some(&idx) = path_index.get(path) {
-                    indices.push(idx);
-                    seen[idx] = true;
                     meta[idx].groups.push(name.clone());
                     if meta[idx].license.is_none() {
                         meta[idx].license = group.license.clone();
                     }
                 }
             }
-            groups.push(GroupEntry {
-                name: name.clone(),
-                assets: indices,
-            });
         }
 
         for (idx, asset) in manifest.assets.iter().enumerate() {
@@ -342,12 +354,6 @@ impl CreatorApp {
             }
         }
 
-        let mut ungrouped = Vec::new();
-        for (idx, flag) in seen.into_iter().enumerate() {
-            if !flag {
-                ungrouped.push(idx);
-            }
-        }
         let raw_dir = manifest_dir.join("assets/raw");
         let thumb_dir = manifest_dir.join("assets/thumbs");
         let (tx, rx) = channel();
@@ -365,10 +371,20 @@ impl CreatorApp {
             manifest_path,
             selection: BTreeSet::new(),
             new_group: String::new(),
+            apng_delay_ms: "100".to_string(),
+            apng_loops: "0".to_string(),
+            fonts_pack_root: String::new(),
+            fonts_pack_size: "32".to_string(),
+            fonts_pack_chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                .to_string(),
+            fonts_pack_open: false,
+            svg_input: String::new(),
+            svg_out_dir: String::new(),
+            svg_dpis: "96".to_string(),
+            svg_threshold: String::new(),
+            svg_open: false,
             filter: String::new(),
             show_unlicensed_only: false,
-            groups,
-            ungrouped,
             meta,
             texture: None,
             texture_idx: None,
@@ -400,29 +416,14 @@ impl CreatorApp {
             path_index.insert(asset.path.clone(), idx);
             self.meta[idx].groups.clear();
         }
-        self.groups.clear();
-        let mut seen = vec![false; self.manifest.assets.len()];
         for (name, group) in &self.manifest.groups {
-            let mut indices = Vec::new();
             for path in &group.assets {
                 if let Some(&idx) = path_index.get(path) {
-                    indices.push(idx);
-                    seen[idx] = true;
                     self.meta[idx].groups.push(name.clone());
                     if self.meta[idx].license.is_none() {
                         self.meta[idx].license = group.license.clone();
                     }
                 }
-            }
-            self.groups.push(GroupEntry {
-                name: name.clone(),
-                assets: indices,
-            });
-        }
-        self.ungrouped.clear();
-        for (idx, flag) in seen.into_iter().enumerate() {
-            if !flag {
-                self.ungrouped.push(idx);
             }
         }
     }
@@ -489,7 +490,9 @@ impl CreatorApp {
             .parent()
             .ok_or_else(|| anyhow::anyhow!("no parent directory"))?;
         let out = dir.join("animation.apng");
-        apng::run(dir, &out, 100, 0)?;
+        let delay = self.apng_delay_ms.trim().parse().unwrap_or(100);
+        let loops = self.apng_loops.trim().parse().unwrap_or(0);
+        apng::run(dir, &out, delay, loops)?;
         self.toasts
             .push((format!("Built {}", out.display()), Instant::now()));
         Ok(())
@@ -728,6 +731,47 @@ impl CreatorApp {
             ui.colored_label(color, text);
         });
     }
+
+    /// Build a directory tree from manifest asset paths.
+    fn build_dir_tree(&self) -> DirNode {
+        let mut root = DirNode::default();
+        for (idx, asset) in self.manifest.assets.iter().enumerate() {
+            let mut node = &mut root;
+            if let Some(parent) = Path::new(&asset.path).parent() {
+                for comp in parent.components() {
+                    let name = comp.as_os_str().to_string_lossy().to_string();
+                    node = node.children.entry(name).or_default();
+                }
+            }
+            node.assets.push(idx);
+        }
+        root
+    }
+
+    /// Recursively render the asset directory tree.
+    fn show_dir_node(&mut self, ui: &mut egui::Ui, name: &str, node: &DirNode) {
+        if !name.is_empty() {
+            egui::CollapsingHeader::new(name).show(ui, |ui| {
+                for (child_name, child) in &node.children {
+                    self.show_dir_node(ui, child_name, child);
+                }
+                for &idx in &node.assets {
+                    if self.asset_matches(idx) {
+                        self.asset_row(ui, idx);
+                    }
+                }
+            });
+        } else {
+            for (child_name, child) in &node.children {
+                self.show_dir_node(ui, child_name, child);
+            }
+            for &idx in &node.assets {
+                if self.asset_matches(idx) {
+                    self.asset_row(ui, idx);
+                }
+            }
+        }
+    }
 }
 
 impl CreatorApp {
@@ -873,15 +917,7 @@ impl CreatorApp {
 
     /// Handle the `fonts pack` CLI command.
     fn handle_fonts_pack(&mut self) {
-        if let Some(root) = FileDialog::new().pick_folder() {
-            let res = fonts::pack(
-                &root,
-                Path::new(&self.manifest_path),
-                32.0,
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-            );
-            self.show_feedback("Fonts Pack", res);
-        }
+        self.fonts_pack_open = true;
     }
 
     /// Handle the `lottie import` CLI command.
@@ -906,14 +942,59 @@ impl CreatorApp {
         }
     }
 
-    /// Handle the `svg` CLI command.
-    fn handle_svg(&mut self) {
-        if let Some(svg_path) = FileDialog::new().add_filter("svg", &["svg"]).pick_file() {
-            if let Some(out) = FileDialog::new().pick_folder() {
-                let res = svg::run(&svg_path, &out, &[96.0], None);
-                self.show_feedback("Svg", res);
+    /// Add new assets via file dialog and refresh the manifest.
+    fn handle_add_asset(&mut self) {
+        if let Some(files) = FileDialog::new().pick_files() {
+            let manifest_dir = Path::new(&self.manifest_path)
+                .parent()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("."));
+            let raw_dir = manifest_dir.join("assets/raw");
+            if let Err(e) = fs::create_dir_all(&raw_dir) {
+                self.toasts.push((
+                    format!("Failed to create assets/raw: {}", e),
+                    Instant::now(),
+                ));
+                return;
+            }
+            let mut copied = false;
+            for file in files {
+                if let Some(name) = file.file_name() {
+                    let dest = raw_dir.join(name);
+                    match fs::copy(&file, &dest) {
+                        Ok(_) => {
+                            self.toasts.push((
+                                format!("Imported {}", name.to_string_lossy()),
+                                Instant::now(),
+                            ));
+                            copied = true;
+                        }
+                        Err(e) => self
+                            .toasts
+                            .push((format!("Copy failed: {}", e), Instant::now())),
+                    }
+                }
+            }
+            if copied {
+                if let Err(e) = scan::run(&raw_dir, Path::new(&self.manifest_path)) {
+                    self.toasts
+                        .push((format!("Scan failed: {}", e), Instant::now()));
+                } else if let Ok(file) = File::open(&self.manifest_path) {
+                    if let Ok(manifest) = from_reader(file) {
+                        let path = self.manifest_path.clone();
+                        let mut new_app = Self::new(manifest, path);
+                        new_app.toasts = self.toasts.clone();
+                        new_app.new_group = self.new_group.clone();
+                        *self = new_app;
+                    }
+                }
             }
         }
+    }
+
+    /// Handle the `svg` CLI command.
+    fn handle_svg(&mut self) {
+        self.svg_open = true;
     }
 }
 
@@ -932,6 +1013,20 @@ impl App for CreatorApp {
                             .position(|a| Path::new(&a.path) == rel)
                         {
                             let _ = self.load_thumbnail(ctx, idx);
+                        } else {
+                            if let Err(e) = scan::run(&self.raw_dir, Path::new(&self.manifest_path))
+                            {
+                                self.toasts
+                                    .push((format!("Scan failed: {}", e), Instant::now()));
+                            } else if let Ok(file) = File::open(&self.manifest_path) {
+                                if let Ok(manifest) = from_reader(file) {
+                                    let path = self.manifest_path.clone();
+                                    let mut new_app = Self::new(manifest, path);
+                                    new_app.toasts = self.toasts.clone();
+                                    new_app.new_group = self.new_group.clone();
+                                    *self = new_app;
+                                }
+                            }
                         }
                     }
                 }
@@ -957,6 +1052,9 @@ impl App for CreatorApp {
                 }
                 if ui.button("Preview").clicked() {
                     self.handle_preview();
+                }
+                if ui.button("Add Asset").clicked() {
+                    self.handle_add_asset();
                 }
                 if ui.button("AddTarget").clicked() {
                     self.handle_add_target();
@@ -1001,12 +1099,18 @@ impl App for CreatorApp {
             ui.checkbox(&mut self.show_unlicensed_only, "Unlicensed only");
             if !self.selection.is_empty() {
                 ui.horizontal(|ui| {
+                    ui.label("Delay (ms):");
+                    ui.text_edit_singleline(&mut self.apng_delay_ms);
+                    ui.label("Loops (0=inf):");
+                    ui.text_edit_singleline(&mut self.apng_loops);
                     if ui.button("Make APNG").clicked() {
                         if let Err(e) = self.make_apng_from_selection() {
                             self.toasts
                                 .push((format!("APNG failed: {}", e), Instant::now()));
                         }
                     }
+                });
+                ui.horizontal(|ui| {
                     ui.text_edit_singleline(&mut self.new_group);
                     if ui.button("Add to group").clicked() {
                         self.add_selection_to_group();
@@ -1031,28 +1135,8 @@ impl App for CreatorApp {
                 });
             }
 
-            for group in self.groups.clone() {
-                egui::CollapsingHeader::new(&group.name).show(ui, |ui| {
-                    for idx in group.assets {
-                        if !self.asset_matches(idx) {
-                            continue;
-                        }
-                        self.asset_row(ui, idx);
-                    }
-                });
-            }
-
-            if !self.ungrouped.is_empty() {
-                let ungrouped = self.ungrouped.clone();
-                egui::CollapsingHeader::new("Ungrouped").show(ui, |ui| {
-                    for idx in ungrouped {
-                        if !self.asset_matches(idx) {
-                            continue;
-                        }
-                        self.asset_row(ui, idx);
-                    }
-                });
-            }
+            let tree = self.build_dir_tree();
+            self.show_dir_node(ui, "", &tree);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -1299,6 +1383,96 @@ impl App for CreatorApp {
                 ui.label("Select an asset");
             }
         });
+
+        if self.fonts_pack_open {
+            let mut open = self.fonts_pack_open;
+            egui::Window::new("Fonts Pack")
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Root:");
+                        ui.text_edit_singleline(&mut self.fonts_pack_root);
+                        if ui.button("...").clicked() {
+                            if let Some(path) = FileDialog::new().pick_folder() {
+                                self.fonts_pack_root = path.display().to_string();
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Size:");
+                        ui.text_edit_singleline(&mut self.fonts_pack_size);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Chars:");
+                        ui.text_edit_singleline(&mut self.fonts_pack_chars);
+                    });
+                    if ui.button("Pack").clicked() {
+                        let size = self.fonts_pack_size.trim().parse().unwrap_or(32.0);
+                        let res = fonts::pack(
+                            Path::new(&self.fonts_pack_root),
+                            Path::new(&self.manifest_path),
+                            size,
+                            &self.fonts_pack_chars,
+                        );
+                        self.show_feedback("Fonts Pack", res);
+                    }
+                });
+            self.fonts_pack_open = open;
+        }
+
+        if self.svg_open {
+            let mut open = self.svg_open;
+            egui::Window::new("Svg").open(&mut open).show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Input:");
+                    ui.text_edit_singleline(&mut self.svg_input);
+                    if ui.button("...").clicked() {
+                        if let Some(path) =
+                            FileDialog::new().add_filter("svg", &["svg"]).pick_file()
+                        {
+                            self.svg_input = path.display().to_string();
+                        }
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Output:");
+                    ui.text_edit_singleline(&mut self.svg_out_dir);
+                    if ui.button("...").clicked() {
+                        if let Some(path) = FileDialog::new().pick_folder() {
+                            self.svg_out_dir = path.display().to_string();
+                        }
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("DPIs:");
+                    ui.text_edit_singleline(&mut self.svg_dpis);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Threshold:");
+                    ui.text_edit_singleline(&mut self.svg_threshold);
+                });
+                if ui.button("Render").clicked() {
+                    let dpis: Vec<f32> = self
+                        .svg_dpis
+                        .split(',')
+                        .filter_map(|s| s.trim().parse().ok())
+                        .collect();
+                    let threshold = if self.svg_threshold.trim().is_empty() {
+                        None
+                    } else {
+                        self.svg_threshold.trim().parse().ok()
+                    };
+                    let res = svg::run(
+                        Path::new(&self.svg_input),
+                        Path::new(&self.svg_out_dir),
+                        &dpis,
+                        threshold,
+                    );
+                    self.show_feedback("Svg", res);
+                }
+            });
+            self.svg_open = open;
+        }
 
         if self.layout_open {
             let mut open = self.layout_open;
