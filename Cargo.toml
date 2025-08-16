@@ -154,10 +154,6 @@ optional = true
 version = "0.45.1"
 optional = true
 
-[dev-dependencies]
-insta = "1"
-tempfile = "3"
-
 [features]
 default = []
 png = ["rlvgl-core/png"]
@@ -179,6 +175,7 @@ pinyin = ["rlvgl-core/pinyin"]
 fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
 nes = ["rlvgl-core/nes", "dep:yane"]
 apng = ["rlvgl-core/apng", "dep:image"]
+fs = ["rlvgl-core/fs"]
 creator = [
     "dep:clap",
     "dep:anyhow",
@@ -200,6 +197,8 @@ creator = [
 ]
 
 [dev-dependencies]
+insta = "1"
+tempfile = "3"
 panic-halt = "1.0.0"
 
 [profile.release]
@@ -217,5 +216,5 @@ debug = true
 incremental = false
 
 [workspace]
-members = ["core", "platform", "widgets", "ui"]
+members = ["core", "platform", "widgets", "ui", "fs-sim"]
 resolver = "2"

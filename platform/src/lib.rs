@@ -31,6 +31,11 @@ pub mod st7789;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub mod stm32h747i_disco;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub mod stm32h747i_disco_sd;
 
 pub use blit::{
     BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
@@ -50,3 +55,8 @@ pub use st7789::St7789Display;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use stm32h747i_disco_sd::DiscoSdBlockDevice;
