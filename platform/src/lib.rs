@@ -53,6 +53,7 @@ pub use ft5336::Ft5336;
 pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
+pub use rlvgl_core::event::Key;
 #[cfg(feature = "simulator")]
 pub use simulator::WgpuDisplay;
 #[cfg(feature = "st7789")]

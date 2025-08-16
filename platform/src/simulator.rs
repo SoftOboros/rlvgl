@@ -9,6 +9,7 @@
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
 use eframe::{self, egui};
 use pollster::block_on;
+use rlvgl_core::event::Key;
 use std::{backtrace::Backtrace, eprintln, panic};
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
@@ -121,12 +122,17 @@ impl WgpuState {
             .copied()
             .find(|f| f.is_srgb())
             .unwrap_or(caps.formats[0]);
+        let present_mode = if caps.present_modes.contains(&wgpu::PresentMode::Fifo) {
+            wgpu::PresentMode::Fifo
+        } else {
+            caps.present_modes[0]
+        };
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width,
             height,
-            present_mode: caps.present_modes[0],
+            present_mode,
             alpha_mode: caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 1,
@@ -269,6 +275,39 @@ impl WgpuDisplay {
         let max_dim = state.max_texture_dimension();
         let mut fullscreen = false;
 
+        fn key_from_event(event: &KeyEvent) -> Key {
+            if let Some(text) = &event.text {
+                if let Some(ch) = text.chars().next() {
+                    return Key::Character(ch);
+                }
+            }
+            match event.physical_key {
+                PhysicalKey::Code(code) => match code {
+                    KeyCode::Escape => Key::Escape,
+                    KeyCode::Enter => Key::Enter,
+                    KeyCode::Space => Key::Space,
+                    KeyCode::ArrowUp => Key::ArrowUp,
+                    KeyCode::ArrowDown => Key::ArrowDown,
+                    KeyCode::ArrowLeft => Key::ArrowLeft,
+                    KeyCode::ArrowRight => Key::ArrowRight,
+                    KeyCode::F1 => Key::Function(1),
+                    KeyCode::F2 => Key::Function(2),
+                    KeyCode::F3 => Key::Function(3),
+                    KeyCode::F4 => Key::Function(4),
+                    KeyCode::F5 => Key::Function(5),
+                    KeyCode::F6 => Key::Function(6),
+                    KeyCode::F7 => Key::Function(7),
+                    KeyCode::F8 => Key::Function(8),
+                    KeyCode::F9 => Key::Function(9),
+                    KeyCode::F10 => Key::Function(10),
+                    KeyCode::F11 => Key::Function(11),
+                    KeyCode::F12 => Key::Function(12),
+                    _ => Key::Other(code as u32),
+                },
+                _ => Key::Other(0),
+            }
+        }
+
         #[allow(deprecated)]
         event_loop
             .run(move |event, target: &ActiveEventLoop| match event {
@@ -310,23 +349,27 @@ impl WgpuDisplay {
                     window.request_redraw();
                 }
                 Event::WindowEvent {
-                    event:
-                        WindowEvent::KeyboardInput {
-                            event:
-                                KeyEvent {
-                                    physical_key: PhysicalKey::Code(KeyCode::F11),
-                                    state: ElementState::Pressed,
-                                    ..
-                                },
-                            ..
-                        },
+                    event: WindowEvent::KeyboardInput { event, .. },
                     ..
                 } => {
-                    fullscreen = !fullscreen;
-                    if fullscreen {
-                        window.set_fullscreen(Some(Fullscreen::Borderless(None)));
-                    } else {
-                        window.set_fullscreen(None);
+                    if let PhysicalKey::Code(code) = event.physical_key {
+                        if code == KeyCode::F11 && event.state == ElementState::Pressed {
+                            fullscreen = !fullscreen;
+                            if fullscreen {
+                                window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                            } else {
+                                window.set_fullscreen(None);
+                            }
+                        }
+                        let key = key_from_event(&event);
+                        match event.state {
+                            ElementState::Pressed => {
+                                event_callback(InputEvent::KeyDown { key });
+                            }
+                            ElementState::Released => {
+                                event_callback(InputEvent::KeyUp { key });
+                            }
+                        }
                     }
                 }
                 Event::WindowEvent {

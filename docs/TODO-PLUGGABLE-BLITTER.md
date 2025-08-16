@@ -72,7 +72,7 @@
 | [x] | Replace/minimize `pixels/minifb` usage | `winit`, `wgpu` | `winit` window + `wgpu` swapchain. |
 | [x] | `WgpuBlitter` implementing `Blitter` | `wgpu` | Use render pass + textured quads or compute. |
 | [ ] | Upload tile/rect to texture; blit/blend in shader | `wgpu` | Match CPU/DMA2D semantics. |
-| [ ] | Present @ vsync; map keyboard/mouse → `InputDevice` | `winit` | DPI scaling; sRGB swapchain. |
+| [x] | Present @ vsync; map keyboard/mouse → `InputDevice` | `winit` | DPI scaling; sRGB swapchain. |
 | [ ] | Headless mode to dump PNGs for CI | `image` | Golden‑image regression tests. |
 
 ---
