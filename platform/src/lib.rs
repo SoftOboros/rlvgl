@@ -13,6 +13,11 @@ pub mod blit;
 pub mod display;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub mod dma2d;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub mod ft5336;
 /// Input device abstractions.
 pub mod input;
 #[cfg(all(
@@ -31,6 +36,13 @@ pub mod st7789;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub mod stm32h747i_disco;
+#[cfg(feature = "simulator")]
+pub mod wgpu_blitter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub mod stm32h747i_disco_sd;
 
 pub use blit::{
     BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
@@ -38,11 +50,17 @@ pub use blit::{
 pub use display::DisplayDriver;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub use dma2d::Dma2dBlitter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use ft5336::Ft5336;
 pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
+pub use rlvgl_core::event::Key;
 #[cfg(feature = "simulator")]
-pub use simulator::PixelsDisplay;
+pub use simulator::WgpuDisplay;
 #[cfg(feature = "st7789")]
 pub use st7789::St7789Display;
 #[cfg(all(
@@ -50,3 +68,10 @@ pub use st7789::St7789Display;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+#[cfg(feature = "simulator")]
+pub use wgpu_blitter::WgpuBlitter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use stm32h747i_disco_sd::DiscoSdBlockDevice;
