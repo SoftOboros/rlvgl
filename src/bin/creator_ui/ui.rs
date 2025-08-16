@@ -181,8 +181,6 @@ struct CreatorApp {
     svg_open: bool,
     filter: String,
     show_unlicensed_only: bool,
-    groups: Vec<GroupEntry>,
-    ungrouped: Vec<usize>,
     meta: Vec<AssetMeta>,
     texture: Option<TextureHandle>,
     texture_idx: Option<usize>,
@@ -207,11 +205,12 @@ struct CreatorApp {
     /// Items placed in the layout editor.
     layout_items: Vec<LayoutItem>,
 }
-
-/// Group entry mapping asset indices.
-#[derive(Clone)]
-struct GroupEntry {
-    name: String,
+/// Node within the asset directory tree.
+#[derive(Default)]
+struct DirNode {
+    /// Child directories keyed by name.
+    children: BTreeMap<String, DirNode>,
+    /// Asset indices contained directly in this directory.
     assets: Vec<usize>,
 }
 
@@ -256,8 +255,6 @@ impl CreatorApp {
             path_index.insert(asset.path.clone(), idx);
         }
 
-        let mut groups = Vec::new();
-        let mut seen = vec![false; manifest.assets.len()];
         let mut meta = manifest
             .assets
             .iter()
@@ -339,21 +336,14 @@ impl CreatorApp {
             .collect::<Vec<_>>();
 
         for (name, group) in &manifest.groups {
-            let mut indices = Vec::new();
             for path in &group.assets {
                 if let Some(&idx) = path_index.get(path) {
-                    indices.push(idx);
-                    seen[idx] = true;
                     meta[idx].groups.push(name.clone());
                     if meta[idx].license.is_none() {
                         meta[idx].license = group.license.clone();
                     }
                 }
             }
-            groups.push(GroupEntry {
-                name: name.clone(),
-                assets: indices,
-            });
         }
 
         for (idx, asset) in manifest.assets.iter().enumerate() {
@@ -364,12 +354,6 @@ impl CreatorApp {
             }
         }
 
-        let mut ungrouped = Vec::new();
-        for (idx, flag) in seen.into_iter().enumerate() {
-            if !flag {
-                ungrouped.push(idx);
-            }
-        }
         let raw_dir = manifest_dir.join("assets/raw");
         let thumb_dir = manifest_dir.join("assets/thumbs");
         let (tx, rx) = channel();
@@ -401,8 +385,6 @@ impl CreatorApp {
             svg_open: false,
             filter: String::new(),
             show_unlicensed_only: false,
-            groups,
-            ungrouped,
             meta,
             texture: None,
             texture_idx: None,
@@ -434,29 +416,14 @@ impl CreatorApp {
             path_index.insert(asset.path.clone(), idx);
             self.meta[idx].groups.clear();
         }
-        self.groups.clear();
-        let mut seen = vec![false; self.manifest.assets.len()];
         for (name, group) in &self.manifest.groups {
-            let mut indices = Vec::new();
             for path in &group.assets {
                 if let Some(&idx) = path_index.get(path) {
-                    indices.push(idx);
-                    seen[idx] = true;
                     self.meta[idx].groups.push(name.clone());
                     if self.meta[idx].license.is_none() {
                         self.meta[idx].license = group.license.clone();
                     }
                 }
-            }
-            self.groups.push(GroupEntry {
-                name: name.clone(),
-                assets: indices,
-            });
-        }
-        self.ungrouped.clear();
-        for (idx, flag) in seen.into_iter().enumerate() {
-            if !flag {
-                self.ungrouped.push(idx);
             }
         }
     }
@@ -764,6 +731,47 @@ impl CreatorApp {
             ui.colored_label(color, text);
         });
     }
+
+    /// Build a directory tree from manifest asset paths.
+    fn build_dir_tree(&self) -> DirNode {
+        let mut root = DirNode::default();
+        for (idx, asset) in self.manifest.assets.iter().enumerate() {
+            let mut node = &mut root;
+            if let Some(parent) = Path::new(&asset.path).parent() {
+                for comp in parent.components() {
+                    let name = comp.as_os_str().to_string_lossy().to_string();
+                    node = node.children.entry(name).or_default();
+                }
+            }
+            node.assets.push(idx);
+        }
+        root
+    }
+
+    /// Recursively render the asset directory tree.
+    fn show_dir_node(&mut self, ui: &mut egui::Ui, name: &str, node: &DirNode) {
+        if !name.is_empty() {
+            egui::CollapsingHeader::new(name).show(ui, |ui| {
+                for (child_name, child) in &node.children {
+                    self.show_dir_node(ui, child_name, child);
+                }
+                for &idx in &node.assets {
+                    if self.asset_matches(idx) {
+                        self.asset_row(ui, idx);
+                    }
+                }
+            });
+        } else {
+            for (child_name, child) in &node.children {
+                self.show_dir_node(ui, child_name, child);
+            }
+            for &idx in &node.assets {
+                if self.asset_matches(idx) {
+                    self.asset_row(ui, idx);
+                }
+            }
+        }
+    }
 }
 
 impl CreatorApp {
@@ -1005,6 +1013,20 @@ impl App for CreatorApp {
                             .position(|a| Path::new(&a.path) == rel)
                         {
                             let _ = self.load_thumbnail(ctx, idx);
+                        } else {
+                            if let Err(e) = scan::run(&self.raw_dir, Path::new(&self.manifest_path))
+                            {
+                                self.toasts
+                                    .push((format!("Scan failed: {}", e), Instant::now()));
+                            } else if let Ok(file) = File::open(&self.manifest_path) {
+                                if let Ok(manifest) = from_reader(file) {
+                                    let path = self.manifest_path.clone();
+                                    let mut new_app = Self::new(manifest, path);
+                                    new_app.toasts = self.toasts.clone();
+                                    new_app.new_group = self.new_group.clone();
+                                    *self = new_app;
+                                }
+                            }
                         }
                     }
                 }
@@ -1113,28 +1135,8 @@ impl App for CreatorApp {
                 });
             }
 
-            for group in self.groups.clone() {
-                egui::CollapsingHeader::new(&group.name).show(ui, |ui| {
-                    for idx in group.assets {
-                        if !self.asset_matches(idx) {
-                            continue;
-                        }
-                        self.asset_row(ui, idx);
-                    }
-                });
-            }
-
-            if !self.ungrouped.is_empty() {
-                let ungrouped = self.ungrouped.clone();
-                egui::CollapsingHeader::new("Ungrouped").show(ui, |ui| {
-                    for idx in ungrouped {
-                        if !self.asset_matches(idx) {
-                            continue;
-                        }
-                        self.asset_row(ui, idx);
-                    }
-                });
-            }
+            let tree = self.build_dir_tree();
+            self.show_dir_node(ui, "", &tree);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {

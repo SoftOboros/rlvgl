@@ -24,10 +24,9 @@ This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to 
  - [x] Add SVG renderer dialog with configurable DPI list and threshold; both settings are user-configurable before rendering.
 
 ## Asset Browser
-- [ ] Replace flat list with hierarchical tree reflecting `assets/raw` (current view
-      groups assets but does not mirror directory hierarchy).
+- [x] Replace flat list with hierarchical tree reflecting `assets/raw`; directories mirror the on-disk hierarchy.
 - [x] Add "Add Asset" action using a file dialog to copy files and update manifest
       (no import workflow yet).
 - [x] Allow deletion of selected assets with confirmation dialog and manifest persistence.
-- [ ] Display full archive contents (view refreshes automatically after additions).
+- [x] Display full archive contents with automatic refresh when files are added externally.
 
