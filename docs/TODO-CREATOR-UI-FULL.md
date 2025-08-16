@@ -27,9 +27,8 @@ This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to 
 ## Asset Browser
 - [ ] Replace flat list with hierarchical tree reflecting `assets/raw` (current view
       groups assets but does not mirror directory hierarchy).
-- [ ] Add "Add Asset" action using a file dialog to copy files and update manifest
+- [x] Add "Add Asset" action using a file dialog to copy files and update manifest
       (no import workflow yet).
 - [x] Allow deletion of selected assets with confirmation dialog and manifest persistence.
-- [ ] Display full archive contents and refresh view after add operations (deletion
-      refreshes view automatically; additions require manual reload).
+- [ ] Display full archive contents (view refreshes automatically after additions).
 

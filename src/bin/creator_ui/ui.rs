@@ -919,6 +919,56 @@ impl CreatorApp {
         }
     }
 
+    /// Add new assets via file dialog and refresh the manifest.
+    fn handle_add_asset(&mut self) {
+        if let Some(files) = FileDialog::new().pick_files() {
+            let manifest_dir = Path::new(&self.manifest_path)
+                .parent()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("."));
+            let raw_dir = manifest_dir.join("assets/raw");
+            if let Err(e) = fs::create_dir_all(&raw_dir) {
+                self.toasts.push((
+                    format!("Failed to create assets/raw: {}", e),
+                    Instant::now(),
+                ));
+                return;
+            }
+            let mut copied = false;
+            for file in files {
+                if let Some(name) = file.file_name() {
+                    let dest = raw_dir.join(name);
+                    match fs::copy(&file, &dest) {
+                        Ok(_) => {
+                            self.toasts.push((
+                                format!("Imported {}", name.to_string_lossy()),
+                                Instant::now(),
+                            ));
+                            copied = true;
+                        }
+                        Err(e) => self
+                            .toasts
+                            .push((format!("Copy failed: {}", e), Instant::now())),
+                    }
+                }
+            }
+            if copied {
+                if let Err(e) = scan::run(&raw_dir, Path::new(&self.manifest_path)) {
+                    self.toasts
+                        .push((format!("Scan failed: {}", e), Instant::now()));
+                } else if let Ok(file) = File::open(&self.manifest_path) {
+                    if let Ok(manifest) = from_reader(file) {
+                        let path = self.manifest_path.clone();
+                        let mut new_app = Self::new(manifest, path);
+                        new_app.toasts = self.toasts.clone();
+                        new_app.new_group = self.new_group.clone();
+                        *self = new_app;
+                    }
+                }
+            }
+        }
+    }
+
     /// Handle the `svg` CLI command.
     fn handle_svg(&mut self) {
         if let Some(svg_path) = FileDialog::new().add_filter("svg", &["svg"]).pick_file() {
@@ -970,6 +1020,9 @@ impl App for CreatorApp {
                 }
                 if ui.button("Preview").clicked() {
                     self.handle_preview();
+                }
+                if ui.button("Add Asset").clicked() {
+                    self.handle_add_asset();
                 }
                 if ui.button("AddTarget").clicked() {
                     self.handle_add_target();
