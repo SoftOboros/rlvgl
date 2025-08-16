@@ -8,9 +8,10 @@
 
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
 use eframe::{self, egui};
+use image::{ColorType, ImageError, save_buffer};
 use pollster::block_on;
 use rlvgl_core::event::Key;
-use std::{backtrace::Backtrace, eprintln, panic};
+use std::{backtrace::Backtrace, eprintln, panic, path::Path};
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
     event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
@@ -425,5 +426,20 @@ impl WgpuDisplay {
                 _ => {}
             })
             .expect("event loop error");
+    }
+
+    /// Render a single frame off-screen and save it as a PNG.
+    ///
+    /// This helper enables headless CI tests that compare rendered
+    /// output against golden images.
+    pub fn headless(
+        width: usize,
+        height: usize,
+        mut frame_callback: impl FnMut(&mut [u8]),
+        path: impl AsRef<Path>,
+    ) -> Result<(), ImageError> {
+        let mut frame = vec![0u8; width * height * 4];
+        frame_callback(&mut frame);
+        save_buffer(path, &frame, width as u32, height as u32, ColorType::Rgba8)
     }
 }

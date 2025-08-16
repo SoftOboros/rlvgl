@@ -23,6 +23,7 @@ wgpu = { version = "0.19", optional = true, features = ["wgsl"] }
 pollster = { version = "0.3", optional = true }
 eframe = { version = "0.27", default-features = false, features = ["glow"], optional = true }
 embedded-graphics = { version = "0.8", optional = true }
+image = { version = "0.24", default-features = false, features = ["png"], optional = true }
 bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 [target.'cfg(any(target_arch = "arm", target_arch = "aarch64"))'.dependencies]
@@ -31,7 +32,7 @@ stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7"]
 
 [features]
 default = []
-simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster"]
+simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster", "image"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
 stm32h747i_disco = ["stm32h7", "stm32h7xx-hal", "embedded-hal"]
 dma2d = ["stm32h7"]
