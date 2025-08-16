@@ -34,6 +34,8 @@ extern crate alloc;
 
 pub mod animation;
 pub mod event;
+#[cfg(feature = "fs")]
+pub mod fs;
 pub mod plugins;
 pub mod renderer;
 pub mod style;

@@ -22,10 +22,10 @@
 
 | ✓   | Description                                     | Dependencies           | Notes                               |
 | --- | ----------------------------------------------- | ---------------------- | ----------------------------------- |
-| [ ] | Add `fs` feature to `rlvgl/core`                | `alloc`                | All FS code behind feature flag     |
-| [ ] | New crate: `rlvgl-fs` (no\_std)                 | `fatfs` (no\_std mode) | Owns FAT glue + traits              |
-| [ ] | New crate: `rlvgl-fs-sim` (std)                 | `fatfs`, `std`         | Simulator: file-backed block device |
-| [ ] | Platform module: `platform/stm32h747i_disco_sd` | HAL + DMA              | SDMMC + DMA + cache maintenance     |
+| [x] | Add `fs` feature to `rlvgl/core`                | `alloc`                | All FS code behind feature flag     |
+| [x] | FS traits (`BlockDevice`, `FsError`) in core     | —                     | Moved from standalone crate        |
+| [x] | New crate: `rlvgl-fs-sim` (std)                 | `fatfs`, `std`         | Simulator: file-backed block device |
+| [x] | Platform module: `platform/stm32h747i_disco_sd` | HAL + DMA              | SDMMC + DMA + cache maintenance     |
 
 > **FAT impl choice:** Prefer the Rust `fatfs` crate in `no_std` mode for consistent API across targets. `embedded-sdmmc` is an alternative; keep the abstraction thin so either can slot in later.
 
@@ -80,9 +80,9 @@ impl<S: AssetSource> AssetManager<S> {
 
 | ✓   | Description                   | Dependencies        | Notes                                               |
 | --- | ----------------------------- | ------------------- | --------------------------------------------------- |
-| [ ] | Implement `SimBlockDevice`    | `std::fs::File`     | One big **disk image** file, pre-sized (e.g., 32MB) |
-| [ ] | Optional memory-map for speed | `memmap2` (feature) | Fallback to pread/pwrite if unavailable             |
-| [ ] | Tool: create/populate image   | Rust CLI            | `mkfatimg --size 32M --from ./assets/`              |
+| [x] | Implement `SimBlockDevice`    | `std::fs::File`     | One big **disk image** file, pre-sized (e.g., 32MB) |
+| [x] | Optional memory-map for speed | `memmap2` (feature) | Fallback to pread/pwrite if unavailable             |
+| [x] | Tool: create/populate image   | Rust CLI            | `mkfatimg --size 32M --from ./assets/`              |
 | [ ] | Mount & smoke test            | rlvgl sim           | Read a PNG/font, render a label                     |
 
 **Rationale:** Keep FAT logic intact by letting FATFS manage the on-disk layout. The simulator just provides sector reads/writes into a single host file.
@@ -93,9 +93,9 @@ impl<S: AssetSource> AssetManager<S> {
 
 | ✓   | Description                    | Dependencies | Notes                                                                     |
 | --- | ------------------------------ | ------------ | ------------------------------------------------------------------------- |
-| [ ] | Pin/clock config in CubeMX     | CubeMX       | SDMMC1 4-bit wide, proper GPIO AF                                         |
-| [ ] | `DCache` strategy              | cortex-m     | Use non-cacheable region for DMA buffers or clean/invalidate around xfers |
-| [ ] | Implement `DiscoSdBlockDevice` | HAL + LL     | Init card, read\_multi, write\_multi, block size=512                      |
+| [x] | Pin/clock config in CubeMX     | CubeMX       | SDMMC1 4-bit wide, proper GPIO AF                                         |
+| [x] | `DCache` strategy              | cortex-m     | Use non-cacheable region for DMA buffers or clean/invalidate around xfers |
+| [x] | Implement `DiscoSdBlockDevice` | HAL + LL     | Init card, read\_multi, write\_multi, block size=512                      |
 | [ ] | DMA double-buffering           | HAL DMA      | Optimize sequential reads                                                 |
 | [ ] | Mount FAT volume               | `fatfs`      | Provide `TimeProvider` (if required)                                      |
 | [ ] | Long runner test               | on-device    | Stream read assets for minutes; check CRC/errors                          |
@@ -123,7 +123,7 @@ impl<S: AssetSource> AssetManager<S> {
 
 | ✓   | Description                      | Dependencies        | Notes                                                      |
 | --- | -------------------------------- | ------------------- | ---------------------------------------------------------- |
-| [ ] | `core` feature gate `fs`         | cargo               | Must not pull in `std`                                     |
+| [x] | `core` feature gate `fs`         | cargo               | Must not pull in `std`                                     |
 | [ ] | `platform` selects a BlockDevice | target BSP          | DISCO uses `DiscoSdBlockDevice`; sim uses `SimBlockDevice` |
 | [ ] | Image decoder selection          | feature flags       | `png`, `jpeg`, `qoi`, etc. (optional)                      |
 | [ ] | Font loader hook                 | `fontdue` or custom | From file → font cache                                     |
@@ -134,8 +134,8 @@ impl<S: AssetSource> AssetManager<S> {
 
 | ✓   | Description                        | Dependencies | Notes                                    |
 | --- | ---------------------------------- | ------------ | ---------------------------------------- |
-| [ ] | Unit: path open/list/exists        | `fatfs`      | Fake device with in-memory image         |
-| [ ] | Unit: partial read/seek            | —            | Verify correct offsets/lengths           |
+| [x] | Unit: path open/list/exists        | `fatfs`      | Fake device with in-memory image         |
+| [x] | Unit: partial read/seek            | —            | Verify correct offsets/lengths           |
 | [ ] | Prop: random file sizes            | proptest     | Ensure no over/underruns                 |
 | [ ] | Sim integration: load font & image | rlvgl sim    | Render text+bitmap; save PNG             |
 | [ ] | DISCO integration: SD mount        | on-device    | OLED/LCD shows PASS/FAIL and asset names |
@@ -146,8 +146,8 @@ impl<S: AssetSource> AssetManager<S> {
 
 | ✓   | Description                   | Dependencies       | Notes                               |
 | --- | ----------------------------- | ------------------ | ----------------------------------- |
-| [ ] | `mkfatimg` CLI                | `fatfs`, `walkdir` | Create disk image from a folder     |
-| [ ] | `fatcat` CLI                  | —                  | List/print files inside image       |
+| [x] | `mkfatimg` CLI                | `fatfs`, `walkdir` | Create disk image from a folder     |
+| [x] | `fatcat` CLI                  | —                  | List/print files inside image       |
 | [ ] | CI step: build/populate image | GitHub Actions     | Attach artifact for simulator tests |
 
 ---
@@ -166,7 +166,7 @@ impl<S: AssetSource> AssetManager<S> {
 | ------------------------------ | ----------------------------------------------------------------- |
 | SDMMC + D‑Cache bugs           | Centralize cache ops in driver; add asserts & debug counters      |
 | FAT fragmentation hurts perf   | Encourage asset packing; sequential reads; optional defrag tool   |
-| `std` leakage into core        | API sits in `rlvgl-fs` no\_std; simulator implementation isolated |
+| `std` leakage into core        | FS API behind `fs` feature in core; simulator implementation isolated |
 | Time source for FAT timestamps | Provide dummy time or feature flag to disable timestamps          |
 
 ---

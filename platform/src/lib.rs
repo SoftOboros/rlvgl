@@ -38,6 +38,11 @@ pub mod st7789;
 pub mod stm32h747i_disco;
 #[cfg(feature = "simulator")]
 pub mod wgpu_blitter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub mod stm32h747i_disco_sd;
 
 pub use blit::{
     BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
@@ -65,3 +70,8 @@ pub use st7789::St7789Display;
 pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
 #[cfg(feature = "simulator")]
 pub use wgpu_blitter::WgpuBlitter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use stm32h747i_disco_sd::DiscoSdBlockDevice;

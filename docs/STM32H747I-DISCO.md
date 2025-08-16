@@ -13,3 +13,24 @@ This document captures pin mappings and peripheral configuration details for usi
 - FT5336 capacitive controller on I2C4 at 7-bit address 0x38 (8-bit 0x70)
 - I2C4 SCL: PD12, SDA: PD13 (AF4), interrupt: PK7
 - Default bus frequency 100 kHz and support for two concurrent touch points
+
+## SD Card
+
+The on-board microSD slot is connected to the SDMMC1 peripheral in 4-bit
+wide mode.
+
+### CubeMX Pin Assignments
+
+| Pin  | Function     | Alternate Function |
+| ---- | ------------ | ------------------ |
+| PC8  | SDMMC1_D0    | AF12               |
+| PC9  | SDMMC1_D1    | AF12               |
+| PC10 | SDMMC1_D2    | AF12               |
+| PC11 | SDMMC1_D3    | AF12               |
+| PC12 | SDMMC1_CK    | AF12               |
+| PD2  | SDMMC1_CMD   | AF12               |
+
+Enable GPIOC and GPIOD clocks and set all pins to very high speed with
+internal pull-ups. SDMMC1 should source its kernel clock from PLL2 with a
+200 MHz output. DMA2 streams 3 (RX) and 6 (TX) using channel 4 are
+recommended for data transfers.
