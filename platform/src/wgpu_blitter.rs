@@ -29,8 +29,8 @@ const TEXTURE_SHADER: &str = r#"
 @group(0) @binding(1) var u_sampler: sampler;
 
 struct VsOut {
-    @builtin(position) pos: vec4<f32>;
-    @location(0) uv: vec2<f32>;
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
 };
 
 @vertex
@@ -61,7 +61,7 @@ const FILL_SHADER: &str = r#"
 @group(0) @binding(0) var<uniform> u_color: vec4<f32>;
 
 struct VsOut {
-    @builtin(position) pos: vec4<f32>;
+    @builtin(position) pos: vec4<f32>,
 };
 
 @vertex
