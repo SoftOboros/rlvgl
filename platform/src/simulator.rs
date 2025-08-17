@@ -6,7 +6,7 @@
 
 #![cfg(feature = "simulator")]
 
-use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, vec, vec::Vec};
 use eframe::{self, egui};
 use image::{ColorType, ImageError, save_buffer};
 use pollster::block_on;
@@ -139,6 +139,7 @@ impl WgpuState {
             desired_maximum_frame_latency: 1,
         };
         surface.configure(&device, &config);
+        eprintln!("Surface format: {:?}", config.format);
         let max_texture_dim = device.limits().max_texture_dimension_2d;
         let frame = vec![0; (width * height * 4) as usize];
         Self {
@@ -175,6 +176,16 @@ impl WgpuState {
                     .expect("failed to acquire surface texture")
             }
         };
+        let frame_slice: Cow<[u8]> = match self.config.format {
+            wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
+                let mut converted = self.frame.clone();
+                for px in converted.chunks_exact_mut(4) {
+                    px.swap(0, 2);
+                }
+                Cow::Owned(converted)
+            }
+            _ => Cow::Borrowed(&self.frame),
+        };
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &output.texture,
@@ -182,7 +193,7 @@ impl WgpuState {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &self.frame,
+            &frame_slice,
             wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * self.config.width),
