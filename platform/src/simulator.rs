@@ -12,6 +12,7 @@ use image::{ColorType, ImageError, save_buffer};
 use pollster::block_on;
 use rlvgl_core::event::Key;
 use std::{backtrace::Backtrace, eprintln, panic, path::Path};
+use tracing_subscriber::EnvFilter;
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
     event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
@@ -21,6 +22,12 @@ use winit::{
 };
 
 use crate::input::InputEvent;
+
+/// Initialize logging for `wgpu` validation messages.
+fn init_wgpu_logger() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("wgpu=warn"));
+    let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
+}
 
 /// Display a panic message in a scrollable window limited to the screen size.
 fn show_panic_window(message: String) {
@@ -97,6 +104,7 @@ struct WgpuState {
 impl WgpuState {
     /// Create a new `wgpu` state for the given window and dimensions.
     fn new(window: &'static Window, width: u32, height: u32) -> Self {
+        init_wgpu_logger();
         let instance = wgpu::Instance::default();
         let surface = instance
             .create_surface(window)
@@ -116,6 +124,10 @@ impl WgpuState {
             None,
         ))
         .expect("failed to create device");
+        device.on_uncaptured_error(Box::new(|e| {
+            eprintln!("wgpu uncaptured error: {e:?}");
+            debug_assert!(false, "wgpu uncaptured error: {e:?}");
+        }));
         let caps = surface.get_capabilities(&adapter);
         let format = caps
             .formats
@@ -169,7 +181,9 @@ impl WgpuState {
     fn render(&mut self) {
         let output = match self.surface.get_current_texture() {
             Ok(frame) => frame,
-            Err(_) => {
+            Err(e) => {
+                eprintln!("surface error: {e:?}");
+                debug_assert!(false, "surface error: {e:?}");
                 self.surface.configure(&self.device, &self.config);
                 self.surface
                     .get_current_texture()
