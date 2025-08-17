@@ -4,7 +4,7 @@
 //! using the SDMMC1 peripheral with DMA and explicit D-Cache maintenance.
 #![deny(missing_docs)]
 
-use cortex_m::{asm, peripheral::SCB};
+use cortex_m::asm;
 use rlvgl_core::fs::{BlockDevice, FsError};
 use stm32h7xx_hal::pac::SDMMC1;
 use stm32h7xx_hal::sdmmc::{SdCard, Sdmmc};
@@ -30,7 +30,9 @@ impl DiscoSdBlockDevice {
             // SAFETY: Accessing the SCB registers is safe here because we have
             // exclusive access to the buffer and perform a full memory
             // barrier after touching the cache.
-            (&mut *SCB::PTR.cast_mut()).invalidate_dcache_by_slice(buf);
+            cortex_m::Peripherals::steal()
+                .SCB
+                .invalidate_dcache_by_slice(buf);
         }
         asm::dmb();
     }
@@ -39,7 +41,9 @@ impl DiscoSdBlockDevice {
     fn clean(buf: &[u8]) {
         unsafe {
             // SAFETY: See rationale in [`Self::invalidate`].
-            (&mut *SCB::PTR.cast_mut()).clean_dcache_by_slice(buf);
+            cortex_m::Peripherals::steal()
+                .SCB
+                .clean_dcache_by_slice(buf);
         }
         asm::dmb();
     }
