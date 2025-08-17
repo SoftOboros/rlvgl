@@ -72,7 +72,7 @@ fn main() {
     }
 
     let mut blitter = WgpuBlitter::new();
-    let frame_cb = {
+    let mut frame_cb = {
         let root = root.clone();
         move |frame: &mut [u8], w: usize, h: usize| {
             let surface = Surface::new(frame, w * 4, PixelFmt::Argb8888, w as u32, h as u32);

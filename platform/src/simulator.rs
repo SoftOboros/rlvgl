@@ -190,7 +190,7 @@ impl WgpuState {
                     .expect("failed to acquire surface texture")
             }
         };
-       let frame_slice: Cow<[u8]> = match self.config.format {
+        let frame_slice: Cow<[u8]> = match self.config.format {
             wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
                 let mut converted = self.frame.clone();
                 for px in converted.chunks_exact_mut(4) {
@@ -200,6 +200,7 @@ impl WgpuState {
             }
             _ => Cow::Borrowed(&self.frame),
         };
+        let data = frame_slice.as_ref();
         let row_bytes = 4 * self.config.width as usize;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
         if row_bytes % align == 0 {
@@ -210,7 +211,7 @@ impl WgpuState {
                     origin: wgpu::Origin3d::ZERO,
                     aspect: wgpu::TextureAspect::All,
                 },
-                &self.frame,
+                data,
                 wgpu::ImageDataLayout {
                     offset: 0,
                     bytes_per_row: Some(row_bytes as u32),
@@ -229,7 +230,7 @@ impl WgpuState {
                 let src_off = y * row_bytes;
                 let dst_off = y * stride;
                 padded[dst_off..dst_off + row_bytes]
-                    .copy_from_slice(&self.frame[src_off..src_off + row_bytes]);
+                    .copy_from_slice(&data[src_off..src_off + row_bytes]);
             }
             self.queue.write_texture(
                 wgpu::ImageCopyTexture {
