@@ -14,6 +14,10 @@ cargo run --bin rlvgl-sim -- --screen=800x480
 Omit `--screen` to use the default 320x240 resolution. Pass a file path as an
 additional argument to export a single frame to a PNG instead of launching the
 interactive window.
+
+For asset management workflows using `rlvgl-creator`, see
+[`README-CREATOR.md`](../../README-CREATOR.md).
+
 ## Requirements
 The rlvgl demo requires libgtk-3-dev and librlotte-dev for display and support of Lottie creation (Not implemented).
 
