@@ -29,4 +29,14 @@ This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to 
       (no import workflow yet).
 - [x] Allow deletion of selected assets with confirmation dialog and manifest persistence.
 - [x] Display full archive contents with automatic refresh when files are added externally.
+ 
+## Workflow & UX Enhancements
+- [ ] Group related commands into top-level menus (Assets, Build, Deploy) to replace one-button-per-command clutter.
+  - **Assets**: init, scan, check, vendor, convert, preview.
+  - **Build**: add-target, scaffold, schema export, font pack, SVG render.
+  - **Deploy**: sync, automation presets.
+- [ ] Introduce wizards that walk through common sequences like scan → convert → preview with progress indication.
+  - Wizard steps: select root → scan assets → convert formats → preview results → summary.
+- [ ] Support automation presets or macros to chain commands and replay frequent workflows.
+  - Allow saving command sequences as named presets in a JSON file and expose a "Run Preset" dialog.
 
