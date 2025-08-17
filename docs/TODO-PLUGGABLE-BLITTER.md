@@ -20,9 +20,9 @@
 
 | Done | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Implement `CpuBlitter` (scalar loops) | none | Correctness baseline, used in tests. |
-| [ ] | Fast paths for common formats (ARGB8888→RGB565, fills) | none | Consider `bytemuck` for casts. |
-| [ ] | Unit tests (golden buffers) | `proptest` optional | Reuse same tests across all backends. |
+| [x] | Implement `CpuBlitter` (scalar loops) | none | Correctness baseline, used in tests. |
+| [x] | Fast paths for common formats (ARGB8888→RGB565, fills) | none | Consider `bytemuck` for casts. |
+| [x] | Unit tests (golden buffers) | `proptest` optional | Reuse same tests across all backends. |
 
 ---
 

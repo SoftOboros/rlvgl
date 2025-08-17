@@ -9,6 +9,8 @@ extern crate std;
 
 /// Blitter traits and helpers.
 pub mod blit;
+/// CPU fallback blitter.
+pub mod cpu_blitter;
 /// Display driver traits and implementations.
 pub mod display;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -47,6 +49,7 @@ pub mod wgpu_blitter;
 pub use blit::{
     BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
 };
+pub use cpu_blitter::CpuBlitter;
 pub use display::DisplayDriver;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub use dma2d::Dma2dBlitter;
