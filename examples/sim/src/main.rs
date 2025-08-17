@@ -73,25 +73,17 @@ fn main() {
 
     let frame_cb = {
         let root = root.clone();
-        let width = width;
-        let height = height;
-        move |frame: &mut [u8]| {
+        move |frame: &mut [u8], w: usize, h: usize| {
             let mut blitter = WgpuBlitter::new();
-            let surface = Surface::new(
-                frame,
-                width * 4,
-                PixelFmt::Argb8888,
-                width as u32,
-                height as u32,
-            );
+            let surface = Surface::new(frame, w * 4, PixelFmt::Argb8888, w as u32, h as u32);
             let mut renderer: BlitterRenderer<'_, WgpuBlitter, 16> =
                 BlitterRenderer::new(&mut blitter, surface);
             root.borrow().draw(&mut renderer);
             renderer.planner().add(BlitRect {
                 x: 0,
                 y: 0,
-                w: width as u32,
-                h: height as u32,
+                w: w as u32,
+                h: h as u32,
             });
         }
     };
@@ -115,9 +107,9 @@ fn main() {
 
     if let Some(path) = headless_path {
         flush_pending(&root, &pending, &to_remove);
-        let mut frame = vec![0u8; WIDTH * HEIGHT * 4];
-        frame_cb(&mut frame);
-        let ascii = dump_ascii_frame(&frame, WIDTH, HEIGHT);
+        let mut frame = vec![0u8; width * height * 4];
+        frame_cb(&mut frame, width, height);
+        let ascii = dump_ascii_frame(&frame, width, height);
         let path = Path::new(&path);
         fs::write(path, ascii).expect("failed to write ASCII output");
         return;
@@ -125,13 +117,13 @@ fn main() {
 
     if let Some(path) = path {
         flush_pending(&root, &pending, &to_remove);
-        WgpuDisplay::headless(WIDTH, HEIGHT, |fb| frame_cb(fb, WIDTH, HEIGHT), path)
+        WgpuDisplay::headless(width, height, |fb| frame_cb(fb, width, height), path)
             .expect("PNG dump failed");
         return;
     }
 
     flush_pending(&root, &pending, &to_remove);
-    WgpuDisplay::new(WIDTH, HEIGHT).run(frame_cb, {
+    WgpuDisplay::new(width, height).run(frame_cb, {
         let root = root.clone();
         let pending = pending.clone();
         let to_remove = to_remove.clone();
