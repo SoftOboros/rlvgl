@@ -6,7 +6,7 @@
 
 #![cfg(feature = "simulator")]
 
-use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, vec, vec::Vec};
 use eframe::{self, egui};
 use image::{ColorType, ImageError, save_buffer};
 use pollster::block_on;
@@ -139,6 +139,7 @@ impl WgpuState {
             desired_maximum_frame_latency: 1,
         };
         surface.configure(&device, &config);
+        eprintln!("Surface format: {:?}", config.format);
         let max_texture_dim = device.limits().max_texture_dimension_2d;
         let frame = vec![0; (width * height * 4) as usize];
         Self {
@@ -174,6 +175,16 @@ impl WgpuState {
                     .get_current_texture()
                     .expect("failed to acquire surface texture")
             }
+        };
+       let frame_slice: Cow<[u8]> = match self.config.format {
+            wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
+                let mut converted = self.frame.clone();
+                for px in converted.chunks_exact_mut(4) {
+                    px.swap(0, 2);
+                }
+                Cow::Owned(converted)
+            }
+            _ => Cow::Borrowed(&self.frame),
         };
         let row_bytes = 4 * self.config.width as usize;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
@@ -228,7 +239,7 @@ impl WgpuState {
         }
         // Submit to ensure the texture write completes before presenting.
         // Set a breakpoint on this line to verify submission and inspect errors.
-        self.queue.submit(std::iter::empty());      
+        self.queue.submit(std::iter::empty());
         output.present();
     }
 
