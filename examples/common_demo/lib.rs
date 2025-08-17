@@ -7,7 +7,9 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, format, rc::Rc, vec::Vec};
+#[cfg(any(feature = "png", feature = "jpeg"))]
+use alloc::boxed::Box;
+use alloc::{format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
 #[cfg(feature = "jpeg")]
@@ -16,11 +18,15 @@ use rlvgl::core::jpeg;
 use rlvgl::core::png;
 #[cfg(feature = "qrcode")]
 use rlvgl::core::qrcode;
+#[cfg(any(feature = "png", feature = "jpeg"))]
+use rlvgl::core::widget::Color;
 use rlvgl::core::{
     WidgetNode,
-    widget::{Color, Rect, Widget},
+    widget::{Rect, Widget},
 };
-use rlvgl::widgets::{button::Button, container::Container, image::Image, label::Label};
+#[cfg(any(feature = "png", feature = "jpeg"))]
+use rlvgl::widgets::image::Image;
+use rlvgl::widgets::{button::Button, container::Container, label::Label};
 
 type WidgetHandle = Rc<RefCell<dyn Widget>>;
 type WidgetSlot = Rc<RefCell<Option<WidgetHandle>>>;
@@ -187,10 +193,7 @@ pub fn build_demo() -> Demo {
                     width: 100,
                     height: 110,
                 })));
-                let mut menu = WidgetNode {
-                    widget: menu_w.clone(),
-                    children: Vec::new(),
-                };
+                let mut children = Vec::new();
 
                 #[cfg(feature = "qrcode")]
                 {
@@ -218,7 +221,7 @@ pub fn build_demo() -> Demo {
                             }
                         });
                     }
-                    menu.children.push(WidgetNode {
+                    children.push(WidgetNode {
                         widget: qr_button,
                         children: Vec::new(),
                     });
@@ -252,7 +255,7 @@ pub fn build_demo() -> Demo {
                                 }
                             });
                     }
-                    menu.children.push(WidgetNode {
+                    children.push(WidgetNode {
                         widget: png_button,
                         children: Vec::new(),
                     });
@@ -286,12 +289,16 @@ pub fn build_demo() -> Demo {
                                 }
                             });
                     }
-                    menu.children.push(WidgetNode {
+                    children.push(WidgetNode {
                         widget: jpeg_button,
                         children: Vec::new(),
                     });
                 }
 
+                let menu = WidgetNode {
+                    widget: menu_w.clone(),
+                    children,
+                };
                 menu_ref.borrow_mut().replace(menu_w);
                 pending_add.borrow_mut().push(menu);
             }

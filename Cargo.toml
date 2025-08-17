@@ -87,7 +87,8 @@ version = "0.7"
 features = ["critical-section-single-core"]
 optional = true
 
-[target.'cfg(target_os = "none")'.dependencies.panic-halt]
+
+[dependencies.panic-halt]
 version = "1.0.0"
 optional = true
 
@@ -177,7 +178,6 @@ optional = true
 [dev-dependencies]
 insta = "1"
 tempfile = "3"
-panic-halt = "1.0.0"
 
 [features]
 default = []
@@ -192,6 +192,7 @@ stm32h747i_disco = [
     "dep:cortex-m-rt",
     "dep:cortex-m",
     "dep:embedded-alloc",
+    "dep:panic-halt",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "dep:rlottie"]
