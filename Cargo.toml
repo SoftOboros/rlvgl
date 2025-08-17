@@ -235,6 +235,7 @@ creator_ui = [
     "dep:open",
     "dep:notify",
     "dep:rfd",
+    "dep:serde_json",
 ]
 
 [profile.release]
