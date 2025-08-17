@@ -3,7 +3,7 @@
 mod common_demo;
 use common_demo::{build_demo, flush_pending};
 use rlvgl::platform::{
-    BlitRect, BlitterRenderer, InputEvent, PixelFmt, Surface, WgpuBlitter, WgpuDisplay,
+    BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Surface, WgpuBlitter, WgpuDisplay,
 };
 use std::{env, fs, path::Path};
 
@@ -51,8 +51,11 @@ fn main() {
     let mut width = DEFAULT_WIDTH;
     let mut height = DEFAULT_HEIGHT;
     let mut path = None;
+    let mut headless_path: Option<String> = None;
+    let mut use_wgpi = false;
 
-    for arg in env::args().skip(1) {
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
         if let Some(screen) = arg.strip_prefix("--screen=") {
             if let Some((w, h)) = screen.split_once('x') {
                 if let (Ok(w), Ok(h)) = (w.parse::<usize>(), h.parse::<usize>()) {
@@ -66,34 +69,9 @@ fn main() {
                 eprintln!("Invalid --screen value: {screen}");
                 return;
             }
-        } else {
-            path = Some(arg);
-        }
-    }
-
-    let mut blitter = WgpuBlitter::new();
-    let mut frame_cb = {
-        let root = root.clone();
-        move |frame: &mut [u8], w: usize, h: usize| {
-            let surface = Surface::new(frame, w * 4, PixelFmt::Argb8888, w as u32, h as u32);
-            let mut renderer: BlitterRenderer<'_, WgpuBlitter, 16> =
-                BlitterRenderer::new(&mut blitter, surface);
-            root.borrow().draw(&mut renderer);
-            renderer.planner().add(BlitRect {
-                x: 0,
-                y: 0,
-                w: w as u32,
-                h: h as u32,
-            });
-        }
-    };
-
-    // Check for a `--headless` option which writes an ASCII representation of
-    // the frame buffer to a file instead of launching a window.
-    let mut args = env::args().skip(1);
-    let mut headless_path: Option<String> = None;
-    while let Some(arg) = args.next() {
-        if arg.starts_with("--headless") {
+        } else if arg == "--wgpi" {
+            use_wgpi = true;
+        } else if arg.starts_with("--headless") {
             if let Some(eq) = arg.split_once('=') {
                 headless_path = Some(eq.1.to_string());
             } else {
@@ -102,8 +80,41 @@ fn main() {
                         .unwrap_or_else(|| DEFAULT_HEADLESS_PATH.to_string()),
                 );
             }
+        } else {
+            path = Some(arg);
         }
     }
+
+    let mut frame_cb = {
+        let root = root.clone();
+        move |frame: &mut [u8], w: usize, h: usize| {
+            if use_wgpi {
+                let mut blitter = WgpuBlitter::new();
+                let surface = Surface::new(frame, w * 4, PixelFmt::Argb8888, w as u32, h as u32);
+                let mut renderer: BlitterRenderer<'_, WgpuBlitter, 16> =
+                    BlitterRenderer::new(&mut blitter, surface);
+                root.borrow().draw(&mut renderer);
+                renderer.planner().add(BlitRect {
+                    x: 0,
+                    y: 0,
+                    w: w as u32,
+                    h: h as u32,
+                });
+            } else {
+                let mut blitter = CpuBlitter;
+                let surface = Surface::new(frame, w * 4, PixelFmt::Argb8888, w as u32, h as u32);
+                let mut renderer: BlitterRenderer<'_, CpuBlitter, 16> =
+                    BlitterRenderer::new(&mut blitter, surface);
+                root.borrow().draw(&mut renderer);
+                renderer.planner().add(BlitRect {
+                    x: 0,
+                    y: 0,
+                    w: w as u32,
+                    h: h as u32,
+                });
+            }
+        }
+    };
 
     if let Some(path) = headless_path {
         flush_pending(&root, &pending, &to_remove);
