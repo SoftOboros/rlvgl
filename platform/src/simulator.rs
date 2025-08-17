@@ -128,13 +128,24 @@ impl WgpuState {
         } else {
             caps.present_modes[0]
         };
+        // Prefer an opaque surface alpha mode so the simulator ignores any
+        // per-pixel alpha values in the frame buffer. Some environments default
+        // to a premultiplied alpha mode, which causes fully transparent pixels
+        // (alpha = 0) to display as the window's clear color instead of the
+        // intended RGB data. Selecting `Opaque` ensures that the RGB channels
+        // are presented directly, matching the headless renderer behaviour.
+        let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::Opaque) {
+            wgpu::CompositeAlphaMode::Opaque
+        } else {
+            caps.alpha_modes[0]
+        };
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width,
             height,
             present_mode,
-            alpha_mode: caps.alpha_modes[0],
+            alpha_mode,
             view_formats: vec![],
             desired_maximum_frame_latency: 1,
         };
