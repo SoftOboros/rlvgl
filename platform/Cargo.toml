@@ -27,7 +27,8 @@ image = { version = "0.24", default-features = false, features = ["png"], option
 bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt"] }
-[target.'cfg(any(target_arch = "arm", target_arch = "aarch64"))'.dependencies]
+
+[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.16", optional = true, features = ["stm32h747cm7", "rt"] }
 stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc"] }
 cortex-m = { version = "0.7", optional = true, features = ["critical-section-single-core", "cm7"] }
