@@ -30,7 +30,7 @@ impl DiscoSdBlockDevice {
             // SAFETY: Accessing the SCB registers is safe here because we have
             // exclusive access to the buffer and perform a full memory
             // barrier after touching the cache.
-            (&mut *(SCB::ptr() as *mut SCB)).invalidate_dcache_by_slice(buf);
+            (&mut *SCB::PTR.cast_mut()).invalidate_dcache_by_slice(buf);
         }
         asm::dmb();
     }
@@ -39,7 +39,7 @@ impl DiscoSdBlockDevice {
     fn clean(buf: &[u8]) {
         unsafe {
             // SAFETY: See rationale in [`Self::invalidate`].
-            (&mut *(SCB::ptr() as *mut SCB)).clean_dcache_by_slice(buf);
+            (&mut *SCB::PTR.cast_mut()).clean_dcache_by_slice(buf);
         }
         asm::dmb();
     }

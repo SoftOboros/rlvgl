@@ -15,8 +15,6 @@ use embedded_alloc::Heap;
 #[cfg(target_os = "none")]
 #[cfg(not(doc))]
 use panic_halt as _;
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-use rlvgl::platform::stm32h747i_disco::Stm32h747iDiscoInput;
 
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
@@ -41,9 +39,8 @@ fn main() -> ! {
         ALLOC.init(start, HEAP_SIZE);
     }
 
-    // TODO: initialize `Stm32h747iDiscoDisplay` with a concrete blitter
-    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-    let _touch = Stm32h747iDiscoInput;
+    // TODO: initialize `Stm32h747iDiscoDisplay` with a concrete blitter and
+    // touch input driver once the hardware integration is complete.
     let _demo = build_demo();
 
     loop {

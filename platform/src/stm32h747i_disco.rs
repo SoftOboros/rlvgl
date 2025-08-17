@@ -32,7 +32,7 @@ use stm32h7::stm32h747cm7::{DSIHOST, FMC, LTDC, RCC};
 /// Wraps a [`Blitter`] and configures LTDC/DSI clocks. The actual flush path is
 /// still unimplemented and will eventually transfer pixel data over MIPI-DSI.
 pub struct Stm32h747iDiscoDisplay<B: Blitter, BL = (), RST = ()> {
-    blitter: B,
+    _blitter: B,
     #[cfg(feature = "stm32h747i_disco")]
     backlight: BL,
     #[cfg(feature = "stm32h747i_disco")]
@@ -75,13 +75,13 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Ensure the panel is held in reset and the backlight is off
         let _ = reset.set_low();
         let mut disp = Self {
-            blitter,
+            _blitter: blitter,
             backlight,
             reset,
             ltdc,
             dsi,
         };
-        let _ = disp.backlight.set_duty_cycle(0);
+        disp.set_backlight(0);
         disp.reset_panel();
         Otm8009a::init(&mut disp.dsi);
         let fb = Self::init_sdram(fmc, rcc);
