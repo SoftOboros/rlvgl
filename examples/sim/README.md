@@ -11,9 +11,10 @@ Run the simulator with a custom screen resolution using:
 cargo run --bin rlvgl-sim -- --screen=800x480
 ```
 
-Omit `--screen` to use the default 320x240 resolution. Pass a file path as an
-additional argument to export a single frame to a PNG instead of launching the
-interactive window.
+Omit `--screen` to use the default 320x240 resolution. By default the simulator
+uses the CPU fallback blitter for rendering. Pass `--wgpi` to enable the wgpu
+accelerated blitter instead. Provide a file path as an additional argument to
+export a single frame to a PNG instead of launching the interactive window.
 
 For asset management workflows using `rlvgl-creator`, see
 [`README-CREATOR.md`](../../README-CREATOR.md).
