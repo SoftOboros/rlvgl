@@ -1,5 +1,7 @@
 //! Command handlers and dialogs for rlgvl-creator UI.
 
+use super::presets::{CommandPreset, run_preset_commands};
+use super::wizard::{WizardStep, run_scan_convert_preview_wizard};
 use super::*;
 
 impl CreatorApp {
@@ -223,5 +225,88 @@ impl CreatorApp {
     /// Handle the `svg` CLI command.
     pub(crate) fn handle_svg(&mut self) {
         self.svg_open = true;
+    }
+
+    /// Load a command preset from JSON and execute it.
+    pub(crate) fn handle_run_preset(&mut self) {
+        if let Some(file) = FileDialog::new()
+            .add_filter("preset", &["json"])
+            .pick_file()
+        {
+            match fs::read_to_string(&file)
+                .ok()
+                .and_then(|t| serde_json::from_str::<CommandPreset>(&t).ok())
+            {
+                Some(preset) => {
+                    run_preset_commands(&preset.commands, |c| self.handle_action(c));
+                    self.show_feedback("Run Preset", Ok(()));
+                }
+                None => {
+                    self.show_feedback("Run Preset", Err(anyhow::anyhow!("invalid preset file")));
+                }
+            }
+        }
+    }
+
+    /// Save the default Scan→Convert→Preview sequence as a preset.
+    pub(crate) fn handle_save_preset(&mut self) {
+        if let Some(path) = FileDialog::new().set_file_name("preset.json").save_file() {
+            let preset = CommandPreset {
+                commands: vec![
+                    "Scan".to_string(),
+                    "Convert".to_string(),
+                    "Preview".to_string(),
+                ],
+            };
+            let res = File::create(&path)
+                .map_err(anyhow::Error::from)
+                .and_then(|f| serde_json::to_writer(f, &preset).map_err(anyhow::Error::from));
+            self.show_feedback("Save Preset", res);
+        }
+    }
+
+    /// Run the Scan→Convert→Preview wizard.
+    pub(crate) fn handle_scan_convert_preview(&mut self) {
+        if let Some(root) = FileDialog::new().pick_folder() {
+            let manifest = Path::new(&self.manifest_path);
+            let res = run_scan_convert_preview_wizard(
+                || scan::run(&root, manifest),
+                || convert::run(&root, manifest, false),
+                || preview::run(&root, manifest),
+                |step| {
+                    self.toasts
+                        .push((format!("Wizard step: {:?}", step), Instant::now()));
+                },
+            );
+            self.show_feedback("Scan→Convert→Preview", res);
+        }
+    }
+}
+
+impl CreatorApp {
+    /// Dispatch a command by its label.
+    pub(crate) fn handle_action(&mut self, label: &str) {
+        match label {
+            "Init" => self.handle_init(),
+            "Scan" => self.handle_scan(),
+            "Check" => self.handle_check(),
+            "Vendor" => self.handle_vendor(),
+            "Convert" => self.handle_convert(),
+            "Preview" => self.handle_preview(),
+            "Add Asset" => self.handle_add_asset(),
+            "AddTarget" => self.handle_add_target(),
+            "Sync" => self.handle_sync(),
+            "Scaffold" => self.handle_scaffold(),
+            "Fonts Pack" => self.handle_fonts_pack(),
+            "Svg" => self.handle_svg(),
+            "Apng" => self.handle_apng(),
+            "Schema" => self.handle_schema(),
+            "Lottie Import" => self.handle_lottie_import(),
+            "Lottie CLI" => self.handle_lottie_cli(),
+            "Run Preset" => self.handle_run_preset(),
+            "Save Preset" => self.handle_save_preset(),
+            "Scan Convert Preview" => self.handle_scan_convert_preview(),
+            _ => {}
+        }
     }
 }

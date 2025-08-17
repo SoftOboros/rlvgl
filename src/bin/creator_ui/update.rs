@@ -39,53 +39,14 @@ impl App for CreatorApp {
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
-                if ui.button("Init").clicked() {
-                    self.handle_init();
-                }
-                if ui.button("Scan").clicked() {
-                    self.handle_scan();
-                }
-                if ui.button("Check").clicked() {
-                    self.handle_check();
-                }
-                if ui.button("Vendor").clicked() {
-                    self.handle_vendor();
-                }
-                if ui.button("Convert").clicked() {
-                    self.handle_convert();
-                }
-                if ui.button("Preview").clicked() {
-                    self.handle_preview();
-                }
-                if ui.button("Add Asset").clicked() {
-                    self.handle_add_asset();
-                }
-                if ui.button("AddTarget").clicked() {
-                    self.handle_add_target();
-                }
-                if ui.button("Sync").clicked() {
-                    self.handle_sync();
-                }
-                if ui.button("Scaffold").clicked() {
-                    self.handle_scaffold();
-                }
-                if ui.button("Apng").clicked() {
-                    self.handle_apng();
-                }
-                if ui.button("Schema").clicked() {
-                    self.handle_schema();
-                }
-                if ui.button("Fonts Pack").clicked() {
-                    self.handle_fonts_pack();
-                }
-                if ui.button("Lottie Import").clicked() {
-                    self.handle_lottie_import();
-                }
-                if ui.button("Lottie CLI").clicked() {
-                    self.handle_lottie_cli();
-                }
-                if ui.button("Svg").clicked() {
-                    self.handle_svg();
+                for (group, cmds) in super::menus::MENU_GROUPS {
+                    ui.menu_button(*group, |ui| {
+                        for cmd in *cmds {
+                            if ui.button(*cmd).clicked() {
+                                self.handle_action(cmd);
+                            }
+                        }
+                    });
                 }
                 ui.separator();
                 if ui.button("Layout Editor").clicked() {

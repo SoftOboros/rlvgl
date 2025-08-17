@@ -1,25 +1,59 @@
 name: Publish
 
 on:
-  push:
-    branches:
-      - dist
-  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]     # fires on close; we'll gate on merged==true
+  workflow_dispatch:       # optional manual run (requires inputs below)
+    inputs:
+      base:
+        description: "Base SHA (e.g., PR base commit)"
+        required: true
+      head:
+        description: "Head SHA (e.g., merge commit on main)"
+        required: true
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
+    # Only run for merged PRs to main, or when manually dispatched
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'closed' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout merged commit on main (or manual head)
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 10
-          ref: ${{ github.sha }}
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Resolve base/head SHAs
+        id: shas
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "base=${{ github.event.inputs.base }}" >> $GITHUB_OUTPUT
+            echo "head=${{ github.event.inputs.head }}" >> $GITHUB_OUTPUT
+          else
+            echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+            echo "head=${{ github.event.pull_request.merge_commit_sha }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
+
       - name: Publish changed crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: bash scripts/publish_changed.sh ${{ github.event.before }}
+        run: bash scripts/publish_changed.sh ${{ steps.shas.outputs.base }} ${{ steps.shas.outputs.head }}

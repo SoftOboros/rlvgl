@@ -81,7 +81,7 @@ fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
 }
 
 @fragment
-fn fs_main(_in: VsOut) -> @location(0) vec4<f32> {
+fn fs_main() -> @location(0) vec4<f32> {
     return u_color;
 }
 "#;
