@@ -20,3 +20,6 @@ RUSTDOCFLAGS="--cfg docsrs --cfg nightly" \
     cargo +nightly doc \
     --all-features \
     --no-deps --target x86_64-unknown-linux-gnu
+
+# Ensure the STM32H747I-DISCO example builds for its target
+RUSTFLAGS="" cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco --features stm32h747i_disco
