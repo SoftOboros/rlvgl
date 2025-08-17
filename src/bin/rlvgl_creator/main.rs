@@ -7,7 +7,7 @@ use anyhow::Result;
 
 #[path = "../creator/cli.rs"]
 mod cli;
-#[path = "../creator_ui/ui.rs"]
+#[path = "../creator_ui/mod.rs"]
 mod ui;
 
 pub use cli::*;
