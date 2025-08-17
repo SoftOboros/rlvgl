@@ -4,7 +4,7 @@ use super::*;
 
 impl CreatorApp {
     /// Display a modal message and toast based on the command result.
-    fn show_feedback(&mut self, title: &str, res: Result<()>) {
+    pub(crate) fn show_feedback(&mut self, title: &str, res: Result<()>) {
         match res {
             Ok(()) => {
                 MessageDialog::new()
@@ -28,14 +28,14 @@ impl CreatorApp {
     }
 
     /// Handle the `init` CLI command.
-    fn handle_init(&mut self) {
+    pub(crate) fn handle_init(&mut self) {
         let manifest = Path::new(&self.manifest_path);
         let res = init::run(manifest);
         self.show_feedback("Init", res);
     }
 
     /// Handle the `scan` CLI command.
-    fn handle_scan(&mut self) {
+    pub(crate) fn handle_scan(&mut self) {
         if let Some(root) = FileDialog::new().pick_folder() {
             let res = scan::run(&root, Path::new(&self.manifest_path));
             self.show_feedback("Scan", res);
@@ -43,7 +43,7 @@ impl CreatorApp {
     }
 
     /// Handle the `check` CLI command.
-    fn handle_check(&mut self) {
+    pub(crate) fn handle_check(&mut self) {
         if let Some(root) = FileDialog::new().pick_folder() {
             let fix = matches!(
                 MessageDialog::new()
@@ -58,7 +58,7 @@ impl CreatorApp {
     }
 
     /// Handle the `vendor` CLI command.
-    fn handle_vendor(&mut self) {
+    pub(crate) fn handle_vendor(&mut self) {
         if let Some(root) = FileDialog::new().pick_folder() {
             if let Some(out) = FileDialog::new().pick_folder() {
                 let res = vendor::run(&root, Path::new(&self.manifest_path), &out, &[], &[]);
@@ -68,7 +68,7 @@ impl CreatorApp {
     }
 
     /// Handle the `convert` CLI command.
-    fn handle_convert(&mut self) {
+    pub(crate) fn handle_convert(&mut self) {
         if let Some(root) = FileDialog::new().pick_folder() {
             let force = matches!(
                 MessageDialog::new()
@@ -83,7 +83,7 @@ impl CreatorApp {
     }
 
     /// Handle the `preview` CLI command.
-    fn handle_preview(&mut self) {
+    pub(crate) fn handle_preview(&mut self) {
         if let Some(root) = FileDialog::new().pick_folder() {
             let res = preview::run(&root, Path::new(&self.manifest_path));
             self.show_feedback("Preview", res);
@@ -91,7 +91,7 @@ impl CreatorApp {
     }
 
     /// Handle the `add-target` CLI command.
-    fn handle_add_target(&mut self) {
+    pub(crate) fn handle_add_target(&mut self) {
         if let Some(vendor_dir) = FileDialog::new().pick_folder() {
             if let Some(name) = vendor_dir.file_name().and_then(|n| n.to_str()) {
                 let res = add_target::run(Path::new(&self.manifest_path), name, &vendor_dir);
@@ -101,7 +101,7 @@ impl CreatorApp {
     }
 
     /// Handle the `sync` CLI command.
-    fn handle_sync(&mut self) {
+    pub(crate) fn handle_sync(&mut self) {
         if let Some(out) = FileDialog::new().pick_folder() {
             let dry_run = matches!(
                 MessageDialog::new()
@@ -116,7 +116,7 @@ impl CreatorApp {
     }
 
     /// Handle the `scaffold` CLI command.
-    fn handle_scaffold(&mut self) {
+    pub(crate) fn handle_scaffold(&mut self) {
         if let Some(path) = FileDialog::new().pick_folder() {
             let res = scaffold::run(&path, Path::new(&self.manifest_path));
             self.show_feedback("Scaffold", res);
@@ -124,7 +124,7 @@ impl CreatorApp {
     }
 
     /// Handle the `apng` CLI command.
-    fn handle_apng(&mut self) {
+    pub(crate) fn handle_apng(&mut self) {
         if let Some(frames) = FileDialog::new().pick_folder() {
             if let Some(out) = FileDialog::new()
                 .add_filter("apng", &["png"])
@@ -138,18 +138,18 @@ impl CreatorApp {
     }
 
     /// Handle the `schema` CLI command.
-    fn handle_schema(&mut self) {
+    pub(crate) fn handle_schema(&mut self) {
         let res = schema::run();
         self.show_feedback("Schema", res);
     }
 
     /// Handle the `fonts pack` CLI command.
-    fn handle_fonts_pack(&mut self) {
+    pub(crate) fn handle_fonts_pack(&mut self) {
         self.fonts_pack_open = true;
     }
 
     /// Handle the `lottie import` CLI command.
-    fn handle_lottie_import(&mut self) {
+    pub(crate) fn handle_lottie_import(&mut self) {
         if let Some(json) = FileDialog::new().add_filter("json", &["json"]).pick_file() {
             if let Some(out) = FileDialog::new().pick_folder() {
                 let res = lottie::import(&json, &out, None);
@@ -159,7 +159,7 @@ impl CreatorApp {
     }
 
     /// Handle the `lottie cli` command.
-    fn handle_lottie_cli(&mut self) {
+    pub(crate) fn handle_lottie_cli(&mut self) {
         if let Some(bin) = FileDialog::new().pick_file() {
             if let Some(json) = FileDialog::new().add_filter("json", &["json"]).pick_file() {
                 if let Some(out) = FileDialog::new().pick_folder() {
@@ -171,7 +171,7 @@ impl CreatorApp {
     }
 
     /// Add new assets via file dialog and refresh the manifest.
-    fn handle_add_asset(&mut self) {
+    pub(crate) fn handle_add_asset(&mut self) {
         if let Some(files) = FileDialog::new().pick_files() {
             let manifest_dir = Path::new(&self.manifest_path)
                 .parent()
@@ -221,7 +221,7 @@ impl CreatorApp {
     }
 
     /// Handle the `svg` CLI command.
-    fn handle_svg(&mut self) {
+    pub(crate) fn handle_svg(&mut self) {
         self.svg_open = true;
     }
 }

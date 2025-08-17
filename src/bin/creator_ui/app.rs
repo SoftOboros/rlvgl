@@ -3,64 +3,73 @@
 use super::*;
 
 pub(crate) struct CreatorApp {
-    manifest: manifest::Manifest,
-    manifest_path: String,
+    /// Asset manifest loaded from disk.
+    pub(crate) manifest: manifest::Manifest,
+    /// Path to the manifest.yml file.
+    pub(crate) manifest_path: String,
     /// Indices of currently selected assets.
-    selection: BTreeSet<usize>,
+    pub(crate) selection: BTreeSet<usize>,
     /// Temporary group name for adding selected assets.
-    new_group: String,
+    pub(crate) new_group: String,
     /// APNG frame delay in milliseconds for the builder.
-    apng_delay_ms: String,
+    pub(crate) apng_delay_ms: String,
     /// APNG loop count for the builder (0 = infinite).
-    apng_loops: String,
+    pub(crate) apng_loops: String,
     /// Root directory for font packing.
-    fonts_pack_root: String,
+    pub(crate) fonts_pack_root: String,
     /// Font size for packing.
-    fonts_pack_size: String,
+    pub(crate) fonts_pack_size: String,
     /// Character set for packing.
-    fonts_pack_chars: String,
+    pub(crate) fonts_pack_chars: String,
     /// Whether the font packer dialog is open.
-    fonts_pack_open: bool,
+    pub(crate) fonts_pack_open: bool,
     /// Source SVG file path for rendering.
-    svg_input: String,
+    pub(crate) svg_input: String,
     /// Output directory for rendered images.
-    svg_out_dir: String,
+    pub(crate) svg_out_dir: String,
     /// Comma-separated list of DPI values for rendering.
-    svg_dpis: String,
+    pub(crate) svg_dpis: String,
     /// Monochrome threshold for rendering (0-255).
-    svg_threshold: String,
+    pub(crate) svg_threshold: String,
     /// Whether the SVG renderer dialog is open.
-    svg_open: bool,
-    filter: String,
-    show_unlicensed_only: bool,
-    meta: Vec<AssetMeta>,
-    texture: Option<TextureHandle>,
-    texture_idx: Option<usize>,
-    zoom: f32,
-    offset: Vec2,
+    pub(crate) svg_open: bool,
+    /// Filter substring for asset search.
+    pub(crate) filter: String,
+    /// Whether to show only unlicensed assets.
+    pub(crate) show_unlicensed_only: bool,
+    /// Per-asset metadata such as hashes and groups.
+    pub(crate) meta: Vec<AssetMeta>,
+    /// Currently loaded texture for preview.
+    pub(crate) texture: Option<TextureHandle>,
+    /// Index of the currently loaded texture.
+    pub(crate) texture_idx: Option<usize>,
+    /// Zoom level for texture preview.
+    pub(crate) zoom: f32,
+    /// Pan offset for texture preview.
+    pub(crate) offset: Vec2,
     /// Cached thumbnail textures for assets.
-    thumbnails: Vec<Option<TextureHandle>>,
+    pub(crate) thumbnails: Vec<Option<TextureHandle>>,
     /// Receiver for raw asset change events.
-    thumb_rx: Receiver<notify::Result<notify::Event>>,
+    pub(crate) thumb_rx: Receiver<notify::Result<notify::Event>>,
     /// Watcher kept alive for hot-reload.
-    _thumb_watcher: Option<RecommendedWatcher>,
+    pub(crate) _thumb_watcher: Option<RecommendedWatcher>,
     /// Directory containing raw assets.
-    raw_dir: PathBuf,
+    pub(crate) raw_dir: PathBuf,
     /// Directory holding cached thumbnails.
-    thumb_dir: PathBuf,
+    pub(crate) thumb_dir: PathBuf,
     /// Transient toast messages with their creation time.
-    toasts: Vec<(String, Instant)>,
+    pub(crate) toasts: Vec<(String, Instant)>,
     /// Currently selected screen preset for bounding box overlays.
-    screen_preset: Option<usize>,
+    pub(crate) screen_preset: Option<usize>,
     /// Whether the layout editor window is open.
-    layout_open: bool,
+    pub(crate) layout_open: bool,
     /// Items placed in the layout editor.
-    layout_items: Vec<LayoutItem>,
+    pub(crate) layout_items: Vec<LayoutItem>,
 }
 
 impl CreatorApp {
     /// Create a new app from a manifest.
-    fn new(manifest: manifest::Manifest, manifest_path: String) -> Self {
+    pub(crate) fn new(manifest: manifest::Manifest, manifest_path: String) -> Self {
         let manifest_dir = Path::new(&manifest_path)
             .parent()
             .map(PathBuf::from)
@@ -220,7 +229,7 @@ impl CreatorApp {
     }
 
     /// Return one selected asset index, if any.
-    fn selected(&self) -> Option<usize> {
+    pub(crate) fn selected(&self) -> Option<usize> {
         self.selection.iter().next().copied()
     }
 
@@ -279,7 +288,7 @@ impl CreatorApp {
     }
 
     /// Load a thumbnail texture for the specified asset.
-    fn load_thumbnail(&mut self, ctx: &egui::Context, idx: usize) -> Result<()> {
+    pub(crate) fn load_thumbnail(&mut self, ctx: &egui::Context, idx: usize) -> Result<()> {
         self.ensure_thumbnail_file(idx)?;
         let path = self.thumb_dir.join(&self.manifest.assets[idx].path);
         if !path.exists() {
@@ -296,7 +305,7 @@ impl CreatorApp {
     }
 
     /// Build an APNG from PNG frames in the directory of the first selected asset.
-    fn make_apng_from_selection(&mut self) -> Result<()> {
+    pub(crate) fn make_apng_from_selection(&mut self) -> Result<()> {
         let idx = self
             .selected()
             .ok_or_else(|| anyhow::anyhow!("no selection"))?;
@@ -314,7 +323,7 @@ impl CreatorApp {
     }
 
     /// Add selected assets to the group named in `self.new_group`.
-    fn add_selection_to_group(&mut self) {
+    pub(crate) fn add_selection_to_group(&mut self) {
         let name = self.new_group.trim().to_string();
         if name.is_empty() || self.selection.is_empty() {
             return;
@@ -334,7 +343,7 @@ impl CreatorApp {
     }
 
     /// Add selected assets to the layout editor.
-    fn add_selection_to_layout(&mut self) {
+    pub(crate) fn add_selection_to_layout(&mut self) {
         if self.selection.is_empty() {
             return;
         }
@@ -348,7 +357,7 @@ impl CreatorApp {
     }
 
     /// Delete selected assets from disk and manifest.
-    fn delete_selection(&mut self) {
+    pub(crate) fn delete_selection(&mut self) {
         if self.selection.is_empty() {
             return;
         }
@@ -372,7 +381,7 @@ impl CreatorApp {
     }
 
     /// Open the manifest file in the system's default handler.
-    fn reveal_in_manifest(&mut self) {
+    pub(crate) fn reveal_in_manifest(&mut self) {
         if let Err(e) = open::that(&self.manifest_path) {
             self.toasts
                 .push((format!("Failed to open manifest: {}", e), Instant::now()));
@@ -380,7 +389,7 @@ impl CreatorApp {
     }
 
     /// Load the selected asset into a texture for preview.
-    fn load_texture(&mut self, ctx: &egui::Context, idx: usize) -> Result<()> {
+    pub(crate) fn load_texture(&mut self, ctx: &egui::Context, idx: usize) -> Result<()> {
         let asset = &self.manifest.assets[idx];
         let path = self.raw_dir.join(&asset.path);
         let img = image::open(&path)?;
@@ -396,14 +405,14 @@ impl CreatorApp {
     }
 
     /// Persist the manifest to disk.
-    fn save_manifest(&self) -> Result<()> {
+    pub(crate) fn save_manifest(&self) -> Result<()> {
         let file = File::create(&self.manifest_path)?;
         serde_yaml::to_writer(file, &self.manifest)?;
         Ok(())
     }
 
     /// Draw a checkerboard background behind the image.
-    fn draw_checkerboard(&self, painter: &egui::Painter, rect: egui::Rect, tile: f32) {
+    pub(crate) fn draw_checkerboard(&self, painter: &egui::Painter, rect: egui::Rect, tile: f32) {
         let light = egui::Color32::from_gray(200);
         let dark = egui::Color32::from_gray(160);
         let mut y = rect.top();
@@ -427,7 +436,7 @@ impl CreatorApp {
     }
 
     /// Overlay a pixel grid when sufficiently zoomed in.
-    fn draw_pixel_grid(
+    pub(crate) fn draw_pixel_grid(
         &self,
         painter: &egui::Painter,
         rect: egui::Rect,
@@ -467,7 +476,7 @@ impl CreatorApp {
     }
 
     /// Handle files dropped onto the UI by copying them into `assets/raw/` and rescanning the manifest.
-    fn handle_dropped_files(&mut self, ctx: &egui::Context) {
+    pub(crate) fn handle_dropped_files(&mut self, ctx: &egui::Context) {
         let dropped = ctx.input(|i| i.raw.dropped_files.clone());
         if dropped.is_empty() {
             return;
@@ -548,7 +557,7 @@ impl CreatorApp {
     }
 
     /// Build a directory tree from manifest asset paths.
-    fn build_dir_tree(&self) -> DirNode {
+    pub(crate) fn build_dir_tree(&self) -> DirNode {
         let mut root = DirNode::default();
         for (idx, asset) in self.manifest.assets.iter().enumerate() {
             let mut node = &mut root;
@@ -564,7 +573,7 @@ impl CreatorApp {
     }
 
     /// Recursively render the asset directory tree.
-    fn show_dir_node(&mut self, ui: &mut egui::Ui, name: &str, node: &DirNode) {
+    pub(crate) fn show_dir_node(&mut self, ui: &mut egui::Ui, name: &str, node: &DirNode) {
         if !name.is_empty() {
             egui::CollapsingHeader::new(name).show(ui, |ui| {
                 for (child_name, child) in &node.children {
