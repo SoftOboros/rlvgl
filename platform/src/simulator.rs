@@ -176,7 +176,7 @@ impl WgpuState {
                     .expect("failed to acquire surface texture")
             }
         };
-        let frame_slice: Cow<[u8]> = match self.config.format {
+       let frame_slice: Cow<[u8]> = match self.config.format {
             wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
                 let mut converted = self.frame.clone();
                 for px in converted.chunks_exact_mut(4) {
@@ -186,25 +186,60 @@ impl WgpuState {
             }
             _ => Cow::Borrowed(&self.frame),
         };
-        self.queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &output.texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &frame_slice,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * self.config.width),
-                rows_per_image: Some(self.config.height),
-            },
-            wgpu::Extent3d {
-                width: self.config.width,
-                height: self.config.height,
-                depth_or_array_layers: 1,
-            },
-        );
+        let row_bytes = 4 * self.config.width as usize;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+        if row_bytes % align == 0 {
+            self.queue.write_texture(
+                wgpu::ImageCopyTexture {
+                    texture: &output.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &self.frame,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(row_bytes as u32),
+                    rows_per_image: Some(self.config.height),
+                },
+                wgpu::Extent3d {
+                    width: self.config.width,
+                    height: self.config.height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        } else {
+            let stride = row_bytes + (align - row_bytes % align);
+            let mut padded = vec![0u8; stride * self.config.height as usize];
+            for y in 0..self.config.height as usize {
+                let src_off = y * row_bytes;
+                let dst_off = y * stride;
+                padded[dst_off..dst_off + row_bytes]
+                    .copy_from_slice(&self.frame[src_off..src_off + row_bytes]);
+            }
+            self.queue.write_texture(
+                wgpu::ImageCopyTexture {
+                    texture: &output.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &padded,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(stride as u32),
+                    rows_per_image: Some(self.config.height),
+                },
+                wgpu::Extent3d {
+                    width: self.config.width,
+                    height: self.config.height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+        // Submit to ensure the texture write completes before presenting.
+        // Set a breakpoint on this line to verify submission and inspect errors.
+        self.queue.submit(std::iter::empty());
         output.present();
     }
 
