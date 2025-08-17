@@ -26,13 +26,21 @@ impl DiscoSdBlockDevice {
 
     /// Clean and invalidate the D-Cache for `buf` to prepare for DMA.
     fn invalidate(buf: &mut [u8]) {
-        unsafe { SCB::invalidate_dcache_by_slice(buf) };
+        unsafe {
+            // SAFETY: Accessing the SCB registers is safe here because we have
+            // exclusive access to the buffer and perform a full memory
+            // barrier after touching the cache.
+            (&mut *(SCB::ptr() as *mut SCB)).invalidate_dcache_by_slice(buf);
+        }
         asm::dmb();
     }
 
     /// Clean the D-Cache for `buf` before a DMA write.
     fn clean(buf: &[u8]) {
-        unsafe { SCB::clean_dcache_by_slice(buf) };
+        unsafe {
+            // SAFETY: See rationale in [`Self::invalidate`].
+            (&mut *(SCB::ptr() as *mut SCB)).clean_dcache_by_slice(buf);
+        }
         asm::dmb();
     }
 }
@@ -67,7 +75,7 @@ impl BlockDevice for DiscoSdBlockDevice {
     fn num_blocks(&self) -> u64 {
         self.sdmmc
             .card()
-            .map(|c| c.block_count() as u64)
+            .map(|c| c.csd.block_count() as u64)
             .unwrap_or(0)
     }
 
