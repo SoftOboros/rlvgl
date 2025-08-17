@@ -194,6 +194,9 @@ impl WgpuState {
                 depth_or_array_layers: 1,
             },
         );
+        // Submit to ensure the texture write completes before presenting.
+        // Set a breakpoint on this line to verify submission and inspect errors.
+        self.queue.submit(std::iter::empty());
         output.present();
     }
 
