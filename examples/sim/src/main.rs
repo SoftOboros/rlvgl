@@ -85,7 +85,7 @@ fn main() {
         }
     }
 
-    let frame_cb = {
+    let mut frame_cb = {
         let root = root.clone();
         move |frame: &mut [u8], w: usize, h: usize| {
             if use_wgpi {
