@@ -60,7 +60,10 @@ mod app;
 use app::CreatorApp;
 
 mod commands;
+mod menus;
+mod presets;
 mod update;
+mod wizard;
 
 /// Launch the rlgvl-creator desktop interface.
 ///
