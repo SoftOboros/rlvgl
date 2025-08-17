@@ -15,43 +15,8 @@ Omit `--screen` to use the default 320x240 resolution. Pass a file path as an
 additional argument to export a single frame to a PNG instead of launching the
 interactive window.
 
-## rlvgl-creator workflows
-
-`rlvgl-creator` manages assets for rlvgl projects and can be combined with the
-simulator when developing interfaces. Common flows include:
-
-### Initialize a new asset pack
-
-```bash
-rlvgl-creator init
-rlvgl-creator add-target host vendor
-```
-
-`init` creates `icons/`, `fonts/`, and `media/` directories alongside a
-`manifest.yml`. `add-target` records where converted assets should be written
-for the host simulator.
-
-### Import and convert assets
-
-Place source files under the asset directories and scan them:
-
-```bash
-rlvgl-creator scan
-rlvgl-creator convert
-```
-
-`scan` hashes assets and updates the manifest; `convert` normalizes images to
-raw RGBA and refreshes the manifest.
-
-### Preview and scaffold
-
-```bash
-rlvgl-creator preview
-rlvgl-creator scaffold assets-pack
-```
-
-`preview` writes 64×64 thumbnails under `thumbs/`. `scaffold` generates a
-dual-mode assets crate that can be embedded or vendored into the simulator.
+For asset management workflows using `rlvgl-creator`, see
+[`README-CREATOR.md`](../../README-CREATOR.md).
 
 ## Requirements
 The rlvgl demo requires libgtk-3-dev and librlotte-dev for display and support of Lottie creation (Not implemented).
