@@ -416,9 +416,23 @@ impl WgpuDisplay {
                         (size.width as f64 - w as f64) / 2.0,
                         (size.height as f64 - h as f64) / 2.0,
                     );
-                    state.resize(w.min(max_dim), h.min(max_dim));
+                    let mut fb_w = w;
+                    let mut fb_h = h;
+                    let mut texture_scale = 1.0f64;
+                    if fb_w > max_dim || fb_h > max_dim {
+                        texture_scale =
+                            (fb_w as f64 / max_dim as f64).max(fb_h as f64 / max_dim as f64);
+                        fb_w = (fb_w as f64 / texture_scale).round() as u32;
+                        fb_h = (fb_h as f64 / texture_scale).round() as u32;
+                    }
+                    // Render at the reduced framebuffer size; the window will scale
+                    // the image up during presentation.
+                    state.resize(fb_w, fb_h);
                     let old_scale = scale;
-                    scale = (w as f64 / width as f64, h as f64 / height as f64);
+                    scale = (
+                        (fb_w as f64 / width as f64) * texture_scale,
+                        (fb_h as f64 / height as f64) * texture_scale,
+                    );
                     pointer_pos = (
                         (pointer_pos.0 as f64 * old_scale.0 / scale.0) as i32,
                         (pointer_pos.1 as f64 * old_scale.1 / scale.1) as i32,

@@ -19,6 +19,12 @@ export a single frame to a PNG instead of launching the interactive window.
 For asset management workflows using `rlvgl-creator`, see
 [`README-CREATOR.md`](../../README-CREATOR.md).
 
+## Limitations
+
+On ultra-high-resolution monitors that exceed the GPU's `max_texture_dimension`,
+the simulator renders to a smaller internal framebuffer and scales it up for
+display. This may result in letterboxing or reduced clarity on such displays.
+
 ## Requirements
 The rlvgl demo requires libgtk-3-dev and librlotte-dev for display and support of Lottie creation (Not implemented).
 
