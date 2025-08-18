@@ -181,10 +181,10 @@ tempfile = "3"
 
 [features]
 default = []
-png = ["rlvgl-core/png"]
-jpeg = ["rlvgl-core/jpeg"]
-gif = ["rlvgl-core/gif", "dep:gif"]
-qrcode = ["rlvgl-core/qrcode"]
+png = ["rlvgl-core/png", "rlvgl-platform/png"]
+jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg"]
+gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif"]
+qrcode = ["rlvgl-core/qrcode", "rlvgl-platform/qrcode"]
 simulator = ["rlvgl-platform/simulator"]
 st7789 = ["rlvgl-platform/st7789"]
 stm32h747i_disco = [
@@ -195,12 +195,12 @@ stm32h747i_disco = [
     "dep:panic-halt",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
-lottie = ["rlvgl-core/lottie", "dep:rlottie"]
-canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
-pinyin = ["rlvgl-core/pinyin"]
-fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
-nes = ["rlvgl-core/nes", "dep:yane"]
-apng = ["rlvgl-core/apng", "dep:image"]
+lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie", "dep:rlottie"]
+canvas = ["rlvgl-core/canvas", "rlvgl-platform/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
+pinyin = ["rlvgl-core/pinyin", "rlvgl-platform/pinyin"]
+fatfs = ["rlvgl-core/fatfs", "rlvgl-platform/fatfs", "dep:fatfs", "dep:fscommon"]
+nes = ["rlvgl-core/nes", "rlvgl-platform/nes", "dep:yane"]
+apng = ["rlvgl-core/apng", "dep:image", "rlvgl-platform/apng"]
 fs = ["rlvgl-core/fs"]
 creator = [
     "dep:clap",

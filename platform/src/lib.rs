@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-#[cfg(feature = "simulator")]
+#[cfg(any(feature = "simulator", feature = "fatfs"))]
 extern crate std;
 
 /// Blitter traits and helpers.

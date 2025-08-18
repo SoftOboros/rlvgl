@@ -3,10 +3,20 @@
 //! These types describe pixel surfaces and operations that can be
 //! accelerated by different platform implementations.
 
+#[cfg(feature = "fontdue")]
+use alloc::collections::BTreeMap;
+use alloc::vec;
+#[cfg(feature = "fontdue")]
+use alloc::vec::Vec;
 use bitflags::bitflags;
-use heapless::Vec;
+use heapless::Vec as HVec;
+#[cfg(feature = "fontdue")]
+use rlvgl_core::fontdue::{Metrics, line_metrics, rasterize_glyph};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect as WidgetRect};
+
+#[cfg(feature = "fontdue")]
+const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
 
 /// Supported pixel formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,13 +116,13 @@ pub trait Blitter {
 /// obtain the batched list for flushing. After presenting the frame, call
 /// [`clear`] to reuse the planner for the next frame.
 pub struct BlitPlanner<const N: usize> {
-    rects: Vec<Rect, N>,
+    rects: HVec<Rect, N>,
 }
 
 impl<const N: usize> BlitPlanner<N> {
     /// Create an empty planner.
     pub fn new() -> Self {
-        Self { rects: Vec::new() }
+        Self { rects: HVec::new() }
     }
 
     /// Record a dirty rectangle.
@@ -146,6 +156,8 @@ pub struct BlitterRenderer<'a, B: Blitter, const N: usize> {
     blitter: &'a mut B,
     surface: Surface<'a>,
     planner: BlitPlanner<N>,
+    #[cfg(feature = "fontdue")]
+    glyph_cache: BTreeMap<char, (Metrics, Vec<u8>)>,
 }
 
 impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
@@ -155,12 +167,184 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             blitter,
             surface,
             planner: BlitPlanner::new(),
+            #[cfg(feature = "fontdue")]
+            glyph_cache: BTreeMap::new(),
         }
     }
 
     /// Access the internal dirty-rectangle planner.
     pub fn planner(&mut self) -> &mut BlitPlanner<N> {
         &mut self.planner
+    }
+
+    fn blit_colors(&mut self, position: (i32, i32), pixels: &[Color], w: u32, h: u32) {
+        let mut buf = vec![0u8; (w * h * 4) as usize];
+        for (i, c) in pixels.iter().enumerate() {
+            buf[i * 4..i * 4 + 4].copy_from_slice(&c.to_argb8888().to_le_bytes());
+        }
+        let src = Surface::new(
+            buf.as_mut_slice(),
+            (w * 4) as usize,
+            PixelFmt::Argb8888,
+            w,
+            h,
+        );
+        self.blitter
+            .blit(&src, Rect { x: 0, y: 0, w, h }, &mut self.surface, position);
+        self.planner.add(Rect {
+            x: position.0,
+            y: position.1,
+            w,
+            h,
+        });
+    }
+
+    #[cfg(feature = "png")]
+    /// Decode a PNG image and blit it onto the target surface.
+    pub fn draw_png(
+        &mut self,
+        position: (i32, i32),
+        data: &[u8],
+    ) -> Result<(), rlvgl_core::png::DecodingError> {
+        let (pixels, w, h) = rlvgl_core::png::decode(data)?;
+        self.blit_colors(position, &pixels, w, h);
+        Ok(())
+    }
+
+    #[cfg(feature = "jpeg")]
+    /// Decode a JPEG image and blit it onto the target surface.
+    pub fn draw_jpeg(
+        &mut self,
+        position: (i32, i32),
+        data: &[u8],
+    ) -> Result<(), rlvgl_core::jpeg::Error> {
+        let (pixels, w, h) = rlvgl_core::jpeg::decode(data)?;
+        self.blit_colors(position, &pixels, w as u32, h as u32);
+        Ok(())
+    }
+
+    #[cfg(feature = "qrcode")]
+    /// Generate a QR code from `data` and blit it onto the target surface.
+    pub fn draw_qr(
+        &mut self,
+        position: (i32, i32),
+        data: &[u8],
+    ) -> Result<(), rlvgl_core::qrcode::QrError> {
+        let (pixels, w, h) = rlvgl_core::qrcode::generate(data)?;
+        self.blit_colors(position, &pixels, w, h);
+        Ok(())
+    }
+
+    #[cfg(feature = "lottie")]
+    /// Render a Lottie JSON animation frame and blit it onto the target surface.
+    ///
+    /// Returns `true` if the frame was rendered successfully.
+    pub fn draw_lottie_frame(
+        &mut self,
+        position: (i32, i32),
+        json: &str,
+        frame: usize,
+        width: u32,
+        height: u32,
+    ) -> bool {
+        if let Some(pixels) =
+            rlvgl_core::lottie::render_lottie_frame(json, frame, width as usize, height as usize)
+        {
+            self.blit_colors(position, &pixels, width, height);
+            true
+        } else {
+            false
+        }
+    }
+
+    #[cfg(feature = "canvas")]
+    /// Blit an [`rlvgl_core::canvas::Canvas`] onto the target surface.
+    pub fn draw_canvas(&mut self, position: (i32, i32), canvas: &rlvgl_core::canvas::Canvas) {
+        let (w, h) = canvas.size();
+        let pixels = canvas.pixels();
+        self.blit_colors(position, &pixels, w, h);
+    }
+
+    #[cfg(feature = "gif")]
+    /// Decode a GIF and blit the selected frame onto the target surface.
+    pub fn draw_gif_frame(
+        &mut self,
+        position: (i32, i32),
+        data: &[u8],
+        frame: usize,
+    ) -> Result<(), rlvgl_core::gif::DecodingError> {
+        let (frames, w, h) = rlvgl_core::gif::decode(data)?;
+        if let Some(f) = frames.get(frame) {
+            self.blit_colors(position, &f.pixels, w as u32, h as u32);
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "apng")]
+    /// Decode an APNG and blit the selected frame onto the target surface.
+    pub fn draw_apng_frame(
+        &mut self,
+        position: (i32, i32),
+        data: &[u8],
+        frame: usize,
+    ) -> Result<(), image::ImageError> {
+        let (frames, w, h) = rlvgl_core::apng::decode(data)?;
+        if let Some(f) = frames.get(frame) {
+            self.blit_colors(position, &f.pixels, w, h);
+        }
+        Ok(())
+    }
+
+    #[cfg(all(feature = "pinyin", feature = "fontdue"))]
+    /// Render Pinyin IME candidate characters via the blitter.
+    ///
+    /// Returns `true` if any candidates were rendered for `input`.
+    pub fn draw_pinyin_candidates(
+        &mut self,
+        position: (i32, i32),
+        ime: &rlvgl_core::pinyin::PinyinInputMethod,
+        input: &str,
+        color: Color,
+    ) -> bool {
+        if let Some(chars) = ime.candidates(input) {
+            let text: alloc::string::String = chars.into_iter().collect();
+            self.draw_text(position, &text, color);
+            true
+        } else {
+            false
+        }
+    }
+
+    #[cfg(all(feature = "fatfs", feature = "fontdue"))]
+    /// List a FAT directory and render the entries line by line.
+    pub fn draw_fatfs_dir<T>(
+        &mut self,
+        position: (i32, i32),
+        image: &mut T,
+        dir: &str,
+        color: Color,
+    ) -> Result<(), std::io::Error>
+    where
+        T: std::io::Read + std::io::Write + std::io::Seek,
+    {
+        let names = rlvgl_core::fatfs::list_dir(image, dir)?;
+        for (i, name) in names.iter().enumerate() {
+            let y = position.1 + (i as i32) * 16;
+            self.draw_text((position.0, y), name, color);
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "nes")]
+    /// Blit an NES frame represented as ARGB8888 [`Color`] pixels.
+    pub fn draw_nes_frame(
+        &mut self,
+        position: (i32, i32),
+        pixels: &[Color],
+        width: u32,
+        height: u32,
+    ) {
+        self.blit_colors(position, pixels, width, height);
     }
 }
 
@@ -177,7 +361,288 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
     }
 
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
-        let _ = (position, text, color);
-        // Text rendering will be implemented in a future revision.
+        #[cfg(feature = "fontdue")]
+        {
+            const PX: f32 = 16.0;
+            let vm = line_metrics(FONT_DATA, PX).unwrap();
+            let ascent = vm.ascent.round() as i32;
+            let baseline = position.1 + ascent;
+            let mut x_cursor = position.0;
+            for ch in text.chars() {
+                let (metrics, bitmap) = {
+                    let entry = self
+                        .glyph_cache
+                        .entry(ch)
+                        .or_insert_with(|| rasterize_glyph(FONT_DATA, ch, PX).unwrap());
+                    (entry.0, entry.1.clone())
+                };
+                let w = metrics.width as i32;
+                let h = metrics.height as i32;
+                if w == 0 || h == 0 {
+                    x_cursor += metrics.advance_width.round() as i32;
+                    continue;
+                }
+                let mut argb = vec![0u8; (w * h * 4) as usize];
+                for y in 0..h {
+                    for x in 0..w {
+                        let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
+                        let idx = ((y * w + x) * 4) as usize;
+                        argb[idx] = (color.0 as u16 * alpha as u16 / 255) as u8;
+                        argb[idx + 1] = (color.1 as u16 * alpha as u16 / 255) as u8;
+                        argb[idx + 2] = (color.2 as u16 * alpha as u16 / 255) as u8;
+                        argb[idx + 3] = alpha;
+                    }
+                }
+                let src = Surface::new(
+                    argb.as_mut_slice(),
+                    (w * 4) as usize,
+                    PixelFmt::Argb8888,
+                    w as u32,
+                    h as u32,
+                );
+                let dst_pos = (
+                    x_cursor + metrics.xmin,
+                    baseline - ascent - metrics.ymin - (h - 1),
+                );
+                self.blitter.blend(
+                    &src,
+                    Rect {
+                        x: 0,
+                        y: 0,
+                        w: w as u32,
+                        h: h as u32,
+                    },
+                    &mut self.surface,
+                    dst_pos,
+                );
+                self.planner.add(Rect {
+                    x: dst_pos.0,
+                    y: dst_pos.1,
+                    w: w as u32,
+                    h: h as u32,
+                });
+                x_cursor += metrics.advance_width.round() as i32;
+            }
+        }
+        #[cfg(not(feature = "fontdue"))]
+        {
+            let _ = (position, text, color);
+        }
+    }
+}
+
+#[cfg(all(test, feature = "fontdue"))]
+mod text_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+
+    #[test]
+    fn blitter_draws_text() {
+        let mut buf = [0u8; 64 * 64 * 4];
+        let surface = Surface::new(&mut buf, 64 * 4, PixelFmt::Argb8888, 64, 64);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_text((0, 0), "A", Color(255, 255, 255, 255));
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "png"))]
+mod png_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use base64::Engine;
+
+    const RED_DOT_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+
+    #[test]
+    fn blitter_draws_png() {
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(RED_DOT_PNG)
+            .unwrap();
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_png((0, 0), &data).unwrap();
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "jpeg"))]
+mod jpeg_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use base64::Engine;
+
+    const RED_DOT_JPEG: &str = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDi6KKK+ZP3E//Z";
+
+    #[test]
+    fn blitter_draws_jpeg() {
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(RED_DOT_JPEG)
+            .unwrap();
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_jpeg((0, 0), &data).unwrap();
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "gif"))]
+mod gif_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use base64::Engine;
+
+    const RED_DOT_GIF: &str = "R0lGODdhAQABAPAAAP8AAP///yH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+
+    #[test]
+    fn blitter_draws_gif() {
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(RED_DOT_GIF)
+            .unwrap();
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_gif_frame((0, 0), &data, 0).unwrap();
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "canvas"))]
+mod canvas_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use embedded_graphics::prelude::Point;
+    use rlvgl_core::canvas::Canvas;
+
+    #[test]
+    fn blitter_draws_canvas() {
+        let mut canvas = Canvas::new(1, 1);
+        canvas.draw_pixel(Point::new(0, 0), Color(255, 0, 0, 255));
+        let mut buf = [0u8; 4];
+        let surface = Surface::new(&mut buf, 4, PixelFmt::Argb8888, 1, 1);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_canvas((0, 0), &canvas);
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "qrcode"))]
+mod qrcode_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+
+    #[test]
+    fn blitter_draws_qr() {
+        let mut buf = [0u8; 64 * 64 * 4];
+        let surface = Surface::new(&mut buf, 64 * 4, PixelFmt::Argb8888, 64, 64);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_qr((0, 0), b"hi").unwrap();
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "lottie"))]
+mod lottie_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+
+    const SIMPLE_JSON: &str =
+        "{\"v\":\"5.7\",\"fr\":30,\"ip\":0,\"op\":0,\"w\":1,\"h\":1,\"layers\":[]}";
+
+    #[test]
+    fn blitter_draws_lottie() {
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        assert!(renderer.draw_lottie_frame((0, 0), SIMPLE_JSON, 0, 1, 1));
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "pinyin", feature = "fontdue"))]
+mod pinyin_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use rlvgl_core::pinyin::PinyinInputMethod;
+
+    #[test]
+    fn blitter_draws_pinyin() {
+        let mut buf = [0u8; 64 * 64 * 4];
+        let surface = Surface::new(&mut buf, 64 * 4, PixelFmt::Argb8888, 64, 64);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let ime = PinyinInputMethod;
+        assert!(renderer.draw_pinyin_candidates((0, 0), &ime, "zhong", Color(255, 255, 255, 255)));
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "fatfs", feature = "fontdue"))]
+mod fatfs_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use fatfs::{FileSystem, FormatVolumeOptions, FsOptions};
+    use fscommon::BufStream;
+    use std::io::{Cursor, Seek, SeekFrom, Write};
+
+    #[test]
+    fn blitter_draws_fatfs_listing() {
+        let mut img = Cursor::new(vec![0u8; 1024 * 512]);
+        fatfs::format_volume(&mut img, FormatVolumeOptions::new()).unwrap();
+        img.seek(SeekFrom::Start(0)).unwrap();
+        {
+            let buf_stream = BufStream::new(&mut img);
+            let fs = FileSystem::new(buf_stream, FsOptions::new()).unwrap();
+            fs.root_dir()
+                .create_file("foo.txt")
+                .unwrap()
+                .write_all(b"hi")
+                .unwrap();
+        }
+        img.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = [0u8; 64 * 64 * 4];
+        let surface = Surface::new(&mut buf, 64 * 4, PixelFmt::Argb8888, 64, 64);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer
+            .draw_fatfs_dir((0, 0), &mut img, "/", Color(255, 255, 255, 255))
+            .unwrap();
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
+#[cfg(all(test, feature = "nes"))]
+mod nes_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+
+    #[test]
+    fn blitter_draws_nes_frame() {
+        let pixels = [Color(255, 0, 0, 255)];
+        let mut buf = [0u8; 4];
+        let surface = Surface::new(&mut buf, 4, PixelFmt::Argb8888, 1, 1);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_nes_frame((0, 0), &pixels, 1, 1);
+        assert!(buf.iter().any(|&p| p != 0));
     }
 }

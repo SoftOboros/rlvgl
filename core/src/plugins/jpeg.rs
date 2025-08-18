@@ -1,7 +1,8 @@
 //! JPEG decoder for Color pixel arrays.
 use crate::widget::Color;
 use alloc::vec::Vec;
-use jpeg_decoder::{Decoder, Error, PixelFormat};
+pub use jpeg_decoder::Error;
+use jpeg_decoder::{Decoder, PixelFormat};
 use std::io::Cursor;
 
 /// Decode a JPEG image into a vector of RGB [`Color`]s.

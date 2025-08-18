@@ -105,3 +105,16 @@
 | [ ] | Developer doc: “Choosing a blitter/backend” | none | When to pick which, memory tradeoffs. |
 | [ ] | Image diff harness (sim output vs golden) | `image`, `assert_cmd` | Thresholded RGBA delta.
 
+
+---
+
+## J) Plugins & Widgets – Blitter Integration
+
+| Done | Description | Dependencies | Notes |
+|---|---|---|---|
+| [x] | Integrate `fontdue` text rasteriser into `BlitterRenderer` | `fontdue` | Cache glyphs as `Surface`s; support CPU/WGPU/DMA2D paths. |
+| [x] | Connect image decoders (`png`, `jpeg`, `gif`, `apng`) to produce blitter surfaces | `png`, `jpeg`, `gif`, `apng` | Decode to `Surface` and call `blit()`/`blend()`; handle animation frames. |
+| [x] | Render `QrWidget` via blitter pipeline | `qrcode` | Generate QR bitmap, upload as `Surface`, avoid direct framebuffer writes. |
+| [x] | Bridge `rlottie` frames to blitter surfaces | `rlottie` | Convert vector frames to `Surface`; allow GPU acceleration. |
+| [x] | Treat `CanvasWidget` buffers as blitter surfaces | `embedded-canvas` | Incrementally flush dirty regions through blitter. |
+| [x] | Route higher-level widgets (pinyin IME, FATFS file picker, NES demo) through canvas/blitter stack | `pinyin`, `fatfs-embedded`, `yane` | Ensure their rendering paths remain backend-agnostic. |
