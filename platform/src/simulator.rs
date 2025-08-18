@@ -271,6 +271,7 @@ pub struct WgpuDisplay {
     event_loop: EventLoop<()>,
     window: &'static Window,
     state: WgpuState,
+    scale: (f64, f64),
 }
 
 impl WgpuDisplay {
@@ -298,14 +299,20 @@ impl WgpuDisplay {
             )
             .expect("failed to create window");
         let window = Box::leak(Box::new(window));
-        let state = WgpuState::new(window, width as u32, height as u32);
+        let phys = window.inner_size();
+        let state = WgpuState::new(window, phys.width, phys.height);
         let window: &'static Window = &*window;
+        let scale = (
+            phys.width as f64 / width as f64,
+            phys.height as f64 / height as f64,
+        );
         Self {
             width,
             height,
             event_loop,
             window,
             state,
+            scale,
         }
     }
 
@@ -326,6 +333,7 @@ impl WgpuDisplay {
             event_loop,
             window,
             mut state,
+            scale: initial_scale,
         } = self;
         event_loop.set_control_flow(ControlFlow::Poll);
         // Request an initial redraw so the window displays its first frame
@@ -337,7 +345,7 @@ impl WgpuDisplay {
         let mut pointer_down = false;
         let mut surface_offset = (0.0f64, 0.0f64);
         // Ratio between window pixels and logical display coordinates
-        let mut scale = (1.0f64, 1.0f64);
+        let mut scale = initial_scale;
         let aspect_ratio = width as f64 / height as f64;
         let max_dim = state.max_texture_dimension();
         let mut fullscreen = false;
