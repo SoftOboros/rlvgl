@@ -18,6 +18,18 @@ use rlvgl_core::widget::{Color, Rect as WidgetRect};
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
 
+#[cfg(feature = "fontdue")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Key identifying a cached glyph by font, size, and character.
+struct GlyphKey {
+    /// Pointer to the font data used to rasterize the glyph.
+    font: *const u8,
+    /// Font size in pixels, stored as raw bits for ordering.
+    size: u32,
+    /// Unicode codepoint of the glyph.
+    ch: char,
+}
+
 /// Supported pixel formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PixelFmt {
@@ -157,7 +169,7 @@ pub struct BlitterRenderer<'a, B: Blitter, const N: usize> {
     surface: Surface<'a>,
     planner: BlitPlanner<N>,
     #[cfg(feature = "fontdue")]
-    glyph_cache: BTreeMap<char, (Metrics, Vec<u8>)>,
+    glyph_cache: BTreeMap<GlyphKey, (Metrics, Vec<u8>)>,
 }
 
 impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
@@ -308,7 +320,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
     ) -> bool {
         if let Some(chars) = ime.candidates(input) {
             let text: alloc::string::String = chars.into_iter().collect();
-            self.draw_text(position, &text, color);
+            Renderer::draw_text(self, position, &text, color);
             true
         } else {
             false
@@ -330,7 +342,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         let names = rlvgl_core::fatfs::list_dir(image, dir)?;
         for (i, name) in names.iter().enumerate() {
             let y = position.1 + (i as i32) * 16;
-            self.draw_text((position.0, y), name, color);
+            Renderer::draw_text(self, (position.0, y), name, color);
         }
         Ok(())
     }
@@ -345,6 +357,95 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         height: u32,
     ) {
         self.blit_colors(position, pixels, width, height);
+    }
+
+    #[cfg(feature = "fontdue")]
+    /// Draw UTF-8 text using the supplied font and size.
+    pub fn draw_text(
+        &mut self,
+        position: (i32, i32),
+        text: &str,
+        color: Color,
+        font_data: &[u8],
+        px: f32,
+    ) {
+        let vm = line_metrics(font_data, px).unwrap();
+        let ascent = vm.ascent.round() as i32;
+        let baseline = position.1 + ascent;
+        let mut x_cursor = position.0;
+        for ch in text.chars() {
+            let key = GlyphKey {
+                font: font_data.as_ptr(),
+                size: px.to_bits(),
+                ch,
+            };
+            let (metrics, bitmap) = {
+                let entry = self
+                    .glyph_cache
+                    .entry(key)
+                    .or_insert_with(|| rasterize_glyph(font_data, ch, px).unwrap());
+                (entry.0, entry.1.clone())
+            };
+            let w = metrics.width as i32;
+            let h = metrics.height as i32;
+            if w == 0 || h == 0 {
+                x_cursor += metrics.advance_width.round() as i32;
+                continue;
+            }
+            let mut argb = vec![0u8; (w * h * 4) as usize];
+            for y in 0..h {
+                for x in 0..w {
+                    let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
+                    let idx = ((y * w + x) * 4) as usize;
+                    argb[idx] = (color.0 as u16 * alpha as u16 / 255) as u8;
+                    argb[idx + 1] = (color.1 as u16 * alpha as u16 / 255) as u8;
+                    argb[idx + 2] = (color.2 as u16 * alpha as u16 / 255) as u8;
+                    argb[idx + 3] = alpha;
+                }
+            }
+            let src = Surface::new(
+                argb.as_mut_slice(),
+                (w * 4) as usize,
+                PixelFmt::Argb8888,
+                w as u32,
+                h as u32,
+            );
+            let dst_pos = (
+                x_cursor + metrics.xmin,
+                baseline - ascent - metrics.ymin - (h - 1),
+            );
+            self.blitter.blend(
+                &src,
+                Rect {
+                    x: 0,
+                    y: 0,
+                    w: w as u32,
+                    h: h as u32,
+                },
+                &mut self.surface,
+                dst_pos,
+            );
+            self.planner.add(Rect {
+                x: dst_pos.0,
+                y: dst_pos.1,
+                w: w as u32,
+                h: h as u32,
+            });
+            x_cursor += metrics.advance_width.round() as i32;
+        }
+    }
+
+    #[cfg(not(feature = "fontdue"))]
+    /// Stub text renderer when fontdue is disabled.
+    pub fn draw_text(
+        &mut self,
+        position: (i32, i32),
+        text: &str,
+        color: Color,
+        _font_data: &[u8],
+        _px: f32,
+    ) {
+        let _ = (position, text, color);
     }
 }
 
@@ -364,65 +465,7 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
         #[cfg(feature = "fontdue")]
         {
             const PX: f32 = 16.0;
-            let vm = line_metrics(FONT_DATA, PX).unwrap();
-            let ascent = vm.ascent.round() as i32;
-            let baseline = position.1 + ascent;
-            let mut x_cursor = position.0;
-            for ch in text.chars() {
-                let (metrics, bitmap) = {
-                    let entry = self
-                        .glyph_cache
-                        .entry(ch)
-                        .or_insert_with(|| rasterize_glyph(FONT_DATA, ch, PX).unwrap());
-                    (entry.0, entry.1.clone())
-                };
-                let w = metrics.width as i32;
-                let h = metrics.height as i32;
-                if w == 0 || h == 0 {
-                    x_cursor += metrics.advance_width.round() as i32;
-                    continue;
-                }
-                let mut argb = vec![0u8; (w * h * 4) as usize];
-                for y in 0..h {
-                    for x in 0..w {
-                        let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
-                        let idx = ((y * w + x) * 4) as usize;
-                        argb[idx] = (color.0 as u16 * alpha as u16 / 255) as u8;
-                        argb[idx + 1] = (color.1 as u16 * alpha as u16 / 255) as u8;
-                        argb[idx + 2] = (color.2 as u16 * alpha as u16 / 255) as u8;
-                        argb[idx + 3] = alpha;
-                    }
-                }
-                let src = Surface::new(
-                    argb.as_mut_slice(),
-                    (w * 4) as usize,
-                    PixelFmt::Argb8888,
-                    w as u32,
-                    h as u32,
-                );
-                let dst_pos = (
-                    x_cursor + metrics.xmin,
-                    baseline - ascent - metrics.ymin - (h - 1),
-                );
-                self.blitter.blend(
-                    &src,
-                    Rect {
-                        x: 0,
-                        y: 0,
-                        w: w as u32,
-                        h: h as u32,
-                    },
-                    &mut self.surface,
-                    dst_pos,
-                );
-                self.planner.add(Rect {
-                    x: dst_pos.0,
-                    y: dst_pos.1,
-                    w: w as u32,
-                    h: h as u32,
-                });
-                x_cursor += metrics.advance_width.round() as i32;
-            }
+            BlitterRenderer::draw_text(self, position, text, color, FONT_DATA, PX);
         }
         #[cfg(not(feature = "fontdue"))]
         {
@@ -443,8 +486,23 @@ mod text_tests {
         let mut blit = CpuBlitter;
         let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
             BlitterRenderer::new(&mut blit, surface);
-        renderer.draw_text((0, 0), "A", Color(255, 255, 255, 255));
+        Renderer::draw_text(&mut renderer, (0, 32), "A", Color(255, 255, 255, 255));
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn cache_accounts_for_size() {
+        let mut buf = [0u8; 64 * 64 * 4];
+        let surface = Surface::new(&mut buf, 64 * 4, PixelFmt::Argb8888, 64, 64);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_text((0, 32), "Hi", Color(255, 255, 255, 255), FONT_DATA, 16.0);
+        let len_after_small = renderer.glyph_cache.len();
+        renderer.draw_text((0, 32), "Hi", Color(255, 255, 255, 255), FONT_DATA, 16.0);
+        assert_eq!(len_after_small, renderer.glyph_cache.len());
+        renderer.draw_text((0, 32), "Hi", Color(255, 255, 255, 255), FONT_DATA, 24.0);
+        assert!(renderer.glyph_cache.len() > len_after_small);
     }
 }
 
