@@ -453,6 +453,7 @@ mod png_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
     use base64::Engine;
+    use rlvgl_core::png::DecodingError;
 
     const RED_DOT_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
 
@@ -469,6 +470,17 @@ mod png_tests {
         renderer.draw_png((0, 0), &data).unwrap();
         assert!(buf.iter().any(|&p| p != 0));
     }
+
+    #[test]
+    fn blitter_rejects_invalid_png() {
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let err = renderer.draw_png((0, 0), b"not a png").unwrap_err();
+        assert!(matches!(err, DecodingError::Format(_)));
+    }
 }
 
 #[cfg(all(test, feature = "jpeg"))]
@@ -476,6 +488,7 @@ mod jpeg_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
     use base64::Engine;
+    use rlvgl_core::jpeg::Error as JpegError;
 
     const RED_DOT_JPEG: &str = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDi6KKK+ZP3E//Z";
 
@@ -492,6 +505,17 @@ mod jpeg_tests {
         renderer.draw_jpeg((0, 0), &data).unwrap();
         assert!(buf.iter().any(|&p| p != 0));
     }
+
+    #[test]
+    fn blitter_rejects_invalid_jpeg() {
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let err = renderer.draw_jpeg((0, 0), b"not a jpeg").unwrap_err();
+        assert!(matches!(err, JpegError::Format(_)));
+    }
 }
 
 #[cfg(all(test, feature = "gif"))]
@@ -499,6 +523,7 @@ mod gif_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
     use base64::Engine;
+    use rlvgl_core::gif::DecodingError as GifDecodingError;
 
     const RED_DOT_GIF: &str = "R0lGODdhAQABAPAAAP8AAP///yH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
@@ -514,6 +539,19 @@ mod gif_tests {
             BlitterRenderer::new(&mut blit, surface);
         renderer.draw_gif_frame((0, 0), &data, 0).unwrap();
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn blitter_rejects_invalid_gif() {
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let err = renderer
+            .draw_gif_frame((0, 0), b"not a gif", 0)
+            .unwrap_err();
+        assert!(matches!(err, GifDecodingError::Format(_)));
     }
 }
 
@@ -542,6 +580,7 @@ mod canvas_tests {
 mod qrcode_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
+    use rlvgl_core::qrcode::QrError;
 
     #[test]
     fn blitter_draws_qr() {
@@ -552,6 +591,18 @@ mod qrcode_tests {
             BlitterRenderer::new(&mut blit, surface);
         renderer.draw_qr((0, 0), b"hi").unwrap();
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn blitter_rejects_invalid_qr_data() {
+        let mut buf = [0u8; 64 * 64 * 4];
+        let surface = Surface::new(&mut buf, 64 * 4, PixelFmt::Argb8888, 64, 64);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let data = vec![0u8; 3000];
+        let err = renderer.draw_qr((0, 0), &data).unwrap_err();
+        assert!(matches!(err, QrError::DataTooLong));
     }
 }
 
@@ -572,6 +623,16 @@ mod lottie_tests {
             BlitterRenderer::new(&mut blit, surface);
         assert!(renderer.draw_lottie_frame((0, 0), SIMPLE_JSON, 0, 1, 1));
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn blitter_rejects_invalid_lottie() {
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        assert!(!renderer.draw_lottie_frame((0, 0), "not json", 0, 1, 1));
     }
 }
 
