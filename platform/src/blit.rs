@@ -306,7 +306,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
     #[cfg(feature = "lottie")]
     /// Render a Lottie JSON animation frame and blit it onto the target surface.
     ///
-    /// Returns `true` if the frame was rendered successfully.
+    /// Returns an error if the JSON data is invalid.
     pub fn draw_lottie_frame(
         &mut self,
         position: (i32, i32),
@@ -314,15 +314,12 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         frame: usize,
         width: u32,
         height: u32,
-    ) -> bool {
-        if let Some(pixels) =
+    ) -> Result<(), rlvgl_core::lottie::Error> {
+        let pixels =
             rlvgl_core::lottie::render_lottie_frame(json, frame, width as usize, height as usize)
-        {
-            self.blit_colors(position, &pixels, width, height);
-            true
-        } else {
-            false
-        }
+                .ok_or(rlvgl_core::lottie::Error::InvalidJson)?;
+        self.blit_colors(position, &pixels, width, height);
+        Ok(())
     }
 
     #[cfg(feature = "canvas")]
@@ -705,7 +702,9 @@ mod lottie_tests {
         let mut blit = CpuBlitter;
         let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
             BlitterRenderer::new(&mut blit, surface);
-        assert!(renderer.draw_lottie_frame((0, 0), SIMPLE_JSON, 0, 1, 1));
+        renderer
+            .draw_lottie_frame((0, 0), SIMPLE_JSON, 0, 1, 1)
+            .unwrap();
         assert!(buf.iter().any(|&p| p != 0));
     }
 }
