@@ -41,7 +41,7 @@ fn main() -> ! {
 
     // TODO: initialize `Stm32h747iDiscoDisplay` with a concrete blitter and
     // touch input driver once the hardware integration is complete.
-    let _demo = build_demo();
+    let _demo = build_demo(480, 272);
 
     loop {
         cortex_m::asm::nop();

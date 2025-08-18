@@ -59,7 +59,7 @@ impl Renderer for FramebufferRenderer {
 
 #[test]
 fn demo_draws_widgets() {
-    let Demo { root, .. } = build_demo();
+    let Demo { root, .. } = build_demo(320, 240);
     let mut renderer = CountRenderer(0);
     root.borrow().draw(&mut renderer);
     assert!(renderer.0 > 0);
@@ -72,7 +72,7 @@ fn button_click_increments_counter() {
         counter,
         pending,
         to_remove,
-    } = build_demo();
+    } = build_demo(320, 240);
     assert_eq!(*counter.borrow(), 0);
     assert!(
         root.borrow_mut()
@@ -124,7 +124,7 @@ fn plugins_button_adds_demo() {
         pending,
         to_remove,
         ..
-    } = build_demo();
+    } = build_demo(320, 240);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
@@ -145,7 +145,7 @@ fn png_button_adds_demo() {
         pending,
         to_remove,
         ..
-    } = build_demo();
+    } = build_demo(320, 240);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
@@ -166,7 +166,7 @@ fn jpeg_button_adds_demo() {
         pending,
         to_remove,
         ..
-    } = build_demo();
+    } = build_demo(320, 240);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
@@ -187,7 +187,7 @@ fn qr_button_toggles_qrcode() {
         pending,
         to_remove,
         ..
-    } = build_demo();
+    } = build_demo(320, 240);
     assert!(
         root.borrow_mut()
             .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
