@@ -473,7 +473,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             let mut argb = vec![0u8; (w * h * 4) as usize];
             for y in 0..h {
                 for x in 0..w {
-                    let alpha = bitmap[(h - 1 - y) as usize * metrics.width + x as usize];
+                    let alpha = bitmap[(y) as usize * metrics.width + x as usize];
                     let idx = ((y * w + x) * 4) as usize;
                     argb[idx] = (color.0 as u16 * alpha as u16 / 255) as u8;
                     argb[idx + 1] = (color.1 as u16 * alpha as u16 / 255) as u8;
