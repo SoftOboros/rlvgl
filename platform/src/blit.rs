@@ -3,11 +3,22 @@
 //! These types describe pixel surfaces and operations that can be
 //! accelerated by different platform implementations.
 
-#[cfg(feature = "fontdue")]
-use alloc::collections::BTreeMap;
-use alloc::vec;
-#[cfg(feature = "fontdue")]
+#[cfg(any(
+    feature = "png",
+    feature = "jpeg",
+    feature = "qrcode",
+    feature = "lottie",
+    feature = "canvas",
+    feature = "gif",
+    feature = "apng",
+    feature = "nes",
+    feature = "pinyin",
+    feature = "fatfs",
+    test,
+))]
 use alloc::vec::Vec;
+#[cfg(feature = "fontdue")]
+use alloc::{collections::BTreeMap, vec};
 use bitflags::bitflags;
 use heapless::Vec as HVec;
 #[cfg(feature = "fontdue")]
@@ -156,6 +167,20 @@ pub struct BlitterRenderer<'a, B: Blitter, const N: usize> {
     blitter: &'a mut B,
     surface: Surface<'a>,
     planner: BlitPlanner<N>,
+    #[cfg(any(
+        feature = "png",
+        feature = "jpeg",
+        feature = "qrcode",
+        feature = "lottie",
+        feature = "canvas",
+        feature = "gif",
+        feature = "apng",
+        feature = "nes",
+        feature = "pinyin",
+        feature = "fatfs",
+        test,
+    ))]
+    scratch: Option<Vec<u8>>,
     #[cfg(feature = "fontdue")]
     glyph_cache: BTreeMap<char, (Metrics, Vec<u8>)>,
 }
@@ -167,6 +192,20 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             blitter,
             surface,
             planner: BlitPlanner::new(),
+            #[cfg(any(
+                feature = "png",
+                feature = "jpeg",
+                feature = "qrcode",
+                feature = "lottie",
+                feature = "canvas",
+                feature = "gif",
+                feature = "apng",
+                feature = "nes",
+                feature = "pinyin",
+                feature = "fatfs",
+                test,
+            ))]
+            scratch: None,
             #[cfg(feature = "fontdue")]
             glyph_cache: BTreeMap::new(),
         }
@@ -177,13 +216,30 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         &mut self.planner
     }
 
+    #[cfg(any(
+        feature = "png",
+        feature = "jpeg",
+        feature = "qrcode",
+        feature = "lottie",
+        feature = "canvas",
+        feature = "gif",
+        feature = "apng",
+        feature = "nes",
+        feature = "pinyin",
+        feature = "fatfs",
+        test,
+    ))]
     fn blit_colors(&mut self, position: (i32, i32), pixels: &[Color], w: u32, h: u32) {
-        let mut buf = vec![0u8; (w * h * 4) as usize];
+        let required = (w * h * 4) as usize;
+        let buf = self.scratch.get_or_insert_with(Vec::new);
+        if buf.len() < required {
+            buf.resize(required, 0);
+        }
         for (i, c) in pixels.iter().enumerate() {
             buf[i * 4..i * 4 + 4].copy_from_slice(&c.to_argb8888().to_le_bytes());
         }
         let src = Surface::new(
-            buf.as_mut_slice(),
+            &mut buf[..required],
             (w * 4) as usize,
             PixelFmt::Argb8888,
             w,
@@ -428,6 +484,27 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
         {
             let _ = (position, text, color);
         }
+    }
+}
+
+#[cfg(test)]
+mod scratch_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+
+    #[test]
+    fn blit_colors_reuses_scratch_buffer() {
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let pixels = [Color(0, 0, 0, 0)];
+        renderer.blit_colors((0, 0), &pixels, 1, 1);
+        let first_ptr = renderer.scratch.as_ref().unwrap().as_ptr();
+        renderer.blit_colors((1, 1), &pixels, 1, 1);
+        let second_ptr = renderer.scratch.as_ref().unwrap().as_ptr();
+        assert_eq!(first_ptr, second_ptr);
     }
 }
 
