@@ -272,6 +272,7 @@ pub struct WgpuDisplay {
     window: &'static Window,
     state: WgpuState,
     scale: (f64, f64),
+    surface_offset: (f64, f64),
 }
 
 impl WgpuDisplay {
@@ -306,6 +307,7 @@ impl WgpuDisplay {
             phys.width as f64 / width as f64,
             phys.height as f64 / height as f64,
         );
+        let surface_offset = (0.0, 0.0);
         Self {
             width,
             height,
@@ -313,6 +315,7 @@ impl WgpuDisplay {
             window,
             state,
             scale,
+            surface_offset,
         }
     }
 
@@ -334,6 +337,7 @@ impl WgpuDisplay {
             window,
             mut state,
             scale: initial_scale,
+            surface_offset: initial_surface_offset,
         } = self;
         event_loop.set_control_flow(ControlFlow::Poll);
         // Request an initial redraw so the window displays its first frame
@@ -342,8 +346,9 @@ impl WgpuDisplay {
         window.request_redraw();
 
         let mut pointer_pos = (0i32, 0i32);
+        let mut raw_pointer_pos = (0.0f64, 0.0f64);
         let mut pointer_down = false;
-        let mut surface_offset = (0.0f64, 0.0f64);
+        let mut surface_offset = initial_surface_offset;
         // Ratio between window pixels and logical display coordinates
         let mut scale = initial_scale;
         let aspect_ratio = width as f64 / height as f64;
@@ -423,6 +428,10 @@ impl WgpuDisplay {
                         (pointer_pos.0 as f64 * old_scale.0 / scale.0) as i32,
                         (pointer_pos.1 as f64 * old_scale.1 / scale.1) as i32,
                     );
+                    raw_pointer_pos = (
+                        pointer_pos.0 as f64 * scale.0 + surface_offset.0,
+                        pointer_pos.1 as f64 * scale.1 + surface_offset.1,
+                    );
                     window.request_redraw();
                 }
                 Event::WindowEvent {
@@ -453,8 +462,9 @@ impl WgpuDisplay {
                     event: WindowEvent::CursorMoved { position, .. },
                     ..
                 } => {
-                    let adj_x = position.x - surface_offset.0;
-                    let adj_y = position.y - surface_offset.1;
+                    raw_pointer_pos = (position.x, position.y);
+                    let adj_x = raw_pointer_pos.0 - surface_offset.0;
+                    let adj_y = raw_pointer_pos.1 - surface_offset.1;
                     pointer_pos = (
                         (adj_x / scale.0).clamp(0.0, width as f64 - 1.0) as i32,
                         (adj_y / scale.1).clamp(0.0, height as f64 - 1.0) as i32,
@@ -476,6 +486,12 @@ impl WgpuDisplay {
                     ..
                 } => {
                     pointer_down = true;
+                    let adj_x = raw_pointer_pos.0 - surface_offset.0;
+                    let adj_y = raw_pointer_pos.1 - surface_offset.1;
+                    pointer_pos = (
+                        (adj_x / scale.0).clamp(0.0, width as f64 - 1.0) as i32,
+                        (adj_y / scale.1).clamp(0.0, height as f64 - 1.0) as i32,
+                    );
                     event_callback(InputEvent::PointerDown {
                         x: pointer_pos.0,
                         y: pointer_pos.1,
@@ -491,6 +507,12 @@ impl WgpuDisplay {
                     ..
                 } => {
                     pointer_down = false;
+                    let adj_x = raw_pointer_pos.0 - surface_offset.0;
+                    let adj_y = raw_pointer_pos.1 - surface_offset.1;
+                    pointer_pos = (
+                        (adj_x / scale.0).clamp(0.0, width as f64 - 1.0) as i32,
+                        (adj_y / scale.1).clamp(0.0, height as f64 - 1.0) as i32,
+                    );
                     event_callback(InputEvent::PointerUp {
                         x: pointer_pos.0,
                         y: pointer_pos.1,
