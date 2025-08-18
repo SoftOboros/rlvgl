@@ -6,6 +6,13 @@
 use crate::widget::Color;
 use rlottie::{Animation, Size, Surface};
 
+/// Errors that can occur when rendering a Lottie animation frame.
+#[derive(Debug, Clone)]
+pub enum Error {
+    /// The provided Lottie JSON data was invalid.
+    InvalidJson,
+}
+
 /// Render a single frame of a Lottie JSON animation.
 ///
 /// * `json` - Lottie document as UTF-8 text.
