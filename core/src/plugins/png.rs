@@ -1,7 +1,8 @@
 //! PNG decoder yielding raw color pixels.
 use crate::widget::Color;
 use alloc::vec::Vec;
-use png::{ColorType, Decoder, DecodingError};
+pub use png::DecodingError;
+use png::{ColorType, Decoder};
 use std::io::Cursor;
 
 /// Decode a PNG image into a vector of RGB [`Color`]s and return dimensions.

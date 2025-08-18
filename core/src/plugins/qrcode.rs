@@ -1,10 +1,8 @@
 //! Generate QR codes as pixel buffers.
 use crate::widget::Color;
 use alloc::vec::Vec;
-use qrcode::{
-    QrCode,
-    types::{Color as QrColor, QrError},
-};
+pub use qrcode::types::QrError;
+use qrcode::{QrCode, types::Color as QrColor};
 
 /// Generate a QR code bitmap for the provided data.
 pub fn generate(data: &[u8]) -> Result<(Vec<Color>, u32, u32), QrError> {
