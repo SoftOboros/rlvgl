@@ -18,6 +18,9 @@ use rlvgl_core::widget::{Color, Rect as WidgetRect};
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
 
+#[cfg(feature = "fontdue")]
+const FONT_PX: f32 = 16.0;
+
 /// Supported pixel formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PixelFmt {
@@ -199,6 +202,28 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         });
     }
 
+    #[cfg(feature = "fontdue")]
+    fn truncate_to_width(&mut self, text: &str, max_width: u32) -> alloc::string::String {
+        let mut acc = 0f32;
+        let mut out = alloc::string::String::new();
+        for ch in text.chars() {
+            let (metrics, _) = {
+                let entry = self
+                    .glyph_cache
+                    .entry(ch)
+                    .or_insert_with(|| rasterize_glyph(FONT_DATA, ch, FONT_PX).unwrap());
+                (entry.0, entry.1.clone())
+            };
+            let adv = metrics.advance_width;
+            if acc + adv > max_width as f32 {
+                break;
+            }
+            out.push(ch);
+            acc += adv;
+        }
+        out
+    }
+
     #[cfg(feature = "png")]
     /// Decode a PNG image and blit it onto the target surface.
     pub fn draw_png(
@@ -308,8 +333,44 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
     ) -> bool {
         if let Some(chars) = ime.candidates(input) {
             let text: alloc::string::String = chars.into_iter().collect();
-            self.draw_text(position, &text, color);
-            true
+            let avail_w = self.surface.width.saturating_sub(position.0.max(0) as u32);
+            let avail_h = self.surface.height.saturating_sub(position.1.max(0) as u32);
+            if avail_w == 0 || avail_h < FONT_PX as u32 {
+                return false;
+            }
+            let max_lines = (avail_h / FONT_PX as u32) as usize;
+            let mut lines: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::new();
+            let mut current = alloc::string::String::new();
+            let mut width_acc = 0f32;
+            for ch in text.chars() {
+                let (metrics, _) = {
+                    let entry = self
+                        .glyph_cache
+                        .entry(ch)
+                        .or_insert_with(|| rasterize_glyph(FONT_DATA, ch, FONT_PX).unwrap());
+                    (entry.0, entry.1.clone())
+                };
+                let adv = metrics.advance_width;
+                if width_acc + adv > avail_w as f32 {
+                    lines.push(core::mem::take(&mut current));
+                    if lines.len() >= max_lines {
+                        break;
+                    }
+                    width_acc = 0f32;
+                }
+                if width_acc + adv <= avail_w as f32 {
+                    current.push(ch);
+                    width_acc += adv;
+                }
+            }
+            if !current.is_empty() && lines.len() < max_lines {
+                lines.push(current);
+            }
+            for (i, line) in lines.iter().enumerate() {
+                let y = position.1 + (i as i32) * FONT_PX as i32;
+                self.draw_text((position.0, y), line, color);
+            }
+            !lines.is_empty()
         } else {
             false
         }
@@ -328,9 +389,16 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         T: std::io::Read + std::io::Write + std::io::Seek,
     {
         let names = rlvgl_core::fatfs::list_dir(image, dir)?;
-        for (i, name) in names.iter().enumerate() {
-            let y = position.1 + (i as i32) * 16;
-            self.draw_text((position.0, y), name, color);
+        let avail_w = self.surface.width.saturating_sub(position.0.max(0) as u32);
+        let avail_h = self.surface.height.saturating_sub(position.1.max(0) as u32);
+        if avail_w == 0 || avail_h < FONT_PX as u32 {
+            return Ok(());
+        }
+        let max_lines = (avail_h / FONT_PX as u32) as usize;
+        for (i, name) in names.iter().enumerate().take(max_lines) {
+            let y = position.1 + (i as i32) * FONT_PX as i32;
+            let line = self.truncate_to_width(name, avail_w);
+            self.draw_text((position.0, y), &line, color);
         }
         Ok(())
     }
@@ -363,8 +431,7 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
         #[cfg(feature = "fontdue")]
         {
-            const PX: f32 = 16.0;
-            let vm = line_metrics(FONT_DATA, PX).unwrap();
+            let vm = line_metrics(FONT_DATA, FONT_PX).unwrap();
             let ascent = vm.ascent.round() as i32;
             let baseline = position.1 + ascent;
             let mut x_cursor = position.0;
@@ -373,7 +440,7 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
                     let entry = self
                         .glyph_cache
                         .entry(ch)
-                        .or_insert_with(|| rasterize_glyph(FONT_DATA, ch, PX).unwrap());
+                        .or_insert_with(|| rasterize_glyph(FONT_DATA, ch, FONT_PX).unwrap());
                     (entry.0, entry.1.clone())
                 };
                 let w = metrics.width as i32;
@@ -592,6 +659,25 @@ mod pinyin_tests {
         assert!(renderer.draw_pinyin_candidates((0, 0), &ime, "zhong", Color(255, 255, 255, 255)));
         assert!(buf.iter().any(|&p| p != 0));
     }
+
+    #[test]
+    fn pinyin_clipping() {
+        let mut buf = [0u8; 32 * 32 * 4];
+        let surface = Surface::new(&mut buf, 32 * 4, PixelFmt::Argb8888, 32, 32);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let ime = PinyinInputMethod;
+        renderer.draw_pinyin_candidates((0, 0), &ime, "guo", Color(255, 255, 255, 255));
+        assert!(buf.iter().take(32 * 16 * 4).any(|&p| p != 0));
+        assert!(
+            buf.iter()
+                .skip(32 * 16 * 4)
+                .take(32 * 16 * 4)
+                .any(|&p| p != 0)
+        );
+        assert!(buf.iter().skip(32 * 32 * 4 - 4).all(|&p| p == 0));
+    }
 }
 
 #[cfg(all(test, feature = "fatfs", feature = "fontdue"))]
@@ -626,6 +712,49 @@ mod fatfs_tests {
             .draw_fatfs_dir((0, 0), &mut img, "/", Color(255, 255, 255, 255))
             .unwrap();
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn fatfs_clipping() {
+        let mut img = Cursor::new(vec![0u8; 1024 * 512]);
+        fatfs::format_volume(&mut img, FormatVolumeOptions::new()).unwrap();
+        img.seek(SeekFrom::Start(0)).unwrap();
+        {
+            let buf_stream = BufStream::new(&mut img);
+            let fs = FileSystem::new(buf_stream, FsOptions::new()).unwrap();
+            fs.root_dir()
+                .create_file("verylongfilename1.txt")
+                .unwrap()
+                .write_all(b"a")
+                .unwrap();
+            fs.root_dir()
+                .create_file("verylongfilename2.txt")
+                .unwrap()
+                .write_all(b"b")
+                .unwrap();
+            fs.root_dir()
+                .create_file("verylongfilename3.txt")
+                .unwrap()
+                .write_all(b"c")
+                .unwrap();
+        }
+        img.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = [0u8; 32 * 32 * 4];
+        let surface = Surface::new(&mut buf, 32 * 4, PixelFmt::Argb8888, 32, 32);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer
+            .draw_fatfs_dir((0, 0), &mut img, "/", Color(255, 255, 255, 255))
+            .unwrap();
+        assert!(buf.iter().take(32 * 16 * 4).any(|&p| p != 0));
+        assert!(
+            buf.iter()
+                .skip(32 * 16 * 4)
+                .take(32 * 16 * 4)
+                .any(|&p| p != 0)
+        );
+        assert!(buf.iter().skip(32 * 32 * 4 - 4).all(|&p| p == 0));
     }
 }
 
