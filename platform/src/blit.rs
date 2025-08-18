@@ -372,8 +372,21 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         color: Color,
     ) -> bool {
         if let Some(chars) = ime.candidates(input) {
+            // Determine remaining space on the surface.
+            let max_w = self.surface.width as i32 - position.0;
+            let max_h = self.surface.height as i32 - position.1;
+            if max_w <= 0 || max_h < 16 {
+                return false;
+            }
+
+            // Truncate the candidate string to fit within the surface width.
             let text: alloc::string::String = chars.into_iter().collect();
-            Renderer::draw_text(self, position, &text, color);
+            let max_chars = (max_w / 16) as usize;
+            let clipped: alloc::string::String = text.chars().take(max_chars).collect();
+            if clipped.is_empty() {
+                return false;
+            }
+            Renderer::draw_text(self, position, &clipped, color);
             true
         } else {
             false
@@ -392,10 +405,22 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
     where
         T: std::io::Read + std::io::Write + std::io::Seek,
     {
+        let max_w = self.surface.width as i32 - position.0;
+        let max_h = self.surface.height as i32 - position.1;
+        if max_w <= 0 || max_h <= 0 {
+            return Ok(());
+        }
+        let line_h = 16;
+        let max_lines = (max_h / line_h) as usize;
+        let max_chars = (max_w / 16) as usize;
         let names = rlvgl_core::fatfs::list_dir(image, dir)?;
-        for (i, name) in names.iter().enumerate() {
-            let y = position.1 + (i as i32) * 16;
-            Renderer::draw_text(self, (position.0, y), name, color);
+        for (i, name) in names.iter().take(max_lines).enumerate() {
+            let y = position.1 + (i as i32) * line_h;
+            let clipped: alloc::string::String = name.chars().take(max_chars).collect();
+            if clipped.is_empty() {
+                break;
+            }
+            Renderer::draw_text(self, (position.0, y), &clipped, color);
         }
         Ok(())
     }
@@ -789,7 +814,11 @@ mod lottie_tests {
         let mut blit = CpuBlitter;
         let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
             BlitterRenderer::new(&mut blit, surface);
-        assert!(!renderer.draw_lottie_frame((0, 0), "not json", 0, 1, 1));
+        assert!(
+            renderer
+                .draw_lottie_frame((0, 0), "not json", 0, 1, 1)
+                .is_err()
+        );
     }
 }
 
@@ -809,6 +838,28 @@ mod pinyin_tests {
         let ime = PinyinInputMethod;
         assert!(renderer.draw_pinyin_candidates((0, 0), &ime, "zhong", Color(255, 255, 255, 255)));
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn pinyin_candidates_clipped_to_surface() {
+        let mut buf = [0u8; 32 * 16 * 4];
+        let surface = Surface::new(&mut buf, 32 * 4, PixelFmt::Argb8888, 32, 16);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        let ime = PinyinInputMethod;
+        assert!(renderer.draw_pinyin_candidates((0, 0), &ime, "zhong", Color(255, 255, 255, 255)));
+
+        let mut expected = [0u8; 32 * 16 * 4];
+        let surface_e = Surface::new(&mut expected, 32 * 4, PixelFmt::Argb8888, 32, 16);
+        let mut blit_e = CpuBlitter;
+        let mut renderer_e: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit_e, surface_e);
+        let chars = ime.candidates("zhong").unwrap();
+        let text: alloc::string::String = chars.into_iter().collect();
+        let clipped: alloc::string::String = text.chars().take(2).collect();
+        Renderer::draw_text(&mut renderer_e, (0, 0), &clipped, Color(255, 255, 255, 255));
+        assert_eq!(buf[..], expected[..]);
     }
 }
 
@@ -844,6 +895,50 @@ mod fatfs_tests {
             .draw_fatfs_dir((0, 0), &mut img, "/", Color(255, 255, 255, 255))
             .unwrap();
         assert!(buf.iter().any(|&p| p != 0));
+    }
+
+    #[test]
+    fn fatfs_listing_clipped_to_surface() {
+        let mut img = Cursor::new(vec![0u8; 1024 * 512]);
+        fatfs::format_volume(&mut img, FormatVolumeOptions::new()).unwrap();
+        img.seek(SeekFrom::Start(0)).unwrap();
+        {
+            let buf_stream = BufStream::new(&mut img);
+            let fs = FileSystem::new(buf_stream, FsOptions::new()).unwrap();
+            fs.root_dir().create_file("first_long_name.txt").unwrap();
+            fs.root_dir().create_file("second_long_name.txt").unwrap();
+            fs.root_dir().create_file("third_long_name.txt").unwrap();
+        }
+        img.seek(SeekFrom::Start(0)).unwrap();
+        let image_vec = img.get_ref().clone();
+        let mut img_expected = Cursor::new(image_vec.clone());
+        let mut img_actual = Cursor::new(image_vec);
+
+        let mut buf = [0u8; 32 * 32 * 4];
+        let surface = Surface::new(&mut buf, 32 * 4, PixelFmt::Argb8888, 32, 32);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer
+            .draw_fatfs_dir((0, 0), &mut img_actual, "/", Color(255, 255, 255, 255))
+            .unwrap();
+
+        let names = rlvgl_core::fatfs::list_dir(&mut img_expected, "/").unwrap();
+        let mut expected = [0u8; 32 * 32 * 4];
+        let surface_e = Surface::new(&mut expected, 32 * 4, PixelFmt::Argb8888, 32, 32);
+        let mut blit_e = CpuBlitter;
+        let mut renderer_e: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit_e, surface_e);
+        for (i, name) in names.iter().take(2).enumerate() {
+            let clipped: alloc::string::String = name.chars().take(2).collect();
+            Renderer::draw_text(
+                &mut renderer_e,
+                (0, (i as i32) * 16),
+                &clipped,
+                Color(255, 255, 255, 255),
+            );
+        }
+        assert_eq!(buf[..], expected[..]);
     }
 }
 
