@@ -43,11 +43,6 @@ fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {
 }
 
 fn main() {
-    let demo = build_demo();
-    let root = demo.root.clone();
-    let pending = demo.pending.clone();
-    let to_remove = demo.to_remove.clone();
-
     let mut width = DEFAULT_WIDTH;
     let mut height = DEFAULT_HEIGHT;
     let mut path = None;
@@ -84,6 +79,11 @@ fn main() {
             path = Some(arg);
         }
     }
+
+    let demo = build_demo(width as i32, height as i32);
+    let root = demo.root.clone();
+    let pending = demo.pending.clone();
+    let to_remove = demo.to_remove.clone();
 
     let mut frame_cb = {
         let root = root.clone();

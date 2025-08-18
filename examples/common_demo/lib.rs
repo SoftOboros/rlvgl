@@ -101,11 +101,14 @@ pub struct Demo {
 
 /// Build a simple widget tree demonstrating basic rlvgl widgets.
 ///
+/// The demo is constructed with a root [`Container`] sized to `width` by
+/// `height` pixels.
+///
 /// Returns a [`Demo`] struct containing the root [`WidgetNode`], a counter
 /// incremented whenever the button is clicked, and a queue of widgets that
 /// should be appended to the root after event dispatch. A `Plugins` button is
 /// included to showcase optional features.
-pub fn build_demo() -> Demo {
+pub fn build_demo(width: i32, height: i32) -> Demo {
     let click_count = Rc::new(RefCell::new(0));
     let pending = Rc::new(RefCell::new(Vec::new()));
     let to_remove = Rc::new(RefCell::new(Vec::new()));
@@ -133,8 +136,8 @@ pub fn build_demo() -> Demo {
         widget: Rc::new(RefCell::new(Container::new(Rect {
             x: 0,
             y: 0,
-            width: 320,
-            height: 240,
+            width,
+            height,
         }))),
         children: Vec::new(),
     }));
