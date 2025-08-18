@@ -645,4 +645,26 @@ mod nes_tests {
         renderer.draw_nes_frame((0, 0), &pixels, 1, 1);
         assert!(buf.iter().any(|&p| p != 0));
     }
+
+    #[test]
+    fn blitter_draws_full_nes_frame() {
+        let mut pixels = [Color(0, 0, 0, 255); 256 * 240];
+        for y in 0..240 {
+            for x in 0..256 {
+                pixels[y * 256 + x] = Color(x as u8, y as u8, 0, 255);
+            }
+        }
+        let mut buf = [0u8; 256 * 240 * 4];
+        let surface = Surface::new(&mut buf, 256 * 4, PixelFmt::Argb8888, 256, 240);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_nes_frame((0, 0), &pixels, 256, 240);
+        let x = 128usize;
+        let y = 120usize;
+        let idx = (y * 256 + x) * 4;
+        let actual = u32::from_le_bytes(buf[idx..idx + 4].try_into().unwrap());
+        let expected = Color(x as u8, y as u8, 0, 255).to_argb8888();
+        assert_eq!(actual, expected);
+    }
 }
