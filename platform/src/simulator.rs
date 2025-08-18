@@ -317,6 +317,7 @@ pub struct WgpuDisplay {
     window: &'static Window,
     state: WgpuState,
     scale: (f64, f64),
+    present_scale: (f64, f64),
     dest_size: (u32, u32),
     surface_offset: (f64, f64),
 }
@@ -360,6 +361,7 @@ impl WgpuDisplay {
             window,
             state,
             scale,
+            present_scale: (1.0, 1.0),
             dest_size: (phys.width, phys.height),
             surface_offset: (0.0, 0.0),
         }
@@ -383,6 +385,7 @@ impl WgpuDisplay {
             window,
             mut state,
             scale: initial_scale,
+            present_scale: initial_present_scale,
             mut dest_size,
             mut surface_offset,
         } = self;
@@ -396,6 +399,8 @@ impl WgpuDisplay {
         let mut pointer_down = false;
         // Ratio between window pixels and logical display coordinates
         let mut scale = initial_scale;
+        // Additional scale applied when the window exceeds device texture limits
+        let mut present_scale = initial_present_scale;
         let aspect_ratio = width as f64 / height as f64;
         let max_dim = state.max_texture_dimension();
         let mut fullscreen = false;
@@ -473,11 +478,16 @@ impl WgpuDisplay {
                         (surf_h as f64 - h as f64) / 2.0,
                     );
                     dest_size = (w, h);
-                    let old_scale = scale;
+                    let old_total_scale = (scale.0 * present_scale.0, scale.1 * present_scale.1);
+                    present_scale = (
+                        size.width as f64 / surf_w as f64,
+                        size.height as f64 / surf_h as f64,
+                    );
                     scale = (w as f64 / width as f64, h as f64 / height as f64);
+                    let new_total_scale = (scale.0 * present_scale.0, scale.1 * present_scale.1);
                     pointer_pos = (
-                        (pointer_pos.0 as f64 * old_scale.0 / scale.0) as i32,
-                        (pointer_pos.1 as f64 * old_scale.1 / scale.1) as i32,
+                        (pointer_pos.0 as f64 * old_total_scale.0 / new_total_scale.0) as i32,
+                        (pointer_pos.1 as f64 * old_total_scale.1 / new_total_scale.1) as i32,
                     );
                     window.request_redraw();
                 }
@@ -509,8 +519,10 @@ impl WgpuDisplay {
                     event: WindowEvent::CursorMoved { position, .. },
                     ..
                 } => {
-                    let adj_x = position.x - surface_offset.0;
-                    let adj_y = position.y - surface_offset.1;
+                    let surf_x = position.x / present_scale.0;
+                    let surf_y = position.y / present_scale.1;
+                    let adj_x = surf_x - surface_offset.0;
+                    let adj_y = surf_y - surface_offset.1;
                     pointer_pos = (
                         (adj_x / scale.0).clamp(0.0, width as f64 - 1.0) as i32,
                         (adj_y / scale.1).clamp(0.0, height as f64 - 1.0) as i32,
