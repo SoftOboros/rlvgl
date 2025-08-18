@@ -98,12 +98,21 @@ struct WgpuState {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     frame: Vec<u8>,
+    fb_width: u32,
+    fb_height: u32,
+    blit_buf: Vec<u8>,
     max_texture_dim: u32,
 }
 
 impl WgpuState {
     /// Create a new `wgpu` state for the given window and dimensions.
-    fn new(window: &'static Window, width: u32, height: u32) -> Self {
+    fn new(
+        window: &'static Window,
+        fb_width: u32,
+        fb_height: u32,
+        surface_width: u32,
+        surface_height: u32,
+    ) -> Self {
         init_wgpu_logger();
         let instance = wgpu::Instance::default();
         let surface = instance
@@ -143,8 +152,8 @@ impl WgpuState {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
-            width,
-            height,
+            width: surface_width,
+            height: surface_height,
             present_mode,
             alpha_mode: caps.alpha_modes[0],
             view_formats: vec![],
@@ -153,13 +162,16 @@ impl WgpuState {
         surface.configure(&device, &config);
         eprintln!("Surface format: {:?}", config.format);
         let max_texture_dim = device.limits().max_texture_dimension_2d;
-        let frame = vec![0; (width * height * 4) as usize];
+        let frame = vec![0; (fb_width * fb_height * 4) as usize];
         Self {
             surface,
             device,
             queue,
             config,
             frame,
+            fb_width,
+            fb_height,
+            blit_buf: Vec::new(),
             max_texture_dim,
         }
     }
@@ -169,16 +181,20 @@ impl WgpuState {
         &mut self.frame
     }
 
-    /// Resize the surface and internal frame buffer.
+    /// Resize the surface but keep the logical frame size unchanged.
     fn resize(&mut self, width: u32, height: u32) {
         self.config.width = width;
         self.config.height = height;
         self.surface.configure(&self.device, &self.config);
-        self.frame.resize((width * height * 4) as usize, 0);
     }
 
     /// Present the current frame buffer to the window.
-    fn render(&mut self) {
+    ///
+    /// `dst_width` and `dst_height` specify the destination rectangle size
+    /// inside the surface. `(offset_x, offset_y)` positions this rectangle
+    /// within the surface. Any area outside the rectangle is filled with a
+    /// solid black color.
+    fn render(&mut self, dst_width: u32, dst_height: u32, offset_x: u32, offset_y: u32) {
         let output = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(e) => {
@@ -190,18 +206,47 @@ impl WgpuState {
                     .expect("failed to acquire surface texture")
             }
         };
-        let frame_slice: Cow<[u8]> = match self.config.format {
+        let surface_w = self.config.width;
+        let surface_h = self.config.height;
+        let required = (surface_w * surface_h * 4) as usize;
+        if self.blit_buf.len() != required {
+            self.blit_buf.resize(required, 0);
+            for px in self.blit_buf.chunks_exact_mut(4) {
+                px[3] = 0xff;
+            }
+        } else {
+            for px in self.blit_buf.chunks_exact_mut(4) {
+                px[0] = 0;
+                px[1] = 0;
+                px[2] = 0;
+                px[3] = 0xff;
+            }
+        }
+        for y in 0..dst_height.min(surface_h) {
+            let src_y = y * self.fb_height / dst_height;
+            for x in 0..dst_width.min(surface_w) {
+                let src_x = x * self.fb_width / dst_width;
+                let src_idx = ((src_y * self.fb_width + src_x) * 4) as usize;
+                let dst_x = x + offset_x;
+                let dst_y = y + offset_y;
+                if dst_x < surface_w && dst_y < surface_h {
+                    let dst_idx = ((dst_y * surface_w + dst_x) * 4) as usize;
+                    self.blit_buf[dst_idx..dst_idx + 4]
+                        .copy_from_slice(&self.frame[src_idx..src_idx + 4]);
+                }
+            }
+        }
+        let data: Cow<[u8]> = match self.config.format {
             wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
-                let mut converted = self.frame.clone();
-                for px in converted.chunks_exact_mut(4) {
+                for px in self.blit_buf.chunks_exact_mut(4) {
                     px.swap(0, 2);
                 }
-                Cow::Owned(converted)
+                Cow::Borrowed(&self.blit_buf)
             }
-            _ => Cow::Borrowed(&self.frame),
+            _ => Cow::Borrowed(&self.blit_buf),
         };
-        let data = frame_slice.as_ref();
-        let row_bytes = 4 * self.config.width as usize;
+        let data = data.as_ref();
+        let row_bytes = 4 * surface_w as usize;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
         if row_bytes % align == 0 {
             self.queue.write_texture(
@@ -215,18 +260,18 @@ impl WgpuState {
                 wgpu::ImageDataLayout {
                     offset: 0,
                     bytes_per_row: Some(row_bytes as u32),
-                    rows_per_image: Some(self.config.height),
+                    rows_per_image: Some(surface_h),
                 },
                 wgpu::Extent3d {
-                    width: self.config.width,
-                    height: self.config.height,
+                    width: surface_w,
+                    height: surface_h,
                     depth_or_array_layers: 1,
                 },
             );
         } else {
             let stride = row_bytes + (align - row_bytes % align);
-            let mut padded = vec![0u8; stride * self.config.height as usize];
-            for y in 0..self.config.height as usize {
+            let mut padded = vec![0u8; stride * surface_h as usize];
+            for y in 0..surface_h as usize {
                 let src_off = y * row_bytes;
                 let dst_off = y * stride;
                 padded[dst_off..dst_off + row_bytes]
@@ -243,11 +288,11 @@ impl WgpuState {
                 wgpu::ImageDataLayout {
                     offset: 0,
                     bytes_per_row: Some(stride as u32),
-                    rows_per_image: Some(self.config.height),
+                    rows_per_image: Some(surface_h),
                 },
                 wgpu::Extent3d {
-                    width: self.config.width,
-                    height: self.config.height,
+                    width: surface_w,
+                    height: surface_h,
                     depth_or_array_layers: 1,
                 },
             );
@@ -272,6 +317,8 @@ pub struct WgpuDisplay {
     window: &'static Window,
     state: WgpuState,
     scale: (f64, f64),
+    dest_size: (u32, u32),
+    surface_offset: (f64, f64),
 }
 
 impl WgpuDisplay {
@@ -300,7 +347,7 @@ impl WgpuDisplay {
             .expect("failed to create window");
         let window = Box::leak(Box::new(window));
         let phys = window.inner_size();
-        let state = WgpuState::new(window, phys.width, phys.height);
+        let state = WgpuState::new(window, width as u32, height as u32, phys.width, phys.height);
         let window: &'static Window = &*window;
         let scale = (
             phys.width as f64 / width as f64,
@@ -313,6 +360,8 @@ impl WgpuDisplay {
             window,
             state,
             scale,
+            dest_size: (phys.width, phys.height),
+            surface_offset: (0.0, 0.0),
         }
     }
 
@@ -334,6 +383,8 @@ impl WgpuDisplay {
             window,
             mut state,
             scale: initial_scale,
+            mut dest_size,
+            mut surface_offset,
         } = self;
         event_loop.set_control_flow(ControlFlow::Poll);
         // Request an initial redraw so the window displays its first frame
@@ -343,7 +394,6 @@ impl WgpuDisplay {
 
         let mut pointer_pos = (0i32, 0i32);
         let mut pointer_down = false;
-        let mut surface_offset = (0.0f64, 0.0f64);
         // Ratio between window pixels and logical display coordinates
         let mut scale = initial_scale;
         let aspect_ratio = width as f64 / height as f64;
@@ -394,17 +444,23 @@ impl WgpuDisplay {
                     event: WindowEvent::RedrawRequested,
                     ..
                 } => {
-                    let w = state.config.width as usize;
-                    let h = state.config.height as usize;
-                    frame_callback(state.frame_mut(), w, h);
-                    state.render();
+                    frame_callback(state.frame_mut(), width, height);
+                    state.render(
+                        dest_size.0,
+                        dest_size.1,
+                        surface_offset.0.round() as u32,
+                        surface_offset.1.round() as u32,
+                    );
                 }
                 Event::WindowEvent {
                     event: WindowEvent::Resized(size),
                     ..
                 } => {
-                    let mut w = size.width;
-                    let mut h = size.height;
+                    let surf_w = size.width.min(max_dim);
+                    let surf_h = size.height.min(max_dim);
+                    state.resize(surf_w, surf_h);
+                    let mut w = surf_w;
+                    let mut h = surf_h;
                     if (w as f64 / h as f64 - aspect_ratio).abs() > f64::EPSILON {
                         if w as f64 / h as f64 > aspect_ratio {
                             w = (h as f64 * aspect_ratio).round() as u32;
@@ -413,10 +469,10 @@ impl WgpuDisplay {
                         }
                     }
                     surface_offset = (
-                        (size.width as f64 - w as f64) / 2.0,
-                        (size.height as f64 - h as f64) / 2.0,
+                        (surf_w as f64 - w as f64) / 2.0,
+                        (surf_h as f64 - h as f64) / 2.0,
                     );
-                    state.resize(w.min(max_dim), h.min(max_dim));
+                    dest_size = (w, h);
                     let old_scale = scale;
                     scale = (w as f64 / width as f64, h as f64 / height as f64);
                     pointer_pos = (
