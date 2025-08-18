@@ -517,6 +517,29 @@ mod gif_tests {
     }
 }
 
+#[cfg(all(test, feature = "apng"))]
+mod apng_tests {
+    use super::*;
+    use crate::cpu_blitter::CpuBlitter;
+    use base64::Engine;
+
+    const RED_DOT_APNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAABAAAAALQt6aAAAAAaZmNUTAAAAAAAAAABAAAAAQAAAAAAAAAAAGQD6AEAqmVSjAAAAA1JREFUeJxj+M/A8B8ABQAB/4mZPR0AAAAASUVORK5CYII=";
+
+    #[test]
+    fn blitter_draws_apng() {
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(RED_DOT_APNG)
+            .unwrap();
+        let mut buf = [0u8; 4 * 4 * 4];
+        let surface = Surface::new(&mut buf, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blit = CpuBlitter;
+        let mut renderer: BlitterRenderer<'_, CpuBlitter, 4> =
+            BlitterRenderer::new(&mut blit, surface);
+        renderer.draw_apng_frame((0, 0), &data, 0).unwrap();
+        assert!(buf.iter().any(|&p| p != 0));
+    }
+}
+
 #[cfg(all(test, feature = "canvas"))]
 mod canvas_tests {
     use super::*;
