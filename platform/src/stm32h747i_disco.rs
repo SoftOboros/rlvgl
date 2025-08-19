@@ -70,7 +70,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         RST: OutputPin,
     {
         // Enable LTDC and DSI peripheral clocks
-        rcc.apb3enr()
+        rcc.apb3enr
             .modify(|_, w| w.ltdcen().set_bit().dsien().set_bit());
         // Ensure the panel is held in reset and the backlight is off
         let _ = reset.set_low();
@@ -112,19 +112,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     fn setup_ltdc_layer(&mut self, fb: u32, width: u16, height: u16) {
-        use stm32h7::stm32h747cm7::ltdc::layer::pfcr::PF;
         let pitch = width * 2; // RGB565
-        let layer0 = self.ltdc.layer(0);
-        layer0.cfbar().write(|w| unsafe { w.cfbadd().bits(fb) });
+        let layer0 = &self.ltdc.layer1;
+        layer0.cfbar.write(|w| w.cfbadd().bits(fb));
         layer0
-            .cfblr()
-            .write(|w| unsafe { w.cfbll().bits(pitch + 3).cfbp().bits(pitch) });
-        layer0
-            .cfblnr()
-            .write(|w| unsafe { w.cfblnbr().bits(height) });
-        layer0.pfcr().write(|w| w.pf().variant(PF::Rgb565));
-        layer0.cr().modify(|_, w| w.len().enabled());
-        self.ltdc.srcr().write(|w| w.imr().reload());
+            .cfblr
+            .write(|w| w.cfbll().bits(pitch + 3).cfbp().bits(pitch));
+        layer0.cfblnr.write(|w| w.cfblnbr().bits(height));
+        layer0.pfcr.write(|w| w.pf().rgb565());
+        layer0.cr.modify(|_, w| w.len().enabled());
+        self.ltdc.srcr.write(|w| w.imr().reload());
     }
 
     #[cfg(all(
@@ -133,7 +130,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     ))]
     /// Initialize the external SDRAM and return its base address.
     fn init_sdram(_fmc: FMC, rcc: &mut RCC) -> u32 {
-        rcc.ahb3enr().modify(|_, w| w.fmcen().set_bit());
+        rcc.ahb3enr.modify(|_, w| w.fmcen().set_bit());
         0xC000_0000
     }
 }
