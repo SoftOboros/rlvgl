@@ -45,6 +45,11 @@ The STM32H747I‑DISCO discovery board provides a built‑in **4‑inch 800×480
 - [x] Add README section under `platform/` describing stm32h747i_disco implementation.
 - [x] Document pin mappings, display init, and touch controller details. See `docs/STM32H747I-DISCO.md`.
 
+## 7. Display and Button Integration
+ - [x] Instantiate `Stm32h747iDiscoDisplay` and `Stm32h747iDiscoInput` in `examples/stm32h747i-disco/src/main.rs`.
+  - The current demo only calls `build_demo`, leaving the platform display and button modules unused.
+ - [x] Wire the board's user button into LVGL input events to validate the input path.
+
 ---
 **References:**
 - STM32H747I‑DISCO board features: 4‑inch 800×480 TFT LCD with MIPI DSI and capacitive touch panel.
