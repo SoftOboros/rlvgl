@@ -57,49 +57,52 @@ impl App for CreatorApp {
 
         egui::SidePanel::left("asset_browser").show(ctx, |ui| {
             ui.heading("Assets");
-            ui.horizontal(|ui| {
-                ui.label("Search:");
-                ui.text_edit_singleline(&mut self.filter);
+            let stroke =
+                egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.fg_stroke.color);
+            egui::Frame::none().stroke(stroke).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Search:");
+                    ui.text_edit_singleline(&mut self.filter);
+                });
+                ui.checkbox(&mut self.show_unlicensed_only, "Unlicensed only");
+                if !self.selection.is_empty() {
+                    ui.horizontal(|ui| {
+                        ui.label("Delay (ms):");
+                        ui.text_edit_singleline(&mut self.apng_delay_ms);
+                        ui.label("Loops (0=inf):");
+                        ui.text_edit_singleline(&mut self.apng_loops);
+                        if ui.button("Make APNG").clicked() {
+                            if let Err(e) = self.make_apng_from_selection() {
+                                self.toasts
+                                    .push((format!("APNG failed: {}", e), Instant::now()));
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.text_edit_singleline(&mut self.new_group);
+                        if ui.button("Add to group").clicked() {
+                            self.add_selection_to_group();
+                        }
+                        if ui.button("Add to layout").clicked() {
+                            self.add_selection_to_layout();
+                        }
+                        if ui.button("Reveal in manifest").clicked() {
+                            self.reveal_in_manifest();
+                        }
+                        if ui.button("Delete").clicked() {
+                            if matches!(
+                                MessageDialog::new()
+                                    .set_title("Delete selected assets?")
+                                    .set_buttons(MessageButtons::YesNo)
+                                    .show(),
+                                MessageDialogResult::Yes
+                            ) {
+                                self.delete_selection();
+                            }
+                        }
+                    });
+                }
             });
-            ui.checkbox(&mut self.show_unlicensed_only, "Unlicensed only");
-            if !self.selection.is_empty() {
-                ui.horizontal(|ui| {
-                    ui.label("Delay (ms):");
-                    ui.text_edit_singleline(&mut self.apng_delay_ms);
-                    ui.label("Loops (0=inf):");
-                    ui.text_edit_singleline(&mut self.apng_loops);
-                    if ui.button("Make APNG").clicked() {
-                        if let Err(e) = self.make_apng_from_selection() {
-                            self.toasts
-                                .push((format!("APNG failed: {}", e), Instant::now()));
-                        }
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.text_edit_singleline(&mut self.new_group);
-                    if ui.button("Add to group").clicked() {
-                        self.add_selection_to_group();
-                    }
-                    if ui.button("Add to layout").clicked() {
-                        self.add_selection_to_layout();
-                    }
-                    if ui.button("Reveal in manifest").clicked() {
-                        self.reveal_in_manifest();
-                    }
-                    if ui.button("Delete").clicked() {
-                        if matches!(
-                            MessageDialog::new()
-                                .set_title("Delete selected assets?")
-                                .set_buttons(MessageButtons::YesNo)
-                                .show(),
-                            MessageDialogResult::Yes
-                        ) {
-                            self.delete_selection();
-                        }
-                    }
-                });
-            }
-
             ui.separator();
             let tree = self.build_dir_tree();
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -209,6 +212,7 @@ impl App for CreatorApp {
                         self.manifest.assets[idx].license = self.meta[idx].license.clone();
                         let _ = self.save_manifest();
                     }
+                    ui.separator();
                     if !meta_snapshot.groups.is_empty() {
                         ui.label("Groups:");
                         for g in &meta_snapshot.groups {
