@@ -1,16 +1,17 @@
+# Publishes crates to crates.io when a release tag is pushed or the workflow is manually dispatched.
 name: Publish
 
 on:
-  pull_request:
-    branches: [ main ]
-    types: [ closed ]     # fires on close; we'll gate on merged==true
-  workflow_dispatch:       # optional manual run (requires inputs below)
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
     inputs:
       base:
-        description: "Base SHA (e.g., PR base commit)"
+        description: "Base SHA (e.g., previous release tag commit)"
         required: true
       head:
-        description: "Head SHA (e.g., merge commit on main)"
+        description: "Head SHA (e.g., tagged commit on main)"
         required: true
 
 concurrency:
@@ -19,21 +20,17 @@ concurrency:
 
 jobs:
   publish:
-    # Only run for merged PRs to main, or when manually dispatched
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' &&
-       github.event.action == 'closed' &&
-       github.event.pull_request.merged == true &&
-       github.event.pull_request.base.ref == 'main')
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout merged commit on main (or manual head)
+      - name: Checkout tagged commit (or manual head)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          ref: ${{ github.sha }}
 
       - name: Resolve base/head SHAs
         id: shas
@@ -43,8 +40,14 @@ jobs:
             echo "base=${{ github.event.inputs.base }}" >> $GITHUB_OUTPUT
             echo "head=${{ github.event.inputs.head }}" >> $GITHUB_OUTPUT
           else
-            echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
-            echo "head=${{ github.event.pull_request.merge_commit_sha }}" >> $GITHUB_OUTPUT
+            prev_tag="$(git describe --tags --abbrev=0 "${GITHUB_SHA}^" 2>/dev/null || echo "")"
+            if [[ -n "$prev_tag" ]]; then
+              base="$(git rev-parse "$prev_tag")"
+            else
+              base="$(git rev-list --max-parents=0 "$GITHUB_SHA")"
+            fi
+            echo "base=$base" >> $GITHUB_OUTPUT
+            echo "head=$GITHUB_SHA" >> $GITHUB_OUTPUT
           fi
 
       - name: Install stable toolchain
