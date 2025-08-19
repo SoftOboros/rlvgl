@@ -99,7 +99,7 @@ impl App for CreatorApp {
                     }
                 });
             }
-
+            ui.separator();
             let tree = self.build_dir_tree();
             self.show_dir_node(ui, "", &tree);
         });
@@ -204,6 +204,7 @@ impl App for CreatorApp {
                     self.manifest.assets[idx].license = self.meta[idx].license.clone();
                     let _ = self.save_manifest();
                 }
+                ui.separator();
                 if !meta_snapshot.groups.is_empty() {
                     ui.label("Groups:");
                     for g in &meta_snapshot.groups {
