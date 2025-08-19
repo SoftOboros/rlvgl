@@ -46,6 +46,8 @@ rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.4", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.1.4", path = "platform", default-features = false }
 rlvgl-ui = { version = "0.1.0", path = "ui", default-features = false }
+embedded-hal = { version = "1.0", optional = true }
+stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -193,6 +195,8 @@ stm32h747i_disco = [
     "dep:cortex-m",
     "dep:embedded-alloc",
     "dep:panic-halt",
+    "dep:embedded-hal",
+    "dep:stm32h7",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie", "dep:rlottie"]
