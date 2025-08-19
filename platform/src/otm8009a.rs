@@ -26,8 +26,8 @@ impl Otm8009a {
     /// Issue a DCS short write command without parameters.
     fn dcs_short_write(dsi: &mut DSIHOST, cmd: u8) {
         // Wait for command FIFO space
-        while dsi.gpsr().read().cmdff().bit_is_set() {}
-        dsi.ghcr().write(|w| unsafe {
+        while dsi.gpsr.read().cmdff().bit_is_set() {}
+        dsi.ghcr.write(|w| unsafe {
             w.dt()
                 .bits(0x05)
                 .vcid()
