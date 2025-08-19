@@ -177,173 +177,176 @@ impl App for CreatorApp {
 
         egui::SidePanel::right("inspector").show(ctx, |ui| {
             ui.heading("Inspector");
+            ui.separator();
             if let Some(idx) = self.selected() {
-                let asset = &self.manifest.assets[idx];
-                let meta_snapshot = self.meta[idx].clone();
-                ui.label(format!("Path: {}", asset.path));
-                ui.label(format!("Hash: {}", meta_snapshot.hash));
-                ui.label(format!(
-                    "Size: {}x{}",
-                    meta_snapshot.width, meta_snapshot.height
-                ));
-                ui.label("License:");
-                let mut changed = false;
-                {
-                    let meta = &mut self.meta[idx];
-                    let mut lic = meta.license.clone().unwrap_or_default();
-                    if ui.text_edit_singleline(&mut lic).changed() {
-                        meta.license = if lic.is_empty() {
-                            None
-                        } else {
-                            Some(lic.clone())
-                        };
-                        changed = true;
-                    }
-                }
-                if changed {
-                    self.manifest.assets[idx].license = self.meta[idx].license.clone();
-                    let _ = self.save_manifest();
-                }
-                if !meta_snapshot.groups.is_empty() {
-                    ui.label("Groups:");
-                    for g in &meta_snapshot.groups {
-                        ui.label(format!("- {}", g));
-                    }
-                }
-                ui.separator();
-                ui.label("Export:");
-                let mut export_changed = false;
-                {
-                    let meta = &mut self.meta[idx];
-                    ui.label("Sizes (px, comma separated):");
-                    export_changed |= ui.text_edit_singleline(&mut meta.export_sizes).changed();
-                    ui.label("Color space:");
-                    export_changed |= ui
-                        .text_edit_singleline(&mut meta.export_color_space)
-                        .changed();
-                    export_changed |= ui
-                        .checkbox(&mut meta.export_premultiplied, "Premultiplied alpha")
-                        .changed();
-                    ui.label("Compression:");
-                    export_changed |= ui
-                        .text_edit_singleline(&mut meta.export_compression)
-                        .changed();
-                    if export_changed {
-                        let sizes_vec = meta
-                            .export_sizes
-                            .split(',')
-                            .filter_map(|s| s.trim().parse().ok())
-                            .collect::<Vec<u32>>();
-                        let export_opts = manifest::ExportOptions {
-                            sizes: sizes_vec,
-                            color_space: if meta.export_color_space.is_empty() {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let asset = &self.manifest.assets[idx];
+                    let meta_snapshot = self.meta[idx].clone();
+                    ui.label(format!("Path: {}", asset.path));
+                    ui.label(format!("Hash: {}", meta_snapshot.hash));
+                    ui.label(format!(
+                        "Size: {}x{}",
+                        meta_snapshot.width, meta_snapshot.height
+                    ));
+                    ui.label("License:");
+                    let mut changed = false;
+                    {
+                        let meta = &mut self.meta[idx];
+                        let mut lic = meta.license.clone().unwrap_or_default();
+                        if ui.text_edit_singleline(&mut lic).changed() {
+                            meta.license = if lic.is_empty() {
                                 None
                             } else {
-                                Some(meta.export_color_space.clone())
-                            },
-                            premultiplied: meta.export_premultiplied,
-                            compression: if meta.export_compression.is_empty() {
-                                None
-                            } else {
-                                Some(meta.export_compression.clone())
-                            },
-                        };
-                        self.manifest.assets[idx].export = if export_opts.sizes.is_empty()
-                            && export_opts.color_space.is_none()
-                            && !export_opts.premultiplied
-                            && export_opts.compression.is_none()
-                        {
-                            None
-                        } else {
-                            Some(export_opts)
-                        };
+                                Some(lic.clone())
+                            };
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        self.manifest.assets[idx].license = self.meta[idx].license.clone();
                         let _ = self.save_manifest();
                     }
-                }
-                ui.separator();
-                ui.label("Animation:");
-                let mut anim_changed = false;
-                {
-                    let meta = &mut self.meta[idx];
-                    ui.label("Frame delay (ms):");
-                    anim_changed |= ui.text_edit_singleline(&mut meta.anim_delay_ms).changed();
-                    ui.label("Loop count (0=inf):");
-                    anim_changed |= ui.text_edit_singleline(&mut meta.anim_loops).changed();
-                    ui.label("Lottie mode:");
-                    let mut mode = meta.lottie_mode.clone();
-                    egui::ComboBox::from_id_salt("lottie_mode")
-                        .selected_text(if mode.is_empty() {
-                            "None".to_string()
-                        } else {
-                            mode.clone()
-                        })
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut mode, "".to_owned(), "None");
-                            ui.selectable_value(&mut mode, "direct".to_owned(), "Direct");
-                            ui.selectable_value(&mut mode, "apng".to_owned(), "Apng");
-                        });
-                    if mode != meta.lottie_mode {
-                        meta.lottie_mode = mode;
-                        anim_changed = true;
+                    if !meta_snapshot.groups.is_empty() {
+                        ui.label("Groups:");
+                        for g in &meta_snapshot.groups {
+                            ui.label(format!("- {}", g));
+                        }
                     }
-                    if anim_changed {
-                        let delay = meta.anim_delay_ms.trim().parse().ok();
-                        let loops = meta.anim_loops.trim().parse().ok();
-                        let lottie = match meta.lottie_mode.as_str() {
-                            "direct" => Some(manifest::LottieMode::Direct),
-                            "apng" => Some(manifest::LottieMode::Apng),
-                            _ => None,
-                        };
-                        self.manifest.assets[idx].frame_delay_ms = delay;
-                        self.manifest.assets[idx].loop_count = loops;
-                        self.manifest.assets[idx].lottie = lottie;
-                        let _ = self.save_manifest();
-                    }
-                }
-                ui.separator();
-                ui.label("Font:");
-                let mut font_changed = false;
-                {
-                    let meta = &mut self.meta[idx];
-                    ui.label("Glyph set:");
-                    font_changed |= ui.text_edit_singleline(&mut meta.font_glyphs).changed();
-                    ui.label("Sizes (pt, comma separated):");
-                    font_changed |= ui.text_edit_singleline(&mut meta.font_sizes).changed();
-                    font_changed |= ui.checkbox(&mut meta.font_hinting, "Hinting").changed();
-                    ui.label("Packing:");
-                    font_changed |= ui.text_edit_singleline(&mut meta.font_packing).changed();
-                    if font_changed {
-                        let sizes_vec = meta
-                            .font_sizes
-                            .split(',')
-                            .filter_map(|s| s.trim().parse().ok())
-                            .collect::<Vec<u32>>();
-                        let font_opts = manifest::FontOptions {
-                            glyphs: if meta.font_glyphs.is_empty() {
+                    ui.separator();
+                    ui.label("Export:");
+                    let mut export_changed = false;
+                    {
+                        let meta = &mut self.meta[idx];
+                        ui.label("Sizes (px, comma separated):");
+                        export_changed |= ui.text_edit_singleline(&mut meta.export_sizes).changed();
+                        ui.label("Color space:");
+                        export_changed |= ui
+                            .text_edit_singleline(&mut meta.export_color_space)
+                            .changed();
+                        export_changed |= ui
+                            .checkbox(&mut meta.export_premultiplied, "Premultiplied alpha")
+                            .changed();
+                        ui.label("Compression:");
+                        export_changed |= ui
+                            .text_edit_singleline(&mut meta.export_compression)
+                            .changed();
+                        if export_changed {
+                            let sizes_vec = meta
+                                .export_sizes
+                                .split(',')
+                                .filter_map(|s| s.trim().parse().ok())
+                                .collect::<Vec<u32>>();
+                            let export_opts = manifest::ExportOptions {
+                                sizes: sizes_vec,
+                                color_space: if meta.export_color_space.is_empty() {
+                                    None
+                                } else {
+                                    Some(meta.export_color_space.clone())
+                                },
+                                premultiplied: meta.export_premultiplied,
+                                compression: if meta.export_compression.is_empty() {
+                                    None
+                                } else {
+                                    Some(meta.export_compression.clone())
+                                },
+                            };
+                            self.manifest.assets[idx].export = if export_opts.sizes.is_empty()
+                                && export_opts.color_space.is_none()
+                                && !export_opts.premultiplied
+                                && export_opts.compression.is_none()
+                            {
                                 None
                             } else {
-                                Some(meta.font_glyphs.clone())
-                            },
-                            sizes: sizes_vec,
-                            hinting: meta.font_hinting,
-                            packing: if meta.font_packing.is_empty() {
+                                Some(export_opts)
+                            };
+                            let _ = self.save_manifest();
+                        }
+                    }
+                    ui.separator();
+                    ui.label("Animation:");
+                    let mut anim_changed = false;
+                    {
+                        let meta = &mut self.meta[idx];
+                        ui.label("Frame delay (ms):");
+                        anim_changed |= ui.text_edit_singleline(&mut meta.anim_delay_ms).changed();
+                        ui.label("Loop count (0=inf):");
+                        anim_changed |= ui.text_edit_singleline(&mut meta.anim_loops).changed();
+                        ui.label("Lottie mode:");
+                        let mut mode = meta.lottie_mode.clone();
+                        egui::ComboBox::from_id_salt("lottie_mode")
+                            .selected_text(if mode.is_empty() {
+                                "None".to_string()
+                            } else {
+                                mode.clone()
+                            })
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut mode, "".to_owned(), "None");
+                                ui.selectable_value(&mut mode, "direct".to_owned(), "Direct");
+                                ui.selectable_value(&mut mode, "apng".to_owned(), "Apng");
+                            });
+                        if mode != meta.lottie_mode {
+                            meta.lottie_mode = mode;
+                            anim_changed = true;
+                        }
+                        if anim_changed {
+                            let delay = meta.anim_delay_ms.trim().parse().ok();
+                            let loops = meta.anim_loops.trim().parse().ok();
+                            let lottie = match meta.lottie_mode.as_str() {
+                                "direct" => Some(manifest::LottieMode::Direct),
+                                "apng" => Some(manifest::LottieMode::Apng),
+                                _ => None,
+                            };
+                            self.manifest.assets[idx].frame_delay_ms = delay;
+                            self.manifest.assets[idx].loop_count = loops;
+                            self.manifest.assets[idx].lottie = lottie;
+                            let _ = self.save_manifest();
+                        }
+                    }
+                    ui.separator();
+                    ui.label("Font:");
+                    let mut font_changed = false;
+                    {
+                        let meta = &mut self.meta[idx];
+                        ui.label("Glyph set:");
+                        font_changed |= ui.text_edit_singleline(&mut meta.font_glyphs).changed();
+                        ui.label("Sizes (pt, comma separated):");
+                        font_changed |= ui.text_edit_singleline(&mut meta.font_sizes).changed();
+                        font_changed |= ui.checkbox(&mut meta.font_hinting, "Hinting").changed();
+                        ui.label("Packing:");
+                        font_changed |= ui.text_edit_singleline(&mut meta.font_packing).changed();
+                        if font_changed {
+                            let sizes_vec = meta
+                                .font_sizes
+                                .split(',')
+                                .filter_map(|s| s.trim().parse().ok())
+                                .collect::<Vec<u32>>();
+                            let font_opts = manifest::FontOptions {
+                                glyphs: if meta.font_glyphs.is_empty() {
+                                    None
+                                } else {
+                                    Some(meta.font_glyphs.clone())
+                                },
+                                sizes: sizes_vec,
+                                hinting: meta.font_hinting,
+                                packing: if meta.font_packing.is_empty() {
+                                    None
+                                } else {
+                                    Some(meta.font_packing.clone())
+                                },
+                            };
+                            self.manifest.assets[idx].font = if font_opts.glyphs.is_none()
+                                && font_opts.sizes.is_empty()
+                                && !font_opts.hinting
+                                && font_opts.packing.is_none()
+                            {
                                 None
                             } else {
-                                Some(meta.font_packing.clone())
-                            },
-                        };
-                        self.manifest.assets[idx].font = if font_opts.glyphs.is_none()
-                            && font_opts.sizes.is_empty()
-                            && !font_opts.hinting
-                            && font_opts.packing.is_none()
-                        {
-                            None
-                        } else {
-                            Some(font_opts)
-                        };
-                        let _ = self.save_manifest();
+                                Some(font_opts)
+                            };
+                            let _ = self.save_manifest();
+                        }
                     }
-                }
+                });
             } else {
                 ui.label("Select an asset");
             }
