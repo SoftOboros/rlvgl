@@ -100,8 +100,11 @@ impl App for CreatorApp {
                 });
             }
 
+            ui.separator();
             let tree = self.build_dir_tree();
-            self.show_dir_node(ui, "", &tree);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                self.show_dir_node(ui, "", &tree);
+            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
