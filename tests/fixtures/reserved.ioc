@@ -1,0 +1,5 @@
+# .ioc fixture configuring reserved SWD pins for test
+Mcu.Name=STM32H747XIHx
+Mcu.Package=LQFP176
+PA13.Signal=GPIO_Output
+PA14.Signal=GPIO_Output

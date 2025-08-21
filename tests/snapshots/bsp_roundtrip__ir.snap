@@ -1,0 +1,58 @@
+---
+source: tests/bsp_roundtrip.rs
+expression: "&ir"
+---
+mcu: STM32H747XIHx
+package: LQFP176
+clocks:
+  pll:
+    pll1:
+      m: 5
+      n: 400
+      p: 2
+      q: 4
+      r: 2
+  kernels:
+    usart1: pclk2
+pinctrl:
+  - pin: PA9
+    func: USART1_TX
+    af: 7
+  - pin: PA10
+    func: USART1_RX
+    af: 7
+  - pin: PB0
+    func: GPIO_Output
+    af: 0
+  - pin: PB3
+    func: SPI1_SCK
+    af: 5
+  - pin: PB4
+    func: SPI1_MISO
+    af: 5
+  - pin: PB5
+    func: SPI1_MOSI
+    af: 5
+  - pin: PB6
+    func: I2C1_SCL
+    af: 4
+  - pin: PB7
+    func: I2C1_SDA
+    af: 4
+peripherals:
+  usart1:
+    class: serial
+    signals:
+      tx: PA9
+      rx: PA10
+  spi1:
+    class: spi
+    signals:
+      sck: PB3
+      miso: PB4
+      mosi: PB5
+  i2c1:
+    class: i2c
+    signals:
+      scl: PB6
+      sda: PB7

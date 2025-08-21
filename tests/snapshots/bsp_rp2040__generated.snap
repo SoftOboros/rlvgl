@@ -1,0 +1,10 @@
+---
+source: tests/bsp_rp2040.rs
+expression: rendered
+---
+pin GPIO0 SPI0_SCK af0
+pin GPIO1 SPI0_MOSI af0
+peripheral spi0 spi
+  ctor Spi::spi0
+  mosi=GPIO1
+  sck=GPIO0

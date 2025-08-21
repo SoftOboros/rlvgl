@@ -1,0 +1,19 @@
+# rp2040.yaml - sample board IR for RP2040 tests
+mcu: RP2040
+package: QFN56
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: GPIO0
+    func: SPI0_SCK
+    af: 0
+  - pin: GPIO1
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: GPIO0
+      mosi: GPIO1
