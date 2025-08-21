@@ -1,0 +1,19 @@
+# ti.yaml - sample board IR for TI tests
+mcu: MSP432P401R
+package: LQFP100
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: P1.5
+    func: SPI0_SCK
+    af: 0
+  - pin: P1.6
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: P1.5
+      mosi: P1.6

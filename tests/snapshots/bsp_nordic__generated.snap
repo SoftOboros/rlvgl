@@ -1,0 +1,10 @@
+---
+source: tests/bsp_nordic.rs
+expression: rendered
+---
+pin P0.03 SPI0_SCK af0
+pin P0.04 SPI0_MOSI af0
+peripheral spi0 spi
+  ctor Spi::spi0
+  mosi=P0.04
+  sck=P0.03

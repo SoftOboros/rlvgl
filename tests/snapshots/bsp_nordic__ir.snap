@@ -1,0 +1,22 @@
+---
+source: tests/bsp_nordic.rs
+expression: "&spec"
+---
+mcu: NRF52840
+package: QFN48
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: P0.03
+    func: SPI0_SCK
+    af: 0
+  - pin: P0.04
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: P0.03
+      mosi: P0.04

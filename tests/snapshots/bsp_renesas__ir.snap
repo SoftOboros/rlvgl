@@ -1,0 +1,22 @@
+---
+source: tests/bsp_renesas.rs
+expression: "&spec"
+---
+mcu: RA6M4
+package: LQFP64
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: P300
+    func: SPI0_SCK
+    af: 0
+  - pin: P301
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: P300
+      mosi: P301
