@@ -149,6 +149,19 @@ optional = true
 version = "1"
 optional = true
 
+[dependencies.regex]
+version = "1"
+optional = true
+
+[dependencies.indexmap]
+version = "2"
+optional = true
+features = ["serde"]
+
+[dependencies.minijinja]
+version = "2"
+optional = true
+
 [dependencies.spdx]
 version = "0.11"
 optional = true
@@ -178,7 +191,7 @@ version = "0.15"
 optional = true
 
 [dev-dependencies]
-insta = "1"
+insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
 
 [features]
@@ -214,11 +227,13 @@ creator = [
     "dep:serde",
     "dep:serde_yaml",
     "dep:image",
-    "dep:tera",
+    "dep:minijinja",
     "dep:apng",
     "dep:png",
     "dep:schemars",
     "dep:serde_json",
+    "dep:regex",
+    "dep:indexmap",
     "dep:spdx",
     "dep:fontdue",
     "dep:rlottie",

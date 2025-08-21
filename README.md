@@ -29,6 +29,102 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
 - [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
 - [rlvgl-sim](https://github.com/SoftOboros/rlvgl/tree/main/examples/sim/README.md)/ – Desktop simulator example
+
+## BSP Generator (`rlvgl-creator`)
+
+`rlvgl-creator` offers a two-stage pipeline for board support packages:
+
+1. **Import** vendor project files (e.g., STM32CubeMX `.ioc`, NXP `.mex`,
+   RP2040 YAML). Each adapter mines the vendor data and emits a small,
+   vendor-neutral
+   YAML **IR** describing clocks, pins, DMA and peripherals.
+2. **Generate** Rust initialization code by rendering MiniJinja templates
+   against the IR. Users may choose from built-in template packs or provide
+   their own.
+
+The STM32CubeMX adapter also parses PLL multipliers and peripheral kernel
+clock selections so that clock setup can be generated alongside pin
+configuration.
+
+No per-chip tables are maintained. Class-level rules are reused across
+instances and vendors, while alternate functions are discovered
+programmatically from per-vendor Python scripts that build a JSON database.
+Reserved SWD pins (`PA13`, `PA14`) are rejected unless explicitly allowed.
+
+Typical flow:
+
+```bash
+rlvgl-creator platform import --vendor st --input board.ioc --out board.yaml
+rlvgl-creator platform gen --spec board.yaml --templates templates/stm32h7 \
+  --out src/generated.rs
+```
+
+To supply accurate alternate-function numbers, generate a JSON database once
+from a vendor-provided pin listing. For STM32, a helper script consumes a CSV
+export:
+
+```bash
+python tools/afdb/st_extract_af.py --db stm32_af.csv --out af.json
+```
+
+The resulting `af.json` can be passed to `rlvgl-creator platform import` via
+`--afdb af.json`.
+
+### IR schema
+
+The import step emits a concise YAML specification describing the board:
+
+```yaml
+mcu: STM32H747XIHx
+package: LQFP176
+power: { supply: smps, vos: scale1 }
+clocks:
+  sources: { hse_hz: 25000000 }
+  pll:
+    pll1: { m: 5, n: 400, p: 2, q: 4, r: 2 }
+  kernels: { usart1: pclk2 }
+pinctrl:
+  - group: usart1-default
+    signals:
+      - { pin: PA9,  func: USART1_TX, af: 7, pull: none, speed: veryhigh }
+      - { pin: PA10, func: USART1_RX, af: 7, pull: up,   speed: veryhigh }
+peripherals:
+  usart1:
+    class: serial
+    params: { baud: 115200, parity: none, stop_bits: 1 }
+    pinctrl: [ usart1-default ]
+reserved_pins: [ PA13, PA14 ]
+```
+
+Field summary:
+
+- `mcu`, `package` – identifiers from the vendor project.
+- `power` – supply configuration; values map directly to HAL calls.
+- `clocks` – input frequencies (`sources`), PLL multipliers (`pll`) and
+  per‑peripheral kernel selections (`kernels`).
+- `pinctrl` – groups of pins with their functions, alternate functions,
+  pulls and speeds.
+- `peripherals` – map of peripheral instances keyed by name (`usart1`),
+  each with a `class` (e.g. `serial`) and optional `params`.
+- `dma`, `interrupts` – optional arrays describing DMA requests and IRQ
+  priorities.
+- `reserved_pins` – pins that must not be reconfigured (e.g. SWD).
+
+### Template helpers
+
+MiniJinja templates can use the following filters:
+
+- `pin_var` – convert a pin like `PA9` into the variable name `pa9`.
+- `periph_num` – extract trailing digits from a peripheral name
+  (`usart12` → `12`).
+- `af_alt` – render an alternate-function number for
+  `into_alternate::<AF>()` (`7` → `<7>`).
+
+Users may supply custom templates by pointing `--templates` at any
+directory; the filters above are always available.
+
+See `docs/TODO-CREATOR-BSP.md` for remaining work.
+
 ## Status
 
 As-built. See [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md) for component-by-component progress.
