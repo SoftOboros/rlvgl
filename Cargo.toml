@@ -136,9 +136,6 @@ optional = true
 version = "0.9"
 optional = true
 
-[dependencies.tera]
-version = "1"
-optional = true
 
 [dependencies.schemars]
 version = "0.8"
@@ -270,6 +267,12 @@ incremental = false
 opt-level = 1
 debug = true
 incremental = false
+
+[workspace.dependencies]
+image = "0.25.6"
+objc2-app-kit = "0.3.1"
+objc2 = "0.6.1"
+objc2-foundation = "0.3.1"
 
 [workspace]
 members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim"]
