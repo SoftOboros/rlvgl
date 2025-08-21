@@ -1,0 +1,10 @@
+---
+source: tests/bsp_nxp.rs
+expression: rendered
+---
+pin PIO0_0 SPI0_SCK af0
+pin PIO0_1 SPI0_MOSI af0
+peripheral spi0 spi
+  ctor Spi::spi0
+  mosi=PIO0_1
+  sck=PIO0_0

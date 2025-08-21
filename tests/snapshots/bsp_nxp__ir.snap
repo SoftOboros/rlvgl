@@ -1,0 +1,22 @@
+---
+source: tests/bsp_nxp.rs
+expression: "&spec"
+---
+mcu: LPC55S69
+package: BGA64
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: PIO0_0
+    func: SPI0_SCK
+    af: 0
+  - pin: PIO0_1
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: PIO0_0
+      mosi: PIO0_1
