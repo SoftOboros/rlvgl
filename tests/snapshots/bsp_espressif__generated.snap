@@ -1,0 +1,10 @@
+---
+source: tests/bsp_espressif.rs
+expression: rendered
+---
+pin GPIO18 SPI0_SCK af0
+pin GPIO19 SPI0_MOSI af0
+peripheral spi0 spi
+  ctor Spi::spi0
+  mosi=GPIO19
+  sck=GPIO18

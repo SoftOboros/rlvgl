@@ -19,14 +19,14 @@ package generator. The generator operates in two stages:
 - [x] Deny configuration of reserved pins (SWD: `PA13`, `PA14`) unless an
       explicit override is provided.
 - [ ] Provide adapters for additional vendors:
-  - [x] NXP
+  - [x] Espressif
   - [x] Microchip
-  - [ ] Nordic
-  - [ ] Espressif
-  - [ ] TI
-  - [ ] Renesas
-  - [ ] Silicon Labs
+  - [x] Nordic
+  - [x] NXP
+  - [x] Renesas
   - [x] RP2040
+  - [x] Silicon Labs
+  - [x] TI
 - [x] Document template helpers and IR schema so users can supply custom
       templates.
 - [x] Add unit tests that snapshot the IR and generated output for sample

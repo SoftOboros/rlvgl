@@ -1,0 +1,19 @@
+# espressif.yaml - sample board IR for Espressif tests
+mcu: ESP32C3
+package: QFN48
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: GPIO18
+    func: SPI0_SCK
+    af: 0
+  - pin: GPIO19
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: GPIO18
+      mosi: GPIO19
