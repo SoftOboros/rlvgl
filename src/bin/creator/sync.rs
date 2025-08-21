@@ -1,14 +1,14 @@
 //! Sync command for rlvgl-creator.
 //!
 //! Regenerates Cargo feature flags and an asset index from the manifest with
-//! an optional dry-run mode to preview changes.
+//! an optional dry-run mode to preview changes using MiniJinja templates.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use tera::{Context, Tera};
+use minijinja::{Environment, context};
 
 use crate::manifest::{FeatureEntry, Manifest};
 use crate::util::valid_root;
@@ -63,7 +63,7 @@ pub(crate) fn run(manifest_path: &Path, out: &Path, dry_run: bool) -> Result<()>
     features.sort_by(|a, b| a.name.cmp(&b.name));
     let all: Vec<String> = features.iter().map(|f| f.name.clone()).collect();
 
-    let mut tera = Tera::default();
+    let mut env = Environment::new();
     const FEATURES_TOML: &str = r#"[features]
 all = [{% for f in all %}"{{ f }}"{% if !loop.last %}, {% endif %}{% endfor %}]
 {% for f in features %}{{ f.name }} = [{% for d in f.deps %}"{{ d }}"{% if !loop.last %}, {% endif %}{% endfor %}]
@@ -72,16 +72,13 @@ all = [{% for f in all %}"{{ f }}"{% if !loop.last %}, {% endif %}{% endfor %}]
 
 {% for asset in assets %}pub const {{ asset.name }}: &str = "{{ asset.path }}";
 {% endfor %}"#;
-    tera.add_raw_template("features", FEATURES_TOML)?;
-    tera.add_raw_template("index", INDEX_RS)?;
+    env.add_template("features", FEATURES_TOML)?;
+    env.add_template("index", INDEX_RS)?;
 
-    let mut ctx = Context::new();
-    ctx.insert("all", &all);
-    ctx.insert("features", &features);
-    ctx.insert("assets", &manifest.assets);
+    let ctx = context! { all => all, features => features, assets => manifest.assets };
 
-    let features_out = tera.render("features", &ctx)?;
-    let index_out = tera.render("index", &ctx)?;
+    let features_out = env.get_template("features")?.render(&ctx)?;
+    let index_out = env.get_template("index")?.render(&ctx)?;
 
     fn print_diff(old: &str, new: &str) {
         let old_lines: Vec<&str> = old.lines().collect();

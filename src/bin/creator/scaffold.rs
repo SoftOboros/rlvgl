@@ -1,13 +1,13 @@
 //! Scaffold command for rlvgl-creator.
 //!
-//! Generates a dual-mode assets crate using embedded Tera templates.
+//! Generates a dual-mode assets crate using embedded MiniJinja templates.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use tera::{Context, Tera};
+use minijinja::{Environment, context};
 
 use crate::manifest::Manifest;
 use serde_yaml;
@@ -66,7 +66,7 @@ pub(crate) fn run(path: &Path, manifest_path: &Path) -> Result<()> {
         });
     }
 
-    let mut tera = Tera::default();
+    let mut env = Environment::new();
     const CARGO_TOML: &str = r#"[package]
 name = "{{ name }}"
 version = "0.1.0"
@@ -241,20 +241,29 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 "#;
-    tera.add_raw_template("Cargo.toml", CARGO_TOML)?;
-    tera.add_raw_template("lib.rs", LIB_RS)?;
-    tera.add_raw_template("README.md", README_MD)?;
-    tera.add_raw_template("build.rs", BUILD_RS)?;
+    env.add_template("Cargo.toml", CARGO_TOML)?;
+    env.add_template("lib.rs", LIB_RS)?;
+    env.add_template("README.md", README_MD)?;
+    env.add_template("build.rs", BUILD_RS)?;
 
-    let mut ctx = Context::new();
-    ctx.insert("name", &crate_name);
-    ctx.insert("groups", &groups);
-    ctx.insert("assets", &embed_assets);
+    let ctx = context! { name => crate_name, groups => groups, assets => embed_assets };
 
-    fs::write(path.join("Cargo.toml"), tera.render("Cargo.toml", &ctx)?)?;
-    fs::write(path.join("src/lib.rs"), tera.render("lib.rs", &ctx)?)?;
-    fs::write(path.join("README.md"), tera.render("README.md", &ctx)?)?;
-    fs::write(path.join("build.rs"), tera.render("build.rs", &ctx)?)?;
+    fs::write(
+        path.join("Cargo.toml"),
+        env.get_template("Cargo.toml")?.render(&ctx)?,
+    )?;
+    fs::write(
+        path.join("src/lib.rs"),
+        env.get_template("lib.rs")?.render(&ctx)?,
+    )?;
+    fs::write(
+        path.join("README.md"),
+        env.get_template("README.md")?.render(&ctx)?,
+    )?;
+    fs::write(
+        path.join("build.rs"),
+        env.get_template("build.rs")?.render(&ctx)?,
+    )?;
 
     println!("Scaffolded crate `{}`", crate_name);
     Ok(())
