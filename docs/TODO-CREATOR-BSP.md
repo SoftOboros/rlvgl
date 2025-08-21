@@ -19,8 +19,8 @@ package generator. The generator operates in two stages:
 - [x] Deny configuration of reserved pins (SWD: `PA13`, `PA14`) unless an
       explicit override is provided.
 - [ ] Provide adapters for additional vendors:
-  - [ ] NXP
-  - [ ] Microchip
+  - [x] NXP
+  - [x] Microchip
   - [ ] Nordic
   - [ ] Espressif
   - [ ] TI
