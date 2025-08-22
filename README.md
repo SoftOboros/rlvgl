@@ -40,8 +40,7 @@ The C version of LVGL is included as a git submodule for reference and test vect
 `rlvgl-creator` offers a two-stage pipeline for board support packages:
 
 1. **Import** vendor project files (e.g., STM32CubeMX `.ioc`, NXP `.mex`,
-   RP2040 YAML). Each adapter mines the vendor data and emits a small,
-   vendor-neutral
+   RP2040 YAML). Each adapter mines the vendor data and emits a small, vendor-neutral
    YAML **IR** describing clocks, pins, DMA and peripherals.
 2. **Generate** Rust initialization code by rendering MiniJinja templates
    against the IR. Users may choose from built-in template packs or provide

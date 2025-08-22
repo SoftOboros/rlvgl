@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# rlvgl-stm32-pins crate manifest.
+
+[package]
+name = "rlvgl-stm-pins"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Pin assingment database for ST Micro STM32 series devices."
