@@ -275,5 +275,5 @@ objc2 = "0.6.1"
 objc2-foundation = "0.3.1"
 
 [workspace]
-members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim"]
+members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040"]
 resolver = "2"
