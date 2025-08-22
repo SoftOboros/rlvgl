@@ -37,6 +37,10 @@ pub(crate) struct CreatorApp {
     pub(crate) filter: String,
     /// Whether to show only unlicensed assets.
     pub(crate) show_unlicensed_only: bool,
+    /// Available board options formatted for the UI drop-down.
+    pub(crate) board_options: Vec<String>,
+    /// Currently selected board option index.
+    pub(crate) board_choice: Option<usize>,
     /// Per-asset metadata such as hashes and groups.
     pub(crate) meta: Vec<AssetMeta>,
     /// Currently loaded texture for preview.
@@ -209,6 +213,8 @@ impl CreatorApp {
             svg_open: false,
             filter: String::new(),
             show_unlicensed_only: false,
+            board_options: board_select::board_labels(),
+            board_choice: None,
             meta,
             texture: None,
             texture_idx: None,

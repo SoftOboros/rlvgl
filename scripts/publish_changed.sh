@@ -21,6 +21,24 @@ if git diff --name-only "$BASE" HEAD | grep -q -e '^src/' -e '^Cargo.toml' -e '^
   changed+=("rlvgl")
 fi
 
+# Detect vendor chip database crates
+chipdb_crates=(
+  rlvgl-chips-stm
+  rlvgl-chips-nrf
+  rlvgl-chips-esp
+  rlvgl-chips-nxp
+  rlvgl-chips-silabs
+  rlvgl-chips-microchip
+  rlvgl-chips-renesas
+  rlvgl-chips-ti
+  rlvgl-chips-rp2040
+)
+for crate in "${chipdb_crates[@]}"; do
+  if git diff --name-only "$BASE" HEAD | grep -q "^chipdb/${crate}/"; then
+    changed+=("$crate")
+  fi
+done
+
 for crate in "${changed[@]}"; do
   echo "Publishing $crate"
   cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify || echo "⚠️ publish $crate failed."

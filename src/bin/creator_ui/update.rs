@@ -48,6 +48,17 @@ impl App for CreatorApp {
                         }
                     });
                 }
+                let label = self
+                    .board_choice
+                    .and_then(|i| self.board_options.get(i).cloned())
+                    .unwrap_or_else(|| "Select board".to_string());
+                egui::ComboBox::from_id_salt("board_select")
+                    .selected_text(label)
+                    .show_ui(ui, |ui| {
+                        for (i, opt) in self.board_options.iter().enumerate() {
+                            ui.selectable_value(&mut self.board_choice, Some(i), opt);
+                        }
+                    });
                 ui.separator();
                 if ui.button("Layout Editor").clicked() {
                     self.layout_open = !self.layout_open;

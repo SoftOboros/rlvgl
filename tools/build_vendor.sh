@@ -19,6 +19,9 @@ mkdir -p "$OUT_DIR"
 
 python3 "$ROOT/tools/gen_pins.py" --input "$VENDOR_DIR/stm" --output "$OUT_DIR"
 
+# Expose generated definitions so vendor crates can embed them
+export RLVGL_CHIP_SRC="$OUT_DIR"
+
 cat >"$CRATE_DIR/LICENSE" <<'LIC'
 BSD 3-Clause License
 
