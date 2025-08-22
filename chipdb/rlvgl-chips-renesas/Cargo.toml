@@ -1,0 +1,13 @@
+# Configuration for rlvgl-chips-renesas crate.
+[package]
+name = "rlvgl-chips-renesas"
+version = "0.0.1"
+edition = "2021"
+publish = true
+readme = "README.md"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
