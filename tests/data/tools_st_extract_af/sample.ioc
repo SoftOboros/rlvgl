@@ -1,0 +1,3 @@
+# Minimal STM32 .ioc for testing
+Pin.PA0.Signal=USART2_TX
+Pin.PA1.Signal=USART2_RX

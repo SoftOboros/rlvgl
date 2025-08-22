@@ -14,6 +14,12 @@ pub struct BoardInfo {
     pub chip: &'static str,
 }
 
+/// Static list of known boards for this vendor.
+const BOARDS: &[BoardInfo] = &[BoardInfo {
+    board: "EFM32GG11",
+    chip: "EFM32GG11",
+}];
+
 /// Returns the vendor name used by the UI.
 #[must_use]
 pub fn vendor() -> &'static str {
@@ -23,11 +29,17 @@ pub fn vendor() -> &'static str {
 /// Returns the list of available boards.
 #[must_use]
 pub fn boards() -> &'static [BoardInfo] {
-    &[]
+    BOARDS
 }
 
 /// Looks up a board by its exact name.
 #[must_use]
-pub fn find(_board_name: &str) -> Option<&'static BoardInfo> {
-    None
+pub fn find(board_name: &str) -> Option<&'static BoardInfo> {
+    BOARDS.iter().find(|b| b.board == board_name)
+}
+
+/// Returns the raw embedded board definition blob.
+#[must_use]
+pub fn raw_db() -> &'static [u8] {
+    include_bytes!(concat!(env!("OUT_DIR"), "/chipdb.bin"))
 }
