@@ -57,3 +57,18 @@ jobs:
       - name: Run polish
         run: bash scripts/pre-commit.sh
 
+  chipdb:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      - name: Generate vendor databases
+        run: tools/build_vendor.sh
+      - name: Build vendor crate
+        env:
+          RLVGL_CHIP_SRC: chipdb/rlvgl-chips-stm/generated
+        run: cargo build -p rlvgl-chips-stm
+

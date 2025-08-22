@@ -187,9 +187,55 @@ optional = true
 version = "0.15"
 optional = true
 
+[dependencies.rlvgl-chips-stm]
+path = "chipdb/rlvgl-chips-stm"
+optional = true
+
+[dependencies.rlvgl-chips-nrf]
+path = "chipdb/rlvgl-chips-nrf"
+optional = true
+
+[dependencies.rlvgl-chips-esp]
+path = "chipdb/rlvgl-chips-esp"
+optional = true
+
+[dependencies.rlvgl-chips-nxp]
+path = "chipdb/rlvgl-chips-nxp"
+optional = true
+
+[dependencies.rlvgl-chips-silabs]
+path = "chipdb/rlvgl-chips-silabs"
+optional = true
+
+[dependencies.rlvgl-chips-microchip]
+path = "chipdb/rlvgl-chips-microchip"
+optional = true
+
+[dependencies.rlvgl-chips-renesas]
+path = "chipdb/rlvgl-chips-renesas"
+optional = true
+
+[dependencies.rlvgl-chips-ti]
+path = "chipdb/rlvgl-chips-ti"
+optional = true
+
+[dependencies.rlvgl-chips-rp2040]
+path = "chipdb/rlvgl-chips-rp2040"
+optional = true
+
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
+rlvgl-chips-stm = { path = "chipdb/rlvgl-chips-stm" }
+rlvgl-chips-nrf = { path = "chipdb/rlvgl-chips-nrf" }
+rlvgl-chips-esp = { path = "chipdb/rlvgl-chips-esp" }
+rlvgl-chips-nxp = { path = "chipdb/rlvgl-chips-nxp" }
+rlvgl-chips-silabs = { path = "chipdb/rlvgl-chips-silabs" }
+rlvgl-chips-microchip = { path = "chipdb/rlvgl-chips-microchip" }
+rlvgl-chips-renesas = { path = "chipdb/rlvgl-chips-renesas" }
+rlvgl-chips-ti = { path = "chipdb/rlvgl-chips-ti" }
+rlvgl-chips-rp2040 = { path = "chipdb/rlvgl-chips-rp2040" }
+serde_json = "1"
 
 [features]
 default = []
@@ -236,6 +282,15 @@ creator = [
     "dep:rlottie",
     "dep:rayon",
     "dep:resvg",
+    "dep:rlvgl-chips-stm",
+    "dep:rlvgl-chips-nrf",
+    "dep:rlvgl-chips-esp",
+    "dep:rlvgl-chips-nxp",
+    "dep:rlvgl-chips-silabs",
+    "dep:rlvgl-chips-microchip",
+    "dep:rlvgl-chips-renesas",
+    "dep:rlvgl-chips-ti",
+    "dep:rlvgl-chips-rp2040",
 ]
 creator_ui = [
     "dep:eframe",
@@ -252,6 +307,15 @@ creator_ui = [
     "dep:notify",
     "dep:rfd",
     "dep:serde_json",
+    "dep:rlvgl-chips-stm",
+    "dep:rlvgl-chips-nrf",
+    "dep:rlvgl-chips-esp",
+    "dep:rlvgl-chips-nxp",
+    "dep:rlvgl-chips-silabs",
+    "dep:rlvgl-chips-microchip",
+    "dep:rlvgl-chips-renesas",
+    "dep:rlvgl-chips-ti",
+    "dep:rlvgl-chips-rp2040",
 ]
 
 [profile.release]

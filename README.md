@@ -35,6 +35,15 @@ The C version of LVGL is included as a git submodule for reference and test vect
 - [docs](./docs/README.md) – Project documentation and task lists
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
 
+## Vendor chip databases
+
+Vendor-specific board definitions live in the `chipdb/` crates. The
+`tools/gen_pins.py` helper aggregates raw vendor inputs into JSON
+blobs, while `tools/build_vendor.sh` orchestrates generation and stamps
+license files. When building a vendor crate, set `RLVGL_CHIP_SRC` to the
+directory containing these JSON files so the build script can embed them
+via `include_bytes!`.
+
 ## BSP Generator (`rlvgl-creator`)
 
 `rlvgl-creator` offers a two-stage pipeline for board support packages:
@@ -64,15 +73,24 @@ rlvgl-creator platform gen --spec board.yaml --templates templates/stm32h7 \
 ```
 
 To supply accurate alternate-function numbers, generate a JSON database once
-from a vendor-provided pin listing. For STM32, a helper script consumes a CSV
-export:
+from a vendor-provided pin listing. For STM32, a helper script consumes either
+an `.ioc` project file or a CSV export:
 
 ```bash
-python tools/afdb/st_extract_af.py --db stm32_af.csv --out af.json
+python tools/afdb/st_extract_af.py --input stm32_af.csv --output af.json
+# or convert a directory of `.ioc`/`.csv` files
+python tools/afdb/st_extract_af.py --input boards/ --output build/stm
 ```
 
 The resulting `af.json` can be passed to `rlvgl-creator platform import` via
 `--afdb af.json`.
+
+To package vendor chip databases for testing or publishing, run:
+
+```bash
+tools/build_vendor.sh
+RLVGL_CHIP_SRC=chipdb/rlvgl-chips-stm/generated cargo build -p rlvgl-chips-stm
+```
 
 For a full asset workflow overview see [README-CREATOR.md](./README-CREATOR.md).
 Command details live in [docs/CREATOR-CLI.md](./docs/CREATOR-CLI.md).

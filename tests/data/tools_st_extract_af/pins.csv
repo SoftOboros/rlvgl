@@ -1,0 +1,3 @@
+mcu,pin,signal,af
+STM32F4,PA0,USART2_TX,7
+STM32F4,PA1,USART2_RX,7
