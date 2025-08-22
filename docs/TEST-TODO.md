@@ -22,6 +22,11 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 | [x] | 16 | T-16 | **Memory/leak detection** with valgrind/asan under simulator | T-09 | Automated |
 | [ ] | 17 | T-17 | **Performance benchmark** – FPS @ 240×320 on desktop & H7 board | T-09, T-06 | **Human-assisted** (hardware timing) |
 | [x] | 18 | T-18 | **Docs code‑snippet compile test** – `doctest` all README/Examples | TODO#8 | Automated |
+| [x] | 19 | T-19 | **Vendor board enumeration** – consolidate vendor crates into a unified list | TODO-CHIP-SUPPORT | Automated |
+| [x] | 20 | T-20 | **Board lookup error handling** – exact name match and helpful errors | T-19 | Automated |
+| [x] | 21 | T-21 | **UI board drop-down** – selection list populates from vendor crates | T-19 | Automated |
+| [x] | 22 | T-22 | **Chip DB env wiring** – build embeds board definitions from `RLVGL_CHIP_SRC` | TODO-CHIP-SUPPORT | Automated |
+| [x] | 23 | T-23 | **Publish script chip crates** – release script lists chipdb crates | T-22 | Automated |
 
 ---
 

@@ -94,3 +94,35 @@ pub fn enumerate() -> Vec<VendorBoard> {
     }
     out
 }
+
+/// Finds a board by vendor and name, returning a descriptive error on failure.
+#[must_use]
+pub fn find_board(vendor: &str, board: &str) -> Result<VendorBoard, String> {
+    macro_rules! check_vendor {
+        ($krate:ident) => {{
+            if vendor == $krate::vendor() {
+                if let Some(b) = $krate::find(board) {
+                    return Ok(VendorBoard {
+                        vendor: $krate::vendor(),
+                        board: b.board,
+                        chip: b.chip,
+                    });
+                }
+                return Err(format!(
+                    "Board '{}' not found for vendor '{}'",
+                    board, vendor
+                ));
+            }
+        }};
+    }
+    check_vendor!(stm);
+    check_vendor!(nrf);
+    check_vendor!(esp);
+    check_vendor!(nxp);
+    check_vendor!(silabs);
+    check_vendor!(microchip);
+    check_vendor!(renesas);
+    check_vendor!(ti);
+    check_vendor!(rp2040);
+    Err(format!("Unknown vendor '{}'", vendor))
+}

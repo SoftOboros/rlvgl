@@ -53,6 +53,11 @@ mod util;
 #[path = "../creator/vendor.rs"]
 mod vendor;
 
+#[path = "../creator/boards.rs"]
+pub mod boards;
+
+mod board_select;
+
 mod types;
 use types::*;
 

@@ -67,14 +67,14 @@ Unify chip and board configuration data into self-contained crates per vendor so
 ### Level 3 – Creator integration
 - [x] **Add vendor crate dependencies** – Update `rlvgl-creator`'s `Cargo.toml` to depend on each vendor crate via path or workspace. Depends on: Vendor crates
 - [x] **Public API to enumerate boards** – Add functions in creator to iterate over all vendor crates and build a flat list of Vendor → Boards entries. Depends on: Vendor API
-- [ ] **UI drop-down support** – On the creator branch’s UI (see `rlvgl/creator-ui`), update the board selection component to present vendor, chip and board options loaded from the crates. Depends on: Enumeration API
-- [ ] **Exact name matching** – Ensure that the UI selection uses exact matching to find board definitions in the vendor crates. Depends on: UI support
-- [ ] **Fallback / error handling** – Define behaviour when a vendor crate or board is missing; display a clear message rather than panicking. Depends on: UI support
+- [x] **UI drop-down support** – On the creator branch’s UI (see `rlvgl/creator-ui`), update the board selection component to present vendor, chip and board options loaded from the crates. Depends on: Enumeration API
+- [x] **Exact name matching** – Ensure that the UI selection uses exact matching to find board definitions in the vendor crates. Depends on: UI support
+- [x] **Fallback / error handling** – Define behaviour when a vendor crate or board is missing; display a clear message rather than panicking. Depends on: UI support
 
 ### Level 4 – Publish & CI integration
 - [x] **CI extraction step** – Add a CI job that runs `tools/build_vendor.sh` against the vendor submodules. Depends on: Python CLI
-- [ ] **Environment variable wiring** – Pass `RLVGL_CHIP_SRC` or similar environment variables into the vendor crate build to locate the generated files. Depends on: CI extraction
-- [ ] **Cargo publish matrix** – Extend the release workflow to publish each vendor crate along with core, ui, and other crates. Depends on: Vendor crates
+- [x] **Environment variable wiring** – Pass `RLVGL_CHIP_SRC` or similar environment variables into the vendor crate build to locate the generated files. Depends on: CI extraction
+- [x] **Cargo publish matrix** – Extend the release workflow to publish each vendor crate along with core, ui, and other crates. Depends on: Vendor crates
 - [ ] **Version bump automation** – Write a script or adopt `cargo release` to bump versions across vendor crates when new definitions are generated. Depends on: Publish matrix
 - [ ] **Update docs and changelog** – Add release notes summarising supported chips/boards and instructions for using the new crates with creator. Depends on: Publish matrix
 
