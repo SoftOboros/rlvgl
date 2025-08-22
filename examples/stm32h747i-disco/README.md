@@ -1,3 +1,6 @@
+<!--
+examples/stm32h747i-disco/README.md - STM32H747I-DISCO board demo.
+-->
 # STM32H747I-DISCO Demo
 ---
 Demonstrates rlvgl on the STM32H747I-DISCO discovery board using placeholder

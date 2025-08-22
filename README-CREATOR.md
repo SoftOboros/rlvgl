@@ -45,3 +45,5 @@ The graphical interface mirrors the CLI steps:
 
 Throughout the UI, status bars and log panes provide feedback, ensuring each action yields visible results.
 
+For detailed CLI and UI flags see [src/bin/creator/README.md](./src/bin/creator/README.md).
+

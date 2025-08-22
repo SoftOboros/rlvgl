@@ -1,6 +1,11 @@
+<!--
+platform/README.md - Traits and utilities for hardware and simulator integration.
+-->
 # rlvgl-platform
 
 Traits and utility types for hooking rlvgl to real hardware or simulators.
+
+See [README-VENDOR.md](./README-VENDOR.md) for the vendor support policy.
 
 Currently provided pieces:
 
