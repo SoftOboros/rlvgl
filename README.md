@@ -1,3 +1,6 @@
+<!--
+README.md - Top-level overview and navigation for rlvgl.
+-->
 <p align="center">
   <img src="./rlvgl-logo.png" alt="rlvgl" />
 </p>
@@ -24,11 +27,13 @@ The C version of LVGL is included as a git submodule for reference and test vect
   Embedded targets should pre-render animations to APNG for minimal size.
 
 ## Project Structure
-- [core](https://github.com/SoftOboros/rlvgl/blob/main/core/README.md)/ – Widget base trait, layout, event dispatch
-- [widgets](https://github.com/SoftOboros/rlvgl/blob/main/widgets/widgets/README.md)/ – Rust-native reimplementations of LVGL widgets
-- [platform](https://github.com/SoftOboros/rlvgl/blob/main/platform/platform/README.md)/ – Display/input traits and HAL adapters
-- [lvgl](https://github.com/lvgl/lvgl/blob/master/README.md)/ – C submodule (reference only)
-- [rlvgl-sim](https://github.com/SoftOboros/rlvgl/tree/main/examples/sim/README.md)/ – Desktop simulator example
+- [core](./core/README.md) – Widget base trait, layout, event dispatch
+- [widgets](./widgets/README.md) – Rust-native reimplementations of LVGL widgets
+- [platform](./platform/README.md) – Display/input traits and HAL adapters
+- [ui](./ui/README.md) – Higher-level UI components
+- [examples](./examples/README.md) – Sample applications and board demos
+- [docs](./docs/README.md) – Project documentation and task lists
+- [lvgl](./lvgl/README.md) – C submodule (reference only)
 
 ## BSP Generator (`rlvgl-creator`)
 
@@ -69,6 +74,9 @@ python tools/afdb/st_extract_af.py --db stm32_af.csv --out af.json
 
 The resulting `af.json` can be passed to `rlvgl-creator platform import` via
 `--afdb af.json`.
+
+For a full asset workflow overview see [README-CREATOR.md](./README-CREATOR.md).
+Command details live in [docs/CREATOR-CLI.md](./docs/CREATOR-CLI.md).
 
 ### IR schema
 
@@ -127,11 +135,7 @@ See `docs/TODO-CREATOR-BSP.md` for remaining work.
 
 ## Status
 
-As-built. See [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md) for component-by-component progress.
-- [TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO.md)
-- [TEST-TODO](https://github.com/SoftOboros/rlvgl/blob/main/docs/TEST-TODO.md)
-- [TODO-PLUGINS](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-PLUGINS.md)
-- [TODO-UI](https://github.com/SoftOboros/rlvgl/blob/main/docs/TODO-UI.md)
+As-built. See [docs](./docs/README.md) for component-by-component progress and outstanding tasks.
 
 As of 0.1.0 many features are implemented and an 87% unit test coverage
 is achived, but functional testing has and bare metal testing have not
@@ -178,6 +182,10 @@ Or add the following line to your Cargo.toml:
 ```toml
 rlvgl = "0.1.5"
 ```
+
+## Community
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Contributor notes](./AGENTS.md)
 
 ## Dockerhub
 The build image used by the Github worflow for this repo is publiclly available on [Dockerhub](https://hub.docker.com/r/iraa/rlvgl).

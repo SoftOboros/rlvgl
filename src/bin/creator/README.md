@@ -1,3 +1,6 @@
+<!--
+src/bin/creator/README.md - Guide to the rlvgl-creator binary workflows.
+-->
 # rlgvl-creator
 
 A combined UI and command-line tool for normalizing assets and generating dual-mode assets crates for rlvgl projects. Running without arguments launches the desktop UI; providing arguments executes the CLI. This guide covers the end-to-end workflow from initialization to consumption.

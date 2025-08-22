@@ -1,3 +1,6 @@
+<!--
+core/README.md - Overview of rlvgl core abstractions.
+-->
 # rlvgl-core
 
 This crate contains the runtime abstractions that underpin every widget and

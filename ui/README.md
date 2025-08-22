@@ -1,3 +1,6 @@
+<!--
+ui/README.md - Unified documentation for rlvgl-ui.
+-->
 # rlvgl-ui ─ Unified Documentation
 *(Copy-paste this single file into `ui/README.md` or anywhere you like.)*
 
