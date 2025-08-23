@@ -2,7 +2,8 @@
 """Convert STM32 pin descriptions to a compact JSON database.
 
 This utility accepts either a single `.csv` or `.ioc` file or a directory
-containing multiple such files.  The resulting JSON maps pin names to the
+containing such files. Directories are searched recursively for supported file
+types. The resulting JSON maps pin names to the
 signals they can provide and, where available, the alternate-function number.
 
 Usage examples:
@@ -19,7 +20,6 @@ Both input types produce a uniform JSON structure:
 import argparse
 import csv
 import json
-import os
 import re
 from pathlib import Path
 from typing import Dict
@@ -76,9 +76,8 @@ def main() -> None:
 
     if in_path.is_dir():
         out_path.mkdir(parents=True, exist_ok=True)
-        for entry in os.listdir(in_path):
-            src = in_path / entry
-            if src.suffix.lower() in {".csv", ".ioc"}:
+        for src in in_path.rglob("*"):
+            if src.is_file() and src.suffix.lower() in {".csv", ".ioc"}:
                 dst = out_path / f"{src.stem}.json"
                 _convert_file(src, dst)
     else:
