@@ -20,7 +20,12 @@ def _parse_ip(ip_dir: Path) -> dict:
     for xml_path in ip_dir.glob("*.xml"):
         root = ET.parse(xml_path).getroot()
         name = root.attrib.get("Name") or xml_path.stem
-        signals = [sig.attrib["Name"] for sig in root.findall(".//Signal")]
+        # Some IP definitions namespace the signal tags and use <PinSignal> or <Signal>.
+        signals = [
+            elem.attrib["Name"]
+            for elem in root.findall(".//*")
+            if elem.tag.endswith("Signal")
+        ]
         db[name] = {"signals": signals}
     return db
 
@@ -62,12 +67,18 @@ def main() -> None:
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
 
-    ip_db = _parse_ip(root / "IP")
+    ip_dir = root / "IP"
+    if not ip_dir.exists():
+        ip_dir = root / "mcu" / "IP"
+    ip_db = _parse_ip(ip_dir)
     (out / "ip.json").write_text(json.dumps(ip_db, indent=2, sort_keys=True))
 
+    mcu_dir = root / "mcu"
+    if not mcu_dir.exists():
+        mcu_dir = root
     mcu_out = out / "mcu"
     mcu_out.mkdir(exist_ok=True)
-    for name, data in _parse_mcu(root / "mcu").items():
+    for name, data in _parse_mcu(mcu_dir).items():
         (mcu_out / f"{name}.json").write_text(json.dumps(data, indent=2, sort_keys=True))
 
     print(f"Wrote {len(ip_db)} IPs and MCU databases to {out}")
