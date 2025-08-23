@@ -31,7 +31,7 @@ def _parse_mcu(mcu_dir: Path) -> dict:
         root = ET.parse(xml_path).getroot()
         name = root.attrib.get("Name") or root.attrib.get("PartNumber") or xml_path.stem
         pins = {}
-        for pin in root.findall(".//Pin"):
+        for pin in root.findall(".//IP"):
             pin_name = pin.attrib.get("Name")
             entries = []
             for sig in pin.findall("Signal"):
@@ -62,7 +62,7 @@ def main() -> None:
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
 
-    ip_db = _parse_ip(root / "ip")
+    ip_db = _parse_ip(root / "IP")
     (out / "ip.json").write_text(json.dumps(ip_db, indent=2, sort_keys=True))
 
     mcu_out = out / "mcu"

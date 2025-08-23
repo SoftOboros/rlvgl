@@ -2,6 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "ST MCU",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tools/afdb/stm32_xml_scraper.py",
+      "console": "integratedTerminal",
+      "args": ["--root", "chips/stm/STM32_open_pin_data", "--output", "chips/stm/mcu.json"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
       "name": "Debug sim",
       "type": "lldb",
       "request": "launch",
@@ -9,9 +18,16 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "cargo": {
-        "args": ["build", "--bin=rlvgl-sim", "--features=simulator,fontdue,qrcode,png,jpeg", "--target=x86_64-apple-darwin"]
+        "args": [
+          "build",
+          "--bin=rlvgl-sim",
+          "--features=simulator,fontdue,qrcode,png,jpeg",
+          "--target=x86_64-apple-darwin"
+        ]
       },
-      "sourceLanguages": ["rust"]
+      "sourceLanguages": [
+        "rust"
+      ]
     },
     {
       "name": "Debug Creator",
@@ -21,9 +37,16 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "cargo": {
-        "args": ["build", "--bin=rlvgl-creator", "--features=creator,creator_ui", "--target=x86_64-apple-darwin"]
+        "args": [
+          "build",
+          "--bin=rlvgl-creator",
+          "--features=creator,creator_ui",
+          "--target=x86_64-apple-darwin"
+        ]
       },
-      "sourceLanguages": ["rust"]
+      "sourceLanguages": [
+        "rust"
+      ]
     },
     {
       "name": "DISCO",
@@ -38,7 +61,9 @@
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
-      "searchDir": ["/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts"],
+      "searchDir": [
+        "/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts"
+      ],
       "toolchainPrefix": "arm-none-eabi-",
       "svdFile": "${workspaceFolder}/STM32H747.svd",
       "runToEntryPoint": "main",
