@@ -1,0 +1,8 @@
+[project]
+name = "afdb"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["defusedxml", "pydantic>=2", "jsonschema", "orjson"]
+
+[project.scripts]
+afdb = "tools.afdb.cli:main"

@@ -27,6 +27,9 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 | [x] | 21 | T-21 | **UI board drop-down** – selection list populates from vendor crates | T-19 | Automated |
 | [x] | 22 | T-22 | **Chip DB env wiring** – build embeds board definitions from `RLVGL_CHIP_SRC` | TODO-CHIP-SUPPORT | Automated |
 | [x] | 23 | T-23 | **Publish script chip crates** – release script lists chipdb crates | T-22 | Automated |
+| [x] | 24 | T-24 | **AFDB MCU/IP ingest tests** – round-trip sample STM32 XML through canonical overlays | TODO-CHIP-SUPPORT | Automated |
+| [x] | 25 | T-25 | **AFDB catalog builder smoke** – verify pin mappings and GPIO IOModes in generated catalog | T-24 | Automated |
+| [x] | 26 | T-26 | **AFDB report rendering** – markdown table lists expected pins and GPIO modes | T-25 | Automated |
 
 ---
 

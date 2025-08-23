@@ -1,0 +1,17 @@
+<IP>
+  <Peripheral Name="TIM">
+    <Signal Name="TIM_CH1"/>
+    <Signal Name="TIM_CH1N"/>
+    <Signal Name="TIM_CH2"/>
+    <Signal Name="TIM_CH2N"/>
+    <Signal Name="TIM_ETR"/>
+    <Signal Name="TIM_BKIN"/>
+  </Peripheral>
+  <Peripheral Name="USART">
+    <Signal Name="USART_TX"/>
+    <Signal Name="USART_RX"/>
+    <Signal Name="USART_CTS"/>
+    <Signal Name="USART_RTS"/>
+    <Signal Name="USART_CK"/>
+  </Peripheral>
+</IP>

@@ -90,6 +90,35 @@ Unify chip and board configuration data into self-contained crates per vendor so
 - [x] **Version bump automation** – Write a script or adopt `cargo release` to bump versions across vendor crates when new definitions are generated. Depends on: Publish matrix
 - [x] **Update docs and changelog** – Add release notes summarising supported chips/boards and instructions for using the new crates with creator. Depends on: Publish matrix
 
+## Codex Playbook — STM32 Open Pin Data ➜ Canonical JSON (lossless + canonical)
+Track a new Python-based pipeline (`afdb`) that converts STM32 vendor XML into lossless and canonical JSON. Facts: ST ships no public XSD for per-MCU or IP XML, so we ingest raw data and validate the canonical overlay with local JSON Schemas.
+- [x] **Phase 0 – Repo scaffold & deps** – Create `tools/afdb` package with CLI, schemas, fixtures, and minimal `pyproject.toml`.
+- [x] **Phase 1 – Lossless XML ingest** – Implement `ingest_raw.py` and `util_xml.py` to parse XML safely into raw JSON trees preserving order, attributes, and line numbers.
+- [x] **Phase 2 – Canonical MCU overlay** – Build `parse_mcu.py` to overlay structured MCU data (meta, instances, pins) while retaining the raw snapshot.
+- [x] **Phase 3 – Canonical IP overlay** – Write `parse_ip.py` to normalize IP `_Modes.xml` files into peripheral signal dictionaries.
+- [x] **Phase 4 – Catalog builder** – Fuse MCU and IP overlays via `build_catalog.py`, producing per-part catalogs keyed by pins and instances.
+- [x] **Phase 5 – JSON Schemas** – Define `schemas/mcu_canonical.schema.json` and `schemas/ip_canonical.schema.json` to validate canonical outputs.
+- [x] **Phase 6 – CLI wiring** – Expose `afdb` subcommands (`import-mcu`, `import-ip`, `build-catalog`) that emit canonical JSON.
+- [x] **Phase 7 – Tests** – Add fixture-driven `pytest` suites covering ingest, MCU/IP parsing, and catalog building.
+- [x] **Phase 8 – Reports** – Generate optional human-readable pin/function tables under `reports/`.
+- [x] **Phase 9 – Integration hooks** – Store generated catalogs under `afdb/<family>/<refname>.json` and retain `raw_xml_path` for provenance.
+
+#### Ready-to-run prompts
+- Prompt A – scaffold & dependencies
+- Prompt B – implement `parse_ip.py` and `build_catalog.py`
+- Prompt C – add JSON Schemas and tests
+- Prompt D – wire CLI and demonstrate end-to-end run
+
+#### Notes on field retention
+- Every input element or attribute persists either in the raw snapshot or in an `other_attributes` map on the canonical nodes.
+- Child order is preserved via `raw_tree.children[]`, and duplicate scalar tags become arrays in the canonical overlay.
+- Namespaces are stored in `qname.ns` so provenance can always be traced back to the vendor XML.
+
+### STM32 data crate size plan
+- [x] Optimise the 11.4 MB zipped MCU XML into a compact IR and Zstd artifact targeting ≤ 4–6 MB per family.
+- [x] Shard runtime data by MCU family (e.g. `stm32-data-f`, `stm32-data-h`) embedding a single `.bin.zst` per crate.
+- [ ] Re‑evaluate the need for further splits if size limits are still tight.
+
 ## Definition of Done
 - All vendor crates compile and expose a stable API returning board definitions.
 - The Python extraction script can parse both `.ioc` and `.csv` and produces consistent outputs; tests cover representative samples.
@@ -97,3 +126,4 @@ Unify chip and board configuration data into self-contained crates per vendor so
 - CI runs extraction and publishes updated vendor crates; version numbers bump automatically when definitions change.
 - Documentation in `README.md` and this TODO is up to date, and `docs/TEST-TODO.md` includes new test IDs covering chip support (e.g. T-19 for vendor enumeration, T-20 for board loading smoke test).
 - Canonical `mcu` and `boards` IR derived from `STM32_open_pin_data` is consumable through `rlvgl-creator`, which can also convert user-supplied `.ioc` files.
+- Each STM32 data crate embeds a compressed `.bin.zst` artifact per MCU family and stays well under the 10 MB publish limit.
