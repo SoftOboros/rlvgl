@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"STM32 IP canonical overlay",
+  "type":"object",
+  "required":["ip"],
+  "properties":{
+    "ip":{
+      "type":"object",
+      "additionalProperties":{
+        "type":"object",
+        "properties":{
+          "signals":{"type":"array","items":{"type":"string"}},
+          "other":{"type":"object","additionalProperties":true}
+        },
+        "additionalProperties":true
+      }
+    }
+  },
+  "additionalProperties":true
+}
