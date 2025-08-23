@@ -14,6 +14,7 @@ use clap::{ArgAction, Parser, Subcommand};
 
 pub mod add_target;
 pub mod apng;
+pub mod board_import;
 pub mod check;
 pub mod convert;
 pub mod fonts;
@@ -162,6 +163,11 @@ enum Command {
         #[arg(long)]
         threshold: Option<u8>,
     },
+    /// Board-related commands
+    Board {
+        #[command(subcommand)]
+        cmd: BoardCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -206,6 +212,19 @@ enum LottieCommand {
         /// Optional APNG file to generate
         #[arg(long)]
         apng: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum BoardCommand {
+    /// Convert a CubeMX `.ioc` file into a board overlay JSON
+    FromIoc {
+        /// Input `.ioc` file
+        ioc: PathBuf,
+        /// Board name to embed in the overlay
+        board: String,
+        /// Output path for the generated JSON
+        out: PathBuf,
     },
 }
 
@@ -262,6 +281,11 @@ pub fn run() -> Result<()> {
             dpi,
             threshold,
         } => svg::run(&svg, &out, &dpi, threshold)?,
+        Command::Board { cmd } => match cmd {
+            BoardCommand::FromIoc { ioc, board, out } => {
+                board_import::from_ioc(&ioc, &board, &out)?
+            }
+        },
     }
 
     Ok(())
