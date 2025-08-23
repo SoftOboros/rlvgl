@@ -47,3 +47,27 @@ Throughout the UI, status bars and log panes provide feedback, ensuring each act
 
 For detailed CLI and UI flags see [src/bin/creator/README.md](./src/bin/creator/README.md).
 
+## Chip and board database integration
+
+`rlvgl-creator` consumes chip and board definitions from the `rlvgl-chips-*` crates under
+`chipdb/`. These crates embed vendor JSON data so the CLI and UI can populate vendor,
+microcontroller and board selections. When regenerating pin data, bump the crate versions
+before publishing:
+
+```bash
+python tools/bump_vendor_versions.py --path chipdb
+```
+
+No additional configuration is required; the creator automatically loads all available
+vendor crates on startup.
+
+To convert a custom CubeMX project into a board overlay, run:
+
+```bash
+rlvgl-creator board from-ioc project.ioc MyBoard MyBoard.json
+```
+
+The CLI detects the MCU automatically and resolves alternate-function numbers
+using the bundled database. The resulting JSON can be placed under `boards/`
+for use by `rlvgl-creator`.
+

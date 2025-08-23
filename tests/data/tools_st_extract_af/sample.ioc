@@ -1,3 +1,4 @@
 # Minimal STM32 .ioc for testing
+Mcu.Name=STM32F4
 Pin.PA0.Signal=USART2_TX
 Pin.PA1.Signal=USART2_RX

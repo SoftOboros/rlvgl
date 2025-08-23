@@ -34,19 +34,22 @@ fn converts_csv_and_ioc() {
         serde_json::from_str(&fs::read_to_string(&csv_out).unwrap()).unwrap();
     assert_eq!(csv_json["PA0"]["USART2_TX"], 7);
 
-    // IOC input
+    // IOC input with MCU database
     let ioc_in = data_dir.join("sample.ioc");
     let ioc_out = tmp.path().join("ioc.json");
+    let mcu_root = data_dir.join("mcu");
     let status = Command::new("python3")
         .arg(&script)
         .arg("--input")
         .arg(&ioc_in)
         .arg("--output")
         .arg(&ioc_out)
+        .arg("--mcu-root")
+        .arg(&mcu_root)
         .status()
         .expect("run st_extract_af.py on ioc");
     assert!(status.success());
     let ioc_json: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&ioc_out).unwrap()).unwrap();
-    assert_eq!(ioc_json["PA1"]["USART2_RX"], 0);
+    assert_eq!(ioc_json["PA1"]["USART2_RX"], 7);
 }
