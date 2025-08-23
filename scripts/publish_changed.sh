@@ -41,5 +41,17 @@ done
 
 for crate in "${changed[@]}"; do
   echo "Publishing $crate"
-  cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify || echo "⚠️ publish $crate failed."
+  if [[ "$crate" == "rlvgl-chips-stm" ]]; then
+    echo "Generating STM chip database"
+    python tools/afdb/st_extract_af.py --input chips/stm/STM32_open_pin_data --output /tmp/stm_json
+    python tools/gen_pins.py --input /tmp/stm_json --output chipdb/rlvgl-chips-stm/db
+    export RLVGL_CHIP_SRC=chipdb/rlvgl-chips-stm/db
+    cargo test -p rlvgl-chips-stm
+    bin_path=$(find target -name chipdb.bin | head -n 1)
+    zstd -19 -f "$bin_path" -o chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
+    git add chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
+    cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty || echo "⚠️ publish $crate failed."
+  else
+    cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify || echo "⚠️ publish $crate failed."
+  fi
 done

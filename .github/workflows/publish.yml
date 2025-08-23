@@ -31,6 +31,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
+          submodules: recursive
 
       - name: Resolve base/head SHAs
         id: shas
@@ -55,6 +56,11 @@ jobs:
         with:
           toolchain: stable
           override: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
       - name: Publish changed crates
         env:
