@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # stm32_afdb_pipeline.sh - Package STM32 Open Pin Data into a compressed blob.
+#
 # Scrapes the entire STM32_open_pin_data repository into JSON, bundles it,
 # compresses the archive with zstd, reports the resulting size, and optionally
 # removes temporary files.
@@ -14,11 +15,17 @@ KEEP_TEMP=${KEEP_TEMP:-0}
 # Ensure submodules are present
 #git submodule update --init --recursive
 
-echo $TMP_DIR
+echo "Generating STM chip database"
+echo "Temp Dir: $TMP_DIR"
 python tools/afdb/stm32_xml_scraper.py --root "chips/stm/STM32_open_pin_data/mcu" --output "$SCRAPE_OUT"
 python tools/afdb/st_extract_af.py --input "chips/stm/STM32_open_pin_data/boards" --output "$SCRAPE_OUT/boards" --mcu-root "$SCRAPE_OUT/mcu"
+python tools/gen_pins.py --input "$SCRAPE_OUT/boards" --output chipdb/rlvgl-chips-stm/db
 
-tar -cf - -C "$SCRAPE_OUT" . | zstd -19 -f -o "$LOADER_BIN"
+export RLVGL_CHIP_SRC=$PWD/chipdb/rlvgl-chips-stm/db
+cargo test -p rlvgl-chips-stm
+
+bin_path=$(find target -name chipdb.bin | head -n 1)
+zstd -19 -f "$bin_path" -o chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
 
 du -h "$LOADER_BIN"
 

@@ -2,6 +2,8 @@
 set -euo pipefail
 
 BASE=${1:-origin/main}
+TMP_DIR="$(mktemp -d)"
+SCRAPE_OUT="$TMP_DIR/stm32_json"
 
 changed=()
 
@@ -21,17 +23,22 @@ if git diff --name-only "$BASE" HEAD | grep -q -e '^src/' -e '^Cargo.toml' -e '^
   changed+=("rlvgl")
 fi
 
-# Detect vendor chip database crates
+# Detect vendor chip database crates - all listed here
+#chipdb_crates=(
+#  rlvgl-chips-stm
+#  rlvgl-chips-nrf
+#  rlvgl-chips-esp
+#  rlvgl-chips-nxp
+#  rlvgl-chips-silabs
+#  rlvgl-chips-microchip
+#  rlvgl-chips-renesas
+#  rlvgl-chips-ti
+#  rlvgl-chips-rp2040
+#)
+
+# Detect vendor chip database crates - active
 chipdb_crates=(
   rlvgl-chips-stm
-  rlvgl-chips-nrf
-  rlvgl-chips-esp
-  rlvgl-chips-nxp
-  rlvgl-chips-silabs
-  rlvgl-chips-microchip
-  rlvgl-chips-renesas
-  rlvgl-chips-ti
-  rlvgl-chips-rp2040
 )
 for crate in "${chipdb_crates[@]}"; do
   if git diff --name-only "$BASE" HEAD | grep -q "^chipdb/${crate}/"; then
@@ -43,9 +50,10 @@ for crate in "${changed[@]}"; do
   echo "Publishing $crate"
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
     echo "Generating STM chip database"
-    python tools/afdb/st_extract_af.py --input chips/stm/STM32_open_pin_data --output /tmp/stm_json
-    python tools/gen_pins.py --input /tmp/stm_json --output chipdb/rlvgl-chips-stm/db
-    export RLVGL_CHIP_SRC=chipdb/rlvgl-chips-stm/db
+    python tools/afdb/stm32_xml_scraper.py --root "chips/stm/STM32_open_pin_data/mcu" --output "$SCRAPE_OUT"
+    python tools/afdb/st_extract_af.py --input "chips/stm/STM32_open_pin_data/boards" --output "$SCRAPE_OUT/boards" --mcu-root "$SCRAPE_OUT/mcu"
+    python tools/gen_pins.py --input "$SCRAPE_OUT/boards" --output chipdb/rlvgl-chips-stm/db
+    export RLVGL_CHIP_SRC=$PWD/chipdb/rlvgl-chips-stm/db
     cargo test -p rlvgl-chips-stm
     bin_path=$(find target -name chipdb.bin | head -n 1)
     zstd -19 -f "$bin_path" -o chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
