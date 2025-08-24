@@ -16,6 +16,9 @@ use rlvgl_chips_stm as stm;
 use rlvgl_chips_ti as ti;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::io::Read;
+use zstd::stream::read::Decoder;
+use minijinja::{Environment, context};
 
 /// Combined vendor and board information.
 pub struct VendorBoard {
@@ -132,7 +135,9 @@ pub fn find_board(vendor: &str, board: &str) -> Result<VendorBoard, String> {
 /// Parses a vendor archive produced by `build.rs` into a map of file names to
 /// contents.
 fn parse_raw_db(blob: &[u8]) -> HashMap<String, Vec<u8>> {
-    let text = core::str::from_utf8(blob).unwrap_or("");
+    let mut decoder = Decoder::new(blob).expect("zstd");
+    let mut text = String::new();
+    decoder.read_to_string(&mut text).expect("read zst");
     let mut files = HashMap::new();
     let mut lines = text.lines();
     while let Some(line) = lines.next() {
@@ -193,4 +198,16 @@ pub fn load_ir(vendor: &str, board: &str) -> Result<(Value, Value), String> {
         .cloned()
         .ok_or_else(|| format!("MCU '{}' not in archive", chip_name))?;
     Ok((board_val, mcu_val))
+}
+
+/// Render a MiniJinja `template` using board and MCU context.
+#[must_use]
+pub fn render_template(vendor: &str, board: &str, template: &str) -> Result<String, String> {
+    let (board_val, mcu_val) = load_ir(vendor, board)?;
+    let mut env = Environment::new();
+    env.add_template("user", template).map_err(|e| e.to_string())?;
+    let ctx = context! { board => board_val, mcu => mcu_val };
+    env.get_template("user")
+        .and_then(|t| t.render(ctx))
+        .map_err(|e| e.to_string())
 }

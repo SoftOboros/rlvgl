@@ -74,6 +74,10 @@ optional = true
 version = "1"
 default-features = false
 optional = true
+
+[dependencies.zstd]
+version = "0.12"
+optional = true
 [dependencies.image]
 version = "0.25"
 default-features = false
@@ -240,6 +244,7 @@ anyhow = "1"
 indexmap = { version = "2", features = ["serde"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
+zstd = "0.12"
 
 [features]
 default = []
@@ -286,6 +291,7 @@ creator = [
     "dep:rlottie",
     "dep:rayon",
     "dep:resvg",
+    "dep:zstd",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",
@@ -311,6 +317,7 @@ creator_ui = [
     "dep:notify",
     "dep:rfd",
     "dep:serde_json",
+    "dep:zstd",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",

@@ -1,0 +1,9 @@
+{
+  "STM32F4": {
+    "pins": {
+      "PA0": [
+        {"signal": "USART2_CTS", "af": 7}
+      ]
+    }
+  }
+}

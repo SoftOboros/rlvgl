@@ -12,6 +12,7 @@ alternate function mappings. The output directory will contain:
 import argparse
 import json
 from pathlib import Path
+import sys
 import xml.etree.ElementTree as ET
 
 def _parse_ip(ip_dir: Path) -> dict:
@@ -29,11 +30,14 @@ def _parse_ip(ip_dir: Path) -> dict:
     return db
 
 
-def _parse_mcu(mcu_dir: Path) -> dict:
+def _parse_mcu(mcu_dir: Path, skip: set[str]) -> dict:
     mcus = {}
     for xml_path in mcu_dir.glob("*.xml"):
         root = ET.parse(xml_path).getroot()
         mcu_name = root.attrib.get("RefName") or xml_path.stem
+        if mcu_name in skip:
+            print(f"Skipping MCU {mcu_name}: requested", file=sys.stderr)
+            continue
         data, pins, ip = {}, {}, {}
         for item in root.findall(".//*"):
             item_tag = item.tag.split('}')[-1]
@@ -77,7 +81,7 @@ def _parse_mcu(mcu_dir: Path) -> dict:
         if pins:
             mcus[mcu_name] = {"pins": pins, "ip": ip, "data": data}
         else:
-            print(f"Skipping MCU {mcu_name}: no pin definitions")
+            print(f"Skipping MCU {mcu_name}: no pin definitions", file=sys.stderr)
     return mcus
 
 
@@ -85,6 +89,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Scrape STM32 XML pin data")
     parser.add_argument("--root", required=True, help="Root of STM32_open_pin_data repository")
     parser.add_argument("--output", required=True, help="Output directory for JSON IR")
+    parser.add_argument(
+        "--skip-mcu",
+        action="append",
+        default=[],
+        help="MCU names to omit from output",
+    )
+    parser.add_argument(
+        "--skip-list",
+        help="File containing MCU names to skip (one per line, # comments allowed)",
+    )
     args = parser.parse_args()
 
     root = Path(args.root)
@@ -102,7 +116,14 @@ def main() -> None:
         mcu_dir = root
     mcu_out = out / "mcu"
     mcu_out.mkdir(exist_ok=True)
-    for name, data in _parse_mcu(mcu_dir).items():
+    skip = set(args.skip_mcu)
+    if args.skip_list:
+        for line in Path(args.skip_list).read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            skip.add(line)
+    for name, data in _parse_mcu(mcu_dir, skip).items():
         (mcu_out / f"{name}.json").write_text(json.dumps(data, indent=2, sort_keys=True))
 
     print(f"Wrote {len(ip_db)} IPs and MCU databases to {out}")

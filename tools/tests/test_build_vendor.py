@@ -25,6 +25,8 @@ def test_build_vendor_exports_env_and_files(tmp_path):
     assert res.stdout == str(out_dir)
     assert (crate_dir / "LICENSE").exists()
     assert (out_dir / "boards.json").exists()
+    assert (out_dir / "mcu.json").exists()
+    assert (crate_dir / "assets/chipdb.bin.zst").exists()
 
 def test_build_vendor_is_idempotent(tmp_path):
     env = os.environ.copy()
@@ -39,4 +41,6 @@ def test_build_vendor_is_idempotent(tmp_path):
     license_text = (crate_dir / "LICENSE").read_text(encoding="utf-8")
     assert "STMicroelectronics" in license_text
     assert (out_dir / "boards.json").exists()
+    assert (out_dir / "mcu.json").exists()
+    assert (crate_dir / "assets/chipdb.bin.zst").exists()
 

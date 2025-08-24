@@ -19,6 +19,9 @@ mkdir -p "$OUT_DIR"
 
 python3 "$ROOT/tools/gen_pins.py" --input "$VENDOR_DIR/stm" --output "$OUT_DIR"
 
+mkdir -p "$CRATE_DIR/assets"
+python3 "$ROOT/tools/pack_chipdb.py" --input "$OUT_DIR" --output "$CRATE_DIR/assets/chipdb.bin.zst"
+
 # Expose generated definitions so vendor crates can embed them
 export RLVGL_CHIP_SRC="$OUT_DIR"
 

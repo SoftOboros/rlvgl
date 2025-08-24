@@ -38,8 +38,8 @@ pub fn find(board_name: &str) -> Option<&'static BoardInfo> {
     BOARDS.iter().find(|b| b.board == board_name)
 }
 
-/// Returns the raw embedded board definition blob.
+/// Returns the compressed board definition archive.
 #[must_use]
 pub fn raw_db() -> &'static [u8] {
-    include_bytes!(concat!(env!("OUT_DIR"), "/chipdb.bin"))
+    include_bytes!(concat!(env!("OUT_DIR"), "/chipdb.bin.zst"))
 }
