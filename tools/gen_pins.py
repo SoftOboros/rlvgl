@@ -29,6 +29,8 @@ def gather_boards(input_dir: pathlib.Path) -> Dict[str, dict]:
             continue
         with path.open("r", encoding="utf-8") as src:
             data = json.load(src)
+        if "chip" not in data:
+            continue
         name = data.pop("board", path.stem)
         boards[name] = data
     return boards

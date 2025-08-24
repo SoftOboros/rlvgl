@@ -81,7 +81,17 @@ jobs:
       - name: Prepare build environment
         run: bash scripts/setup-ci-env.sh
       - name: Generate board list
-        run: python3 tools/gen_pins.py --input tests/data/gen_pins --output board-list
+        run: |
+          mkdir -p board-list/raw
+          python3 tools/afdb/st_extract_af.py --input tests/data/tools_st_extract_af/sample.ioc --output board-list/raw/SAMPLE.json --mcu-root tests/data/tools_st_extract_af/mcu
+          python3 - <<'PY'
+import json, pathlib
+p=pathlib.Path('board-list/raw/SAMPLE.json')
+d=json.loads(p.read_text())
+d.update({'board':'SAMPLE','chip':'STM32F4'})
+p.write_text(json.dumps(d))
+PY
+          python3 tools/gen_pins.py --input board-list/raw --output board-list
       - name: Upload boards.json
         uses: actions/upload-artifact@v4
         with:

@@ -18,7 +18,11 @@ KEEP_TEMP=${KEEP_TEMP:-0}
 echo "Generating STM chip database"
 echo "Temp Dir: $TMP_DIR"
 python tools/afdb/stm32_xml_scraper.py --root "chips/stm/STM32_open_pin_data/mcu" --output "$SCRAPE_OUT"
-python tools/afdb/st_extract_af.py --input "chips/stm/STM32_open_pin_data/boards" --output "$SCRAPE_OUT/boards" --mcu-root "$SCRAPE_OUT/mcu"
+mkdir -p "$SCRAPE_OUT/boards"
+find chips/stm/STM32_open_pin_data/boards -name "*.ioc" | while read -r ioc; do
+  bname="$(basename "$ioc" .ioc)"
+  python tools/afdb/st_ioc_board.py --ioc "$ioc" --mcu-root "$SCRAPE_OUT/mcu" --board "$bname" --output "$SCRAPE_OUT/boards/$bname.json" || true
+done
 python tools/gen_pins.py --input "$SCRAPE_OUT/boards" --output chipdb/rlvgl-chips-stm/db
 
 export RLVGL_CHIP_SRC=$PWD/chipdb/rlvgl-chips-stm/db
