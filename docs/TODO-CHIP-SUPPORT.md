@@ -66,13 +66,20 @@ Unify chip and board configuration data into self-contained crates per vendor so
 
 ### Level 2 – Python extraction & conversion
 - [x] **STM32 XML scraper** – Parse `STM32_open_pin_data` `mcu/` and `ip/` directories into canonical `mcu` IR. Depends on: Pre-setup
-- [x] **.ioc overlay generation** – Convert `.ioc` files into `boards` entries using the canonical `mcu` data. Depends on: STM32 XML scraper
+- [x] **Ignore undefined MCUs** – Update `stm32_xml_scraper.py` to skip MCUs without definitions so full `.ioc` conversions do not fail. Depends on: STM32 XML scraper
+- [x] **.ioc overlay generation** – Populate IR JSON with pin data when converting `.ioc` files into `boards` entries using the canonical `mcu` data. Depends on: STM32 XML scraper
 - [x] **User .ioc conversion** – Provide a CLI that accepts a CubeMX `.ioc` and emits a `boards` overlay for custom configurations. Depends on: .ioc overlay generation
 - [x] **CSV parser integration** – Extend `tools/st_extract_af.py` to parse CSV pin descriptions into the same intermediate representation. Depends on: Pre-setup
 - [x] **Unified output format** – Ensure both `.ioc` and `.csv` sources produce a consistent JSON/YAML schema used by the vendor crates. Depends on: CSV parser
 - [x] **Command-line interface** – Add CLI flags for input directory, output directory and vendor name. Depends on: Unified format
 - [x] **Sample file tests** – Add automated tests in Rust or Python that process sample `.ioc` and `.csv` files and compare against expected snapshots. Depends on: CSV parser
 - [x] **Documentation** – Document the usage of the script and the expected file formats in the repository’s `README.md` and in this TODO. Depends on: CLI
+
+### Level 2a – IR ➜ Rust initialisation alignment
+- [ ] **Canonical pin context** – Define a per-pin schema including `name`, `port`, `index`, `class`, `sig_full`, `instance`, `signal`, `af`, `mode`, `pull`, `speed`, `otype`, `label`, `is_exti`, and `exti_line` while retaining existing MCU fields.
+- [ ] **Lookup table normalisation** – Map Cube strings for mode, pull, speed and otype into bitfield values and HAL-friendly enums.
+- [ ] **Template generation rules** – Encode Peripheral, GPIO and System class rules and provide HAL and PAC output patterns based on the canonical context.
+- [ ] **EXTI handling** – Add fields for EXTI port indices and trigger configuration so templates can set up SYSCFG and EXTI registers correctly.
 
 ### Level 3 – Creator integration
 - [x] **Expose canonical IR** – Update creator to load `mcu` definitions alongside `boards` overlays and surface both in the UI and CLI. Depends on: STM32 XML scraper

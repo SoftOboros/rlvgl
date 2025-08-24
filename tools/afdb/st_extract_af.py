@@ -56,10 +56,10 @@ def _parse_ioc(path: Path, mcu_pins: Optional[Dict[str, Dict[str, int]]] = None)
             match = _IOC_RE.match(line.strip())
             if match:
                 pin, signal = match.groups()
+                af = 0
                 if mcu_pins:
-                    af = mcu_pins.get(pin, {})
-                    if af:
-                        db.setdefault(pin, {})[signal] = af[0]
+                    af = mcu_pins.get(pin, {}).get(signal, 0)
+                db.setdefault(pin, {})[signal] = af
     if not db:
         raise ValueError(f"{path.name} evaluated to a null db")
     return db

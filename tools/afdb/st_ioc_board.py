@@ -47,10 +47,10 @@ def main() -> None:
 
     with mcu_path.open() as f:
         mcu_data = json.load(f)
-    mcu_pins = {
-        pin: {entry["signal"]: entry.get("af", 0) for entry in entries}
-        for pin, entries in mcu_data.get("pins", {}).items()
-    }
+    mcu_pins = {}
+    for pin, info in mcu_data.get("pins", {}).items():
+        sigs = {name: sig.get("af", 0) for name, sig in info.get("sigs", {}).items()}
+        mcu_pins[pin] = sigs
 
     pins = _parse_ioc(ioc_path, mcu_pins)
     board = {"board": args.board, "chip": mcu_name, "pins": pins}
