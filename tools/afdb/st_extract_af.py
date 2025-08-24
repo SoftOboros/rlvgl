@@ -79,15 +79,16 @@ def _convert_file(in_path: Path, out_path: Path, mcu_root: Optional[Path]) -> No
                         data = json.load(f)
                     print(f"Loaded: {mcu_path}")
                     mcu_pins = {}
-                    for pin, entries in data.get("pins", []).items():
-                        pin_num = entries["position"]
-                        sigs = {sig_name: pin_num for sig_name in entries["sigs"].keys()}
-                        sigs.update({pin: entries["position"]})
-                        for k, v in sigs.items():
-                            if k in mcu_pins:
-                                mcu_pins[k].append(pin_num)
-                            else:
-                                mcu_pins[k] = [pin_num]
+                    for pin, info in data.get("pins", {}).items():
+                        sigs = {}
+                        for sig_name, sig in info.get("sigs", {}).items():
+                            af = sig.get("af")
+                            try:
+                                af = int(af) if af is not None else 0
+                            except (TypeError, ValueError):
+                                af = 0
+                            sigs[sig_name] = af
+                        mcu_pins[pin] = sigs
         db = _parse_ioc(in_path, mcu_pins)
         #print(db)
     else:

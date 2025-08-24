@@ -71,3 +71,44 @@ def test_ioc_board_populates_pins(tmp_path):
     )
     data = json.loads(out.read_text())
     assert data["pins"]["PA0"]["USART2_TX"] == 7
+
+
+def test_extract_af_converts_ioc(tmp_path):
+    mcu_root = tmp_path / "mcu"
+    mcu_root.mkdir()
+    mcu_root.joinpath("STM32F4.json").write_text(
+        json.dumps(
+            {
+                "pins": {
+                    "PA0": {
+                        "name": "PA0",
+                        "sigs": {"USART2_TX": {"signal": "USART2_TX", "af": 7}},
+                        "position": 0,
+                    }
+                },
+                "ip": {},
+                "data": {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    ioc = tmp_path / "board.ioc"
+    ioc.write_text("Mcu.Name=STM32F4\nPA0.Signal=USART2_TX\n")
+    out = tmp_path / "out.json"
+    script = Path(__file__).resolve().parents[1] / "afdb" / "st_extract_af.py"
+    subprocess.run(
+        [
+            "python3",
+            str(script),
+            "--input",
+            str(ioc),
+            "--output",
+            str(out),
+            "--mcu-root",
+            str(mcu_root),
+        ],
+        check=True,
+    )
+    data = json.loads(out.read_text())
+    assert data["PA0"]["USART2_TX"] == 7
