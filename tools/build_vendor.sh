@@ -10,7 +10,7 @@
 #   OUT_DIR    – directory for generated JSON
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENDOR_DIR="${VENDOR_DIR:-$ROOT/tests/data/chipdb}" # placeholder input
 CRATE_DIR="${CRATE_DIR:-$ROOT/chipdb/rlvgl-chips-stm}"
 OUT_DIR="${OUT_DIR:-$CRATE_DIR/generated}"

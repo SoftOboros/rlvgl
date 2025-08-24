@@ -91,8 +91,8 @@ Unify chip and board configuration data into self-contained crates per vendor so
 - [x] **Fallback / error handling** – Define behaviour when a vendor crate or board is missing; display a clear message rather than panicking. Depends on: UI support
 
 ### Level 4 – Publish & CI integration
-- [x] **CI extraction step** – Add a CI job that runs `tools/build_vendor.sh` against the vendor submodules. Depends on: Python CLI
-- [x] **Environment variable wiring** – Pass `RLVGL_CHIP_SRC` or similar environment variables into the vendor crate build to locate the generated files. Depends on: CI extraction
+- [x] **CI extraction step** – Add a CI job that runs `tools/build_vendor.sh` against the vendor submodules. Depends on: Python CLI. Covered by `tools/tests/test_build_vendor.py`.
+- [x] **Environment variable wiring** – Pass `RLVGL_CHIP_SRC` or similar environment variables into the vendor crate build to locate the generated files. Depends on: CI extraction. Verified via `tools/tests/test_build_vendor.py`.
 - [x] **Cargo publish matrix** – Extend the release workflow to publish each vendor crate along with core, ui, and other crates. Depends on: Vendor crates
 - [x] **Version bump automation** – Write a script or adopt `cargo release` to bump versions across vendor crates when new definitions are generated. Depends on: Publish matrix
 - [x] **Update docs and changelog** – Add release notes summarising supported chips/boards and instructions for using the new crates with creator. Depends on: Publish matrix
