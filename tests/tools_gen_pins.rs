@@ -1,6 +1,7 @@
 //! Tests for the `gen_pins.py` helper script.
 
 use std::{fs, path::Path, process::Command};
+use serde_json::Value;
 
 #[test]
 fn aggregates_boards() {
@@ -16,5 +17,7 @@ fn aggregates_boards() {
         .expect("run gen_pins");
     assert!(status.success());
     let data = fs::read_to_string(output.path().join("boards.json")).unwrap();
-    assert!(data.contains("STM32F4DISCOVERY"));
+    let v: Value = serde_json::from_str(&data).unwrap();
+    let chip = &v["boards"]["STM32F4DISCOVERY"]["chip"];
+    assert_eq!(chip, "STM32F407");
 }

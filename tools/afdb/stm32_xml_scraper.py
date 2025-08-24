@@ -7,6 +7,7 @@ alternate function mappings. The output directory will contain:
 
   ip.json          – map of peripheral type -> supported signals
   mcu/<part>.json  – per-part pin AF database
+  mcu.json         – combined data for all MCUs
 """
 
 import argparse
@@ -123,10 +124,12 @@ def main() -> None:
             if not line or line.startswith("#"):
                 continue
             skip.add(line)
-    for name, data in _parse_mcu(mcu_dir, skip).items():
+    mcus = _parse_mcu(mcu_dir, skip)
+    for name, data in mcus.items():
         (mcu_out / f"{name}.json").write_text(json.dumps(data, indent=2, sort_keys=True))
+    (out / "mcu.json").write_text(json.dumps(mcus, indent=2, sort_keys=True))
 
-    print(f"Wrote {len(ip_db)} IPs and MCU databases to {out}")
+    print(f"Wrote {len(ip_db)} IPs and {len(mcus)} MCUs to {out}")
 
 
 if __name__ == "__main__":

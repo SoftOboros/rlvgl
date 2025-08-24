@@ -1,6 +1,7 @@
-[
-  {
-    "board": "STM32F4DISCOVERY",
-    "chip": "STM32F4"
+{
+  "boards": {
+    "STM32F4DISCOVERY": {
+      "chip": "STM32F4"
+    }
   }
-]
+}
