@@ -19,8 +19,10 @@ use std::collections::HashMap;
 use std::io::Read;
 use zstd::stream::read::Decoder;
 use minijinja::{Environment, context};
+use serde::Serialize;
 
 /// Combined vendor and board information.
+#[derive(Serialize)]
 pub struct VendorBoard {
     /// Vendor identifier, e.g. `"stm"`.
     pub vendor: &'static str,
@@ -204,9 +206,10 @@ pub fn load_ir(vendor: &str, board: &str) -> Result<(Value, Value), String> {
 #[must_use]
 pub fn render_template(vendor: &str, board: &str, template: &str) -> Result<String, String> {
     let (board_val, mcu_val) = load_ir(vendor, board)?;
+    let info = find_board(vendor, board)?;
     let mut env = Environment::new();
     env.add_template("user", template).map_err(|e| e.to_string())?;
-    let ctx = context! { board => board_val, mcu => mcu_val };
+    let ctx = context! { board => board_val, mcu => mcu_val, meta => info };
     env.get_template("user")
         .and_then(|t| t.render(ctx))
         .map_err(|e| e.to_string())

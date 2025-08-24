@@ -72,3 +72,19 @@ jobs:
           RLVGL_CHIP_SRC: chipdb/rlvgl-chips-stm/generated
         run: cargo build -p rlvgl-chips-stm
 
+  boards:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      - name: Build STM32 board database
+        run: bash scripts/stm32_afdb_pipeline.sh
+      - name: Upload boards.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: boards-json
+          path: chipdb/rlvgl-chips-stm/db/boards.json
+
