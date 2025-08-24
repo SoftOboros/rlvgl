@@ -72,3 +72,19 @@ jobs:
           RLVGL_CHIP_SRC: chipdb/rlvgl-chips-stm/generated
         run: cargo build -p rlvgl-chips-stm
 
+  boards:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      - name: Generate board list
+        run: python3 tools/gen_pins.py --input tests/data/gen_pins --output board-list
+      - name: Upload boards.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: boards-json
+          path: board-list/boards.json
+

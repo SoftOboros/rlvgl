@@ -18,6 +18,11 @@ fn aggregates_boards() {
     assert!(status.success());
     let data = fs::read_to_string(output.path().join("boards.json")).unwrap();
     let v: Value = serde_json::from_str(&data).unwrap();
-    let chip = &v["boards"]["STM32F4DISCOVERY"]["chip"];
-    assert_eq!(chip, "STM32F407");
+    let boards = &v["boards"];
+    let chip_f4 = &boards["STM32F4DISCOVERY"]["chip"];
+    assert_eq!(chip_f4, "STM32F407");
+    let chip_nucleo = &boards["NUCLEO-F401RE"]["chip"];
+    assert_eq!(chip_nucleo, "STM32F401");
+    let chip_f3 = &boards["STM32F3DISCOVERY"]["chip"];
+    assert_eq!(chip_f3, "STM32F303");
 }

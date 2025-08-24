@@ -1,0 +1,4 @@
+{
+  "board": "STM32F3DISCOVERY",
+  "chip": "STM32F303"
+}

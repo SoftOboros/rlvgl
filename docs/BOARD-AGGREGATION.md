@@ -15,3 +15,7 @@ This document explains how STM32 board definition files are gathered and merged 
 4. If `mcu.json` is present in the input or its parent directory, it is copied alongside `boards.json`.
 
 The script is generic and acts as a placeholder for vendor-specific converters.
+
+## Continuous Integration
+
+The main CI pipeline runs `tools/gen_pins.py` against sample data and uploads the resulting `boards.json` as an artifact, ensuring the aggregation step stays functional.
