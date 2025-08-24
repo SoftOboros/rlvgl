@@ -29,7 +29,9 @@ def test_build_vendor_exports_env_and_files(tmp_path):
     assert boards["boards"]["STM32F4DISCOVERY"]["chip"] == "STM32F4"
     assert boards["boards"]["NUCLEO-F401RE"]["chip"] == "STM32F401"
     assert boards["boards"]["STM32F3DISCOVERY"]["chip"] == "STM32F303"
-    assert (out_dir / "mcu.json").exists()
+    mcu = json.loads((out_dir / "mcu.json").read_text())
+    for entry in boards["boards"].values():
+        assert entry["chip"] in mcu
     assert (crate_dir / "assets/chipdb.bin.zst").exists()
 
 def test_build_vendor_is_idempotent(tmp_path):
@@ -48,6 +50,8 @@ def test_build_vendor_is_idempotent(tmp_path):
     assert boards["boards"]["STM32F4DISCOVERY"]["chip"] == "STM32F4"
     assert boards["boards"]["NUCLEO-F401RE"]["chip"] == "STM32F401"
     assert boards["boards"]["STM32F3DISCOVERY"]["chip"] == "STM32F303"
-    assert (out_dir / "mcu.json").exists()
+    mcu = json.loads((out_dir / "mcu.json").read_text())
+    for entry in boards["boards"].values():
+        assert entry["chip"] in mcu
     assert (crate_dir / "assets/chipdb.bin.zst").exists()
 
