@@ -66,13 +66,23 @@ Unify chip and board configuration data into self-contained crates per vendor so
 
 ### Level 2 – Python extraction & conversion
 - [x] **STM32 XML scraper** – Parse `STM32_open_pin_data` `mcu/` and `ip/` directories into canonical `mcu` IR. Depends on: Pre-setup
-- [x] **.ioc overlay generation** – Convert `.ioc` files into `boards` entries using the canonical `mcu` data. Depends on: STM32 XML scraper
-- [x] **User .ioc conversion** – Provide a CLI that accepts a CubeMX `.ioc` and emits a `boards` overlay for custom configurations. Depends on: .ioc overlay generation
+- [ ] **Ignore undefined MCUs** – Skip or delete MCUs without pin definitions after scraping to prevent `.ioc` conversion failures; accepts `--skip-list` for bulk exclusions. Depends on: STM32 XML scraper
+- [ ] **.ioc overlay generation** – Populate IR JSON with pin contexts when converting `.ioc` files into `boards` entries using the canonical `mcu` data. Depends on: STM32 XML scraper
+- [ ] **User .ioc conversion** – Provide a CLI that accepts a CubeMX `.ioc` and emits a `boards` overlay using the canonical schema. Depends on: .ioc overlay generation
 - [x] **CSV parser integration** – Extend `tools/st_extract_af.py` to parse CSV pin descriptions into the same intermediate representation. Depends on: Pre-setup
 - [x] **Unified output format** – Ensure both `.ioc` and `.csv` sources produce a consistent JSON/YAML schema used by the vendor crates. Depends on: CSV parser
 - [x] **Command-line interface** – Add CLI flags for input directory, output directory and vendor name. Depends on: Unified format
 - [x] **Sample file tests** – Add automated tests in Rust or Python that process sample `.ioc` and `.csv` files and compare against expected snapshots. Depends on: CSV parser
 - [x] **Documentation** – Document the usage of the script and the expected file formats in the repository’s `README.md` and in this TODO. Depends on: CLI
+
+### Level 2a – Board IR normalisation & Rust init templates
+- [ ] **Canonical pin context** – Build per-pin objects with fields: `name`, `port`, `index`, `class`, `sig_full`, `instance`, `signal`, `af`, `mode`, `pull`, `speed`, `otype`, `label`, `is_exti`, `exti_line`, `exti_port_index`, `exti_rising`, `exti_falling`, `moder_bits`, `pupd_bits`, `speed_bits`, `otype_bit`, `hal_speed`, and `hal_pull`.
+- [ ] **Lookup tables** – Map Cube strings for mode, pull, speed, and otype to register bits and HAL enum names.
+- [ ] **Board overlay emission** – Save canonical pin contexts under `boards/<board>.json` so all boards share the same schema.
+- [ ] **HAL template rules** – Render `into_alternate`, `into_push_pull_output`, `into_analog`, etc., using helpers for speed, pull, otype, and AF.
+- [ ] **PAC template rules** – Emit register writes for MODER/OTYPER/OSPEEDR/PUPDR and AFR; include EXTI routing when `is_exti` is true.
+- [ ] **EXTI fields** – Derive `exti_port_index`, `exti_rising`, and `exti_falling` from `.ioc` mode strings for interrupt-capable pins.
+- [ ] **Snapshot & template tests** – Verify `.ioc` → context conversion and HAL/PAC generation.
 
 ### Level 3 – Creator integration
 - [x] **Expose canonical IR** – Update creator to load `mcu` definitions alongside `boards` overlays and surface both in the UI and CLI. Depends on: STM32 XML scraper
@@ -83,12 +93,19 @@ Unify chip and board configuration data into self-contained crates per vendor so
 - [x] **Exact name matching** – Ensure that the UI selection uses exact matching to find board definitions in the vendor crates. Depends on: UI support
 - [x] **Fallback / error handling** – Define behaviour when a vendor crate or board is missing; display a clear message rather than panicking. Depends on: UI support
 
+### Level 3a – Compressed IR loading
+- [x] **Embed zstd databases** – Vendor crates emit `chipdb.bin.zst` archives and expose them via `raw_db()`.
+- [x] **Creator decompression** – Teach `rlvgl-creator` to locate and decompress the `.bin.zst` data through vendor crate APIs.
+- [x] **Round-trip tests** – Exercise compressed archives end to end, ensuring `load_ir` loads board and MCU IR.
+
 ### Level 4 – Publish & CI integration
-- [x] **CI extraction step** – Add a CI job that runs `tools/build_vendor.sh` against the vendor submodules. Depends on: Python CLI
-- [x] **Environment variable wiring** – Pass `RLVGL_CHIP_SRC` or similar environment variables into the vendor crate build to locate the generated files. Depends on: CI extraction
+- [x] **CI extraction step** – Add a CI job that runs `tools/build_vendor.sh` against the vendor submodules. Depends on: Python CLI. Covered by `tools/tests/test_build_vendor.py`.
+- [x] **Environment variable wiring** – Pass `RLVGL_CHIP_SRC` or similar environment variables into the vendor crate build to locate the generated files. Depends on: CI extraction. Verified via `tools/tests/test_build_vendor.py`.
 - [x] **Cargo publish matrix** – Extend the release workflow to publish each vendor crate along with core, ui, and other crates. Depends on: Vendor crates
 - [x] **Version bump automation** – Write a script or adopt `cargo release` to bump versions across vendor crates when new definitions are generated. Depends on: Publish matrix
 - [x] **Update docs and changelog** – Add release notes summarising supported chips/boards and instructions for using the new crates with creator. Depends on: Publish matrix
+- [x] **Pack chip databases** – `tools/pack_chipdb.py` creates `chipdb.bin.zst` archives during publish so crates ship prebuilt data.
+- [x] **Vendor build verification** – Tests cover `pack_chipdb.py` round trips and the version-bump script, keeping publish artifacts reproducible.
 
 ## Codex Playbook — STM32 Open Pin Data ➜ Canonical JSON (lossless + canonical)
 Track a new Python-based pipeline (`afdb`) that converts STM32 vendor XML into lossless and canonical JSON. Facts: ST ships no public XSD for per-MCU or IP XML, so we ingest raw data and validate the canonical overlay with local JSON Schemas.

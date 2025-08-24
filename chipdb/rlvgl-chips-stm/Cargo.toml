@@ -11,3 +11,9 @@ crate-type = ["rlib"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
+
+[build-dependencies]
+zstd = "0.12"
+
+[dev-dependencies]
+zstd = "0.12"
