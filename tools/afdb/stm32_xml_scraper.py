@@ -36,11 +36,13 @@ def _parse_mcu(mcu_dir: Path) -> dict:
         mcu_name = root.attrib.get("RefName") or xml_path.stem
         data, pins, ip = {}, {}, {}
         for item in root.findall(".//*"):
-            item_tag = item.tag.split('}')[1]
+            item_tag = item.tag.split('}')[-1]
             if item_tag == "Pin":
                 pin_name = item.attrib.get("Name")
                 sigs = {}
-                for sig in item.findall("{http://dummy.com}Signal"):
+                for sig in item.findall(".//*"):
+                    if not sig.tag.endswith("Signal"):
+                        continue
                     entry = {}
                     instance = sig.attrib.get("Instance")
                     if instance:
@@ -72,7 +74,10 @@ def _parse_mcu(mcu_dir: Path) -> dict:
                 ip[n] = {"name": n, "config": cf, "instance": i, "version": v}
             elif item.text and not item.text.isspace():
                 data[item_tag] = item.text
-        mcus[mcu_name] = {"pins": pins, "ip": ip, "data": data}
+        if pins:
+            mcus[mcu_name] = {"pins": pins, "ip": ip, "data": data}
+        else:
+            print(f"Skipping MCU {mcu_name}: no pin definitions")
     return mcus
 
 
