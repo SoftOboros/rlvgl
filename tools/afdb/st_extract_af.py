@@ -36,10 +36,9 @@ def _parse_csv(path: Path) -> Dict[str, Dict[str, int]]:
             db.setdefault(pin, {})[signal] = af
     return db
 
-
-_IOC_RE = re.compile(r"Pin\.([A-Z0-9]+)\.Signal=(.+)")
+_IOC_RE = re.compile(r'^(?:Mcu\.)?(?:Pin\.)?(.+?)\.Signal=(.+)$')
+#_IOC_RE = re.compile(r"Pin\.([A-Z0-9]+)\.Signal=(.+)")
 _MCU_NAME_RE = re.compile(r"Mcu\.Name=(.+)")
-
 
 def _detect_mcu(path: Path) -> Optional[str]:
     with path.open() as f:
@@ -57,10 +56,12 @@ def _parse_ioc(path: Path, mcu_pins: Optional[Dict[str, Dict[str, int]]] = None)
             match = _IOC_RE.match(line.strip())
             if match:
                 pin, signal = match.groups()
-                af = 0
                 if mcu_pins:
-                    af = mcu_pins.get(pin, {}).get(signal, 0)
-                db.setdefault(pin, {})[signal] = af
+                    af = mcu_pins.get(pin, {})
+                    if af:
+                        db.setdefault(pin, {})[signal] = af[0]
+    if not db:
+        raise ValueError(f"{path.name} evaluated to a null db")
     return db
 
 
@@ -76,11 +77,19 @@ def _convert_file(in_path: Path, out_path: Path, mcu_root: Optional[Path]) -> No
                 if mcu_path.exists():
                     with mcu_path.open() as f:
                         data = json.load(f)
-                    mcu_pins = {
-                        pin: {entry["signal"]: entry.get("af", 0) for entry in entries}
-                        for pin, entries in data.get("pins", {}).items()
-                    }
+                    print(f"Loaded: {mcu_path}")
+                    mcu_pins = {}
+                    for pin, entries in data.get("pins", []).items():
+                        pin_num = entries["position"]
+                        sigs = {sig_name: pin_num for sig_name in entries["sigs"].keys()}
+                        sigs.update({pin: entries["position"]})
+                        for k, v in sigs.items():
+                            if k in mcu_pins:
+                                mcu_pins[k].append(pin_num)
+                            else:
+                                mcu_pins[k] = [pin_num]
         db = _parse_ioc(in_path, mcu_pins)
+        #print(db)
     else:
         raise ValueError(f"Unsupported file extension: {in_path.suffix}")
 

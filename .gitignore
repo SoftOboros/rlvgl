@@ -9,3 +9,6 @@ venv
 .DS_Store
 **/*.map
 **/sorted_symbols.txt
+*.pyc
+**/boards.json
+**/mcu.json

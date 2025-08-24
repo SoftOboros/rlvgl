@@ -4,19 +4,19 @@
 # compresses the archive with zstd, reports the resulting size, and optionally
 # removes temporary files.
 
-set -euo pipefail
+set -euov pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 SCRAPE_OUT="$TMP_DIR/stm32_json"
-LOADER_BIN="$ROOT_DIR/loader.bin.zst"
+LOADER_BIN="chipdb/rlvgl-chips-stm/db/loader.bin.zst"
 KEEP_TEMP=${KEEP_TEMP:-0}
 
 # Ensure submodules are present
-git -C "$ROOT_DIR" submodule update --init --recursive
+#git submodule update --init --recursive
 
-python tools/afdb/stm32_xml_scraper.py --root "$ROOT_DIR/chips/stm/STM32_open_pin_data" --output "$SCRAPE_OUT"
-python tools/afdb/st_extract_af.py --input "$ROOT_DIR/chips/stm/STM32_open_pin_data/boards" --output "$SCRAPE_OUT/boards" --mcu-root "$SCRAPE_OUT/mcu"
+echo $TMP_DIR
+python tools/afdb/stm32_xml_scraper.py --root "chips/stm/STM32_open_pin_data/mcu" --output "$SCRAPE_OUT"
+python tools/afdb/st_extract_af.py --input "chips/stm/STM32_open_pin_data/boards" --output "$SCRAPE_OUT/boards" --mcu-root "$SCRAPE_OUT/mcu"
 
 tar -cf - -C "$SCRAPE_OUT" . | zstd -19 -f -o "$LOADER_BIN"
 

@@ -14,7 +14,6 @@ import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-
 def _parse_ip(ip_dir: Path) -> dict:
     db = {}
     for xml_path in ip_dir.glob("*.xml"):
@@ -34,26 +33,46 @@ def _parse_mcu(mcu_dir: Path) -> dict:
     mcus = {}
     for xml_path in mcu_dir.glob("*.xml"):
         root = ET.parse(xml_path).getroot()
-        name = root.attrib.get("Name") or root.attrib.get("PartNumber") or xml_path.stem
-        pins = {}
-        for pin in root.findall(".//IP"):
-            pin_name = pin.attrib.get("Name")
-            entries = []
-            for sig in pin.findall("Signal"):
-                entry = {
-                    "instance": sig.attrib.get("Instance"),
-                    "signal": sig.attrib.get("Name"),
-                }
-                af = sig.attrib.get("AlternateFunction")
-                if af:
-                    try:
-                        entry["af"] = int(af)
-                    except ValueError:
-                        pass
-                entries.append(entry)
-            if entries:
-                pins[pin_name] = entries
-        mcus[name] = {"pins": pins}
+        mcu_name = root.attrib.get("RefName") or xml_path.stem
+        data, pins, ip = {}, {}, {}
+        for item in root.findall(".//*"):
+            item_tag = item.tag.split('}')[1]
+            if item_tag == "Pin":
+                pin_name = item.attrib.get("Name")
+                sigs = {}
+                for sig in item.findall("{http://dummy.com}Signal"):
+                    entry = {}
+                    instance = sig.attrib.get("Instance")
+                    if instance:
+                        entry["instance"] = instance
+                    modes = sig.attrib.get("IOModes")
+                    if modes:
+                        entry["modes"] = modes
+                    entry["signal"] = sig.attrib.get("Name")
+                    af = sig.attrib.get("AlternateFunction")
+                    if af:
+                        try:
+                            entry["af"] = int(af)
+                        except ValueError:
+                            pass
+                    sigs[entry["signal"]] = entry
+                if sigs:
+                    pos = item.attrib.get("Position")
+                    if pos:
+                        try:
+                            pos = int(pos)
+                        except ValueError:
+                            pass
+                    pins[pin_name] = {"name": pin_name, "sigs": sigs, "position": pos }
+            if item_tag == "IP":
+                cf = item.attrib.get("ConfigFile")
+                i = item.attrib.get("InstanceName")
+                n = item.attrib.get("Name")
+                v = item.attrib.get("Version")
+                ip[n] = {"name": n, "config": cf, "instance": i, "version": v}
+            elif item.text and not item.text.isspace():
+                data[item_tag] = item.text
+        mcus[mcu_name] = {"pins": pins, "ip": ip, "data": data}
     return mcus
 
 
