@@ -1,7 +1,7 @@
 //! Command handlers and dialogs for rlgvl-creator UI.
 
 use super::presets::{CommandPreset, run_preset_commands};
-use super::wizard::{WizardStep, run_scan_convert_preview_wizard};
+use super::wizard::run_scan_convert_preview_wizard;
 use super::*;
 
 impl CreatorApp {
