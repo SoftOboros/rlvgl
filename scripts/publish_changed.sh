@@ -2,8 +2,6 @@
 set -euo pipefail
 
 BASE=${1:-origin/main}
-TMP_DIR="$(mktemp -d)"
-SCRAPE_OUT="$TMP_DIR/stm32_json"
 
 changed=()
 
@@ -49,14 +47,7 @@ done
 for crate in "${changed[@]}"; do
   echo "Publishing $crate"
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
-    echo "Generating STM chip database"
-    python tools/afdb/stm32_xml_scraper.py --root "chips/stm/STM32_open_pin_data/mcu" --output "$SCRAPE_OUT"
-    python tools/afdb/st_extract_af.py --input "chips/stm/STM32_open_pin_data/boards" --output "$SCRAPE_OUT/boards" --mcu-root "$SCRAPE_OUT/mcu"
-    python tools/gen_pins.py --input "$SCRAPE_OUT/boards" --output chipdb/rlvgl-chips-stm/db
-    export RLVGL_CHIP_SRC=$PWD/chipdb/rlvgl-chips-stm/db
-    cargo test -p rlvgl-chips-stm
-    bin_path=$(find target -name chipdb.bin | head -n 1)
-    zstd -19 -f "$bin_path" -o chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
+    scripts/stm32_afdb_pipeline.sh
     git add chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty || echo "⚠️ publish $crate failed."
   else
