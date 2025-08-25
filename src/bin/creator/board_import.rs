@@ -9,6 +9,7 @@ use rlvgl_chips_stm as stm;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 /// Convert a user CubeMX `.ioc` file into a board overlay JSON.
@@ -17,7 +18,12 @@ use std::path::Path;
 /// are resolved using the STM32 canonical database bundled with the
 /// `rlvgl-chips-stm` crate.
 #[allow(clippy::module_name_repetitions)]
-pub fn from_ioc(ioc_path: &Path, board: &str, out_path: &Path) -> Result<()> {
+pub fn from_ioc(
+    ioc_path: &Path,
+    board: &str,
+    out_path: &Path,
+    template: Option<&str>,
+) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     let mcu = detect_mcu(&text)?;
     let af = load_mcu_af(&mcu)?;
@@ -36,15 +42,17 @@ pub fn from_ioc(ioc_path: &Path, board: &str, out_path: &Path) -> Result<()> {
         }
     }
 
-    let board_json = serde_json::json!({
-        "board": board,
-        "chip": mcu,
-        "pins": pins,
-    });
+    let mut obj = Map::new();
+    obj.insert("board".to_string(), Value::from(board));
+    obj.insert("chip".to_string(), Value::from(mcu));
+    obj.insert("pins".to_string(), Value::Object(pins));
+    if let Some(t) = template {
+        obj.insert("template".to_string(), Value::from(t));
+    }
     if let Some(parent) = out_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(out_path, serde_json::to_string_pretty(&board_json)?)?;
+    fs::write(out_path, serde_json::to_string_pretty(&Value::Object(obj))?)?;
     Ok(())
 }
 
@@ -56,7 +64,10 @@ fn detect_mcu(text: &str) -> Result<String> {
 
 fn load_mcu_af(mcu: &str) -> Result<McuAf> {
     let blob = stm::raw_db();
-    let files = parse_raw_db(blob);
+    let mut decoder = zstd::Decoder::new(&blob[..])?;
+    let mut data = Vec::new();
+    decoder.read_to_end(&mut data)?;
+    let files = parse_raw_db(&data);
     let mcu_json = files
         .get("mcu.json")
         .ok_or_else(|| anyhow!("mcu.json missing from STM database"))?;
