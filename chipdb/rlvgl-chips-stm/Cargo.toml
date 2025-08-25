@@ -12,7 +12,7 @@ repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"
 documentation = "https://docs.rs/rlvgl"
 keywords = ["embedded", "stm32", "st", "mcu", "no_std"]
-categories = ["data", "no_std", "embedded", "st", "stm32"]
+categories = ["config", "embedded"]
 exclude = [
   "db/mcu.json",
   "db/boards.json",
