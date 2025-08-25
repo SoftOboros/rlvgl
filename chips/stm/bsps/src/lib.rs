@@ -27,11 +27,12 @@ pub struct BoardInfo {
 
 pub mod f407_demo;
 pub mod f429_demo;
-
 use f407_demo::INFO as F407_DEMO;
 use f429_demo::INFO as F429_DEMO;
-
-const BOARDS: &[BoardInfo] = &[F407_DEMO, F429_DEMO];
+const BOARDS: &[BoardInfo] = &[
+    F407_DEMO,
+    F429_DEMO,
+];
 
 /// Returns the vendor identifier.
 #[must_use]

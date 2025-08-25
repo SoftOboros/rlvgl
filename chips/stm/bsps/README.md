@@ -10,3 +10,8 @@ Rust modules within this crate:
 ```
 python tools/gen_bsps.py --input path/to/ioc --output chips/stm/bsps/src
 ```
+
+## Available boards
+
+- `f407_demo`
+- `f429_demo`
