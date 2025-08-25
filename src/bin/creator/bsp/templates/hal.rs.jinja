@@ -241,20 +241,18 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
     {%- endif %}
 
     // Disable interrupts
-{%- macro irq_list(name) -%}
-{%- if name == "i2c4" -%}["I2C4_EV", "I2C4_ER"]
-{%- elif name == "spi2" -%}["SPI2"]
-{%- elif name == "spi5" -%}["SPI5"]
-{%- elif name == "uart8" -%}["UART8"]
-{%- elif name == "usart1" -%}["USART1"]
-{%- else -%}[]
-{%- endif -%}
-{%- endmacro %}
-{%- for name, _per in spec.peripherals | dictsort %}
-    {%- for irq in irq_list(name) %}
+    {%- set irq_map = {
+        "i2c4": ["I2C4_EV", "I2C4_ER"],
+        "spi2": ["SPI2"],
+        "spi5": ["SPI5"],
+        "uart8": ["UART8"],
+        "usart1": ["USART1"],
+    } -%}
+    {%- for name, _per in spec.peripherals | dictsort %}
+        {%- for irq in irq_map.get(name, []) %}
     unsafe { pac::NVIC::mask(pac::Interrupt::{{ irq }}); }
+        {%- endfor %}
     {%- endfor %}
-{%- endfor %}
 }
 {% endif %}
 
