@@ -1,0 +1,12 @@
+{
+  "STM32H747XIHx": {
+    "PA10": { "USART1_RX": 7 },
+    "PA9": { "USART1_TX": 7 },
+    "PB0": { "GPIO_Output": 0 },
+    "PB3": { "SPI1_SCK": 5 },
+    "PB4": { "SPI1_MISO": 5 },
+    "PB5": { "SPI1_MOSI": 5 },
+    "PB6": { "I2C1_SCL": 4 },
+    "PB7": { "I2C1_SDA": 4 }
+  }
+}

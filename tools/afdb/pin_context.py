@@ -60,6 +60,10 @@ def build_pin_context(ioc_path: Path, mcu_pins: Optional[Dict[str, Dict[str, int
 
     pins: Dict[str, Dict[str, Any]] = {}
     for pin, fields in raw.items():
+        if len(pin) < 3 or not pin.startswith("P") or not pin[2:].isdigit():
+            # Skip entries that do not follow the expected ``P<port><index>`` pattern.
+            continue
+
         sig_full = fields.get("Signal")
         mode = fields.get("Mode")
         pull = fields.get("GPIO_PuPd")

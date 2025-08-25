@@ -162,11 +162,29 @@ rlvgl-creator svg <svg> <out> [--dpi DPI...] [--threshold VAL]
 Converts a CubeMX project into a board overlay JSON.
 
 ```
-rlvgl-creator board from-ioc <ioc> <board> <out>
+rlvgl-creator board from-ioc <ioc> <board> <out> [--hal | --pac | --template <template>] [--af <af>] [--bsp-out <dir>]
 ```
 * `ioc` – path to the CubeMX `.ioc` file.
 * `board` – name to embed in the overlay.
 * `out` – path to write the generated JSON.
+* `--hal` – embed HAL template selection.
+* `--pac` – embed PAC template selection.
+* `--template` – record a custom template path.
+* `--af` – JSON alternate-function database used to render a BSP.
+* `--bsp-out` – directory to emit BSP code (requires `--af`).
+
+### bsp from-ioc
+Renders Rust source from a CubeMX project using a MiniJinja template.
+
+```
+rlvgl-creator bsp from-ioc <ioc> <af> (--hal | --pac | --template <template>) --out <dir>
+```
+* `ioc` – input CubeMX `.ioc` file.
+* `af` – JSON alternate-function database.
+* `--hal` – render using the built-in HAL template.
+* `--pac` – render using the built-in PAC template.
+* `--template` – path to a custom MiniJinja template.
+* `--out` – directory to place the generated source file.
 
 ## Workflow: STM32 `.ioc` to BSP
 1. Generate an alternate-function database:
@@ -175,7 +193,7 @@ rlvgl-creator board from-ioc <ioc> <board> <out>
    ```
 2. Convert the `.ioc` file into intermediate representation and render a BSP crate:
    ```bash
-   rlvgl-creator bsp from-ioc simple.ioc stm32_af.json --template src/bin/creator/bsp/templates/simple.rs.jinja --out bsp
+   rlvgl-creator bsp from-ioc simple.ioc stm32_af.json --hal --out bsp
    ```
    The command parses pin assignments and clock configuration from `simple.ioc`, maps signals using `stm32_af.json`, and renders Rust source into the `bsp/` directory.
 3. Use the generated BSP in a project:

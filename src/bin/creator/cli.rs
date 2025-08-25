@@ -9,7 +9,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{ArgAction, Parser, Subcommand};
 
 pub mod add_target;
@@ -18,6 +18,7 @@ pub mod board_import;
 pub mod check;
 pub mod convert;
 pub mod fonts;
+pub mod bsp_gen;
 pub mod init;
 pub mod lottie;
 pub mod manifest;
@@ -168,6 +169,11 @@ enum Command {
         #[command(subcommand)]
         cmd: BoardCommand,
     },
+    /// Board support package generation commands
+    Bsp {
+        #[command(subcommand)]
+        cmd: BspCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -225,6 +231,44 @@ enum BoardCommand {
         board: String,
         /// Output path for the generated JSON
         out: PathBuf,
+        /// Embed HAL template selection
+        #[arg(long, conflicts_with_all = ["pac", "template"])]
+        hal: bool,
+        /// Embed PAC template selection
+        #[arg(long, conflicts_with_all = ["hal", "template"])]
+        pac: bool,
+        /// Embed a custom template path
+        #[arg(long, conflicts_with_all = ["hal", "pac"])]
+        template: Option<String>,
+        /// JSON alternate-function database for BSP rendering
+        #[arg(long)]
+        af: Option<PathBuf>,
+        /// Output directory for generated BSP code
+        #[arg(long, requires="af")]
+        bsp_out: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum BspCommand {
+    /// Render Rust source from a CubeMX `.ioc` file
+    FromIoc {
+        /// Input `.ioc` file
+        ioc: PathBuf,
+        /// JSON alternate-function database
+        af: PathBuf,
+        /// Output directory for generated files
+        #[arg(long)]
+        out: PathBuf,
+        /// Render using the built-in HAL template
+        #[arg(long, conflicts_with_all = ["pac", "template"])]
+        hal: bool,
+        /// Render using the built-in PAC template
+        #[arg(long, conflicts_with_all = ["hal", "template"])]
+        pac: bool,
+        /// MiniJinja template to render
+        #[arg(long, conflicts_with_all = ["hal", "pac"])]
+        template: Option<PathBuf>,
     },
 }
 
@@ -282,8 +326,53 @@ pub fn run() -> Result<()> {
             threshold,
         } => svg::run(&svg, &out, &dpi, threshold)?,
         Command::Board { cmd } => match cmd {
-            BoardCommand::FromIoc { ioc, board, out } => {
-                board_import::from_ioc(&ioc, &board, &out)?
+            BoardCommand::FromIoc {
+                ioc,
+                board,
+                out,
+                hal,
+                pac,
+                template,
+                af,
+                bsp_out,
+            } => {
+                let tmpl_sel = if hal {
+                    Some("hal")
+                } else if pac {
+                    Some("pac")
+                } else {
+                    template.as_deref()
+                };
+                board_import::from_ioc(&ioc, &board, &out, tmpl_sel)?;
+                if let (Some(af_path), Some(dir)) = (af, bsp_out) {
+                    let kind = match tmpl_sel {
+                        Some("pac") => bsp_gen::TemplateKind::Pac,
+                        Some("hal") | None => bsp_gen::TemplateKind::Hal,
+                        Some(t) => bsp_gen::TemplateKind::Custom(PathBuf::from(t)),
+                    };
+                    bsp_gen::from_ioc(&ioc, &af_path, kind, &dir)?;
+                }
+            }
+        },
+        Command::Bsp { cmd } => match cmd {
+            BspCommand::FromIoc {
+                ioc,
+                af,
+                out,
+                hal,
+                pac,
+                template,
+            } => {
+                let kind = if hal {
+                    bsp_gen::TemplateKind::Hal
+                } else if pac {
+                    bsp_gen::TemplateKind::Pac
+                } else if let Some(t) = template {
+                    bsp_gen::TemplateKind::Custom(t)
+                } else {
+                    return Err(anyhow!("select --hal, --pac, or --template"));
+                };
+                bsp_gen::from_ioc(&ioc, &af, kind, &out)?
             }
         },
     }

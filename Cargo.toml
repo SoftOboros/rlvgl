@@ -39,7 +39,7 @@ required-features = ["stm32h747i_disco"]
 [[bin]]
 name = "rlvgl-creator"
 path = "src/bin/rlvgl_creator/main.rs"
-required-features = ["creator", "creator_ui"]
+required-features = ["creator"]
 
 [dependencies]
 rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
