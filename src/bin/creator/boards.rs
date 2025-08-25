@@ -12,7 +12,8 @@ use rlvgl_chips_nxp as nxp;
 use rlvgl_chips_renesas as renesas;
 use rlvgl_chips_rp2040 as rp2040;
 use rlvgl_chips_silabs as silabs;
-use rlvgl_chips_stm as stm;
+use rlvgl_stm_bsps as stm;
+use rlvgl_chips_stm as stm_db;
 use rlvgl_chips_ti as ti;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -166,7 +167,7 @@ fn parse_raw_db(blob: &[u8]) -> HashMap<String, Vec<u8>> {
 pub fn load_ir(vendor: &str, board: &str) -> Result<(Value, Value), String> {
     let info = find_board(vendor, board)?;
     let blob = match vendor {
-        v if v == stm::vendor() => stm::raw_db(),
+        v if v == stm::vendor() => stm_db::raw_db(),
         v if v == nrf::vendor() => nrf::raw_db(),
         v if v == esp::vendor() => esp::raw_db(),
         v if v == nxp::vendor() => nxp::raw_db(),
@@ -178,38 +179,25 @@ pub fn load_ir(vendor: &str, board: &str) -> Result<(Value, Value), String> {
         _ => return Err(format!("Unknown vendor '{}'", vendor)),
     };
     let files = parse_raw_db(blob);
-    let boards_json = files
-        .get("boards.json")
-        .ok_or("boards.json missing from vendor archive")?;
-    let boards: Vec<Value> =
-        serde_json::from_slice(boards_json).map_err(|e| format!("parse boards.json: {e}"))?;
-    let board_val = boards
-        .into_iter()
-        .find(|b| b["board"] == info.board)
-        .ok_or_else(|| format!("Board '{}' not in archive", board))?;
-    let chip_name = board_val["chip"]
-        .as_str()
-        .ok_or("board missing chip field")?;
     let mcu_json = files
         .get("mcu.json")
         .ok_or("mcu.json missing from vendor archive")?;
     let mcu_map: HashMap<String, Value> =
         serde_json::from_slice(mcu_json).map_err(|e| format!("parse mcu.json: {e}"))?;
-    let mcu_val = mcu_map
-        .get(chip_name)
+    mcu_map
+        .get(info.chip)
         .cloned()
-        .ok_or_else(|| format!("MCU '{}' not in archive", chip_name))?;
-    Ok((board_val, mcu_val))
+        .ok_or_else(|| format!("MCU '{}' not in archive", info.chip))
 }
 
-/// Render a MiniJinja `template` using board and MCU context.
+/// Render a MiniJinja `template` using MCU context.
 #[must_use]
 pub fn render_template(vendor: &str, board: &str, template: &str) -> Result<String, String> {
-    let (board_val, mcu_val) = load_ir(vendor, board)?;
+    let mcu_val = load_ir(vendor, board)?;
     let info = find_board(vendor, board)?;
     let mut env = Environment::new();
     env.add_template("user", template).map_err(|e| e.to_string())?;
-    let ctx = context! { board => board_val, mcu => mcu_val, meta => info };
+    let ctx = context! { mcu => mcu_val, meta => info };
     env.get_template("user")
         .and_then(|t| t.render(ctx))
         .map_err(|e| e.to_string())

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# rlvgl-stm-bsps crate manifest.
+
+[package]
+name = "rlvgl-stm-bsps"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Board support package stubs for STM32 devices."
+
+[lib]
+path = "src/lib.rs"
+

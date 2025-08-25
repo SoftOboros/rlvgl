@@ -191,6 +191,10 @@ optional = true
 version = "0.15"
 optional = true
 
+[dependencies.rlvgl-stm-bsps]
+path = "chips/stm/bsps"
+optional = true
+
 [dependencies.rlvgl-chips-stm]
 path = "chipdb/rlvgl-chips-stm"
 optional = true
@@ -292,6 +296,7 @@ creator = [
     "dep:rayon",
     "dep:resvg",
     "dep:zstd",
+    "dep:rlvgl-stm-bsps",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",
@@ -318,6 +323,7 @@ creator_ui = [
     "dep:rfd",
     "dep:serde_json",
     "dep:zstd",
+    "dep:rlvgl-stm-bsps",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",
@@ -350,5 +356,5 @@ objc2 = "0.6.1"
 objc2-foundation = "0.3.1"
 
 [workspace]
-members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040"]
+members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040", "chips/stm/bsps"]
 resolver = "2"

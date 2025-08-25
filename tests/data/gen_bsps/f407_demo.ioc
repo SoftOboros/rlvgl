@@ -1,0 +1,2 @@
+Mcu.Name=STM32F407
+PA0.Signal=GPIO_Input
