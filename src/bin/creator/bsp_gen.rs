@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};
 
-use crate::bsp::{af::JsonAfDb, ioc};
+use crate::bsp::{af::JsonAfDb, ioc, ir};
 
 /// Built-in templates for BSP rendering.
 #[derive(Clone)]
@@ -107,7 +107,7 @@ pub(crate) fn from_ioc(
                     .filter(|p| per.signals.values().any(|pin| pin == &p.pin))
                     .cloned()
                     .collect();
-                let mut sub = ioc::Ir {
+                let mut sub = ir::Ir {
                     mcu: ir.mcu.clone(),
                     package: ir.package.clone(),
                     clocks: ir.clocks.clone(),

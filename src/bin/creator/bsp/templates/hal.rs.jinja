@@ -9,14 +9,14 @@
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
-use stm32h7xx_hal::{pac, prelude::*};
+use stm32h7xx_hal::{pac, prelude::*, gpio::Speed};
 
 {% macro gpio_bus(family) -%}
-{% if family.startswith("STM32H7") %}ahb4enr
-{% elif family.startswith("STM32H5") or family.startswith("STM32L5") or family.startswith("STM32L4") or family.startswith("STM32G4") %}ahb2enr
-{% elif family.startswith("STM32G0") or family.startswith("STM32L0") %}iopenr
-{% elif family.startswith("STM32F1") %}apb2enr
-{% elif family.startswith("STM32F0") or family.startswith("STM32F3") or family.startswith("STM32L1") %}ahbenr
+{% if family[0:7] == "STM32H7" %}ahb4enr
+{% elif family[0:7] == "STM32H5" or family[0:7] == "STM32L5" or family[0:7] == "STM32L4" or family[0:7] == "STM32G4" %}ahb2enr
+{% elif family[0:7] == "STM32G0" or family[0:7] == "STM32L0" %}iopenr
+{% elif family[0:7] == "STM32F1" %}apb2enr
+{% elif family[0:7] == "STM32F0" or family[0:7] == "STM32F3" or family[0:7] == "STM32L1" %}ahbenr
 {% else %}ahb1enr{% endif %}
 {%- endmacro %}
 {% macro port_bit(p) -%}
@@ -44,16 +44,17 @@ use stm32h7xx_hal::{pac, prelude::*};
 {%- endmacro %}
 
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {% set ports = [] %}{% for pin in spec.pinctrl %}{% if pin.pin[1] not in ports %}{% do ports.append(pin.pin[1]) %}{% endif %}{% endfor %}
+    {% set ns = namespace(ports=[]) %}
+    {% for pin in spec.pinctrl %}{% if pin.pin[1] not in ns.ports %}{% set ns.ports = ns.ports + [pin.pin[1]] %}{% endif %}{% endfor %}
     {% if grouped_writes %}
-    dp.RCC.{{ gpio_bus(spec.mcu.family) }}.modify(|r, w| unsafe {
+    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        bits |= {% for p in ports %}(1 << {{ port_bit(p) }}){% if not loop.last %} | {% endif %}{% endfor %};
+        bits |= {% for p in ns.ports %}(1 << {{ port_bit(p) }}){% if not loop.last %} | {% endif %}{% endfor %};
         w.bits(bits)
     });
     {% else %}
-    {%- for p in ports %}
-    dp.RCC.{{ gpio_bus(spec.mcu.family) }}.modify(|_, w| w.gpio{{ p|lower }}en().set_bit());
+    {%- for p in ns.ports %}
+    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|_, w| w.gpio{{ p|lower }}en().set_bit());
     {%- endfor %}
     {% endif %}
 }
@@ -73,50 +74,48 @@ pub fn configure_pins_hal() {
         {%- endif -%}
     {%- else %}
         {%- if is_i2c %}                 gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate_open_drain::<{{ pin.af }}>()
+                                            .internal_pull_up(true)
         {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate::<{{ pin.af }}>()
         {%- endif -%}
+    {%- endif %}
+    {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" %}
+        .set_speed(Speed::VeryHigh)
     {%- endif %};
 {%- endfor %}
 }
 
 pub fn enable_peripherals(dp: &pac::Peripherals) {
-{%- set regs = {} -%}
+{%- set pairs = [] -%}
 {%- for name, _per in spec.peripherals | dictsort %}
-    {%- if spec.mcu.family.startswith("STM32H7") %}
+    {%- if spec.mcu[0:7] == "STM32H7" %}
         {%- if name == "i2c4" %}{% set reg = "apb4enr" %}{% set field = "i2c4en" %}
         {%- elif name == "spi2" %}{% set reg = "apb1lenr" %}{% set field = "spi2en" %}
         {%- elif name == "spi5" %}{% set reg = "apb2enr" %}{% set field = "spi5en" %}
         {%- elif name == "uart8" %}{% set reg = "apb1henr" %}{% set field = "uart8en" %}
         {%- elif name == "usart1" %}{% set reg = "apb2enr" %}{% set field = "usart1en" %}
-        {%- else %}{% set reg = None %}{% set field = None %}
-        {%- endif %}
-    {%- elif spec.mcu.family.startswith("STM32H5") %}
+        {%- else %}{% set reg = None %}{% set field = None %}{%- endif %}
+    {%- elif spec.mcu[0:7] == "STM32H5" %}
         {%- if name in ["usart1", "spi1"] %}{% set reg = "apb2enr" %}{% set field = name ~ "en" %}
-        {%- else %}{% set reg = "apb1enr1" %}{% set field = name ~ "en" %}
-        {%- endif %}
-    {%- elif spec.mcu.family.startswith("STM32F") or spec.mcu.family.startswith("STM32L") or spec.mcu.family.startswith("STM32G") %}
+        {%- else %}{% set reg = "apb1enr1" %}{% set field = name ~ "en" %}{%- endif %}
+    {%- elif spec.mcu[0:6] == "STM32F" or spec.mcu[0:6] == "STM32L" or spec.mcu[0:6] == "STM32G" %}
         {%- if name in ["spi1", "spi4", "spi5", "spi6", "usart1", "usart6"] %}
             {% set reg = "apb2enr" %}
-        {%- elif name.startswith("spi") or name.startswith("usart") or name.startswith("uart") or name.startswith("i2c") %}
+        {%- elif name[0:3] == "spi" or name[0:5] == "usart" or name[0:4] == "uart" or name[0:3] == "i2c" %}
             {% set reg = "apb1enr" %}
         {%- else %}{% set reg = None %}{% endif %}
         {%- if reg %}{% set field = name ~ "en" %}{% else %}{% set field = None %}{% endif %}
     {%- else %}
         {% set reg = None %}{% set field = None %}
     {%- endif %}
-    {%- if reg and field %}
-        {%- if reg in regs %}{% do regs[reg].append(field) %}{% else %}{% set _ = regs.update({reg:[field]}) %}{% endif %}
-    {%- endif %}
+    {%- if reg and field %}{% set pairs = pairs + [{"reg": reg, "field": field}] %}{% endif %}
 {%- endfor %}
 {% if grouped_writes %}
-{%- for reg, fields in regs.items() %}
-    dp.RCC.{{ reg }}.modify(|_, w| w{% for f in fields %}.{{ f }}().set_bit(){% endfor %});
+{%- for group in pairs | groupby("reg") %}
+    dp.RCC.{{ group.grouper }}.modify(|_, w| w{% for item in group.list %}.{{ item.field }}().set_bit(){% endfor %});
 {%- endfor %}
 {% else %}
-{%- for reg, fields in regs.items() %}
-    {%- for f in fields %}
-    dp.RCC.{{ reg }}.modify(|_, w| w.{{ f }}().set_bit());
-    {%- endfor %}
+{%- for item in pairs %}
+    dp.RCC.{{ item.reg }}.modify(|_, w| w.{{ item.field }}().set_bit());
 {%- endfor %}
 {% endif %}
 }
@@ -136,48 +135,44 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 {%- endfor %}
 
     // Gate peripheral clocks
-{%- set regs = {} -%}
+{%- set pairs = [] -%}
 {%- for name, _per in spec.peripherals | dictsort %}
-    {%- if spec.mcu.family.startswith("STM32H7") %}
+    {%- if spec.mcu[0:7] == "STM32H7" %}
         {%- if name == "i2c4" %}{% set reg = "apb4enr" %}{% set field = "i2c4en" %}
         {%- elif name == "spi2" %}{% set reg = "apb1lenr" %}{% set field = "spi2en" %}
         {%- elif name == "spi5" %}{% set reg = "apb2enr" %}{% set field = "spi5en" %}
         {%- elif name == "uart8" %}{% set reg = "apb1henr" %}{% set field = "uart8en" %}
         {%- elif name == "usart1" %}{% set reg = "apb2enr" %}{% set field = "usart1en" %}
-        {%- else %}{% set reg = None %}{% set field = None %}
-        {%- endif %}
-    {%- elif spec.mcu.family.startswith("STM32H5") %}
+        {%- else %}{% set reg = None %}{% set field = None %}{%- endif %}
+    {%- elif spec.mcu[0:7] == "STM32H5" %}
         {%- if name in ["usart1", "spi1"] %}{% set reg = "apb2enr" %}{% set field = name ~ "en" %}
-        {%- else %}{% set reg = "apb1enr1" %}{% set field = name ~ "en" %}
-        {%- endif %}
-    {%- elif spec.mcu.family.startswith("STM32F") or spec.mcu.family.startswith("STM32L") or spec.mcu.family.startswith("STM32G") %}
+        {%- else %}{% set reg = "apb1enr1" %}{% set field = name ~ "en" %}{%- endif %}
+    {%- elif spec.mcu[0:6] == "STM32F" or spec.mcu[0:6] == "STM32L" or spec.mcu[0:6] == "STM32G" %}
         {%- if name in ["spi1", "spi4", "spi5", "spi6", "usart1", "usart6"] %}
             {% set reg = "apb2enr" %}
-        {%- elif name.startswith("spi") or name.startswith("usart") or name.startswith("uart") or name.startswith("i2c") %}
+        {%- elif name[0:3] == "spi" or name[0:5] == "usart" or name[0:4] == "uart" or name[0:3] == "i2c" %}
             {% set reg = "apb1enr" %}
         {%- else %}{% set reg = None %}{% endif %}
         {%- if reg %}{% set field = name ~ "en" %}{% else %}{% set field = None %}{% endif %}
     {%- else %}
         {% set reg = None %}{% set field = None %}
     {%- endif %}
-    {%- if reg and field %}
-        {%- if reg in regs %}{% do regs[reg].append(field) %}{% else %}{% set _ = regs.update({reg:[field]}) %}{% endif %}
-    {%- endif %}
+    {%- if reg and field %}{% set pairs = pairs + [{"reg": reg, "field": field}] %}{% endif %}
 {%- endfor %}
-{%- for reg, fields in regs.items() %}
-    dp.RCC.{{ reg }}.modify(|_, w| w{% for f in fields %}.{{ f }}().clear_bit(){% endfor %});
+{%- for group in pairs | groupby("reg") %}
+    dp.RCC.{{ group.grouper }}.modify(|_, w| w{% for item in group.list %}.{{ item.field }}().clear_bit(){% endfor %});
 {%- endfor %}
 
     {%- set dmas = [] %}
     {%- set bdmas = [] %}
     {%- set mdmas = [] %}
     {%- for name, _per in spec.peripherals | dictsort %}
-        {%- if name.startswith("dma") %}{% do dmas.append(name|upper) %}
-        {%- elif name.startswith("bdma") %}{% do bdmas.append(name|upper) %}
-        {%- elif name.startswith("mdma") %}{% do mdmas.append(name|upper) %}
+        {%- if name[0:3] == "dma" %}{% set dmas = dmas + [name|upper] %}
+        {%- elif name[0:4] == "bdma" %}{% set bdmas = bdmas + [name|upper] %}
+        {%- elif name[0:4] == "mdma" %}{% set mdmas = mdmas + [name|upper] %}
         {%- endif %}
     {%- endfor %}
-    {%- set channel_dma = spec.mcu.family.startswith("STM32F0") or spec.mcu.family.startswith("STM32F1") or spec.mcu.family.startswith("STM32F3") or spec.mcu.family.startswith("STM32L0") or spec.mcu.family.startswith("STM32L1") or spec.mcu.family.startswith("STM32G0") %}
+    {%- set channel_dma = spec.mcu[0:7] == "STM32F0" or spec.mcu[0:7] == "STM32F1" or spec.mcu[0:7] == "STM32F3" or spec.mcu[0:7] == "STM32L0" or spec.mcu[0:7] == "STM32L1" or spec.mcu[0:7] == "STM32G0" %}
 
     // Disable DMA controllers and mask their interrupts
     {%- if dmas %}

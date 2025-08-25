@@ -362,7 +362,15 @@ pub fn run() -> Result<()> {
                         Some("hal") | None => bsp_gen::TemplateKind::Hal,
                         Some(t) => bsp_gen::TemplateKind::Custom(PathBuf::from(t)),
                     };
-                    bsp_gen::from_ioc(&ioc, &af_path, kind, &dir)?;
+                    bsp_gen::from_ioc(
+                        &ioc,
+                        &af_path,
+                        kind,
+                        &dir,
+                        false,
+                        false,
+                        bsp_gen::Layout::OneFile,
+                    )?;
                 }
             }
         },
@@ -375,7 +383,7 @@ pub fn run() -> Result<()> {
                 emit_pac,
                 template,
                 grouped_writes,
-                one_file,
+                one_file: _,
                 per_peripheral,
                 with_deinit,
             } => {
