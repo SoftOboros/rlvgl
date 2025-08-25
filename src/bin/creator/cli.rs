@@ -261,14 +261,26 @@ enum BspCommand {
         #[arg(long)]
         out: PathBuf,
         /// Render using the built-in HAL template
-        #[arg(long, conflicts_with_all = ["pac", "template"])]
-        hal: bool,
+        #[arg(long)]
+        emit_hal: bool,
         /// Render using the built-in PAC template
-        #[arg(long, conflicts_with_all = ["hal", "template"])]
-        pac: bool,
+        #[arg(long)]
+        emit_pac: bool,
         /// MiniJinja template to render
-        #[arg(long, conflicts_with_all = ["hal", "pac"])]
+        #[arg(long, conflicts_with_all = ["emit_hal", "emit_pac"])]
         template: Option<PathBuf>,
+        /// Collapse RCC writes by register
+        #[arg(long)]
+        grouped_writes: bool,
+        /// Emit a single consolidated file
+        #[arg(long, group = "layout")]
+        one_file: bool,
+        /// Emit one file per peripheral
+        #[arg(long, group = "layout")]
+        per_peripheral: bool,
+        /// Include optional de-initialization helpers
+        #[arg(long)]
+        with_deinit: bool,
     },
 }
 
@@ -359,20 +371,43 @@ pub fn run() -> Result<()> {
                 ioc,
                 af,
                 out,
-                hal,
-                pac,
+                emit_hal,
+                emit_pac,
                 template,
+                grouped_writes,
+                one_file,
+                per_peripheral,
+                with_deinit,
             } => {
-                let kind = if hal {
-                    bsp_gen::TemplateKind::Hal
-                } else if pac {
-                    bsp_gen::TemplateKind::Pac
-                } else if let Some(t) = template {
-                    bsp_gen::TemplateKind::Custom(t)
+                let mut kinds = Vec::new();
+                if emit_hal {
+                    kinds.push(bsp_gen::TemplateKind::Hal);
+                }
+                if emit_pac {
+                    kinds.push(bsp_gen::TemplateKind::Pac);
+                }
+                if let Some(t) = template {
+                    kinds.push(bsp_gen::TemplateKind::Custom(t));
+                }
+                if kinds.is_empty() {
+                    return Err(anyhow!("select --emit-hal, --emit-pac, or --template"));
+                }
+                let layout = if per_peripheral {
+                    bsp_gen::Layout::PerPeripheral
                 } else {
-                    return Err(anyhow!("select --hal, --pac, or --template"));
+                    bsp_gen::Layout::OneFile
                 };
-                bsp_gen::from_ioc(&ioc, &af, kind, &out)?
+                for kind in kinds {
+                    bsp_gen::from_ioc(
+                        &ioc,
+                        &af,
+                        kind,
+                        &out,
+                        grouped_writes,
+                        with_deinit,
+                        layout.clone(),
+                    )?;
+                }
             }
         },
     }

@@ -6,12 +6,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use minijinja::{context, Environment};
 
 use crate::bsp::{af::JsonAfDb, ioc};
 
 /// Built-in templates for BSP rendering.
+#[derive(Clone)]
 pub enum TemplateKind {
     /// Emit HAL-style initialization code.
     Hal,
@@ -19,6 +20,15 @@ pub enum TemplateKind {
     Pac,
     /// Render using a custom MiniJinja template.
     Custom(PathBuf),
+}
+
+/// Output layout for generated code.
+#[derive(Clone)]
+pub enum Layout {
+    /// Emit a single consolidated source file.
+    OneFile,
+    /// Emit one file per peripheral.
+    PerPeripheral,
 }
 
 /// Convert a CubeMX `.ioc` file into Rust source using `template`.
@@ -30,6 +40,9 @@ pub(crate) fn from_ioc(
     af_json: &Path,
     template: TemplateKind,
     out_dir: &Path,
+    grouped_writes: bool,
+    with_deinit: bool,
+    layout: Layout,
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     let af = JsonAfDb::from_path(af_json)?;
@@ -74,10 +87,46 @@ pub(crate) fn from_ioc(
 
     let mut env = Environment::new();
     env.add_template("gen", &tmpl_src)?;
-    let rendered = env.get_template("gen")?.render(context! { spec => &ir })?;
 
     fs::create_dir_all(out_dir)?;
-    fs::write(out_dir.join(out_name), rendered)?;
+
+    match layout {
+        Layout::OneFile => {
+            let rendered = env
+                .get_template("gen")?
+                .render(context! { spec => &ir, grouped_writes, with_deinit })?;
+            fs::write(out_dir.join(out_name), rendered)?;
+        }
+        Layout::PerPeripheral => {
+            use indexmap::IndexMap;
+            let mut modfile = String::new();
+            for (name, per) in &ir.peripherals {
+                let pins: Vec<_> = ir
+                    .pinctrl
+                    .iter()
+                    .filter(|p| per.signals.values().any(|pin| pin == &p.pin))
+                    .cloned()
+                    .collect();
+                let mut sub = ioc::Ir {
+                    mcu: ir.mcu.clone(),
+                    package: ir.package.clone(),
+                    clocks: ir.clocks.clone(),
+                    pinctrl: pins,
+                    peripherals: IndexMap::new(),
+                };
+                sub.peripherals.insert(name.clone(), per.clone());
+                let rendered = env.get_template("gen")?.render(context! {
+                    spec => &sub,
+                    grouped_writes,
+                    with_deinit,
+                    mod_name => name
+                })?;
+                fs::write(out_dir.join(format!("{name}.rs")), rendered)?;
+                modfile.push_str(&format!("#[cfg(feature = \"{name}\")]\npub mod {name};\n"));
+            }
+            fs::write(out_dir.join("mod.rs"), modfile)?;
+        }
+    }
     Ok(())
 }
 

@@ -177,23 +177,94 @@ rlvgl-creator board from-ioc <ioc> <board> <out> [--hal | --pac | --template <te
 Renders Rust source from a CubeMX project using a MiniJinja template.
 
 ```
-rlvgl-creator bsp from-ioc <ioc> <af> (--hal | --pac | --template <template>) --out <dir>
+rlvgl-creator bsp from-ioc <ioc> <af> [--emit-hal] [--emit-pac] [--template <template>]
+    --out <dir> [--grouped-writes] [--one-file | --per-peripheral] [--with-deinit]
 ```
 * `ioc` – input CubeMX `.ioc` file.
 * `af` – JSON alternate-function database.
-* `--hal` – render using the built-in HAL template.
-* `--pac` – render using the built-in PAC template.
+* `--emit-hal` – render using the built-in HAL template.
+* `--emit-pac` – render using the built-in PAC template.
 * `--template` – path to a custom MiniJinja template.
 * `--out` – directory to place the generated source file.
+* `--grouped-writes` – collapse RCC writes by register.
+  Automatically selects family-specific bus names across F0, F1, F2,
+  F3, F4, F7, G0, G4, H5, H7, L0, L1, L4, L5, U5, WB, and WL families.
+* `--one-file` – emit a single consolidated source file.
+* `--per-peripheral` – emit one file per peripheral with feature gating.
+* `--with-deinit` – include optional de-initialization helpers.
+  Helpers gate clocks, mask IRQs, and reset DMA/BDMA/MDMA configuration
+  registers, including DMAMUX routing and stream/channel edge cases.
+  Covers controllers across F0, F1, F2, F3, F4, F7, H5, H7, L0, L1, L4,
+  L5, G0, G4, U5, WB, and WL variants.
 
-## Workflow: STM32 `.ioc` to BSP
-1. Generate an alternate-function database:
+#### Advanced configuration examples
+
+Generate HAL and PAC BSPs with grouped RCC writes, per-peripheral layout, and deinit hooks:
+
+```bash
+rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+    --emit-hal --emit-pac --grouped-writes \
+    --per-peripheral --with-deinit --out bsp
+```
+
+Render a minimal PAC-only BSP in a single file for early bring-up:
+
+```bash
+rlvgl-creator bsp from-ioc bringup.ioc stm32_af.json \
+    --emit-pac --one-file --out bsp
+```
+
+Generate a HAL-only BSP with ungrouped RCC writes in a single file:
+
+```bash
+rlvgl-creator bsp from-ioc minimal.ioc stm32_af.json \
+    --emit-hal --one-file --out bsp
+```
+
+Walk through a bus-aware STM32F769I-DISCO BSP with full DMA cleanup:
+
+1. Build the alternate-function database:
    ```bash
    python3 tools/afdb/st_extract_af.py --db tests/fixtures/stm32_af.csv --out stm32_af.json
    ```
+2. Generate HAL and PAC code with grouped writes, per-peripheral layout, and deinit hooks:
+   ```bash
+   rlvgl-creator bsp from-ioc f769.ioc stm32_af.json \\
+       --emit-hal --emit-pac --grouped-writes \\
+       --per-peripheral --with-deinit --out bsp
+   ```
+3. Call `board::deinit()` during shutdown to gate clocks, mask interrupts, and reset DMA/BDMA/MDMA state.
+
+Walk through a bus-aware STM32H573I-DISCO BSP with ungrouped writes:
+
+1. Build the alternate-function database:
+   ```bash
+   python3 tools/afdb/st_extract_af.py --db tests/fixtures/stm32_af.csv --out stm32_af.json
+   ```
+ 2. Generate HAL code in a single file without grouped RCC writes:
+  ```bash
+  rlvgl-creator bsp from-ioc h573.ioc stm32_af.json \\
+      --emit-hal --one-file --out bsp
+  ```
+3. Call `board::deinit()` during shutdown to gate clocks and reset pin state.
+
+### Edge cases and gotchas
+
+* Peripheral clock registers vary across low-power families such as L0 and
+  L1. Review generated RCC writes when targeting newly added parts.
+* DMA cleanup clears DMAMUX channels and stream registers but does not yet
+  handle linked-list or double-buffer modes.
+* Some peripherals require extra reset steps beyond clock gating; verify
+  deinit hooks for custom or rare IP blocks.
+
+## Workflow: STM32 `.ioc` to BSP
+1. Generate an alternate-function database:
+  ```bash
+  python3 tools/afdb/st_extract_af.py --db tests/fixtures/stm32_af.csv --out stm32_af.json
+   ```
 2. Convert the `.ioc` file into intermediate representation and render a BSP crate:
    ```bash
-   rlvgl-creator bsp from-ioc simple.ioc stm32_af.json --hal --out bsp
+   rlvgl-creator bsp from-ioc simple.ioc stm32_af.json --emit-hal --out bsp
    ```
    The command parses pin assignments and clock configuration from `simple.ioc`, maps signals using `stm32_af.json`, and renders Rust source into the `bsp/` directory.
 3. Use the generated BSP in a project:
