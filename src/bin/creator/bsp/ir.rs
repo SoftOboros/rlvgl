@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 /// Top-level intermediate representation describing the board.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Ir {
     /// Microcontroller identifier, e.g. "STM32H747XIHx".
     pub mcu: String,
@@ -23,7 +23,7 @@ pub struct Ir {
 }
 
 /// Clock configuration extracted from the vendor project.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct Clocks {
     /// Phase-locked loop settings keyed by name (`pll1`, `pll2`, ...).
     #[serde(default)]
@@ -34,7 +34,7 @@ pub struct Clocks {
 }
 
 /// PLL parameter block.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Pll {
     /// Pre-divider value.
     pub m: u8,
@@ -49,7 +49,7 @@ pub struct Pll {
 }
 
 /// Pin description capturing function and alternate function number.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Pin {
     /// Pin name, e.g. "PA9".
     pub pin: String,
@@ -60,7 +60,7 @@ pub struct Pin {
 }
 
 /// Peripheral description with class and signal-to-pin mapping.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Peripheral {
     /// Class name aligned with `embedded-hal` families, e.g. "serial".
     pub class: String,
