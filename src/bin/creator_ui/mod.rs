@@ -35,6 +35,7 @@ mod init;
 #[path = "../creator/lottie.rs"]
 mod lottie;
 #[path = "../creator/manifest.rs"]
+#[allow(dead_code)]
 mod manifest;
 #[path = "../creator/preview.rs"]
 mod preview;
@@ -49,11 +50,13 @@ mod svg;
 #[path = "../creator/sync.rs"]
 mod sync;
 #[path = "../creator/util.rs"]
+#[allow(dead_code)]
 mod util;
 #[path = "../creator/vendor.rs"]
 mod vendor;
 
 #[path = "../creator/boards.rs"]
+#[allow(dead_code)]
 pub mod boards;
 
 mod board_select;

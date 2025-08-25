@@ -27,11 +27,14 @@ pub struct BoardInfo {
 
 pub mod f407_demo;
 pub mod f429_demo;
+pub mod stm32f4discovery;
 use f407_demo::INFO as F407_DEMO;
 use f429_demo::INFO as F429_DEMO;
+use stm32f4discovery::INFO as STM32F4DISCOVERY;
 const BOARDS: &[BoardInfo] = &[
     F407_DEMO,
     F429_DEMO,
+    STM32F4DISCOVERY,
 ];
 
 /// Returns the vendor identifier.

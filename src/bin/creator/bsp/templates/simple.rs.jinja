@@ -8,6 +8,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * Provenance: STM32_open_pin_data (commit <hash>), build <build-hash>.
  */
+{% if meta is defined %}
+board {{ meta.vendor }} {{ meta.board }} {{ meta.chip }}
+{% endif %}
 {%- for name, pll in spec.clocks.pll | dictsort %}
 pll {{ name }} m{{ pll.m }} n{{ pll.n }} p{{ pll.p }} q{{ pll.q }} r{{ pll.r }}
 {%- endfor %}
