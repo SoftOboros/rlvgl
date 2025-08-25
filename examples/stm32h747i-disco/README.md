@@ -6,6 +6,11 @@ examples/stm32h747i-disco/README.md - STM32H747I-DISCO board demo.
 Demonstrates rlvgl on the STM32H747I-DISCO discovery board using placeholder
 display and touch drivers.
 
+## BSP Generation
+The `bsp` directory is produced by `rlvgl-creator` and demonstrates
+bus-aware clock gating. GPIO and peripheral enables target the H7's `AHB4ENR`
+and related APB registers automatically.
+
 ## Requirements
 - Rust target `thumbv7em-none-eabihf`
 - `arm-none-eabi` cross toolchain
