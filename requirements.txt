@@ -1,5 +1,5 @@
-# Project-wide Python dependencies for AFDB utilities and tooling.
-# Pinned versions ensure reproducible installs.
+annotated-types==0.7.0
+attrs==25.3.0
 certifi==2025.7.14
 charset-normalizer==3.4.2
 colorama==0.4.6
@@ -7,16 +7,26 @@ conan==2.19.1
 defusedxml==0.7.1
 fasteners==0.19
 idna==3.10
+iniconfig==2.1.0
 Jinja2==3.1.6
 jsonschema==4.23.0
+jsonschema-specifications==2025.4.1
 MarkupSafe==3.0.2
 orjson==3.10.1
+packaging==25.0
 patch-ng==1.18.1
 pillow==11.3.0
+pluggy==1.6.0
 pydantic==2.7.4
+pydantic_core==2.18.4
+Pygments==2.19.2
+pytest==8.4.1
 python-dateutil==2.9.0.post0
 PyYAML==6.0.2
+referencing==0.36.2
 requests==2.32.4
+rpds-py==0.27.0
 six==1.17.0
+typing_extensions==4.14.1
 urllib3==2.0.7
 zstandard==0.22.0
