@@ -1506,63 +1506,12 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
     // Disable DMA controllers and mask their interrupts
 
     // Disable interrupts
-    unsafe { pac::NVIC::mask(pac::Interrupt::[); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::I); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::2); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::C); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::4); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::_); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::E); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::V); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::,); }
-    unsafe { pac::NVIC::mask(pac::Interrupt:: ); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::I); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::2); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::C); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::4); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::_); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::E); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::R); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::]); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::[); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::S); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::P); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::I); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::2); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::]); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::[); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::S); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::P); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::I); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::5); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::]); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::[); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::U); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::A); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::R); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::T); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::8); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::]); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::[); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::U); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::S); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::A); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::R); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::T); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::1); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::"); }
-    unsafe { pac::NVIC::mask(pac::Interrupt::]); }
+    unsafe { pac::NVIC::mask(pac::Interrupt::I2C4_EV); }
+    unsafe { pac::NVIC::mask(pac::Interrupt::I2C4_ER); }
+    unsafe { pac::NVIC::mask(pac::Interrupt::SPI2); }
+    unsafe { pac::NVIC::mask(pac::Interrupt::SPI5); }
+    unsafe { pac::NVIC::mask(pac::Interrupt::UART8); }
+    unsafe { pac::NVIC::mask(pac::Interrupt::USART1); }
 }
 
 
