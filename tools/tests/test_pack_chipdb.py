@@ -10,8 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_pack_chipdb_roundtrip(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
-    (src / "boards.json").write_text(json.dumps({"a": 1}))
-    (src / "mcu.json").write_text(json.dumps({"b": 2}))
+    (src / "mcu.json").write_text(json.dumps({"chip": "STM32F407"}))
     out = tmp_path / "db.bin.zst"
     subprocess.run(
         ["python3", str(REPO_ROOT / "tools/pack_chipdb.py"), "--input", str(src), "--output", str(out)],

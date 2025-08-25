@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: MIT
+//! Board support package stubs for STM32 devices.
+//!
+//! This crate hosts board modules generated from STM32CubeMX `.ioc`
+//! definitions. Each supported board exposes a [`BoardInfo`] describing
+//! its name, MCU, and pin assignments.
+
+#![no_std]
+
+/// Pin mapping for a board.
+pub struct PinInfo {
+    /// Pin identifier, e.g., "PA0".
+    pub pin: &'static str,
+    /// Pin signal function.
+    pub signal: &'static str,
+}
+
+/// Information about a supported board.
+pub struct BoardInfo {
+    /// Board's human-friendly name.
+    pub board: &'static str,
+    /// Associated microcontroller name.
+    pub chip: &'static str,
+    /// List of pin assignments.
+    pub pins: &'static [PinInfo],
+}
+
+pub mod f407_demo;
+pub mod f429_demo;
+
+use f407_demo::INFO as F407_DEMO;
+use f429_demo::INFO as F429_DEMO;
+
+const BOARDS: &[BoardInfo] = &[F407_DEMO, F429_DEMO];
+
+/// Returns the vendor identifier.
+#[must_use]
+pub const fn vendor() -> &'static str {
+    "stm"
+}
+
+/// Returns the crate version.
+#[must_use]
+pub const fn version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Lists all available boards.
+#[must_use]
+pub fn boards() -> &'static [BoardInfo] {
+    BOARDS
+}
+
+/// Finds a board by name.
+#[must_use]
+pub fn find(name: &str) -> Option<&'static BoardInfo> {
+    BOARDS.iter().find(|b| b.board == name)
+}

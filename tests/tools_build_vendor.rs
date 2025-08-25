@@ -2,7 +2,7 @@
 use std::{fs, path::Path, process::Command};
 
 #[test]
-fn generates_license_and_boards() {
+fn generates_license_and_mcu() {
     let crate_dir = tempfile::tempdir().unwrap();
     let out_dir = crate_dir.path().join("generated");
     fs::create_dir_all(&out_dir).unwrap();
@@ -14,5 +14,5 @@ fn generates_license_and_boards() {
         .expect("run build_vendor");
     assert!(status.success());
     assert!(crate_dir.path().join("LICENSE").exists());
-    assert!(out_dir.join("boards.json").exists());
+    assert!(out_dir.join("mcu.json").exists());
 }

@@ -25,13 +25,8 @@ def test_build_vendor_exports_env_and_files(tmp_path):
     )
     assert res.stdout == str(out_dir)
     assert (crate_dir / "LICENSE").exists()
-    boards = json.loads((out_dir / "boards.json").read_text())
-    assert boards["boards"]["STM32F4DISCOVERY"]["chip"] == "STM32F4"
-    assert boards["boards"]["NUCLEO-F401RE"]["chip"] == "STM32F401"
-    assert boards["boards"]["STM32F3DISCOVERY"]["chip"] == "STM32F303"
     mcu = json.loads((out_dir / "mcu.json").read_text())
-    for entry in boards["boards"].values():
-        assert entry["chip"] in mcu
+    assert mcu["chip"] == "STM32F407"
     assert (crate_dir / "assets/chipdb.bin.zst").exists()
 
 def test_build_vendor_is_idempotent(tmp_path):
@@ -46,12 +41,6 @@ def test_build_vendor_is_idempotent(tmp_path):
         subprocess.run(["bash", "tools/build_vendor.sh"], cwd=REPO_ROOT, env=env, check=True)
     license_text = (crate_dir / "LICENSE").read_text(encoding="utf-8")
     assert "STMicroelectronics" in license_text
-    boards = json.loads((out_dir / "boards.json").read_text())
-    assert boards["boards"]["STM32F4DISCOVERY"]["chip"] == "STM32F4"
-    assert boards["boards"]["NUCLEO-F401RE"]["chip"] == "STM32F401"
-    assert boards["boards"]["STM32F3DISCOVERY"]["chip"] == "STM32F303"
     mcu = json.loads((out_dir / "mcu.json").read_text())
-    for entry in boards["boards"].values():
-        assert entry["chip"] in mcu
+    assert mcu["chip"] == "STM32F407"
     assert (crate_dir / "assets/chipdb.bin.zst").exists()
-
