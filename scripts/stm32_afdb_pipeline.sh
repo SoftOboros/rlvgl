@@ -34,7 +34,7 @@ zstd -19 -f "$bin_path" -o chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
 du -h "$LOADER_BIN"
 
 if [[ "$KEEP_TEMP" -eq 0 ]]; then
-  rm -rf "$TMP_DIR" "$LOADER_BIN"
+  rm -rf "$TMP_DIR"
 else
-  echo "Keeping temporary files in $TMP_DIR and $LOADER_BIN"
+  echo "Keeping temporary files in $TMP_DIR"
 fi
