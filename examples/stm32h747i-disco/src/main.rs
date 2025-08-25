@@ -19,6 +19,11 @@ use panic_halt as _;
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
 
+#[path = "../bsp/hal.rs"]
+mod bsp_hal;
+#[path = "../bsp/pac.rs"]
+mod bsp_pac;
+
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
@@ -53,7 +58,6 @@ fn main() -> ! {
         use rlvgl::platform::{
             CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
         };
-        use stm32h7::stm32h747cm7::{DSIHOST, FMC, LTDC, RCC};
 
         struct DummyBacklight;
         impl PwmError for DummyBacklight {
@@ -159,13 +163,12 @@ fn main() -> ! {
             }
         }
 
+        let dp = bsp_pac::Peripherals::take().unwrap();
+        bsp_hal::init_board_hal(&dp);
+        let bsp_pac::Peripherals { DSIHOST: dsi, FMC: fmc, LTDC: ltdc, RCC: mut rcc, .. } = dp;
         let blitter = CpuBlitter;
         let backlight = DummyBacklight;
         let reset = DummyReset;
-        let ltdc: LTDC = unsafe { core::mem::MaybeUninit::uninit().assume_init() };
-        let dsi: DSIHOST = unsafe { core::mem::MaybeUninit::uninit().assume_init() };
-        let fmc: FMC = unsafe { core::mem::MaybeUninit::uninit().assume_init() };
-        let mut rcc: RCC = unsafe { core::mem::MaybeUninit::uninit().assume_init() };
         let mut _display =
             Stm32h747iDiscoDisplay::new(blitter, backlight, reset, ltdc, dsi, fmc, &mut rcc);
         let i2c = DummyI2c;
