@@ -10,6 +10,7 @@ High-level guides and task lists for rlvgl.
 - [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) – MiniJinja template guidelines for BSP generation.
 - [CUSTOM-SIMULATOR.md](./CUSTOM-SIMULATOR.md) – Notes on building a custom simulator backend.
 - [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) – Details for the STM32H747I-DISCO board.
+- [CROSS-TESTING.md](./CROSS-TESTING.md) – Cross-target test linker requirements.
 
 ## TODO Lists
 - [TODO.md](./TODO.md) – High-level project roadmap.

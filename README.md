@@ -179,6 +179,29 @@ fn main() {
 }
 ```
 
+## Testing
+
+Run host-based tests with the default toolchain:
+
+```bash
+cargo test --workspace
+```
+
+Cross-target tests (e.g., `thumbv7em-none-eabihf`) require a linker. Cargo
+defaults to `arm-none-eabi-gcc`, but you can avoid installing GCC by adding
+the `rust-lld` component and configuring:
+
+```bash
+rustup component add rust-lld
+```
+
+```toml
+[target.thumbv7em-none-eabihf]
+linker = "rust-lld"
+```
+
+See [docs/CROSS-TESTING.md](docs/CROSS-TESTING.md) for troubleshooting tips.
+
 ## Coverage
 
 LLVM coverage instrumentation is configured via `.cargo/config.toml` and the

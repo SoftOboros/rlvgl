@@ -11,6 +11,13 @@ The `bsp` directory is produced by `rlvgl-creator` and demonstrates
 bus-aware clock gating. GPIO and peripheral enables target the H7's `AHB4ENR`
 and related APB registers automatically.
 
+```rust
+use crate::bsp::{hal, pac};
+
+let dp = pac::Peripherals::take().unwrap();
+hal::init_board_hal(&dp);
+```
+
 ## Requirements
 - Rust target `thumbv7em-none-eabihf`
 - `arm-none-eabi` cross toolchain
