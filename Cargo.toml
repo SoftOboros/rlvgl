@@ -1,7 +1,7 @@
 [package]
 name = "rlvgl"
 version = "0.1.6"
-authors = ["Ira Abbott <ira@softobotos.com>"]
+authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
 description = "A modular, idiomatic Rust reimplementation of the LVGL graphics library for embedded and simulator use."
