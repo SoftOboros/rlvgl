@@ -4,6 +4,9 @@
  * SPDX-FileCopyrightText: 2025 Softoboros Technology, Inc.
  * SPDX-License-Identifier: BSD-3-Clause
  * Provenance: STM32_open_pin_data (commit <hash>), build <build-hash>.
+{% if meta is defined %}
+ * Board: {{ meta.board }} ({{ meta.chip }})
+{% endif %}
  */
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
