@@ -140,6 +140,15 @@ pub(crate) fn emit_lib_rs(
     }
 
     for (slug, forms) in mcus {
+        if !inline_includes {
+            if let (Some(prefix), Some(fam)) = (family_prefix, family_from_slug(&slug)) {
+                let fam = fam.strip_prefix("stm32-").unwrap_or(&fam);
+                s.push_str(&format!("#[cfg(feature=\"{}{}\")]\n", prefix, fam));
+            }
+            s.push_str(&format!("pub mod {slug};\n\n"));
+            continue;
+        }
+
         if let (Some(prefix), Some(fam)) = (family_prefix, family_from_slug(&slug)) {
             let fam = fam.strip_prefix("stm32-").unwrap_or(&fam);
             s.push_str(&format!("#[cfg(feature=\"{}{}\")]\n", prefix, fam));

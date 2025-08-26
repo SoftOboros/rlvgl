@@ -57,26 +57,28 @@ use stm32h7xx_hal::{pac, prelude::*, gpio::Speed};
 /// Enables GPIO clocks required by the generated board.
 {% endif %}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {% set ns = namespace(ports=[]) %}
-    {% for pin in spec.pinctrl %}{% if pin.pin[1] not in ns.ports %}{% set ns.ports = ns.ports + [pin.pin[1]] %}{% endif %}{% endfor %}
-    {% if grouped_writes %}
-    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        bits |= {% for p in ns.ports %}(1 << {{ port_bit(p) }}){% if not loop.last %} | {% endif %}{% endfor %};
-        w.bits(bits)
-    });
-    {% else %}
-    {%- for p in ns.ports %}
+    {%- set ports = [] -%}
+    {%- for pin in spec.pinctrl -%}
+        {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
+    {%- endfor -%}
+    {%- if ports|length -%}
+    {%- if grouped_writes -%}
+    const MASK: u32 = {%- for p in ports -%}(1u32 << {{ port_bit(p) }}){%- if not loop.last %} |{% endif %}{%- endfor %};
+    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    {%- else -%}
+    {%- for p in ports -%}
     dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|_, w| w.gpio{{ p|lower }}en().set_bit());
-    {%- endfor %}
-    {% endif %}
+    {%- endfor -%}
+    {%- endif -%}
+    {%- endif -%}
 }
 
-{% if meta is defined %}
+{%- if spec.pinctrl|length -%}
+{%- if meta is defined %}
 /// Configures pins for {{ meta.board }} using the HAL API.
-{% else %}
+{%- else %}
 /// Configures pins using the HAL API.
-{% endif %}
+{%- endif %}
 pub fn configure_pins_hal() {
 {%- for pin in spec.pinctrl %}
     {%- set is_gpio = pin.func[0:5] == "GPIO_" %}
@@ -101,6 +103,7 @@ pub fn configure_pins_hal() {
     {%- endif %};
 {%- endfor %}
 }
+{%- endif %}
 
 {% if meta is defined %}
 /// Enables peripheral clocks for {{ meta.board }}.
