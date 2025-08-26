@@ -42,11 +42,12 @@ pub(crate) fn from_ioc(
     out_dir: &Path,
     grouped_writes: bool,
     with_deinit: bool,
+    allow_reserved: bool,
     layout: Layout,
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     let af = JsonAfDb::from_path(af_json)?;
-    let ir = ioc::ioc_to_ir(&text, &af, false)?;
+    let ir = ioc::ioc_to_ir(&text, &af, allow_reserved)?;
 
     // Ensure all peripherals reference known pins
     use std::collections::HashSet;

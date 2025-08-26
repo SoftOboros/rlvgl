@@ -281,6 +281,9 @@ enum BspCommand {
         /// Include optional de-initialization helpers
         #[arg(long)]
         with_deinit: bool,
+        /// Permit configuration of reserved SWD pins (PA13/PA14)
+        #[arg(long)]
+        allow_reserved: bool,
     },
 }
 
@@ -369,24 +372,26 @@ pub fn run() -> Result<()> {
                         &dir,
                         false,
                         false,
+                        false,
                         bsp_gen::Layout::OneFile,
                     )?;
                 }
             }
         },
         Command::Bsp { cmd } => match cmd {
-            BspCommand::FromIoc {
-                ioc,
-                af,
-                out,
-                emit_hal,
-                emit_pac,
-                template,
-                grouped_writes,
-                one_file: _,
-                per_peripheral,
-                with_deinit,
-            } => {
+        BspCommand::FromIoc {
+            ioc,
+            af,
+            out,
+            emit_hal,
+            emit_pac,
+            template,
+            grouped_writes,
+            one_file: _,
+            per_peripheral,
+            with_deinit,
+            allow_reserved,
+        } => {
                 let mut kinds = Vec::new();
                 if emit_hal {
                     kinds.push(bsp_gen::TemplateKind::Hal);
@@ -413,6 +418,7 @@ pub fn run() -> Result<()> {
                         &out,
                         grouped_writes,
                         with_deinit,
+                        allow_reserved,
                         layout.clone(),
                     )?;
                 }

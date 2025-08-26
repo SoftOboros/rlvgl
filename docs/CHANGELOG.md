@@ -10,3 +10,4 @@ CHANGELOG.md - Notes on chip & board database releases.
 - Introduced `st_ioc_board.py` to convert CubeMX `.ioc` files into board overlays.
 - `rlvgl-creator` can now load canonical MCU definitions alongside board overlays from vendor archives.
 - Added `rlvgl-creator board from-ioc` to convert user CubeMX projects into board overlays.
+- Added `--allow-reserved` flag to `rlvgl-creator bsp from-ioc` to permit SWD pins `PA13`/`PA14`.
