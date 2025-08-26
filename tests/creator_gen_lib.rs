@@ -97,3 +97,24 @@ fn templates_skip_empty_pin_fns() {
         .unwrap();
     assert!(!hal.contains("pub fn configure_pins_hal"));
 }
+
+#[test]
+fn pac_split_omits_board_init() {
+    let mut env = Environment::new();
+    env.add_template(
+        "pac",
+        include_str!("../src/bin/creator/bsp/templates/pac.rs.jinja"),
+    )
+    .unwrap();
+    let spec = context! {
+        mcu => "STM32F0",
+        pinctrl => Vec::<String>::new(),
+        peripherals => BTreeMap::<String, String>::new(),
+    };
+    let pac = env
+        .get_template("pac")
+        .unwrap()
+        .render(context! { spec => spec, grouped_writes => true, with_deinit => false, mod_name => "foo" })
+        .unwrap();
+    assert!(!pac.contains("init_board_pac"));
+}
