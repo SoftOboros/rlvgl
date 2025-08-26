@@ -39,7 +39,21 @@ for ioc in "${iocs[@]}"; do
   count=$((count + 1))
   raw="$(basename "$ioc" .ioc)"
   IFS='_' read -r -a parts <<<"$raw"
-  board="${parts[2]:-$raw}"
+  parts=("${parts[@]:1}")
+  board=""
+  for part in "${parts[@]}"; do
+    lpart="$(echo "$part" | tr '[:upper:]' '[:lower:]')"
+    case "$lpart" in
+      nucleo|discovery|evaluation|connectivity|expansion|board)
+        continue
+        ;;
+      *)
+        board="$part"
+        break
+        ;;
+    esac
+  done
+  board="${board:-$raw}"
   board="$(echo "$board" | tr '[:upper:]' '[:lower:]' | tr '-' '_')"
   echo "[$count/$total] $board"
   out_dir="$OUT_DIR/$board"
