@@ -8,8 +8,8 @@
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 
-pub use pac::Peripherals;
 use stm32h7::stm32h747cm7 as pac;
+pub type Peripherals = pac::Peripherals;
 
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     dp.RCC
@@ -3784,7 +3784,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
     });
 }
 
-pub fn enable_peripherals(dp: &pac::Peripherals) {}
+pub fn enable_peripherals(_dp: &pac::Peripherals) {}
 
 pub fn init_board_pac(dp: pac::Peripherals) {
     enable_gpio_clocks(&dp);
