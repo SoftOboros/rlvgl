@@ -379,6 +379,7 @@ pub fn deinit_board_pac(dp: &pac::Peripherals) {
 }
 {% endif %}
 
+{% if mod_name is not defined %}
 {% if meta is defined %}
 /// Initializes {{ meta.board }} using PAC register access.
 {% else %}
@@ -394,3 +395,4 @@ pub fn init_board_pac(dp: pac::Peripherals) {
     configure_pins_pac(&dp);
     enable_peripherals(&dp);
 }
+{% endif %}
