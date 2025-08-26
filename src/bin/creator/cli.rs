@@ -31,6 +31,7 @@ pub mod svg;
 pub mod sync;
 pub mod util;
 pub mod vendor;
+pub mod gen_lib;
 
 /// CLI arguments for rlgvl-creator.
 #[derive(Parser)]
@@ -163,6 +164,27 @@ enum Command {
         /// Monochrome threshold (0-255)
         #[arg(long)]
         threshold: Option<u8>,
+    },
+    /// Generate a `lib.rs` from generated BSP fragments
+    GenLib {
+        /// Directory containing generated modules
+        #[arg(long)]
+        src: PathBuf,
+        /// Path to output `lib.rs`
+        #[arg(long)]
+        out: PathBuf,
+        /// Prelude re-export form (e.g., `hal:split` or `none`)
+        #[arg(long, default_value = "hal:split")]
+        prelude: String,
+        /// Features to gate (comma-separated)
+        #[arg(long, value_delimiter = ',', default_value = "hal,pac,split,flat,summaries,pinreport")]
+        features: Vec<String>,
+        /// Optional feature prefix for family gates
+        #[arg(long)]
+        family_feature_prefix: Option<String>,
+        /// Inline includes rather than `mod` shims
+        #[arg(long)]
+        inline_includes: bool,
     },
     /// Board-related commands
     Board {
@@ -340,6 +362,33 @@ pub fn run() -> Result<()> {
             dpi,
             threshold,
         } => svg::run(&svg, &out, &dpi, threshold)?,
+        Command::GenLib {
+            src,
+            out,
+            prelude,
+            features,
+            family_feature_prefix,
+            inline_includes,
+        } => {
+            let df = if prelude == "none" {
+                None
+            } else {
+                let parts: Vec<_> = prelude.split(':').collect();
+                if parts.len() != 2 {
+                    return Err(anyhow!("prelude must be kind:form or 'none'"));
+                }
+                Some((parts[0].to_string(), parts[1].to_string()))
+            };
+            let df_ref = df.as_ref().map(|(a, b)| (a.as_str(), b.as_str()));
+            gen_lib::emit_lib_rs(
+                &src,
+                &out,
+                df_ref,
+                &features,
+                family_feature_prefix.as_deref(),
+                inline_includes,
+            )?;
+        }
         Command::Board { cmd } => match cmd {
             BoardCommand::FromIoc {
                 ioc,
@@ -421,6 +470,9 @@ pub fn run() -> Result<()> {
                         allow_reserved,
                         layout.clone(),
                     )?;
+                }
+                if per_peripheral {
+                    bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
                 }
             }
         },

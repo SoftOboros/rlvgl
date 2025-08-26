@@ -20,6 +20,9 @@ fi
 if git diff --name-only "$BASE" HEAD | grep -q -e '^src/' -e '^Cargo.toml' -e '^examples/'; then
   changed+=("rlvgl")
 fi
+if git diff --name-only "$BASE" HEAD | grep -q '^chips/stm/bsps/'; then
+  changed+=("rlvgl-stm-bsps")
+fi
 
 # Detect vendor chip database crates - all listed here
 #chipdb_crates=(
@@ -49,6 +52,9 @@ for crate in "${changed[@]}"; do
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
     scripts/stm32_afdb_pipeline.sh
     git add chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
+    cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty || echo "⚠️ publish $crate failed."
+  elif [[ "$crate" == "rlvgl-stm-bsps" ]]; then
+    scripts/gen_ioc_bsps.sh
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty || echo "⚠️ publish $crate failed."
   else
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify || echo "⚠️ publish $crate failed."
