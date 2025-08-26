@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 //! Event hook helpers for rlvgl-ui widgets.
 //!
-//! Provides builder-style `on_click` and `on_change` APIs.
+//! Bridges [`Event`](rlvgl_core::event::Event) types from `rlvgl-core` with
+//! components from [`rlvgl-widgets`](rlvgl_widgets) using builder-style
+//! `on_click` and `on_change` APIs.
 
 use alloc::boxed::Box;
 use rlvgl_core::{

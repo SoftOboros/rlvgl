@@ -1,6 +1,10 @@
 <!--
 examples/stm32f746g-disco/README.md - STM32F746G-DISCO board demo.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32F746G-DISCO Demo
 
 Demonstrates bus-aware BSP generation on the STM32F746G-DISCO.

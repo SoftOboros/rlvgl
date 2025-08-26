@@ -1,9 +1,17 @@
 <!--
 platform/README.md - Traits and utilities for hardware and simulator integration.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-platform
+Package: `rlvgl-platform`
 
 Traits and utility types for hooking rlvgl to real hardware or simulators.
+
+Pairs with the [core](../core/README.md) and
+[widgets](../widgets/README.md) crates.
 
 See [README-VENDOR.md](./README-VENDOR.md) for the vendor support policy.
 

@@ -1,4 +1,5 @@
 //! Tests for BSP mod generation and lib scanning.
+#![cfg(feature = "creator")]
 
 #[path = "../src/bin/creator/bsp/af.rs"]
 pub mod af;

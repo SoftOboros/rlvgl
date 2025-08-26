@@ -1,6 +1,10 @@
 <!--
 docs/CROSS-TESTING.md - Cross-target test linker requirements and native test guidance.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Cross-Target Testing
 
 Running tests for embedded targets such as `thumbv7em-none-eabihf` requires a compatible linker. By default `cargo test` invokes `arm-none-eabi-gcc`, which fails if the GCC toolchain is missing. To avoid this dependency, install the `rust-lld` component and configure Cargo to use it:

@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-stm vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-stm
+Package: `rlvgl-chips-stm`
 
 Provides a board database for STMicroelectronics devices used by `rlvgl-creator`.
 
@@ -22,6 +27,8 @@ VENDOR_DIR=chips/stm CRATE_DIR=chipdb/rlvgl-chips-stm OUT_DIR=build/chipdb/stm \
 If `assets/chipdb.bin.zst` is absent, the build script falls back to the
 `RLVGL_CHIP_SRC` environment variable to locate uncompressed JSON
 definitions.
+
+See [assets/README.md](./assets/README.md) for details on the compressed database archive.
 
 The library exposes helper functions for consumers:
 

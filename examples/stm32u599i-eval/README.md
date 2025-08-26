@@ -1,6 +1,10 @@
 <!--
 examples/stm32u599i-eval/README.md - STM32U599I-EVAL board demo.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32U599I-EVAL Demo
 
 Showcases bus-aware BSP generation on the STM32U599I-EVAL.

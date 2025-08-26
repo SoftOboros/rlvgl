@@ -1,6 +1,10 @@
 <!--
 CREATOR-CLI.md - Command-line reference and workflows for rlvgl-creator.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-creator CLI
 
 ## Overview

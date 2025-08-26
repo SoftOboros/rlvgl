@@ -1,3 +1,10 @@
+<!--
+chipdb/rlvgl-chips-stm/assets/README.md - STM chip database assets.
+-->
+<p align="center">
+  <img src="../../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM chip database assets
 
 This directory stores the compressed STM chip database. The archive

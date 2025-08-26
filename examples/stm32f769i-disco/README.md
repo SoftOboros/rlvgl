@@ -1,6 +1,10 @@
 <!--
 examples/stm32f769i-disco/README.md - STM32F769I-DISCO board demo.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32F769I-DISCO Demo
 
 Showcases bus-aware BSP generation on the STM32F769I-DISCO.

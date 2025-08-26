@@ -1,3 +1,10 @@
+<!--
+docs/CREATOR-TEMPLATES.md - rlvgl-creator Templates and Hooks.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-creator Templates and Hooks
 
 Developer documentation describing how the creator uses embedded Tera templates for scaffolding assets crates and where to extend the conversion pipeline.

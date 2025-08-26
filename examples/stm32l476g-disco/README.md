@@ -1,6 +1,10 @@
 <!--
 examples/stm32l476g-disco/README.md - STM32L476G-DISCO board demo.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32L476G-DISCO Demo
 
 Demonstrates bus-aware BSP generation for the STM32L476G Discovery board.

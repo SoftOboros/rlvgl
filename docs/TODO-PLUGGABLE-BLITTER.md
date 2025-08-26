@@ -1,3 +1,10 @@
+<!--
+docs/TODO-PLUGGABLE-BLITTER.md - Epic: Pluggable Rendering/Display Backends (CPU, DMA2D, winit/wgpu).
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Epic: Pluggable Rendering/Display Backends (CPU, DMA2D, winit/wgpu)
 
 **Description**: Introduce a `Blitter` strategy trait and multiple implementations (CPU fallback, STM32H7 DMA2D, desktop wgpu). Wire these under `platform/` so the same widget/render code targets embedded and desktop. Adds LTDC/DSI + OTM8009A (DISCO) and FT5336 touch. Updates simulator to use `winit + wgpu` (window + GPU) for speed.  

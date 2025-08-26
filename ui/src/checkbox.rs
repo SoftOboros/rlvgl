@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 //! Checkbox component with change callbacks for rlvgl-ui.
 //!
-//! Wraps the base checkbox widget and exposes a builder-style `on_change`
-//! handler that fires whenever the checked state toggles.
+//! Wraps the [`Checkbox`](rlvgl_widgets::checkbox::Checkbox) widget and
+//! exposes a builder-style `on_change` handler that fires whenever the checked
+//! state toggles.
 
 use alloc::{boxed::Box, string::String};
 use rlvgl_core::{

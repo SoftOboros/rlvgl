@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Tag component for rlvgl-ui.
 //!
-//! Tags are lightweight buttons commonly used for categorization or filters.
+//! Built on top of the [`Button`](rlvgl_widgets::button::Button) widget to
+//! provide lightweight controls for categorization or filters.
 
 use rlvgl_core::{
     event::Event,

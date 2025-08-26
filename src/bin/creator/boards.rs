@@ -6,6 +6,7 @@
 //! internals.
 
 use minijinja::{Environment, context};
+use rlvgl_bsps_stm as stm;
 use rlvgl_chips_esp as esp;
 use rlvgl_chips_microchip as microchip;
 use rlvgl_chips_nrf as nrf;
@@ -14,7 +15,6 @@ use rlvgl_chips_renesas as renesas;
 use rlvgl_chips_rp2040 as rp2040;
 use rlvgl_chips_silabs as silabs;
 use rlvgl_chips_ti as ti;
-use rlvgl_bsps_stm as stm;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;

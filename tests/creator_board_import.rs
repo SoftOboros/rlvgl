@@ -1,4 +1,5 @@
 //! Tests converting user `.ioc` files into board overlays via creator helpers.
+#![cfg(feature = "creator")]
 
 #[path = "../src/bin/creator/bsp/af.rs"]
 pub mod af;

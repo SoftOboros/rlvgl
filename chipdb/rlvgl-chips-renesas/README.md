@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-renesas vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-renesas
+Package: `rlvgl-chips-renesas`
 
 Provides a board database for Renesas devices used by `rlvgl-creator`.
 

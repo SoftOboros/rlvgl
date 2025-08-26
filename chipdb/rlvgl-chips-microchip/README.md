@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-microchip vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-microchip
+Package: `rlvgl-chips-microchip`
 
 Provides a board database for Microchip devices used by `rlvgl-creator`.
 

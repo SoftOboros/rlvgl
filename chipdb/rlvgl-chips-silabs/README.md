@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-silabs vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-silabs
+Package: `rlvgl-chips-silabs`
 
 Provides a board database for Silicon Labs devices used by `rlvgl-creator`.
 

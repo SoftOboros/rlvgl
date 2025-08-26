@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 //! Toast component for rlvgl-ui.
 //!
-//! Lightweight notification label that can be styled and dismissed.
+//! Built from a [`Container`](rlvgl_widgets::container::Container) and
+//! [`Label`](rlvgl_widgets::label::Label) to provide lightweight dismissible
+//! notifications.
 
 use rlvgl_core::{
     event::Event,

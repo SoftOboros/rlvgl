@@ -1,4 +1,5 @@
 //! Ensure presets dispatch commands in sequence.
+#![cfg(feature = "creator_ui")]
 
 #[path = "../src/bin/creator_ui/presets.rs"]
 mod presets;

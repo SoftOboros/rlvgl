@@ -1,6 +1,10 @@
 <!--
 Plan for aligning CubeMX `.ioc` board overlays with canonical IR and Rust init templates.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32 Board IR Alignment Plan
 
 ## Current gap

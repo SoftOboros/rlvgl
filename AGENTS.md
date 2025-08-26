@@ -1,3 +1,10 @@
+<!--
+AGENTS.md - Contributor guidance and project conventions.
+-->
+<p align="center">
+  <img src="rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl
 
 A modular, idiomatic Rust reimplementation of LVGL (Light and Versatile Graphics Library).
@@ -82,6 +89,8 @@ documentation for users.
 All files must include a descriptive file header summarizing their purpose.
 
 Run ./scripts/pre-commit.sh and ensure it succeeds before opening a pull request. This script enforces formatting, runs clippy, builds with all features, and verifies documentation generation using nightly.
+
+Use `scripts/check-links.sh` to validate Markdown links before committing documentation changes.
 
 ## Example linker scripts
 

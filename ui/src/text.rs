@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Text and heading helpers for rlvgl-ui.
 //!
-//! Provides simple wrappers around the base label widget for body text and
-//! semantic headings.
+//! Provides simple wrappers around the [`Label`](rlvgl_widgets::label::Label)
+//! widget for body text and semantic headings.
 
 use rlvgl_core::{
     event::Event,

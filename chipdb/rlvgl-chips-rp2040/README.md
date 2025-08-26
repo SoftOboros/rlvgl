@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-rp2040 vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-rp2040
+Package: `rlvgl-chips-rp2040`
 
 Provides a board database for generic RP2040 devices used by `rlvgl-creator`.
 
