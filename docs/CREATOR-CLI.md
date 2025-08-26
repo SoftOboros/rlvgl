@@ -179,6 +179,7 @@ Renders Rust source from a CubeMX project using a MiniJinja template.
 ```
 rlvgl-creator bsp from-ioc <ioc> <af> [--emit-hal] [--emit-pac] [--template <template>]
     --out <dir> [--grouped-writes] [--one-file | --per-peripheral] [--with-deinit]
+    [--allow-reserved]
 ```
 * `ioc` – input CubeMX `.ioc` file.
 * `af` – JSON alternate-function database.
@@ -192,6 +193,7 @@ rlvgl-creator bsp from-ioc <ioc> <af> [--emit-hal] [--emit-pac] [--template <tem
 * `--one-file` – emit a single consolidated source file.
 * `--per-peripheral` – emit one file per peripheral with feature gating.
 * `--with-deinit` – include optional de-initialization helpers.
+* `--allow-reserved` – permit configuration of reserved SWD pins (`PA13`, `PA14`).
   Helpers gate clocks, mask IRQs, and reset DMA/BDMA/MDMA configuration
   registers, including DMAMUX routing and stream/channel edge cases.
   Covers controllers across F0, F1, F2, F3, F4, F7, H5, H7, L0, L1, L4,

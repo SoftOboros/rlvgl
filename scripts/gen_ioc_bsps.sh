@@ -40,7 +40,7 @@ find "$BOARD_DIR" -name '*.ioc' | while read -r ioc; do
       layout_flag="--per-peripheral"
     fi
     "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
-      --emit-hal --emit-pac --grouped-writes --with-deinit $layout_flag \
+      --emit-hal --emit-pac --grouped-writes --with-deinit --allow-reserved $layout_flag \
       --out "$out_dir" || echo "failed: $board ($layout)"
   done
 done
