@@ -18,7 +18,9 @@ mod bsp_gen;
 mod gen_lib;
 
 use std::fs;
+use std::collections::BTreeMap;
 use tempfile::tempdir;
+use minijinja::{Environment, context};
 
 #[test]
 fn board_mod_respects_flags() {
@@ -50,4 +52,32 @@ fn scan_tree_detects_forms() {
     assert!(forms.pac_flat);
     assert!(forms.summary);
     assert!(!forms.pinreport);
+}
+
+#[test]
+fn emit_lib_rs_uses_mod_files() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir_all(root.join("foo/hal")).unwrap();
+    fs::write(root.join("foo/hal/split.rs"), "").unwrap();
+    fs::write(root.join("foo/mod.rs"), "").unwrap();
+    gen_lib::emit_lib_rs(root, root.join("lib.rs"), None, &[], None, false).unwrap();
+    let text = fs::read_to_string(root.join("lib.rs")).unwrap();
+    assert!(text.contains("pub mod foo;"));
+}
+
+#[test]
+fn templates_skip_empty_pin_fns() {
+    let mut env = Environment::new();
+    env.add_template("pac", include_str!("../src/bin/creator/bsp/templates/pac.rs.jinja")).unwrap();
+    env.add_template("hal", include_str!("../src/bin/creator/bsp/templates/hal.rs.jinja")).unwrap();
+    let spec = context! {
+        mcu => "STM32F0",
+        pinctrl => Vec::<String>::new(),
+        peripherals => BTreeMap::<String, String>::new(),
+    };
+    let pac = env.get_template("pac").unwrap().render(context! { spec => spec.clone(), grouped_writes => true, with_deinit => false }).unwrap();
+    assert!(!pac.contains("pub fn configure_pins_pac"));
+    let hal = env.get_template("hal").unwrap().render(context! { spec => spec, grouped_writes => true, with_deinit => false }).unwrap();
+    assert!(!hal.contains("pub fn configure_pins_hal"));
 }

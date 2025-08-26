@@ -49,118 +49,114 @@ use stm32h7::stm32h747 as pac;
 {%- endif -%}
 {%- endmacro %}
 
-{% if meta is defined %}
+{%- if meta is defined -%}
 /// Enables GPIO clocks required by {{ meta.board }}.
-{% else %}
+{%- else -%}
 /// Enables GPIO clocks required by the generated board.
-{% endif %}
+{%- endif -%}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {% set ns = namespace(ports=[]) %}
-    {% for pin in spec.pinctrl %}{% if pin.pin[1] not in ns.ports %}{% set ns.ports = ns.ports + [pin.pin[1]] %}{% endif %}{% endfor %}
-    {% if grouped_writes %}
-    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        bits |= {% for p in ns.ports %}(1 << {{ port_bit(p) }}){% if not loop.last %} | {% endif %}{% endfor %};
-        w.bits(bits)
-    });
-    {% else %}
-    {%- for p in ns.ports %}
-    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ port_bit(p) }})) });
-    {%- endfor %}
-    {% endif %}
+    {%- set ports = [] -%}
+    {%- for pin in spec.pinctrl -%}
+        {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
+    {%- endfor -%}
+    {%- if ports|length -%}
+    const MASK: u32 = {%- for p in ports -%}(1u32 << {{ port_bit(p) }}){%- if not loop.last %} |{% endif %}{%- endfor %};
+    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    {%- endif -%}
 }
 
-{% if meta is defined %}
+{%- if spec.pinctrl|length -%}
+{%- if meta is defined -%}
 /// Configures pins for {{ meta.board }} using PAC registers.
-{% else %}
+{%- else -%}
 /// Configures pins using PAC registers.
-{% endif %}
+{%- endif -%}
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
-{% if grouped_writes %}
-    {% set ports = [] %}{% for pin in spec.pinctrl %}{% if pin.pin[1] not in ports %}{% set ports = ports + [pin.pin[1]] %}{% endif %}{% endfor %}
-    {%- for p in ports %}
+{%- if grouped_writes -%}
+    {%- set ports = [] -%}{%- for pin in spec.pinctrl -%}{%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}{%- endfor -%}
+    {%- for p in ports -%}
     // GPIO{{ p }}
     dp.GPIO{{ p }}.pupdr.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p %}
+        {%- for pin in spec.pinctrl if pin.pin[1] == p -%}
         let shift = {{ idx(pin) }} * 2;
         bits &= !(0b11 << shift);
         {%- if pin.func[0:3] == "I2C" %}bits |= 0b01 << shift;{%- else %}bits |= 0b00 << shift;{%- endif %}
-        {%- endfor %}
+        {%- endfor -%}
         w.bits(bits)
     });
     dp.GPIO{{ p }}.otyper.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p %}
+        {%- for pin in spec.pinctrl if pin.pin[1] == p -%}
         bits &= !(1 << {{ idx(pin) }});
         {%- if pin.func[0:3] == "I2C" %}bits |= 1 << {{ idx(pin) }};{%- endif %}
-        {%- endfor %}
+        {%- endfor -%}
         w.bits(bits)
     });
     dp.GPIO{{ p }}.ospeedr.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p %}
+        {%- for pin in spec.pinctrl if pin.pin[1] == p -%}
         let shift = {{ idx(pin) }} * 2;
         bits &= !(0b11 << shift);
         {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" %}bits |= 0b11 << shift;{%- endif %}
-        {%- endfor %}
+        {%- endfor -%}
         w.bits(bits)
     });
     dp.GPIO{{ p }}.afrl.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p and idx(pin) < 8 %}
+        {%- for pin in spec.pinctrl if pin.pin[1] == p and idx(pin) < 8 -%}
         let afr_shift = {{ idx(pin) }} * 4;
         bits &= !(0xF << afr_shift);
         bits |= ({{ pin.af }}u32 & 0xF) << afr_shift;
-        {%- endfor %}
+        {%- endfor -%}
         w.bits(bits)
     });
     dp.GPIO{{ p }}.afrh.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p and idx(pin) >= 8 %}
+        {%- for pin in spec.pinctrl if pin.pin[1] == p and idx(pin) >= 8 -%}
         let afr_shift = ({{ idx(pin) }} % 8) * 4;
         bits &= !(0xF << afr_shift);
         bits |= ({{ pin.af }}u32 & 0xF) << afr_shift;
-        {%- endfor %}
+        {%- endfor -%}
         w.bits(bits)
     });
     dp.GPIO{{ p }}.moder.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p %}
+        {%- for pin in spec.pinctrl if pin.pin[1] == p -%}
         let shift = {{ idx(pin) }} * 2;
         bits &= !(0b11 << shift);
-        {%- if pin.func[0:5] == "GPIO_" %}
+        {%- if pin.func[0:5] == "GPIO_" -%}
             {%- if "Output" in pin.func %}bits |= 0b01 << shift;{%- elif "Input" in pin.func %}bits |= 0b00 << shift;{%- elif pin.func[0:3] == "ADC" or ("Analog" in pin.func) %}bits |= 0b11 << shift;{%- else %}bits |= 0b00 << shift;{%- endif %}
-        {%- else %}bits |= 0b10 << shift;{%- endif %}
-        {%- endfor %}
+        {%- else -%}bits |= 0b10 << shift;{%- endif -%}
+        {%- endfor -%}
         w.bits(bits)
     });
-    {%- endfor %}
-{% else %}
-{%- for pin in spec.pinctrl %}
+    {%- endfor -%}
+{%- else -%}
+{%- for pin in spec.pinctrl -%}
     // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}
     let shift = {{ idx(pin) }} * 2;
     dp.GPIO{{ port_u(pin) }}.pupdr.modify(|r, w| unsafe {
         let mut bits = r.bits() & !(0b11 << shift);
-        {%- if pin.func[0:3] == "I2C" %}
+        {%- if pin.func[0:3] == "I2C" -%}
         bits |= 0b01 << shift; // PullUp
-        {%- else %}
+        {%- else -%}
         bits |= 0b00 << shift;
-        {%- endif %}
+        {%- endif -%}
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.otyper.modify(|r, w| unsafe {
         let mut bits = r.bits() & !(1 << {{ idx(pin) }});
-        {%- if pin.func[0:3] == "I2C" %}
+        {%- if pin.func[0:3] == "I2C" -%}
         bits |= 1 << {{ idx(pin) }}; // OpenDrain
-        {%- endif %}
+        {%- endif -%}
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.ospeedr.modify(|r, w| unsafe {
         let mut bits = r.bits() & !(0b11 << shift);
-        {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" %}
+        {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" -%}
         bits |= 0b11 << shift; // VeryHigh
-        {%- endif %}
+        {%- endif -%}
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.afr{{ 'l' if idx(pin) < 8 else 'h' }}.modify(|r, w| unsafe {
@@ -171,24 +167,25 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
     });
     dp.GPIO{{ port_u(pin) }}.moder.modify(|r, w| unsafe {
         let mut bits = r.bits() & !(0b11 << shift);
-        {%- if pin.func[0:5] == "GPIO_" %}
-        {%- if "Output" in pin.func %}
+        {%- if pin.func[0:5] == "GPIO_" -%}
+        {%- if "Output" in pin.func -%}
         bits |= 0b01 << shift;
-        {%- elif "Input" in pin.func %}
+        {%- elif "Input" in pin.func -%}
         bits |= 0b00 << shift;
-        {%- elif pin.func[0:3] == "ADC" or ("Analog" in pin.func) %}
+        {%- elif pin.func[0:3] == "ADC" or ("Analog" in pin.func) -%}
         bits |= 0b11 << shift;
-        {%- else %}
+        {%- else -%}
         bits |= 0b00 << shift;
-        {%- endif %}
-        {%- else %}
+        {%- endif -%}
+        {%- else -%}
         bits |= 0b10 << shift; // Alternate
-        {%- endif %}
+        {%- endif -%}
         w.bits(bits)
     });
-{%- endfor %}
-{% endif %}
+{%- endfor -%}
+{%- endif -%}
 }
+{%- endif -%}
 
 {% if meta is defined %}
 /// Disables unused peripherals for {{ meta.board }} and masks their interrupts.
