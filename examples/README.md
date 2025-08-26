@@ -1,6 +1,10 @@
 <!--
 examples/README.md - Index of example applications.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Examples
 
 Sample projects demonstrating rlvgl in different environments.

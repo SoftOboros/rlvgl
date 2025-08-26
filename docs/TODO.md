@@ -1,3 +1,10 @@
+<!--
+docs/TODO.md - Project TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Project TODO
 
 This document tracks the high-level work streams and tasks for rlvgl development.

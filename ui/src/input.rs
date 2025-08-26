@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Input and textarea components for rlvgl-ui.
 //!
-//! These wrappers provide simple text fields backed by the base label widget.
+//! Wrap the [`Label`](rlvgl_widgets::label::Label) widget to provide simple
+//! text fields backed by `rlvgl-widgets`.
 
 use alloc::boxed::Box;
 use rlvgl_core::{

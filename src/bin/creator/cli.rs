@@ -9,16 +9,17 @@
 
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand};
 
 pub mod add_target;
 pub mod apng;
 pub mod board_import;
+pub mod bsp_gen;
 pub mod check;
 pub mod convert;
 pub mod fonts;
-pub mod bsp_gen;
+pub mod gen_lib;
 pub mod init;
 pub mod lottie;
 pub mod manifest;
@@ -31,7 +32,6 @@ pub mod svg;
 pub mod sync;
 pub mod util;
 pub mod vendor;
-pub mod gen_lib;
 
 /// CLI arguments for rlgvl-creator.
 #[derive(Parser)]
@@ -177,7 +177,11 @@ enum Command {
         #[arg(long, default_value = "hal:split")]
         prelude: String,
         /// Features to gate (comma-separated)
-        #[arg(long, value_delimiter = ',', default_value = "hal,pac,split,flat,summaries,pinreport")]
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "hal,pac,split,flat,summaries,pinreport"
+        )]
         features: Vec<String>,
         /// Optional feature prefix for family gates
         #[arg(long)]
@@ -266,7 +270,7 @@ enum BoardCommand {
         #[arg(long)]
         af: Option<PathBuf>,
         /// Output directory for generated BSP code
-        #[arg(long, requires="af")]
+        #[arg(long, requires = "af")]
         bsp_out: Option<PathBuf>,
     },
 }
@@ -428,19 +432,19 @@ pub fn run() -> Result<()> {
             }
         },
         Command::Bsp { cmd } => match cmd {
-        BspCommand::FromIoc {
-            ioc,
-            af,
-            out,
-            emit_hal,
-            emit_pac,
-            template,
-            grouped_writes,
-            one_file: _,
-            per_peripheral,
-            with_deinit,
-            allow_reserved,
-        } => {
+            BspCommand::FromIoc {
+                ioc,
+                af,
+                out,
+                emit_hal,
+                emit_pac,
+                template,
+                grouped_writes,
+                one_file: _,
+                per_peripheral,
+                with_deinit,
+                allow_reserved,
+            } => {
                 let mut kinds = Vec::new();
                 if emit_hal {
                     kinds.push(bsp_gen::TemplateKind::Hal);

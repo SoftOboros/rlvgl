@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-//! Theme and token definitions.
+//! Theme and token definitions for styling
+//! [`rlvgl-widgets`](rlvgl_widgets) components.
 
 use crate::style::Color;
 

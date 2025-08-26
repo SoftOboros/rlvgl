@@ -1,6 +1,10 @@
 <!--
 TODO-CREATOR-BSP.md - Task list for the BSP generator in rlvgl-creator.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # TODO - Creator BSP
 
 This file tracks remaining work for the `rlvgl-creator` board support

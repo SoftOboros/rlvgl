@@ -1,3 +1,10 @@
+<!--
+docs/CUSTOM-SIMULATOR.md - Custom Simulator Integration.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Custom Simulator Integration
 
 This document explains how to link to rlvgl from your own application while providing custom screen dimensions and your own demo setup function instead of the built-in simulator demo.

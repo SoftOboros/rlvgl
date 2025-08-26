@@ -1,6 +1,10 @@
 <!--
 examples/sim/README.md - Desktop simulator example.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl Demo
 ---
 Demonstrates core widgets alongside plugin features such as QR code generation

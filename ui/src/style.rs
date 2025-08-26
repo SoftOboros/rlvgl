@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-//! Builder utilities for constructing styles.
+//! Builder utilities for constructing styles consumed by
+//! [`Widget`](rlvgl_core::widget::Widget) implementations across
+//! [`rlvgl-widgets`](rlvgl_widgets).
 
 pub use rlvgl_core::widget::Color;
 
@@ -69,6 +71,9 @@ impl Default for State {
 }
 
 /// High-level style applied to widgets.
+///
+/// Styles mirror those in [`rlvgl_core::style`], enabling a common
+/// appearance for components in [`rlvgl_widgets`](rlvgl_widgets).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
     /// Background color.
@@ -102,6 +107,9 @@ impl Default for Style {
 }
 
 /// Builder for [`Style`].
+///
+/// Produces styles consumable by any [`Widget`](rlvgl_core::widget::Widget)
+/// in [`rlvgl_widgets`](rlvgl_widgets).
 #[derive(Debug, Default)]
 pub struct StyleBuilder {
     style: Style,

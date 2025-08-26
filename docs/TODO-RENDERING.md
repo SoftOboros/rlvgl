@@ -1,3 +1,10 @@
+<!--
+docs/TODO-RENDERING.md - rlvgl – Rendering Workstream TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl – Rendering Workstream TODO
 
 This file tracks tasks for enhancing the rendering pipeline so widgets can draw multiple layers with alpha blending. All color values must carry RGBA data from source to display; if every layer is transparent at a pixel, the color from the lowest layer remains visible.

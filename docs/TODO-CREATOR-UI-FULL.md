@@ -1,3 +1,10 @@
+<!--
+docs/TODO-CREATOR-UI-FULL.md - rlvgl-creator – UI Full Functionality TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-creator – UI Full Functionality TODO
 
 This file tracks the remaining work to bring `rlvgl-creator`'s desktop UI up to parity with its CLI and provide complete asset management.

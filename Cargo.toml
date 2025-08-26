@@ -191,13 +191,9 @@ optional = true
 version = "0.15"
 optional = true
 
-<<<<<<< Updated upstream
-=======
 [dependencies.rlvgl-bsps-stm]
 path = "chips/stm/bsps"
 optional = true
-
->>>>>>> Stashed changes
 [dependencies.rlvgl-chips-stm]
 path = "chipdb/rlvgl-chips-stm"
 optional = true
@@ -299,10 +295,7 @@ creator = [
     "dep:rayon",
     "dep:resvg",
     "dep:zstd",
-<<<<<<< Updated upstream
-=======
     "dep:rlvgl-bsps-stm",
->>>>>>> Stashed changes
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",
@@ -329,10 +322,7 @@ creator_ui = [
     "dep:rfd",
     "dep:serde_json",
     "dep:zstd",
-<<<<<<< Updated upstream
-=======
     "dep:rlvgl-bsps-stm",
->>>>>>> Stashed changes
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",

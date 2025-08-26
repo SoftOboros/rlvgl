@@ -1,6 +1,10 @@
 <!--
 examples/stm32f429i-disco/README.md - STM32F429I-DISCO board demo.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32F429I-DISCO Demo
 
 Shows rlvgl on the STM32F429I-DISCO board using bus-aware BSP generation.

@@ -1,6 +1,10 @@
 <!--
 examples/stm32h573i-disco/README.md - STM32H573I-DISCO board demo.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32H573I-DISCO Demo
 
 Showcases bus-aware BSP generation on the STM32H573I-DISCO.

@@ -1,4 +1,5 @@
 //! Integration test validating creator UI menu grouping.
+#![cfg(feature = "creator_ui")]
 
 #[path = "../src/bin/creator_ui/menus.rs"]
 mod menus;

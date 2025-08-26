@@ -1,3 +1,10 @@
+<!--
+docs/STM32H747I-DISCO.md - STM32H747I-DISCO Hardware Notes.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32H747I-DISCO Hardware Notes
 
 This document captures pin mappings and peripheral configuration details for using the STM32H747I-DISCO board with rlvgl.

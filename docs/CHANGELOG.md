@@ -1,6 +1,10 @@
 <!--
 CHANGELOG.md - Notes on chip & board database releases.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Changelog
 
 ## Unreleased

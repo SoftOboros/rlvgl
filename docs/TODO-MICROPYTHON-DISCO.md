@@ -1,3 +1,10 @@
+<!--
+docs/TODO-MICROPYTHON-DISCO.md - TODO – MicroPython on STM32H747I‑DISCO (CM7) + rlvgl Top‑Level API.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # TODO – MicroPython on STM32H747I‑DISCO (CM7) + rlvgl Top‑Level API
 
 > **Epic:** Run MicroPython on CM7, keep rlvgl rendering/input on CM4, and expose a unified, *Python‑first* top‑level API that works on MicroPython (device) and Rust (host/tests). The on‑device Python binding uses MicroPython’s C‑module API via a small Rust FFI shim (not PyO3). For desktop CPython parity and CI, we’ll also ship a PyO3 shim that mirrors the same API surface.

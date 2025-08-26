@@ -12,6 +12,7 @@ rlvgl preserves the widget-based UI paradigm of LVGL while eliminating unsafe C-
 The C version of LVGL is included as a git submodule for reference and test vector extraction, but not linked or compiled into this library.
 
 ## Goals
+Package: `rlvgl`
 - Preserve LVGL architecture and layout system
 - Replace C memory handling with idiomatic Rust ownership
 - Support embedded display flush/input via embedded-hal
@@ -37,7 +38,7 @@ The C version of LVGL is included as a git submodule for reference and test vect
 
 ## Vendor chip databases
 
-Vendor-specific board definitions live in the `chipdb/` crates. The
+Vendor-specific board definitions live in the [`chipdb/`](./chipdb/README.md) crates. The
 `tools/gen_pins.py` helper aggregates raw vendor inputs into JSON
 blobs, while `tools/build_vendor.sh` orchestrates generation and stamps
 license files. When building a vendor crate, set `RLVGL_CHIP_SRC` to the
@@ -238,4 +239,5 @@ Consult the [Dockerfile](https://github.com/SoftOboros/rlvgl/blob/main/Dockerfil
 Other useful helper scripts may be found in [`/scripts`](https://github.com/SoftOboros/rlvgl/blob/main/scripts).
 
 ## License
-rlvgl is licensed under the MIT license.  See [LICENSE](https://github.com/SoftOboros/rlvgl/blob/main/LICENSE) for more details.
+rlvgl is licensed under the MIT license. See [LICENSE](./LICENSE) for more details.
+Third-party license notices are summarized in [NOTICES.md](./NOTICES.md).

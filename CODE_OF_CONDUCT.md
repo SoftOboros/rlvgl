@@ -1,3 +1,8 @@
+<!-- CODE_OF_CONDUCT.md - Contributor Covenant code of conduct for rlvgl. -->
+<p align="center">
+  <img src="./rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge

@@ -1,3 +1,10 @@
+<!--
+docs/TODO-STM32H747I-DISCO.md - STM32H747I‑DISCO Platform Integration TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # STM32H747I‑DISCO Platform Integration TODO
 
 This checklist tracks the tasks for adding a **stm32h747i_disco** target to the `rlvgl` platform, implementing the board’s **MIPI‑DSI LCD + capacitive touch** interface and creating a demo example.

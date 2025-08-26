@@ -1,7 +1,13 @@
 <!--
 README-CREATOR.md - Guide to rlvgl-creator asset workflows.
 -->
+<p align="center">
+  <img src="./rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-creator
+
+Package: `rlvgl-creator`.
 
 ## Overview
 `rlvgl-creator` assembles and transforms assets for rlvgl applications. It groups icons, fonts, and media into an asset pack and records metadata in a manifest to simplify reuse across targets.
@@ -91,4 +97,6 @@ Run `scripts/gen_ioc_bsps.sh` to convert every CubeMX `.ioc` under
 `chips/stm/STM32_open_pin_data/boards`. The script invokes
 `rlvgl-creator` for each file and relies on the `rlvgl-chips-stm`
 archive for MCU metadata, so no standalone `mcu.json` is required.
+
+See [chips/stm/bsps/README.md](./chips/stm/bsps/README.md) for details on the generated stubs.
 

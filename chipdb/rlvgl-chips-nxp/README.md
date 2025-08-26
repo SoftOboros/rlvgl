@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-nxp vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-nxp
+Package: `rlvgl-chips-nxp`
 
 Provides a board database for NXP devices used by `rlvgl-creator`.
 

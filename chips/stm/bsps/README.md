@@ -1,7 +1,12 @@
 <!--
 chips/stm/bsps/README.md - STM32 BSP stub generation notes.
 -->
+<p align="center">
+  <img src="../../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-bsps-stm
+Package: `rlvgl-bsps-stm`
 
 Board support package stubs for STM32 boards used by `rlvgl-creator`.
 This crate now includes simple modules generated from CubeMX `.ioc`

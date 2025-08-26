@@ -165,7 +165,13 @@ fn main() -> ! {
 
         let dp = bsp_pac::Peripherals::take().unwrap();
         bsp_hal::init_board_hal(&dp);
-        let bsp_pac::Peripherals { DSIHOST: dsi, FMC: fmc, LTDC: ltdc, RCC: mut rcc, .. } = dp;
+        let bsp_pac::Peripherals {
+            DSIHOST: dsi,
+            FMC: fmc,
+            LTDC: ltdc,
+            RCC: mut rcc,
+            ..
+        } = dp;
         let blitter = CpuBlitter;
         let backlight = DummyBacklight;
         let reset = DummyReset;

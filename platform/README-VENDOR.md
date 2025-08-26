@@ -1,6 +1,10 @@
 <!--
 platform/README-VENDOR.md - Policy for vendor-specific platform support.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Vendor Support Policy for rlvgl
 
 This document describes how vendor-specific support is managed in the `rlvgl-platform` crates.

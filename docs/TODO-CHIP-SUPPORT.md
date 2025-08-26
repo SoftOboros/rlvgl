@@ -1,6 +1,10 @@
 <!--
 Tracks tasks for the Chip & Board Support workstream.
 -->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Chip & Board Support Workstream TODO
 
 ## Purpose

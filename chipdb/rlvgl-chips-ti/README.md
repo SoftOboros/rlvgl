@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-ti vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-ti
+Package: `rlvgl-chips-ti`
 
 Provides a board database for Texas Instruments devices used by `rlvgl-creator`.
 

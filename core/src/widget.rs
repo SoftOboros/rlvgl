@@ -7,6 +7,10 @@ use crate::renderer::Renderer;
 ///
 /// Coordinates are relative to the parent widget. Width and height are signed
 /// integers to simplify layout calculations.
+///
+/// Used by [`Widget`](crate::widget::Widget) implementations to describe layout
+/// and passed to [`Renderer::fill_rect`](crate::renderer::Renderer::fill_rect)
+/// when drawing.
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
     /// X coordinate relative to the parent widget.
@@ -36,6 +40,9 @@ pub struct Color(
 
 impl Color {
     /// Convert this color to a packed ARGB8888 integer.
+    ///
+    /// Used by display backends in the
+    /// [`rlvgl-platform`](https://docs.rs/rlvgl-platform) crate.
     pub fn to_argb8888(self) -> u32 {
         ((self.3 as u32) << 24) | ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32)
     }

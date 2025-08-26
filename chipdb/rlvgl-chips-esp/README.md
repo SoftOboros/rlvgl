@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-esp vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-esp
+Package: `rlvgl-chips-esp`
 
 Provides a board database for Espressif devices used by `rlvgl-creator`.
 

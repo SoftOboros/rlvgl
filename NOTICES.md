@@ -1,3 +1,10 @@
+<!--
+NOTICES.md - Third-party license notices.
+-->
+<p align="center">
+  <img src="./rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Notices & Third-Party Licenses
 
 This repository contains third-party materials. Unless otherwise noted, **Softoboros-authored code** is under the top-level **MIT** license (`LICENSE`). Materials listed below retain their **original licenses** and attribution requirements.
@@ -19,8 +26,8 @@ This repository contains third-party materials. Unless otherwise noted, **Softob
 - `chips/stm/STM32_open_pin_data/` — **verbatim upstream** content.
 - `chips/stm/mcu/` — **derived** canonicalized MCU pin/AF data generated from the upstream.
 - `chips/stm/boards/` — **derived** board-level descriptions constructed from the upstream MCU data and public board docs.
-- `chips/stm/bsps/` — **generated** Rust BSP sources that incorporate/express upstream-derived mappings.
-- `chipdb/rlvgl-chips-stm/assets/` — **embedded** compressed database artifacts (e.g., `*.tar.zst`) built from the upstream data.
+- [`chips/stm/bsps/`](chips/stm/bsps/README.md) — **generated** Rust BSP sources that incorporate/express upstream-derived mappings.
+- [`chipdb/rlvgl-chips-stm/assets/`](chipdb/rlvgl-chips-stm/assets/README.md) — **embedded** compressed database artifacts (e.g., `*.tar.zst`) built from the upstream data.
 - `chipdb/rlvgl-chips-stm/db/` — **intermediate/derived** JSON or similar records produced from upstream.
 - `chipdb/rlvgl-chips-stm/src/` — crate code that **accesses** the embedded upstream-derived data.
 
@@ -86,7 +93,7 @@ When adding vendor-specific data:
 - **STM-related subtrees:** BSD-3-Clause (ST) for upstream and derived data; Softoboros additions under MIT; distributed artifacts may therefore be **MIT AND BSD-3-Clause**.  
 - **Crates to check when publishing:**  
   - `chipdb/rlvgl-chips-stm` → should include BSD-3 text and this `NOTICES.md` in the crate package.  
-  - Any crate that ships generated BSP modules under `chips/stm/bsps` should do the same.
+  - Any crate that ships generated BSP modules under [`chips/stm/bsps`](chips/stm/bsps/README.md) should do the same.
 
 ---
 

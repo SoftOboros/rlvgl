@@ -1,3 +1,10 @@
+<!--
+docs/TEST-TODO.md - rlvgl – Test TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl – Test TODO
 
 This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ordered roughly in the sequence it should be tackled, lists its upstream **dependencies** ­– either by reference to `docs/TODO.md` sections (`TODO#N`) or to earlier tests – and indicates whether it can be **fully automated** (via Codex‑driven `cargo test`, headless simulator, CI image‑diff, etc.) or requires **human verification** (e.g. visual acceptance on real hardware).

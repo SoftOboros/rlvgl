@@ -1,7 +1,12 @@
 <!--
 README.md - Usage and format notes for the rlvgl-chips-nrf vendor crate.
 -->
+<p align="center">
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-chips-nrf
+Package: `rlvgl-chips-nrf`
 
 Provides a board database for Nordic Semiconductor devices used by `rlvgl-creator`.
 

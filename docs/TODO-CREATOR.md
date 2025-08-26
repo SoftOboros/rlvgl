@@ -1,3 +1,10 @@
+<!--
+docs/TODO-CREATOR.md - rlvgl-creator — Epic & Sectioned Tables.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-creator — Epic & Sectioned Tables
 
 _A single markdown that structures the work as one **Epic** with sectioned user‑story tables. Each section begins with a brief description (user story) and a checklist table._
