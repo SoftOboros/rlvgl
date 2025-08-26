@@ -4,7 +4,7 @@ Plan for aligning CubeMX `.ioc` board overlays with canonical IR and Rust init t
 # STM32 Board IR Alignment Plan
 
 ## Current gap
-- `st_extract_af.py`/`st_ioc_board.py` emit pin → signal → AF maps only.
+- The current importer emits pin → signal → AF maps only.
 - Templates require per-pin context: port/index, class, mode, pull, speed, otype, EXTI, etc.
 
 ## Plan

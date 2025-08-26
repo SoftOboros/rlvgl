@@ -47,6 +47,20 @@ Throughout the UI, status bars and log panes provide feedback, ensuring each act
 
 For detailed CLI and UI flags see [src/bin/creator/README.md](./src/bin/creator/README.md).
 
+## Template notes
+
+The creator's board and asset generators rely on [MiniJinja](https://github.com/mitsuhiko/minijinja),
+which does not implement Python-style `dict.get` methods. When accessing optional keys in a mapping,
+use bracket notation combined with the `default` filter instead. For example:
+
+```
+{%- for irq in (irq_map[name] | default([])) %}
+    ...
+{%- endfor %}
+```
+
+This pattern safely expands to an empty list when `name` is absent.
+
 ## Chip and board database integration
 
 `rlvgl-creator` consumes chip and board definitions from the `rlvgl-chips-*` crates under
@@ -70,4 +84,11 @@ rlvgl-creator board from-ioc project.ioc MyBoard MyBoard.json
 The CLI detects the MCU automatically and resolves alternate-function numbers
 using the bundled database. The resulting JSON can be placed under `boards/`
 for use by `rlvgl-creator`.
+
+## Batch BSP generation
+
+Run `scripts/gen_ioc_bsps.sh` to convert every CubeMX `.ioc` under
+`chips/stm/STM32_open_pin_data/boards`. The script invokes
+`rlvgl-creator` for each file and relies on the `rlvgl-chips-stm`
+archive for MCU metadata, so no standalone `mcu.json` is required.
 
