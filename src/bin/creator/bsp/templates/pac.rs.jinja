@@ -19,7 +19,7 @@
 
 use stm32h7::stm32h747 as pac;
 
-{% macro gpio_bus(family) -%}
+{%- macro gpio_bus(family) -%}
 {% if family[0:7] == "STM32H7" %}ahb4enr
 {% elif family[0:7] == "STM32H5" or family[0:7] == "STM32L5" or family[0:7] == "STM32L4" or family[0:7] == "STM32G4" %}ahb2enr
 {% elif family[0:7] == "STM32G0" or family[0:7] == "STM32L0" %}iopenr

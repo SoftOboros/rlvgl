@@ -2,7 +2,7 @@
 //! BSP module generated from `tests/data/gen_bsps/f407_demo.ioc`.
 //!
 //! This placeholder demonstrates wiring generated boards into the
-//! `rlvgl-stm-bsps` crate.
+//! `rlvgl-bsps-stm` crate.
 
 use crate::{BoardInfo, PinInfo};
 

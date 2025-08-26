@@ -1,9 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# rlvgl-stm-bsps crate manifest.
+
 [package]
-name = "rlvgl-stm-bsps"
+name = "rlvgl-bsps-stm"
 version = "0.1.0"
+authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
-license = "MIT"
-description = "Board support package stubs for STM32 devices."
+license = "BSD-3-Clause"
+description = "BSP files for STM32 Demo, Nucleo, and Discovery boards per vendor .ioc files."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-bsps-stm"
+keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
+categories = ["embedded", "gui", "no-std", "graphics"]
+publish = true
 
 [lib]
 path = "src/lib.rs"

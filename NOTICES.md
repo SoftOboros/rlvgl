@@ -11,9 +11,9 @@ This repository contains third-party materials. Unless otherwise noted, **Softob
 **Copyright:** © 2020 STMicroelectronics
 
 **Provenance (fill when pinned):**
-- Upstream commit: `<commit-hash>`
+- Upstream commit: `3d64b1076ac7f0bf0f74acf89b9578b530f37ed7`
 - Retrieved via: Git submodule at `chips/stm/STM32_open_pin_data` (read-only)
-- Reference (optional): CubeMX DBVersion `<Vx.y>`
+- Reference : CubeMX DBVersion `6.15.0`
 
 **Local paths covered by this notice:**
 - `chips/stm/STM32_open_pin_data/` — **verbatim upstream** content.
@@ -37,7 +37,7 @@ All generated files that include or express upstream-derived content carry an SP
  * SPDX-FileCopyrightText: 2020 STMicroelectronics
  * SPDX-FileCopyrightText: 2025 Softoboros Technology, Inc.
  * SPDX-License-Identifier: BSD-3-Clause AND MIT
- * Provenance: STM32_open_pin_data (commit <commit-hash>), build <build-hash>.
+ * Provenance: STM32_open_pin_data ( commit 3d64b1076ac7f0bf0f74acf89b9578b530f37ed7 ), build <build-hash>.
  */
 ```
 
