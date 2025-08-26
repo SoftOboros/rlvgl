@@ -5,6 +5,7 @@ import argparse
 import subprocess
 import tempfile
 from pathlib import Path
+from jinja2 import Environment, FileSystemLoader
 
 
 def main() -> None:
@@ -40,6 +41,14 @@ def main() -> None:
             check=True,
         )
         tmp_json.unlink(missing_ok=True)
+
+    tmpl_path = Path(__file__).resolve().parents[1] / "src/bin/creator/bsp/templates"
+    env = Environment(loader=FileSystemLoader(tmpl_path))
+    tmpl = env.get_template("lib.rs.jinja")
+    modules = sorted(
+        p.stem for p in args.output.glob("*.rs") if p.name not in {"lib.rs", "mod.rs"}
+    )
+    args.output.joinpath("lib.rs").write_text(tmpl.render(modules=modules))
 
 
 if __name__ == "__main__":

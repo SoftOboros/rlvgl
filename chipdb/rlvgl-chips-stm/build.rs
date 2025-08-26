@@ -5,10 +5,14 @@ Reads board definition files from the directory specified by the
 `RLVGL_CHIP_SRC` environment variable and packs them into a single
 binary blob at build time.
 */
-use std::{env, fs, io::Write, path::PathBuf};
+use std::{
+    env, fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 /// Compresses `input` into `output` using zstd level 19.
-fn compress_zstd(input: &PathBuf, output: &PathBuf) {
+fn compress_zstd(input: &Path, output: &Path) {
     let data = fs::read(input).expect("read uncompressed");
     let file = fs::File::create(output).expect("create zst");
     let mut encoder = zstd::Encoder::new(file, 19).expect("encoder");
@@ -16,7 +20,7 @@ fn compress_zstd(input: &PathBuf, output: &PathBuf) {
     encoder.finish().expect("finish zst");
 }
 
-fn copy_asset(out_dir: &PathBuf) -> bool {
+fn copy_asset(out_dir: &Path) -> bool {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let asset = manifest.join("assets/chipdb.bin.zst");
     if asset.exists() {

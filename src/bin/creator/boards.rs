@@ -5,6 +5,7 @@
 //! the creator CLI and UI to populate drop-downs without depending on vendor
 //! internals.
 
+use minijinja::{Environment, context};
 use rlvgl_chips_esp as esp;
 use rlvgl_chips_microchip as microchip;
 use rlvgl_chips_nrf as nrf;
@@ -12,15 +13,14 @@ use rlvgl_chips_nxp as nxp;
 use rlvgl_chips_renesas as renesas;
 use rlvgl_chips_rp2040 as rp2040;
 use rlvgl_chips_silabs as silabs;
-use rlvgl_stm_bsps as stm;
 use rlvgl_chips_stm as stm_db;
 use rlvgl_chips_ti as ti;
+use rlvgl_stm_bsps as stm;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Read;
 use zstd::stream::read::Decoder;
-use minijinja::{Environment, context};
-use serde::Serialize;
 #[cfg(test)]
 mod test_vendor {
     use std::sync::OnceLock;
@@ -52,7 +52,10 @@ mod test_vendor {
     }
 
     pub fn boards() -> &'static [BoardInfo] {
-        &[BoardInfo { board: "demo", chip: "STM32F4" }]
+        &[BoardInfo {
+            board: "demo",
+            chip: "STM32F4",
+        }]
     }
 
     pub fn find(board: &str) -> Option<BoardInfo> {
@@ -245,7 +248,8 @@ pub fn render_template(vendor: &str, board: &str, template: &str) -> Result<Stri
     let (board_val, mcu_val) = load_ir(vendor, board)?;
     let info = find_board(vendor, board)?;
     let mut env = Environment::new();
-    env.add_template("user", template).map_err(|e| e.to_string())?;
+    env.add_template("user", template)
+        .map_err(|e| e.to_string())?;
     let ctx = context! { board => board_val, mcu => mcu_val, meta => info };
     env.get_template("user")
         .and_then(|t| t.render(ctx))

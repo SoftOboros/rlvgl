@@ -6,8 +6,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
-use minijinja::{context, Environment};
+use anyhow::{Result, anyhow};
+use minijinja::{Environment, context};
 
 use crate::bsp::{af::JsonAfDb, ioc, ir};
 
@@ -100,7 +100,7 @@ pub(crate) fn from_ioc(
         }
         Layout::PerPeripheral => {
             use indexmap::IndexMap;
-            let mut modfile = String::new();
+            let mut mods = Vec::new();
             for (name, per) in &ir.peripherals {
                 let pins: Vec<_> = ir
                     .pinctrl
@@ -123,11 +123,16 @@ pub(crate) fn from_ioc(
                     mod_name => name
                 })?;
                 fs::write(out_dir.join(format!("{name}.rs")), rendered)?;
-                modfile.push_str(&format!("#[cfg(feature = \"{name}\")]\npub mod {name};\n"));
+                mods.push(name);
             }
-            fs::write(out_dir.join("mod.rs"), modfile)?;
+            let mod_tmpl = include_str!("bsp/templates/mod.rs.jinja");
+            let mut env_mod = Environment::new();
+            env_mod.add_template("mod", mod_tmpl)?;
+            let rendered = env_mod
+                .get_template("mod")?
+                .render(context! { modules => mods })?;
+            fs::write(out_dir.join("mod.rs"), rendered)?;
         }
     }
     Ok(())
 }
-
