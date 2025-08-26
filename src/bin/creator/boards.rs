@@ -13,9 +13,7 @@ use rlvgl_chips_nxp as nxp;
 use rlvgl_chips_renesas as renesas;
 use rlvgl_chips_rp2040 as rp2040;
 use rlvgl_chips_silabs as silabs;
-use rlvgl_chips_stm as stm_db;
 use rlvgl_chips_ti as ti;
-use rlvgl_stm_bsps as stm;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -78,13 +76,6 @@ pub struct VendorBoard {
 #[must_use]
 pub fn enumerate() -> Vec<VendorBoard> {
     let mut out = Vec::new();
-    for b in stm::boards() {
-        out.push(VendorBoard {
-            vendor: stm::vendor(),
-            board: b.board,
-            chip: b.chip,
-        });
-    }
     for b in nrf::boards() {
         out.push(VendorBoard {
             vendor: nrf::vendor(),
@@ -164,7 +155,6 @@ pub fn find_board(vendor: &str, board: &str) -> Result<VendorBoard, String> {
             }
         }};
     }
-    check_vendor!(stm);
     check_vendor!(nrf);
     check_vendor!(esp);
     check_vendor!(nxp);
@@ -210,7 +200,6 @@ fn parse_raw_db(blob: &[u8]) -> HashMap<String, Vec<u8>> {
 pub fn load_ir(vendor: &str, board: &str) -> Result<(Value, Value), String> {
     let info = find_board(vendor, board)?;
     let blob = match vendor {
-        v if v == stm::vendor() => stm_db::raw_db(),
         v if v == nrf::vendor() => nrf::raw_db(),
         v if v == esp::vendor() => esp::raw_db(),
         v if v == nxp::vendor() => nxp::raw_db(),

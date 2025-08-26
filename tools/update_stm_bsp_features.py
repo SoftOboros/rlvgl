@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""Synchronize stm32-* feature options for the STM BSP crate.
+
+Scans `chips/stm/bsps/src` for board modules, extracts the STM32
+family for each board, and rewrites `Cargo.toml` with matching
+`stm32-*` feature keys. Existing `stm32-*` entries are replaced.
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+import tomllib
+import tomli_w
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT / "chips" / "stm" / "bsps" / "src"
+TOML_PATH = SRC_DIR.parent / "Cargo.toml"
+
+CHIP_RE = re.compile(r'chip:\s*"STM32([A-Z]\d)')
+
+def collect_features() -> list[str]:
+    """Return sorted `stm32-*` feature names present in the BSP sources."""
+    features: set[str] = set()
+    for file in SRC_DIR.glob("*.rs"):
+        if file.name == "lib.rs":
+            continue
+        text = file.read_text(encoding="utf-8")
+        if match := CHIP_RE.search(text):
+            series = match.group(1).lower()
+            features.add(f"stm32-{series}")
+    return sorted(features)
+
+def update_cargo_toml(features: list[str]) -> None:
+    """Rewrite the `[features]` table with the supplied STM32 entries."""
+    data = tomllib.loads(TOML_PATH.read_text(encoding="utf-8"))
+    feats = data.setdefault("features", {})
+    # Remove existing stm32-* keys
+    for key in list(feats.keys()):
+        if key.startswith("stm32-"):
+            feats.pop(key)
+    for feat in features:
+        feats[feat] = []
+    TOML_PATH.write_text(tomli_w.dumps(data), encoding="utf-8")
+
+def main() -> None:
+    update_cargo_toml(collect_features())
+
+if __name__ == "__main__":
+    main()
