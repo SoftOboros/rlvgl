@@ -6,7 +6,6 @@
 //! internals.
 
 use minijinja::{Environment, context};
-use rlvgl_bsps_stm as stm;
 use rlvgl_chips_esp as esp;
 use rlvgl_chips_microchip as microchip;
 use rlvgl_chips_nrf as nrf;
