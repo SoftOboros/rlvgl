@@ -11,3 +11,16 @@ description = "Board support package stubs for STM32 devices."
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = ["hal", "split"]
+hal = []
+pac = []
+split = []
+flat = []
+summaries = []
+pinreport = []
+stm32-f4 = []
+stm32-h7 = []
+stm32-l4 = []
+stm32-c0 = []
+

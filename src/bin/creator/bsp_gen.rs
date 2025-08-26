@@ -66,14 +66,16 @@ pub(crate) fn from_ioc(
         }
     }
 
-    let (tmpl_src, out_name) = match template {
+    let (tmpl_src, out_name, subdir) = match template {
         TemplateKind::Hal => (
             include_str!("bsp/templates/hal.rs.jinja").to_string(),
             "hal.rs".to_string(),
+            Some("hal"),
         ),
         TemplateKind::Pac => (
             include_str!("bsp/templates/pac.rs.jinja").to_string(),
             "pac.rs".to_string(),
+            Some("pac"),
         ),
         TemplateKind::Custom(path) => {
             let src = fs::read_to_string(&path)?;
@@ -82,21 +84,26 @@ pub(crate) fn from_ioc(
                 .and_then(|n| n.to_str())
                 .unwrap_or("out.rs");
             let out = name.strip_suffix(".jinja").unwrap_or(name).to_string();
-            (src, out)
+            (src, out, None)
         }
     };
 
     let mut env = Environment::new();
     env.add_template("gen", &tmpl_src)?;
 
-    fs::create_dir_all(out_dir)?;
+    let base_dir = match (&layout, subdir) {
+        (Layout::PerPeripheral, Some(sub)) => out_dir.join(sub),
+        _ => out_dir.to_path_buf(),
+    };
+
+    fs::create_dir_all(&base_dir)?;
 
     match layout {
         Layout::OneFile => {
             let rendered = env
                 .get_template("gen")?
                 .render(context! { spec => &ir, grouped_writes, with_deinit })?;
-            fs::write(out_dir.join(out_name), rendered)?;
+            fs::write(base_dir.join(out_name), rendered)?;
         }
         Layout::PerPeripheral => {
             use indexmap::IndexMap;
@@ -122,7 +129,7 @@ pub(crate) fn from_ioc(
                     with_deinit,
                     mod_name => name
                 })?;
-                fs::write(out_dir.join(format!("{name}.rs")), rendered)?;
+                fs::write(base_dir.join(format!("{name}.rs")), rendered)?;
                 mods.push(name);
             }
             let mod_tmpl = include_str!("bsp/templates/mod.rs.jinja");
@@ -131,8 +138,29 @@ pub(crate) fn from_ioc(
             let rendered = env_mod
                 .get_template("mod")?
                 .render(context! { modules => mods })?;
-            fs::write(out_dir.join("mod.rs"), rendered)?;
+            fs::write(base_dir.join("mod.rs"), rendered)?;
         }
     }
+    Ok(())
+}
+
+/// Emits a top-level `mod.rs` exposing available forms for a board.
+pub(crate) fn emit_board_mod(
+    out_dir: &Path,
+    has_hal: bool,
+    has_pac: bool,
+    has_summary: bool,
+    has_pinreport: bool,
+) -> Result<()> {
+    let tmpl = include_str!("bsp/templates/board_mod.rs.jinja");
+    let mut env = Environment::new();
+    env.add_template("board", tmpl)?;
+    let rendered = env.get_template("board")?.render(context! {
+        hal => has_hal,
+        pac => has_pac,
+        summary => has_summary,
+        pinreport => has_pinreport
+    })?;
+    fs::write(out_dir.join("mod.rs"), rendered)?;
     Ok(())
 }

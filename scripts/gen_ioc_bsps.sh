@@ -42,18 +42,20 @@ for ioc in "${iocs[@]}"; do
   board="${parts[2]:-$raw}"
   board="$(echo "$board" | tr '[:upper:]' '[:lower:]' | tr '-' '_')"
   echo "[$count/$total] $board"
-  for layout in one-file per-peripheral; do
-    out_dir="$OUT_DIR/$board/$layout"
-    layout_flag=""
-    if [ "$layout" = per-peripheral ]; then
-      layout_flag="--per-peripheral"
-    fi
-    if "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
-      --emit-hal --emit-pac --grouped-writes --with-deinit --allow-reserved $layout_flag \
-      --out "$out_dir"; then
-      echo "    done ($layout)"
-    else
-      echo "    failed: $board ($layout)" >&2
-    fi
-  done
+  out_dir="$OUT_DIR/$board"
+  if "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
+    --emit-hal --emit-pac --grouped-writes --with-deinit --allow-reserved --per-peripheral \
+    --out "$out_dir"; then
+    echo "    done"
+  else
+    echo "    failed: $board" >&2
+  fi
 done
+
+echo "Generating lib.rs..."
+"$RLVGL_CREATOR" gen-lib \
+  --src "$OUT_DIR" \
+  --out "$OUT_DIR/lib.rs" \
+  --prelude hal:split \
+  --features hal,pac,split,flat,summaries,pinreport \
+  --family-feature-prefix stm32- || echo "warning: gen-lib failed" >&2
