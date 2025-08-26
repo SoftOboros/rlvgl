@@ -252,7 +252,7 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
         "usart1": ["USART1"],
     } -%}
     {%- for name, _per in spec.peripherals | dictsort %}
-        {%- for irq in irq_map.get(name, []) %}
+        {%- for irq in (irq_map[name] | default([])) %}
     unsafe { pac::NVIC::mask(pac::Interrupt::{{ irq }}); }
         {%- endfor %}
     {%- endfor %}
