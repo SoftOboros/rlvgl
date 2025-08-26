@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Synchronize stm32-* feature options for the STM BSP crate.
+"""Synchronize ``stm32-*`` feature options for the STM BSP crate.
 
-Scans `chips/stm/bsps/src` for board modules, extracts the STM32
-family for each board, and rewrites `Cargo.toml` with matching
-`stm32-*` feature keys. Existing `stm32-*` entries are replaced.
+Scans the generated BSP sources for ``#[cfg(feature = "stm32-*")]``
+entries and rewrites ``Cargo.toml`` with matching feature keys. This
+keeps the manifest in sync with the options referenced by the source
+to avoid warnings about unknown features.
 """
 from __future__ import annotations
 
@@ -16,18 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "chips" / "stm" / "bsps" / "src"
 TOML_PATH = SRC_DIR.parent / "Cargo.toml"
 
-CHIP_RE = re.compile(r'chip:\s*"STM32([A-Z]\d)')
+FEATURE_RE = re.compile(r'feature\s*=\s*"(stm32-[^"]+)"')
 
 def collect_features() -> list[str]:
-    """Return sorted `stm32-*` feature names present in the BSP sources."""
+    """Return sorted ``stm32-*`` feature names present in the BSP sources."""
     features: set[str] = set()
-    for file in SRC_DIR.glob("*.rs"):
-        if file.name == "lib.rs":
-            continue
+    for file in SRC_DIR.rglob("*.rs"):
         text = file.read_text(encoding="utf-8")
-        if match := CHIP_RE.search(text):
-            series = match.group(1).lower()
-            features.add(f"stm32-{series}")
+        for feat in FEATURE_RE.findall(text):
+            features.add(feat)
     return sorted(features)
 
 def update_cargo_toml(features: list[str]) -> None:
