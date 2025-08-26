@@ -77,3 +77,4 @@ echo "Generating lib.rs..."
 # Synchronize stm32-* feature flags in the BSP crate after regeneration.
 echo "Updating Cargo feature flags..."
 python tools/update_stm_bsp_features.py || echo "warning: feature sync failed" >&2
+cargo fmt -p rlvgl-bsps-stm --all

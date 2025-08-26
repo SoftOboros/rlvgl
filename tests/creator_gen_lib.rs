@@ -17,10 +17,10 @@ mod bsp_gen;
 #[path = "../src/bin/creator/gen_lib.rs"]
 mod gen_lib;
 
-use std::fs;
-use std::collections::BTreeMap;
-use tempfile::tempdir;
 use minijinja::{Environment, context};
+use std::collections::BTreeMap;
+use std::fs;
+use tempfile::tempdir;
 
 #[test]
 fn board_mod_respects_flags() {
@@ -69,15 +69,31 @@ fn emit_lib_rs_uses_mod_files() {
 #[test]
 fn templates_skip_empty_pin_fns() {
     let mut env = Environment::new();
-    env.add_template("pac", include_str!("../src/bin/creator/bsp/templates/pac.rs.jinja")).unwrap();
-    env.add_template("hal", include_str!("../src/bin/creator/bsp/templates/hal.rs.jinja")).unwrap();
+    env.add_template(
+        "pac",
+        include_str!("../src/bin/creator/bsp/templates/pac.rs.jinja"),
+    )
+    .unwrap();
+    env.add_template(
+        "hal",
+        include_str!("../src/bin/creator/bsp/templates/hal.rs.jinja"),
+    )
+    .unwrap();
     let spec = context! {
         mcu => "STM32F0",
         pinctrl => Vec::<String>::new(),
         peripherals => BTreeMap::<String, String>::new(),
     };
-    let pac = env.get_template("pac").unwrap().render(context! { spec => spec.clone(), grouped_writes => true, with_deinit => false }).unwrap();
+    let pac = env
+        .get_template("pac")
+        .unwrap()
+        .render(context! { spec => spec.clone(), grouped_writes => true, with_deinit => false })
+        .unwrap();
     assert!(!pac.contains("pub fn configure_pins_pac"));
-    let hal = env.get_template("hal").unwrap().render(context! { spec => spec, grouped_writes => true, with_deinit => false }).unwrap();
+    let hal = env
+        .get_template("hal")
+        .unwrap()
+        .render(context! { spec => spec, grouped_writes => true, with_deinit => false })
+        .unwrap();
     assert!(!hal.contains("pub fn configure_pins_hal"));
 }

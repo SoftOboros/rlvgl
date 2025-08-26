@@ -17,10 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "chips" / "stm" / "bsps" / "src"
 TOML_PATH = SRC_DIR.parent / "Cargo.toml"
 
-FEATURE_RE = re.compile(r'feature\s*=\s*"(stm32-[^"]+)"')
+FEATURE_RE = re.compile(r'feature\s*=\s*"([^"]+)"')
 
 def collect_features() -> list[str]:
-    """Return sorted ``stm32-*`` feature names present in the BSP sources."""
+    """Return sorted by feature names present in the BSP sources."""
     features: set[str] = set()
     for file in SRC_DIR.rglob("*.rs"):
         text = file.read_text(encoding="utf-8")
