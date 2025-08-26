@@ -9,7 +9,7 @@ set -euo pipefail
 
 RLVGL_CREATOR=${RLVGL_CREATOR:-target/debug/rlvgl-creator}
 AF_JSON=${AF_JSON:-stm32_af.json}
-OUT_DIR=${OUT_DIR:-generated}
+OUT_DIR=${OUT_DIR:-chips/stm/bsps/src}
 OPEN_PIN_DATA=${OPEN_PIN_DATA:-chips/stm/STM32_open_pin_data}
 BOARD_DIR="$OPEN_PIN_DATA/boards"
 
