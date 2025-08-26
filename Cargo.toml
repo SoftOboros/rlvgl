@@ -191,10 +191,6 @@ optional = true
 version = "0.15"
 optional = true
 
-[dependencies.rlvgl-stm-bsps]
-path = "chips/stm/bsps"
-optional = true
-
 [dependencies.rlvgl-chips-stm]
 path = "chipdb/rlvgl-chips-stm"
 optional = true
@@ -296,7 +292,6 @@ creator = [
     "dep:rayon",
     "dep:resvg",
     "dep:zstd",
-    "dep:rlvgl-stm-bsps",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",
@@ -323,7 +318,6 @@ creator_ui = [
     "dep:rfd",
     "dep:serde_json",
     "dep:zstd",
-    "dep:rlvgl-stm-bsps",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
     "dep:rlvgl-chips-esp",

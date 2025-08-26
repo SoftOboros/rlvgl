@@ -73,3 +73,7 @@ echo "Generating lib.rs..."
   --prelude hal:split \
   --features hal,pac,split,flat,summaries,pinreport \
   --family-feature-prefix stm32- || echo "warning: gen-lib failed" >&2
+
+# Synchronize stm32-* feature flags in the BSP crate after regeneration.
+echo "Updating Cargo feature flags..."
+python tools/update_stm_bsp_features.py || echo "warning: feature sync failed" >&2
