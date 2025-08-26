@@ -22,7 +22,7 @@ fn imports_custom_ioc() {
     let ioc = data_dir.join("sample.ioc");
     let tmp = tempdir().unwrap();
     let out = tmp.path().join("board.json");
-    board_import::from_ioc(&ioc, "MyBoard", &out).expect("convert");
+    board_import::from_ioc(&ioc, "MyBoard", &out, None).expect("convert");
     let text = std::fs::read_to_string(&out).unwrap();
     let json: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(json["board"], "MyBoard");

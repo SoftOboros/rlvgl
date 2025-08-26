@@ -8,6 +8,11 @@
  * Board: {{ meta.board }} ({{ meta.chip }})
 {% endif %}
  */
+{% if meta is defined %}
+//! PAC BSP for {{ meta.board }}.
+{% else %}
+//! PAC BSP for the generated board.
+{% endif %}
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
@@ -190,6 +195,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
 {% else %}
 /// Disables unused peripherals and masks their interrupts.
 {% endif %}
+{% if meta is defined %}
+/// Enables peripheral clocks for {{ meta.board }} using PAC registers.
+{% else %}
+/// Enables peripheral clocks for the generated board using PAC registers.
+{% endif %}
 pub fn enable_peripherals(dp: &pac::Peripherals) {
 {%- set pairs = [] -%}
 {%- for name, _per in spec.peripherals | dictsort %}
@@ -231,6 +241,11 @@ pub fn enable_peripherals(dp: &pac::Peripherals) {
 /// De-initializes {{ meta.board }} pins to their analog state.
 {% else %}
 /// De-initializes board pins to their analog state.
+{% endif %}
+{% if meta is defined %}
+/// De-initializes {{ meta.board }} peripherals and clocks using PAC registers.
+{% else %}
+/// De-initializes board peripherals and clocks using PAC registers.
 {% endif %}
 pub fn deinit_board_pac(dp: &pac::Peripherals) {
     // Return pins to analog and remove pulls/open-drain
@@ -367,6 +382,11 @@ pub fn deinit_board_pac(dp: &pac::Peripherals) {
 }
 {% endif %}
 
+{% if meta is defined %}
+/// Initializes {{ meta.board }} using PAC register access.
+{% else %}
+/// Initializes the board using PAC register access.
+{% endif %}
 {% if meta is defined %}
 /// Initializes {{ meta.board }} using PAC register access.
 {% else %}
