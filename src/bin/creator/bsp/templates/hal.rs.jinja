@@ -8,6 +8,11 @@
  * Board: {{ meta.board }} ({{ meta.chip }})
 {% endif %}
  */
+{% if meta is defined %}
+//! HAL BSP for {{ meta.board }}.
+{% else %}
+//! HAL BSP for the generated board.
+{% endif %}
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
@@ -46,6 +51,11 @@ use stm32h7xx_hal::{pac, prelude::*, gpio::Speed};
 {%- endif -%}
 {%- endmacro %}
 
+{% if meta is defined %}
+/// Enables GPIO clocks required by {{ meta.board }}.
+{% else %}
+/// Enables GPIO clocks required by the generated board.
+{% endif %}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     {% set ns = namespace(ports=[]) %}
     {% for pin in spec.pinctrl %}{% if pin.pin[1] not in ns.ports %}{% set ns.ports = ns.ports + [pin.pin[1]] %}{% endif %}{% endfor %}
@@ -62,6 +72,11 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     {% endif %}
 }
 
+{% if meta is defined %}
+/// Configures pins for {{ meta.board }} using the HAL API.
+{% else %}
+/// Configures pins using the HAL API.
+{% endif %}
 pub fn configure_pins_hal() {
 {%- for pin in spec.pinctrl %}
     {%- set is_gpio = pin.func[0:5] == "GPIO_" %}
@@ -87,6 +102,11 @@ pub fn configure_pins_hal() {
 {%- endfor %}
 }
 
+{% if meta is defined %}
+/// Enables peripheral clocks for {{ meta.board }}.
+{% else %}
+/// Enables peripheral clocks for the generated board.
+{% endif %}
 pub fn enable_peripherals(dp: &pac::Peripherals) {
 {%- set pairs = [] -%}
 {%- for name, _per in spec.peripherals | dictsort %}
@@ -124,6 +144,11 @@ pub fn enable_peripherals(dp: &pac::Peripherals) {
 }
 
 {% if with_deinit %}
+{% if meta is defined %}
+/// De-initializes {{ meta.board }} peripherals and clocks.
+{% else %}
+/// De-initializes board peripherals and clocks.
+{% endif %}
 pub fn deinit_board_hal(dp: &pac::Peripherals) {
     // Return pins to analog and remove pulls/open-drain
 {%- for pin in spec.pinctrl %}
@@ -259,6 +284,11 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 }
 {% endif %}
 
+{% if meta is defined %}
+/// Initializes {{ meta.board }} using HAL drivers.
+{% else %}
+/// Initializes the board using HAL drivers.
+{% endif %}
 pub fn init_board_hal(dp: pac::Peripherals /*, clocks */) {
     enable_gpio_clocks(&dp);
     configure_pins_hal();

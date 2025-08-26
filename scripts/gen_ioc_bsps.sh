@@ -31,16 +31,29 @@ if [ ! -d "$BOARD_DIR" ]; then
   exit 0
 fi
 
-find "$BOARD_DIR" -name '*.ioc' | while read -r ioc; do
-  board="$(basename "$ioc" .ioc)"
+mapfile -t iocs < <(find "$BOARD_DIR" -name '*.ioc' | sort)
+total=${#iocs[@]}
+echo "Generating BSPs for $total boards..."
+count=0
+for ioc in "${iocs[@]}"; do
+  count=$((count + 1))
+  raw="$(basename "$ioc" .ioc)"
+  IFS='_' read -r -a parts <<<"$raw"
+  board="${parts[2]:-$raw}"
+  board="$(echo "$board" | tr '[:upper:]' '[:lower:]' | tr '-' '_')"
+  echo "[$count/$total] $board"
   for layout in one-file per-peripheral; do
     out_dir="$OUT_DIR/$board/$layout"
     layout_flag=""
     if [ "$layout" = per-peripheral ]; then
       layout_flag="--per-peripheral"
     fi
-    "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
+    if "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
       --emit-hal --emit-pac --grouped-writes --with-deinit --allow-reserved $layout_flag \
-      --out "$out_dir" || echo "failed: $board ($layout)"
+      --out "$out_dir"; then
+      echo "    done ($layout)"
+    else
+      echo "    failed: $board ($layout)" >&2
+    fi
   done
 done
