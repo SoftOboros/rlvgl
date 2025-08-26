@@ -1,7 +1,7 @@
 //! Tests for the `gen_pins.py` helper script.
 
-use std::{fs, path::Path, process::Command};
 use serde_json::Value;
+use std::{fs, path::Path, process::Command};
 
 #[test]
 fn copies_mcu_definition() {
