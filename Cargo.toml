@@ -29,7 +29,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "rlvgl-sim"
 path = "examples/sim/src/main.rs"
-required-features = ["simulator", "qrcode", "png", "jpeg", "fontdue"]
+required-features = ["simulator", "qrcode", "png", "jpeg", "gif", "fontdue"]
 
 [[bin]]
 name = "rlvgl-stm32h747i-disco"

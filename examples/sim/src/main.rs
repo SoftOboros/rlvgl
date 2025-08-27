@@ -48,6 +48,9 @@ fn main() {
     let mut path = None;
     let mut headless_path: Option<String> = None;
     let mut use_wgpi = false;
+    let mut show_qr = false;
+    let mut show_png = false;
+    let mut show_gif = false;
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -66,6 +69,12 @@ fn main() {
             }
         } else if arg == "--wgpi" {
             use_wgpi = true;
+        } else if arg == "--qrcode" {
+            show_qr = true;
+        } else if arg == "--png" {
+            show_png = true;
+        } else if arg == "--gif" {
+            show_gif = true;
         } else if arg.starts_with("--headless") {
             if let Some(eq) = arg.split_once('=') {
                 headless_path = Some(eq.1.to_string());
@@ -84,6 +93,25 @@ fn main() {
     let root = demo.root.clone();
     let pending = demo.pending.clone();
     let to_remove = demo.to_remove.clone();
+
+    if show_qr {
+        #[cfg(feature = "qrcode")]
+        root.borrow_mut()
+            .children
+            .push(common_demo::build_plugin_demo(width as u32, height as u32));
+    }
+    if show_png {
+        #[cfg(feature = "png")]
+        root.borrow_mut()
+            .children
+            .push(common_demo::build_png_demo(width as u32, height as u32));
+    }
+    if show_gif {
+        #[cfg(feature = "gif")]
+        root.borrow_mut()
+            .children
+            .push(common_demo::build_gif_demo(width as u32, height as u32));
+    }
 
     let mut frame_cb = {
         let root = root.clone();

@@ -7,24 +7,26 @@
 
 extern crate alloc;
 
-#[cfg(any(feature = "png", feature = "jpeg"))]
+#[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]
 use alloc::boxed::Box;
 use alloc::{format, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
+#[cfg(feature = "gif")]
+use rlvgl::core::gif;
 #[cfg(feature = "jpeg")]
 use rlvgl::core::jpeg;
 #[cfg(feature = "png")]
 use rlvgl::core::png;
 #[cfg(feature = "qrcode")]
 use rlvgl::core::qrcode;
-#[cfg(any(feature = "png", feature = "jpeg"))]
+#[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]
 use rlvgl::core::widget::Color;
 use rlvgl::core::{
     WidgetNode,
     widget::{Rect, Widget},
 };
-#[cfg(any(feature = "png", feature = "jpeg"))]
+#[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]
 use rlvgl::widgets::image::Image;
 use rlvgl::widgets::{button::Button, container::Container, label::Label};
 
@@ -86,6 +88,13 @@ const JPEG_LOGO: &[u8] = &[
     0xe2, 0xe8, 0xa2, 0x8a, 0xf9, 0x93, 0xf7, 0x13, 0xff, 0xd9,
 ];
 
+#[cfg(feature = "gif")]
+const GIF_LOGO: &[u8] = &[
+    0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x01, 0x00, 0x01, 0x00, 0xf0, 0x00, 0x00, 0xff, 0x00, 0x00,
+    0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+];
+
 /// State returned by [`build_demo`] containing the root widget tree and related
 /// bookkeeping used by the demos.
 pub struct Demo {
@@ -112,6 +121,8 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     let click_count = Rc::new(RefCell::new(0));
     let pending = Rc::new(RefCell::new(Vec::new()));
     let to_remove = Rc::new(RefCell::new(Vec::new()));
+    let root_w = width as u32;
+    let root_h = height as u32;
 
     let button = Rc::new(RefCell::new(Button::new(
         "Clicks: 0",
@@ -174,6 +185,8 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     let qr_demo: WidgetSlot = Rc::new(RefCell::new(None));
     #[cfg(feature = "png")]
     let png_demo: WidgetSlot = Rc::new(RefCell::new(None));
+    #[cfg(feature = "gif")]
+    let gif_demo: WidgetSlot = Rc::new(RefCell::new(None));
     #[cfg(feature = "jpeg")]
     let jpeg_demo: WidgetSlot = Rc::new(RefCell::new(None));
     {
@@ -184,8 +197,12 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
         let qr_ref = qr_demo.clone();
         #[cfg(feature = "png")]
         let png_ref = png_demo.clone();
+        #[cfg(feature = "gif")]
+        let gif_ref = gif_demo.clone();
         #[cfg(feature = "jpeg")]
         let jpeg_ref = jpeg_demo.clone();
+        let root_w = root_w;
+        let root_h = root_h;
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
             if let Some(menu_w) = menu_ref.borrow_mut().take() {
                 pending_rm.borrow_mut().push(menu_w);
@@ -194,7 +211,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     x: 10,
                     y: 70,
                     width: 100,
-                    height: 110,
+                    height: 170,
                 })));
                 let mut children = Vec::new();
 
@@ -213,11 +230,13 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                         let pending_add = pending_add.clone();
                         let pending_rm = pending_rm.clone();
                         let qr_demo = qr_ref.clone();
+                        let w = root_w;
+                        let h = root_h;
                         qr_button.borrow_mut().set_on_click(move |_b: &mut Button| {
                             if let Some(qr_w) = qr_demo.borrow_mut().take() {
                                 pending_rm.borrow_mut().push(qr_w);
                             } else {
-                                let demo = build_plugin_demo();
+                                let demo = build_plugin_demo(w, h);
                                 let handle = demo.widget.clone();
                                 qr_demo.borrow_mut().replace(handle.clone());
                                 pending_add.borrow_mut().push(demo);
@@ -245,13 +264,15 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                         let pending_add = pending_add.clone();
                         let pending_rm = pending_rm.clone();
                         let png_demo = png_ref.clone();
+                        let w = root_w;
+                        let h = root_h;
                         png_button
                             .borrow_mut()
                             .set_on_click(move |_b: &mut Button| {
                                 if let Some(png_w) = png_demo.borrow_mut().take() {
                                     pending_rm.borrow_mut().push(png_w);
                                 } else {
-                                    let demo = build_png_demo();
+                                    let demo = build_png_demo(w, h);
                                     let handle = demo.widget.clone();
                                     png_demo.borrow_mut().replace(handle.clone());
                                     pending_add.borrow_mut().push(demo);
@@ -264,10 +285,10 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     });
                 }
 
-                #[cfg(feature = "jpeg")]
+                #[cfg(feature = "gif")]
                 {
-                    let jpeg_button = Rc::new(RefCell::new(Button::new(
-                        "JPEG",
+                    let gif_button = Rc::new(RefCell::new(Button::new(
+                        "GIF",
                         Rect {
                             x: 20,
                             y: 140,
@@ -278,14 +299,52 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     {
                         let pending_add = pending_add.clone();
                         let pending_rm = pending_rm.clone();
+                        let gif_demo = gif_ref.clone();
+                        let w = root_w;
+                        let h = root_h;
+                        gif_button
+                            .borrow_mut()
+                            .set_on_click(move |_b: &mut Button| {
+                                if let Some(gif_w) = gif_demo.borrow_mut().take() {
+                                    pending_rm.borrow_mut().push(gif_w);
+                                } else {
+                                    let demo = build_gif_demo(w, h);
+                                    let handle = demo.widget.clone();
+                                    gif_demo.borrow_mut().replace(handle.clone());
+                                    pending_add.borrow_mut().push(demo);
+                                }
+                            });
+                    }
+                    children.push(WidgetNode {
+                        widget: gif_button,
+                        children: Vec::new(),
+                    });
+                }
+
+                #[cfg(feature = "jpeg")]
+                {
+                    let jpeg_button = Rc::new(RefCell::new(Button::new(
+                        "JPEG",
+                        Rect {
+                            x: 20,
+                            y: 170,
+                            width: 80,
+                            height: 20,
+                        },
+                    )));
+                    {
+                        let pending_add = pending_add.clone();
+                        let pending_rm = pending_rm.clone();
                         let jpeg_demo = jpeg_ref.clone();
+                        let w = root_w;
+                        let h = root_h;
                         jpeg_button
                             .borrow_mut()
                             .set_on_click(move |_b: &mut Button| {
                                 if let Some(jpeg_w) = jpeg_demo.borrow_mut().take() {
                                     pending_rm.borrow_mut().push(jpeg_w);
                                 } else {
-                                    let demo = build_jpeg_demo();
+                                    let demo = build_jpeg_demo(w, h);
                                     let handle = demo.widget.clone();
                                     jpeg_demo.borrow_mut().replace(handle.clone());
                                     pending_add.borrow_mut().push(demo);
@@ -322,10 +381,8 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
 
 #[cfg(feature = "qrcode")]
 /// Build a widget demonstrating plugin features such as QR code generation.
-pub fn build_plugin_demo() -> WidgetNode {
+pub fn build_plugin_demo(root_w: u32, root_h: u32) -> WidgetNode {
     let (pixels_vec, width, _) = qrcode::generate(b"https://github.com/SoftOboros/rlvgl").unwrap();
-    let root_w = 320u32;
-    let root_h = 240u32;
     // Match the area used by the PNG/JPEG demos: the lower-right 2/3rds of the display.
     let target = root_h * 2 / 3;
     let scale = target as f32 / width as f32;
@@ -367,14 +424,12 @@ pub fn build_plugin_demo() -> WidgetNode {
 /// Build a widget displaying the rlvgl logo decoded from an embedded PNG.
 ///
 /// `scale` controls the desired scaling factor. The final image is clamped so
-/// it never exceeds the 320x240 screen bounds, and it is anchored to the lower
+/// it never exceeds the screen bounds, and it is anchored to the lower
 /// right corner of the display.
-pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
+pub fn build_png_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode {
     let (pixels_vec, width, height) =
         png::decode(PNG_LOGO).expect("failed to decode built-in PNG asset");
 
-    let root_w = 320u32;
-    let root_h = 240u32;
     let mut scale = if scale.is_finite() && scale > 0.0 {
         scale
     } else {
@@ -419,22 +474,82 @@ pub fn build_png_demo_scaled(scale: f32) -> WidgetNode {
 
 #[cfg(feature = "png")]
 /// Build a PNG demo using the default scale of `0.5`.
-pub fn build_png_demo() -> WidgetNode {
-    build_png_demo_scaled(0.5)
+pub fn build_png_demo(root_w: u32, root_h: u32) -> WidgetNode {
+    build_png_demo_scaled(0.5, root_w, root_h)
+}
+
+#[cfg(feature = "gif")]
+/// Build a widget displaying the rlvgl logo decoded from an embedded GIF.
+///
+/// Mirrors [`build_png_demo_scaled`] but decodes the first frame of a GIF image.
+pub fn build_gif_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode {
+    let (frames, width, height) =
+        gif::decode(GIF_LOGO).expect("failed to decode built-in GIF asset");
+    let frame = &frames[0];
+    let width = width as u32;
+    let height = height as u32;
+    let mut scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    scale = scale
+        .min(root_w as f32 / width as f32)
+        .min(root_h as f32 / height as f32);
+
+    let new_w = (width as f32 * scale).max(1.0).round() as u32;
+    let new_h = (height as f32 * scale).max(1.0).round() as u32;
+
+    let mut scaled = Vec::with_capacity((new_w * new_h) as usize);
+    for y in 0..new_h {
+        for x in 0..new_w {
+            let src_x = (x as f32 / scale).floor() as usize;
+            let src_y = (y as f32 / scale).floor() as usize;
+            let idx = src_y * width as usize + src_x;
+            let color = frame
+                .pixels
+                .get(idx)
+                .copied()
+                .unwrap_or(Color(0, 0, 0, 255));
+            scaled.push(color);
+        }
+    }
+    let pixels: &'static [Color] = Box::leak(scaled.into_boxed_slice());
+
+    let x_pos = (root_w - new_w) as i32;
+    let y_pos = (root_h - new_h) as i32;
+    WidgetNode {
+        widget: Rc::new(RefCell::new(Image::new(
+            Rect {
+                x: x_pos,
+                y: y_pos,
+                width: new_w as i32,
+                height: new_h as i32,
+            },
+            new_w as i32,
+            new_h as i32,
+            pixels,
+        ))),
+        children: Vec::new(),
+    }
+}
+
+#[cfg(feature = "gif")]
+/// Build a GIF demo using the default scale of `0.5`.
+pub fn build_gif_demo(root_w: u32, root_h: u32) -> WidgetNode {
+    build_gif_demo_scaled(0.5, root_w, root_h)
 }
 
 #[cfg(feature = "jpeg")]
 /// Build a widget displaying the rlvgl logo decoded from an embedded JPEG.
 ///
 /// Mirrors [`build_png_demo_scaled`] but decodes a JPEG image instead.
-pub fn build_jpeg_demo_scaled(scale: f32) -> WidgetNode {
+pub fn build_jpeg_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode {
     let (pixels_vec, width, height) =
         jpeg::decode(JPEG_LOGO).expect("failed to decode built-in JPEG asset");
 
     let width = width as u32;
     let height = height as u32;
-    let root_w = 320u32;
-    let root_h = 240u32;
     let mut scale = if scale.is_finite() && scale > 0.0 {
         scale
     } else {
@@ -479,8 +594,8 @@ pub fn build_jpeg_demo_scaled(scale: f32) -> WidgetNode {
 
 #[cfg(feature = "jpeg")]
 /// Build a JPEG demo using the default scale of `0.5`.
-pub fn build_jpeg_demo() -> WidgetNode {
-    build_jpeg_demo_scaled(0.5)
+pub fn build_jpeg_demo(root_w: u32, root_h: u32) -> WidgetNode {
+    build_jpeg_demo_scaled(0.5, root_w, root_h)
 }
 
 /// Flush any widgets queued during event callbacks into the root tree.
