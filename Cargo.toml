@@ -43,9 +43,9 @@ required-features = ["creator"]
 
 [dependencies]
 rlvgl-core = { version = "0.1.6", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.1.4", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.1.5", path = "platform", default-features = false }
-rlvgl-ui = { version = "0.1.1", path = "ui", default-features = false }
+rlvgl-widgets = { version = "0.1.5", path = "widgets", default-features = false }
+rlvgl-platform = { version = "0.1.6", path = "platform", default-features = false }
+rlvgl-ui = { version = "0.1.2", path = "ui", default-features = false }
 embedded-hal = { version = "1.0", optional = true }
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
 
