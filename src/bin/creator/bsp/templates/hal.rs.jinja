@@ -300,6 +300,6 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 {% endif %}
 pub fn init_board_hal(dp: pac::Peripherals /*, clocks */) {
     enable_gpio_clocks(&dp);
-    configure_pins_hal();
+    configure_pins_hal(&dp);
     enable_peripherals(&dp);
 }
