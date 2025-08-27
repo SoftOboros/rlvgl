@@ -18,7 +18,21 @@ Regenerate the stubs with `scripts/gen_ioc_bsps.sh`. The script invokes
 `chips/stm/bsps/src`. MCU data comes from the bundled `rlvgl-chips-stm`
 archive, so no separate `mcu.json` is needed.
 
-## Available boards
+## Supported devices
 
 - `f407_demo`
 - `f429_demo`
+
+## Unsupported devices (partial)
+
+The following boards are known to be unsupported or require vendor
+crates that are not yet integrated. They are skipped by the BSP
+generation script.
+
+- `b_g473e_zest1s`
+- `b_g474e_dpow1`
+- `b_l072z_lrwan1`
+- `stm32wba65i_dk1`
+
+*This list of unsupported devices is not complete; other boards in the
+archive may also fail to build.*

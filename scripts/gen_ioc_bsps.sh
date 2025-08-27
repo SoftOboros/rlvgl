@@ -12,6 +12,9 @@ AF_JSON=${AF_JSON:-stm32_af.json}
 OUT_DIR=${OUT_DIR:-chips/stm/bsps/src}
 OPEN_PIN_DATA=${OPEN_PIN_DATA:-chips/stm/STM32_open_pin_data}
 BOARD_DIR="$OPEN_PIN_DATA/boards"
+# Boards lacking HAL or PAC support
+SKIP_BOARDS=(b_g473e_zest1s b_g474e_dpow1 b_l072z_lrwan1 stm32wba65i_dk1)
+
 
 if [ ! -x "$RLVGL_CREATOR" ]; then
   echo "warning: rlvgl-creator not found at $RLVGL_CREATOR" >&2
@@ -55,6 +58,10 @@ for ioc in "${iocs[@]}"; do
   done
   board="${board:-$raw}"
   board="$(echo "$board" | tr '[:upper:]' '[:lower:]' | tr '-' '_')"
+  if [[ " ${SKIP_BOARDS[*]} " == *" $board "* ]]; then
+    echo "[$count/$total] $board (skipped)"
+    continue
+  fi
   echo "[$count/$total] $board"
   out_dir="$OUT_DIR/$board"
   if "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
