@@ -1,10 +1,9 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# rlvgl-stm-bsps crate manifest.
-
 [package]
 name = "rlvgl-bsps-stm"
 version = "0.1.0"
-authors = ["Ira Abbott <ira@softoboros.com>"]
+authors = [
+    "Ira Abbott <ira@softoboros.com>",
+]
 edition = "2024"
 license = "BSD-3-Clause"
 description = "BSP files for STM32 Demo, Nucleo, and Discovery boards per vendor .ioc files."
@@ -12,8 +11,19 @@ readme = "README.md"
 repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"
 documentation = "https://docs.rs/rlvgl-bsps-stm"
-keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
-categories = ["embedded", "gui", "no-std", "graphics"]
+keywords = [
+    "embedded",
+    "graphics",
+    "ui",
+    "lvgl",
+    "no_std",
+]
+categories = [
+    "embedded",
+    "gui",
+    "no-std",
+    "graphics",
+]
 publish = true
 
 [lib]
@@ -30,19 +40,65 @@ split = []
 flat = []
 summaries = []
 pinreport = []
-stm32-c0 = []
-stm32-f0 = []
-stm32-f3 = []
-stm32-f4 = []
-stm32-f7 = []
-stm32-g0 = []
-stm32-g4 = []
-stm32-h5 = []
-stm32-h7 = []
-stm32-l0 = []
-stm32-l1 = []
-stm32-l4 = []
-stm32-l5 = []
+i2c1 = []
+i2c2 = []
+i2c3 = []
+i2c4 = []
+i2c5 = []
+i2c7 = []
+i2c8 = []
+spi1 = []
+spi2 = []
+spi3 = []
+spi4 = []
+spi5 = []
+spi6 = []
+spi8 = []
+stm32-c0 = ["dep:stm32c0xx-hal"]
+stm32-f0 = ["dep:stm32f0xx-hal"]
+stm32-f3 = ["dep:stm32f3xx-hal"]
+stm32-f4 = ["dep:stm32f4xx-hal"]
+stm32-f7 = ["dep:stm32f7xx-hal"]
+stm32-g0 = ["dep:stm32g0xx-hal"]
+stm32-g4 = ["dep:stm32g4xx-hal"]
+stm32-h5 = ["dep:stm32h5xx-hal"]
+stm32-h7 = ["dep:stm32h7xx-hal"]
+stm32-l0 = ["dep:stm32l0xx-hal"]
+stm32-l1 = ["dep:stm32l1xx-hal"]
+stm32-l4 = ["dep:stm32l4xx-hal"]
+stm32-l5 = ["dep:stm32l5xx-hal"]
 stm32-n6 = []
 stm32-u0 = []
 stm32-u5 = []
+stm32-wb = ["dep:stm32wb-hal"]
+stm32-wl = ["dep:stm32wlxx-hal"]
+uart10 = []
+uart4 = []
+uart5 = []
+uart7 = []
+uart8 = []
+usart1 = []
+usart2 = []
+usart3 = []
+usart4 = []
+usart5 = []
+usart6 = []
+usart7 = []
+usart8 = []
+
+[dependencies]
+stm32c0xx-hal = { version = "0.0.0", optional = true, default-features = false }
+stm32f0xx-hal = { version = "0.18.0", optional = true, default-features = false }
+stm32f3xx-hal = { version = "0.10.0", optional = true, default-features = false }
+stm32f4xx-hal = { version = "0.22.1", optional = true, default-features = false }
+stm32f7xx-hal = { version = "0.8.0", optional = true, default-features = false }
+stm32g0xx-hal = { version = "0.2.0", optional = true, default-features = false }
+stm32g4xx-hal = { version = "0.0.1", optional = true, default-features = false }
+stm32h5xx-hal = { version = "0.0.0", optional = true, default-features = false }
+stm32h7xx-hal = { version = "0.16.0", optional = true, default-features = false }
+stm32l0xx-hal = { version = "0.10.0", optional = true, default-features = false }
+stm32l1xx-hal = { version = "0.1.0", optional = true, default-features = false }
+stm32l4xx-hal = { version = "0.7.1", optional = true, default-features = false }
+stm32l5xx-hal = { version = "0.0.0", optional = true, default-features = false }
+stm32wb-hal = { version = "0.1.14", optional = true, default-features = false }
+stm32wlxx-hal = { version = "0.6.1", optional = true, default-features = false }

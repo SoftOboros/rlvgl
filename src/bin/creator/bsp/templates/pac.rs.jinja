@@ -17,11 +17,49 @@
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
-{%- set ports = [] -%}
-{%- for pin in spec.pinctrl -%}
-    {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
-{%- endfor -%}
-use stm32h7::stm32h747 as pac;
+{# collect unique GPIO port letters #}
+{% set ns = namespace(ports=[]) %}
+{% for pin in spec.pinctrl %}
+    {% if pin.pin[1] not in ns.ports %}{% set ns.ports = ns.ports + [pin.pin[1]] %}{% endif %}
+{% endfor %}
+
+{# derive PAC crate and module from the MCU identifier #}
+{% set crate = namespace(letters='', digits='', digits_started=false, stop=false) %}
+{% for ch in spec.mcu[5:] %}
+    {% if not crate.stop %}
+        {% if ch >= 'A' and ch <= 'Z' %}
+            {% if crate.digits_started %}
+                {% set crate.stop = true %}
+            {% else %}
+                {% set crate.letters = crate.letters + ch %}
+            {% endif %}
+        {% elif ch >= '0' and ch <= '9' %}
+            {% set crate.digits_started = true %}
+            {% set crate.digits = crate.digits + ch %}
+        {% else %}
+            {% set crate.stop = true %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+{% set family = crate.letters | lower %}
+{% set nums = crate.digits %}
+{% if family == 'wb' %}
+    {% set pac_crate = 'stm32wb' %}
+    {% set pac_mod = pac_crate + nums %}
+{% elif family == 'wl' %}
+    {% set pac_crate = 'stm32wl' %}
+    {% set pac_mod = pac_crate + nums %}
+{% elif family == 'wba' %}
+    {% set pac_crate = 'stm32wba' %}
+    {% set pac_mod = pac_crate + nums %}
+{% elif family == 'mp' %}
+    {% set pac_crate = 'stm32mp1' %}
+    {% set pac_mod = pac_crate + nums %}
+{% else %}
+    {% set pac_crate = 'stm32' + family + nums[0:1] %}
+    {% set pac_mod = pac_crate + nums[1:] %}
+{% endif %}
+use {{ pac_crate }}::{{ pac_mod }} as pac;
 
 {%- macro gpio_bus(family) -%}
 {% if family[0:7] == "STM32H7" %}ahb4enr
@@ -32,7 +70,7 @@ use stm32h7::stm32h747 as pac;
 {% else %}ahb1enr{% endif %}
 {%- endmacro %}
 {% macro port_bit(p) -%}
-{% set map = {"A":0,"B":1,"C":2,"D":3,"E":4,"F":5,"G":6,"H":7,"I":8,"J":9,"K":10} %}
+{% set map = {"A":0,"B":1,"C":2,"D":3,"E":4,"F":5,"G":6,"H":7,"I":8,"J":9,"K":10,"L":11,"M":12,"N":13,"O":14,"P":15,"Q":16,"R":17,"S":18,"T":19,"U":20,"V":21,"W":22,"X":23,"Y":24,"Z":25} %}
 {{ map[p] }}
 {%- endmacro %}
 {% macro port_u(pin) -%}{{ pin.pin[1] }}{%- endmacro %}
@@ -53,33 +91,33 @@ use stm32h7::stm32h747 as pac;
 {%- endif -%}
 {%- endmacro %}
 
-{%- if meta is defined -%}
+{% if meta is defined %}
 /// Enables GPIO clocks required by {{ meta.board }}.
-{%- else -%}
+{% else %}
 /// Enables GPIO clocks required by the generated board.
-{%- endif -%}
+{% endif %}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {%- if ports|length -%}
-    {%- if grouped_writes -%}
-    const MASK: u32 = {%- for p in ports -%}(1u32 << {{ port_bit(p) }}){%- if not loop.last %} |{% endif %}{%- endfor %};
+    {% if ns.ports|length %}
+    {% if grouped_writes %}
+    const MASK: u32 = {% for p in ns.ports %}(1u32 << {{ port_bit(p) }}){% if not loop.last %} |{% endif %}{% endfor %};
     dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
-    {%- else -%}
-    {%- for p in ports -%}
+    {% else %}
+    {% for p in ns.ports %}
     dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|_, w| w.gpio{{ p|lower }}en().set_bit());
-    {%- endfor -%}
-    {%- endif -%}
-    {%- endif -%}
+    {% endfor %}
+    {% endif %}
+    {% endif %}
 }
 
-{%- if spec.pinctrl|length -%}
-{%- if meta is defined -%}
+{% if spec.pinctrl|length %}
+{% if meta is defined %}
 /// Configures pins for {{ meta.board }} using PAC registers.
-{%- else -%}
+{% else %}
 /// Configures pins using PAC registers.
-{%- endif -%}
+{% endif %}
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
-{%- if grouped_writes -%}
-    {%- for p in ports -%}
+{% if grouped_writes %}
+{% for p in ns.ports %}
     // GPIO{{ p }}
     dp.GPIO{{ p }}.pupdr.modify(|r, w| unsafe {
         let mut bits = r.bits();
@@ -136,9 +174,9 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         {%- endfor -%}
         w.bits(bits)
     });
-    {%- endfor -%}
-{%- else -%}
-{%- for pin in spec.pinctrl -%}
+{% endfor %}
+{% else %}
+{% for pin in spec.pinctrl %}
     // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}
     let shift = {{ idx(pin) }} * 2;
     dp.GPIO{{ port_u(pin) }}.pupdr.modify(|r, w| unsafe {
@@ -187,10 +225,10 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         {%- endif -%}
         w.bits(bits)
     });
-{%- endfor -%}
-{%- endif -%}
+{% endfor %}
+{% endif %}
 }
-{%- endif -%}
+{% endif %}
 
 {% if meta is defined %}
 /// Disables unused peripherals for {{ meta.board }} and masks their interrupts.
