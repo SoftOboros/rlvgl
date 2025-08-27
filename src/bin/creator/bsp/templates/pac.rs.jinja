@@ -17,6 +17,10 @@
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
+{%- set ports = [] -%}
+{%- for pin in spec.pinctrl -%}
+    {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
+{%- endfor -%}
 use stm32h7::stm32h747 as pac;
 
 {%- macro gpio_bus(family) -%}
@@ -55,13 +59,15 @@ use stm32h7::stm32h747 as pac;
 /// Enables GPIO clocks required by the generated board.
 {%- endif -%}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {%- set ports = [] -%}
-    {%- for pin in spec.pinctrl -%}
-        {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
-    {%- endfor -%}
     {%- if ports|length -%}
+    {%- if grouped_writes -%}
     const MASK: u32 = {%- for p in ports -%}(1u32 << {{ port_bit(p) }}){%- if not loop.last %} |{% endif %}{%- endfor %};
     dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    {%- else -%}
+    {%- for p in ports -%}
+    dp.RCC.{{ gpio_bus(spec.mcu) }}.modify(|_, w| w.gpio{{ p|lower }}en().set_bit());
+    {%- endfor -%}
+    {%- endif -%}
     {%- endif -%}
 }
 
@@ -73,7 +79,6 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 {%- endif -%}
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
 {%- if grouped_writes -%}
-    {%- set ports = [] -%}{%- for pin in spec.pinctrl -%}{%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}{%- endfor -%}
     {%- for p in ports -%}
     // GPIO{{ p }}
     dp.GPIO{{ p }}.pupdr.modify(|r, w| unsafe {
@@ -146,14 +151,14 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << {{ idx(pin) }});
+        let {{ 'mut ' if pin.func[0:3] == 'I2C' }}bits = r.bits() & !(1 << {{ idx(pin) }});
         {%- if pin.func[0:3] == "I2C" -%}
         bits |= 1 << {{ idx(pin) }}; // OpenDrain
         {%- endif -%}
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let {{ 'mut ' if pin.func[0:18] == 'USB_OTG_HS_ULPI_' or pin.func[0:5] == 'SDMMC' or pin.func[0:3] == 'SPI' }}bits = r.bits() & !(0b11 << shift);
         {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" -%}
         bits |= 0b11 << shift; // VeryHigh
         {%- endif -%}
@@ -197,7 +202,6 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
 {% else %}
 /// Enables peripheral clocks for the generated board using PAC registers.
 {% endif %}
-pub fn enable_peripherals(dp: &pac::Peripherals) {
 {%- set pairs = [] -%}
 {%- for name, _per in spec.peripherals | dictsort %}
     {%- if spec.mcu[0:7] == "STM32H7" %}
@@ -222,6 +226,8 @@ pub fn enable_peripherals(dp: &pac::Peripherals) {
     {%- endif %}
     {%- if reg and field %}{% set pairs = pairs + [{"reg": reg, "field": field}] %}{% endif %}
 {%- endfor %}
+pub fn enable_peripherals({{ 'dp' if pairs|length else '_dp' }}: &pac::Peripherals) {
+{% if pairs|length %}
 {% if grouped_writes %}
 {%- for group in pairs | groupby("reg") %}
     dp.RCC.{{ group.grouper }}.modify(|_, w| w{% for item in group.list %}.{{ item.field }}().set_bit(){% endfor %});
@@ -230,6 +236,7 @@ pub fn enable_peripherals(dp: &pac::Peripherals) {
 {%- for item in pairs %}
     dp.RCC.{{ item.reg }}.modify(|_, w| w.{{ item.field }}().set_bit());
 {%- endfor %}
+{% endif %}
 {% endif %}
 }
 

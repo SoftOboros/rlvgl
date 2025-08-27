@@ -17,7 +17,14 @@
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
+{%- set ports = [] -%}
+{%- for pin in spec.pinctrl -%}
+    {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
+{%- endfor -%}
 use stm32h7xx_hal::{pac, prelude::*, gpio::Speed};
+{%- for p in ports %}
+use stm32h7xx_hal::gpio::gpio{{ p|lower }}::*;
+{%- endfor %}
 
 {% macro gpio_bus(family) -%}
 {% if family[0:7] == "STM32H7" %}ahb4enr
@@ -57,10 +64,6 @@ use stm32h7xx_hal::{pac, prelude::*, gpio::Speed};
 /// Enables GPIO clocks required by the generated board.
 {% endif %}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {%- set ports = [] -%}
-    {%- for pin in spec.pinctrl -%}
-        {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
-    {%- endfor -%}
     {%- if ports|length -%}
     {%- if grouped_writes -%}
     const MASK: u32 = {%- for p in ports -%}(1u32 << {{ port_bit(p) }}){%- if not loop.last %} |{% endif %}{%- endfor %};
@@ -79,7 +82,10 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 {%- else %}
 /// Configures pins using the HAL API.
 {%- endif %}
-pub fn configure_pins_hal() {
+pub fn configure_pins_hal(dp: &pac::Peripherals) {
+{%- for p in ports %}
+    let gpio{{ p|lower }} = dp.GPIO{{ p }}.split();
+{%- endfor %}
 {%- for pin in spec.pinctrl %}
     {%- set is_gpio = pin.func[0:5] == "GPIO_" %}
     {%- set is_i2c  = pin.func[0:3] == "I2C" %}
