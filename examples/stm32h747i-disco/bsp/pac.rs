@@ -56,11 +56,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -82,11 +82,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -108,7 +108,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
@@ -135,7 +135,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
@@ -162,11 +162,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -188,11 +188,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -214,11 +214,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -240,11 +240,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -266,11 +266,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -292,11 +292,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
@@ -318,11 +318,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -344,11 +344,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -370,11 +370,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -396,11 +396,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -422,11 +422,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -448,11 +448,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -474,11 +474,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -500,11 +500,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -526,11 +526,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -552,11 +552,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -578,11 +578,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
@@ -604,11 +604,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOC.afrh.modify(|r, w| unsafe {
@@ -630,11 +630,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOC.afrh.modify(|r, w| unsafe {
@@ -656,7 +656,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -683,7 +683,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -710,7 +710,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -737,11 +737,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOC.afrh.modify(|r, w| unsafe {
@@ -763,7 +763,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -790,7 +790,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -817,11 +817,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOC.afrh.modify(|r, w| unsafe {
@@ -843,11 +843,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOC.afrh.modify(|r, w| unsafe {
@@ -869,7 +869,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -896,7 +896,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
@@ -923,11 +923,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -949,11 +949,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -975,11 +975,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1001,11 +1001,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1032,7 +1032,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1059,7 +1059,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1081,11 +1081,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1107,11 +1107,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1133,7 +1133,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
@@ -1160,11 +1160,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1186,11 +1186,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1212,11 +1212,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOD.afrh.modify(|r, w| unsafe {
@@ -1238,11 +1238,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1264,11 +1264,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1290,11 +1290,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1316,11 +1316,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1342,11 +1342,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1368,11 +1368,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1394,11 +1394,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1420,11 +1420,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1446,11 +1446,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1472,11 +1472,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1498,11 +1498,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1524,11 +1524,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1550,11 +1550,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1576,11 +1576,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1602,11 +1602,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOE.afrh.modify(|r, w| unsafe {
@@ -1628,11 +1628,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1654,11 +1654,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1680,11 +1680,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1706,11 +1706,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1732,11 +1732,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1758,11 +1758,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1784,11 +1784,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1810,11 +1810,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1836,11 +1836,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1862,11 +1862,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1888,11 +1888,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1914,11 +1914,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1940,11 +1940,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1966,11 +1966,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -1992,11 +1992,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -2018,11 +2018,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOF.afrh.modify(|r, w| unsafe {
@@ -2044,11 +2044,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2070,11 +2070,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2096,11 +2096,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2122,11 +2122,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2148,11 +2148,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2174,11 +2174,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2200,11 +2200,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2226,11 +2226,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2252,11 +2252,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2278,11 +2278,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2304,11 +2304,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2330,11 +2330,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2356,11 +2356,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2382,11 +2382,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOG.afrh.modify(|r, w| unsafe {
@@ -2408,11 +2408,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2434,11 +2434,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2460,11 +2460,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2486,11 +2486,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2512,11 +2512,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2538,11 +2538,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2564,11 +2564,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2590,11 +2590,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2616,11 +2616,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2642,11 +2642,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2668,11 +2668,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2694,11 +2694,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2720,11 +2720,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2746,11 +2746,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOH.afrh.modify(|r, w| unsafe {
@@ -2772,11 +2772,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2798,11 +2798,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2824,11 +2824,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2850,11 +2850,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2876,11 +2876,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2902,11 +2902,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2928,11 +2928,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 14);
+        let bits = r.bits() & !(1 << 14);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2954,11 +2954,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -2980,11 +2980,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3006,11 +3006,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3032,11 +3032,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3058,11 +3058,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3084,11 +3084,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3110,11 +3110,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3136,11 +3136,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3162,11 +3162,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOI.afrh.modify(|r, w| unsafe {
@@ -3188,11 +3188,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3214,11 +3214,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3240,7 +3240,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 10);
+        let bits = r.bits() & !(1 << 10);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
@@ -3267,7 +3267,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 11);
+        let bits = r.bits() & !(1 << 11);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
@@ -3294,11 +3294,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
+        let bits = r.bits() & !(1 << 12);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3320,11 +3320,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
+        let bits = r.bits() & !(1 << 13);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3346,11 +3346,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 15);
+        let bits = r.bits() & !(1 << 15);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3372,11 +3372,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3398,11 +3398,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3424,11 +3424,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3450,11 +3450,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3476,11 +3476,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3502,11 +3502,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3528,11 +3528,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 8);
+        let bits = r.bits() & !(1 << 8);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3554,11 +3554,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 9);
+        let bits = r.bits() & !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
@@ -3580,7 +3580,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 0);
+        let bits = r.bits() & !(1 << 0);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
@@ -3607,7 +3607,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 1);
+        let bits = r.bits() & !(1 << 1);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
@@ -3634,11 +3634,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 2);
+        let bits = r.bits() & !(1 << 2);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {
@@ -3660,11 +3660,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 3);
+        let bits = r.bits() & !(1 << 3);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {
@@ -3686,11 +3686,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 4);
+        let bits = r.bits() & !(1 << 4);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {
@@ -3712,11 +3712,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 5);
+        let bits = r.bits() & !(1 << 5);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {
@@ -3738,11 +3738,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 6);
+        let bits = r.bits() & !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {
@@ -3764,11 +3764,11 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 7);
+        let bits = r.bits() & !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let bits = r.bits() & !(0b11 << shift);
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {

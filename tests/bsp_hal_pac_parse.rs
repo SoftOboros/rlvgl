@@ -1,5 +1,5 @@
 #![cfg(feature = "creator")]
-//! Ensure HAL templates import all used GPIO ports.
+//! Render HAL and PAC BSP templates and ensure the output parses.
 
 #[path = "../src/bin/creator/bsp/af.rs"]
 mod af;
@@ -12,6 +12,7 @@ use af::AfProvider;
 use ioc::ioc_to_ir;
 use minijinja::{Environment, context};
 use std::{fs, path::PathBuf};
+use syn::parse_file;
 
 struct DummyAf;
 
@@ -22,7 +23,7 @@ impl AfProvider for DummyAf {
 }
 
 #[test]
-fn hal_imports_per_board() {
+fn hal_pac_parse_per_board() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let afdb = DummyAf;
 
@@ -37,12 +38,24 @@ fn hal_imports_per_board() {
             include_str!("../src/bin/creator/bsp/templates/hal.rs.jinja"),
         )
         .unwrap();
-        let rendered = env
+        env.add_template(
+            "pac",
+            include_str!("../src/bin/creator/bsp/templates/pac.rs.jinja"),
+        )
+        .unwrap();
+
+        let rendered_hal = env
             .get_template("hal")
             .unwrap()
             .render(context! { spec => &ir, grouped_writes => true, with_deinit => false })
             .unwrap();
+        parse_file(&rendered_hal).expect("HAL parse failed");
 
-        assert!(!rendered.is_empty(), "render failed for {}", board);
+        let rendered_pac = env
+            .get_template("pac")
+            .unwrap()
+            .render(context! { spec => &ir, grouped_writes => true, with_deinit => false })
+            .unwrap();
+        parse_file(&rendered_pac).expect("PAC parse failed");
     }
 }

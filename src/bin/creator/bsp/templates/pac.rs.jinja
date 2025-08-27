@@ -151,14 +151,14 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << {{ idx(pin) }});
+        let {{ 'mut ' if pin.func[0:3] == 'I2C' }}bits = r.bits() & !(1 << {{ idx(pin) }});
         {%- if pin.func[0:3] == "I2C" -%}
         bits |= 1 << {{ idx(pin) }}; // OpenDrain
         {%- endif -%}
         w.bits(bits)
     });
     dp.GPIO{{ port_u(pin) }}.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let {{ 'mut ' if pin.func[0:18] == 'USB_OTG_HS_ULPI_' or pin.func[0:5] == 'SDMMC' or pin.func[0:3] == 'SPI' }}bits = r.bits() & !(0b11 << shift);
         {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" -%}
         bits |= 0b11 << shift; // VeryHigh
         {%- endif -%}

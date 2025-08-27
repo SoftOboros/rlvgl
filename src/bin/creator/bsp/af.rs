@@ -18,12 +18,14 @@ pub trait AfProvider {
 /// The JSON structure matches the output of
 /// `tools/afdb/st_extract_af.py`:
 /// `{ "MCU": { "PIN": { "SIGNAL": AF }}}`.
+#[allow(dead_code)]
 pub struct JsonAfDb {
     map: HashMap<String, HashMap<String, HashMap<String, u8>>>,
 }
 
 impl JsonAfDb {
     /// Load the database from `path`.
+    #[allow(dead_code)]
     pub fn from_path(path: &std::path::Path) -> anyhow::Result<Self> {
         let data = std::fs::read_to_string(path)?;
         let map = serde_json::from_str(&data)?;
