@@ -1,16 +1,16 @@
 <!--
-README-CREATOR.md - Guide to rlvgl-creator asset workflows.
+README-CREATOR.md - Guide to rlvgl-creator 🆕 asset workflows.
 -->
 <p align="center">
   <img src="./rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# rlvgl-creator
+# rlvgl-creator 🆕
 
-Package: `rlvgl-creator`.
+Package: `rlvgl-creator` 🆕.
 
 ## Overview
-`rlvgl-creator` assembles and transforms assets for rlvgl applications. It groups icons, fonts, and media into an asset pack and records metadata in a manifest to simplify reuse across targets.
+`rlvgl-creator` 🆕 assembles and transforms assets for rlvgl applications. It groups icons, fonts, and media into an asset pack and records metadata in a manifest to simplify reuse across targets. It can also generate Rust BSP code from STM32CubeMX `.ioc` files.
 
 ### Terms
 - **Asset pack**: A directory tree containing `icons/`, `fonts/`, `media/`, and a `manifest.yml` that tracks each resource.
@@ -22,23 +22,26 @@ Package: `rlvgl-creator`.
 
 ### Initialize a new asset pack
 ```bash
-rlvgl-creator init
-rlvgl-creator add-target host vendor
+# rlvgl-creator 🆕
+rlvgl-creator init # 🆕
+rlvgl-creator add-target host vendor # 🆕
 ```
 `init` creates the asset directories and an empty manifest. `add-target` registers a `host` target whose converted assets will be placed in the `vendor` directory used by the simulator.
 
 ### Import and convert assets
 Place raw files into the asset directories, then scan and convert them:
 ```bash
-rlvgl-creator scan
-rlvgl-creator convert
+# rlvgl-creator 🆕
+rlvgl-creator scan # 🆕
+rlvgl-creator convert # 🆕
 ```
 `scan` computes hashes for new or changed assets and refreshes `manifest.yml`. `convert` normalizes images to raw RGBA and prepares fonts or media for each target.
 
 ### Preview and scaffold
 ```bash
-rlvgl-creator preview
-rlvgl-creator scaffold assets-pack
+# rlvgl-creator 🆕
+rlvgl-creator preview # 🆕
+rlvgl-creator scaffold assets-pack # 🆕
 ```
 `preview` writes thumbnails under `thumbs/` so assets can be reviewed quickly. `scaffold` generates a crate named `assets-pack` that either embeds assets or vendors them into the simulator at build time.
 
@@ -69,7 +72,7 @@ This pattern safely expands to an empty list when `name` is absent.
 
 ## Chip and board database integration
 
-`rlvgl-creator` consumes chip and board definitions from the `rlvgl-chips-*` crates under
+`rlvgl-creator` 🆕 consumes chip and board definitions from the `rlvgl-chips-*` crates under
 `chipdb/`. These crates embed vendor JSON data so the CLI and UI can populate vendor,
 microcontroller and board selections. When regenerating pin data, bump the crate versions
 before publishing:
@@ -81,22 +84,30 @@ python tools/bump_vendor_versions.py --path chipdb
 No additional configuration is required; the creator automatically loads all available
 vendor crates on startup.
 
+> ⚠️ The legacy `board` subcommand remains but is deprecated in favor of BSP generation.
+
 To convert a custom CubeMX project into a board overlay, run:
 
 ```bash
-rlvgl-creator board from-ioc project.ioc MyBoard MyBoard.json
+# rlvgl-creator 🆕
+rlvgl-creator board from-ioc project.ioc MyBoard MyBoard.json # 🆕
 ```
 
 The CLI detects the MCU automatically and resolves alternate-function numbers
 using the bundled database. The resulting JSON can be placed under `boards/`
-for use by `rlvgl-creator`.
+for use by `rlvgl-creator` 🆕.
 
 ## Batch BSP generation
 
 Run `scripts/gen_ioc_bsps.sh` to convert every CubeMX `.ioc` under
 `chips/stm/STM32_open_pin_data/boards`. The script invokes
-`rlvgl-creator` for each file and relies on the `rlvgl-chips-stm`
+`rlvgl-creator` 🆕 for each file and relies on the `rlvgl-chips-stm`
 archive for MCU metadata, so no standalone `mcu.json` is required.
 
-See [chips/stm/bsps/README.md](./chips/stm/bsps/README.md) for details on the generated stubs.
+Generated modules are published as [`rlvgl-bsps-stm` 🆕](./chips/stm/bsps/README.md).
+Include a module in your project:
+
+```rust
+use rlvgl_bsps_stm::f407_demo as bsp;
+```
 

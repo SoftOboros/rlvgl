@@ -35,6 +35,7 @@ Package: `rlvgl`
 - [examples](./examples/README.md) – Sample applications and board demos
 - [docs](./docs/README.md) – Project documentation and task lists
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
+- [chips/stm/bsps](./chips/stm/bsps/README.md) 🆕 – Generated STM32 BSP stubs
 
 ## Vendor chip databases
 
@@ -45,9 +46,16 @@ license files. When building a vendor crate, set `RLVGL_CHIP_SRC` to the
 directory containing these JSON files so the build script can embed them
 via `include_bytes!`.
 
-## BSP Generator (`rlvgl-creator`)
+## STM32CubeMX BSP generation 🆕
 
-`rlvgl-creator` offers a two-stage pipeline for board support packages:
+`rlvgl-creator` 🆕 converts STM32 CubeMX `.ioc` projects into board support
+stubs. Generated modules ship in
+[`rlvgl-bsps-stm` 🆕](./chips/stm/bsps/README.md). The older `board`
+overlay support remains but is deprecated.
+
+## BSP Generator (`rlvgl-creator` 🆕)
+
+`rlvgl-creator` 🆕 offers a two-stage pipeline for board support packages:
 
 1. **Import** vendor project files (e.g., STM32CubeMX `.ioc`, NXP `.mex`,
    RP2040 YAML). Each adapter mines the vendor data and emits a small, vendor-neutral
@@ -83,8 +91,8 @@ python tools/afdb/st_extract_af.py --input stm32_af.csv --output af.json
 python tools/afdb/st_extract_af.py --input boards/ --output build/stm
 ```
 
-The resulting `af.json` can be passed to `rlvgl-creator platform import` via
-`--afdb af.json`.
+The resulting `af.json` can be passed to `rlvgl-creator` 🆕 via
+`platform import --afdb af.json`.
 
 To package vendor chip databases for testing or publishing, run:
 
@@ -93,7 +101,7 @@ tools/build_vendor.sh
 RLVGL_CHIP_SRC=chipdb/rlvgl-chips-stm/generated cargo build -p rlvgl-chips-stm
 ```
 
-For a full asset workflow overview see [README-CREATOR.md](./README-CREATOR.md).
+For a full asset workflow overview see the [rlvgl-creator 🆕 README](./README-CREATOR.md).
 Command details live in [docs/CREATOR-CLI.md](./docs/CREATOR-CLI.md).
 
 ### IR schema
