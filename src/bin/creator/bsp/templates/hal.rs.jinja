@@ -21,10 +21,7 @@
 {%- for pin in spec.pinctrl -%}
     {%- if pin.pin[1] not in ports -%}{% set ports = ports + [pin.pin[1]] %}{%- endif -%}
 {%- endfor -%}
-use stm32h7xx_hal::{pac, prelude::*, gpio::Speed};
-{%- for p in ports %}
-use stm32h7xx_hal::gpio::gpio{{ p|lower }}::*;
-{%- endfor %}
+use stm32h7xx_hal::{gpio::Speed, pac, prelude::*{% for p in ports %}, gpio{{ p|lower }}::*{% endfor %}};
 
 {% macro gpio_bus(family) -%}
 {% if family[0:7] == "STM32H7" %}ahb4enr
