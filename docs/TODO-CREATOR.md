@@ -182,11 +182,11 @@ _User story: As a planner, I can stage delivery to land value early and often._
 
 | Complete | Description | Dependencies | Notes |
 |---|---|---|---|
-| [ ] | Phase 1 – MVP: scan/convert/vendor; scaffold crate; strict check. | core pieces | Baseline release.
-| [ ] | Phase 2 – Fonts: subsetting/packing/metrics; feature groups by size/family. | fontdue | Improves load perf.
-| [ ] | Phase 3 – Lottie: import + APNG; sprite sheets + timing meta. | rlottie/apng | Broader animation support.
-| [ ] | Phase 4 – Preview: thumbs + CLI/GUI viewer; size/hotpath profiling. | UI + image | Developer speed.
-| [ ] | Phase 5 – GUI: full UI with layout preview/editor and presets. | UI stack | Designer speed.
+| [x] | Phase 1 – MVP: scan/convert/vendor; scaffold crate; strict check. | core pieces | Baseline release.
+| [x] | Phase 2 – Fonts: subsetting/packing/metrics; feature groups by size/family. | fontdue | Improves load perf.
+| [x] | Phase 3 – Lottie: import + APNG; sprite sheets + timing meta. | rlottie/apng | Broader animation support.
+| [x] | Phase 4 – Preview: thumbs + CLI/GUI viewer; size/hotpath profiling. | UI + image | Developer speed.
+| [x] | Phase 5 – GUI: full UI with layout preview/editor and presets. | UI stack | Designer speed.
 | [ ] | Phase 6 – Advanced: wasm pipelines; remote catalogs; CDN packaging. | wasm-bindgen | Stretch.
 
 ---
