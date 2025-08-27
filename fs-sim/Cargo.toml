@@ -1,0 +1,22 @@
+[package]
+name = "rlvgl-fs-sim"
+version = "0.1.0"
+authors = ["Ira Abbott <ira@softobotos.com>"]
+edition = "2024"
+license = "MIT"
+description = "Simulator block device using a host file disk image."
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+
+[dependencies]
+rlvgl-core = { path = "../core", default-features = false, features = ["fs"] }
+memmap2 = { version = "0.9", optional = true }
+fatfs = { version = "0.3", default-features = false, features = ["std", "alloc"] }
+walkdir = "2"
+
+[features]
+default = []
+mmap = ["memmap2"]
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ["cfg(nightly)"] }

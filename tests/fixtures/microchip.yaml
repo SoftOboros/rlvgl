@@ -1,0 +1,19 @@
+# microchip.yaml - sample board IR for Microchip tests
+mcu: ATSAMD51J20A
+package: TQFP64
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: PA00
+    func: SPI0_SCK
+    af: 0
+  - pin: PA01
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: PA00
+      mosi: PA01

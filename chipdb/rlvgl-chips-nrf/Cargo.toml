@@ -1,0 +1,13 @@
+# Configuration for rlvgl-chips-nrf crate.
+[package]
+name = "rlvgl-chips-nrf"
+version = "0.0.1"
+edition = "2021"
+publish = true
+readme = "README.md"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }

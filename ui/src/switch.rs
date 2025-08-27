@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Switch component with change callbacks for rlvgl-ui.
 //!
-//! Wraps the base switch widget and exposes a builder-style `on_change`
-//! handler fired whenever the on/off state toggles.
+//! Wraps the [`Switch`](rlvgl_widgets::switch::Switch) widget and exposes a
+//! builder-style `on_change` handler fired whenever the on/off state toggles.
 
 use alloc::boxed::Box;
 use rlvgl_core::{

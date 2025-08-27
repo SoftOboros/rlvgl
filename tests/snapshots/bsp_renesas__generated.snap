@@ -1,0 +1,10 @@
+---
+source: tests/bsp_renesas.rs
+expression: rendered
+---
+pin P300 SPI0_SCK af0
+pin P301 SPI0_MOSI af0
+peripheral spi0 spi
+  ctor Spi::spi0
+  mosi=P301
+  sck=P300

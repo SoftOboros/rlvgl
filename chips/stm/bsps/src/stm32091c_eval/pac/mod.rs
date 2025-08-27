@@ -1,0 +1,23 @@
+//! Generated board modules.
+#[cfg(feature = "i2c1")]
+pub mod i2c1;
+#[cfg(feature = "i2c2")]
+pub mod i2c2;
+#[cfg(feature = "spi1")]
+pub mod spi1;
+#[cfg(feature = "usart1")]
+pub mod usart1;
+#[cfg(feature = "usart2")]
+pub mod usart2;
+#[cfg(feature = "usart3")]
+pub mod usart3;
+#[cfg(feature = "usart4")]
+pub mod usart4;
+#[cfg(feature = "usart5")]
+pub mod usart5;
+#[cfg(feature = "usart6")]
+pub mod usart6;
+#[cfg(feature = "usart7")]
+pub mod usart7;
+#[cfg(feature = "usart8")]
+pub mod usart8;

@@ -1,3 +1,10 @@
+<!--
+docs/TEST-TODO.md - rlvgl – Test TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl – Test TODO
 
 This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ordered roughly in the sequence it should be tackled, lists its upstream **dependencies** ­– either by reference to `docs/TODO.md` sections (`TODO#N`) or to earlier tests – and indicates whether it can be **fully automated** (via Codex‑driven `cargo test`, headless simulator, CI image‑diff, etc.) or requires **human verification** (e.g. visual acceptance on real hardware).
@@ -22,6 +29,14 @@ This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ord
 | [x] | 16 | T-16 | **Memory/leak detection** with valgrind/asan under simulator | T-09 | Automated |
 | [ ] | 17 | T-17 | **Performance benchmark** – FPS @ 240×320 on desktop & H7 board | T-09, T-06 | **Human-assisted** (hardware timing) |
 | [x] | 18 | T-18 | **Docs code‑snippet compile test** – `doctest` all README/Examples | TODO#8 | Automated |
+| [x] | 19 | T-19 | **Vendor board enumeration** – consolidate vendor crates into a unified list | TODO-CHIP-SUPPORT | Automated |
+| [x] | 20 | T-20 | **Board lookup error handling** – exact name match and helpful errors | T-19 | Automated |
+| [x] | 21 | T-21 | **UI board drop-down** – selection list populates from vendor crates | T-19 | Automated |
+| [x] | 22 | T-22 | **Chip DB env wiring** – build embeds board definitions from `RLVGL_CHIP_SRC` | TODO-CHIP-SUPPORT | Automated |
+| [x] | 23 | T-23 | **Publish script chip crates** – release script lists chipdb crates | T-22 | Automated |
+| [x] | 24 | T-24 | **AFDB MCU/IP ingest tests** – round-trip sample STM32 XML through canonical overlays | TODO-CHIP-SUPPORT | Automated |
+| [x] | 25 | T-25 | **AFDB catalog builder smoke** – verify pin mappings and GPIO IOModes in generated catalog | T-24 | Automated |
+| [x] | 26 | T-26 | **AFDB report rendering** – markdown table lists expected pins and GPIO modes | T-25 | Automated |
 
 ---
 

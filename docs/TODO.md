@@ -1,9 +1,16 @@
+<!--
+docs/TODO.md - Project TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # Project TODO
 
 This document tracks the high-level work streams and tasks for rlvgl development.
 
 ## 0 Repo & Container bootstrap
-- [x] Create rlvgl monorepo skeleton (`core/`, `widgets/`, `platform/`, `support/`, `lvgl/` submodule)
+ - [x] Create rlvgl monorepo skeleton (`core/`, `widgets/`, `platform/`, `lvgl/` submodule)
 - [x] Finalise Dockerfile tweaks (LLVM/clang, rustup, arm-gcc, bindgen, SDL)
 - [x] Add `.cargo/config.toml` with embedded profile & target triple
 - [x] GitHub Actions / GitLab CI stub (build, unit-test, size report)

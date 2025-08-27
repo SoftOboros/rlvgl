@@ -1,0 +1,6 @@
+---
+source: src/bin/creator/scaffold.rs
+expression: "read_out(\"rlvgl_assets.rs\")"
+---
+//! Auto-generated asset constants
+

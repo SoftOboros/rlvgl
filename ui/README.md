@@ -1,4 +1,12 @@
+<!--
+ui/README.md - Unified documentation for rlvgl-ui.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-ui ─ Unified Documentation
+Package: `rlvgl-ui`
 *(Copy-paste this single file into `ui/README.md` or anywhere you like.)*
 
 ---

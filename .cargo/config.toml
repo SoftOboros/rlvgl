@@ -1,0 +1,3 @@
+# .cargo/config.toml
+[target.thumbv7em-none-eabihf]
+rustflags = ["-C", "link-arg=-T${RLVGL_LINKER_SCRIPT}"]

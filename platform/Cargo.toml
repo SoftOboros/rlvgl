@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-platform"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -18,13 +18,40 @@ rlvgl-core = { version = "0.1.5", path = "../core", default-features = false }
 embedded-hal = { version = "1.0", optional = true }
 display-interface = { version = "0.5", optional = true }
 display-interface-spi = { version = "0.5", optional = true }
-pixels = { version = "0.15", optional = true }
 winit = { version = "0.30.12", optional = true }
+wgpu = { version = "0.19", optional = true, features = ["wgsl"] }
+pollster = { version = "0.3", optional = true }
 eframe = { version = "0.27", default-features = false, features = ["glow"], optional = true }
 embedded-graphics = { version = "0.8", optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+bitflags = { version = "2", default-features = false }
+heapless = { version = "0.8", default-features = false }
+tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt"] }
+
+[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
+stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
+stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc"] }
+cortex-m = { version = "0.7", optional = true, features = ["critical-section-single-core", "cm7"] }
 
 [features]
 default = []
-simulator = ["pixels", "winit", "embedded-graphics", "eframe"]
+simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster", "dep:image", "tracing-subscriber"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
+stm32h747i_disco = ["stm32h7", "embedded-hal", "stm32h7xx-hal", "cortex-m", "rlvgl-core/fs"]
+dma2d = ["stm32h7"]
 fontdue = ["rlvgl-core/fontdue"]
+png = ["rlvgl-core/png"]
+jpeg = ["rlvgl-core/jpeg"]
+gif = ["rlvgl-core/gif"]
+qrcode = ["rlvgl-core/qrcode"]
+apng = ["rlvgl-core/apng", "dep:image"]
+lottie = ["rlvgl-core/lottie"]
+canvas = ["rlvgl-core/canvas", "embedded-graphics"]
+pinyin = ["rlvgl-core/pinyin"]
+fatfs = ["rlvgl-core/fatfs"]
+nes = ["rlvgl-core/nes"]
+
+[dev-dependencies]
+base64 = "0.21"
+fatfs = "0.3"
+fscommon = "0.1"

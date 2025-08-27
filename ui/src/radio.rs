@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Radio component with change callbacks for rlvgl-ui.
 //!
-//! Wraps the base radio widget and exposes a builder-style `on_change`
-//! handler that fires whenever the selection toggles.
+//! Wraps the [`Radio`](rlvgl_widgets::radio::Radio) widget and exposes a
+//! builder-style `on_change` handler fired whenever the selection toggles.
 
 use alloc::{boxed::Box, string::String};
 use rlvgl_core::{

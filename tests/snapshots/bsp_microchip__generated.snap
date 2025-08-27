@@ -1,0 +1,10 @@
+---
+source: tests/bsp_microchip.rs
+expression: rendered
+---
+pin PA00 SPI0_SCK af0
+pin PA01 SPI0_MOSI af0
+peripheral spi0 spi
+  ctor Spi::spi0
+  mosi=PA01
+  sck=PA00

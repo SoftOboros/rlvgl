@@ -1,0 +1,18 @@
+{# Board-level module template for rlvgl-creator. #}
+//! Generated board modules.
+{%- if hal %}
+#[cfg(feature = "hal")]
+pub mod hal;
+{%- endif %}
+{%- if pac %}
+#[cfg(feature = "pac")]
+pub mod pac;
+{%- endif %}
+{%- if summary %}
+#[cfg(feature = "summaries")]
+pub mod summary;
+{%- endif %}
+{%- if pinreport %}
+#[cfg(feature = "pinreport")]
+pub mod pinreport;
+{%- endif %}

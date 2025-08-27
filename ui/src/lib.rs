@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-//! High-level style and theme utilities for rlvgl UI components.
+//! High-level style and theme utilities bridging
+//! [`rlvgl-core`](rlvgl_core) and [`rlvgl-widgets`](rlvgl_widgets)
+//! components.
 
 #![no_std]
 

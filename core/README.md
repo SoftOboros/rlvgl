@@ -1,4 +1,13 @@
+<!--
+core/README.md - Overview of rlvgl core abstractions.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl-core
+
+Package: `rlvgl-core`.
 
 This crate contains the runtime abstractions that underpin every widget and
 backend used in **rlvgl**.

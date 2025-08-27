@@ -1,3 +1,6 @@
 [submodule "lvgl"]
 	path = lvgl
 	url = https://github.com/lvgl/lvgl.git
+[submodule "chips/stm/STM32_open_pin_data"]
+	path = chips/stm/STM32_open_pin_data
+	url = https://github.com/STMicroelectronics/STM32_open_pin_data.git

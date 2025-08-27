@@ -1,0 +1,24 @@
+<Mcu Family="STM32C0" Line="STM32C0x1" Package="UFQFPN20" RefName="STM32C011F4Ux" ClockTree="STM32C0" DBVersion="V3.0" HasPowerPad="false">
+  <Core>ARM Cortex-M0+</Core>
+  <Frequency>48</Frequency>
+  <Ram>6</Ram>
+  <Flash>16</Flash>
+  <Flash>32</Flash>
+  <Voltage Min="2.0" Max="3.6"/>
+  <Temperature Min="-40" Max="85"/>
+  <IONb>18</IONb>
+  <Die>DIE443</Die>
+  <IP InstanceName="ADC1" Name="ADC" Version="aditf4_v3_0_Cube" ConfigFile="ADC-STM32C0xx" ClockEnableMode="__HAL_RCC_ADC_CLK_ENABLE"/>
+  <IP InstanceName="USART1" Name="USART" Version="sci3_v2_1_Cube"/>
+  <Pin Name="PA0" Position="5" Type="I/O">
+    <Signal Name="ADC1_IN0"/>
+    <Signal Name="PWR_WKUP1"/>
+    <Signal Name="TIM16_CH1"/>
+    <Signal Name="TIM1_CH1"/>
+    <Signal Name="USART1_TX"/>
+    <Signal Name="USART2_CTS"/>
+    <Signal Name="USART2_NSS"/>
+    <Signal Name="GPIO" IOModes="Input,Output,Analog,EXTI"/>
+  </Pin>
+  <Pin Name="VSS" Position="10" Type="Power"/>
+</Mcu>

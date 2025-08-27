@@ -1,0 +1,27 @@
+---
+source: tests/bsp_roundtrip.rs
+expression: rendered
+---
+pll pll1 m5 n400 p2 q4 r2
+kernel usart1 pclk2
+pin PA9 USART1_TX af7
+pin PA10 USART1_RX af7
+pin PB0 GPIO_Output af0
+pin PB3 SPI1_SCK af5
+pin PB4 SPI1_MISO af5
+pin PB5 SPI1_MOSI af5
+pin PB6 I2C1_SCL af4
+pin PB7 I2C1_SDA af4
+peripheral i2c1 i2c
+  ctor I2c::i2c1
+  scl=PB6
+  sda=PB7
+peripheral spi1 spi
+  ctor Spi::spi1
+  miso=PB4
+  mosi=PB5
+  sck=PB3
+peripheral usart1 serial
+  ctor Serial::usart1
+  rx=PA10
+  tx=PA9

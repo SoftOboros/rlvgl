@@ -1,0 +1,5 @@
+//! Generated board modules.
+{%- for module in modules %}
+#[cfg(feature = "{{ module }}")]
+pub mod {{ module }};
+{%- endfor %}

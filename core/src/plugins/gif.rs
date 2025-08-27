@@ -1,7 +1,8 @@
 //! GIF decoder returning frames.
 use crate::widget::Color;
 use alloc::vec::Vec;
-use gif::{ColorOutput, DecodeOptions, DecodingError, Frame};
+pub use gif::DecodingError;
+use gif::{ColorOutput, DecodeOptions, Frame};
 use std::io::Cursor;
 
 #[derive(Debug, Clone)]

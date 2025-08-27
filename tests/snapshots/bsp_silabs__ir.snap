@@ -1,0 +1,22 @@
+---
+source: tests/bsp_silabs.rs
+expression: "&spec"
+---
+mcu: EFM32GG11
+package: QFN48
+clocks:
+  pll: {}
+  kernels: {}
+pinctrl:
+  - pin: PA0
+    func: SPI0_SCK
+    af: 0
+  - pin: PA1
+    func: SPI0_MOSI
+    af: 0
+peripherals:
+  spi0:
+    class: spi
+    signals:
+      sck: PA0
+      mosi: PA1

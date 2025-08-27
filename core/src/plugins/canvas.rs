@@ -20,6 +20,12 @@ impl Canvas {
         }
     }
 
+    /// Return the width and height of the canvas in pixels.
+    pub fn size(&self) -> (u32, u32) {
+        let s = self.inner.size();
+        (s.width, s.height)
+    }
+
     /// Draw a single pixel at the provided point using the given color.
     pub fn draw_pixel(&mut self, point: Point, color: Color) {
         let rgb = Rgb888::new(color.0, color.1, color.2);

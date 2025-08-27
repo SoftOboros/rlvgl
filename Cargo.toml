@@ -1,7 +1,7 @@
 [package]
 name = "rlvgl"
-version = "0.1.6"
-authors = ["Ira Abbott <ira@softobotos.com>"]
+version = "0.1.7"
+authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
 description = "A modular, idiomatic Rust reimplementation of the LVGL graphics library for embedded and simulator use."
@@ -29,13 +29,25 @@ path = "src/lib.rs"
 [[bin]]
 name = "rlvgl-sim"
 path = "examples/sim/src/main.rs"
-required-features = ["simulator", "qrcode", "png", "jpeg", "fontdue"]
+required-features = ["simulator", "qrcode", "png", "jpeg", "gif", "fontdue"]
+
+[[bin]]
+name = "rlvgl-stm32h747i-disco"
+path = "examples/stm32h747i-disco/src/main.rs"
+required-features = ["stm32h747i_disco"]
+
+[[bin]]
+name = "rlvgl-creator"
+path = "src/bin/rlvgl_creator/main.rs"
+required-features = ["creator"]
 
 [dependencies]
-rlvgl-core = { version = "0.1.5", path = "core", default-features = false }
+rlvgl-core = { version = "0.1.6", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.1.4", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.1.4", path = "platform", default-features = false }
-rlvgl-ui = { version = "0.1.0", path = "ui", default-features = false }
+rlvgl-platform = { version = "0.1.5", path = "platform", default-features = false }
+rlvgl-ui = { version = "0.1.1", path = "ui", default-features = false }
+embedded-hal = { version = "1.0", optional = true }
+stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -62,27 +74,266 @@ optional = true
 version = "1"
 default-features = false
 optional = true
+
+[dependencies.zstd]
+version = "0.12"
+optional = true
 [dependencies.image]
 version = "0.25"
 default-features = false
 features = ["png"]
 optional = true
 
+[dependencies.cortex-m-rt]
+version = "0.7"
+optional = true
+
+[dependencies.cortex-m]
+version = "0.7"
+features = ["critical-section-single-core"]
+optional = true
+
+
+[dependencies.panic-halt]
+version = "1.0.0"
+optional = true
+
+[dependencies.embedded-alloc]
+version = "=0.5.1"
+optional = true
+
+[dependencies.critical-section]
+version = "1.1.2"
+optional = true
+
+[dependencies.apng]
+version = "0.3"
+optional = true
+
+[dependencies.png]
+version = "0.17"
+optional = true
+
+[dependencies.clap]
+version = "4.5.4"
+features = ["derive"]
+optional = true
+
+[dependencies.anyhow]
+version = "1"
+optional = true
+
+[dependencies.walkdir]
+version = "2"
+optional = true
+
+[dependencies.blake3]
+version = "1"
+optional = true
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+optional = true
+
+[dependencies.serde_yaml]
+version = "0.9"
+optional = true
+
+
+[dependencies.schemars]
+version = "0.8"
+features = ["derive"]
+optional = true
+
+[dependencies.serde_json]
+version = "1"
+optional = true
+
+[dependencies.regex]
+version = "1"
+optional = true
+
+[dependencies.indexmap]
+version = "2"
+optional = true
+features = ["serde"]
+
+[dependencies.minijinja]
+version = "2"
+optional = true
+
+[dependencies.spdx]
+version = "0.11"
+optional = true
+
+[dependencies.rayon]
+version = "1"
+optional = true
+
+[dependencies.resvg]
+version = "0.45.1"
+optional = true
+
+[dependencies.eframe]
+version = "0.29"
+optional = true
+
+[dependencies.open]
+version = "5"
+optional = true
+
+[dependencies.notify]
+version = "6"
+optional = true
+
+[dependencies.rfd]
+version = "0.15"
+optional = true
+
+[dependencies.rlvgl-bsps-stm]
+path = "chips/stm/bsps"
+optional = true
+[dependencies.rlvgl-chips-stm]
+path = "chipdb/rlvgl-chips-stm"
+optional = true
+
+[dependencies.rlvgl-chips-nrf]
+path = "chipdb/rlvgl-chips-nrf"
+optional = true
+
+[dependencies.rlvgl-chips-esp]
+path = "chipdb/rlvgl-chips-esp"
+optional = true
+
+[dependencies.rlvgl-chips-nxp]
+path = "chipdb/rlvgl-chips-nxp"
+optional = true
+
+[dependencies.rlvgl-chips-silabs]
+path = "chipdb/rlvgl-chips-silabs"
+optional = true
+
+[dependencies.rlvgl-chips-microchip]
+path = "chipdb/rlvgl-chips-microchip"
+optional = true
+
+[dependencies.rlvgl-chips-renesas]
+path = "chipdb/rlvgl-chips-renesas"
+optional = true
+
+[dependencies.rlvgl-chips-ti]
+path = "chipdb/rlvgl-chips-ti"
+optional = true
+
+[dependencies.rlvgl-chips-rp2040]
+path = "chipdb/rlvgl-chips-rp2040"
+optional = true
+
+[dev-dependencies]
+insta = { version = "1", features = ["yaml"] }
+tempfile = "3"
+rlvgl-chips-stm = { path = "chipdb/rlvgl-chips-stm" }
+rlvgl-chips-nrf = { path = "chipdb/rlvgl-chips-nrf" }
+rlvgl-chips-esp = { path = "chipdb/rlvgl-chips-esp" }
+rlvgl-chips-nxp = { path = "chipdb/rlvgl-chips-nxp" }
+rlvgl-chips-silabs = { path = "chipdb/rlvgl-chips-silabs" }
+rlvgl-chips-microchip = { path = "chipdb/rlvgl-chips-microchip" }
+rlvgl-chips-renesas = { path = "chipdb/rlvgl-chips-renesas" }
+rlvgl-chips-ti = { path = "chipdb/rlvgl-chips-ti" }
+rlvgl-chips-rp2040 = { path = "chipdb/rlvgl-chips-rp2040" }
+serde_json = "1"
+anyhow = "1"
+indexmap = { version = "2", features = ["serde"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+zstd = "0.12"
+syn = { version = "2", features = ["full"] }
+
 [features]
 default = []
-png = ["rlvgl-core/png"]
-jpeg = ["rlvgl-core/jpeg"]
-gif = ["rlvgl-core/gif", "dep:gif"]
-qrcode = ["rlvgl-core/qrcode"]
+png = ["rlvgl-core/png", "rlvgl-platform/png"]
+jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg"]
+gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif"]
+qrcode = ["rlvgl-core/qrcode", "rlvgl-platform/qrcode"]
 simulator = ["rlvgl-platform/simulator"]
 st7789 = ["rlvgl-platform/st7789"]
+stm32h747i_disco = [
+    "rlvgl-platform/stm32h747i_disco",
+    "dep:cortex-m-rt",
+    "dep:cortex-m",
+    "dep:embedded-alloc",
+    "dep:panic-halt",
+    "dep:embedded-hal",
+    "dep:stm32h7",
+]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
-lottie = ["rlvgl-core/lottie", "dep:rlottie"]
-canvas = ["rlvgl-core/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
-pinyin = ["rlvgl-core/pinyin"]
-fatfs = ["rlvgl-core/fatfs", "dep:fatfs", "dep:fscommon"]
-nes = ["rlvgl-core/nes", "dep:yane"]
-apng = ["rlvgl-core/apng", "dep:image"]
+lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie", "dep:rlottie"]
+canvas = ["rlvgl-core/canvas", "rlvgl-platform/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
+pinyin = ["rlvgl-core/pinyin", "rlvgl-platform/pinyin"]
+fatfs = ["rlvgl-core/fatfs", "rlvgl-platform/fatfs", "dep:fatfs", "dep:fscommon"]
+nes = ["rlvgl-core/nes", "rlvgl-platform/nes", "dep:yane"]
+apng = ["rlvgl-core/apng", "dep:image", "rlvgl-platform/apng"]
+fs = ["rlvgl-core/fs"]
+creator = [
+    "dep:clap",
+    "dep:anyhow",
+    "dep:walkdir",
+    "dep:blake3",
+    "dep:serde",
+    "dep:serde_yaml",
+    "dep:image",
+    "dep:minijinja",
+    "dep:apng",
+    "dep:png",
+    "dep:schemars",
+    "dep:serde_json",
+    "dep:regex",
+    "dep:indexmap",
+    "dep:spdx",
+    "dep:fontdue",
+    "dep:rlottie",
+    "dep:rayon",
+    "dep:resvg",
+    "dep:zstd",
+    "dep:rlvgl-bsps-stm",
+    "dep:rlvgl-chips-stm",
+    "dep:rlvgl-chips-nrf",
+    "dep:rlvgl-chips-esp",
+    "dep:rlvgl-chips-nxp",
+    "dep:rlvgl-chips-silabs",
+    "dep:rlvgl-chips-microchip",
+    "dep:rlvgl-chips-renesas",
+    "dep:rlvgl-chips-ti",
+    "dep:rlvgl-chips-rp2040",
+]
+creator_ui = [
+    "dep:eframe",
+    "dep:anyhow",
+    "dep:serde",
+    "dep:serde_yaml",
+    "dep:image",
+    "dep:schemars",
+    "dep:walkdir",
+    "dep:blake3",
+    "dep:apng",
+    "dep:png",
+    "dep:open",
+    "dep:notify",
+    "dep:rfd",
+    "dep:serde_json",
+    "dep:zstd",
+    "dep:rlvgl-bsps-stm",
+    "dep:rlvgl-chips-stm",
+    "dep:rlvgl-chips-nrf",
+    "dep:rlvgl-chips-esp",
+    "dep:rlvgl-chips-nxp",
+    "dep:rlvgl-chips-silabs",
+    "dep:rlvgl-chips-microchip",
+    "dep:rlvgl-chips-renesas",
+    "dep:rlvgl-chips-ti",
+    "dep:rlvgl-chips-rp2040",
+]
 
 [profile.release]
 opt-level = "z"
@@ -98,6 +349,12 @@ opt-level = 1
 debug = true
 incremental = false
 
+[workspace.dependencies]
+image = "0.25.6"
+objc2-app-kit = "0.3.1"
+objc2 = "0.6.2"
+objc2-foundation = "0.3.1"
+
 [workspace]
-members = ["core", "platform", "widgets", "ui"]
+members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040", "chips/stm/bsps"]
 resolver = "2"

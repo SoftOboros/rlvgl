@@ -1,0 +1,2 @@
+Mcu.Name=STM32F429
+PA1.Signal=GPIO_Output

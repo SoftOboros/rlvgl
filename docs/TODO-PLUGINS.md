@@ -1,3 +1,10 @@
+<!--
+docs/TODO-PLUGINS.md - rlvgl – Plugins Workstream TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl – Plugins Workstream TODO
 
 > **Purpose**  Track incremental porting of C-based LVGL add-ons to Rust crates for `rlvgl`.  Tasks are ordered to respect technical dependencies so each layer builds on the previous one.

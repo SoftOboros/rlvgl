@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -42,6 +42,7 @@ pinyin = []
 fatfs = ["dep:fatfs", "dep:fscommon"]
 nes = ["dep:yane"]
 apng = ["dep:image"]
+fs = []
 
 [dev-dependencies]
 rlvgl-widgets = { path = "../widgets" }

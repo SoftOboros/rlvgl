@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
-//! Button helpers and IconButton component for rlvgl-ui.
+//! Button helpers and [`IconButton`](crate::button::IconButton) component
+//! for rlvgl-ui.
 //!
-//! Provides a convenient icon-only button wrapper built atop the base widget.
+//! Wraps the [`Button`](rlvgl_widgets::button::Button) widget from
+//! `rlvgl-widgets` to render glyph-only controls.
 
 use crate::icon::Icon;
 use rlvgl_core::{

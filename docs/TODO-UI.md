@@ -1,3 +1,10 @@
+<!--
+docs/TODO-UI.md - rlvgl – UI Workstream TODO.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
 # rlvgl – UI Workstream TODO
 
 This file tracks the tasks for building the high-level `rlvgl-ui` crate.

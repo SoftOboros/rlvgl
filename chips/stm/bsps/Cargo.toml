@@ -1,0 +1,158 @@
+[package]
+name = "rlvgl-bsps-stm"
+version = "0.1.0"
+authors = [
+    "Ira Abbott <ira@softoboros.com>",
+]
+edition = "2024"
+license = "BSD-3-Clause"
+description = "BSP files for STM32 Demo, Nucleo, and Discovery boards per vendor .ioc files."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-bsps-stm"
+keywords = [
+    "embedded",
+    "stm32",
+    "stmicro",
+    "no_std",
+]
+categories = [
+    "embedded",
+    "no-std",
+    "bsp"
+]
+publish = true
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = [
+    "hal",
+    "split",
+]
+hal = []
+pac = []
+split = []
+flat = []
+summaries = []
+pinreport = []
+i2c1 = []
+i2c2 = []
+i2c3 = []
+i2c4 = []
+i2c5 = []
+i2c7 = []
+i2c8 = []
+spi1 = []
+spi2 = []
+spi3 = []
+spi4 = []
+spi5 = []
+spi6 = []
+spi8 = []
+uart10 = []
+uart4 = []
+uart5 = []
+uart7 = []
+uart8 = []
+usart1 = []
+usart2 = []
+usart3 = []
+usart4 = []
+usart5 = []
+usart6 = []
+usart7 = []
+usart8 = []
+stm32-c0 = []
+stm32-f0 = []
+stm32-f3 = []
+stm32-f4 = []
+stm32-f7 = []
+stm32-g0 = []
+stm32-g4 = []
+stm32-h5 = []
+stm32-h7 = []
+stm32-l0 = []
+stm32-l1 = []
+stm32-l4 = []
+stm32-l5 = []
+stm32-n6 = []
+stm32-u0 = []
+stm32-u5 = []
+
+[dependencies.stm32c0xx-hal]
+version = "0.0.0"
+optional = true
+default-features = false
+
+[dependencies.stm32f0xx-hal]
+version = "0.18.0"
+optional = true
+default-features = false
+
+[dependencies.stm32f3xx-hal]
+version = "0.10.0"
+optional = true
+default-features = false
+
+[dependencies.stm32f4xx-hal]
+version = "0.22.1"
+optional = true
+default-features = false
+
+[dependencies.stm32f7xx-hal]
+version = "0.8.0"
+optional = true
+default-features = false
+
+[dependencies.stm32g0xx-hal]
+version = "0.2.0"
+optional = true
+default-features = false
+
+[dependencies.stm32g4xx-hal]
+version = "0.0.1"
+optional = true
+default-features = false
+
+[dependencies.stm32h5xx-hal]
+version = "0.0.0"
+optional = true
+default-features = false
+
+[dependencies.stm32h7xx-hal]
+version = "0.16.0"
+optional = true
+default-features = false
+
+[dependencies.stm32l0xx-hal]
+version = "0.10.0"
+optional = true
+default-features = false
+
+[dependencies.stm32l1xx-hal]
+version = "0.1.0"
+optional = true
+default-features = false
+
+[dependencies.stm32l4xx-hal]
+version = "0.7.1"
+optional = true
+default-features = false
+
+[dependencies.stm32l5xx-hal]
+version = "0.0.0"
+optional = true
+default-features = false
+
+[dependencies.stm32wb-hal]
+version = "0.1.14"
+optional = true
+default-features = false
+
+[dependencies.stm32wlxx-hal]
+version = "0.6.1"
+optional = true
+default-features = false

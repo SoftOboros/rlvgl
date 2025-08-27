@@ -1,0 +1,10 @@
+{
+  "pins": {
+    "PA0": [
+      {"instance": "USART2", "signal": "USART2_TX", "af": 7}
+    ],
+    "PA1": [
+      {"instance": "USART2", "signal": "USART2_RX", "af": 7}
+    ]
+  }
+}
