@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -230,6 +230,10 @@ optional = true
 path = "chipdb/rlvgl-chips-rp2040"
 optional = true
 
+[dependencies.tar]
+version = "0.4"
+optional = true
+
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
@@ -296,6 +300,7 @@ creator = [
     "dep:rayon",
     "dep:resvg",
     "dep:zstd",
+    "dep:tar",
     "dep:rlvgl-bsps-stm",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
@@ -323,6 +328,7 @@ creator_ui = [
     "dep:rfd",
     "dep:serde_json",
     "dep:zstd",
+    "dep:tar",
     "dep:rlvgl-bsps-stm",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",

@@ -31,9 +31,20 @@ fn copy_asset(out_dir: &Path) -> bool {
     false
 }
 
+fn copy_loader(out_dir: &Path) -> bool {
+    let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let loader = manifest.join("db/loader.bin.zst");
+    if loader.exists() {
+        println!("cargo:rerun-if-changed={}", loader.display());
+        fs::copy(loader, out_dir.join("chipdb.bin.zst")).expect("copy loader");
+        return true;
+    }
+    false
+}
+
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    if copy_asset(&out_dir) {
+    if copy_asset(&out_dir) || copy_loader(&out_dir) {
         return;
     }
     println!("cargo:rerun-if-env-changed=RLVGL_CHIP_SRC");

@@ -9,8 +9,9 @@ use rlvgl_chips_stm as stm;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::path::Path;
+use tar::Archive;
 
 /// Convert a user CubeMX `.ioc` file into a board overlay JSON.
 ///
@@ -64,9 +65,24 @@ fn detect_mcu(text: &str) -> Result<String> {
 
 fn load_mcu_af(mcu: &str) -> Result<McuAf> {
     let blob = stm::raw_db();
-    let mut decoder = zstd::Decoder::new(&blob[..])?;
-    let mut data = Vec::new();
-    decoder.read_to_end(&mut data)?;
+    let data = zstd::decode_all(&blob[..])?;
+    // Try new tar-based layout first
+    {
+        let mut archive = Archive::new(Cursor::new(&data));
+        let target = format!("mcu/{mcu}.json");
+        let mut buf = Vec::new();
+        for file in archive.entries()? {
+            let mut file = file?;
+            if file.path()?.ends_with(&target) {
+                file.read_to_end(&mut buf)?;
+                let val: Value = serde_json::from_slice(&buf)?;
+                return Ok(McuAf {
+                    pins: parse_pins(&val),
+                });
+            }
+        }
+    }
+    // Fallback to legacy flat format
     let files = parse_raw_db(&data);
     let mcu_json = files
         .get("mcu.json")
@@ -75,6 +91,12 @@ fn load_mcu_af(mcu: &str) -> Result<McuAf> {
     let val = map
         .get(mcu)
         .ok_or_else(|| anyhow!("MCU '{}' not found in STM database", mcu))?;
+    Ok(McuAf {
+        pins: parse_pins(val),
+    })
+}
+
+fn parse_pins(val: &Value) -> HashMap<String, HashMap<String, u8>> {
     let mut pins = HashMap::new();
     if let Some(obj) = val.get("pins").and_then(|v| v.as_object()) {
         for (pin, entries) in obj {
@@ -92,7 +114,7 @@ fn load_mcu_af(mcu: &str) -> Result<McuAf> {
             pins.insert(pin.clone(), funcs);
         }
     }
-    Ok(McuAf { pins })
+    pins
 }
 
 struct McuAf {

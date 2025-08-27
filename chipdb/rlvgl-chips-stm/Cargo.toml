@@ -1,7 +1,7 @@
 # Configuration for rlvgl-chips-stm crate.
 [package]
 name = "rlvgl-chips-stm"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2021"
 license = "BSD-3-Clause"
