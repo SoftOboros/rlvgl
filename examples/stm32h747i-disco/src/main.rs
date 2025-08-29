@@ -19,8 +19,6 @@ use panic_halt as _;
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
 
-#[path = "../bsp/hal.rs"]
-mod bsp_hal;
 #[path = "../bsp/pac.rs"]
 mod bsp_pac;
 
@@ -48,6 +46,15 @@ fn main() -> ! {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
+        // Early spin delay to give debuggers time to attach before
+        // peripheral clocks and pin configuration. This is a coarse, cycle-based
+        // busy-wait that does not rely on any timers being configured yet.
+        // Adjust the iteration count as needed for your CPU clock.
+        // Rough guide: 10 × 100M cycles ≈ ~2.5s @ 400 MHz, ~10s @ 100 MHz.
+        for _ in 0..10 {
+            cortex_m::asm::delay(100_000_000);
+        }
+
         use core::convert::Infallible;
         use embedded_hal::{
             digital::{ErrorType as DigitalError, InputPin, OutputPin},
@@ -162,9 +169,11 @@ fn main() -> ! {
                 }
             }
         }
-
         let dp = bsp_pac::Peripherals::take().unwrap();
-        bsp_hal::init_board_hal(&dp);
+        // Configure essential clocks and pins using the generated PAC-based BSP
+        // prior to moving PAC peripherals.
+        bsp_pac::enable_gpio_clocks(&dp);
+        bsp_pac::configure_pins_pac(&dp);
         let bsp_pac::Peripherals {
             DSIHOST: dsi,
             FMC: fmc,

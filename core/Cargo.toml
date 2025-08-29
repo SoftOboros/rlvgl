@@ -15,7 +15,9 @@ publish = true
 
 [dependencies]
 
-png = { version = "0.17", optional = true }
+# Use `png` in no_std by disabling default features; the crate works with
+# `alloc` without an explicit feature flag in 0.17.x.
+png = { version = "0.17", default-features = false, optional = true }
 jpeg-decoder = { version = "0.3", optional = true }
 qrcode = { version = "0.14", default-features = false, optional = true }
 gif = { version = "0.13", optional = true }
@@ -57,4 +59,3 @@ rustdoc-args = ["--cfg", "docsrs", "--cfg", "nightly"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ["cfg(nightly)"] }
-

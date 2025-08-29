@@ -6,6 +6,8 @@ docker run -d \
   -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?Need AWS_ACCESS_KEY_ID set}" \
   -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?Need AWS_SECRET_ACCESS_KEY set}" \
   -e SCCACHE_REGION="${AWS_REGION:?Need AWS_REGION set}" \
+  -v codex_state:/root/.codex \
+  -p 127.0.0.1:1455:1455 \
   --name rlvgl-builder \
   iraa/rlvgl:latest tail -f /dev/null
 # Get a copy of .ssh files from outside repo and populate them on the container once 

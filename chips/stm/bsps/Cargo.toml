@@ -16,12 +16,12 @@ keywords = [
     "stm32",
     "stmicro",
     "no_std",
-    "bsp"
+    "bsp",
 ]
 categories = [
     "embedded",
     "no-std",
-    "hardware-support"
+    "hardware-support",
 ]
 publish = true
 

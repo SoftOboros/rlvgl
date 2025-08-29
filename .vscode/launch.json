@@ -65,14 +65,28 @@
         "/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts"
       ],
       "toolchainPrefix": "arm-none-eabi-",
-      "svdFile": "${workspaceFolder}/STM32H747.svd",
       "runToEntryPoint": "main",
       "preLaunchTask": "Build: rlvgl-stm32h747i-disco",
       "preLaunchCommands": [
         "monitor reset init",
         "load",
-        "monitor mdw 0x08000000 2",
         "monitor reset init"
+      ],
+      "showDevDebugOutput": "raw"
+    },
+    {
+      "name": "DISCO (Attach ext OpenOCD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "external",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "gdbTarget": "localhost:3333",
+      "toolchainPrefix": "arm-none-eabi-",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "Build: rlvgl-stm32h747i-disco",
+      "preLaunchCommands": [
+        "monitor reset halt"
       ],
       "showDevDebugOutput": "raw"
     }

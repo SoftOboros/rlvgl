@@ -93,6 +93,11 @@ version = "0.7"
 features = ["critical-section-single-core"]
 optional = true
 
+[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32h7xx-hal]
+version = "0.16"
+optional = true
+features = ["stm32h747cm7", "sdmmc"]
+
 
 [dependencies.panic-halt]
 version = "1.0.0"
@@ -270,6 +275,7 @@ stm32h747i_disco = [
     "dep:panic-halt",
     "dep:embedded-hal",
     "dep:stm32h7",
+    "dep:stm32h7xx-hal",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie", "dep:rlottie"]
