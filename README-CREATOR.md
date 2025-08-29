@@ -116,7 +116,7 @@ use rlvgl_bsps_stm::f407_demo as bsp;
 Generate PAC or HAL code from a CubeMX `.ioc` file using the bundled AF database:
 
 ```bash
-rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+rlvgl-creator bsp from-ioc board.ioc \
   --out bsp \
   --emit-pac \
   --grouped-writes \
@@ -131,7 +131,7 @@ CubeMX projects often assign `GPIO_Label` to pins (e.g., `PA9.GPIO_Label=STLINK_
 - Use labels as identifiers (HAL only):
 
 ```bash
-rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+rlvgl-creator bsp from-ioc board.ioc \
   --out bsp --emit-hal \
   --use-label-names \
   --label-prefix pin_ \
@@ -143,7 +143,7 @@ This sanitizes labels into snake_case (prefixing identifiers that start with dig
 - Emit label constants (PAC):
 
 ```bash
-rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+rlvgl-creator bsp from-ioc board.ioc \
   --out bsp --emit-pac \
   --emit-label-consts
 ```

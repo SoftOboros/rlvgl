@@ -19,7 +19,7 @@ use panic_halt as _;
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
 
-#[path = "../bsp/pac.rs"]
+#[path = "bsp/pac.rs"]
 mod bsp_pac;
 
 /// Global allocator backed by a fixed-size heap in RAM.

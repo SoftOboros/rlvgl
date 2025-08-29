@@ -69,9 +69,10 @@ clock selections so that clock setup can be generated alongside pin
 configuration.
 
 No per-chip tables are maintained. Class-level rules are reused across
-instances and vendors, while alternate functions are discovered
-programmatically from per-vendor Python scripts that build a JSON database.
-Reserved SWD pins (`PA13`, `PA14`) are rejected unless explicitly allowed.
+instances and vendors. Alternate functions are derived from embedded vendor
+databases generated from the official XML sources; no external JSON is
+required at generation time. Reserved SWD pins (`PA13`, `PA14`) are rejected
+unless explicitly allowed.
 
 Typical flow:
 
@@ -81,18 +82,8 @@ rlvgl-creator platform gen --spec board.yaml --templates templates/stm32h7 \
   --out src/generated.rs
 ```
 
-To supply accurate alternate-function numbers, generate a JSON database once
-from a vendor-provided pin listing. For STM32, a helper script consumes either
-an `.ioc` project file or a CSV export:
-
-```bash
-python tools/afdb/st_extract_af.py --input stm32_af.csv --output af.json
-# or convert a directory of `.ioc`/`.csv` files
-python tools/afdb/st_extract_af.py --input boards/ --output build/stm
-```
-
-The resulting `af.json` can be passed to `rlvgl-creator` 🆕 via
-`platform import --afdb af.json`.
+Alternate-function numbers are computed from the embedded database at runtime
+by `rlvgl-creator`, so there is no need to generate or pass a JSON file.
 
 To package vendor chip databases for testing or publishing, run:
 

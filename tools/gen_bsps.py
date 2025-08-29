@@ -21,10 +21,8 @@ def main() -> None:
     )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    af_db = Path(__file__).resolve().parent.parent / "stm32_af.json"
     for ioc in args.input.glob("*.ioc"):
         module = ioc.stem.replace("-", "_")
-        tmp_json = Path(tempfile.mkstemp(suffix=".json")[1])
         subprocess.run(
             [
                 "rlvgl-creator",
@@ -32,15 +30,12 @@ def main() -> None:
                 "from-ioc",
                 str(ioc),
                 module,
-                str(tmp_json),
-                "--af",
-                str(af_db),
+                str(Path(tempfile.mkstemp(suffix=".json")[1])),
                 "--bsp-out",
                 str(args.output),
             ],
             check=True,
         )
-        tmp_json.unlink(missing_ok=True)
 
     tmpl_path = Path(__file__).resolve().parents[1] / "src/bin/creator/bsp/templates"
     env = Environment(loader=FileSystemLoader(tmpl_path))

@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow};
 use minijinja::{Environment, context};
 
-use crate::bsp::{af::JsonAfDb, ioc, ir};
+use crate::bsp::{ioc, ir};
+use rlvgl_chips_stm as stm;
 
 /// Built-in templates for BSP rendering.
 #[derive(Clone)]
@@ -33,11 +34,10 @@ pub enum Layout {
 
 /// Convert a CubeMX `.ioc` file into Rust source using `template`.
 ///
-/// The `af_json` file supplies alternate-function numbers. Rendered output is
+/// AFs are derived from the embedded vendor database. Rendered output is
 /// written into `out_dir` with the template's base name.
 pub(crate) fn from_ioc(
     ioc_path: &Path,
-    af_json: &Path,
     template: TemplateKind,
     out_dir: &Path,
     grouped_writes: bool,
@@ -51,8 +51,10 @@ pub(crate) fn from_ioc(
     emit_label_consts: bool,
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
-    let af = JsonAfDb::from_path(af_json)?;
-    let ir = ioc::ioc_to_ir(&text, &af, allow_reserved)?;
+    // Determine AF provider from embedded vendor database
+    let mcu = detect_mcu(&text)?;
+    let vendor = load_mcu_af(&mcu)?;
+    let ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
 
     // Ensure all peripherals reference known pins
     use std::collections::HashSet;
@@ -183,6 +185,101 @@ pub(crate) fn from_ioc(
         }
     }
     Ok(())
+}
+
+fn detect_mcu(text: &str) -> Result<String> {
+    text.lines()
+        .find_map(|l| l.strip_prefix("Mcu.Name=").map(|s| s.to_string()))
+        .ok_or_else(|| anyhow!("Mcu.Name not found in .ioc"))
+}
+
+struct McuAf {
+    pins: std::collections::HashMap<String, std::collections::HashMap<String, u8>>,
+}
+
+impl crate::bsp::af::AfProvider for McuAf {
+    fn lookup_af(&self, _mcu: &str, pin: &str, func: &str) -> Option<u8> {
+        self.pins.get(pin).and_then(|m| m.get(func)).copied()
+    }
+}
+
+fn load_mcu_af(mcu: &str) -> Result<McuAf> {
+    let blob = stm::raw_db();
+    let data = zstd::decode_all(&blob[..])?;
+    {
+        let mut archive = tar::Archive::new(std::io::Cursor::new(&data));
+        let target = format!("mcu/{mcu}.json");
+        let mut buf = Vec::new();
+        for file in archive.entries()? {
+            let mut file = file?;
+            if file.path()?.ends_with(&target) {
+                use std::io::Read;
+                file.read_to_end(&mut buf)?;
+                let val: serde_json::Value = serde_json::from_slice(&buf)?;
+                return Ok(McuAf {
+                    pins: parse_pins(&val),
+                });
+            }
+        }
+    }
+    // Legacy flat format fallback
+    let files = parse_raw_db(&data);
+    let mcu_json = files
+        .get("mcu.json")
+        .ok_or_else(|| anyhow!("mcu.json missing from STM database"))?;
+    let map: std::collections::HashMap<String, serde_json::Value> =
+        serde_json::from_slice(mcu_json)?;
+    let val = map
+        .get(mcu)
+        .ok_or_else(|| anyhow!("MCU '{}' not found in STM database", mcu))?;
+    Ok(McuAf {
+        pins: parse_pins(val),
+    })
+}
+
+fn parse_pins(
+    val: &serde_json::Value,
+) -> std::collections::HashMap<String, std::collections::HashMap<String, u8>> {
+    let mut pins = std::collections::HashMap::new();
+    if let Some(obj) = val.get("pins").and_then(|v| v.as_object()) {
+        for (pin, entries) in obj {
+            let mut funcs = std::collections::HashMap::new();
+            if let Some(arr) = entries.as_array() {
+                for e in arr {
+                    if let (Some(sig), Some(af)) = (
+                        e.get("signal").and_then(|s| s.as_str()),
+                        e.get("af").and_then(|a| a.as_u64()),
+                    ) {
+                        funcs.insert(sig.to_string(), af as u8);
+                    }
+                }
+            }
+            pins.insert(pin.clone(), funcs);
+        }
+    }
+    pins
+}
+
+fn parse_raw_db(blob: &[u8]) -> std::collections::HashMap<String, Vec<u8>> {
+    let text = core::str::from_utf8(blob).unwrap_or("");
+    let mut files = std::collections::HashMap::new();
+    let mut lines = text.lines();
+    while let Some(line) = lines.next() {
+        if let Some(name) = line.strip_prefix('>') {
+            let mut content = String::new();
+            while let Some(l) = lines.next() {
+                if l == "<" {
+                    break;
+                }
+                if !content.is_empty() {
+                    content.push('\n');
+                }
+                content.push_str(l);
+            }
+            files.insert(name.to_string(), content.into_bytes());
+        }
+    }
+    files
 }
 
 #[cfg(test)]

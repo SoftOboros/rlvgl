@@ -17,27 +17,35 @@ clocks:
 pinctrl:
   - pin: PA9
     func: USART1_TX
+    label: ~
     af: 7
   - pin: PA10
     func: USART1_RX
+    label: ~
     af: 7
   - pin: PB0
     func: GPIO_Output
+    label: ~
     af: 0
   - pin: PB3
     func: SPI1_SCK
+    label: ~
     af: 5
   - pin: PB4
     func: SPI1_MISO
+    label: ~
     af: 5
   - pin: PB5
     func: SPI1_MOSI
+    label: ~
     af: 5
   - pin: PB6
     func: I2C1_SCL
+    label: ~
     af: 4
   - pin: PB7
     func: I2C1_SDA
+    label: ~
     af: 4
 peripherals:
   usart1:
