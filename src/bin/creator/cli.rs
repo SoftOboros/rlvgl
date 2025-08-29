@@ -319,6 +319,9 @@ enum BspCommand {
         /// Fail if two labels sanitize to the same identifier
         #[arg(long)]
         fail_on_duplicate_labels: bool,
+        /// Emit a `pins` module with label constants (PAC)
+        #[arg(long)]
+        emit_label_consts: bool,
     },
 }
 
@@ -439,6 +442,7 @@ pub fn run() -> Result<()> {
                         false,
                         None,
                         false,
+                        false,
                     )?;
                 }
             }
@@ -459,6 +463,7 @@ pub fn run() -> Result<()> {
                 use_label_names,
                 label_prefix,
                 fail_on_duplicate_labels,
+                emit_label_consts,
             } => {
                 let mut kinds = Vec::new();
                 if emit_hal {
@@ -491,6 +496,7 @@ pub fn run() -> Result<()> {
                         use_label_names,
                         label_prefix.as_deref(),
                         fail_on_duplicate_labels,
+                        emit_label_consts,
                     )?;
                 }
                 if per_peripheral {

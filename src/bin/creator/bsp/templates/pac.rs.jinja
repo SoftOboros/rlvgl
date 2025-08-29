@@ -441,3 +441,18 @@ pub fn init_board_pac(dp: pac::Peripherals) {
     enable_peripherals(&dp);
 }
 {% endif %}
+
+{# Emit label constants if requested #}
+{% if emit_label_consts and idents and spec.pinctrl|length %}
+/// Label-to-pin mapping constants derived from GPIO_Label entries.
+#[allow(dead_code)]
+pub struct PinLabel { pub pin: &'static str, pub func: &'static str, pub af: u8 }
+
+/// Constants for user labels to ease discovery and mapping.
+pub mod pins {
+    use super::PinLabel;
+    {% for pin in spec.pinctrl if pin.label and idents.get(pin.pin) is defined %}
+    pub const {{ idents.get(pin.pin) | upper }}: PinLabel = PinLabel { pin: "{{ pin.pin }}", func: "{{ pin.func }}", af: {{ pin.af }} };
+    {% endfor %}
+}
+{% endif %}

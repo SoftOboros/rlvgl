@@ -111,3 +111,41 @@ Include a module in your project:
 use rlvgl_bsps_stm::f407_demo as bsp;
 ```
 
+## BSP generation from CubeMX
+
+Generate PAC or HAL code from a CubeMX `.ioc` file using the bundled AF database:
+
+```bash
+rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+  --out bsp \
+  --emit-pac \
+  --grouped-writes \
+  --with-deinit
+```
+
+### Using GPIO labels from `.ioc`
+
+CubeMX projects often assign `GPIO_Label` to pins (e.g., `PA9.GPIO_Label=STLINK_RX`). `rlvgl-creator` can propagate these through to the BSP IR and templates.
+
+- Add labels to comments (default): enabled automatically in both PAC and HAL templates.
+- Use labels as identifiers (HAL only):
+
+```bash
+rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+  --out bsp --emit-hal \
+  --use-label-names \
+  --label-prefix pin_ \
+  --fail-on-duplicate-labels
+```
+
+This sanitizes labels into snake_case (prefixing identifiers that start with digits/underscores, and avoiding Rust keywords) and uses them as local variable names in the HAL template. Duplicate labels after sanitization can be rejected (`--fail-on-duplicate-labels`) or deduplicated with numeric suffixes.
+
+- Emit label constants (PAC):
+
+```bash
+rlvgl-creator bsp from-ioc board.ioc stm32_af.json \
+  --out bsp --emit-pac \
+  --emit-label-consts
+```
+
+This adds a `pins` module with constants like `pub const STLINK_RX: PinLabel = PinLabel { pin: "PA9", func: "USART1_TX", af: 7 };` to make it easy to reference labeled pins from application code.

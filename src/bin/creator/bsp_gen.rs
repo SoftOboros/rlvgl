@@ -48,6 +48,7 @@ pub(crate) fn from_ioc(
     use_label_names: bool,
     label_prefix: Option<&str>,
     fail_on_duplicate_labels: bool,
+    emit_label_consts: bool,
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     let af = JsonAfDb::from_path(af_json)?;
@@ -105,7 +106,7 @@ pub(crate) fn from_ioc(
     // Prepare label-based identifiers for HAL template use if requested.
     use indexmap::IndexMap;
     let mut idents: IndexMap<String, String> = IndexMap::new();
-    if use_label_names {
+    if use_label_names || emit_label_consts {
         let mut seen = IndexMap::<String, usize>::new();
         for p in &ir.pinctrl {
             if let Some(label) = &p.label {
@@ -132,9 +133,14 @@ pub(crate) fn from_ioc(
 
     match layout {
         Layout::OneFile => {
-            let rendered = env.get_template("gen")?.render(
-                context! { spec => &ir, grouped_writes, with_deinit, use_label_names, idents },
-            )?;
+            let rendered = env.get_template("gen")?.render(context! {
+                spec => &ir,
+                grouped_writes,
+                with_deinit,
+                use_label_names,
+                emit_label_consts,
+                idents
+            })?;
             fs::write(base_dir.join(out_name), rendered)?;
         }
         Layout::PerPeripheral => {
@@ -161,6 +167,7 @@ pub(crate) fn from_ioc(
                     with_deinit,
                     mod_name => name,
                     use_label_names,
+                    emit_label_consts,
                     idents
                 })?;
                 fs::write(base_dir.join(format!("{name}.rs")), rendered)?;
@@ -208,6 +215,35 @@ mod tests {
             .render(context! { spec => &spec, grouped_writes => false, with_deinit => false })
             .unwrap();
         assert!(rendered.contains("PA9 USART1_TX AF7 (STLINK_RX)"));
+    }
+
+    #[test]
+    fn pac_template_emits_label_constants_when_enabled() {
+        let tmpl = include_str!("bsp/templates/pac.rs.jinja");
+        let mut env = Environment::new();
+        env.add_template("pac", tmpl).unwrap();
+
+        let spec = ir::Ir {
+            mcu: "STM32H747XIHx".to_string(),
+            package: "TFBGA240".to_string(),
+            clocks: ir::Clocks::default(),
+            pinctrl: vec![ir::Pin {
+                pin: "PA9".to_string(),
+                func: "USART1_TX".to_string(),
+                label: Some("STLINK_RX".to_string()),
+                af: 7,
+            }],
+            peripherals: indexmap::IndexMap::new(),
+        };
+        let mut idents = indexmap::IndexMap::new();
+        idents.insert("PA9".to_string(), "stlink_rx".to_string());
+        let rendered = env
+            .get_template("pac")
+            .unwrap()
+            .render(context! { spec => &spec, grouped_writes => false, with_deinit => false, emit_label_consts => true, idents })
+            .unwrap();
+        assert!(rendered.contains("pub const STLINK_RX: PinLabel"));
+        assert!(rendered.contains("pin: \"PA9\""));
     }
 
     #[test]
