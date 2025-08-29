@@ -14,7 +14,6 @@ use clap::{ArgAction, Parser, Subcommand};
 
 pub mod add_target;
 pub mod apng;
-pub mod board_import;
 pub mod bsp_gen;
 pub mod check;
 pub mod convert;
@@ -57,6 +56,10 @@ struct Cli {
     /// Increase output verbosity
     #[arg(short, long, global = true, action = ArgAction::Count)]
     verbose: u8,
+
+    /// Suppress non-error output (hides splash and info messages)
+    #[arg(long, global = true)]
+    silent: bool,
 
     /// Subcommand to execute
     #[command(subcommand)]
@@ -190,11 +193,6 @@ enum Command {
         #[arg(long)]
         inline_includes: bool,
     },
-    /// Board-related commands
-    Board {
-        #[command(subcommand)]
-        cmd: BoardCommand,
-    },
     /// Board support package generation commands
     Bsp {
         #[command(subcommand)]
@@ -244,31 +242,6 @@ enum LottieCommand {
         /// Optional APNG file to generate
         #[arg(long)]
         apng: Option<PathBuf>,
-    },
-}
-
-#[derive(Subcommand)]
-enum BoardCommand {
-    /// Convert a CubeMX `.ioc` file into a board overlay JSON
-    FromIoc {
-        /// Input `.ioc` file
-        ioc: PathBuf,
-        /// Board name to embed in the overlay
-        board: String,
-        /// Output path for the generated JSON
-        out: PathBuf,
-        /// Embed HAL template selection
-        #[arg(long, conflicts_with_all = ["pac", "template"])]
-        hal: bool,
-        /// Embed PAC template selection
-        #[arg(long, conflicts_with_all = ["hal", "template"])]
-        pac: bool,
-        /// Embed a custom template path
-        #[arg(long, conflicts_with_all = ["hal", "pac"])]
-        template: Option<String>,
-        /// Output directory for generated BSP code
-        #[arg(long)]
-        bsp_out: Option<PathBuf>,
     },
 }
 
@@ -323,8 +296,11 @@ enum BspCommand {
 /// Run the rlgvl-creator command-line interface.
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-    if cli.verbose > 0 {
-        eprintln!("Using manifest {}", cli.manifest.display());
+    if !cli.silent {
+        println!("rlvgl v{} • rlvgl-creator", env!("CARGO_PKG_VERSION"));
+        if cli.verbose > 0 {
+            eprintln!("Using manifest {}", cli.manifest.display());
+        }
     }
 
     match cli.command {
@@ -400,46 +376,6 @@ pub fn run() -> Result<()> {
                 inline_includes,
             )?;
         }
-        Command::Board { cmd } => match cmd {
-            BoardCommand::FromIoc {
-                ioc,
-                board,
-                out,
-                hal,
-                pac,
-                template,
-                bsp_out,
-            } => {
-                let tmpl_sel = if hal {
-                    Some("hal")
-                } else if pac {
-                    Some("pac")
-                } else {
-                    template.as_deref()
-                };
-                board_import::from_ioc(&ioc, &board, &out, tmpl_sel)?;
-                if let Some(dir) = bsp_out {
-                    let kind = match tmpl_sel {
-                        Some("pac") => bsp_gen::TemplateKind::Pac,
-                        Some("hal") | None => bsp_gen::TemplateKind::Hal,
-                        Some(t) => bsp_gen::TemplateKind::Custom(PathBuf::from(t)),
-                    };
-                    bsp_gen::from_ioc(
-                        &ioc,
-                        kind,
-                        &dir,
-                        false,
-                        false,
-                        false,
-                        bsp_gen::Layout::OneFile,
-                        false, // use_label_names
-                        None,  // label_prefix
-                        false, // fail_on_duplicate_labels
-                        false, // emit_label_consts
-                    )?;
-                }
-            }
-        },
         Command::Bsp { cmd } => match cmd {
             BspCommand::FromIoc {
                 ioc,

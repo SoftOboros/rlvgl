@@ -5,3786 +5,3908 @@
 * Provenance: STM32_open_pin_data (commit <hash>), build <build-hash>.
 
 */
+
+//! PAC BSP for the generated board.
+
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 
-use stm32h7::stm32h747cm7 as pac;
-pub type Peripherals = pac::Peripherals;
+use stm32h7::stm32h747 as pac;
+
+/// Enables GPIO clocks required by the generated board.
 
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
+    const MASK: u32 = (1u32 << 0)
+        | (1u32 << 1)
+        | (1u32 << 2)
+        | (1u32 << 3)
+        | (1u32 << 4)
+        | (1u32 << 5)
+        | (1u32 << 6)
+        | (1u32 << 7)
+        | (1u32 << 8)
+        | (1u32 << 9)
+        | (1u32 << 10);
     dp.RCC
         .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 0)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 1)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 2)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 3)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 4)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 5)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 6)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 7)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 8)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 9)) });
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 10)) });
+        .modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
 }
+
+/// Configures pins using PAC registers.
 
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
-    // PA1 ETH_REF_CLK AF0
-    let shift = 1 * 2;
+    // GPIOA
     dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
     dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 1);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 5);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOA.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         w.bits(bits)
     });
     dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA10 USART1_RX AF7
-    let shift = 10 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (7u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA11 SPI2_NSS AF0
-    let shift = 11 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA12 SPI2_SCK AF0
-    let shift = 12 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA2 ETH_MDIO AF0
-    let shift = 2 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA3 USB_OTG_HS_ULPI_D0 AF0
-    let shift = 3 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA5 USB_OTG_HS_ULPI_CK AF0
-    let shift = 5 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA7 ETH_CRS_DV AF0
-    let shift = 7 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA8 RCC_MCO_1 AF0
-    let shift = 8 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PA9 USART1_TX AF7
-    let shift = 9 * 2;
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (7u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB0 USB_OTG_HS_ULPI_D1 AF0
-    let shift = 0 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB1 USB_OTG_HS_ULPI_D2 AF0
-    let shift = 1 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
         let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB10 USB_OTG_HS_ULPI_D3 AF0
-    let shift = 10 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
         let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB11 USB_OTG_HS_ULPI_D4 AF0
-    let shift = 11 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
         let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB12 USB_OTG_HS_ULPI_D5 AF0
-    let shift = 12 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
         let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB13 USB_OTG_HS_ULPI_D6 AF0
-    let shift = 13 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
-        let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        let afr_shift = (1 % 8) * 4;
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB14 GPIO_Input AF0
-    let shift = 14 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
-        let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PB15 GPIO_Input AF0
-    let shift = 15 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
-        let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PB2 QUADSPI_CLK AF0
-    let shift = 2 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
         let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PB5 USB_OTG_HS_ULPI_D7 AF0
-    let shift = 5 * 2;
-    dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOB.afrh.modify(|r, w| unsafe {
+        let afr_shift = (3 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (7 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (8 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (9 % 8) * 4;
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
-    dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PB6 CEC AF0
-    let shift = 6 * 2;
+
+    // GPIOB
     dp.GPIOB.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
     dp.GPIOB.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
         w.bits(bits)
     });
     dp.GPIOB.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOB.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         w.bits(bits)
     });
     dp.GPIOB.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let afr_shift = (0 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (1 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (10 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (11 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (12 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (13 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (14 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (15 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (2 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (5 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
     dp.GPIOB.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PC0 USB_OTG_HS_ULPI_STP AF0
-    let shift = 0 * 2;
+
+    // GPIOC
     dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
     dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 2);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         w.bits(bits)
     });
     dp.GPIOC.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC1 ETH_MDC AF0
-    let shift = 1 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC10 SDMMC1_D2 AF0
-    let shift = 10 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC11 SDMMC1_D3 AF0
-    let shift = 11 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC12 SDMMC1_CK AF0
-    let shift = 12 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC13 RTC_TAMP1 AF0
-    let shift = 13 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC2 SPI2_MISO AF0
-    let shift = 2 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC3 SPI2_MOSI AF0
-    let shift = 3 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
+        let afr_shift = (2 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC4 ETH_RXD0 AF0
-    let shift = 4 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
+        let afr_shift = (3 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC5 ETH_RXD1 AF0
-    let shift = 5 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
         let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (8 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (9 % 8) * 4;
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
     dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PC8 SDMMC1_D0 AF0
-    let shift = 8 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
-        let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PC9 SDMMC1_D1 AF0
-    let shift = 9 * 2;
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
-        let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD0 FMC_D2_DA2 AF0
-    let shift = 0 * 2;
+
+    // GPIOD
     dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD1 FMC_D3_DA3 AF0
-    let shift = 1 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD10 FMC_D15_DA15 AF0
-    let shift = 10 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD11 QUADSPI_BK1_IO0 AF0
-    let shift = 11 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD12 I2C4_SCL AF0
-    let shift = 12 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift; // PullUp
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 12);
-        bits |= 1 << 12; // OpenDrain
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD13 I2C4_SDA AF0
-    let shift = 13 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift; // PullUp
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(1 << 13);
-        bits |= 1 << 13; // OpenDrain
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD14 FMC_D0_DA0 AF0
-    let shift = 14 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD15 FMC_D1_DA1 AF0
-    let shift = 15 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD2 SDMMC1_CMD AF0
-    let shift = 2 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD7 SPDIFRX1_IN0 AF0
-    let shift = 7 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD8 FMC_D13_DA13 AF0
-    let shift = 8 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PD9 FMC_D14_DA14 AF0
-    let shift = 9 * 2;
-    dp.GPIOD.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOD.afrh.modify(|r, w| unsafe {
-        let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOD.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE0 FMC_NBL0 AF0
-    let shift = 0 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE1 FMC_NBL1 AF0
-    let shift = 1 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE10 FMC_D7_DA7 AF0
-    let shift = 10 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE11 FMC_D8_DA8 AF0
-    let shift = 11 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE12 FMC_D9_DA9 AF0
-    let shift = 12 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE13 FMC_D10_DA10 AF0
-    let shift = 13 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE14 FMC_D11_DA11 AF0
-    let shift = 14 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE15 FMC_D12_DA12 AF0
-    let shift = 15 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE3 SAI1_SD_B AF0
-    let shift = 3 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE4 SAI1_FS_A AF0
-    let shift = 4 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE5 SAI1_SCK_A AF0
-    let shift = 5 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE6 SAI1_SD_A AF0
-    let shift = 6 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE7 FMC_D4_DA4 AF0
-    let shift = 7 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE8 FMC_D5_DA5 AF0
-    let shift = 8 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PE9 FMC_D6_DA6 AF0
-    let shift = 9 * 2;
-    dp.GPIOE.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOE.afrh.modify(|r, w| unsafe {
-        let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOE.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF0 FMC_A0 AF0
-    let shift = 0 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF1 FMC_A1 AF0
-    let shift = 1 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF10 ADC3_INP6 AF0
-    let shift = 10 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF11 FMC_SDNRAS AF0
-    let shift = 11 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF12 FMC_A6 AF0
-    let shift = 12 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF13 FMC_A7 AF0
-    let shift = 13 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF14 FMC_A8 AF0
-    let shift = 14 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF15 FMC_A9 AF0
-    let shift = 15 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF2 FMC_A2 AF0
-    let shift = 2 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF3 FMC_A3 AF0
-    let shift = 3 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF4 FMC_A4 AF0
-    let shift = 4 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF5 FMC_A5 AF0
-    let shift = 5 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF6 QUADSPI_BK1_IO3 AF0
-    let shift = 6 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF7 QUADSPI_BK1_IO2 AF0
-    let shift = 7 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF8 S_TIM13_CH1 AF0
-    let shift = 8 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PF9 QUADSPI_BK1_IO1 AF0
-    let shift = 9 * 2;
-    dp.GPIOF.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOF.afrh.modify(|r, w| unsafe {
-        let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOF.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG0 FMC_A10 AF0
-    let shift = 0 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG1 FMC_A11 AF0
-    let shift = 1 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG11 ETH_TX_EN AF0
-    let shift = 11 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG12 ETH_TXD1 AF0
-    let shift = 12 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG13 ETH_TXD0 AF0
-    let shift = 13 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG14 QUADSPI_BK2_IO3 AF0
-    let shift = 14 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG15 FMC_SDNCAS AF0
-    let shift = 15 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG2 FMC_A12 AF0
-    let shift = 2 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG3 GPIO_Output AF0
-    let shift = 3 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b01 << shift;
-        w.bits(bits)
-    });
-    // PG4 FMC_A14_BA0 AF0
-    let shift = 4 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
+    dp.GPIOD.otyper.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits |= 1 << 12;
+        bits &= !(1 << 13);
+        bits |= 1 << 13;
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
         w.bits(bits)
     });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+    dp.GPIOD.ospeedr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         w.bits(bits)
     });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+    dp.GPIOD.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        w.bits(bits)
+    });
+    dp.GPIOD.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let afr_shift = (0 % 8) * 4;
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG6 QUADSPI_BK1_NCS AF0
-    let shift = 6 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        let afr_shift = (1 % 8) * 4;
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG7 SAI1_MCLK_A AF0
-    let shift = 7 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG8 FMC_SDCLK AF0
-    let shift = 8 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PG9 QUADSPI_BK2_IO2 AF0
-    let shift = 9 * 2;
-    dp.GPIOG.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOG.afrh.modify(|r, w| unsafe {
-        let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOG.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH10 FMC_D18 AF0
-    let shift = 10 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH11 FMC_D19 AF0
-    let shift = 11 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH12 FMC_D20 AF0
-    let shift = 12 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH13 FMC_D21 AF0
-    let shift = 13 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH14 FMC_D22 AF0
-    let shift = 14 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH15 FMC_D23 AF0
-    let shift = 15 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH2 QUADSPI_BK2_IO0 AF0
-    let shift = 2 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH3 QUADSPI_BK2_IO1 AF0
-    let shift = 3 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
-        let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH4 USB_OTG_HS_ULPI_NXT AF0
-    let shift = 4 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
-        let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH5 FMC_SDNWE AF0
-    let shift = 5 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
-        let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH6 FMC_SDNE1 AF0
-    let shift = 6 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
-        let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH7 FMC_SDCKE1 AF0
-    let shift = 7 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH8 FMC_D16 AF0
-    let shift = 8 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PH9 FMC_D17 AF0
-    let shift = 9 * 2;
-    dp.GPIOH.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOH.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOH.afrh.modify(|r, w| unsafe {
         let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
-    dp.GPIOH.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PI0 FMC_D24 AF0
-    let shift = 0 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+
+    // GPIOE
+    dp.GPIOE.pupdr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
+    dp.GPIOE.otyper.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
         w.bits(bits)
     });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+    dp.GPIOE.ospeedr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         w.bits(bits)
     });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
+    dp.GPIOE.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        w.bits(bits)
+    });
+    dp.GPIOE.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI1 FMC_D25 AF0
-    let shift = 1 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI10 FMC_D31 AF0
-    let shift = 10 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI11 USB_OTG_HS_ULPI_DIR AF0
-    let shift = 11 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI12 GPIO_Output AF0
-    let shift = 12 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift;
-        w.bits(bits)
-    });
-    // PI13 GPIO_Output AF0
-    let shift = 13 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift;
-        w.bits(bits)
-    });
-    // PI14 GPIO_Output AF0
-    let shift = 14 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 14);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (14 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift;
-        w.bits(bits)
-    });
-    // PI15 GPIO_Output AF0
-    let shift = 15 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift;
-        w.bits(bits)
-    });
-    // PI2 FMC_D26 AF0
-    let shift = 2 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
-        let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI3 FMC_D27 AF0
-    let shift = 3 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI4 FMC_NBL2 AF0
-    let shift = 4 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI5 FMC_NBL3 AF0
-    let shift = 5 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI6 FMC_D28 AF0
-    let shift = 6 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI7 FMC_D29 AF0
-    let shift = 7 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PI8 GPIO_Input AF0
-    let shift = 8 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PI9 FMC_D30 AF0
-    let shift = 9 * 2;
-    dp.GPIOI.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOI.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
-        w.bits(bits)
-    });
-    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOI.afrh.modify(|r, w| unsafe {
         let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
-    dp.GPIOI.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PJ0 GPIO_Input AF0
-    let shift = 0 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+
+    // GPIOF
+    dp.GPIOF.pupdr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
+    dp.GPIOF.otyper.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
         w.bits(bits)
     });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+    dp.GPIOF.ospeedr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         w.bits(bits)
     });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
+    dp.GPIOF.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        w.bits(bits)
+    });
+    dp.GPIOF.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ1 GPIO_Input AF0
-    let shift = 1 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ10 SPI5_MOSI AF0
-    let shift = 10 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 10);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (10 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PJ11 SPI5_MISO AF0
-    let shift = 11 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (11 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PJ12 GPIO_Output AF0
-    let shift = 12 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (12 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b01 << shift;
-        w.bits(bits)
-    });
-    // PJ13 GPIO_Input AF0
-    let shift = 13 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 13);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (13 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ15 GPIO_Input AF0
-    let shift = 15 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 15);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
+        let afr_shift = (14 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (15 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ2 DSIHOST_TE AF0
-    let shift = 2 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PJ3 GPIO_Input AF0
-    let shift = 3 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ4 GPIO_Input AF0
-    let shift = 4 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ5 GPIO_Input AF0
-    let shift = 5 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PJ6 S_TIM8_CH2 AF0
-    let shift = 6 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PJ7 TIM8_CH2N AF0
-    let shift = 7 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PJ8 UART8_TX AF0
-    let shift = 8 * 2;
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 8);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
         let afr_shift = (8 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (9 % 8) * 4;
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PJ9 UART8_RX AF0
-    let shift = 9 * 2;
+
+    // GPIOG
+    dp.GPIOG.pupdr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG.otyper.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
+        w.bits(bits)
+    });
+    dp.GPIOG.ospeedr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOG.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        w.bits(bits)
+    });
+    dp.GPIOG.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let afr_shift = (0 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (1 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (11 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (12 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (13 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (14 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (15 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (2 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (3 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (4 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (6 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (7 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (8 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (9 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        w.bits(bits)
+    });
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        w.bits(bits)
+    });
+
+    // GPIOH
+    dp.GPIOH.pupdr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH.otyper.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
+        w.bits(bits)
+    });
+    dp.GPIOH.ospeedr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOH.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        w.bits(bits)
+    });
+    dp.GPIOH.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let afr_shift = (10 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (11 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (12 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (13 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (14 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (15 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (2 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (3 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (4 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (5 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (6 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (7 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (8 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (9 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        w.bits(bits)
+    });
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        w.bits(bits)
+    });
+
+    // GPIOI
+    dp.GPIOI.pupdr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI.otyper.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 14);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
+        w.bits(bits)
+    });
+    dp.GPIOI.ospeedr.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOI.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        w.bits(bits)
+    });
+    dp.GPIOI.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let afr_shift = (0 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (1 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (10 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (11 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (12 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (13 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (14 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (15 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (2 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (3 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (4 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (5 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (6 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (7 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (8 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (9 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        w.bits(bits)
+    });
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 14 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        w.bits(bits)
+    });
+
+    // GPIOJ
     dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
     dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 9);
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 10);
+        bits &= !(1 << 11);
+        bits &= !(1 << 12);
+        bits &= !(1 << 13);
+        bits &= !(1 << 15);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
+        bits &= !(1 << 8);
+        bits &= !(1 << 9);
         w.bits(bits)
     });
     dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOJ.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         w.bits(bits)
     });
     dp.GPIOJ.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
+        let afr_shift = (0 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (1 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (10 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (11 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (12 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (13 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (15 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (2 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (3 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (4 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (5 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (6 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (7 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
+        let afr_shift = (8 % 8) * 4;
+        bits &= !(0xF << afr_shift);
+        bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (9 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
     dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 10 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 11 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 12 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b01 << shift;
+        let shift = 13 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 15 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 8 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 9 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
         w.bits(bits)
     });
-    // PK0 SPI5_SCK AF0
-    let shift = 0 * 2;
+
+    // GPIOK
     dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
     dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 0);
+        let mut bits = r.bits();
+        bits &= !(1 << 0);
+        bits &= !(1 << 1);
+        bits &= !(1 << 2);
+        bits &= !(1 << 3);
+        bits &= !(1 << 4);
+        bits &= !(1 << 5);
+        bits &= !(1 << 6);
+        bits &= !(1 << 7);
         w.bits(bits)
     });
     dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b11 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
+        w.bits(bits)
+    });
+    dp.GPIOK.afrl.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         w.bits(bits)
     });
     dp.GPIOK.afrh.modify(|r, w| unsafe {
+        let mut bits = r.bits();
         let afr_shift = (0 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PK1 SPI5_NSS AF0
-    let shift = 1 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift; // VeryHigh
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (1 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b10 << shift; // Alternate
-        w.bits(bits)
-    });
-    // PK2 GPIO_Input AF0
-    let shift = 2 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 2);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (2 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PK3 GPIO_Input AF0
-    let shift = 3 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (3 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PK4 GPIO_Input AF0
-    let shift = 4 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 4);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (4 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PK5 GPIO_Input AF0
-    let shift = 5 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 5);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (5 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PK6 GPIO_Input AF0
-    let shift = 6 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 6);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (6 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    // PK7 GPIO_Input AF0
-    let shift = 7 * 2;
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let bits = r.bits() & !(1 << 7);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let bits = r.bits() & !(0b11 << shift);
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
         let afr_shift = (7 % 8) * 4;
-        let mut bits = r.bits() & !(0xF << afr_shift);
+        bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
         w.bits(bits)
     });
     dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
+        let mut bits = r.bits();
+        let shift = 0 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 1 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b10 << shift;
+        let shift = 2 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 3 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 4 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 5 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 6 * 2;
+        bits &= !(0b11 << shift);
+        bits |= 0b00 << shift;
+        let shift = 7 * 2;
+        bits &= !(0b11 << shift);
         bits |= 0b00 << shift;
         w.bits(bits)
     });
 }
 
+/// Disables unused peripherals and masks their interrupts.
+
+/// Enables peripheral clocks for the generated board using PAC registers.
+
 pub fn enable_peripherals(_dp: &pac::Peripherals) {}
+
+/// De-initializes board pins to their analog state.
+
+/// De-initializes board peripherals and clocks using PAC registers.
+
+pub fn deinit_board_pac(dp: &pac::Peripherals) {
+    // Return pins to analog and remove pulls/open-drain
+    let shift = 0 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 1 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 2 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 5 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 7 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOA.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOA
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOA
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 5 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOB.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOB
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOB
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 0 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 2 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 2 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 3 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 8 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOC.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOC
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOC
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 7 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOD.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOD
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOD
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 3 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOE.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOE
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOE
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOF.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOF
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOF
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 11 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 6 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOG.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOG
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOG
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 10 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOH.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOH
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOH
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 14 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
+    let shift = 15 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOI.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOI
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOI
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 10 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+    let shift = 11 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+    let shift = 12 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+    let shift = 13 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 13)) });
+    let shift = 15 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 15)) });
+    let shift = 2 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+    let shift = 8 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 8)) });
+    let shift = 9 * 2;
+    dp.GPIOJ.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOJ
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOJ
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    let shift = 0 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+    let shift = 1 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    let shift = 2 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    let shift = 3 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    let shift = 4 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    let shift = 5 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 5)) });
+    let shift = 6 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 6)) });
+    let shift = 7 * 2;
+    dp.GPIOK.moder.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << shift);
+        bits |= 0b11 << shift;
+        w.bits(bits)
+    });
+    dp.GPIOK
+        .pupdr
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+    dp.GPIOK
+        .otyper
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 7)) });
+
+    // Gate peripheral clocks
+
+    // Disable DMA controllers and mask their interrupts
+
+    // Disable interrupts
+    unsafe {
+        pac::NVIC::mask(pac::Interrupt::I2C4_EV);
+    }
+    unsafe {
+        pac::NVIC::mask(pac::Interrupt::I2C4_ER);
+    }
+    unsafe {
+        pac::NVIC::mask(pac::Interrupt::SPI2);
+    }
+    unsafe {
+        pac::NVIC::mask(pac::Interrupt::SPI5);
+    }
+    unsafe {
+        pac::NVIC::mask(pac::Interrupt::UART8);
+    }
+    unsafe {
+        pac::NVIC::mask(pac::Interrupt::USART1);
+    }
+}
+
+/// Initializes the board using PAC register access.
+
+/// Initializes the board using PAC register access.
 
 pub fn init_board_pac(dp: pac::Peripherals) {
     enable_gpio_clocks(&dp);

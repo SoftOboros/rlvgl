@@ -154,11 +154,11 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     }));
 
     let label = Label::new(
-        "rlvgl Demo",
+        format!("rlvgl Demo v{}", env!("CARGO_PKG_VERSION")),
         Rect {
             x: 10,
             y: 10,
-            width: 120,
+            width: 200,
             height: 20,
         },
     );
