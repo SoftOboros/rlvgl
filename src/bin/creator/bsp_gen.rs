@@ -55,24 +55,34 @@ pub(crate) fn from_ioc(
     let mcu = detect_mcu(&text)?;
     let vendor = load_mcu_af(&mcu)?;
     let ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
+    render_from_ir(
+        &ir,
+        template,
+        out_dir,
+        grouped_writes,
+        with_deinit,
+        layout,
+        use_label_names,
+        label_prefix,
+        fail_on_duplicate_labels,
+        emit_label_consts,
+    )
+}
 
-    // Ensure all peripherals reference known pins
-    use std::collections::HashSet;
-    let mut pin_set = HashSet::new();
-    for p in &ir.pinctrl {
-        pin_set.insert(&p.pin);
-    }
-    for (name, per) in &ir.peripherals {
-        if per.signals.is_empty() {
-            return Err(anyhow!("peripheral {} has no active pins", name));
-        }
-        for (role, pin) in &per.signals {
-            if !pin_set.contains(pin) {
-                return Err(anyhow!("peripheral {} missing pin for {}", name, role));
-            }
-        }
-    }
-
+/// Render Rust source from a precomputed IR using MiniJinja templates.
+pub(crate) fn render_from_ir(
+    ir: &ir::Ir,
+    template: TemplateKind,
+    out_dir: &Path,
+    grouped_writes: bool,
+    with_deinit: bool,
+    layout: Layout,
+    // Label handling
+    use_label_names: bool,
+    label_prefix: Option<&str>,
+    fail_on_duplicate_labels: bool,
+    emit_label_consts: bool,
+) -> Result<()> {
     let (tmpl_src, out_name, subdir) = match template {
         TemplateKind::Hal => (
             include_str!("bsp/templates/hal.rs.jinja").to_string(),
@@ -136,7 +146,7 @@ pub(crate) fn from_ioc(
     match layout {
         Layout::OneFile => {
             let rendered = env.get_template("gen")?.render(context! {
-                spec => &ir,
+                spec => ir,
                 grouped_writes,
                 with_deinit,
                 use_label_names,

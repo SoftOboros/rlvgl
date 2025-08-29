@@ -18,6 +18,8 @@ pub mod af;
 pub mod ioc;
 #[path = "../creator/bsp/ir.rs"]
 pub mod ir;
+#[path = "../creator/ast.rs"]
+pub mod ast;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {

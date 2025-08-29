@@ -200,6 +200,11 @@ enum Command {
         #[command(subcommand)]
         cmd: BspCommand,
     },
+    /// Extract BSP IR from vendor C sources (experimental)
+    Ast {
+        #[command(subcommand)]
+        cmd: AstCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -317,6 +322,71 @@ enum BspCommand {
         /// Emit a `pins` module with label constants (PAC)
         #[arg(long)]
         emit_label_consts: bool,
+    },
+    /// Render Rust source from vendor C sources (experimental)
+    FromC {
+        /// Input C files or directories (recurses)
+        inputs: Vec<PathBuf>,
+        /// Output directory for generated files
+        #[arg(long)]
+        out: PathBuf,
+        /// MCU identifier (e.g., STM32H747XIHx)
+        #[arg(long)]
+        mcu: String,
+        /// Package identifier (e.g., LQFP176)
+        #[arg(long)]
+        package: String,
+        /// Render using the built-in HAL template
+        #[arg(long)]
+        emit_hal: bool,
+        /// Render using the built-in PAC template
+        #[arg(long)]
+        emit_pac: bool,
+        /// MiniJinja template to render
+        #[arg(long, conflicts_with_all = ["emit_hal", "emit_pac"])]
+        template: Option<PathBuf>,
+        /// Collapse RCC writes by register
+        #[arg(long)]
+        grouped_writes: bool,
+        /// Include optional de-initialization helpers
+        #[arg(long)]
+        with_deinit: bool,
+        /// Emit a single consolidated file
+        #[arg(long, group = "layout")] 
+        one_file: bool,
+        /// Emit one file per peripheral
+        #[arg(long, group = "layout")]
+        per_peripheral: bool,
+        /// Use label-based identifiers when available
+        #[arg(long)]
+        use_label_names: bool,
+        /// Prefix to apply to label identifiers when needed
+        #[arg(long)]
+        label_prefix: Option<String>,
+        /// Fail if two labels sanitize to the same identifier
+        #[arg(long)]
+        fail_on_duplicate_labels: bool,
+        /// Emit a `pins` module with label constants (PAC)
+        #[arg(long)]
+        emit_label_consts: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum AstCommand {
+    /// Extract IR from one or more C files
+    FromC {
+        /// MCU identifier (e.g., STM32H747XIHx)
+        #[arg(long)]
+        mcu: String,
+        /// Package identifier (e.g., LQFP176)
+        #[arg(long)]
+        package: String,
+        /// Input C files or directories (recurses)
+        inputs: Vec<PathBuf>,
+        /// Output path for the generated IR JSON (stdout if omitted)
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
@@ -492,6 +562,91 @@ pub fn run() -> Result<()> {
                 }
                 if per_peripheral {
                     bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
+                }
+            }
+            BspCommand::FromC {
+                inputs,
+                out,
+                mcu,
+                package,
+                emit_hal,
+                emit_pac,
+                template,
+                grouped_writes,
+                one_file: _,
+                per_peripheral,
+                with_deinit,
+                use_label_names,
+                label_prefix,
+                fail_on_duplicate_labels,
+                emit_label_consts,
+            } => {
+                let mut files = Vec::new();
+                for p in inputs {
+                    let ps = if p.is_dir() { crate::ast::discover_c_sources(&p) } else { vec![p] };
+                    files.extend(ps);
+                }
+                if files.is_empty() {
+                    return Err(anyhow!("no C sources found in inputs"));
+                }
+                let ir = crate::ast::extract_from_c_sources(
+                    &files,
+                    crate::ast::ExtractOptions { mcu: &mcu, package: &package },
+                )?;
+
+                let mut kinds = Vec::new();
+                if emit_hal { kinds.push(bsp_gen::TemplateKind::Hal); }
+                if emit_pac { kinds.push(bsp_gen::TemplateKind::Pac); }
+                if let Some(t) = template { kinds.push(bsp_gen::TemplateKind::Custom(t)); }
+                if kinds.is_empty() { return Err(anyhow!("select --emit-hal, --emit-pac, or --template")); }
+                let layout = if per_peripheral { bsp_gen::Layout::PerPeripheral } else { bsp_gen::Layout::OneFile };
+                for kind in kinds {
+                    bsp_gen::render_from_ir(
+                        &ir,
+                        kind,
+                        &out,
+                        grouped_writes,
+                        with_deinit,
+                        layout.clone(),
+                        use_label_names,
+                        label_prefix.as_deref(),
+                        fail_on_duplicate_labels,
+                        emit_label_consts,
+                    )?;
+                }
+                if per_peripheral {
+                    bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
+                }
+            }
+        },
+        Command::Ast { cmd } => match cmd {
+            AstCommand::FromC {
+                mcu,
+                package,
+                inputs,
+                out,
+            } => {
+                let mut files = Vec::new();
+                for p in inputs {
+                    let ps = if p.is_dir() {
+                        crate::ast::discover_c_sources(&p)
+                    } else {
+                        vec![p]
+                    };
+                    files.extend(ps);
+                }
+                let ir = crate::ast::extract_from_c_sources(
+                    &files,
+                    crate::ast::ExtractOptions {
+                        mcu: &mcu,
+                        package: &package,
+                    },
+                )?;
+                let json = serde_json::to_string_pretty(&ir)?;
+                if let Some(path) = out {
+                    std::fs::write(path, json)?;
+                } else {
+                    println!("{}", json);
                 }
             }
         },
