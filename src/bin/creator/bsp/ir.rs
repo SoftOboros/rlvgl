@@ -48,13 +48,19 @@ pub struct Pll {
     pub r: u8,
 }
 
-/// Pin description capturing function and alternate function number.
+/// Pin description capturing function, label, and alternate function number.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Pin {
     /// Pin name, e.g. "PA9".
     pub pin: String,
     /// Signal name, e.g. "USART1_TX" or "GPIO_Output".
     pub func: String,
+    /// Optional user-assigned label from the vendor project (e.g. `GPIO_Label` in `.ioc`).
+    ///
+    /// When present, code generators can surface this label in comments or use
+    /// it to derive identifier aliases.
+    #[serde(default)]
+    pub label: Option<String>,
     /// Alternate function number for the signal (0 for GPIO).
     pub af: u8,
 }

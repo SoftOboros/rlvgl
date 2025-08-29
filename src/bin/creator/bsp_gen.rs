@@ -144,6 +144,39 @@ pub(crate) fn from_ioc(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use minijinja::{Environment, context};
+
+    #[test]
+    fn pac_template_includes_label_in_comment() {
+        let tmpl = include_str!("bsp/templates/pac.rs.jinja");
+        let mut env = Environment::new();
+        env.add_template("pac", tmpl).unwrap();
+
+        let mut spec = ir::Ir {
+            mcu: "STM32H747XIHx".to_string(),
+            package: "TFBGA240".to_string(),
+            clocks: ir::Clocks::default(),
+            pinctrl: vec![ir::Pin {
+                pin: "PA9".to_string(),
+                func: "USART1_TX".to_string(),
+                label: Some("STLINK_RX".to_string()),
+                af: 7,
+            }],
+            peripherals: indexmap::IndexMap::new(),
+        };
+
+        let rendered = env
+            .get_template("pac")
+            .unwrap()
+            .render(context! { spec => &spec, grouped_writes => false, with_deinit => false })
+            .unwrap();
+        assert!(rendered.contains("PA9 USART1_TX AF7 (STLINK_RX)"));
+    }
+}
+
 /// Emits a top-level `mod.rs` exposing available forms for a board.
 pub(crate) fn emit_board_mod(
     out_dir: &Path,

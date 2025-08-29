@@ -147,21 +147,40 @@ mod tests {
 
     impl TestWidget {
         fn new(name: &'static str) -> (Rc<RefCell<Self>>, Rc<RefCell<Self>>) {
-            let w = Rc::new(RefCell::new(Self { name, events: alloc::vec::Vec::new(), draws: alloc::vec::Vec::new(), handle: false }));
+            let w = Rc::new(RefCell::new(Self {
+                name,
+                events: alloc::vec::Vec::new(),
+                draws: alloc::vec::Vec::new(),
+                handle: false,
+            }));
             (w.clone(), w)
         }
     }
 
     impl Widget for TestWidget {
-        fn bounds(&self) -> Rect { Rect { x: 0, y: 0, width: 0, height: 0 } }
-        fn draw(&self, renderer: &mut dyn Renderer) { renderer.draw_text((0,0), self.name, Color(0,0,0,0)); }
-        fn handle_event(&mut self, _event: &Event) -> bool { self.events.push(self.name); self.handle }
+        fn bounds(&self) -> Rect {
+            Rect {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            }
+        }
+        fn draw(&self, renderer: &mut dyn Renderer) {
+            renderer.draw_text((0, 0), self.name, Color(0, 0, 0, 0));
+        }
+        fn handle_event(&mut self, _event: &Event) -> bool {
+            self.events.push(self.name);
+            self.handle
+        }
     }
 
     struct TestRenderer(pub alloc::vec::Vec<alloc::string::String>);
     impl Renderer for TestRenderer {
         fn fill_rect(&mut self, _rect: Rect, _color: Color) {}
-        fn draw_text(&mut self, _position: (i32, i32), text: &str, _color: Color) { self.0.push(text.to_string()); }
+        fn draw_text(&mut self, _position: (i32, i32), text: &str, _color: Color) {
+            self.0.push(text.to_string());
+        }
     }
 
     #[test]
@@ -173,8 +192,14 @@ mod tests {
         let mut tree = WidgetNode {
             widget: root_a,
             children: alloc::vec![
-                WidgetNode { widget: child_b.clone(), children: alloc::vec![] },
-                WidgetNode { widget: child_c.clone(), children: alloc::vec![] },
+                WidgetNode {
+                    widget: child_b.clone(),
+                    children: alloc::vec![],
+                },
+                WidgetNode {
+                    widget: child_c.clone(),
+                    children: alloc::vec![],
+                },
             ],
         };
 
@@ -196,18 +221,28 @@ mod tests {
         let tree = WidgetNode {
             widget: root_a,
             children: alloc::vec![
-                WidgetNode { widget: child_b, children: alloc::vec![] },
-                WidgetNode { widget: child_c, children: alloc::vec![] },
+                WidgetNode {
+                    widget: child_b,
+                    children: alloc::vec![],
+                },
+                WidgetNode {
+                    widget: child_c,
+                    children: alloc::vec![],
+                },
             ],
         };
 
         let mut renderer = TestRenderer(alloc::vec::Vec::new());
         tree.draw(&mut renderer);
-        assert_eq!(renderer.0, alloc::vec![
-            alloc::string::String::from("A"),
-            alloc::string::String::from("B"),
-            alloc::string::String::from("C"),
-        ], "preorder draw order");
+        assert_eq!(
+            renderer.0,
+            alloc::vec![
+                alloc::string::String::from("A"),
+                alloc::string::String::from("B"),
+                alloc::string::String::from("C"),
+            ],
+            "preorder draw order"
+        );
 
         // Ensure no accidental mutation of the root widget occurred during draw.
         assert!(root_ref.borrow().events.is_empty());

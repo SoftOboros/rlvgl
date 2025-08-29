@@ -177,7 +177,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
 {% endfor %}
 {% else %}
 {% for pin in spec.pinctrl %}
-    // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}
+    // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}{% if pin.label %} ({{ pin.label }}){% endif %}
     let shift = {{ idx(pin) }} * 2;
     dp.GPIO{{ port_u(pin) }}.pupdr.modify(|r, w| unsafe {
         let mut bits = r.bits() & !(0b11 << shift);

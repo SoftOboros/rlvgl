@@ -19,12 +19,22 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
     let kv = parse_kv(text);
     let mcu = kv.get("Mcu.Name").cloned().unwrap_or_default();
     let package = kv.get("Mcu.Package").cloned().unwrap_or_default();
-
-    let pin_re = Regex::new(r"^P([A-Z])(\d+)\.Signal$").unwrap();
+    // Support direct pins (PA9), and domain-suffixed analog pins (PA1_C).
+    let pin_re = Regex::new(r"^P([A-Z])(\d+)(?:_C)?\.Signal$").unwrap();
+    let label_re = Regex::new(r"^P([A-Z])(\d+)(?:_C)?\.GPIO_Label$").unwrap();
     let kernel_re = Regex::new(r"^RCC\.([A-Za-z0-9]+)ClockSelection$").unwrap();
     let mut pins = Vec::new();
     let mut peripherals: IndexMap<String, Peripheral> = IndexMap::new();
     let mut kernels: IndexMap<String, String> = IndexMap::new();
+    // Collect user labels per normalized pin (PA1, not PA1_C)
+    let mut labels: IndexMap<String, String> = IndexMap::new();
+
+    for (k, v) in kv.iter() {
+        if let Some(caps) = label_re.captures(k) {
+            let pin = format!("P{}{}", &caps[1], &caps[2]);
+            labels.insert(pin, v.to_string());
+        }
+    }
 
     for (k, v) in kv.iter() {
         if let Some(caps) = pin_re.captures(k) {
@@ -34,6 +44,7 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
             pins.push(Pin {
                 pin: pin.clone(),
                 func: func.clone(),
+                label: labels.get(&pin).cloned(),
                 af: afn,
             });
             if let Some((name, class, role)) = split_signal(&func) {
@@ -121,5 +132,54 @@ fn split_signal(sig: &str) -> Option<(String, String, String)> {
         ))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct DummyAf;
+    impl AfProvider for DummyAf {
+        fn lookup_af(&self, _mcu: &str, _pin: &str, func: &str) -> Option<u8> {
+            match func {
+                "USART1_TX" => Some(7),
+                _ => Some(0),
+            }
+        }
+    }
+
+    #[test]
+    fn parses_gpio_labels_for_simple_and_c_domain_pins() {
+        let txt = r#"
+Mcu.Name=STM32H747XIHx
+Mcu.Package=LQFP176
+PA9.Signal=USART1_TX
+PA9.GPIO_Label=STLINK_RX
+PA1_C.Signal=ADCx_INP1
+PA1_C.GPIO_Label=ARD_A3
+"#;
+        let ir = ioc_to_ir(txt, &DummyAf, true).expect("parse");
+        // Expect two pins
+        assert_eq!(ir.pinctrl.len(), 2);
+        let mut found_pa9 = false;
+        let mut found_pa1 = false;
+        for p in ir.pinctrl {
+            match (p.pin.as_str(), p.func.as_str()) {
+                ("PA9", "USART1_TX") => {
+                    found_pa9 = true;
+                    assert_eq!(p.label.as_deref(), Some("STLINK_RX"));
+                    assert_eq!(p.af, 7);
+                }
+                ("PA1", "ADCx_INP1") => {
+                    found_pa1 = true;
+                    assert_eq!(p.label.as_deref(), Some("ARD_A3"));
+                    // Analog / GPIO style func → af from DummyAf (0)
+                    assert_eq!(p.af, 0);
+                }
+                _ => {}
+            }
+        }
+        assert!(found_pa9 && found_pa1, "expected PA9 and PA1 pins");
     }
 }
