@@ -16,6 +16,18 @@ Unify chip and board configuration data into self-contained crates per vendor so
 - Board overlays are stored under `boards/` and are produced by converting `.ioc` examples or user-supplied CubeMX files using the canonical `mcu` data.
 - Both `mcu` and `boards` datasets are bundled with creator, which also exposes a converter for arbitrary `.ioc` files.
 
+### User Pin Labels (GPIO_Label) Propagation
+- [x] Extend IR `Pin` with optional `label: Option<String>`.
+- [x] Parse `*.GPIO_Label` from CubeMX `.ioc` (supports `PAx` and `PAx_C` forms) and attach to IR.
+- [x] Surface labels in generated code comments (PAC/HAL templates).
+- [x] Add unit tests for label parsing and template rendering.
+- [ ] CLI flags for label behavior in BSP generation:
+  - [x] `--use-label-names` to use sanitized labels as identifiers (HAL template).
+  - [x] `--label-prefix <str>` to prefix identifiers starting with digits/underscores.
+  - [x] `--fail-on-duplicate-labels` to error on collisions after sanitization.
+  - [ ] Document flags in `README-CREATOR.md` with examples.
+- [ ] Optional: generate a `pins` helper module exporting `pub const` aliases for labels in PAC output.
+
 ## Pre-setup Instructions
 1. **Establish vendor crate locations**
    - Create a new top-level directory (e.g. `chipdb/`) or reuse an existing `support/` subfolder to house vendor crates. Each vendor gets its own crate, such as `rlvgl-stm-pins` for STMicroelectronics devices, `rlvgl-nrf-pins` for Nordic, `rlvgl-esp-pins` for Espressif, `rlvgl-nxp-pins` for NXP, `rlvgl-silabs-pins` for Silicon Labs, `rlvgl-microchip-pins` for Microchip, `rlvgl-renesas-pins` for Renesas, `rlvgl-ti-pins` for Texas Instruments, and `rlvgl-rp2040-pins` for generic RP2040 support. All crates live under the workspace and share the same edition while carrying vendor-specific license files.

@@ -310,6 +310,15 @@ enum BspCommand {
         /// Permit configuration of reserved SWD pins (PA13/PA14)
         #[arg(long)]
         allow_reserved: bool,
+        /// Use label-based identifiers when available
+        #[arg(long)]
+        use_label_names: bool,
+        /// Prefix to apply to label identifiers when needed
+        #[arg(long)]
+        label_prefix: Option<String>,
+        /// Fail if two labels sanitize to the same identifier
+        #[arg(long)]
+        fail_on_duplicate_labels: bool,
     },
 }
 
@@ -427,6 +436,9 @@ pub fn run() -> Result<()> {
                         false,
                         false,
                         bsp_gen::Layout::OneFile,
+                        false,
+                        None,
+                        false,
                     )?;
                 }
             }
@@ -444,6 +456,9 @@ pub fn run() -> Result<()> {
                 per_peripheral,
                 with_deinit,
                 allow_reserved,
+                use_label_names,
+                label_prefix,
+                fail_on_duplicate_labels,
             } => {
                 let mut kinds = Vec::new();
                 if emit_hal {
@@ -473,6 +488,9 @@ pub fn run() -> Result<()> {
                         with_deinit,
                         allow_reserved,
                         layout.clone(),
+                        use_label_names,
+                        label_prefix.as_deref(),
+                        fail_on_duplicate_labels,
                     )?;
                 }
                 if per_peripheral {

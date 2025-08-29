@@ -44,6 +44,10 @@ pub(crate) fn from_ioc(
     with_deinit: bool,
     allow_reserved: bool,
     layout: Layout,
+    // Label handling
+    use_label_names: bool,
+    label_prefix: Option<&str>,
+    fail_on_duplicate_labels: bool,
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     let af = JsonAfDb::from_path(af_json)?;
@@ -98,11 +102,39 @@ pub(crate) fn from_ioc(
 
     fs::create_dir_all(&base_dir)?;
 
+    // Prepare label-based identifiers for HAL template use if requested.
+    use indexmap::IndexMap;
+    let mut idents: IndexMap<String, String> = IndexMap::new();
+    if use_label_names {
+        let mut seen = IndexMap::<String, usize>::new();
+        for p in &ir.pinctrl {
+            if let Some(label) = &p.label {
+                let mut ident = sanitize_ident(label, label_prefix);
+                if ident.is_empty() {
+                    continue;
+                }
+                match seen.get_mut(&ident) {
+                    Some(count) => {
+                        if fail_on_duplicate_labels {
+                            return Err(anyhow!("duplicate label after sanitization: {}", ident));
+                        }
+                        *count += 1;
+                        ident = format!("{}_{count}", ident);
+                    }
+                    None => {
+                        seen.insert(ident.clone(), 1);
+                    }
+                }
+                idents.insert(p.pin.clone(), ident);
+            }
+        }
+    }
+
     match layout {
         Layout::OneFile => {
-            let rendered = env
-                .get_template("gen")?
-                .render(context! { spec => &ir, grouped_writes, with_deinit })?;
+            let rendered = env.get_template("gen")?.render(
+                context! { spec => &ir, grouped_writes, with_deinit, use_label_names, idents },
+            )?;
             fs::write(base_dir.join(out_name), rendered)?;
         }
         Layout::PerPeripheral => {
@@ -127,7 +159,9 @@ pub(crate) fn from_ioc(
                     spec => &sub,
                     grouped_writes,
                     with_deinit,
-                    mod_name => name
+                    mod_name => name,
+                    use_label_names,
+                    idents
                 })?;
                 fs::write(base_dir.join(format!("{name}.rs")), rendered)?;
                 mods.push(name);
@@ -175,6 +209,34 @@ mod tests {
             .unwrap();
         assert!(rendered.contains("PA9 USART1_TX AF7 (STLINK_RX)"));
     }
+
+    #[test]
+    fn hal_template_uses_label_name_when_enabled() {
+        let tmpl = include_str!("bsp/templates/hal.rs.jinja");
+        let mut env = Environment::new();
+        env.add_template("hal", tmpl).unwrap();
+
+        let spec = ir::Ir {
+            mcu: "STM32H747XIHx".to_string(),
+            package: "TFBGA240".to_string(),
+            clocks: ir::Clocks::default(),
+            pinctrl: vec![ir::Pin {
+                pin: "PA9".to_string(),
+                func: "GPIO_Output".to_string(),
+                label: Some("STLINK_RX".to_string()),
+                af: 0,
+            }],
+            peripherals: indexmap::IndexMap::new(),
+        };
+        let mut idents = indexmap::IndexMap::new();
+        idents.insert("PA9".to_string(), "stlink_rx".to_string());
+        let rendered = env
+            .get_template("hal")
+            .unwrap()
+            .render(context! { spec => &spec, grouped_writes => false, with_deinit => false, use_label_names => true, idents })
+            .unwrap();
+        assert!(rendered.contains("let stlink_rx ="));
+    }
 }
 
 /// Emits a top-level `mod.rs` exposing available forms for a board.
@@ -196,4 +258,30 @@ pub(crate) fn emit_board_mod(
     })?;
     fs::write(out_dir.join("mod.rs"), rendered)?;
     Ok(())
+}
+fn sanitize_ident(label: &str, prefix: Option<&str>) -> String {
+    // Lowercase and replace non-alphanumeric with underscores
+    let mut s: String = label
+        .chars()
+        .map(|c| {
+            let lc = c.to_ascii_lowercase();
+            if lc.is_ascii_alphanumeric() { lc } else { '_' }
+        })
+        .collect();
+    while s.contains("__") {
+        s = s.replace("__", "_");
+    }
+    if s.starts_with(|c: char| c.is_ascii_digit() | c.eq(&'_')) {
+        s = format!("{}{}", prefix.unwrap_or("pin_"), s.trim_start_matches('_'));
+    }
+    // Avoid Rust keywords minimally
+    match s.as_str() {
+        "fn" | "let" | "mod" | "type" | "struct" | "enum" | "impl" | "trait" | "const"
+        | "static" | "crate" | "super" | "self" | "Self" | "use" | "pub" | "move" | "async"
+        | "await" | "loop" | "while" | "for" | "in" | "match" | "if" | "else" | "return" => {
+            s.push_str("_pin");
+        }
+        _ => {}
+    }
+    s.trim_matches('_').to_string()
 }
