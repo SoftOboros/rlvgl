@@ -6,12 +6,17 @@
 //! external parsers for now and focuses on recognizable HAL patterns so
 //! work can proceed without network access.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use indexmap::IndexMap;
 use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
-use indexmap::IndexMap;
 
+// In the binary, use the shared IR module declared by the entrypoint.
+// In tests (where this module is included directly), include the IR locally.
+#[cfg(not(test))]
+use crate::ir;
+#[cfg(test)]
 #[path = "bsp/ir.rs"]
 pub mod ir;
 
@@ -29,10 +34,7 @@ pub struct ExtractOptions<'a> {
 /// This first-cut implementation scans for common HAL GPIO init blocks and a few
 /// RCC patterns to populate pins and kernel clock hints. It is intentionally
 /// conservative; unknown content is ignored rather than mis-parsed.
-pub fn extract_from_c_sources(
-    files: &[PathBuf],
-    opts: ExtractOptions,
-    ) -> Result<ir::Ir> {
+pub fn extract_from_c_sources(files: &[PathBuf], opts: ExtractOptions) -> Result<ir::Ir> {
     if files.is_empty() {
         return Err(anyhow!("no C source files provided"));
     }
@@ -46,7 +48,8 @@ pub fn extract_from_c_sources(
     // Match all GPIO_PIN_<n> tokens on the line to support bitwise OR lists
     let re_pin = Regex::new(r"GPIO_PIN_(\d+)").unwrap();
     let re_alt = Regex::new(r"GPIO_InitStruct\.Alternate\s*=\s*GPIO_AF(\d+)_([A-Z0-9_]+)").unwrap();
-    let re_port = Regex::new(r"HAL_GPIO_Init\s*\(\s*GPIO([A-Z])\s*,\s*&GPIO_InitStruct\s*\)").unwrap();
+    let re_port =
+        Regex::new(r"HAL_GPIO_Init\s*\(\s*GPIO([A-Z])\s*,\s*&GPIO_InitStruct\s*\)").unwrap();
     let re_kernel = Regex::new(r"__HAL_RCC_([A-Z0-9]+)_CLK_ENABLE\s*\(\s*\)").unwrap();
 
     let mut pins: Vec<ir::Pin> = Vec::new();
@@ -55,7 +58,7 @@ pub fn extract_from_c_sources(
 
     for file in files {
         let src = fs::read_to_string(file)
-        .map_err(|e| anyhow!("failed to read {}: {e}", file.display()))?;
+            .map_err(|e| anyhow!("failed to read {}: {e}", file.display()))?;
 
         // Walk through the file and try to collect per init-block state.
         // We maintain a rolling state for (last pin number, last AF/peripheral, last port).
@@ -87,9 +90,12 @@ pub fn extract_from_c_sources(
                 last_port = Some(cap.get(1).unwrap().as_str().chars().next().unwrap());
 
                 // If we have pins, port, AF, and signal, record pin entries.
-                if let (true, Some(port), Some(af), Some(sig)) =
-                    (!last_pin_nums.is_empty(), last_port, last_af_num, last_signal.clone())
-                {
+                if let (true, Some(port), Some(af), Some(sig)) = (
+                    !last_pin_nums.is_empty(),
+                    last_port,
+                    last_af_num,
+                    last_signal.clone(),
+                ) {
                     for pn in &last_pin_nums {
                         let pin_name = format!("P{}{}", port, pn);
                         pins.push(ir::Pin {
@@ -115,7 +121,10 @@ pub fn extract_from_c_sources(
             if let Some(cap) = re_kernel.captures(line) {
                 let per = cap.get(1).unwrap().as_str().to_ascii_lowercase();
                 // Mark a kernel clock presence; exact kernel selection may be refined later.
-                clocks.kernels.entry(per).or_insert_with(|| "pclk".to_string());
+                clocks
+                    .kernels
+                    .entry(per)
+                    .or_insert_with(|| "pclk".to_string());
                 continue;
             }
         }
@@ -152,11 +161,7 @@ pub fn discover_c_sources(root: &Path) -> Vec<PathBuf> {
                 let p = e.path();
                 if p.is_dir() {
                     rec(&p, out);
-                } else if p
-                    .extension()
-                    .map(|e| e == "c" || e == "h")
-                    .unwrap_or(false)
-                {
+                } else if p.extension().map(|e| e == "c" || e == "h").unwrap_or(false) {
                     out.push(p);
                 }
             }
