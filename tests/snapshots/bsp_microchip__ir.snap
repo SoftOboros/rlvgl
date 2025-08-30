@@ -1,5 +1,6 @@
 ---
 source: tests/bsp_microchip.rs
+assertion_line: 15
 expression: "&spec"
 ---
 mcu: ATSAMD51J20A
@@ -7,12 +8,15 @@ package: TQFP64
 clocks:
   pll: {}
   kernels: {}
+  init_by: ~
 pinctrl:
   - pin: PA00
     func: SPI0_SCK
+    label: ~
     af: 0
   - pin: PA01
     func: SPI0_MOSI
+    label: ~
     af: 0
 peripherals:
   spi0:
@@ -20,3 +24,4 @@ peripherals:
     signals:
       sck: PA00
       mosi: PA01
+    core: ~
