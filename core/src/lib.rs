@@ -141,7 +141,6 @@ mod tests {
     struct TestWidget {
         name: &'static str,
         events: alloc::vec::Vec<&'static str>,
-        draws: alloc::vec::Vec<&'static str>,
         handle: bool,
     }
 
@@ -150,7 +149,6 @@ mod tests {
             let w = Rc::new(RefCell::new(Self {
                 name,
                 events: alloc::vec::Vec::new(),
-                draws: alloc::vec::Vec::new(),
                 handle: false,
             }));
             (w.clone(), w)

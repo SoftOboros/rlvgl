@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 pub mod add_target;
 pub mod apng;
@@ -31,6 +31,13 @@ pub mod svg;
 pub mod sync;
 pub mod util;
 pub mod vendor;
+
+/// Dual-core selector for BSP generation.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum CoreSel {
+    Cm7,
+    Cm4,
+}
 
 /// CLI arguments for rlgvl-creator.
 #[derive(Parser)]
@@ -254,6 +261,19 @@ enum BspCommand {
         /// Output directory for generated files
         #[arg(long)]
         out: PathBuf,
+        /// Generate per-core outputs (cm7/ and cm4/) instead of unified
+        #[arg(long)]
+        split_cores: bool,
+        /// Restrict output to a single core in unified mode
+        #[arg(long, value_enum)]
+        core: Option<CoreSel>,
+        /// Override which core initializes system clocks
+        #[arg(long, value_enum)]
+        clock_init_core: Option<CoreSel>,
+        /// Assign ownership to peripherals (comma-separated name=core pairs)
+        /// Example: --periph-core usart1=cm4,spi1=cm7
+        #[arg(long, value_delimiter = ',')]
+        periph_core: Vec<String>,
         /// Render using the built-in HAL template
         #[arg(long)]
         emit_hal: bool,
@@ -380,6 +400,10 @@ pub fn run() -> Result<()> {
             BspCommand::FromIoc {
                 ioc,
                 out,
+                split_cores,
+                core,
+                clock_init_core,
+                periph_core,
                 emit_hal,
                 emit_pac,
                 template,
@@ -411,20 +435,78 @@ pub fn run() -> Result<()> {
                 } else {
                     bsp_gen::Layout::OneFile
                 };
-                for kind in kinds {
-                    bsp_gen::from_ioc(
-                        &ioc,
-                        kind,
-                        &out,
-                        grouped_writes,
-                        with_deinit,
-                        allow_reserved,
-                        layout.clone(),
-                        use_label_names,
-                        label_prefix.as_deref(),
-                        fail_on_duplicate_labels,
-                        emit_label_consts,
-                    )?;
+                let to_ir_core = |c: CoreSel| match c {
+                    CoreSel::Cm7 => crate::bsp::ir::Core::Cm7,
+                    CoreSel::Cm4 => crate::bsp::ir::Core::Cm4,
+                };
+                // Build overrides map if provided
+                let mut overrides: indexmap::IndexMap<String, crate::bsp::ir::Core> =
+                    indexmap::IndexMap::new();
+                for entry in periph_core {
+                    if let Some((name, core_s)) = entry.split_once('=') {
+                        let c = match core_s.to_ascii_lowercase().as_str() {
+                            "cm7" => Some(crate::bsp::ir::Core::Cm7),
+                            "cm4" => Some(crate::bsp::ir::Core::Cm4),
+                            _ => None,
+                        };
+                        if let Some(c) = c {
+                            overrides.insert(name.to_ascii_lowercase(), c);
+                        } else {
+                            return Err(anyhow!("invalid core in periph-core: {}", core_s));
+                        }
+                    } else {
+                        return Err(anyhow!("periph-core entries must be name=core"));
+                    }
+                }
+                let overrides_ref = if overrides.is_empty() {
+                    None
+                } else {
+                    Some(&overrides)
+                };
+                let init_override = clock_init_core.map(to_ir_core);
+                if split_cores {
+                    for (subdir, csel) in [("cm7", CoreSel::Cm7), ("cm4", CoreSel::Cm4)] {
+                        let odir = out.join(subdir);
+                        std::fs::create_dir_all(&odir)?;
+                        for kind in &kinds {
+                            bsp_gen::from_ioc(
+                                &ioc,
+                                kind.clone(),
+                                &odir,
+                                grouped_writes,
+                                with_deinit,
+                                allow_reserved,
+                                layout.clone(),
+                                use_label_names,
+                                label_prefix.as_deref(),
+                                fail_on_duplicate_labels,
+                                emit_label_consts,
+                                Some(to_ir_core(csel)),
+                                init_override,
+                                overrides_ref,
+                            )?;
+                        }
+                    }
+                } else {
+                    let core_filter = core.map(to_ir_core);
+                    for kind in kinds {
+                        bsp_gen::from_ioc(
+                            &ioc,
+                            kind,
+                            &out,
+                            grouped_writes,
+                            with_deinit,
+                            allow_reserved,
+                            layout.clone(),
+                            use_label_names,
+                            label_prefix.as_deref(),
+                            fail_on_duplicate_labels,
+                            emit_label_consts,
+                            core_filter,
+                            init_override,
+                            overrides_ref,
+                        )?;
+                    }
                 }
                 if per_peripheral {
                     bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;

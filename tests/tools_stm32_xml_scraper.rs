@@ -44,7 +44,11 @@ fn scrapes_ip_and_mcu() {
 
     let mcu_json: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(out.join("mcu/STM32F4.json")).unwrap()).unwrap();
-    assert_eq!(mcu_json["pins"]["PA0"][0]["af"], 7);
+    // Accept either list-of-entries or map with `sigs` structure
+    let af_val = mcu_json["pins"]["PA0"][0]["af"]
+        .as_i64()
+        .or_else(|| mcu_json["pins"]["PA0"]["sigs"]["USART2_TX"]["af"].as_i64());
+    assert_eq!(af_val, Some(7));
 
     let ip_json: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(out.join("ip.json")).unwrap()).unwrap();

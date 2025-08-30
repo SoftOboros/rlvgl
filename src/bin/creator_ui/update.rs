@@ -382,8 +382,9 @@ impl App for CreatorApp {
         });
 
         if self.bsp_open {
+            let mut open = true;
             egui::Window::new("Generate BSP")
-                .open(&mut self.bsp_open)
+                .open(&mut open)
                 .show(ctx, |ui| {
                     let mut prefs_changed = false;
                     ui.horizontal(|ui| {
@@ -567,6 +568,9 @@ impl App for CreatorApp {
                                 },
                                 self.bsp_fail_on_duplicate_labels,
                                 self.bsp_emit_label_consts,
+                                None, // core_filter (unified)
+                                None, // init_by override
+                                None, // periph owners
                             ) {
                                 ok = false;
                                 let msg = format!("HAL generation failed: {}", e);
@@ -592,6 +596,9 @@ impl App for CreatorApp {
                                 },
                                 self.bsp_fail_on_duplicate_labels,
                                 self.bsp_emit_label_consts,
+                                None, // core_filter (unified)
+                                None, // init_by override
+                                None, // periph owners
                             ) {
                                 ok = false;
                                 let msg = format!("PAC generation failed: {}", e);
@@ -608,11 +615,13 @@ impl App for CreatorApp {
                         }
                     }
                 });
+            self.bsp_open = open;
         }
 
         if self.about_open {
+            let mut open = true;
             egui::Window::new("About rlvgl Creator")
-                .open(&mut self.about_open)
+                .open(&mut open)
                 .resizable(false)
                 .show(ctx, |ui| {
                     ui.vertical_centered(|ui| {
@@ -649,11 +658,13 @@ impl App for CreatorApp {
                         ui.label("© 2025 Softoboros Technology, Inc. • MIT license");
                     });
                 });
+            self.about_open = open;
         }
 
         if self.bsp_error_open {
+            let mut open = true;
             egui::Window::new("BSP Errors")
-                .open(&mut self.bsp_error_open)
+                .open(&mut open)
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         if ui.button("Clear").clicked() {
@@ -674,6 +685,7 @@ impl App for CreatorApp {
                         }
                     });
                 });
+            self.bsp_error_open = open;
         }
 
         if self.fonts_pack_open {

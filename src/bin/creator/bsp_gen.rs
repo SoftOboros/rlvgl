@@ -10,6 +10,7 @@ use anyhow::{Result, anyhow};
 use minijinja::{Environment, context};
 
 use crate::bsp::{ioc, ir};
+use indexmap::IndexMap;
 use rlvgl_chips_stm as stm;
 
 /// Built-in templates for BSP rendering.
@@ -49,12 +50,38 @@ pub(crate) fn from_ioc(
     label_prefix: Option<&str>,
     fail_on_duplicate_labels: bool,
     emit_label_consts: bool,
+    // Optional core filter (unified by default)
+    core_filter: Option<ir::Core>,
+    // Optional overrides: which core initializes clocks and peripheral owners
+    init_by: Option<ir::Core>,
+    periph_owners: Option<&IndexMap<String, ir::Core>>,
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     // Determine AF provider from embedded vendor database
     let mcu = detect_mcu(&text)?;
     let vendor = load_mcu_af(&mcu)?;
-    let ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
+    let mut ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
+    if let Some(c) = init_by {
+        ir.clocks.init_by = Some(c);
+    }
+    // Heuristic: default clock init to CM7 for common dual-core H7 parts if unspecified
+    if ir.clocks.init_by.is_none() {
+        let m = ir.mcu.as_str();
+        if m.starts_with("STM32H745")
+            || m.starts_with("STM32H747")
+            || m.starts_with("STM32H755")
+            || m.starts_with("STM32H757")
+        {
+            ir.clocks.init_by = Some(ir::Core::Cm7);
+        }
+    }
+    if let Some(map) = periph_owners {
+        for (name, core) in map.iter() {
+            if let Some(p) = ir.peripherals.get_mut(name) {
+                p.core = Some(*core);
+            }
+        }
+    }
 
     // Ensure all peripherals reference known pins
     use std::collections::HashSet;
@@ -133,15 +160,56 @@ pub(crate) fn from_ioc(
         }
     }
 
+    // Optionally filter by core ownership
+    let maybe_filter_ir = |spec: &ir::Ir| -> ir::Ir {
+        if let Some(sel) = core_filter {
+            use indexmap::IndexMap;
+            let mut periph_filtered: IndexMap<String, ir::Peripheral> = IndexMap::new();
+            for (name, p) in &spec.peripherals {
+                if p.core.map(|c| c == sel).unwrap_or(false) {
+                    periph_filtered.insert(name.clone(), p.clone());
+                }
+            }
+            if periph_filtered.is_empty() {
+                return spec.clone();
+            }
+            use std::collections::HashSet;
+            let mut used: HashSet<&str> = HashSet::new();
+            for p in periph_filtered.values() {
+                for pin in p.signals.values() {
+                    used.insert(pin.as_str());
+                }
+            }
+            let mut pins = Vec::new();
+            for p in &spec.pinctrl {
+                if used.contains(p.pin.as_str()) {
+                    pins.push(p.clone());
+                }
+            }
+            ir::Ir {
+                mcu: spec.mcu.clone(),
+                package: spec.package.clone(),
+                clocks: spec.clocks.clone(),
+                pinctrl: pins,
+                peripherals: periph_filtered,
+            }
+        } else {
+            spec.clone()
+        }
+    };
+
     match layout {
         Layout::OneFile => {
+            let filtered = maybe_filter_ir(&ir);
             let rendered = env.get_template("gen")?.render(context! {
-                spec => &ir,
+                spec => &filtered,
                 grouped_writes,
                 with_deinit,
                 use_label_names,
                 emit_label_consts,
-                idents
+                idents,
+                init_by => filtered.clocks.init_by.as_ref().map(|c| match c { ir::Core::Cm7 => "cm7", ir::Core::Cm4 => "cm4" }),
+                this_core => core_filter.as_ref().map(|c| match c { ir::Core::Cm7 => "cm7", ir::Core::Cm4 => "cm4" }),
             })?;
             fs::write(base_dir.join(out_name), rendered)?;
         }
@@ -149,6 +217,11 @@ pub(crate) fn from_ioc(
             use indexmap::IndexMap;
             let mut mods = Vec::new();
             for (name, per) in &ir.peripherals {
+                if let Some(sel) = core_filter {
+                    if per.core.map(|c| c != sel).unwrap_or(false) {
+                        continue;
+                    }
+                }
                 let pins: Vec<_> = ir
                     .pinctrl
                     .iter()
@@ -170,7 +243,9 @@ pub(crate) fn from_ioc(
                     mod_name => name,
                     use_label_names,
                     emit_label_consts,
-                    idents
+                    idents,
+                    init_by => sub.clocks.init_by.as_ref().map(|c| match c { ir::Core::Cm7 => "cm7", ir::Core::Cm4 => "cm4" }),
+                    this_core => core_filter.as_ref().map(|c| match c { ir::Core::Cm7 => "cm7", ir::Core::Cm4 => "cm4" }),
                 })?;
                 fs::write(base_dir.join(format!("{name}.rs")), rendered)?;
                 mods.push(name);

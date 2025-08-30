@@ -5,7 +5,7 @@
 //! function numbers are supplied by an [`AfProvider`].
 
 use crate::af::AfProvider;
-use crate::ir::{Clocks, Ir, Peripheral, Pin, Pll};
+use crate::ir::{Clocks, Core, Ir, Peripheral, Pin, Pll};
 use anyhow::{Result, anyhow};
 use indexmap::IndexMap;
 use indexmap::IndexMap as HashMap;
@@ -51,6 +51,7 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
                 let periph = peripherals.entry(name).or_insert(Peripheral {
                     class,
                     signals: IndexMap::new(),
+                    core: None,
                 });
                 periph.signals.insert(role, pin);
             }
@@ -86,6 +87,7 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
     let clocks = Clocks {
         pll: pll_map,
         kernels,
+        init_by: None,
     };
 
     if !allow_reserved {
@@ -96,13 +98,15 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
         }
     }
 
-    Ok(Ir {
+    let mut ir = Ir {
         mcu,
         package,
         clocks,
         pinctrl: pins,
         peripherals,
-    })
+    };
+    infer_core_assignments(&kv, &mut ir);
+    Ok(ir)
 }
 
 fn parse_kv(s: &str) -> HashMap<String, String> {
@@ -132,6 +136,65 @@ fn split_signal(sig: &str) -> Option<(String, String, String)> {
         ))
     } else {
         None
+    }
+}
+
+fn parse_core_token(s: &str) -> Option<Core> {
+    let v = s.trim().to_ascii_lowercase();
+    match v.as_str() {
+        "cm7" | "cpu1" | "core1" | "m7" => Some(Core::Cm7),
+        "cm4" | "cpu2" | "core2" | "m4" => Some(Core::Cm4),
+        _ => None,
+    }
+}
+
+fn infer_core_assignments(kv: &HashMap<String, String>, ir: &mut Ir) {
+    // Per-peripheral ownership via common patterns like `<IP>.AssignedTo`/`<IP>.Core`/`<IP>.CPU`
+    for (name, p) in ir.peripherals.iter_mut() {
+        let ip = name.to_ascii_uppercase(); // e.g., usart1 -> USART1
+        let keys = [
+            format!("{ip}.AssignedTo"),
+            format!("{ip}.Core"),
+            format!("{ip}.CPU"),
+            format!("{ip}.Owner"),
+        ];
+        for k in &keys {
+            if let Some(val) = kv.get(k) {
+                if let Some(core) = parse_core_token(val) {
+                    p.core = Some(core);
+                    break;
+                }
+                let lower = val.to_ascii_lowercase();
+                if lower.contains("cm4") || lower.contains("cpu2") || lower.contains("core2") {
+                    p.core = Some(Core::Cm4);
+                    break;
+                }
+                if lower.contains("cm7") || lower.contains("cpu1") || lower.contains("core1") {
+                    p.core = Some(Core::Cm7);
+                    break;
+                }
+            }
+        }
+    }
+    // Clock init core via explicit hint if present
+    if ir.clocks.init_by.is_none() {
+        if let Some(v) = kv.get("RCC.InitBy") {
+            ir.clocks.init_by = parse_core_token(v);
+        }
+    }
+    // Project flags heuristic: if only one core project is enabled, prefer that
+    if ir.clocks.init_by.is_none() {
+        let cm7 = kv
+            .get("ProjectManager.CM7Project")
+            .map(|s| s == "true" || s == "1")
+            .unwrap_or(false);
+        let cm4 = kv
+            .get("ProjectManager.CM4Project")
+            .map(|s| s == "true" || s == "1")
+            .unwrap_or(false);
+        if cm7 ^ cm4 {
+            ir.clocks.init_by = Some(if cm7 { Core::Cm7 } else { Core::Cm4 });
+        }
     }
 }
 
