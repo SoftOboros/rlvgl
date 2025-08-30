@@ -17,6 +17,24 @@
 #![allow(clippy::too_many_arguments)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
+{% if init_by is defined and this_core is defined %}
+/// Clock initialization ownership: {{ init_by }}
+#[doc(hidden)]
+pub const CLOCKS_INIT_BY: &str = "{{ init_by }}";
+
+{% if this_core != init_by %}
+/// Secondary core helper: wait for system clocks initialized by the primary core.
+pub fn wait_for_clocks() {
+    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+}
+{% else %}
+/// Primary core helper: optionally signal clocks ready to the secondary core.
+pub fn signal_clocks_ready() {
+    // TODO: Implement HSEM/EXTI or shared-flag signal as needed.
+}
+{% endif %}
+{% endif %}
+
 {# collect unique GPIO port letters #}
 {% set ns = namespace(ports=[]) %}
 {% for pin in spec.pinctrl %}
@@ -122,8 +140,8 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     {%- set is_ana  = pin.func[0:3] == "ADC" or ("Analog" in pin.func) %}
     // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}{% if pin.label %} ({{ pin.label }}){% endif %}
     {%- set base = pin.pin | lower -%}
-    {%- if use_label_names and idents and idents.get(pin.pin) is defined -%}
-    {%- set base = idents.get(pin.pin) -%}
+    {%- if use_label_names and idents and idents[pin.pin] is defined -%}
+    {%- set base = idents[pin.pin] -%}
     {%- endif -%}
     let {{ base }} =
     {%- if is_gpio %}

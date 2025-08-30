@@ -162,20 +162,6 @@ rlvgl-creator svg <svg> <out> [--dpi DPI...] [--threshold VAL]
 * `--dpi` – one or more DPI values to render at (default `96`).
 * `--threshold` – monochrome threshold (0–255).
 
-### board from-ioc
-Converts a CubeMX project into a board overlay JSON.
-
-```
-rlvgl-creator board from-ioc <ioc> <board> <out> [--hal | --pac | --template <template>] [--bsp-out <dir>]
-```
-* `ioc` – path to the CubeMX `.ioc` file.
-* `board` – name to embed in the overlay.
-* `out` – path to write the generated JSON.
-* `--hal` – embed HAL template selection.
-* `--pac` – embed PAC template selection.
-* `--template` – record a custom template path.
-* `--bsp-out` – directory to emit BSP code.
-
 ### bsp from-ioc
 Renders Rust source from a CubeMX project using a MiniJinja template.
 

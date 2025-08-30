@@ -22,16 +22,22 @@ def main() -> None:
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     for ioc in args.input.glob("*.ioc"):
-        module = ioc.stem.replace("-", "_")
         subprocess.run(
             [
                 "rlvgl-creator",
-                "board",
+                "bsp",
                 "from-ioc",
                 str(ioc),
-                module,
-                str(Path(tempfile.mkstemp(suffix=".json")[1])),
-                "--bsp-out",
+                "--emit-hal",
+                "--emit-pac",
+                "--grouped-writes",
+                "--per-peripheral",
+                "--with-deinit",
+                "--use-label-names",
+                "--emit-label-consts",
+                "--label-prefix",
+                "pin_",
+                "--out",
                 str(args.output),
             ],
             check=True,

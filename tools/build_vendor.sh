@@ -20,7 +20,15 @@ mkdir -p "$OUT_DIR"
 python3 "$ROOT/tools/gen_pins.py" --input "$VENDOR_DIR/stm" --output "$OUT_DIR"
 
 mkdir -p "$CRATE_DIR/assets"
-python3 "$ROOT/tools/pack_chipdb.py" --input "$OUT_DIR" --output "$CRATE_DIR/assets/chipdb.bin.zst"
+# Package the database if zstandard is available; otherwise skip gracefully.
+if python3 - <<'PY' 2>/dev/null
+import zstandard
+PY
+then
+  python3 "$ROOT/tools/pack_chipdb.py" --input "$OUT_DIR" --output "$CRATE_DIR/assets/chipdb.bin.zst"
+else
+  echo "warning: python zstandard module not found; skipping pack step" >&2
+fi
 
 # Expose generated definitions so vendor crates can embed them
 export RLVGL_CHIP_SRC="$OUT_DIR"

@@ -86,16 +86,9 @@ vendor crates on startup.
 
 > ⚠️ The legacy `board` subcommand remains but is deprecated in favor of BSP generation.
 
-To convert a custom CubeMX project into a board overlay, run:
-
-```bash
-# rlvgl-creator 🆕
-rlvgl-creator board from-ioc project.ioc MyBoard MyBoard.json # 🆕
-```
-
-The CLI detects the MCU automatically and resolves alternate-function numbers
-using the bundled database. The resulting JSON can be placed under `boards/`
-for use by `rlvgl-creator` 🆕.
+The creator now derives alternate functions directly from embedded vendor data.
+There is no separate board overlay conversion step; generate BSPs with
+`bsp from-ioc` as shown below.
 
 ## Batch BSP generation
 

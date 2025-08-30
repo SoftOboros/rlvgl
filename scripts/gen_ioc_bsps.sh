@@ -65,6 +65,7 @@ for ioc in "${iocs[@]}"; do
   out_dir="$OUT_DIR/$board"
   if "$RLVGL_CREATOR" bsp from-ioc "$ioc" \
     --emit-hal --emit-pac --grouped-writes --with-deinit --allow-reserved --per-peripheral \
+    --use-label-names --emit-label-consts --label-prefix pin_ \
     --out "$out_dir"; then
     echo "    done"
   else

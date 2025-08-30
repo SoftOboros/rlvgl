@@ -1,5 +1,6 @@
 #!/bin/bash
 # run the contaner with environment secrets.
+set -eav pipeline
 docker run -d \
   -e SCCACHE_BUCKET="${SCCACHE_BUCKET:?Need SCCACHE_BUCKET set}" \
   -e AWS_REGION="${AWS_REGION:?Need AWS_REGION set}" \
@@ -20,12 +21,15 @@ docker cp ~/ssh/known_hosts      rlvgl-builder:home/rlvgl/.ssh/known_hosts
 docker cp ~/ssh/id_rsa           rlvgl-builder:home/rlvgl/.ssh/id_rsa
 docker cp ~/ssh/id_rsa.pub       rlvgl-builder:home/rlvgl/.ssh/id_rsa.pub
 docker cp ~/ssh/config_container rlvgl-builder:home/rlvgl/.ssh/config
+docker exec rlvgl-builder mkdir -p /home/rlvgl/.codex 
+docker cp ~/.codex/config.toml   rlvgl-builder:home/rlvgl/.codex/config.toml
 # Make sure rlvgl user has access to it's creentials.s
 docker exec -u 0 rlvgl-builder chown -R "rlvgl":"rlvgl" \
                                 /home/rlvgl/.ssh/known_hosts \
                                 /home/rlvgl/.ssh/id_rsa \
                                 /home/rlvgl/.ssh/id_rsa.pub \
-                                /home/rlvgl/.ssh/config
+                                /home/rlvgl/.ssh/config \
+                                /home/rlvgl/.codex/config.toml
 # Execute commands to checkout repo, submodules, add ssh origin, assign it and execute bash
 docker exec rlvgl-builder git clone https://github.com/SoftOboros/rlvgl.git /opt/rlvgl
 docker exec rlvgl-builder git submodule update --init --depth=3
