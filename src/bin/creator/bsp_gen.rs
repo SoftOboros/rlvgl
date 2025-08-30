@@ -60,6 +60,22 @@ pub(crate) fn from_ioc(
     // Determine AF provider from embedded vendor database
     let mcu = detect_mcu(&text)?;
     let vendor = load_mcu_af(&mcu)?;
+<<<<<<< HEAD
+    let ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
+    render_from_ir(
+        &ir,
+        template,
+        out_dir,
+        grouped_writes,
+        with_deinit,
+        layout,
+        use_label_names,
+        label_prefix,
+        fail_on_duplicate_labels,
+        emit_label_consts,
+    )
+}
+=======
     let mut ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
     if let Some(c) = init_by {
         ir.clocks.init_by = Some(c);
@@ -82,24 +98,22 @@ pub(crate) fn from_ioc(
             }
         }
     }
+>>>>>>> 1120213a57a2aa0db4192e195d54eef5455a3af4
 
-    // Ensure all peripherals reference known pins
-    use std::collections::HashSet;
-    let mut pin_set = HashSet::new();
-    for p in &ir.pinctrl {
-        pin_set.insert(&p.pin);
-    }
-    for (name, per) in &ir.peripherals {
-        if per.signals.is_empty() {
-            return Err(anyhow!("peripheral {} has no active pins", name));
-        }
-        for (role, pin) in &per.signals {
-            if !pin_set.contains(pin) {
-                return Err(anyhow!("peripheral {} missing pin for {}", name, role));
-            }
-        }
-    }
-
+/// Render Rust source from a precomputed IR using MiniJinja templates.
+pub(crate) fn render_from_ir(
+    ir: &ir::Ir,
+    template: TemplateKind,
+    out_dir: &Path,
+    grouped_writes: bool,
+    with_deinit: bool,
+    layout: Layout,
+    // Label handling
+    use_label_names: bool,
+    label_prefix: Option<&str>,
+    fail_on_duplicate_labels: bool,
+    emit_label_consts: bool,
+) -> Result<()> {
     let (tmpl_src, out_name, subdir) = match template {
         TemplateKind::Hal => (
             include_str!("bsp/templates/hal.rs.jinja").to_string(),
@@ -202,7 +216,11 @@ pub(crate) fn from_ioc(
         Layout::OneFile => {
             let filtered = maybe_filter_ir(&ir);
             let rendered = env.get_template("gen")?.render(context! {
+<<<<<<< HEAD
+                spec => ir,
+=======
                 spec => &filtered,
+>>>>>>> 1120213a57a2aa0db4192e195d54eef5455a3af4
                 grouped_writes,
                 with_deinit,
                 use_label_names,

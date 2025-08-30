@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rlvgl.dev/schemas/config.schema.json",
+  "$comment": "schemas/config.schema.json - Unified board configuration IR v0.1 for pins, clocks, peripherals, and metadata.",
+  "title": "Unified Board Configuration IR v0.1",
+  "type": "object",
+  "required": ["version", "board", "mcu", "package", "pins"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "0.1",
+      "description": "IR schema version."
+    },
+    "board": { "type": "string", "minLength": 1, "description": "Human name of the board or project." },
+    "mcu": { "type": "string", "minLength": 1, "description": "Microcontroller identifier (e.g., STM32H747XIHx)." },
+    "package": { "type": "string", "minLength": 1, "description": "Chip package (e.g., LQFP176)." },
+    "metadata": {
+      "type": "object",
+      "description": "Optional provenance and auxiliary metadata.",
+      "additionalProperties": true,
+      "properties": {
+        "vendor": { "type": "string", "description": "Vendor identifier (e.g., st, nxp, ti)." },
+        "source": { "type": "string", "description": "Path or URL of the original configuration project." },
+        "generated_at": { "type": "string", "description": "ISO8601 timestamp when this IR was produced." },
+        "hashes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Optional content hashes for reproducibility."
+        }
+      }
+    },
+    "pins": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/PinEntry" },
+      "description": "Configured pins for this board/project. One entry per configured function."
+    },
+    "clocks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Clock sources and selections relevant to configured peripherals.",
+      "properties": {
+        "sources": {
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "number", "string", "boolean"] },
+          "description": "Optional raw source descriptions (e.g., HSE frequency)."
+        },
+        "pll": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/Pll" },
+          "description": "PLL configurations keyed by name (pll1, pll2, …)."
+        },
+        "kernels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Peripheral kernel clock selections (e.g., usart1 -> pclk2)."
+        }
+      }
+    },
+    "peripherals": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": { "$ref": "#/$defs/Peripheral" },
+      "description": "Peripheral instances discovered from configured pins."
+    },
+    "other_attributes": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Bag for vendor-specific or unknown attributes preserved during conversion."
+    }
+  },
+  "$defs": {
+    "PinEntry": {
+      "type": "object",
+      "required": ["name", "function", "af"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^P[A-Z][0-9]+$", "description": "Pin name (e.g., PA9)." },
+        "function": { "type": "string", "minLength": 1, "description": "Signal name (e.g., USART1_TX, GPIO_Output)." },
+        "label": { "type": "string", "description": "Optional user label assigned in the vendor project." },
+        "af": { "type": "integer", "minimum": 0, "maximum": 15, "description": "Alternate function number (0 for GPIO/analog)." },
+        "electrical": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": { "type": "string", "enum": ["analog", "input", "output", "alternate" ] },
+            "pull": { "type": "string", "enum": ["none", "up", "down"] },
+            "speed": { "type": ["string", "integer"], "description": "Speed setting (vendor-specific scale)." },
+            "otype": { "type": "string", "enum": ["push_pull", "open_drain"] }
+          }
+        },
+        "other_attributes": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "Pll": {
+      "type": "object",
+      "required": ["m", "n"],
+      "additionalProperties": false,
+      "properties": {
+        "m": { "type": "integer", "minimum": 1 },
+        "n": { "type": "integer", "minimum": 1 },
+        "p": { "type": "integer", "minimum": 1 },
+        "q": { "type": "integer", "minimum": 1 },
+        "r": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "Peripheral": {
+      "type": "object",
+      "required": ["class", "signals"],
+      "additionalProperties": false,
+      "properties": {
+        "class": { "type": "string", "description": "Functional class (e.g., serial, spi, i2c, timer, gpio)." },
+        "signals": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Role-to-pin mapping (e.g., tx -> PA9)."
+        },
+        "params": { "type": "object", "additionalProperties": true },
+        "other_attributes": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}
+
