@@ -14,12 +14,12 @@ mod ui;
 
 #[path = "../creator/bsp/af.rs"]
 pub mod af;
+#[path = "../creator/ast.rs"]
+pub mod ast;
 #[path = "../creator/bsp/ioc.rs"]
 pub mod ioc;
 #[path = "../creator/bsp/ir.rs"]
 pub mod ir;
-#[path = "../creator/ast.rs"]
-pub mod ast;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {

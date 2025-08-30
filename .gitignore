@@ -13,3 +13,4 @@ venv
 **/boards.json
 **/mcu.json
 codex_state/
+.codex/

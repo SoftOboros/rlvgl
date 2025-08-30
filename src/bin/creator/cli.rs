@@ -345,7 +345,7 @@ enum BspCommand {
         #[arg(long)]
         with_deinit: bool,
         /// Emit a single consolidated file
-        #[arg(long, group = "layout")] 
+        #[arg(long, group = "layout")]
         one_file: bool,
         /// Emit one file per peripheral
         #[arg(long, group = "layout")]
@@ -601,23 +601,44 @@ pub fn run() -> Result<()> {
             } => {
                 let mut files = Vec::new();
                 for p in inputs {
-                    let ps = if p.is_dir() { crate::ast::discover_c_sources(&p) } else { vec![p] };
+                    let ps = if p.is_dir() {
+                        crate::ast::discover_c_sources(&p)
+                    } else {
+                        vec![p]
+                    };
                     files.extend(ps);
                 }
                 if files.is_empty() {
                     return Err(anyhow!("no C sources found in inputs"));
                 }
-                let ir = crate::ast::extract_from_c_sources(
+                let ir_tmp = crate::ast::extract_from_c_sources(
                     &files,
-                    crate::ast::ExtractOptions { mcu: &mcu, package: &package },
+                    crate::ast::ExtractOptions {
+                        mcu: &mcu,
+                        package: &package,
+                    },
                 )?;
+                // Normalize to the shared IR type to avoid cfg(test) path differences
+                let ir: crate::ir::Ir = serde_json::from_slice(&serde_json::to_vec(&ir_tmp)?)?;
 
                 let mut kinds = Vec::new();
-                if emit_hal { kinds.push(bsp_gen::TemplateKind::Hal); }
-                if emit_pac { kinds.push(bsp_gen::TemplateKind::Pac); }
-                if let Some(t) = template { kinds.push(bsp_gen::TemplateKind::Custom(t)); }
-                if kinds.is_empty() { return Err(anyhow!("select --emit-hal, --emit-pac, or --template")); }
-                let layout = if per_peripheral { bsp_gen::Layout::PerPeripheral } else { bsp_gen::Layout::OneFile };
+                if emit_hal {
+                    kinds.push(bsp_gen::TemplateKind::Hal);
+                }
+                if emit_pac {
+                    kinds.push(bsp_gen::TemplateKind::Pac);
+                }
+                if let Some(t) = template {
+                    kinds.push(bsp_gen::TemplateKind::Custom(t));
+                }
+                if kinds.is_empty() {
+                    return Err(anyhow!("select --emit-hal, --emit-pac, or --template"));
+                }
+                let layout = if per_peripheral {
+                    bsp_gen::Layout::PerPeripheral
+                } else {
+                    bsp_gen::Layout::OneFile
+                };
                 for kind in kinds {
                     bsp_gen::render_from_ir(
                         &ir,
@@ -630,6 +651,7 @@ pub fn run() -> Result<()> {
                         label_prefix.as_deref(),
                         fail_on_duplicate_labels,
                         emit_label_consts,
+                        None,
                     )?;
                 }
                 if per_peripheral {
@@ -653,13 +675,14 @@ pub fn run() -> Result<()> {
                     };
                     files.extend(ps);
                 }
-                let ir = crate::ast::extract_from_c_sources(
+                let ir_tmp = crate::ast::extract_from_c_sources(
                     &files,
                     crate::ast::ExtractOptions {
                         mcu: &mcu,
                         package: &package,
                     },
                 )?;
+                let ir: crate::ir::Ir = serde_json::from_slice(&serde_json::to_vec(&ir_tmp)?)?;
                 let json = serde_json::to_string_pretty(&ir)?;
                 if let Some(path) = out {
                     std::fs::write(path, json)?;

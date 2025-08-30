@@ -35,10 +35,7 @@ fn extract_basic_gpio_and_kernel() {
 
     assert_eq!(ir.mcu, "STM32H747XIHx");
     assert_eq!(ir.package, "LQFP176");
-    assert!(ir
-        .clocks
-        .kernels
-        .contains_key(&"usart1".to_string()));
+    assert!(ir.clocks.kernels.contains_key(&"usart1".to_string()));
     assert!(ir.pinctrl.iter().any(|p| p.pin == "PA9"));
     // Ensure AF number captured
     assert!(ir.pinctrl.iter().any(|p| p.af == 7));

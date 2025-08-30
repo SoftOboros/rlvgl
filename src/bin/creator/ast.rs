@@ -12,10 +12,10 @@ use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-// In the binary, use the shared IR module declared by the entrypoint.
-// In tests (where this module is included directly), include the IR locally.
+// In normal builds, re-export the shared IR module.
 #[cfg(not(test))]
-use crate::ir;
+pub use crate::ir;
+// In tests that include this file directly, provide a local IR module.
 #[cfg(test)]
 #[path = "bsp/ir.rs"]
 pub mod ir;
@@ -114,6 +114,7 @@ pub fn extract_from_c_sources(files: &[PathBuf], opts: ExtractOptions) -> Result
                     peripherals.entry(inst).or_insert_with(|| ir::Peripheral {
                         class: infer_class_from_signal(&sig),
                         signals: indexmap::IndexMap::new(),
+                        core: None,
                     });
                 }
                 continue;

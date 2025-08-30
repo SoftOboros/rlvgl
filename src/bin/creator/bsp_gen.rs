@@ -60,22 +60,6 @@ pub(crate) fn from_ioc(
     // Determine AF provider from embedded vendor database
     let mcu = detect_mcu(&text)?;
     let vendor = load_mcu_af(&mcu)?;
-<<<<<<< HEAD
-    let ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
-    render_from_ir(
-        &ir,
-        template,
-        out_dir,
-        grouped_writes,
-        with_deinit,
-        layout,
-        use_label_names,
-        label_prefix,
-        fail_on_duplicate_labels,
-        emit_label_consts,
-    )
-}
-=======
     let mut ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
     if let Some(c) = init_by {
         ir.clocks.init_by = Some(c);
@@ -98,7 +82,21 @@ pub(crate) fn from_ioc(
             }
         }
     }
->>>>>>> 1120213a57a2aa0db4192e195d54eef5455a3af4
+
+    render_from_ir(
+        &ir,
+        template,
+        out_dir,
+        grouped_writes,
+        with_deinit,
+        layout,
+        use_label_names,
+        label_prefix,
+        fail_on_duplicate_labels,
+        emit_label_consts,
+        core_filter,
+    )
+}
 
 /// Render Rust source from a precomputed IR using MiniJinja templates.
 pub(crate) fn render_from_ir(
@@ -113,6 +111,8 @@ pub(crate) fn render_from_ir(
     label_prefix: Option<&str>,
     fail_on_duplicate_labels: bool,
     emit_label_consts: bool,
+    // Optional core filter for split-core generation
+    core_filter: Option<ir::Core>,
 ) -> Result<()> {
     let (tmpl_src, out_name, subdir) = match template {
         TemplateKind::Hal => (
@@ -216,11 +216,7 @@ pub(crate) fn render_from_ir(
         Layout::OneFile => {
             let filtered = maybe_filter_ir(&ir);
             let rendered = env.get_template("gen")?.render(context! {
-<<<<<<< HEAD
-                spec => ir,
-=======
                 spec => &filtered,
->>>>>>> 1120213a57a2aa0db4192e195d54eef5455a3af4
                 grouped_writes,
                 with_deinit,
                 use_label_names,
