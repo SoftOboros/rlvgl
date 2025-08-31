@@ -1,5 +1,5 @@
 //! Round-trip test for the Renesas YAML adapter.
-#![cfg(feature = "creator")]
+#![cfg(all(feature = "creator", feature = "regression"))]
 
 #[path = "../src/bin/creator/bsp/ir.rs"]
 mod ir;

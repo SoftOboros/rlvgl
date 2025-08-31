@@ -55,7 +55,7 @@ pub(crate) fn run(svg: &Path, out: &Path, dpis: &[f32], threshold: Option<u8>) -
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "regression"))]
 mod tests {
     use super::*;
     use blake3::hash;

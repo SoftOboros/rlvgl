@@ -94,6 +94,12 @@ fn main() {
     let pending = demo.pending.clone();
     let to_remove = demo.to_remove.clone();
 
+    let headless = headless_path.is_some();
+    if headless {
+        // Start from a blank scene in headless mode; test flags add content.
+        root.borrow_mut().children.clear();
+    }
+
     if show_qr {
         #[cfg(feature = "qrcode")]
         root.borrow_mut()
@@ -113,7 +119,7 @@ fn main() {
             .push(common_demo::build_gif_demo(width as u32, height as u32));
     }
 
-    let mut frame_cb = {
+    let frame_cb = {
         let root = root.clone();
         move |frame: &mut [u8], w: usize, h: usize| {
             if use_wgpi {

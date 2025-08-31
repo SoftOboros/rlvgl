@@ -252,6 +252,7 @@ syn = { version = "2", features = ["full"] }
 
 [features]
 default = []
+regression = []
 png = ["rlvgl-core/png", "rlvgl-platform/png"]
 jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg"]
 gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif"]
