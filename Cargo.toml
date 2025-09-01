@@ -346,6 +346,7 @@ creator_ui = [
     "dep:rlvgl-chips-ti",
     "dep:rlvgl-chips-rp2040",
 ]
+backlight_pwm = []
 
 [profile.release]
 opt-level = "z"
