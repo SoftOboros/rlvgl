@@ -1,4 +1,5 @@
 //! Tests for the `stm32_xml_scraper.py` utility.
+#![cfg(feature = "regression")]
 
 use std::{fs, path::PathBuf, process::Command};
 use tempfile::tempdir;

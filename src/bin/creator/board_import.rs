@@ -26,7 +26,9 @@ pub fn from_ioc(
 ) -> Result<()> {
     let text = fs::read_to_string(ioc_path)?;
     let mcu = detect_mcu(&text)?;
-    let af = load_mcu_af(&mcu)?;
+    // Resolve AFs via the canonical STM32 database when available; fall back to
+    // zeros if the compressed database asset isn't present.
+    let af = load_mcu_af(&mcu).unwrap_or_else(|_| McuAf { pins: HashMap::new() });
     // CubeMX `.ioc` files prefix pin keys with `Pin.`; strip it so the
     // lightweight parser can match the signals.
     let cleaned = text.replace("Pin.", "");

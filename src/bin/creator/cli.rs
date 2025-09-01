@@ -266,11 +266,8 @@ enum BoardCommand {
         /// Embed a custom template path
         #[arg(long, conflicts_with_all = ["hal", "pac"])]
         template: Option<String>,
-        /// JSON alternate-function database for BSP rendering
-        #[arg(long)]
-        af: Option<PathBuf>,
         /// Output directory for generated BSP code
-        #[arg(long, requires = "af")]
+        #[arg(long)]
         bsp_out: Option<PathBuf>,
     },
 }
@@ -281,8 +278,6 @@ enum BspCommand {
     FromIoc {
         /// Input `.ioc` file
         ioc: PathBuf,
-        /// JSON alternate-function database
-        af: PathBuf,
         /// Output directory for generated files
         #[arg(long)]
         out: PathBuf,
@@ -401,7 +396,6 @@ pub fn run() -> Result<()> {
                 hal,
                 pac,
                 template,
-                af,
                 bsp_out,
             } => {
                 let tmpl_sel = if hal {
@@ -412,29 +406,19 @@ pub fn run() -> Result<()> {
                     template.as_deref()
                 };
                 board_import::from_ioc(&ioc, &board, &out, tmpl_sel)?;
-                if let (Some(af_path), Some(dir)) = (af, bsp_out) {
+                if let Some(dir) = bsp_out {
                     let kind = match tmpl_sel {
                         Some("pac") => bsp_gen::TemplateKind::Pac,
                         Some("hal") | None => bsp_gen::TemplateKind::Hal,
                         Some(t) => bsp_gen::TemplateKind::Custom(PathBuf::from(t)),
                     };
-                    bsp_gen::from_ioc(
-                        &ioc,
-                        &af_path,
-                        kind,
-                        &dir,
-                        false,
-                        false,
-                        false,
-                        bsp_gen::Layout::OneFile,
-                    )?;
+                    bsp_gen::from_ioc(&ioc, kind, &dir, false, false, false, bsp_gen::Layout::OneFile)?;
                 }
             }
         },
         Command::Bsp { cmd } => match cmd {
             BspCommand::FromIoc {
                 ioc,
-                af,
                 out,
                 emit_hal,
                 emit_pac,
@@ -464,16 +448,7 @@ pub fn run() -> Result<()> {
                     bsp_gen::Layout::OneFile
                 };
                 for kind in kinds {
-                    bsp_gen::from_ioc(
-                        &ioc,
-                        &af,
-                        kind,
-                        &out,
-                        grouped_writes,
-                        with_deinit,
-                        allow_reserved,
-                        layout.clone(),
-                    )?;
+                    bsp_gen::from_ioc(&ioc, kind, &out, grouped_writes, with_deinit, allow_reserved, layout.clone())?;
                 }
                 if per_peripheral {
                     bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;

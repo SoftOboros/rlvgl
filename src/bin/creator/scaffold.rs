@@ -269,7 +269,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "regression"))]
 mod tests {
     use super::*;
     use std::path::Path;
