@@ -28,6 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext-dev          \
     libxrender1          \
     llvm-dev             \
+    gcc-arm-none-eabi    \
+    binutils-arm-none-eabi \
+    zstd                 \
     mold                 \
     nano                 \
     ninja-build          \

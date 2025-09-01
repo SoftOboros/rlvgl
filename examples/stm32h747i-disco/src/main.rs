@@ -21,6 +21,8 @@ mod common_demo;
 
 #[path = "bsp/pac.rs"]
 mod bsp_pac;
+#[path = "bsp/hal.rs"]
+mod bsp_hal;
 
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
@@ -66,16 +68,24 @@ fn main() -> ! {
             CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
         };
 
-        struct DummyBacklight;
-        impl PwmError for DummyBacklight {
+        struct GpioBacklight;
+        impl PwmError for GpioBacklight {
             type Error = Infallible;
         }
-        impl SetDutyCycle for DummyBacklight {
-            fn set_duty_cycle(&mut self, _duty: u16) -> Result<(), Self::Error> {
+        impl SetDutyCycle for GpioBacklight {
+            fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+                unsafe {
+                    let gpioj = &*stm32h7::stm32h747cm7::GPIOJ::ptr();
+                    if duty == 0 {
+                        gpioj.bsrr.write(|w| w.bits(1 << (6 + 16))); // PJ6 low
+                    } else {
+                        gpioj.bsrr.write(|w| w.bits(1 << 6)); // PJ6 high
+                    }
+                }
                 Ok(())
             }
             fn max_duty_cycle(&self) -> u16 {
-                0
+                u16::MAX
             }
         }
 
@@ -169,20 +179,45 @@ fn main() -> ! {
                 }
             }
         }
-        let dp = bsp_pac::Peripherals::take().unwrap();
-        // Configure essential clocks and pins using the generated PAC-based BSP
+        // Configure essential clocks and pins using the generated HAL-based BSP
         // prior to moving PAC peripherals.
-        bsp_pac::enable_gpio_clocks(&dp);
-        bsp_pac::configure_pins_pac(&dp);
-        let bsp_pac::Peripherals {
+        let mut p = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
+        use stm32h7xx_hal::prelude::*;
+        let pwr = p.PWR.constrain();
+        let vos = pwr.freeze();
+        let rcc = p.RCC.constrain();
+        let ccdr = rcc.freeze(vos, &mut p.SYSCFG);
+        bsp_hal::enable_gpio_clocks(&p);
+        bsp_hal::configure_pins_hal(&p, &ccdr);
+        // Minimal panel reset (PJ12) and prepare backlight (PJ6 as PWM placeholder)
+        unsafe {
+            let gpioj = &*stm32h7::stm32h747cm7::GPIOJ::ptr();
+            // PJ6 and PJ12 -> output mode (01)
+            let mut moder = gpioj.moder.read().bits();
+            moder &= !(0b11 << (6 * 2));
+            moder |= 0b01 << (6 * 2);
+            moder &= !(0b11 << (12 * 2));
+            moder |= 0b01 << (12 * 2);
+            gpioj.moder.write(|w| w.bits(moder));
+            // push-pull
+            let mut otyper = gpioj.otyper.read().bits();
+            otyper &= !(1 << 6);
+            otyper &= !(1 << 12);
+            gpioj.otyper.write(|w| w.bits(otyper));
+            // Panel reset sequence: PJ12 low → delay → high
+            gpioj.bsrr.write(|w| w.bits(1 << (12 + 16))); // reset low
+            cortex_m::asm::delay(10_000_00);
+            gpioj.bsrr.write(|w| w.bits(1 << 12)); // reset high
+        }
+        let stm32h7::stm32h747cm7::Peripherals {
             DSIHOST: dsi,
             FMC: fmc,
             LTDC: ltdc,
             RCC: mut rcc,
             ..
-        } = dp;
+        } = p;
         let blitter = CpuBlitter;
-        let backlight = DummyBacklight;
+        let backlight = GpioBacklight;
         let reset = DummyReset;
         let mut _display =
             Stm32h747iDiscoDisplay::new(blitter, backlight, reset, ltdc, dsi, fmc, &mut rcc);

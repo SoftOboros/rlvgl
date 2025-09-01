@@ -72,7 +72,10 @@ pub fn signal_clocks_ready() {
 {% else %}
     {% set hal_crate = 'stm32' + family + nums[0:1] + 'xx_hal' %}
 {% endif %}
-use {{ hal_crate }}::{gpio::Speed, pac, prelude::*{% for p in ns.ports %}, gpio{{ p|lower }}::*{% endfor %}};
+use {{ hal_crate }}::{gpio::Speed, pac, prelude::*};
+{% if spec.mcu[0:7] == "STM32H7" %}
+use {{ hal_crate }}::rcc;
+{% endif %}
 
 {% macro gpio_bus(family) -%}
 {% if family[0:7] == "STM32H7" %}ahb4enr
@@ -130,9 +133,9 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 {% else %}
 /// Configures pins using the HAL API.
 {% endif %}
-pub fn configure_pins_hal(dp: &pac::Peripherals) {
+pub fn configure_pins_hal(dp: &pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" %}, ccdr: &rcc::Ccdr{% endif %}) {
 {% for p in ns.ports %}
-    let gpio{{ p|lower }} = dp.GPIO{{ p }}.split();
+    let gpio{{ p|lower }} = dp.GPIO{{ p }}.split({% if spec.mcu[0:7] == "STM32H7" %}ccdr.peripheral.GPIO{{ p }}{% endif %});
 {% endfor %}
 {% for pin in spec.pinctrl %}
     {%- set is_gpio = pin.func[0:5] == "GPIO_" %}
@@ -143,22 +146,22 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     {%- if use_label_names and idents and idents[pin.pin] is defined -%}
     {%- set base = idents[pin.pin] -%}
     {%- endif -%}
-    let {{ base }} =
-    {%- if is_gpio %}
+    let {{ base }} = {%- if is_gpio -%}
         {%- if "Output" in pin.func %} gpio{{ port_l(pin) }}.{{ field(pin) }}.into_push_pull_output()
         {%- elif "Input" in pin.func %}  gpio{{ port_l(pin) }}.{{ field(pin) }}.into_floating_input()
         {%- elif is_ana %}               gpio{{ port_l(pin) }}.{{ field(pin) }}.into_analog()
         {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_floating_input()
         {%- endif -%}
-    {%- else %}
+    {%- else -%}
         {%- if is_i2c %}                 gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate_open_drain::<{{ pin.af }}>()
                                             .internal_pull_up(true)
         {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate::<{{ pin.af }}>()
         {%- endif -%}
-    {%- endif %}
-    {% if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" %}
+    {%- endif -%}
+    {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" -%}
         .set_speed(Speed::VeryHigh)
-    {% endif %};
+    {%- endif -%}
+    ;
 {% endfor %}
 }
 {% endif %}

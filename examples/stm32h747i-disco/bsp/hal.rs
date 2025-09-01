@@ -14,6 +14,19 @@
 
 
 
+/// Clock initialization ownership: cm7
+#[doc(hidden)]
+pub const CLOCKS_INIT_BY: &str = "cm7";
+
+
+/// Secondary core helper: wait for system clocks initialized by the primary core.
+pub fn wait_for_clocks() {
+    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+}
+
+
+
+
 
 
     
@@ -363,7 +376,9 @@
     
 
 use stm32h7xx_hal::{gpio::Speed, pac, prelude::*};
+
 use stm32h7xx_hal::rcc;
+
 
 
 
@@ -401,501 +416,326 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 
 /// Configures pins using the HAL API.
 
-pub fn configure_pins_hal(dp: &pac::Peripherals) {
+pub fn configure_pins_hal(dp: &pac::Peripherals, ccdr: &rcc::Ccdr) {
 
-    let gpioa = dp.GPIOA.split();
+    let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
 
-    let gpiob = dp.GPIOB.split();
+    let gpiob = dp.GPIOB.split(ccdr.peripheral.GPIOB);
 
-    let gpioc = dp.GPIOC.split();
+    let gpioc = dp.GPIOC.split(ccdr.peripheral.GPIOC);
 
-    let gpiod = dp.GPIOD.split();
+    let gpiod = dp.GPIOD.split(ccdr.peripheral.GPIOD);
 
-    let gpioe = dp.GPIOE.split();
+    let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
 
-    let gpiof = dp.GPIOF.split();
+    let gpiof = dp.GPIOF.split(ccdr.peripheral.GPIOF);
 
-    let gpiog = dp.GPIOG.split();
+    let gpiog = dp.GPIOG.split(ccdr.peripheral.GPIOG);
 
-    let gpioh = dp.GPIOH.split();
+    let gpioh = dp.GPIOH.split(ccdr.peripheral.GPIOH);
 
-    let gpioi = dp.GPIOI.split();
+    let gpioi = dp.GPIOI.split(ccdr.peripheral.GPIOI);
 
-    let gpioj = dp.GPIOJ.split();
+    let gpioj = dp.GPIOJ.split(ccdr.peripheral.GPIOJ);
 
-    let gpiok = dp.GPIOK.split();
+    let gpiok = dp.GPIOK.split(ccdr.peripheral.GPIOK);
 
 
-    // PA0 ADCx_INP0 AF0 (ARD_A2)let pa0 =                      gpioa.pa0.into_alternate::<0>()
-    ;
+    // PA0 ADCx_INP0 AF0 (ARD_A2)let pa0 =                      gpioa.pa0.into_alternate::<0>();
 
-    // PA1 ETH_REF_CLK AF0 (ARD_A3)let pa1 =                      gpioa.pa1.into_alternate::<0>()
-    ;
+    // PA1 ETH_REF_CLK AF0 (ARD_A3)let pa1 =                      gpioa.pa1.into_alternate::<0>();
 
-    // PA10 USART1_RX AF0 (STLINK_TX)let pa10 =                      gpioa.pa10.into_alternate::<0>()
-    ;
+    // PA10 USART1_RX AF0 (STLINK_TX)let pa10 =                      gpioa.pa10.into_alternate::<0>();
 
-    // PA11 SPI2_NSS AF0 (PMOD\#1)let pa11 =                      gpioa.pa11.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PA11 SPI2_NSS AF0 (PMOD\#1)let pa11 =                      gpioa.pa11.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PA12 SPI2_SCK AF0 (SPI2_SCK)let pa12 =                      gpioa.pa12.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PA12 SPI2_SCK AF0 (SPI2_SCK)let pa12 =                      gpioa.pa12.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PA1 ADCx_INP1 AF0 (ARD_A3)let pa1 =                      gpioa.pa1.into_alternate::<0>()
-    ;
+    // PA1 ADCx_INP1 AF0 (ARD_A3)let pa1 =                      gpioa.pa1.into_alternate::<0>();
 
-    // PA2 ETH_MDIO AF0 (ETH_MDIO)let pa2 =                      gpioa.pa2.into_alternate::<0>()
-    ;
+    // PA2 ETH_MDIO AF0 (ETH_MDIO)let pa2 =                      gpioa.pa2.into_alternate::<0>();
 
-    // PA3 USB_OTG_HS_ULPI_D0 AF0 (ULPI_D0)let pa3 =                      gpioa.pa3.into_alternate::<0>()
-    ;
+    // PA3 USB_OTG_HS_ULPI_D0 AF0 (ULPI_D0)let pa3 =                      gpioa.pa3.into_alternate::<0>();
 
-    // PA5 USB_OTG_HS_ULPI_CK AF0 (ULPI_CK)let pa5 =                      gpioa.pa5.into_alternate::<0>()
-    ;
+    // PA5 USB_OTG_HS_ULPI_CK AF0 (ULPI_CK)let pa5 =                      gpioa.pa5.into_alternate::<0>();
 
-    // PA7 ETH_CRS_DV AF0 (ETH_CRS_DV)let pa7 =                      gpioa.pa7.into_alternate::<0>()
-    ;
+    // PA7 ETH_CRS_DV AF0 (ETH_CRS_DV)let pa7 =                      gpioa.pa7.into_alternate::<0>();
 
-    // PA8 RCC_MCO_1 AF0 (CEC_CK/MCO1)let pa8 =                      gpioa.pa8.into_alternate::<0>()
-    ;
+    // PA8 RCC_MCO_1 AF0 (CEC_CK/MCO1)let pa8 =                      gpioa.pa8.into_alternate::<0>();
 
-    // PA9 USART1_TX AF0 (STLINK_RX)let pa9 =                      gpioa.pa9.into_alternate::<0>()
-    ;
+    // PA9 USART1_TX AF0 (STLINK_RX)let pa9 =                      gpioa.pa9.into_alternate::<0>();
 
-    // PB0 USB_OTG_HS_ULPI_D1 AF0 (ULPI_D1)let pb0 =                      gpiob.pb0.into_alternate::<0>()
-    ;
+    // PB0 USB_OTG_HS_ULPI_D1 AF0 (ULPI_D1)let pb0 =                      gpiob.pb0.into_alternate::<0>();
 
-    // PB1 USB_OTG_HS_ULPI_D2 AF0 (ULPI_D2)let pb1 =                      gpiob.pb1.into_alternate::<0>()
-    ;
+    // PB1 USB_OTG_HS_ULPI_D2 AF0 (ULPI_D2)let pb1 =                      gpiob.pb1.into_alternate::<0>();
 
-    // PB10 USB_OTG_HS_ULPI_D3 AF0 (ULPI_D3)let pb10 =                      gpiob.pb10.into_alternate::<0>()
-    ;
+    // PB10 USB_OTG_HS_ULPI_D3 AF0 (ULPI_D3)let pb10 =                      gpiob.pb10.into_alternate::<0>();
 
-    // PB11 USB_OTG_HS_ULPI_D4 AF0 (ULPI_D4)let pb11 =                      gpiob.pb11.into_alternate::<0>()
-    ;
+    // PB11 USB_OTG_HS_ULPI_D4 AF0 (ULPI_D4)let pb11 =                      gpiob.pb11.into_alternate::<0>();
 
-    // PB12 USB_OTG_HS_ULPI_D5 AF0 (ULPI_D5)let pb12 =                      gpiob.pb12.into_alternate::<0>()
-    ;
+    // PB12 USB_OTG_HS_ULPI_D5 AF0 (ULPI_D5)let pb12 =                      gpiob.pb12.into_alternate::<0>();
 
-    // PB13 USB_OTG_HS_ULPI_D6 AF0 (ULPI_D6)let pb13 =                      gpiob.pb13.into_alternate::<0>()
-    ;
+    // PB13 USB_OTG_HS_ULPI_D6 AF0 (ULPI_D6)let pb13 =                      gpiob.pb13.into_alternate::<0>();
 
-    // PB14 GPIO_Input AF0 (PMOD\#9)let pb14 =  gpiob.pb14.into_floating_input()
-    ;
+    // PB14 GPIO_Input AF0 (PMOD\#9)let pb14 =  gpiob.pb14.into_floating_input();
 
-    // PB15 GPIO_Input AF0 (PMOD\#8)let pb15 =  gpiob.pb15.into_floating_input()
-    ;
+    // PB15 GPIO_Input AF0 (PMOD\#8)let pb15 =  gpiob.pb15.into_floating_input();
 
-    // PB2 QUADSPI_CLK AF0 (QSPI_CLK)let pb2 =                      gpiob.pb2.into_alternate::<0>()
-    ;
+    // PB2 QUADSPI_CLK AF0 (QSPI_CLK)let pb2 =                      gpiob.pb2.into_alternate::<0>();
 
-    // PB5 USB_OTG_HS_ULPI_D7 AF0 (ULPI_D7)let pb5 =                      gpiob.pb5.into_alternate::<0>()
-    ;
+    // PB5 USB_OTG_HS_ULPI_D7 AF0 (ULPI_D7)let pb5 =                      gpiob.pb5.into_alternate::<0>();
 
-    // PB6 CEC AF0 (HDMI_CEC)let pb6 =                      gpiob.pb6.into_alternate::<0>()
-    ;
+    // PB6 CEC AF0 (HDMI_CEC)let pb6 =                      gpiob.pb6.into_alternate::<0>();
 
-    // PC0 USB_OTG_HS_ULPI_STP AF0 (ULPI_STP)let pc0 =                      gpioc.pc0.into_alternate::<0>()
-    ;
+    // PC0 USB_OTG_HS_ULPI_STP AF0 (ULPI_STP)let pc0 =                      gpioc.pc0.into_alternate::<0>();
 
-    // PC1 ETH_MDC AF0 (ETH_MDC/SAI4_D1)let pc1 =                      gpioc.pc1.into_alternate::<0>()
-    ;
+    // PC1 ETH_MDC AF0 (ETH_MDC/SAI4_D1)let pc1 =                      gpioc.pc1.into_alternate::<0>();
 
-    // PC10 SDMMC1_D2 AF0 (SDIO1_D2)let pc10 =                      gpioc.pc10.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC10 SDMMC1_D2 AF0 (SDIO1_D2)let pc10 =                      gpioc.pc10.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC11 SDMMC1_D3 AF0 (SDIO1_D3)let pc11 =                      gpioc.pc11.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC11 SDMMC1_D3 AF0 (SDIO1_D3)let pc11 =                      gpioc.pc11.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC12 SDMMC1_CK AF0 (SDIO1_CK)let pc12 =                      gpioc.pc12.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC12 SDMMC1_CK AF0 (SDIO1_CK)let pc12 =                      gpioc.pc12.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC13 RTC_TAMP1 AF0 (B2 [Wakeup Button])let pc13 =                      gpioc.pc13.into_alternate::<0>()
-    ;
+    // PC13 RTC_TAMP1 AF0 (B2 [Wakeup Button])let pc13 =                      gpioc.pc13.into_alternate::<0>();
 
-    // PC2 SPI2_MISO AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC2 SPI2_MISO AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC2 ADC3_INP0 AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>()
-    ;
+    // PC2 ADC3_INP0 AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>();
 
-    // PC3 SPI2_MOSI AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC3 SPI2_MOSI AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC3 ADC3_INP1 AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>()
-    ;
+    // PC3 ADC3_INP1 AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>();
 
-    // PC4 ETH_RXD0 AF0 (ETH_RXD0)let pc4 =                      gpioc.pc4.into_alternate::<0>()
-    ;
+    // PC4 ETH_RXD0 AF0 (ETH_RXD0)let pc4 =                      gpioc.pc4.into_alternate::<0>();
 
-    // PC5 ETH_RXD1 AF0 (ETH_RXD1)let pc5 =                      gpioc.pc5.into_alternate::<0>()
-    ;
+    // PC5 ETH_RXD1 AF0 (ETH_RXD1)let pc5 =                      gpioc.pc5.into_alternate::<0>();
 
-    // PC8 SDMMC1_D0 AF0 (SDIO1_D0)let pc8 =                      gpioc.pc8.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC8 SDMMC1_D0 AF0 (SDIO1_D0)let pc8 =                      gpioc.pc8.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC9 SDMMC1_D1 AF0 (SDIO1_D1)let pc9 =                      gpioc.pc9.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC9 SDMMC1_D1 AF0 (SDIO1_D1)let pc9 =                      gpioc.pc9.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PD0 FMC_D2_DA2 AF0 (FMC_D2)let pd0 =                      gpiod.pd0.into_alternate::<0>()
-    ;
+    // PD0 FMC_D2_DA2 AF0 (FMC_D2)let pd0 =                      gpiod.pd0.into_alternate::<0>();
 
-    // PD1 FMC_D3_DA3 AF0 (FMC_D3)let pd1 =                      gpiod.pd1.into_alternate::<0>()
-    ;
+    // PD1 FMC_D3_DA3 AF0 (FMC_D3)let pd1 =                      gpiod.pd1.into_alternate::<0>();
 
-    // PD10 FMC_D15_DA15 AF0 (FMC_D15)let pd10 =                      gpiod.pd10.into_alternate::<0>()
-    ;
+    // PD10 FMC_D15_DA15 AF0 (FMC_D15)let pd10 =                      gpiod.pd10.into_alternate::<0>();
 
-    // PD11 QUADSPI_BK1_IO0 AF0 (QSPI_BK1_IO0)let pd11 =                      gpiod.pd11.into_alternate::<0>()
-    ;
+    // PD11 QUADSPI_BK1_IO0 AF0 (QSPI_BK1_IO0)let pd11 =                      gpiod.pd11.into_alternate::<0>();
 
-    // PD12 I2C4_SCL AF0let pd12 =                 gpiod.pd12.into_alternate_open_drain::<0>()
-                                            .internal_pull_up(true)
-    ;
+    // PD12 I2C4_SCL AF4let pd12 =                 gpiod.pd12.into_alternate_open_drain::<4>()
+                                            .internal_pull_up(true);
 
-    // PD13 I2C4_SDA AF0let pd13 =                 gpiod.pd13.into_alternate_open_drain::<0>()
-                                            .internal_pull_up(true)
-    ;
+    // PD13 I2C4_SDA AF4let pd13 =                 gpiod.pd13.into_alternate_open_drain::<4>()
+                                            .internal_pull_up(true);
 
-    // PD14 FMC_D0_DA0 AF0 (FMC_D0)let pd14 =                      gpiod.pd14.into_alternate::<0>()
-    ;
+    // PD14 FMC_D0_DA0 AF0 (FMC_D0)let pd14 =                      gpiod.pd14.into_alternate::<0>();
 
-    // PD15 FMC_D1_DA1 AF0 (FMC_D1)let pd15 =                      gpiod.pd15.into_alternate::<0>()
-    ;
+    // PD15 FMC_D1_DA1 AF0 (FMC_D1)let pd15 =                      gpiod.pd15.into_alternate::<0>();
 
-    // PD2 SDMMC1_CMD AF0 (SDIO1_CMD)let pd2 =                      gpiod.pd2.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PD2 SDMMC1_CMD AF0 (SDIO1_CMD)let pd2 =                      gpiod.pd2.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PD7 SPDIFRX1_IN0 AF0 (SPDIF_RX0)let pd7 =                      gpiod.pd7.into_alternate::<0>()
-    ;
+    // PD7 SPDIFRX1_IN0 AF0 (SPDIF_RX0)let pd7 =                      gpiod.pd7.into_alternate::<0>();
 
-    // PD8 FMC_D13_DA13 AF0 (FMC_D13)let pd8 =                      gpiod.pd8.into_alternate::<0>()
-    ;
+    // PD8 FMC_D13_DA13 AF0 (FMC_D13)let pd8 =                      gpiod.pd8.into_alternate::<0>();
 
-    // PD9 FMC_D14_DA14 AF0 (FMC_D14)let pd9 =                      gpiod.pd9.into_alternate::<0>()
-    ;
+    // PD9 FMC_D14_DA14 AF0 (FMC_D14)let pd9 =                      gpiod.pd9.into_alternate::<0>();
 
-    // PE0 FMC_NBL0 AF0 (FMC_NBL0)let pe0 =                      gpioe.pe0.into_alternate::<0>()
-    ;
+    // PE0 FMC_NBL0 AF0 (FMC_NBL0)let pe0 =                      gpioe.pe0.into_alternate::<0>();
 
-    // PE1 FMC_NBL1 AF0 (FMC_NBL1)let pe1 =                      gpioe.pe1.into_alternate::<0>()
-    ;
+    // PE1 FMC_NBL1 AF0 (FMC_NBL1)let pe1 =                      gpioe.pe1.into_alternate::<0>();
 
-    // PE10 FMC_D7_DA7 AF0 (FMC_D7)let pe10 =                      gpioe.pe10.into_alternate::<0>()
-    ;
+    // PE10 FMC_D7_DA7 AF0 (FMC_D7)let pe10 =                      gpioe.pe10.into_alternate::<0>();
 
-    // PE11 FMC_D8_DA8 AF0 (FMC_D8)let pe11 =                      gpioe.pe11.into_alternate::<0>()
-    ;
+    // PE11 FMC_D8_DA8 AF0 (FMC_D8)let pe11 =                      gpioe.pe11.into_alternate::<0>();
 
-    // PE12 FMC_D9_DA9 AF0 (FMC_D9)let pe12 =                      gpioe.pe12.into_alternate::<0>()
-    ;
+    // PE12 FMC_D9_DA9 AF0 (FMC_D9)let pe12 =                      gpioe.pe12.into_alternate::<0>();
 
-    // PE13 FMC_D10_DA10 AF0 (FMC_D10)let pe13 =                      gpioe.pe13.into_alternate::<0>()
-    ;
+    // PE13 FMC_D10_DA10 AF0 (FMC_D10)let pe13 =                      gpioe.pe13.into_alternate::<0>();
 
-    // PE14 FMC_D11_DA11 AF0 (FMC_D11)let pe14 =                      gpioe.pe14.into_alternate::<0>()
-    ;
+    // PE14 FMC_D11_DA11 AF0 (FMC_D11)let pe14 =                      gpioe.pe14.into_alternate::<0>();
 
-    // PE15 FMC_D12_DA12 AF0 (FMC_D12)let pe15 =                      gpioe.pe15.into_alternate::<0>()
-    ;
+    // PE15 FMC_D12_DA12 AF0 (FMC_D12)let pe15 =                      gpioe.pe15.into_alternate::<0>();
 
-    // PE3 SAI1_SD_B AF0 (SAI1_SD_B)let pe3 =                      gpioe.pe3.into_alternate::<0>()
-    ;
+    // PE3 SAI1_SD_B AF0 (SAI1_SD_B)let pe3 =                      gpioe.pe3.into_alternate::<0>();
 
-    // PE4 SAI1_FS_A AF0 (SAI1_FS_A)let pe4 =                      gpioe.pe4.into_alternate::<0>()
-    ;
+    // PE4 SAI1_FS_A AF0 (SAI1_FS_A)let pe4 =                      gpioe.pe4.into_alternate::<0>();
 
-    // PE5 SAI1_SCK_A AF0 (SAI1_SCK_A)let pe5 =                      gpioe.pe5.into_alternate::<0>()
-    ;
+    // PE5 SAI1_SCK_A AF0 (SAI1_SCK_A)let pe5 =                      gpioe.pe5.into_alternate::<0>();
 
-    // PE6 SAI1_SD_A AF0 (SAI1_SD_A)let pe6 =                      gpioe.pe6.into_alternate::<0>()
-    ;
+    // PE6 SAI1_SD_A AF0 (SAI1_SD_A)let pe6 =                      gpioe.pe6.into_alternate::<0>();
 
-    // PE7 FMC_D4_DA4 AF0 (FMC_D4)let pe7 =                      gpioe.pe7.into_alternate::<0>()
-    ;
+    // PE7 FMC_D4_DA4 AF0 (FMC_D4)let pe7 =                      gpioe.pe7.into_alternate::<0>();
 
-    // PE8 FMC_D5_DA5 AF0 (FMC_D5)let pe8 =                      gpioe.pe8.into_alternate::<0>()
-    ;
+    // PE8 FMC_D5_DA5 AF0 (FMC_D5)let pe8 =                      gpioe.pe8.into_alternate::<0>();
 
-    // PE9 FMC_D6_DA6 AF0 (FMC_D6)let pe9 =                      gpioe.pe9.into_alternate::<0>()
-    ;
+    // PE9 FMC_D6_DA6 AF0 (FMC_D6)let pe9 =                      gpioe.pe9.into_alternate::<0>();
 
-    // PF0 FMC_A0 AF0 (FMC_A0)let pf0 =                      gpiof.pf0.into_alternate::<0>()
-    ;
+    // PF0 FMC_A0 AF0 (FMC_A0)let pf0 =                      gpiof.pf0.into_alternate::<0>();
 
-    // PF1 FMC_A1 AF0 (FMC_A1)let pf1 =                      gpiof.pf1.into_alternate::<0>()
-    ;
+    // PF1 FMC_A1 AF0 (FMC_A1)let pf1 =                      gpiof.pf1.into_alternate::<0>();
 
-    // PF10 ADC3_INP6 AF0 (ARD_A1)let pf10 =                      gpiof.pf10.into_alternate::<0>()
-    ;
+    // PF10 ADC3_INP6 AF0 (ARD_A1)let pf10 =                      gpiof.pf10.into_alternate::<0>();
 
-    // PF11 FMC_SDNRAS AF0 (FMC_SDRAS)let pf11 =                      gpiof.pf11.into_alternate::<0>()
-    ;
+    // PF11 FMC_SDNRAS AF0 (FMC_SDRAS)let pf11 =                      gpiof.pf11.into_alternate::<0>();
 
-    // PF12 FMC_A6 AF0 (FMC_A6)let pf12 =                      gpiof.pf12.into_alternate::<0>()
-    ;
+    // PF12 FMC_A6 AF0 (FMC_A6)let pf12 =                      gpiof.pf12.into_alternate::<0>();
 
-    // PF13 FMC_A7 AF0 (FMC_A7)let pf13 =                      gpiof.pf13.into_alternate::<0>()
-    ;
+    // PF13 FMC_A7 AF0 (FMC_A7)let pf13 =                      gpiof.pf13.into_alternate::<0>();
 
-    // PF14 FMC_A8 AF0 (FMC_A8)let pf14 =                      gpiof.pf14.into_alternate::<0>()
-    ;
+    // PF14 FMC_A8 AF0 (FMC_A8)let pf14 =                      gpiof.pf14.into_alternate::<0>();
 
-    // PF15 FMC_A9 AF0 (FMC_A9)let pf15 =                      gpiof.pf15.into_alternate::<0>()
-    ;
+    // PF15 FMC_A9 AF0 (FMC_A9)let pf15 =                      gpiof.pf15.into_alternate::<0>();
 
-    // PF2 FMC_A2 AF0 (FMC_A2)let pf2 =                      gpiof.pf2.into_alternate::<0>()
-    ;
+    // PF2 FMC_A2 AF0 (FMC_A2)let pf2 =                      gpiof.pf2.into_alternate::<0>();
 
-    // PF3 FMC_A3 AF0 (FMC_A3)let pf3 =                      gpiof.pf3.into_alternate::<0>()
-    ;
+    // PF3 FMC_A3 AF0 (FMC_A3)let pf3 =                      gpiof.pf3.into_alternate::<0>();
 
-    // PF4 FMC_A4 AF0 (FMC_A4)let pf4 =                      gpiof.pf4.into_alternate::<0>()
-    ;
+    // PF4 FMC_A4 AF0 (FMC_A4)let pf4 =                      gpiof.pf4.into_alternate::<0>();
 
-    // PF5 FMC_A5 AF0 (FMC_A5)let pf5 =                      gpiof.pf5.into_alternate::<0>()
-    ;
+    // PF5 FMC_A5 AF0 (FMC_A5)let pf5 =                      gpiof.pf5.into_alternate::<0>();
 
-    // PF6 QUADSPI_BK1_IO3 AF0 (QSPI_BK1_IO3)let pf6 =                      gpiof.pf6.into_alternate::<0>()
-    ;
+    // PF6 QUADSPI_BK1_IO3 AF0 (QSPI_BK1_IO3)let pf6 =                      gpiof.pf6.into_alternate::<0>();
 
-    // PF7 QUADSPI_BK1_IO2 AF0 (QSPI_BK1_IO2)let pf7 =                      gpiof.pf7.into_alternate::<0>()
-    ;
+    // PF7 QUADSPI_BK1_IO2 AF0 (QSPI_BK1_IO2)let pf7 =                      gpiof.pf7.into_alternate::<0>();
 
-    // PF8 S_TIM13_CH1 AF0 (PMOD\#14/ARD_D3)let pf8 =                      gpiof.pf8.into_alternate::<0>()
-    ;
+    // PF8 S_TIM13_CH1 AF0 (PMOD\#14/ARD_D3)let pf8 =                      gpiof.pf8.into_alternate::<0>();
 
-    // PF9 QUADSPI_BK1_IO1 AF0 (QSPI_BK1_IO1)let pf9 =                      gpiof.pf9.into_alternate::<0>()
-    ;
+    // PF9 QUADSPI_BK1_IO1 AF0 (QSPI_BK1_IO1)let pf9 =                      gpiof.pf9.into_alternate::<0>();
 
-    // PG0 FMC_A10 AF0 (FMC_A10)let pg0 =                      gpiog.pg0.into_alternate::<0>()
-    ;
+    // PG0 FMC_A10 AF0 (FMC_A10)let pg0 =                      gpiog.pg0.into_alternate::<0>();
 
-    // PG1 FMC_A11 AF0 (FMC_A11)let pg1 =                      gpiog.pg1.into_alternate::<0>()
-    ;
+    // PG1 FMC_A11 AF0 (FMC_A11)let pg1 =                      gpiog.pg1.into_alternate::<0>();
 
-    // PG11 ETH_TX_EN AF0 (ETH_TX_EN)let pg11 =                      gpiog.pg11.into_alternate::<0>()
-    ;
+    // PG11 ETH_TX_EN AF0 (ETH_TX_EN)let pg11 =                      gpiog.pg11.into_alternate::<0>();
 
-    // PG12 ETH_TXD1 AF0 (ETH_TXD1)let pg12 =                      gpiog.pg12.into_alternate::<0>()
-    ;
+    // PG12 ETH_TXD1 AF0 (ETH_TXD1)let pg12 =                      gpiog.pg12.into_alternate::<0>();
 
-    // PG13 ETH_TXD0 AF0 (ETH_TXD0)let pg13 =                      gpiog.pg13.into_alternate::<0>()
-    ;
+    // PG13 ETH_TXD0 AF0 (ETH_TXD0)let pg13 =                      gpiog.pg13.into_alternate::<0>();
 
-    // PG14 QUADSPI_BK2_IO3 AF0 (QSPI_BK2_IO3)let pg14 =                      gpiog.pg14.into_alternate::<0>()
-    ;
+    // PG14 QUADSPI_BK2_IO3 AF0 (QSPI_BK2_IO3)let pg14 =                      gpiog.pg14.into_alternate::<0>();
 
-    // PG15 FMC_SDNCAS AF0 (FMC_SDCAS)let pg15 =                      gpiog.pg15.into_alternate::<0>()
-    ;
+    // PG15 FMC_SDNCAS AF0 (FMC_SDCAS)let pg15 =                      gpiog.pg15.into_alternate::<0>();
 
-    // PG2 FMC_A12 AF0 (FMC_A12)let pg2 =                      gpiog.pg2.into_alternate::<0>()
-    ;
+    // PG2 FMC_A12 AF0 (FMC_A12)let pg2 =                      gpiog.pg2.into_alternate::<0>();
 
-    // PG3 GPIO_Output AF0 (DSI_Reset)let pg3 = gpiog.pg3.into_push_pull_output()
-    ;
+    // PG3 GPIO_Output AF0 (DSI_Reset)let pg3 = gpiog.pg3.into_push_pull_output();
 
-    // PG4 FMC_A14_BA0 AF0 (FMC_BA0)let pg4 =                      gpiog.pg4.into_alternate::<0>()
-    ;
+    // PG4 FMC_A14_BA0 AF0 (FMC_BA0)let pg4 =                      gpiog.pg4.into_alternate::<0>();
 
-    // PG6 QUADSPI_BK1_NCS AF0 (QSPI_BK1_NCS)let pg6 =                      gpiog.pg6.into_alternate::<0>()
-    ;
+    // PG6 QUADSPI_BK1_NCS AF0 (QSPI_BK1_NCS)let pg6 =                      gpiog.pg6.into_alternate::<0>();
 
-    // PG7 SAI1_MCLK_A AF0 (SAI1_MCLK_A)let pg7 =                      gpiog.pg7.into_alternate::<0>()
-    ;
+    // PG7 SAI1_MCLK_A AF0 (SAI1_MCLK_A)let pg7 =                      gpiog.pg7.into_alternate::<0>();
 
-    // PG8 FMC_SDCLK AF0 (FMC_SDCLK)let pg8 =                      gpiog.pg8.into_alternate::<0>()
-    ;
+    // PG8 FMC_SDCLK AF0 (FMC_SDCLK)let pg8 =                      gpiog.pg8.into_alternate::<0>();
 
-    // PG9 QUADSPI_BK2_IO2 AF0 (QSPI_BK2_IO2)let pg9 =                      gpiog.pg9.into_alternate::<0>()
-    ;
+    // PG9 QUADSPI_BK2_IO2 AF0 (QSPI_BK2_IO2)let pg9 =                      gpiog.pg9.into_alternate::<0>();
 
-    // PH10 FMC_D18 AF0 (FMC_D18)let ph10 =                      gpioh.ph10.into_alternate::<0>()
-    ;
+    // PH10 FMC_D18 AF0 (FMC_D18)let ph10 =                      gpioh.ph10.into_alternate::<0>();
 
-    // PH11 FMC_D19 AF0 (FMC_D19)let ph11 =                      gpioh.ph11.into_alternate::<0>()
-    ;
+    // PH11 FMC_D19 AF0 (FMC_D19)let ph11 =                      gpioh.ph11.into_alternate::<0>();
 
-    // PH12 FMC_D20 AF0 (FMC_D20)let ph12 =                      gpioh.ph12.into_alternate::<0>()
-    ;
+    // PH12 FMC_D20 AF0 (FMC_D20)let ph12 =                      gpioh.ph12.into_alternate::<0>();
 
-    // PH13 FMC_D21 AF0 (FMC_D21)let ph13 =                      gpioh.ph13.into_alternate::<0>()
-    ;
+    // PH13 FMC_D21 AF0 (FMC_D21)let ph13 =                      gpioh.ph13.into_alternate::<0>();
 
-    // PH14 FMC_D22 AF0 (FMC_D22)let ph14 =                      gpioh.ph14.into_alternate::<0>()
-    ;
+    // PH14 FMC_D22 AF0 (FMC_D22)let ph14 =                      gpioh.ph14.into_alternate::<0>();
 
-    // PH15 FMC_D23 AF0 (FMC_D23)let ph15 =                      gpioh.ph15.into_alternate::<0>()
-    ;
+    // PH15 FMC_D23 AF0 (FMC_D23)let ph15 =                      gpioh.ph15.into_alternate::<0>();
 
-    // PH2 QUADSPI_BK2_IO0 AF0 (QSPI_BK2_IO0)let ph2 =                      gpioh.ph2.into_alternate::<0>()
-    ;
+    // PH2 QUADSPI_BK2_IO0 AF0 (QSPI_BK2_IO0)let ph2 =                      gpioh.ph2.into_alternate::<0>();
 
-    // PH3 QUADSPI_BK2_IO1 AF0 (QSPI_BK2_IO1)let ph3 =                      gpioh.ph3.into_alternate::<0>()
-    ;
+    // PH3 QUADSPI_BK2_IO1 AF0 (QSPI_BK2_IO1)let ph3 =                      gpioh.ph3.into_alternate::<0>();
 
-    // PH4 USB_OTG_HS_ULPI_NXT AF0 (ULPI_NXT)let ph4 =                      gpioh.ph4.into_alternate::<0>()
-    ;
+    // PH4 USB_OTG_HS_ULPI_NXT AF0 (ULPI_NXT)let ph4 =                      gpioh.ph4.into_alternate::<0>();
 
-    // PH5 FMC_SDNWE AF0 (FMC_SDNWE)let ph5 =                      gpioh.ph5.into_alternate::<0>()
-    ;
+    // PH5 FMC_SDNWE AF0 (FMC_SDNWE)let ph5 =                      gpioh.ph5.into_alternate::<0>();
 
-    // PH6 FMC_SDNE1 AF0 (FMC_SDNE1)let ph6 =                      gpioh.ph6.into_alternate::<0>()
-    ;
+    // PH6 FMC_SDNE1 AF0 (FMC_SDNE1)let ph6 =                      gpioh.ph6.into_alternate::<0>();
 
-    // PH7 FMC_SDCKE1 AF0 (FMC_SDCKE1)let ph7 =                      gpioh.ph7.into_alternate::<0>()
-    ;
+    // PH7 FMC_SDCKE1 AF0 (FMC_SDCKE1)let ph7 =                      gpioh.ph7.into_alternate::<0>();
 
-    // PH8 FMC_D16 AF0 (FMC_D16)let ph8 =                      gpioh.ph8.into_alternate::<0>()
-    ;
+    // PH8 FMC_D16 AF0 (FMC_D16)let ph8 =                      gpioh.ph8.into_alternate::<0>();
 
-    // PH9 FMC_D17 AF0 (FMC_D17)let ph9 =                      gpioh.ph9.into_alternate::<0>()
-    ;
+    // PH9 FMC_D17 AF0 (FMC_D17)let ph9 =                      gpioh.ph9.into_alternate::<0>();
 
-    // PI0 FMC_D24 AF0 (FMC_D24)let pi0 =                      gpioi.pi0.into_alternate::<0>()
-    ;
+    // PI0 FMC_D24 AF0 (FMC_D24)let pi0 =                      gpioi.pi0.into_alternate::<0>();
 
-    // PI1 FMC_D25 AF0 (FMC_D25)let pi1 =                      gpioi.pi1.into_alternate::<0>()
-    ;
+    // PI1 FMC_D25 AF0 (FMC_D25)let pi1 =                      gpioi.pi1.into_alternate::<0>();
 
-    // PI10 FMC_D31 AF0 (FMC_D31)let pi10 =                      gpioi.pi10.into_alternate::<0>()
-    ;
+    // PI10 FMC_D31 AF0 (FMC_D31)let pi10 =                      gpioi.pi10.into_alternate::<0>();
 
-    // PI11 USB_OTG_HS_ULPI_DIR AF0 (ULPI_DIR)let pi11 =                      gpioi.pi11.into_alternate::<0>()
-    ;
+    // PI11 USB_OTG_HS_ULPI_DIR AF0 (ULPI_DIR)let pi11 =                      gpioi.pi11.into_alternate::<0>();
 
-    // PI12 GPIO_Output AF0 (LED1)let pi12 = gpioi.pi12.into_push_pull_output()
-    ;
+    // PI12 GPIO_Output AF0 (LED1)let pi12 = gpioi.pi12.into_push_pull_output();
 
-    // PI13 GPIO_Output AF0 (LED2)let pi13 = gpioi.pi13.into_push_pull_output()
-    ;
+    // PI13 GPIO_Output AF0 (LED2)let pi13 = gpioi.pi13.into_push_pull_output();
 
-    // PI14 GPIO_Output AF0 (LED3)let pi14 = gpioi.pi14.into_push_pull_output()
-    ;
+    // PI14 GPIO_Output AF0 (LED3)let pi14 = gpioi.pi14.into_push_pull_output();
 
-    // PI15 GPIO_Output AF0 (LED4)let pi15 = gpioi.pi15.into_push_pull_output()
-    ;
+    // PI15 GPIO_Output AF0 (LED4)let pi15 = gpioi.pi15.into_push_pull_output();
 
-    // PI2 FMC_D26 AF0 (FMC_D26)let pi2 =                      gpioi.pi2.into_alternate::<0>()
-    ;
+    // PI2 FMC_D26 AF0 (FMC_D26)let pi2 =                      gpioi.pi2.into_alternate::<0>();
 
-    // PI3 FMC_D27 AF0 (FMC_D27)let pi3 =                      gpioi.pi3.into_alternate::<0>()
-    ;
+    // PI3 FMC_D27 AF0 (FMC_D27)let pi3 =                      gpioi.pi3.into_alternate::<0>();
 
-    // PI4 FMC_NBL2 AF0 (FMC_NBL2)let pi4 =                      gpioi.pi4.into_alternate::<0>()
-    ;
+    // PI4 FMC_NBL2 AF0 (FMC_NBL2)let pi4 =                      gpioi.pi4.into_alternate::<0>();
 
-    // PI5 FMC_NBL3 AF0 (FMC_NBL3)let pi5 =                      gpioi.pi5.into_alternate::<0>()
-    ;
+    // PI5 FMC_NBL3 AF0 (FMC_NBL3)let pi5 =                      gpioi.pi5.into_alternate::<0>();
 
-    // PI6 FMC_D28 AF0 (FMC_D28)let pi6 =                      gpioi.pi6.into_alternate::<0>()
-    ;
+    // PI6 FMC_D28 AF0 (FMC_D28)let pi6 =                      gpioi.pi6.into_alternate::<0>();
 
-    // PI7 FMC_D29 AF0 (FMC_D29)let pi7 =                      gpioi.pi7.into_alternate::<0>()
-    ;
+    // PI7 FMC_D29 AF0 (FMC_D29)let pi7 =                      gpioi.pi7.into_alternate::<0>();
 
-    // PI8 GPIO_Input AF0 (uSD_Detect)let pi8 =  gpioi.pi8.into_floating_input()
-    ;
+    // PI8 GPIO_Input AF0 (uSD_Detect)let pi8 =  gpioi.pi8.into_floating_input();
 
-    // PI9 FMC_D30 AF0 (FMC_D30)let pi9 =                      gpioi.pi9.into_alternate::<0>()
-    ;
+    // PI9 FMC_D30 AF0 (FMC_D30)let pi9 =                      gpioi.pi9.into_alternate::<0>();
 
-    // PJ0 GPIO_Input AF0 (ARD_D7)let pj0 =  gpioj.pj0.into_floating_input()
-    ;
+    // PJ0 GPIO_Input AF0 (ARD_D7)let pj0 =  gpioj.pj0.into_floating_input();
 
-    // PJ1 GPIO_Input AF0 (OTG_HS_OverCurrent)let pj1 =  gpioj.pj1.into_floating_input()
-    ;
+    // PJ1 GPIO_Input AF0 (OTG_HS_OverCurrent)let pj1 =  gpioj.pj1.into_floating_input();
 
-    // PJ10 SPI5_MOSI AF0 (ARD_D11)let pj10 =                      gpioj.pj10.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PJ10 SPI5_MOSI AF0 (ARD_D11)let pj10 =                      gpioj.pj10.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PJ11 SPI5_MISO AF0 (ARD_D12)let pj11 =                      gpioj.pj11.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PJ11 SPI5_MISO AF0 (ARD_D12)let pj11 =                      gpioj.pj11.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PJ12 GPIO_Output AF0 (BL_CTRL)let pj12 = gpioj.pj12.into_push_pull_output()
-    ;
+    // PJ12 GPIO_Output AF0 (BL_CTRL)let pj12 = gpioj.pj12.into_push_pull_output();
 
-    // PJ13 GPIO_Input AF0 (PMOD\#12)let pj13 =  gpioj.pj13.into_floating_input()
-    ;
+    // PJ13 GPIO_Input AF0 (PMOD\#12)let pj13 =  gpioj.pj13.into_floating_input();
 
-    // PJ15 GPIO_Input AF0 (Audio_INT)let pj15 =  gpioj.pj15.into_floating_input()
-    ;
+    // PJ15 GPIO_Input AF0 (Audio_INT)let pj15 =  gpioj.pj15.into_floating_input();
 
-    // PJ2 DSIHOST_TE AF0 (DSI_TE)let pj2 =                      gpioj.pj2.into_alternate::<0>()
-    ;
+    // PJ2 DSIHOST_TE AF0 (DSI_TE)let pj2 =                      gpioj.pj2.into_alternate::<0>();
 
-    // PJ3 GPIO_Input AF0 (ARD_D2)let pj3 =  gpioj.pj3.into_floating_input()
-    ;
+    // PJ3 GPIO_Input AF0 (ARD_D2)let pj3 =  gpioj.pj3.into_floating_input();
 
-    // PJ4 GPIO_Input AF0 (ARD_D4)let pj4 =  gpioj.pj4.into_floating_input()
-    ;
+    // PJ4 GPIO_Input AF0 (ARD_D4)let pj4 =  gpioj.pj4.into_floating_input();
 
-    // PJ5 GPIO_Input AF0 (ARD_D8)let pj5 =  gpioj.pj5.into_floating_input()
-    ;
+    // PJ5 GPIO_Input AF0 (ARD_D8)let pj5 =  gpioj.pj5.into_floating_input();
 
-    // PJ6 S_TIM8_CH2 AF0 (ARD_D9)let pj6 =                      gpioj.pj6.into_alternate::<0>()
-    ;
+    // PJ6 S_TIM8_CH2 AF0 (ARD_D9)let pj6 =                      gpioj.pj6.into_alternate::<0>();
 
-    // PJ7 TIM8_CH2N AF0 (ARD_D6)let pj7 =                      gpioj.pj7.into_alternate::<0>()
-    ;
+    // PJ7 TIM8_CH2N AF0 (ARD_D6)let pj7 =                      gpioj.pj7.into_alternate::<0>();
 
-    // PJ8 UART8_TX AF0 (ARD_D1)let pj8 =                      gpioj.pj8.into_alternate::<0>()
-    ;
+    // PJ8 UART8_TX AF0 (ARD_D1)let pj8 =                      gpioj.pj8.into_alternate::<0>();
 
-    // PJ9 UART8_RX AF0 (ARD_D0)let pj9 =                      gpioj.pj9.into_alternate::<0>()
-    ;
+    // PJ9 UART8_RX AF0 (ARD_D0)let pj9 =                      gpioj.pj9.into_alternate::<0>();
 
-    // PK0 SPI5_SCK AF0 (ARD_D13)let pk0 =                      gpiok.pk0.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PK0 SPI5_SCK AF0 (ARD_D13)let pk0 =                      gpiok.pk0.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PK1 SPI5_NSS AF0 (ARD_D10)let pk1 =                      gpiok.pk1.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PK1 SPI5_NSS AF0 (ARD_D10)let pk1 =                      gpiok.pk1.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PK2 GPIO_Input AF0 (JOY_SEL)let pk2 =  gpiok.pk2.into_floating_input()
-    ;
+    // PK2 GPIO_Input AF0 (JOY_SEL)let pk2 =  gpiok.pk2.into_floating_input();
 
-    // PK3 GPIO_Input AF0 (JOY_DOWN)let pk3 =  gpiok.pk3.into_floating_input()
-    ;
+    // PK3 GPIO_Input AF0 (JOY_DOWN)let pk3 =  gpiok.pk3.into_floating_input();
 
-    // PK4 GPIO_Input AF0 (JOY_LEFT)let pk4 =  gpiok.pk4.into_floating_input()
-    ;
+    // PK4 GPIO_Input AF0 (JOY_LEFT)let pk4 =  gpiok.pk4.into_floating_input();
 
-    // PK5 GPIO_Input AF0 (JOY_RIGHT)let pk5 =  gpiok.pk5.into_floating_input()
-    ;
+    // PK5 GPIO_Input AF0 (JOY_RIGHT)let pk5 =  gpiok.pk5.into_floating_input();
 
-    // PK6 GPIO_Input AF0 (JOY_UP)let pk6 =  gpiok.pk6.into_floating_input()
-    ;
+    // PK6 GPIO_Input AF0 (JOY_UP)let pk6 =  gpiok.pk6.into_floating_input();
 
-    // PK7 GPIO_Input AF0 (TOUCH_INT)let pk7 =  gpiok.pk7.into_floating_input()
-    ;
+    // PK7 GPIO_Input AF0 (TOUCH_INT)let pk7 =  gpiok.pk7.into_floating_input();
 
 }
 
