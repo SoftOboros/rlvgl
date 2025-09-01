@@ -414,9 +414,35 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 
 
 
-/// Configures pins using the HAL API.
+/// Configures pins using the HAL API and returns GPIO parts.
 
-pub fn configure_pins_hal(dp: &pac::Peripherals, ccdr: &rcc::Ccdr) {
+pub struct GpioParts {
+
+    pub gpioa: stm32h7xx_hal::gpio::gpioa::Parts,
+
+    pub gpiob: stm32h7xx_hal::gpio::gpiob::Parts,
+
+    pub gpioc: stm32h7xx_hal::gpio::gpioc::Parts,
+
+    pub gpiod: stm32h7xx_hal::gpio::gpiod::Parts,
+
+    pub gpioe: stm32h7xx_hal::gpio::gpioe::Parts,
+
+    pub gpiof: stm32h7xx_hal::gpio::gpiof::Parts,
+
+    pub gpiog: stm32h7xx_hal::gpio::gpiog::Parts,
+
+    pub gpioh: stm32h7xx_hal::gpio::gpioh::Parts,
+
+    pub gpioi: stm32h7xx_hal::gpio::gpioi::Parts,
+
+    pub gpioj: stm32h7xx_hal::gpio::gpioj::Parts,
+
+    pub gpiok: stm32h7xx_hal::gpio::gpiok::Parts,
+
+}
+
+pub fn configure_pins_hal(dp: pac::Peripherals, ccdr: &rcc::Ccdr) -> GpioParts {
 
     let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
 
@@ -523,11 +549,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals, ccdr: &rcc::Ccdr) {
 
     // PD11 QUADSPI_BK1_IO0 AF0 (QSPI_BK1_IO0)let pd11 =                      gpiod.pd11.into_alternate::<0>();
 
-    // PD12 I2C4_SCL AF4let pd12 =                 gpiod.pd12.into_alternate_open_drain::<4>()
-                                            .internal_pull_up(true);
+    // PD12 I2C4_SCL AF4let pd12 =                 gpiod.pd12.into_alternate_open_drain::<4>().internal_pull_up(true);
 
-    // PD13 I2C4_SDA AF4let pd13 =                 gpiod.pd13.into_alternate_open_drain::<4>()
-                                            .internal_pull_up(true);
+    // PD13 I2C4_SDA AF4let pd13 =                 gpiod.pd13.into_alternate_open_drain::<4>().internal_pull_up(true);
 
     // PD14 FMC_D0_DA0 AF0 (FMC_D0)let pd14 =                      gpiod.pd14.into_alternate::<0>();
 
@@ -713,9 +737,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals, ccdr: &rcc::Ccdr) {
 
     // PJ5 GPIO_Input AF0 (ARD_D8)let pj5 =  gpioj.pj5.into_floating_input();
 
-    // PJ6 S_TIM8_CH2 AF0 (ARD_D9)let pj6 =                      gpioj.pj6.into_alternate::<0>();
+    // PJ6 S_TIM8_CH2 AF3 (ARD_D9)let pj6 =                      gpioj.pj6.into_alternate::<3>();
 
-    // PJ7 TIM8_CH2N AF0 (ARD_D6)let pj7 =                      gpioj.pj7.into_alternate::<0>();
+    // PJ7 TIM8_CH2N AF3 (ARD_D6)let pj7 =                      gpioj.pj7.into_alternate::<3>();
 
     // PJ8 UART8_TX AF0 (ARD_D1)let pj8 =                      gpioj.pj8.into_alternate::<0>();
 
@@ -737,6 +761,32 @@ pub fn configure_pins_hal(dp: &pac::Peripherals, ccdr: &rcc::Ccdr) {
 
     // PK7 GPIO_Input AF0 (TOUCH_INT)let pk7 =  gpiok.pk7.into_floating_input();
 
+
+    GpioParts {
+    
+        gpioa,
+    
+        gpiob,
+    
+        gpioc,
+    
+        gpiod,
+    
+        gpioe,
+    
+        gpiof,
+    
+        gpiog,
+    
+        gpioh,
+    
+        gpioi,
+    
+        gpioj,
+    
+        gpiok,
+    
+    }
 }
 
 
@@ -1946,10 +1996,10 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 
 
 
-/// Initializes the board using HAL drivers.
+/// Initializes the board using HAL drivers and returns GPIO parts.
 
-pub fn init_board_hal(dp: pac::Peripherals /*, clocks */) {
+pub fn init_board_hal(dp: pac::Peripherals, ccdr: &rcc::Ccdr /*, clocks */) -> GpioParts {
     enable_gpio_clocks(&dp);
-    configure_pins_hal(&dp);
     enable_peripherals(&dp);
+    configure_pins_hal(dp, ccdr)
 }

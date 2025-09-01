@@ -400,30 +400,18 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 
 
 /// Configures pins using the HAL API.
-
-pub fn configure_pins_hal(dp: &pac::Peripherals) {
-
-    let gpioa = dp.GPIOA.split();
-
-    let gpiob = dp.GPIOB.split();
-
-    let gpioc = dp.GPIOC.split();
-
-    let gpiod = dp.GPIOD.split();
-
-    let gpioe = dp.GPIOE.split();
-
-    let gpiof = dp.GPIOF.split();
-
-    let gpiog = dp.GPIOG.split();
-
-    let gpioh = dp.GPIOH.split();
-
-    let gpioi = dp.GPIOI.split();
-
-    let gpioj = dp.GPIOJ.split();
-
-    let gpiok = dp.GPIOK.split();
+pub fn configure_pins_hal(dp: &pac::Peripherals, ccdr: &rcc::Ccdr) {
+    let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
+    let gpiob = dp.GPIOB.split(ccdr.peripheral.GPIOB);
+    let gpioc = dp.GPIOC.split(ccdr.peripheral.GPIOC);
+    let gpiod = dp.GPIOD.split(ccdr.peripheral.GPIOD);
+    let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
+    let gpiof = dp.GPIOF.split(ccdr.peripheral.GPIOF);
+    let gpiog = dp.GPIOG.split(ccdr.peripheral.GPIOG);
+    let gpioh = dp.GPIOH.split(ccdr.peripheral.GPIOH);
+    let gpioi = dp.GPIOI.split(ccdr.peripheral.GPIOI);
+    let gpioj = dp.GPIOJ.split(ccdr.peripheral.GPIOJ);
+    let gpiok = dp.GPIOK.split(ccdr.peripheral.GPIOK);
 
 
     // PA0 ADCx_INP0 AF0 (ARD_A2)let pa0 =                      gpioa.pa0.into_alternate::<0>()
@@ -435,15 +423,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PA10 USART1_RX AF0 (STLINK_TX)let pa10 =                      gpioa.pa10.into_alternate::<0>()
     ;
 
-    // PA11 SPI2_NSS AF0 (PMOD\#1)let pa11 =                      gpioa.pa11.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PA11 SPI2_NSS AF0 (PMOD\#1)let pa11 =                      gpioa.pa11.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PA12 SPI2_SCK AF0 (SPI2_SCK)let pa12 =                      gpioa.pa12.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PA12 SPI2_SCK AF0 (SPI2_SCK)let pa12 =                      gpioa.pa12.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PA1 ADCx_INP1 AF0 (ARD_A3)let pa1 =                      gpioa.pa1.into_alternate::<0>()
     ;
@@ -505,36 +487,21 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PC1 ETH_MDC AF0 (ETH_MDC/SAI4_D1)let pc1 =                      gpioc.pc1.into_alternate::<0>()
     ;
 
-    // PC10 SDMMC1_D2 AF0 (SDIO1_D2)let pc10 =                      gpioc.pc10.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC10 SDMMC1_D2 AF0 (SDIO1_D2)let pc10 =                      gpioc.pc10.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC11 SDMMC1_D3 AF0 (SDIO1_D3)let pc11 =                      gpioc.pc11.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC11 SDMMC1_D3 AF0 (SDIO1_D3)let pc11 =                      gpioc.pc11.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC12 SDMMC1_CK AF0 (SDIO1_CK)let pc12 =                      gpioc.pc12.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC12 SDMMC1_CK AF0 (SDIO1_CK)let pc12 =                      gpioc.pc12.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PC13 RTC_TAMP1 AF0 (B2 [Wakeup Button])let pc13 =                      gpioc.pc13.into_alternate::<0>()
     ;
 
-    // PC2 SPI2_MISO AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC2 SPI2_MISO AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PC2 ADC3_INP0 AF0 (ARD_A4)let pc2 =                      gpioc.pc2.into_alternate::<0>()
     ;
 
-    // PC3 SPI2_MOSI AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC3 SPI2_MOSI AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PC3 ADC3_INP1 AF0 (ARD_A5)let pc3 =                      gpioc.pc3.into_alternate::<0>()
     ;
@@ -545,15 +512,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PC5 ETH_RXD1 AF0 (ETH_RXD1)let pc5 =                      gpioc.pc5.into_alternate::<0>()
     ;
 
-    // PC8 SDMMC1_D0 AF0 (SDIO1_D0)let pc8 =                      gpioc.pc8.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC8 SDMMC1_D0 AF0 (SDIO1_D0)let pc8 =                      gpioc.pc8.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PC9 SDMMC1_D1 AF0 (SDIO1_D1)let pc9 =                      gpioc.pc9.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PC9 SDMMC1_D1 AF0 (SDIO1_D1)let pc9 =                      gpioc.pc9.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PD0 FMC_D2_DA2 AF0 (FMC_D2)let pd0 =                      gpiod.pd0.into_alternate::<0>()
     ;
@@ -567,13 +528,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PD11 QUADSPI_BK1_IO0 AF0 (QSPI_BK1_IO0)let pd11 =                      gpiod.pd11.into_alternate::<0>()
     ;
 
-    // PD12 I2C4_SCL AF0let pd12 =                 gpiod.pd12.into_alternate_open_drain::<0>()
-                                            .internal_pull_up(true)
-    ;
+    // PD12 I2C4_SCL AF0let pd12 =                 gpiod.pd12.into_alternate_open_drain::<0>().internal_pull_up(true);
 
-    // PD13 I2C4_SDA AF0let pd13 =                 gpiod.pd13.into_alternate_open_drain::<0>()
-                                            .internal_pull_up(true)
-    ;
+    // PD13 I2C4_SDA AF0let pd13 =                 gpiod.pd13.into_alternate_open_drain::<0>().internal_pull_up(true);
 
     // PD14 FMC_D0_DA0 AF0 (FMC_D0)let pd14 =                      gpiod.pd14.into_alternate::<0>()
     ;
@@ -581,10 +538,7 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PD15 FMC_D1_DA1 AF0 (FMC_D1)let pd15 =                      gpiod.pd15.into_alternate::<0>()
     ;
 
-    // PD2 SDMMC1_CMD AF0 (SDIO1_CMD)let pd2 =                      gpiod.pd2.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PD2 SDMMC1_CMD AF0 (SDIO1_CMD)let pd2 =                      gpiod.pd2.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PD7 SPDIFRX1_IN0 AF0 (SPDIF_RX0)let pd7 =                      gpiod.pd7.into_alternate::<0>()
     ;
@@ -826,15 +780,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PJ1 GPIO_Input AF0 (OTG_HS_OverCurrent)let pj1 =  gpioj.pj1.into_floating_input()
     ;
 
-    // PJ10 SPI5_MOSI AF0 (ARD_D11)let pj10 =                      gpioj.pj10.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PJ10 SPI5_MOSI AF0 (ARD_D11)let pj10 =                      gpioj.pj10.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PJ11 SPI5_MISO AF0 (ARD_D12)let pj11 =                      gpioj.pj11.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PJ11 SPI5_MISO AF0 (ARD_D12)let pj11 =                      gpioj.pj11.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PJ12 GPIO_Output AF0 (BL_CTRL)let pj12 = gpioj.pj12.into_push_pull_output()
     ;
@@ -869,15 +817,9 @@ pub fn configure_pins_hal(dp: &pac::Peripherals) {
     // PJ9 UART8_RX AF0 (ARD_D0)let pj9 =                      gpioj.pj9.into_alternate::<0>()
     ;
 
-    // PK0 SPI5_SCK AF0 (ARD_D13)let pk0 =                      gpiok.pk0.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PK0 SPI5_SCK AF0 (ARD_D13)let pk0 =                      gpiok.pk0.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
-    // PK1 SPI5_NSS AF0 (ARD_D10)let pk1 =                      gpiok.pk1.into_alternate::<0>()
-    
-        .set_speed(Speed::VeryHigh)
-    ;
+    // PK1 SPI5_NSS AF0 (ARD_D10)let pk1 =                      gpiok.pk1.into_alternate::<0>().set_speed(Speed::VeryHigh);
 
     // PK2 GPIO_Input AF0 (JOY_SEL)let pk2 =  gpiok.pk2.into_floating_input()
     ;
@@ -2108,8 +2050,8 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 
 /// Initializes the board using HAL drivers.
 
-pub fn init_board_hal(dp: pac::Peripherals /*, clocks */) {
+pub fn init_board_hal(dp: pac::Peripherals, ccdr: &rcc::Ccdr /*, clocks */) {
     enable_gpio_clocks(&dp);
-    configure_pins_hal(&dp);
+    configure_pins_hal(&dp, ccdr);
     enable_peripherals(&dp);
 }

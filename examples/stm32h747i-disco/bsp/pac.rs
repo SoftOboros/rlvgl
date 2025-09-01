@@ -1280,9 +1280,9 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;let afr_shift = (6 % 8) * 4;
         bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;let afr_shift = (7 % 8) * 4;
+        bits |= (3u32 & 0xF) << afr_shift;let afr_shift = (7 % 8) * 4;
         bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;let afr_shift = (8 % 8) * 4;
+        bits |= (3u32 & 0xF) << afr_shift;let afr_shift = (8 % 8) * 4;
         bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;let afr_shift = (9 % 8) * 4;
         bits &= !(0xF << afr_shift);

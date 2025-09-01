@@ -129,11 +129,17 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
 
 {% if spec.pinctrl|length %}
 {% if meta is defined %}
-/// Configures pins for {{ meta.board }} using the HAL API.
+/// Configures pins for {{ meta.board }} using the HAL API and returns GPIO parts.
 {% else %}
-/// Configures pins using the HAL API.
+/// Configures pins using the HAL API and returns GPIO parts.
 {% endif %}
-pub fn configure_pins_hal(dp: &pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" %}, ccdr: &rcc::Ccdr{% endif %}) {
+pub struct GpioParts {
+{% for p in ns.ports %}
+    pub gpio{{ p|lower }}: {{ hal_crate }}::gpio::gpio{{ p|lower }}::Parts,
+{% endfor %}
+}
+
+pub fn configure_pins_hal(dp: pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" %}, ccdr: &rcc::Ccdr{% endif %}) -> GpioParts {
 {% for p in ns.ports %}
     let gpio{{ p|lower }} = dp.GPIO{{ p }}.split({% if spec.mcu[0:7] == "STM32H7" %}ccdr.peripheral.GPIO{{ p }}{% endif %});
 {% endfor %}
@@ -153,16 +159,17 @@ pub fn configure_pins_hal(dp: &pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" 
         {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_floating_input()
         {%- endif -%}
     {%- else -%}
-        {%- if is_i2c %}                 gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate_open_drain::<{{ pin.af }}>()
-                                            .internal_pull_up(true)
+        {%- if is_i2c %}                 gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate_open_drain::<{{ pin.af }}>(){% raw %}.internal_pull_up(true){% endraw %}
         {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate::<{{ pin.af }}>()
         {%- endif -%}
-    {%- endif -%}
-    {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" -%}
-        .set_speed(Speed::VeryHigh)
-    {%- endif -%}
-    ;
+    {%- endif -%}{% if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" %}{% raw %}.set_speed(Speed::VeryHigh){% endraw %}{% endif %};
 {% endfor %}
+
+    GpioParts {
+    {% for p in ns.ports %}
+        gpio{{ p|lower }},
+    {% endfor %}
+    }
 }
 {% endif %}
 
@@ -349,12 +356,12 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 {% endif %}
 
 {% if meta is defined %}
-/// Initializes {{ meta.board }} using HAL drivers.
+/// Initializes {{ meta.board }} using HAL drivers and returns GPIO parts.
 {% else %}
-/// Initializes the board using HAL drivers.
+/// Initializes the board using HAL drivers and returns GPIO parts.
 {% endif %}
-pub fn init_board_hal(dp: pac::Peripherals /*, clocks */) {
+pub fn init_board_hal(dp: pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" %}, ccdr: &rcc::Ccdr{% endif %} /*, clocks */) -> GpioParts {
     enable_gpio_clocks(&dp);
-    configure_pins_hal(&dp);
     enable_peripherals(&dp);
+    configure_pins_hal(dp{% if spec.mcu[0:7] == "STM32H7" %}, ccdr{% endif %})
 }

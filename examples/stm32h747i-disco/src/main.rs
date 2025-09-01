@@ -21,8 +21,7 @@ mod common_demo;
 
 #[path = "bsp/pac.rs"]
 mod bsp_pac;
-#[path = "bsp/hal.rs"]
-mod bsp_hal;
+// HAL BSP module is not required for this bring-up path
 
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
@@ -64,42 +63,21 @@ fn main() -> ! {
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
         use rlvgl::core::event::{Event, Key};
-        use rlvgl::platform::{
-            CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
-        };
+        use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+        use stm32h7xx_hal::prelude::*;
 
-        struct GpioBacklight;
-        impl PwmError for GpioBacklight {
-            type Error = Infallible;
-        }
-        impl SetDutyCycle for GpioBacklight {
+        // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
+        use stm32h7xx_hal::gpio::{Output, Pin, PushPull};
+        use stm32h7xx_hal::hal::digital::v2::OutputPin as OutputPin02;
+        type HalBacklightPin = Pin<'J', 6, Output<PushPull>>;
+        struct HalGpioBacklight(HalBacklightPin);
+        impl PwmError for HalGpioBacklight { type Error = Infallible; }
+        impl SetDutyCycle for HalGpioBacklight {
             fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
-                unsafe {
-                    let gpioj = &*stm32h7::stm32h747cm7::GPIOJ::ptr();
-                    if duty == 0 {
-                        gpioj.bsrr.write(|w| w.bits(1 << (6 + 16))); // PJ6 low
-                    } else {
-                        gpioj.bsrr.write(|w| w.bits(1 << 6)); // PJ6 high
-                    }
-                }
+                if duty == 0 { let _ = self.0.set_low(); } else { let _ = self.0.set_high(); }
                 Ok(())
             }
-            fn max_duty_cycle(&self) -> u16 {
-                u16::MAX
-            }
-        }
-
-        struct DummyReset;
-        impl DigitalError for DummyReset {
-            type Error = Infallible;
-        }
-        impl OutputPin for DummyReset {
-            fn set_high(&mut self) -> Result<(), Self::Error> {
-                Ok(())
-            }
-            fn set_low(&mut self) -> Result<(), Self::Error> {
-                Ok(())
-            }
+            fn max_duty_cycle(&self) -> u16 { u16::MAX }
         }
 
         struct DummyI2c;
@@ -179,48 +157,55 @@ fn main() -> ! {
                 }
             }
         }
-        // Configure essential clocks and pins using the generated HAL-based BSP
-        // prior to moving PAC peripherals.
-        let mut p = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
-        use stm32h7xx_hal::prelude::*;
-        let pwr = p.PWR.constrain();
+        // Destructure PAC peripherals and switch to HAL for operation
+        let dp = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
+        let stm32h7::stm32h747cm7::Peripherals { PWR, RCC, SYSCFG, GPIOJ, TIM8, DSIHOST: dsi, FMC: fmc, LTDC: ltdc, .. } = dp;
+        let pwr = PWR.constrain();
         let vos = pwr.freeze();
-        let rcc = p.RCC.constrain();
-        let ccdr = rcc.freeze(vos, &mut p.SYSCFG);
-        bsp_hal::enable_gpio_clocks(&p);
-        bsp_hal::configure_pins_hal(&p, &ccdr);
-        // Minimal panel reset (PJ12) and prepare backlight (PJ6 as PWM placeholder)
-        unsafe {
-            let gpioj = &*stm32h7::stm32h747cm7::GPIOJ::ptr();
-            // PJ6 and PJ12 -> output mode (01)
-            let mut moder = gpioj.moder.read().bits();
-            moder &= !(0b11 << (6 * 2));
-            moder |= 0b01 << (6 * 2);
-            moder &= !(0b11 << (12 * 2));
-            moder |= 0b01 << (12 * 2);
-            gpioj.moder.write(|w| w.bits(moder));
-            // push-pull
-            let mut otyper = gpioj.otyper.read().bits();
-            otyper &= !(1 << 6);
-            otyper &= !(1 << 12);
-            gpioj.otyper.write(|w| w.bits(otyper));
-            // Panel reset sequence: PJ12 low → delay → high
-            gpioj.bsrr.write(|w| w.bits(1 << (12 + 16))); // reset low
-            cortex_m::asm::delay(10_000_00);
-            gpioj.bsrr.write(|w| w.bits(1 << 12)); // reset high
+        let rcc = RCC.constrain();
+        let mut syscfg = SYSCFG;
+        let ccdr = rcc.freeze(vos, &mut syscfg);
+        let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
+        // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
+        struct HalResetPin<P>(P);
+        impl<P> embedded_hal::digital::ErrorType for HalResetPin<P> { type Error = Infallible; }
+        impl<P: stm32h7xx_hal::hal::digital::v2::OutputPin<Error = Infallible>> embedded_hal::digital::OutputPin for HalResetPin<P> {
+            fn set_high(&mut self) -> Result<(), Self::Error> { let _ = self.0.set_high(); Ok(()) }
+            fn set_low(&mut self) -> Result<(), Self::Error> { let _ = self.0.set_low(); Ok(()) }
         }
-        let stm32h7::stm32h747cm7::Peripherals {
-            DSIHOST: dsi,
-            FMC: fmc,
-            LTDC: ltdc,
-            RCC: mut rcc,
-            ..
-        } = p;
+        let mut panel_reset_hal = gpioj.pj12.into_push_pull_output();
+        let _ = panel_reset_hal.set_low();
+        cortex_m::asm::delay(10_000_00);
+        let _ = panel_reset_hal.set_high();
+        // Backlight via HAL PWM (feature) or GPIO fallback
+        #[cfg(feature = "backlight_pwm")]
+        let backlight = {
+            use stm32h7xx_hal::hal::PwmPin as HalPwmPin02;
+            // Configure PJ6 as TIM8_CH2 with AF3 and start PWM at ~10kHz
+            let pj6_ch2 = gpioj.pj6.into_alternate::<3>();
+            let mut ch = TIM8.pwm(pj6_ch2, 10.kHz(), ccdr.peripheral.TIM8, &ccdr.clocks);
+            // Adapter from HAL 0.2 PwmPin to embedded-hal 1.0 SetDutyCycle
+            struct TimBacklight<T: HalPwmPin02<Duty = u16>>(T);
+            impl<T: HalPwmPin02<Duty = u16>> PwmError for TimBacklight<T> { type Error = Infallible; }
+            impl<T: HalPwmPin02<Duty = u16>> SetDutyCycle for TimBacklight<T> {
+                fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+                    let max = self.0.get_max_duty();
+                    let d = if duty == 0 { 0 } else { max.min(duty) };
+                    self.0.set_duty(d);
+                    if d == 0 { self.0.disable(); } else { self.0.enable(); }
+                    Ok(())
+                }
+                fn max_duty_cycle(&self) -> u16 { self.0.get_max_duty() }
+            }
+            TimBacklight(ch)
+        };
+        #[cfg(not(feature = "backlight_pwm"))]
+        let backlight = {
+            let bl_pin = gpioj.pj6.into_push_pull_output();
+            HalGpioBacklight(bl_pin)
+        };
         let blitter = CpuBlitter;
-        let backlight = GpioBacklight;
-        let reset = DummyReset;
-        let mut _display =
-            Stm32h747iDiscoDisplay::new(blitter, backlight, reset, ltdc, dsi, fmc, &mut rcc);
+        let mut _display = Stm32h747iDiscoDisplay::new(blitter, backlight, HalResetPin(panel_reset_hal), ltdc, dsi, fmc);
         let i2c = DummyI2c;
         let mut input = Stm32h747iDiscoInput::new(i2c);
         let button = DummyButton;

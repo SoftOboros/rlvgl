@@ -288,15 +288,26 @@ struct McuAf {
 
 impl crate::bsp::af::AfProvider for McuAf {
     fn lookup_af(&self, _mcu: &str, pin: &str, func: &str) -> Option<u8> {
-        if let Some(v) = self.pins.get(pin).and_then(|m| m.get(func)).copied() {
+        // Normalize STM suffix prefixes occasionally emitted by Cube (e.g. S_TIM8_CH2)
+        let normalized = func.strip_prefix("S_").unwrap_or(func);
+        if let Some(v) = self
+            .pins
+            .get(pin)
+            .and_then(|m| m.get(normalized).copied())
+            .or_else(|| self.pins.get(pin).and_then(|m| m.get(func).copied()))
+        {
             if v != 0 {
                 return Some(v);
             }
         }
-        // Minimal fallback for STM32H747I-DISCO: I2C4 on PD12/PD13 uses AF4
+        // Minimal fallbacks for STM32H747I-DISCO bring-up
         match (pin, func) {
+            // I2C4 on PD12/PD13 uses AF4
             ("PD12", "I2C4_SCL") => Some(4),
             ("PD13", "I2C4_SDA") => Some(4),
+            // Backlight PWM: TIM8 CH2 on PJ6 (and CH2N on PJ7) typically AF3
+            ("PJ6", "TIM8_CH2") | ("PJ6", "S_TIM8_CH2") => Some(3),
+            ("PJ7", "TIM8_CH2N") => Some(3),
             _ => None,
         }
     }
