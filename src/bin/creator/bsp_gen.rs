@@ -288,7 +288,28 @@ struct McuAf {
 
 impl crate::bsp::af::AfProvider for McuAf {
     fn lookup_af(&self, _mcu: &str, pin: &str, func: &str) -> Option<u8> {
-        self.pins.get(pin).and_then(|m| m.get(func)).copied()
+        // Normalize STM suffix prefixes occasionally emitted by Cube (e.g. S_TIM8_CH2)
+        let normalized = func.strip_prefix("S_").unwrap_or(func);
+        if let Some(v) = self
+            .pins
+            .get(pin)
+            .and_then(|m| m.get(normalized).copied())
+            .or_else(|| self.pins.get(pin).and_then(|m| m.get(func).copied()))
+        {
+            if v != 0 {
+                return Some(v);
+            }
+        }
+        // Minimal fallbacks for STM32H747I-DISCO bring-up
+        match (pin, func) {
+            // I2C4 on PD12/PD13 uses AF4
+            ("PD12", "I2C4_SCL") => Some(4),
+            ("PD13", "I2C4_SDA") => Some(4),
+            // Backlight PWM: TIM8 CH2 on PJ6 (and CH2N on PJ7) typically AF3
+            ("PJ6", "TIM8_CH2") | ("PJ6", "S_TIM8_CH2") => Some(3),
+            ("PJ7", "TIM8_CH2N") => Some(3),
+            _ => None,
+        }
     }
 }
 
@@ -333,13 +354,25 @@ fn parse_pins(
     if let Some(obj) = val.get("pins").and_then(|v| v.as_object()) {
         for (pin, entries) in obj {
             let mut funcs = std::collections::HashMap::new();
+            // Support array-of-entries [{signal, af}, ...]
             if let Some(arr) = entries.as_array() {
                 for e in arr {
-                    if let (Some(sig), Some(af)) = (
-                        e.get("signal").and_then(|s| s.as_str()),
-                        e.get("af").and_then(|a| a.as_u64()),
-                    ) {
+                    if let Some(sig) = e.get("signal").and_then(|s| s.as_str()) {
+                        if let Some(af) = e.get("af").and_then(|a| a.as_u64()) {
+                            funcs.insert(sig.to_string(), af as u8);
+                        } else {
+                            funcs.entry(sig.to_string()).or_insert(0);
+                        }
+                    }
+                }
+            }
+            // Support object with nested { sigs: { SIG: {af: N, ...} } }
+            if let Some(sigs) = entries.get("sigs").and_then(|s| s.as_object()) {
+                for (sig, info) in sigs {
+                    if let Some(af) = info.get("af").and_then(|a| a.as_u64()) {
                         funcs.insert(sig.to_string(), af as u8);
+                    } else {
+                        funcs.entry(sig.to_string()).or_insert(0);
                     }
                 }
             }

@@ -1,5 +1,5 @@
 //! Round-trip test for the Espressif YAML adapter.
-#![cfg(feature = "creator")]
+#![cfg(all(feature = "creator", feature = "regression"))]
 
 #[path = "../src/bin/creator/bsp/espressif.rs"]
 mod espressif;

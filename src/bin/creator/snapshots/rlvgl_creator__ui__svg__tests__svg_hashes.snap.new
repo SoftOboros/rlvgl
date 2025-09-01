@@ -1,0 +1,6 @@
+---
+source: src/bin/rlvgl_creator/../creator_ui/../creator/svg.rs
+assertion_line: 77
+expression: hash
+---
+4afd9d2454855dc8557412527aa5a10170883fb8773f2127cb9929c51b0d51b4
