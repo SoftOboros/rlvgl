@@ -58,6 +58,94 @@ fn main() -> ! {
         use rlvgl::platform::{
             CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
         };
+        // 0.2 → 1.0 I2C adapter
+        struct I2cCompat<I> {
+            inner: I,
+        }
+        impl<I> I2cCompat<I> {
+            fn new(inner: I) -> Self {
+                Self { inner }
+            }
+        }
+        #[derive(Debug)]
+        struct I2cCompatError;
+        impl embedded_hal::i2c::Error for I2cCompatError {
+            fn kind(&self) -> embedded_hal::i2c::ErrorKind {
+                embedded_hal::i2c::ErrorKind::Other
+            }
+        }
+        impl<I> embedded_hal::i2c::ErrorType for I2cCompat<I>
+        where
+            I: embedded_hal_02::blocking::i2c::Write
+                + embedded_hal_02::blocking::i2c::Read
+                + embedded_hal_02::blocking::i2c::WriteRead,
+        {
+            type Error = I2cCompatError;
+        }
+        impl<I> embedded_hal::i2c::I2c<embedded_hal::i2c::SevenBitAddress> for I2cCompat<I>
+        where
+            I: embedded_hal_02::blocking::i2c::Write
+                + embedded_hal_02::blocking::i2c::Read
+                + embedded_hal_02::blocking::i2c::WriteRead,
+        {
+            fn read(
+                &mut self,
+                address: embedded_hal::i2c::SevenBitAddress,
+                buf: &mut [u8],
+            ) -> Result<(), Self::Error> {
+                <I as embedded_hal_02::blocking::i2c::Read>::read(&mut self.inner, address, buf)
+                    .map_err(|_| I2cCompatError)
+            }
+            fn write(
+                &mut self,
+                address: embedded_hal::i2c::SevenBitAddress,
+                bytes: &[u8],
+            ) -> Result<(), Self::Error> {
+                <I as embedded_hal_02::blocking::i2c::Write>::write(&mut self.inner, address, bytes)
+                    .map_err(|_| I2cCompatError)
+            }
+            fn write_read(
+                &mut self,
+                address: embedded_hal::i2c::SevenBitAddress,
+                bytes: &[u8],
+                buf: &mut [u8],
+            ) -> Result<(), Self::Error> {
+                <I as embedded_hal_02::blocking::i2c::WriteRead>::write_read(
+                    &mut self.inner,
+                    address,
+                    bytes,
+                    buf,
+                )
+                .map_err(|_| I2cCompatError)
+            }
+            fn transaction(
+                &mut self,
+                address: embedded_hal::i2c::SevenBitAddress,
+                operations: &mut [embedded_hal::i2c::Operation<'_>],
+            ) -> Result<(), Self::Error> {
+                for op in operations {
+                    match op {
+                        embedded_hal::i2c::Operation::Read(buf) => {
+                            <I as embedded_hal_02::blocking::i2c::Read>::read(
+                                &mut self.inner,
+                                address,
+                                buf,
+                            )
+                            .map_err(|_| I2cCompatError)?
+                        }
+                        embedded_hal::i2c::Operation::Write(data) => {
+                            <I as embedded_hal_02::blocking::i2c::Write>::write(
+                                &mut self.inner,
+                                address,
+                                data,
+                            )
+                            .map_err(|_| I2cCompatError)?
+                        }
+                    }
+                }
+                Ok(())
+            }
+        }
 
         struct DummyBacklight;
         impl PwmError for DummyBacklight {
@@ -163,22 +251,33 @@ fn main() -> ! {
             }
         }
 
-        let dp = bsp_pac::Peripherals::take().unwrap();
-        bsp_hal::init_board_hal(&dp);
-        let bsp_pac::Peripherals {
-            DSIHOST: dsi,
-            FMC: fmc,
-            LTDC: ltdc,
-            RCC: mut rcc,
-            ..
-        } = dp;
+        let mut p = stm32h7xx_hal::pac::Peripherals::take().unwrap();
+        // Configure basic GPIO and peripheral clocks via generated PAC helper
+        bsp_hal::init_board_hal(&p);
+        // Bring up display peripherals first while RCC is still owned by `p`
+        let dsi = p.DSIHOST;
+        let fmc = p.FMC;
+        let ltdc = p.LTDC;
+        let rcc_regs = &mut p.RCC;
         let blitter = CpuBlitter;
         let backlight = DummyBacklight;
         let reset = DummyReset;
         let mut _display =
-            Stm32h747iDiscoDisplay::new(blitter, backlight, reset, ltdc, dsi, fmc, &mut rcc);
-        let i2c = DummyI2c;
-        let mut input = Stm32h747iDiscoInput::new(i2c);
+            Stm32h747iDiscoDisplay::new(blitter, backlight, reset, ltdc, dsi, fmc, rcc_regs);
+        // Initialize I2C4 on PD12/PD13 for FT5336 touch using HAL (embedded-hal v1)
+        let mut input = {
+            use rlvgl::platform::stm32h747i_disco::init_touch_i2c;
+            use stm32h7xx_hal::prelude::*;
+            // Set up system/clock domains for HAL
+            let pwr = p.PWR.constrain();
+            let vos = pwr.freeze();
+            let rcc = p.RCC.constrain();
+            let ccdr = rcc.freeze(vos, &mut p.SYSCFG);
+            let gpiod = p.GPIOD.split(ccdr.peripheral.GPIOD);
+            let i2c_hal = init_touch_i2c(p.I2C4, gpiod, ccdr.peripheral.I2C4, &ccdr.clocks);
+            let i2c = I2cCompat::new(i2c_hal);
+            Stm32h747iDiscoInput::new(i2c)
+        };
         let button = DummyButton;
         let mut button_input = ButtonInput::new(button);
 

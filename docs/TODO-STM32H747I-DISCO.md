@@ -1,64 +1,105 @@
 <!--
-docs/TODO-STM32H747I-DISCO.md - STM32H747I‑DISCO Platform Integration TODO.
+TODO-STM32H747I-DISCO.md - Bring-up checklist and work plan for real hardware.
 -->
-<p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
-</p>
 
-# STM32H747I‑DISCO Platform Integration TODO
+# STM32H747I-DISCO Hardware Bring-up TODOs
 
-This checklist tracks the tasks for adding a **stm32h747i_disco** target to the `rlvgl` platform, implementing the board’s **MIPI‑DSI LCD + capacitive touch** interface and creating a demo example.
-The STM32H747I‑DISCO discovery board provides a built‑in **4‑inch 800×480 TFT LCD with MIPI‑DSI and a capacitive touch panel**; the BSP header defines this display's default resolution.
+This document tracks the remaining work required to run the `rlvgl` demo on
+real STM32H747I-DISCO hardware (M7 core). Items are grouped by subsystem and
+ordered roughly from boot prerequisites to higher-level features.
 
-## 0. Research & Hardware Setup
-- [x] **Gather datasheets and BSP sources** for STM32H747I‑DISCO and MIPI‑DSI display controller.
-  - Dependencies: ST BSP repo (`STM32CubeH7`), CubeMX
-  - Notes: Confirmed display init sequence and touch controller I²C address (FT5336 at 0x38). Links: [ST board page](https://www.st.com/en/evaluation-tools/stm32h747i-disco.html), [STM32CubeH7 BSP](https://github.com/STMicroelectronics/STM32CubeH7)
-- [x] **Verify toolchain** for Cortex‑M7 cross‑compile (arm-none-eabi-gcc / Rust target).
-  - Dependencies: Existing `.cargo/config.toml` setup for embedded targets.
-  - Notes: Installed `arm-none-eabi-gcc` 13.2.1 and verified Rust `thumbv7em-none-eabihf` target.
+## Boot, Link, and Clocks
 
-## 1. Platform Module Implementation (`platform/src/stm32h747i_disco.rs`)
-- [x] Implement `DisplayDriver` trait:
-  - `flush(Rect, &[Color])` sends pixel data via MIPI‑DSI peripheral.
-  - Dependencies: STM32H7 HAL crate or BSP LCD driver.
-  - Notes: Ensure flush uses DMA where possible.
-- [x] Implement `InputDevice` trait:
-  - `poll()` reads capacitive touch events from FT5336 (or equivalent) via I²C.
-  - Dependencies: Touch controller driver crate or BSP component.
+- Build script for linker script:
+  - Add a `build.rs` to the example that copies `memory.x` into the Cargo
+    build `OUT_DIR`, emits `cargo:rustc-link-search`, and
+    `cargo:rustc-link-arg=-Tmemory.x` (see project “Example linker scripts”
+    guidelines). This avoids relying on workspace `.cargo/config.toml`.
+- System clocks and PLLs:
+  - Parse PLL settings from the `.ioc` (already supported in IR) and generate
+    minimal clock setup sufficient for LTDC pixel clock and I2C/SDMMC kernels.
+  - Program PLLs and kernel muxes via PAC/HAL during board init.
 
-## 2. Example Project Creation (`examples/stm32h747i-disco`)
-- [x] Copy `examples/sim` structure, replace simulator backend with `stm32h747i_disco` platform driver.
-- [x] Adjust `Cargo.toml` for embedded target triple.
-- [x] Provide board‑specific linker script and startup code.
+## External SDRAM (FMC)
 
-## 3. Common Demo Refactor
-- [x] Move UI construction code from `examples/sim/src/lib.rs` into `examples/common_demo/lib.rs`.
-- [x] Update both `sim` and `STM32H747I-DISCO` examples to import from common module.
-- [x] Maintain feature parity between simulator and hardware demo.
+- Implement SDRAM controller init (timings, mode registers, refresh):
+  - Configure FMC pins and timing for the onboard SDRAM.
+  - Run the JEDEC SDRAM init sequence and set refresh rate.
+  - Verify that the framebuffer base at `0xC000_0000` is writable and stable.
 
-## 4. Build & CI Integration
-- [x] Add build job for `stm32h747i_disco` target to CI matrix.
-  - Cross‑compile only; no automated hardware test at this stage.
-- [x] Include size reports and build artifact upload for firmware binary.
+## Display (LTDC + DSI + Panel)
 
-## 5. Manual Test Procedure
-- [x] Flash binary to STM32H747I‑DISCO via ST‑LINK.
-- [x] Verify LCD output matches simulator layout.
-- [x] Verify touch events propagate to widgets.
-  - See `examples/stm32h747i-disco/README.md` for flashing and testing steps.
+- LTDC timing and layer configuration:
+  - Program sync widths, back/front porch, and polarity for 800×480 panel.
+  - Configure layer 1 pitch, pixel format (RGB565), blending, and enable reload.
+- MIPI-DSI link bring-up:
+  - Flesh out `platform::otm8009a` to include full panel init sequence (format,
+    power, gamma) rather than the current minimal sleep-out/display-on.
+  - Set up DSI host video mode parameters and start the link.
+- Flush path:
+  - Implement `DisplayDriver::flush` to blit changes into SDRAM and/or trigger
+    LTDC reload. Consider DMA2D acceleration if available (optional feature).
 
-## 6. Documentation
-- [x] Add README section under `platform/` describing stm32h747i_disco implementation.
-- [x] Document pin mappings, display init, and touch controller details. See `docs/STM32H747I-DISCO.md`.
+## Backlight and Panel Reset
 
-## 7. Display and Button Integration
- - [x] Instantiate `Stm32h747iDiscoDisplay` and `Stm32h747iDiscoInput` in `examples/stm32h747i-disco/src/main.rs`.
-  - The current demo only calls `build_demo`, leaving the platform display and button modules unused.
- - [x] Wire the board's user button into LVGL input events to validate the input path.
+- Backlight PWM:
+  - Use TIM8 CH2 on `PJ6` (and optional `CH2N` on `PJ7`) for PWM backlight.
+  - Provide a simple brightness API and default ramp on startup.
+- Panel reset GPIO:
+  - Drive `PJ12` as push-pull output. Apply datasheet-compliant delays between
+    reset low/high and DSI initialization.
 
----
-**References:**
-- STM32H747I‑DISCO board features: 4‑inch 800×480 TFT LCD with MIPI DSI and capacitive touch panel.
-- ST BSP `stm32h747i_discovery_lcd.h` defines width/height constants.
+## Touch (FT5336)
+
+- Real I2C4 wiring:
+  - Confirm `.ioc` has I2C4 SCL/SDA on `PD12/PD13` (AF4, open‑drain, pull-ups).
+  - Use HAL to initialize I2C4 at 400 kHz (helper exists:
+    `platform::stm32h747i_disco::init_touch_i2c`).
+  - Remove temporary 0.2→1.0 I2C compat shim once platform/HAL converge on
+    embedded‑hal 1.0 for I2C.
+- Interrupt line (optional):
+  - Wire FT5336 INT (candidate `PJ13`) as input and use `new_with_int` path to
+    reduce polling.
+
+## SD Card (optional)
+
+- Validate `DiscoSdBlockDevice` against actual media:
+  - Initialize SDMMC1 + DMA, confirm block reads/writes, and mount a filesystem
+    using `fatfs` when the `fs` feature is enabled.
+
+## Power, Performance, and Robustness
+
+- Cache maintenance:
+  - Ensure D-Cache coherency for DMA users (SDMMC, DMA2D) during display flush
+    and file I/O paths.
+- Error handling and logging:
+  - Add lightweight logging hooks (e.g., ITM/SEGGER RTT or UART) for bring-up.
+  - Surface meaningful errors from I2C/display init to aid diagnostics.
+
+## BSP Generator Follow-ups
+
+- Regeneration inputs:
+  - Ensure rlvgl-creator always uses the canonical STM32 database
+    (`rlvgl-chips-stm`) for AF resolution. No `stm32_af.json` usage remains.
+- HAL/PAC output:
+  - After embedding the canonical DB assets (`RLVGL_CHIP_SRC`), regenerate the
+    H747I-DISCO BSP and verify AFs (I2C4 on `PD12/PD13` → AF4, etc.).
+
+## Testing and CI
+
+- Host-side checks:
+  - Maintain `cargo fmt` / `clippy` clean state with all feature combos.
+- Cross builds:
+  - Add a CI job to build `rlvgl-stm32h747i-disco` for
+    `thumbv7em-none-eabihf` using the example’s `build.rs`-managed linker script.
+- On-target smoke tests (manual/hardware):
+  - Verify backlight, clear-screen color, and touch events echo over UART.
+  - Capture a short demo run and compare expected event sequences.
+
+## Done / Recently Landed
+
+- Creator now resolves alternate functions from the canonical STM32 database;
+  `--af` and `stm32_af.json` are removed from CLI/docs/scripts.
+- Example gains a path to initialize I2C4 via HAL and bridge to
+  embedded‑hal 1.0 for the touch driver (temporary compat layer).
 

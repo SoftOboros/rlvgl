@@ -47,6 +47,7 @@ rlvgl-widgets = { version = "0.1.5", path = "widgets", default-features = false 
 rlvgl-platform = { version = "0.1.6", path = "platform", default-features = false }
 rlvgl-ui = { version = "0.1.2", path = "ui", default-features = false }
 embedded-hal = { version = "1.0", optional = true }
+embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", optional = true }
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
 
 [dependencies.gif]
@@ -266,7 +267,9 @@ stm32h747i_disco = [
     "dep:embedded-alloc",
     "dep:panic-halt",
     "dep:embedded-hal",
+    "dep:embedded-hal-02",
     "dep:stm32h7",
+    "dep:stm32h7xx-hal",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue"]
 lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie", "dep:rlottie"]
@@ -358,4 +361,9 @@ objc2-foundation = "0.3.1"
 
 [workspace]
 members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040", "chips/stm/bsps"]
+[dependencies.stm32h7xx-hal]
+version = "0.16"
+optional = true
+features = ["stm32h747cm7", "sdmmc"]
+
 resolver = "2"
