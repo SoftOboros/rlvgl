@@ -21,6 +21,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    af_db = Path(__file__).resolve().parent.parent / "stm32_af.json"
     for ioc in args.input.glob("*.ioc"):
         module = ioc.stem.replace("-", "_")
         tmp_json = Path(tempfile.mkstemp(suffix=".json")[1])
@@ -32,6 +33,8 @@ def main() -> None:
                 str(ioc),
                 module,
                 str(tmp_json),
+                "--af",
+                str(af_db),
                 "--bsp-out",
                 str(args.output),
             ],

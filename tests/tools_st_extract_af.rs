@@ -1,5 +1,4 @@
 //! Test the `st_extract_af.py` helper against sample CSV and IOC files.
-#![cfg(feature = "regression")]
 
 use std::fs;
 use std::path::PathBuf;

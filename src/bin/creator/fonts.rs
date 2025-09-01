@@ -70,7 +70,7 @@ pub(crate) fn pack(root: &Path, manifest_path: &Path, size: f32, chars: &str) ->
     check::run(root, manifest_path, true)?;
     Ok(())
 }
-#[cfg(all(test, feature = "regression"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::manifest::{Group, Manifest};

@@ -1,5 +1,4 @@
 //! Tests for the `bump_vendor_versions.py` helper.
-#![cfg(feature = "regression")]
 
 use std::{fs, path::Path, process::Command};
 

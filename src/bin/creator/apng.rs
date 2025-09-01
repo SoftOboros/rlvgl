@@ -57,7 +57,7 @@ pub(crate) fn run(frames_dir: &Path, out: &Path, delay: u16, loops: u32) -> Resu
     );
     Ok(())
 }
-#[cfg(all(test, feature = "regression"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use blake3::hash;

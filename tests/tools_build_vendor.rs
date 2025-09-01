@@ -1,5 +1,4 @@
 //! Tests for the `build_vendor.sh` helper script.
-#![cfg(feature = "regression")]
 use std::{fs, path::Path, process::Command};
 
 #[test]

@@ -8,6 +8,7 @@
 set -euo pipefail
 
 RLVGL_CREATOR=${RLVGL_CREATOR:-target/debug/rlvgl-creator}
+AF_JSON=${AF_JSON:-stm32_af.json}
 OUT_DIR=${OUT_DIR:-chips/stm/bsps/src}
 OPEN_PIN_DATA=${OPEN_PIN_DATA:-chips/stm/STM32_open_pin_data}
 BOARD_DIR="$OPEN_PIN_DATA/boards"
@@ -63,7 +64,7 @@ for ioc in "${iocs[@]}"; do
   fi
   echo "[$count/$total] $board"
   out_dir="$OUT_DIR/$board"
-  if "$RLVGL_CREATOR" bsp from-ioc "$ioc" \
+  if "$RLVGL_CREATOR" bsp from-ioc "$ioc" "$AF_JSON" \
     --emit-hal --emit-pac --grouped-writes --with-deinit --allow-reserved --per-peripheral \
     --out "$out_dir"; then
     echo "    done"

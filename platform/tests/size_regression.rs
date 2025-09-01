@@ -1,5 +1,4 @@
 //! Ensures the embedded binary size stays within limits.
-#![cfg(feature = "regression")]
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;

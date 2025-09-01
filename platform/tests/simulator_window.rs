@@ -1,6 +1,6 @@
 //! Tests for the pixels simulator window.
 #[cfg(feature = "simulator")]
-use rlvgl_platform::WgpuDisplay;
+use rlvgl_platform::PixelsDisplay;
 
 #[cfg(feature = "simulator")]
 #[test]
@@ -9,7 +9,7 @@ fn pixels_window_draws() {
         eprintln!("skipping pixels_window_draws: no display");
         return;
     }
-    let _disp = WgpuDisplay::new(4, 4);
+    let _disp = PixelsDisplay::new(4, 4);
     // success is not crashing when constructing the display
 }
 

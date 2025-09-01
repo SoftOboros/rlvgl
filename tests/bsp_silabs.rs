@@ -1,5 +1,5 @@
 //! Round-trip test for the Silicon Labs YAML adapter.
-#![cfg(all(feature = "creator", feature = "regression"))]
+#![cfg(feature = "creator")]
 
 #[path = "../src/bin/creator/bsp/ir.rs"]
 mod ir;

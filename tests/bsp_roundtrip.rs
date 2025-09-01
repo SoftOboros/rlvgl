@@ -1,5 +1,5 @@
 //! Tests the BSP generation pipeline: `.ioc` → IR → template.
-#![cfg(all(feature = "creator", feature = "regression"))]
+#![cfg(feature = "creator")]
 
 #[path = "../src/bin/creator/bsp/af.rs"]
 mod af;

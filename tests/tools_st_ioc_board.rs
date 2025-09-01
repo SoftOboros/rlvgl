@@ -1,5 +1,4 @@
 //! Test the `st_ioc_board.py` converter for user CubeMX projects.
-#![cfg(feature = "regression")]
 
 use std::fs;
 use std::path::PathBuf;

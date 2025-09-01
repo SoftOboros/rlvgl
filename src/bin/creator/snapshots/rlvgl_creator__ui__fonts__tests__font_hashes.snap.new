@@ -1,7 +1,0 @@
----
-source: src/bin/rlvgl_creator/../creator_ui/../creator/fonts.rs
-assertion_line: 111
-expression: "format!(\"{}\\n{}\", bin_hash, json_hash)"
----
-652cac0891936be91df5f7775a567234f7f543c6f54d1f232d72f0128b5de3ed
-8fe460aba6c13ade3e7ca8e7ad674e294c71228e9e0477991e67074cea169792

@@ -2,7 +2,8 @@
 #![no_std]
 
 /// Ergonomic re-exports of the default form.
-pub mod prelude {}
+pub mod prelude {
+}
 
 pub mod b_g473e_zest1s;
 
