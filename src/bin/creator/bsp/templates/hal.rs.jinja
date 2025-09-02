@@ -147,22 +147,27 @@ pub fn configure_pins_hal(dp: pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" %
     {%- set is_gpio = pin.func[0:5] == "GPIO_" %}
     {%- set is_i2c  = pin.func[0:3] == "I2C" %}
     {%- set is_ana  = pin.func[0:3] == "ADC" or ("Analog" in pin.func) %}
-    // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}{% if pin.label %} ({{ pin.label }}){% endif %}
     {%- set base = pin.pin | lower -%}
-    {%- if use_label_names and idents and idents[pin.pin] is defined -%}
-    {%- set base = idents[pin.pin] -%}
-    {%- endif -%}
-    let {{ base }} = {%- if is_gpio -%}
-        {%- if "Output" in pin.func %} gpio{{ port_l(pin) }}.{{ field(pin) }}.into_push_pull_output()
-        {%- elif "Input" in pin.func %}  gpio{{ port_l(pin) }}.{{ field(pin) }}.into_floating_input()
-        {%- elif is_ana %}               gpio{{ port_l(pin) }}.{{ field(pin) }}.into_analog()
-        {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_floating_input()
+    {%- if use_label_names and idents and idents[pin.pin] is defined -%}{%- set base = idents[pin.pin] -%}{%- endif -%}
+    {%- set head = "gpio" ~ port_l(pin) ~ "." ~ field(pin) -%}
+    {%- if is_gpio -%}
+        {%- if "Output" in pin.func -%}{%- set mode = ".into_push_pull_output()" -%}
+        {%- elif "Input" in pin.func -%}{%- set mode = ".into_floating_input()" -%}
+        {%- elif is_ana -%}{%- set mode = ".into_analog()" -%}
+        {%- else -%}{%- set mode = ".into_floating_input()" -%}
         {%- endif -%}
     {%- else -%}
-        {%- if is_i2c %}                 gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate_open_drain::<{{ pin.af }}>(){% raw %}.internal_pull_up(true){% endraw %}
-        {%- else %}                      gpio{{ port_l(pin) }}.{{ field(pin) }}.into_alternate::<{{ pin.af }}>()
+        {%- if is_i2c -%}{%- set mode = ".into_alternate_open_drain::<" ~ pin.af ~ ">()" -%}{%- set mode = mode ~ ".internal_pull_up(true)" -%}
+        {%- else -%}{%- set mode = ".into_alternate::<" ~ pin.af ~ ">()" -%}
         {%- endif -%}
-    {%- endif -%}{% if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" %}{% raw %}.set_speed(Speed::VeryHigh){% endraw %}{% endif %};
+    {%- endif -%}
+    {%- if pin.func[0:18] == "USB_OTG_HS_ULPI_" or pin.func[0:5] == "SDMMC" or pin.func[0:3] == "SPI" -%}
+        {%- set speed = ".set_speed(Speed::VeryHigh)" -%}
+    {%- else -%}
+        {%- set speed = "" -%}
+    {%- endif -%}
+    // {{ pin.pin }} {{ pin.func }} AF{{ pin.af }}{% if pin.label %} ({{ pin.label }}){% endif %}
+    let {{ base }} = {{ head }}{{ mode }}{{ speed }};
 {% endfor %}
 
     GpioParts {

@@ -11,7 +11,16 @@
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 
-use stm32h7::stm32h747cm7 as pac;
+/// Clock initialization ownership: cm7
+#[doc(hidden)]
+pub const CLOCKS_INIT_BY: &str = "cm7";
+
+/// Secondary core helper: wait for system clocks initialized by the primary core.
+pub fn wait_for_clocks() {
+    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+}
+
+use stm32h7::stm32h747 as pac;
 
 /// Enables GPIO clocks required by the generated board.
 
@@ -674,10 +683,10 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (12 % 8) * 4;
         bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
+        bits |= (4u32 & 0xF) << afr_shift;
         let afr_shift = (13 % 8) * 4;
         bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
+        bits |= (4u32 & 0xF) << afr_shift;
         let afr_shift = (14 % 8) * 4;
         bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
@@ -1915,10 +1924,10 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         bits |= (0u32 & 0xF) << afr_shift;
         let afr_shift = (6 % 8) * 4;
         bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
+        bits |= (3u32 & 0xF) << afr_shift;
         let afr_shift = (7 % 8) * 4;
         bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
+        bits |= (3u32 & 0xF) << afr_shift;
         let afr_shift = (8 % 8) * 4;
         bits &= !(0xF << afr_shift);
         bits |= (0u32 & 0xF) << afr_shift;
@@ -3912,4 +3921,887 @@ pub fn init_board_pac(dp: pac::Peripherals) {
     enable_gpio_clocks(&dp);
     configure_pins_pac(&dp);
     enable_peripherals(&dp);
+}
+
+/// Label-to-pin mapping constants derived from GPIO_Label entries.
+#[allow(dead_code)]
+pub struct PinLabel {
+    pub pin: &'static str,
+    pub func: &'static str,
+    pub af: u8,
+}
+
+/// Constants for user labels to ease discovery and mapping.
+pub mod pins {
+    use super::PinLabel;
+
+    pub const ARD_A2: PinLabel = PinLabel {
+        pin: "PA0",
+        func: "ADCx_INP0",
+        af: 0,
+    };
+
+    pub const ARD_A3_2: PinLabel = PinLabel {
+        pin: "PA1",
+        func: "ETH_REF_CLK",
+        af: 0,
+    };
+
+    pub const STLINK_TX: PinLabel = PinLabel {
+        pin: "PA10",
+        func: "USART1_RX",
+        af: 0,
+    };
+
+    pub const PMOD_1: PinLabel = PinLabel {
+        pin: "PA11",
+        func: "SPI2_NSS",
+        af: 0,
+    };
+
+    pub const SPI2_SCK: PinLabel = PinLabel {
+        pin: "PA12",
+        func: "SPI2_SCK",
+        af: 0,
+    };
+
+    pub const ARD_A3_2: PinLabel = PinLabel {
+        pin: "PA1",
+        func: "ADCx_INP1",
+        af: 0,
+    };
+
+    pub const ETH_MDIO: PinLabel = PinLabel {
+        pin: "PA2",
+        func: "ETH_MDIO",
+        af: 0,
+    };
+
+    pub const ULPI_D0: PinLabel = PinLabel {
+        pin: "PA3",
+        func: "USB_OTG_HS_ULPI_D0",
+        af: 0,
+    };
+
+    pub const ULPI_CK: PinLabel = PinLabel {
+        pin: "PA5",
+        func: "USB_OTG_HS_ULPI_CK",
+        af: 0,
+    };
+
+    pub const ETH_CRS_DV: PinLabel = PinLabel {
+        pin: "PA7",
+        func: "ETH_CRS_DV",
+        af: 0,
+    };
+
+    pub const CEC_CK_MCO1: PinLabel = PinLabel {
+        pin: "PA8",
+        func: "RCC_MCO_1",
+        af: 0,
+    };
+
+    pub const STLINK_RX: PinLabel = PinLabel {
+        pin: "PA9",
+        func: "USART1_TX",
+        af: 0,
+    };
+
+    pub const ULPI_D1: PinLabel = PinLabel {
+        pin: "PB0",
+        func: "USB_OTG_HS_ULPI_D1",
+        af: 0,
+    };
+
+    pub const ULPI_D2: PinLabel = PinLabel {
+        pin: "PB1",
+        func: "USB_OTG_HS_ULPI_D2",
+        af: 0,
+    };
+
+    pub const ULPI_D3: PinLabel = PinLabel {
+        pin: "PB10",
+        func: "USB_OTG_HS_ULPI_D3",
+        af: 0,
+    };
+
+    pub const ULPI_D4: PinLabel = PinLabel {
+        pin: "PB11",
+        func: "USB_OTG_HS_ULPI_D4",
+        af: 0,
+    };
+
+    pub const ULPI_D5: PinLabel = PinLabel {
+        pin: "PB12",
+        func: "USB_OTG_HS_ULPI_D5",
+        af: 0,
+    };
+
+    pub const ULPI_D6: PinLabel = PinLabel {
+        pin: "PB13",
+        func: "USB_OTG_HS_ULPI_D6",
+        af: 0,
+    };
+
+    pub const PMOD_9: PinLabel = PinLabel {
+        pin: "PB14",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const PMOD_8: PinLabel = PinLabel {
+        pin: "PB15",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const QSPI_CLK: PinLabel = PinLabel {
+        pin: "PB2",
+        func: "QUADSPI_CLK",
+        af: 0,
+    };
+
+    pub const ULPI_D7: PinLabel = PinLabel {
+        pin: "PB5",
+        func: "USB_OTG_HS_ULPI_D7",
+        af: 0,
+    };
+
+    pub const HDMI_CEC: PinLabel = PinLabel {
+        pin: "PB6",
+        func: "CEC",
+        af: 0,
+    };
+
+    pub const ULPI_STP: PinLabel = PinLabel {
+        pin: "PC0",
+        func: "USB_OTG_HS_ULPI_STP",
+        af: 0,
+    };
+
+    pub const ETH_MDC_SAI4_D1: PinLabel = PinLabel {
+        pin: "PC1",
+        func: "ETH_MDC",
+        af: 0,
+    };
+
+    pub const SDIO1_D2: PinLabel = PinLabel {
+        pin: "PC10",
+        func: "SDMMC1_D2",
+        af: 0,
+    };
+
+    pub const SDIO1_D3: PinLabel = PinLabel {
+        pin: "PC11",
+        func: "SDMMC1_D3",
+        af: 0,
+    };
+
+    pub const SDIO1_CK: PinLabel = PinLabel {
+        pin: "PC12",
+        func: "SDMMC1_CK",
+        af: 0,
+    };
+
+    pub const B2_WAKEUP_BUTTON: PinLabel = PinLabel {
+        pin: "PC13",
+        func: "RTC_TAMP1",
+        af: 0,
+    };
+
+    pub const ARD_A4_2: PinLabel = PinLabel {
+        pin: "PC2",
+        func: "SPI2_MISO",
+        af: 0,
+    };
+
+    pub const ARD_A4_2: PinLabel = PinLabel {
+        pin: "PC2",
+        func: "ADC3_INP0",
+        af: 0,
+    };
+
+    pub const ARD_A5_2: PinLabel = PinLabel {
+        pin: "PC3",
+        func: "SPI2_MOSI",
+        af: 0,
+    };
+
+    pub const ARD_A5_2: PinLabel = PinLabel {
+        pin: "PC3",
+        func: "ADC3_INP1",
+        af: 0,
+    };
+
+    pub const ETH_RXD0: PinLabel = PinLabel {
+        pin: "PC4",
+        func: "ETH_RXD0",
+        af: 0,
+    };
+
+    pub const ETH_RXD1: PinLabel = PinLabel {
+        pin: "PC5",
+        func: "ETH_RXD1",
+        af: 0,
+    };
+
+    pub const SDIO1_D0: PinLabel = PinLabel {
+        pin: "PC8",
+        func: "SDMMC1_D0",
+        af: 0,
+    };
+
+    pub const SDIO1_D1: PinLabel = PinLabel {
+        pin: "PC9",
+        func: "SDMMC1_D1",
+        af: 0,
+    };
+
+    pub const FMC_D2: PinLabel = PinLabel {
+        pin: "PD0",
+        func: "FMC_D2_DA2",
+        af: 0,
+    };
+
+    pub const FMC_D3: PinLabel = PinLabel {
+        pin: "PD1",
+        func: "FMC_D3_DA3",
+        af: 0,
+    };
+
+    pub const FMC_D15: PinLabel = PinLabel {
+        pin: "PD10",
+        func: "FMC_D15_DA15",
+        af: 0,
+    };
+
+    pub const QSPI_BK1_IO0: PinLabel = PinLabel {
+        pin: "PD11",
+        func: "QUADSPI_BK1_IO0",
+        af: 0,
+    };
+
+    pub const FMC_D0: PinLabel = PinLabel {
+        pin: "PD14",
+        func: "FMC_D0_DA0",
+        af: 0,
+    };
+
+    pub const FMC_D1: PinLabel = PinLabel {
+        pin: "PD15",
+        func: "FMC_D1_DA1",
+        af: 0,
+    };
+
+    pub const SDIO1_CMD: PinLabel = PinLabel {
+        pin: "PD2",
+        func: "SDMMC1_CMD",
+        af: 0,
+    };
+
+    pub const SPDIF_RX0: PinLabel = PinLabel {
+        pin: "PD7",
+        func: "SPDIFRX1_IN0",
+        af: 0,
+    };
+
+    pub const FMC_D13: PinLabel = PinLabel {
+        pin: "PD8",
+        func: "FMC_D13_DA13",
+        af: 0,
+    };
+
+    pub const FMC_D14: PinLabel = PinLabel {
+        pin: "PD9",
+        func: "FMC_D14_DA14",
+        af: 0,
+    };
+
+    pub const FMC_NBL0: PinLabel = PinLabel {
+        pin: "PE0",
+        func: "FMC_NBL0",
+        af: 0,
+    };
+
+    pub const FMC_NBL1: PinLabel = PinLabel {
+        pin: "PE1",
+        func: "FMC_NBL1",
+        af: 0,
+    };
+
+    pub const FMC_D7: PinLabel = PinLabel {
+        pin: "PE10",
+        func: "FMC_D7_DA7",
+        af: 0,
+    };
+
+    pub const FMC_D8: PinLabel = PinLabel {
+        pin: "PE11",
+        func: "FMC_D8_DA8",
+        af: 0,
+    };
+
+    pub const FMC_D9: PinLabel = PinLabel {
+        pin: "PE12",
+        func: "FMC_D9_DA9",
+        af: 0,
+    };
+
+    pub const FMC_D10: PinLabel = PinLabel {
+        pin: "PE13",
+        func: "FMC_D10_DA10",
+        af: 0,
+    };
+
+    pub const FMC_D11: PinLabel = PinLabel {
+        pin: "PE14",
+        func: "FMC_D11_DA11",
+        af: 0,
+    };
+
+    pub const FMC_D12: PinLabel = PinLabel {
+        pin: "PE15",
+        func: "FMC_D12_DA12",
+        af: 0,
+    };
+
+    pub const SAI1_SD_B: PinLabel = PinLabel {
+        pin: "PE3",
+        func: "SAI1_SD_B",
+        af: 0,
+    };
+
+    pub const SAI1_FS_A: PinLabel = PinLabel {
+        pin: "PE4",
+        func: "SAI1_FS_A",
+        af: 0,
+    };
+
+    pub const SAI1_SCK_A: PinLabel = PinLabel {
+        pin: "PE5",
+        func: "SAI1_SCK_A",
+        af: 0,
+    };
+
+    pub const SAI1_SD_A: PinLabel = PinLabel {
+        pin: "PE6",
+        func: "SAI1_SD_A",
+        af: 0,
+    };
+
+    pub const FMC_D4: PinLabel = PinLabel {
+        pin: "PE7",
+        func: "FMC_D4_DA4",
+        af: 0,
+    };
+
+    pub const FMC_D5: PinLabel = PinLabel {
+        pin: "PE8",
+        func: "FMC_D5_DA5",
+        af: 0,
+    };
+
+    pub const FMC_D6: PinLabel = PinLabel {
+        pin: "PE9",
+        func: "FMC_D6_DA6",
+        af: 0,
+    };
+
+    pub const FMC_A0: PinLabel = PinLabel {
+        pin: "PF0",
+        func: "FMC_A0",
+        af: 0,
+    };
+
+    pub const FMC_A1: PinLabel = PinLabel {
+        pin: "PF1",
+        func: "FMC_A1",
+        af: 0,
+    };
+
+    pub const ARD_A1: PinLabel = PinLabel {
+        pin: "PF10",
+        func: "ADC3_INP6",
+        af: 0,
+    };
+
+    pub const FMC_SDRAS: PinLabel = PinLabel {
+        pin: "PF11",
+        func: "FMC_SDNRAS",
+        af: 0,
+    };
+
+    pub const FMC_A6: PinLabel = PinLabel {
+        pin: "PF12",
+        func: "FMC_A6",
+        af: 0,
+    };
+
+    pub const FMC_A7: PinLabel = PinLabel {
+        pin: "PF13",
+        func: "FMC_A7",
+        af: 0,
+    };
+
+    pub const FMC_A8: PinLabel = PinLabel {
+        pin: "PF14",
+        func: "FMC_A8",
+        af: 0,
+    };
+
+    pub const FMC_A9: PinLabel = PinLabel {
+        pin: "PF15",
+        func: "FMC_A9",
+        af: 0,
+    };
+
+    pub const FMC_A2: PinLabel = PinLabel {
+        pin: "PF2",
+        func: "FMC_A2",
+        af: 0,
+    };
+
+    pub const FMC_A3: PinLabel = PinLabel {
+        pin: "PF3",
+        func: "FMC_A3",
+        af: 0,
+    };
+
+    pub const FMC_A4: PinLabel = PinLabel {
+        pin: "PF4",
+        func: "FMC_A4",
+        af: 0,
+    };
+
+    pub const FMC_A5: PinLabel = PinLabel {
+        pin: "PF5",
+        func: "FMC_A5",
+        af: 0,
+    };
+
+    pub const QSPI_BK1_IO3: PinLabel = PinLabel {
+        pin: "PF6",
+        func: "QUADSPI_BK1_IO3",
+        af: 0,
+    };
+
+    pub const QSPI_BK1_IO2: PinLabel = PinLabel {
+        pin: "PF7",
+        func: "QUADSPI_BK1_IO2",
+        af: 0,
+    };
+
+    pub const PMOD_14_ARD_D3: PinLabel = PinLabel {
+        pin: "PF8",
+        func: "S_TIM13_CH1",
+        af: 0,
+    };
+
+    pub const QSPI_BK1_IO1: PinLabel = PinLabel {
+        pin: "PF9",
+        func: "QUADSPI_BK1_IO1",
+        af: 0,
+    };
+
+    pub const FMC_A10: PinLabel = PinLabel {
+        pin: "PG0",
+        func: "FMC_A10",
+        af: 0,
+    };
+
+    pub const FMC_A11: PinLabel = PinLabel {
+        pin: "PG1",
+        func: "FMC_A11",
+        af: 0,
+    };
+
+    pub const ETH_TX_EN: PinLabel = PinLabel {
+        pin: "PG11",
+        func: "ETH_TX_EN",
+        af: 0,
+    };
+
+    pub const ETH_TXD1: PinLabel = PinLabel {
+        pin: "PG12",
+        func: "ETH_TXD1",
+        af: 0,
+    };
+
+    pub const ETH_TXD0: PinLabel = PinLabel {
+        pin: "PG13",
+        func: "ETH_TXD0",
+        af: 0,
+    };
+
+    pub const QSPI_BK2_IO3: PinLabel = PinLabel {
+        pin: "PG14",
+        func: "QUADSPI_BK2_IO3",
+        af: 0,
+    };
+
+    pub const FMC_SDCAS: PinLabel = PinLabel {
+        pin: "PG15",
+        func: "FMC_SDNCAS",
+        af: 0,
+    };
+
+    pub const FMC_A12: PinLabel = PinLabel {
+        pin: "PG2",
+        func: "FMC_A12",
+        af: 0,
+    };
+
+    pub const DSI_RESET: PinLabel = PinLabel {
+        pin: "PG3",
+        func: "GPIO_Output",
+        af: 0,
+    };
+
+    pub const FMC_BA0: PinLabel = PinLabel {
+        pin: "PG4",
+        func: "FMC_A14_BA0",
+        af: 0,
+    };
+
+    pub const QSPI_BK1_NCS: PinLabel = PinLabel {
+        pin: "PG6",
+        func: "QUADSPI_BK1_NCS",
+        af: 0,
+    };
+
+    pub const SAI1_MCLK_A: PinLabel = PinLabel {
+        pin: "PG7",
+        func: "SAI1_MCLK_A",
+        af: 0,
+    };
+
+    pub const FMC_SDCLK: PinLabel = PinLabel {
+        pin: "PG8",
+        func: "FMC_SDCLK",
+        af: 0,
+    };
+
+    pub const QSPI_BK2_IO2: PinLabel = PinLabel {
+        pin: "PG9",
+        func: "QUADSPI_BK2_IO2",
+        af: 0,
+    };
+
+    pub const FMC_D18: PinLabel = PinLabel {
+        pin: "PH10",
+        func: "FMC_D18",
+        af: 0,
+    };
+
+    pub const FMC_D19: PinLabel = PinLabel {
+        pin: "PH11",
+        func: "FMC_D19",
+        af: 0,
+    };
+
+    pub const FMC_D20: PinLabel = PinLabel {
+        pin: "PH12",
+        func: "FMC_D20",
+        af: 0,
+    };
+
+    pub const FMC_D21: PinLabel = PinLabel {
+        pin: "PH13",
+        func: "FMC_D21",
+        af: 0,
+    };
+
+    pub const FMC_D22: PinLabel = PinLabel {
+        pin: "PH14",
+        func: "FMC_D22",
+        af: 0,
+    };
+
+    pub const FMC_D23: PinLabel = PinLabel {
+        pin: "PH15",
+        func: "FMC_D23",
+        af: 0,
+    };
+
+    pub const QSPI_BK2_IO0: PinLabel = PinLabel {
+        pin: "PH2",
+        func: "QUADSPI_BK2_IO0",
+        af: 0,
+    };
+
+    pub const QSPI_BK2_IO1: PinLabel = PinLabel {
+        pin: "PH3",
+        func: "QUADSPI_BK2_IO1",
+        af: 0,
+    };
+
+    pub const ULPI_NXT: PinLabel = PinLabel {
+        pin: "PH4",
+        func: "USB_OTG_HS_ULPI_NXT",
+        af: 0,
+    };
+
+    pub const FMC_SDNWE: PinLabel = PinLabel {
+        pin: "PH5",
+        func: "FMC_SDNWE",
+        af: 0,
+    };
+
+    pub const FMC_SDNE1: PinLabel = PinLabel {
+        pin: "PH6",
+        func: "FMC_SDNE1",
+        af: 0,
+    };
+
+    pub const FMC_SDCKE1: PinLabel = PinLabel {
+        pin: "PH7",
+        func: "FMC_SDCKE1",
+        af: 0,
+    };
+
+    pub const FMC_D16: PinLabel = PinLabel {
+        pin: "PH8",
+        func: "FMC_D16",
+        af: 0,
+    };
+
+    pub const FMC_D17: PinLabel = PinLabel {
+        pin: "PH9",
+        func: "FMC_D17",
+        af: 0,
+    };
+
+    pub const FMC_D24: PinLabel = PinLabel {
+        pin: "PI0",
+        func: "FMC_D24",
+        af: 0,
+    };
+
+    pub const FMC_D25: PinLabel = PinLabel {
+        pin: "PI1",
+        func: "FMC_D25",
+        af: 0,
+    };
+
+    pub const FMC_D31: PinLabel = PinLabel {
+        pin: "PI10",
+        func: "FMC_D31",
+        af: 0,
+    };
+
+    pub const ULPI_DIR: PinLabel = PinLabel {
+        pin: "PI11",
+        func: "USB_OTG_HS_ULPI_DIR",
+        af: 0,
+    };
+
+    pub const LED1: PinLabel = PinLabel {
+        pin: "PI12",
+        func: "GPIO_Output",
+        af: 0,
+    };
+
+    pub const LED2: PinLabel = PinLabel {
+        pin: "PI13",
+        func: "GPIO_Output",
+        af: 0,
+    };
+
+    pub const LED3: PinLabel = PinLabel {
+        pin: "PI14",
+        func: "GPIO_Output",
+        af: 0,
+    };
+
+    pub const LED4: PinLabel = PinLabel {
+        pin: "PI15",
+        func: "GPIO_Output",
+        af: 0,
+    };
+
+    pub const FMC_D26: PinLabel = PinLabel {
+        pin: "PI2",
+        func: "FMC_D26",
+        af: 0,
+    };
+
+    pub const FMC_D27: PinLabel = PinLabel {
+        pin: "PI3",
+        func: "FMC_D27",
+        af: 0,
+    };
+
+    pub const FMC_NBL2: PinLabel = PinLabel {
+        pin: "PI4",
+        func: "FMC_NBL2",
+        af: 0,
+    };
+
+    pub const FMC_NBL3: PinLabel = PinLabel {
+        pin: "PI5",
+        func: "FMC_NBL3",
+        af: 0,
+    };
+
+    pub const FMC_D28: PinLabel = PinLabel {
+        pin: "PI6",
+        func: "FMC_D28",
+        af: 0,
+    };
+
+    pub const FMC_D29: PinLabel = PinLabel {
+        pin: "PI7",
+        func: "FMC_D29",
+        af: 0,
+    };
+
+    pub const USD_DETECT: PinLabel = PinLabel {
+        pin: "PI8",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const FMC_D30: PinLabel = PinLabel {
+        pin: "PI9",
+        func: "FMC_D30",
+        af: 0,
+    };
+
+    pub const ARD_D7: PinLabel = PinLabel {
+        pin: "PJ0",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const OTG_HS_OVERCURRENT: PinLabel = PinLabel {
+        pin: "PJ1",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const ARD_D11: PinLabel = PinLabel {
+        pin: "PJ10",
+        func: "SPI5_MOSI",
+        af: 0,
+    };
+
+    pub const ARD_D12: PinLabel = PinLabel {
+        pin: "PJ11",
+        func: "SPI5_MISO",
+        af: 0,
+    };
+
+    pub const BL_CTRL: PinLabel = PinLabel {
+        pin: "PJ12",
+        func: "GPIO_Output",
+        af: 0,
+    };
+
+    pub const PMOD_12: PinLabel = PinLabel {
+        pin: "PJ13",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const AUDIO_INT: PinLabel = PinLabel {
+        pin: "PJ15",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const DSI_TE: PinLabel = PinLabel {
+        pin: "PJ2",
+        func: "DSIHOST_TE",
+        af: 0,
+    };
+
+    pub const ARD_D2: PinLabel = PinLabel {
+        pin: "PJ3",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const ARD_D4: PinLabel = PinLabel {
+        pin: "PJ4",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const ARD_D8: PinLabel = PinLabel {
+        pin: "PJ5",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const ARD_D9: PinLabel = PinLabel {
+        pin: "PJ6",
+        func: "S_TIM8_CH2",
+        af: 3,
+    };
+
+    pub const ARD_D6: PinLabel = PinLabel {
+        pin: "PJ7",
+        func: "TIM8_CH2N",
+        af: 3,
+    };
+
+    pub const ARD_D1: PinLabel = PinLabel {
+        pin: "PJ8",
+        func: "UART8_TX",
+        af: 0,
+    };
+
+    pub const ARD_D0: PinLabel = PinLabel {
+        pin: "PJ9",
+        func: "UART8_RX",
+        af: 0,
+    };
+
+    pub const ARD_D13: PinLabel = PinLabel {
+        pin: "PK0",
+        func: "SPI5_SCK",
+        af: 0,
+    };
+
+    pub const ARD_D10: PinLabel = PinLabel {
+        pin: "PK1",
+        func: "SPI5_NSS",
+        af: 0,
+    };
+
+    pub const JOY_SEL: PinLabel = PinLabel {
+        pin: "PK2",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const JOY_DOWN: PinLabel = PinLabel {
+        pin: "PK3",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const JOY_LEFT: PinLabel = PinLabel {
+        pin: "PK4",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const JOY_RIGHT: PinLabel = PinLabel {
+        pin: "PK5",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const JOY_UP: PinLabel = PinLabel {
+        pin: "PK6",
+        func: "GPIO_Input",
+        af: 0,
+    };
+
+    pub const TOUCH_INT: PinLabel = PinLabel {
+        pin: "PK7",
+        func: "GPIO_Input",
+        af: 0,
+    };
 }
