@@ -97,7 +97,7 @@ RUN mkdir -p /home/ubuntu/.ssh
 
 # set env vars
 ENV APP_HOME=/opt/rlvgl
-ENV RUSTFLAGS="-Cdebuginfo=0 -Ccodegen-units=32 -Clink-self-contained=no -Clink-arg=-fuse-ld=mold"
+# RUSTFLAGS intentionally unset here; provide via docker-run.sh if needed
 ENV CARGO_INCREMENTAL=0
 ENV SCCACHE_S3_KEY_PREFIX=/rlvgl
 
