@@ -257,6 +257,7 @@ enum LottieCommand {
     },
 }
 
+#[derive(Subcommand)]
 enum BspCommand {
     /// Render Rust source from a CubeMX `.ioc` file
     FromIoc {

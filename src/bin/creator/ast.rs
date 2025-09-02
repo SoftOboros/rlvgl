@@ -62,10 +62,11 @@ pub fn extract_from_c_sources(files: &[PathBuf], opts: ExtractOptions) -> Result
 
         // Walk through the file and try to collect per init-block state.
         // We maintain a rolling state for (last pin number, last AF/peripheral, last port).
-        let mut last_pin_nums: Vec<u8> = Vec::new();
-        let mut last_af_num: Option<u8> = None;
-        let mut last_signal: Option<String> = None;
-        let mut last_port: Option<char> = None;
+    let mut last_pin_nums: Vec<u8> = Vec::new();
+    let mut last_af_num: Option<u8> = None;
+    let mut last_signal: Option<String> = None;
+    #[allow(unused_assignments)]
+    let mut last_port: Option<char> = None;
 
         for line in src.lines() {
             // Collect all GPIO_PIN_<n> tokens seen until a HAL_GPIO_Init call flushes them
@@ -155,6 +156,7 @@ fn infer_class_from_signal(sig: &str) -> String {
 }
 
 /// Convenience helper: find C files under a root.
+#[allow(dead_code)]
 pub fn discover_c_sources(root: &Path) -> Vec<PathBuf> {
     fn rec(dir: &Path, out: &mut Vec<PathBuf>) {
         if let Ok(rd) = std::fs::read_dir(dir) {

@@ -5,7 +5,6 @@
 //! embedded in `rlvgl-chips-stm`.
 
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
