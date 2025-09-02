@@ -66,6 +66,8 @@ fn main() -> ! {
         use rlvgl::platform::{
             CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
         };
+        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+        use rlvgl::platform::{DiscoSdBlockDevice, mount_and_list_assets};
         use stm32h7xx_hal::prelude::*;
 
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
@@ -179,6 +181,12 @@ fn main() -> ! {
             DSIHOST: dsi,
             FMC: fmc,
             LTDC: ltdc,
+            #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+            GPIOC,
+            #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+            GPIOD,
+            #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+            SDMMC1,
             ..
         } = dp;
         let pwr = PWR.constrain();
@@ -187,6 +195,10 @@ fn main() -> ! {
         let mut syscfg = SYSCFG;
         let ccdr = rcc.freeze(vos, &mut syscfg);
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
+        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+        let gpioc = GPIOC.split(ccdr.peripheral.GPIOC);
+        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+        let gpiod = GPIOD.split(ccdr.peripheral.GPIOD);
         // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
         struct HalResetPin<P>(P);
         impl<P> embedded_hal::digital::ErrorType for HalResetPin<P> {
@@ -261,6 +273,85 @@ fn main() -> ! {
         let root = demo.root;
         let pending = demo.pending;
         let to_remove = demo.to_remove;
+
+        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+        {
+            use alloc::{format, rc::Rc};
+            use core::cell::RefCell;
+            use rlvgl::core::widget::Rect;
+            use rlvgl::widgets::label::Label;
+            use stm32h7xx_hal::gpio::Alternate;
+            // SDMMC1 pins: PC12=CK, PD2=CMD, PC8..PC11=D0..D3 (AF12)
+            let ck: stm32h7xx_hal::gpio::Pin<'C', 12, Alternate<12>> = gpioc.pc12.into_alternate();
+            let cmd: stm32h7xx_hal::gpio::Pin<'D', 2, Alternate<12>> = gpiod.pd2.into_alternate();
+            let d0: stm32h7xx_hal::gpio::Pin<'C', 8, Alternate<12>> = gpioc.pc8.into_alternate();
+            let d1: stm32h7xx_hal::gpio::Pin<'C', 9, Alternate<12>> = gpioc.pc9.into_alternate();
+            let d2: stm32h7xx_hal::gpio::Pin<'C', 10, Alternate<12>> = gpioc.pc10.into_alternate();
+            let d3: stm32h7xx_hal::gpio::Pin<'C', 11, Alternate<12>> = gpioc.pc11.into_alternate();
+            let pins = (ck, cmd, d0, d1, d2, d3);
+            let sdmmc = stm32h7xx_hal::sdmmc::Sdmmc::new(
+                SDMMC1,
+                pins,
+                ccdr.peripheral.SDMMC1,
+                &ccdr.clocks,
+            );
+            let mut bd = DiscoSdBlockDevice::new(sdmmc);
+            match mount_and_list_assets(&mut bd) {
+                Ok(names) => {
+                    if names.is_empty() {
+                        let label = Label::new(
+                            "SD: no assets",
+                            Rect {
+                                x: 10,
+                                y: 70,
+                                width: 180,
+                                height: 16,
+                            },
+                        );
+                        let node = rlvgl::core::WidgetNode {
+                            widget: Rc::new(RefCell::new(label)),
+                            children: alloc::vec![],
+                        };
+                        pending.borrow_mut().push(node);
+                    } else {
+                        for (i, name) in names.into_iter().take(4).enumerate() {
+                            let label = Label::new(
+                                format!("asset: {}", name),
+                                Rect {
+                                    x: 10,
+                                    y: 70 + (i as i32 * 18),
+                                    width: 260,
+                                    height: 16,
+                                },
+                            );
+                            let node = rlvgl::core::WidgetNode {
+                                widget: Rc::new(RefCell::new(label)),
+                                children: alloc::vec![],
+                            };
+                            pending.borrow_mut().push(node);
+                        }
+                    }
+                    common_demo::flush_pending(&root, &pending, &to_remove);
+                }
+                Err(_) => {
+                    let label = Label::new(
+                        "SD: mount/list failed",
+                        Rect {
+                            x: 10,
+                            y: 70,
+                            width: 220,
+                            height: 16,
+                        },
+                    );
+                    let node = rlvgl::core::WidgetNode {
+                        widget: Rc::new(RefCell::new(label)),
+                        children: alloc::vec![],
+                    };
+                    pending.borrow_mut().push(node);
+                    common_demo::flush_pending(&root, &pending, &to_remove);
+                }
+            }
+        }
 
         loop {
             if let Some(evt) = input.poll() {

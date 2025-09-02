@@ -350,6 +350,9 @@ creator_ui = [
     "dep:rlvgl-chips-rp2040",
 ]
 backlight_pwm = []
+fatfs_nostd = ["rlvgl-platform/fatfs_nostd"]
+sd_assets_demo = []
+
 
 [profile.release]
 opt-level = "z"

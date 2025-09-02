@@ -19,7 +19,8 @@ This document captures pin mappings and peripheral configuration details for usi
 
 - FT5336 capacitive controller on I2C4 at 7-bit address 0x38 (8-bit 0x70)
 - I2C4 SCL: PD12, SDA: PD13 (AF4), interrupt: PK7
-- Default bus frequency 100 kHz and support for two concurrent touch points
+- Recommended bus frequency 400 kHz (HAL helper configures this); supports two
+  concurrent touch points
 
 ## SD Card
 
@@ -41,3 +42,11 @@ Enable GPIOC and GPIOD clocks and set all pins to very high speed with
 internal pull-ups. SDMMC1 should source its kernel clock from PLL2 with a
 200 MHz output. DMA2 streams 3 (RX) and 6 (TX) using channel 4 are
 recommended for data transfers.
+
+## Backlight & Reset
+
+- Backlight uses TIM8 CH2 on `PJ6` (optional complementary `CH2N` on `PJ7`)
+  for PWM brightness control. For early bring-up, a GPIO high/low fallback
+  on `PJ6` is acceptable.
+- Panel reset is mapped to `PJ12` (push-pull). Apply datasheet‑compliant delays
+  between reset low/high and DSI link initialization.

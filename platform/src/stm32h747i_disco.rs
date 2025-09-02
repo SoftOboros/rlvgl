@@ -78,11 +78,27 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             ltdc,
             dsi,
         };
+        // Start with backlight off
         disp.set_backlight(0);
         disp.reset_panel();
         Otm8009a::init(&mut disp.dsi);
         let fb = Self::init_sdram(fmc);
         disp.setup_ltdc_layer(fb, 800, 480);
+        // Gentle brightness ramp for bring-up
+        #[allow(clippy::arithmetic_side_effects)]
+        {
+            let max = disp.backlight.max_duty_cycle();
+            let target = max / 2;
+            let step = core::cmp::max(1, target / 20);
+            let mut lvl = 0u16;
+            while lvl < target {
+                let _ = disp.backlight.set_duty_cycle(lvl);
+                // Small delay between steps; coarse cycle wait is sufficient here
+                cortex_m::asm::delay(5_000_00);
+                lvl = lvl.saturating_add(step);
+            }
+            let _ = disp.backlight.set_duty_cycle(target);
+        }
         disp
     }
 

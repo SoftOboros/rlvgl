@@ -132,6 +132,7 @@ impl<S: AssetSource> AssetManager<S> {
 | --- | -------------------------------- | ------------------- | ---------------------------------------------------------- |
 | [x] | `core` feature gate `fs`         | cargo               | Must not pull in `std`                                     |
 | [ ] | `platform` selects a BlockDevice | target BSP          | DISCO uses `DiscoSdBlockDevice`; sim uses `SimBlockDevice` |
+| [ ] | Example wires `fatfs` + device   | stm32h747i-disco    | Mount volume via no_std adapter and list `/assets`         |
 | [ ] | Image decoder selection          | feature flags       | `png`, `jpeg`, `qoi`, etc. (optional)                      |
 | [ ] | Font loader hook                 | `fontdue` or custom | From file → font cache                                     |
 
@@ -146,6 +147,7 @@ impl<S: AssetSource> AssetManager<S> {
 | [ ] | Prop: random file sizes            | proptest     | Ensure no over/underruns                 |
 | [ ] | Sim integration: load font & image | rlvgl sim    | Render text+bitmap; save PNG             |
 | [ ] | DISCO integration: SD mount        | on-device    | OLED/LCD shows PASS/FAIL and asset names |
+| [ ] | DISCO: render asset from SD        | on-device    | Draw a PNG/text asset from `/assets`     |
 
 ---
 
@@ -184,4 +186,3 @@ impl<S: AssetSource> AssetManager<S> {
 - DISCO: mounts SD card, lists `/assets`, renders text and one image.
 - Core builds without `fs`; with `fs` feature it links using either backend.
 - CI artifacts include a reproducible disk image used by sim tests.
-

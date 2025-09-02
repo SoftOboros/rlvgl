@@ -27,6 +27,7 @@ image = { version = "0.25", default-features = false, features = ["png"], option
 bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt"] }
+fatfs = { version = "0.3", default-features = false, features = ["alloc", "core_io"], optional = true }
 
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
@@ -39,6 +40,7 @@ regression = []
 simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster", "dep:image", "tracing-subscriber"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
 stm32h747i_disco = ["stm32h7", "embedded-hal", "stm32h7xx-hal", "cortex-m", "rlvgl-core/fs"]
+fatfs_nostd = ["dep:fatfs"]
 dma2d = ["stm32h7"]
 fontdue = ["rlvgl-core/fontdue"]
 png = ["rlvgl-core/png"]
