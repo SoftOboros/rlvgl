@@ -29,6 +29,13 @@ pub mod input;
 mod otm8009a;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    feature = "fatfs_nostd",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// No-std FATFS adapter to mount and list assets on SDMMC-backed block devices.
+pub mod sd_fatfs_adapter;
 #[cfg(feature = "simulator")]
 pub mod simulator;
 #[cfg(feature = "st7789")]
@@ -62,6 +69,12 @@ pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
 pub use rlvgl_core::event::Key;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    feature = "fatfs_nostd",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use sd_fatfs_adapter::{FatfsBlockStream, mount_and_list_assets};
 #[cfg(feature = "simulator")]
 pub use simulator::WgpuDisplay;
 #[cfg(feature = "st7789")]

@@ -53,7 +53,15 @@ The current CI workflow executes tests on the host target only, but cross-target
 - **STM32H747I-DISCO** – Enable the `stm32h747i_disco` feature and let the example's `build.rs` stage `memory.x`. Build or test with:
 
   ```bash
-  cargo build --bin rlvgl-stm32h747i-disco --features stm32h747i_disco --target thumbv7em-none-eabihf
+  cargo build --bin rlvgl-stm32h747i-disco \
+    --features "stm32h747i_disco" \
+    --target thumbv7em-none-eabihf
+
+  SD + FATFS smoke (no_std adapter; CI marked allow-failure due to `core_io` on newer rustc):
+
+  cargo build --bin rlvgl-stm32h747i-disco \
+    --features "stm32h747i_disco,fatfs_nostd" \
+    --target thumbv7em-none-eabihf
   ```
 
   Host-only tests can omit the `--target` flag to run natively.
