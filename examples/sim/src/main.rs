@@ -47,6 +47,7 @@ fn main() {
     let mut height = DEFAULT_HEIGHT;
     let mut path = None;
     let mut headless_path: Option<String> = None;
+    let mut headless = false;
     let mut use_wgpi = false;
     let mut show_qr = false;
     let mut show_png = false;
@@ -84,6 +85,7 @@ fn main() {
                         .unwrap_or_else(|| DEFAULT_HEADLESS_PATH.to_string()),
                 );
             }
+            headless = true;
         } else {
             path = Some(arg);
         }
@@ -94,9 +96,8 @@ fn main() {
     let pending = demo.pending.clone();
     let to_remove = demo.to_remove.clone();
 
-    let headless = headless_path.is_some();
     if headless {
-        // Start from a blank scene in headless mode; test flags add content.
+        // In headless mode, start with a blank scene to make tests predictable.
         root.borrow_mut().children.clear();
     }
 

@@ -13,8 +13,7 @@
       ],
       "options": {
         "env": {
-          "RUSTFLAGS": "-C link-arg=-Tmemory_STM32H747XI.x --remap-path-prefix=$(pwd)=.",
-          "RLVGL_LINKER_SCRIPT": "examples/stm32h747i-disco/memory_STM32H747XI.x"
+          "RUSTFLAGS": "--remap-path-prefix=$(pwd)=."
         }
       },
       "group": {

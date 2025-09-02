@@ -63,6 +63,17 @@ impl App for CreatorApp {
                 if ui.button("Layout Editor").clicked() {
                     self.layout_open = !self.layout_open;
                 }
+                if ui.button("Generate BSP").clicked() {
+                    self.bsp_open = !self.bsp_open;
+                }
+                if !self.bsp_errors.is_empty() {
+                    if ui.button("BSP Errors").clicked() {
+                        self.bsp_error_open = true;
+                    }
+                }
+                if ui.button("About").clicked() {
+                    self.about_open = !self.about_open;
+                }
             });
         });
 
@@ -369,6 +380,313 @@ impl App for CreatorApp {
                 ui.label("Select an asset");
             }
         });
+
+        if self.bsp_open {
+            let mut open = true;
+            egui::Window::new("Generate BSP")
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    let mut prefs_changed = false;
+                    ui.horizontal(|ui| {
+                        ui.label("Input .ioc:");
+                        if ui
+                            .text_edit_singleline(&mut self.bsp_ioc_path)
+                            .on_hover_text("Path to a CubeMX .ioc file.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui.button("Browse").clicked() {
+                            if let Some(path) =
+                                FileDialog::new().add_filter("ioc", &["ioc"]).pick_file()
+                            {
+                                self.bsp_ioc_path = path.to_string_lossy().into_owned();
+                                prefs_changed = true;
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Output dir:");
+                        if ui
+                            .text_edit_singleline(&mut self.bsp_out_dir)
+                            .on_hover_text("Directory where generated code will be written.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui.button("Browse").clicked() {
+                            if let Some(path) = FileDialog::new().pick_folder() {
+                                self.bsp_out_dir = path.to_string_lossy().into_owned();
+                                prefs_changed = true;
+                            }
+                        }
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui
+                            .checkbox(&mut self.bsp_emit_hal, "Emit HAL")
+                            .on_hover_text("Render HAL-based pin and clock init code.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui
+                            .checkbox(&mut self.bsp_emit_pac, "Emit PAC")
+                            .on_hover_text("Render PAC register-level init code.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        if ui
+                            .checkbox(&mut self.bsp_grouped_writes, "Grouped writes")
+                            .on_hover_text("Collapse RCC writes by register for smaller code.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui
+                            .checkbox(&mut self.bsp_with_deinit, "With deinit")
+                            .on_hover_text("Emit helpers to return pins/clocks to a safe state.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui
+                            .checkbox(&mut self.bsp_allow_reserved, "Allow reserved (PA13/PA14)")
+                            .on_hover_text(
+                                "Permit configuration of SWD pins when explicitly required.",
+                            )
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        let r1 = ui
+                            .radio_value(&mut self.bsp_per_peripheral, false, "One file")
+                            .on_hover_text("Emit a single consolidated source file.");
+                        let r2 = ui
+                            .radio_value(&mut self.bsp_per_peripheral, true, "Per peripheral")
+                            .on_hover_text("Emit one file per peripheral with a mod shim.");
+                        if r1.clicked() || r2.clicked() {
+                            prefs_changed = true;
+                        }
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui
+                            .checkbox(&mut self.bsp_use_label_names, "Use label names (HAL)")
+                            .on_hover_text(
+                                "Use CubeMX GPIO_Label values as identifier names where safe.",
+                            )
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui
+                            .checkbox(&mut self.bsp_emit_label_consts, "Emit label consts (PAC)")
+                            .on_hover_text(
+                                "Emit a pins module with constants for label→pin mapping.",
+                            )
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Label prefix:");
+                        if ui
+                            .text_edit_singleline(&mut self.bsp_label_prefix)
+                            .on_hover_text(
+                                "Prefix when a label would start with a digit or underscore.",
+                            )
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                        if ui
+                            .checkbox(
+                                &mut self.bsp_fail_on_duplicate_labels,
+                                "Fail on duplicate labels",
+                            )
+                            .on_hover_text("Error if two labels sanitize to the same identifier.")
+                            .changed()
+                        {
+                            prefs_changed = true;
+                        }
+                    });
+                    if prefs_changed {
+                        self.save_bsp_prefs();
+                    }
+                    ui.separator();
+                    if ui
+                        .button("Generate")
+                        .on_hover_text("Run BSP generation")
+                        .clicked()
+                    {
+                        let ioc = std::path::Path::new(&self.bsp_ioc_path);
+                        let out = std::path::Path::new(&self.bsp_out_dir);
+                        if !ioc.exists() || self.bsp_ioc_path.is_empty() {
+                            self.toasts
+                                .push(("Select a valid .ioc file".into(), Instant::now()));
+                            return;
+                        }
+                        if self.bsp_out_dir.is_empty() {
+                            self.toasts
+                                .push(("Select an output directory".into(), Instant::now()));
+                            return;
+                        }
+                        if !(self.bsp_emit_hal || self.bsp_emit_pac) {
+                            self.toasts.push((
+                                "Select at least one template (HAL or PAC)".into(),
+                                Instant::now(),
+                            ));
+                            return;
+                        }
+                        let layout = if self.bsp_per_peripheral {
+                            super::bsp_gen::Layout::PerPeripheral
+                        } else {
+                            super::bsp_gen::Layout::OneFile
+                        };
+                        let mut ok = true;
+                        if self.bsp_emit_hal {
+                            if let Err(e) = super::bsp_gen::from_ioc(
+                                ioc,
+                                super::bsp_gen::TemplateKind::Hal,
+                                out,
+                                self.bsp_grouped_writes,
+                                self.bsp_with_deinit,
+                                self.bsp_allow_reserved,
+                                layout.clone(),
+                                self.bsp_use_label_names,
+                                if self.bsp_label_prefix.is_empty() {
+                                    None
+                                } else {
+                                    Some(self.bsp_label_prefix.as_str())
+                                },
+                                self.bsp_fail_on_duplicate_labels,
+                                self.bsp_emit_label_consts,
+                                None, // core_filter (unified)
+                                None, // init_by override
+                                None, // periph owners
+                            ) {
+                                ok = false;
+                                let msg = format!("HAL generation failed: {}", e);
+                                self.toasts.push((msg.clone(), Instant::now()));
+                                self.bsp_errors.push(msg);
+                                self.bsp_error_open = true;
+                            }
+                        }
+                        if self.bsp_emit_pac {
+                            if let Err(e) = super::bsp_gen::from_ioc(
+                                ioc,
+                                super::bsp_gen::TemplateKind::Pac,
+                                out,
+                                self.bsp_grouped_writes,
+                                self.bsp_with_deinit,
+                                self.bsp_allow_reserved,
+                                layout.clone(),
+                                self.bsp_use_label_names,
+                                if self.bsp_label_prefix.is_empty() {
+                                    None
+                                } else {
+                                    Some(self.bsp_label_prefix.as_str())
+                                },
+                                self.bsp_fail_on_duplicate_labels,
+                                self.bsp_emit_label_consts,
+                                None, // core_filter (unified)
+                                None, // init_by override
+                                None, // periph owners
+                            ) {
+                                ok = false;
+                                let msg = format!("PAC generation failed: {}", e);
+                                self.toasts.push((msg.clone(), Instant::now()));
+                                self.bsp_errors.push(msg);
+                                self.bsp_error_open = true;
+                            }
+                        }
+                        if ok {
+                            // Persist preferences on success
+                            self.save_bsp_prefs();
+                            self.toasts
+                                .push(("BSP generation completed".into(), Instant::now()));
+                        }
+                    }
+                });
+            self.bsp_open = open;
+        }
+
+        if self.about_open {
+            let mut open = true;
+            egui::Window::new("About rlvgl Creator")
+                .open(&mut open)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.heading(format!("rlvgl Creator v{}", env!("CARGO_PKG_VERSION")));
+                        ui.label("A modular, idiomatic Rust reimplementation of LVGL.");
+                        ui.add_space(8.0);
+                        if self.about_logo.is_none() {
+                            if let Ok(img) = image::open("rlvgl-logo.png") {
+                                let rgba = img.to_rgba8();
+                                let size = img.dimensions();
+                                let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                                    [size.0 as usize, size.1 as usize],
+                                    &rgba,
+                                );
+                                self.about_logo = Some(ui.ctx().load_texture(
+                                    "rlvgl_logo",
+                                    color_image,
+                                    Default::default(),
+                                ));
+                            }
+                        }
+                        if let Some(tex) = &self.about_logo {
+                            let max_w = 360.0_f32.min(ui.available_width());
+                            let scale = (max_w / tex.size()[0] as f32).min(1.0);
+                            let size = egui::Vec2::new(
+                                tex.size()[0] as f32 * scale,
+                                tex.size()[1] as f32 * scale,
+                            );
+                            ui.image((tex.id(), size));
+                        } else {
+                            ui.label("(logo not found)");
+                        }
+                        ui.add_space(8.0);
+                        ui.label("© 2025 Softoboros Technology, Inc. • MIT license");
+                    });
+                });
+            self.about_open = open;
+        }
+
+        if self.bsp_error_open {
+            let mut open = true;
+            egui::Window::new("BSP Errors")
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Clear").clicked() {
+                            self.bsp_errors.clear();
+                        }
+                        if ui.button("Copy").clicked() {
+                            let all = self.bsp_errors.join(
+                                "
+",
+                            );
+                            ui.output_mut(|o| o.copied_text = all);
+                        }
+                    });
+                    ui.separator();
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for err in &self.bsp_errors {
+                            ui.colored_label(egui::Color32::RED, err);
+                        }
+                    });
+                });
+            self.bsp_error_open = open;
+        }
 
         if self.fonts_pack_open {
             let mut open = self.fonts_pack_open;

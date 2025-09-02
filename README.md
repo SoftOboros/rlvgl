@@ -69,9 +69,10 @@ clock selections so that clock setup can be generated alongside pin
 configuration.
 
 No per-chip tables are maintained. Class-level rules are reused across
-instances and vendors. Alternate functions are resolved from the canonical
-vendor databases bundled in `chipdb/` crates.
-Reserved SWD pins (`PA13`, `PA14`) are rejected unless explicitly allowed.
+instances and vendors. Alternate functions are derived from embedded vendor
+databases generated from the official XML sources; no external JSON is
+required at generation time. Reserved SWD pins (`PA13`, `PA14`) are rejected
+unless explicitly allowed.
 
 Typical flow:
 
@@ -81,8 +82,8 @@ rlvgl-creator platform gen --spec board.yaml --templates templates/stm32h7 \
   --out src/generated.rs
 ```
 
-Alternate-function numbers are resolved automatically from the canonical STM32
-database embedded in `rlvgl-chips-stm`; no external AF JSON is required.
+Alternate-function numbers are computed from the embedded database at runtime
+by `rlvgl-creator`, so there is no need to generate or pass a JSON file.
 
 To package vendor chip databases for testing or publishing, run:
 

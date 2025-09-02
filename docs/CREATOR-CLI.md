@@ -162,20 +162,6 @@ rlvgl-creator svg <svg> <out> [--dpi DPI...] [--threshold VAL]
 * `--dpi` – one or more DPI values to render at (default `96`).
 * `--threshold` – monochrome threshold (0–255).
 
-### board from-ioc
-Converts a CubeMX project into a board overlay JSON.
-
-```
-rlvgl-creator board from-ioc <ioc> <board> <out> [--hal | --pac | --template <template>] [--bsp-out <dir>]
-```
-* `ioc` – path to the CubeMX `.ioc` file.
-* `board` – name to embed in the overlay.
-* `out` – path to write the generated JSON.
-* `--hal` – embed HAL template selection.
-* `--pac` – embed PAC template selection.
-* `--template` – record a custom template path.
-* `--bsp-out` – directory to emit BSP code.
-
 ### bsp from-ioc
 Renders Rust source from a CubeMX project using a MiniJinja template.
 
@@ -227,22 +213,22 @@ rlvgl-creator bsp from-ioc minimal.ioc \
 
 Walk through a bus-aware STM32F769I-DISCO BSP with full DMA cleanup:
 
-Generate HAL and PAC code with grouped writes, per-peripheral layout, and deinit hooks:
+1. Generate HAL and PAC code with grouped writes, per-peripheral layout, and deinit hooks:
    ```bash
    rlvgl-creator bsp from-ioc f769.ioc \\
        --emit-hal --emit-pac --grouped-writes \\
        --per-peripheral --with-deinit --out bsp
    ```
-3. Call `board::deinit()` during shutdown to gate clocks, mask interrupts, and reset DMA/BDMA/MDMA state.
+2. Call `board::deinit()` during shutdown to gate clocks, mask interrupts, and reset DMA/BDMA/MDMA state.
 
 Walk through a bus-aware STM32H573I-DISCO BSP with ungrouped writes:
 
-Generate HAL code in a single file without grouped RCC writes:
+ 1. Generate HAL code in a single file without grouped RCC writes:
   ```bash
   rlvgl-creator bsp from-ioc h573.ioc \\
       --emit-hal --one-file --out bsp
   ```
-3. Call `board::deinit()` during shutdown to gate clocks and reset pin state.
+2. Call `board::deinit()` during shutdown to gate clocks and reset pin state.
 
 ### Edge cases and gotchas
 
@@ -254,12 +240,11 @@ Generate HAL code in a single file without grouped RCC writes:
   deinit hooks for custom or rare IP blocks.
 
 ## Workflow: STM32 `.ioc` to BSP
-Convert the `.ioc` file into a BSP crate:
+1. Convert the `.ioc` file into intermediate representation and render a BSP crate (AFs derived from embedded vendor data):
    ```bash
    rlvgl-creator bsp from-ioc simple.ioc --emit-hal --out bsp
    ```
-   The command parses pin assignments and clock configuration from `simple.ioc`, resolves alternate functions via the canonical STM32 database, and renders Rust source into the `bsp/` directory.
-3. Use the generated BSP in a project:
+2. Use the generated BSP in a project:
    ```rust
    // Cargo.toml
    // [dependencies]

@@ -10,11 +10,10 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 pub mod add_target;
 pub mod apng;
-pub mod board_import;
 pub mod bsp_gen;
 pub mod check;
 pub mod convert;
@@ -32,6 +31,13 @@ pub mod svg;
 pub mod sync;
 pub mod util;
 pub mod vendor;
+
+/// Dual-core selector for BSP generation.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum CoreSel {
+    Cm7,
+    Cm4,
+}
 
 /// CLI arguments for rlgvl-creator.
 #[derive(Parser)]
@@ -57,6 +63,10 @@ struct Cli {
     /// Increase output verbosity
     #[arg(short, long, global = true, action = ArgAction::Count)]
     verbose: u8,
+
+    /// Suppress non-error output (hides splash and info messages)
+    #[arg(long, global = true)]
+    silent: bool,
 
     /// Subcommand to execute
     #[command(subcommand)]
@@ -190,15 +200,15 @@ enum Command {
         #[arg(long)]
         inline_includes: bool,
     },
-    /// Board-related commands
-    Board {
-        #[command(subcommand)]
-        cmd: BoardCommand,
-    },
     /// Board support package generation commands
     Bsp {
         #[command(subcommand)]
         cmd: BspCommand,
+    },
+    /// Extract BSP IR from vendor C sources (experimental)
+    Ast {
+        #[command(subcommand)]
+        cmd: AstCommand,
     },
 }
 
@@ -247,32 +257,6 @@ enum LottieCommand {
     },
 }
 
-#[derive(Subcommand)]
-enum BoardCommand {
-    /// Convert a CubeMX `.ioc` file into a board overlay JSON
-    FromIoc {
-        /// Input `.ioc` file
-        ioc: PathBuf,
-        /// Board name to embed in the overlay
-        board: String,
-        /// Output path for the generated JSON
-        out: PathBuf,
-        /// Embed HAL template selection
-        #[arg(long, conflicts_with_all = ["pac", "template"])]
-        hal: bool,
-        /// Embed PAC template selection
-        #[arg(long, conflicts_with_all = ["hal", "template"])]
-        pac: bool,
-        /// Embed a custom template path
-        #[arg(long, conflicts_with_all = ["hal", "pac"])]
-        template: Option<String>,
-        /// Output directory for generated BSP code
-        #[arg(long)]
-        bsp_out: Option<PathBuf>,
-    },
-}
-
-#[derive(Subcommand)]
 enum BspCommand {
     /// Render Rust source from a CubeMX `.ioc` file
     FromIoc {
@@ -281,6 +265,19 @@ enum BspCommand {
         /// Output directory for generated files
         #[arg(long)]
         out: PathBuf,
+        /// Generate per-core outputs (cm7/ and cm4/) instead of unified
+        #[arg(long)]
+        split_cores: bool,
+        /// Restrict output to a single core in unified mode
+        #[arg(long, value_enum)]
+        core: Option<CoreSel>,
+        /// Override which core initializes system clocks
+        #[arg(long, value_enum)]
+        clock_init_core: Option<CoreSel>,
+        /// Assign ownership to peripherals (comma-separated name=core pairs)
+        /// Example: --periph-core usart1=cm4,spi1=cm7
+        #[arg(long, value_delimiter = ',')]
+        periph_core: Vec<String>,
         /// Render using the built-in HAL template
         #[arg(long)]
         emit_hal: bool,
@@ -305,14 +302,94 @@ enum BspCommand {
         /// Permit configuration of reserved SWD pins (PA13/PA14)
         #[arg(long)]
         allow_reserved: bool,
+        /// Use label-based identifiers when available
+        #[arg(long)]
+        use_label_names: bool,
+        /// Prefix to apply to label identifiers when needed
+        #[arg(long)]
+        label_prefix: Option<String>,
+        /// Fail if two labels sanitize to the same identifier
+        #[arg(long)]
+        fail_on_duplicate_labels: bool,
+        /// Emit a `pins` module with label constants (PAC)
+        #[arg(long)]
+        emit_label_consts: bool,
+    },
+    /// Render Rust source from vendor C sources (experimental)
+    FromC {
+        /// Input C files or directories (recurses)
+        inputs: Vec<PathBuf>,
+        /// Output directory for generated files
+        #[arg(long)]
+        out: PathBuf,
+        /// MCU identifier (e.g., STM32H747XIHx)
+        #[arg(long)]
+        mcu: String,
+        /// Package identifier (e.g., LQFP176)
+        #[arg(long)]
+        package: String,
+        /// Render using the built-in HAL template
+        #[arg(long)]
+        emit_hal: bool,
+        /// Render using the built-in PAC template
+        #[arg(long)]
+        emit_pac: bool,
+        /// MiniJinja template to render
+        #[arg(long, conflicts_with_all = ["emit_hal", "emit_pac"])]
+        template: Option<PathBuf>,
+        /// Collapse RCC writes by register
+        #[arg(long)]
+        grouped_writes: bool,
+        /// Include optional de-initialization helpers
+        #[arg(long)]
+        with_deinit: bool,
+        /// Emit a single consolidated file
+        #[arg(long, group = "layout")]
+        one_file: bool,
+        /// Emit one file per peripheral
+        #[arg(long, group = "layout")]
+        per_peripheral: bool,
+        /// Use label-based identifiers when available
+        #[arg(long)]
+        use_label_names: bool,
+        /// Prefix to apply to label identifiers when needed
+        #[arg(long)]
+        label_prefix: Option<String>,
+        /// Fail if two labels sanitize to the same identifier
+        #[arg(long)]
+        fail_on_duplicate_labels: bool,
+        /// Emit a `pins` module with label constants (PAC)
+        #[arg(long)]
+        emit_label_consts: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum AstCommand {
+    /// Extract IR from one or more C files
+    FromC {
+        /// MCU identifier (e.g., STM32H747XIHx)
+        #[arg(long)]
+        mcu: String,
+        /// Package identifier (e.g., LQFP176)
+        #[arg(long)]
+        package: String,
+        /// Input C files or directories (recurses)
+        inputs: Vec<PathBuf>,
+        /// Output path for the generated IR JSON (stdout if omitted)
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
 /// Run the rlgvl-creator command-line interface.
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-    if cli.verbose > 0 {
-        eprintln!("Using manifest {}", cli.manifest.display());
+    if !cli.silent {
+        println!("rlvgl v{} • rlvgl-creator", env!("CARGO_PKG_VERSION"));
+        if cli.verbose > 0 {
+            eprintln!("Using manifest {}", cli.manifest.display());
+        }
     }
 
     match cli.command {
@@ -388,38 +465,14 @@ pub fn run() -> Result<()> {
                 inline_includes,
             )?;
         }
-        Command::Board { cmd } => match cmd {
-            BoardCommand::FromIoc {
-                ioc,
-                board,
-                out,
-                hal,
-                pac,
-                template,
-                bsp_out,
-            } => {
-                let tmpl_sel = if hal {
-                    Some("hal")
-                } else if pac {
-                    Some("pac")
-                } else {
-                    template.as_deref()
-                };
-                board_import::from_ioc(&ioc, &board, &out, tmpl_sel)?;
-                if let Some(dir) = bsp_out {
-                    let kind = match tmpl_sel {
-                        Some("pac") => bsp_gen::TemplateKind::Pac,
-                        Some("hal") | None => bsp_gen::TemplateKind::Hal,
-                        Some(t) => bsp_gen::TemplateKind::Custom(PathBuf::from(t)),
-                    };
-                    bsp_gen::from_ioc(&ioc, kind, &dir, false, false, false, bsp_gen::Layout::OneFile)?;
-                }
-            }
-        },
         Command::Bsp { cmd } => match cmd {
             BspCommand::FromIoc {
                 ioc,
                 out,
+                split_cores,
+                core,
+                clock_init_core,
+                periph_core,
                 emit_hal,
                 emit_pac,
                 template,
@@ -428,6 +481,10 @@ pub fn run() -> Result<()> {
                 per_peripheral,
                 with_deinit,
                 allow_reserved,
+                use_label_names,
+                label_prefix,
+                fail_on_duplicate_labels,
+                emit_label_consts,
             } => {
                 let mut kinds = Vec::new();
                 if emit_hal {
@@ -447,11 +504,189 @@ pub fn run() -> Result<()> {
                 } else {
                     bsp_gen::Layout::OneFile
                 };
-                for kind in kinds {
-                    bsp_gen::from_ioc(&ioc, kind, &out, grouped_writes, with_deinit, allow_reserved, layout.clone())?;
+                let to_ir_core = |c: CoreSel| match c {
+                    CoreSel::Cm7 => crate::bsp::ir::Core::Cm7,
+                    CoreSel::Cm4 => crate::bsp::ir::Core::Cm4,
+                };
+                // Build overrides map if provided
+                let mut overrides: indexmap::IndexMap<String, crate::bsp::ir::Core> =
+                    indexmap::IndexMap::new();
+                for entry in periph_core {
+                    if let Some((name, core_s)) = entry.split_once('=') {
+                        let c = match core_s.to_ascii_lowercase().as_str() {
+                            "cm7" => Some(crate::bsp::ir::Core::Cm7),
+                            "cm4" => Some(crate::bsp::ir::Core::Cm4),
+                            _ => None,
+                        };
+                        if let Some(c) = c {
+                            overrides.insert(name.to_ascii_lowercase(), c);
+                        } else {
+                            return Err(anyhow!("invalid core in periph-core: {}", core_s));
+                        }
+                    } else {
+                        return Err(anyhow!("periph-core entries must be name=core"));
+                    }
+                }
+                let overrides_ref = if overrides.is_empty() {
+                    None
+                } else {
+                    Some(&overrides)
+                };
+                let init_override = clock_init_core.map(to_ir_core);
+                if split_cores {
+                    for (subdir, csel) in [("cm7", CoreSel::Cm7), ("cm4", CoreSel::Cm4)] {
+                        let odir = out.join(subdir);
+                        std::fs::create_dir_all(&odir)?;
+                        for kind in &kinds {
+                            bsp_gen::from_ioc(
+                                &ioc,
+                                kind.clone(),
+                                &odir,
+                                grouped_writes,
+                                with_deinit,
+                                allow_reserved,
+                                layout.clone(),
+                                use_label_names,
+                                label_prefix.as_deref(),
+                                fail_on_duplicate_labels,
+                                emit_label_consts,
+                                Some(to_ir_core(csel)),
+                                init_override,
+                                overrides_ref,
+                            )?;
+                        }
+                    }
+                } else {
+                    let core_filter = core.map(to_ir_core);
+                    for kind in kinds {
+                        bsp_gen::from_ioc(
+                            &ioc,
+                            kind,
+                            &out,
+                            grouped_writes,
+                            with_deinit,
+                            allow_reserved,
+                            layout.clone(),
+                            use_label_names,
+                            label_prefix.as_deref(),
+                            fail_on_duplicate_labels,
+                            emit_label_consts,
+                            core_filter,
+                            init_override,
+                            overrides_ref,
+                        )?;
+                    }
                 }
                 if per_peripheral {
                     bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
+                }
+            }
+            BspCommand::FromC {
+                inputs,
+                out,
+                mcu,
+                package,
+                emit_hal,
+                emit_pac,
+                template,
+                grouped_writes,
+                one_file: _,
+                per_peripheral,
+                with_deinit,
+                use_label_names,
+                label_prefix,
+                fail_on_duplicate_labels,
+                emit_label_consts,
+            } => {
+                let mut files = Vec::new();
+                for p in inputs {
+                    let ps = if p.is_dir() {
+                        crate::ast::discover_c_sources(&p)
+                    } else {
+                        vec![p]
+                    };
+                    files.extend(ps);
+                }
+                if files.is_empty() {
+                    return Err(anyhow!("no C sources found in inputs"));
+                }
+                let ir_tmp = crate::ast::extract_from_c_sources(
+                    &files,
+                    crate::ast::ExtractOptions {
+                        mcu: &mcu,
+                        package: &package,
+                    },
+                )?;
+                // Normalize to the shared IR type to avoid cfg(test) path differences
+                let ir: crate::ir::Ir = serde_json::from_slice(&serde_json::to_vec(&ir_tmp)?)?;
+
+                let mut kinds = Vec::new();
+                if emit_hal {
+                    kinds.push(bsp_gen::TemplateKind::Hal);
+                }
+                if emit_pac {
+                    kinds.push(bsp_gen::TemplateKind::Pac);
+                }
+                if let Some(t) = template {
+                    kinds.push(bsp_gen::TemplateKind::Custom(t));
+                }
+                if kinds.is_empty() {
+                    return Err(anyhow!("select --emit-hal, --emit-pac, or --template"));
+                }
+                let layout = if per_peripheral {
+                    bsp_gen::Layout::PerPeripheral
+                } else {
+                    bsp_gen::Layout::OneFile
+                };
+                for kind in kinds {
+                    bsp_gen::render_from_ir(
+                        &ir,
+                        kind,
+                        &out,
+                        grouped_writes,
+                        with_deinit,
+                        layout.clone(),
+                        use_label_names,
+                        label_prefix.as_deref(),
+                        fail_on_duplicate_labels,
+                        emit_label_consts,
+                        None,
+                    )?;
+                }
+                if per_peripheral {
+                    bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
+                }
+            }
+        },
+        Command::Ast { cmd } => match cmd {
+            AstCommand::FromC {
+                mcu,
+                package,
+                inputs,
+                out,
+            } => {
+                let mut files = Vec::new();
+                for p in inputs {
+                    let ps = if p.is_dir() {
+                        crate::ast::discover_c_sources(&p)
+                    } else {
+                        vec![p]
+                    };
+                    files.extend(ps);
+                }
+                let ir_tmp = crate::ast::extract_from_c_sources(
+                    &files,
+                    crate::ast::ExtractOptions {
+                        mcu: &mcu,
+                        package: &package,
+                    },
+                )?;
+                let ir: crate::ir::Ir = serde_json::from_slice(&serde_json::to_vec(&ir_tmp)?)?;
+                let json = serde_json::to_string_pretty(&ir)?;
+                if let Some(path) = out {
+                    std::fs::write(path, json)?;
+                } else {
+                    println!("{}", json);
                 }
             }
         },

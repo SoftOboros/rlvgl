@@ -102,4 +102,18 @@ ordered roughly from boot prerequisites to higher-level features.
   `--af` and `stm32_af.json` are removed from CLI/docs/scripts.
 - Example gains a path to initialize I2C4 via HAL and bridge to
   embedded‑hal 1.0 for the touch driver (temporary compat layer).
+ 
 
+## Remaining HAL/BSP polish and next steps
+
+- HAL template (H7):
+  - Keep `.set_speed(Speed::VeryHigh)` chained to `.into_alternate::<AF>()` on a single statement (avoid leading `.` lines).
+  - Do not emit per‑port imports (`gpioa::*`, etc.); only `use stm32h7xx_hal::{gpio::Speed, pac, prelude::*};` and `use stm32h7xx_hal::rcc;`.
+  - Ensure `configure_pins_hal(dp, ccdr)` signature for H7 and use `dp.GPIOx.split(ccdr.peripheral.GPIOX)`.
+- BSP regeneration: run `scripts/gen-example-bsp.sh` and verify the regenerated `examples/stm32h747i-disco/bsp/hal.rs` compiles and passes `cargo fmt --check`.
+- Example pin‑mux: switch to HAL mux (`bsp_hal::configure_pins_hal(&dp, &ccdr)`), dropping the temporary PAC fallback once the regenerated file compiles cleanly.
+- AF resolution: confirm PD12/PD13 → I2C4 AF4 (canonical DB); remove the fallback once the database provides AFs for H747 definitively.
+- Backlight + reset:
+  - Replace temporary GPIO backlight with TIM8 CH2 (PJ6) HAL PWM; add a tiny embedded‑hal 1.0 `SetDutyCycle` adapter over the HAL PWM channel.
+  - Keep panel reset on PJ12 with compliant delays; move to HAL GPIO after mux compiles.
+- CI/formatting: rerun `cargo fmt --all -- --check` and fix residual template whitespace or line‑wrap nits so generated files stay rustfmt‑clean.

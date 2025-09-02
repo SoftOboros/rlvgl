@@ -8,12 +8,6 @@
     feature = "jpeg",
     feature = "qrcode",
     feature = "lottie",
-    feature = "canvas",
-    feature = "gif",
-    feature = "apng",
-    feature = "nes",
-    feature = "pinyin",
-    feature = "fatfs",
     test,
 ))]
 use alloc::vec::Vec;
@@ -184,12 +178,6 @@ pub struct BlitterRenderer<'a, B: Blitter, const N: usize> {
         feature = "jpeg",
         feature = "qrcode",
         feature = "lottie",
-        feature = "canvas",
-        feature = "gif",
-        feature = "apng",
-        feature = "nes",
-        feature = "pinyin",
-        feature = "fatfs",
         test,
     ))]
     scratch: Option<Vec<u8>>,
@@ -209,12 +197,6 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
                 feature = "jpeg",
                 feature = "qrcode",
                 feature = "lottie",
-                feature = "canvas",
-                feature = "gif",
-                feature = "apng",
-                feature = "nes",
-                feature = "pinyin",
-                feature = "fatfs",
                 test,
             ))]
             scratch: None,
@@ -233,12 +215,6 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         feature = "jpeg",
         feature = "qrcode",
         feature = "lottie",
-        feature = "canvas",
-        feature = "gif",
-        feature = "apng",
-        feature = "nes",
-        feature = "pinyin",
-        feature = "fatfs",
         test,
     ))]
     fn blit_colors(&mut self, position: (i32, i32), pixels: &[Color], w: u32, h: u32) {

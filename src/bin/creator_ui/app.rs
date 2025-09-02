@@ -1,6 +1,7 @@
 //! Application state and core asset management helpers.
 
 use super::*;
+use serde::{Deserialize, Serialize};
 
 pub(crate) struct CreatorApp {
     /// Asset manifest loaded from disk.
@@ -69,6 +70,42 @@ pub(crate) struct CreatorApp {
     pub(crate) layout_open: bool,
     /// Items placed in the layout editor.
     pub(crate) layout_items: Vec<LayoutItem>,
+    /// Whether the About window is open.
+    pub(crate) about_open: bool,
+    /// Cached texture for the rlvgl logo in the About window.
+    pub(crate) about_logo: Option<TextureHandle>,
+    /// Whether the BSP generation window is open.
+    pub(crate) bsp_open: bool,
+    /// Input `.ioc` path for BSP generation.
+    pub(crate) bsp_ioc_path: String,
+    /// Output directory for BSP generation.
+    pub(crate) bsp_out_dir: String,
+    /// BSP option: emit HAL template.
+    pub(crate) bsp_emit_hal: bool,
+    /// BSP option: emit PAC template.
+    pub(crate) bsp_emit_pac: bool,
+    /// BSP option: grouped writes.
+    pub(crate) bsp_grouped_writes: bool,
+    /// BSP option: per-peripheral layout (else one file).
+    pub(crate) bsp_per_peripheral: bool,
+    /// BSP option: include deinit helpers.
+    pub(crate) bsp_with_deinit: bool,
+    /// BSP option: allow reserved pins (PA13/PA14).
+    pub(crate) bsp_allow_reserved: bool,
+    /// BSP option: use label names for identifiers (HAL).
+    pub(crate) bsp_use_label_names: bool,
+    /// BSP option: emit label constants (PAC).
+    pub(crate) bsp_emit_label_consts: bool,
+    /// BSP option: label prefix for identifiers.
+    pub(crate) bsp_label_prefix: String,
+    /// BSP option: fail on duplicate labels after sanitization.
+    pub(crate) bsp_fail_on_duplicate_labels: bool,
+    /// Last error while saving/loading BSP prefs (if any), transient.
+    pub(crate) bsp_prefs_error: Option<String>,
+    /// BSP generation error log window state.
+    pub(crate) bsp_error_open: bool,
+    /// BSP generation error messages.
+    pub(crate) bsp_errors: Vec<String>,
 }
 
 impl CreatorApp {
@@ -229,7 +266,27 @@ impl CreatorApp {
             screen_preset: None,
             layout_open: false,
             layout_items: Vec::new(),
+            about_open: false,
+            about_logo: None,
+            bsp_open: false,
+            bsp_ioc_path: String::new(),
+            bsp_out_dir: String::new(),
+            bsp_emit_hal: true,
+            bsp_emit_pac: false,
+            bsp_grouped_writes: true,
+            bsp_per_peripheral: false,
+            bsp_with_deinit: true,
+            bsp_allow_reserved: false,
+            bsp_use_label_names: true,
+            bsp_emit_label_consts: true,
+            bsp_label_prefix: "pin_".to_string(),
+            bsp_fail_on_duplicate_labels: false,
+            bsp_prefs_error: None,
+            bsp_error_open: false,
+            bsp_errors: Vec::new(),
         };
+        // Attempt to load persisted BSP preferences
+        app.load_bsp_prefs();
         app.generate_thumbnails();
         app
     }
@@ -602,4 +659,81 @@ impl CreatorApp {
             }
         }
     }
+
+    fn bsp_prefs_path(&self) -> Option<PathBuf> {
+        Path::new(&self.manifest_path)
+            .parent()
+            .map(|p| p.join(".creator_bsp.yml"))
+    }
+
+    pub(crate) fn save_bsp_prefs(&mut self) {
+        if let Some(path) = self.bsp_prefs_path() {
+            let prefs = self.current_bsp_prefs();
+            match serde_yaml::to_string(&prefs)
+                .and_then(|y| Ok(std::fs::write(&path, y).map(|_| ())))
+            {
+                Ok(_) => self.bsp_prefs_error = None,
+                Err(e) => self.bsp_prefs_error = Some(format!("save prefs: {}", e)),
+            }
+        }
+    }
+
+    fn load_bsp_prefs(&mut self) {
+        if let Some(path) = self.bsp_prefs_path() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                match serde_yaml::from_str::<BspPrefs>(&text) {
+                    Ok(p) => self.apply_bsp_prefs(&p),
+                    Err(e) => self.bsp_prefs_error = Some(format!("load prefs: {}", e)),
+                }
+            }
+        }
+    }
+
+    fn current_bsp_prefs(&self) -> BspPrefs {
+        BspPrefs {
+            ioc_path: self.bsp_ioc_path.clone(),
+            out_dir: self.bsp_out_dir.clone(),
+            emit_hal: self.bsp_emit_hal,
+            emit_pac: self.bsp_emit_pac,
+            grouped_writes: self.bsp_grouped_writes,
+            per_peripheral: self.bsp_per_peripheral,
+            with_deinit: self.bsp_with_deinit,
+            allow_reserved: self.bsp_allow_reserved,
+            use_label_names: self.bsp_use_label_names,
+            emit_label_consts: self.bsp_emit_label_consts,
+            label_prefix: self.bsp_label_prefix.clone(),
+            fail_on_duplicate_labels: self.bsp_fail_on_duplicate_labels,
+        }
+    }
+
+    fn apply_bsp_prefs(&mut self, p: &BspPrefs) {
+        self.bsp_ioc_path = p.ioc_path.clone();
+        self.bsp_out_dir = p.out_dir.clone();
+        self.bsp_emit_hal = p.emit_hal;
+        self.bsp_emit_pac = p.emit_pac;
+        self.bsp_grouped_writes = p.grouped_writes;
+        self.bsp_per_peripheral = p.per_peripheral;
+        self.bsp_with_deinit = p.with_deinit;
+        self.bsp_allow_reserved = p.allow_reserved;
+        self.bsp_use_label_names = p.use_label_names;
+        self.bsp_emit_label_consts = p.emit_label_consts;
+        self.bsp_label_prefix = p.label_prefix.clone();
+        self.bsp_fail_on_duplicate_labels = p.fail_on_duplicate_labels;
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BspPrefs {
+    ioc_path: String,
+    out_dir: String,
+    emit_hal: bool,
+    emit_pac: bool,
+    grouped_writes: bool,
+    per_peripheral: bool,
+    with_deinit: bool,
+    allow_reserved: bool,
+    use_label_names: bool,
+    emit_label_consts: bool,
+    label_prefix: String,
+    fail_on_duplicate_labels: bool,
 }

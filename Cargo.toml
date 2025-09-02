@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -93,6 +93,11 @@ optional = true
 version = "0.7"
 features = ["critical-section-single-core"]
 optional = true
+
+[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32h7xx-hal]
+version = "0.16"
+optional = true
+features = ["stm32h747cm7", "sdmmc"]
 
 
 [dependencies.panic-halt]
@@ -231,6 +236,10 @@ optional = true
 path = "chipdb/rlvgl-chips-rp2040"
 optional = true
 
+[dependencies.tar]
+version = "0.4"
+optional = true
+
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
@@ -300,6 +309,7 @@ creator = [
     "dep:rayon",
     "dep:resvg",
     "dep:zstd",
+    "dep:tar",
     "dep:rlvgl-bsps-stm",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
@@ -327,6 +337,7 @@ creator_ui = [
     "dep:rfd",
     "dep:serde_json",
     "dep:zstd",
+    "dep:tar",
     "dep:rlvgl-bsps-stm",
     "dep:rlvgl-chips-stm",
     "dep:rlvgl-chips-nrf",
@@ -338,6 +349,7 @@ creator_ui = [
     "dep:rlvgl-chips-ti",
     "dep:rlvgl-chips-rp2040",
 ]
+backlight_pwm = []
 
 [profile.release]
 opt-level = "z"

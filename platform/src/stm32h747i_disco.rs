@@ -63,15 +63,12 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         ltdc: LTDC,
         dsi: DSIHOST,
         fmc: FMC,
-        rcc: &mut RCC,
     ) -> Self
     where
         BL: SetDutyCycle,
         RST: OutputPin,
     {
-        // Enable LTDC and DSI peripheral clocks
-        rcc.apb3enr
-            .modify(|_, w| w.ltdcen().set_bit().dsien().set_bit());
+        // Assume clocks for LTDC and DSI are already enabled by HAL setup.
         // Ensure the panel is held in reset and the backlight is off
         let _ = reset.set_low();
         let mut disp = Self {
@@ -84,7 +81,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.set_backlight(0);
         disp.reset_panel();
         Otm8009a::init(&mut disp.dsi);
-        let fb = Self::init_sdram(fmc, rcc);
+        let fb = Self::init_sdram(fmc);
         disp.setup_ltdc_layer(fb, 800, 480);
         disp
     }
@@ -129,8 +126,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     /// Initialize the external SDRAM and return its base address.
-    fn init_sdram(_fmc: FMC, rcc: &mut RCC) -> u32 {
-        rcc.ahb3enr.modify(|_, w| w.fmcen().set_bit());
+    fn init_sdram(_fmc: FMC) -> u32 {
         0xC000_0000
     }
 }

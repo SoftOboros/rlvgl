@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     llvm-dev             \
     gcc-arm-none-eabi    \
     binutils-arm-none-eabi \
+    zstd                 \
     mold                 \
     nano                 \
     ninja-build          \
@@ -61,6 +62,16 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-too
  && rustup target add thumbv7em-none-eabihf \
  && cargo install cargo-binutils
 
+# install npm
+ RUN apt-get update && apt-get install -y \
+    curl ca-certificates gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    # Add NodeSource repo (example: Node 20 LTS)
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g yarn @openai/codex
+
 # If you run as a non-root user at runtime, make sure they can read it
 ARG RLVGL_BUILDER_USER=rlvgl
 RUN useradd -m -s /bin/bash "$RLVGL_BUILDER_USER" || true \
@@ -91,7 +102,7 @@ ENV CARGO_INCREMENTAL=0
 ENV SCCACHE_S3_KEY_PREFIX=/rlvgl
 
 # Comment this out to remove sccache, or remove on run.
-ENV RUSTC_WRAPPER=/opt/rust/cargo/bin/sccache
+ENV RUSTC_WRAPPER=/usr/bin/sccache
 
 # Default to non-root user for everything that follows
 USER ${RLVGL_BUILDER_USER}

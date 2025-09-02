@@ -12,3 +12,5 @@ venv
 *.pyc
 **/boards.json
 **/mcu.json
+codex_state/
+.codex/
