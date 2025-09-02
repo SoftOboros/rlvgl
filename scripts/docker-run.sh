@@ -1,16 +1,14 @@
 #!/bin/bash
 # run the contaner with environment secrets.
-set -eav pipeline
+set -ea pipeline
 docker run -d \
   -e SCCACHE_BUCKET="${SCCACHE_BUCKET:?Need SCCACHE_BUCKET set}" \
   -e AWS_REGION="${AWS_REGION:?Need AWS_REGION set}" \
-  -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?Need AWS_ACCESS_KEY_ID set}" \
-  -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?Need AWS_SECRET_ACCESS_KEY set}" \
   -e SCCACHE_REGION="${AWS_REGION:?Need AWS_REGION set}" \
   -v codex_state:/root/.codex \
   -p 127.0.0.1:1455:1455 \
   --name rlvgl-builder \
-  iraa/rlvgl:latest tail -f /dev/null
+  iraa/rlvgl:latest tail -f /dev/null || echo "Container Failed to Spawn - Name taken ?"
 # Get a copy of .ssh files from outside repo and populate them on the container once 
 # running.  Create these and put them in ../ssh from the repo root
 docker cp ~/ssh/known_hosts      rlvgl-builder:home/ubuntu/.ssh/known_hosts
@@ -31,8 +29,10 @@ docker exec -u 0 rlvgl-builder chown -R "rlvgl":"rlvgl" \
                                 /home/rlvgl/.ssh/config \
                                 /home/rlvgl/.codex/config.toml
 # Execute commands to checkout repo, submodules, add ssh origin, assign it and execute bash
-docker exec rlvgl-builder git clone https://github.com/SoftOboros/rlvgl.git /opt/rlvgl
-docker exec rlvgl-builder git submodule update --init --depth=3
-docker exec rlvgl-builder git remote add origin-ssh git@github.com:SoftOboros/rlvgl
-docker exec rlvgl-builder git pull --set-upstream origin-ssh main
-docker exec -it rlvgl-builder bash
+docker exec rlvgl-builder git clone https://github.com/SoftOboros/rlvgl.git /opt/rlvgl \
+                          || echo "Already Cloned"
+docker exec rlvgl-builder git submodule update --init --depth=3 || echo "Submodule Dirty"
+docker exec rlvgl-builder git remote add origin-ssh git@github.com:SoftOboros/rlvgl \
+                          || echo "Remote Exists"
+docker exec rlvgl-builder git pull --set-upstream origin-ssh main \
+                          || echo "Repo Dirty"
