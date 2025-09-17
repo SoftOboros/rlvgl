@@ -2,38 +2,32 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build: rlvgl-stm32h747i-disco",
+      "label": "build-disco (cm7)",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco"
-      ],
-      "options": {
-        "env": {
-          "RUSTFLAGS": "--remap-path-prefix=$(pwd)=."
-        }
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "command": "cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7",
+      "group": "build",
       "problemMatcher": ["$rustc"]
     },
     {
-      "label": "Size: rlvgl-stm32h747i-disco",
+      "label": "build-disco (cm4)",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "size",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco", "smps"
-      ],
+      "command": "cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco-cm4 --features stm32h747i_disco_cm4",
       "group": "build",
-      "problemMatcher": []
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "build-sim",
+      "type": "shell",
+      "command": "cargo build --bin rlvgl-sim --features simulator,qrcode,png,jpeg,fontdue",
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "build-creator",
+      "type": "shell",
+      "command": "cargo build --bin rlvgl-creator --features creator",
+      "group": "build",
+      "problemMatcher": ["$rustc"]
     }
   ]
 }

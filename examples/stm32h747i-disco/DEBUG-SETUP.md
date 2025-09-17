@@ -120,6 +120,19 @@ define _reconnect
 end
 
 _reconnect
+
+## Dual‑Core OpenOCD
+
+- Use `openocd/stm32h747_dual_core.cfg` (slow SWD + connect‑under‑reset):
+  - GDB ports: CM7 on 3333, CM4 on 3334
+  - Run: `make openocd-dual`
+- Launch order: attach CM7 first, then CM4.
+
+## SVDs
+
+- Place device SVDs in `.svd/` and point launch configs to:
+  - CM7: `.svd/STM32H747_CM7.svd`
+  - CM4: `.svd/STM32H747_CM4.svd`
 ```
 
 If your GDB lacks `$_target_connected`, prefer the shell wrapper.
@@ -171,4 +184,3 @@ openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
       reset_config srst_only srst_nogate connect_assert_srst; \
       init; reset halt; stm32h7x unlock 0; exit"
 ```
-

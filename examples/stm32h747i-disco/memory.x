@@ -17,6 +17,8 @@ MEMORY
   MAILBOX : ORIGIN = 0x30047000, LENGTH = 1K
   /* D3 SRAM4 (64K) is owned by CM4 for low-power retention; declared for visibility */
   D3_CM4  : ORIGIN = 0x38000000, LENGTH = 64K
+  /* External SDRAM connected via FMC Bank1 (32 MB typical on H747I-DISCO) */
+  SDRAM   : ORIGIN = 0xC0000000, LENGTH = 32M
 }
 
 /* Optional aliases used by newer link.x scripts; harmless if unused. */
@@ -26,6 +28,10 @@ REGION_ALIAS("REGION_DATA",   RAM);
 REGION_ALIAS("REGION_BSS",    RAM);
 REGION_ALIAS("REGION_HEAP",   RAM);
 REGION_ALIAS("REGION_STACK",  RAM);
+
+/* SDRAM linker region helpers (for allocators or optional sections) */
+PROVIDE(_sdram_start = ORIGIN(SDRAM));
+PROVIDE(_sdram_size  = LENGTH(SDRAM));
 
 /* Optional custom section aliases for future placement */
 /* Place `.axisram_cm7` into D1_CM7 if referenced in a custom linker script */

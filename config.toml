@@ -1,0 +1,47 @@
+[project]
+name = "acme"
+root = "./"
+artifacts_dir = ".makeitso/artifacts"
+
+[manager]
+kind = "api:gpt-5-instant"   # or "codex"
+approval = "confirm-phase"   # "manual" | "confirm-phase" | "delegate"
+budget_tokens = 2000000
+max_concurrency = 2
+api_key_env = "OPENAI_API_KEY"
+org_env = "OPENAI_ORG"
+max_iterations=100
+
+[workers.codex]
+run_via = "cli"              # "cli" | "api"
+profile = "default"
+delimiters = { start = "<<MIS:START>>", end = "<<MIS:END>>", json = "<<MIS:JSON>>", err = "<<MIS:ERR>>" }
+interactive = false
+stdin_only = true
+plain = true
+# extra_args = ["-y"]
+# timeout_ms = 15000
+
+[policies]
+write_files = "ask"
+run_shell = "ask"
+network = "ask"
+
+[telemetry]
+enabled = true
+redact = true
+store = "local"
+
+[learning]
+mode = "shadow"
+regex_repo = "./protocol/regexes.toml"
+prompt_repo = "./protocol/prompts/"
+replay_dir = ".makeitso/replays"
+
+[monitor]
+enabled = true
+stall_timeout_ms = 120000
+dangerous_regexes = []
+
+[ui]
+open_url = "print"

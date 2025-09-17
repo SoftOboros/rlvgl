@@ -51,9 +51,10 @@ ordered roughly from boot prerequisites to higher-level features.
     `SetDutyCycle` adapter. A gentle startup brightness ramp is implemented in
     the display bring-up. Next: consider making PWM the default.
 - Panel reset GPIO:
-  - Progress: `PJ12` reset is driven via HAL GPIO in the example with a basic
-    delay between low/high, prior to DSI initialization. Next: replace the
-    coarse cycle delay with a timer‑based delay that matches datasheet timing.
+  - Progress: `PG3` (LCD_RESET) is driven via HAL GPIO in the example with a
+    basic delay between low/high, prior to DSI initialization. Next: replace
+    the coarse cycle delay with a timer‑based delay that matches datasheet
+    timing.
 
 ## Touch (FT5336)
 
@@ -65,8 +66,8 @@ ordered roughly from boot prerequisites to higher-level features.
   - Remove temporary 0.2→1.0 I2C compat shim once platform/HAL converge on
     embedded‑hal 1.0 for I2C.
 - Interrupt line (optional):
-  - Wire FT5336 INT (candidate `PJ13`) as input and use `new_with_int` path to
-    reduce polling.
+  - Wire FT5336 INT on `PK7` as input and use `new_with_int` path to reduce
+    polling.
 
 ## SD Card (optional)
 
@@ -162,7 +163,7 @@ let mut dev = rlvgl::platform::DiscoSdBlockDevice::new(sd);
  - Linker script handling: workspace `build.rs` stages the example’s
    `memory.x` into `OUT_DIR` and passes `-Tmemory.x` to the linker for embedded
    targets.
- - Example wiring for panel reset on `PJ12` landed; backlight control works via
+ - Example wiring for panel reset on `PG3` landed; backlight control works via
    a HAL‑GPIO fallback, with a gated TIM8 PWM path behind `backlight_pwm`.
  - SD block device scaffold implemented for SDMMC1 with DMA and cache hygiene.
  
@@ -177,6 +178,6 @@ let mut dev = rlvgl::platform::DiscoSdBlockDevice::new(sd);
 - Example pin‑mux: switch to HAL mux (`bsp_hal::configure_pins_hal(&dp, &ccdr)`), dropping the temporary PAC fallback once the regenerated file compiles cleanly.
 - AF resolution: confirm PD12/PD13 → I2C4 AF4 (canonical DB); remove the fallback once the database provides AFs for H747 definitively.
 - Backlight + reset:
-  - Replace temporary GPIO backlight with TIM8 CH2 (PJ6) HAL PWM; add a tiny embedded‑hal 1.0 `SetDutyCycle` adapter over the HAL PWM channel.
-  - Keep panel reset on PJ12 with compliant delays; move to HAL GPIO after mux compiles.
+  - Replace temporary GPIO backlight with TIM8 (PJ6) HAL PWM; add a tiny embedded‑hal 1.0 `SetDutyCycle` adapter over the HAL PWM channel.
+  - Keep panel reset on PG3 with compliant delays; move to HAL GPIO after mux compiles.
 - CI/formatting: rerun `cargo fmt --all -- --check` and fix residual template whitespace or line‑wrap nits so generated files stay rustfmt‑clean.

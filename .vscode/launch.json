@@ -2,22 +2,85 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "CM7 attach (external OpenOCD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:3333",
+      "runToEntryPoint": "Reset",
+      "showDevDebugOutput": "raw",
+      "preLaunchCommands": [
+        "monitor reset halt"
+      ],
+      "preLaunchTask": "build-disco (cm7)",
+      "postLaunchCommands": []
+    },
+    {
+      "name": "CM4 attach (external OpenOCD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco-cm4",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM4.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:3334",
+      "runToEntryPoint": "Reset",
+      "showDevDebugOutput": "raw",
+      "preLaunchCommands": [
+        "monitor reset halt"
+      ],
+      "preLaunchTask": "build-disco (cm4)",
+      "postLaunchCommands": []
+    },
+    {
+      "name": "Host: rlvgl-sim",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/rlvgl-sim",
+      "args": [],
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": "build-sim"
+    },
+    {
+      "name": "Host: rlvgl-creator",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/rlvgl-creator",
+      "args": [],
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": "build-creator"
+    },
+    {
       "name": "CM7: rlvgl-stm32h747i-disco",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "openocd",
       "cwd": "${workspaceRoot}",
       "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
-      "svdFile": "${workspaceRoot}/.svd/stm32h747.svd",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
       "device": "STM32H747",
       "runToEntryPoint": "Reset",
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "build-disco (cm7)",
+      "preLaunchCommands": [
+        "monitor reset halt"
+      ],
+      "searchDir": [
+        "${workspaceRoot}",
+        "/opt/homebrew/share/openocd/scripts",
+        "/usr/local/share/openocd/scripts",
+        "/usr/share/openocd/scripts"
+      ],
       "configFiles": [
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
-      "postLaunchCommands": [
-        "monitor reset halt"
-      ]
+      "postLaunchCommands": []
     },
     {
       "name": "CM4: rlvgl-stm32h747i-disco-cm4",
@@ -26,17 +89,25 @@
       "servertype": "openocd",
       "cwd": "${workspaceRoot}",
       "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco-cm4",
-      "svdFile": "${workspaceRoot}/.svd/stm32h747.svd",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM4.svd",
       "device": "STM32H747",
       "runToEntryPoint": "Reset",
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "build-disco (cm4)",
+      "preLaunchCommands": [
+        "monitor reset halt"
+      ],
+      "searchDir": [
+        "${workspaceRoot}",
+        "/opt/homebrew/share/openocd/scripts",
+        "/usr/local/share/openocd/scripts",
+        "/usr/share/openocd/scripts"
+      ],
       "configFiles": [
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
-      "postLaunchCommands": [
-        "monitor reset halt"
-      ]
+      "postLaunchCommands": []
     }
   ]
 }
-

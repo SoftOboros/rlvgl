@@ -69,6 +69,35 @@ st-flash write firmware.bin 0x08000000
 1. Reset the board and confirm the demo UI matches the simulator layout.
 2. Tap widgets to ensure touch events propagate correctly.
 
+## Display Status (Bring‑up)
+
+- Pixel clock: 32 MHz (PLL3R) — conservative default; adjust later.
+- LTDC timings (typical OTM8009A 800×480):
+  - HSW=20, HBP=140, HFP=20
+  - VSW=4,  VBP=34,  VFP=10
+- Layer 1: RGB565 framebuffer; DMA2D planned for blits/fills.
+- Notes:
+  - These values are labeled in `platform/src/stm32h747i_disco.rs::configure_ltdc_timing()`
+    for easy tweaking during tuning.
+  - DSI panel init is stubbed; LTDC draws are WIP.
+
+## Touch (FT5336)
+
+- I²C bus: I2C4
+  - PD12 = I2C4_SCL (AF4, open‑drain, pull‑up)
+  - PD13 = I2C4_SDA (AF4, open‑drain, pull‑up)
+- Interrupt: PK7 = TOUCH_INT
+- Ownership: CM4 initializes I2C4 and polls FT5336; CM7 executes display work.
+- A PAC‑based I2C4 init for CM4 will be added; FT5336 support uses an
+  embedded‑hal 1.0 adapter.
+
+## Backlight and Reset (Temporary)
+
+- Backlight GPIO fallback: PJ6 (high = on). PWM bring‑up is optional on TIM8
+  (PJ6 supports TIM8 CH1/CH2; routed to LCD_BL_CTRL).
+- Panel reset: PG3 (LCD_RESET on MB1166). Early bring‑up may toggle this via
+  GPIO; add datasheet‑compliant delays.
+
 ## Optional: SD Assets
 
 - Enable the no_std FATFS adapter and the SD block device when building. For a

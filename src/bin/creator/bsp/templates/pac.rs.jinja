@@ -255,7 +255,7 @@ pub fn init_clocks(dp: &pac::Peripherals) {
         "{{ spec.clocks.d1ppre | default("-") }}",
         "{{ spec.clocks.d2ppre1 | default("-") }}",
         "{{ spec.clocks.d2ppre2 | default("-") }}",
-        "{{ spec.clocks.d3ppre | default("-") }}",
+        "{{ spec.clocks.d3ppre | default("-") }}"
     );
     {% if spec.clocks.sys_src and spec.clocks.sys_src | upper in ["HSI","HSE"] %}
     // Handle simple SYSCLK sources without PLL
@@ -280,10 +280,11 @@ pub fn init_clocks(dp: &pac::Peripherals) {
     while dp.RCC.cr.read().bits() & (1 << 25) != 0 {} // wait PLL1RDY=0
     // 2) Select PLL source and DIVM1
     // PLLSRC: 00=HSI, 01=CSI, 10=HSE
-    let pllsrc_bits: u32 = match {{ spec.clocks.pll_src | default("HSI") | upper }} {
+    let pllsrc_str: &str = "{{ spec.clocks.pll_src | default("HSI") | upper }}";
+    let pllsrc_bits: u32 = match pllsrc_str {
         "HSE" | "RCC_PLLSOURCE_HSE" => 0b10,
         "CSI" | "RCC_PLLSOURCE_CSI" => 0b01,
-        _ => 0b00,
+        _ => 0b00, // HSI default
     };
     // DIVM1 from `.ioc` PLL1
     let divm1: u32 = {{ (spec.clocks.pll["pll1"].m | default(1)) }} as u32 & 0x3F;

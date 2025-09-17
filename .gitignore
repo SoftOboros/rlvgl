@@ -14,3 +14,5 @@ venv
 **/mcu.json
 codex_state/
 .codex/
+.makeitso/
+.svd/

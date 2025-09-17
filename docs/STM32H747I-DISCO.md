@@ -45,8 +45,8 @@ recommended for data transfers.
 
 ## Backlight & Reset
 
-- Backlight uses TIM8 CH2 on `PJ6` (optional complementary `CH2N` on `PJ7`)
-  for PWM brightness control. For early bring-up, a GPIO high/low fallback
-  on `PJ6` is acceptable.
-- Panel reset is mapped to `PJ12` (push-pull). Apply datasheet‑compliant delays
+- Backlight uses TIM8 (e.g., CH1/CH2) on `PJ6` (optional complementary `CH2N`
+  on `PJ7`) for PWM brightness control. For early bring-up, a GPIO high/low
+  fallback on `PJ6` is acceptable.
+- Panel reset is mapped to `PG3` (LCD_RESET). Apply datasheet‑compliant delays
   between reset low/high and DSI link initialization.

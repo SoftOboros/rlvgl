@@ -7,6 +7,7 @@ help:
 	@echo "  make build-disco-cm4            # Build CM4 example"
 	@echo "  make build-disco-all            # Build both cores"
 	@echo "  make openocd                    # Start OpenOCD (ST-Link + STM32H7)"
+	@echo "  make openocd-dual               # Start OpenOCD with dual-core cfg (CM7 on 3333, CM4 on 3334)"
 	@echo "  make openocd-erase              # Full chip erase via OpenOCD (DANGER)"
 
 gen-stm32h747i-disco-bsp:
@@ -15,11 +16,11 @@ gen-stm32h747i-disco-bsp:
 
 build-disco:
 	cargo build --target thumbv7em-none-eabihf \
-	  --bin rlvgl-stm32h747i-disco --features stm32h747i_disco
+	  --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7
 
 build-disco-cm4:
 	cargo build --target thumbv7em-none-eabihf \
-	  --bin rlvgl-stm32h747i-disco-cm4 --features stm32h747i_disco
+	  --bin rlvgl-stm32h747i-disco-cm4 --features stm32h747i_disco_cm4
 
 build-disco-all: build-disco build-disco-cm4
 
@@ -27,7 +28,9 @@ build-disco-all: build-disco build-disco-cm4
 openocd:
 	openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c init -c "reset halt"
 
+openocd-dual:
+	openocd -f openocd/stm32h747_dual_core.cfg
+
 openocd-erase:
 	openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
 	  -c init -c "reset halt" -c "stm32h7x mass_erase 0" -c shutdown
-

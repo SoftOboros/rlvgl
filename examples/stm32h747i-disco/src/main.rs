@@ -22,6 +22,7 @@ mod common_demo;
 // Use the split-core generated PAC BSP for CM7
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
+mod ipc;
 // HAL BSP module is not required for this bring-up path
 
 // Optional: route BSP log messages to semihosting when enabled.
@@ -57,7 +58,7 @@ fn main() -> ! {
     }
 
     #[cfg(all(
-        feature = "stm32h747i_disco",
+        feature = "stm32h747i_disco_cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
@@ -72,8 +73,7 @@ fn main() -> ! {
 
         use core::convert::Infallible;
         use embedded_hal::{
-            digital::{ErrorType as DigitalError, InputPin, OutputPin},
-            i2c::{ErrorType as I2cError, I2c, Operation, SevenBitAddress},
+            digital::{ErrorType as DigitalError, InputPin},
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
         use rlvgl::core::event::{Event, Key};
@@ -86,7 +86,7 @@ fn main() -> ! {
 
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
         use stm32h7xx_hal::gpio::{Output, Pin, PushPull};
-        use stm32h7xx_hal::hal::digital::v2::OutputPin as OutputPin02;
+        // Backlight control on PJ6 (GPIO fallback); touch INT uses PK7
         type HalBacklightPin = Pin<'J', 6, Output<PushPull>>;
         struct HalGpioBacklight(HalBacklightPin);
         impl PwmError for HalGpioBacklight {
@@ -106,39 +106,19 @@ fn main() -> ! {
             }
         }
 
-        struct DummyI2c;
-        impl I2cError for DummyI2c {
+        // Adapter to bridge HAL v0.2 input pin to embedded-hal 1.0 InputPin
+        struct HalInputPin<P>(P);
+        impl embedded_hal::digital::ErrorType for HalInputPin<P> {
             type Error = Infallible;
         }
-        impl I2c<SevenBitAddress> for DummyI2c {
-            fn read(
-                &mut self,
-                _address: SevenBitAddress,
-                _buf: &mut [u8],
-            ) -> Result<(), Self::Error> {
-                Ok(())
+        impl<P: stm32h7xx_hal::hal::digital::v2::InputPin<Error = Infallible>>
+            embedded_hal::digital::InputPin for HalInputPin<P>
+        {
+            fn is_high(&mut self) -> Result<bool, Self::Error> {
+                self.0.is_high()
             }
-            fn write(
-                &mut self,
-                _address: SevenBitAddress,
-                _bytes: &[u8],
-            ) -> Result<(), Self::Error> {
-                Ok(())
-            }
-            fn write_read(
-                &mut self,
-                _address: SevenBitAddress,
-                _bytes: &[u8],
-                _buf: &mut [u8],
-            ) -> Result<(), Self::Error> {
-                Ok(())
-            }
-            fn transaction(
-                &mut self,
-                _address: SevenBitAddress,
-                _ops: &mut [Operation<'_>],
-            ) -> Result<(), Self::Error> {
-                Ok(())
+            fn is_low(&mut self) -> Result<bool, Self::Error> {
+                self.0.is_low()
             }
         }
 
@@ -185,16 +165,29 @@ fn main() -> ! {
         }
         // Destructure PAC peripherals and switch to HAL for operation
         let dp = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
-        // Apply CM7-only clock init generated from .ioc (if any)
-        #[allow(clippy::let_unit_value)]
-        {
-            let _ = bsp_pac::init_clocks(&dp);
-        }
+        // Ensure the PWR peripheral clock is enabled before touching PWR regs.
+        // On H7, PWR sits on APB4; without PWREN the VOSRDY poll can hang.
+        // Some PACs don’t expose a typed `pwren()`; set the bit position directly.
+        dp.RCC
+            .apb4enr
+            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 9)) });
+
+        // PWR clock now enabled. Skip PAC-based clock init for bring-up.
+
+        // Now split out PAC peripherals and hand PWR to the HAL.
         let stm32h7::stm32h747cm7::Peripherals {
             PWR,
             RCC,
             SYSCFG,
             GPIOJ,
+            GPIOG,
+            GPIOK,
+            GPIOD,
+            GPIOE,
+            GPIOF,
+            GPIOH,
+            GPIOI,
+            I2C4,
             TIM8,
             DSIHOST: dsi,
             FMC: fmc,
@@ -202,16 +195,30 @@ fn main() -> ! {
             #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
             GPIOC,
             #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
-            GPIOD,
-            #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
             SDMMC1,
             ..
         } = dp;
+        // Configure SMPS supply + VOS1 via HAL (requires `stm32h7xx-hal` feature `smps`).
         let pwr = PWR.constrain();
-        let vos = pwr.freeze();
+        let vos = pwr.smps().vos1().freeze();
+        use stm32h7xx_hal::rcc::{PllConfigStrategy, ResetEnable};
+        use stm32h7xx_hal::prelude::*;
         let rcc = RCC.constrain();
         let mut syscfg = SYSCFG;
-        let ccdr = rcc.freeze(vos, &mut syscfg);
+        // HAL RCC: derive SYSCLK and LTDC pixel clock (via PLL3R)
+        // Assumes HSE=25 MHz on H747I-DISCO. Adjust if using HSI or a different crystal.
+        let ccdr = rcc
+            .use_hse(25.MHz())
+            .sys_ck(400.MHz())
+            .pll1_strategy(PllConfigStrategy::Iterative)
+            // Target ~33 MHz pixel clock for 800x480 panel bring-up
+            .pll3_r_ck(32.MHz())
+            .freeze(vos, &mut syscfg);
+        // Enable display-related peripherals in D1 domain
+        let _ = ccdr.peripheral.LTDC.enable();
+        let _ = ccdr.peripheral.DMA2D.enable();
+        let _ = ccdr.peripheral.DSI.enable();
+        let _ = ccdr.peripheral.FMC.enable();
         // Signal clocks ready to CM4 via shared mailbox flag
         #[allow(clippy::let_unit_value)]
         {
@@ -219,10 +226,15 @@ fn main() -> ! {
             let _ = bsp_pac::signal_clocks_ready();
         }
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
+        let gpiog = GPIOG.split(ccdr.peripheral.GPIOG);
+        let gpiok = GPIOK.split(ccdr.peripheral.GPIOK);
+        let gpiod = GPIOD.split(ccdr.peripheral.GPIOD);
+        let gpioe = GPIOE.split(ccdr.peripheral.GPIOE);
+        let gpiof = GPIOF.split(ccdr.peripheral.GPIOF);
+        let gpioh = GPIOH.split(ccdr.peripheral.GPIOH);
+        let gpioi = GPIOI.split(ccdr.peripheral.GPIOI);
         #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
         let gpioc = GPIOC.split(ccdr.peripheral.GPIOC);
-        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
-        let gpiod = GPIOD.split(ccdr.peripheral.GPIOD);
         // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
         struct HalResetPin<P>(P);
         impl<P> embedded_hal::digital::ErrorType for HalResetPin<P> {
@@ -240,7 +252,76 @@ fn main() -> ! {
                 Ok(())
             }
         }
-        let mut panel_reset_hal = gpioj.pj12.into_push_pull_output();
+        // Configure FMC SDRAM pin mux (subset necessary for SDRAM Bank1)
+        use stm32h7xx_hal::gpio::Alternate;
+        // Address lines PF0..PF5 (A0..A5)
+        let _ = gpiof.pf0.into_alternate::<0>();
+        let _ = gpiof.pf1.into_alternate::<0>();
+        let _ = gpiof.pf2.into_alternate::<0>();
+        let _ = gpiof.pf3.into_alternate::<0>();
+        let _ = gpiof.pf4.into_alternate::<0>();
+        let _ = gpiof.pf5.into_alternate::<0>();
+        // Address lines PF12..PF15 (A6..A9)
+        let _ = gpiof.pf12.into_alternate::<0>();
+        let _ = gpiof.pf13.into_alternate::<0>();
+        let _ = gpiof.pf14.into_alternate::<0>();
+        let _ = gpiof.pf15.into_alternate::<0>();
+        // Address lines PG0..PG1 (A10..A11), PG2 (A12), PG4 (BA0)
+        let _ = gpiog.pg0.into_alternate::<0>();
+        let _ = gpiog.pg1.into_alternate::<0>();
+        let _ = gpiog.pg2.into_alternate::<0>();
+        let _ = gpiog.pg4.into_alternate::<0>();
+        // Control lines PF11 (SDNRAS), PG15 (SDNCAS), PH5 (SDNWE)
+        let _ = gpiof.pf11.into_alternate::<0>();
+        let _ = gpiog.pg15.into_alternate::<0>();
+        let _ = gpioh.ph5.into_alternate::<0>();
+        // Clock and enable: PG8 (SDCLK), PH6 (SDNE1), PH7 (SDCKE1)
+        let _ = gpiog.pg8.into_alternate::<0>();
+        let _ = gpioh.ph6.into_alternate::<0>();
+        let _ = gpioh.ph7.into_alternate::<0>();
+        // Byte lane enables: PE0 (NBL0), PE1 (NBL1), PI4 (NBL2), PI5 (NBL3)
+        let _ = gpioe.pe0.into_alternate::<0>();
+        let _ = gpioe.pe1.into_alternate::<0>();
+        let _ = gpioi.pi4.into_alternate::<0>();
+        let _ = gpioi.pi5.into_alternate::<0>();
+        // Data lines D0..D15 on PD/PE
+        let _ = gpiod.pd14.into_alternate::<0>(); // D0
+        let _ = gpiod.pd15.into_alternate::<0>(); // D1
+        let _ = gpiod.pd0.into_alternate::<0>();  // D2
+        let _ = gpiod.pd1.into_alternate::<0>();  // D3
+        let _ = gpioe.pe7.into_alternate::<0>();  // D4
+        let _ = gpioe.pe8.into_alternate::<0>();  // D5
+        let _ = gpioe.pe9.into_alternate::<0>();  // D6
+        let _ = gpioe.pe10.into_alternate::<0>(); // D7
+        let _ = gpioe.pe11.into_alternate::<0>(); // D8
+        let _ = gpioe.pe12.into_alternate::<0>(); // D9
+        let _ = gpioe.pe13.into_alternate::<0>(); // D10
+        let _ = gpioe.pe14.into_alternate::<0>(); // D11
+        let _ = gpioe.pe15.into_alternate::<0>(); // D12
+        let _ = gpiod.pd8.into_alternate::<0>();  // D13
+        let _ = gpiod.pd9.into_alternate::<0>();  // D14
+        let _ = gpiod.pd10.into_alternate::<0>(); // D15
+        // Data lines D16..D23 on PH
+        let _ = gpioh.ph8.into_alternate::<0>();  // D16
+        let _ = gpioh.ph9.into_alternate::<0>();  // D17
+        let _ = gpioh.ph10.into_alternate::<0>(); // D18
+        let _ = gpioh.ph11.into_alternate::<0>(); // D19
+        let _ = gpioh.ph12.into_alternate::<0>(); // D20
+        let _ = gpioh.ph13.into_alternate::<0>(); // D21
+        let _ = gpioh.ph14.into_alternate::<0>(); // D22
+        let _ = gpioh.ph15.into_alternate::<0>(); // D23
+        // Data lines D24..D31 on PI
+        let _ = gpioi.pi0.into_alternate::<0>();  // D24
+        let _ = gpioi.pi1.into_alternate::<0>();  // D25
+        let _ = gpioi.pi2.into_alternate::<0>();  // D26
+        let _ = gpioi.pi3.into_alternate::<0>();  // D27
+        let _ = gpioi.pi6.into_alternate::<0>();  // D28
+        let _ = gpioi.pi7.into_alternate::<0>();  // D29
+        let _ = gpioi.pi9.into_alternate::<0>();  // D30
+        let _ = gpioi.pi10.into_alternate::<0>(); // D31
+
+        // Panel reset GPIO on PG3 (LCD_RESET)
+        let mut panel_reset_hal = gpiog.pg3.into_push_pull_output();
         let _ = panel_reset_hal.set_low();
         cortex_m::asm::delay(10_000_00);
         let _ = panel_reset_hal.set_high();
@@ -280,7 +361,17 @@ fn main() -> ! {
             HalGpioBacklight(bl_pin)
         };
         let blitter = CpuBlitter;
-        let mut _display = Stm32h747iDiscoDisplay::new(
+        // Configure a SysTick timer to flip buffers at ~60 Hz
+        let mut cp = cortex_m::Peripherals::take().unwrap();
+        use cortex_m::peripheral::syst::SystClkSource;
+        cp.SYST.set_clock_source(SystClkSource::Core);
+        let sys_hz = ccdr.clocks.sys_ck().0;
+        let flip_hz = 6u32; // loose 6 Hz flip for bring-up
+        let reload = (sys_hz / flip_hz).saturating_sub(1);
+        cp.SYST.set_reload(reload);
+        cp.SYST.clear_current();
+        cp.SYST.enable_counter();
+        let mut display = Stm32h747iDiscoDisplay::new(
             blitter,
             backlight,
             HalResetPin(panel_reset_hal),
@@ -288,8 +379,113 @@ fn main() -> ! {
             dsi,
             fmc,
         );
-        let i2c = DummyI2c;
-        let mut input = Stm32h747iDiscoInput::new(i2c);
+        // Optional: SDRAM RAM test (feature-gated). Writes a few patterns per MB
+        // and prints progress via semihosting if enabled.
+        #[cfg(feature = "sdram_ramtest")]
+        {
+            #[cfg(feature = "semihosting")]
+            fn logln(args: core::fmt::Arguments) {
+                use core::fmt::Write;
+                if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+                    let _ = writeln!(out, "{}", args);
+                }
+            }
+            #[cfg(not(feature = "semihosting"))]
+            fn logln(_args: core::fmt::Arguments) {}
+            macro_rules! log {
+                ($($arg:tt)*) => {
+                    logln(format_args!($($arg)*));
+                }
+            }
+            unsafe {
+                const BASE: usize = 0xC000_0000;
+                const SIZE_MB: usize = 32; // H747I-DISCO typical SDRAM size
+                // stride controls test density per MB (words touched per MB)
+                const STRIDE: usize = 256; // higher = denser test, slower
+                for mb in 0..SIZE_MB {
+                    let mb_base = BASE + (mb << 20);
+                    let mut errs = 0usize;
+
+                    // Pattern 1: solid zeros
+                    for i in 0..STRIDE {
+                        let p = (mb_base as *mut u32).add(i * 8);
+                        p.write_volatile(0x0000_0000);
+                    }
+                    for i in 0..STRIDE {
+                        let p = (mb_base as *const u32).add(i * 8);
+                        if p.read_volatile() != 0x0000_0000 { errs += 1; }
+                    }
+
+                    // Pattern 2: solid ones
+                    for i in 0..STRIDE {
+                        let p = (mb_base as *mut u32).add(i * 8 + 1);
+                        p.write_volatile(0xFFFF_FFFF);
+                    }
+                    for i in 0..STRIDE {
+                        let p = (mb_base as *const u32).add(i * 8 + 1);
+                        if p.read_volatile() != 0xFFFF_FFFF { errs += 1; }
+                    }
+
+                    // Pattern 3: address-based
+                    for i in 0..STRIDE {
+                        let p = (mb_base as *mut u32).add(i * 8 + 2);
+                        let v = (mb_base as u32).wrapping_add((i as u32) << 4);
+                        p.write_volatile(v);
+                    }
+                    for i in 0..STRIDE {
+                        let p = (mb_base as *const u32).add(i * 8 + 2);
+                        let v = (mb_base as u32).wrapping_add((i as u32) << 4);
+                        if p.read_volatile() != v { errs += 1; }
+                    }
+
+                    // Pattern 4: checkerboard
+                    for i in 0..STRIDE {
+                        let p0 = (mb_base as *mut u32).add(i * 8 + 3);
+                        let p1 = (mb_base as *mut u32).add(i * 8 + 4);
+                        p0.write_volatile(0xAAAA_AAAA);
+                        p1.write_volatile(0x5555_5555);
+                    }
+                    for i in 0..STRIDE {
+                        let p0 = (mb_base as *const u32).add(i * 8 + 3);
+                        let p1 = (mb_base as *const u32).add(i * 8 + 4);
+                        if p0.read_volatile() != 0xAAAA_AAAA { errs += 1; }
+                        if p1.read_volatile() != 0x5555_5555 { errs += 1; }
+                    }
+
+                    // Pattern 5: pseudo-random (xorshift)
+                    let mut seed: u32 = 0xC0FF_EE11 ^ (mb as u32 * 0x9E37_79B9);
+                    for i in 0..STRIDE {
+                        // xorshift32
+                        seed ^= seed << 13;
+                        seed ^= seed >> 17;
+                        seed ^= seed << 5;
+                        let p = (mb_base as *mut u32).add(i * 8 + 5);
+                        p.write_volatile(seed);
+                    }
+                    let mut seed2: u32 = 0xC0FF_EE11 ^ (mb as u32 * 0x9E37_79B9);
+                    for i in 0..STRIDE {
+                        seed2 ^= seed2 << 13;
+                        seed2 ^= seed2 >> 17;
+                        seed2 ^= seed2 << 5;
+                        let p = (mb_base as *const u32).add(i * 8 + 5);
+                        if p.read_volatile() != seed2 { errs += 1; }
+                    }
+
+                    log!("SDRAM test: MB {} -> {} errors\n", mb, errs);
+                }
+            }
+        }
+        // Main loop: handle IPC commands (from CM4) and input stubs
+        ipc::init();
+        // Touch I2C4 on PD12/PD13 @ 400 kHz and INT on PK7
+        let i2c = rlvgl::platform::stm32h747i_disco::init_touch_i2c(
+            I2C4,
+            gpiod,
+            ccdr.peripheral.I2C4,
+            &ccdr.clocks,
+        );
+        let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
+        let mut input = Stm32h747iDiscoInput::new_with_int(i2c, touch_int);
         let button = DummyButton;
         let mut button_input = ButtonInput::new(button);
 
@@ -378,6 +574,15 @@ fn main() -> ! {
         }
 
         loop {
+            // Handle CM4 commands
+            if let Some(cmd) = ipc::pop() {
+                if cmd.kind == ipc::CmdKind::SetBacklight as u32 {
+                    let duty = (cmd.a & 0xFFFF) as u16;
+                    // Map 16-bit duty to simple on/off for GPIO fallback
+                    let level = if duty < 512 { 0 } else { u16::MAX };
+                    display.set_brightness(level);
+                }
+            }
             if let Some(evt) = input.poll() {
                 root.borrow_mut().dispatch_event(&evt);
                 common_demo::flush_pending(&root, &pending, &to_remove);
@@ -386,12 +591,16 @@ fn main() -> ! {
                 root.borrow_mut().dispatch_event(&evt);
                 common_demo::flush_pending(&root, &pending, &to_remove);
             }
+            // Flip on SysTick wrap (approx. 60 Hz)
+            if cp.SYST.has_wrapped() {
+                display.present();
+            }
             cortex_m::asm::nop();
         }
     }
 
     #[cfg(not(all(
-        feature = "stm32h747i_disco",
+        feature = "stm32h747i_disco_cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     )))]
     loop {
