@@ -10,6 +10,11 @@ examples/stm32h747i-disco/README.md - STM32H747I-DISCO board demo.
 Demonstrates rlvgl on the STM32H747I-DISCO discovery board using placeholder
 display and touch drivers.
 
+## Quick Links
+- Boot options and dual-core flow: see `BOOT.md`
+- Memory map and regions: see `MEMORY.md`
+- STM32 BSP generation behavior and flags: see `docs/STM_BSP_GENERATION.md`
+
 ## BSP Generation
 The `bsp` directory is produced by `rlvgl-creator` and demonstrates
 bus-aware clock gating. GPIO and peripheral enables target the H7's `AHB4ENR`
@@ -32,6 +37,17 @@ rustup target add thumbv7em-none-eabihf
 cargo build --bin rlvgl-stm32h747i-disco \
     --features "stm32h747i_disco,qrcode,png,jpeg,fontdue" \
     --target thumbv7em-none-eabihf
+```
+
+Alternatively, use the top-level Makefile shortcuts:
+
+```
+make gen-stm32h747i-disco-bsp   # Regenerate BSP (defaults SMPS/VOS1)
+make build-disco                # Build CM7 example
+make build-disco-cm4            # Build CM4 example
+make build-disco-all            # Build both
+make openocd                    # Start OpenOCD (stlink + stm32h7x)
+make openocd-erase              # Mass erase (DANGER)
 ```
 
 Notes:

@@ -534,7 +534,17 @@ pub fn run() -> Result<()> {
                     Some(&overrides)
                 };
                 let init_override = clock_init_core.map(to_ir_core);
-                if split_cores {
+                // Auto-split when both cores are present in the .ioc and no single-core was requested
+                let mut do_split = split_cores;
+                if !do_split && core.is_none() {
+                    if let Ok(txt) = std::fs::read_to_string(&ioc) {
+                        let (cm7, cm4) = crate::bsp::ioc::detect_core_projects(&txt);
+                        if cm7 && cm4 {
+                            do_split = true;
+                        }
+                    }
+                }
+                if do_split {
                     for (subdir, csel) in [("cm7", CoreSel::Cm7), ("cm4", CoreSel::Cm4)] {
                         let odir = out.join(subdir);
                         std::fs::create_dir_all(&odir)?;
@@ -619,7 +629,9 @@ pub fn run() -> Result<()> {
                     },
                 )?;
                 // Normalize to the shared IR type to avoid cfg(test) path differences
-                let ir: crate::ir::Ir = serde_json::from_slice(&serde_json::to_vec(&ir_tmp)?)?;
+                let mut ir: crate::ir::Ir = serde_json::from_slice(&serde_json::to_vec(&ir_tmp)?)?;
+                // Apply environment overrides (STM32_* variables)
+                crate::bsp_gen::apply_env_overrides(&mut ir);
 
                 let mut kinds = Vec::new();
                 if emit_hal {

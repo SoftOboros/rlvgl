@@ -30,6 +30,9 @@ pub struct Ir {
     pub pinctrl: Vec<Pin>,
     /// Discovered peripherals keyed by instance name.
     pub peripherals: IndexMap<String, Peripheral>,
+    /// Optional power configuration (supply/VOS) extracted from the `.ioc`.
+    #[serde(default)]
+    pub pwr: Power,
 }
 
 /// Clock configuration extracted from the vendor project.
@@ -47,6 +50,37 @@ pub struct Clocks {
     /// externally or select a sensible default.
     #[serde(default)]
     pub init_by: Option<Core>,
+    /// System clock source (e.g., "HSI", "HSE", "PLL1").
+    #[serde(default)]
+    pub sys_src: Option<String>,
+    /// PLL source (e.g., "HSE", "HSI", "CSI").
+    #[serde(default)]
+    pub pll_src: Option<String>,
+    /// Optional HSE frequency in Hz (e.g., 25000000).
+    #[serde(default)]
+    pub hse_hz: Option<u32>,
+    /// Domain prescalers from .ioc (raw tokens).
+    #[serde(default)]
+    pub d1cpu: Option<String>,
+    #[serde(default)]
+    pub d1ppre: Option<String>,
+    #[serde(default)]
+    pub d2ppre1: Option<String>,
+    #[serde(default)]
+    pub d2ppre2: Option<String>,
+    #[serde(default)]
+    pub d3ppre: Option<String>,
+}
+
+/// Power configuration (supply/VOS) as declared in the vendor project.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct Power {
+    /// Supply mode selected in CubeMX (e.g., "SMPS", "LDO").
+    #[serde(default)]
+    pub supply: Option<String>,
+    /// VOS/SDLEVEL (e.g., "VOS1").
+    #[serde(default)]
+    pub sdlevel: Option<String>,
 }
 
 /// PLL parameter block.

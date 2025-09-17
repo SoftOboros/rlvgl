@@ -25,12 +25,25 @@ pub const CLOCKS_INIT_BY: &str = "{{ init_by }}";
 {% if this_core != init_by %}
 /// Secondary core helper: wait for system clocks initialized by the primary core.
 pub fn wait_for_clocks() {
-    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+    // Mailbox: 1K reserved in D2 SRAM3 at 0x3004_7000..0x3004_73FF
+    const MAILBOX_BASE: u32 = 0x3004_7000;
+    // Semaphore at offset 0
+    let flag = (MAILBOX_BASE + 0) as *const core::sync::atomic::AtomicU32;
+    // Safety: fixed shared address in D2 SRAM
+    let f = unsafe { &*flag };
+    while f.load(core::sync::atomic::Ordering::Acquire) == 0 {
+        cortex_m::asm::wfe();
+    }
 }
 {% else %}
 /// Primary core helper: optionally signal clocks ready to the secondary core.
 pub fn signal_clocks_ready() {
-    // TODO: Implement HSEM/EXTI or shared-flag signal as needed.
+    const MAILBOX_BASE: u32 = 0x3004_7000;
+    let flag = (MAILBOX_BASE + 0) as *const core::sync::atomic::AtomicU32;
+    // Safety: fixed shared address in D2 SRAM
+    let f = unsafe { &*flag };
+    f.store(1, core::sync::atomic::Ordering::Release);
+    cortex_m::asm::sev();
 }
 {% endif %}
 {% endif %}
@@ -77,7 +90,42 @@ pub fn signal_clocks_ready() {
     {% set pac_crate = 'stm32' + family + nums[0:1] %}
     {% set pac_mod = pac_crate + nums[1:] %}
 {% endif %}
+{# Adjust for STM32H7 dual-core PAC module naming #}
+{% if spec.mcu[0:9] in ["STM32H745", "STM32H747", "STM32H755", "STM32H757"] %}
+    {% if this_core is defined and this_core == 'cm4' %}
+        {% set pac_mod = pac_mod + 'cm4' %}
+    {% else %}
+        {% set pac_mod = pac_mod + 'cm7' %}
+    {% endif %}
+{% endif %}
 use {{ pac_crate }}::{{ pac_mod }} as pac;
+// Optional lightweight logging hook. Enable with `--features bsp_log` and
+// override `_bsp_log` in your binary to route output.
+#[cfg(feature = "bsp_log")]
+#[allow(unused)]
+fn _bsp_log(_args: core::fmt::Arguments) { /* user-defined sink */ }
+#[cfg(feature = "bsp_log")]
+macro_rules! bsp_log { ($($arg:tt)*) => { _bsp_log(format_args!($($arg)*)); } }
+#[cfg(not(feature = "bsp_log"))]
+macro_rules! bsp_log { ($($arg:tt)*) => { let _ = ($(& $arg),*); } }
+{# Provide board defaults inline when not part of a parent module tree #}
+{% if mod_name is defined %}
+use super::board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
+{% else %}
+mod board {
+    /// Supply mode for the PWR block.
+    #[derive(Copy, Clone)]
+    pub enum Supply { SMPS, LDO }
+    /// Voltage scaling level (SDLEVEL/VOS).
+    #[derive(Copy, Clone)]
+    pub enum Vos { VOS0, VOS1, VOS2, VOS3 }
+    /// User default: board reality on STM32H747I-DISCO is SMPS.
+    pub const DEFAULT_PWR_SUPPLY: Supply = Supply::SMPS;
+    /// User default: VOS1 is appropriate for high clocks on STM32H7.
+    pub const DEFAULT_VOS: Vos = Vos::VOS1;
+}
+use board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
+{% endif %}
 
 {%- macro gpio_bus(family) -%}
 {% if family[0:7] == "STM32H7" %}ahb4enr
@@ -127,6 +175,196 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     {% endif %}
 }
 
+/// Configure power supply and voltage scaling.
+pub fn init_power(dp: &pac::Peripherals) {
+    // Resolve supply from .ioc or fallback default
+    let supply = {
+        {%- if spec.pwr and spec.pwr.supply is defined and spec.pwr.supply %}
+        // From .ioc: PWR.Supply = {{ spec.pwr.supply }}
+        Supply::{{ spec.pwr.supply | upper }}
+        {%- else %}
+        // No supply configuration in .ioc
+        // Using DEFAULT_PWR_SUPPLY (user-editable)
+        DEFAULT_PWR_SUPPLY
+        {%- endif %}
+    };
+    let vos = {
+        {%- if spec.pwr and spec.pwr.sdlevel is defined and spec.pwr.sdlevel %}
+        // From .ioc: PWR.SDLEVEL = {{ spec.pwr.sdlevel }}
+        Vos::{{ spec.pwr.sdlevel | upper }}
+        {%- else %}
+        // No VOS in .ioc; using DEFAULT_VOS (user-editable)
+        DEFAULT_VOS
+        {%- endif %}
+    };
+
+    {# Apply only for H7 family for now #}
+    {%- if spec.mcu[0:7] == "STM32H7" %}
+    // Allow supply/VOS configuration updates (SCUEN gates changes on H7)
+    // Some PACs lack a typed accessor for SCUEN; set the bit position directly.
+    dp.PWR.cr3.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 2)) });
+    match supply {
+        Supply::SMPS => {
+            // SMPS enable is SDEN in the PAC
+            dp.PWR.cr3.modify(|_, w| w.sden().set_bit().ldoen().clear_bit());
+            // SDLEVEL is only relevant under SMPS on H7
+            match vos {
+                Vos::VOS0 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b00) }),
+                Vos::VOS1 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b01) }),
+                Vos::VOS2 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b10) }),
+                Vos::VOS3 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b11) }),
+            }
+        }
+        Supply::LDO => {
+            dp.PWR.cr3.modify(|_, w| w.ldoen().set_bit().sden().clear_bit());
+        }
+    }
+    // Program VOS in D3CR using raw bits (VOS[15:14]). PACs differ on typed accessors.
+    let vos_bits: u32 = match vos {
+        Vos::VOS0 => 0b11,
+        Vos::VOS1 => 0b10,
+        Vos::VOS2 => 0b01,
+        Vos::VOS3 => 0b00,
+    };
+    dp.PWR.d3cr.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << 14);
+        bits |= vos_bits << 14;
+        w.bits(bits)
+    });
+    // And active VOS achieved
+    while dp.PWR.csr1.read().actvosrdy().bit_is_clear() {}
+    // Lock supply/VOS configuration updates (optional hardening)
+    dp.PWR.cr3.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    {%- else %}
+    // TODO: Power init for non-H7 families
+    let _ = (supply, vos);
+    {%- endif %}
+}
+
+{% if init_by is defined and this_core is defined and this_core == init_by %}
+/// Configure system clocks from CubeMX `.ioc` settings (CM7 owner).
+pub fn init_clocks(dp: &pac::Peripherals) {
+    // Parsed from .ioc (raw tokens): SYSCLK={{ spec.clocks.sys_src | default("unknown") }}, PLLSRC={{ spec.clocks.pll_src | default("unknown") }}
+    // Prescalers: D1CPU={{ spec.clocks.d1cpu | default("-") }}, D1PPRE={{ spec.clocks.d1ppre | default("-") }}, D2PPRE1={{ spec.clocks.d2ppre1 | default("-") }}, D2PPRE2={{ spec.clocks.d2ppre2 | default("-") }}, D3PPRE={{ spec.clocks.d3ppre | default("-") }}
+    // HSE: {{ spec.clocks.hse_hz | default(0) }} Hz
+    bsp_log!("[bsp] SYS={} PLLSRC={} HSE={}Hz D1CPU={} D1PPRE={} D2PPRE1={} D2PPRE2={} D3PPRE={}\n",
+        "{{ spec.clocks.sys_src | default("unknown") }}",
+        "{{ spec.clocks.pll_src | default("unknown") }}",
+        {{ spec.clocks.hse_hz | default(0) }},
+        "{{ spec.clocks.d1cpu | default("-") }}",
+        "{{ spec.clocks.d1ppre | default("-") }}",
+        "{{ spec.clocks.d2ppre1 | default("-") }}",
+        "{{ spec.clocks.d2ppre2 | default("-") }}",
+        "{{ spec.clocks.d3ppre | default("-") }}",
+    );
+    {% if spec.clocks.sys_src and spec.clocks.sys_src | upper in ["HSI","HSE"] %}
+    // Handle simple SYSCLK sources without PLL
+    {% if spec.clocks.sys_src | upper == "HSE" %}
+    // Enable HSE and wait ready
+    dp.RCC.cr.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 16)) }); // HSEON
+    while dp.RCC.cr.read().bits() & (1 << 17) == 0 {} // HSERDY
+    // Switch SYSCLK to HSE (CFGR.SW = 0b10)
+    dp.RCC.cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0b11)) | (0b10)) });
+    {% else %}
+    // HSI is enabled by default after reset; ensure it remains on and select it (SW=0b00)
+    dp.RCC.cfgr.modify(|r, w| unsafe { w.bits(r.bits() & !(0b11)) });
+    {% endif %}
+    // NOTE: Prescalers are left at reset defaults (no division). Add mappings as needed.
+    {% else %}
+    // Attempt PLL1 system clock configuration for STM32H7 using parsed `.ioc` values.
+    // This sequence follows the reference manual at a high level and may need
+    // refinement per sub-family. Values are encoded per H7 PAC layout.
+    // Preconditions: Voltage scaling and supply have been set in init_power().
+    // 1) Ensure PLL1 is off
+    dp.RCC.cr.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 24)) }); // PLL1ON=0
+    while dp.RCC.cr.read().bits() & (1 << 25) != 0 {} // wait PLL1RDY=0
+    // 2) Select PLL source and DIVM1
+    // PLLSRC: 00=HSI, 01=CSI, 10=HSE
+    let pllsrc_bits: u32 = match {{ spec.clocks.pll_src | default("HSI") | upper }} {
+        "HSE" | "RCC_PLLSOURCE_HSE" => 0b10,
+        "CSI" | "RCC_PLLSOURCE_CSI" => 0b01,
+        _ => 0b00,
+    };
+    // DIVM1 from `.ioc` PLL1
+    let divm1: u32 = {{ (spec.clocks.pll["pll1"].m | default(1)) }} as u32 & 0x3F;
+    // PLLCKSELR: set PLLSRC and DIVM1; keep other DIVM at reset
+    dp.RCC.pllckselr.modify(|_, w| unsafe { w.bits((pllsrc_bits & 0b11) | (divm1 << 4)) });
+    // 3) Program PLL1DIVR (minus-one encoding)
+    let n1: u32 = ({{ (spec.clocks.pll["pll1"].n | default(8)) }} as u32).saturating_sub(1) & 0x1FF;
+    let p1: u32 = ({{ (spec.clocks.pll["pll1"].p | default(2)) }} as u32).saturating_sub(1) & 0x7F;
+    let q1: u32 = ({{ (spec.clocks.pll["pll1"].q | default(2)) }} as u32).saturating_sub(1) & 0x7F;
+    let r1: u32 = ({{ (spec.clocks.pll["pll1"].r | default(2)) }} as u32).saturating_sub(1) & 0x7F;
+    let pll1divr: u32 = (n1 << 0) | (p1 << 9) | (q1 << 16) | (r1 << 24);
+    dp.RCC.pll1divr.write(|w| unsafe { w.bits(pll1divr) });
+    // 4) Enable PLL1 P/Q/R outputs as needed; here we enable P for SYSCLK
+    // DIVP1EN=1 (bit 16), others optional
+    dp.RCC.pllcfgr.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 16)) });
+    // 5) Enable PLL1 and wait ready
+    dp.RCC.cr.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 24)) }); // PLL1ON=1
+    while dp.RCC.cr.read().bits() & (1 << 25) == 0 {} // PLL1RDY
+    // 6) Switch SYSCLK to PLL1 (CFGR.SW=0b11) and wait SWS==0b11
+    dp.RCC.cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !0b11) | 0b11) });
+    while (dp.RCC.cfgr.read().bits() & (0b11 << 3)) != (0b11 << 3) {}
+    // 7) Apply CPU prescaler (D1CFGR.D1CPRE[3:0]) if specified
+    let d1cpre_bits: u32 = match "{{ spec.clocks.d1cpu | default("") }}" {
+        "RCC_D1CPRE_DIV1" | "RCC_SYSCLK_NOT_DIV1" | "RCC_HCLK_DIV1" => 0b0000,
+        "RCC_D1CPRE_DIV2" | "RCC_HCLK_DIV2" => 0b1000,
+        "RCC_D1CPRE_DIV4" | "RCC_HCLK_DIV4" => 0b1001,
+        "RCC_D1CPRE_DIV8" | "RCC_HCLK_DIV8" => 0b1010,
+        "RCC_D1CPRE_DIV16"| "RCC_HCLK_DIV16"=> 0b1011,
+        "RCC_D1CPRE_DIV64"| "RCC_HCLK_DIV64"=> 0b1100,
+        "RCC_D1CPRE_DIV128"|"RCC_HCLK_DIV128"=>0b1101,
+        "RCC_D1CPRE_DIV256"|"RCC_HCLK_DIV256"=>0b1110,
+        "RCC_D1CPRE_DIV512"|"RCC_HCLK_DIV512"=>0b1111,
+        _ => 0b0000,
+    };
+    dp.RCC.d1cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !0xF) | d1cpre_bits) });
+
+    // 8) Apply APB prescalers if specified
+    // D1PPRE (APB3) at D1CFGR[10:8]
+    let d1ppre_bits: u32 = match "{{ spec.clocks.d1ppre | default("") }}" {
+        "RCC_APB3_DIV1" | "RCC_D1PPRE_DIV1" | "RCC_HCLK_DIV1" => 0b000,
+        "RCC_APB3_DIV2" | "RCC_D1PPRE_DIV2" | "RCC_HCLK_DIV2" => 0b100,
+        "RCC_APB3_DIV4" | "RCC_D1PPRE_DIV4" | "RCC_HCLK_DIV4" => 0b101,
+        "RCC_APB3_DIV8" | "RCC_D1PPRE_DIV8" | "RCC_HCLK_DIV8" => 0b110,
+        "RCC_APB3_DIV16"| "RCC_D1PPRE_DIV16"| "RCC_HCLK_DIV16"=> 0b111,
+        _ => 0b000,
+    };
+    dp.RCC.d1cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0x7 << 8)) | (d1ppre_bits << 8)) });
+    // D2PPRE1 (APB1) at D2CFGR[10:8]
+    let d2ppre1_bits: u32 = match "{{ spec.clocks.d2ppre1 | default("") }}" {
+        "RCC_APB1_DIV1" | "RCC_D2PPRE1_DIV1" | "RCC_HCLK_DIV1" => 0b000,
+        "RCC_APB1_DIV2" | "RCC_D2PPRE1_DIV2" | "RCC_HCLK_DIV2" => 0b100,
+        "RCC_APB1_DIV4" | "RCC_D2PPRE1_DIV4" | "RCC_HCLK_DIV4" => 0b101,
+        "RCC_APB1_DIV8" | "RCC_D2PPRE1_DIV8" | "RCC_HCLK_DIV8" => 0b110,
+        "RCC_APB1_DIV16"| "RCC_D2PPRE1_DIV16"| "RCC_HCLK_DIV16"=> 0b111,
+        _ => 0b000,
+    };
+    dp.RCC.d2cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0x7 << 8)) | (d2ppre1_bits << 8)) });
+    // D2PPRE2 (APB2) at D2CFGR[13:11]
+    let d2ppre2_bits: u32 = match "{{ spec.clocks.d2ppre2 | default("") }}" {
+        "RCC_APB2_DIV1" | "RCC_D2PPRE2_DIV1" | "RCC_HCLK_DIV1" => 0b000,
+        "RCC_APB2_DIV2" | "RCC_D2PPRE2_DIV2" | "RCC_HCLK_DIV2" => 0b100,
+        "RCC_APB2_DIV4" | "RCC_D2PPRE2_DIV4" | "RCC_HCLK_DIV4" => 0b101,
+        "RCC_APB2_DIV8" | "RCC_D2PPRE2_DIV8" | "RCC_HCLK_DIV8" => 0b110,
+        "RCC_APB2_DIV16"| "RCC_D2PPRE2_DIV16"| "RCC_HCLK_DIV16"=> 0b111,
+        _ => 0b000,
+    };
+    dp.RCC.d2cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0x7 << 11)) | (d2ppre2_bits << 11)) });
+    // D3PPRE (APB4) at D3CFGR[10:8]
+    let d3ppre_bits: u32 = match "{{ spec.clocks.d3ppre | default("") }}" {
+        "RCC_APB4_DIV1" | "RCC_D3PPRE_DIV1" | "RCC_HCLK_DIV1" => 0b000,
+        "RCC_APB4_DIV2" | "RCC_D3PPRE_DIV2" | "RCC_HCLK_DIV2" => 0b100,
+        "RCC_APB4_DIV4" | "RCC_D3PPRE_DIV4" | "RCC_HCLK_DIV4" => 0b101,
+        "RCC_APB4_DIV8" | "RCC_D3PPRE_DIV8" | "RCC_HCLK_DIV8" => 0b110,
+        "RCC_APB4_DIV16"| "RCC_D3PPRE_DIV16"| "RCC_HCLK_DIV16"=> 0b111,
+        _ => 0b000,
+    };
+    dp.RCC.d3cfgr.modify(|r, w| unsafe { w.bits((r.bits() & !(0x7 << 8)) | (d3ppre_bits << 8)) });
+    {% endif %}
+}
+{% endif %}
+
 {% if spec.pinctrl|length %}
 {% if meta is defined %}
 /// Configures pins for {{ meta.board }} using PAC registers.
@@ -163,24 +401,41 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
         {%- endfor -%}
         w.bits(bits)
     });
+    {# Only emit AFRL/AFRH writes when there are pins in the half #}
+    {% set have_low = namespace(v=false) %}
+    {% for pin in spec.pinctrl %}
+        {% if pin.pin[1] == p and idx(pin) < 8 %}{% set have_low.v = true %}{% endif %}
+    {% endfor %}
+    {% if have_low.v %}
     dp.GPIO{{ p }}.afrl.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p and idx(pin) < 8 -%}
+        {%- for pin in spec.pinctrl -%}
+            {%- if pin.pin[1] == p and idx(pin) < 8 -%}
         let afr_shift = {{ idx(pin) }} * 4;
         bits &= !(0xF << afr_shift);
         bits |= ({{ pin.af }}u32 & 0xF) << afr_shift;
+            {%- endif -%}
         {%- endfor -%}
         w.bits(bits)
     });
+    {% endif %}
+    {% set have_high = namespace(v=false) %}
+    {% for pin in spec.pinctrl %}
+        {% if pin.pin[1] == p and idx(pin) >= 8 %}{% set have_high.v = true %}{% endif %}
+    {% endfor %}
+    {% if have_high.v %}
     dp.GPIO{{ p }}.afrh.modify(|r, w| unsafe {
         let mut bits = r.bits();
-        {%- for pin in spec.pinctrl if pin.pin[1] == p and idx(pin) >= 8 -%}
+        {%- for pin in spec.pinctrl -%}
+            {%- if pin.pin[1] == p and idx(pin) >= 8 -%}
         let afr_shift = ({{ idx(pin) }} % 8) * 4;
         bits &= !(0xF << afr_shift);
         bits |= ({{ pin.af }}u32 & 0xF) << afr_shift;
+            {%- endif -%}
         {%- endfor -%}
         w.bits(bits)
     });
+    {% endif %}
     dp.GPIO{{ p }}.moder.modify(|r, w| unsafe {
         let mut bits = r.bits();
         {%- for pin in spec.pinctrl if pin.pin[1] == p -%}
@@ -454,6 +709,7 @@ pub fn deinit_board_pac(dp: &pac::Peripherals) {
 /// Initializes the board using PAC register access.
 {% endif %}
 pub fn init_board_pac(dp: pac::Peripherals) {
+    init_power(&dp);
     enable_gpio_clocks(&dp);
     configure_pins_pac(&dp);
     enable_peripherals(&dp);
@@ -469,8 +725,12 @@ pub struct PinLabel { pub pin: &'static str, pub func: &'static str, pub af: u8 
 /// Constants for user labels to ease discovery and mapping.
 pub mod pins {
     use super::PinLabel;
-  {% for pin in spec.pinctrl if pin.label and idents[pin.pin] is defined %}
-    pub const {{ idents[pin.pin] | upper }}: PinLabel = PinLabel { pin: "{{ pin.pin }}", func: "{{ pin.func }}", af: {{ pin.af }} };
-    {% endfor %}
+  {# De-duplicate by physical pin: emit first entry for each pin having a label #}
+  {% for group in spec.pinctrl | groupby("pin") %}
+    {% set first = group.list[0] %}
+    {% if first.label and idents[first.pin] is defined %}
+    pub const {{ idents[first.pin] | upper }}: PinLabel = PinLabel { pin: "{{ first.pin }}", func: "{{ first.func }}", af: {{ first.af }} };
+    {% endif %}
+  {% endfor %}
 }
 {% endif %}

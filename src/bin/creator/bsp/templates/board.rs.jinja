@@ -1,0 +1,19 @@
+// Board power defaults (user-editable)
+//
+// Users may change these defaults to match custom boards. If the CubeMX .ioc
+// provides explicit power settings, the generated PAC/HAL init will honor those
+// and these defaults are ignored.
+
+/// Supply mode for the PWR block.
+#[derive(Copy, Clone)]
+pub enum Supply { SMPS, LDO }
+
+/// Voltage scaling level (SDLEVEL/VOS).
+#[derive(Copy, Clone)]
+pub enum Vos { VOS0, VOS1, VOS2, VOS3 }
+
+/// User default: board reality on STM32H747I-DISCO is SMPS.
+pub const DEFAULT_PWR_SUPPLY: Supply = Supply::SMPS;
+/// User default: VOS1 is appropriate for high clocks on STM32H7.
+pub const DEFAULT_VOS: Vos = Vos::VOS1;
+

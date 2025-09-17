@@ -19,6 +19,7 @@ See crate overviews for:
 ## Guides
 - [CREATOR-CLI.md](./CREATOR-CLI.md) – Command-line reference and workflows for rlvgl-creator.
 - [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) – MiniJinja template guidelines for BSP generation.
+- [STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) – STM32 BSP generation behavior, flags, and roadmap.
 - [CUSTOM-SIMULATOR.md](./CUSTOM-SIMULATOR.md) – Notes on building a custom simulator backend.
 - [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) – Details for the STM32H747I-DISCO board.
 - [CROSS-TESTING.md](./CROSS-TESTING.md) – Cross-target test linker requirements.

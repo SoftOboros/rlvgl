@@ -21,7 +21,15 @@ pub const CLOCKS_INIT_BY: &str = "cm7";
 
 /// Secondary core helper: wait for system clocks initialized by the primary core.
 pub fn wait_for_clocks() {
-    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+    // Mailbox: 1K reserved in D2 SRAM3 at 0x3004_7000..0x3004_73FF
+    const MAILBOX_BASE: u32 = 0x3004_7000;
+    // Semaphore at offset 0
+    let flag = (MAILBOX_BASE + 0) as *const core::sync::atomic::AtomicU32;
+    // Safety: fixed shared address in D2 SRAM
+    let f = unsafe { &*flag };
+    while f.load(core::sync::atomic::Ordering::Acquire) == 0 {
+        cortex_m::asm::wfe();
+    }
 }
 
 
@@ -382,7 +390,16 @@ pub fn wait_for_clocks() {
         
     
 
-use stm32h7::stm32h747cm7 as pac;
+use stm32h7::stm32h747cm4 as pac;
+// Optional lightweight logging hook. Enable with `--features bsp_log` and
+// override `_bsp_log` in your binary to route output.
+#[cfg(feature = "bsp_log")]
+#[allow(unused)]
+fn _bsp_log(_args: core::fmt::Arguments) { /* user-defined sink */ }
+#[cfg(feature = "bsp_log")]
+macro_rules! bsp_log { ($($arg:tt)*) => { _bsp_log(format_args!($($arg)*)); } }
+#[cfg(not(feature = "bsp_log"))]
+macro_rules! bsp_log { ($($arg:tt)*) => { let _ = ($(& $arg),*); } }
 
 
 mod board {
@@ -476,6 +493,8 @@ pub fn init_power(dp: &pac::Peripherals) {
     // Lock supply/VOS configuration updates (optional hardening)
     dp.PWR.cr3.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
 }
+
+
 
 
 

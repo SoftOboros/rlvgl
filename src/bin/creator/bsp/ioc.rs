@@ -5,7 +5,7 @@
 //! function numbers are supplied by an [`AfProvider`].
 
 use crate::af::AfProvider;
-use crate::ir::{Clocks, Core, Ir, Peripheral, Pin, Pll};
+use crate::ir::{Clocks, Core, Ir, Peripheral, Pin, Pll, Power};
 use anyhow::{Result, anyhow};
 use indexmap::IndexMap;
 use indexmap::IndexMap as HashMap;
@@ -65,29 +65,78 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
 
     let mut pll_map: IndexMap<String, Pll> = IndexMap::new();
     for idx in 1..=3 {
-        let m = kv.get(&format!("RCC.PLL{}M", idx));
-        let n = kv.get(&format!("RCC.PLL{}N", idx));
-        let p = kv.get(&format!("RCC.PLL{}P", idx));
-        let q = kv.get(&format!("RCC.PLL{}Q", idx));
-        let r = kv.get(&format!("RCC.PLL{}R", idx));
-        if let (Some(m), Some(n), Some(p), Some(q), Some(r)) = (m, n, p, q, r) {
+        // Prefer explicit PLLxM/N/P/Q/R keys when present
+        let m = kv
+            .get(&format!("RCC.PLL{}M", idx))
+            .or_else(|| kv.get(&format!("RCC.DIVM{}", idx)));
+        let n = kv
+            .get(&format!("RCC.PLL{}N", idx))
+            .or_else(|| kv.get(&format!("RCC.DIVN{}", idx)));
+        let p = kv
+            .get(&format!("RCC.PLL{}P", idx))
+            .or_else(|| kv.get(&format!("RCC.DIVP{}", idx)));
+        let q = kv
+            .get(&format!("RCC.PLL{}Q", idx))
+            .or_else(|| kv.get(&format!("RCC.DIVQ{}", idx)));
+        let r = kv
+            .get(&format!("RCC.PLL{}R", idx))
+            .or_else(|| kv.get(&format!("RCC.DIVR{}", idx)));
+        // Require at least M and N; fill P/Q/R with defaults if missing
+        if let (Some(m), Some(n)) = (m, n) {
+            let p = p.and_then(|v| v.parse().ok()).unwrap_or(2u8);
+            let q = q.and_then(|v| v.parse().ok()).unwrap_or(2u8);
+            let r = r.and_then(|v| v.parse().ok()).unwrap_or(2u8);
             pll_map.insert(
                 format!("pll{}", idx),
                 Pll {
                     m: m.parse()?,
                     n: n.parse()?,
-                    p: p.parse()?,
-                    q: q.parse()?,
-                    r: r.parse()?,
+                    p,
+                    q,
+                    r,
                 },
             );
         }
     }
 
+    // Power configuration
+    let mut pwr = Power::default();
+    if let Some(s) = kv.get("PWR.Supply").cloned().or_else(|| kv.get("RCC.SupplySource").cloned()) {
+        // Normalize common CubeMX encodings
+        let ss = s.to_uppercase();
+        let norm = if ss.contains("SMPS") { "SMPS" } else if ss.contains("LDO") { "LDO" } else { "" };
+        if !norm.is_empty() {
+            pwr.supply = Some(norm.to_string());
+        }
+    }
+    if let Some(sd) = kv.get("PWR.SDLEVEL").cloned() {
+        pwr.sdlevel = Some(sd.to_uppercase());
+    }
+
+    // Clocks/topology
+    let sys_src = kv.get("RCC.SYSCLKSource").cloned();
+    let pll_src = kv.get("RCC.PLLSource").cloned();
+    let hse_hz = kv
+        .get("RCC.HSE_VALUE")
+        .and_then(|v| v.parse::<u32>().ok());
+    let d1cpu = kv.get("RCC.D1CPUPrescaler").cloned();
+    let d1ppre = kv.get("RCC.D1PPRE").cloned();
+    let d2ppre1 = kv.get("RCC.D2PPRE1").cloned();
+    let d2ppre2 = kv.get("RCC.D2PPRE2").cloned();
+    let d3ppre = kv.get("RCC.D3PPRE").cloned();
+
     let clocks = Clocks {
         pll: pll_map,
         kernels,
         init_by: None,
+        sys_src,
+        pll_src,
+        hse_hz,
+        d1cpu,
+        d1ppre,
+        d2ppre1,
+        d2ppre2,
+        d3ppre,
     };
 
     if !allow_reserved {
@@ -104,9 +153,31 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
         clocks,
         pinctrl: pins,
         peripherals,
+        pwr,
     };
     infer_core_assignments(&kv, &mut ir);
     Ok(ir)
+}
+
+/// Return whether the `.ioc` enables CM7 and/or CM4 projects.
+pub fn detect_core_projects(text: &str) -> (bool, bool) {
+    let kv = parse_kv(text);
+    let mut cm7 = kv
+        .get("ProjectManager.CM7Project")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let mut cm4 = kv
+        .get("ProjectManager.CM4Project")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    // Fallback detection: presence of core-specific IP lists
+    if text.contains("CortexM7.IPs=") {
+        cm7 = true;
+    }
+    if text.contains("CortexM4.IPs=") {
+        cm4 = true;
+    }
+    (cm7, cm4)
 }
 
 fn parse_kv(s: &str) -> HashMap<String, String> {

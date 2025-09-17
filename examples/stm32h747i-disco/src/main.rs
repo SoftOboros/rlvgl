@@ -19,9 +19,23 @@ use panic_halt as _;
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
 
-#[path = "bsp/pac.rs"]
+// Use the split-core generated PAC BSP for CM7
+#[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
 // HAL BSP module is not required for this bring-up path
+
+// Optional: route BSP log messages to semihosting when enabled.
+#[cfg(feature = "bsp_log")]
+#[no_mangle]
+fn _bsp_log(args: core::fmt::Arguments) {
+    #[cfg(feature = "semihosting")]
+    {
+        use core::fmt::Write;
+        if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+            let _ = writeln!(out, "{}", args);
+        }
+    }
+}
 
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
@@ -170,8 +184,12 @@ fn main() -> ! {
             }
         }
         // Destructure PAC peripherals and switch to HAL for operation
-        // Destructure PAC peripherals and switch to HAL for operation
         let dp = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
+        // Apply CM7-only clock init generated from .ioc (if any)
+        #[allow(clippy::let_unit_value)]
+        {
+            let _ = bsp_pac::init_clocks(&dp);
+        }
         let stm32h7::stm32h747cm7::Peripherals {
             PWR,
             RCC,
@@ -194,6 +212,12 @@ fn main() -> ! {
         let rcc = RCC.constrain();
         let mut syscfg = SYSCFG;
         let ccdr = rcc.freeze(vos, &mut syscfg);
+        // Signal clocks ready to CM4 via shared mailbox flag
+        #[allow(clippy::let_unit_value)]
+        {
+            // Safe to call; function is a no-op in unified builds
+            let _ = bsp_pac::signal_clocks_ready();
+        }
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
         #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
         let gpioc = GPIOC.split(ccdr.peripheral.GPIOC);

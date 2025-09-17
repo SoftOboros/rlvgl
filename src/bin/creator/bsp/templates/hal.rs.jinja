@@ -25,12 +25,21 @@ pub const CLOCKS_INIT_BY: &str = "{{ init_by }}";
 {% if this_core != init_by %}
 /// Secondary core helper: wait for system clocks initialized by the primary core.
 pub fn wait_for_clocks() {
-    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+    const MAILBOX_BASE: u32 = 0x3004_7000;
+    let flag = (MAILBOX_BASE + 0) as *const core::sync::atomic::AtomicU32;
+    let f = unsafe { &*flag };
+    while f.load(core::sync::atomic::Ordering::Acquire) == 0 {
+        cortex_m::asm::wfe();
+    }
 }
 {% else %}
 /// Primary core helper: optionally signal clocks ready to the secondary core.
 pub fn signal_clocks_ready() {
-    // TODO: Implement HSEM/EXTI or shared-flag signal as needed.
+    const MAILBOX_BASE: u32 = 0x3004_7000;
+    let flag = (MAILBOX_BASE + 0) as *const core::sync::atomic::AtomicU32;
+    let f = unsafe { &*flag };
+    f.store(1, core::sync::atomic::Ordering::Release);
+    cortex_m::asm::sev();
 }
 {% endif %}
 {% endif %}
@@ -75,6 +84,25 @@ pub fn signal_clocks_ready() {
 use {{ hal_crate }}::{gpio::Speed, pac, prelude::*};
 {% if spec.mcu[0:7] == "STM32H7" %}
 use {{ hal_crate }}::rcc;
+{% endif %}
+
+{# Provide board defaults inline when not part of a parent module tree #}
+{% if mod_name is defined %}
+use super::board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
+{% else %}
+mod board {
+    /// Supply mode for the PWR block.
+    #[derive(Copy, Clone)]
+    pub enum Supply { SMPS, LDO }
+    /// Voltage scaling level (SDLEVEL/VOS).
+    #[derive(Copy, Clone)]
+    pub enum Vos { VOS0, VOS1, VOS2, VOS3 }
+    /// User default: SMPS is typical on STM32H747I-DISCO.
+    pub const DEFAULT_PWR_SUPPLY: Supply = Supply::SMPS;
+    /// User default: VOS1 is appropriate for high clocks on STM32H7.
+    pub const DEFAULT_VOS: Vos = Vos::VOS1;
+}
+use board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
 {% endif %}
 
 {% macro gpio_bus(family) -%}
@@ -125,6 +153,65 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     {% endfor %}
     {% endif %}
     {% endif %}
+}
+
+/// Configure power supply and voltage scaling (HAL path uses PAC for PWR).
+pub fn init_power(dp: &pac::Peripherals) {
+    // Resolve supply from .ioc or fallback default
+    let supply = {
+        {%- if spec.pwr and spec.pwr.supply is defined and spec.pwr.supply %}
+        // From .ioc: PWR.Supply = {{ spec.pwr.supply }}
+        Supply::{{ spec.pwr.supply | upper }}
+        {%- else %}
+        DEFAULT_PWR_SUPPLY
+        {%- endif %}
+    };
+    let vos = {
+        {%- if spec.pwr and spec.pwr.sdlevel is defined and spec.pwr.sdlevel %}
+        // From .ioc: PWR.SDLEVEL = {{ spec.pwr.sdlevel }}
+        Vos::{{ spec.pwr.sdlevel | upper }}
+        {%- else %}
+        DEFAULT_VOS
+        {%- endif %}
+    };
+
+    {%- if spec.mcu[0:7] == "STM32H7" %}
+    // Allow supply/VOS configuration updates (SCUEN gates changes on H7)
+    dp.PWR.cr3.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 2)) });
+    match supply {
+        Supply::SMPS => {
+            dp.PWR.cr3.modify(|_, w| w.sden().set_bit().ldoen().clear_bit());
+            // SDLEVEL is only relevant under SMPS on H7
+            match vos {
+                Vos::VOS0 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b00) }),
+                Vos::VOS1 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b01) }),
+                Vos::VOS2 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b10) }),
+                Vos::VOS3 => dp.PWR.cr3.modify(|_, w| unsafe { w.sdlevel().bits(0b11) }),
+            }
+        }
+        Supply::LDO => {
+            dp.PWR.cr3.modify(|_, w| w.ldoen().set_bit().sden().clear_bit());
+        }
+    }
+    // Program VOS in D3CR using raw bits (VOS[15:14])
+    let vos_bits: u32 = match vos {
+        Vos::VOS0 => 0b11,
+        Vos::VOS1 => 0b10,
+        Vos::VOS2 => 0b01,
+        Vos::VOS3 => 0b00,
+    };
+    dp.PWR.d3cr.modify(|r, w| unsafe {
+        let mut bits = r.bits() & !(0b11 << 14);
+        bits |= vos_bits << 14;
+        w.bits(bits)
+    });
+    // Wait for active VOS achieved
+    while dp.PWR.csr1.read().actvosrdy().bit_is_clear() {}
+    // Lock supply/VOS configuration updates (optional hardening)
+    dp.PWR.cr3.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+    {%- else %}
+    let _ = (supply, vos);
+    {%- endif %}
 }
 
 {% if spec.pinctrl|length %}
@@ -366,6 +453,8 @@ pub fn deinit_board_hal(dp: &pac::Peripherals) {
 /// Initializes the board using HAL drivers and returns GPIO parts.
 {% endif %}
 pub fn init_board_hal(dp: pac::Peripherals{% if spec.mcu[0:7] == "STM32H7" %}, ccdr: &rcc::Ccdr{% endif %} /*, clocks */) -> GpioParts {
+    // Ensure PWR supply/VOS is configured before HAL clock-dependent init
+    init_power(&dp);
     enable_gpio_clocks(&dp);
     enable_peripherals(&dp);
     configure_pins_hal(dp{% if spec.mcu[0:7] == "STM32H7" %}, ccdr{% endif %})

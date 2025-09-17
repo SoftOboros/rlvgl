@@ -1,3 +1,6 @@
 # .cargo/config.toml
 [target.thumbv7em-none-eabihf]
-rustflags = ["-C", "link-arg=-T${RLVGL_LINKER_SCRIPT}"]
+# Use the example-local build.rs to stage and pass the linker script.
+# Avoid injecting an unspecified linker script via env here, as it can
+# override cortex-m-rt's link.x and break the vector table/entry point.
+rustflags = []

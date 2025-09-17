@@ -5,6 +5,7 @@
 //! embedded in `rlvgl-chips-stm`.
 
 use std::fs;
+use std::env;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
@@ -62,6 +63,7 @@ pub(crate) fn from_ioc(
     let mcu = detect_mcu(&text)?;
     let vendor = load_mcu_af(&mcu)?;
     let mut ir = ioc::ioc_to_ir(&text, &vendor, allow_reserved)?;
+    apply_env_overrides(&mut ir);
     if let Some(c) = init_by {
         ir.clocks.init_by = Some(c);
     }
@@ -207,6 +209,7 @@ pub(crate) fn render_from_ir(
                 clocks: spec.clocks.clone(),
                 pinctrl: pins,
                 peripherals: periph_filtered,
+                pwr: ir::Power::default(),
             }
         } else {
             spec.clone()
@@ -249,6 +252,7 @@ pub(crate) fn render_from_ir(
                     clocks: ir.clocks.clone(),
                     pinctrl: pins,
                     peripherals: IndexMap::new(),
+                    pwr: ir.pwr.clone(),
                 };
                 sub.peripherals.insert(name.clone(), per.clone());
                 let rendered = env.get_template("gen")?.render(context! {
@@ -275,6 +279,27 @@ pub(crate) fn render_from_ir(
         }
     }
     Ok(())
+}
+
+/// Apply environment variable overrides for STM32 BSP context.
+///
+/// Maps STM32_SECTION_KEY env vars to known IR fields. Currently supports:
+/// - `STM32_PWR_SUPPLY` → `ir.pwr.supply` ("SMPS"/"LDO")
+/// - `STM32_PWR_SDLEVEL` → `ir.pwr.sdlevel` ("VOS0".."VOS3")
+pub(crate) fn apply_env_overrides(ir: &mut ir::Ir) {
+    if let Ok(s) = env::var("STM32_PWR_SUPPLY") {
+        let v = s.trim().to_ascii_uppercase();
+        if v == "SMPS" || v == "LDO" {
+            ir.pwr.supply = Some(v);
+        }
+    }
+    if let Ok(s) = env::var("STM32_PWR_SDLEVEL") {
+        let v = s.trim().to_ascii_uppercase();
+        match v.as_str() {
+            "VOS0" | "VOS1" | "VOS2" | "VOS3" => ir.pwr.sdlevel = Some(v),
+            _ => {}
+        }
+    }
 }
 
 fn detect_mcu(text: &str) -> Result<String> {
@@ -427,6 +452,7 @@ mod tests {
                 af: 7,
             }],
             peripherals: indexmap::IndexMap::new(),
+            pwr: ir::Power::default(),
         };
 
         let rendered = env
@@ -454,6 +480,7 @@ mod tests {
                 af: 7,
             }],
             peripherals: indexmap::IndexMap::new(),
+            pwr: ir::Power::default(),
         };
         let mut idents = indexmap::IndexMap::new();
         idents.insert("PA9".to_string(), "stlink_rx".to_string());
@@ -483,6 +510,7 @@ mod tests {
                 af: 0,
             }],
             peripherals: indexmap::IndexMap::new(),
+            pwr: ir::Power::default(),
         };
         let mut idents = indexmap::IndexMap::new();
         idents.insert("PA9".to_string(), "stlink_rx".to_string());
@@ -513,6 +541,12 @@ pub(crate) fn emit_board_mod(
         pinreport => has_pinreport
     })?;
     fs::write(out_dir.join("mod.rs"), rendered)?;
+    // Also emit a user-editable board.rs with defaults if missing.
+    let board_rs = out_dir.join("board.rs");
+    if !board_rs.exists() {
+        let tmpl = include_str!("bsp/templates/board.rs.jinja");
+        fs::write(board_rs, tmpl)?;
+    }
     Ok(())
 }
 fn sanitize_ident(label: &str, prefix: Option<&str>) -> String {

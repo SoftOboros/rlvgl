@@ -138,6 +138,7 @@ pub fn extract_from_c_sources(files: &[PathBuf], opts: ExtractOptions) -> Result
         clocks,
         pinctrl: pins,
         peripherals,
+        pwr: ir::Power::default(),
     })
 }
 

@@ -4,7 +4,7 @@ set -ea pipeline
 
 # Optional name suffix; default to "0"
 NAME_SUFFIX="${1:-0}"
-NAME="rlvgl-builder_${NAME_SUFFIX}"
+NAME="rlvgl-builder"
 
 docker exec \
   -it \

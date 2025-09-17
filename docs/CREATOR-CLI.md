@@ -187,6 +187,10 @@ rlvgl-creator bsp from-ioc <ioc> [--emit-hal] [--emit-pac] [--template <template
   Covers controllers across F0, F1, F2, F3, F4, F7, H5, H7, L0, L1, L4,
   L5, G0, G4, U5, WB, and WL variants.
 
+See also: STM32 BSP generation behavior, flags, and roadmap in
+[STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) — includes dual-core split,
+power (SCUEN/VOS), and clock (PLL1/prescalers) details.
+
 #### Advanced configuration examples
 
 Generate HAL and PAC BSPs with grouped RCC writes, per-peripheral layout, and deinit hooks:

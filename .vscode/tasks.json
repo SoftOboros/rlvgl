@@ -30,7 +30,7 @@
         "size",
         "--target", "thumbv7em-none-eabihf",
         "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco"
+        "--features", "stm32h747i_disco", "smps"
       ],
       "group": "build",
       "problemMatcher": []

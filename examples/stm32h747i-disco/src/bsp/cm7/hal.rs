@@ -19,9 +19,13 @@
 pub const CLOCKS_INIT_BY: &str = "cm7";
 
 
-/// Secondary core helper: wait for system clocks initialized by the primary core.
-pub fn wait_for_clocks() {
-    // TODO: Implement HSEM/EXTI or shared-flag wait as needed.
+/// Primary core helper: optionally signal clocks ready to the secondary core.
+pub fn signal_clocks_ready() {
+    const MAILBOX_BASE: u32 = 0x3004_7000;
+    let flag = (MAILBOX_BASE + 0) as *const core::sync::atomic::AtomicU32;
+    let f = unsafe { &*flag };
+    f.store(1, core::sync::atomic::Ordering::Release);
+    cortex_m::asm::sev();
 }
 
 

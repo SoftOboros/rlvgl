@@ -37,6 +37,11 @@ path = "examples/stm32h747i-disco/src/main.rs"
 required-features = ["stm32h747i_disco"]
 
 [[bin]]
+name = "rlvgl-stm32h747i-disco-cm4"
+path = "examples/stm32h747i-disco/src/cm4_main.rs"
+required-features = ["stm32h747i_disco"]
+
+[[bin]]
 name = "rlvgl-creator"
 path = "src/bin/rlvgl_creator/main.rs"
 required-features = ["creator"]
@@ -48,7 +53,7 @@ rlvgl-platform = { version = "0.1.6", path = "platform", default-features = fals
 rlvgl-ui = { version = "0.1.2", path = "ui", default-features = false }
 embedded-hal = { version = "1.0", optional = true }
 embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", optional = true }
-stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
+stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "stm32h747cm4", "rt"] }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -349,6 +354,8 @@ creator_ui = [
     "dep:rlvgl-chips-ti",
     "dep:rlvgl-chips-rp2040",
 ]
+bsp_log = []
+semihosting = ["dep:cortex-m-semihosting"]
 backlight_pwm = []
 fatfs_nostd = ["rlvgl-platform/fatfs_nostd"]
 sd_assets_demo = []
@@ -380,5 +387,8 @@ members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", 
 version = "0.16"
 optional = true
 features = ["stm32h747cm7", "sdmmc"]
+[dependencies.cortex-m-semihosting]
+version = "0.5"
+optional = true
 
 resolver = "2"

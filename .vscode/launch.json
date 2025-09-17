@@ -2,93 +2,41 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "ST MCU",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "tools/afdb/stm32_xml_scraper.py",
-      "console": "integratedTerminal",
-      "args": ["--root", "chips/stm/STM32_open_pin_data", "--output", "chips/stm/mcu.json"],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "Debug sim",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/target/x86_64-apple-darwin/debug/rlvgl-sim",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "cargo": {
-        "args": [
-          "build",
-          "--bin=rlvgl-sim",
-          "--features=simulator,fontdue,qrcode,png,jpeg",
-          "--target=x86_64-apple-darwin"
-        ]
-      },
-      "sourceLanguages": [
-        "rust"
-      ]
-    },
-    {
-      "name": "Debug Creator",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/target/x86_64-apple-darwin/debug/rlvgl-creator",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "cargo": {
-        "args": [
-          "build",
-          "--bin=rlvgl-creator",
-          "--features=creator,creator_ui",
-          "--target=x86_64-apple-darwin"
-        ]
-      },
-      "sourceLanguages": [
-        "rust"
-      ]
-    },
-    {
-      "name": "DISCO",
+      "name": "CM7: rlvgl-stm32h747i-disco",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "openocd",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
-      "device": "STM32H747XI",
-      "interface": "swd",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/stm32h747.svd",
+      "device": "STM32H747",
+      "runToEntryPoint": "Reset",
       "configFiles": [
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
-      "searchDir": [
-        "/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts"
-      ],
-      "toolchainPrefix": "arm-none-eabi-",
-      "runToEntryPoint": "main",
-      "preLaunchTask": "Build: rlvgl-stm32h747i-disco",
-      "preLaunchCommands": [
-        "monitor reset init",
-        "load",
-        "monitor reset init"
-      ],
-      "showDevDebugOutput": "raw"
+      "postLaunchCommands": [
+        "monitor reset halt"
+      ]
     },
     {
-      "name": "DISCO (Attach ext OpenOCD)",
+      "name": "CM4: rlvgl-stm32h747i-disco-cm4",
       "type": "cortex-debug",
       "request": "launch",
-      "servertype": "external",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
-      "gdbTarget": "localhost:3333",
-      "toolchainPrefix": "arm-none-eabi-",
-      "runToEntryPoint": "main",
-      "preLaunchTask": "Build: rlvgl-stm32h747i-disco",
-      "preLaunchCommands": [
-        "monitor reset halt"
+      "servertype": "openocd",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco-cm4",
+      "svdFile": "${workspaceRoot}/.svd/stm32h747.svd",
+      "device": "STM32H747",
+      "runToEntryPoint": "Reset",
+      "configFiles": [
+        "interface/stlink.cfg",
+        "target/stm32h7x.cfg"
       ],
-      "showDevDebugOutput": "raw"
+      "postLaunchCommands": [
+        "monitor reset halt"
+      ]
     }
   ]
 }
+
