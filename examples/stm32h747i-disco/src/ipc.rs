@@ -1,7 +1,7 @@
 //! Simple cross-core mailbox (CM4 -> CM7) using a fixed location in D2 SRAM3.
 //! This is deliberately tiny and blocking for bring-up.
 
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::sync::atomic::{Ordering, compiler_fence};
 
 // Mailbox base in D2 SRAM3 (declared in memory scripts): 0x3004_7000
 const MAILBOX_BASE: usize = 0x3004_7000;
@@ -24,7 +24,12 @@ pub struct CommandRaw {
 
 impl Default for CommandRaw {
     fn default() -> Self {
-        Self { kind: 0, a: 0, b: 0, c: 0 }
+        Self {
+            kind: 0,
+            a: 0,
+            b: 0,
+            c: 0,
+        }
     }
 }
 
@@ -50,7 +55,9 @@ pub fn init() {
 pub fn try_push(cmd: CommandRaw) -> bool {
     let m = mb();
     // single-slot: if write != read, consumer hasn't drained
-    if m.write != m.read { return false; }
+    if m.write != m.read {
+        return false;
+    }
     compiler_fence(Ordering::SeqCst);
     m.cmd = cmd;
     // publish
@@ -61,7 +68,9 @@ pub fn try_push(cmd: CommandRaw) -> bool {
 
 pub fn pop() -> Option<CommandRaw> {
     let m = mb();
-    if m.write == m.read { return None; }
+    if m.write == m.read {
+        return None;
+    }
     compiler_fence(Ordering::SeqCst);
     let cmd = m.cmd;
     m.read = m.write;
@@ -70,6 +79,10 @@ pub fn pop() -> Option<CommandRaw> {
 }
 
 pub fn cmd_set_backlight(duty: u16) -> CommandRaw {
-    CommandRaw { kind: CmdKind::SetBacklight as u32, a: duty as u32, b: 0, c: 0 }
+    CommandRaw {
+        kind: CmdKind::SetBacklight as u32,
+        a: duty as u32,
+        b: 0,
+        c: 0,
+    }
 }
-

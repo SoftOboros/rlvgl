@@ -4,8 +4,8 @@
 //! Alternate-function numbers are resolved from the canonical STM32 database
 //! embedded in `rlvgl-chips-stm`.
 
-use std::fs;
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};

@@ -21,11 +21,18 @@ use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 use embedded_hal::{digital::OutputPin, pwm::SetDutyCycle};
 use rlvgl_core::event::Event;
 use rlvgl_core::widget::{Color, Rect};
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+use stm32h7::stm32h747cm7::DMA2D;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-use stm32h7::stm32h747cm7::{DSIHOST, FMC, LTDC};
+use stm32h7::stm32h747cm7::{DSIHOST, LTDC};
+// SCB no longer needed after MPU WT change; remove import
+#[cfg(feature = "semihosting")]
+use core::fmt::Write as _;
+#[cfg(feature = "semihosting")]
+use cortex_m_semihosting::hio;
 
 // Simple SDRAM bump allocator for framebuffer and large blocks.
 // Not thread-safe; intended for early boot allocations only.
@@ -47,7 +54,7 @@ mod sdram_alloc {
     }
 
     pub fn alloc(size: usize, align: usize) -> Option<u32> {
-        let mut cur = CUR.load(Ordering::Relaxed);
+        let cur = CUR.load(Ordering::Relaxed);
         let align_m1 = (align as u32).wrapping_sub(1);
         let aligned = (cur.wrapping_add(align_m1)) & !align_m1;
         let new_cur = aligned.wrapping_add(size as u32);
@@ -56,6 +63,10 @@ mod sdram_alloc {
         }
         CUR.store(new_cur, Ordering::Relaxed);
         Some(aligned)
+    }
+
+    pub fn alloc_bytes(size: usize, align: usize) -> Option<*mut u8> {
+        alloc(size, align).map(|addr| addr as *mut u8)
     }
 }
 
@@ -94,6 +105,10 @@ pub struct Stm32h747iDiscoDisplay<B: Blitter, BL = (), RST = ()> {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     dsi: DSIHOST,
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    dma2d: Option<DMA2D>,
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    staging_pool: [StagingBuf; 3],
     #[cfg(all(
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
@@ -101,7 +116,62 @@ pub struct Stm32h747iDiscoDisplay<B: Blitter, BL = (), RST = ()> {
     fb_addr_back: u32,
 }
 
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+#[derive(Copy, Clone)]
+struct StagingBuf {
+    ptr: *mut u8,
+    cap: usize,
+    in_use: bool,
+}
+
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+impl StagingBuf {
+    const EMPTY: StagingBuf = StagingBuf {
+        ptr: core::ptr::null_mut(),
+        cap: 0,
+        in_use: false,
+    };
+}
+
 impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
+    /// Reset DMA2D staging pool (mark all buffers free) for a new frame.
+    pub fn reset_staging_pool(&mut self) {
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        {
+            for buf in &mut self.staging_pool {
+                buf.in_use = false;
+            }
+        }
+    }
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn staging_get(&mut self, size: usize) -> Option<(usize, *mut u8)> {
+        for (i, buf) in self.staging_pool.iter_mut().enumerate() {
+            if !buf.in_use && buf.cap >= size && !buf.ptr.is_null() {
+                buf.in_use = true;
+                return Some((i, buf.ptr));
+            }
+        }
+        for (i, buf) in self.staging_pool.iter_mut().enumerate() {
+            if !buf.in_use {
+                if let Some(p) = sdram_alloc::alloc_bytes(size, 32) {
+                    buf.ptr = p;
+                    buf.cap = size;
+                    buf.in_use = true;
+                    return Some((i, buf.ptr));
+                } else {
+                    return None;
+                }
+            }
+        }
+        None
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn staging_release(&mut self, index: usize) {
+        if let Some(buf) = self.staging_pool.get_mut(index) {
+            buf.in_use = false;
+        }
+    }
     /// Create a new display driver, enabling LTDC and DSI clocks and preparing
     /// the panel control pins.
     #[cfg(all(
@@ -114,7 +184,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         mut reset: RST,
         ltdc: LTDC,
         dsi: DSIHOST,
-        fmc: FMC,
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        dma2d: DMA2D,
     ) -> Self
     where
         BL: SetDutyCycle,
@@ -133,6 +204,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             height: 0,
             ltdc,
             dsi,
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            dma2d: Some(dma2d),
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            staging_pool: [StagingBuf::EMPTY; 3],
         };
         // Start with backlight off
         disp.set_backlight(0);
@@ -143,16 +218,14 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         let width = 800u16;
         let height = 480u16;
         disp.configure_ltdc_timing(
-            width,
-            height,
-            20,  // HSW
+            width, height, 20,  // HSW
             140, // HBP
             20,  // HFP
             4,   // VSW
             34,  // VBP
             10,  // VFP
         );
-        let fb = Self::init_sdram(fmc);
+        let fb = Self::init_sdram();
         // Minimal DSI host setup for RGB565 on VCID 0 (video mode tuning TBD)
         disp.configure_dsi_video_mode(width, height);
         // Initialize a simple SDRAM allocator and allocate the primary framebuffer
@@ -166,6 +239,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.fb_addr_back = fb_back;
         disp.width = width;
         disp.height = height;
+        // Configure MPU for SDRAM framebuffer: Write-Through, non-executable
+        Self::configure_mpu_sdram_writethrough(0xC000_0000, 32 * 1024 * 1024);
         // Pre-fill framebuffer with SMPTE color bars for visual verification
         Self::fill_smpte_bars_rgb565(fb_addr as *mut u16, width, height);
         disp.setup_ltdc_layer(fb_addr, width, height);
@@ -173,9 +248,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Optionally allocate additional framebuffers for testing and fill them
         #[cfg(feature = "sdram_ramtest")]
         {
-            let _ = sdram_alloc::alloc(fb_bytes, 64).map(|addr| {
-                Self::fill_smpte_bars_rgb565(addr as *mut u16, width, height)
-            });
+            let _ = sdram_alloc::alloc(fb_bytes, 64)
+                .map(|addr| Self::fill_smpte_bars_rgb565(addr as *mut u16, width, height));
         }
         // Gentle brightness ramp for bring-up
         #[allow(clippy::arithmetic_side_effects)]
@@ -199,7 +273,17 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
-    fn configure_ltdc_timing(&mut self, width: u16, height: u16, hsw: u16, hbp: u16, hfp: u16, vsw: u16, vbp: u16, vfp: u16) {
+    fn configure_ltdc_timing(
+        &mut self,
+        width: u16,
+        height: u16,
+        hsw: u16,
+        hbp: u16,
+        hfp: u16,
+        vsw: u16,
+        vbp: u16,
+        vfp: u16,
+    ) {
         let vsh = vsw;
         let hswm1 = (hsw.saturating_sub(1)) as u32;
         let vshm1 = (vsh.saturating_sub(1)) as u32;
@@ -210,10 +294,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         let totalw = (hsw as u32 + hbp as u32 + width as u32 + hfp as u32).saturating_sub(1);
         let totalh = (vsh as u32 + vbp as u32 + height as u32 + vfp as u32).saturating_sub(1);
 
-        self.ltdc.sscr.write(|w| unsafe { w.bits((vshm1 << 16) | hswm1) });
-        self.ltdc.bpcr.write(|w| unsafe { w.bits((avbp << 16) | ahbp) });
-        self.ltdc.awcr.write(|w| unsafe { w.bits((aah << 16) | aaw) });
-        self.ltdc.twcr.write(|w| unsafe { w.bits((totalh << 16) | totalw) });
+        self.ltdc
+            .sscr
+            .write(|w| unsafe { w.bits((vshm1 << 16) | hswm1) });
+        self.ltdc
+            .bpcr
+            .write(|w| unsafe { w.bits((avbp << 16) | ahbp) });
+        self.ltdc
+            .awcr
+            .write(|w| unsafe { w.bits((aah << 16) | aaw) });
+        self.ltdc
+            .twcr
+            .write(|w| unsafe { w.bits((totalh << 16) | totalw) });
         self.ltdc.bccr.write(|w| unsafe { w.bits(0) });
         self.ltdc.gcr.modify(|_, w| w.ltdcen().set_bit());
     }
@@ -262,7 +354,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         layer0.whpcr.write(|w| unsafe { w.bits((x1 << 16) | x0) });
         layer0.wvpcr.write(|w| unsafe { w.bits((y1 << 16) | y0) });
         layer0.cfbar.write(|w| w.cfbadd().bits(fb));
-        layer0.cfblr.write(|w| unsafe { w.bits(((pitch as u32 + 3) << 16) | (pitch as u32)) });
+        layer0
+            .cfblr
+            .write(|w| unsafe { w.bits(((pitch as u32 + 3) << 16) | (pitch as u32)) });
         layer0.cfblnr.write(|w| w.cfblnbr().bits(height));
         layer0.pfcr.write(|w| w.pf().rgb565());
         // Set full alpha and blending factors (constant alpha)
@@ -306,6 +400,200 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             self.dsi.vhbpcr.write(|w| w.hbp().bits(hbp as u16));
             self.dsi.vlcr.write(|w| w.hline().bits(hline as u16));
         }
+        // Attempt DSI host/wrapper enable sequence (scaffold; PLL values TBD)
+        let _ = self.enable_dsi_host_2lane_60hz();
+    }
+
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    fn enable_dsi_host_2lane_60hz(&mut self) -> bool {
+        // NOTE: This is a scaffold for the host enable sequence. Exact PLL and
+        // wrapper configuration values depend on reference clock and desired
+        // lane byte clock. We keep this guarded and minimal to avoid illegal
+        // state transitions until tuned.
+        unsafe {
+            let dsi = &self.dsi;
+            // Target: 2 data lanes, ~60 Hz for 800x480 RGB565
+            // Throughput estimate:
+            //   HLINE = HSA+HBP+HACT+HFP = 20+140+800+20 = 980
+            //   VLINE = VSA+VBP+VACT+VFP = 4+34+480+10 = 528
+            //   Bits/frame ≈ HACT*VACT*16 = 800*480*16 = 6.144 Mbits (active)
+            //   With porch/sync overhead, provision ~250 Mbps per lane (2 lanes => ~500 Mbps total)
+            // Choose lane byte clock ≈ 31.25 MHz (bit clock 250 Mbps).
+            // DSI Wrapper PLL (assume HSE=25 MHz): VCO = (HSE/IDF)*NDIV; ByteClk = VCO / 2^ODF
+            // Pick IDF=5, NDIV=50 => VCO=250 MHz; ODF=3 (/8) => ByteClk=31.25 MHz → 250 Mbps per lane.
+            const WRPCR_REGEN: u32 = 1 << 24; // Regulator enable
+            const WRPCR_PLLEN: u32 = 1 << 0; // PLL enable
+            // IDF/NDIV/ODF positions TBD; conservative defaults below
+            const WRPCR_IDF_POS: u32 = 8;
+            const WRPCR_NDIV_POS: u32 = 16;
+            const WRPCR_ODF_POS: u32 = 2;
+
+            const WCFGR_DSIM: u32 = 0; // DPI input mode (vs. command)
+            const WCFGR_COLMUX_RGB565: u32 = 0x5 << 1; // Color coding bits
+
+            const WCR_DSIEN: u32 = 1 << 3; // Wrapper enable
+
+            const PCTLR_CKE: u32 = 1 << 2; // Clock lane enable
+            const PCTLR_DEN: u32 = 1 << 1; // Data lanes enable
+
+            const CLCR_DPCC: u32 = 1 << 1; // Data lanes in HS
+            const CLCR_DPCC_CLK: u32 = 1 << 0; // Clock lane in HS
+
+            const VMCR_VMT_NB_SYNC: u32 = 0b01 << 0; // Non-burst with sync pulses
+            const VMCR_VMEN: u32 = 1 << 1; // Video mode enable
+
+            // 1) Configure PLL (placeholder divisors for bring-up)
+            let idf = 5u32; // input division factor (HSE/5 = 5 MHz)
+            let ndiv = 50u32; // multiplication factor (→ 250 MHz VCO)
+            let odf = 3u32; // output division factor (/8 → 31.25 MHz byte clk)
+            let wrpcr = WRPCR_REGEN
+                | ((idf & 0x0F) << WRPCR_IDF_POS)
+                | ((ndiv & 0x7F) << WRPCR_NDIV_POS)
+                | ((odf & 0x03) << WRPCR_ODF_POS)
+                | WRPCR_PLLEN;
+            // Write WRPCR and wait a short time (no explicit ready bit used here)
+            dsi.wrpcr.write(|w| w.bits(wrpcr));
+            // Clear prior interrupts (PLL lock/unlock, TE, EoR, regulator ready)
+            dsi.wifcr.write(|w| {
+                w.cplllif()
+                    .set_bit()
+                    .cplluif()
+                    .set_bit()
+                    .cteif()
+                    .set_bit()
+                    .cerif()
+                    .set_bit()
+                    .crrif()
+                    .set_bit()
+            });
+            // Wait for PLL lock
+            if !Self::wait_pll_lock(dsi, 500, 10_000) {
+                Self::log_timeout("DSI: PLL lock timeout");
+                return false;
+            }
+
+            // 2) Wrapper config: DPI + RGB565
+            dsi.wcfgr
+                .write(|w| w.bits(WCFGR_DSIM | WCFGR_COLMUX_RGB565));
+
+            // 3) Enable wrapper and host; exit ULPS
+            dsi.wcr.write(|w| w.bits(WCR_DSIEN));
+            dsi.pctlr.write(|w| w.bits(PCTLR_CKE | PCTLR_DEN));
+            // Wait for lanes to be active (clock + data lanes leave stop-state)
+            if !Self::wait_lanes_ready(dsi, 500, 10_000) {
+                Self::log_timeout("DSI: lanes ready timeout");
+                return false;
+            }
+
+            // 4) Enable lanes in HS for video
+            dsi.clcr.write(|w| w.bits(CLCR_DPCC | CLCR_DPCC_CLK));
+
+            // 5) Video mode config: non-burst with sync pulses + enable
+            dsi.vmcr.write(|w| w.bits(VMCR_VMT_NB_SYNC | VMCR_VMEN));
+            // Optional: small delay after enabling video mode
+            cortex_m::asm::delay(50_000);
+
+            // 6) Small delay to let lanes settle
+            cortex_m::asm::delay(100_000);
+        }
+        true
+    }
+
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    fn wait_pll_lock(dsi: &DSIHOST, tries: u32, delay_cycles: u32) -> bool {
+        let mut n = tries;
+        while n > 0 {
+            if dsi.wisr.read().pllls().bit() {
+                return true;
+            }
+            cortex_m::asm::delay(delay_cycles);
+            n -= 1;
+        }
+        false
+    }
+
+    fn wait_lanes_ready(dsi: &DSIHOST, tries: u32, delay_cycles: u32) -> bool {
+        let mut n = tries;
+        while n > 0 {
+            let psr = dsi.psr.read();
+            let clk_active = !psr.pssc().bit();
+            let d0_active = !psr.pss0().bit();
+            // Assume 2 lanes; if single-lane, d1_active may remain true (stopped)
+            let d1_active = !psr.pss1().bit();
+            if clk_active && d0_active && d1_active {
+                return true;
+            }
+            cortex_m::asm::delay(delay_cycles);
+            n -= 1;
+        }
+        false
+    }
+
+    #[inline]
+    fn log_timeout(msg: &str) {
+        #[cfg(feature = "semihosting")]
+        {
+            if let Ok(mut out) = hio::hstdout() {
+                let _ = writeln!(out, "{}", msg);
+            }
+        }
+        #[cfg(not(feature = "semihosting"))]
+        {
+            let _ = msg; // no-op
+        }
+    }
+
+    /// Configure MPU region for SDRAM framebuffer as write-through, non-executable.
+    fn configure_mpu_sdram_writethrough(base: u32, size_bytes: u32) {
+        // Region size must be power-of-two and base must be aligned to size.
+        // For H747I-DISCO SDRAM: base=0xC000_0000, size=32 MiB.
+        unsafe {
+            let p = cortex_m::Peripherals::steal();
+            // Disable MPU
+            p.MPU.ctrl.write(0);
+            cortex_m::asm::dsb();
+            cortex_m::asm::isb();
+
+            // Compute RASR SIZE field: size = 2^(SIZE+1)
+            let mut sz = 0u32;
+            let mut n = size_bytes;
+            while n > 1 {
+                n >>= 1;
+                sz += 1;
+            }
+            // SIZE encodes as (log2(size) - 1)
+            if sz > 0 {
+                sz -= 1;
+            }
+
+            // Select region number 6 (arbitrary, avoid typical HAL regions)
+            p.MPU.rnr.write(6);
+            // Set base address
+            p.MPU.rbar.write(base);
+            // RASR attributes:
+            // XN=1 (execute never), AP=0b011 (full access), TEX=0, C=1 (WT), B=0, S=0
+            let xn = 1u32 << 28;
+            let ap = 0b011u32 << 24;
+            let tex_cb_s = (0u32 << 19) | (1u32 << 17) | (0u32 << 16); // TEX=0,C=1,B=0
+            let s = 0u32 << 18;
+            let size_field = (sz & 0x1F) << 1;
+            let enable = 1u32;
+            p.MPU
+                .rasr
+                .write(xn | ap | s | tex_cb_s | size_field | enable);
+
+            // Enable MPU with default memory map for privileged access
+            // PRIVDEFENA=1 (bit 2), ENABLE=1 (bit 0)
+            p.MPU.ctrl.write(0x5);
+            cortex_m::asm::dsb();
+            cortex_m::asm::isb();
+        }
     }
 
     /// Swap LTDC layer address between front/back buffers and reload
@@ -321,76 +609,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     /// Initialize the external SDRAM and return its base address.
-    fn init_sdram(_fmc: FMC) -> u32 {
-        // Configure external SDRAM on FMC Bank1 and return its base address.
-        // NOTE: GPIO pin mux for FMC must be configured before calling this.
-        let fmc = _fmc;
-        // Basic SDRAM control/timing for a 16-bit, 4-bank SDRAM with CAS=3.
-        // Timings are conservative defaults suitable for ~100 MHz SDRAM clock.
-        // SDCR1: RPIPE=1, RBURST=1, SDCLK=HCLK/2, WP=0, CAS=3, NB=4, MWID=16, NR=12, NC=8
-        unsafe {
-            // Control register
-            // MWID=32-bit bus, CAS=3, 4 banks, SDCLK=HCLK/2, RBURST on, RPIPE=1
-            fmc.sdcr1.write(|w| w.bits(
-                (1 << 13) | // RPIPE = 1 (one HCLK cycle)
-                (1 << 12) | // RBURST = 1 (enable burst)
-                (2 << 10) | // SDCLK = HCLK/2 (target ~100 MHz)
-                (3 << 7)  | // CAS = 3
-                (1 << 6)  | // NB = 4 internal banks
-                (2 << 4)  | // MWID = 32 bits (10b)
-                (1 << 2)  | // NR = 12 rows (01b) — adjust if part differs
-                (0 << 0)    // NC = 8 columns (00b)
-            ));
-            // Timing register (values are encoded as cycles-1)
-            // TMRD=2, TXSR=7, TRAS=5, TRC=7, TWR=2, TRP=2, TRCD=2 at ~100 MHz
-            fmc.sdtr1.write(|w| w.bits(
-                (1 << 0)  | // TMRD = 2
-                (6 << 4)  | // TXSR = 7
-                (4 << 8)  | // TRAS = 5
-                (6 << 12) | // TRC  = 7
-                (1 << 16) | // TWR  = 2
-                (1 << 20) | // TRP  = 2
-                (1 << 24)   // TRCD = 2
-            ));
-        }
-
-        // Command sequence: clock enable -> delay -> precharge all -> auto-refresh -> load mode -> set refresh
-        unsafe {
-            // Clock enable (CTB1)
-            fmc.sdcmr.write(|w| w.bits(
-                (1 << 0) | // MODE = 1 (Clock Configuration Enable)
-                (1 << 3)   // CTB1 = 1 (Target bank 1)
-            ));
-            // Small delay to allow clock to start
-            cortex_m::asm::delay(1000);
-            // Precharge all
-            fmc.sdcmr.write(|w| w.bits(
-                (2 << 0) | // MODE = 2 (PALL)
-                (1 << 3)   // CTB1 = 1
-            ));
-            // Auto-refresh (8 cycles)
-            fmc.sdcmr.write(|w| w.bits(
-                (3 << 0) | // MODE = 3 (Auto-refresh)
-                (1 << 3) | // CTB1 = 1
-                (7 << 5)   // NRFS = 8 auto-refresh cycles (encoded as value-1)
-            ));
-            // Load mode register: BL=1, BT=sequential, CAS=3, OP=standard
-            let mrd: u32 = 0
-                | 0b000 << 0   // Burst length = 1
-                | 0b0   << 3   // Burst type = sequential
-                | 0b011 << 4   // CAS latency = 3
-                | 0b0   << 7   // Operating mode = standard
-                | 0b0   << 9;  // Write burst mode = programmed burst length
-            fmc.sdcmr.write(|w| w.bits(
-                (4 << 0) | // MODE = 4 (Load Mode Register)
-                (1 << 3) | // CTB1 = 1
-                (mrd << 9)
-            ));
-            // Set refresh rate: COUNT = (SDCLK_Hz * 64ms / 8192) - margin
-            // For ~100 MHz SDCLK: ~781 - 20 = ~761. Tune margin as needed.
-            let count: u32 = 761 & 0x1FFF;
-            fmc.sdrtr.write(|w| w.bits(count));
-        }
+    fn init_sdram() -> u32 {
         0xC000_0000
     }
 
@@ -406,9 +625,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     fn fill_smpte_bars_rgb565(fb: *mut u16, width: u16, height: u16) {
         let w = width as usize;
         let h = height as usize;
-        let top_h = (h * 2) / 3;      // Top 2/3: standard bars
-        let mid_h = top_h + (h / 6);  // Next 1/6: alt bars
-        let bot_h = h;                // Bottom 1/6: pluge/simple
+        let top_h = (h * 2) / 3; // Top 2/3: standard bars
+        let mid_h = top_h + (h / 6); // Next 1/6: alt bars
+        let bot_h = h; // Bottom 1/6: pluge/simple
 
         // Top bars: White, Yellow, Cyan, Green, Magenta, Red, Blue
         let top_colors = [
@@ -425,31 +644,43 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let row = y * w;
             for i in 0..top_colors.len() {
                 let x0 = i * seg_w;
-                let x1 = if i + 1 == top_colors.len() { w } else { (i + 1) * seg_w };
+                let x1 = if i + 1 == top_colors.len() {
+                    w
+                } else {
+                    (i + 1) * seg_w
+                };
                 for x in x0..x1 {
-                    unsafe { fb.add(row + x).write_volatile(top_colors[i]); }
+                    unsafe {
+                        fb.add(row + x).write_volatile(top_colors[i]);
+                    }
                 }
             }
         }
 
         // Middle bars: Blue, Black, Magenta, Black, Cyan, Black, Gray
         let mid_colors = [
-            Self::rgb565(0, 0, 191),     // blue
-            Self::rgb565(0, 0, 0),       // black
-            Self::rgb565(191, 0, 191),   // magenta
-            Self::rgb565(0, 0, 0),       // black
-            Self::rgb565(0, 191, 191),   // cyan
-            Self::rgb565(0, 0, 0),       // black
-            Self::rgb565(96, 96, 96),    // gray (50%)
+            Self::rgb565(0, 0, 191),   // blue
+            Self::rgb565(0, 0, 0),     // black
+            Self::rgb565(191, 0, 191), // magenta
+            Self::rgb565(0, 0, 0),     // black
+            Self::rgb565(0, 191, 191), // cyan
+            Self::rgb565(0, 0, 0),     // black
+            Self::rgb565(96, 96, 96),  // gray (50%)
         ];
         let seg_w2 = w / mid_colors.len();
         for y in top_h..mid_h {
             let row = y * w;
             for i in 0..mid_colors.len() {
                 let x0 = i * seg_w2;
-                let x1 = if i + 1 == mid_colors.len() { w } else { (i + 1) * seg_w2 };
+                let x1 = if i + 1 == mid_colors.len() {
+                    w
+                } else {
+                    (i + 1) * seg_w2
+                };
                 for x in x0..x1 {
-                    unsafe { fb.add(row + x).write_volatile(mid_colors[i]); }
+                    unsafe {
+                        fb.add(row + x).write_volatile(mid_colors[i]);
+                    }
                 }
             }
         }
@@ -466,9 +697,15 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let row = y * w;
             for i in 0..bot_colors.len() {
                 let x0 = i * seg_w3;
-                let x1 = if i + 1 == bot_colors.len() { w } else { (i + 1) * seg_w3 };
+                let x1 = if i + 1 == bot_colors.len() {
+                    w
+                } else {
+                    (i + 1) * seg_w3
+                };
                 for x in x0..x1 {
-                    unsafe { fb.add(row + x).write_volatile(bot_colors[i]); }
+                    unsafe {
+                        fb.add(row + x).write_volatile(bot_colors[i]);
+                    }
                 }
             }
         }
@@ -484,24 +721,92 @@ impl<B: Blitter> DisplayDriver for Stm32h747iDiscoDisplay<B> {
         let y0 = core::cmp::max(0, area.y);
         let x1 = core::cmp::min(sw, area.x + area.width);
         let y1 = core::cmp::min(sh, area.y + area.height);
-        if x1 <= x0 || y1 <= y0 { return; }
+        if x1 <= x0 || y1 <= y0 {
+            return;
+        }
         let w = (x1 - x0) as usize;
         let h = (y1 - y0) as usize;
         let src_stride = area.width as usize;
-        let fb_ptr = self.fb_addr as *mut u16;
-        // Write row by row converting ARGB8888 to RGB565
-        for row in 0..h {
-            let src_off = row * src_stride;
-            let dst_off = ((y0 as usize + row) * self.width as usize) + x0 as usize;
-            for col in 0..w {
-                let Color(r, g, b, a) = colors[src_off + col];
-                // Alpha ignore for now (assume opaque)
-                let r5 = (r as u16) >> 3;
-                let g6 = (g as u16) >> 2;
-                let b5 = (b as u16) >> 3;
-                let rgb565: u16 = (r5 << 11) | (g6 << 5) | b5;
-                unsafe { fb_ptr.add(dst_off + col).write_volatile(rgb565); }
-                let _ = a; // silence unused in no-alpha path
+        // Draw into back buffer when available to reduce tearing
+        let dst_base = if self.fb_addr_back != 0 && self.fb_addr_back != self.fb_addr {
+            self.fb_addr_back
+        } else {
+            self.fb_addr
+        } as usize;
+
+        // Prefer DMA2D path when available by staging the ARGB8888 source
+        // into SDRAM (write-through MPU region) so no cache maintenance is
+        // required for DMA reads. Fallback to CPU if allocation fails or DMA2D
+        // feature is disabled.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        if let Some(dma2d) = self.dma2d.take() {
+            // Acquire a staging buffer from the pool (ARGB8888)
+            let stage_bytes = w * h * 4;
+            if let Some((pool_ix, stage_ptr)) = self.staging_get(stage_bytes) {
+                // Pack the clipped area into staging (row-major, tight stride)
+                unsafe {
+                    let mut dst = stage_ptr;
+                    for row in 0..h {
+                        let src_off = row * src_stride;
+                        for col in 0..w {
+                            let Color(r, g, b, a) = colors[src_off + col];
+                            // ARGB8888 order for DMA2D
+                            core::ptr::write(dst, a);
+                            dst = dst.add(1);
+                            core::ptr::write(dst, r);
+                            dst = dst.add(1);
+                            core::ptr::write(dst, g);
+                            dst = dst.add(1);
+                            core::ptr::write(dst, b);
+                            dst = dst.add(1);
+                        }
+                    }
+                }
+                let dst_stride_bytes = (self.width as usize) * 2;
+                let dst_start = dst_base + ((y0 as usize) * dst_stride_bytes) + ((x0 as usize) * 2);
+                let dst_offset = dst_stride_bytes - (w * 2);
+                unsafe {
+                    // Configure DMA2D: M2M_PFC ARGB8888 -> RGB565
+                    dma2d.fgmar.write(|w| w.bits(stage_ptr as u32));
+                    dma2d.fgor.write(|w| w.bits(0));
+                    dma2d.fgpfccr.write(|w| w.bits(0)); // ARGB8888
+                    dma2d.omar.write(|w| w.bits(dst_start as u32));
+                    dma2d.oor.write(|w| w.bits(dst_offset as u32));
+                    dma2d.opfccr.write(|w| w.bits(2)); // RGB565
+                    dma2d
+                        .nlr
+                        .write(|wr| wr.bits(((h as u32) << 16) | (w as u32)));
+                    dma2d.cr.write(|w| w.bits(0x0001_0000)); // M2M_PFC
+                    dma2d.cr.modify(|r, w| w.bits(r.bits() | 1)); // START
+                    while dma2d.isr.read().bits() & 1 == 0 {}
+                    dma2d.ifcr.write(|w| w.bits(1));
+                }
+                self.dma2d = Some(dma2d);
+                self.staging_release(pool_ix);
+                return;
+            } else {
+                // Put back DMA2D and fall through to CPU path
+                self.dma2d = Some(dma2d);
+            }
+        }
+
+        // CPU fallback path
+        {
+            let dst_ptr = dst_base as *mut u16;
+            for row in 0..h {
+                let src_off = row * src_stride;
+                let dst_off = ((y0 as usize + row) * self.width as usize) + x0 as usize;
+                for col in 0..w {
+                    let Color(r, g, b, a) = colors[src_off + col];
+                    let r5 = (r as u16) >> 3;
+                    let g6 = (g as u16) >> 2;
+                    let b5 = (b as u16) >> 3;
+                    let rgb565: u16 = (r5 << 11) | (g6 << 5) | b5;
+                    unsafe {
+                        dst_ptr.add(dst_off + col).write_volatile(rgb565);
+                    }
+                    let _ = a;
+                }
             }
         }
         // Layer uses direct framebuffer; no register reload required for content updates.
@@ -619,7 +924,10 @@ where
             }
             (Some((x, y)), None) => {
                 self.last = Some((x, y));
-                Some(Event::PointerDown { x: x as i32, y: y as i32 })
+                Some(Event::PointerDown {
+                    x: x as i32,
+                    y: y as i32,
+                })
             }
             (None, Some((lx, ly))) => {
                 self.last = None;

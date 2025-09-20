@@ -39,12 +39,36 @@ impl Otm8009a {
         });
     }
 
+    /// Issue a DCS short write command with one parameter.
+    fn dcs_short_write1(dsi: &mut DSIHOST, cmd: u8, param: u8) {
+        // Wait for command FIFO space
+        while dsi.gpsr.read().cmdff().bit_is_set() {}
+        dsi.ghcr.write(|w| unsafe {
+            w.dt()
+                .bits(0x15) // DCS short write, 1 param
+                .vcid()
+                .bits(0)
+                .wclsb()
+                .bits(param)
+                .wcmsb()
+                .bits(cmd)
+        });
+    }
+
     /// Initialize the panel for basic operation.
     ///
     /// This sequence exits sleep mode and turns the display on. A complete
     /// bring-up would configure power, pixel format, and gamma tables.
     pub fn init(dsi: &mut DSIHOST) {
-        Self::dcs_short_write(dsi, 0x11); // Exit sleep
-        Self::dcs_short_write(dsi, 0x29); // Display on
+        // Exit sleep
+        Self::dcs_short_write(dsi, 0x11);
+        // Small delay
+        cortex_m::asm::delay(10_000_00);
+        // Set pixel format to 16-bit (RGB565)
+        Self::dcs_short_write1(dsi, 0x3A, 0x55);
+        // Memory access control: landscape orientation (value may be panel-specific)
+        Self::dcs_short_write1(dsi, 0x36, 0x60);
+        // Display on
+        Self::dcs_short_write(dsi, 0x29);
     }
 }

@@ -107,7 +107,9 @@ pub fn decode_rgba(
                 i += 1;
                 let mut count = (SHORT_REPEAT_MAX as u16 + 1) + add; // 61..316
                 let idx = recent_idx as usize;
-                if idx >= palette_rgb565.len() { return Err(Error::Truncated); }
+                if idx >= palette_rgb565.len() {
+                    return Err(Error::Truncated);
+                }
                 let px = rgb565_to_rgba(palette_rgb565[idx]);
                 while count > 0 {
                     out.extend_from_slice(&px);
@@ -124,7 +126,9 @@ pub fn decode_rgba(
                     let base = palette_rgb565.len() as u8;
                     let mut count = (data.saturating_sub(base)).saturating_add(1);
                     let idx = recent_idx as usize;
-                    if idx >= palette_rgb565.len() { return Err(Error::Truncated); }
+                    if idx >= palette_rgb565.len() {
+                        return Err(Error::Truncated);
+                    }
                     let px = rgb565_to_rgba(palette_rgb565[idx]);
                     while count > 0 {
                         out.extend_from_slice(&px);
@@ -141,11 +145,7 @@ pub fn decode_rgba(
 }
 
 /// Encode an RGBA frame into (palette RGB565, byte stream) using short and long repeats.
-pub fn encode_rgba(
-    width: usize,
-    height: usize,
-    rgba: &[u8],
-) -> Result<(Vec<u16>, Vec<u8>), Error> {
+pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>, Vec<u8>), Error> {
     use consts::*;
     // Build RGB565 histogram
     use alloc::collections::BTreeMap;
@@ -163,7 +163,9 @@ pub fn encode_rgba(
     pairs.sort_by(|a, b| b.1.cmp(&a.1));
     let take = core::cmp::min(pairs.len(), MAX_PALETTE);
     let mut palette: Vec<u16> = pairs.iter().take(take).map(|p| p.0).collect();
-    if palette.len() > MAX_PALETTE { return Err(Error::PaletteTooLarge); }
+    if palette.len() > MAX_PALETTE {
+        return Err(Error::PaletteTooLarge);
+    }
     // Map color to palette index
     use alloc::collections::BTreeMap as Map;
     let mut lut: Map<u16, u8> = Map::new();
@@ -177,9 +179,16 @@ pub fn encode_rgba(
     let mut cur_idx: Option<u8> = None;
     let mut run_color: Option<u16> = None;
     let mut run_len: usize = 0;
-    let flush_run = |palette: &Vec<u16>, out: &mut Vec<u8>, base: u8, cur_idx: Option<u8>, run_color: Option<u16>, run_len: usize| {
+    let flush_run = |palette: &Vec<u16>,
+                     out: &mut Vec<u8>,
+                     base: u8,
+                     cur_idx: Option<u8>,
+                     run_color: Option<u16>,
+                     run_len: usize| {
         let mut emitted = 0usize;
-        if run_len == 0 { return 0usize; }
+        if run_len == 0 {
+            return 0usize;
+        }
         if let Some(idx) = cur_idx {
             // Emit palette index first (one pixel)
             out.push(idx);
@@ -226,8 +235,14 @@ pub fn encode_rgba(
             let c = rgba_to_rgb565(&rgba[row + x * 4..row + x * 4 + 4]);
             let this_idx = lut.get(&c).copied();
             match (run_color, run_len, this_idx) {
-                (None, 0, _) => { run_color = Some(c); cur_idx = this_idx; run_len = 1; }
-                (Some(rc), n, _) if rc == c => { run_len = n + 1; }
+                (None, 0, _) => {
+                    run_color = Some(c);
+                    cur_idx = this_idx;
+                    run_len = 1;
+                }
+                (Some(rc), n, _) if rc == c => {
+                    run_len = n + 1;
+                }
                 _ => {
                     // flush previous run
                     let _ = flush_run(&palette, &mut out, base, cur_idx, run_color, run_len);
@@ -243,4 +258,3 @@ pub fn encode_rgba(
 
     Ok((palette, out))
 }
-

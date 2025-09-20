@@ -40,10 +40,14 @@ fn main() -> ! {
         // simple triangle wave on backlight
         if dir_up {
             level = level.saturating_add(step);
-            if level >= u16::MAX - step { dir_up = false; }
+            if level >= u16::MAX - step {
+                dir_up = false;
+            }
         } else {
             level = level.saturating_sub(step);
-            if level <= step { dir_up = true; }
+            if level <= step {
+                dir_up = true;
+            }
         }
         cortex_m::asm::delay(12_000_000);
     }

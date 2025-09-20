@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+use core::arch::asm;
 use core::ptr::addr_of_mut;
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
@@ -42,6 +43,354 @@ fn _bsp_log(args: core::fmt::Arguments) {
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
+fn mpu_rasr(
+    size_field: u32,
+    ap: u32,
+    tex: u32,
+    shareable: u32,
+    cacheable: u32,
+    bufferable: u32,
+    execute_never: u32,
+) -> u32 {
+    let enable = 1u32;
+    let size_bits = size_field << 1;
+    let tex_bits = tex << 19;
+    let s_bits = shareable << 18;
+    let c_bits = cacheable << 17;
+    let b_bits = bufferable << 16;
+    let xn_bits = execute_never << 28;
+    enable | size_bits | ap | tex_bits | s_bits | c_bits | b_bits | xn_bits
+}
+
+fn configure_mpu_regions(cp: &mut cortex_m::Peripherals) {
+    const AP_FULL_ACCESS: u32 = 0b011 << 24;
+
+    unsafe {
+        set_mpu_trace(0xFACE_0001);
+        cp.MPU.ctrl.write(0);
+        barrier_dsb();
+        barrier_isb();
+    }
+
+    #[inline(always)]
+    fn configure_slot(
+        mpu: &mut cortex_m::peripheral::MPU,
+        number: u32,
+        base: u32,
+        rasr: u32,
+        slot: usize,
+    ) {
+        unsafe {
+            mpu.rnr.write(number);
+            mpu.rbar.write(base);
+            mpu.rasr.write(rasr);
+        }
+        record_region(slot, base, rasr);
+    }
+
+    let mpu = &mut cp.MPU;
+
+    unsafe {
+        configure_slot(
+            mpu,
+            0,
+            0x0800_0000,
+            mpu_rasr(20, AP_FULL_ACCESS, 0, 0, 1, 1, 0),
+            0,
+        );
+        set_mpu_trace(0xDEAD_0010);
+
+        configure_slot(
+            mpu,
+            1,
+            0x2000_0000,
+            mpu_rasr(16, AP_FULL_ACCESS, 0, 0, 1, 1, 1),
+            1,
+        );
+        set_mpu_trace(0xDEAD_0020);
+
+        configure_slot(
+            mpu,
+            2,
+            0x2400_0000,
+            mpu_rasr(18, AP_FULL_ACCESS, 0, 1, 1, 1, 1),
+            2,
+        );
+        set_mpu_trace(0xDEAD_0030);
+
+        configure_slot(
+            mpu,
+            3,
+            0x3004_7000,
+            mpu_rasr(11, AP_FULL_ACCESS, 0, 1, 0, 0, 1),
+            3,
+        );
+        set_mpu_trace(0xDEAD_0040);
+
+        configure_slot(
+            mpu,
+            4,
+            0x3800_0000,
+            mpu_rasr(15, AP_FULL_ACCESS, 0, 1, 1, 1, 1),
+            4,
+        );
+        set_mpu_trace(0xDEAD_0050);
+
+        configure_slot(
+            mpu,
+            5,
+            0xC000_0000,
+            mpu_rasr(24, AP_FULL_ACCESS, 1, 1, 0, 0, 1),
+            5,
+        );
+        set_mpu_trace(0xDEAD_0060);
+
+        const MPU_CTRL_ENABLE: u32 = 1;
+        const MPU_CTRL_PRIVDEFENA: u32 = 1 << 2;
+        mpu.ctrl.write(MPU_CTRL_ENABLE | MPU_CTRL_PRIVDEFENA);
+        single_nop();
+        barrier_dsb();
+        barrier_isb();
+        set_mpu_trace(0xDEAD_0003);
+    }
+}
+#[allow(unsafe_attributes)]
+#[unsafe(link_section = ".noinit")]
+#[unsafe(no_mangle)]
+static mut MPU_TRACE: u32 = 0;
+
+#[allow(unsafe_attributes)]
+#[unsafe(link_section = ".noinit")]
+#[unsafe(no_mangle)]
+static mut MPU_DUMP: [u32; 12] = [0; 12];
+
+#[inline(always)]
+fn set_mpu_trace(val: u32) {
+    unsafe {
+        core::ptr::write_volatile(core::ptr::addr_of_mut!(MPU_TRACE), val);
+    }
+}
+
+#[inline(always)]
+fn record_region(slot: usize, base: u32, rasr: u32) {
+    unsafe {
+        let ptr = core::ptr::addr_of_mut!(MPU_DUMP[slot * 2]);
+        core::ptr::write_volatile(ptr, base);
+        core::ptr::write_volatile(ptr.add(1), rasr);
+    }
+}
+
+#[inline(always)]
+fn single_nop() {
+    unsafe {
+        asm!("nop", options(nomem, nostack, preserves_flags));
+    }
+}
+
+#[inline(always)]
+fn barrier_dsb() {
+    unsafe {
+        asm!("dsb sy", options(nostack, preserves_flags));
+    }
+}
+
+#[inline(always)]
+fn barrier_isb() {
+    unsafe {
+        asm!("isb sy", options(nostack, preserves_flags));
+    }
+}
+
+#[cfg(feature = "pac_sdram_init")]
+const SDRAM_REFRESH_COUNT: u16 = 566;
+#[cfg(feature = "pac_sdram_init")]
+const SDRAM_MODE_REGISTER: u16 = 0x0230;
+
+#[cfg(feature = "pac_sdram_init")]
+fn wait_for_sdram_ready(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
+    while fmc.sdsr.read().bits() & (1 << 5) != 0 {
+        cortex_m::asm::nop();
+    }
+}
+
+#[cfg(feature = "pac_sdram_init")]
+fn issue_sdram_command(
+    fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock,
+    mode: u8,
+    auto_refresh: u8,
+    mode_register: u16,
+) {
+    unsafe {
+        fmc.sdcmr.write(|w| {
+            w.mode()
+                .bits(mode)
+                .ctb1()
+                .set_bit()
+                .ctb2()
+                .clear_bit()
+                .nrfs()
+                .bits(auto_refresh)
+                .mrd()
+                .bits(mode_register)
+        });
+    }
+    wait_for_sdram_ready(fmc);
+}
+
+#[cfg(feature = "pac_sdram_init")]
+fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
+    unsafe {
+        fmc.bcr1.modify(|_, w| w.fmcen().set_bit());
+        fmc.sdbank1().sdcr.write(|w| {
+            w.nc()
+                .bits(0b01)
+                .nr()
+                .bits(0b01)
+                .mwid()
+                .bits(0b10)
+                .nb()
+                .set_bit()
+                .cas()
+                .bits(0b11)
+                .wp()
+                .clear_bit()
+                .sdclk()
+                .bits(0b01)
+                .rburst()
+                .set_bit()
+                .rpipe()
+                .bits(0)
+        });
+        fmc.sdbank1().sdtr.write(|w| {
+            w.tmrd()
+                .bits(1)
+                .txsr()
+                .bits(6)
+                .tras()
+                .bits(4)
+                .trc()
+                .bits(6)
+                .twr()
+                .bits(1)
+                .trp()
+                .bits(1)
+                .trcd()
+                .bits(1)
+        });
+    }
+
+    issue_sdram_command(fmc, 0b001, 0, 0);
+    cortex_m::asm::delay(100_000);
+    issue_sdram_command(fmc, 0b010, 0, 0);
+    issue_sdram_command(fmc, 0b011, 7, 0);
+    issue_sdram_command(fmc, 0b100, 0, SDRAM_MODE_REGISTER);
+    issue_sdram_command(fmc, 0b000, 0, 0);
+
+    unsafe {
+        fmc.sdrtr.write(|w| w.count().bits(SDRAM_REFRESH_COUNT));
+    }
+
+    wait_for_sdram_ready(fmc);
+}
+
+#[cfg(feature = "pac_sdram_init")]
+fn configure_pin_alt12(gpio: &stm32h7::stm32h747cm7::gpioa::RegisterBlock, pin: u8) {
+    let shift2 = (pin as u32) * 2;
+    unsafe {
+        gpio.moder.modify(|r, w| {
+            let mut bits = r.bits();
+            bits &= !(0b11 << shift2);
+            bits |= 0b10 << shift2;
+            w.bits(bits)
+        });
+        gpio.ospeedr.modify(|r, w| {
+            let mut bits = r.bits();
+            bits &= !(0b11 << shift2);
+            bits |= 0b11 << shift2;
+            w.bits(bits)
+        });
+        gpio.pupdr.modify(|r, w| {
+            let mut bits = r.bits();
+            bits &= !(0b11 << shift2);
+            w.bits(bits)
+        });
+        gpio.otyper.modify(|r, w| {
+            let mut bits = r.bits();
+            bits &= !(1 << pin);
+            w.bits(bits)
+        });
+        if pin < 8 {
+            let shift4 = (pin as u32) * 4;
+            gpio.afrl.modify(|r, w| {
+                let mut bits = r.bits();
+                bits &= !(0xF << shift4);
+                bits |= 12 << shift4;
+                w.bits(bits)
+            });
+        } else {
+            let shift4 = ((pin as u32) - 8) * 4;
+            gpio.afrh.modify(|r, w| {
+                let mut bits = r.bits();
+                bits &= !(0xF << shift4);
+                bits |= 12 << shift4;
+                w.bits(bits)
+            });
+        }
+    }
+}
+
+#[cfg(feature = "pac_sdram_init")]
+fn early_fmc_setup() {
+    use stm32h7::stm32h747cm7::{
+        GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, RCC, gpioa::RegisterBlock as GpioRegs,
+    };
+
+    let rcc = unsafe { &*RCC::ptr() };
+
+    unsafe {
+        // Enable clocks for GPIO D through I so alternate functions can be programmed.
+        let mask = (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8);
+        rcc.ahb4enr.modify(|r, w| w.bits(r.bits() | mask));
+        rcc.ahb4enr.read();
+    }
+
+    let gpiod = unsafe { &*GPIOD::ptr() as &GpioRegs };
+    for &pin in &[0, 1, 8, 9, 10, 14, 15] {
+        configure_pin_alt12(gpiod, pin);
+    }
+    let gpioe = unsafe { &*GPIOE::ptr() as &GpioRegs };
+    for &pin in &[0, 1, 7, 8, 9, 10, 11, 12, 13, 14, 15] {
+        configure_pin_alt12(gpioe, pin);
+    }
+    let gpiof = unsafe { &*GPIOF::ptr() as &GpioRegs };
+    for &pin in &[0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15] {
+        configure_pin_alt12(gpiof, pin);
+    }
+    let gpiog = unsafe { &*GPIOG::ptr() as &GpioRegs };
+    for &pin in &[0, 1, 2, 4, 5, 8, 15] {
+        configure_pin_alt12(gpiog, pin);
+    }
+    let gpioh = unsafe { &*GPIOH::ptr() as &GpioRegs };
+    for &pin in &[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] {
+        configure_pin_alt12(gpioh, pin);
+    }
+    let gpioi = unsafe { &*GPIOI::ptr() as &GpioRegs };
+    for &pin in &[0, 1, 2, 3, 4, 5, 6, 7, 9, 10] {
+        configure_pin_alt12(gpioi, pin);
+    }
+
+    unsafe {
+        // Enable FMC clocks in both the combined and core 1 domains.
+        rcc.ahb3enr.modify(|r, w| w.bits(r.bits() | (1 << 12)));
+        rcc.ahb3enr.read();
+        rcc.c1_ahb3enr.modify(|r, w| w.bits(r.bits() | (1 << 12)));
+        rcc.c1_ahb3enr.read();
+    }
+
+    let fmc = unsafe { &*stm32h7::stm32h747cm7::FMC::ptr() };
+    configure_fmc_sdram(fmc);
+}
+
 /// Heap size in bytes.
 const HEAP_SIZE: usize = 64 * 1024;
 
@@ -71,9 +420,13 @@ fn main() -> ! {
             cortex_m::asm::delay(100_000_000);
         }
 
+        let mut cp = cortex_m::Peripherals::take().unwrap();
+        configure_mpu_regions(&mut cp);
+
         use core::convert::Infallible;
         use embedded_hal::{
             digital::{ErrorType as DigitalError, InputPin},
+            i2c::{ErrorType as I2cError, I2c as EhI2c, Operation, SevenBitAddress},
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
         use rlvgl::core::event::{Event, Key};
@@ -108,7 +461,7 @@ fn main() -> ! {
 
         // Adapter to bridge HAL v0.2 input pin to embedded-hal 1.0 InputPin
         struct HalInputPin<P>(P);
-        impl embedded_hal::digital::ErrorType for HalInputPin<P> {
+        impl<P> embedded_hal::digital::ErrorType for HalInputPin<P> {
             type Error = Infallible;
         }
         impl<P: stm32h7xx_hal::hal::digital::v2::InputPin<Error = Infallible>>
@@ -165,6 +518,9 @@ fn main() -> ! {
         }
         // Destructure PAC peripherals and switch to HAL for operation
         let dp = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
+
+        #[cfg(feature = "pac_sdram_init")]
+        early_fmc_setup();
         // Ensure the PWR peripheral clock is enabled before touching PWR regs.
         // On H7, PWR sits on APB4; without PWREN the VOSRDY poll can hang.
         // Some PACs don’t expose a typed `pwren()`; set the bit position directly.
@@ -187,11 +543,13 @@ fn main() -> ! {
             GPIOF,
             GPIOH,
             GPIOI,
-            I2C4,
+            I2C4: _i2c4,
             TIM8,
             DSIHOST: dsi,
             FMC: fmc,
             LTDC: ltdc,
+            #[cfg(feature = "dma2d")]
+            DMA2D,
             #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
             GPIOC,
             #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
@@ -202,7 +560,6 @@ fn main() -> ! {
         let pwr = PWR.constrain();
         let vos = pwr.smps().vos1().freeze();
         use stm32h7xx_hal::rcc::{PllConfigStrategy, ResetEnable};
-        use stm32h7xx_hal::prelude::*;
         let rcc = RCC.constrain();
         let mut syscfg = SYSCFG;
         // HAL RCC: derive SYSCLK and LTDC pixel clock (via PLL3R)
@@ -210,7 +567,9 @@ fn main() -> ! {
         let ccdr = rcc
             .use_hse(25.MHz())
             .sys_ck(400.MHz())
+            .hclk(200.MHz())
             .pll1_strategy(PllConfigStrategy::Iterative)
+            .pll2_r_ck(150.MHz())
             // Target ~33 MHz pixel clock for 800x480 panel bring-up
             .pll3_r_ck(32.MHz())
             .freeze(vos, &mut syscfg);
@@ -252,73 +611,70 @@ fn main() -> ! {
                 Ok(())
             }
         }
-        // Configure FMC SDRAM pin mux (subset necessary for SDRAM Bank1)
-        use stm32h7xx_hal::gpio::Alternate;
-        // Address lines PF0..PF5 (A0..A5)
-        let _ = gpiof.pf0.into_alternate::<0>();
-        let _ = gpiof.pf1.into_alternate::<0>();
-        let _ = gpiof.pf2.into_alternate::<0>();
-        let _ = gpiof.pf3.into_alternate::<0>();
-        let _ = gpiof.pf4.into_alternate::<0>();
-        let _ = gpiof.pf5.into_alternate::<0>();
-        // Address lines PF12..PF15 (A6..A9)
-        let _ = gpiof.pf12.into_alternate::<0>();
-        let _ = gpiof.pf13.into_alternate::<0>();
-        let _ = gpiof.pf14.into_alternate::<0>();
-        let _ = gpiof.pf15.into_alternate::<0>();
-        // Address lines PG0..PG1 (A10..A11), PG2 (A12), PG4 (BA0)
-        let _ = gpiog.pg0.into_alternate::<0>();
-        let _ = gpiog.pg1.into_alternate::<0>();
-        let _ = gpiog.pg2.into_alternate::<0>();
-        let _ = gpiog.pg4.into_alternate::<0>();
-        // Control lines PF11 (SDNRAS), PG15 (SDNCAS), PH5 (SDNWE)
-        let _ = gpiof.pf11.into_alternate::<0>();
-        let _ = gpiog.pg15.into_alternate::<0>();
-        let _ = gpioh.ph5.into_alternate::<0>();
-        // Clock and enable: PG8 (SDCLK), PH6 (SDNE1), PH7 (SDCKE1)
-        let _ = gpiog.pg8.into_alternate::<0>();
-        let _ = gpioh.ph6.into_alternate::<0>();
-        let _ = gpioh.ph7.into_alternate::<0>();
-        // Byte lane enables: PE0 (NBL0), PE1 (NBL1), PI4 (NBL2), PI5 (NBL3)
-        let _ = gpioe.pe0.into_alternate::<0>();
-        let _ = gpioe.pe1.into_alternate::<0>();
-        let _ = gpioi.pi4.into_alternate::<0>();
-        let _ = gpioi.pi5.into_alternate::<0>();
-        // Data lines D0..D15 on PD/PE
-        let _ = gpiod.pd14.into_alternate::<0>(); // D0
-        let _ = gpiod.pd15.into_alternate::<0>(); // D1
-        let _ = gpiod.pd0.into_alternate::<0>();  // D2
-        let _ = gpiod.pd1.into_alternate::<0>();  // D3
-        let _ = gpioe.pe7.into_alternate::<0>();  // D4
-        let _ = gpioe.pe8.into_alternate::<0>();  // D5
-        let _ = gpioe.pe9.into_alternate::<0>();  // D6
-        let _ = gpioe.pe10.into_alternate::<0>(); // D7
-        let _ = gpioe.pe11.into_alternate::<0>(); // D8
-        let _ = gpioe.pe12.into_alternate::<0>(); // D9
-        let _ = gpioe.pe13.into_alternate::<0>(); // D10
-        let _ = gpioe.pe14.into_alternate::<0>(); // D11
-        let _ = gpioe.pe15.into_alternate::<0>(); // D12
-        let _ = gpiod.pd8.into_alternate::<0>();  // D13
-        let _ = gpiod.pd9.into_alternate::<0>();  // D14
-        let _ = gpiod.pd10.into_alternate::<0>(); // D15
-        // Data lines D16..D23 on PH
-        let _ = gpioh.ph8.into_alternate::<0>();  // D16
-        let _ = gpioh.ph9.into_alternate::<0>();  // D17
-        let _ = gpioh.ph10.into_alternate::<0>(); // D18
-        let _ = gpioh.ph11.into_alternate::<0>(); // D19
-        let _ = gpioh.ph12.into_alternate::<0>(); // D20
-        let _ = gpioh.ph13.into_alternate::<0>(); // D21
-        let _ = gpioh.ph14.into_alternate::<0>(); // D22
-        let _ = gpioh.ph15.into_alternate::<0>(); // D23
-        // Data lines D24..D31 on PI
-        let _ = gpioi.pi0.into_alternate::<0>();  // D24
-        let _ = gpioi.pi1.into_alternate::<0>();  // D25
-        let _ = gpioi.pi2.into_alternate::<0>();  // D26
-        let _ = gpioi.pi3.into_alternate::<0>();  // D27
-        let _ = gpioi.pi6.into_alternate::<0>();  // D28
-        let _ = gpioi.pi7.into_alternate::<0>();  // D29
-        let _ = gpioi.pi9.into_alternate::<0>();  // D30
-        let _ = gpioi.pi10.into_alternate::<0>(); // D31
+        // Configure FMC SDRAM pin mux (AF12 + VeryHigh speed)
+        use stm32h7xx_hal::gpio::Speed;
+        macro_rules! af12_high {
+            ($pin:expr) => {{
+                let mut pin = $pin.into_alternate::<12>();
+                pin.set_speed(Speed::VeryHigh);
+            }};
+        }
+        af12_high!(gpiof.pf0);
+        af12_high!(gpiof.pf1);
+        af12_high!(gpiof.pf2);
+        af12_high!(gpiof.pf3);
+        af12_high!(gpiof.pf4);
+        af12_high!(gpiof.pf5);
+        af12_high!(gpiof.pf12);
+        af12_high!(gpiof.pf13);
+        af12_high!(gpiof.pf14);
+        af12_high!(gpiof.pf15);
+        af12_high!(gpiog.pg0);
+        af12_high!(gpiog.pg1);
+        af12_high!(gpiog.pg2);
+        af12_high!(gpiog.pg4);
+        af12_high!(gpiof.pf11);
+        af12_high!(gpiog.pg15);
+        af12_high!(gpioh.ph5);
+        af12_high!(gpiog.pg8);
+        af12_high!(gpioh.ph6);
+        af12_high!(gpioh.ph7);
+        af12_high!(gpioe.pe0);
+        af12_high!(gpioe.pe1);
+        af12_high!(gpioi.pi4);
+        af12_high!(gpioi.pi5);
+        af12_high!(gpiod.pd14);
+        af12_high!(gpiod.pd15);
+        af12_high!(gpiod.pd0);
+        af12_high!(gpiod.pd1);
+        af12_high!(gpioe.pe7);
+        af12_high!(gpioe.pe8);
+        af12_high!(gpioe.pe9);
+        af12_high!(gpioe.pe10);
+        af12_high!(gpioe.pe11);
+        af12_high!(gpioe.pe12);
+        af12_high!(gpioe.pe13);
+        af12_high!(gpioe.pe14);
+        af12_high!(gpioe.pe15);
+        af12_high!(gpiod.pd8);
+        af12_high!(gpiod.pd9);
+        af12_high!(gpiod.pd10);
+        af12_high!(gpioh.ph8);
+        af12_high!(gpioh.ph9);
+        af12_high!(gpioh.ph10);
+        af12_high!(gpioh.ph11);
+        af12_high!(gpioh.ph12);
+        af12_high!(gpioh.ph13);
+        af12_high!(gpioh.ph14);
+        af12_high!(gpioh.ph15);
+        af12_high!(gpioi.pi0);
+        af12_high!(gpioi.pi1);
+        af12_high!(gpioi.pi2);
+        af12_high!(gpioi.pi3);
+        af12_high!(gpioi.pi6);
+        af12_high!(gpioi.pi7);
+        af12_high!(gpioi.pi9);
+        af12_high!(gpioi.pi10);
 
         // Panel reset GPIO on PG3 (LCD_RESET)
         let mut panel_reset_hal = gpiog.pg3.into_push_pull_output();
@@ -362,10 +718,9 @@ fn main() -> ! {
         };
         let blitter = CpuBlitter;
         // Configure a SysTick timer to flip buffers at ~60 Hz
-        let mut cp = cortex_m::Peripherals::take().unwrap();
         use cortex_m::peripheral::syst::SystClkSource;
         cp.SYST.set_clock_source(SystClkSource::Core);
-        let sys_hz = ccdr.clocks.sys_ck().0;
+        let sys_hz = ccdr.clocks.sys_ck().to_Hz();
         let flip_hz = 6u32; // loose 6 Hz flip for bring-up
         let reload = (sys_hz / flip_hz).saturating_sub(1);
         cp.SYST.set_reload(reload);
@@ -377,7 +732,8 @@ fn main() -> ! {
             HalResetPin(panel_reset_hal),
             ltdc,
             dsi,
-            fmc,
+            #[cfg(feature = "dma2d")]
+            DMA2D,
         );
         // Optional: SDRAM RAM test (feature-gated). Writes a few patterns per MB
         // and prints progress via semihosting if enabled.
@@ -413,7 +769,9 @@ fn main() -> ! {
                     }
                     for i in 0..STRIDE {
                         let p = (mb_base as *const u32).add(i * 8);
-                        if p.read_volatile() != 0x0000_0000 { errs += 1; }
+                        if p.read_volatile() != 0x0000_0000 {
+                            errs += 1;
+                        }
                     }
 
                     // Pattern 2: solid ones
@@ -423,7 +781,9 @@ fn main() -> ! {
                     }
                     for i in 0..STRIDE {
                         let p = (mb_base as *const u32).add(i * 8 + 1);
-                        if p.read_volatile() != 0xFFFF_FFFF { errs += 1; }
+                        if p.read_volatile() != 0xFFFF_FFFF {
+                            errs += 1;
+                        }
                     }
 
                     // Pattern 3: address-based
@@ -435,7 +795,9 @@ fn main() -> ! {
                     for i in 0..STRIDE {
                         let p = (mb_base as *const u32).add(i * 8 + 2);
                         let v = (mb_base as u32).wrapping_add((i as u32) << 4);
-                        if p.read_volatile() != v { errs += 1; }
+                        if p.read_volatile() != v {
+                            errs += 1;
+                        }
                     }
 
                     // Pattern 4: checkerboard
@@ -448,8 +810,12 @@ fn main() -> ! {
                     for i in 0..STRIDE {
                         let p0 = (mb_base as *const u32).add(i * 8 + 3);
                         let p1 = (mb_base as *const u32).add(i * 8 + 4);
-                        if p0.read_volatile() != 0xAAAA_AAAA { errs += 1; }
-                        if p1.read_volatile() != 0x5555_5555 { errs += 1; }
+                        if p0.read_volatile() != 0xAAAA_AAAA {
+                            errs += 1;
+                        }
+                        if p1.read_volatile() != 0x5555_5555 {
+                            errs += 1;
+                        }
                     }
 
                     // Pattern 5: pseudo-random (xorshift)
@@ -468,7 +834,9 @@ fn main() -> ! {
                         seed2 ^= seed2 >> 17;
                         seed2 ^= seed2 << 5;
                         let p = (mb_base as *const u32).add(i * 8 + 5);
-                        if p.read_volatile() != seed2 { errs += 1; }
+                        if p.read_volatile() != seed2 {
+                            errs += 1;
+                        }
                     }
 
                     log!("SDRAM test: MB {} -> {} errors\n", mb, errs);
@@ -477,13 +845,43 @@ fn main() -> ! {
         }
         // Main loop: handle IPC commands (from CM4) and input stubs
         ipc::init();
-        // Touch I2C4 on PD12/PD13 @ 400 kHz and INT on PK7
-        let i2c = rlvgl::platform::stm32h747i_disco::init_touch_i2c(
-            I2C4,
-            gpiod,
-            ccdr.peripheral.I2C4,
-            &ccdr.clocks,
-        );
+        // Touch I2C placeholder: provide a dummy I²C until the HAL 0.2 → EH1.0 adapter is ready
+        struct DummyI2c;
+        impl I2cError for DummyI2c {
+            type Error = Infallible;
+        }
+        impl EhI2c<SevenBitAddress> for DummyI2c {
+            fn read(
+                &mut self,
+                _address: SevenBitAddress,
+                _buf: &mut [u8],
+            ) -> Result<(), Self::Error> {
+                Ok(())
+            }
+            fn write(
+                &mut self,
+                _address: SevenBitAddress,
+                _bytes: &[u8],
+            ) -> Result<(), Self::Error> {
+                Ok(())
+            }
+            fn write_read(
+                &mut self,
+                _address: SevenBitAddress,
+                _bytes: &[u8],
+                _buf: &mut [u8],
+            ) -> Result<(), Self::Error> {
+                Ok(())
+            }
+            fn transaction(
+                &mut self,
+                _address: SevenBitAddress,
+                _ops: &mut [Operation<'_>],
+            ) -> Result<(), Self::Error> {
+                Ok(())
+            }
+        }
+        let i2c = DummyI2c;
         let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
         let mut input = Stm32h747iDiscoInput::new_with_int(i2c, touch_int);
         let button = DummyButton;

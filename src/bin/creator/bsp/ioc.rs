@@ -101,10 +101,20 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
 
     // Power configuration
     let mut pwr = Power::default();
-    if let Some(s) = kv.get("PWR.Supply").cloned().or_else(|| kv.get("RCC.SupplySource").cloned()) {
+    if let Some(s) = kv
+        .get("PWR.Supply")
+        .cloned()
+        .or_else(|| kv.get("RCC.SupplySource").cloned())
+    {
         // Normalize common CubeMX encodings
         let ss = s.to_uppercase();
-        let norm = if ss.contains("SMPS") { "SMPS" } else if ss.contains("LDO") { "LDO" } else { "" };
+        let norm = if ss.contains("SMPS") {
+            "SMPS"
+        } else if ss.contains("LDO") {
+            "LDO"
+        } else {
+            ""
+        };
         if !norm.is_empty() {
             pwr.supply = Some(norm.to_string());
         }
@@ -116,9 +126,7 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
     // Clocks/topology
     let sys_src = kv.get("RCC.SYSCLKSource").cloned();
     let pll_src = kv.get("RCC.PLLSource").cloned();
-    let hse_hz = kv
-        .get("RCC.HSE_VALUE")
-        .and_then(|v| v.parse::<u32>().ok());
+    let hse_hz = kv.get("RCC.HSE_VALUE").and_then(|v| v.parse::<u32>().ok());
     let d1cpu = kv.get("RCC.D1CPUPrescaler").cloned();
     let d1ppre = kv.get("RCC.D1PPRE").cloned();
     let d2ppre1 = kv.get("RCC.D2PPRE1").cloned();

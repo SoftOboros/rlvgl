@@ -15,6 +15,11 @@
 {% endif %}
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_macros)]
+#![allow(unused_variables)]
+#![allow(unused_unsafe)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
 {% if init_by is defined and this_core is defined %}
@@ -110,7 +115,7 @@ macro_rules! bsp_log { ($($arg:tt)*) => { _bsp_log(format_args!($($arg)*)); } }
 macro_rules! bsp_log { ($($arg:tt)*) => { let _ = ($(& $arg),*); } }
 {# Provide board defaults inline when not part of a parent module tree #}
 {% if mod_name is defined %}
-use super::board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
+use super::board::{Supply, Vos};
 {% else %}
 mod board {
     /// Supply mode for the PWR block.

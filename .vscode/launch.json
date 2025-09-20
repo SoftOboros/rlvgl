@@ -11,13 +11,46 @@
       "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
       "device": "STM32H747",
       "gdbTarget": "localhost:3333",
-      "runToEntryPoint": "Reset",
+      "objdumpPath": "/Users/iraabbott/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      
       "showDevDebugOutput": "raw",
       "preLaunchCommands": [
-        "monitor reset halt"
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
       ],
       "preLaunchTask": "build-disco (cm7)",
       "postLaunchCommands": []
+    },
+    {
+      "name": "CM7 attach + run (no reset)",
+      "type": "cortex-debug",
+      "request": "attach",
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:3333",
+      "objdumpPath": "/Users/iraabbott/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "build-disco (cm7)",
+      "preLaunchCommands": [
+        "set mem inaccessible-by-default off",
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "postAttachCommands": [
+        "continue"
+      ]
     },
     {
       "name": "CM4 attach (external OpenOCD)",
@@ -29,10 +62,17 @@
       "svdFile": "${workspaceRoot}/.svd/STM32H747_CM4.svd",
       "device": "STM32H747",
       "gdbTarget": "localhost:3334",
-      "runToEntryPoint": "Reset",
+      "objdumpPath": "/Users/iraabbott/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      
       "showDevDebugOutput": "raw",
       "preLaunchCommands": [
-        "monitor reset halt"
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
       ],
       "preLaunchTask": "build-disco (cm4)",
       "postLaunchCommands": []
@@ -64,11 +104,13 @@
       "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
       "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
       "device": "STM32H747",
-      "runToEntryPoint": "Reset",
+      
       "showDevDebugOutput": "raw",
       "preLaunchTask": "build-disco (cm7)",
       "preLaunchCommands": [
-        "monitor reset halt"
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
       ],
       "searchDir": [
         "${workspaceRoot}",
@@ -80,6 +122,11 @@
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
+      "objdumpPath": "/Users/iraabbott/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
       "postLaunchCommands": []
     },
     {
@@ -91,11 +138,13 @@
       "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco-cm4",
       "svdFile": "${workspaceRoot}/.svd/STM32H747_CM4.svd",
       "device": "STM32H747",
-      "runToEntryPoint": "Reset",
+      
       "showDevDebugOutput": "raw",
       "preLaunchTask": "build-disco (cm4)",
       "preLaunchCommands": [
-        "monitor reset halt"
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
       ],
       "searchDir": [
         "${workspaceRoot}",
@@ -107,6 +156,11 @@
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
+      "objdumpPath": "/Users/iraabbott/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
       "postLaunchCommands": []
     }
   ]

@@ -5,7 +5,7 @@
 
 use crate::blit::{BlitCaps, Blitter, PixelFmt, Rect, Surface};
 #[cfg(feature = "dma2d")]
-use stm32h7::stm32h747::DMA2D;
+use stm32h7::stm32h747cm7::DMA2D;
 
 /// Blitter backed by the STM32H7 DMA2D peripheral.
 #[cfg(feature = "dma2d")]

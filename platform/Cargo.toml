@@ -33,13 +33,17 @@ fatfs = { version = "0.3", default-features = false, features = ["alloc", "core_
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
 stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc"] }
 cortex-m = { version = "0.7", optional = true, features = ["critical-section-single-core", "cm7"] }
+cortex-m-semihosting = { version = "0.5", optional = true }
 
 [features]
 default = []
 regression = []
+## Enable optional SDRAM RAM test blocks in platform
+sdram_ramtest = []
 simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster", "dep:image", "tracing-subscriber"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
 stm32h747i_disco = ["stm32h7", "embedded-hal", "stm32h7xx-hal", "cortex-m", "rlvgl-core/fs"]
+semihosting = ["dep:cortex-m-semihosting"]
 fatfs_nostd = ["dep:fatfs"]
 dma2d = ["stm32h7"]
 fontdue = ["rlvgl-core/fontdue"]

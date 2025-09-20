@@ -202,8 +202,8 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
         let gif_ref = gif_demo.clone();
         #[cfg(feature = "jpeg")]
         let jpeg_ref = jpeg_demo.clone();
-        let root_w = root_w;
-        let root_h = root_h;
+        let _root_w = root_w;
+        let _root_h = root_h;
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
             if let Some(menu_w) = menu_ref.borrow_mut().take() {
                 pending_rm.borrow_mut().push(menu_w);
@@ -214,7 +214,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     width: 100,
                     height: 170,
                 })));
-        let children = Vec::new();
+                let children = Vec::new();
 
                 #[cfg(feature = "qrcode")]
                 {

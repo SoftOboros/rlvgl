@@ -99,9 +99,14 @@ version = "0.7"
 features = ["critical-section-single-core"]
 optional = true
 
+[dependencies.cortex-m-semihosting]
+version = "0.5"
+optional = true
+
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32h7xx-hal]
 version = "0.16"
 optional = true
+features = ["stm32h747cm7", "sdmmc", "fmc"]
 
 [dependencies.panic-halt]
 version = "1.0.0"
@@ -266,6 +271,11 @@ syn = { version = "2", features = ["full"] }
 [features]
 default = []
 regression = []
+dma2d = ["rlvgl-platform/dma2d"]
+hal_sdram = ["dep:stm32-fmc"]
+sdram_ramtest = ["rlvgl-platform/sdram_ramtest"]
+pac_sdram_init = []
+skip_sdram_mpu = []
 png = ["rlvgl-core/png", "rlvgl-platform/png"]
 jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg"]
 gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif"]
@@ -368,7 +378,8 @@ semihosting = ["dep:cortex-m-semihosting"]
 backlight_pwm = []
 fatfs_nostd = ["rlvgl-platform/fatfs_nostd"]
 sd_assets_demo = []
-sdram_ramtest = []
+bringup_bkpt = []
+ 
 
 
 [profile.release]
@@ -381,24 +392,30 @@ strip = true
 incremental = false
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 debug = true
 incremental = false
 
+# Make key HAL/deps unoptimized for better single-step debugging
+[profile.dev.package.stm32-fmc]
+opt-level = 0
+
+[profile.dev.package.stm32h7xx-hal]
+opt-level = 0
+
 [workspace.dependencies]
 image = "0.25.6"
-objc2-app-kit = "0.3.1"
+## Removed unavailable objc2* workspace deps to fix crates.io resolution
+
+# macOS-specific Objective‑C crates required by simulator/windowing on macOS.
+[target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.2"
 objc2-foundation = "0.3.1"
+objc2-app-kit = "0.3.1"
 
 [workspace]
 members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040", "chips/stm/bsps", "rlvgl-decomp"]
-[dependencies.stm32h7xx-hal]
-version = "0.16"
+## duplicated non-target-specific stm32h7xx-hal removed; use the target-specific one above
+[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32-fmc]
+version = "0.3.2"
 optional = true
-features = ["stm32h747cm7", "sdmmc"]
-[dependencies.cortex-m-semihosting]
-version = "0.5"
-optional = true
-
-resolver = "2"

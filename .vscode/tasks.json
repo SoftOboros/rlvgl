@@ -1,31 +1,81 @@
 {
+  // VS Code tasks for rlvgl STM32H747I-DISCO builds
   "version": "2.0.0",
   "tasks": [
     {
       "label": "build-disco (cm7)",
       "type": "shell",
-      "command": "cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--target", "thumbv7em-none-eabihf",
+        "--bin", "rlvgl-stm32h747i-disco",
+        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest"
+      ],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "build-disco (cm7, release)",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--release",
+        "--target", "thumbv7em-none-eabihf",
+        "--bin", "rlvgl-stm32h747i-disco",
+        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest"
+      ],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "build-disco (cm7 + sdram)",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--target", "thumbv7em-none-eabihf",
+        "--bin", "rlvgl-stm32h747i-disco",
+        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest"
+      ],
       "group": "build",
       "problemMatcher": ["$rustc"]
     },
     {
       "label": "build-disco (cm4)",
       "type": "shell",
-      "command": "cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco-cm4 --features stm32h747i_disco_cm4",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--target", "thumbv7em-none-eabihf",
+        "--bin", "rlvgl-stm32h747i-disco-cm4",
+        "--features", "stm32h747i_disco_cm4"
+      ],
       "group": "build",
       "problemMatcher": ["$rustc"]
     },
     {
       "label": "build-sim",
       "type": "shell",
-      "command": "cargo build --bin rlvgl-sim --features simulator,qrcode,png,jpeg,fontdue",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--bin", "rlvgl-sim",
+        "--features", "simulator,qrcode,png,jpeg,gif,fontdue"
+      ],
       "group": "build",
       "problemMatcher": ["$rustc"]
     },
     {
       "label": "build-creator",
       "type": "shell",
-      "command": "cargo build --bin rlvgl-creator --features creator",
+      "command": "cargo",
+      "args": [
+        "build",
+        "--bin", "rlvgl-creator",
+        "--features", "creator"
+      ],
       "group": "build",
       "problemMatcher": ["$rustc"]
     }

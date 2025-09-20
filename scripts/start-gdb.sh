@@ -74,12 +74,18 @@ if [ -n "$ELF_RESOLVED" ]; then
   echo "[gdb] using ELF: $ELF_RESOLVED"
 fi
 
+EXTRA_ARGS=()
+# If a workspace .gdbinit exists, source it to load user macros/helpers
+if [ -f ".gdbinit" ]; then
+  EXTRA_ARGS+=( -x .gdbinit )
+fi
+
 while :; do
   echo "[gdb] launching with $INIT"
   if [ -n "$ELF_RESOLVED" ]; then
-    "$GDB_BIN_RESOLVED" -q "$ELF_RESOLVED" --command="$INIT" || true
+    "$GDB_BIN_RESOLVED" -q "${EXTRA_ARGS[@]}" "$ELF_RESOLVED" --command="$INIT" || true
   else
-    "$GDB_BIN_RESOLVED" -q --command="$INIT" || true
+    "$GDB_BIN_RESOLVED" -q "${EXTRA_ARGS[@]}" --command="$INIT" || true
   fi
   echo "[gdb] disconnected; retrying in 1s"
   sleep 1
