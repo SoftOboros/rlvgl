@@ -227,10 +227,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         );
         let fb = Self::init_sdram();
         // Minimal DSI host setup for RGB565 on VCID 0 (video mode tuning TBD)
-        disp.configure_dsi_video_mode(width, height);
+        //disp.configure_dsi_video_mode(width, height);
         // Initialize a simple SDRAM allocator and allocate the primary framebuffer
         // H747I-DISCO uses a 32 MB SDRAM at 0xC000_0000.
-        sdram_alloc::init(0xC000_0000, 32 * 1024 * 1024);
+        sdram_alloc::init(fb, 32 * 1024 * 1024);
         let fb_bytes = (width as usize) * (height as usize) * 2; // RGB565
         let fb_addr = sdram_alloc::alloc(fb_bytes, 64).unwrap_or(fb);
         // Allocate a back buffer as well for potential page-flip
@@ -307,7 +307,6 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             .twcr
             .write(|w| unsafe { w.bits((totalh << 16) | totalw) });
         self.ltdc.bccr.write(|w| unsafe { w.bits(0) });
-        self.ltdc.gcr.modify(|_, w| w.ltdcen().set_bit());
     }
     #[cfg(feature = "stm32h747i_disco")]
     fn set_backlight(&mut self, level: u16)
@@ -363,6 +362,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         layer0.cacr.write(|w| w.consta().bits(255));
         layer0.bfcr.write(|w| unsafe { w.bits(0x0405) });
         layer0.cr.modify(|_, w| w.len().enabled());
+        // Enable the controller only after a valid framebuffer address is programmed
+        self.ltdc.gcr.modify(|_, w| w.ltdcen().set_bit());
         self.ltdc.srcr.write(|w| w.imr().reload());
     }
 
@@ -370,6 +371,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
+    #[cfg(feature = "experimental_dsi_host")]
     fn configure_dsi_video_mode(&mut self, _width: u16, _height: u16) {
         // Minimal configuration: set virtual channel and color coding to RGB565.
         // Full video mode timing/setup TBD.
@@ -408,6 +410,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
+    #[cfg(not(feature = "experimental_dsi_host"))]
+    fn configure_dsi_video_mode(&mut self, _width: u16, _height: u16) {
+        // DSI enable sequence is experimental and disabled by default to avoid wedging
+        // the bus during bring-up.
+        let _ = (_width, _height);
+    }
+
+    #[cfg(all(
+        feature = "stm32h747i_disco",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    #[cfg(feature = "experimental_dsi_host")]
     fn enable_dsi_host_2lane_60hz(&mut self) -> bool {
         // NOTE: This is a scaffold for the host enable sequence. Exact PLL and
         // wrapper configuration values depend on reference clock and desired
@@ -506,6 +520,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
+    #[cfg(feature = "experimental_dsi_host")]
     fn wait_pll_lock(dsi: &DSIHOST, tries: u32, delay_cycles: u32) -> bool {
         let mut n = tries;
         while n > 0 {
@@ -518,6 +533,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         false
     }
 
+    #[cfg(feature = "experimental_dsi_host")]
     fn wait_lanes_ready(dsi: &DSIHOST, tries: u32, delay_cycles: u32) -> bool {
         let mut n = tries;
         while n > 0 {
@@ -536,6 +552,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     }
 
     #[inline]
+    #[cfg(feature = "experimental_dsi_host")]
     fn log_timeout(msg: &str) {
         #[cfg(feature = "semihosting")]
         {

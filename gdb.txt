@@ -1,0 +1,71 @@
+Remote debugging using localhost:1337
+[remote] start_remote_1: enter
+  [remote] Sending packet: $qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;memory-tagging+#ec
+  [remote] Received Ack
+  [remote] Packet received: PacketSize=1000;vContSupported+;multiprocess+;QStartNoAckMode+;hwbreak+;qXfer:features:read+;qXfer:memory-map:read+
+  [remote] packet_ok: Packet qSupported (supported-packets) is supported
+  [remote] Sending packet: $vCont?#49
+  [remote] Received Ack
+  [remote] Packet received: vCont;c;C;s;S
+  [remote] packet_ok: Packet vCont (verbose-resume) is supported
+  [remote] Sending packet: $vMustReplyEmpty#3a
+  [remote] Received Ack
+  [remote] Packet received: 
+  [remote] Sending packet: $QStartNoAckMode#b0
+  [remote] Received Ack
+  [remote] Packet received: OK
+  [remote] Sending packet: $!#21
+  [remote] Packet received: 
+  [remote] Sending packet: $Hgp0.0#ad
+  [remote] Packet received: OK
+  [remote] Sending packet: $qXfer:features:read:target.xml:0,ffb#79
+  [remote] Packet received: m<?xml version="1.0"?>\n        <!DOCTYPE target SYSTEM "gdb-target.dtd">\n        <target version="1.0">\n        <architecture>armv7</architecture><feature name='org.gnu.gdb.arm.m-profile'><reg name='r0' bitsize='32' type='uint32'/><reg name='r1' bitsize='32' type='uint32'/><reg name='r2' bitsize='32' type='uint32'/><reg name='r3' bitsize='32' type='uint32'/><reg name='r4' bitsize='32' type='uint32'/><reg name='r5' bitsize='32' type='uint32'/><reg name='r6' bitsize='32' type='uint32'/><reg name='r7' bitsize= [1619 bytes omitted]
+  [remote] Sending packet: $qXfer:features:read:target.xml:852,ffb#e8
+  [remote] Packet received: l
+  [remote] Sending packet: $qTStatus#49
+  [remote] Packet received: 
+  [remote] packet_ok: Packet qTStatus (trace-status) is NOT supported
+  [remote] Sending packet: $?#3f
+  [remote] Packet received: T05thread:p01.01;
+  [remote] Sending packet: $qfThreadInfo#bb
+  [remote] Packet received: mp01.01,p01.02
+  [remote] Sending packet: $qsThreadInfo#c8
+  [remote] Packet received: l
+  [remote] Sending packet: $qAttached:1#fa
+  [remote] Packet received: 1
+  [remote] packet_ok: Packet qAttached (query-attached) is supported
+  [remote] Sending packet: $Hc-1#09
+  [remote] Packet received: OK
+  [remote] Sending packet: $qOffsets#4b
+  [remote] Packet received: 
+  [remote] wait: enter
+  [remote] wait: exit
+  [remote] Sending packet: $g#67
+  [remote] Packet received: 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000220ffffffff980200080000022000000000000000010000000000000001
+  [remote] Sending packet: $qfThreadInfo#bb
+  [remote] Packet received: mp01.01,p01.02
+  [remote] Sending packet: $qsThreadInfo#c8
+  [remote] Packet received: l
+  [remote] Sending packet: $qXfer:memory-map:read::0,ffb#18
+  [remote] Packet received: m<?xml version="1.0"?>\n<!DOCTYPE memory-map PUBLIC "+//IDN gnu.org//DTD GDB Memory Map V1.0//EN" "http://sourceware.org/gdb/gdb-memory-map.dtd">\n<memory-map>\n<memory type="ram" start="0x0" length="0x10000"/>\\n<memory type="rom" start="0x8000000" length="0x100000"/>\\n<memory type="rom" start="0x8100000" length="0x100000"/>\\n<memory type="ram" start="0x20000000" length="0x20000"/>\\n<memory type="ram" start="0x24000000" length="0x80000"/>\\n<memory type="ram" start="0x30000000" length="0x20000"/>\\n<memory type= [354 bytes omitted]
+  [remote] Sending packet: $qXfer:memory-map:read::361,ffb#82
+  [remote] Packet received: l
+  [remote] Sending packet: $m8000298,4#38
+  [remote] Packet received: 24f04afc
+0x08000298 in Reset ()
+  [remote] Sending packet: $qSymbol::#5b
+  [remote] Packet received: 
+  [remote] packet_ok: Packet qSymbol (symbol-lookup) is NOT supported
+[remote] start_remote_1: exit
+[remote] Sending packet: $qRcmd,72657365742068616c74#72
+[remote] Packet received: O526573657474696e6720616e642068616c74696e67207461726765740a5461726765742068616c7465640a
+Resetting and halting target
+Target halted
+[remote] Packet received: OK
+Loading section .vector_table, size 0x298 lma 0x8000000
+Load failed
+Quit
+Quit
+Detaching from program: /Users/iraabbott/rlvgl/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco, process 1
+[remote] Sending packet: $D;1#b0
+Remote communication error.  Target disconnected: Broken pipe.

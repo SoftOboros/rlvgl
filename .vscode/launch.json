@@ -27,6 +27,30 @@
       "postLaunchCommands": []
     },
     {
+      "name": "CM7 attach (probe-rs gdb)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:1337",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "probe-rs gdb (cm7)",
+      "preLaunchCommands": [
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "noLoad": true,
+      "postLaunchCommands": []
+    },
+    {
       "name": "CM7 attach + run (no reset)",
       "type": "cortex-debug",
       "request": "attach",

@@ -1,4 +1,9 @@
-.PHONY: help gen-stm32h747i-disco-bsp build-disco build-disco-cm4 build-disco-all openocd openocd-erase
+.PHONY: help gen-stm32h747i-disco-bsp build-disco build-disco-cm4 build-disco-all \
+	openocd openocd-dual openocd-erase probe-rs-gdb
+
+ELF_CM7 := target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco
+PROBE_ID ?= 0483:374e:004F00273133510837363734
+PROBE_SPEED_KHZ ?= 50
 
 help:
 	@echo "Convenience targets:"
@@ -9,6 +14,7 @@ help:
 	@echo "  make openocd                    # Start OpenOCD (ST-Link + STM32H7)"
 	@echo "  make openocd-dual               # Start OpenOCD with dual-core cfg (CM7 on 3333, CM4 on 3334)"
 	@echo "  make openocd-erase              # Full chip erase via OpenOCD (DANGER)"
+	@echo "  make probe-rs-gdb               # Flash CM7 image, then launch probe-rs GDB server"
 
 gen-stm32h747i-disco-bsp:
 	STM32_PWR_SUPPLY=SMPS STM32_PWR_SDLEVEL=VOS1 \
@@ -23,6 +29,16 @@ build-disco-cm4:
 	  --bin rlvgl-stm32h747i-disco-cm4 --features stm32h747i_disco_cm4
 
 build-disco-all: build-disco build-disco-cm4
+
+probe-rs-gdb: build-disco
+	probe-rs download --chip STM32H747XIHx \
+	  --protocol swd --speed $(PROBE_SPEED_KHZ) \
+	  --non-interactive --connect-under-reset \
+	  --probe $(PROBE_ID) $(ELF_CM7) && \
+	probe-rs gdb --chip STM32H747XIHx \
+	  --protocol swd --speed $(PROBE_SPEED_KHZ) \
+	  --non-interactive --connect-under-reset --reset-halt \
+	  --probe $(PROBE_ID)
 
 # Basic OpenOCD sessions; adjust interface/target as needed
 openocd:
