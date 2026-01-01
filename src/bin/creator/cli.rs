@@ -22,8 +22,10 @@ pub mod gen_lib;
 pub mod init;
 pub mod lottie;
 pub mod manifest;
+pub mod new;
 pub mod preview;
 pub mod raw;
+pub mod run;
 pub mod scaffold;
 pub mod scan;
 pub mod schema;
@@ -39,6 +41,12 @@ pub mod vendor;
 enum CoreSel {
     Cm7,
     Cm4,
+}
+
+/// Target to run.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum RunTarget {
+    Sim,
 }
 
 /// CLI arguments for rlgvl-creator.
@@ -80,6 +88,20 @@ struct Cli {
 enum Command {
     /// Initialize asset directories and a default manifest
     Init,
+    /// Create a new rlvgl workspace
+    New {
+        /// Name of the project
+        name: String,
+        /// Target MCU (optional)
+        #[arg(long)]
+        mcu: Option<String>,
+    },
+    /// Build and run a target
+    Run {
+        /// Target to run
+        #[arg(value_enum)]
+        target: RunTarget,
+    },
     /// Scan a directory for assets and update the manifest
     Scan {
         /// Root path containing assets
@@ -455,6 +477,10 @@ pub fn run() -> Result<()> {
 
     match cli.command {
         Command::Init => init::run(&cli.manifest)?,
+        Command::New { name, mcu } => new::run(&name, mcu.as_deref())?,
+        Command::Run { target } => match target {
+            RunTarget::Sim => run::sim()?,
+        },
         Command::Scan { path } => scan::run(&path, &cli.manifest)?,
         Command::Check { path, fix } => check::run(&path, &cli.manifest, fix)?,
         Command::Vendor {

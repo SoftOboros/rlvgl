@@ -179,7 +179,8 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
     let mut cur_idx: Option<u8> = None;
     let mut run_color: Option<u16> = None;
     let mut run_len: usize = 0;
-    let flush_run = |out: &mut Vec<u8>,
+    let flush_run = |_palette: &Vec<u16>,
+                     out: &mut Vec<u8>,
                      base: u8,
                      cur_idx: Option<u8>,
                      run_color: Option<u16>,
@@ -244,7 +245,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
                 }
                 _ => {
                     // flush previous run
-                    let _ = flush_run(&mut out, base, cur_idx, run_color, run_len);
+                    let _ = flush_run(&palette, &mut out, base, cur_idx, run_color, run_len);
                     run_color = Some(c);
                     cur_idx = this_idx;
                     run_len = 1;
@@ -253,7 +254,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
         }
     }
     // Flush tail
-    let _ = flush_run(&mut out, base, cur_idx, run_color, run_len);
+    let _ = flush_run(&palette, &mut out, base, cur_idx, run_color, run_len);
 
     Ok((palette, out))
 }

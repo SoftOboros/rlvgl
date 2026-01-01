@@ -33,7 +33,9 @@ See crate overviews for:
 - [TODO-CHIP-SUPPORT.md](./TODO-CHIP-SUPPORT.md) – Chip support backlog.
 - [TODO-CREATOR.md](./TODO-CREATOR.md) – Outstanding work for rlvgl-creator.
 - [TODO-CREATOR-BSP.md](./TODO-CREATOR-BSP.md) – BSP generator tasks.
-- [TODO-CREATOR-UI-FULL.md](./TODO-CREATOR-UI-FULL.md) – Creator UI completion list.
+- [TODO-CREATOR-UI-FULL.md](./TODO-CREATOR-UI-FULL.md) – Roadmap for the full GUI version of the creator tool.
+- [TODO-CREATOR-WORKSPACES.md](./TODO-CREATOR-WORKSPACES.md) – Roadmap for workspace-first project scaffolding and simulator integration.
+- [TODO-DECOMP.md](./TODO-DECOMP.md) – Plans for the image decompression module.
 - [TODO-FATFS-ASSETS.md](./TODO-FATFS-ASSETS.md) – FATFS asset storage notes.
 - [TODO-MICROPYTHON-DISCO.md](./TODO-MICROPYTHON-DISCO.md) – MicroPython support tasks.
 - [TODO-PLUGGABLE-BLITTER.md](./TODO-PLUGGABLE-BLITTER.md) – Pluggable blitter work items.

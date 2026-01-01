@@ -36,6 +36,7 @@ pub mod animation;
 pub mod event;
 #[cfg(feature = "fs")]
 pub mod fs;
+pub mod interface;
 pub mod plugins;
 pub mod renderer;
 pub mod style;
