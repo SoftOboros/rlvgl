@@ -9,7 +9,7 @@
 //!   - 0xFF: Single inline pixel. Next two bytes are RGB565; emit once.
 //!   - 0xFE: Double inline pixel. Next two bytes are RGB565; emit twice.
 //!   - 0xFD: Long repeat. Repeats the most recent palette index color for
-//!           (SHORT_REPEAT_MAX + 1 + next_byte) pixels.
+//!     (SHORT_REPEAT_MAX + 1 + next_byte) pixels.
 //! - Data bytes:
 //!   - 0..(palette_len-1): palette index; emit once and update recent index.
 //!   - palette_len..(palette_len + SHORT_REPEAT_MAX): short repeat; emit the
@@ -162,7 +162,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
     let mut pairs: Vec<(u16, u32)> = hist.into_iter().collect();
     pairs.sort_by(|a, b| b.1.cmp(&a.1));
     let take = core::cmp::min(pairs.len(), MAX_PALETTE);
-    let mut palette: Vec<u16> = pairs.iter().take(take).map(|p| p.0).collect();
+    let palette: Vec<u16> = pairs.iter().take(take).map(|p| p.0).collect();
     if palette.len() > MAX_PALETTE {
         return Err(Error::PaletteTooLarge);
     }
@@ -179,8 +179,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
     let mut cur_idx: Option<u8> = None;
     let mut run_color: Option<u16> = None;
     let mut run_len: usize = 0;
-    let flush_run = |palette: &Vec<u16>,
-                     out: &mut Vec<u8>,
+    let flush_run = |out: &mut Vec<u8>,
                      base: u8,
                      cur_idx: Option<u8>,
                      run_color: Option<u16>,
@@ -245,7 +244,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
                 }
                 _ => {
                     // flush previous run
-                    let _ = flush_run(&palette, &mut out, base, cur_idx, run_color, run_len);
+                    let _ = flush_run(&mut out, base, cur_idx, run_color, run_len);
                     run_color = Some(c);
                     cur_idx = this_idx;
                     run_len = 1;
@@ -254,7 +253,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
         }
     }
     // Flush tail
-    let _ = flush_run(&palette, &mut out, base, cur_idx, run_color, run_len);
+    let _ = flush_run(&mut out, base, cur_idx, run_color, run_len);
 
     Ok((palette, out))
 }

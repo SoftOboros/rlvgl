@@ -23,6 +23,7 @@ pub enum TemplateKind {
     /// Emit PAC-style initialization code.
     Pac,
     /// Render using a custom MiniJinja template.
+    #[allow(dead_code)]
     Custom(PathBuf),
 }
 
@@ -441,7 +442,7 @@ mod tests {
         let mut env = Environment::new();
         env.add_template("pac", tmpl).unwrap();
 
-        let mut spec = ir::Ir {
+        let spec = ir::Ir {
             mcu: "STM32H747XIHx".to_string(),
             package: "TFBGA240".to_string(),
             clocks: ir::Clocks::default(),
@@ -524,6 +525,7 @@ mod tests {
 }
 
 /// Emits a top-level `mod.rs` exposing available forms for a board.
+#[allow(dead_code)]
 pub(crate) fn emit_board_mod(
     out_dir: &Path,
     has_hal: bool,

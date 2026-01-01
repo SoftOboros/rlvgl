@@ -1,0 +1,11 @@
+# tokens-invalid.yaml - Invalid token fixture for svelte checks.
+version: 1
+colors:
+  Primary: "#GGGGGG"
+spacing:
+  xs: 2
+  xl: 300
+radii:
+  md: 300
+fonts:
+  body: ""

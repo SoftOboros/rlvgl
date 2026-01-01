@@ -214,7 +214,8 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     width: 100,
                     height: 170,
                 })));
-                let children = Vec::new();
+                #[allow(unused_mut)]
+                let mut children = Vec::new();
 
                 #[cfg(feature = "qrcode")]
                 {

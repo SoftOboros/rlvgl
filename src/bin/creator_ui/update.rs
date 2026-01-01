@@ -38,7 +38,7 @@ impl App for CreatorApp {
         }
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
                 for (group, cmds) in super::menus::MENU_GROUPS {
                     ui.menu_button(*group, |ui| {
                         for cmd in *cmds {
@@ -81,7 +81,7 @@ impl App for CreatorApp {
             ui.heading("Assets");
             let stroke =
                 egui::Stroke::new(1.0, ui.visuals().widgets.noninteractive.fg_stroke.color);
-            egui::Frame::none().stroke(stroke).show(ui, |ui| {
+            egui::Frame::NONE.stroke(stroke).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("Search:");
                     ui.text_edit_singleline(&mut self.filter);
@@ -191,6 +191,7 @@ impl App for CreatorApp {
                             rect,
                             0.0,
                             egui::Stroke::new(2.0, egui::Color32::GREEN),
+                            egui::StrokeKind::Inside,
                         );
                     }
                 } else {
@@ -618,6 +619,41 @@ impl App for CreatorApp {
             self.bsp_open = open;
         }
 
+        if self.sim_open {
+            let mut open = true;
+            egui::Window::new("Emulator")
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    let mut prefs_changed = false;
+                    ui.horizontal(|ui| {
+                        ui.label("Screen:");
+                        prefs_changed |= ui.text_edit_singleline(&mut self.sim_width).changed();
+                        ui.label("x");
+                        prefs_changed |= ui.text_edit_singleline(&mut self.sim_height).changed();
+                    });
+                    prefs_changed |= ui
+                        .checkbox(&mut self.sim_use_wgpu, "Use wgpu blitter")
+                        .changed();
+                    ui.separator();
+                    ui.label("Plugins:");
+                    prefs_changed |= ui.checkbox(&mut self.sim_show_qrcode, "QR code").changed();
+                    prefs_changed |= ui.checkbox(&mut self.sim_show_png, "PNG").changed();
+                    prefs_changed |= ui.checkbox(&mut self.sim_show_jpeg, "JPEG").changed();
+                    prefs_changed |= ui.checkbox(&mut self.sim_show_gif, "GIF").changed();
+                    if prefs_changed {
+                        self.save_sim_prefs();
+                    }
+                    ui.separator();
+                    if ui.button("Launch").clicked() {
+                        self.launch_simulator();
+                    }
+                    if let Some(err) = &self.sim_prefs_error {
+                        ui.colored_label(egui::Color32::RED, err);
+                    }
+                });
+            self.sim_open = open;
+        }
+
         if self.about_open {
             let mut open = true;
             egui::Window::new("About rlvgl Creator")
@@ -675,7 +711,7 @@ impl App for CreatorApp {
                                 "
 ",
                             );
-                            ui.output_mut(|o| o.copied_text = all);
+                            ctx.copy_text(all);
                         }
                     });
                     ui.separator();

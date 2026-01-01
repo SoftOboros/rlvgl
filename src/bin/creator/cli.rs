@@ -2,10 +2,10 @@
 //!
 //! Provides CLI utilities for managing rlvgl assets. Supports the `init`, `scan`, `check`,
 //! `vendor`, `convert`, `preview`, `add-target`, `sync`, `scaffold`, `apng`, `schema`, `fonts`,
-//! `svg`, and `lottie` commands to bootstrap asset directories, update a manifest, validate
-//! asset policies, copy assets to build outputs, regenerate feature lists, generate thumbnails,
-//! register targets, build animations, pack fonts, render SVGs, import Lottie animations, and
-//! generate dual-mode crates.
+//! `svg`, `lottie`, `svelte`, `sim`, and `ui` commands to bootstrap asset directories, update a
+//! manifest, validate asset policies, copy assets to build outputs, regenerate feature lists,
+//! generate thumbnails, register targets, build animations, pack fonts, render SVGs, import
+//! Lottie animations, align Svelte tokens, and launch the desktop UI or simulator.
 
 use std::path::PathBuf;
 
@@ -27,6 +27,8 @@ pub mod raw;
 pub mod scaffold;
 pub mod scan;
 pub mod schema;
+pub mod sim;
+pub mod svelte;
 pub mod svg;
 pub mod sync;
 pub mod util;
@@ -175,6 +177,15 @@ enum Command {
         #[arg(long)]
         threshold: Option<u8>,
     },
+    /// Svelte alignment commands
+    Svelte {
+        #[command(subcommand)]
+        cmd: SvelteCommand,
+    },
+    /// Launch the desktop UI.
+    Ui,
+    /// Run the desktop simulator.
+    Sim(sim::SimArgs),
     /// Generate a `lib.rs` from generated BSP fragments
     GenLib {
         /// Directory containing generated modules
@@ -227,6 +238,55 @@ enum FontsCommand {
             default_value = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         )]
         chars: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum SvelteCommand {
+    /// Generate token outputs for web + rlvgl
+    Tokens {
+        /// Input token YAML
+        input: PathBuf,
+        /// Output directory
+        out: PathBuf,
+        /// Optional token mode (defaults to the first/only mode)
+        #[arg(long)]
+        mode: Option<String>,
+    },
+    /// Compile Svelte components into rlvgl output
+    Compile {
+        /// Input Svelte file or directory
+        input: PathBuf,
+        /// Output directory
+        out: PathBuf,
+        /// Optional token YAML to resolve styles
+        #[arg(long)]
+        tokens: Option<PathBuf>,
+    },
+    /// Emit renderer glue for Svelte → WASM → rlvgl
+    Wasm {
+        /// Output directory
+        out: PathBuf,
+        /// Optional package name for generated files
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Output JSON schema for tokens + UI IR
+    Schema {
+        /// Optional output file (defaults to stdout)
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Validate tokens + Svelte subset constraints
+    Check {
+        /// Input Svelte file or directory
+        input: PathBuf,
+        /// Optional token YAML
+        #[arg(long)]
+        tokens: Option<PathBuf>,
+        /// Optional token mode (defaults to the first/only mode)
+        #[arg(long)]
+        mode: Option<String>,
     },
 }
 
@@ -439,6 +499,28 @@ pub fn run() -> Result<()> {
             dpi,
             threshold,
         } => svg::run(&svg, &out, &dpi, threshold)?,
+        Command::Svelte { cmd } => match cmd {
+            SvelteCommand::Tokens { input, out, mode } => {
+                svelte::tokens(&input, &out, mode.as_deref())?
+            }
+            SvelteCommand::Compile { input, out, tokens } => {
+                svelte::compile(&input, &out, tokens.as_deref())?
+            }
+            SvelteCommand::Wasm { out, name } => svelte::wasm(&out, name.as_deref())?,
+            SvelteCommand::Schema { out } => svelte::schema(out.as_deref())?,
+            SvelteCommand::Check {
+                input,
+                tokens,
+                mode,
+            } => svelte::check(&input, tokens.as_deref(), mode.as_deref())?,
+        },
+        Command::Ui => {
+            #[cfg(feature = "creator_ui")]
+            crate::ui::run()?;
+            #[cfg(not(feature = "creator_ui"))]
+            return Err(anyhow!("creator_ui feature is not enabled"));
+        }
+        Command::Sim(args) => sim::run(args)?,
         Command::GenLib {
             src,
             out,

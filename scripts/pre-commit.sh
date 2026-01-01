@@ -8,6 +8,10 @@ cargo fmt --all
 echo "[phase 1] clippy (core/workspace)"
 cargo clippy --workspace -- -D warnings
 
+if [[ -d "$HOME/.local/rlottie/lib" ]]; then
+  export DYLD_LIBRARY_PATH="$HOME/.local/rlottie/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+fi
+
 echo "[phase 2] build+test: creator CLI"
 # Build creator CLI and run its tests (no UI)
 cargo build --bin rlvgl-creator --features creator

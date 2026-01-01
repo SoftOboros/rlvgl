@@ -8,6 +8,7 @@
     feature = "jpeg",
     feature = "qrcode",
     feature = "lottie",
+    feature = "fontdue",
     test,
 ))]
 use alloc::vec::Vec;

@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -82,7 +82,7 @@ default-features = false
 optional = true
 
 [dependencies.zstd]
-version = "0.12"
+version = "0.13.3"
 optional = true
 [dependencies.image]
 version = "0.25"
@@ -122,10 +122,11 @@ optional = true
 
 [dependencies.apng]
 version = "0.3"
+features = ["png"]
 optional = true
 
 [dependencies.png]
-version = "0.17"
+version = "0.18.0"
 optional = true
 
 [dependencies.clap]
@@ -156,7 +157,7 @@ optional = true
 
 
 [dependencies.schemars]
-version = "0.8"
+version = "1.2.0"
 features = ["derive"]
 optional = true
 
@@ -178,7 +179,7 @@ version = "2"
 optional = true
 
 [dependencies.spdx]
-version = "0.11"
+version = "0.13.3"
 optional = true
 
 [dependencies.rayon]
@@ -190,7 +191,7 @@ version = "0.45.1"
 optional = true
 
 [dependencies.eframe]
-version = "0.29"
+version = "0.33.3"
 optional = true
 
 [dependencies.open]
@@ -198,11 +199,11 @@ version = "5"
 optional = true
 
 [dependencies.notify]
-version = "6"
+version = "8.2.0"
 optional = true
 
 [dependencies.rfd]
-version = "0.15"
+version = "0.16.0"
 optional = true
 
 [dependencies.rlvgl-bsps-stm]
@@ -265,7 +266,7 @@ anyhow = "1"
 indexmap = { version = "2", features = ["serde"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
-zstd = "0.12"
+zstd = "0.13.3"
 syn = { version = "2", features = ["full"] }
 
 [features]
@@ -372,6 +373,12 @@ creator_ui = [
     "dep:rlvgl-chips-renesas",
     "dep:rlvgl-chips-ti",
     "dep:rlvgl-chips-rp2040",
+    "simulator",
+    "png",
+    "jpeg",
+    "gif",
+    "qrcode",
+    "fontdue",
 ]
 bsp_log = []
 semihosting = ["dep:cortex-m-semihosting"]
