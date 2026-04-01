@@ -1,0 +1,13 @@
+.DS_Store
+build
+mx.scratch
+.settings/
+.envrc
+.ninja
+*.o
+mx-generated.cmake
+*.elf
+*.bin
+.mxproject
+tests/ring_buffer_test
+tests/fixtures/open_channel.wav

@@ -30,7 +30,7 @@ fi
 if [[ "$need_regen" == true ]]; then
   echo "[gen-bsp] Generating BSP with STM32_PWR_SUPPLY=$STM32_PWR_SUPPLY STM32_PWR_SDLEVEL=$STM32_PWR_SDLEVEL"
   cargo run --bin rlvgl-creator --features creator -- \
-    bsp from-ioc ./examples/stm32h747i-disco/DiscoBiscuit.ioc \
+    bsp from-ioc ./examples/stm32h747i-disco/DiscoBiscuit/DiscoBiscuit.ioc \
     --out "$OUT_DIR" \
     --emit-hal --emit-pac \
     --grouped-writes --with-deinit \

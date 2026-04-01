@@ -66,22 +66,33 @@ usart5 = []
 usart6 = []
 usart7 = []
 usart8 = []
+c_hal = ["dep:cc"]
 stm32-c0 = []
 stm32-f0 = []
+stm32-f1 = []
+stm32-f2 = []
 stm32-f3 = []
 stm32-f4 = []
 stm32-f7 = []
 stm32-g0 = []
 stm32-g4 = []
 stm32-h5 = []
-stm32-h7 = []
+stm32-h7 = ["dep:stm32h7"]
 stm32-l0 = []
 stm32-l1 = []
 stm32-l4 = []
 stm32-l5 = []
+stm32-mp = []
 stm32-n6 = []
 stm32-u0 = []
+stm32-u3 = []
 stm32-u5 = []
+stm32-wb = []
+stm32-wba = []
+stm32-wl = []
+
+[build-dependencies]
+cc = { version = "1", optional = true }
 
 [dependencies.stm32c0xx-hal]
 version = "0.0.0"
@@ -122,6 +133,12 @@ default-features = false
 version = "0.0.0"
 optional = true
 default-features = false
+
+[dependencies.stm32h7]
+version = "0.15.1"
+optional = true
+default-features = false
+features = ["stm32h747cm7"]
 
 [dependencies.stm32h7xx-hal]
 version = "0.16.0"

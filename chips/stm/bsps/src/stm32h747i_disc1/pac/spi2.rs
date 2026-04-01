@@ -12,7 +12,7 @@
 #![allow(clippy::too_many_arguments)]
 #![cfg(feature = "spi2")]
 
-use stm32h7::stm32h747 as pac;
+use stm32h7::stm32h747cm7 as pac;
 
 /// Enables GPIO clocks required by the generated board.
 

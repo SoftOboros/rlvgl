@@ -12,7 +12,7 @@
 #![allow(clippy::too_many_arguments)]
 #![cfg(feature = "usart1")]
 
-use stm32h7::stm32h7 as pac;
+use stm32h7::stm32h7b3 as pac;
 
 /// Enables GPIO clocks required by the generated board.
 

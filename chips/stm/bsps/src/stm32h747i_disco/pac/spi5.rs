@@ -12,192 +12,219 @@
 #![allow(clippy::too_many_arguments)]
 #![cfg(feature = "spi5")]
 
-use stm32h7::stm32h747 as pac;
+use stm32h7::stm32h747cm7 as pac;
 
 /// Enables GPIO clocks required by the generated board.
 
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    const MASK: u32 = (1u32 << 9) | (1u32 << 10);
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe { super::super::c_ffi::c_spi5_enable_gpio_clocks(); }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {
+        const MASK: u32 = (1u32 << 9) | (1u32 << 10);
+        dp.RCC
+            .ahb4enr
+            .modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    }
 }
 
 /// Configures pins using PAC registers.
 
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
-    // GPIOJ
-    dp.GPIOJ.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 10 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        let shift = 11 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        bits &= !(1 << 10);
-        bits &= !(1 << 11);
-        w.bits(bits)
-    });
-    dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 10 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        let shift = 11 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrl.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        w.bits(bits)
-    });
-    dp.GPIOJ.afrh.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let afr_shift = (10 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        let afr_shift = (11 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 10 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        let shift = 11 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        w.bits(bits)
-    });
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe { super::super::c_ffi::c_spi5_configure_pins(); }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {
+        // GPIOJ
+        dp.GPIOJ.pupdr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 10 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            let shift = 11 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOJ.otyper.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            bits &= !(1 << 10);
+            bits &= !(1 << 11);
+            w.bits(bits)
+        });
+        dp.GPIOJ.ospeedr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 10 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            let shift = 11 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOJ.afrl.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            w.bits(bits)
+        });
+        dp.GPIOJ.afrh.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let afr_shift = (10 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            let afr_shift = (11 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            w.bits(bits)
+        });
+        dp.GPIOJ.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 10 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            let shift = 11 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            w.bits(bits)
+        });
 
-    // GPIOK
-    dp.GPIOK.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 0 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        let shift = 1 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        bits &= !(1 << 0);
-        bits &= !(1 << 1);
-        w.bits(bits)
-    });
-    dp.GPIOK.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 0 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        let shift = 1 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.afrl.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        w.bits(bits)
-    });
-    dp.GPIOK.afrh.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let afr_shift = (0 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        let afr_shift = (1 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 0 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        let shift = 1 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        w.bits(bits)
-    });
+        // GPIOK
+        dp.GPIOK.pupdr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 0 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            let shift = 1 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOK.otyper.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            bits &= !(1 << 0);
+            bits &= !(1 << 1);
+            w.bits(bits)
+        });
+        dp.GPIOK.ospeedr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 0 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            let shift = 1 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOK.afrl.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            w.bits(bits)
+        });
+        dp.GPIOK.afrh.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let afr_shift = (0 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            let afr_shift = (1 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            w.bits(bits)
+        });
+        dp.GPIOK.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 0 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            let shift = 1 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            w.bits(bits)
+        });
+    }
 }
 
 /// Disables unused peripherals and masks their interrupts.
 
 /// Enables peripheral clocks for the generated board using PAC registers.
 
-pub fn enable_peripherals(_dp: &pac::Peripherals) {}
+pub fn enable_peripherals(_dp: &pac::Peripherals) {
+    #[cfg(feature = "c_hal")]
+    unsafe { super::super::c_ffi::c_spi5_enable_peripherals(); }
+}
 
 /// De-initializes board pins to their analog state.
 
 /// De-initializes board peripherals and clocks using PAC registers.
 
 pub fn deinit_board_pac(dp: &pac::Peripherals) {
-    // Return pins to analog and remove pulls/open-drain
-    let shift = 10 * 2;
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOJ
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
-    let shift = 11 * 2;
-    dp.GPIOJ.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOJ
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOJ
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
-    let shift = 0 * 2;
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOK
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
-    let shift = 1 * 2;
-    dp.GPIOK.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOK
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOK
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe { super::super::c_ffi::c_spi5_deinit(); }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {
+        // Return pins to analog and remove pulls/open-drain
+        let shift = 10 * 2;
+        dp.GPIOJ.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOJ
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOJ
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 10)) });
+        let shift = 11 * 2;
+        dp.GPIOJ.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOJ
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOJ
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+        let shift = 0 * 2;
+        dp.GPIOK.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOK
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOK
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) });
+        let shift = 1 * 2;
+        dp.GPIOK.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOK
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOK
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 1)) });
 
-    // Gate peripheral clocks
+        // Gate peripheral clocks
 
-    // Disable DMA controllers and mask their interrupts
+        // Disable DMA controllers and mask their interrupts
 
-    // Disable interrupts
-    unsafe {
-        pac::NVIC::mask(pac::Interrupt::SPI5);
+        // Disable interrupts
+        unsafe {
+            pac::NVIC::mask(pac::Interrupt::SPI5);
+        }
     }
 }

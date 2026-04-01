@@ -11,7 +11,7 @@
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 #![cfg(feature = "i2c1")]
-use stm32h7::stm32h747 as pac;
+use stm32h7::stm32h747cm7 as pac;
 
 /// Enables GPIO clocks required by the generated board.pub fn enable_gpio_clocks(dp: &pac::Peripherals) {}/// Configures pins using PAC registers.pub fn configure_pins_pac(dp: &pac::Peripherals) {}
 /// Disables unused peripherals and masks their interrupts.

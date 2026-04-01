@@ -168,6 +168,15 @@ use board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
 /// Enables GPIO clocks required by the generated board.
 {% endif %}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
+    {% if mod_name %}
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe { super::super::c_ffi::c_{{ mod_name }}_enable_gpio_clocks(); }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {% endif %}
+    {
     {% if ns.ports|length %}
     {% if grouped_writes %}
     const MASK: u32 = {% for p in ns.ports %}(1u32 << {{ port_bit(p) }}){% if not loop.last %} |{% endif %}{% endfor %};
@@ -178,6 +187,7 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     {% endfor %}
     {% endif %}
     {% endif %}
+    }
 }
 
 /// Configure power supply and voltage scaling.
@@ -378,6 +388,15 @@ pub fn init_clocks(dp: &pac::Peripherals) {
 /// Configures pins using PAC registers.
 {% endif %}
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
+    {% if mod_name %}
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe { super::super::c_ffi::c_{{ mod_name }}_configure_pins(); }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {% endif %}
+    {
 {% if grouped_writes %}
 {% for p in ns.ports %}
     // GPIO{{ p }}
@@ -506,6 +525,7 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
     });
 {% endfor %}
 {% endif %}
+    }
 }
 {% endif %}
 
@@ -544,7 +564,13 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
     {%- if reg and field %}{% set pairs = pairs + [{"reg": reg, "field": field}] %}{% endif %}
 {%- endfor %}
 pub fn enable_peripherals({{ 'dp' if pairs|length else '_dp' }}: &pac::Peripherals) {
+    {% if mod_name %}
+    #[cfg(feature = "c_hal")]
+    unsafe { super::super::c_ffi::c_{{ mod_name }}_enable_peripherals(); }
+    {% endif %}
 {% if pairs|length %}
+    {% if mod_name %}#[cfg(not(feature = "c_hal"))]{% endif %}
+    {
 {% if grouped_writes %}
 {%- for group in pairs | groupby("reg") %}
     dp.RCC.{{ group.grouper }}.modify(|_, w| w{% for item in group.list %}.{{ item.field }}().set_bit(){% endfor %});
@@ -554,6 +580,7 @@ pub fn enable_peripherals({{ 'dp' if pairs|length else '_dp' }}: &pac::Periphera
     dp.RCC.{{ item.reg }}.modify(|_, w| w.{{ item.field }}().set_bit());
 {%- endfor %}
 {% endif %}
+    }
 {% endif %}
 }
 
@@ -569,6 +596,15 @@ pub fn enable_peripherals({{ 'dp' if pairs|length else '_dp' }}: &pac::Periphera
 /// De-initializes board peripherals and clocks using PAC registers.
 {% endif %}
 pub fn deinit_board_pac(dp: &pac::Peripherals) {
+    {% if mod_name %}
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe { super::super::c_ffi::c_{{ mod_name }}_deinit(); }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {% endif %}
+    {
     // Return pins to analog and remove pulls/open-drain
 {%- for pin in spec.pinctrl %}
     let shift = {{ idx(pin) }} * 2;
@@ -700,6 +736,7 @@ pub fn deinit_board_pac(dp: &pac::Peripherals) {
     unsafe { pac::NVIC::mask(pac::Interrupt::{{ irq }}); }
         {%- endfor %}
     {%- endfor %}
+    }
 }
 {% endif %}
 
