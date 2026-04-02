@@ -1,0 +1,24 @@
+version: 1
+packages: {}
+groups: {}
+features: {}
+expose: {}
+targets:
+- name: stm32h747i-disco
+  vendor_dir: vendor
+  preset:
+    width: 800
+    height: 480
+    color_depth: 16
+    storage: flash
+assets:
+- name: MEDIA_SPLASH_RAW
+  path: media/splash.raw
+  hash: 788bd041367d971c71a91cb94d644c8460a26dd0070022a93ab0b1057a1b950d
+  license: MIT
+naming:
+  prefixes:
+    fonts: FONT_
+    icons: ICON_
+    media: MEDIA_
+  case: screaming_snake
