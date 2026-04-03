@@ -9,6 +9,14 @@ fn main() {
         let compiler = find_arm_gcc();
 
         let mut build = cc::Build::new();
+        // Use -O0 for debug builds so GDB can step through C line-by-line;
+        // keep -O2 for release.
+        let opt = if std::env::var("PROFILE").as_deref() == Ok("release") {
+            2u32
+        } else {
+            0
+        };
+
         build
             .compiler(&compiler)
             .flag("-mcpu=cortex-m7")
@@ -19,9 +27,13 @@ fn main() {
             .flag("-nostdlib")
             .include("csrc/stm32h747i_disco")
             .warnings(true)
-            .opt_level(2);
+            .opt_level(opt);
 
         let c_files = [
+            "csrc/stm32h747i_disco/system_init.c",
+            "csrc/stm32h747i_disco/gpio_fmc.c",
+            "csrc/stm32h747i_disco/sdram_init.c",
+            "csrc/stm32h747i_disco/bsp_init.c",
             "csrc/stm32h747i_disco/i2c4.c",
             "csrc/stm32h747i_disco/spi2.c",
             "csrc/stm32h747i_disco/spi5.c",
@@ -37,9 +49,51 @@ fn main() {
         build.files(c_files.iter());
         build.compile("stm32h747i_disco_c_hal");
     }
+
+    #[cfg(feature = "c_hal_cm4")]
+    {
+        let target = std::env::var("TARGET").unwrap_or_default();
+        if !target.starts_with("thumbv7em") {
+            return;
+        }
+
+        let compiler = find_arm_gcc();
+
+        let mut build = cc::Build::new();
+        let opt = if std::env::var("PROFILE").as_deref() == Ok("release") {
+            2u32
+        } else {
+            0
+        };
+
+        build
+            .compiler(&compiler)
+            .flag("-mcpu=cortex-m4")
+            .flag("-mthumb")
+            .flag("-mfloat-abi=hard")
+            .flag("-mfpu=fpv4-sp-d16")
+            .flag("-ffreestanding")
+            .flag("-nostdlib")
+            .include("csrc/stm32h747i_disco")
+            .warnings(true)
+            .opt_level(opt);
+
+        let c_files = [
+            "csrc/stm32h747i_disco/system_init_cm4.c",
+            "csrc/stm32h747i_disco/bsp_init_cm4.c",
+        ];
+
+        for file in &c_files {
+            println!("cargo:rerun-if-changed={}", file);
+        }
+        println!("cargo:rerun-if-changed=csrc/stm32h747i_disco/stm32h747xi.h");
+
+        build.files(c_files.iter());
+        build.compile("stm32h747i_disco_c_hal_cm4");
+    }
 }
 
-#[cfg(feature = "c_hal")]
+#[cfg(any(feature = "c_hal", feature = "c_hal_cm4"))]
 fn find_arm_gcc() -> std::path::PathBuf {
     // 1. Honour explicit override via environment variable
     if let Ok(cc) = std::env::var("ARM_NONE_EABI_GCC") {

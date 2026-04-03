@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "c_hal"))]
 use core::arch::asm;
 use core::ptr::addr_of_mut;
 use cortex_m_rt::entry;
@@ -17,10 +18,15 @@ use embedded_alloc::Heap;
 #[cfg(not(doc))]
 use panic_halt as _;
 
+// common_demo is used by the Rust-HAL (non-c_hal) path and the simulator.
+// The c_hal path uses a server-mode widget tree driven by CM4 via IPC.
+#[cfg(not(all(feature = "c_hal", feature = "stm32h747i_disco_cm7")))]
 #[path = "../../common_demo/lib.rs"]
 mod common_demo;
 
-// Use the split-core generated PAC BSP for CM7
+// Auto-generated board support — pin constants and PAC helpers are a reference
+// library; not all are consumed in every build configuration.
+#[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
 mod ipc;
@@ -43,6 +49,7 @@ fn _bsp_log(args: core::fmt::Arguments) {
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
+#[cfg(not(feature = "c_hal"))]
 fn mpu_rasr(
     size_field: u32,
     ap: u32,
@@ -62,6 +69,7 @@ fn mpu_rasr(
     enable | size_bits | ap | tex_bits | s_bits | c_bits | b_bits | xn_bits
 }
 
+#[cfg(not(feature = "c_hal"))]
 fn configure_mpu_regions(cp: &mut cortex_m::Peripherals) {
     const AP_FULL_ACCESS: u32 = 0b011 << 24;
 
@@ -154,16 +162,19 @@ fn configure_mpu_regions(cp: &mut cortex_m::Peripherals) {
         set_mpu_trace(0xDEAD_0003);
     }
 }
+#[cfg(not(feature = "c_hal"))]
 #[allow(unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
 static mut MPU_TRACE: u32 = 0;
 
+#[cfg(not(feature = "c_hal"))]
 #[allow(unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
 static mut MPU_DUMP: [u32; 12] = [0; 12];
 
+#[cfg(not(feature = "c_hal"))]
 #[inline(always)]
 fn set_mpu_trace(val: u32) {
     unsafe {
@@ -171,6 +182,7 @@ fn set_mpu_trace(val: u32) {
     }
 }
 
+#[cfg(not(feature = "c_hal"))]
 #[inline(always)]
 fn record_region(slot: usize, base: u32, rasr: u32) {
     unsafe {
@@ -180,6 +192,7 @@ fn record_region(slot: usize, base: u32, rasr: u32) {
     }
 }
 
+#[cfg(not(feature = "c_hal"))]
 #[inline(always)]
 fn single_nop() {
     unsafe {
@@ -187,6 +200,7 @@ fn single_nop() {
     }
 }
 
+#[cfg(not(feature = "c_hal"))]
 #[inline(always)]
 fn barrier_dsb() {
     unsafe {
@@ -194,6 +208,7 @@ fn barrier_dsb() {
     }
 }
 
+#[cfg(not(feature = "c_hal"))]
 #[inline(always)]
 fn barrier_isb() {
     unsafe {
@@ -201,19 +216,19 @@ fn barrier_isb() {
     }
 }
 
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 const SDRAM_REFRESH_COUNT: u16 = 566;
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 const SDRAM_MODE_REGISTER: u16 = 0x0230;
 
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 fn wait_for_sdram_ready(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
     while fmc.sdsr.read().bits() & (1 << 5) != 0 {
         cortex_m::asm::nop();
     }
 }
 
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 fn issue_sdram_command(
     fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock,
     mode: u8,
@@ -237,7 +252,7 @@ fn issue_sdram_command(
     wait_for_sdram_ready(fmc);
 }
 
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
     unsafe {
         fmc.bcr1.modify(|_, w| w.fmcen().set_bit());
@@ -293,7 +308,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
     wait_for_sdram_ready(fmc);
 }
 
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 fn configure_pin_alt12(gpio: &stm32h7::stm32h747cm7::gpioa::RegisterBlock, pin: u8) {
     let shift2 = (pin as u32) * 2;
     unsafe {
@@ -339,7 +354,7 @@ fn configure_pin_alt12(gpio: &stm32h7::stm32h747cm7::gpioa::RegisterBlock, pin: 
     }
 }
 
-#[cfg(feature = "pac_sdram_init")]
+#[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
 fn early_fmc_setup() {
     use stm32h7::stm32h747cm7::{
         GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, GPIOI, RCC, gpioa::RegisterBlock as GpioRegs,
@@ -401,12 +416,32 @@ static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 #[cfg(not(doc))]
 #[entry]
 fn main() -> ! {
+    // Heap must be ready before any Rust allocation (including rlvgl_app_main).
     unsafe {
         let start = addr_of_mut!(HEAP_MEM) as usize;
         ALLOC.init(start, HEAP_SIZE);
     }
 
+    // ── C HAL path ──────────────────────────────────────────────────────────
+    // All MCU init (MPU, power, clocks, GPIO, SDRAM) is handled by c_bsp_init,
+    // which calls back into rlvgl_app_main() when hardware is ready.
     #[cfg(all(
+        feature = "c_hal",
+        feature = "stm32h747i_disco_cm7",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))]
+    {
+        // Force-link the BSP crate so its native C library is included.
+        extern crate rlvgl_bsps_stm;
+        unsafe extern "C" {
+            fn c_bsp_init() -> !;
+        }
+        unsafe { c_bsp_init() }
+    }
+
+    // ── Rust HAL path (no c_hal feature) ────────────────────────────────────
+    #[cfg(all(
+        not(feature = "c_hal"),
         feature = "stm32h747i_disco_cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
@@ -519,7 +554,7 @@ fn main() -> ! {
         // Destructure PAC peripherals and switch to HAL for operation
         let dp = stm32h7::stm32h747cm7::Peripherals::take().unwrap();
 
-        #[cfg(feature = "pac_sdram_init")]
+        #[cfg(all(feature = "pac_sdram_init", not(feature = "c_hal")))]
         early_fmc_setup();
         // Ensure the PWR peripheral clock is enabled before touching PWR regs.
         // On H7, PWR sits on APB4; without PWREN the VOSRDY poll can hang.
@@ -973,7 +1008,7 @@ fn main() -> ! {
 
         loop {
             // Handle CM4 commands
-            if let Some(cmd) = ipc::pop() {
+            if let Some(cmd) = ipc::cmd_pop() {
                 if cmd.kind == ipc::CmdKind::SetBacklight as u32 {
                     let duty = (cmd.a & 0xFFFF) as u16;
                     // Map 16-bit duty to simple on/off for GPIO fallback
@@ -997,11 +1032,275 @@ fn main() -> ! {
         }
     }
 
-    #[cfg(not(all(
-        feature = "stm32h747i_disco_cm7",
-        any(target_arch = "arm", target_arch = "aarch64")
+    // Fallback: non-ARM / non-disco / doc builds
+    #[cfg(not(any(
+        all(feature = "c_hal",       feature = "stm32h747i_disco_cm7", any(target_arch = "arm", target_arch = "aarch64")),
+        all(not(feature = "c_hal"),  feature = "stm32h747i_disco_cm7", any(target_arch = "arm", target_arch = "aarch64"))
     )))]
     loop {
+        cortex_m::asm::nop();
+    }
+}
+
+// ── c_hal application entry ─────────────────────────────────────────────────
+//
+// Called by c_bsp_init() after all C hardware init completes.  No Rust HAL
+// clock configuration is needed here — clocks are already running at 400 MHz.
+// PAC peripherals are obtained via steal() since the C side never called
+// Peripherals::take().
+#[cfg(all(
+    feature = "c_hal",
+    feature = "stm32h747i_disco_cm7",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+#[unsafe(no_mangle)]
+pub extern "C" fn rlvgl_app_main() -> ! {
+    use core::convert::Infallible;
+    use embedded_hal::{
+        digital::{ErrorType as DigitalError, InputPin, OutputPin},
+        i2c::{ErrorType as I2cError, I2c as EhI2c, Operation, SevenBitAddress},
+        pwm::{ErrorType as PwmError, SetDutyCycle},
+    };
+    use rlvgl::core::event::{Event, Key};
+    use rlvgl::platform::{
+        CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
+    };
+
+    // ── Signal clocks ready to CM4 ──────────────────────────────────────────
+    #[allow(clippy::let_unit_value)]
+    let _ = bsp_pac::signal_clocks_ready();
+
+    // ── Steal PAC peripherals (clocks/GPIO already configured by C) ─────────
+    let dp = unsafe { stm32h7::stm32h747cm7::Peripherals::steal() };
+    let mut cp = unsafe { cortex_m::Peripherals::steal() };
+
+    // ── Direct GPIO output pin (BSRR-based, no HAL ownership chain) ─────────
+    struct GpioOut { base: u32, pin: u8 }
+    impl DigitalError for GpioOut { type Error = Infallible; }
+    impl OutputPin for GpioOut {
+        fn set_high(&mut self) -> Result<(), Infallible> {
+            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << self.pin) }
+            Ok(())
+        }
+        fn set_low(&mut self) -> Result<(), Infallible> {
+            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << (self.pin + 16)) }
+            Ok(())
+        }
+    }
+
+    // ── Backlight: GPIO output wrapped as SetDutyCycle ───────────────────────
+    struct GpioBacklight(GpioOut);
+    impl PwmError for GpioBacklight { type Error = Infallible; }
+    impl SetDutyCycle for GpioBacklight {
+        fn max_duty_cycle(&self) -> u16 { u16::MAX }
+        fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Infallible> {
+            if duty == 0 { self.0.set_low() } else { self.0.set_high() }
+        }
+    }
+
+    // ── Direct GPIO input pin ────────────────────────────────────────────────
+    struct GpioIn { base: u32, pin: u8 }
+    impl DigitalError for GpioIn { type Error = Infallible; }
+    impl InputPin for GpioIn {
+        fn is_high(&mut self) -> Result<bool, Infallible> {
+            let idr = unsafe { ((self.base + 0x10) as *const u32).read_volatile() };
+            Ok((idr >> self.pin) & 1 != 0)
+        }
+        fn is_low(&mut self) -> Result<bool, Infallible> {
+            self.is_high().map(|v| !v)
+        }
+    }
+
+    // ── Dummy I2C (touch controller not yet wired) ───────────────────────────
+    struct DummyI2c;
+    impl I2cError for DummyI2c { type Error = Infallible; }
+    impl EhI2c<SevenBitAddress> for DummyI2c {
+        fn read(&mut self, _a: SevenBitAddress, _b: &mut [u8]) -> Result<(), Infallible> { Ok(()) }
+        fn write(&mut self, _a: SevenBitAddress, _b: &[u8]) -> Result<(), Infallible> { Ok(()) }
+        fn write_read(&mut self, _a: SevenBitAddress, _b: &[u8], _r: &mut [u8]) -> Result<(), Infallible> { Ok(()) }
+        fn transaction(&mut self, _a: SevenBitAddress, _ops: &mut [Operation<'_>]) -> Result<(), Infallible> { Ok(()) }
+    }
+
+    // ── Dummy button ─────────────────────────────────────────────────────────
+    struct DummyButton;
+    impl DigitalError for DummyButton { type Error = Infallible; }
+    impl InputPin for DummyButton {
+        fn is_high(&mut self) -> Result<bool, Infallible> { Ok(false) }
+        fn is_low(&mut self)  -> Result<bool, Infallible> { Ok(true)  }
+    }
+
+    struct ButtonInput<B: InputPin> { button: B, last: bool }
+    impl<B: InputPin> ButtonInput<B> {
+        fn new(b: B) -> Self { Self { button: b, last: false } }
+    }
+    impl<B: InputPin> InputDevice for ButtonInput<B> {
+        fn poll(&mut self) -> Option<Event> {
+            let pressed = self.button.is_low().ok()?;
+            match (pressed, self.last) {
+                (true,  false) => { self.last = true;  Some(Event::KeyDown { key: Key::Enter }) }
+                (false, true)  => { self.last = false; Some(Event::KeyUp   { key: Key::Enter }) }
+                _ => None,
+            }
+        }
+    }
+
+    // GPIO base addresses (must match stm32h747xi.h)
+    const GPIOG: u32 = 0x58021800;
+    const GPIOJ: u32 = 0x58022400;
+    const GPIOK: u32 = 0x58022800;
+
+    // PG3: panel reset — C left it asserted (low); display constructor
+    // will toggle it via reset.set_low() / set_high().
+    let panel_reset = GpioOut { base: GPIOG, pin: 3 };
+
+    // PJ6: backlight GPIO fallback
+    let backlight = GpioBacklight(GpioOut { base: GPIOJ, pin: 6 });
+
+    // PK7: touch interrupt input
+    let touch_int = GpioIn { base: GPIOK, pin: 7 };
+
+    // ── SysTick: loose ~6 Hz flip timer ─────────────────────────────────────
+    use cortex_m::peripheral::syst::SystClkSource;
+    cp.SYST.set_clock_source(SystClkSource::Core);
+    // 400 MHz / 6 Hz — truncates to 24-bit SysTick register; actual rate
+    // will be higher, which is fine for a bring-up display flip.
+    const SYS_HZ: u32 = 400_000_000;
+    const FLIP_HZ: u32 = 6;
+    cp.SYST.set_reload((SYS_HZ / FLIP_HZ).saturating_sub(1));
+    cp.SYST.clear_current();
+    cp.SYST.enable_counter();
+
+    // ── Display ──────────────────────────────────────────────────────────────
+    let mut display = Stm32h747iDiscoDisplay::new(
+        CpuBlitter,
+        backlight,
+        panel_reset,
+        dp.LTDC,
+        dp.DSIHOST,
+        #[cfg(feature = "dma2d")]
+        dp.DMA2D,
+    );
+
+    // ── IPC + input ──────────────────────────────────────────────────────────
+    ipc::init();
+    let mut input = Stm32h747iDiscoInput::new_with_int(DummyI2c, touch_int);
+    let mut _button_input = ButtonInput::new(DummyButton);
+
+    // ── Display server widget tree ───────────────────────────────────────────
+    // Static widget tree with well-known IDs that CM4 drives via IPC commands.
+    use alloc::{format, rc::Rc, vec::Vec};
+    use core::cell::RefCell;
+    use rlvgl::core::WidgetNode;
+    use rlvgl::widgets::{button::Button, container::Container, label::Label};
+    use rlvgl::core::widget::Rect;
+
+    let title_label = Rc::new(RefCell::new(Label::new(
+        format!("rlvgl v{}", env!("CARGO_PKG_VERSION")),
+        Rect { x: 10, y: 10, width: 200, height: 20 },
+    )));
+
+    let counter_button = Rc::new(RefCell::new(Button::new(
+        "Clicks: 0",
+        Rect { x: 10, y: 40, width: 120, height: 30 },
+    )));
+
+    // When the button is tapped locally, forward ButtonPressed to CM4
+    {
+        counter_button.borrow_mut().set_on_click(|_btn: &mut Button| {
+            let _ = ipc::event_push(ipc::evt_button_pressed(ipc::widget_id::CLICK_COUNTER));
+        });
+    }
+
+    let status_label = Rc::new(RefCell::new(Label::new(
+        "CM4: waiting",
+        Rect { x: 10, y: 80, width: 300, height: 20 },
+    )));
+
+    let root = Rc::new(RefCell::new(WidgetNode {
+        widget: Rc::new(RefCell::new(Container::new(Rect {
+            x: 0, y: 0, width: 800, height: 480,
+        }))),
+        children: Vec::new(),
+    }));
+    root.borrow_mut().children.push(WidgetNode {
+        widget: title_label.clone(),
+        children: Vec::new(),
+    });
+    root.borrow_mut().children.push(WidgetNode {
+        widget: counter_button.clone(),
+        children: Vec::new(),
+    });
+    root.borrow_mut().children.push(WidgetNode {
+        widget: status_label.clone(),
+        children: Vec::new(),
+    });
+
+    // ── Display server main loop ─────────────────────────────────────────────
+    let mut frame_counter: u32 = 0;
+
+    loop {
+        // 1. Drain command queue from CM4
+        while let Some(cmd) = ipc::cmd_pop() {
+            match ipc::CmdKind::from_u32(cmd.kind) {
+                ipc::CmdKind::SetBacklight => {
+                    let duty = (cmd.a & 0xFFFF) as u16;
+                    let level = if duty < 512 { 0 } else { u16::MAX };
+                    display.set_brightness(level);
+                }
+                ipc::CmdKind::UpdateLabel => {
+                    let mut buf = [0u8; 12];
+                    let len = ipc::extract_label_text(&cmd, &mut buf);
+                    if let Ok(text) = core::str::from_utf8(&buf[..len]) {
+                        let text_owned = alloc::string::String::from(text);
+                        match cmd.a {
+                            ipc::widget_id::TITLE => {
+                                title_label.borrow_mut().set_text(text_owned);
+                            }
+                            ipc::widget_id::CLICK_COUNTER => {
+                                counter_button.borrow_mut().set_text(text_owned);
+                            }
+                            ipc::widget_id::STATUS_LABEL => {
+                                status_label.borrow_mut().set_text(text_owned);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                ipc::CmdKind::Navigate => {
+                    // Screen navigation — placeholder for future screens
+                }
+                ipc::CmdKind::UpdateValue => {
+                    // Numeric value update — placeholder
+                }
+                ipc::CmdKind::ShowWidget => {
+                    // Widget visibility — placeholder
+                }
+                ipc::CmdKind::None => {}
+            }
+        }
+
+        // 2. Poll touch → dispatch to widget tree → forward to CM4
+        if let Some(evt) = input.poll() {
+            root.borrow_mut().dispatch_event(&evt);
+            // Forward touch events to CM4
+            let ipc_evt = match &evt {
+                Event::PointerDown { x, y } => Some(ipc::evt_pointer_down(*x, *y)),
+                Event::PointerMove { x, y } => Some(ipc::evt_pointer_move(*x, *y)),
+                Event::PointerUp { x, y } => Some(ipc::evt_pointer_up(*x, *y)),
+                _ => None,
+            };
+            if let Some(e) = ipc_evt {
+                let _ = ipc::event_push(e);
+            }
+        }
+
+        // 3. SysTick → render frame → notify CM4
+        if cp.SYST.has_wrapped() {
+            display.present();
+            frame_counter = frame_counter.wrapping_add(1);
+            let _ = ipc::event_push(ipc::evt_frame_rendered(frame_counter));
+        }
+
         cortex_m::asm::nop();
     }
 }

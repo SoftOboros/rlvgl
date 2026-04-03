@@ -11,10 +11,11 @@ fn main() {
     // Example-specific linker script lives under the example directory.
     // Copy it into OUT_DIR so rustc can find it.
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    // Choose CM4 vs CM7 script based on CARGO_BIN_NAME
+    // Choose CM4 vs CM7 script based on feature flag.
+    // CARGO_BIN_NAME is not available in build scripts — use feature detection.
     let example_dir = manifest_dir.join("examples").join("stm32h747i-disco");
-    let bin_name = env::var("CARGO_BIN_NAME").unwrap_or_default();
-    let script = if bin_name.contains("cm4") {
+    let is_cm4 = env::var("CARGO_FEATURE_STM32H747I_DISCO_CM4").is_ok();
+    let script = if is_cm4 {
         example_dir.join("memory_cm4.x")
     } else {
         example_dir.join("memory.x")
@@ -27,9 +28,9 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let _ = fs::copy(&script, out_dir.join("memory.x"));
 
-    // Provide link search paths so cortex-m-rt's link.x can `INCLUDE memory.x`
-    // from either the example directory or the build OUT_DIR.
-    println!("cargo:rustc-link-search={}", example_dir.display());
+    // Provide link search path so cortex-m-rt's link.x can `INCLUDE memory.x`.
+    // Only use OUT_DIR (which has the correct CM4 or CM7 copy) — listing the
+    // example directory would always find the CM7 memory.x first.
     println!("cargo:rustc-link-search={}", out_dir.display());
     println!("cargo:rustc-link-arg=-Tlink.x");
 }

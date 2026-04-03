@@ -6,7 +6,7 @@
 
 MEMORY
 {
-  FLASH : ORIGIN = 0x08000000, LENGTH = 2048K
+  FLASH : ORIGIN = 0x08100000, LENGTH = 1024K  /* Bank 2 (RM0399 BCM4_ADD0 default) */
   /* D2 SRAM (SRAM1/2/3) starts at 0x3000_0000; allocate 256K for CM4 */
   RAM   : ORIGIN = 0x30000000, LENGTH = 256K
   /* Reserve a 1K cross-core mailbox in D2 SRAM3 for CM7<->CM4 */

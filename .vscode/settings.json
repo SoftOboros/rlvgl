@@ -7,5 +7,6 @@
     "--target",
     "x86_64-apple-darwin"
   ],
-  "cortex-debug.gdbPath": "/Users/iraabbott/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9/bin/arm-none-eabi-gdb"
+  "rust-analyzer.diagnostics.disabled": ["cyclic-deps"],
+  "cortex-debug.gdbPath": "/opt/homebrew/bin/arm-none-eabi-gdb"
 }

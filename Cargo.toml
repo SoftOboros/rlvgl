@@ -277,6 +277,8 @@ hal_sdram = ["dep:stm32-fmc"]
 sdram_ramtest = ["rlvgl-platform/sdram_ramtest"]
 pac_sdram_init = []
 skip_sdram_mpu = []
+c_hal = ["dep:rlvgl-bsps-stm", "rlvgl-bsps-stm/c_hal"]
+c_hal_cm4 = ["dep:rlvgl-bsps-stm", "rlvgl-bsps-stm/c_hal_cm4"]
 png = ["rlvgl-core/png", "rlvgl-platform/png"]
 jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg"]
 gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif"]
@@ -399,16 +401,9 @@ strip = true
 incremental = false
 
 [profile.dev]
-opt-level = 0
+opt-level = 1
 debug = true
 incremental = false
-
-# Make key HAL/deps unoptimized for better single-step debugging
-[profile.dev.package.stm32-fmc]
-opt-level = 0
-
-[profile.dev.package.stm32h7xx-hal]
-opt-level = 0
 
 [workspace.dependencies]
 image = "0.25.6"
