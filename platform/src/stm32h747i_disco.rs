@@ -331,44 +331,84 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
 
 
-        // Step 4: D-PHY — 2 data lanes + UIX4 timing
-        // PAC has PCONFR/CLCR/CLTCR/PUCR offsets swapped (see memory).
-        // Incremental fix: start with PAC accessors for PCONFR/CLCR (they
-        // accidentally produce a bootable config), fix only CLTCR→PUCR swap.
+        // ══════════════════════════════════════════════════════════════════
+        // DSI init — follows ST HAL sequence (HAL_DSI_Init → ConfigAdapted
+        // CommandMode → HAL_DSI_Start) exactly to match proven working order.
+        // ══════════════════════════════════════════════════════════════════
         const DSI: u32 = 0x5000_0000;
+
+        // Step 4a: Enable DSI host FIRST (HAL does this before PHY config)
+        disp.dsi.cr.write(|w| w.en().set_bit());
+
+        // Step 4b: TX escape clock divider
+        disp.dsi.ccr.write(|w| unsafe { w.bits(4) }); // TXECKDIV = 4
+
+        // Step 4c: Enable D-PHY — DEN and CKE separately (HAL order)
+        disp.dsi.pctlr.modify(|_, w| w.den().set_bit());
+        disp.dsi.pctlr.modify(|_, w| w.cke().set_bit());
+
+        // Step 4d: Configure number of lanes
         disp.dsi.pconfr.write(|w| unsafe {
             w.nl().bits(1)          // 2 lanes
              .sw_time().bits(0x28)
         });
-        disp.dsi.clcr.write(|w| unsafe { w.bits(0x01) }); // DPCC
-        // WPCR0: UIX4 = unit interval × 4 (critical for PHY timing!)
-        // UIX4 = 4000000 * IDF * (1 << ODF) / (HSE_kHz * NDIV)
-        //       = 4000000 * 5 * 1 / (25000 * 100) = 8
+
+        // Step 4e: Wait for PHY lane stop state (HAL waits for PSS0+PSS1+PSSC)
+        // PSR at offset 0xB0 (CMSIS): PSS0=bit1, PSS1=bit2, PSSC=bit3...
+        // Actually PAC PSR — let me use raw read
+        {
+            let psr_addr = (DSI + 0xB0) as *const u32;
+            let mut tries = 1_000_000u32;
+            // For 2 lanes: wait for PSS0 (bit 1) + PSS1 (bit 2) + PSSC (bit 3) = 0x0E
+            loop {
+                let psr = unsafe { psr_addr.read_volatile() };
+                if psr & 0x0E == 0x0E { break; }
+                tries -= 1;
+                if tries == 0 {
+                    dbg("  PSR timeout! PSR=");
+                    dbg_hex(unsafe { psr_addr.read_volatile() });
+                    dbg("\r\n");
+                    break;
+                }
+                cortex_m::asm::nop();
+            }
+        }
+
+        // Step 4f: UIX4 — set bit period in WPCR0
+        // UIX4 = 4000000 * IDF * (1 << ODF) / (HSE_kHz * NDIV) = 8
         disp.dsi.wpcr0.modify(|r, w| unsafe {
-            w.bits((r.bits() & !0x3F) | 8) // UIX4 = 8 (bits 5:0)
+            w.bits((r.bits() & !0x3F) | 8)
         });
 
-        // Step 5: DSI Host timings — DEFERRED until after PCTLR enables PHY.
-        // Semihosting revealed CLTCR reads 0x00000002 (not our 0x00320032)
-        // when written before PCTLR. The PHY enable may reset timing regs.
+        // Step 4g: Disable DSI host (HAL does this after PHY init!)
+        disp.dsi.cr.write(|w| unsafe { w.bits(0) }); // CR.EN=0
 
-        // Step 5b: TX escape clock divider (required for LP↔HS transitions!)
-        // ST BSP: TXEscapeCkdiv = 4 → escape_clk = 62.5/8 = 7.8 MHz (< 20 MHz max)
-        disp.dsi.ccr.write(|w| unsafe { w.bits(4) }); // TXECKDIV = 4
+        // Step 4h: Configure CLCR with DPCC + ACR (automatic clock lane control)
+        // HAL does this WHILE DSI IS DISABLED
+        disp.dsi.clcr.write(|w| unsafe {
+            w.bits(0x03) // DPCC=1 (bit 0) + ACR=1 (bit 1)
+        });
+        dbg("  PHY init done (CLCR=0x03 ACR+DPCC)\r\n");
+
+        // Step 5: Lane timings (while DSI disabled)
+        disp.dsi.cltcr.write(|w| unsafe {
+            w.bits((50 << 16) | 50)
+        });
+        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
 
         // Step 6: Flow control
         disp.dsi.pcr.write(|w| unsafe { w.bits(0x15) }); // ETTXE + BTAE + ECCRXE
 
-        // Step 7: DSI Host LTDC interface — VCID=0, RGB888, NT35510 loosely packed
+        // Step 7: DSI Host LTDC interface — VCID=0, RGB888
         disp.dsi.lvcidr.write(|w| unsafe { w.vcid().bits(0) });
-        // Loosely packed (LPE=1) — tightly packed showed rainbow snow
-        disp.dsi.lcolcr.write(|w| unsafe { w.bits((1 << 8) | 5) }); // LPE + COLC=5(RGB888)
-        // Polarity: all active-low (must match LTDC GCR defaults: HSPOL=0, VSPOL=0, DEPOL=0)
-        disp.dsi.lpcr.write(|w| unsafe { w.bits(0x00) }); // HSP=0, VSP=0, DEP=0
+        // Color coding: RGB888, loosely packed
+        disp.dsi.lcolcr.write(|w| unsafe { w.bits((1 << 8) | 5) }); // LPE + COLC=5
+        // Polarity: match LTDC GCR defaults
+        disp.dsi.lpcr.write(|w| unsafe { w.bits(0x00) });
 
-        // Step 8: Video mode — burst mode
+        // Step 8: Video mode timing (needed even for adapted cmd mode per HAL)
         let lane_byte_clk: u32 = 62500; // kHz
-        let pixel_clk: u32 = 32000;     // kHz (PLL3_R = 320MHz / 10 = 32 MHz)
+        let pixel_clk: u32 = 32000;     // kHz
         let total_pixels = (hsw as u32) + (hbp as u32) + (width as u32) + (hfp as u32);
         let hsa_dsi = (hsw as u32) * lane_byte_clk / pixel_clk;
         let hbp_dsi = (hbp as u32) * lane_byte_clk / pixel_clk;
@@ -383,92 +423,49 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             disp.dsi.vvacr.write(|w| w.va().bits(height));
         }
         disp.dsi.vpcr.write(|w| unsafe { w.vpsize().bits(width) });
-        disp.dsi.vccr.write(|w| unsafe { w.bits(0) }); // 0 chunks (burst)
-        disp.dsi.vnpcr.write(|w| unsafe { w.bits(0xFFF) }); // max null packets
+        disp.dsi.vccr.write(|w| unsafe { w.bits(0) });
+        disp.dsi.vnpcr.write(|w| unsafe { w.bits(0xFFF) });
         disp.dsi.vmcr.write(|w| unsafe {
             w.bits(
-                (0b10 << 0)     // VMT = burst mode
-                | (1 << 8)      // LPVSAE
-                | (1 << 9)      // LPVBPE
-                | (1 << 10)     // LPVFPE
-                | (1 << 11)     // LPVAE
-                | (1 << 12)     // LPHBPE
-                | (1 << 13)     // LPHFPE
-                | (1 << 15)     // LPCE
+                (0b10 << 0) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11)
+                | (1 << 12) | (1 << 13) | (1 << 15)
             )
         });
-        // NT35510: LP largest packet size = 64 (vs 4 for OTM8009A)
         disp.dsi.lpmcr.write(|w| unsafe { w.bits((64 << 16) | 64) });
 
-        // Step 9: Adapted command mode
-        // MCR defaults to CMDM=1 (command mode) — leave it as-is
-        // LCCR: command size = width (pixels per line)
+        // Step 9: Adapted command mode config (HAL_DSI_ConfigAdaptedCommandMode)
+        // MCR.CMDM=1 (default)
         disp.dsi.lccr.write(|w| unsafe { w.bits(width as u32) });
-        // Configure PJ2 as DSI_TE (AF13) — NT35510 TE output pin
-        // Port J clock already enabled
+
+        // Configure PJ2 as DSI_TE (AF13)
         unsafe {
             let gpioj: u32 = 0x5802_2400;
-            // PJ2: MODER bits 5:4 = 10 (AF)
             let moder = (gpioj as *mut u32).read_volatile();
             (gpioj as *mut u32).write_volatile((moder & !(3u32 << 4)) | (2u32 << 4));
-            // PJ2: AFRL bits 11:8 = 13 (AF13 = DSI_TE)
             let afrl = ((gpioj + 0x20) as *mut u32).read_volatile();
             ((gpioj + 0x20) as *mut u32).write_volatile((afrl & !(0xFu32 << 8)) | (13u32 << 8));
         }
         dbg("  PJ2 = DSI_TE (AF13)\r\n");
 
-        // WCFGR: adapted command mode + external TE + automatic refresh
+        // WCFGR: adapted command mode + external TE + auto refresh
         disp.dsi.wcfgr.write(|w| unsafe {
             w.bits(
                 (1 << 0)    // DSIM = 1 (adapted command mode)
                 | (5 << 1)  // COLMUX = 5 (RGB888)
-                | (1 << 4)  // TESRC = 1 → external TE pin (PJ2)
-                // TEPOL = 0 (bit 5) → rising edge
-                | (1 << 6)  // AR = 1 → automatic refresh
-                // VSPOL = 0 (bit 7)
+                | (1 << 4)  // TESRC = 1 (external TE pin)
+                | (1 << 6)  // AR = 1 (automatic refresh)
             )
         });
-        // CMCR: Enable tearing effect acknowledge request (bit 0)
-        // This tells the DSI host to request TE from the panel before
-        // each frame transfer. Without this, the wrapper never initiates
-        // pixel data transfer in adapted command mode.
-        disp.dsi.cmcr.modify(|r, w| unsafe { w.bits(r.bits() | 1) }); // TEARE=1
+        // CMCR: TEARE=1 for TE handshake
+        disp.dsi.cmcr.write(|w| unsafe { w.bits(1) }); // TEARE only
+        // Enable TE + End-of-Refresh interrupts
+        disp.dsi.wier.write(|w| unsafe { w.bits(0x03) }); // TEIE + ERIE
 
-
-        // Step 10: Enable D-PHY
-        // PCTLR at 0xA0: PAC bit positions (DEN=bit1, CKE=bit2) confirmed working
-        disp.dsi.pctlr.write(|w| w.den().set_bit().cke().set_bit());
-        cortex_m::asm::delay(400_000); // ~1ms for PHY to stabilize
-
-        // Step 10b: DSI Host timings — written AFTER PCTLR PHY enable.
-        // ST CMSIS header confirms: CLTCR=0x98, DLTCR=0x9C (PAC is correct!)
-        // Our earlier "fix" writing to 0xA8 was actually hitting PUCR.
-        // Errata §2.14.4: Add SW_TIME (0x28=40) to HS2LP_TIME fields
-        // Errata §2.14.2: HS2LP_TIME and LP2HS_TIME must be equal (use max)
-        disp.dsi.cltcr.write(|w| unsafe {
-            w.bits((50 << 16) | 50) // LP2HS_TIME=50, HS2LP_TIME=50
-        });
-        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
-        // Verify CLTCR readback
-        let cltcr_rb = disp.dsi.cltcr.read().bits();
-        dbg("  CLTCR(0x98) readback="); dbg_hex(cltcr_rb);
-        if cltcr_rb != (50 << 16) | 50 {
-            dbg(" MISMATCH!");
-        }
-        dbg("\r\n");
-
-        // Step 11: Enable DSI Host
+        // Step 10: HAL_DSI_Start — re-enable DSI host + wrapper
         disp.dsi.cr.write(|w| w.en().set_bit());
-
-        // Step 12: Enable DSI Wrapper
         disp.dsi.wcr.write(|w| w.dsien().set_bit());
-        // Enable TE and End-of-Refresh wrapper interrupts (WIER)
-        // HAL does this — wrapper state machine may depend on it
-        disp.dsi.wier.write(|w| unsafe {
-            w.bits((1 << 0) | (1 << 1)) // TEIE + ERIE
-        });
         cortex_m::asm::delay(2_000_000);
-        dbg("  DSI host+wrapper enabled\r\n");
+        dbg("  DSI host+wrapper enabled (HAL sequence)\r\n");
 
         // Step 13: Reset panel and send NT35510 init commands
         // Enable LP command transmission in CMCR for DCS writes
