@@ -216,7 +216,8 @@ void c_system_init_power(void)
 
 /* RCC_PLL3DIVR: N=64, P=10, Q=8, R=10 (all written as value-1)
  * VCO = (HSE/5) × 64 = 320 MHz (wide VCO: 192-960)
- * PLL3_R = 320/10 = 32 MHz (LTDC pixel clock) */
+ * PLL3_R = 320/10 = 32 MHz (LTDC pixel clock)
+ * TODO: change to N=132,R=24 (27.5 MHz) once LTDC aliasing bug is resolved */
 #define PLL3DIVR_VAL    ((9u << 24) |   /* DIVR3-1 = 9 (R=10)  */  \
                          (7u << 16) |   /* DIVQ3-1 = 7 (Q=8)   */  \
                          (9u <<  9) |   /* DIVP3-1 = 9 (P=10)  */  \

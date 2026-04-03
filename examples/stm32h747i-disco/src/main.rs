@@ -1066,6 +1066,14 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
     };
 
+    // ── Disable D-cache to ensure SDRAM coherency with LTDC ─────────────────
+    unsafe {
+        let ccr = (0xE000_ED14u32 as *const u32).read_volatile();
+        (0xE000_ED14u32 as *mut u32).write_volatile(ccr & !(1 << 16));
+        cortex_m::asm::dsb();
+        cortex_m::asm::isb();
+    }
+
     // ── Signal clocks ready to CM4 ──────────────────────────────────────────
     #[allow(clippy::let_unit_value)]
     let _ = bsp_pac::signal_clocks_ready();
@@ -1149,12 +1157,103 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     const GPIOJ: u32 = 0x58022400;
     const GPIOK: u32 = 0x58022800;
 
-    // PG3: panel reset — C left it asserted (low); display constructor
-    // will toggle it via reset.set_low() / set_high().
+    // PG3: panel reset — ensure it's in GPIO output mode (C BSP may
+    // have left it in AF mode, which prevents BSRR from toggling the pin).
+    unsafe {
+        let moder = (GPIOG as *mut u32).read_volatile();
+        // Clear bits 7:6 (pin 3 MODER) and set to 01 (GP output)
+        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
+    }
     let panel_reset = GpioOut { base: GPIOG, pin: 3 };
 
-    // PJ6: backlight GPIO fallback
-    let backlight = GpioBacklight(GpioOut { base: GPIOJ, pin: 6 });
+    // PJ12: LCD backlight control (DSI_BL_CTRL per UM2411 CN15 pin 53)
+    // Configure PJ12 as GP output (clear bits 25:24, set to 01)
+    unsafe {
+        let moder = (GPIOJ as *mut u32).read_volatile();
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
+    }
+    let backlight = GpioBacklight(GpioOut { base: GPIOJ, pin: 12 });
+
+    // PJ6: debug toggle probe — Arduino D9 on CN5, scope-accessible
+    // Configure PJ6 as GP output (MODER bits 13:12 = 01)
+    unsafe {
+        let moder = (GPIOJ as *mut u32).read_volatile();
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 12)) | (1u32 << 12));
+    }
+    /// Toggle PJ6 high then low as a scope breadcrumb.
+    #[inline(always)]
+    fn dbg_pulse() {
+        const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32;
+        unsafe {
+            GPIOJ_BSRR.write_volatile(1u32 << 6);       // set PJ6
+            cortex_m::asm::delay(40);                     // ~100ns pulse
+            GPIOJ_BSRR.write_volatile(1u32 << (6 + 16)); // reset PJ6
+        }
+    }
+    // Quick triple-pulse to confirm probe is alive
+    for _ in 0..3 { dbg_pulse(); cortex_m::asm::delay(4_000); }
+
+    // ── UART8 debug serial (PJ8=TX on Arduino D1/CN6, 115200 8N1) ─────
+    // PJ8 = UART8_TX (AF8) — Port J clock already enabled
+    const UART8: u32 = 0x4000_7C00;
+    const RCC_APB1LENR: u32 = 0x5802_44E8;
+    unsafe {
+        // Enable UART8 clock (RCC_APB1LENR bit 31)
+        let apb1 = (RCC_APB1LENR as *mut u32).read_volatile();
+        (RCC_APB1LENR as *mut u32).write_volatile(apb1 | (1 << 31));
+        (RCC_APB1LENR as *const u32).read_volatile(); // readback fence
+        // PJ8 = AF8: MODER bits 17:16 = 10 (AF), AFRH bits 3:0 = 0x8
+        let moder = (GPIOJ as *mut u32).read_volatile();
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 16)) | (2u32 << 16));
+        let afrh = ((GPIOJ + 0x24) as *mut u32).read_volatile();
+        ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8);
+        // UART8: BRR = APB1_clk / baud = 100_000_000 / 115200 ≈ 868
+        ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR
+        ((UART8 + 0x00) as *mut u32).write_volatile(
+            (1 << 3)  // TE (transmitter enable)
+            | (1 << 0) // UE (USART enable)
+        );
+    }
+
+    // ── USART1 debug serial via ST-LINK VCP (PA9=TX AF7, 115200 8N1) ────
+    const USART1: u32 = 0x4001_1000;
+    const GPIOA: u32 = 0x5802_0000;
+    unsafe {
+        // Enable GPIOA clock (AHB4ENR bit 0)
+        let ahb4 = (0x5802_44E0u32 as *mut u32).read_volatile();
+        (0x5802_44E0u32 as *mut u32).write_volatile(ahb4 | (1 << 0));
+        (0x5802_44E0u32 as *const u32).read_volatile();
+        // PA9 = AF7: AFRH bits 7:4 = 7, MODER bits 19:18 = 10 (AF)
+        let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile();
+        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32 << 4)) | (7u32 << 4));
+        let moder = (GPIOA as *mut u32).read_volatile();
+        (GPIOA as *mut u32).write_volatile((moder & !(3u32 << 18)) | (2u32 << 18));
+        // Enable USART1 clock (APB2ENR bit 4)
+        let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile();
+        (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4));
+        (0x5802_44F0u32 as *const u32).read_volatile();
+        // BRR = APB2_clk / baud = 100_000_000 / 115200 ≈ 868
+        ((USART1 + 0x0C) as *mut u32).write_volatile(868);
+        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 3) | (1 << 0)); // TE + UE
+    }
+
+    /// Send a string over UART8 + USART1 VCP (blocking, dual output).
+    fn dbg_print(s: &str) {
+        const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
+        const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
+        const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
+        const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+        for b in s.bytes() {
+            unsafe {
+                while U8_ISR.read_volatile() & (1 << 7) == 0 {}
+                U8_TDR.write_volatile(b as u32);
+                while U1_ISR.read_volatile() & (1 << 7) == 0 {}
+                U1_TDR.write_volatile(b as u32);
+            }
+        }
+    }
+    dbg_print("rlvgl: UART8+VCP alive\r\n");
+    dbg_pulse();
 
     // PK7: touch interrupt input
     let touch_int = GpioIn { base: GPIOK, pin: 7 };
@@ -1171,6 +1270,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     cp.SYST.enable_counter();
 
     // ── Display ──────────────────────────────────────────────────────────────
+    dbg_print("rlvgl: DSI+LTDC init start\r\n");
+    dbg_pulse();
     let mut display = Stm32h747iDiscoDisplay::new(
         CpuBlitter,
         backlight,
@@ -1180,6 +1281,22 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         #[cfg(feature = "dma2d")]
         dp.DMA2D,
     );
+    dbg_print("rlvgl: DSI+LTDC init done\r\n");
+    dbg_pulse();
+
+    // Re-assert PJ12 as GP output and PG3 as GP output — the display
+    // constructor or PAC peripheral take() may reset GPIO MODER.
+    unsafe {
+        // PJ12 backlight: MODER bits 25:24 = 01
+        let moder = (GPIOJ as *mut u32).read_volatile();
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
+        // Drive PJ12 high (backlight on)
+        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+        // PG3 panel reset: MODER bits 7:6 = 01, drive high
+        let moder = (GPIOG as *mut u32).read_volatile();
+        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
+        ((GPIOG + 0x18) as *mut u32).write_volatile(1u32 << 3);
+    }
 
     // ── IPC + input ──────────────────────────────────────────────────────────
     ipc::init();
@@ -1234,6 +1351,23 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         widget: status_label.clone(),
         children: Vec::new(),
     });
+
+    dbg_print("rlvgl: entering main loop\r\n");
+    dbg_pulse();
+
+    // ── Backlight blink test: 3 visible blinks on PJ12 ─────────────────────
+    for _ in 0..3 {
+        unsafe {
+            // PJ12 HIGH
+            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+            cortex_m::asm::delay(80_000_000); // ~200ms at 400 MHz
+            // PJ12 LOW
+            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << (12 + 16));
+            cortex_m::asm::delay(80_000_000);
+        }
+    }
+    // Leave backlight ON
+    unsafe { ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); }
 
     // ── Display server main loop ─────────────────────────────────────────────
     let mut frame_counter: u32 = 0;
@@ -1296,7 +1430,17 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
         // 3. SysTick → render frame → notify CM4
         if cp.SYST.has_wrapped() {
+            // Heartbeat toggle on PJ6 (CN5 D9)
+            unsafe {
+                const GPIOJ_ODR: *mut u32 = (0x58022400 + 0x14) as *mut u32;
+                let odr = GPIOJ_ODR.read_volatile();
+                GPIOJ_ODR.write_volatile(odr ^ (1 << 6));
+            }
             display.present();
+            // Periodic UART status (~1 Hz)
+            if frame_counter % 25 == 0 {
+                dbg_print(".");
+            }
             frame_counter = frame_counter.wrapping_add(1);
             let _ = ipc::event_push(ipc::evt_frame_rendered(frame_counter));
         }

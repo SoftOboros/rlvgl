@@ -26,7 +26,7 @@ pub mod input;
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-mod otm8009a;
+mod nt35510;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
 #[cfg(all(

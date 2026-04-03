@@ -24,9 +24,10 @@ pub struct Otm8009a;
 ))]
 impl Otm8009a {
     /// Wait for command FIFO space with timeout.  Returns false if timed out.
+    /// Wait for command FIFO empty (CMDFE) — matches ST HAL_DSI_ShortWrite.
     fn wait_fifo(dsi: &DSIHOST) -> bool {
-        let mut tries = 100_000u32;
-        while dsi.gpsr.read().cmdff().bit_is_set() {
+        let mut tries = 1_000_000u32;
+        while !dsi.gpsr.read().cmdfe().bit_is_set() {
             tries -= 1;
             if tries == 0 {
                 return false;
@@ -92,6 +93,20 @@ impl Otm8009a {
         // Set column address (0..799)
         // Set page address (0..479)
         // (These use long writes which we skip for now — defaults should work)
+
+        // Enable backlight control via CABC (Content Adaptive Brightness Control)
+        // WRDISBV (0x51): Set display brightness to maximum (0xFF)
+        if !Self::dcs_short_write1(dsi, 0x51, 0xFF) {
+            return false;
+        }
+        // WRCTRLD (0x53): Enable brightness control (BL=1, DD=1, BL_EN=1)
+        if !Self::dcs_short_write1(dsi, 0x53, 0x24) {
+            return false;
+        }
+        // WRCABC (0x55): CABC off (still use manual brightness)
+        if !Self::dcs_short_write1(dsi, 0x55, 0x00) {
+            return false;
+        }
 
         // Display on
         if !Self::dcs_short_write(dsi, 0x29) {
