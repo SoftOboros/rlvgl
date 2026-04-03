@@ -210,19 +210,19 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         };
         disp.set_backlight(0);
 
+        // ── ST BSP reference values for OTM8009A 800×480 ────────────────────
         let width = 800u16;
         let height = 480u16;
-        let hsw: u16 = 2;
-        let hbp: u16 = 34;
-        let hfp: u16 = 34;
-        let vsw: u16 = 1;
-        let vbp: u16 = 15;
-        let vfp: u16 = 16;
+        let hsw: u16 = 10;   // HSYNC width
+        let hbp: u16 = 20;   // Horizontal back porch
+        let hfp: u16 = 10;   // Horizontal front porch
+        let vsw: u16 = 2;    // VSYNC width
+        let vbp: u16 = 13;   // Vertical back porch
+        let vfp: u16 = 17;   // Vertical front porch
 
         // ── RM0399 §34.14: DSI programming procedure ───────────────────────
-        //
-        // Step 1: LTDC timing (configured before DSI to define the pixel
-        //         stream dimensions; LTDC itself is enabled later).
+
+        // Step 1: LTDC timing
         disp.configure_ltdc_timing(width, height, hsw, hbp, hfp, vsw, vbp, vfp);
 
         // Step 2: DSI regulator enable + wait ready
@@ -236,24 +236,21 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
 
-        // Step 3: DSI wrapper PLL — 500 Mbps per lane
-        //   HSE = 25 MHz feeds DSI PLL directly (not through DIVM).
-        //   IDF = 5 → f_ref = 25/5 = 5 MHz
-        //   NDIV = 96 → VCO = 5 × 2 × 96 = 960 MHz (max for wide VCO)
-        //   ODF = 0 (÷1) → f_PHY = 960/2 = 480 MHz ≈ 480 Mbps/lane
-        //   Lane byte clock = 480/8 = 60 MHz
-        // BKPT 1: before DSI PLL (removed)
+        // Step 3: DSI wrapper PLL (matches ST BSP: IDF=5, NDIV=100, ODF=0)
+        //   HSE = 25 MHz, IDF=5 → ref=5 MHz
+        //   NDIV=100 → VCO = 5 × 2 × 100 = 1000 MHz
+        //   ODF=0 (÷1) → f_PHY = 1000/2 = 500 MHz → 500 Mbps/lane
+        //   Lane byte clock = 500/8 = 62.5 MHz
         disp.dsi.wrpcr.write(|w| {
             w.regen().set_bit();
             w.pllen().set_bit();
             unsafe {
                 w.idf().bits(5);
-                w.ndiv().bits(96);
-                w.odf().bits(0);
+                w.ndiv().bits(100);
+                w.odf().bits(0); // ODF=0 (DSI_PLL_OUT_DIV1)
             }
             w
         });
-        // Wait for PLL lock
         {
             let mut tries = 100_000u32;
             while !disp.dsi.wisr.read().pllls().bit() {
@@ -263,41 +260,40 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
 
-
-
-        // Step 4: D-PHY configuration — 2 data lanes, stop-wait time
+        // Step 4: D-PHY — 2 data lanes
         disp.dsi.pconfr.write(|w| unsafe {
-            w.nl().bits(1)          // NL = 1 → 2 lanes
-             .sw_time().bits(0x28)  // Stop-wait time
+            w.nl().bits(1)          // 2 lanes
+             .sw_time().bits(0x28)
         });
-        // Clock lane: HS mode, auto-stop
-        disp.dsi.clcr.write(|w| unsafe { w.bits(0x03) }); // DPCC + ACR
+        // Clock lane: disable auto clock lane control (matches ST BSP)
+        disp.dsi.clcr.write(|w| unsafe { w.bits(0x01) }); // DPCC only, no ACR
 
-        // Step 5: DSI Host timings (clock/data lane HS→LP and LP→HS)
-        disp.dsi.cltcr.write(|w| unsafe { w.bits((10 << 16) | 35) }); // LP2HS=10, HS2LP=35
-        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (10 << 16) | 20) }); // MRD=15, LP2HS=10, HS2LP=20
+        // Step 5: DSI Host timings
+        disp.dsi.cltcr.write(|w| unsafe { w.bits((10 << 16) | 35) });
+        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (10 << 16) | 20) });
 
-        // Step 6: Flow control — enable EoTp transmission, BTA
+        // Step 5b: TX escape clock divider (required for LP↔HS transitions!)
+        // ST BSP: TXEscapeCkdiv = 4 → escape_clk = 62.5/8 = 7.8 MHz (< 20 MHz max)
+        disp.dsi.ccr.write(|w| unsafe { w.bits(4) }); // TXECKDIV = 4
+
+        // Step 6: Flow control
         disp.dsi.pcr.write(|w| unsafe { w.bits(0x15) }); // ETTXE + BTAE + ECCRXE
 
-        // Step 7: DSI Host LTDC interface — virtual channel 0, RGB888 (24bpp)
+        // Step 7: DSI Host LTDC interface — VCID=0, RGB888 (ST BSP), all active-high
         disp.dsi.lvcidr.write(|w| unsafe { w.vcid().bits(0) });
         disp.dsi.lcolcr.write(|w| unsafe { w.colc().bits(5) }); // 5 = RGB888
-        // LTDC polarity: active-low DE, VSYNC, HSYNC
-        disp.dsi.lpcr.write(|w| unsafe { w.bits(0) }); // All active-low
+        // Polarity: all active-high (matches ST BSP)
+        disp.dsi.lpcr.write(|w| unsafe { w.bits(0x07) }); // HSP=1, VSP=1, DEP=1
 
-        // Step 8: Video mode configuration
-        //   Horizontal timings in lane byte clock cycles:
-        //   lane_byte_clk = 62.5 MHz, pixel_clk ≈ 27 MHz (PLL3_R=32MHz)
-        //   Ratio ≈ 62.5 / 27 ≈ 2.3; for RGB888 (3 bytes/pixel) each pixel
-        //   takes 3 bytes on DSI.  With 2 lanes: 3/2 = 1.5 byte clocks/pixel.
-        let bpp_factor: u32 = 3; // RGB888: 3 bytes per pixel
-        let lanes: u32 = 2;
-        let hsa_dsi = (hsw as u32) * bpp_factor / lanes;
-        let hbp_dsi = (hbp as u32) * bpp_factor / lanes;
-        let hact_dsi = (width as u32) * bpp_factor / lanes;
-        let hfp_dsi = (hfp as u32) * bpp_factor / lanes;
-        let hline_dsi = hsa_dsi + hbp_dsi + hact_dsi + hfp_dsi;
+        // Step 8: Video mode — burst mode (matches ST BSP)
+        //   Lane byte clock = 62.5 MHz, pixel clock ≈ 27.4 MHz (PLL3_R=32MHz)
+        //   In burst mode, HLINE = total line period in lane byte clocks
+        let lane_byte_clk: u32 = 62500; // kHz
+        let pixel_clk: u32 = 27429;     // kHz (from ST BSP)
+        let total_pixels = (hsw as u32) + (hbp as u32) + (width as u32) + (hfp as u32);
+        let hsa_dsi = (hsw as u32) * lane_byte_clk / pixel_clk;
+        let hbp_dsi = (hbp as u32) * lane_byte_clk / pixel_clk;
+        let hline_dsi = total_pixels * lane_byte_clk / pixel_clk;
         unsafe {
             disp.dsi.vhsacr.write(|w| w.hsa().bits(hsa_dsi as u16));
             disp.dsi.vhbpcr.write(|w| w.hbp().bits(hbp_dsi as u16));
@@ -307,16 +303,13 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             disp.dsi.vvfpcr.write(|w| w.vfp().bits(vfp));
             disp.dsi.vvacr.write(|w| w.va().bits(height));
         }
-        // Video packet size = active width in pixels
         disp.dsi.vpcr.write(|w| unsafe { w.vpsize().bits(width) });
-        // 1 chunk
-        disp.dsi.vccr.write(|w| unsafe { w.bits(1) });
-        // Null packet size = 0
-        disp.dsi.vnpcr.write(|w| unsafe { w.bits(0) });
-        // Video mode: non-burst with sync events (VMT=0b00), LP transitions enabled
+        disp.dsi.vccr.write(|w| unsafe { w.bits(0) }); // 0 chunks (burst)
+        disp.dsi.vnpcr.write(|w| unsafe { w.bits(0xFFF) }); // max null packets
+        // VMCR: burst mode + LP transitions enabled + LP command enable
         disp.dsi.vmcr.write(|w| unsafe {
             w.bits(
-                (0b00 << 0)     // VMT: non-burst sync events
+                (0b10 << 0)     // VMT = burst mode
                 | (1 << 8)      // LPVSAE
                 | (1 << 9)      // LPVBPE
                 | (1 << 10)     // LPVFPE
@@ -326,13 +319,20 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 | (1 << 15)     // LPCE
             )
         });
+        // LP largest packet sizes (for LP command during blanking)
+        disp.dsi.lpmcr.write(|w| unsafe { w.bits((4 << 16) | 4) }); // VLPSIZE=4, LPSIZE=4
 
-        // Step 9: Wrapper config — MUST be written while DSI is stopped
-        //   DSIM = 0 (video mode), COLMUX = 5 (RGB888)
-        //   RM0399: "must only be changed when DSI Host is stopped"
-        disp.dsi.wcfgr.write(|w| unsafe { w.bits(5 << 1) }); // COLMUX=5, DSIM=0
+        // Step 9: Mode + wrapper config — video mode, RGB888
+        // MCR.CMDM must be cleared for video mode (ST HAL requirement)
+        disp.dsi.mcr.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 0)) }); // CMDM=0
+        disp.dsi.wcfgr.write(|w| unsafe {
+            w.bits(
+                (0 << 0)    // DSIM = 0 (video mode)
+                | (5 << 1)  // COLMUX = 5 (RGB888, matches LCOLCR)
+            )
+        });
 
-        // Step 10: Enable D-PHY (DEN + CKEN)
+        // Step 10: Enable D-PHY
         disp.dsi.pctlr.write(|w| w.den().set_bit().cke().set_bit());
 
         // Step 11: Enable DSI Host
@@ -340,36 +340,46 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Step 12: Enable DSI Wrapper
         disp.dsi.wcr.write(|w| w.dsien().set_bit());
-
-        // Small delay for DSI to settle
         cortex_m::asm::delay(2_000_000);
 
         // Step 13: Reset panel and send OTM8009A init commands
+        // Enable LP command transmission in CMCR for DCS writes
+        // Use PAC bit positions: DSW0TX=16, DSW1TX=17, DLWTX=19, MRDPS=24
+        disp.dsi.cmcr.write(|w| {
+            w.dlwtx().set_bit()   // DCS long write in LP
+             .dsw1tx().set_bit()  // DCS short write 1p in LP
+             .dsw0tx().set_bit()  // DCS short write 0p in LP
+             .glwtx().set_bit()   // Generic long write in LP
+             .gsw2tx().set_bit()  // Generic short write 2p in LP
+             .gsw1tx().set_bit()  // Generic short write 1p in LP
+             .gsw0tx().set_bit()  // Generic short write 0p in LP
+        });
         disp.reset_panel();
-        cortex_m::asm::delay(4_000_000); // 10ms at 400MHz
+        cortex_m::asm::delay(4_000_000);
         let _panel_ok = Otm8009a::init(&mut disp.dsi);
+        // Disable LP command overrides after panel init (video mode takes over)
+        disp.dsi.cmcr.write(|w| unsafe { w.bits(0) });
 
         // ── SDRAM framebuffer allocation ────────────────────────────────────
         let fb = Self::init_sdram();
         sdram_alloc::init(fb, 32 * 1024 * 1024);
-        let fb_bytes = (width as usize) * (height as usize) * 3; // RGB888: 3 bytes/pixel
+        let fb_bytes = (width as usize) * (height as usize) * 4; // ARGB8888
         let fb_addr = sdram_alloc::alloc(fb_bytes, 64).unwrap_or(fb);
         let fb_back = sdram_alloc::alloc(fb_bytes, 64).unwrap_or(fb_addr);
         disp.fb_addr = fb_addr;
         disp.fb_addr_back = fb_back;
         disp.width = width;
         disp.height = height;
-        // MPU + SMPTE fill temporarily disabled for bringup
-        // Self::configure_mpu_sdram_writethrough(0xC000_0000, 32 * 1024 * 1024);
-        // Self::fill_smpte_bars_rgb565(fb_addr as *mut u16, width, height);
-        // Quick solid-color fill: just zero the FB (black)
+        Self::configure_mpu_sdram_writethrough(0xC000_0000, 32 * 1024 * 1024);
+        // Fill with solid white (ARGB8888: 0xFFFFFFFF)
         unsafe {
-            let ptr = fb_addr as *mut u8;
-            let len = (width as usize) * (height as usize) * 2; // RGB565
-            core::ptr::write_bytes(ptr, 0, len);
+            let ptr = fb_addr as *mut u32;
+            for i in 0..(width as usize * height as usize) {
+                ptr.add(i).write_volatile(0xFF_FF_00_00); // Red for visibility
+            }
         }
 
-        // Step 15: Setup LTDC layer and enable LTDC
+        // Step 14: Setup LTDC layer (but don't enable GCR yet)
         disp.setup_ltdc_layer(fb_addr, width, height);
 
         #[cfg(feature = "sdram_ramtest")]
@@ -378,11 +388,12 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 .map(|addr| Self::fill_smpte_bars_rgb565(addr as *mut u16, width, height));
         }
 
-        // Step 16: LTDC + DSI video flow enable.
-        // TODO: LTDCEN write locks AXI bus — DSI video mode config needs
-        // tuning before the LTDC-to-DSI bridge can be started.
-        // disp.dsi.wcr.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 2)) });
-        // disp.ltdc.gcr.modify(|_, w| w.ltdcen().set_bit());
+        // Step 15: Start video — LTDCEN first (opens bridge), then LTDC GCR
+        // (starts pixel scanning).  Both must be active for video flow.
+        // Write LTDCEN via direct register write to avoid read-modify-write hang.
+        unsafe { (0x50000404 as *mut u32).write_volatile(0x0C) }; // DSIEN + LTDCEN
+        disp.ltdc.gcr.modify(|_, w| w.ltdcen().set_bit());
+        disp.ltdc.srcr.write(|w| w.imr().reload());
 
         // Backlight on
         #[allow(clippy::arithmetic_side_effects)]
@@ -471,13 +482,13 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     fn setup_ltdc_layer(&mut self, fb: u32, width: u16, height: u16) {
-        let pitch = (width as u32) * 2; // RGB565 bytes/line
+        let pitch = (width as u32) * 4; // ARGB8888 bytes/line
         let layer0 = &self.ltdc.layer1;
-        // Match the timing values used in new()
-        let hsw: u32 = 2;
-        let hbp: u32 = 34;
-        let vsw: u32 = 1;
-        let vbp: u32 = 15;
+        // Match the timing values used in new() (ST BSP OTM8009A values)
+        let hsw: u32 = 10;
+        let hbp: u32 = 20;
+        let vsw: u32 = 2;
+        let vbp: u32 = 13;
         let x0 = hsw + hbp + 1;
         let x1 = x0 + (width as u32) - 1;
         let y0 = vsw + vbp + 1;
@@ -489,7 +500,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             .cfblr
             .write(|w| unsafe { w.bits(((pitch + 3) << 16) | pitch) });
         layer0.cfblnr.write(|w| w.cfblnbr().bits(height));
-        layer0.pfcr.write(|w| w.pf().rgb565());
+        layer0.pfcr.write(|w| w.pf().argb8888());
         layer0.cacr.write(|w| w.consta().bits(255));
         layer0.bfcr.write(|w| unsafe { w.bits(0x0405) });
         layer0.cr.modify(|_, w| w.len().enabled());
