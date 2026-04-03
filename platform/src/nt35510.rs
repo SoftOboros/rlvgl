@@ -13,6 +13,7 @@ use stm32h7::stm32h747cm7::DSIHOST;
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
+/// NT35510 panel driver.
 pub struct Nt35510;
 
 #[cfg(all(
@@ -164,6 +165,10 @@ impl Nt35510 {
         // Pixel format: RGB888 (0x77)
         Self::dcs_short_write1(dsi, 0x3A, 0x77);
 
+        // Set Tear On — required for adapted command mode TE handshake
+        // 0x35 param=0x00: TE output V-blanking only
+        Self::dcs_short_write1(dsi, 0x35, 0x00);
+
         // Backlight control
         Self::dcs_short_write1(dsi, 0x51, 0x7F); // WRDISBV: brightness 50%
         Self::dcs_short_write1(dsi, 0x53, 0x2C); // WRCTRLD: BL+DD+BL_EN
@@ -176,9 +181,56 @@ impl Nt35510 {
         }
         cortex_m::asm::delay(4_000_000);
 
-        // NOTE: Do NOT send RAMWR (0x2C) here — in adapted command mode,
-        // the DSI wrapper automatically generates the memory write command.
+        // Manual pixel test moved to dedicated function called after
+        // LTDC/DSI init with auto-refresh disabled.
 
         true
+    }
+
+    /// Manual pixel test: write a 10×10 green block at top-left via DCS.
+    /// Call with LTDC stopped and auto-refresh disabled so nothing overwrites.
+    pub fn pixel_test(dsi: &mut DSIHOST) {
+        // Enable LP mode for DCS writes
+        dsi.cmcr.write(|w| unsafe {
+            w.bits(
+                (1 << 0)   // TEARE
+                | (1 << 16) // DSW0TX (short write 0p in LP)
+                | (1 << 17) // DSW1TX (short write 1p in LP)
+                | (1 << 19) // DLWTX  (long write in LP)
+            )
+        });
+        cortex_m::asm::delay(400_000);
+
+        // Set column 0..9
+        Self::dcs_long_write(dsi, &[0x2A, 0x00, 0x00, 0x00, 0x09]);
+        // Set row 0..9
+        Self::dcs_long_write(dsi, &[0x2B, 0x00, 0x00, 0x00, 0x09]);
+        // Write Memory Start: 10 green pixels (row 0)
+        Self::dcs_long_write(dsi, &[
+            0x2C,
+            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+        ]);
+        // Rows 1..9 via Write Memory Continue
+        for _ in 1..10 {
+            Self::dcs_long_write(dsi, &[
+                0x3C,
+                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
+            ]);
+        }
+
+        // Restore column/page to full panel
+        Self::dcs_long_write(dsi, &[0x2A, 0x00, 0x00, 0x01, 0xDF]);
+        Self::dcs_long_write(dsi, &[0x2B, 0x00, 0x00, 0x03, 0x1F]);
+
+        // Clear LP overrides, keep TEARE
+        dsi.cmcr.write(|w| unsafe { w.bits(1) });
     }
 }

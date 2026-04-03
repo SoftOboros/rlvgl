@@ -1352,6 +1352,148 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         children: Vec::new(),
     });
 
+    // ── Semihosting SDRAM inspector ──────────────────────────────────────────
+    // CM7 reads SDRAM perfectly; semihosting passes data via BKPT trap to the
+    // debugger console, bypassing the AHB-AP bus width issues that corrupt
+    // probe-rs direct reads.
+    #[cfg(feature = "semihosting")]
+    fn sh_hexdump(label: &str, addr: u32, words: usize) {
+        use core::fmt::Write;
+        if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+            let _ = writeln!(out, "\n── {} @ 0x{:08X} ({} words) ──", label, addr, words);
+            for i in 0..words {
+                let a = addr + (i as u32) * 4;
+                let val = unsafe { (a as *const u32).read_volatile() };
+                if i % 4 == 0 {
+                    let _ = write!(out, "  {:08X}:", a);
+                }
+                let _ = write!(out, " {:08X}", val);
+                if i % 4 == 3 || i == words - 1 {
+                    let _ = writeln!(out);
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "semihosting")]
+    #[allow(dead_code)]
+    fn sh_print(msg: &str) {
+        use core::fmt::Write;
+        if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+            let _ = write!(out, "{}", msg);
+        }
+    }
+
+    #[cfg(feature = "semihosting")]
+    fn sh_println(msg: &str) {
+        use core::fmt::Write;
+        if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+            let _ = writeln!(out, "{}", msg);
+        }
+    }
+
+    #[cfg(feature = "semihosting")]
+    fn sh_reg(label: &str, addr: u32) {
+        use core::fmt::Write;
+        if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+            let val = unsafe { (addr as *const u32).read_volatile() };
+            let _ = writeln!(out, "  {} (0x{:08X}) = 0x{:08X}", label, addr, val);
+        }
+    }
+
+    // Post-init semihosting dump: LTDC, DSI, and framebuffer contents
+    #[cfg(feature = "semihosting")]
+    {
+        sh_println("╔══════════════════════════════════════════════════╗");
+        sh_println("║   rlvgl semihosting SDRAM/register inspector    ║");
+        sh_println("╚══════════════════════════════════════════════════╝");
+
+        // Key DSI wrapper registers
+        sh_println("\n── DSI wrapper ──");
+        sh_reg("WCFGR ", 0x5000_0400);
+        sh_reg("WCR   ", 0x5000_0404);
+        sh_reg("WIER  ", 0x5000_0408);
+        sh_reg("WISR  ", 0x5000_040C);
+        sh_reg("WIFCR ", 0x5000_0410);
+        sh_reg("WPCR0 ", 0x5000_0418);
+
+        // DSI host registers (RM0399 §34.15: VR=0x00, CR=0x04, CCR=0x08)
+        sh_println("\n── DSI host ──");
+        sh_reg("VR    ", 0x5000_0000); // Version register
+        sh_reg("CR    ", 0x5000_0004); // Control: bit0=EN
+        sh_reg("CCR   ", 0x5000_0008); // Clock control
+        sh_reg("LVCIDR", 0x5000_000C);
+        sh_reg("LCOLCR", 0x5000_0010);
+        sh_reg("LPCR  ", 0x5000_0014);
+        sh_reg("LPMCR ", 0x5000_0018);
+        sh_reg("PCR   ", 0x5000_002C);
+        sh_reg("MCR   ", 0x5000_0034);
+        sh_reg("VMCR  ", 0x5000_0038);
+        sh_reg("CMCR  ", 0x5000_0068);
+        sh_reg("GHCR  ", 0x5000_006C);
+        sh_reg("GPSR  ", 0x5000_0074);
+
+        // DSI PHY registers — ST CMSIS header offsets (matches PAC)
+        sh_println("\n── DSI PHY (CMSIS/PAC offsets) ──");
+        sh_reg("CLCR  ", 0x5000_0094);
+        sh_reg("CLTCR ", 0x5000_0098); // Clock lane timer
+        sh_reg("DLTCR ", 0x5000_009C);
+        sh_reg("PCTLR ", 0x5000_00A0);
+        sh_reg("PCONFR", 0x5000_00A4);
+        sh_reg("PUCR  ", 0x5000_00A8); // ULPS control
+        sh_reg("WRPCR ", 0x5000_0430);
+
+        // LTDC and DSI error flags
+        const LTDC_BASE: u32 = 0x5000_1000;
+        sh_println("\n── Error flags ──");
+        sh_reg("LTDC_ISR ", LTDC_BASE + 0x38); // bit1=FUIF (FIFO underrun)
+        sh_reg("LTDC_GCR ", LTDC_BASE + 0x18);
+        sh_reg("DSI_ISR0 ", 0x5000_00BC); // ACK errors, PHY errors
+        sh_reg("DSI_ISR1 ", 0x5000_00C0); // Payload errors
+
+        // LTDC pre-LTDCEN values (comprehensive dump at 0x24070140)
+        sh_println("\n── LTDC pre-LTDCEN snapshot (0x24070140) ──");
+        sh_hexdump("Pre-en full", 0x2407_0140, 16);
+        // Layout: [sentinel, L1CR, WHPCR, WVPCR, PFCR, CACR,
+        //          BFCR, CFBAR, CFBLR, CFBLNR,
+        //          SSCR, BPCR, AWCR, TWCR, GCR, end]
+
+        // Also read SRAM diagnostic dump
+        sh_hexdump("SRAM diag", 0x2407_0000, 27);
+
+        // Framebuffer content: read from pre-stored CFBAR (0x24070128)
+        // (Live LTDC reads are aliased to GCR after LTDCEN)
+        let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };
+        if cfbar >= 0x2400_0000 && cfbar < 0x2408_0000 {
+            sh_hexdump("Framebuffer (AXI SRAM)", cfbar, 64);
+        } else if cfbar >= 0xC000_0000 {
+            sh_hexdump("Framebuffer (SDRAM)", cfbar, 64);
+        } else {
+            use core::fmt::Write;
+            if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+                let _ = writeln!(out, "  CFBAR=0x{:08X} — unexpected range!", cfbar);
+            }
+        }
+
+        // SDRAM sanity: read/write test at 0xC000_0000
+        sh_println("\n── SDRAM read/write test ──");
+        let test_addr: u32 = 0xC000_0000;
+        unsafe {
+            let before = (test_addr as *const u32).read_volatile();
+            (test_addr as *mut u32).write_volatile(0xDEAD_BEEF);
+            cortex_m::asm::dsb();
+            let after = (test_addr as *const u32).read_volatile();
+            (test_addr as *mut u32).write_volatile(before); // restore
+            use core::fmt::Write;
+            if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
+                let _ = writeln!(out, "  [0xC0000000] before=0x{:08X} wrote=0xDEADBEEF readback=0x{:08X} {}",
+                    before, after, if after == 0xDEAD_BEEF { "OK" } else { "FAIL" });
+            }
+        }
+
+        sh_println("\n── Initial dump complete ──\n");
+    }
+
     dbg_print("rlvgl: entering main loop\r\n");
     dbg_pulse();
 
@@ -1440,6 +1582,18 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             // Periodic UART status (~1 Hz)
             if frame_counter % 25 == 0 {
                 dbg_print(".");
+            }
+            // Periodic semihosting SDRAM dump (~30s = every 180 frames at 6 Hz)
+            // Periodic semihosting SDRAM dump (~30s = every 180 frames at 6 Hz)
+            #[cfg(feature = "semihosting")]
+            if frame_counter % 180 == 30 {
+                sh_println("\n── Periodic SDRAM check ──");
+                // CFBAR is at LTDC+0xAC (aliased after LTDCEN — use pre-stored value)
+                let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };
+                sh_hexdump("FB snapshot", cfbar, 16);
+                sh_reg("WISR  ", 0x5000_040C);
+                sh_reg("WCR   ", 0x5000_0404);
+                sh_reg("CR    ", 0x5000_0004);
             }
             frame_counter = frame_counter.wrapping_add(1);
             let _ = ipc::event_push(ipc::evt_frame_rendered(frame_counter));

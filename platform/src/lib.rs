@@ -26,7 +26,8 @@ pub mod input;
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-mod nt35510;
+/// NT35510 MIPI-DSI panel driver for MB1166 Rev A-09.
+pub mod nt35510;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
 #[cfg(all(

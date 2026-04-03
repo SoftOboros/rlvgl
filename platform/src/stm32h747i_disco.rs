@@ -348,16 +348,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             w.bits((r.bits() & !0x3F) | 8) // UIX4 = 8 (bits 5:0)
         });
 
-        // Step 5: DSI Host timings
-        // Errata §2.14.4: Add SW_TIME (0x28=40) to HS2LP_TIME fields
-        // Errata §2.14.2: HS2LP_TIME and LP2HS_TIME must be equal (use max)
-        // KEY FIX: CLTCR goes to 0xA8 (PAC 0x98 is actually PUCR!)
-        // Writing timing values to PUCR was causing D-PHY ULPS entry.
-        unsafe {
-            ((DSI + 0xA8) as *mut u32).write_volatile((50 << 16) | 50); // CLTCR
-        }
-        // DLTCR: PAC offset 0x9C is correct
-        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
+        // Step 5: DSI Host timings — DEFERRED until after PCTLR enables PHY.
+        // Semihosting revealed CLTCR reads 0x00000002 (not our 0x00320032)
+        // when written before PCTLR. The PHY enable may reset timing regs.
 
         // Step 5b: TX escape clock divider (required for LP↔HS transitions!)
         // ST BSP: TXEscapeCkdiv = 4 → escape_clk = 62.5/8 = 7.8 MHz (< 20 MHz max)
@@ -407,27 +400,73 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // NT35510: LP largest packet size = 64 (vs 4 for OTM8009A)
         disp.dsi.lpmcr.write(|w| unsafe { w.bits((64 << 16) | 64) });
 
-        // Step 9: Adapted command mode (diagnostic — video mode engine won't start)
+        // Step 9: Adapted command mode
         // MCR defaults to CMDM=1 (command mode) — leave it as-is
         // LCCR: command size = width (pixels per line)
         disp.dsi.lccr.write(|w| unsafe { w.bits(width as u32) });
+        // Configure PJ2 as DSI_TE (AF13) — NT35510 TE output pin
+        // Port J clock already enabled
+        unsafe {
+            let gpioj: u32 = 0x5802_2400;
+            // PJ2: MODER bits 5:4 = 10 (AF)
+            let moder = (gpioj as *mut u32).read_volatile();
+            (gpioj as *mut u32).write_volatile((moder & !(3u32 << 4)) | (2u32 << 4));
+            // PJ2: AFRL bits 11:8 = 13 (AF13 = DSI_TE)
+            let afrl = ((gpioj + 0x20) as *mut u32).read_volatile();
+            ((gpioj + 0x20) as *mut u32).write_volatile((afrl & !(0xFu32 << 8)) | (13u32 << 8));
+        }
+        dbg("  PJ2 = DSI_TE (AF13)\r\n");
+
+        // WCFGR: adapted command mode + external TE + automatic refresh
         disp.dsi.wcfgr.write(|w| unsafe {
             w.bits(
                 (1 << 0)    // DSIM = 1 (adapted command mode)
                 | (5 << 1)  // COLMUX = 5 (RGB888)
+                | (1 << 4)  // TESRC = 1 → external TE pin (PJ2)
+                // TEPOL = 0 (bit 5) → rising edge
+                | (1 << 6)  // AR = 1 → automatic refresh
+                // VSPOL = 0 (bit 7)
             )
         });
+        // CMCR: Enable tearing effect acknowledge request (bit 0)
+        // This tells the DSI host to request TE from the panel before
+        // each frame transfer. Without this, the wrapper never initiates
+        // pixel data transfer in adapted command mode.
+        disp.dsi.cmcr.modify(|r, w| unsafe { w.bits(r.bits() | 1) }); // TEARE=1
 
 
         // Step 10: Enable D-PHY
         // PCTLR at 0xA0: PAC bit positions (DEN=bit1, CKE=bit2) confirmed working
         disp.dsi.pctlr.write(|w| w.den().set_bit().cke().set_bit());
+        cortex_m::asm::delay(400_000); // ~1ms for PHY to stabilize
+
+        // Step 10b: DSI Host timings — written AFTER PCTLR PHY enable.
+        // ST CMSIS header confirms: CLTCR=0x98, DLTCR=0x9C (PAC is correct!)
+        // Our earlier "fix" writing to 0xA8 was actually hitting PUCR.
+        // Errata §2.14.4: Add SW_TIME (0x28=40) to HS2LP_TIME fields
+        // Errata §2.14.2: HS2LP_TIME and LP2HS_TIME must be equal (use max)
+        disp.dsi.cltcr.write(|w| unsafe {
+            w.bits((50 << 16) | 50) // LP2HS_TIME=50, HS2LP_TIME=50
+        });
+        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
+        // Verify CLTCR readback
+        let cltcr_rb = disp.dsi.cltcr.read().bits();
+        dbg("  CLTCR(0x98) readback="); dbg_hex(cltcr_rb);
+        if cltcr_rb != (50 << 16) | 50 {
+            dbg(" MISMATCH!");
+        }
+        dbg("\r\n");
 
         // Step 11: Enable DSI Host
         disp.dsi.cr.write(|w| w.en().set_bit());
 
         // Step 12: Enable DSI Wrapper
         disp.dsi.wcr.write(|w| w.dsien().set_bit());
+        // Enable TE and End-of-Refresh wrapper interrupts (WIER)
+        // HAL does this — wrapper state machine may depend on it
+        disp.dsi.wier.write(|w| unsafe {
+            w.bits((1 << 0) | (1 << 1)) // TEIE + ERIE
+        });
         cortex_m::asm::delay(2_000_000);
         dbg("  DSI host+wrapper enabled\r\n");
 
@@ -451,7 +490,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         let gpsr = unsafe { (0x5000_0074u32 as *const u32).read_volatile() };
         dbg(" GPSR="); dbg_hex(gpsr); dbg("\r\n");
         // Clear LP command overrides — adapted cmd mode takes over
-        disp.dsi.cmcr.write(|w| unsafe { w.bits(0) });
+        // Keep TEARE=1 (bit 0) for TE handshake in adapted command mode
+        disp.dsi.cmcr.write(|w| unsafe { w.bits(1) }); // TEARE=1 only
 
         // ── SDRAM framebuffer allocation ────────────────────────────────────
         let fb = Self::init_sdram();
@@ -464,21 +504,21 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.width = width;
         disp.height = height;
         Self::configure_mpu_sdram_writethrough(0xC000_0000, 32 * 1024 * 1024);
-        // TEST: Use AXI SRAM instead of SDRAM for framebuffer.
-        // Fill 480×100 lines (76800 pixels = 300 KB, fits in AXI SRAM)
-        let test_fb = 0x2402_0000u32;
+        // Use SDRAM framebuffer — fill entire 480×800 with solid red
+        // AXI SRAM was too small (384KB vs 1.5MB needed), causing LTDC to
+        // read past end → bus error → FIFO underrun → wrapper sends garbage.
         unsafe {
-            let test_pixels = (width as usize) * 100; // full width, 100 lines
-            for i in 0..test_pixels {
-                (test_fb as *mut u32).add(i).write_volatile(0xFFFF_0000); // red
+            let total_pixels = (width as usize) * (height as usize);
+            for i in 0..total_pixels {
+                (fb_addr as *mut u32).add(i).write_volatile(0xFFFF_0000); // red ARGB
             }
             cortex_m::asm::dsb();
         }
-        disp.fb_addr = test_fb;
-        disp.fb_addr_back = test_fb;
+        dbg("  FB filled: "); dbg_hex(fb_addr);
+        dbg(" ("); dbg_hex((width as u32) * (height as u32)); dbg(" px)\r\n");
 
-        // Step 14: Setup LTDC layer — now uses AXI SRAM address
-        disp.setup_ltdc_layer(test_fb, width, height);
+        // Step 14: Setup LTDC layer with SDRAM framebuffer
+        disp.setup_ltdc_layer(fb_addr, width, height);
 
         // Readback layer regs BEFORE GCR enable (no aliasing yet)
         unsafe {
@@ -507,11 +547,45 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 .map(|addr| Self::fill_smpte_bars_rgb565(addr as *mut u16, width, height));
         }
 
+        // Verify all layer registers before LTDCEN (no aliasing yet)
+        unsafe {
+            let l1_cr    = (0x5000_1084u32 as *const u32).read_volatile();
+            let l1_whpcr = (0x5000_1088u32 as *const u32).read_volatile();
+            let l1_wvpcr = (0x5000_108Cu32 as *const u32).read_volatile();
+            let l1_pfcr  = (0x5000_1094u32 as *const u32).read_volatile();
+            let l1_cacr  = (0x5000_1098u32 as *const u32).read_volatile();
+            let l1_bfcr  = (0x5000_10A0u32 as *const u32).read_volatile();
+            let l1_cfbar = (0x5000_10ACu32 as *const u32).read_volatile();
+            let l1_cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
+            let l1_cfblnr= (0x5000_10B4u32 as *const u32).read_volatile();
+            let sscr     = (0x5000_1008u32 as *const u32).read_volatile();
+            let bpcr     = (0x5000_100Cu32 as *const u32).read_volatile();
+            let awcr     = (0x5000_1010u32 as *const u32).read_volatile();
+            let twcr     = (0x5000_1014u32 as *const u32).read_volatile();
+            let gcr      = (0x5000_1018u32 as *const u32).read_volatile();
+            // Store comprehensive pre-LTDCEN dump at 0x24070140
+            let base_dump: u32 = 0x2407_0140;
+            let dump_vals: [u32; 16] = [
+                0xBEEF_0003, // sentinel
+                l1_cr, l1_whpcr, l1_wvpcr, l1_pfcr, l1_cacr,
+                l1_bfcr, l1_cfbar, l1_cfblr, l1_cfblnr,
+                sscr, bpcr, awcr, twcr, gcr,
+                0xBEEF_EEEE, // end
+            ];
+            for (i, &v) in dump_vals.iter().enumerate() {
+                ((base_dump + i as u32 * 4) as *mut u32).write_volatile(v);
+            }
+            dbg("  pre-LTDCEN: L1CR="); dbg_hex(l1_cr);
+            dbg(" CFBAR="); dbg_hex(l1_cfbar);
+            dbg(" CFBLR="); dbg_hex(l1_cfblr);
+            dbg(" GCR="); dbg_hex(gcr); dbg("\r\n");
+        }
+
         // Step 15: Enable LTDC, then start DSI wrapper bridge.
         // Use write (not modify) to ensure GCR polarity bits are all 0
         // (HSPOL=0, VSPOL=0, DEPOL=0, PCPOL=0) matching LPCR=0x00.
         // Raw write — PAC gcr.write() starts from 0 and may not set LTDCEN correctly
-        unsafe { (0x5000_1018 as *mut u32).write_volatile(0x0000_0001) }; // GCR.LTDCEN=1
+        unsafe { (0x5000_1018 as *mut u32).write_volatile(0x0000_2221) }; // GCR reset val + LTDCEN
         unsafe { (0x5000_1024 as *mut u32).write_volatile(1) }; // SRCR.IMR
         cortex_m::asm::dsb();
         // RM0399 §34.5: DSI host waits for the first VSYNC active
@@ -720,7 +794,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             ((L1 + 0x14) as *mut u32).write_volatile(255);                    // CACR
             ((L1 + 0x1C) as *mut u32).write_volatile(0x0405);                 // BFCR
             ((L1 + 0x28) as *mut u32).write_volatile(fb);                     // CFBAR
-            ((L1 + 0x2C) as *mut u32).write_volatile(((pitch + 3) << 16) | pitch); // CFBLR
+            // CFBLR: bits[28:16]=CFBP (pitch), bits[12:0]=CFBLL (line_len + 7)
+            ((L1 + 0x2C) as *mut u32).write_volatile((pitch << 16) | (pitch + 7)); // CFBLR
             ((L1 + 0x30) as *mut u32).write_volatile(height as u32);          // CFBLNR
             // Enable layer (CR bit 0 = LEN)
             let cr = ((L1) as *const u32).read_volatile();

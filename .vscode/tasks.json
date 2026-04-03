@@ -109,7 +109,7 @@
         "build",
         "--target", "thumbv7em-none-eabihf",
         "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,c_hal"
+        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,c_hal,semihosting"
       ],
       "options": {
         "env": {
