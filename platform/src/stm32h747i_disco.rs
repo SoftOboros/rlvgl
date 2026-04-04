@@ -1109,6 +1109,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         self.fb_addr_back
     }
 
+    /// Return the address of the current front (displayed) buffer.
+    pub fn front_buffer_addr(&self) -> u32 {
+        self.fb_addr
+    }
+
+    /// Override the back-buffer address (for fixing double-buffer allocation).
+    pub fn set_back_buffer(&mut self, addr: u32) {
+        self.fb_addr_back = addr;
+    }
+
     /// Return the display dimensions as (width, height) in pixels.
     pub fn dimensions(&self) -> (u32, u32) {
         (self.width as u32, self.height as u32)

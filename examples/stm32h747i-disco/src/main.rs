@@ -860,8 +860,7 @@ fn main() -> ! {
             Some(SPLASH_RLE),
         );
         unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); } // post-display::new
-        #[cfg(feature = "splash")]
-        cortex_m::asm::delay(400_000_000 * 2);
+        // No splash delay — splash is the desktop background.
         // Optional: SDRAM RAM test (feature-gated). Writes a few patterns per MB
         // and prints progress via semihosting if enabled.
         #[cfg(feature = "sdram_ramtest")]
@@ -1159,9 +1158,68 @@ fn main() -> ! {
 
         let mut render_blitter = CpuBlitter;
 
+        // ── Fix double-buffering ──────────────────────────────────────────
+        // The sdram_alloc may have given both framebuffers the same address.
+        // Force a second buffer at a known SDRAM offset and copy splash into it.
+        let (w_fb, h_fb) = display.dimensions();
+        let fb_bytes = (w_fb * h_fb * 4) as usize;
+        const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
+        if display.back_buffer_addr() == display.front_buffer_addr() {
+            serial_puts("FIX: double-buffer was single — setting FB2\r\n");
+            // Copy splash into the second buffer
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    display.front_buffer_addr() as *const u8,
+                    FB2_ADDR as *mut u8,
+                    fb_bytes,
+                );
+                cortex_m::asm::dsb();
+            }
+            display.set_back_buffer(FB2_ADDR);
+        }
+
+        // Telemetry: write both fb addresses
+        unsafe {
+            (0x3800_0620u32 as *mut u32).write_volatile(display.front_buffer_addr());
+            (0x3800_0624u32 as *mut u32).write_volatile(display.back_buffer_addr());
+        }
+
+        // Save a pristine copy of the splash framebuffer so we can restore
+        // pixels under the EventWindow when it hides (the front buffer gets
+        // EventWindow pixels painted on it, so we can't copy from there).
+        let splash_ref = display.back_buffer_addr();
+        // Place pristine copy at 0xD030_0000 (after the two 1.5MB framebuffers)
+        const SPLASH_PRISTINE: u32 = 0xD030_0000;
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                splash_ref as *const u8,
+                SPLASH_PRISTINE as *mut u8,
+                fb_bytes,
+            );
+            cortex_m::asm::dsb();
+        }
+
         // D3 breadcrumb: entering main loop
         unsafe { (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); }
         serial_puts("rlvgl: input proof loop started\r\n");
+
+        // No boot discard — splash delay removed, pins are stable by now.
+        let btn_discard: u32 = 0;
+
+        // Double-buffer sync: render for 2 frames after any visual change
+        // so both ping-pong buffers match.
+        let mut dirty_frames: u8 = 0;
+        let mut was_visible = false;
+        let mut render_count: u32 = 0;
+        let mut tick_count: u32 = 0;
+
+        // EventWindow fb region (after 90° CCW rotation):
+        // logical (10, 10, 380, 264) → fb (480-10-264, 10, 264, 380) = (206, 10, 264, 380)
+        // We restore this region from pristine splash when the window hides.
+        const EW_FB_X: u32 = 206;
+        const EW_FB_Y: u32 = 10;
+        const EW_FB_W: u32 = 264;
+        const EW_FB_H: u32 = 380;
 
         // Event counter written to D3 SRAM for probe-rs inspection
         let mut evt_count: u32 = 0;
@@ -1177,32 +1235,57 @@ fn main() -> ! {
             }
 
             // ── Poll touch ──
+            // Touch driver reports in portrait fb coords (x=0..479, y=0..799).
+            // Transform to landscape physical: phys_x = touch_y, phys_y = 479 - touch_x.
             if let Some(evt) = input.poll() {
                 if let Event::PointerDown { x, y } = &evt {
                     serial_puts("TOUCH: DOWN\r\n");
+                    let phys_x = *y;
+                    let phys_y = 479 - *x;
                     let mut buf = alloc::string::String::new();
                     use core::fmt::Write;
-                    let _ = write!(buf, "Touch: ({}, {})", x, y);
+                    let _ = write!(buf, "Touch: ({}, {})", phys_x, phys_y);
                     event_win.borrow_mut().push_event(buf);
+                    dirty_frames = 2;
                     evt_count += 1;
                 }
                 root.borrow_mut().dispatch_event(&evt);
             }
 
-            // ── Poll button ──
+            // ── Poll button (PC13 — the one with the pole) ──
             if let Some(evt) = button_input.poll() {
+                unsafe {
+                    let code: u32 = match &evt {
+                        Event::KeyDown { .. } => 0x4200_0001,
+                        Event::KeyUp { .. } => 0x4200_8000,
+                        _ => 0x4200_FFFF,
+                    };
+                    (0x3800_0630u32 as *mut u32).write_volatile(code);
+                }
                 if matches!(evt, Event::KeyDown { .. }) {
                     serial_puts("BTN: PRESS\r\n");
                     event_win.borrow_mut().push_event(
                         alloc::string::String::from("Btn: Press"),
                     );
+                    dirty_frames = 2;
                     evt_count += 1;
                 }
                 root.borrow_mut().dispatch_event(&evt);
             }
 
-            // ── Poll joystick ──
+            // ── Poll joystick (PK2-PK6 — the flat pad) ──
             if let Some(evt) = joystick.poll() {
+                unsafe {
+                    let code: u32 = match &evt {
+                        Event::KeyDown { key } => 0x4A00_0000 | match key {
+                            Key::Enter => 1, Key::ArrowUp => 2, Key::ArrowDown => 3,
+                            Key::ArrowLeft => 4, Key::ArrowRight => 5, _ => 0xFF,
+                        },
+                        Event::KeyUp { .. } => 0x4A00_8000,
+                        _ => 0x4A00_FFFF,
+                    };
+                    (0x3800_0634u32 as *mut u32).write_volatile(code);
+                }
                 if let Event::KeyDown { ref key } = evt {
                     let label = match key {
                         Key::ArrowUp => "Joy: Up",
@@ -1217,46 +1300,96 @@ fn main() -> ! {
                     event_win.borrow_mut().push_event(
                         alloc::string::String::from(label),
                     );
+                    dirty_frames = 2;
                     evt_count += 1;
                 }
                 root.borrow_mut().dispatch_event(&evt);
             }
 
-            // ── SysTick: tick widgets, render tree, present ──
+            // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
                 // Dispatch Tick to age EventWindow entries
                 root.borrow_mut().dispatch_event(&Event::Tick);
-                common_demo::flush_pending(&root, &pending, &to_remove);
 
-                // Create renderer targeting the back buffer
-                let back = display.back_buffer_addr();
-                let (w, h) = display.dimensions();
-                let fb_slice = unsafe {
-                    core::slice::from_raw_parts_mut(
-                        back as *mut u8,
-                        (w * h * 4) as usize,
-                    )
-                };
-                let surface = Surface::new(
-                    fb_slice,
-                    (w * 4) as usize,
-                    PixelFmt::Argb8888,
-                    w,
-                    h,
-                );
-                let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
-                    BlitterRenderer::new(&mut render_blitter, surface);
+                let vis = event_win.borrow().is_visible();
+                let entry_count = event_win.borrow().entry_count();
 
-                // Wrap in 90° CCW rotation: landscape widgets → portrait framebuffer
-                let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+                // Only render when something visually changed:
+                // - visibility transition (show or hide)
+                // - entry count changed (new event or expiry)
+                // - dirty_frames > 0 (second buffer needs sync)
+                if vis != was_visible {
+                    dirty_frames = 2; // sync both buffers
+                    was_visible = vis;
+                }
+                // Detect entry count change (expiry or new push)
+                static mut LAST_ENTRY_COUNT: usize = 0;
+                let ec = entry_count;
+                if ec != unsafe { LAST_ENTRY_COUNT } {
+                    unsafe { LAST_ENTRY_COUNT = ec; }
+                    dirty_frames = 2;
+                }
+                let need_render = dirty_frames > 0;
 
-                // Draw the entire widget tree (EventWindow is last → on top)
-                root.borrow().draw(&mut renderer);
+                if need_render {
+                    let back = display.back_buffer_addr();
+                    let (w, h) = display.dimensions();
+                    let fb_bytes = (w * h * 4) as usize;
+                    let stride = (w * 4) as usize;
 
-                // Write event count to D3 SRAM for probe-rs
-                unsafe { (0x3800_0604u32 as *mut u32).write_volatile(evt_count); }
+                    // Restore EventWindow fb region from pristine splash so
+                    // stale pixels from the previous frame are cleared.
+                    unsafe {
+                        for row in 0..EW_FB_H {
+                            let y = EW_FB_Y + row;
+                            let off = y as usize * stride + EW_FB_X as usize * 4;
+                            let len = EW_FB_W as usize * 4;
+                            core::ptr::copy_nonoverlapping(
+                                (SPLASH_PRISTINE as *const u8).add(off),
+                                (back as *mut u8).add(off),
+                                len,
+                            );
+                        }
+                        cortex_m::asm::dsb();
+                    }
 
-                display.present();
+                    let fb_slice = unsafe {
+                        core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
+                    };
+                    let surface = Surface::new(
+                        fb_slice, stride, PixelFmt::Argb8888, w, h,
+                    );
+                    let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                        BlitterRenderer::new(&mut render_blitter, surface);
+                    let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+
+                    // Draw widget tree (EventWindow only draws when visible)
+                    root.borrow().draw(&mut renderer);
+
+                    render_count += 1;
+                    if dirty_frames > 0 { dirty_frames -= 1; }
+                    display.present();
+                }
+
+                tick_count += 1;
+                // Telemetry at 0x3800_0604..0x3800_0620
+                unsafe {
+                    (0x3800_0604u32 as *mut u32).write_volatile(evt_count);
+                    (0x3800_0608u32 as *mut u32).write_volatile(tick_count);
+                    (0x3800_060Cu32 as *mut u32).write_volatile(render_count);
+                    (0x3800_0610u32 as *mut u32).write_volatile(
+                        ((dirty_frames as u32) << 16)
+                        | ((was_visible as u32) << 8)
+                        | (event_win.borrow().is_visible() as u32)
+                    );
+                    (0x3800_0614u32 as *mut u32).write_volatile(
+                        display.back_buffer_addr()
+                    );
+                    // LTDC L1CFBAR (what LTDC is currently displaying)
+                    (0x3800_0618u32 as *mut u32).write_volatile(
+                        (0x5000_10ACu32 as *const u32).read_volatile()
+                    );
+                }
             }
             cortex_m::asm::nop();
         }

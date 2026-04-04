@@ -46,6 +46,16 @@ pub struct EventWindow {
 }
 
 impl EventWindow {
+    /// Whether the window is currently visible.
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    /// Number of entries currently in the list.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
     /// Push a pre-formatted event string into the display list.
     pub fn push_event(&mut self, text: String) {
         self.entries.push(EventEntry { text, age: 0 });
@@ -77,9 +87,6 @@ impl Widget for EventWindow {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         if !self.visible {
-            if self.clear_countdown > 0 {
-                renderer.fill_rect(self.bounds, Color(0, 0, 0, 255));
-            }
             return;
         }
 
