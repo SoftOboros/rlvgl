@@ -18,3 +18,5 @@ codex_state/
 .svd/
 cookies.txt
 .mcp.json
+tmp/
+**/.cache/
