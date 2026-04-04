@@ -16,6 +16,7 @@ pub mod add_target;
 pub mod apng;
 pub mod bsp_gen;
 pub mod check;
+pub mod compress;
 pub mod convert;
 pub mod fonts;
 pub mod gen_lib;
@@ -135,6 +136,13 @@ enum Command {
         /// Rebuild all assets even if cached
         #[arg(long)]
         force: bool,
+    },
+    /// Compress an image to an RLEC blob for firmware splash
+    Compress {
+        /// Input image (PNG, BMP, etc.)
+        input: PathBuf,
+        /// Output .rle file
+        output: PathBuf,
     },
     /// Generate thumbnails for quick previews
     Preview {
@@ -490,6 +498,7 @@ pub fn run() -> Result<()> {
             deny,
         } => vendor::run(&path, &cli.manifest, &out, &allow, &deny)?,
         Command::Convert { path, force } => convert::run(&path, &cli.manifest, force)?,
+        Command::Compress { input, output } => compress::run(&input, &output)?,
         Command::Preview { path } => preview::run(&path, &cli.manifest)?,
         Command::AddTarget { name, vendor_dir } => {
             add_target::run(&cli.manifest, &name, &vendor_dir)?

@@ -99,7 +99,7 @@ pub struct Stm32h747iDiscoDisplay<B: Blitter, BL = (), RST = ()> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
-    ltdc: LTDC,
+    _ltdc: LTDC,
     #[cfg(all(
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
@@ -186,11 +186,23 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         dsi: DSIHOST,
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         dma2d: DMA2D,
+        #[cfg(feature = "splash")]
+        splash: Option<&[u8]>,
     ) -> Self
     where
         BL: SetDutyCycle,
         RST: OutputPin,
     {
+        // D3 SRAM telemetry: write breadcrumbs at 0x3800_0100+ so probe-rs
+        // can read them to diagnose how far boot progresses.
+        #[inline(always)]
+        fn d3(slot: u32, val: u32) {
+            unsafe {
+                ((0x3800_0100u32 + slot * 4) as *mut u32).write_volatile(val);
+            }
+        }
+        d3(0, 0xB007_0001); // entered new()
+
         // Clocks for LTDC/DSI/PLL3 are already enabled by C BSP.
         let _ = reset.set_low();
         let mut disp = Self {
@@ -201,7 +213,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             fb_addr_back: 0,
             width: 0,
             height: 0,
-            ltdc,
+            _ltdc: ltdc,
             dsi,
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             dma2d: Some(dma2d),
@@ -254,43 +266,31 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
 
-        // ── Reset LTDC and DSI before configuration ────────────────────────
-        // RCC_APB3RSTR: bit 3 = LTDC reset, bit 4 = DSI reset (RM0399 §8.7.40)
+        // PLL3 is now enabled in main.rs after HAL freeze().
+        // No LTDC/DSI reset — HAL enable() provides a clean state.
         unsafe {
-            let rstr = (0x5802_448Cu32 as *mut u32).read_volatile();
-            (0x5802_448Cu32 as *mut u32).write_volatile(rstr | (1 << 3)); // assert LTDC reset
-            cortex_m::asm::dsb();
-            cortex_m::asm::delay(1000);
-            (0x5802_448Cu32 as *mut u32).write_volatile(rstr & !(1 << 3)); // release
-            cortex_m::asm::dsb();
-            cortex_m::asm::delay(1000);
+            let gcr = (0x5000_1018u32 as *const u32).read_volatile();
+            dbg_hex(gcr);
         }
-        dbg("  LTDC reset done\r\n");
+        dbg(" OK\r\n");
 
         // ── RM0399 §34.14: DSI programming procedure ───────────────────────
 
         // Step 1: LTDC timing
+        dbg("  [1] pre-timing\r\n");
         disp.configure_ltdc_timing(width, height, hsw, hbp, hfp, vsw, vbp, vfp);
+        dbg("  [2] post-timing\r\n");
 
         // Verify LTDC timing writes stuck (BEFORE GCR enable)
         // Store at 0x24070100 to avoid clobbering main diag block
         unsafe {
-            let sscr = (0x5000_1008u32 as *const u32).read_volatile();
-            let bpcr = (0x5000_100Cu32 as *const u32).read_volatile();
-            let awcr = (0x5000_1010u32 as *const u32).read_volatile();
-            let twcr = (0x5000_1014u32 as *const u32).read_volatile();
-            let gcr  = (0x5000_1018u32 as *const u32).read_volatile();
-            dbg("  post-timing: SSCR="); dbg_hex(sscr);
-            dbg(" BPCR="); dbg_hex(bpcr);
-            dbg(" GCR="); dbg_hex(gcr); dbg("\r\n");
-            (0x2407_0100u32 as *mut u32).write_volatile(0xBEEF_0001); // sentinel
-            (0x2407_0104u32 as *mut u32).write_volatile(sscr);
-            (0x2407_0108u32 as *mut u32).write_volatile(bpcr);
-            (0x2407_010Cu32 as *mut u32).write_volatile(awcr);
-            (0x2407_0110u32 as *mut u32).write_volatile(twcr);
-            (0x2407_0114u32 as *mut u32).write_volatile(gcr);
+            // Skip LTDC readback — reading LTDC regs hangs AXI bus.
+            // Jump straight to DSI init.
+            dbg("  [SKIP readback]\r\n");
+            // All LTDC register reads removed — they hang the AXI bus.
         }
 
+        d3(10, 0xD510_0002); // post LTDC timing
         // Step 2: DSI regulator enable + wait ready
         // RM0399 §34.16.4 WISR: RRS=bit12, PLLLS=bit8 (PAC is correct)
         disp.dsi.wrpcr.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 24)) }); // REGEN
@@ -303,6 +303,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
 
+        d3(10, 0xD510_0003); // post regulator
         // Step 3: DSI wrapper PLL (matches ST BSP: IDF=5, NDIV=100, ODF=0)
         //   HSE = 25 MHz, IDF=5 → ref=5 MHz
         //   NDIV=100 → VCO = 500 MHz → 500 Mbps/lane
@@ -388,6 +389,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.dsi.clcr.write(|w| unsafe {
             w.bits(0x03) // DPCC=1 (bit 0) + ACR=1 (bit 1)
         });
+        d3(10, 0xD510_0005); // post PHY init
         dbg("  PHY init done (CLCR=0x03 ACR+DPCC)\r\n");
 
         // Step 5: Lane timings (while DSI disabled)
@@ -465,6 +467,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.dsi.cr.write(|w| w.en().set_bit());
         disp.dsi.wcr.write(|w| w.dsien().set_bit());
         cortex_m::asm::delay(2_000_000);
+        d3(10, 0xD510_0008); // post DSI host+wrapper enable
         dbg("  DSI host+wrapper enabled (HAL sequence)\r\n");
 
         // Step 13: Reset panel and send NT35510 init commands
@@ -482,6 +485,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.reset_panel();
         cortex_m::asm::delay(4_000_000);
         let panel_ok = Nt35510::init(&mut disp.dsi);
+        d3(10, 0xD510_000A); // post NT35510 init
         dbg("  NT35510 init: ");
         dbg(if panel_ok { "ok" } else { "FAIL" });
         let gpsr = unsafe { (0x5000_0074u32 as *const u32).read_volatile() };
@@ -491,7 +495,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.dsi.cmcr.write(|w| unsafe { w.bits(1) }); // TEARE=1 only
 
         // ── SDRAM framebuffer allocation ────────────────────────────────────
+        d3(1, 0xB007_0002); // pre-SDRAM init
         let fb = Self::init_sdram();
+        d3(2, 0xB007_0003); // post-SDRAM init
         sdram_alloc::init(fb, 32 * 1024 * 1024);
         let fb_bytes = (width as usize) * (height as usize) * 4; // ARGB8888
         let fb_addr = sdram_alloc::alloc(fb_bytes, 64).unwrap_or(fb);
@@ -501,18 +507,81 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.width = width;
         disp.height = height;
         Self::configure_mpu_sdram_writethrough(0xC000_0000, 32 * 1024 * 1024);
-        // Use SDRAM framebuffer — fill entire 480×800 with solid red
-        // AXI SRAM was too small (384KB vs 1.5MB needed), causing LTDC to
-        // read past end → bus error → FIFO underrun → wrapper sends garbage.
+        d3(3, 0xB007_0004); // post-MPU SDRAM config
+        // Quick SDRAM smoke test: write/read one word
         unsafe {
-            let total_pixels = (width as usize) * (height as usize);
-            for i in 0..total_pixels {
-                (fb_addr as *mut u32).add(i).write_volatile(0xFFFF_0000); // red ARGB
+            let test_addr = (fb_addr as *mut u32).add(0x1000);
+            test_addr.write_volatile(0xCAFE_BABE);
+            cortex_m::asm::dsb();
+            let rb = test_addr.read_volatile();
+            d3(4, rb); // should be 0xCAFE_BABE if SDRAM works
+        }
+
+        // Fill both framebuffers: splash if provided, otherwise solid black.
+        #[cfg(feature = "splash")]
+        let splash_ok = splash.and_then(|blob| {
+            let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).ok()?;
+            if (w as usize) * (h as usize) * 4 != fb_bytes { return None; }
+            let pal_count = pal_bytes.len() / 2;
+            let mut palette = [0u16; 192];
+            for i in 0..pal_count {
+                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+            }
+
+            // Decode into fb0
+            let fb0 = unsafe { core::slice::from_raw_parts_mut(fb_addr as *mut u8, fb_bytes) };
+            rlvgl_decomp::decode_argb_into(
+                w as usize, h as usize, &palette[..pal_count], stream, fb0,
+            ).ok()?;
+            // Draw a bright red 50×50 square at top-left to prove overwrites work
+            unsafe {
+                for row in 0..50u32 {
+                    for col in 0..50u32 {
+                        (fb_addr as *mut u32).add((row * w as u32 + col) as usize)
+                            .write_volatile(0xFFFF_0000);
+                    }
+                }
             }
             cortex_m::asm::dsb();
+            Some(())
+        }).is_some();
+        #[cfg(not(feature = "splash"))]
+        let splash_ok = false;
+        // SDRAM smoke test
+        unsafe {
+            let p = fb_addr as *mut u32;
+            p.write_volatile(0xDEAD_BEEF);
+            p.add(1).write_volatile(0xCAFE_BABE);
+            cortex_m::asm::dsb();
+            let r0 = p.read_volatile();
+            let r1 = p.add(1).read_volatile();
+            dbg("  SDRAM test: "); dbg_hex(r0); dbg(" "); dbg_hex(r1); dbg("\r\n");
         }
+        if !splash_ok {
+            unsafe {
+                let total_pixels = (width as usize) * (height as usize);
+                for i in 0..total_pixels {
+                    (fb_addr as *mut u32).add(i).write_volatile(0xFFFF_00FF); // magenta = fallback
+                }
+                cortex_m::asm::dsb();
+            }
+        }
+        // Ensure all framebuffer writes are globally visible to LTDC DMA
+        // before configuring the layer to read from this address.
+        cortex_m::asm::dsb();
+        cortex_m::asm::isb();
+
+        d3(5, if splash_ok { 0x5F1A_0001 } else { 0x5F1A_0000 }); // splash result
         dbg("  FB filled: "); dbg_hex(fb_addr);
+        dbg(if splash_ok { " (splash)" } else { " (solid)" });
         dbg(" ("); dbg_hex((width as u32) * (height as u32)); dbg(" px)\r\n");
+
+        // Readback a few FB pixels for telemetry
+        unsafe {
+            d3(6, (fb_addr as *const u32).read_volatile());          // pixel[0]
+            d3(7, (fb_addr as *const u32).add(256).read_volatile()); // pixel[256]
+            d3(8, (fb_addr as *const u32).add(480).read_volatile()); // pixel[480] (row 1)
+        }
 
         // Step 14: Setup LTDC layer with SDRAM framebuffer
         disp.setup_ltdc_layer(fb_addr, width, height);
@@ -1065,8 +1134,126 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
-    /// Initialize the external SDRAM and return its base address.
+    /// Reinitialize SDRAM after HAL RCC clock switch.
+    ///
+    /// The early PAC init (configure_fmc_sdram) runs at pre-HAL HSI clock.
+    /// After HAL freeze(), hclk3 jumps to 200 MHz and the FMC kernel clock
+    /// changes, making the pre-HAL SDRAM init invalid. This function
+    /// performs a full JEDEC init sequence at the post-HAL clock rate.
+    ///
+    /// IS42S32800J-6: 4 banks × 4096 rows × 512 cols × 32 bits, 166 MHz max.
+    /// SDCLK = hclk3/2 = 100 MHz (10 ns/cycle).
     fn init_sdram() -> u32 {
+        const FMC_BCR1:  *mut u32 = 0x5200_4000u32 as *mut u32;
+        const FMC_SDCR1: *mut u32 = 0x5200_4140u32 as *mut u32;
+        const FMC_SDTR1: *mut u32 = 0x5200_4148u32 as *mut u32;
+        const FMC_SDCMR: *mut u32 = 0x5200_4150u32 as *mut u32;
+        const FMC_SDRTR: *mut u32 = 0x5200_4154u32 as *mut u32;
+        const FMC_SDSR:  *const u32 = 0x5200_4158u32 as *const u32;
+
+        #[inline(always)]
+        fn sdram_busy_wait() {
+            while unsafe { FMC_SDSR.read_volatile() } & (1 << 5) != 0 {
+                cortex_m::asm::nop();
+            }
+        }
+        fn sdram_cmd(mode: u32, nrfs: u32, mrd: u32) {
+            sdram_busy_wait();
+            unsafe {
+                FMC_SDCMR.write_volatile(
+                    ((mrd & 0x1FFF) << 9)
+                    | ((nrfs & 0xF) << 5)
+                    | (1 << 4)          // CTB1 = bank 1
+                    | (mode & 0x7)
+                );
+            }
+            sdram_busy_wait();
+        }
+
+        // D3 SRAM telemetry base for SDRAM reinit
+        const D3: *mut u32 = 0x3800_0400u32 as *mut u32;
+        unsafe {
+            D3.write_volatile(0x5D_000001); // entered reinit
+
+            // FMC peripheral reset via RCC_AHB3RSTR bit 12
+            // This clears the SDRAM controller state machine so we can reconfigure.
+            const RCC_AHB3RSTR: *mut u32 = (0x5802_4400 + 0x7C) as *mut u32;
+            let rstr = RCC_AHB3RSTR.read_volatile();
+            RCC_AHB3RSTR.write_volatile(rstr | (1 << 12)); // assert FMC reset
+            cortex_m::asm::dsb();
+            cortex_m::asm::delay(1000);
+            RCC_AHB3RSTR.write_volatile(rstr & !(1 << 12)); // release
+            cortex_m::asm::dsb();
+            cortex_m::asm::delay(1000);
+
+            // Re-enable FMC clock after reset
+            const RCC_AHB3ENR: *mut u32 = (0x5802_4400 + 0xD4) as *mut u32;
+            RCC_AHB3ENR.write_volatile(RCC_AHB3ENR.read_volatile() | (1 << 12));
+            let _ = (RCC_AHB3ENR as *const u32).read_volatile();
+
+            // Ensure FMC is enabled
+            FMC_BCR1.write_volatile(FMC_BCR1.read_volatile() | (1 << 31));
+
+            // Read current SDCR1 for diagnostics
+            let old_sdcr1 = FMC_SDCR1.read_volatile();
+            D3.add(1).write_volatile(old_sdcr1); // old SDCR1
+
+            // Disable SDCLK (set to 0b00) before reconfiguring — RM0399 §23.9.5
+            FMC_SDCR1.write_volatile(old_sdcr1 & !(0b11 << 10)); // SDCLK = 00
+            cortex_m::asm::dsb();
+            cortex_m::asm::delay(10_000);
+
+            // SDCR1: NC=01(9col), NR=01(12row), MWID=10(32bit), NB=1(4bank),
+            //        CAS=11(3), WP=0, SDCLK=10(hclk/2), RBURST=1, RPIPE=00
+            FMC_SDCR1.write_volatile(
+                (0b00 << 13)  // RPIPE  = 0
+                | (1 << 12)   // RBURST = 1
+                | (0b10 << 10)// SDCLK  = hclk3/2 (100 MHz)
+                | (0 << 9)    // WP     = 0
+                | (0b11 << 7) // CAS    = 3
+                | (1 << 6)    // NB     = 4 banks
+                | (0b10 << 4) // MWID   = 32-bit
+                | (0b01 << 2) // NR     = 12-bit row
+                | (0b01 << 0) // NC     = 9-bit column
+            );
+
+            // SDTR1: timing for IS42S32800J-6 at 100 MHz (10 ns/cycle)
+            // Values are (cycles - 1) per RM0399.
+            FMC_SDTR1.write_volatile(
+                (1 << 24)   // TRCD = 1 → 2 cycles (20 ns ≥ 18 ns)
+                | (1 << 20) // TRP  = 1 → 2 cycles (20 ns ≥ 18 ns)
+                | (1 << 16) // TWR  = 1 → 2 cycles
+                | (5 << 12) // TRC  = 5 → 6 cycles (60 ns ≥ 60 ns)
+                | (4 << 8)  // TRAS = 4 → 5 cycles (50 ns ≥ 42 ns)
+                | (6 << 4)  // TXSR = 6 → 7 cycles (70 ns ≥ 72 ns, tight but ok)
+                | (1 << 0)  // TMRD = 1 → 2 cycles
+            );
+        }
+
+        // JEDEC init sequence (RM0399 §23.9.3)
+        sdram_cmd(0b001, 0, 0);             // clock config enable
+        cortex_m::asm::delay(1_000_000);    // generous 2.5 ms (≥ 100 µs required)
+        sdram_cmd(0b010, 0, 0);             // precharge all
+        sdram_cmd(0b011, 7, 0);             // 8× auto-refresh
+        sdram_cmd(0b100, 0, 0x0230);        // load mode register (BL=1, CAS=3, sequential)
+        sdram_cmd(0b000, 0, 0);             // normal mode
+
+        // Refresh: 64 ms / 4096 rows at 100 MHz → 1562; use 566 (conservative)
+        unsafe { FMC_SDRTR.write_volatile(566 << 1); }
+        sdram_busy_wait();
+
+        // Diagnostics: readback SDCR1 and quick write/read test
+        unsafe {
+            let new_sdcr1 = FMC_SDCR1.read_volatile();
+            D3.add(2).write_volatile(new_sdcr1); // new SDCR1
+            let p = 0xC000_0000u32 as *mut u32;
+            p.write_volatile(0xCAFE_BABE);
+            cortex_m::asm::dsb();
+            let rb = p.read_volatile();
+            D3.add(3).write_volatile(rb); // should be 0xCAFE_BABE
+            D3.write_volatile(0x5D_000002); // reinit complete
+        }
+
         0xC000_0000
     }
 
@@ -1171,6 +1358,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     }
 
     /// Fill a framebuffer with SMPTE color bars in ARGB8888 format.
+    #[allow(dead_code)]
     fn fill_smpte_bars_argb8888(fb: *mut u32, width: u16, height: u16) {
         let w = width as usize;
         let h = height as usize;

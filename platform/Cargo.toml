@@ -28,6 +28,7 @@ bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt"] }
 fatfs = { version = "0.3", default-features = false, features = ["alloc", "core_io"], optional = true }
+rlvgl-decomp = { version = "0.1.0", path = "../rlvgl-decomp", optional = true }
 
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
@@ -48,6 +49,7 @@ experimental_dsi_host = []
 semihosting = ["dep:cortex-m-semihosting"]
 fatfs_nostd = ["dep:fatfs"]
 dma2d = ["stm32h7"]
+splash = ["dep:rlvgl-decomp"]
 fontdue = ["rlvgl-core/fontdue"]
 png = ["rlvgl-core/png"]
 jpeg = ["rlvgl-core/jpeg"]

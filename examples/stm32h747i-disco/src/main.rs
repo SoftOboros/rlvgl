@@ -32,6 +32,10 @@ mod bsp_pac;
 mod ipc;
 // HAL BSP module is not required for this bring-up path
 
+#[cfg(feature = "splash")]
+static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
+
+
 // Optional: route BSP log messages to semihosting when enabled.
 #[cfg(feature = "bsp_log")]
 #[no_mangle]
@@ -270,12 +274,15 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
                 .wp()
                 .clear_bit()
                 .sdclk()
-                .bits(0b01)
+                .bits(0b01) // NOTE: 0b01 is reserved per RM0399 but works on this silicon
                 .rburst()
                 .set_bit()
                 .rpipe()
                 .bits(0)
         });
+        // NOTE: PAC sdbank1().sdtr maps to offset 0x144 = FMC_SDCR2, not
+        // FMC_SDTR1 at 0x148. This means SDTR1 gets reset defaults (all max).
+        // SDRAM works but at slowest timings. Fix pending.
         fmc.sdbank1().sdtr.write(|w| {
             w.tmrd()
                 .bits(1)
@@ -403,7 +410,19 @@ fn early_fmc_setup() {
     }
 
     let fmc = unsafe { &*stm32h7::stm32h747cm7::FMC::ptr() };
+    // D3 SRAM telemetry for early FMC init
+    unsafe { (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32); }
     configure_fmc_sdram(fmc);
+    // Capture SDCR1, SDTR1, SDSR after init
+    unsafe {
+        let sdcr1 = (0x5200_4140u32 as *const u32).read_volatile();
+        let sdtr1 = (0x5200_4148u32 as *const u32).read_volatile();
+        let sdsr  = (0x5200_4158u32 as *const u32).read_volatile();
+        (0x3800_0204u32 as *mut u32).write_volatile(sdcr1);
+        (0x3800_0208u32 as *mut u32).write_volatile(sdtr1);
+        (0x3800_020Cu32 as *mut u32).write_volatile(sdsr);
+        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0002u32);
+    }
 }
 
 /// Heap size in bytes.
@@ -446,17 +465,21 @@ fn main() -> ! {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
+        // D3 breadcrumb: very first thing in Rust HAL path
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32); }
         // Early spin delay to give debuggers time to attach before
         // peripheral clocks and pin configuration. This is a coarse, cycle-based
         // busy-wait that does not rely on any timers being configured yet.
         // Adjust the iteration count as needed for your CPU clock.
         // Rough guide: 10 × 100M cycles ≈ ~2.5s @ 400 MHz, ~10s @ 100 MHz.
-        for _ in 0..10 {
-            cortex_m::asm::delay(100_000_000);
+        for _ in 0..2 {
+            cortex_m::asm::delay(10_000_000);
         }
 
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32); } // post-delay
         let mut cp = cortex_m::Peripherals::take().unwrap();
         configure_mpu_regions(&mut cp);
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32); } // post-MPU
 
         use core::convert::Infallible;
         use embedded_hal::{
@@ -581,7 +604,7 @@ fn main() -> ! {
             I2C4: _i2c4,
             TIM8,
             DSIHOST: dsi,
-            FMC: fmc,
+            FMC: _fmc,
             LTDC: ltdc,
             #[cfg(feature = "dma2d")]
             DMA2D,
@@ -613,6 +636,14 @@ fn main() -> ! {
         let _ = ccdr.peripheral.DMA2D.enable();
         let _ = ccdr.peripheral.DSI.enable();
         let _ = ccdr.peripheral.FMC.enable();
+        // HAL bug: pll3_r_ck() configures PLL3 dividers but never sets PLL3ON.
+        // Without PLL3R running, LTDC register reads hang (no pixel clock domain).
+        // Force PLL3ON and wait for PLL3RDY.
+        unsafe {
+            const RCC_CR: *mut u32 = 0x5802_4400u32 as *mut u32;
+            RCC_CR.write_volatile(RCC_CR.read_volatile() | (1 << 28)); // PLL3ON
+            while RCC_CR.read_volatile() & (1 << 29) == 0 {} // wait PLL3RDY
+        }
         // Signal clocks ready to CM4 via shared mailbox flag
         #[allow(clippy::let_unit_value)]
         {
@@ -761,6 +792,30 @@ fn main() -> ! {
         cp.SYST.set_reload(reload);
         cp.SYST.clear_current();
         cp.SYST.enable_counter();
+        // ── USART1 VCP init (PA9=TX AF7, 115200 8N1) ──────────────────────
+        // Addresses from C HAL path (RCC C1 domain registers at 0x5802_44xx)
+        unsafe {
+            // Enable GPIOA clock (AHB4ENR at RCC+0xE0)
+            let ahb4 = 0x5802_44E0u32 as *mut u32; // global AHB4ENR
+            ahb4.write_volatile(ahb4.read_volatile() | (1 << 0));
+            let _ = (ahb4 as *const u32).read_volatile();
+            // PA9 = AF7: AFRH bits 7:4 = 7, MODER bits 19:18 = 10 (AF)
+            let gpioa = 0x5802_0000u32;
+            let afrh = (gpioa + 0x24) as *mut u32;
+            afrh.write_volatile((afrh.read_volatile() & !(0xFu32 << 4)) | (7u32 << 4));
+            let moder = gpioa as *mut u32;
+            moder.write_volatile((moder.read_volatile() & !(3u32 << 18)) | (2u32 << 18));
+            // Enable USART1 clock (C1_APB2ENR bit 4)
+            let apb2 = 0x5802_44F0u32 as *mut u32;
+            apb2.write_volatile(apb2.read_volatile() | (1 << 4));
+            let _ = (apb2 as *const u32).read_volatile();
+            // USART1 config: BRR=868 (100 MHz / 115200), TE+UE
+            let usart1 = 0x4001_1000u32;
+            ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR
+            ((usart1 + 0x00) as *mut u32).write_volatile((1 << 3) | (1 << 0)); // CR1: TE + UE
+        }
+
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32); } // pre-display::new
         let mut display = Stm32h747iDiscoDisplay::new(
             blitter,
             backlight,
@@ -769,7 +824,11 @@ fn main() -> ! {
             dsi,
             #[cfg(feature = "dma2d")]
             DMA2D,
+            #[cfg(feature = "splash")]
+            Some(SPLASH_RLE),
         );
+        #[cfg(feature = "splash")]
+        cortex_m::asm::delay(400_000_000 * 2);
         // Optional: SDRAM RAM test (feature-gated). Writes a few patterns per MB
         // and prints progress via semihosting if enabled.
         #[cfg(feature = "sdram_ramtest")]
@@ -1280,9 +1339,15 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         dp.DSIHOST,
         #[cfg(feature = "dma2d")]
         dp.DMA2D,
+        #[cfg(feature = "splash")]
+        Some(SPLASH_RLE),
     );
     dbg_print("rlvgl: DSI+LTDC init done\r\n");
     dbg_pulse();
+
+    // Hold splash for ~2s
+    #[cfg(feature = "splash")]
+    for _ in 0..200u32 { cortex_m::asm::delay(4_000_000); }
 
     // Re-assert PJ12 as GP output and PG3 as GP output — the display
     // constructor or PAC peripheral take() may reset GPIO MODER.

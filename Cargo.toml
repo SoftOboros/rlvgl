@@ -81,6 +81,11 @@ version = "1"
 default-features = false
 optional = true
 
+[dependencies.rlvgl-decomp]
+version = "0.1.0"
+path = "rlvgl-decomp"
+optional = true
+
 [dependencies.zstd]
 version = "0.13.3"
 optional = true
@@ -285,6 +290,7 @@ gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif"]
 qrcode = ["rlvgl-core/qrcode", "rlvgl-platform/qrcode"]
 simulator = ["rlvgl-platform/simulator"]
 st7789 = ["rlvgl-platform/st7789"]
+splash = ["dep:rlvgl-decomp", "rlvgl-platform/splash"]
 stm32h747i_disco_cm7 = [
     "rlvgl-platform/stm32h747i_disco",
     "dep:cortex-m-rt",
@@ -347,6 +353,7 @@ creator = [
     "dep:rlvgl-chips-renesas",
     "dep:rlvgl-chips-ti",
     "dep:rlvgl-chips-rp2040",
+    "dep:rlvgl-decomp",
 ]
 creator_ui = [
     "dep:eframe",
