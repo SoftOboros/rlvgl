@@ -167,13 +167,13 @@ fn configure_mpu_regions(cp: &mut cortex_m::Peripherals) {
     }
 }
 #[cfg(not(feature = "c_hal"))]
-#[allow(unsafe_attributes)]
+#[allow(unknown_lints, unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
 static mut MPU_TRACE: u32 = 0;
 
 #[cfg(not(feature = "c_hal"))]
-#[allow(unsafe_attributes)]
+#[allow(unknown_lints, unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
 static mut MPU_DUMP: [u32; 12] = [0; 12];
@@ -244,9 +244,9 @@ fn issue_sdram_command(
             w.mode()
                 .bits(mode)
                 .ctb1()
-                .set_bit()
-                .ctb2()
                 .clear_bit()
+                .ctb2()
+                .set_bit()  // Bank 2 (SDNE1/SDCKE1 on H747I-DISCO)
                 .nrfs()
                 .bits(auto_refresh)
                 .mrd()
@@ -260,7 +260,18 @@ fn issue_sdram_command(
 fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
     unsafe {
         fmc.bcr1.modify(|_, w| w.fmcen().set_bit());
+        // SDCR1: shared bits only (SDCLK, RBURST, RPIPE)
         fmc.sdbank1().sdcr.write(|w| {
+            w.sdclk()
+                .bits(0b01) // Reserved per RM0399, but required on this silicon
+                .rburst()
+                .set_bit()
+                .rpipe()
+                .bits(0)
+        });
+        // SDCR2: bank-specific config (NC, NR, MWID, NB, CAS, WP)
+        // H747I-DISCO SDRAM is on Bank 2 (SDNE1=PH6, SDCKE1=PH7)
+        fmc.sdbank2().sdcr.write(|w| {
             w.nc()
                 .bits(0b01)
                 .nr()
@@ -273,32 +284,26 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
                 .bits(0b11)
                 .wp()
                 .clear_bit()
-                .sdclk()
-                .bits(0b01) // NOTE: 0b01 is reserved per RM0399 but works on this silicon
-                .rburst()
-                .set_bit()
-                .rpipe()
-                .bits(0)
         });
-        // NOTE: PAC sdbank1().sdtr maps to offset 0x144 = FMC_SDCR2, not
-        // FMC_SDTR1 at 0x148. This means SDTR1 gets reset defaults (all max).
-        // SDRAM works but at slowest timings. Fix pending.
-        fmc.sdbank1().sdtr.write(|w| {
-            w.tmrd()
-                .bits(1)
-                .txsr()
-                .bits(6)
-                .tras()
-                .bits(4)
-                .trc()
-                .bits(6)
-                .twr()
-                .bits(1)
-                .trp()
-                .bits(1)
-                .trcd()
-                .bits(1)
-        });
+        // SDTR1: shared timing (TRP, TRC must be in SDTR1)
+        // PAC sdbank1().sdtr offset = 0x144 = SDCR2 (known PAC bug).
+        // Use raw write to SDTR1 at 0x148.
+        let sdtr1 = 0x5200_4148u32 as *mut u32;
+        sdtr1.write_volatile(
+            (1 << 20) // TRP = 2 cycles
+            | (6 << 12) // TRC = 7 cycles
+        );
+        // SDTR2: bank-specific timing
+        // PAC sdbank2().sdtr offset = 0x148 = SDTR1 (same PAC bug pattern).
+        // Use raw write to SDTR2 at 0x14C.
+        let sdtr2 = 0x5200_414Cu32 as *mut u32;
+        sdtr2.write_volatile(
+            (1 << 24)   // TRCD = 2 cycles
+            | (1 << 16) // TWR = 2 cycles
+            | (4 << 8)  // TRAS = 5 cycles
+            | (6 << 4)  // TXSR = 7 cycles
+            | (1 << 0)  // TMRD = 2 cycles
+        );
     }
 
     issue_sdram_command(fmc, 0b001, 0, 0);
@@ -498,7 +503,9 @@ fn main() -> ! {
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
         use stm32h7xx_hal::gpio::{Output, Pin, PushPull};
         // Backlight control on PJ6 (GPIO fallback); touch INT uses PK7
+        #[allow(dead_code)]
         type HalBacklightPin = Pin<'J', 6, Output<PushPull>>;
+        #[allow(dead_code)]
         struct HalGpioBacklight(HalBacklightPin);
         impl PwmError for HalGpioBacklight {
             type Error = Infallible;
@@ -753,7 +760,7 @@ fn main() -> ! {
             use stm32h7xx_hal::hal::PwmPin as HalPwmPin02;
             // Configure PJ6 as TIM8_CH2 with AF3 and start PWM at ~10kHz
             let pj6_ch2 = gpioj.pj6.into_alternate::<3>();
-            let mut ch = TIM8.pwm(pj6_ch2, 10.kHz(), ccdr.peripheral.TIM8, &ccdr.clocks);
+            let ch = TIM8.pwm(pj6_ch2, 10.kHz(), ccdr.peripheral.TIM8, &ccdr.clocks);
             // Adapter from HAL 0.2 PwmPin to embedded-hal 1.0 SetDutyCycle
             struct TimBacklight<T: HalPwmPin02<Duty = u16>>(T);
             impl<T: HalPwmPin02<Duty = u16>> PwmError for TimBacklight<T> {

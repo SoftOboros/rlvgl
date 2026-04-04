@@ -283,12 +283,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Verify LTDC timing writes stuck (BEFORE GCR enable)
         // Store at 0x24070100 to avoid clobbering main diag block
-        unsafe {
-            // Skip LTDC readback — reading LTDC regs hangs AXI bus.
-            // Jump straight to DSI init.
-            dbg("  [SKIP readback]\r\n");
-            // All LTDC register reads removed — they hang the AXI bus.
-        }
+        // Skip LTDC readback — reading LTDC regs hangs AXI bus.
+        // Jump straight to DSI init.
+        dbg("  [SKIP readback]\r\n");
 
         d3(10, 0xD510_0002); // post LTDC timing
         // Step 2: DSI regulator enable + wait ready
@@ -506,7 +503,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.fb_addr_back = fb_back;
         disp.width = width;
         disp.height = height;
-        Self::configure_mpu_sdram_writethrough(0xC000_0000, 32 * 1024 * 1024);
+        Self::configure_mpu_sdram_writethrough(0xD000_0000, 32 * 1024 * 1024);
         d3(3, 0xB007_0004); // post-MPU SDRAM config
         // Quick SDRAM smoke test: write/read one word
         unsafe {
@@ -517,7 +514,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             d3(4, rb); // should be 0xCAFE_BABE if SDRAM works
         }
 
-        // Fill both framebuffers: splash if provided, otherwise solid black.
+        // Fill BOTH framebuffers: splash if provided, otherwise solid black.
         #[cfg(feature = "splash")]
         let splash_ok = splash.and_then(|blob| {
             let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).ok()?;
@@ -528,40 +525,28 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
 
-            // Decode into fb0
+            // Decode into front buffer
             let fb0 = unsafe { core::slice::from_raw_parts_mut(fb_addr as *mut u8, fb_bytes) };
             rlvgl_decomp::decode_argb_into(
                 w as usize, h as usize, &palette[..pal_count], stream, fb0,
             ).ok()?;
-            // Draw a bright red 50×50 square at top-left to prove overwrites work
-            unsafe {
-                for row in 0..50u32 {
-                    for col in 0..50u32 {
-                        (fb_addr as *mut u32).add((row * w as u32 + col) as usize)
-                            .write_volatile(0xFFFF_0000);
-                    }
-                }
-            }
+            // Decode into back buffer
+            let fb1 = unsafe { core::slice::from_raw_parts_mut(fb_back as *mut u8, fb_bytes) };
+            rlvgl_decomp::decode_argb_into(
+                w as usize, h as usize, &palette[..pal_count], stream, fb1,
+            ).ok()?;
             cortex_m::asm::dsb();
             Some(())
         }).is_some();
         #[cfg(not(feature = "splash"))]
         let splash_ok = false;
-        // SDRAM smoke test
-        unsafe {
-            let p = fb_addr as *mut u32;
-            p.write_volatile(0xDEAD_BEEF);
-            p.add(1).write_volatile(0xCAFE_BABE);
-            cortex_m::asm::dsb();
-            let r0 = p.read_volatile();
-            let r1 = p.add(1).read_volatile();
-            dbg("  SDRAM test: "); dbg_hex(r0); dbg(" "); dbg_hex(r1); dbg("\r\n");
-        }
         if !splash_ok {
+            // Fill both buffers with solid black
             unsafe {
                 let total_pixels = (width as usize) * (height as usize);
                 for i in 0..total_pixels {
-                    (fb_addr as *mut u32).add(i).write_volatile(0xFFFF_00FF); // magenta = fallback
+                    (fb_addr as *mut u32).add(i).write_volatile(0xFF00_0000); // black
+                    (fb_back as *mut u32).add(i).write_volatile(0xFF00_0000);
                 }
                 cortex_m::asm::dsb();
             }
@@ -1073,7 +1058,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// Configure MPU region for SDRAM framebuffer as write-through, non-executable.
     fn configure_mpu_sdram_writethrough(base: u32, size_bytes: u32) {
         // Region size must be power-of-two and base must be aligned to size.
-        // For H747I-DISCO SDRAM: base=0xC000_0000, size=32 MiB.
+        // For H747I-DISCO SDRAM: base=0xD000_0000, size=32 MiB.
         unsafe {
             let p = cortex_m::Peripherals::steal();
             // Disable MPU
@@ -1134,19 +1119,95 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         feature = "stm32h747i_disco",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
-    /// Reinitialize SDRAM after HAL RCC clock switch.
+    /// Initialize SDRAM from scratch at the post-HAL clock rate.
     ///
-    /// The early PAC init (configure_fmc_sdram) runs at pre-HAL HSI clock.
-    /// After HAL freeze(), hclk3 jumps to 200 MHz and the FMC kernel clock
-    /// changes, making the pre-HAL SDRAM init invalid. This function
-    /// performs a full JEDEC init sequence at the post-HAL clock rate.
+    /// Configures FMC GPIO pins (AF12), enables FMC clock, then performs
+    /// a full JEDEC init sequence. Can be called with or without the
+    /// early PAC init (pac_sdram_init feature).
     ///
     /// IS42S32800J-6: 4 banks × 4096 rows × 512 cols × 32 bits, 166 MHz max.
     /// SDCLK = hclk3/2 = 100 MHz (10 ns/cycle).
     fn init_sdram() -> u32 {
+        // ── FMC GPIO pin setup (AF12, high-speed, push-pull) ────────────
+        // STM32H747I-DISCO SDRAM pin mapping (IS42S32800J):
+        //   GPIOD: 0,1,8,9,10,14,15
+        //   GPIOE: 0,1,7,8,9,10,11,12,13,14,15
+        //   GPIOF: 0,1,2,3,4,5,11,12,13,14,15
+        //   GPIOG: 0,1,2,4,5,8,15
+        //   GPIOH: 5,6,7,8,9,10,11,12,13,14,15
+        //   GPIOI: 0,1,2,3,4,5,6,7,9,10
+        unsafe {
+            // Enable GPIO D-I clocks (AHB4ENR bits 3-8)
+            let ahb4enr = 0x5802_44E0u32 as *mut u32;
+            ahb4enr.write_volatile(ahb4enr.read_volatile()
+                | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8));
+            let _ = (ahb4enr as *const u32).read_volatile();
+
+            // Enable FMC clock (AHB3ENR bit 12)
+            let ahb3enr = (0x5802_4400 + 0xD4) as *mut u32;
+            ahb3enr.write_volatile(ahb3enr.read_volatile() | (1 << 12));
+            let _ = (ahb3enr as *const u32).read_volatile();
+        }
+
+        // Configure pin as AF12, very-high speed, push-pull
+        #[inline(always)]
+        fn fmc_pin(gpio_base: u32, pin: u32) {
+            unsafe {
+                let moder = gpio_base as *mut u32;
+                let ospeedr = (gpio_base + 0x08) as *mut u32;
+                let afr = if pin < 8 {
+                    (gpio_base + 0x20) as *mut u32 // AFRL
+                } else {
+                    (gpio_base + 0x24) as *mut u32 // AFRH
+                };
+                let bit = if pin < 8 { pin } else { pin - 8 };
+                // MODER: AF mode (0b10)
+                let m = moder.read_volatile();
+                moder.write_volatile((m & !(3 << (pin * 2))) | (2 << (pin * 2)));
+                // OSPEEDR: very high (0b11)
+                let s = ospeedr.read_volatile();
+                ospeedr.write_volatile((s & !(3 << (pin * 2))) | (3 << (pin * 2)));
+                // AFR: AF12 (0xC)
+                let a = afr.read_volatile();
+                afr.write_volatile((a & !(0xF << (bit * 4))) | (0xC << (bit * 4)));
+            }
+        }
+
+        const GPIOD: u32 = 0x5802_0C00;
+        const GPIOE: u32 = 0x5802_1000;
+        const GPIOF: u32 = 0x5802_1400;
+        const GPIOG: u32 = 0x5802_1800;
+        const GPIOH: u32 = 0x5802_1C00;
+        const GPIOI: u32 = 0x5802_2000;
+
+        for &p in &[0,1,8,9,10,14,15]          { fmc_pin(GPIOD, p); }
+        for &p in &[0,1,7,8,9,10,11,12,13,14,15] { fmc_pin(GPIOE, p); }
+        for &p in &[0,1,2,3,4,5,11,12,13,14,15]  { fmc_pin(GPIOF, p); }
+        for &p in &[0,1,2,4,5,8,15]            { fmc_pin(GPIOG, p); }
+        for &p in &[5,6,7,8,9,10,11,12,13,14,15] { fmc_pin(GPIOH, p); }
+        for &p in &[0,1,2,3,4,5,6,7,9,10]      { fmc_pin(GPIOI, p); }
+
+        // GPIO telemetry: verify clocks and pin config
+        const D3_GPIO: *mut u32 = 0x3800_0500u32 as *mut u32;
+        unsafe {
+            let ahb4enr = (0x5802_44E0u32 as *const u32).read_volatile();
+            let gpiod_moder = (GPIOD as *const u32).read_volatile();
+            let gpiod_afrh = ((GPIOD + 0x24) as *const u32).read_volatile();
+            let gpiof_moder = (GPIOF as *const u32).read_volatile();
+            D3_GPIO.write_volatile(0x6F10_0001);  // sentinel
+            D3_GPIO.add(1).write_volatile(ahb4enr);
+            D3_GPIO.add(2).write_volatile(gpiod_moder);
+            D3_GPIO.add(3).write_volatile(gpiod_afrh);
+            D3_GPIO.add(4).write_volatile(gpiof_moder);
+        }
+
+        // ── FMC SDRAM controller init ───────────────────────────────────
+        // STM32H747I-DISCO: SDRAM on FMC Bank 2 (SDNE1=PH6, SDCKE1=PH7)
         const FMC_BCR1:  *mut u32 = 0x5200_4000u32 as *mut u32;
         const FMC_SDCR1: *mut u32 = 0x5200_4140u32 as *mut u32;
+        const FMC_SDCR2: *mut u32 = 0x5200_4144u32 as *mut u32;
         const FMC_SDTR1: *mut u32 = 0x5200_4148u32 as *mut u32;
+        const FMC_SDTR2: *mut u32 = 0x5200_414Cu32 as *mut u32;
         const FMC_SDCMR: *mut u32 = 0x5200_4150u32 as *mut u32;
         const FMC_SDRTR: *mut u32 = 0x5200_4154u32 as *mut u32;
         const FMC_SDSR:  *const u32 = 0x5200_4158u32 as *const u32;
@@ -1163,7 +1224,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 FMC_SDCMR.write_volatile(
                     ((mrd & 0x1FFF) << 9)
                     | ((nrfs & 0xF) << 5)
-                    | (1 << 4)          // CTB1 = bank 1
+                    | (1 << 3)          // CTB2 = bank 2 (SDNE1/SDCKE1 on H747I-DISCO)
                     | (mode & 0x7)
                 );
             }
@@ -1175,41 +1236,49 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         unsafe {
             D3.write_volatile(0x5D_000001); // entered reinit
 
-            // FMC peripheral reset via RCC_AHB3RSTR bit 12
-            // This clears the SDRAM controller state machine so we can reconfigure.
+            // FMC peripheral reset + full JEDEC reinit at post-HAL clock.
+            // The early PAC init (SDCLK=0b10) runs at 32 MHz. After HAL
+            // changes hclk3 to 200 MHz, SDCLK becomes 100 MHz with wrong
+            // timing params. Reset the FMC and reinitialize from scratch.
+
+            let old_sdcr1 = FMC_SDCR1.read_volatile();
+            let old_sdsr  = FMC_SDSR.read_volatile();
+            D3.add(1).write_volatile(old_sdcr1); // old SDCR1
+            D3.add(4).write_volatile(old_sdsr);  // old SDSR
+
+            // Step 1: FMC peripheral reset via RCC_AHB3RSTR bit 12
             const RCC_AHB3RSTR: *mut u32 = (0x5802_4400 + 0x7C) as *mut u32;
             let rstr = RCC_AHB3RSTR.read_volatile();
-            RCC_AHB3RSTR.write_volatile(rstr | (1 << 12)); // assert FMC reset
+            RCC_AHB3RSTR.write_volatile(rstr | (1 << 12)); // assert
             cortex_m::asm::dsb();
-            cortex_m::asm::delay(1000);
+            cortex_m::asm::delay(10_000);
             RCC_AHB3RSTR.write_volatile(rstr & !(1 << 12)); // release
-            cortex_m::asm::dsb();
-            cortex_m::asm::delay(1000);
-
-            // Re-enable FMC clock after reset
-            const RCC_AHB3ENR: *mut u32 = (0x5802_4400 + 0xD4) as *mut u32;
-            RCC_AHB3ENR.write_volatile(RCC_AHB3ENR.read_volatile() | (1 << 12));
-            let _ = (RCC_AHB3ENR as *const u32).read_volatile();
-
-            // Ensure FMC is enabled
-            FMC_BCR1.write_volatile(FMC_BCR1.read_volatile() | (1 << 31));
-
-            // Read current SDCR1 for diagnostics
-            let old_sdcr1 = FMC_SDCR1.read_volatile();
-            D3.add(1).write_volatile(old_sdcr1); // old SDCR1
-
-            // Disable SDCLK (set to 0b00) before reconfiguring — RM0399 §23.9.5
-            FMC_SDCR1.write_volatile(old_sdcr1 & !(0b11 << 10)); // SDCLK = 00
             cortex_m::asm::dsb();
             cortex_m::asm::delay(10_000);
 
-            // SDCR1: NC=01(9col), NR=01(12row), MWID=10(32bit), NB=1(4bank),
-            //        CAS=11(3), WP=0, SDCLK=10(hclk/2), RBURST=1, RPIPE=00
+            // Re-enable FMC clock + FMCEN after reset
+            const RCC_AHB3ENR: *mut u32 = (0x5802_4400 + 0xD4) as *mut u32;
+            RCC_AHB3ENR.write_volatile(RCC_AHB3ENR.read_volatile() | (1 << 12));
+            let _ = (RCC_AHB3ENR as *const u32).read_volatile();
+            FMC_BCR1.write_volatile(FMC_BCR1.read_volatile() | (1u32 << 31));
+            cortex_m::asm::dsb();
+            cortex_m::asm::delay(10_000);
+
+            // Verify reset cleared SDCR1
+            let post_reset_sdcr1 = FMC_SDCR1.read_volatile();
+            D3.add(10).write_volatile(post_reset_sdcr1); // should be 0x02D0
+
+            // Step 2: Configure SDRAM Bank 2 registers.
+            // SDCR1: shared bits only (SDCLK, RBURST, RPIPE). Bank-specific
+            // bits (NC, NR, MWID, NB, CAS, WP) go in SDCR2.
             FMC_SDCR1.write_volatile(
-                (0b00 << 13)  // RPIPE  = 0
-                | (1 << 12)   // RBURST = 1
-                | (0b10 << 10)// SDCLK  = hclk3/2 (100 MHz)
-                | (0 << 9)    // WP     = 0
+                (0b00 << 13)  // RPIPE  = 0 (shared, only in SDCR1)
+                | (1 << 12)   // RBURST = 1 (shared, only in SDCR1)
+                | (0b10 << 10)// SDCLK  = hclk3/2 (shared, only in SDCR1)
+            );
+            // SDCR2: bank-specific config for IS42S32800J
+            FMC_SDCR2.write_volatile(
+                (0 << 9)      // WP     = 0
                 | (0b11 << 7) // CAS    = 3
                 | (1 << 6)    // NB     = 4 banks
                 | (0b10 << 4) // MWID   = 32-bit
@@ -1217,44 +1286,82 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 | (0b01 << 0) // NC     = 9-bit column
             );
 
-            // SDTR1: timing for IS42S32800J-6 at 100 MHz (10 ns/cycle)
-            // Values are (cycles - 1) per RM0399.
+            // SDTR1: shared timing (TRP, TRC must be in SDTR1 per RM0399)
             FMC_SDTR1.write_volatile(
+                (1 << 20) // TRP  = 1 → 2 cycles (20 ns ≥ 18 ns) — shared
+                | (5 << 12) // TRC  = 5 → 6 cycles (60 ns ≥ 60 ns) — shared
+            );
+            // SDTR2: bank-specific timing for IS42S32800J-6 at 100 MHz
+            FMC_SDTR2.write_volatile(
                 (1 << 24)   // TRCD = 1 → 2 cycles (20 ns ≥ 18 ns)
-                | (1 << 20) // TRP  = 1 → 2 cycles (20 ns ≥ 18 ns)
                 | (1 << 16) // TWR  = 1 → 2 cycles
-                | (5 << 12) // TRC  = 5 → 6 cycles (60 ns ≥ 60 ns)
                 | (4 << 8)  // TRAS = 4 → 5 cycles (50 ns ≥ 42 ns)
-                | (6 << 4)  // TXSR = 6 → 7 cycles (70 ns ≥ 72 ns, tight but ok)
+                | (7 << 4)  // TXSR = 7 → 8 cycles (80 ns ≥ 72 ns)
                 | (1 << 0)  // TMRD = 1 → 2 cycles
             );
+            cortex_m::asm::dsb();
+
+            // Step 3: Re-enable FMC
+            FMC_BCR1.write_volatile(FMC_BCR1.read_volatile() | (1u32 << 31));
+            cortex_m::asm::dsb();
+            cortex_m::asm::delay(10_000);
         }
 
-        // JEDEC init sequence (RM0399 §23.9.3)
+        // Step 4: Full JEDEC cold init at the new clock rate (RM0399 §23.9.3).
+        // Capture SDSR after each command to verify execution.
         sdram_cmd(0b001, 0, 0);             // clock config enable
+        unsafe { D3.add(11).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after clk_en
         cortex_m::asm::delay(1_000_000);    // generous 2.5 ms (≥ 100 µs required)
         sdram_cmd(0b010, 0, 0);             // precharge all
+        unsafe { D3.add(12).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after precharge
         sdram_cmd(0b011, 7, 0);             // 8× auto-refresh
+        unsafe { D3.add(13).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after refresh
         sdram_cmd(0b100, 0, 0x0230);        // load mode register (BL=1, CAS=3, sequential)
+        unsafe { D3.add(14).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after LMR
         sdram_cmd(0b000, 0, 0);             // normal mode
+        unsafe { D3.add(15).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after normal
 
-        // Refresh: 64 ms / 4096 rows at 100 MHz → 1562; use 566 (conservative)
-        unsafe { FMC_SDRTR.write_volatile(566 << 1); }
+        // Refresh: 64 ms / 4096 rows at 100 MHz → 1562; use 683 (conservative)
+        unsafe { FMC_SDRTR.write_volatile(683 << 1); }
         sdram_busy_wait();
 
-        // Diagnostics: readback SDCR1 and quick write/read test
+        // Also capture SDCMR readback, BCR1, SDTR1 for full picture
+        unsafe {
+            D3.add(16).write_volatile(FMC_SDCMR.read_volatile()); // SDCMR (should be 0)
+            D3.add(17).write_volatile(FMC_BCR1.read_volatile());  // BCR1
+            D3.add(18).write_volatile(FMC_SDTR1.read_volatile()); // SDTR1
+        }
+
+        // Diagnostics: readback registers + multi-address RAM test
         unsafe {
             let new_sdcr1 = FMC_SDCR1.read_volatile();
+            let new_sdsr  = FMC_SDSR.read_volatile();
             D3.add(2).write_volatile(new_sdcr1); // new SDCR1
-            let p = 0xC000_0000u32 as *mut u32;
-            p.write_volatile(0xCAFE_BABE);
+            D3.add(5).write_volatile(new_sdsr);  // new SDSR
+
+            // Write 4 distinct values to 4 widely-spaced addresses
+            let p0 = 0xD000_0000u32 as *mut u32;
+            let p1 = 0xD000_1000u32 as *mut u32; // +4 KiB
+            let p2 = 0xD010_0000u32 as *mut u32; // +1 MiB
+            let p3 = 0xD100_0000u32 as *mut u32; // +16 MiB
+            p0.write_volatile(0xCAFE_0000);
+            p1.write_volatile(0xCAFE_1111);
+            p2.write_volatile(0xCAFE_2222);
+            p3.write_volatile(0xCAFE_3333);
             cortex_m::asm::dsb();
-            let rb = p.read_volatile();
-            D3.add(3).write_volatile(rb); // should be 0xCAFE_BABE
+            // Read all four back
+            let r0 = p0.read_volatile();
+            let r1 = p1.read_volatile();
+            let r2 = p2.read_volatile();
+            let r3 = p3.read_volatile();
+            D3.add(6).write_volatile(r0);  // expect 0xCAFE_0000
+            D3.add(7).write_volatile(r1);  // expect 0xCAFE_1111
+            D3.add(8).write_volatile(r2);  // expect 0xCAFE_2222
+            D3.add(9).write_volatile(r3);  // expect 0xCAFE_3333
             D3.write_volatile(0x5D_000002); // reinit complete
         }
 
-        0xC000_0000
+        0xD000_0000
     }
 
     #[inline(always)]
