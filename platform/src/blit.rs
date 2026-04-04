@@ -527,6 +527,136 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
             let _ = (position, text, color);
         }
     }
+
+    fn draw_pixels(
+        &mut self,
+        position: (i32, i32),
+        pixels: &[Color],
+        width: u32,
+        height: u32,
+    ) {
+        // Fast path: write ARGB8888 pixels directly into the surface buffer,
+        // then record the dirty rectangle. Avoids per-pixel fill_rect overhead.
+        if self.surface.format == PixelFmt::Argb8888 {
+            let sw = self.surface.width as i32;
+            let sh = self.surface.height as i32;
+            let stride = self.surface.stride;
+            for y in 0..height as i32 {
+                let dy = position.1 + y;
+                if dy < 0 || dy >= sh {
+                    continue;
+                }
+                for x in 0..width as i32 {
+                    let dx = position.0 + x;
+                    if dx < 0 || dx >= sw {
+                        continue;
+                    }
+                    let src_idx = (y as u32 * width + x as u32) as usize;
+                    if let Some(&c) = pixels.get(src_idx) {
+                        let off = dy as usize * stride + dx as usize * 4;
+                        self.surface.buf[off..off + 4]
+                            .copy_from_slice(&c.to_argb8888().to_le_bytes());
+                    }
+                }
+            }
+            self.planner.add(Rect {
+                x: position.0,
+                y: position.1,
+                w: width,
+                h: height,
+            });
+        } else {
+            // Fallback: per-pixel fill_rect for non-ARGB8888 surfaces
+            for y in 0..height as i32 {
+                for x in 0..width as i32 {
+                    let idx = (y as u32 * width + x as u32) as usize;
+                    if let Some(&c) = pixels.get(idx) {
+                        self.fill_rect(
+                            WidgetRect {
+                                x: position.0 + x,
+                                y: position.1 + y,
+                                width: 1,
+                                height: 1,
+                            },
+                            c,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Renderer wrapper that applies 90° CCW rotation for platforms where the
+/// physical display is landscape but the framebuffer is portrait.
+///
+/// Maps logical coordinates (800×480 landscape) to framebuffer coordinates
+/// (480×800 portrait):
+///   fb_x = fb_width - logical_y - logical_height
+///   fb_y = logical_x
+///   fb_w = logical_height
+///   fb_h = logical_width
+pub struct RotatedRenderer<'a> {
+    inner: &'a mut dyn Renderer,
+    /// Portrait framebuffer width (the short dimension, e.g. 480).
+    fb_width: i32,
+}
+
+impl<'a> RotatedRenderer<'a> {
+    /// Create a rotated renderer wrapping `inner`.
+    ///
+    /// `fb_width` is the portrait framebuffer width (480 on STM32H747I-DISCO).
+    pub fn new(inner: &'a mut dyn Renderer, fb_width: u32) -> Self {
+        Self {
+            inner,
+            fb_width: fb_width as i32,
+        }
+    }
+}
+
+impl Renderer for RotatedRenderer<'_> {
+    fn fill_rect(&mut self, rect: WidgetRect, color: Color) {
+        self.inner.fill_rect(
+            WidgetRect {
+                x: self.fb_width - rect.y - rect.height,
+                y: rect.x,
+                width: rect.height,
+                height: rect.width,
+            },
+            color,
+        );
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        self.inner
+            .draw_text((self.fb_width - 1 - position.1, position.0), text, color);
+    }
+
+    fn draw_pixels(
+        &mut self,
+        position: (i32, i32),
+        pixels: &[Color],
+        width: u32,
+        height: u32,
+    ) {
+        // Rotate pixel-by-pixel through our fill_rect which handles the transform.
+        for py in 0..height as i32 {
+            for px in 0..width as i32 {
+                let idx = (py as u32 * width + px as u32) as usize;
+                if let Some(&c) = pixels.get(idx) {
+                    self.fill_rect(
+                        WidgetRect {
+                            x: position.0 + px,
+                            y: position.1 + py,
+                            width: 1,
+                            height: 1,
+                        },
+                        c,
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

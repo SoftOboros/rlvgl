@@ -1104,6 +1104,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
     }
 
+    /// Return the address of the current back (off-screen) buffer.
+    pub fn back_buffer_addr(&self) -> u32 {
+        self.fb_addr_back
+    }
+
+    /// Return the display dimensions as (width, height) in pixels.
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.width as u32, self.height as u32)
+    }
+
     /// Swap LTDC layer address between front/back buffers and reload
     pub fn present(&mut self) {
         let next = self.fb_addr_back;

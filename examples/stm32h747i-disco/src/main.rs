@@ -488,8 +488,8 @@ fn main() -> ! {
 
         use core::convert::Infallible;
         use embedded_hal::{
-            digital::{ErrorType as DigitalError, InputPin},
-            i2c::{ErrorType as I2cError, I2c as EhI2c, Operation, SevenBitAddress},
+            digital::InputPin,
+            i2c::{I2c as EhI2c, Operation, SevenBitAddress},
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
         use rlvgl::core::event::{Event, Key};
@@ -540,19 +540,6 @@ fn main() -> ! {
             }
         }
 
-        struct DummyButton;
-        impl DigitalError for DummyButton {
-            type Error = Infallible;
-        }
-        impl InputPin for DummyButton {
-            fn is_high(&mut self) -> Result<bool, Self::Error> {
-                Ok(false)
-            }
-            fn is_low(&mut self) -> Result<bool, Self::Error> {
-                Ok(true)
-            }
-        }
-
         struct ButtonInput<B: InputPin> {
             button: B,
             last: bool,
@@ -579,6 +566,43 @@ fn main() -> ! {
                     }
                     _ => None,
                 }
+            }
+        }
+        /// Joystick input: polls 5 GPIO pins (SEL, DOWN, LEFT, RIGHT, UP)
+        /// and generates KeyDown/KeyUp events on edge transitions.
+        struct JoystickInput<S: InputPin, D: InputPin, L: InputPin, R: InputPin, U: InputPin> {
+            sel: S, down: D, left: L, right: R, up: U,
+            last: [bool; 5],
+        }
+        impl<S: InputPin, D: InputPin, L: InputPin, R: InputPin, U: InputPin>
+            JoystickInput<S, D, L, R, U>
+        {
+            fn new(sel: S, down: D, left: L, right: R, up: U) -> Self {
+                Self { sel, down, left, right, up, last: [false; 5] }
+            }
+            fn poll(&mut self) -> Option<Event> {
+                let pins: [bool; 5] = [
+                    self.sel.is_low().unwrap_or(false),
+                    self.down.is_low().unwrap_or(false),
+                    self.left.is_low().unwrap_or(false),
+                    self.right.is_low().unwrap_or(false),
+                    self.up.is_low().unwrap_or(false),
+                ];
+                const KEYS: [Key; 5] = [
+                    Key::Enter, Key::ArrowDown, Key::ArrowLeft,
+                    Key::ArrowRight, Key::ArrowUp,
+                ];
+                for i in 0..5 {
+                    if pins[i] != self.last[i] {
+                        self.last[i] = pins[i];
+                        return Some(if pins[i] {
+                            Event::KeyDown { key: KEYS[i].clone() }
+                        } else {
+                            Event::KeyUp { key: KEYS[i].clone() }
+                        });
+                    }
+                }
+                None
             }
         }
         // Destructure PAC peripherals and switch to HAL for operation
@@ -608,14 +632,13 @@ fn main() -> ! {
             GPIOF,
             GPIOH,
             GPIOI,
-            I2C4: _i2c4,
+            I2C4,
             TIM8,
             DSIHOST: dsi,
             FMC: _fmc,
             LTDC: ltdc,
             #[cfg(feature = "dma2d")]
             DMA2D,
-            #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
             GPIOC,
             #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
             SDMMC1,
@@ -657,6 +680,7 @@ fn main() -> ! {
             // Safe to call; function is a no-op in unified builds
             let _ = bsp_pac::signal_clocks_ready();
         }
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32); } // pre-gpio-split
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
         let gpiog = GPIOG.split(ccdr.peripheral.GPIOG);
         let gpiok = GPIOK.split(ccdr.peripheral.GPIOK);
@@ -665,8 +689,8 @@ fn main() -> ! {
         let gpiof = GPIOF.split(ccdr.peripheral.GPIOF);
         let gpioh = GPIOH.split(ccdr.peripheral.GPIOH);
         let gpioi = GPIOI.split(ccdr.peripheral.GPIOI);
-        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
         let gpioc = GPIOC.split(ccdr.peripheral.GPIOC);
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32); } // post-gpio-split
         // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
         struct HalResetPin<P>(P);
         impl<P> embedded_hal::digital::ErrorType for HalResetPin<P> {
@@ -748,6 +772,7 @@ fn main() -> ! {
         af12_high!(gpioi.pi7);
         af12_high!(gpioi.pi9);
         af12_high!(gpioi.pi10);
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32); } // post-FMC-pins
 
         // Panel reset GPIO on PG3 (LCD_RESET)
         let mut panel_reset_hal = gpiog.pg3.into_push_pull_output();
@@ -834,6 +859,7 @@ fn main() -> ! {
             #[cfg(feature = "splash")]
             Some(SPLASH_RLE),
         );
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); } // post-display::new
         #[cfg(feature = "splash")]
         cortex_m::asm::delay(400_000_000 * 2);
         // Optional: SDRAM RAM test (feature-gated). Writes a few patterns per MB
@@ -944,54 +970,84 @@ fn main() -> ! {
                 }
             }
         }
-        // Main loop: handle IPC commands (from CM4) and input stubs
+        // Main loop: handle IPC commands (from CM4) and real inputs
         ipc::init();
-        // Touch I2C placeholder: provide a dummy I²C until the HAL 0.2 → EH1.0 adapter is ready
-        struct DummyI2c;
-        impl I2cError for DummyI2c {
-            type Error = Infallible;
+
+        // ── I2C4 for FT5336 touch controller (PD12=SCL, PD13=SDA, AF4 OD) ──
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32); } // pre-I2C4
+        let _scl = gpiod.pd12.into_alternate_open_drain::<4>();
+        let _sda = gpiod.pd13.into_alternate_open_drain::<4>();
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32); } // post-I2C4-pins
+        let i2c4 = stm32h7xx_hal::i2c::I2c::i2c4(
+            I2C4, 400.kHz(), ccdr.peripheral.I2C4, &ccdr.clocks,
+        );
+        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32); } // post-I2C4-init
+        // Wrap for embedded-hal 1.0 (stm32h7xx-hal I2c implements eh 0.2 I2C)
+        struct HalI2c<I>(I);
+        impl<I> embedded_hal::i2c::ErrorType for HalI2c<I> {
+            type Error = embedded_hal::i2c::ErrorKind;
         }
-        impl EhI2c<SevenBitAddress> for DummyI2c {
-            fn read(
-                &mut self,
-                _address: SevenBitAddress,
-                _buf: &mut [u8],
-            ) -> Result<(), Self::Error> {
-                Ok(())
+        impl<I> EhI2c<SevenBitAddress> for HalI2c<I>
+        where
+            I: stm32h7xx_hal::hal::blocking::i2c::WriteRead
+                + stm32h7xx_hal::hal::blocking::i2c::Write
+                + stm32h7xx_hal::hal::blocking::i2c::Read,
+        {
+            fn read(&mut self, addr: SevenBitAddress, buf: &mut [u8]) -> Result<(), Self::Error> {
+                self.0.read(addr, buf).map_err(|_| embedded_hal::i2c::ErrorKind::Other)
             }
-            fn write(
-                &mut self,
-                _address: SevenBitAddress,
-                _bytes: &[u8],
-            ) -> Result<(), Self::Error> {
-                Ok(())
+            fn write(&mut self, addr: SevenBitAddress, bytes: &[u8]) -> Result<(), Self::Error> {
+                self.0.write(addr, bytes).map_err(|_| embedded_hal::i2c::ErrorKind::Other)
             }
-            fn write_read(
-                &mut self,
-                _address: SevenBitAddress,
-                _bytes: &[u8],
-                _buf: &mut [u8],
-            ) -> Result<(), Self::Error> {
-                Ok(())
+            fn write_read(&mut self, addr: SevenBitAddress, bytes: &[u8], buf: &mut [u8]) -> Result<(), Self::Error> {
+                self.0.write_read(addr, bytes, buf).map_err(|_| embedded_hal::i2c::ErrorKind::Other)
             }
-            fn transaction(
-                &mut self,
-                _address: SevenBitAddress,
-                _ops: &mut [Operation<'_>],
-            ) -> Result<(), Self::Error> {
-                Ok(())
+            fn transaction(&mut self, _addr: SevenBitAddress, _ops: &mut [Operation<'_>]) -> Result<(), Self::Error> {
+                Err(embedded_hal::i2c::ErrorKind::Other)
             }
         }
-        let i2c = DummyI2c;
+        let touch_i2c = HalI2c(i2c4);
         let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
-        let mut input = Stm32h747iDiscoInput::new_with_int(i2c, touch_int);
-        let button = DummyButton;
+        let mut input = Stm32h747iDiscoInput::new_with_int(touch_i2c, touch_int);
+
+        // ── Real button: PC13 wakeup button (active-low, external pull-up) ──
+        let button = HalInputPin(gpioc.pc13.into_floating_input());
         let mut button_input = ButtonInput::new(button);
 
-        let demo = common_demo::build_demo(800, 480);
-        let root = demo.root;
-        let pending = demo.pending;
-        let to_remove = demo.to_remove;
+        // ── Joystick: PK2=SEL, PK3=DOWN, PK4=LEFT, PK5=RIGHT, PK6=UP ──
+        // Use pull-up inputs to prevent floating pin noise on boot
+        let mut joystick = JoystickInput::new(
+            HalInputPin(gpiok.pk2.into_pull_up_input()),
+            HalInputPin(gpiok.pk3.into_pull_up_input()),
+            HalInputPin(gpiok.pk4.into_pull_up_input()),
+            HalInputPin(gpiok.pk5.into_pull_up_input()),
+            HalInputPin(gpiok.pk6.into_pull_up_input()),
+        );
+
+        // Build a minimal root widget tree. The common_demo tree has a white
+        // root container that paints over the SDRAM splash. We use an invisible
+        // root that produces no pixels — the splash survives in the framebuffer
+        // and the EventWindow draws on top when visible.
+        use rlvgl::core::WidgetNode;
+
+        /// Root widget that draws nothing (splash stays in the framebuffer).
+        struct InvisibleRoot;
+        impl rlvgl::core::widget::Widget for InvisibleRoot {
+            fn bounds(&self) -> rlvgl::core::widget::Rect {
+                rlvgl::core::widget::Rect { x: 0, y: 0, width: 480, height: 800 }
+            }
+            fn draw(&self, _renderer: &mut dyn rlvgl::core::renderer::Renderer) {}
+            fn handle_event(&mut self, _event: &Event) -> bool { false }
+        }
+
+        let root = Rc::new(RefCell::new(WidgetNode {
+            widget: Rc::new(RefCell::new(InvisibleRoot)),
+            children: alloc::vec![],
+        }));
+        let pending: Rc<RefCell<alloc::vec::Vec<WidgetNode>>> =
+            Rc::new(RefCell::new(alloc::vec::Vec::new()));
+        let to_remove: Rc<RefCell<alloc::vec::Vec<Rc<RefCell<dyn rlvgl::core::widget::Widget>>>>> =
+            Rc::new(RefCell::new(alloc::vec::Vec::new()));
 
         #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
         {
@@ -1072,26 +1128,134 @@ fn main() -> ! {
             }
         }
 
+        // ── USART1 serial helper (115200 8N1 already configured above) ──
+        fn serial_puts(s: &str) {
+            const USART1_ISR: *const u32 = 0x4001_101C as *const u32;
+            const USART1_TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            for b in s.bytes() {
+                unsafe {
+                    while USART1_ISR.read_volatile() & (1 << 7) == 0 {} // TXE
+                    USART1_TDR.write_volatile(b as u32);
+                }
+            }
+        }
+
+        // ── EventWindow widget (replaces direct-framebuffer toasts) ──────
+        use alloc::rc::Rc;
+        use core::cell::RefCell;
+        use rlvgl::core::bitmap_font::FONT_6X10;
+        use rlvgl::ui::EventWindowBuilder;
+        use rlvgl::platform::blit::{BlitterRenderer, RotatedRenderer, Surface, PixelFmt};
+
+        let event_win = Rc::new(RefCell::new(
+            EventWindowBuilder::new(800, 480, &FONT_6X10).build(),
+        ));
+
+        // Add as LAST child so it draws on top of everything
+        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            widget: event_win.clone(),
+            children: alloc::vec![],
+        });
+
+        let mut render_blitter = CpuBlitter;
+
+        // D3 breadcrumb: entering main loop
+        unsafe { (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); }
+        serial_puts("rlvgl: input proof loop started\r\n");
+
+        // Event counter written to D3 SRAM for probe-rs inspection
+        let mut evt_count: u32 = 0;
+
         loop {
             // Handle CM4 commands
             if let Some(cmd) = ipc::cmd_pop() {
                 if cmd.kind == ipc::CmdKind::SetBacklight as u32 {
                     let duty = (cmd.a & 0xFFFF) as u16;
-                    // Map 16-bit duty to simple on/off for GPIO fallback
                     let level = if duty < 512 { 0 } else { u16::MAX };
                     display.set_brightness(level);
                 }
             }
+
+            // ── Poll touch ──
             if let Some(evt) = input.poll() {
+                if let Event::PointerDown { x, y } = &evt {
+                    serial_puts("TOUCH: DOWN\r\n");
+                    let mut buf = alloc::string::String::new();
+                    use core::fmt::Write;
+                    let _ = write!(buf, "Touch: ({}, {})", x, y);
+                    event_win.borrow_mut().push_event(buf);
+                    evt_count += 1;
+                }
                 root.borrow_mut().dispatch_event(&evt);
-                common_demo::flush_pending(&root, &pending, &to_remove);
             }
+
+            // ── Poll button ──
             if let Some(evt) = button_input.poll() {
+                if matches!(evt, Event::KeyDown { .. }) {
+                    serial_puts("BTN: PRESS\r\n");
+                    event_win.borrow_mut().push_event(
+                        alloc::string::String::from("Btn: Press"),
+                    );
+                    evt_count += 1;
+                }
                 root.borrow_mut().dispatch_event(&evt);
-                common_demo::flush_pending(&root, &pending, &to_remove);
             }
-            // Flip on SysTick wrap (approx. 60 Hz)
+
+            // ── Poll joystick ──
+            if let Some(evt) = joystick.poll() {
+                if let Event::KeyDown { ref key } = evt {
+                    let label = match key {
+                        Key::ArrowUp => "Joy: Up",
+                        Key::ArrowDown => "Joy: Down",
+                        Key::ArrowLeft => "Joy: Left",
+                        Key::ArrowRight => "Joy: Right",
+                        Key::Enter => "Joy: Sel",
+                        _ => "Joy: ?",
+                    };
+                    serial_puts(label);
+                    serial_puts("\r\n");
+                    event_win.borrow_mut().push_event(
+                        alloc::string::String::from(label),
+                    );
+                    evt_count += 1;
+                }
+                root.borrow_mut().dispatch_event(&evt);
+            }
+
+            // ── SysTick: tick widgets, render tree, present ──
             if cp.SYST.has_wrapped() {
+                // Dispatch Tick to age EventWindow entries
+                root.borrow_mut().dispatch_event(&Event::Tick);
+                common_demo::flush_pending(&root, &pending, &to_remove);
+
+                // Create renderer targeting the back buffer
+                let back = display.back_buffer_addr();
+                let (w, h) = display.dimensions();
+                let fb_slice = unsafe {
+                    core::slice::from_raw_parts_mut(
+                        back as *mut u8,
+                        (w * h * 4) as usize,
+                    )
+                };
+                let surface = Surface::new(
+                    fb_slice,
+                    (w * 4) as usize,
+                    PixelFmt::Argb8888,
+                    w,
+                    h,
+                );
+                let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                    BlitterRenderer::new(&mut render_blitter, surface);
+
+                // Wrap in 90° CCW rotation: landscape widgets → portrait framebuffer
+                let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+
+                // Draw the entire widget tree (EventWindow is last → on top)
+                root.borrow().draw(&mut renderer);
+
+                // Write event count to D3 SRAM for probe-rs
+                unsafe { (0x3800_0604u32 as *mut u32).write_volatile(evt_count); }
+
                 display.present();
             }
             cortex_m::asm::nop();

@@ -33,6 +33,7 @@ extern crate std;
 extern crate alloc;
 
 pub mod animation;
+pub mod bitmap_font;
 pub mod event;
 #[cfg(feature = "fs")]
 pub mod fs;
