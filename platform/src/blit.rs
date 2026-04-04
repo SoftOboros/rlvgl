@@ -616,20 +616,37 @@ impl<'a> RotatedRenderer<'a> {
 
 impl Renderer for RotatedRenderer<'_> {
     fn fill_rect(&mut self, rect: WidgetRect, color: Color) {
+        let fb_x = self.fb_width - rect.y - rect.height;
+        let fb_y = rect.x;
+        let fb_w = rect.height;
+        let fb_h = rect.width;
+
+        // Clamp to framebuffer bounds (fb is fb_width × ∞ in y; y is
+        // clamped by the underlying BlitterRenderer/Surface).
+        if fb_x < 0 || fb_w <= 0 || fb_h <= 0 {
+            return;
+        }
+        // Clamp x to [0, fb_width)
+        let (cx, cw) = if fb_x + fb_w > self.fb_width {
+            (fb_x, self.fb_width - fb_x)
+        } else {
+            (fb_x, fb_w)
+        };
+        if cw <= 0 {
+            return;
+        }
+
         self.inner.fill_rect(
-            WidgetRect {
-                x: self.fb_width - rect.y - rect.height,
-                y: rect.x,
-                width: rect.height,
-                height: rect.width,
-            },
+            WidgetRect { x: cx, y: fb_y, width: cw, height: fb_h },
             color,
         );
     }
 
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
-        self.inner
-            .draw_text((self.fb_width - 1 - position.1, position.0), text, color);
+        let fx = self.fb_width - 1 - position.1;
+        if fx >= 0 {
+            self.inner.draw_text((fx, position.0), text, color);
+        }
     }
 
     fn draw_pixels(
@@ -639,7 +656,6 @@ impl Renderer for RotatedRenderer<'_> {
         width: u32,
         height: u32,
     ) {
-        // Rotate pixel-by-pixel through our fill_rect which handles the transform.
         for py in 0..height as i32 {
             for px in 0..width as i32 {
                 let idx = (py as u32 * width + px as u32) as usize;

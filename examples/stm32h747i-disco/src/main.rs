@@ -1337,20 +1337,25 @@ fn main() -> ! {
                     let fb_bytes = (w * h * 4) as usize;
                     let stride = (w * 4) as usize;
 
-                    // Restore EventWindow fb region from pristine splash so
-                    // stale pixels from the previous frame are cleared.
-                    unsafe {
-                        for row in 0..EW_FB_H {
-                            let y = EW_FB_Y + row;
-                            let off = y as usize * stride + EW_FB_X as usize * 4;
-                            let len = EW_FB_W as usize * 4;
-                            core::ptr::copy_nonoverlapping(
-                                (SPLASH_PRISTINE as *const u8).add(off),
-                                (back as *mut u8).add(off),
-                                len,
-                            );
+                    // Only restore splash when the EventWindow is NOT visible
+                    // (clearing both buffers after hide). When visible, the
+                    // EventWindow's fill_rounded_rect covers the full region —
+                    // no splash restore needed, and doing it causes visible
+                    // tearing as splash pixels flash before being overdrawn.
+                    if !vis {
+                        unsafe {
+                            for row in 0..EW_FB_H {
+                                let y = EW_FB_Y + row;
+                                let off = y as usize * stride + EW_FB_X as usize * 4;
+                                let len = EW_FB_W as usize * 4;
+                                core::ptr::copy_nonoverlapping(
+                                    (SPLASH_PRISTINE as *const u8).add(off),
+                                    (back as *mut u8).add(off),
+                                    len,
+                                );
+                            }
+                            cortex_m::asm::dsb();
                         }
-                        cortex_m::asm::dsb();
                     }
 
                     let fb_slice = unsafe {
@@ -1372,7 +1377,7 @@ fn main() -> ! {
                 }
 
                 tick_count += 1;
-                // Telemetry at 0x3800_0604..0x3800_0620
+                // Telemetry at 0x3800_0604..0x3800_0640
                 unsafe {
                     (0x3800_0604u32 as *mut u32).write_volatile(evt_count);
                     (0x3800_0608u32 as *mut u32).write_volatile(tick_count);
@@ -1385,9 +1390,23 @@ fn main() -> ! {
                     (0x3800_0614u32 as *mut u32).write_volatile(
                         display.back_buffer_addr()
                     );
-                    // LTDC L1CFBAR (what LTDC is currently displaying)
                     (0x3800_0618u32 as *mut u32).write_volatile(
                         (0x5000_10ACu32 as *const u32).read_volatile()
+                    );
+                    // Cortex-M fault registers
+                    (0x3800_0638u32 as *mut u32).write_volatile(
+                        (0xE000_ED28u32 as *const u32).read_volatile() // CFSR
+                    );
+                    (0x3800_063Cu32 as *mut u32).write_volatile(
+                        (0xE000_ED38u32 as *const u32).read_volatile() // MMFAR/BFAR
+                    );
+                    // LTDC ISR — check for underrun (bit 1) or error flags
+                    (0x3800_0640u32 as *mut u32).write_volatile(
+                        (0x5000_1010u32 as *const u32).read_volatile() // LTDC ISR
+                    );
+                    // EventWindow entry count for debugging
+                    (0x3800_0644u32 as *mut u32).write_volatile(
+                        event_win.borrow().entry_count() as u32
                     );
                 }
             }

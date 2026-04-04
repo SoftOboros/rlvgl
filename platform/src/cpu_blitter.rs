@@ -121,11 +121,24 @@ impl Blitter for CpuBlitter {
     }
 
     fn fill(&mut self, dst: &mut Surface, area: Rect, color: u32) {
+        // Clamp to surface bounds to prevent out-of-bounds writes.
+        let sx = if area.x < 0 { 0i32 } else { area.x };
+        let sy = if area.y < 0 { 0i32 } else { area.y };
+        let ex = (area.x + area.w as i32).min(dst.width as i32);
+        let ey = (area.y + area.h as i32).min(dst.height as i32);
+        if sx >= ex || sy >= ey {
+            return;
+        }
+        let cw = (ex - sx) as u32;
+
         match dst.format {
             PixelFmt::Argb8888 => {
-                for row in 0..area.h as i32 {
-                    let start = ((area.y + row) as usize * dst.stride) + (area.x as usize * 4);
-                    let line = &mut dst.buf[start..start + area.w as usize * 4];
+                let bpp = 4usize;
+                for row in sy..ey {
+                    let start = row as usize * dst.stride + sx as usize * bpp;
+                    let end = start + cw as usize * bpp;
+                    if end > dst.buf.len() { break; }
+                    let line = &mut dst.buf[start..end];
                     for px in line.chunks_exact_mut(4) {
                         px.copy_from_slice(&color.to_le_bytes());
                     }
@@ -133,17 +146,20 @@ impl Blitter for CpuBlitter {
             }
             PixelFmt::Rgb565 => {
                 let c = Self::argb8888_to_rgb565(color);
-                for row in 0..area.h as i32 {
-                    let start = ((area.y + row) as usize * dst.stride) + (area.x as usize * 2);
-                    let line = &mut dst.buf[start..start + area.w as usize * 2];
+                let bpp = 2usize;
+                for row in sy..ey {
+                    let start = row as usize * dst.stride + sx as usize * bpp;
+                    let end = start + cw as usize * bpp;
+                    if end > dst.buf.len() { break; }
+                    let line = &mut dst.buf[start..end];
                     for px in line.chunks_exact_mut(2) {
                         px.copy_from_slice(&c.to_le_bytes());
                     }
                 }
             }
             _ => {
-                for y in area.y..area.y + area.h as i32 {
-                    for x in area.x..area.x + area.w as i32 {
+                for y in sy..ey {
+                    for x in sx..ex {
                         Self::write_pixel(dst, x, y, color);
                     }
                 }
