@@ -16,6 +16,42 @@ assets:
   path: media/splash.raw
   hash: 788bd041367d971c71a91cb94d644c8460a26dd0070022a93ab0b1057a1b950d
   license: MIT
+- name: MEDIA_ALCHEMIST_404_RAW
+  path: media/alchemist-404.raw
+  hash: e9f29fad659d842c08a8be38df47b57399a8484a55ec4e244e126a820384c73f
+  license: MIT
+- name: MEDIA_ALCHEMIST_500_RAW
+  path: media/alchemist-500.raw
+  hash: c825d2093374313c583b5d8de24ac2cceca74ef2c2c3e6aa4af58f314c841fbe
+  license: MIT
+- name: MEDIA_OAK_WOOD_GRAIN_RAW
+  path: media/oak-wood-grain.raw
+  hash: 9901c09c8d93a0f1e227fc9e6cec61f2d22c93e8851f5ef778b0317bd2d82af2
+  license: MIT
+- name: ICON_FAVICON_RAW
+  path: icons/favicon.raw
+  hash: e110256c25664a1d716f673fc9f862ff0029a111e44a6ff3c0bb6967ae9ea1fd
+  license: MIT
+- name: ICON_FILE_RAW
+  path: icons/file.raw
+  hash: 2a149407bf3602b2c54097cee010cf93c1b487c8a2bd53cc6acdd990f5cd4afe
+  license: MIT
+- name: ICON_GLOBE_RAW
+  path: icons/globe.raw
+  hash: e8f657c23245de304e05ec980f2dee1122a98334957c234a57488562a72e2e98
+  license: MIT
+- name: ICON_SOFT_O_OUTLINE_YELLOW_RAW
+  path: icons/soft-o-outline-yellow.raw
+  hash: 5487bdb5536a507ccb949aeba751043f453b22a4c46a74914017ac22c42f744c
+  license: MIT
+- name: ICON_SOFTOBOROS_LETTER_LOGO_RAW
+  path: icons/softoboros-letter-logo.raw
+  hash: bb14a2fa855dcb534e8c40a5b8c1a31cfd3feaa048a6eb6d8bad71b7e52053e1
+  license: MIT
+- name: ICON_WINDOW_RAW
+  path: icons/window.raw
+  hash: dadf122f1d6dd0c2fb71df97ac17e4081202bcaa12cb74266be9268b38637353
+  license: MIT
 naming:
   prefixes:
     fonts: FONT_
