@@ -19,3 +19,4 @@ codex_state/
 cookies.txt
 .mcp.json
 tmp/
+**/.cache/
