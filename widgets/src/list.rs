@@ -68,7 +68,8 @@ impl Widget for List {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        let a = self.style.alpha;
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
         let row_height = 16;
         for (i, item) in self.items.iter().enumerate() {
             let y = self.bounds.y + (i as i32 * row_height);
@@ -78,7 +79,7 @@ impl Widget for List {
             } else {
                 self.text_color
             };
-            renderer.draw_text(pos, item, color);
+            renderer.draw_text(pos, item, color.with_alpha(a));
         }
     }
 

@@ -50,8 +50,9 @@ impl Widget for Radio {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        let a = self.style.alpha;
         // Draw background.
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
 
         // Draw outer circle approximated by a square.
         let size = 10;
@@ -61,7 +62,7 @@ impl Widget for Radio {
             width: size,
             height: size,
         };
-        renderer.fill_rect(circle_rect, self.style.border_color);
+        renderer.fill_rect(circle_rect, self.style.border_color.with_alpha(a));
 
         if self.selected {
             let inner = Rect {
@@ -70,12 +71,12 @@ impl Widget for Radio {
                 width: circle_rect.width - 6,
                 height: circle_rect.height - 6,
             };
-            renderer.fill_rect(inner, self.dot_color);
+            renderer.fill_rect(inner, self.dot_color.with_alpha(a));
         }
 
         // Draw label text to the right of the circle with baseline at the bottom.
         let text_pos = (self.bounds.x + size + 4, self.bounds.y + self.bounds.height);
-        renderer.draw_text(text_pos, &self.text, self.text_color);
+        renderer.draw_text(text_pos, &self.text, self.text_color.with_alpha(a));
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {

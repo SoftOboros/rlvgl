@@ -27,7 +27,7 @@ impl Widget for Container {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(self.style.alpha));
     }
 
     /// Containers are currently passive and do not react to events.

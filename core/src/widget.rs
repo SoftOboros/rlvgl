@@ -46,6 +46,18 @@ impl Color {
     pub fn to_argb8888(self) -> u32 {
         ((self.3 as u32) << 24) | ((self.0 as u32) << 16) | ((self.1 as u32) << 8) | (self.2 as u32)
     }
+
+    /// Return a copy with the alpha channel multiplied by `opacity`.
+    ///
+    /// Both the existing alpha and `opacity` are in `0..=255`.
+    pub fn with_alpha(self, opacity: u8) -> Color {
+        Color(
+            self.0,
+            self.1,
+            self.2,
+            ((self.3 as u16 * opacity as u16) / 255) as u8,
+        )
+    }
 }
 
 /// Base trait implemented by all widgets.

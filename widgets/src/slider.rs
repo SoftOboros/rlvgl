@@ -56,7 +56,8 @@ impl Widget for Slider {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        let a = self.style.alpha;
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
 
         // Draw track
         let track_height = 4;
@@ -67,7 +68,7 @@ impl Widget for Slider {
             width: self.bounds.width,
             height: track_height,
         };
-        renderer.fill_rect(track_rect, self.style.border_color);
+        renderer.fill_rect(track_rect, self.style.border_color.with_alpha(a));
 
         // Draw knob
         let knob_x = self.position_from_value();
@@ -78,7 +79,7 @@ impl Widget for Slider {
             width: knob_size,
             height: knob_size,
         };
-        renderer.fill_rect(knob_rect, self.knob_color);
+        renderer.fill_rect(knob_rect, self.knob_color.with_alpha(a));
     }
 
     /// Update the slider value based on pointer release position.

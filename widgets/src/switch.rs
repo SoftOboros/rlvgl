@@ -43,8 +43,9 @@ impl Widget for Switch {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        let a = self.style.alpha;
         // Draw the background track.
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
 
         // Draw the knob on the left or right half depending on state.
         let knob_width = self.bounds.width / 2;
@@ -63,7 +64,7 @@ impl Widget for Switch {
                 height: self.bounds.height,
             }
         };
-        renderer.fill_rect(knob_rect, self.knob_color);
+        renderer.fill_rect(knob_rect, self.knob_color.with_alpha(a));
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
