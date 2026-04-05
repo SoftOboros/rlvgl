@@ -68,6 +68,28 @@ rlvgl-creator convert <path> [--force]
 * `path` – root directory containing assets.
 * `--force` – rebuild all assets even if cached outputs exist.
 
+### compress
+Encodes an image as an RLEC binary blob for firmware use. Accepts standard image
+formats (PNG, BMP, JPEG, etc.) as well as the creator's own `.raw` files
+produced by the `svg` command. The output can be loaded at runtime via
+`rlvgl-decomp`.
+
+```
+rlvgl-creator compress <input> <output>
+```
+* `input` – source image or `.raw` file.
+* `output` – path for the RLEC `.rle` blob.
+
+### decompress
+Decodes an RLEC `.rle` blob back to a PNG image. Useful for inspecting
+compressed assets or generating preview images for documentation.
+
+```
+rlvgl-creator decompress <input> <output>
+```
+* `input` – RLEC `.rle` blob file.
+* `output` – output PNG file.
+
 ### preview
 Generates thumbnails under `thumbs/` for quick visual inspection.
 
@@ -130,8 +152,11 @@ rlvgl-creator fonts pack <path> [--size PX] [--chars STRING]
 * `--size` – point size for rasterization (default `32`).
 * `--chars` – string of characters to include in the pack.
 
-### lottie import
-Imports a Lottie JSON animation into PNG frames and optionally an APNG.
+### lottie import (Linux only)
+Imports a Lottie JSON animation into PNG frames and optionally an APNG using the
+`rlottie` FFI library. This subcommand is only available on Linux where
+`librlottie` can be installed. On macOS and other platforms use `lottie cli`
+with an external converter instead.
 
 ```
 rlvgl-creator lottie import <json> <out> [--apng FILE]
@@ -141,7 +166,7 @@ rlvgl-creator lottie import <json> <out> [--apng FILE]
 * `--apng` – optional APNG file to generate.
 
 ### lottie cli
-Uses an external CLI to convert a Lottie JSON animation.
+Uses an external CLI to convert a Lottie JSON animation. Works on all platforms.
 
 ```
 rlvgl-creator lottie cli [--bin PATH] <json> <out> [--apng FILE]
@@ -292,6 +317,81 @@ Walk through a bus-aware STM32H573I-DISCO BSP with ungrouped writes:
    use assets_pack::images::LOGO;
    ```
    The crate provides strongly typed accessors for fonts and graphics that can be embedded or vendored depending on build features.
+
+## Workflow: Lucide icon extraction
+
+Icons are sourced from the [Lucide](https://lucide.dev) icon set (ISC license)
+via the `lucide-react` npm package installed in the sibling `softoboros`
+frontend. A TypeScript extractor parses the JS icon modules and reconstructs
+standalone SVG files, which are then rendered and compressed for firmware use.
+
+### End-to-end pipeline
+
+```bash
+make import-icons
+```
+
+This runs three stages:
+
+1. **Extract** – `npx tsx scripts/extract-lucide-icons.ts` reads Lucide JS
+   modules and writes SVG files to `assets/icons/`.
+2. **Render** – `rlvgl-creator svg` converts each SVG to RLVGLRAW format at
+   96 DPI in `assets/icons/raw/`.
+3. **Compress** – `rlvgl-creator compress` encodes each `.raw` file to an RLEC
+   blob in `assets/icons/rle/` for runtime loading via `rlvgl-decomp`.
+
+### Example icons
+
+The default icon set after running `make import-icons`:
+
+| Settings | File | Trash | Folder Open | Close |
+|:--------:|:----:|:-----:|:-----------:|:-----:|
+| ![settings](icons/settings_96dpi.png) | ![file](icons/file_96dpi.png) | ![trash](icons/trash_96dpi.png) | ![folder-open](icons/folder-open_96dpi.png) | ![close](icons/close_96dpi.png) |
+| 414 B | 241 B | 276 B | 255 B | 188 B |
+
+Sizes shown are RLEC blob sizes. All icons are 24x24 pixels at 96 DPI.
+
+### Adding new icons
+
+Edit the `ICONS` map in `scripts/extract-lucide-icons.ts` to add or remove
+icons. Keys are the output filenames; values are Lucide module filenames in
+`node_modules/lucide-react/dist/esm/icons/`. Browse available icons at
+<https://lucide.dev/icons>.
+
+```typescript
+const DEFAULT_ICONS: Record<string, string> = {
+  "settings":    "settings.js",     // gear/config
+  "file":        "file.js",         // file document
+  "trash":       "trash-2.js",      // delete
+  "folder-open": "folder-open.js",  // open file
+  "close":       "x.js",            // close/dismiss
+};
+```
+
+After editing, run `make import-icons` to regenerate all stages.
+
+### Extractor options
+
+```
+npx tsx scripts/extract-lucide-icons.ts [options]
+```
+* `--lucide-path <path>` – Lucide icons directory (default: `../softoboros/frontend/node_modules/lucide-react/dist/esm/icons`).
+* `--out <dir>` – output directory for SVG files (default: `assets/icons`).
+* `--stroke <color>` – SVG stroke color (default: `#FFFFFF`).
+* `--size <px>` – icon viewport size (default: `24`).
+* `--icons <list>` – comma-separated icon names to extract.
+
+## Platform notes
+
+### rlottie (Linux only)
+
+The `lottie import` subcommand uses `rlottie` (C++ FFI) for in-process Lottie
+rendering. This library is only available on Linux. On macOS the `rlottie`
+dependency is excluded at compile time and the `lottie import` subcommand is not
+present. Use `lottie cli` with an external converter on non-Linux platforms.
+
+All other creator commands (svg, compress, fonts, apng, bsp, etc.) work on all
+platforms.
 
 ## Examples of use
 * **BSP** – Include the generated board crate in a firmware project and call `board::init()` to configure clocks and pin multiplexing.
