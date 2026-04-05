@@ -1436,13 +1436,9 @@ fn main() -> ! {
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
 
-        // EventWindow fb region (after 90° CCW rotation):
-        // logical (10, 10, 380, 264) → fb (480-10-264, 10, 264, 380) = (206, 10, 264, 380)
-        // We restore this region from pristine splash when the window hides.
-        const EW_FB_X: u32 = 206;
-        const EW_FB_Y: u32 = 10;
-        const EW_FB_W: u32 = 264;
-        const EW_FB_H: u32 = 380;
+        // Compositor: restores pristine background under dismissed overlays.
+        use rlvgl::platform::compositor::Compositor;
+        let mut compositor = Compositor::new(DESKTOP_PRISTINE, w_fb, h_fb);
 
         // Event counter written to D3 SRAM for probe-rs inspection
         let mut evt_count: u32 = 0;
@@ -1588,24 +1584,16 @@ fn main() -> ! {
                     let fb_bytes = (w * h * 4) as usize;
                     let stride = (w * 4) as usize;
 
-                    // Restore EventWindow region from pristine when it hides.
-                    // The EW and config menu fb regions don't overlap so this
-                    // is always safe regardless of menu state.
-                    if !vis {
-                        unsafe {
-                            for row in 0..EW_FB_H {
-                                let y = EW_FB_Y + row;
-                                let off = y as usize * stride + EW_FB_X as usize * 4;
-                                let len = EW_FB_W as usize * 4;
-                                core::ptr::copy_nonoverlapping(
-                                    (DESKTOP_PRISTINE as *const u8).add(off),
-                                    (back as *mut u8).add(off),
-                                    len,
-                                );
-                            }
-                            cortex_m::asm::dsb();
-                        }
+                    // Collect clear regions from overlays that just hid
+                    use rlvgl::core::widget::Widget as _;
+                    if let Some(r) = event_win.borrow_mut().clear_region() {
+                        compositor.mark_dirty(r);
                     }
+                    if let Some(r) = config_menu.borrow_mut().clear_region() {
+                        compositor.mark_dirty(r);
+                    }
+                    // Restore pristine background under dismissed overlays
+                    unsafe { compositor.restore(back as *mut u8); }
 
                     let fb_slice = unsafe {
                         core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)

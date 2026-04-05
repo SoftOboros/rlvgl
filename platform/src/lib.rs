@@ -20,6 +20,8 @@ pub mod dma2d;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub mod ft5336;
+/// Dirty-region compositor for framebuffer restoration.
+pub mod compositor;
 /// Gesture recognition (debounced tap, press-down/release).
 pub mod gesture;
 /// Input device abstractions.

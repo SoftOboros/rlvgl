@@ -122,6 +122,15 @@ impl Widget for EventWindow {
         }
         false // never consume — let other widgets see the event too
     }
+
+    fn clear_region(&mut self) -> Option<Rect> {
+        if self.clear_countdown > 0 && !self.visible {
+            self.clear_countdown -= 1;
+            Some(self.bounds)
+        } else {
+            None
+        }
+    }
 }
 
 /// Builder for [`EventWindow`] with the dark-overlay theme.

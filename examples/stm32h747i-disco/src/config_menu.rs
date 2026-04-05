@@ -197,17 +197,6 @@ impl ConfigMenu {
         self.visible = false;
     }
 
-    /// Returns the draw-space bounds to clear if the menu just closed,
-    /// and decrements the internal counter. Returns `None` when no clearing
-    /// is needed.
-    pub fn take_clear_region(&mut self) -> Option<Rect> {
-        if self.clear_countdown > 0 && !self.visible {
-            self.clear_countdown -= 1;
-            self.clear_bounds
-        } else {
-            None
-        }
-    }
 
     fn fire_on_change(&mut self) {
         if let Some(cb) = self.on_change.as_mut() {
@@ -504,5 +493,14 @@ impl Widget for ConfigMenu {
         }
 
         false
+    }
+
+    fn clear_region(&mut self) -> Option<Rect> {
+        if self.clear_countdown > 0 && !self.visible {
+            self.clear_countdown -= 1;
+            self.clear_bounds
+        } else {
+            None
+        }
     }
 }
