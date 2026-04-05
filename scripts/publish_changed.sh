@@ -53,6 +53,9 @@ fi
 if git diff --name-only "$BASE" HEAD | grep -q '^platform/'; then
   changed+=("rlvgl-platform")
 fi
+if git diff --name-only "$BASE" HEAD | grep -q '^i18n/'; then
+  changed+=("rlvgl-i18n")
+fi
 if git diff --name-only "$BASE" HEAD | grep -q -e '^src/' -e '^Cargo.toml' -e '^examples/'; then
   changed+=("rlvgl")
 fi

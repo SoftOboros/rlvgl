@@ -135,11 +135,12 @@ fn main() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let out_path = Path::new(&out_dir);
 
-    // Write .bin blob.
+    // Write .bin blob to OUT_DIR (embedded via include_bytes).
     fs::write(out_path.join("translations.bin"), &blob).unwrap();
 
-    // Also copy to the crate root so it can be shipped to SD / media.
-    fs::write(Path::new("translations.bin"), &blob).unwrap();
+    // Print the blob path so it can be copied to SD / media.
+    eprintln!("cargo:warning=i18n blob: {}/translations.bin ({} bytes)",
+              out_dir, blob.len());
 
     // ── Generate Rust source ───────────────────────────────────────────
     let mut out = String::with_capacity(4096);
