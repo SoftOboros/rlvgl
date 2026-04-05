@@ -1077,12 +1077,15 @@ fn main() -> ! {
         }
         // ── Audio codec init (before touch claims I2C4) ──
         #[cfg(feature = "audio")]
-        let i2c4 = {
-            use rlvgl::platform::{Sai1Audio, Wm8994};
-
-            // SAI1 peripheral clock + kernel clock source = PLL2_P
+        let sai = {
+            use rlvgl::platform::Sai1Audio;
             let sai = Sai1Audio::new();
             sai.enable_clock(1); // 1 = PLL2_P
+            sai
+        };
+        #[cfg(feature = "audio")]
+        let i2c4 = {
+            use rlvgl::platform::Wm8994;
 
             // SAI1 GPIO pins (AF6, VeryHigh speed)
             let _sai1_mclk = gpiog.pg7.into_alternate::<6>().speed(Speed::VeryHigh);
@@ -1158,6 +1161,21 @@ fn main() -> ! {
             widget: Rc::new(RefCell::new(InvisibleRoot)),
             children: alloc::vec![],
         }));
+
+        // ── Audio player (created before SD block, started after WAV load) ──
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        let mut audio_player = {
+            use rlvgl::platform::AudioPlayer;
+            const AUDIO_BUF0: u32 = 0xD048_0000;
+            const AUDIO_BUF1: u32 = 0xD048_1000;
+            const AUDIO_BUF_SIZE: usize = 4096;
+            AudioPlayer::new(AUDIO_BUF0 as *mut u8, AUDIO_BUF1 as *mut u8, AUDIO_BUF_SIZE)
+        };
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_PCM_BASE: u32 = 0xD048_2000;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        let mut audio_pcm_len: u32 = 0;
+
         #[cfg(feature = "sd_storage")]
         {
             use alloc::rc::Rc;
@@ -1200,10 +1218,96 @@ fn main() -> ! {
                         match volume.open_root_dir() {
                             Ok(root_dir) => {
                                 let mut count = 0u32;
+                                #[cfg(feature = "audio")]
+                                let mut wav_name: Option<alloc::string::String> = None;
                                 root_dir.iterate_dir(|entry| {
                                     count += 1;
-                                    let _ = entry;
+                                    #[cfg(feature = "audio")]
+                                    if wav_name.is_none() && !entry.attributes.is_directory() {
+                                        let ext = entry.name.extension();
+                                        if ext.eq_ignore_ascii_case(b"WAV") {
+                                            let base = entry.name.base_name();
+                                            let base_s = core::str::from_utf8(base).unwrap_or("");
+                                            let ext_s = core::str::from_utf8(ext).unwrap_or("");
+                                            let mut s = alloc::string::String::from(base_s.trim_end());
+                                            s.push('.');
+                                            s.push_str(ext_s.trim_end());
+                                            wav_name = Some(s);
+                                        }
+                                    }
                                 }).ok();
+
+                                // ── Load WAV into SDRAM and start playback ──
+                                #[cfg(feature = "audio")]
+                                if let Some(ref name) = wav_name {
+                                    if let Ok(f) = root_dir.open_file_in_dir(
+                                        name.as_str(), embedded_sdmmc::Mode::ReadOnly,
+                                    ) {
+                                        let mut hdr_buf = [0u8; 256];
+                                        if let Ok(hdr_len) = f.read(&mut hdr_buf) {
+                                            if let Ok(wav_hdr) = rlvgl::platform::parse_wav_header(&hdr_buf[..hdr_len]) {
+                                                let pcm_max: usize = 24 * 1024 * 1024;
+                                                let pcm_len = core::cmp::min(wav_hdr.data_length as usize, pcm_max);
+                                                let sdram_dst = AUDIO_PCM_BASE as *mut u8;
+                                                let mut loaded: usize = 0;
+
+                                                // Copy PCM data already in header buffer
+                                                if (wav_hdr.data_offset as usize) < hdr_len {
+                                                    let start = wav_hdr.data_offset as usize;
+                                                    let avail = hdr_len - start;
+                                                    let to_copy = core::cmp::min(avail, pcm_len);
+                                                    unsafe {
+                                                        core::ptr::copy_nonoverlapping(
+                                                            hdr_buf[start..].as_ptr(),
+                                                            sdram_dst,
+                                                            to_copy,
+                                                        );
+                                                    }
+                                                    loaded = to_copy;
+                                                }
+                                                // Stream rest into SDRAM
+                                                while loaded < pcm_len && !f.is_eof() {
+                                                    let chunk = core::cmp::min(pcm_len - loaded, 4096);
+                                                    let dst = unsafe {
+                                                        core::slice::from_raw_parts_mut(
+                                                            sdram_dst.add(loaded), chunk,
+                                                        )
+                                                    };
+                                                    match f.read(dst) {
+                                                        Ok(n) if n > 0 => loaded += n,
+                                                        _ => break,
+                                                    }
+                                                }
+                                                audio_pcm_len = loaded as u32;
+
+                                                // Pre-fill DMA double-buffers
+                                                let buf_sz = 4096usize;
+                                                let fill0 = core::cmp::min(buf_sz, loaded);
+                                                let fill1 = core::cmp::min(buf_sz, loaded.saturating_sub(buf_sz));
+                                                unsafe {
+                                                    let buf0 = 0xD048_0000u32 as *mut u8;
+                                                    let buf1 = 0xD048_1000u32 as *mut u8;
+                                                    core::ptr::copy_nonoverlapping(sdram_dst, buf0, fill0);
+                                                    if fill0 < buf_sz {
+                                                        core::ptr::write_bytes(buf0.add(fill0), 0, buf_sz - fill0);
+                                                    }
+                                                    if fill1 > 0 {
+                                                        core::ptr::copy_nonoverlapping(sdram_dst.add(buf_sz), buf1, fill1);
+                                                    }
+                                                    if fill1 < buf_sz {
+                                                        core::ptr::write_bytes(buf1.add(fill1), 0, buf_sz - fill1);
+                                                    }
+                                                    cortex_m::asm::dsb();
+                                                }
+
+                                                if audio_player.prepare(&wav_hdr) {
+                                                    audio_player.start(&sai);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if count > 0 { t!("hw.sd_mounted_ok") } else { t!("hw.sd_empty") }
                             }
                             Err(_) => t!("hw.sd_root_dir_failed"),
@@ -1564,6 +1668,40 @@ fn main() -> ! {
                     let duty = (cmd.a & 0xFFFF) as u16;
                     let level = if duty < 512 { 0 } else { u16::MAX };
                     display.set_brightness(level);
+                }
+            }
+
+            // ── Poll audio player ──
+            #[cfg(all(feature = "audio", feature = "sd_storage"))]
+            {
+                use rlvgl::platform::audio_player::PollResult;
+                match audio_player.poll() {
+                    PollResult::NeedRefill { buf, file_offset: _, max_bytes } => {
+                        let pcm_base = AUDIO_PCM_BASE as *const u8;
+                        let cursor = audio_read_cursor;
+                        let remaining = audio_pcm_len.saturating_sub(cursor) as usize;
+                        let to_copy = core::cmp::min(max_bytes, remaining);
+                        if to_copy > 0 {
+                            unsafe {
+                                core::ptr::copy_nonoverlapping(
+                                    pcm_base.add(cursor as usize),
+                                    buf,
+                                    to_copy,
+                                );
+                            }
+                        }
+                        if to_copy < max_bytes {
+                            unsafe {
+                                core::ptr::write_bytes(buf.add(to_copy), 0, max_bytes - to_copy);
+                            }
+                        }
+                        audio_read_cursor += to_copy as u32;
+                        audio_player.refill_done(to_copy);
+                    }
+                    PollResult::Finished => {
+                        audio_player.stop(&sai);
+                    }
+                    _ => {}
                 }
             }
 

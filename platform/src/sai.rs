@@ -302,6 +302,22 @@ impl Sai1Audio {
         unsafe { self.reg(BDR).read_volatile() }
     }
 
+    /// Enable DMA requests for sub-block A TX.
+    pub fn enable_dma_tx(&self) {
+        unsafe {
+            let acr1 = self.reg(ACR1);
+            acr1.write_volatile(acr1.read_volatile() | CR1_DMAEN);
+        }
+    }
+
+    /// Disable DMA requests for sub-block A TX.
+    pub fn disable_dma_tx(&self) {
+        unsafe {
+            let acr1 = self.reg(ACR1);
+            acr1.write_volatile(acr1.read_volatile() & !CR1_DMAEN);
+        }
+    }
+
     /// Return the address of the TX data register (for DMA configuration).
     pub fn tx_data_register_addr(&self) -> u32 {
         self.base + ADR

@@ -86,6 +86,27 @@ pub mod sai;
 /// WM8994 audio codec driver (I2C control, headphone/speaker output).
 #[allow(dead_code)]
 pub mod wm8994;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// WAV (RIFF) header parser for embedded audio playback.
+pub mod wav;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// DMA1 driver for SAI1 sub-block A transmit streaming.
+pub mod dma_sai;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// Audio player state machine with DMA double-buffering.
+pub mod audio_player;
 #[cfg(feature = "simulator")]
 pub mod wgpu_blitter;
 
@@ -114,6 +135,18 @@ pub use sai::Sai1Audio;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub use wm8994::Wm8994;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use audio_player::AudioPlayer;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use wav::parse_wav_header;
 #[cfg(feature = "simulator")]
 pub use app_loader::LoadedApp;
 #[cfg(feature = "simulator")]
