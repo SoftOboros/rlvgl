@@ -137,11 +137,18 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
-    /// Compress an image to an RLEC blob for firmware splash
+    /// Compress an image to an RLEC blob for firmware use
     Compress {
-        /// Input image (PNG, BMP, etc.)
+        /// Input image (PNG, BMP, etc.) or RLVGLRAW .raw file
         input: PathBuf,
         /// Output .rle file
+        output: PathBuf,
+    },
+    /// Decompress an RLEC .rle blob back to a PNG image
+    Decompress {
+        /// Input .rle file
+        input: PathBuf,
+        /// Output PNG file
         output: PathBuf,
     },
     /// Generate thumbnails for quick previews
@@ -189,7 +196,7 @@ enum Command {
         #[command(subcommand)]
         cmd: FontsCommand,
     },
-    /// Lottie-related commands
+    /// Lottie-related commands (direct import requires Linux; CLI mode works everywhere)
     Lottie {
         #[command(subcommand)]
         cmd: LottieCommand,
@@ -323,6 +330,8 @@ enum SvelteCommand {
 #[derive(Subcommand)]
 enum LottieCommand {
     /// Import a Lottie JSON into PNG frames and an optional APNG via rlottie FFI
+    /// (Linux only — requires librlottie)
+    #[cfg(target_os = "linux")]
     Import {
         /// Path to the Lottie JSON file
         json: PathBuf,
@@ -499,6 +508,7 @@ pub fn run() -> Result<()> {
         } => vendor::run(&path, &cli.manifest, &out, &allow, &deny)?,
         Command::Convert { path, force } => convert::run(&path, &cli.manifest, force)?,
         Command::Compress { input, output } => compress::run(&input, &output)?,
+        Command::Decompress { input, output } => compress::decompress(&input, &output)?,
         Command::Preview { path } => preview::run(&path, &cli.manifest)?,
         Command::AddTarget { name, vendor_dir } => {
             add_target::run(&cli.manifest, &name, &vendor_dir)?
@@ -518,6 +528,7 @@ pub fn run() -> Result<()> {
             }
         },
         Command::Lottie { cmd } => match cmd {
+            #[cfg(target_os = "linux")]
             LottieCommand::Import { json, out, apng } => {
                 lottie::import(&json, &out, apng.as_deref())?
             }

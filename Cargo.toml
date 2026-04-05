@@ -63,7 +63,9 @@ optional = true
 [dependencies.fontdue]
 version = "0.9.3"
 optional = true
-[dependencies.rlottie]
+# rlottie requires librlottie C++ dylib — only available on Linux.
+# On other platforms, the lottie CLI fallback is used instead.
+[target.'cfg(target_os = "linux")'.dependencies.rlottie]
 version = "0.5.2"
 optional = true
 [dependencies.embedded-canvas]
@@ -284,6 +286,7 @@ syn = { version = "2", features = ["full"] }
 [features]
 default = []
 regression = []
+audio = ["rlvgl-platform/audio"]
 dma2d = ["rlvgl-platform/dma2d"]
 hal_sdram = ["dep:stm32-fmc"]
 sdram_ramtest = ["rlvgl-platform/sdram_ramtest"]
@@ -298,6 +301,7 @@ qrcode = ["rlvgl-core/qrcode", "rlvgl-platform/qrcode", "rlvgl-app-demo?/qrcode"
 simulator = ["rlvgl-platform/simulator", "dep:rlvgl-app-demo"]
 st7789 = ["rlvgl-platform/st7789"]
 splash = ["dep:rlvgl-decomp", "rlvgl-platform/splash"]
+desktop = ["dep:rlvgl-decomp"]
 stm32h747i_disco_cm7 = [
     "rlvgl-platform/stm32h747i_disco",
     "dep:cortex-m-rt",
@@ -322,7 +326,7 @@ stm32h747i_disco_cm4 = [
     "stm32h7/stm32h747cm4",
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue", "rlvgl-app-demo?/fontdue"]
-lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie", "dep:rlottie"]
+lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie"]
 canvas = ["rlvgl-core/canvas", "rlvgl-platform/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin", "rlvgl-platform/pinyin"]
 fatfs = ["rlvgl-core/fatfs", "rlvgl-platform/fatfs", "dep:fatfs", "dep:fscommon"]
@@ -346,7 +350,6 @@ creator = [
     "dep:indexmap",
     "dep:spdx",
     "dep:fontdue",
-    "dep:rlottie",
     "dep:rayon",
     "dep:resvg",
     "dep:zstd",

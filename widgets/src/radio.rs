@@ -80,7 +80,7 @@ impl Widget for Radio {
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if let Event::PointerUp { x, y } = event {
+        if let Event::PressRelease { x, y } = event {
             let inside = *x >= self.bounds.x
                 && *x < self.bounds.x + self.bounds.width
                 && *y >= self.bounds.y
@@ -110,7 +110,7 @@ mod tests {
         let mut radio = Radio::new("A", rect);
         assert_eq!(radio.bounds().x, rect.x);
         assert_eq!(radio.bounds().y, rect.y);
-        let evt = Event::PointerUp { x: 5, y: 5 };
+        let evt = Event::PressRelease { x: 5, y: 5 };
         assert!(radio.handle_event(&evt));
         assert!(radio.is_selected());
     }

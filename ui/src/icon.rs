@@ -15,6 +15,7 @@ pub fn lookup(name: &str) -> Option<&'static str> {
         "save" => Some("\u{f0c7}"),
         "edit" => Some("\u{f304}"),
         "close" => Some("\u{f00d}"),
+        "gear" => Some("\u{f013}"),
         _ => None,
     }
 }

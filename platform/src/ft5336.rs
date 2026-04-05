@@ -39,6 +39,46 @@ where
         Ok(Some((x, y)))
     }
 
+    /// Read all active touch points from the controller.
+    ///
+    /// Returns `(count, points)` where `count` is `0..=5` and each entry in
+    /// `points[..count]` holds `(id, event_flag, x, y)`.
+    ///
+    /// `event_flag`: 0 = press down, 1 = lift up, 2 = contact (held/moved).
+    pub fn read_touches(
+        &mut self,
+    ) -> Result<(u8, [(u8, u8, u16, u16); 5]), I2C::Error> {
+        // Bulk read registers 0x02..0x20 (31 bytes):
+        //   byte 0     = TD_STATUS (touch count in low nibble)
+        //   bytes 1–6  = touch point 0
+        //   bytes 7–12 = touch point 1
+        //   bytes 13–18 = touch point 2
+        //   bytes 19–24 = touch point 3
+        //   bytes 25–30 = touch point 4
+        //
+        // Each 6-byte touch block:
+        //   [0] bits 7:6 = event flag, bits 3:0 = X high nibble
+        //   [1] X low byte
+        //   [2] bits 7:4 = touch ID, bits 3:0 = Y high nibble
+        //   [3] Y low byte
+        //   [4] weight (unused)
+        //   [5] area (unused)
+        let mut buf = [0u8; 31];
+        self.i2c.write_read(Self::ADDRESS, &[0x02], &mut buf)?;
+        let count = (buf[0] & 0x0F).min(5);
+        let mut points = [(0u8, 0u8, 0u16, 0u16); 5];
+        for i in 0..count as usize {
+            let base = 1 + i * 6;
+            let event_flag = buf[base] >> 6;
+            let x = (((buf[base] & 0x0F) as u16) << 8) | buf[base + 1] as u16;
+            let id = buf[base + 2] >> 4;
+            let y =
+                (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
+            points[i] = (id, event_flag, x, y);
+        }
+        Ok((count, points))
+    }
+
     /// Release the underlying I²C peripheral.
     pub fn release(self) -> I2C {
         self.i2c

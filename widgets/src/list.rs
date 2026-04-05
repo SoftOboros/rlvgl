@@ -85,7 +85,7 @@ impl Widget for List {
 
     /// Select an item when the pointer is released over it.
     fn handle_event(&mut self, event: &Event) -> bool {
-        let Event::PointerUp { x, y } = event else {
+        let Event::PressRelease { x, y } = event else {
             return false;
         };
 

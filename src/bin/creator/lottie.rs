@@ -10,16 +10,18 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Result, anyhow};
-use image::{Rgba, RgbaImage};
-use rlottie::{Animation, Surface};
 
 use crate::apng;
 
-/// Import a Lottie animation from `json` into `out` directory.
+/// Import a Lottie animation from `json` into `out` directory using rlottie FFI.
 ///
-/// Writes PNG frame files and a `timing.json` map. If `apng_out` is
-/// provided, an APNG is assembled from the generated frames.
+/// Only available on Linux where librlottie is installable. On other platforms
+/// use [`import_cli`] with an external converter binary instead.
+#[cfg(target_os = "linux")]
 pub(crate) fn import(json: &Path, out: &Path, apng_out: Option<&Path>) -> Result<()> {
+    use image::{Rgba, RgbaImage};
+    use rlottie::{Animation, Surface};
+
     let data = fs::read_to_string(json)?;
     let mut anim = Animation::from_data(data, json.to_string_lossy().as_ref(), ".")
         .ok_or_else(|| anyhow!("invalid Lottie JSON"))?;

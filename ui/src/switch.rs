@@ -94,7 +94,7 @@ mod tests {
         let state = Rc::new(Cell::new(false));
         let s = state.clone();
         let mut sw = Switch::new(rect).on_change(move |v| s.set(v));
-        let event = Event::PointerUp { x: 5, y: 5 };
+        let event = Event::PressRelease { x: 5, y: 5 };
         sw.handle_event(&event);
         assert!(state.get());
     }

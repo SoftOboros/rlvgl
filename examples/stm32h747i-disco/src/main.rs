@@ -27,11 +27,17 @@ use panic_halt as _;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
+mod config_menu;
 mod ipc;
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
 static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
+
+/// Desktop background image — decoded into the framebuffer and restored
+/// behind widgets when they hide.  Independent of the splash boot screen.
+#[cfg(feature = "desktop")]
+static DESKTOP_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
 
 
 // Optional: route BSP log messages to semihosting when enabled.
@@ -1066,9 +1072,53 @@ fn main() -> ! {
                 Err(embedded_hal::i2c::ErrorKind::Other)
             }
         }
+        // ── Audio codec init (before touch claims I2C4) ──
+        #[cfg(feature = "audio")]
+        let i2c4 = {
+            use rlvgl::platform::{Sai1Audio, Wm8994};
+
+            // SAI1 peripheral clock + kernel clock source = PLL2_P
+            let sai = Sai1Audio::new();
+            sai.enable_clock(1); // 1 = PLL2_P
+
+            // SAI1 GPIO pins (AF6, VeryHigh speed)
+            let _sai1_mclk = gpiog.pg7.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sck  = gpioe.pe5.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_fs   = gpioe.pe4.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sd_a = gpioe.pe6.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sd_b = gpioe.pe3.into_alternate::<6>().speed(Speed::VeryHigh);
+
+            // Configure SAI1 sub-block A as I2S master TX
+            // MCKDIV=0 means /1; the WM8994 FLL handles exact audio frequency
+            sai.configure_tx(0);
+
+            // Init WM8994 codec over I2C4 (temporary ownership, then release)
+            let codec_i2c = HalI2c(i2c4);
+            let mut codec = Wm8994::new(codec_i2c);
+            // init_playback performs a software reset, verifies chip ID,
+            // configures FLL for exact audio clocking, and sets up DAC routing.
+            // PLL2_P provides the SAI1 kernel clock; MCKDIV=0 means MCLK = kernel_ck.
+            // The WM8994 FLL locks to whatever MCLK we provide.
+            let _ = codec.init_playback(
+                48_000,
+                150_000_000, // approximate MCLK from PLL2_P
+                rlvgl::platform::wm8994::OutputDevice::Headphone,
+            );
+
+            // Enable SAI1 TX — codec is now receiving I2S frames
+            sai.enable_tx();
+
+            // Release I2C4 back so touch can use it
+            codec.release().0
+        };
+        #[cfg(not(feature = "audio"))]
+        let i2c4 = i2c4;
+
         let touch_i2c = HalI2c(i2c4);
         let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
-        let mut input = Stm32h747iDiscoInput::new_with_int(touch_i2c, touch_int);
+        let mut input = Stm32h747iDiscoInput::new_with_int(
+            touch_i2c, touch_int, display.dimensions().0 as u16,
+        );
 
         // ── Real button: PC13 wakeup button (active-low, external pull-up) ──
         let button = HalInputPin(gpioc.pc13.into_floating_input());
@@ -1094,7 +1144,8 @@ fn main() -> ! {
         struct InvisibleRoot;
         impl rlvgl::core::widget::Widget for InvisibleRoot {
             fn bounds(&self) -> rlvgl::core::widget::Rect {
-                rlvgl::core::widget::Rect { x: 0, y: 0, width: 480, height: 800 }
+                // Landscape widget space: 800 wide × 480 tall
+                rlvgl::core::widget::Rect { x: 0, y: 0, width: 800, height: 480 }
             }
             fn draw(&self, _renderer: &mut dyn rlvgl::core::renderer::Renderer) {}
             fn handle_event(&mut self, _event: &Event) -> bool { false }
@@ -1189,12 +1240,12 @@ fn main() -> ! {
         use rlvgl::core::bitmap_font::FONT_6X10;
         use rlvgl::ui::EventWindowBuilder;
         use rlvgl::platform::blit::{BlitterRenderer, RotatedRenderer, Surface, PixelFmt};
+        use rlvgl_i18n::t;
 
         let event_win = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10).build(),
         ));
 
-        // Add as LAST child so it draws on top of everything
         root.borrow_mut().children.push(rlvgl::core::WidgetNode {
             widget: event_win.clone(),
             children: alloc::vec![],
@@ -1204,13 +1255,70 @@ fn main() -> ! {
 
         // ── Fix double-buffering ──────────────────────────────────────────
         // The sdram_alloc may have given both framebuffers the same address.
-        // Force a second buffer at a known SDRAM offset and copy splash into it.
+        // Force a second buffer at a known SDRAM offset and copy the front
+        // buffer into it.
         let (w_fb, h_fb) = display.dimensions();
+
+        // ── Settings gear icon (upper-right, 10px margin) ────────────────
+        let config_menu = {
+            use crate::config_menu::ConfigMenu;
+            use rlvgl::core::widget::Rect;
+
+            // Helper to decode RLEC blob → RGBA bytes
+            fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
+                let (w, h, pal_bytes, stream) =
+                    rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
+                let pal_count = pal_bytes.len() / 2;
+                let mut palette = alloc::vec![0u16; pal_count];
+                for i in 0..pal_count {
+                    palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+                }
+                let rgba = rlvgl_decomp::decode_rgba(
+                    w as usize, h as usize, &palette, stream,
+                ).expect("RLE decode");
+                (w as u32, h as u32, rgba)
+            }
+
+            static GEAR_RLE: &[u8] = include_bytes!("../assets/icons/gear.rle");
+            let (gw, gh, gear_rgba) = decode_rle(GEAR_RLE);
+
+            static CLOSE_RLE: &[u8] = include_bytes!("../assets/icons/close28.rle");
+            let (cw, ch, close_rgba) = decode_rle(CLOSE_RLE);
+
+            let gear = Rc::new(RefCell::new(
+                ConfigMenu::new(
+                    // Upper-right of landscape in draw/widget coords:
+                    // x = long axis (0..h_fb), y = short axis (0..w_fb).
+                    // Gear hit area: 80×80 in upper-right corner
+                    Rect {
+                        x: h_fb as i32 - 80,
+                        y: 0,
+                        width: 80,
+                        height: 80,
+                    },
+                    rlvgl_i18n::locale() as u8,
+                    &FONT_6X10,
+                )
+                .gear_icon(&gear_rgba, gw, gh)
+                .close_icon(&close_rgba, cw, ch)
+                .on_change(|idx| {
+                    let locale = rlvgl_i18n::locale_from_u8(idx);
+                    rlvgl_i18n::set_locale(locale);
+                }),
+            ));
+
+            // Add as LAST child so it draws on top of everything
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: gear.clone(),
+                children: alloc::vec![],
+            });
+            gear // escape the block
+        };
+
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
         if display.back_buffer_addr() == display.front_buffer_addr() {
             serial_puts("FIX: double-buffer was single — setting FB2\r\n");
-            // Copy splash into the second buffer
             unsafe {
                 core::ptr::copy_nonoverlapping(
                     display.front_buffer_addr() as *const u8,
@@ -1222,22 +1330,58 @@ fn main() -> ! {
             display.set_back_buffer(FB2_ADDR);
         }
 
+        // ── Desktop background ────────────────────────────────────────────
+        // When the `desktop` feature is enabled, decode the desktop image
+        // into both framebuffers.  This is independent of `splash` — you
+        // can have a splash boot animation, a desktop background, both
+        // (with the same or different assets), or neither.
+        #[cfg(feature = "desktop")]
+        {
+            let (dw, dh, pal_bytes, stream) =
+                rlvgl_decomp::parse_rle_blob(DESKTOP_RLE).expect("desktop RLE parse");
+            let pal_count = pal_bytes.len() / 2;
+            let mut palette = [0u16; 192];
+            for i in 0..pal_count {
+                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+            }
+            let fb0 = unsafe {
+                core::slice::from_raw_parts_mut(
+                    display.front_buffer_addr() as *mut u8, fb_bytes,
+                )
+            };
+            let _ = rlvgl_decomp::decode_argb_into(
+                dw as usize, dh as usize, &palette[..pal_count], stream, fb0,
+            );
+            let fb1 = unsafe {
+                core::slice::from_raw_parts_mut(
+                    display.back_buffer_addr() as *mut u8, fb_bytes,
+                )
+            };
+            let _ = rlvgl_decomp::decode_argb_into(
+                dw as usize, dh as usize, &palette[..pal_count], stream, fb1,
+            );
+            cortex_m::asm::dsb();
+            serial_puts("DESKTOP: decoded into both FBs\r\n");
+        }
+
         // Telemetry: write both fb addresses
         unsafe {
             (0x3800_0620u32 as *mut u32).write_volatile(display.front_buffer_addr());
             (0x3800_0624u32 as *mut u32).write_volatile(display.back_buffer_addr());
         }
 
-        // Save a pristine copy of the splash framebuffer so we can restore
+        // Save a pristine copy of the desktop framebuffer so we can restore
         // pixels under the EventWindow when it hides (the front buffer gets
         // EventWindow pixels painted on it, so we can't copy from there).
-        let splash_ref = display.back_buffer_addr();
-        // Place pristine copy at 0xD030_0000 (after the two 1.5MB framebuffers)
-        const SPLASH_PRISTINE: u32 = 0xD030_0000;
+        // Place pristine copy at 0xD030_0000 (after the two 1.5MB framebuffers).
+        const DESKTOP_PRISTINE: u32 = 0xD030_0000;
+        // When desktop feature is off, the pristine copy is still taken so
+        // that the solid-black background can be restored correctly.
+        let pristine_ref = display.back_buffer_addr();
         unsafe {
             core::ptr::copy_nonoverlapping(
-                splash_ref as *const u8,
-                SPLASH_PRISTINE as *mut u8,
+                pristine_ref as *const u8,
+                DESKTOP_PRISTINE as *mut u8,
                 fb_bytes,
             );
             cortex_m::asm::dsb();
@@ -1250,6 +1394,40 @@ fn main() -> ! {
         // No boot discard — splash delay removed, pins are stable by now.
         let _btn_discard: u32 = 0;
 
+        // ── Tap gesture recognizer ────────────────────────────────────────
+        use rlvgl::platform::gesture::TapRecognizer;
+        let mut tap = TapRecognizer::new(2); // 2 ticks (~330ms at 6Hz)
+
+        // ── Event telemetry ring buffer ──────────────────────────────────
+        // 16-entry ring at D3 SRAM 0x3800_0700, each entry = 4 words:
+        //   [0] tick_count  [1] event_code  [2] x  [3] y
+        // Event codes: 0x01=PointerDown, 0x02=PointerUp, 0x03=PressDown,
+        //              0x04=PressRelease, 0x10=GestureProcess, 0x11=GestureTick
+        const TELEM_BASE: u32 = 0x3800_0700;
+        const TELEM_ENTRIES: u32 = 16;
+        const TELEM_ENTRY_WORDS: u32 = 4;
+        // Ring index at 0x3800_06F0, dump tick counter at 0x3800_06F4
+        const TELEM_IDX_ADDR: u32 = 0x3800_06F0;
+        const TELEM_DUMP_TICK: u32 = 0x3800_06F4;
+
+        unsafe {
+            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
+            (TELEM_DUMP_TICK as *mut u32).write_volatile(0);
+        }
+
+        fn telem_log(tick: u32, code: u32, x: i32, y: i32) {
+            unsafe {
+                let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                let slot = idx % TELEM_ENTRIES;
+                let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
+                (base as *mut u32).write_volatile(tick);
+                ((base + 4) as *mut u32).write_volatile(code);
+                ((base + 8) as *mut u32).write_volatile(x as u32);
+                ((base + 12) as *mut u32).write_volatile(y as u32);
+                (TELEM_IDX_ADDR as *mut u32).write_volatile(idx + 1);
+            }
+        }
+
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
         let mut dirty_frames: u8 = 0;
@@ -1257,13 +1435,10 @@ fn main() -> ! {
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
 
-        // EventWindow fb region (after 90° CCW rotation):
-        // logical (10, 10, 380, 264) → fb (480-10-264, 10, 264, 380) = (206, 10, 264, 380)
-        // We restore this region from pristine splash when the window hides.
-        const EW_FB_X: u32 = 206;
-        const EW_FB_Y: u32 = 10;
-        const EW_FB_W: u32 = 264;
-        const EW_FB_H: u32 = 380;
+        // Save-under compositor: saves fb pixels when overlays open,
+        // restores when they close.
+        use rlvgl::platform::compositor::Compositor;
+        let mut compositor = Compositor::new(w_fb, h_fb, DESKTOP_PRISTINE);
 
         // Event counter written to D3 SRAM for probe-rs inspection
         let mut evt_count: u32 = 0;
@@ -1279,20 +1454,36 @@ fn main() -> ! {
             }
 
             // ── Poll touch ──
-            // Touch driver reports in portrait fb coords (x=0..479, y=0..799).
-            // Transform to landscape physical: phys_x = touch_y, phys_y = 479 - touch_x.
+            // Poll touch — coords already in landscape widget space
+            // (portrait→landscape transform done inside InputDevice::poll)
             if let Some(evt) = input.poll() {
-                if let Event::PointerDown { x, y } = &evt {
-                    serial_puts("TOUCH: DOWN\r\n");
-                    let phys_x = *y;
-                    let phys_y = 479 - *x;
-                    event_win.borrow_mut().push_event(
-                        t!("hw.touch", x = phys_x, y = phys_y),
-                    );
-                    dirty_frames = 2;
-                    evt_count += 1;
+                // Log to telemetry + event window
+                match &evt {
+                    Event::PointerDown { x, y } => {
+                        telem_log(tick_count, 0x01, *x, *y);
+                        event_win.borrow_mut().push_event(
+                            t!("hw.touch", x = *x, y = *y),
+                        );
+                        dirty_frames = dirty_frames.max(2);
+                        evt_count += 1;
+                    }
+                    Event::PointerUp { x, y } => {
+                        telem_log(tick_count, 0x02, *x, *y);
+                        evt_count += 1;
+                    }
+                    _ => {}
                 }
-                root.borrow_mut().dispatch_event(&evt);
+
+                // Feed to gesture recognizer → dispatch gestures to widgets
+                if let Some(gesture) = tap.process(&evt) {
+                    match &gesture {
+                        Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
+                        Event::PressRelease { x, y } => telem_log(tick_count, 0x04, *x, *y),
+                        _ => {}
+                    }
+                    dirty_frames = 2;
+                    root.borrow_mut().dispatch_event(&gesture);
+                }
             }
 
             // ── Poll button (PC13 — the one with the pole) ──
@@ -1351,6 +1542,20 @@ fn main() -> ! {
 
             // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
+                // Advance gesture settle timer → may emit PressRelease
+                if let Some(gesture) = tap.tick() {
+                    if let Event::PressRelease { x, y } = &gesture {
+                        telem_log(tick_count, 0x14, *x, *y);
+                    }
+                    dirty_frames = 4; // enough for double-buffer + clear countdown
+                    root.borrow_mut().dispatch_event(&gesture);
+                }
+
+                // Keep rendering while config menu is clearing stale pixels
+                if config_menu.borrow().clear_active() {
+                    dirty_frames = dirty_frames.max(2);
+                }
+
                 // Dispatch Tick to age EventWindow entries
                 root.borrow_mut().dispatch_event(&Event::Tick);
 
@@ -1361,9 +1566,30 @@ fn main() -> ! {
                 // - visibility transition (show or hide)
                 // - entry count changed (new event or expiry)
                 // - dirty_frames > 0 (second buffer needs sync)
+                // Track overlay visibility transitions — restore from
+                // pristine desktop when overlays hide.
+                use rlvgl::core::widget::Widget as _;
                 if vis != was_visible {
-                    dirty_frames = 2; // sync both buffers
+                    dirty_frames = 4;
+                    if !vis {
+                        // EventWindow just hid — restore from pristine
+                        compositor.mark_pristine_restore(event_win.borrow().bounds());
+                    }
                     was_visible = vis;
+                }
+                let cm_vis = config_menu.borrow().is_visible();
+                static mut CM_WAS_VISIBLE: bool = false;
+                if cm_vis != unsafe { CM_WAS_VISIBLE } {
+                    dirty_frames = 4;
+                    if !cm_vis {
+                        // ConfigMenu just hid — restore panel region from pristine
+                        if let Some(panel) = config_menu.borrow().last_panel_bounds() {
+                            compositor.mark_pristine_restore(panel);
+                        }
+                        // Also restore gear area (it was part of the visible bounds)
+                        compositor.mark_pristine_restore(config_menu.borrow().bounds());
+                    }
+                    unsafe { CM_WAS_VISIBLE = cm_vis; }
                 }
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
@@ -1371,6 +1597,10 @@ fn main() -> ! {
                 if ec != unsafe { LAST_ENTRY_COUNT } {
                     unsafe { LAST_ENTRY_COUNT = ec; }
                     dirty_frames = 2;
+                }
+                // Keep rendering while restores are pending
+                if compositor.has_pending() {
+                    dirty_frames = dirty_frames.max(2);
                 }
                 let need_render = dirty_frames > 0;
 
@@ -1380,26 +1610,8 @@ fn main() -> ! {
                     let fb_bytes = (w * h * 4) as usize;
                     let stride = (w * 4) as usize;
 
-                    // Only restore splash when the EventWindow is NOT visible
-                    // (clearing both buffers after hide). When visible, the
-                    // EventWindow's fill_rounded_rect covers the full region —
-                    // no splash restore needed, and doing it causes visible
-                    // tearing as splash pixels flash before being overdrawn.
-                    if !vis {
-                        unsafe {
-                            for row in 0..EW_FB_H {
-                                let y = EW_FB_Y + row;
-                                let off = y as usize * stride + EW_FB_X as usize * 4;
-                                let len = EW_FB_W as usize * 4;
-                                core::ptr::copy_nonoverlapping(
-                                    (SPLASH_PRISTINE as *const u8).add(off),
-                                    (back as *mut u8).add(off),
-                                    len,
-                                );
-                            }
-                            cortex_m::asm::dsb();
-                        }
-                    }
+                    // Restore saved pixels under dismissed overlays
+                    compositor.restore(back as *mut u8);
 
                     let fb_slice = unsafe {
                         core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
@@ -1411,7 +1623,7 @@ fn main() -> ! {
                         BlitterRenderer::new(&mut render_blitter, surface);
                     let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
 
-                    // Draw widget tree (EventWindow only draws when visible)
+                    // Draw widget tree
                     root.borrow().draw(&mut renderer);
 
                     render_count += 1;
@@ -1451,6 +1663,34 @@ fn main() -> ! {
                     (0x3800_0644u32 as *mut u32).write_volatile(
                         event_win.borrow().entry_count() as u32
                     );
+
+                    // Dump event telemetry ring over serial every ~1s (6 ticks)
+                    let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile();
+                    if tick_count - last_dump >= 180 { // ~30s at 6Hz
+                        let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                        if idx > 0 {
+                            let dump_count = idx.min(TELEM_ENTRIES);
+                            let start = if idx > TELEM_ENTRIES { idx - TELEM_ENTRIES } else { 0 };
+                            serial_puts("TELEM:");
+                            for i in start..start + dump_count {
+                                let slot = i % TELEM_ENTRIES;
+                                let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
+                                let t = (base as *const u32).read_volatile();
+                                let code = ((base + 4) as *const u32).read_volatile();
+                                let x = ((base + 8) as *const u32).read_volatile();
+                                let y = ((base + 12) as *const u32).read_volatile();
+                                // Format: " T:code:x:y"
+                                use core::fmt::Write;
+                                let mut buf = alloc::string::String::new();
+                                let _ = write!(buf, " {}:{:02x}:{},{}", t, code, x as i32, y as i32);
+                                serial_puts(&buf);
+                            }
+                            serial_puts("\r\n");
+                            // Reset ring
+                            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
+                        }
+                        (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count);
+                    }
                 }
             }
             cortex_m::asm::nop();
@@ -1731,7 +1971,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── IPC + input ──────────────────────────────────────────────────────────
     ipc::init();
-    let mut input = Stm32h747iDiscoInput::new_with_int(DummyI2c, touch_int);
+    let mut input = Stm32h747iDiscoInput::new_with_int(
+        DummyI2c, touch_int, display.dimensions().0 as u16,
+    );
     let mut _button_input = ButtonInput::new(DummyButton);
 
     // ── Display server widget tree ───────────────────────────────────────────
@@ -1944,6 +2186,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     unsafe { ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); }
 
     // ── Display server main loop ─────────────────────────────────────────────
+    let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(2);
     let mut frame_counter: u32 = 0;
 
     loop {
@@ -1987,14 +2230,32 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             }
         }
 
-        // 2. Poll touch → dispatch to widget tree → forward to CM4
+        // 2. Poll touch → gesture → dispatch to widget tree → forward to CM4
         if let Some(evt) = input.poll() {
-            root.borrow_mut().dispatch_event(&evt);
-            // Forward touch events to CM4
+            let transformed = match &evt {
+                Event::PointerDown { x, y } => Event::PointerDown {
+                    x: *y, y: w_fb as i32 - 1 - *x,
+                },
+                Event::PointerUp { x, y } => Event::PointerUp {
+                    x: *y, y: w_fb as i32 - 1 - *x,
+                },
+                Event::PointerMove { x, y } => Event::PointerMove {
+                    x: *y, y: w_fb as i32 - 1 - *x,
+                },
+                other => other.clone(),
+            };
+            if let Some(gesture) = tap2.process(&transformed) {
+                root.borrow_mut().dispatch_event(&gesture);
+            }
+            // Forward touch events to CM4 (primary point only for IPC)
             let ipc_evt = match &evt {
                 Event::PointerDown { x, y } => Some(ipc::evt_pointer_down(*x, *y)),
                 Event::PointerMove { x, y } => Some(ipc::evt_pointer_move(*x, *y)),
                 Event::PointerUp { x, y } => Some(ipc::evt_pointer_up(*x, *y)),
+                Event::Touch { count, points } if *count > 0 => {
+                    let tp = &points[0];
+                    Some(ipc::evt_pointer_down(tp.x, tp.y))
+                }
                 _ => None,
             };
             if let Some(e) = ipc_evt {

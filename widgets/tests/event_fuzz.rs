@@ -75,7 +75,7 @@ fn event_fuzz_random() {
                 x: rng.random_range(0..64),
                 y: rng.random_range(0..64),
             },
-            1 => Event::PointerUp {
+            1 => Event::PressRelease {
                 x: rng.random_range(0..64),
                 y: rng.random_range(0..64),
             },

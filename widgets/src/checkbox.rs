@@ -82,7 +82,7 @@ impl Widget for Checkbox {
 
     /// Toggle the checked state when clicked.
     fn handle_event(&mut self, event: &Event) -> bool {
-        if let Event::PointerUp { x, y } = event {
+        if let Event::PressRelease { x, y } = event {
             let inside = *x >= self.bounds.x
                 && *x < self.bounds.x + self.bounds.width
                 && *y >= self.bounds.y

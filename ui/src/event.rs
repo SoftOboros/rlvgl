@@ -111,7 +111,7 @@ mod tests {
         let clicked = Rc::new(Cell::new(false));
         let c = clicked.clone();
         let mut btn = Button::new("ok", bounds).on_click(move |_| c.set(true));
-        let event = Event::PointerUp { x: 5, y: 5 };
+        let event = Event::PressRelease { x: 5, y: 5 };
         btn.handle_event(&event);
         assert!(clicked.get());
     }
@@ -127,7 +127,7 @@ mod tests {
         let value = Rc::new(Cell::new(0));
         let v = value.clone();
         let mut slider = Slider::new(bounds, 0, 10).on_change(move |x| v.set(x));
-        let event = Event::PointerUp { x: 50, y: 5 };
+        let event = Event::PressRelease { x: 50, y: 5 };
         slider.handle_event(&event);
         assert_ne!(value.get(), 0);
     }

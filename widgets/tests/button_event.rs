@@ -22,7 +22,7 @@ fn button_clicks_on_corners() {
         (rect.x, rect.y + rect.height - 1),
         (rect.x + rect.width - 1, rect.y + rect.height - 1),
     ] {
-        assert!(btn.handle_event(&Event::PointerUp { x, y }));
+        assert!(btn.handle_event(&Event::PressRelease { x, y }));
     }
     assert_eq!(counter.get(), 4);
 }

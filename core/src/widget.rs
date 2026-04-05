@@ -74,4 +74,14 @@ pub trait Widget {
     /// The default implementation for most widgets will simply ignore the
     /// event and return `false`.
     fn handle_event(&mut self, event: &Event) -> bool;
+
+    /// Return a region (in draw/landscape coordinates) that should be
+    /// restored from the pristine background copy, or `None`.
+    ///
+    /// Called once per frame before drawing. Overlay widgets should return
+    /// their bounds when they have just become hidden and need their
+    /// screen region cleared. The compositor handles the actual restoration.
+    fn clear_region(&mut self) -> Option<Rect> {
+        None
+    }
 }
