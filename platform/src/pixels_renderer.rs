@@ -74,6 +74,36 @@ impl<'a> FontdueRenderTarget for PixelsRenderer<'a> {
 }
 
 impl<'a> Renderer for PixelsRenderer<'a> {
+    fn blend_rect(&mut self, rect: Rect, color: Color) {
+        let alpha = color.3 as u16;
+        if alpha == 0 {
+            return;
+        }
+        if alpha == 255 {
+            self.fill_rect(rect, color);
+            return;
+        }
+        let inv = 255 - alpha;
+        let x0 = rect.x.max(0) as usize;
+        let y0 = rect.y.max(0) as usize;
+        let x1 = (rect.x + rect.width).max(0) as usize;
+        let y1 = (rect.y + rect.height).max(0) as usize;
+        let x1 = x1.min(self.width);
+        let y1 = y1.min(self.height);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let idx = (y * self.width + x) * 4;
+                let bg_r = self.frame[idx] as u16;
+                let bg_g = self.frame[idx + 1] as u16;
+                let bg_b = self.frame[idx + 2] as u16;
+                self.frame[idx] = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+                self.frame[idx + 1] = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+                self.frame[idx + 2] = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+                self.frame[idx + 3] = 0xff;
+            }
+        }
+    }
+
     fn fill_rect(&mut self, rect: Rect, color: Color) {
         let rgb = Rgb888::new(color.0, color.1, color.2);
         let x0 = rect.x.max(0);

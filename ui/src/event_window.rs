@@ -12,7 +12,7 @@ use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
-use crate::draw_helpers::{draw_border, fill_rounded_rect};
+use crate::draw_helpers::{draw_rounded_border, fill_rounded_rect};
 
 /// Number of ticks before an entry expires (10 s at 6 Hz).
 const EXPIRE_TICKS: u32 = 60;
@@ -94,7 +94,7 @@ impl Widget for EventWindow {
 
         // Background + border
         fill_rounded_rect(renderer, self.bounds, self.bg_color, self.radius);
-        draw_border(renderer, self.bounds, self.border_color, self.border_width);
+        draw_rounded_border(renderer, self.bounds, self.border_color, self.border_width, self.radius);
 
         // Text entries stacked vertically
         let line_h = self.font.scaled_height() + 4;

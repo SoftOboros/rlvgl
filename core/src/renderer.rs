@@ -16,6 +16,16 @@ pub trait Renderer {
     /// Draw UTF‑8 text with its baseline anchored at the provided position using the color.
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color);
 
+    /// Blend a rectangle onto the target, honoring the alpha channel of `color`
+    /// for source-over compositing.
+    ///
+    /// The default implementation ignores alpha and falls back to
+    /// [`fill_rect`](Self::fill_rect). Backends with blending support should
+    /// override this for correct anti-aliased rendering.
+    fn blend_rect(&mut self, rect: Rect, color: Color) {
+        self.fill_rect(rect, color);
+    }
+
     /// Blit a buffer of pixels to the target at the given position.
     ///
     /// The default implementation falls back to per-pixel [`fill_rect`](Self::fill_rect)

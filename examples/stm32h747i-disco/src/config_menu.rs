@@ -12,7 +12,7 @@ use rlvgl::core::packed_font::PackedFont;
 use rlvgl::core::event::Event;
 use rlvgl::core::renderer::Renderer;
 use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl::ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
 use rlvgl::ui::GridCalc;
 
 // ── D3 SRAM debug slots (readable via probe-rs) ──────────────────
@@ -346,7 +346,7 @@ impl ConfigMenu {
         bg: Color,
     ) {
         fill_rounded_rect(renderer, bounds, bg, 6);
-        draw_border(renderer, bounds, BORDER_COLOR, 1);
+        draw_rounded_border(renderer, bounds, BORDER_COLOR, 1, 6);
         let text_w = font.measure(label);
         let text_x = bounds.x + (bounds.width - text_w) / 2;
         let text_y = bounds.y + (bounds.height - font.height as i32) / 2;
@@ -425,7 +425,7 @@ impl Widget for ConfigMenu {
         // Panel background
         let panel = self.panel_bounds();
         fill_rounded_rect(renderer, panel, BG_COLOR, PANEL_RADIUS);
-        draw_border(renderer, panel, BORDER_COLOR, 1);
+        draw_rounded_border(renderer, panel, BORDER_COLOR, 1, PANEL_RADIUS);
 
         // Title
         self.font.draw_str(
