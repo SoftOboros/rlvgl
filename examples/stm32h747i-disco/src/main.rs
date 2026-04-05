@@ -35,6 +35,11 @@ mod ipc;
 #[cfg(feature = "splash")]
 static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
 
+/// Desktop background image — decoded into the framebuffer and restored
+/// behind widgets when they hide.  Independent of the splash boot screen.
+#[cfg(feature = "desktop")]
+static DESKTOP_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
+
 
 // Optional: route BSP log messages to semihosting when enabled.
 #[cfg(feature = "bsp_log")]
@@ -1191,6 +1196,7 @@ fn main() -> ! {
         use rlvgl::core::bitmap_font::FONT_6X10;
         use rlvgl::ui::EventWindowBuilder;
         use rlvgl::platform::blit::{BlitterRenderer, RotatedRenderer, Surface, PixelFmt};
+        use rlvgl_i18n::t;
 
         let event_win = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10).build(),
@@ -1206,13 +1212,13 @@ fn main() -> ! {
 
         // ── Fix double-buffering ──────────────────────────────────────────
         // The sdram_alloc may have given both framebuffers the same address.
-        // Force a second buffer at a known SDRAM offset and copy splash into it.
+        // Force a second buffer at a known SDRAM offset and copy the front
+        // buffer into it.
         let (w_fb, h_fb) = display.dimensions();
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
         if display.back_buffer_addr() == display.front_buffer_addr() {
             serial_puts("FIX: double-buffer was single — setting FB2\r\n");
-            // Copy splash into the second buffer
             unsafe {
                 core::ptr::copy_nonoverlapping(
                     display.front_buffer_addr() as *const u8,
@@ -1224,22 +1230,58 @@ fn main() -> ! {
             display.set_back_buffer(FB2_ADDR);
         }
 
+        // ── Desktop background ────────────────────────────────────────────
+        // When the `desktop` feature is enabled, decode the desktop image
+        // into both framebuffers.  This is independent of `splash` — you
+        // can have a splash boot animation, a desktop background, both
+        // (with the same or different assets), or neither.
+        #[cfg(feature = "desktop")]
+        {
+            let (dw, dh, pal_bytes, stream) =
+                rlvgl_decomp::parse_rle_blob(DESKTOP_RLE).expect("desktop RLE parse");
+            let pal_count = pal_bytes.len() / 2;
+            let mut palette = [0u16; 192];
+            for i in 0..pal_count {
+                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+            }
+            let fb0 = unsafe {
+                core::slice::from_raw_parts_mut(
+                    display.front_buffer_addr() as *mut u8, fb_bytes,
+                )
+            };
+            let _ = rlvgl_decomp::decode_argb_into(
+                dw as usize, dh as usize, &palette[..pal_count], stream, fb0,
+            );
+            let fb1 = unsafe {
+                core::slice::from_raw_parts_mut(
+                    display.back_buffer_addr() as *mut u8, fb_bytes,
+                )
+            };
+            let _ = rlvgl_decomp::decode_argb_into(
+                dw as usize, dh as usize, &palette[..pal_count], stream, fb1,
+            );
+            cortex_m::asm::dsb();
+            serial_puts("DESKTOP: decoded into both FBs\r\n");
+        }
+
         // Telemetry: write both fb addresses
         unsafe {
             (0x3800_0620u32 as *mut u32).write_volatile(display.front_buffer_addr());
             (0x3800_0624u32 as *mut u32).write_volatile(display.back_buffer_addr());
         }
 
-        // Save a pristine copy of the splash framebuffer so we can restore
+        // Save a pristine copy of the desktop framebuffer so we can restore
         // pixels under the EventWindow when it hides (the front buffer gets
         // EventWindow pixels painted on it, so we can't copy from there).
-        let splash_ref = display.back_buffer_addr();
-        // Place pristine copy at 0xD030_0000 (after the two 1.5MB framebuffers)
-        const SPLASH_PRISTINE: u32 = 0xD030_0000;
+        // Place pristine copy at 0xD030_0000 (after the two 1.5MB framebuffers).
+        const DESKTOP_PRISTINE: u32 = 0xD030_0000;
+        // When desktop feature is off, the pristine copy is still taken so
+        // that the solid-black background can be restored correctly.
+        let pristine_ref = display.back_buffer_addr();
         unsafe {
             core::ptr::copy_nonoverlapping(
-                splash_ref as *const u8,
-                SPLASH_PRISTINE as *mut u8,
+                pristine_ref as *const u8,
+                DESKTOP_PRISTINE as *mut u8,
                 fb_bytes,
             );
             cortex_m::asm::dsb();
@@ -1284,15 +1326,30 @@ fn main() -> ! {
             // Touch driver reports in portrait fb coords (x=0..479, y=0..799).
             // Transform to landscape physical: phys_x = touch_y, phys_y = 479 - touch_x.
             if let Some(evt) = input.poll() {
-                if let Event::PointerDown { x, y } = &evt {
-                    serial_puts("TOUCH: DOWN\r\n");
-                    let phys_x = *y;
-                    let phys_y = 479 - *x;
-                    event_win.borrow_mut().push_event(
-                        t!("hw.touch", x = phys_x, y = phys_y),
-                    );
-                    dirty_frames = 2;
-                    evt_count += 1;
+                match &evt {
+                    Event::PointerDown { x, y } => {
+                        serial_puts("TOUCH: DOWN\r\n");
+                        let phys_x = *y;
+                        let phys_y = 479 - *x;
+                        event_win.borrow_mut().push_event(
+                            t!("hw.touch", x = phys_x, y = phys_y),
+                        );
+                        dirty_frames = 2;
+                        evt_count += 1;
+                    }
+                    Event::Touch { count, points } => {
+                        serial_puts("TOUCH: MULTI\r\n");
+                        for tp in &points[..*count as usize] {
+                            let phys_x = tp.y;
+                            let phys_y = 479 - tp.x;
+                            event_win.borrow_mut().push_event(
+                                t!("hw.touch", x = phys_x, y = phys_y),
+                            );
+                        }
+                        dirty_frames = 2;
+                        evt_count += 1;
+                    }
+                    _ => {}
                 }
                 root.borrow_mut().dispatch_event(&evt);
             }
@@ -1394,7 +1451,7 @@ fn main() -> ! {
                                 let off = y as usize * stride + EW_FB_X as usize * 4;
                                 let len = EW_FB_W as usize * 4;
                                 core::ptr::copy_nonoverlapping(
-                                    (SPLASH_PRISTINE as *const u8).add(off),
+                                    (DESKTOP_PRISTINE as *const u8).add(off),
                                     (back as *mut u8).add(off),
                                     len,
                                 );
@@ -1992,11 +2049,15 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         // 2. Poll touch → dispatch to widget tree → forward to CM4
         if let Some(evt) = input.poll() {
             root.borrow_mut().dispatch_event(&evt);
-            // Forward touch events to CM4
+            // Forward touch events to CM4 (primary point only for IPC)
             let ipc_evt = match &evt {
                 Event::PointerDown { x, y } => Some(ipc::evt_pointer_down(*x, *y)),
                 Event::PointerMove { x, y } => Some(ipc::evt_pointer_move(*x, *y)),
                 Event::PointerUp { x, y } => Some(ipc::evt_pointer_up(*x, *y)),
+                Event::Touch { count, points } if *count > 0 => {
+                    let tp = &points[0];
+                    Some(ipc::evt_pointer_down(tp.x, tp.y))
+                }
                 _ => None,
             };
             if let Some(e) = ipc_evt {

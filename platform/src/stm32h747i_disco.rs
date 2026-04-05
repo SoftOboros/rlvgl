@@ -19,7 +19,7 @@ use crate::{Blitter, DisplayDriver, InputDevice};
 use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 #[cfg(feature = "stm32h747i_disco")]
 use embedded_hal::{digital::OutputPin, pwm::SetDutyCycle};
-use rlvgl_core::event::Event;
+use rlvgl_core::event::{Event, TouchPoint, TouchState, MAX_TOUCH_POINTS};
 use rlvgl_core::widget::{Color, Rect};
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use stm32h7::stm32h747cm7::DMA2D;
@@ -1639,6 +1639,7 @@ pub struct Stm32h747iDiscoInput<I2C, INT> {
     touch: Ft5336<I2C>,
     int: INT,
     last: Option<(u16, u16)>,
+    last_count: u8,
 }
 
 #[cfg(feature = "stm32h747i_disco")]
@@ -1691,6 +1692,7 @@ where
             touch: Ft5336::new(i2c),
             int: DummyPin,
             last: None,
+            last_count: 0,
         }
     }
 }
@@ -1707,6 +1709,7 @@ where
             touch: Ft5336::new(i2c),
             int,
             last: None,
+            last_count: 0,
         }
     }
 
@@ -1725,11 +1728,52 @@ where
         if !self.int_active() {
             return None;
         }
-        let touch = self.touch.read_touch().ok()?;
+        let (count, raw) = self.touch.read_touches().ok()?;
+
+        // Multi-touch path: 2+ contacts → emit Event::Touch
+        if count >= 2 {
+            let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
+            for i in 0..count as usize {
+                let (id, flag, x, y) = raw[i];
+                points[i] = TouchPoint {
+                    id,
+                    x: x as i32,
+                    y: y as i32,
+                    state: match flag {
+                        0 => TouchState::Down,
+                        1 => TouchState::Up,
+                        _ => TouchState::Contact,
+                    },
+                };
+            }
+            // Track first point for transition back to single-pointer
+            let (_, _, x0, y0) = raw[0];
+            self.last = Some((x0, y0));
+            self.last_count = count;
+            return Some(Event::Touch { count, points });
+        }
+
+        // Single-touch path: 0–1 contacts → legacy PointerDown/Up/Move
+        let touch = if count == 1 {
+            let (_, _, x, y) = raw[0];
+            Some((x, y))
+        } else {
+            None
+        };
+
+        let was_multi = self.last_count >= 2;
+        self.last_count = count;
+
         match (touch, self.last) {
             (Some((x, y)), Some((lx, ly))) => {
                 self.last = Some((x, y));
-                if (x, y) != (lx, ly) {
+                if was_multi {
+                    // Transitioning from multi → single: treat as new down
+                    Some(Event::PointerDown {
+                        x: x as i32,
+                        y: y as i32,
+                    })
+                } else if (x, y) != (lx, ly) {
                     Some(Event::PointerMove {
                         x: x as i32,
                         y: y as i32,
