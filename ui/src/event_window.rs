@@ -39,6 +39,8 @@ pub struct EventWindow {
     text_color: Color,
     entries: Vec<EventEntry>,
     visible: bool,
+    /// When `false`, `push_event` is a no-op (events are silently dropped).
+    enabled: bool,
     /// Counts down after hiding to clear stale pixels from both framebuffers.
     clear_countdown: u8,
     padding: i32,
@@ -56,8 +58,21 @@ impl EventWindow {
         self.entries.len()
     }
 
+    /// Whether event collection is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Enable or disable event collection. When disabled, `push_event` is a no-op.
+    pub fn set_enabled(&mut self, val: bool) {
+        self.enabled = val;
+    }
+
     /// Push a pre-formatted event string into the display list.
     pub fn push_event(&mut self, text: String) {
+        if !self.enabled {
+            return;
+        }
         self.entries.push(EventEntry { text, age: 0 });
         // Cap total entries to prevent unbounded growth.
         if self.entries.len() > MAX_LINES * 2 {
@@ -197,6 +212,7 @@ impl EventWindowBuilder {
             text_color: self.text_color,
             entries: Vec::new(),
             visible: false,
+            enabled: true,
             clear_countdown: 0,
             padding: 12,
             font: self.font,

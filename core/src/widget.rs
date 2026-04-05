@@ -11,7 +11,7 @@ use crate::renderer::Renderer;
 /// Used by [`Widget`](crate::widget::Widget) implementations to describe layout
 /// and passed to [`Renderer::fill_rect`](crate::renderer::Renderer::fill_rect)
 /// when drawing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
     /// X coordinate relative to the parent widget.
     pub x: i32,

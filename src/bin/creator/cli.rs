@@ -15,6 +15,7 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 pub mod add_target;
 pub mod apng;
 pub mod bsp_gen;
+pub mod chakra;
 pub mod check;
 pub mod compress;
 pub mod convert;
@@ -290,6 +291,13 @@ enum SvelteCommand {
         #[arg(long)]
         mode: Option<String>,
     },
+    /// Ingest a Chakra UI theme (.ts) and emit a tokens.yaml
+    Chakra {
+        /// Input Chakra theme TypeScript file
+        input: PathBuf,
+        /// Output directory (tokens.yaml written here)
+        out: PathBuf,
+    },
     /// Compile Svelte components into rlvgl output
     Compile {
         /// Input Svelte file or directory
@@ -546,6 +554,9 @@ pub fn run() -> Result<()> {
             threshold,
         } => svg::run(&svg, &out, &dpi, threshold)?,
         Command::Svelte { cmd } => match cmd {
+            SvelteCommand::Chakra { input, out } => {
+                chakra::ingest(&input, &out)?
+            }
             SvelteCommand::Tokens { input, out, mode } => {
                 svelte::tokens(&input, &out, mode.as_deref())?
             }

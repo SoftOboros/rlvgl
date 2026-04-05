@@ -1125,6 +1125,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         (self.width as u32, self.height as u32)
     }
 
+    /// Temporarily take the DMA2D peripheral for external use.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn take_dma2d_raw(&mut self) -> Option<stm32h7::stm32h747cm7::DMA2D> {
+        self.dma2d.take()
+    }
+
+    /// Return the DMA2D peripheral after external use.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn return_dma2d_raw(&mut self, dma2d: stm32h7::stm32h747cm7::DMA2D) {
+        self.dma2d = Some(dma2d);
+    }
+
     /// Swap LTDC layer address between front/back buffers and reload
     pub fn present(&mut self) {
         let next = self.fb_addr_back;

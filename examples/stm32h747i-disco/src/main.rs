@@ -31,6 +31,7 @@ mod config_menu;
 mod fonts;
 mod icon_strip;
 mod ipc;
+mod star_crawl;
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
@@ -1301,6 +1302,7 @@ fn main() -> ! {
                 data: FONT_DATA,
             };
 
+            let event_win_for_cfg = event_win.clone();
             Rc::new(RefCell::new(
                 ConfigMenu::new(
                     Rect { x: 730, y: 17, width: 60, height: 60 },
@@ -1311,6 +1313,13 @@ fn main() -> ! {
                 .on_change(|idx| {
                     let locale = rlvgl_i18n::locale_from_u8(idx);
                     rlvgl_i18n::set_locale(locale);
+                })
+                .on_preview(|idx| {
+                    let locale = rlvgl_i18n::locale_from_u8(idx);
+                    rlvgl_i18n::set_locale(locale);
+                })
+                .on_event_viewer_change(move |enabled| {
+                    event_win_for_cfg.borrow_mut().set_enabled(enabled);
                 }),
             ))
         };
@@ -1491,6 +1500,58 @@ fn main() -> ! {
         // Event counter written to D3 SRAM for probe-rs inspection
         let mut evt_count: u32 = 0;
 
+        // ── Star Wars opening crawl ─────────────────────────────────────
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let mut star_crawl = {
+            use rlvgl::core::packed_font::PackedFont;
+
+            static BOLD_FONT_DATA: &[u8] =
+                include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
+            static BOLD_FONT: PackedFont = PackedFont {
+                height: 32,
+                glyphs: &crate::fonts::DEJAVU_SANS_BOLD_32_GLYPHS,
+                data: BOLD_FONT_DATA,
+            };
+
+            static CRAWL_LINES: &[&str] = &[
+                "RLVGL",
+                "",
+                "Episode I",
+                "THE EMBEDDED MENACE",
+                "",
+                "It is a period of civil war.",
+                "Rebel firmware engineers,",
+                "striking from a hidden lab,",
+                "have won their first victory",
+                "against the evil Proprietary",
+                "RTOS Empire.",
+                "",
+                "During the battle, Rebel",
+                "spies managed to steal",
+                "secret plans to the Empire's",
+                "ultimate weapon, the",
+                "DEATH BLOB, a binary",
+                "firmware image with enough",
+                "power to destroy an entire",
+                "product line.",
+                "",
+                "Pursued by the Empire's",
+                "sinister vendor lock-in,",
+                "Princess Ferris races home",
+                "aboard her starship,",
+                "custodian of the stolen",
+                "plans that can save her",
+                "people and restore freedom",
+                "to the galaxy....",
+            ];
+
+            star_crawl::StarCrawl::new(&BOLD_FONT, CRAWL_LINES)
+        };
+
+        // Info icon tap flag — set by PressRelease in icon slot 5 bounds.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let mut crawl_toggle_pending = false;
+
         loop {
             // Loop heartbeat
             unsafe {
@@ -1531,7 +1592,14 @@ fn main() -> ! {
                 if let Some(gesture) = tap.process(&evt) {
                     match &gesture {
                         Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
-                        Event::PressRelease { x, y } => telem_log(tick_count, 0x04, *x, *y),
+                        Event::PressRelease { x, y } => {
+                            telem_log(tick_count, 0x04, *x, *y);
+                            // Info icon (slot 5): x=730, y=402, 60×60
+                            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                            if *x >= 730 && *x < 790 && *y >= 402 && *y < 462 {
+                                crawl_toggle_pending = true;
+                            }
+                        }
                         _ => {}
                     }
                     dirty_frames = 2;
@@ -1660,33 +1728,70 @@ fn main() -> ! {
                 if compositor.has_pending() {
                     dirty_frames = dirty_frames.max(2);
                 }
-                let need_render = dirty_frames > 0;
 
-                if need_render {
-                    let back = display.back_buffer_addr();
-                    let (w, h) = display.dimensions();
-                    let fb_bytes = (w * h * 4) as usize;
-                    let stride = (w * 4) as usize;
+                // ── Star crawl toggle + render override ─────────────────
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                if crawl_toggle_pending {
+                    crawl_toggle_pending = false;
+                    if star_crawl.is_active() {
+                        star_crawl.deactivate();
+                        dirty_frames = 4; // restore desktop
+                    } else if let Some(raw) = display.take_dma2d_raw() {
+                        let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                        star_crawl.activate(&mut blitter);
+                        display.return_dma2d_raw(blitter.into_inner());
+                    }
+                }
 
-                    // Restore saved pixels under dismissed overlays
-                    compositor.restore(back as *mut u8);
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                let crawl_active = star_crawl.is_active();
+                #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+                let crawl_active = false;
 
-                    let fb_slice = unsafe {
-                        core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
-                    };
-                    let surface = Surface::new(
-                        fb_slice, stride, PixelFmt::Argb8888, w, h,
-                    );
-                    let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
-                        BlitterRenderer::new(&mut render_blitter, surface);
-                    let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+                if crawl_active {
+                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    if let Some(raw) = display.take_dma2d_raw() {
+                        let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                        let back = display.back_buffer_addr();
+                        let (w, h) = display.dimensions();
+                        if star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
+                            render_count += 1;
+                            display.present();
+                        }
+                        display.return_dma2d_raw(blitter.into_inner());
+                        // Auto-deactivation: crawl finished scrolling
+                        if !star_crawl.is_active() {
+                            dirty_frames = 4;
+                        }
+                    }
+                } else {
+                    let need_render = dirty_frames > 0;
+                    if need_render {
+                        let back = display.back_buffer_addr();
+                        let (w, h) = display.dimensions();
+                        let fb_bytes = (w * h * 4) as usize;
+                        let stride = (w * 4) as usize;
 
-                    // Draw widget tree
-                    root.borrow().draw(&mut renderer);
+                        // Restore saved pixels under dismissed overlays
+                        compositor.restore(back as *mut u8);
 
-                    render_count += 1;
-                    if dirty_frames > 0 { dirty_frames -= 1; }
-                    display.present();
+                        let fb_slice = unsafe {
+                            core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
+                        };
+                        let surface = Surface::new(
+                            fb_slice, stride, PixelFmt::Argb8888, w, h,
+                        );
+                        let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                            BlitterRenderer::new(&mut render_blitter, surface);
+                        let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+
+                        // Draw widget tree
+                        root.borrow().draw(&mut renderer);
+
+                        render_count += 1;
+                        if dirty_frames > 0 { dirty_frames -= 1; }
+                        display.present();
+                    }
                 }
 
                 tick_count += 1;

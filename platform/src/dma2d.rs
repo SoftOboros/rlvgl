@@ -26,6 +26,11 @@ impl Dma2dBlitter {
         Self { regs }
     }
 
+    /// Consume the blitter and return the raw DMA2D peripheral.
+    pub fn into_inner(self) -> DMA2D {
+        self.regs
+    }
+
     fn pixel_size(fmt: PixelFmt) -> usize {
         match fmt {
             PixelFmt::Argb8888 => 4,
@@ -204,6 +209,139 @@ impl Dma2dBlitter {
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+    }
+}
+
+// ── Raw-pointer methods for direct SDRAM buffer operations ───────────────
+//
+// These bypass the Surface abstraction for use by overlay renderers
+// (e.g. star crawl) that manage their own SDRAM buffers.
+
+#[cfg(feature = "dma2d")]
+impl Dma2dBlitter {
+    /// R2M fill by raw pointer. Fills `width × height` pixels at `dst` with
+    /// a solid color. `dst_stride` is in bytes.
+    pub fn fill_raw(
+        &mut self,
+        dst: *mut u8,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        color: u32,
+        fmt: PixelFmt,
+    ) {
+        let bpp = Self::pixel_size(fmt) as u32;
+        let line_offset = dst_stride - width * bpp;
+        unsafe {
+            self.regs.omar.write(|w| w.bits(dst as u32));
+            self.regs.ocolr.write(|w| w.bits(color));
+            self.regs
+                .opfccr
+                .write(|w| w.bits(Self::dma2d_fmt(fmt)));
+            self.regs.oor.write(|w| w.bits(line_offset));
+            self.regs
+                .nlr
+                .write(|w| w.bits((height << 16) | width));
+        }
+        self.regs
+            .cr
+            .write(|w| unsafe { w.bits(Self::CR_MODE_R2M) });
+        self.regs
+            .cr
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+        self.wait();
+    }
+
+    /// M2M copy by raw pointer. Copies `width × height` pixels from `src` to
+    /// `dst`. Both must be the same pixel format. Strides are in bytes.
+    pub fn blit_raw(
+        &mut self,
+        src: *const u8,
+        src_stride: u32,
+        dst: *mut u8,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        fmt: PixelFmt,
+    ) {
+        let bpp = Self::pixel_size(fmt) as u32;
+        let src_offset = src_stride - width * bpp;
+        let dst_offset = dst_stride - width * bpp;
+        let cm = Self::dma2d_fmt(fmt);
+        unsafe {
+            self.regs.fgmar.write(|w| w.bits(src as u32));
+            self.regs.fgor.write(|w| w.bits(src_offset));
+            self.regs.fgpfccr.write(|w| w.bits(cm));
+            self.regs.omar.write(|w| w.bits(dst as u32));
+            self.regs.oor.write(|w| w.bits(dst_offset));
+            self.regs.opfccr.write(|w| w.bits(cm));
+            self.regs
+                .nlr
+                .write(|w| w.bits((height << 16) | width));
+        }
+        self.regs
+            .cr
+            .write(|w| unsafe { w.bits(Self::CR_MODE_M2M_PFC) });
+        self.regs
+            .cr
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+        self.wait();
+    }
+
+    /// Blend an A8 alpha source with a fixed foreground color onto an
+    /// ARGB8888 background. Each source byte is treated as the alpha channel
+    /// and multiplied by `fg_color` (0x00RRGGBB). The result is blended
+    /// onto the destination which is read-modify-written in place.
+    ///
+    /// This is the key DMA2D operation for anti-aliased colored text
+    /// rendering: set fg_color to yellow (0x00FFFF00) and feed glyph
+    /// bitmaps as A8 source data.
+    ///
+    /// `a8_src` must be contiguous (stride == width).
+    /// `dst` points to the first ARGB8888 pixel to blend onto.
+    /// `dst_stride` is in bytes.
+    pub fn blend_a8_color(
+        &mut self,
+        a8_src: *const u8,
+        width: u32,
+        height: u32,
+        fg_color: u32,
+        dst: *mut u8,
+        dst_stride: u32,
+    ) {
+        let dst_bpp = 4u32; // ARGB8888
+        let dst_offset = dst_stride - width * dst_bpp;
+        unsafe {
+            // Foreground: A8 source with fixed color
+            self.regs.fgmar.write(|w| w.bits(a8_src as u32));
+            self.regs.fgor.write(|w| w.bits(0)); // contiguous A8
+            // CM=0x9 (A8), AM=00 (no alpha modify), ALPHA=0xFF
+            self.regs
+                .fgpfccr
+                .write(|w| w.bits(0xFF00_0000 | 9));
+            self.regs.fgcolr.write(|w| w.bits(fg_color));
+
+            // Background: ARGB8888 destination (read side)
+            self.regs.bgmar.write(|w| w.bits(dst as u32));
+            self.regs.bgor.write(|w| w.bits(dst_offset));
+            self.regs.bgpfccr.write(|w| w.bits(0)); // ARGB8888
+
+            // Output: same as background (in-place blend)
+            self.regs.omar.write(|w| w.bits(dst as u32));
+            self.regs.oor.write(|w| w.bits(dst_offset));
+            self.regs.opfccr.write(|w| w.bits(0)); // ARGB8888
+
+            self.regs
+                .nlr
+                .write(|w| w.bits((height << 16) | width));
+        }
+        self.regs
+            .cr
+            .write(|w| unsafe { w.bits(Self::CR_MODE_M2M_BLEND) });
+        self.regs
+            .cr
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+        self.wait();
     }
 }
 
