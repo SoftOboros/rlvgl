@@ -65,6 +65,7 @@ mod sdram_alloc {
         Some(aligned)
     }
 
+    #[cfg(feature = "dma2d")]
     pub fn alloc_bytes(size: usize, align: usize) -> Option<*mut u8> {
         alloc(size, align).map(|addr| addr as *mut u8)
     }
