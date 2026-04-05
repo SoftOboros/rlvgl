@@ -1285,6 +1285,36 @@ fn main() -> ! {
             (w, h, colors)
         }
 
+        // ── Config menu (created first so icon strip can reference it) ────
+        let config_menu = {
+            use crate::config_menu::ConfigMenu;
+            use rlvgl::core::widget::Rect;
+            use rlvgl::core::packed_font::PackedFont;
+
+            static CLOSE_RLE: &[u8] = include_bytes!("../assets/icons/close28.rle");
+            let (cw, ch, close_rgba) = decode_rle(CLOSE_RLE);
+
+            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+            static UI_FONT: PackedFont = PackedFont {
+                height: 24,
+                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                data: FONT_DATA,
+            };
+
+            Rc::new(RefCell::new(
+                ConfigMenu::new(
+                    Rect { x: 730, y: 17, width: 60, height: 60 },
+                    rlvgl_i18n::locale() as u8,
+                    &UI_FONT,
+                )
+                .close_icon(&close_rgba, cw, ch)
+                .on_change(|idx| {
+                    let locale = rlvgl_i18n::locale_from_u8(idx);
+                    rlvgl_i18n::set_locale(locale);
+                }),
+            ))
+        };
+
         // ── Icon strip (right edge, 6 slots) ────────────────────────────────
         {
             use crate::icon_strip::{IconStrip, IconSlot};
@@ -1296,7 +1326,6 @@ fn main() -> ! {
                 17,  // gap between icons
             );
 
-            // Set up 6 icon slots with static RLE blobs (no heap alloc at init)
             let icons: [(&[u8], bool); 6] = [
                 (include_bytes!("../assets/icons/settings.rle"), true),
                 (include_bytes!("../assets/icons/file.rle"), true),
@@ -1314,50 +1343,23 @@ fn main() -> ! {
                 });
             }
 
+            // Settings tap (slot 0) → toggle config menu
+            let cm = config_menu.clone();
+            strip.slots_mut()[0].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
+                cm.borrow_mut().toggle_visible();
+            }));
+
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: Rc::new(RefCell::new(strip)),
                 children: alloc::vec![],
             });
         }
 
-        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0002); }
-        // ── Config menu (opens from settings icon tap) ──────────────────────
-        let config_menu = {
-            use crate::config_menu::ConfigMenu;
-            use rlvgl::core::widget::Rect;
-            use rlvgl::core::packed_font::PackedFont;
-
-            static CLOSE_RLE: &[u8] = include_bytes!("../assets/icons/close28.rle");
-            let (cw, ch, close_rgba) = decode_rle(CLOSE_RLE);
-
-            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
-            static UI_FONT: PackedFont = PackedFont {
-                height: 24,
-                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
-                data: FONT_DATA,
-            };
-
-            // Settings icon is at slot 0: (730, 17, 60, 60)
-            let gear = Rc::new(RefCell::new(
-                ConfigMenu::new(
-                    Rect { x: 730, y: 17, width: 60, height: 60 },
-                    rlvgl_i18n::locale() as u8,
-                    &UI_FONT,
-                )
-                .close_icon(&close_rgba, cw, ch)
-                .on_change(|idx| {
-                    let locale = rlvgl_i18n::locale_from_u8(idx);
-                    rlvgl_i18n::set_locale(locale);
-                }),
-            ));
-
-            // Config menu draws on top of everything (last child)
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-                widget: gear.clone(),
-                children: alloc::vec![],
-            });
-            gear
-        };
+        // Config menu draws on top of everything (last child)
+        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            widget: config_menu.clone(),
+            children: alloc::vec![],
+        });
 
         unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
@@ -1597,8 +1599,13 @@ fn main() -> ! {
                 if let Some(gesture) = tap.tick() {
                     if let Event::PressRelease { x, y } = &gesture {
                         telem_log(tick_count, 0x14, *x, *y);
+                        // Log settled tap to EventWindow (PointerDown may have
+                        // been missed for very fast taps)
+                        event_win.borrow_mut().push_event(
+                            t!("hw.touch", x = *x, y = *y),
+                        );
                     }
-                    dirty_frames = 4; // enough for double-buffer + clear countdown
+                    dirty_frames = 4;
                     root.borrow_mut().dispatch_event(&gesture);
                 }
 

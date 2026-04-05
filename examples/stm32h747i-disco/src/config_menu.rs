@@ -94,6 +94,16 @@ impl ConfigMenu {
         self.visible
     }
 
+    /// Toggle the config panel visibility.
+    pub fn toggle_visible(&mut self) {
+        if self.visible {
+            self.close_menu();
+        } else {
+            self.visible = true;
+            self.pending = self.applied;
+        }
+    }
+
     /// Whether the menu is actively clearing stale pixels.
     pub fn clear_active(&self) -> bool {
         self.clear_countdown > 0
@@ -400,18 +410,8 @@ impl Widget for ConfigMenu {
                 (0x3800_066Cu32 as *mut u32).write_volatile(self.visible as u32); // visible
             }
 
-            // Gear icon tap: toggle menu
-            if Self::inside(self.gear_bounds, *x, *y) {
-                self.visible = !self.visible;
-                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                unsafe { (0x3800_065Cu32 as *mut u32).write_volatile(0x6E_000000 | self.visible as u32); }
-                if self.visible {
-                    self.pending = self.applied;
-                }
-                self.dirty_frames = 2;
-                return true;
-            }
-
+            // Gear toggle is handled by the IconStrip callback.
+            // Config menu only handles taps when the panel is visible.
             if self.visible {
                 // Write touch coords + hit result to D3 SRAM for probe-rs
                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]

@@ -52,6 +52,11 @@ impl IconStrip {
         }
     }
 
+    /// Mutable access to the slots array (for wiring callbacks after creation).
+    pub fn slots_mut(&mut self) -> &mut [Option<IconSlot>; SLOT_COUNT] {
+        &mut self.slots
+    }
+
     /// Set an icon slot.
     pub fn set_slot(&mut self, index: usize, slot: IconSlot) {
         if index < SLOT_COUNT {
@@ -107,15 +112,15 @@ impl Widget for IconStrip {
                     let bounds = self.slot_bounds(i);
                     let ox = bounds.x + (bounds.width - iw as i32) / 2;
                     let oy = bounds.y + (bounds.height - ih as i32) / 2;
-                    if s.enabled {
-                        renderer.draw_pixels((ox, oy), &buf, iw, ih);
-                    } else {
-                        // Dim in-place for disabled
+                    if !s.enabled {
+                        // Dim RGB values by half for disabled icons
                         for c in buf.iter_mut() {
-                            c.3 /= 2;
+                            c.0 /= 2;
+                            c.1 /= 2;
+                            c.2 /= 2;
                         }
-                        renderer.draw_pixels((ox, oy), &buf, iw, ih);
                     }
+                    renderer.draw_pixels((ox, oy), &buf, iw, ih);
                 }
             }
         }
@@ -127,15 +132,18 @@ impl Widget for IconStrip {
             let mt = self.margin_top;
             let gap = self.gap;
             let isz = self.icon_size;
+            let step = isz + gap; // 77px per cell
             for (i, slot) in self.slots.iter_mut().enumerate() {
                 if let Some(s) = slot {
                     if !s.enabled {
                         continue;
                     }
-                    let by = mt + i as i32 * (isz + gap);
-                    if *x >= sx && *x < sx + isz
-                        && *y >= by && *y < by + isz
-                    {
+                    // Hit cell: icon position with gap split between neighbors.
+                    // First slot gets full top margin, last gets full bottom.
+                    let cell_top = if i == 0 { 0 } else { mt + i as i32 * step - gap / 2 };
+                    let cell_bot = if i == SLOT_COUNT - 1 { 480 } else { mt + (i as i32 + 1) * step - gap / 2 };
+                    // x extends from icon to screen edge (>= is inclusive)
+                    if *x >= sx && *y >= cell_top && *y < cell_bot {
                         if let Some(cb) = s.on_tap.as_mut() {
                             cb(i);
                         }
