@@ -20,3 +20,4 @@ cookies.txt
 .mcp.json
 tmp/
 **/.cache/
+i18n/translations.bin

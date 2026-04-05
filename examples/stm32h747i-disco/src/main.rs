@@ -1054,6 +1054,7 @@ fn main() -> ! {
             use core::cell::RefCell;
             use rlvgl::core::widget::Rect;
             use rlvgl::widgets::label::Label;
+            use rlvgl_i18n::t;
             use stm32h7xx_hal::gpio::Alternate;
             // SDMMC1 pins: PC12=CK, PD2=CMD, PC8..PC11=D0..D3 (AF12)
             let ck: stm32h7xx_hal::gpio::Pin<'C', 12, Alternate<12>> = gpioc.pc12.into_alternate();
@@ -1074,7 +1075,7 @@ fn main() -> ! {
                 Ok(names) => {
                     if names.is_empty() {
                         let label = Label::new(
-                            "SD: no assets",
+                            t!("hw.sd_no_assets"),
                             Rect {
                                 x: 10,
                                 y: 70,
@@ -1109,7 +1110,7 @@ fn main() -> ! {
                 }
                 Err(_) => {
                     let label = Label::new(
-                        "SD: mount/list failed",
+                        t!("hw.sd_mount_failed"),
                         Rect {
                             x: 10,
                             y: 70,
@@ -1242,10 +1243,9 @@ fn main() -> ! {
                     serial_puts("TOUCH: DOWN\r\n");
                     let phys_x = *y;
                     let phys_y = 479 - *x;
-                    let mut buf = alloc::string::String::new();
-                    use core::fmt::Write;
-                    let _ = write!(buf, "Touch: ({}, {})", phys_x, phys_y);
-                    event_win.borrow_mut().push_event(buf);
+                    event_win.borrow_mut().push_event(
+                        t!("hw.touch", x = phys_x, y = phys_y),
+                    );
                     dirty_frames = 2;
                     evt_count += 1;
                 }
@@ -1265,7 +1265,7 @@ fn main() -> ! {
                 if matches!(evt, Event::KeyDown { .. }) {
                     serial_puts("BTN: PRESS\r\n");
                     event_win.borrow_mut().push_event(
-                        alloc::string::String::from("Btn: Press"),
+                        alloc::string::String::from(t!("hw.btn_press")),
                     );
                     dirty_frames = 2;
                     evt_count += 1;
@@ -1288,12 +1288,12 @@ fn main() -> ! {
                 }
                 if let Event::KeyDown { ref key } = evt {
                     let label = match key {
-                        Key::ArrowUp => "Joy: Up",
-                        Key::ArrowDown => "Joy: Down",
-                        Key::ArrowLeft => "Joy: Left",
-                        Key::ArrowRight => "Joy: Right",
-                        Key::Enter => "Joy: Sel",
-                        _ => "Joy: ?",
+                        Key::ArrowUp => t!("hw.joy_up"),
+                        Key::ArrowDown => t!("hw.joy_down"),
+                        Key::ArrowLeft => t!("hw.joy_left"),
+                        Key::ArrowRight => t!("hw.joy_right"),
+                        Key::Enter => t!("hw.joy_sel"),
+                        _ => t!("hw.joy_unknown"),
                     };
                     serial_puts(label);
                     serial_puts("\r\n");
@@ -1693,19 +1693,20 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── Display server widget tree ───────────────────────────────────────────
     // Static widget tree with well-known IDs that CM4 drives via IPC commands.
-    use alloc::{format, rc::Rc, vec::Vec};
+    use alloc::{rc::Rc, vec::Vec};
     use core::cell::RefCell;
     use rlvgl::core::WidgetNode;
     use rlvgl::widgets::{button::Button, container::Container, label::Label};
     use rlvgl::core::widget::Rect;
+    use rlvgl_i18n::t;
 
     let title_label = Rc::new(RefCell::new(Label::new(
-        format!("rlvgl v{}", env!("CARGO_PKG_VERSION")),
+        t!("hw.title", version = env!("CARGO_PKG_VERSION")),
         Rect { x: 10, y: 10, width: 200, height: 20 },
     )));
 
     let counter_button = Rc::new(RefCell::new(Button::new(
-        "Clicks: 0",
+        t!("demo.clicks_zero"),
         Rect { x: 10, y: 40, width: 120, height: 30 },
     )));
 
@@ -1717,7 +1718,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
 
     let status_label = Rc::new(RefCell::new(Label::new(
-        "CM4: waiting",
+        t!("hw.cm4_waiting"),
         Rect { x: 10, y: 80, width: 300, height: 20 },
     )));
 
