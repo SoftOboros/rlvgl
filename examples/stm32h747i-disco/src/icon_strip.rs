@@ -5,7 +5,6 @@
 //! tappable) or disabled (50% opacity, not interactive).
 
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 
 use rlvgl::core::event::Event;
 use rlvgl::core::renderer::Renderer;
@@ -14,12 +13,13 @@ use rlvgl::core::widget::{Color, Rect, Widget};
 /// Number of icon slots in the strip.
 pub const SLOT_COUNT: usize = 6;
 
-/// A single icon slot with pixel data and enabled state.
+/// A single icon slot with RLE-compressed icon data.
+///
+/// Icons are decoded on-the-fly during draw to avoid heap allocation
+/// for 6 × 14,400-byte pixel buffers.
 pub struct IconSlot {
-    /// Decoded RGBA pixels as Color values.
-    pub pixels: Vec<Color>,
-    /// Icon dimensions (width, height).
-    pub size: (u32, u32),
+    /// RLEC blob reference (static, embedded via include_bytes).
+    pub rle: &'static [u8],
     /// Whether the icon is interactive (true) or greyed out (false).
     pub enabled: bool,
     /// Callback fired on tap (PressRelease) if enabled.
@@ -70,22 +70,17 @@ impl IconStrip {
         }
     }
 
-    /// Draw a single icon slot.
-    fn draw_slot(&self, renderer: &mut dyn Renderer, index: usize, slot: &IconSlot) {
-        let bounds = self.slot_bounds(index);
-        let (iw, ih) = slot.size;
-        let ox = bounds.x + (bounds.width - iw as i32) / 2;
-        let oy = bounds.y + (bounds.height - ih as i32) / 2;
-
-        if slot.enabled {
-            renderer.draw_pixels((ox, oy), &slot.pixels, iw, ih);
-        } else {
-            // Draw at 50% alpha for disabled state
-            let dimmed: Vec<Color> = slot.pixels.iter().map(|c| {
-                Color(c.0, c.1, c.2, c.3 / 2)
-            }).collect();
-            renderer.draw_pixels((ox, oy), &dimmed, iw, ih);
+    /// Decode an RLEC blob into a reusable buffer. Returns (width, height).
+    fn decode_into(rle: &[u8], buf: &mut alloc::vec::Vec<Color>) -> Option<(u32, u32)> {
+        let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(rle).ok()?;
+        let pal_count = pal_bytes.len() / 2;
+        let mut palette = alloc::vec![0u16; pal_count];
+        for i in 0..pal_count {
+            palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
         }
+        let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream).ok()?;
+        buf.extend(rgba.chunks_exact(4).map(|c| Color(c[0], c[1], c[2], c[3])));
+        Some((w as u32, h as u32))
     }
 }
 
@@ -103,9 +98,25 @@ impl Widget for IconStrip {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        // Shared decode buffer — reused across all 6 icons to minimize heap
+        let mut buf: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
         for (i, slot) in self.slots.iter().enumerate() {
             if let Some(s) = slot {
-                self.draw_slot(renderer, i, s);
+                buf.clear();
+                if let Some((iw, ih)) = Self::decode_into(s.rle, &mut buf) {
+                    let bounds = self.slot_bounds(i);
+                    let ox = bounds.x + (bounds.width - iw as i32) / 2;
+                    let oy = bounds.y + (bounds.height - ih as i32) / 2;
+                    if s.enabled {
+                        renderer.draw_pixels((ox, oy), &buf, iw, ih);
+                    } else {
+                        // Dim in-place for disabled
+                        for c in buf.iter_mut() {
+                            c.3 /= 2;
+                        }
+                        renderer.draw_pixels((ox, oy), &buf, iw, ih);
+                    }
+                }
             }
         }
     }

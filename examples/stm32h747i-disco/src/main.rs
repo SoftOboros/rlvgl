@@ -1261,6 +1261,7 @@ fn main() -> ! {
         // buffer into it.
         let (w_fb, h_fb) = display.dimensions();
 
+        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001); }
         // ── RLE decode helper ─────────────────────────────────────────────
         fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
             let (w, h, pal_bytes, stream) =
@@ -1295,7 +1296,7 @@ fn main() -> ! {
                 17,  // gap between icons
             );
 
-            // Decode all 6 icons
+            // Set up 6 icon slots with static RLE blobs (no heap alloc at init)
             let icons: [(&[u8], bool); 6] = [
                 (include_bytes!("../assets/icons/settings.rle"), true),
                 (include_bytes!("../assets/icons/file.rle"), true),
@@ -1306,12 +1307,10 @@ fn main() -> ! {
             ];
 
             for (i, (rle, enabled)) in icons.iter().enumerate() {
-                let (w, h, pixels) = decode_rle_colors(rle);
                 strip.set_slot(i, IconSlot {
-                    pixels,
-                    size: (w, h),
+                    rle,
                     enabled: *enabled,
-                    on_tap: None, // wired below
+                    on_tap: None,
                 });
             }
 
@@ -1321,6 +1320,7 @@ fn main() -> ! {
             });
         }
 
+        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0002); }
         // ── Config menu (opens from settings icon tap) ──────────────────────
         let config_menu = {
             use crate::config_menu::ConfigMenu;
@@ -1359,6 +1359,7 @@ fn main() -> ! {
             gear
         };
 
+        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
         if display.back_buffer_addr() == display.front_buffer_addr() {
@@ -1433,6 +1434,7 @@ fn main() -> ! {
 
         // D3 breadcrumb: entering main loop
         unsafe { (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); }
+        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004); }
         serial_puts("rlvgl: input proof loop started\r\n");
 
         // No boot discard — splash delay removed, pins are stable by now.
@@ -1474,7 +1476,7 @@ fn main() -> ! {
 
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
-        let mut dirty_frames: u8 = 0;
+        let mut dirty_frames: u8 = 4; // force initial render
         let mut was_visible = false;
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
@@ -1488,6 +1490,11 @@ fn main() -> ! {
         let mut evt_count: u32 = 0;
 
         loop {
+            // Loop heartbeat
+            unsafe {
+                let prev = (0x3800_0660u32 as *const u32).read_volatile();
+                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1));
+            }
             // Handle CM4 commands
             if let Some(cmd) = ipc::cmd_pop() {
                 if cmd.kind == ipc::CmdKind::SetBacklight as u32 {
