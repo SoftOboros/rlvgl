@@ -92,6 +92,15 @@ pub enum Event {
         /// Vertical coordinate.
         y: i32,
     },
+    /// Two consecutive short taps detected at the given coordinates.
+    /// Emitted by [`DoubleTapRecognizer`] when two `PressRelease` events
+    /// with short hold durations occur within the double-tap time window.
+    DoubleTap {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
     /// A keyboard key was pressed.
     KeyDown {
         /// Key that was pressed.

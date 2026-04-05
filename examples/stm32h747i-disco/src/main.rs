@@ -1625,9 +1625,10 @@ fn main() -> ! {
         // No boot discard — splash delay removed, pins are stable by now.
         let _btn_discard: u32 = 0;
 
-        // ── Tap gesture recognizer ────────────────────────────────────────
-        use rlvgl::platform::gesture::TapRecognizer;
-        let mut tap = TapRecognizer::new(2); // 2 ticks (~330ms at 6Hz)
+        // ── Gesture recognizers ───────────────────────────────────────────
+        use rlvgl::platform::gesture::{TapRecognizer, DoubleTapRecognizer};
+        let mut tap = TapRecognizer::new(FRAME_HZ);
+        let mut dtap = DoubleTapRecognizer::new(FRAME_HZ);
 
         // ── Event telemetry ring buffer ──────────────────────────────────
         // 16-entry ring at D3 SRAM 0x3800_0700, each entry = 4 words:
@@ -1765,17 +1766,21 @@ fn main() -> ! {
                     _ => {}
                 }
 
-                // Feed to gesture recognizer → dispatch gestures to widgets
+                // Feed to gesture recognizer → double-tap → dispatch to widgets
                 if let Some(gesture) = tap.process(&evt) {
-                    match &gesture {
-                        Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
-                        Event::PressRelease { x, y } => {
-                            telem_log(tick_count, 0x04, *x, *y);
+                    let (e1, e2) = dtap.process(&gesture);
+                    for ge in [e1, e2].into_iter().flatten() {
+                        match &ge {
+                            Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
+                            Event::PressRelease { x, y } => {
+                                telem_log(tick_count, 0x04, *x, *y);
+                            }
+                            Event::DoubleTap { x, y } => telem_log(tick_count, 0x05, *x, *y),
+                            _ => {}
                         }
-                        _ => {}
+                        dirty_frames = 2;
+                        root.borrow_mut().dispatch_event(&ge);
                     }
-                    dirty_frames = 2;
-                    root.borrow_mut().dispatch_event(&gesture);
                 }
             }
 
@@ -1837,16 +1842,22 @@ fn main() -> ! {
             if cp.SYST.has_wrapped() {
                 // Advance gesture settle timer → may emit PressRelease
                 if let Some(gesture) = tap.tick() {
-                    if let Event::PressRelease { x, y } = &gesture {
-                        telem_log(tick_count, 0x14, *x, *y);
-                        // Log settled tap to EventWindow (PointerDown may have
-                        // been missed for very fast taps)
-                        event_win.borrow_mut().push_event(
-                            t!("hw.touch", x = *x, y = *y),
-                        );
+                    let (e1, e2) = dtap.process(&gesture);
+                    for ge in [e1, e2].into_iter().flatten() {
+                        if let Event::PressRelease { x, y } = &ge {
+                            telem_log(tick_count, 0x14, *x, *y);
+                            event_win.borrow_mut().push_event(
+                                t!("hw.touch", x = *x, y = *y),
+                            );
+                        }
+                        dirty_frames = 4;
+                        root.borrow_mut().dispatch_event(&ge);
                     }
+                }
+                // Advance double-tap window timer
+                if let Some(held) = dtap.tick() {
                     dirty_frames = 4;
-                    root.borrow_mut().dispatch_event(&gesture);
+                    root.borrow_mut().dispatch_event(&held);
                 }
 
                 // (Wing clear_region handled by widget tree dispatch below)
@@ -2531,7 +2542,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     unsafe { ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); }
 
     // ── Display server main loop ─────────────────────────────────────────────
-    let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(2);
+    let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(FRAME_HZ);
+    let mut dtap2 = rlvgl::platform::gesture::DoubleTapRecognizer::new(FRAME_HZ);
     let mut frame_counter: u32 = 0;
 
     loop {
@@ -2590,7 +2602,10 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                 other => other.clone(),
             };
             if let Some(gesture) = tap2.process(&transformed) {
-                root.borrow_mut().dispatch_event(&gesture);
+                let (e1, e2) = dtap2.process(&gesture);
+                for ge in [e1, e2].into_iter().flatten() {
+                    root.borrow_mut().dispatch_event(&ge);
+                }
             }
             // Forward touch events to CM4 (primary point only for IPC)
             let ipc_evt = match &evt {
@@ -2610,6 +2625,17 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
         // 3. SysTick → render frame → notify CM4
         if cp.SYST.has_wrapped() {
+            // Advance gesture timers
+            if let Some(gesture) = tap2.tick() {
+                let (e1, e2) = dtap2.process(&gesture);
+                for ge in [e1, e2].into_iter().flatten() {
+                    root.borrow_mut().dispatch_event(&ge);
+                }
+            }
+            if let Some(held) = dtap2.tick() {
+                root.borrow_mut().dispatch_event(&held);
+            }
+
             // Heartbeat toggle on PJ6 (CN5 D9)
             unsafe {
                 const GPIOJ_ODR: *mut u32 = (0x58022400 + 0x14) as *mut u32;

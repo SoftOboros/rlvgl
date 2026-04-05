@@ -15,6 +15,7 @@ pub mod draw_helpers;
 pub mod drawer;
 pub mod event;
 pub mod event_window;
+pub mod file_browser;
 pub mod icon;
 pub mod input;
 pub mod layout;
