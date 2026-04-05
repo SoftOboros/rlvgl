@@ -1392,6 +1392,20 @@ fn main() -> ! {
         // No boot discard — splash delay removed, pins are stable by now.
         let _btn_discard: u32 = 0;
 
+        // ── Tap gesture recognizer ────────────────────────────────────────
+        // Debounces FT5336 touch bounce by waiting for the contact to
+        // stabilize before emitting a single PointerUp to the widget tree.
+        // PointerDown dispatches immediately (widgets may want press feedback).
+        struct TapState {
+            /// Pending PointerUp coords (in widget space), or None.
+            pending_up: Option<(i32, i32)>,
+            /// Settle ticks remaining before firing the pending tap.
+            settle: u8,
+        }
+        let mut tap = TapState { pending_up: None, settle: 0 };
+        /// Number of Tick cycles to wait after PointerUp before firing.
+        const TAP_SETTLE_TICKS: u8 = 2;
+
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
         let mut dirty_frames: u8 = 0;
@@ -1421,49 +1435,59 @@ fn main() -> ! {
             }
 
             // ── Poll touch ──
-            // Touch driver reports in portrait fb coords (x=0..w_fb-1, y=0..h_fb-1).
-            // Transform to landscape physical: phys_x = touch_y, phys_y = (w_fb-1) - touch_x.
+            // Touch driver reports portrait coords. Transform to widget
+            // (landscape) space: wx = touch_y, wy = w_fb - 1 - touch_x.
             if let Some(evt) = input.poll() {
                 match &evt {
-                    Event::PointerDown { x, y } | Event::PointerUp { x, y } => {
-                        serial_puts("TOUCH: DOWN\r\n");
-                        let phys_x = *y;
-                        let phys_y = w_fb as i32 - 1 - *x;
+                    Event::PointerDown { x, y } => {
+                        let wx = *y;
+                        let wy = w_fb as i32 - 1 - *x;
+                        // Log to event window
                         event_win.borrow_mut().push_event(
-                            t!("hw.touch", x = phys_x, y = phys_y),
+                            t!("hw.touch", x = wx, y = wy),
                         );
                         dirty_frames = 2;
                         evt_count += 1;
+                        // Cancel any pending tap (bounce from previous touch)
+                        tap.pending_up = None;
+                        tap.settle = 0;
+                        // Dispatch PointerDown immediately for press feedback
+                        root.borrow_mut().dispatch_event(
+                            &Event::PointerDown { x: wx, y: wy },
+                        );
+                    }
+                    Event::PointerUp { x, y } => {
+                        let wx = *y;
+                        let wy = w_fb as i32 - 1 - *x;
+                        // Don't dispatch yet — queue for settle
+                        tap.pending_up = Some((wx, wy));
+                        tap.settle = TAP_SETTLE_TICKS;
+                        dirty_frames = 2;
+                        evt_count += 1;
+                    }
+                    Event::PointerMove { x, y } => {
+                        let wx = *y;
+                        let wy = w_fb as i32 - 1 - *x;
+                        root.borrow_mut().dispatch_event(
+                            &Event::PointerMove { x: wx, y: wy },
+                        );
                     }
                     Event::Touch { count, points } => {
-                        serial_puts("TOUCH: MULTI\r\n");
                         for tp in &points[..*count as usize] {
-                            let phys_x = tp.y;
-                            let phys_y = w_fb as i32 - 1 - tp.x;
+                            let wx = tp.y;
+                            let wy = w_fb as i32 - 1 - tp.x;
                             event_win.borrow_mut().push_event(
-                                t!("hw.touch", x = phys_x, y = phys_y),
+                                t!("hw.touch", x = wx, y = wy),
                             );
                         }
                         dirty_frames = 2;
                         evt_count += 1;
+                        root.borrow_mut().dispatch_event(&evt);
                     }
-                    _ => {}
+                    other => {
+                        root.borrow_mut().dispatch_event(other);
+                    }
                 }
-                // Transform touch from driver portrait to draw/widget space:
-                // draw_x = touch_y, draw_y = w_fb - 1 - touch_x.
-                let widget_evt = match &evt {
-                    Event::PointerDown { x, y } => Event::PointerDown {
-                        x: *y, y: w_fb as i32 - 1 - *x,
-                    },
-                    Event::PointerUp { x, y } => Event::PointerUp {
-                        x: *y, y: w_fb as i32 - 1 - *x,
-                    },
-                    Event::PointerMove { x, y } => Event::PointerMove {
-                        x: *y, y: w_fb as i32 - 1 - *x,
-                    },
-                    other => other.clone(),
-                };
-                root.borrow_mut().dispatch_event(&widget_evt);
             }
 
             // ── Poll button (PC13 — the one with the pole) ──
@@ -1522,6 +1546,19 @@ fn main() -> ! {
 
             // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
+                // Fire settled tap gesture
+                if tap.settle > 0 {
+                    tap.settle -= 1;
+                    if tap.settle == 0 {
+                        if let Some((wx, wy)) = tap.pending_up.take() {
+                            root.borrow_mut().dispatch_event(
+                                &Event::PointerUp { x: wx, y: wy },
+                            );
+                            dirty_frames = 2;
+                        }
+                    }
+                }
+
                 // Dispatch Tick to age EventWindow entries
                 root.borrow_mut().dispatch_event(&Event::Tick);
 
@@ -1573,14 +1610,20 @@ fn main() -> ! {
                     }
 
                     // Restore pristine pixels under config menu when it closes
-                    if let Some(draw_rect) = config_menu.borrow_mut().take_clear_region() {
+                    if let Some(dr) = config_menu.borrow_mut().take_clear_region() {
                         // Transform draw coords to fb coords:
                         // fb_x = w - draw_y - draw_h, fb_y = draw_x
-                        let fb_x = (w as i32 - draw_rect.y - draw_rect.height) as u32;
-                        let fb_y = draw_rect.x as u32;
-                        let fb_w = draw_rect.height as u32;
-                        let fb_h = draw_rect.width as u32;
+                        let fb_x = ((w as i32 - dr.y - dr.height).max(0) as u32).min(w - 1);
+                        let fb_y = (dr.x.max(0) as u32).min(h - 1);
+                        let fb_w = (dr.height as u32).min(w - fb_x);
+                        let fb_h = (dr.width as u32).min(h - fb_y);
                         unsafe {
+                            (0x3800_0650u32 as *mut u32).write_volatile(
+                                ((fb_x as u32) << 16) | fb_y as u32
+                            );
+                            (0x3800_0654u32 as *mut u32).write_volatile(
+                                ((fb_w as u32) << 16) | fb_h as u32
+                            );
                             for row in 0..fb_h {
                                 let y = fb_y + row;
                                 let off = y as usize * stride + fb_x as usize * 4;

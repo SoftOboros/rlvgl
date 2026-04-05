@@ -30,8 +30,6 @@ pub struct ConfigMenu {
     pending: u8,
     /// Number of frames to keep redrawing after visibility change.
     dirty_frames: u8,
-    /// Debounce counter: ignore PointerUp events until this reaches 0.
-    debounce: u8,
     /// Callback invoked when the selected locale is applied.
     on_change: Option<Box<dyn FnMut(u8)>>,
     /// Last received touch coords (for debug display).
@@ -81,7 +79,6 @@ impl ConfigMenu {
             applied: initial_locale,
             pending: initial_locale,
             dirty_frames: 0,
-            debounce: 0,
             on_change: None,
             last_touch: None,
             gear_pixels: Vec::new(),
@@ -184,7 +181,6 @@ impl ConfigMenu {
         if self.visible {
             self.clear_bounds = Some(self.panel_bounds());
             self.clear_countdown = 3;
-            self.debounce = 4; // block gear reopen from touch bounce
         }
         self.visible = false;
     }
@@ -396,18 +392,8 @@ impl Widget for ConfigMenu {
         if let Event::PointerUp { x, y } = event {
             self.last_touch = Some((*x, *y));
 
-            // Debounce: skip PointerUp events after a close action
-            if self.debounce > 0 {
-                self.debounce -= 1;
-                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                unsafe { (0x3800_064Cu32 as *mut u32).write_volatile(0xB0CE_0000 | self.debounce as u32); }
-                return true;
-            }
-
             // Gear icon tap: toggle menu
             if Self::inside(self.gear_bounds, *x, *y) {
-                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                unsafe { (0x3800_064Cu32 as *mut u32).write_volatile(0x6EA2_0000 | self.visible as u32); }
                 self.visible = !self.visible;
                 if self.visible {
                     self.pending = self.applied;
