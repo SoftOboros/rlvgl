@@ -1073,6 +1073,48 @@ fn main() -> ! {
                 Err(embedded_hal::i2c::ErrorKind::Other)
             }
         }
+        // ── Audio codec init (before touch claims I2C4) ──
+        #[cfg(feature = "audio")]
+        let i2c4 = {
+            use rlvgl::platform::{Sai1Audio, Wm8994};
+
+            // SAI1 peripheral clock + kernel clock source = PLL2_P
+            let sai = Sai1Audio::new();
+            sai.enable_clock(1); // 1 = PLL2_P
+
+            // SAI1 GPIO pins (AF6, VeryHigh speed)
+            let _sai1_mclk = gpiog.pg7.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sck  = gpioe.pe5.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_fs   = gpioe.pe4.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sd_a = gpioe.pe6.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sd_b = gpioe.pe3.into_alternate::<6>().speed(Speed::VeryHigh);
+
+            // Configure SAI1 sub-block A as I2S master TX
+            // MCKDIV=0 means /1; the WM8994 FLL handles exact audio frequency
+            sai.configure_tx(0);
+
+            // Init WM8994 codec over I2C4 (temporary ownership, then release)
+            let codec_i2c = HalI2c(i2c4);
+            let mut codec = Wm8994::new(codec_i2c);
+            // init_playback performs a software reset, verifies chip ID,
+            // configures FLL for exact audio clocking, and sets up DAC routing.
+            // PLL2_P provides the SAI1 kernel clock; MCKDIV=0 means MCLK = kernel_ck.
+            // The WM8994 FLL locks to whatever MCLK we provide.
+            let _ = codec.init_playback(
+                48_000,
+                150_000_000, // approximate MCLK from PLL2_P
+                rlvgl::platform::wm8994::OutputDevice::Headphone,
+            );
+
+            // Enable SAI1 TX — codec is now receiving I2S frames
+            sai.enable_tx();
+
+            // Release I2C4 back so touch can use it
+            codec.release().0
+        };
+        #[cfg(not(feature = "audio"))]
+        let i2c4 = i2c4;
+
         let touch_i2c = HalI2c(i2c4);
         let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
         let mut input = Stm32h747iDiscoInput::new_with_int(touch_i2c, touch_int);

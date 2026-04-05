@@ -285,6 +285,7 @@ syn = { version = "2", features = ["full"] }
 [features]
 default = []
 regression = []
+audio = ["rlvgl-platform/audio"]
 dma2d = ["rlvgl-platform/dma2d"]
 hal_sdram = ["dep:stm32-fmc"]
 sdram_ramtest = ["rlvgl-platform/sdram_ramtest"]

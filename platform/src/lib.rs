@@ -64,6 +64,22 @@ pub mod qspi_flash;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub mod stm32h747i_disco_sd;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// SAI1 serial audio interface driver for I2S playback/recording.
+#[allow(dead_code)]
+pub mod sai;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// WM8994 audio codec driver (I2C control, headphone/speaker output).
+#[allow(dead_code)]
+pub mod wm8994;
 #[cfg(feature = "simulator")]
 pub mod wgpu_blitter;
 
@@ -80,6 +96,18 @@ pub use dma2d::Dma2dBlitter;
 ))]
 pub use ft5336::Ft5336;
 pub use input::{InputDevice, InputEvent};
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use sai::Sai1Audio;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use wm8994::Wm8994;
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
 pub use rlvgl_core::event::Key;
