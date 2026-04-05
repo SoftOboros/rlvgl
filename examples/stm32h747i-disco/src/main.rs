@@ -1118,6 +1118,10 @@ fn main() -> ! {
             // Enable SAI1 TX — codec is now receiving I2S frames
             sai.enable_tx();
 
+            // ── SAI4 PDM microphone GPIO (PE2=SAI4_CK1, PC1=SAI4_D1, AF10) ──
+            let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
+            let _sai4_d1  = gpioc.pc1.into_alternate::<10>();
+
             // Release I2C4 back so touch can use it
             codec.release().0
         };

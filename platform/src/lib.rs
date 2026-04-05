@@ -107,6 +107,34 @@ pub mod dma_sai;
 ))]
 /// Audio player state machine with DMA double-buffering.
 pub mod audio_player;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// SAI4 PDM interface driver for onboard MP34DT05-A MEMS digital microphone.
+pub mod sai4_pdm;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// BDMA driver for SAI4 PDM capture (D3 domain, SRAM4 buffers).
+pub mod bdma;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// CIC decimation filter for PDM-to-PCM conversion.
+pub mod pdm_filter;
+#[cfg(all(
+    feature = "audio",
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// High-level microphone capture API (SAI4 PDM + BDMA + CIC filter).
+pub mod mic_capture;
 #[cfg(feature = "simulator")]
 pub mod wgpu_blitter;
 
