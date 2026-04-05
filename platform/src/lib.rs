@@ -29,6 +29,8 @@ pub mod input;
 /// NT35510 MIPI-DSI panel driver for MB1166 Rev A-09.
 pub mod nt35510;
 #[cfg(feature = "simulator")]
+pub mod app_loader;
+#[cfg(feature = "simulator")]
 pub mod pixels_renderer;
 #[cfg(all(
     feature = "stm32h747i_disco",
@@ -80,6 +82,8 @@ pub use dma2d::Dma2dBlitter;
 ))]
 pub use ft5336::Ft5336;
 pub use input::{InputDevice, InputEvent};
+#[cfg(feature = "simulator")]
+pub use app_loader::LoadedApp;
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
 pub use rlvgl_core::event::Key;

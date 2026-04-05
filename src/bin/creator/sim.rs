@@ -9,10 +9,6 @@ use clap::Args;
 use std::fs;
 
 #[cfg(feature = "simulator")]
-#[path = "../../../examples/common_demo/lib.rs"]
-mod common_demo;
-
-#[cfg(feature = "simulator")]
 const DEFAULT_HEADLESS_PATH: &str = "headless.txt";
 
 /// CLI arguments for the simulator runner.
@@ -49,16 +45,19 @@ pub(crate) struct SimArgs {
 
 #[cfg(feature = "simulator")]
 pub(crate) fn run(args: SimArgs) -> Result<()> {
+    use rlvgl::core::application::Application;
+    use rlvgl::core::event::Event;
     use rlvgl::platform::{
         BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Surface, WgpuBlitter,
         WgpuDisplay,
     };
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     let (width, height) = parse_screen(&args.screen)?;
-    let demo = common_demo::build_demo(width as i32, height as i32);
-    let root = demo.root.clone();
-    let pending = demo.pending.clone();
-    let to_remove = demo.to_remove.clone();
+    let mut app = rlvgl_app_demo::create_app();
+    let root_node = app.build(width, height);
+    let root = Rc::new(RefCell::new(root_node));
 
     if args.headless {
         // In headless mode, start with a blank scene to keep output deterministic.
@@ -69,25 +68,25 @@ pub(crate) fn run(args: SimArgs) -> Result<()> {
         #[cfg(feature = "qrcode")]
         root.borrow_mut()
             .children
-            .push(common_demo::build_plugin_demo(width, height));
+            .push(rlvgl_app_demo::build_plugin_demo(width, height));
     }
     if args.png {
         #[cfg(feature = "png")]
         root.borrow_mut()
             .children
-            .push(common_demo::build_png_demo(width, height));
+            .push(rlvgl_app_demo::build_png_demo(width, height));
     }
     if args.gif {
         #[cfg(feature = "gif")]
         root.borrow_mut()
             .children
-            .push(common_demo::build_gif_demo(width, height));
+            .push(rlvgl_app_demo::build_gif_demo(width, height));
     }
     if args.jpeg {
         #[cfg(feature = "jpeg")]
         root.borrow_mut()
             .children
-            .push(common_demo::build_jpeg_demo(width, height));
+            .push(rlvgl_app_demo::build_jpeg_demo(width, height));
     }
 
     let frame_cb = {
@@ -121,8 +120,10 @@ pub(crate) fn run(args: SimArgs) -> Result<()> {
         }
     };
 
+    // Initial flush.
+    app.after_event(&root, &Event::Tick);
+
     if args.headless {
-        common_demo::flush_pending(&root, &pending, &to_remove);
         let mut frame = vec![0u8; width as usize * height as usize * 4];
         frame_cb(&mut frame, width as usize, height as usize);
         let ascii = dump_ascii_frame(&frame, width as usize, height as usize);
@@ -134,7 +135,6 @@ pub(crate) fn run(args: SimArgs) -> Result<()> {
     }
 
     if let Some(path) = args.out {
-        common_demo::flush_pending(&root, &pending, &to_remove);
         WgpuDisplay::headless(
             width as usize,
             height as usize,
@@ -145,14 +145,13 @@ pub(crate) fn run(args: SimArgs) -> Result<()> {
         return Ok(());
     }
 
-    common_demo::flush_pending(&root, &pending, &to_remove);
+    let app = Rc::new(RefCell::new(app));
     WgpuDisplay::new(width as usize, height as usize).run(frame_cb, {
         let root = root.clone();
-        let pending = pending.clone();
-        let to_remove = to_remove.clone();
+        let app = app.clone();
         move |evt: InputEvent| {
             root.borrow_mut().dispatch_event(&evt);
-            common_demo::flush_pending(&root, &pending, &to_remove);
+            app.borrow_mut().after_event(&root, &evt);
         }
     });
 
