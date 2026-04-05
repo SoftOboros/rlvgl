@@ -1249,6 +1249,14 @@ fn main() -> ! {
             children: alloc::vec![],
         });
 
+        let mut render_blitter = CpuBlitter;
+
+        // ── Fix double-buffering ──────────────────────────────────────────
+        // The sdram_alloc may have given both framebuffers the same address.
+        // Force a second buffer at a known SDRAM offset and copy the front
+        // buffer into it.
+        let (w_fb, h_fb) = display.dimensions();
+
         // ── Settings gear icon (upper-right, 10px margin) ────────────────
         {
             use rlvgl::ui::ConfigMenu;
@@ -1256,7 +1264,14 @@ fn main() -> ! {
 
             let gear = Rc::new(RefCell::new(
                 ConfigMenu::new(
-                    Rect { x: 440, y: 10, width: 30, height: 30 },
+                    // Upper-right of landscape in draw/widget coords:
+                    // x = long axis (0..h_fb), y = short axis (0..w_fb).
+                    Rect {
+                        x: h_fb as i32 - 60 - 10,
+                        y: 10,
+                        width: 60,
+                        height: 60,
+                    },
                     rlvgl_i18n::locale() as u8,
                 )
                 .on_change(|idx| {
@@ -1271,14 +1286,6 @@ fn main() -> ! {
                 children: alloc::vec![],
             });
         }
-
-        let mut render_blitter = CpuBlitter;
-
-        // ── Fix double-buffering ──────────────────────────────────────────
-        // The sdram_alloc may have given both framebuffers the same address.
-        // Force a second buffer at a known SDRAM offset and copy the front
-        // buffer into it.
-        let (w_fb, h_fb) = display.dimensions();
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
         if display.back_buffer_addr() == display.front_buffer_addr() {
@@ -1387,14 +1394,14 @@ fn main() -> ! {
             }
 
             // ── Poll touch ──
-            // Touch driver reports in portrait fb coords (x=0..479, y=0..799).
-            // Transform to landscape physical: phys_x = touch_y, phys_y = 479 - touch_x.
+            // Touch driver reports in portrait fb coords (x=0..w_fb-1, y=0..h_fb-1).
+            // Transform to landscape physical: phys_x = touch_y, phys_y = (w_fb-1) - touch_x.
             if let Some(evt) = input.poll() {
                 match &evt {
-                    Event::PointerDown { x, y } => {
+                    Event::PointerDown { x, y } | Event::PointerUp { x, y } => {
                         serial_puts("TOUCH: DOWN\r\n");
                         let phys_x = *y;
-                        let phys_y = 479 - *x;
+                        let phys_y = w_fb as i32 - 1 - *x;
                         event_win.borrow_mut().push_event(
                             t!("hw.touch", x = phys_x, y = phys_y),
                         );
@@ -1405,7 +1412,7 @@ fn main() -> ! {
                         serial_puts("TOUCH: MULTI\r\n");
                         for tp in &points[..*count as usize] {
                             let phys_x = tp.y;
-                            let phys_y = 479 - tp.x;
+                            let phys_y = w_fb as i32 - 1 - tp.x;
                             event_win.borrow_mut().push_event(
                                 t!("hw.touch", x = phys_x, y = phys_y),
                             );
@@ -1415,7 +1422,21 @@ fn main() -> ! {
                     }
                     _ => {}
                 }
-                root.borrow_mut().dispatch_event(&evt);
+                // Transform touch from driver portrait to draw/widget space:
+                // draw_x = touch_y, draw_y = w_fb - 1 - touch_x.
+                let widget_evt = match &evt {
+                    Event::PointerDown { x, y } => Event::PointerDown {
+                        x: *y, y: w_fb as i32 - 1 - *x,
+                    },
+                    Event::PointerUp { x, y } => Event::PointerUp {
+                        x: *y, y: w_fb as i32 - 1 - *x,
+                    },
+                    Event::PointerMove { x, y } => Event::PointerMove {
+                        x: *y, y: w_fb as i32 - 1 - *x,
+                    },
+                    other => other.clone(),
+                };
+                root.borrow_mut().dispatch_event(&widget_evt);
             }
 
             // ── Poll button (PC13 — the one with the pole) ──
@@ -2112,7 +2133,19 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
         // 2. Poll touch → dispatch to widget tree → forward to CM4
         if let Some(evt) = input.poll() {
-            root.borrow_mut().dispatch_event(&evt);
+            let widget_evt = match &evt {
+                Event::PointerDown { x, y } => Event::PointerDown {
+                    x: *y, y: w_fb as i32 - 1 - *x,
+                },
+                Event::PointerUp { x, y } => Event::PointerUp {
+                    x: *y, y: w_fb as i32 - 1 - *x,
+                },
+                Event::PointerMove { x, y } => Event::PointerMove {
+                    x: *y, y: w_fb as i32 - 1 - *x,
+                },
+                other => other.clone(),
+            };
+            root.borrow_mut().dispatch_event(&widget_evt);
             // Forward touch events to CM4 (primary point only for IPC)
             let ipc_evt = match &evt {
                 Event::PointerDown { x, y } => Some(ipc::evt_pointer_down(*x, *y)),
