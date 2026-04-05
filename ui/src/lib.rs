@@ -37,7 +37,7 @@ pub use drawer::Drawer;
 pub use event::{OnClick, Slider};
 pub use icon::{Icon, lookup};
 pub use input::{Input, Textarea};
-pub use layout::{BoxLayout, Grid, HStack, VStack};
+pub use layout::{BoxLayout, Grid, GridCalc, HStack, VStack};
 pub use modal::Modal;
 pub use radio::Radio;
 pub use rlvgl_widgets::button::Button;

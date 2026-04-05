@@ -13,6 +13,36 @@ use rlvgl::core::event::Event;
 use rlvgl::core::renderer::Renderer;
 use rlvgl::core::widget::{Color, Rect, Widget};
 use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl::ui::GridCalc;
+
+// ── D3 SRAM debug slots (readable via probe-rs) ──────────────────
+// ConfigMenu writes to 0x3800_0640..0x3800_066F for live debugging.
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+mod d3 {
+    // Touch coordinates captured while panel is open
+    pub const TOUCH_X: *mut u32 = 0x3800_0640 as *mut u32;
+    pub const TOUCH_Y: *mut u32 = 0x3800_0644 as *mut u32;
+    // Action code identifying which UI element was hit
+    pub const HIT_CODE: *mut u32 = 0x3800_0648 as *mut u32;
+    // Clear-countdown state on menu close
+    pub const CLEAR_STATE: *mut u32 = 0x3800_0658 as *mut u32;
+    // Menu visibility toggle event
+    pub const VISIBILITY: *mut u32 = 0x3800_065C as *mut u32;
+    // PressRelease event counter + last coords + visible state
+    pub const EVENT_COUNT: *mut u32 = 0x3800_0660 as *mut u32;
+    pub const LAST_X: *mut u32 = 0x3800_0664 as *mut u32;
+    pub const LAST_Y: *mut u32 = 0x3800_0668 as *mut u32;
+    pub const MENU_VIS: *mut u32 = 0x3800_066C as *mut u32;
+
+    // Action-code sentinels written to HIT_CODE
+    pub const ACT_CLOSE: u32 = 0xC105_E000;
+    pub const ACT_OK: u32 = 0x0000_0111;
+    pub const ACT_CANCEL: u32 = 0x0CAA_CE10;
+    pub const ACT_ENGLISH: u32 = 0xE000_0000;
+    pub const ACT_FRENCH: u32 = 0xF000_0001;
+    pub const ACT_OUTSIDE: u32 = 0x0000_DEAD;
+    pub const ACT_MISS: u32 = 0xFFFF_FFFF;
+}
 
 /// A self-contained settings menu widget.
 pub struct ConfigMenu {
@@ -30,8 +60,16 @@ pub struct ConfigMenu {
     pending: u8,
     /// Number of frames to keep redrawing after visibility change.
     dirty_frames: u8,
-    /// Callback invoked when the selected locale is applied.
+    /// Callback invoked when the selected locale is applied (OK).
     on_change: Option<Box<dyn FnMut(u8)>>,
+    /// Callback invoked when the pending locale changes (live preview).
+    on_preview: Option<Box<dyn FnMut(u8)>>,
+    /// Whether the event viewer is enabled (applied state).
+    event_viewer_applied: bool,
+    /// Pending event viewer state (may differ while menu is open).
+    event_viewer_pending: bool,
+    /// Callback invoked when the event viewer setting is applied (OK).
+    on_event_viewer_change: Option<Box<dyn FnMut(bool)>>,
     /// Last received touch coords (for debug display).
     last_touch: Option<(i32, i32)>,
     /// Pre-decoded gear icon pixels (RGBA → Color), or empty if not provided.
@@ -48,7 +86,7 @@ pub struct ConfigMenu {
 
 // Layout constants for the config panel.
 const PANEL_W: i32 = 340;
-const PANEL_H: i32 = 280;
+const PANEL_H: i32 = 340;
 const PANEL_RADIUS: u8 = 10;
 const PANEL_PADDING: i32 = 16;
 const CHECK_SIZE: i32 = 24;
@@ -80,6 +118,10 @@ impl ConfigMenu {
             pending: initial_locale,
             dirty_frames: 0,
             on_change: None,
+            on_preview: None,
+            event_viewer_applied: true,
+            event_viewer_pending: true,
+            on_event_viewer_change: None,
             last_touch: None,
             gear_pixels: Vec::new(),
             gear_icon_size: (0, 0),
@@ -134,6 +176,25 @@ impl ConfigMenu {
         self
     }
 
+    /// Attach a callback invoked when the pending locale changes (live preview).
+    pub fn on_preview<F: FnMut(u8) + 'static>(mut self, handler: F) -> Self {
+        self.on_preview = Some(Box::new(handler));
+        self
+    }
+
+    /// Set the initial event viewer enabled state (default: true).
+    pub fn event_viewer_default(mut self, enabled: bool) -> Self {
+        self.event_viewer_applied = enabled;
+        self.event_viewer_pending = enabled;
+        self
+    }
+
+    /// Attach a callback invoked when the event viewer setting is applied (OK).
+    pub fn on_event_viewer_change<F: FnMut(bool) + 'static>(mut self, handler: F) -> Self {
+        self.on_event_viewer_change = Some(Box::new(handler));
+        self
+    }
+
     /// The panel rect: 10px below the gear, right edge at gear's left edge.
     fn panel_bounds(&self) -> Rect {
         Rect {
@@ -155,15 +216,19 @@ impl ConfigMenu {
         }
     }
 
-    /// Checkbox row bounds within the panel (below title bar).
-    fn checkbox_row(&self, index: i32) -> Rect {
+    /// Grid calculator for the content area below the title bar.
+    ///
+    /// Single-column grid with rows of `ROW_HEIGHT`. Row indices:
+    ///   0 = English, 1 = Français, 2 = (separator), 3 = Event Viewer.
+    fn content_grid(&self) -> GridCalc {
         let panel = self.panel_bounds();
-        Rect {
-            x: panel.x + PANEL_PADDING,
-            y: panel.y + TITLE_HEIGHT + PANEL_PADDING + index * ROW_HEIGHT,
-            width: PANEL_W - 2 * PANEL_PADDING,
-            height: ROW_HEIGHT,
-        }
+        GridCalc::new(
+            panel.x + PANEL_PADDING,
+            panel.y + TITLE_HEIGHT + PANEL_PADDING,
+            1,
+            PANEL_W - 2 * PANEL_PADDING,
+            ROW_HEIGHT,
+        )
     }
 
     /// OK button bounds.
@@ -198,7 +263,7 @@ impl ConfigMenu {
             self.clear_bounds = Some(self.panel_bounds());
             self.clear_countdown = 3;
             #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-            unsafe { (0x3800_0658u32 as *mut u32).write_volatile(0xD0_000000 | self.clear_countdown as u32); }
+            unsafe { d3::CLEAR_STATE.write_volatile(0xD0_000000 | self.clear_countdown as u32); }
         }
         self.visible = false;
     }
@@ -207,6 +272,18 @@ impl ConfigMenu {
     fn fire_on_change(&mut self) {
         if let Some(cb) = self.on_change.as_mut() {
             cb(self.applied);
+        }
+    }
+
+    fn fire_on_preview(&mut self) {
+        if let Some(cb) = self.on_preview.as_mut() {
+            cb(self.pending);
+        }
+    }
+
+    fn fire_on_event_viewer_change(&mut self) {
+        if let Some(cb) = self.on_event_viewer_change.as_mut() {
+            cb(self.event_viewer_applied);
         }
     }
 
@@ -364,8 +441,18 @@ impl Widget for ConfigMenu {
         }
 
         // Language checkboxes
-        Self::draw_checkbox(renderer, self.font, self.checkbox_row(0), "English", self.pending == 0);
-        Self::draw_checkbox(renderer, self.font, self.checkbox_row(1), "Francais", self.pending == 1);
+        Self::draw_checkbox(renderer, self.font, self.content_grid().cell(0, 0), "English", self.pending == 0);
+        Self::draw_checkbox(renderer, self.font, self.content_grid().cell(1, 0), "Francais", self.pending == 1);
+
+        // Separator line between language and options sections
+        let sep_y = self.content_grid().cell(2, 0).y + ROW_HEIGHT / 2;
+        renderer.fill_rect(
+            Rect { x: panel.x + PANEL_PADDING, y: sep_y, width: PANEL_W - 2 * PANEL_PADDING, height: 1 },
+            BORDER_COLOR,
+        );
+
+        // Event Viewer toggle
+        Self::draw_checkbox(renderer, self.font, self.content_grid().cell(3, 0), "Event Viewer", self.event_viewer_pending);
 
         // OK / Cancel buttons
         Self::draw_button(renderer, self.font, self.ok_bounds(), "OK", BTN_OK_BG);
@@ -375,8 +462,9 @@ impl Widget for ConfigMenu {
         draw_border(renderer, self.close_bounds(), Color(255, 0, 0, 255), 1);
         draw_border(renderer, self.ok_bounds(), Color(0, 255, 0, 255), 1);
         draw_border(renderer, self.cancel_bounds(), Color(255, 255, 0, 255), 1);
-        draw_border(renderer, self.checkbox_row(0), Color(0, 255, 255, 255), 1);
-        draw_border(renderer, self.checkbox_row(1), Color(255, 0, 255, 255), 1);
+        draw_border(renderer, self.content_grid().cell(0, 0), Color(0, 255, 255, 255), 1);
+        draw_border(renderer, self.content_grid().cell(1, 0), Color(255, 0, 255, 255), 1);
+        draw_border(renderer, self.content_grid().cell(3, 0), Color(0, 255, 255, 255), 1);
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
@@ -393,20 +481,21 @@ impl Widget for ConfigMenu {
             // Log every PressRelease received by config menu
             #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
             unsafe {
-                let prev = (0x3800_0660u32 as *const u32).read_volatile();
-                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1)); // count
-                (0x3800_0664u32 as *mut u32).write_volatile(*x as u32); // last x
-                (0x3800_0668u32 as *mut u32).write_volatile(*y as u32); // last y
-                (0x3800_066Cu32 as *mut u32).write_volatile(self.visible as u32); // visible
+                let prev = d3::EVENT_COUNT.read_volatile();
+                d3::EVENT_COUNT.write_volatile(prev.wrapping_add(1));
+                d3::LAST_X.write_volatile(*x as u32);
+                d3::LAST_Y.write_volatile(*y as u32);
+                d3::MENU_VIS.write_volatile(self.visible as u32);
             }
 
             // Gear icon tap: toggle menu
             if Self::inside(self.gear_bounds, *x, *y) {
                 self.visible = !self.visible;
                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                unsafe { (0x3800_065Cu32 as *mut u32).write_volatile(0x6E_000000 | self.visible as u32); }
+                unsafe { d3::VISIBILITY.write_volatile(0x6E_000000 | self.visible as u32); }
                 if self.visible {
                     self.pending = self.applied;
+                    self.event_viewer_pending = self.event_viewer_applied;
                 }
                 self.dirty_frames = 2;
                 return true;
@@ -416,15 +505,17 @@ impl Widget for ConfigMenu {
                 // Write touch coords + hit result to D3 SRAM for probe-rs
                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
                 unsafe {
-                    (0x3800_0640u32 as *mut u32).write_volatile(*x as u32);
-                    (0x3800_0644u32 as *mut u32).write_volatile(*y as u32);
+                    d3::TOUCH_X.write_volatile(*x as u32);
+                    d3::TOUCH_Y.write_volatile(*y as u32);
                 }
 
                 // Close X
                 if Self::inside(self.close_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xC105_E000); }
+                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_CLOSE); }
                     self.pending = self.applied;
+                    self.fire_on_preview();
+                    self.event_viewer_pending = self.event_viewer_applied;
                     self.close_menu();
                     self.dirty_frames = 2;
                     return true;
@@ -433,10 +524,14 @@ impl Widget for ConfigMenu {
                 // OK button — apply and close
                 if Self::inside(self.ok_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0x0000_0111); }
+                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_OK); }
                     if self.pending != self.applied {
                         self.applied = self.pending;
                         self.fire_on_change();
+                    }
+                    if self.event_viewer_pending != self.event_viewer_applied {
+                        self.event_viewer_applied = self.event_viewer_pending;
+                        self.fire_on_event_viewer_change();
                     }
                     self.close_menu();
                     self.dirty_frames = 2;
@@ -446,27 +541,38 @@ impl Widget for ConfigMenu {
                 // Cancel button — revert and close
                 if Self::inside(self.cancel_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xCAA_CE100); }
+                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_CANCEL); }
                     self.pending = self.applied;
+                    self.fire_on_preview();
+                    self.event_viewer_pending = self.event_viewer_applied;
                     self.close_menu();
                     self.dirty_frames = 2;
                     return true;
                 }
 
                 // English checkbox
-                if Self::inside(self.checkbox_row(0), *x, *y) {
+                if Self::inside(self.content_grid().cell(0, 0), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xE000_0000); }
+                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_ENGLISH); }
                     self.pending = 0;
+                    self.fire_on_preview();
                     self.dirty_frames = 2;
                     return true;
                 }
 
                 // French checkbox
-                if Self::inside(self.checkbox_row(1), *x, *y) {
+                if Self::inside(self.content_grid().cell(1, 0), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xF000_0001); }
+                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_FRENCH); }
                     self.pending = 1;
+                    self.fire_on_preview();
+                    self.dirty_frames = 2;
+                    return true;
+                }
+
+                // Event Viewer checkbox (toggle)
+                if Self::inside(self.content_grid().cell(3, 0), *x, *y) {
+                    self.event_viewer_pending = !self.event_viewer_pending;
                     self.dirty_frames = 2;
                     return true;
                 }
@@ -474,8 +580,10 @@ impl Widget for ConfigMenu {
                 // Tap outside panel: cancel
                 if !Self::inside(self.panel_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0x0000_DEAD); }
+                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_OUTSIDE); }
                     self.pending = self.applied;
+                    self.fire_on_preview();
+                    self.event_viewer_pending = self.event_viewer_applied;
                     self.close_menu();
                     self.dirty_frames = 2;
                     return true;
@@ -483,7 +591,7 @@ impl Widget for ConfigMenu {
 
                 // Inside panel but no specific hit
                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xFFFF_FFFF); }
+                unsafe { d3::HIT_CODE.write_volatile(d3::ACT_MISS); }
 
                 return true;
             }

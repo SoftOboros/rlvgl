@@ -1339,6 +1339,7 @@ fn main() -> ! {
             };
 
             // Settings icon is at slot 0: (730, 17, 60, 60)
+            let event_win_for_cfg = event_win.clone();
             let gear = Rc::new(RefCell::new(
                 ConfigMenu::new(
                     Rect { x: 730, y: 17, width: 60, height: 60 },
@@ -1349,6 +1350,13 @@ fn main() -> ! {
                 .on_change(|idx| {
                     let locale = rlvgl_i18n::locale_from_u8(idx);
                     rlvgl_i18n::set_locale(locale);
+                })
+                .on_preview(|idx| {
+                    let locale = rlvgl_i18n::locale_from_u8(idx);
+                    rlvgl_i18n::set_locale(locale);
+                })
+                .on_event_viewer_change(move |enabled| {
+                    event_win_for_cfg.borrow_mut().set_enabled(enabled);
                 }),
             ));
 
