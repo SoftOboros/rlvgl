@@ -1202,11 +1202,33 @@ fn main() -> ! {
             EventWindowBuilder::new(&FONT_6X10).build(),
         ));
 
-        // Add as LAST child so it draws on top of everything
         root.borrow_mut().children.push(rlvgl::core::WidgetNode {
             widget: event_win.clone(),
             children: alloc::vec![],
         });
+
+        // ── Settings gear icon (upper-right, 10px margin) ────────────────
+        {
+            use rlvgl::ui::ConfigMenu;
+            use rlvgl::core::widget::Rect;
+
+            let gear = Rc::new(RefCell::new(
+                ConfigMenu::new(
+                    Rect { x: 440, y: 10, width: 30, height: 30 },
+                    rlvgl_i18n::locale() as u8,
+                )
+                .on_change(|idx| {
+                    let locale = rlvgl_i18n::locale_from_u8(idx);
+                    rlvgl_i18n::set_locale(locale);
+                }),
+            ));
+
+            // Add as LAST child so it draws on top of everything
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: gear,
+                children: alloc::vec![],
+            });
+        }
 
         let mut render_blitter = CpuBlitter;
 
