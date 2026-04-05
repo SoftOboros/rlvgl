@@ -99,6 +99,12 @@ impl ConfigMenu {
         self.clear_countdown > 0
     }
 
+    /// Return the full region that was covered when the menu was last open.
+    /// Includes the panel bounds (not just the gear).
+    pub fn last_panel_bounds(&self) -> Option<Rect> {
+        self.clear_bounds
+    }
+
     /// Set the gear icon from pre-decoded RGBA pixel data.
     ///
     /// `rgba` is a flat `[R, G, B, A, ...]` byte slice. Pixels with alpha == 0
@@ -128,11 +134,11 @@ impl ConfigMenu {
         self
     }
 
-    /// The panel rect, anchored below and left-aligned with the gear's right edge.
+    /// The panel rect: 10px below the gear, right edge at gear's left edge.
     fn panel_bounds(&self) -> Rect {
         Rect {
-            x: self.gear_bounds.x + self.gear_bounds.width - PANEL_W,
-            y: self.gear_bounds.y + self.gear_bounds.height + 6,
+            x: self.gear_bounds.x - PANEL_W,
+            y: self.gear_bounds.y + self.gear_bounds.height + 10,
             width: PANEL_W,
             height: PANEL_H,
         }

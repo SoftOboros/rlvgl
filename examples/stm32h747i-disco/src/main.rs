@@ -1291,11 +1291,12 @@ fn main() -> ! {
                 ConfigMenu::new(
                     // Upper-right of landscape in draw/widget coords:
                     // x = long axis (0..h_fb), y = short axis (0..w_fb).
+                    // Gear hit area: 80×80 in upper-right corner
                     Rect {
-                        x: h_fb as i32 - 60 - 10,
-                        y: 10,
-                        width: 60,
-                        height: 60,
+                        x: h_fb as i32 - 80,
+                        y: 0,
+                        width: 80,
+                        height: 80,
                     },
                     rlvgl_i18n::locale() as u8,
                     &FONT_6X10,
@@ -1436,9 +1437,10 @@ fn main() -> ! {
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
 
-        // Compositor: restores pristine background under dismissed overlays.
+        // Save-under compositor: saves fb pixels when overlays open,
+        // restores when they close.
         use rlvgl::platform::compositor::Compositor;
-        let mut compositor = Compositor::new(DESKTOP_PRISTINE, w_fb, h_fb);
+        let mut compositor = Compositor::new(w_fb, h_fb, DESKTOP_PRISTINE);
 
         // Event counter written to D3 SRAM for probe-rs inspection
         let mut evt_count: u32 = 0;
@@ -1464,6 +1466,7 @@ fn main() -> ! {
                         event_win.borrow_mut().push_event(
                             t!("hw.touch", x = *x, y = *y),
                         );
+                        dirty_frames = dirty_frames.max(2);
                         evt_count += 1;
                     }
                     Event::PointerUp { x, y } => {
@@ -1565,9 +1568,30 @@ fn main() -> ! {
                 // - visibility transition (show or hide)
                 // - entry count changed (new event or expiry)
                 // - dirty_frames > 0 (second buffer needs sync)
+                // Track overlay visibility transitions — restore from
+                // pristine desktop when overlays hide.
+                use rlvgl::core::widget::Widget as _;
                 if vis != was_visible {
-                    dirty_frames = 2; // sync both buffers
+                    dirty_frames = 4;
+                    if !vis {
+                        // EventWindow just hid — restore from pristine
+                        compositor.mark_pristine_restore(event_win.borrow().bounds());
+                    }
                     was_visible = vis;
+                }
+                let cm_vis = config_menu.borrow().is_visible();
+                static mut CM_WAS_VISIBLE: bool = false;
+                if cm_vis != unsafe { CM_WAS_VISIBLE } {
+                    dirty_frames = 4;
+                    if !cm_vis {
+                        // ConfigMenu just hid — restore panel region from pristine
+                        if let Some(panel) = config_menu.borrow().last_panel_bounds() {
+                            compositor.mark_pristine_restore(panel);
+                        }
+                        // Also restore gear area (it was part of the visible bounds)
+                        compositor.mark_pristine_restore(config_menu.borrow().bounds());
+                    }
+                    unsafe { CM_WAS_VISIBLE = cm_vis; }
                 }
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
@@ -1575,6 +1599,10 @@ fn main() -> ! {
                 if ec != unsafe { LAST_ENTRY_COUNT } {
                     unsafe { LAST_ENTRY_COUNT = ec; }
                     dirty_frames = 2;
+                }
+                // Keep rendering while restores are pending
+                if compositor.has_pending() {
+                    dirty_frames = dirty_frames.max(2);
                 }
                 let need_render = dirty_frames > 0;
 
@@ -1584,16 +1612,8 @@ fn main() -> ! {
                     let fb_bytes = (w * h * 4) as usize;
                     let stride = (w * 4) as usize;
 
-                    // Collect clear regions from overlays that just hid
-                    use rlvgl::core::widget::Widget as _;
-                    if let Some(r) = event_win.borrow_mut().clear_region() {
-                        compositor.mark_dirty(r);
-                    }
-                    if let Some(r) = config_menu.borrow_mut().clear_region() {
-                        compositor.mark_dirty(r);
-                    }
-                    // Restore pristine background under dismissed overlays
-                    unsafe { compositor.restore(back as *mut u8); }
+                    // Restore saved pixels under dismissed overlays
+                    compositor.restore(back as *mut u8);
 
                     let fb_slice = unsafe {
                         core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)

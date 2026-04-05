@@ -20,8 +20,8 @@ const EXPIRE_TICKS: u32 = 60;
 /// Maximum visible lines in the window.
 const MAX_LINES: usize = 10;
 
-/// Frames to keep clearing after hiding (double-buffer needs 2).
-const CLEAR_FRAMES: u8 = 2;
+/// Frames to keep clearing after hiding (double-buffer + 1 margin).
+const CLEAR_FRAMES: u8 = 3;
 
 /// A single event log entry.
 struct EventEntry {
@@ -106,14 +106,11 @@ impl Widget for EventWindow {
                     entry.age += 1;
                 }
                 self.entries.retain(|e| e.age < EXPIRE_TICKS);
-                if self.entries.is_empty() {
-                    if self.visible {
-                        // Start clearing stale pixels from both framebuffers.
-                        self.clear_countdown = CLEAR_FRAMES;
-                        self.visible = false;
-                    } else if self.clear_countdown > 0 {
-                        self.clear_countdown -= 1;
-                    }
+                if self.entries.is_empty() && self.visible {
+                    // Start clearing stale pixels from both framebuffers.
+                    // The Compositor calls clear_region() to drive the countdown.
+                    self.clear_countdown = CLEAR_FRAMES;
+                    self.visible = false;
                 }
             }
             // Input events are pushed by the application via push_event()
