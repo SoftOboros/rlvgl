@@ -2,9 +2,9 @@
 //! Vertical popup "wing" column on the left edge of the display.
 //!
 //! A wing mirrors the right-side icon strip layout: a vertical column
-//! of sub-icons on a dark rounded-rect background. It appears on the
-//! left edge when a main icon is tapped, and disappears on outside tap
-//! or when a sub-icon fires its callback.
+//! of 60×60 sub-icons on a dark rounded-rect background with identical
+//! spacing. It appears on the left edge when a main icon is tapped,
+//! and disappears on outside tap or when a sub-icon fires its callback.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -16,16 +16,14 @@ use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
 
 /// Maximum number of sub-icon slots in a wing.
 const MAX_SLOTS: usize = 5;
-/// Sub-icon size (pixels, square).
-const ICON_SIZE: i32 = 48;
-/// Gap between adjacent sub-icons (mirrors right strip gap).
+/// Sub-icon size — identical to right strip (60×60).
+const ICON_SIZE: i32 = 60;
+/// Gap between adjacent sub-icons — identical to right strip.
 const GAP: i32 = 10;
-/// Padding inside the wing background.
-const PADDING: i32 = 12;
-/// Left-edge margin (mirrors the 10px right margin of the main strip).
-const LEFT_MARGIN: i32 = 10;
-/// Top margin before first icon.
+/// Top margin before first icon — identical to right strip.
 const MARGIN_TOP: i32 = 17;
+/// Left-edge x position — mirrors right strip's 10px right margin.
+const WING_X: i32 = 10;
 /// Corner radius of the background rect.
 const RADIUS: u8 = 8;
 /// Frames to keep clearing after hiding (double-buffer + 1 margin).
@@ -60,14 +58,16 @@ pub struct Wing {
 
 impl Wing {
     /// Create a wing as a vertical column on the left edge.
+    /// Layout mirrors the right-side icon strip exactly.
     ///
     /// `icons` is a slice of (rle_data, enabled) pairs.
     pub fn new(icons: &[(&'static [u8], bool)]) -> Self {
         let n = icons.len().min(MAX_SLOTS);
-        let wing_w = PADDING + ICON_SIZE + PADDING;
-        let wing_h = MARGIN_TOP + n as i32 * ICON_SIZE + (n as i32 - 1).max(0) * GAP + PADDING;
-        let wing_x = LEFT_MARGIN;
-        let wing_y = 0;
+        // Total height: same calculation as right strip
+        let total_h = MARGIN_TOP
+            + n as i32 * ICON_SIZE
+            + (n as i32 - 1).max(0) * GAP
+            + MARGIN_TOP; // bottom margin matches top
 
         let mut slots: [Option<WingSlot>; MAX_SLOTS] = [const { None }; MAX_SLOTS];
         for (i, &(rle, enabled)) in icons.iter().enumerate().take(MAX_SLOTS) {
@@ -83,10 +83,10 @@ impl Wing {
             slot_count: n,
             visible: false,
             bounds: Rect {
-                x: wing_x,
-                y: wing_y,
-                width: wing_w,
-                height: wing_h,
+                x: WING_X,
+                y: 0,
+                width: ICON_SIZE, // just the icon column width
+                height: total_h,
             },
             clear_countdown: 0,
             clear_bounds: None,
@@ -122,13 +122,16 @@ impl Wing {
         &mut self.slots
     }
 
-    /// Bounds of the icon at a given slot index (vertical layout).
+    /// Y position of icon at a given slot index (identical to right strip calc).
+    fn slot_y(&self, index: usize) -> i32 {
+        MARGIN_TOP + index as i32 * (ICON_SIZE + GAP)
+    }
+
+    /// Bounds of the icon at a given slot index.
     fn icon_rect(&self, index: usize) -> Rect {
-        let x = self.bounds.x + PADDING;
-        let y = MARGIN_TOP + index as i32 * (ICON_SIZE + GAP);
         Rect {
-            x,
-            y,
+            x: WING_X,
+            y: self.slot_y(index),
             width: ICON_SIZE,
             height: ICON_SIZE,
         }
@@ -158,17 +161,24 @@ impl Widget for Wing {
             return;
         }
 
-        // Background + border
-        fill_rounded_rect(renderer, self.bounds, BG_COLOR, RADIUS);
-        draw_border(renderer, self.bounds, BORDER_COLOR, BORDER_WIDTH);
+        // Background + border around the icon column
+        let bg_rect = Rect {
+            x: WING_X - 2,
+            y: 0,
+            width: ICON_SIZE + 4,
+            height: self.bounds.height,
+        };
+        fill_rounded_rect(renderer, bg_rect, BG_COLOR, RADIUS);
+        draw_border(renderer, bg_rect, BORDER_COLOR, BORDER_WIDTH);
 
-        // Sub-icons stacked vertically
+        // Sub-icons stacked vertically — same layout as right strip
         let mut buf: Vec<Color> = Vec::new();
         for i in 0..self.slot_count {
             if let Some(slot) = &self.slots[i] {
                 buf.clear();
                 if let Some((iw, ih)) = Self::decode_into(slot.rle, &mut buf) {
                     let rect = self.icon_rect(i);
+                    // Center the decoded icon within the 60×60 cell
                     let ox = rect.x + (rect.width - iw as i32) / 2;
                     let oy = rect.y + (rect.height - ih as i32) / 2;
                     if !slot.enabled {
@@ -190,21 +200,19 @@ impl Widget for Wing {
         }
 
         if let Event::PressRelease { x, y } = event {
-            let bx = self.bounds.x;
-            let by = self.bounds.y;
-            let bw = self.bounds.width;
-            let bh = self.bounds.height;
-
-            // Inside wing bounds?
-            if *x >= bx && *x < bx + bw && *y >= by && *y < by + bh {
-                // Check each sub-icon slot
-                for i in 0..self.slot_count {
-                    let r = self.icon_rect(i);
+            // Use same split-gap hit cell strategy as the right strip
+            let step = ICON_SIZE + GAP;
+            for i in 0..self.slot_count {
+                let cell_top = if i == 0 { 0 } else { MARGIN_TOP + i as i32 * step - GAP / 2 };
+                let cell_bot = if i == self.slot_count - 1 {
+                    480
+                } else {
+                    MARGIN_TOP + (i as i32 + 1) * step - GAP / 2
+                };
+                // x from left edge to wing_x + icon_size (generous)
+                if *x <= WING_X + ICON_SIZE && *y >= cell_top && *y < cell_bot {
                     if let Some(slot) = &mut self.slots[i] {
-                        if !slot.enabled {
-                            continue;
-                        }
-                        if *x >= r.x && *x < r.x + r.width && *y >= r.y && *y < r.y + r.height {
+                        if slot.enabled {
                             if let Some(cb) = slot.on_tap.as_mut() {
                                 cb(i);
                             }
@@ -212,14 +220,13 @@ impl Widget for Wing {
                             return true;
                         }
                     }
+                    // Hit disabled icon — consume but don't fire
+                    return true;
                 }
-                // Inside wing but no icon hit — consume to prevent pass-through
-                return true;
             }
 
-            // Outside wing — close it
+            // Tap outside the wing column — close it
             self.close();
-            // Don't consume — let the tap fall through to other widgets
             return false;
         }
 
@@ -229,7 +236,13 @@ impl Widget for Wing {
     fn clear_region(&mut self) -> Option<Rect> {
         if self.clear_countdown > 0 && !self.visible {
             self.clear_countdown -= 1;
-            self.clear_bounds
+            // Return background rect (slightly wider than icon bounds)
+            Some(Rect {
+                x: WING_X - 2,
+                y: 0,
+                width: ICON_SIZE + 4,
+                height: self.bounds.height,
+            })
         } else {
             None
         }

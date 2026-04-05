@@ -1499,7 +1499,10 @@ fn main() -> ! {
             let iw = info_wing.clone();
             strip.slots_mut()[0].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
                 iw.borrow_mut().close();
-                sw.borrow_mut().toggle_visible();
+                let vis = sw.borrow_mut().toggle_visible();
+                unsafe { (0x3800_06A0u32 as *mut u32).write_volatile(
+                    if vis { 0x5E77_0001 } else { 0x5E77_0000 }
+                ); }
             }));
 
             // Info tap (slot 2) → close settings wing, toggle info wing
@@ -1507,7 +1510,10 @@ fn main() -> ! {
             let iw2 = info_wing.clone();
             strip.slots_mut()[2].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
                 sw2.borrow_mut().close();
-                iw2.borrow_mut().toggle_visible();
+                let vis = iw2.borrow_mut().toggle_visible();
+                unsafe { (0x3800_06A4u32 as *mut u32).write_volatile(
+                    if vis { 0x1AF0_0001 } else { 0x1AF0_0000 }
+                ); }
             }));
 
             // Overlays dispatched first so they receive events when visible.
