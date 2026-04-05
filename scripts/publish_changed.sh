@@ -63,7 +63,13 @@ if git diff --name-only "$BASE" HEAD | grep -q '^chips/stm/bsps/'; then
   changed+=("rlvgl-stm-bsps")
 fi
 
+prev=""
 for crate in "${changed[@]}"; do
+  # crates.io needs time to index a new publish before dependents can resolve it.
+  if [[ -n "$prev" ]]; then
+    echo "Waiting 30s for crates.io to index $prev…"
+    sleep 30
+  fi
   echo "Publishing $crate"
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
     scripts/stm32_afdb_pipeline.sh
@@ -75,4 +81,5 @@ for crate in "${changed[@]}"; do
   else
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify || echo "⚠️ publish $crate failed."
   fi
+  prev="$crate"
 done
