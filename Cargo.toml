@@ -112,7 +112,12 @@ optional = true
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32h7xx-hal]
 version = "0.16"
 optional = true
-features = ["stm32h747cm7", "sdmmc", "fmc"]
+features = ["stm32h747cm7", "sdmmc", "fmc", "xspi"]
+
+[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.embedded-sdmmc]
+version = "0.9"
+default-features = false
+optional = true
 
 [dependencies.panic-halt]
 version = "1.0.0"
@@ -394,7 +399,9 @@ bsp_log = []
 semihosting = ["dep:cortex-m-semihosting"]
 backlight_pwm = []
 fatfs_nostd = ["rlvgl-platform/fatfs_nostd"]
-sd_assets_demo = []
+sd_assets_demo = ["sd_storage"]
+sd_storage = ["rlvgl-platform/sd_storage", "dep:embedded-sdmmc"]
+qspi_flash = []
 bringup_bkpt = []
  
 

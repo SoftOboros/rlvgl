@@ -5,6 +5,9 @@
 //! placeholder graphics. Designed for `no_std` builds so that the same
 //! module powers both simulator and embedded demonstrations.
 
+// Not all items are used by every binary that includes this module.
+#![allow(dead_code)]
+
 extern crate alloc;
 
 #[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]

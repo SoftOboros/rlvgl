@@ -8,6 +8,7 @@ fn default_style() {
     assert_eq!(style.bg_color, Color(255, 255, 255, 255));
     assert_eq!(style.border_color, Color(0, 0, 0, 255));
     assert_eq!(style.border_width, 0);
+    assert_eq!(style.alpha, 255);
 }
 
 #[test]

@@ -616,28 +616,30 @@ impl<'a> RotatedRenderer<'a> {
 
 impl Renderer for RotatedRenderer<'_> {
     fn fill_rect(&mut self, rect: WidgetRect, color: Color) {
-        let fb_x = self.fb_width - rect.y - rect.height;
+        let mut fb_x = self.fb_width - rect.y - rect.height;
         let fb_y = rect.x;
-        let fb_w = rect.height;
+        let mut fb_w = rect.height;
         let fb_h = rect.width;
 
-        // Clamp to framebuffer bounds (fb is fb_width × ∞ in y; y is
-        // clamped by the underlying BlitterRenderer/Surface).
-        if fb_x < 0 || fb_w <= 0 || fb_h <= 0 {
+        if fb_w <= 0 || fb_h <= 0 {
             return;
         }
-        // Clamp x to [0, fb_width)
-        let (cx, cw) = if fb_x + fb_w > self.fb_width {
-            (fb_x, self.fb_width - fb_x)
-        } else {
-            (fb_x, fb_w)
-        };
-        if cw <= 0 {
+
+        // Clamp left edge: rect extends off-screen left
+        if fb_x < 0 {
+            fb_w += fb_x; // shrink width by the overshoot
+            fb_x = 0;
+        }
+        // Clamp right edge
+        if fb_x + fb_w > self.fb_width {
+            fb_w = self.fb_width - fb_x;
+        }
+        if fb_w <= 0 {
             return;
         }
 
         self.inner.fill_rect(
-            WidgetRect { x: cx, y: fb_y, width: cw, height: fb_h },
+            WidgetRect { x: fb_x, y: fb_y, width: fb_w, height: fb_h },
             color,
         );
     }

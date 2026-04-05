@@ -17,6 +17,8 @@ MEMORY
   MAILBOX : ORIGIN = 0x30047000, LENGTH = 1K
   /* D3 SRAM4 (64K) is owned by CM4 for low-power retention; declared for visibility */
   D3_CM4  : ORIGIN = 0x38000000, LENGTH = 64K
+  /* External QSPI flash (MT25TL01G Bank 1, 64 MB) memory-mapped via QUADSPI */
+  QSPI_FLASH : ORIGIN = 0x90000000, LENGTH = 64M
   /* External SDRAM connected via FMC Bank1 (32 MB typical on H747I-DISCO) */
   SDRAM   : ORIGIN = 0xC0000000, LENGTH = 32M
 }
@@ -28,6 +30,10 @@ REGION_ALIAS("REGION_DATA",   RAM);
 REGION_ALIAS("REGION_BSS",    RAM);
 REGION_ALIAS("REGION_HEAP",   RAM);
 REGION_ALIAS("REGION_STACK",  RAM);
+
+/* QSPI flash linker region helpers (memory-mapped at 0x9000_0000) */
+PROVIDE(_qspi_flash_start = ORIGIN(QSPI_FLASH));
+PROVIDE(_qspi_flash_size  = LENGTH(QSPI_FLASH));
 
 /* SDRAM linker region helpers (for allocators or optional sections) */
 PROVIDE(_sdram_start = ORIGIN(SDRAM));

@@ -56,7 +56,8 @@ impl Widget for ProgressBar {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        let a = self.style.alpha;
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
 
         let bar_width = self.width_from_value();
         let bar_rect = Rect {
@@ -65,7 +66,7 @@ impl Widget for ProgressBar {
             width: bar_width,
             height: self.bounds.height,
         };
-        renderer.fill_rect(bar_rect, self.bar_color);
+        renderer.fill_rect(bar_rect, self.bar_color.with_alpha(a));
     }
 
     /// Progress bars are display only and ignore events.

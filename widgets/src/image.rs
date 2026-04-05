@@ -33,7 +33,7 @@ impl<'a> Widget for Image<'a> {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(self.style.alpha));
         renderer.draw_pixels(
             (self.bounds.x, self.bounds.y),
             self.pixels,

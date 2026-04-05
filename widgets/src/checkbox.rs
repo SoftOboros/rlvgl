@@ -48,8 +48,9 @@ impl Widget for Checkbox {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        let a = self.style.alpha;
         // Draw background
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
 
         // Draw check box square at the left side
         let square_size = 10;
@@ -59,7 +60,7 @@ impl Widget for Checkbox {
             width: square_size,
             height: square_size,
         };
-        renderer.fill_rect(box_rect, self.style.border_color);
+        renderer.fill_rect(box_rect, self.style.border_color.with_alpha(a));
 
         if self.checked {
             let inner = Rect {
@@ -68,7 +69,7 @@ impl Widget for Checkbox {
                 width: box_rect.width - 4,
                 height: box_rect.height - 4,
             };
-            renderer.fill_rect(inner, self.check_color);
+            renderer.fill_rect(inner, self.check_color.with_alpha(a));
         }
 
         // Draw label text to the right of the box with baseline at the bottom
@@ -76,7 +77,7 @@ impl Widget for Checkbox {
             self.bounds.x + square_size + 4,
             self.bounds.y + self.bounds.height,
         );
-        renderer.draw_text(text_pos, &self.text, self.text_color);
+        renderer.draw_text(text_pos, &self.text, self.text_color.with_alpha(a));
     }
 
     /// Toggle the checked state when clicked.
