@@ -26,6 +26,10 @@ const DEFAULT_ICONS: Record<string, string> = {
   trash: "trash-2.js", // trash can
   "folder-open": "folder-open.js", // open
   close: "x.js", // close/X
+  audio: "volume.js", // speaker/audio
+  video: "video.js", // video camera
+  camera: "camera.js", // photo camera
+  info: "info.js", // info circle
 };
 
 // camelCase SVG attributes that need kebab-case conversion

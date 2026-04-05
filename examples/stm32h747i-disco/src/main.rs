@@ -30,6 +30,8 @@ mod common_demo;
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
 mod config_menu;
+mod fonts;
+mod icon_strip;
 mod ipc;
 // HAL BSP module is not required for this bring-up path
 
@@ -1261,47 +1263,89 @@ fn main() -> ! {
         // buffer into it.
         let (w_fb, h_fb) = display.dimensions();
 
-        // ── Settings gear icon (upper-right, 10px margin) ────────────────
+        // ── RLE decode helper ─────────────────────────────────────────────
+        fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
+            let (w, h, pal_bytes, stream) =
+                rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
+            let pal_count = pal_bytes.len() / 2;
+            let mut palette = alloc::vec![0u16; pal_count];
+            for i in 0..pal_count {
+                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+            }
+            let rgba = rlvgl_decomp::decode_rgba(
+                w as usize, h as usize, &palette, stream,
+            ).expect("RLE decode");
+            (w as u32, h as u32, rgba)
+        }
+
+        fn decode_rle_colors(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<rlvgl::core::widget::Color>) {
+            let (w, h, rgba) = decode_rle(blob);
+            let colors = rgba.chunks_exact(4)
+                .map(|c| rlvgl::core::widget::Color(c[0], c[1], c[2], c[3]))
+                .collect();
+            (w, h, colors)
+        }
+
+        // ── Icon strip (right edge, 6 slots) ────────────────────────────────
+        {
+            use crate::icon_strip::{IconStrip, IconSlot};
+
+            let mut strip = IconStrip::new(
+                730, // x position
+                60,  // icon size
+                17,  // margin top
+                17,  // gap between icons
+            );
+
+            // Decode all 6 icons
+            let icons: [(&[u8], bool); 6] = [
+                (include_bytes!("../assets/icons/settings.rle"), true),
+                (include_bytes!("../assets/icons/file.rle"), true),
+                (include_bytes!("../assets/icons/audio.rle"), false),
+                (include_bytes!("../assets/icons/video.rle"), false),
+                (include_bytes!("../assets/icons/camera.rle"), false),
+                (include_bytes!("../assets/icons/info.rle"), true),
+            ];
+
+            for (i, (rle, enabled)) in icons.iter().enumerate() {
+                let (w, h, pixels) = decode_rle_colors(rle);
+                strip.set_slot(i, IconSlot {
+                    pixels,
+                    size: (w, h),
+                    enabled: *enabled,
+                    on_tap: None, // wired below
+                });
+            }
+
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: Rc::new(RefCell::new(strip)),
+                children: alloc::vec![],
+            });
+        }
+
+        // ── Config menu (opens from settings icon tap) ──────────────────────
         let config_menu = {
             use crate::config_menu::ConfigMenu;
             use rlvgl::core::widget::Rect;
-
-            // Helper to decode RLEC blob → RGBA bytes
-            fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
-                let (w, h, pal_bytes, stream) =
-                    rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
-                let pal_count = pal_bytes.len() / 2;
-                let mut palette = alloc::vec![0u16; pal_count];
-                for i in 0..pal_count {
-                    palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
-                }
-                let rgba = rlvgl_decomp::decode_rgba(
-                    w as usize, h as usize, &palette, stream,
-                ).expect("RLE decode");
-                (w as u32, h as u32, rgba)
-            }
-
-            static GEAR_RLE: &[u8] = include_bytes!("../assets/icons/gear.rle");
-            let (gw, gh, gear_rgba) = decode_rle(GEAR_RLE);
+            use rlvgl::core::packed_font::PackedFont;
 
             static CLOSE_RLE: &[u8] = include_bytes!("../assets/icons/close28.rle");
             let (cw, ch, close_rgba) = decode_rle(CLOSE_RLE);
 
+            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+            static UI_FONT: PackedFont = PackedFont {
+                height: 24,
+                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                data: FONT_DATA,
+            };
+
+            // Settings icon is at slot 0: (730, 17, 60, 60)
             let gear = Rc::new(RefCell::new(
                 ConfigMenu::new(
-                    // Upper-right of landscape in draw/widget coords:
-                    // x = long axis (0..h_fb), y = short axis (0..w_fb).
-                    // Gear hit area: 80×80 in upper-right corner
-                    Rect {
-                        x: h_fb as i32 - 80,
-                        y: 0,
-                        width: 80,
-                        height: 80,
-                    },
+                    Rect { x: 730, y: 17, width: 60, height: 60 },
                     rlvgl_i18n::locale() as u8,
-                    &FONT_6X10,
+                    &UI_FONT,
                 )
-                .gear_icon(&gear_rgba, gw, gh)
                 .close_icon(&close_rgba, cw, ch)
                 .on_change(|idx| {
                     let locale = rlvgl_i18n::locale_from_u8(idx);
@@ -1309,12 +1353,12 @@ fn main() -> ! {
                 }),
             ));
 
-            // Add as LAST child so it draws on top of everything
+            // Config menu draws on top of everything (last child)
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: gear.clone(),
                 children: alloc::vec![],
             });
-            gear // escape the block
+            gear
         };
 
         let fb_bytes = (w_fb * h_fb * 4) as usize;

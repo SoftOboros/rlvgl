@@ -8,7 +8,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use rlvgl::core::bitmap_font::BitmapFont;
+use rlvgl::core::packed_font::PackedFont;
 use rlvgl::core::event::Event;
 use rlvgl::core::renderer::Renderer;
 use rlvgl::core::widget::{Color, Rect, Widget};
@@ -43,7 +43,7 @@ pub struct ConfigMenu {
     /// Close icon pixel dimensions.
     close_icon_size: (u32, u32),
     /// Bitmap font for text rendering.
-    font: &'static BitmapFont,
+    font: &'static PackedFont,
 }
 
 // Layout constants for the config panel.
@@ -70,7 +70,7 @@ const CLOSE_COLOR: Color = Color(180, 80, 80, 255);
 
 impl ConfigMenu {
     /// Create a new config menu with the gear icon at the given bounds.
-    pub fn new(gear_bounds: Rect, initial_locale: u8, font: &'static BitmapFont) -> Self {
+    pub fn new(gear_bounds: Rect, initial_locale: u8, font: &'static PackedFont) -> Self {
         Self {
             gear_bounds,
             visible: false,
@@ -212,7 +212,7 @@ impl ConfigMenu {
 
     fn draw_checkbox(
         renderer: &mut dyn Renderer,
-        font: &BitmapFont,
+        font: &PackedFont,
         row: Rect,
         label: &str,
         checked: bool,
@@ -246,22 +246,22 @@ impl ConfigMenu {
 
         // Label text
         let text_x = row.x + CHECK_SIZE + 12;
-        let text_y = row.y + (ROW_HEIGHT - font.scaled_height()) / 2;
+        let text_y = row.y + (ROW_HEIGHT - font.height as i32) / 2;
         font.draw_str(renderer, text_x, text_y, label, TEXT_COLOR);
     }
 
     fn draw_button(
         renderer: &mut dyn Renderer,
-        font: &BitmapFont,
+        font: &PackedFont,
         bounds: Rect,
         label: &str,
         bg: Color,
     ) {
         fill_rounded_rect(renderer, bounds, bg, 6);
         draw_border(renderer, bounds, BORDER_COLOR, 1);
-        let char_w = font.scaled_width() + font.scale as i32;
-        let text_x = bounds.x + (bounds.width - label.len() as i32 * char_w) / 2;
-        let text_y = bounds.y + (bounds.height - font.scaled_height()) / 2;
+        let text_w = font.measure(label);
+        let text_x = bounds.x + (bounds.width - text_w) / 2;
+        let text_y = bounds.y + (bounds.height - font.height as i32) / 2;
         font.draw_str(renderer, text_x, text_y, label, TEXT_COLOR);
     }
 
@@ -328,16 +328,7 @@ impl Widget for ConfigMenu {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        // Draw gear icon: use pixel data if available, else fallback to rectangles
-        if !self.gear_pixels.is_empty() {
-            let (iw, ih) = self.gear_icon_size;
-            // Center the icon within the gear bounds
-            let ox = self.gear_bounds.x + (self.gear_bounds.width - iw as i32) / 2;
-            let oy = self.gear_bounds.y + (self.gear_bounds.height - ih as i32) / 2;
-            renderer.draw_pixels((ox, oy), &self.gear_pixels, iw, ih);
-        } else {
-            Self::draw_gear(renderer, self.gear_bounds, GEAR_COLOR);
-        }
+        // Gear icon is drawn by the IconStrip — config menu only draws the panel
 
         if !self.visible {
             return;
@@ -352,7 +343,7 @@ impl Widget for ConfigMenu {
         self.font.draw_str(
             renderer,
             panel.x + PANEL_PADDING,
-            panel.y + (TITLE_HEIGHT - self.font.scaled_height()) / 2,
+            panel.y + (TITLE_HEIGHT - self.font.height as i32) / 2,
             "Settings",
             TEXT_COLOR,
         );

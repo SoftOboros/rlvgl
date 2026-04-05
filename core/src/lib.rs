@@ -35,6 +35,8 @@ extern crate alloc;
 pub mod animation;
 pub mod bitmap_font;
 pub mod event;
+/// Variable-width packed font renderer (grayscale anti-aliased).
+pub mod packed_font;
 #[cfg(feature = "fs")]
 pub mod fs;
 pub mod interface;
