@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Vertical icon strip widget for the right edge of the display.
 //!
-//! Draws 6 icon slots in a column. Each slot can be enabled (full opacity,
+//! Draws 3 icon slots in a column. Each slot can be enabled (full opacity,
 //! tappable) or disabled (50% opacity, not interactive).
 
 use alloc::boxed::Box;
@@ -11,7 +11,7 @@ use rlvgl::core::renderer::Renderer;
 use rlvgl::core::widget::{Color, Rect, Widget};
 
 /// Number of icon slots in the strip.
-pub const SLOT_COUNT: usize = 6;
+pub const SLOT_COUNT: usize = 3;
 
 /// A single icon slot with RLE-compressed icon data.
 ///
@@ -28,7 +28,7 @@ pub struct IconSlot {
 
 /// Vertical icon strip widget.
 pub struct IconStrip {
-    /// The 6 icon slots.
+    /// The 3 icon slots.
     slots: [Option<IconSlot>; SLOT_COUNT],
     /// X position of the strip (landscape coords).
     x: i32,

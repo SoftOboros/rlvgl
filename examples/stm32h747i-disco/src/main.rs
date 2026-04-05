@@ -27,11 +27,14 @@ use panic_halt as _;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
+#[allow(dead_code)]
 mod config_menu;
 mod fonts;
 mod icon_strip;
 mod ipc;
+mod readme_crawl;
 mod star_crawl;
+mod wing;
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
@@ -1390,45 +1393,75 @@ fn main() -> ! {
             (w, h, colors)
         }
 
-        // ── Config menu (created first so icon strip can reference it) ────
-        let config_menu = {
-            use crate::config_menu::ConfigMenu;
-            use rlvgl::core::widget::Rect;
-            use rlvgl::core::packed_font::PackedFont;
+        // ── Icon strip (right edge, 3 slots) + wings ────────────────────
+        // Shared crawl toggle flag — set by info wing favicon callback.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let crawl_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
 
-            static CLOSE_RLE: &[u8] = include_bytes!("../assets/icons/close28.rle");
-            let (cw, ch, close_rgba) = decode_rle(CLOSE_RLE);
-
-            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
-            static UI_FONT: PackedFont = PackedFont {
-                height: 24,
-                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
-                data: FONT_DATA,
-            };
-
-            let event_win_for_cfg = event_win.clone();
-            Rc::new(RefCell::new(
-                ConfigMenu::new(
-                    Rect { x: 730, y: 17, width: 60, height: 60 },
-                    rlvgl_i18n::locale() as u8,
-                    &UI_FONT,
-                )
-                .close_icon(&close_rgba, cw, ch)
-                .on_change(|idx| {
-                    let locale = rlvgl_i18n::locale_from_u8(idx);
-                    rlvgl_i18n::set_locale(locale);
-                })
-                .on_preview(|idx| {
-                    let locale = rlvgl_i18n::locale_from_u8(idx);
-                    rlvgl_i18n::set_locale(locale);
-                })
-                .on_event_viewer_change(move |enabled| {
-                    event_win_for_cfg.borrow_mut().set_enabled(enabled);
-                }),
-            ))
+        // Wings are created first so icon strip callbacks can reference them.
+        let settings_wing = {
+            use crate::wing::Wing;
+            Rc::new(RefCell::new(Wing::new(
+                730, // strip x
+                47,  // parent center y (slot 0: y=17 + 30)
+                &[
+                    (include_bytes!("../assets/icons/48/audio48.rle"), false),
+                    (include_bytes!("../assets/icons/48/camera48.rle"), false),
+                    (include_bytes!("../assets/icons/48/monitor48.rle"), false),
+                    (include_bytes!("../assets/icons/48/globe48.rle"), true),
+                    (include_bytes!("../assets/icons/48/bug48.rle"), true),
+                ],
+            )))
         };
 
-        // ── Icon strip (right edge, 6 slots) ────────────────────────────────
+        let info_wing = {
+            use crate::wing::Wing;
+            Rc::new(RefCell::new(Wing::new(
+                730, // strip x
+                187, // parent center y (slot 2: y=157 + 30)
+                &[
+                    (include_bytes!("../assets/icons/48/cpu48.rle"), true),
+                    (include_bytes!("../assets/icons/48/favicon48.rle"), true),
+                    (include_bytes!("../assets/icons/48/play48.rle"), false),
+                ],
+            )))
+        };
+
+        // Wire settings wing callbacks
+        {
+            // Language (slot 3): cycle locale
+            settings_wing.borrow_mut().slots_mut()[3].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(|_| {
+                    let cur = rlvgl_i18n::locale() as u8;
+                    let next = (cur + 1) % 2;
+                    let locale = rlvgl_i18n::locale_from_u8(next);
+                    rlvgl_i18n::set_locale(locale);
+                }));
+            // Bug (slot 4): toggle event viewer
+            let ew = event_win.clone();
+            settings_wing.borrow_mut().slots_mut()[4].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    let enabled = ew.borrow().is_enabled();
+                    ew.borrow_mut().set_enabled(!enabled);
+                }));
+        }
+
+        // Wire info wing callbacks
+        // Slot 0 (system): stub — write to D3 SRAM
+        info_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
+            Some(alloc::boxed::Box::new(|_| {
+                unsafe { (0x3800_0680u32 as *mut u32).write_volatile(0xC0DE_0001); }
+            }));
+        // Slot 1 (favicon): trigger star wars crawl
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        {
+            let cf = crawl_flag.clone();
+            info_wing.borrow_mut().slots_mut()[1].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    cf.set(true);
+                }));
+        }
+
         {
             use crate::icon_strip::{IconStrip, IconSlot};
 
@@ -1436,15 +1469,12 @@ fn main() -> ! {
                 730, // x position
                 60,  // icon size
                 17,  // margin top
-                17,  // gap between icons
+                10,  // gap between icons
             );
 
-            let icons: [(&[u8], bool); 6] = [
+            let icons: [(&[u8], bool); 3] = [
                 (include_bytes!("../assets/icons/settings.rle"), true),
-                (include_bytes!("../assets/icons/file.rle"), true),
-                (include_bytes!("../assets/icons/audio.rle"), false),
-                (include_bytes!("../assets/icons/video.rle"), false),
-                (include_bytes!("../assets/icons/camera.rle"), false),
+                (include_bytes!("../assets/icons/file.rle"), false),
                 (include_bytes!("../assets/icons/info.rle"), true),
             ];
 
@@ -1456,10 +1486,20 @@ fn main() -> ! {
                 });
             }
 
-            // Settings tap (slot 0) → toggle config menu
-            let cm = config_menu.clone();
+            // Settings tap (slot 0) → close info wing, toggle settings wing
+            let sw = settings_wing.clone();
+            let iw = info_wing.clone();
             strip.slots_mut()[0].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
-                cm.borrow_mut().toggle_visible();
+                iw.borrow_mut().close();
+                sw.borrow_mut().toggle_visible();
+            }));
+
+            // Info tap (slot 2) → close settings wing, toggle info wing
+            let sw2 = settings_wing.clone();
+            let iw2 = info_wing.clone();
+            strip.slots_mut()[2].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
+                sw2.borrow_mut().close();
+                iw2.borrow_mut().toggle_visible();
             }));
 
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
@@ -1468,9 +1508,13 @@ fn main() -> ! {
             });
         }
 
-        // Config menu draws on top of everything (last child)
+        // Wings draw on top of icon strip
         root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-            widget: config_menu.clone(),
+            widget: settings_wing.clone(),
+            children: alloc::vec![],
+        });
+        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            widget: info_wing.clone(),
             children: alloc::vec![],
         });
 
@@ -1617,44 +1661,13 @@ fn main() -> ! {
                 data: BOLD_FONT_DATA,
             };
 
-            static CRAWL_LINES: &[&str] = &[
-                "RLVGL",
-                "",
-                "Episode I",
-                "THE EMBEDDED MENACE",
-                "",
-                "It is a period of civil war.",
-                "Rebel firmware engineers,",
-                "striking from a hidden lab,",
-                "have won their first victory",
-                "against the evil Proprietary",
-                "RTOS Empire.",
-                "",
-                "During the battle, Rebel",
-                "spies managed to steal",
-                "secret plans to the Empire's",
-                "ultimate weapon, the",
-                "DEATH BLOB, a binary",
-                "firmware image with enough",
-                "power to destroy an entire",
-                "product line.",
-                "",
-                "Pursued by the Empire's",
-                "sinister vendor lock-in,",
-                "Princess Ferris races home",
-                "aboard her starship,",
-                "custodian of the stolen",
-                "plans that can save her",
-                "people and restore freedom",
-                "to the galaxy....",
-            ];
-
-            star_crawl::StarCrawl::new(&BOLD_FONT, CRAWL_LINES)
+            star_crawl::StarCrawl::new(&BOLD_FONT, crate::readme_crawl::README_CRAWL)
         };
 
-        // Info icon tap flag — set by PressRelease in icon slot 5 bounds.
-        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        let mut crawl_toggle_pending = false;
+        // Audio read cursor: tracks position in SDRAM PCM buffer.
+        // Pre-fill consumed the first 2 * buf_size bytes.
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        let mut audio_read_cursor: u32 = core::cmp::min(2 * 4096, audio_pcm_len);
 
         loop {
             // Loop heartbeat
@@ -1732,11 +1745,6 @@ fn main() -> ! {
                         Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
                         Event::PressRelease { x, y } => {
                             telem_log(tick_count, 0x04, *x, *y);
-                            // Info icon (slot 5): x=730, y=402, 60×60
-                            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                            if *x >= 730 && *x < 790 && *y >= 402 && *y < 462 {
-                                crawl_toggle_pending = true;
-                            }
                         }
                         _ => {}
                     }
@@ -1815,10 +1823,7 @@ fn main() -> ! {
                     root.borrow_mut().dispatch_event(&gesture);
                 }
 
-                // Keep rendering while config menu is clearing stale pixels
-                if config_menu.borrow().clear_active() {
-                    dirty_frames = dirty_frames.max(2);
-                }
+                // (Wing clear_region handled by widget tree dispatch below)
 
                 // Dispatch Tick to age EventWindow entries
                 root.borrow_mut().dispatch_event(&Event::Tick);
@@ -1841,19 +1846,24 @@ fn main() -> ! {
                     }
                     was_visible = vis;
                 }
-                let cm_vis = config_menu.borrow().is_visible();
-                static mut CM_WAS_VISIBLE: bool = false;
-                if cm_vis != unsafe { CM_WAS_VISIBLE } {
+                // Track wing visibility for dirty frames + compositor restore
+                let sw_vis = settings_wing.borrow().is_visible();
+                static mut SW_WAS_VISIBLE: bool = false;
+                if sw_vis != unsafe { SW_WAS_VISIBLE } {
                     dirty_frames = 4;
-                    if !cm_vis {
-                        // ConfigMenu just hid — restore panel region from pristine
-                        if let Some(panel) = config_menu.borrow().last_panel_bounds() {
-                            compositor.mark_pristine_restore(panel);
-                        }
-                        // Also restore gear area (it was part of the visible bounds)
-                        compositor.mark_pristine_restore(config_menu.borrow().bounds());
+                    if !sw_vis {
+                        compositor.mark_pristine_restore(settings_wing.borrow().bounds());
                     }
-                    unsafe { CM_WAS_VISIBLE = cm_vis; }
+                    unsafe { SW_WAS_VISIBLE = sw_vis; }
+                }
+                let iw_vis = info_wing.borrow().is_visible();
+                static mut IW_WAS_VISIBLE: bool = false;
+                if iw_vis != unsafe { IW_WAS_VISIBLE } {
+                    dirty_frames = 4;
+                    if !iw_vis {
+                        compositor.mark_pristine_restore(info_wing.borrow().bounds());
+                    }
+                    unsafe { IW_WAS_VISIBLE = iw_vis; }
                 }
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
@@ -1869,8 +1879,8 @@ fn main() -> ! {
 
                 // ── Star crawl toggle + render override ─────────────────
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                if crawl_toggle_pending {
-                    crawl_toggle_pending = false;
+                if crawl_flag.get() {
+                    crawl_flag.set(false);
                     if star_crawl.is_active() {
                         star_crawl.deactivate();
                         dirty_frames = 4; // restore desktop

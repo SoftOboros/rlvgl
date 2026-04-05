@@ -30,6 +30,11 @@ const DEFAULT_ICONS: Record<string, string> = {
   video: "video.js", // video camera
   camera: "camera.js", // photo camera
   info: "info.js", // info circle
+  monitor: "monitor.js", // display/screen
+  bug: "bug.js", // debug/event viewer
+  play: "play.js", // media playback
+  cpu: "cpu.js", // system/chip info
+  globe: "globe.js", // language/i18n
 };
 
 // camelCase SVG attributes that need kebab-case conversion

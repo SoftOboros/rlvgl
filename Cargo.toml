@@ -310,6 +310,7 @@ stm32h747i_disco_cm7 = [
     "stm32h7/stm32h747cm7",
     "stm32h7xx-hal/stm32h747cm7",
     "dep:rlvgl-app-demo",
+    "dep:rlvgl-decomp",
 ]
 
 stm32h747i_disco_cm4 = [
