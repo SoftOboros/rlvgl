@@ -18,11 +18,9 @@ use embedded_alloc::Heap;
 #[cfg(not(doc))]
 use panic_halt as _;
 
-// common_demo is used by the Rust-HAL (non-c_hal) path and the simulator.
-// The c_hal path uses a server-mode widget tree driven by CM4 via IPC.
-#[cfg(not(all(feature = "c_hal", feature = "stm32h747i_disco_cm7")))]
-#[path = "../../common_demo/lib.rs"]
-mod common_demo;
+// The demo app crate provides flush_pending and Application trait for widget
+// tree management. The c_hal path uses a server-mode widget tree driven by
+// CM4 via IPC and does not need it.
 
 // Auto-generated board support — pin constants and PAC helpers are a reference
 // library; not all are consumed in every build configuration.
@@ -1138,7 +1136,7 @@ fn main() -> ! {
             HalInputPin(gpiok.pk6.into_pull_up_input()),
         );
 
-        // Build a minimal root widget tree. The common_demo tree has a white
+        // Build a minimal root widget tree. The demo app tree has a white
         // root container that paints over the SDRAM splash. We use an invisible
         // root that produces no pixels — the splash survives in the framebuffer
         // and the EventWindow draws on top when visible.
@@ -1223,7 +1221,7 @@ fn main() -> ! {
                 children: alloc::vec![],
             };
             pending.borrow_mut().push(node);
-            common_demo::flush_pending(&root, &pending, &to_remove);
+            rlvgl_app_demo::flush_pending(&root, &pending, &to_remove);
         }
 
         // ── USART1 serial helper (115200 8N1 already configured above) ──

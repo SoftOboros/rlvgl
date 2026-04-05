@@ -1,11 +1,12 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
-#[path = "../../common_demo/lib.rs"]
-mod common_demo;
-use common_demo::{build_demo, flush_pending};
+
+use rlvgl::core::application::Application;
+use rlvgl::core::event::Event;
 use rlvgl::platform::{
-    BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Surface, WgpuBlitter, WgpuDisplay,
+    BlitRect, BlitterRenderer, CpuBlitter, InputEvent, LoadedApp, PixelFmt, Surface, WgpuBlitter,
+    WgpuDisplay,
 };
-use std::{env, fs, path::Path};
+use std::{cell::RefCell, env, fs, path::Path, rc::Rc};
 
 /// Default screen width in pixels.
 const DEFAULT_WIDTH: usize = 320;
@@ -42,84 +43,16 @@ fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {
     out
 }
 
-fn main() {
-    let mut width = DEFAULT_WIDTH;
-    let mut height = DEFAULT_HEIGHT;
-    let mut path = None;
-    let mut headless_path: Option<String> = None;
-    let mut headless = false;
-    let mut use_wgpi = false;
-    let mut show_qr = false;
-    let mut show_png = false;
-    let mut show_gif = false;
-
-    let mut args = env::args().skip(1);
-    while let Some(arg) = args.next() {
-        if let Some(screen) = arg.strip_prefix("--screen=") {
-            if let Some((w, h)) = screen.split_once('x') {
-                if let (Ok(w), Ok(h)) = (w.parse::<usize>(), h.parse::<usize>()) {
-                    width = w;
-                    height = h;
-                } else {
-                    eprintln!("Invalid --screen value: {screen}");
-                    return;
-                }
-            } else {
-                eprintln!("Invalid --screen value: {screen}");
-                return;
-            }
-        } else if arg == "--wgpi" {
-            use_wgpi = true;
-        } else if arg == "--qrcode" {
-            show_qr = true;
-        } else if arg == "--png" {
-            show_png = true;
-        } else if arg == "--gif" {
-            show_gif = true;
-        } else if arg.starts_with("--headless") {
-            if let Some(eq) = arg.split_once('=') {
-                headless_path = Some(eq.1.to_string());
-            } else {
-                headless_path = Some(
-                    args.next()
-                        .unwrap_or_else(|| DEFAULT_HEADLESS_PATH.to_string()),
-                );
-            }
-            headless = true;
-        } else {
-            path = Some(arg);
-        }
-    }
-
-    let demo = build_demo(width as i32, height as i32);
-    let root = demo.root.clone();
-    let pending = demo.pending.clone();
-    let to_remove = demo.to_remove.clone();
-
-    if headless {
-        // In headless mode, start with a blank scene to make tests predictable.
-        root.borrow_mut().children.clear();
-    }
-
-    if show_qr {
-        #[cfg(feature = "qrcode")]
-        root.borrow_mut()
-            .children
-            .push(common_demo::build_plugin_demo(width as u32, height as u32));
-    }
-    if show_png {
-        #[cfg(feature = "png")]
-        root.borrow_mut()
-            .children
-            .push(common_demo::build_png_demo(width as u32, height as u32));
-    }
-    if show_gif {
-        #[cfg(feature = "gif")]
-        root.borrow_mut()
-            .children
-            .push(common_demo::build_gif_demo(width as u32, height as u32));
-    }
-
+/// Run the simulator with the given application.
+fn run_with_app(
+    app: &Rc<RefCell<dyn Application>>,
+    root: &Rc<RefCell<rlvgl::core::WidgetNode>>,
+    width: usize,
+    height: usize,
+    use_wgpi: bool,
+    headless_path: Option<String>,
+    png_path: Option<String>,
+) {
     let frame_cb = {
         let root = root.clone();
         move |frame: &mut [u8], w: usize, h: usize| {
@@ -151,8 +84,10 @@ fn main() {
         }
     };
 
+    // Initial flush.
+    app.borrow_mut().after_event(root, &Event::Tick);
+
     if let Some(path) = headless_path {
-        flush_pending(&root, &pending, &to_remove);
         let mut frame = vec![0u8; width * height * 4];
         frame_cb(&mut frame, width, height);
         let ascii = dump_ascii_frame(&frame, width, height);
@@ -161,21 +96,178 @@ fn main() {
         return;
     }
 
-    if let Some(path) = path {
-        flush_pending(&root, &pending, &to_remove);
+    if let Some(path) = png_path {
         WgpuDisplay::headless(width, height, |fb| frame_cb(fb, width, height), path)
             .expect("PNG dump failed");
         return;
     }
 
-    flush_pending(&root, &pending, &to_remove);
     WgpuDisplay::new(width, height).run(frame_cb, {
         let root = root.clone();
-        let pending = pending.clone();
-        let to_remove = to_remove.clone();
+        let app = app.clone();
         move |evt: InputEvent| {
             root.borrow_mut().dispatch_event(&evt);
-            flush_pending(&root, &pending, &to_remove);
+            app.borrow_mut().after_event(&root, &evt);
         }
     });
+}
+
+fn main() {
+    let mut width = DEFAULT_WIDTH;
+    let mut height = DEFAULT_HEIGHT;
+    let mut png_path = None;
+    let mut headless_path: Option<String> = None;
+    let mut headless = false;
+    let mut use_wgpi = false;
+    let mut show_qr = false;
+    let mut show_png = false;
+    let mut show_gif = false;
+    let mut app_dylib: Option<String> = None;
+
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(screen) = arg.strip_prefix("--screen=") {
+            if let Some((w, h)) = screen.split_once('x') {
+                if let (Ok(w), Ok(h)) = (w.parse::<usize>(), h.parse::<usize>()) {
+                    width = w;
+                    height = h;
+                } else {
+                    eprintln!("Invalid --screen value: {screen}");
+                    return;
+                }
+            } else {
+                eprintln!("Invalid --screen value: {screen}");
+                return;
+            }
+        } else if arg == "--wgpi" {
+            use_wgpi = true;
+        } else if arg == "--qrcode" {
+            show_qr = true;
+        } else if arg == "--png" {
+            show_png = true;
+        } else if arg == "--gif" {
+            show_gif = true;
+        } else if arg == "--app" {
+            app_dylib = args.next();
+            if app_dylib.is_none() {
+                eprintln!("--app requires a path argument");
+                return;
+            }
+        } else if let Some(val) = arg.strip_prefix("--app=") {
+            app_dylib = Some(val.to_string());
+        } else if arg.starts_with("--headless") {
+            if let Some(eq) = arg.split_once('=') {
+                headless_path = Some(eq.1.to_string());
+            } else {
+                headless_path = Some(
+                    args.next()
+                        .unwrap_or_else(|| DEFAULT_HEADLESS_PATH.to_string()),
+                );
+            }
+            headless = true;
+        } else {
+            png_path = Some(arg);
+        }
+    }
+
+    if let Some(ref dylib_path) = app_dylib {
+        // Dynamic loading path.
+        let mut loaded = unsafe { LoadedApp::load(dylib_path) }
+            .unwrap_or_else(|e| panic!("Failed to load app from {dylib_path}: {e}"));
+
+        let root_node = loaded.app_mut().build(width as u32, height as u32);
+        let root = Rc::new(RefCell::new(root_node));
+
+        if headless {
+            root.borrow_mut().children.clear();
+        }
+
+        // Wrap in Rc<RefCell<>> for the run loop. We use a thin wrapper that
+        // delegates to LoadedApp since LoadedApp isn't Clone/Rc-compatible.
+        // For the dynamic path, we use a simpler inline loop.
+        let app: Rc<RefCell<dyn Application>> = Rc::new(RefCell::new(LoadedAppWrapper(loaded)));
+        run_with_app(&app, &root, width, height, use_wgpi, headless_path, png_path);
+    } else {
+        // Static path: use the built-in demo app.
+        let mut demo = rlvgl_app_demo::create_app();
+        let root_node = demo.build(width as u32, height as u32);
+        let root = Rc::new(RefCell::new(root_node));
+
+        if headless {
+            root.borrow_mut().children.clear();
+        }
+
+        if show_qr {
+            #[cfg(feature = "qrcode")]
+            root.borrow_mut()
+                .children
+                .push(rlvgl_app_demo::build_plugin_demo(
+                    width as u32,
+                    height as u32,
+                ));
+        }
+        if show_png {
+            #[cfg(feature = "png")]
+            root.borrow_mut()
+                .children
+                .push(rlvgl_app_demo::build_png_demo(
+                    width as u32,
+                    height as u32,
+                ));
+        }
+        if show_gif {
+            #[cfg(feature = "gif")]
+            root.borrow_mut()
+                .children
+                .push(rlvgl_app_demo::build_gif_demo(
+                    width as u32,
+                    height as u32,
+                ));
+        }
+
+        let app: Rc<RefCell<dyn Application>> = Rc::new(RefCell::new(BoxedAppWrapper(demo)));
+        run_with_app(&app, &root, width, height, use_wgpi, headless_path, png_path);
+    };
+}
+
+/// Wrapper to put a `Box<dyn Application>` behind `Rc<RefCell<dyn Application>>`.
+struct BoxedAppWrapper(Box<dyn Application>);
+
+impl Application for BoxedAppWrapper {
+    fn info(&self) -> rlvgl::core::application::AppInfo {
+        self.0.info()
+    }
+    fn build(&mut self, width: u32, height: u32) -> rlvgl::core::WidgetNode {
+        self.0.build(width, height)
+    }
+    fn after_event(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>, event: &Event) {
+        self.0.after_event(root, event);
+    }
+    fn tick(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>) {
+        self.0.tick(root);
+    }
+    fn destroy(&mut self) {
+        self.0.destroy();
+    }
+}
+
+/// Wrapper to put a `LoadedApp` behind `Rc<RefCell<dyn Application>>`.
+struct LoadedAppWrapper(LoadedApp);
+
+impl Application for LoadedAppWrapper {
+    fn info(&self) -> rlvgl::core::application::AppInfo {
+        self.0.app().info()
+    }
+    fn build(&mut self, width: u32, height: u32) -> rlvgl::core::WidgetNode {
+        self.0.app_mut().build(width, height)
+    }
+    fn after_event(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>, event: &Event) {
+        self.0.app_mut().after_event(root, event);
+    }
+    fn tick(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>) {
+        self.0.app_mut().tick(root);
+    }
+    fn destroy(&mut self) {
+        self.0.app_mut().destroy();
+    }
 }
