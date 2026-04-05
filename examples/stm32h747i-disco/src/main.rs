@@ -1192,7 +1192,7 @@ fn main() -> ! {
         use rlvgl::platform::blit::{BlitterRenderer, RotatedRenderer, Surface, PixelFmt};
 
         let event_win = Rc::new(RefCell::new(
-            EventWindowBuilder::new(800, 480, &FONT_6X10).build(),
+            EventWindowBuilder::new(&FONT_6X10).build(),
         ));
 
         // Add as LAST child so it draws on top of everything

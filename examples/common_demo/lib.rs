@@ -34,7 +34,6 @@ use rlvgl::widgets::image::Image;
 use rlvgl::widgets::{button::Button, container::Container, label::Label};
 
 type WidgetHandle = Rc<RefCell<dyn Widget>>;
-#[allow(dead_code)]
 type WidgetSlot = Rc<RefCell<Option<WidgetHandle>>>;
 
 // 1x1 pixel PNG and JPEG images used to exercise the decoders without relying on

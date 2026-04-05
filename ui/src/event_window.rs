@@ -8,7 +8,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use rlvgl_core::bitmap_font::BitmapFont;
-use rlvgl_core::event::{Event, Key};
+use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -64,20 +64,6 @@ impl EventWindow {
             self.entries.remove(0);
         }
         self.visible = true;
-    }
-}
-
-#[allow(dead_code)]
-fn format_key(key: &Key) -> &'static str {
-    match key {
-        Key::Enter => "Sel",
-        Key::ArrowUp => "Up",
-        Key::ArrowDown => "Down",
-        Key::ArrowLeft => "Left",
-        Key::ArrowRight => "Right",
-        Key::Escape => "Esc",
-        Key::Space => "Space",
-        _ => "?",
     }
 }
 
@@ -140,10 +126,6 @@ impl Widget for EventWindow {
 
 /// Builder for [`EventWindow`] with the dark-overlay theme.
 pub struct EventWindowBuilder {
-    #[allow(dead_code)]
-    screen_w: i32,
-    #[allow(dead_code)]
-    screen_h: i32,
     window_w: i32,
     window_h: i32,
     bg_color: Color,
@@ -156,19 +138,13 @@ pub struct EventWindowBuilder {
 
 impl EventWindowBuilder {
     /// Create a builder with default dark-overlay theme values.
-    pub fn new(
-        screen_w: i32,
-        screen_h: i32,
-        font: &'static BitmapFont,
-    ) -> Self {
+    pub fn new(font: &'static BitmapFont) -> Self {
         // Window sized to hold MAX_LINES of text at the font's scaled line height.
         let line_h = font.scaled_height() + 4;
         let padding = 12;
         let window_h = MAX_LINES as i32 * line_h + padding * 2;
         let window_w = 380;
         Self {
-            screen_w,
-            screen_h,
             window_w,
             window_h,
             bg_color: Color(25, 25, 25, 255),
