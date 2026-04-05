@@ -1641,6 +1641,8 @@ pub struct Stm32h747iDiscoInput<I2C, INT> {
     int: INT,
     last: Option<(u16, u16)>,
     last_count: u8,
+    /// Short-axis display width for portrait→landscape coordinate transform.
+    display_width: u16,
 }
 
 #[cfg(feature = "stm32h747i_disco")]
@@ -1688,12 +1690,17 @@ where
     /// Create a new input driver from an initialized I²C peripheral without an
     /// interrupt line. The controller is polled on each call to
     /// [`InputDevice::poll`].
-    pub fn new(i2c: I2C) -> Self {
+    /// Create a new input driver with display width for coordinate transform.
+    ///
+    /// `display_width` is the short axis (480 for the H747I-DISCO).
+    /// Touch coordinates are transformed from portrait to landscape internally.
+    pub fn new(i2c: I2C, display_width: u16) -> Self {
         Self {
             touch: Ft5336::new(i2c),
             int: DummyPin,
             last: None,
             last_count: 0,
+            display_width,
         }
     }
 }
@@ -1705,12 +1712,15 @@ where
     INT: InputPin,
 {
     /// Create a new input driver using an interrupt line.
-    pub fn new_with_int(i2c: I2C, int: INT) -> Self {
+    ///
+    /// `display_width` is the short axis (480 for the H747I-DISCO).
+    pub fn new_with_int(i2c: I2C, int: INT, display_width: u16) -> Self {
         Self {
             touch: Ft5336::new(i2c),
             int,
             last: None,
             last_count: 0,
+            display_width,
         }
     }
 
@@ -1729,6 +1739,7 @@ where
         if !self.int_active() {
             return None;
         }
+        let dw = self.display_width as i32;
         let (count, raw) = self.touch.read_touches().ok()?;
 
         // Multi-touch path: 2+ contacts → emit Event::Touch
@@ -1736,10 +1747,11 @@ where
             let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
             for i in 0..count as usize {
                 let (id, flag, x, y) = raw[i];
+                // Transform portrait → landscape
                 points[i] = TouchPoint {
                     id,
-                    x: x as i32,
-                    y: y as i32,
+                    x: y as i32,
+                    y: dw - 1 - x as i32,
                     state: match flag {
                         0 => TouchState::Down,
                         1 => TouchState::Up,
@@ -1765,37 +1777,33 @@ where
         let was_multi = self.last_count >= 2;
         self.last_count = count;
 
+        // Helper: portrait (px, py) → landscape (py, dw-1-px)
+        let to_landscape = |px: u16, py: u16| -> (i32, i32) {
+            (py as i32, dw - 1 - px as i32)
+        };
+
         match (touch, self.last) {
             (Some((x, y)), Some((lx, ly))) => {
                 self.last = Some((x, y));
                 if was_multi {
-                    // Transitioning from multi → single: treat as new down
-                    Some(Event::PointerDown {
-                        x: x as i32,
-                        y: y as i32,
-                    })
+                    let (lx, ly) = to_landscape(x, y);
+                    Some(Event::PointerDown { x: lx, y: ly })
                 } else if (x, y) != (lx, ly) {
-                    Some(Event::PointerMove {
-                        x: x as i32,
-                        y: y as i32,
-                    })
+                    let (lx, ly) = to_landscape(x, y);
+                    Some(Event::PointerMove { x: lx, y: ly })
                 } else {
                     None
                 }
             }
             (Some((x, y)), None) => {
                 self.last = Some((x, y));
-                Some(Event::PointerDown {
-                    x: x as i32,
-                    y: y as i32,
-                })
+                let (lx, ly) = to_landscape(x, y);
+                Some(Event::PointerDown { x: lx, y: ly })
             }
             (None, Some((lx, ly))) => {
                 self.last = None;
-                Some(Event::PointerUp {
-                    x: lx as i32,
-                    y: ly as i32,
-                })
+                let (lx, ly) = to_landscape(lx, ly);
+                Some(Event::PointerUp { x: lx, y: ly })
             }
             (None, None) => None,
         }

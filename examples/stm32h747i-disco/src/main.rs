@@ -1118,7 +1118,9 @@ fn main() -> ! {
 
         let touch_i2c = HalI2c(i2c4);
         let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
-        let mut input = Stm32h747iDiscoInput::new_with_int(touch_i2c, touch_int);
+        let mut input = Stm32h747iDiscoInput::new_with_int(
+            touch_i2c, touch_int, display.dimensions().0 as u16,
+        );
 
         // ── Real button: PC13 wakeup button (active-low, external pull-up) ──
         let button = HalInputPin(gpioc.pc13.into_floating_input());
@@ -1144,7 +1146,8 @@ fn main() -> ! {
         struct InvisibleRoot;
         impl rlvgl::core::widget::Widget for InvisibleRoot {
             fn bounds(&self) -> rlvgl::core::widget::Rect {
-                rlvgl::core::widget::Rect { x: 0, y: 0, width: 480, height: 800 }
+                // Landscape widget space: 800 wide × 480 tall
+                rlvgl::core::widget::Rect { x: 0, y: 0, width: 800, height: 480 }
             }
             fn draw(&self, _renderer: &mut dyn rlvgl::core::renderer::Renderer) {}
             fn handle_event(&mut self, _event: &Event) -> bool { false }
@@ -1455,26 +1458,11 @@ fn main() -> ! {
             }
 
             // ── Poll touch ──
-            // Transform portrait driver coords to landscape widget space,
-            // then feed through the gesture recognizer.
+            // Poll touch — coords already in landscape widget space
+            // (portrait→landscape transform done inside InputDevice::poll)
             if let Some(evt) = input.poll() {
-                // Coordinate transform: wx = touch_y, wy = w_fb - 1 - touch_x
-                let transformed = match &evt {
-                    Event::PointerDown { x, y } => Event::PointerDown {
-                        x: *y, y: w_fb as i32 - 1 - *x,
-                    },
-                    Event::PointerUp { x, y } => Event::PointerUp {
-                        x: *y, y: w_fb as i32 - 1 - *x,
-                    },
-                    Event::PointerMove { x, y } => Event::PointerMove {
-                        x: *y, y: w_fb as i32 - 1 - *x,
-                    },
-                    other => other.clone(),
-                };
-
-                // Log raw event to telemetry ring
-                // Log raw events to telemetry ring
-                match &transformed {
+                // Log to telemetry + event window
+                match &evt {
                     Event::PointerDown { x, y } => {
                         telem_log(tick_count, 0x01, *x, *y);
                         event_win.borrow_mut().push_event(
@@ -1490,7 +1478,7 @@ fn main() -> ! {
                 }
 
                 // Feed to gesture recognizer → dispatch gestures to widgets
-                if let Some(gesture) = tap.process(&transformed) {
+                if let Some(gesture) = tap.process(&evt) {
                     match &gesture {
                         Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
                         Event::PressRelease { x, y } => telem_log(tick_count, 0x04, *x, *y),
@@ -1977,7 +1965,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── IPC + input ──────────────────────────────────────────────────────────
     ipc::init();
-    let mut input = Stm32h747iDiscoInput::new_with_int(DummyI2c, touch_int);
+    let mut input = Stm32h747iDiscoInput::new_with_int(
+        DummyI2c, touch_int, display.dimensions().0 as u16,
+    );
     let mut _button_input = ButtonInput::new(DummyButton);
 
     // ── Display server widget tree ───────────────────────────────────────────
