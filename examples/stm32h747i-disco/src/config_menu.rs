@@ -6,12 +6,13 @@
 //! exclusive behavior. OK applies the change, Cancel/X reverts it.
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 
-use rlvgl_core::event::Event;
-use rlvgl_core::renderer::Renderer;
-use rlvgl_core::widget::{Color, Rect, Widget};
-
-use crate::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl::core::bitmap_font::BitmapFont;
+use rlvgl::core::event::Event;
+use rlvgl::core::renderer::Renderer;
+use rlvgl::core::widget::{Color, Rect, Widget};
+use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
 
 /// A self-contained settings menu widget.
 pub struct ConfigMenu {
@@ -19,6 +20,10 @@ pub struct ConfigMenu {
     gear_bounds: Rect,
     /// Whether the config panel is currently visible.
     visible: bool,
+    /// Number of frames to clear stale pixels after closing.
+    clear_countdown: u8,
+    /// Panel bounds to clear (saved when menu closes).
+    clear_bounds: Option<Rect>,
     /// Currently applied locale index.
     applied: u8,
     /// Pending selection (may differ from applied while menu is open).
@@ -26,24 +31,33 @@ pub struct ConfigMenu {
     /// Number of frames to keep redrawing after visibility change.
     dirty_frames: u8,
     /// Debounce counter: ignore PointerUp events until this reaches 0.
-    /// Prevents FT5336 touch bounce from immediately closing the menu.
     debounce: u8,
     /// Callback invoked when the selected locale is applied.
     on_change: Option<Box<dyn FnMut(u8)>>,
     /// Last received touch coords (for debug display).
     last_touch: Option<(i32, i32)>,
+    /// Pre-decoded gear icon pixels (RGBA → Color), or empty if not provided.
+    gear_pixels: Vec<Color>,
+    /// Gear icon pixel dimensions (width, height).
+    gear_icon_size: (u32, u32),
+    /// Pre-decoded close (X) icon pixels.
+    close_pixels: Vec<Color>,
+    /// Close icon pixel dimensions.
+    close_icon_size: (u32, u32),
+    /// Bitmap font for text rendering.
+    font: &'static BitmapFont,
 }
 
 // Layout constants for the config panel.
-const PANEL_W: i32 = 300;
-const PANEL_H: i32 = 220;
+const PANEL_W: i32 = 340;
+const PANEL_H: i32 = 280;
 const PANEL_RADIUS: u8 = 10;
 const PANEL_PADDING: i32 = 16;
 const CHECK_SIZE: i32 = 24;
 const ROW_HEIGHT: i32 = 40;
-const BTN_W: i32 = 90;
-const BTN_H: i32 = 34;
-const CLOSE_SIZE: i32 = 28;
+const BTN_W: i32 = 120;
+const BTN_H: i32 = 44;
+const CLOSE_SIZE: i32 = 40;
 const TITLE_HEIGHT: i32 = 32;
 
 // Colors
@@ -58,17 +72,47 @@ const CLOSE_COLOR: Color = Color(180, 80, 80, 255);
 
 impl ConfigMenu {
     /// Create a new config menu with the gear icon at the given bounds.
-    pub fn new(gear_bounds: Rect, initial_locale: u8) -> Self {
+    pub fn new(gear_bounds: Rect, initial_locale: u8, font: &'static BitmapFont) -> Self {
         Self {
             gear_bounds,
             visible: false,
+            clear_countdown: 0,
+            clear_bounds: None,
             applied: initial_locale,
             pending: initial_locale,
             dirty_frames: 0,
             debounce: 0,
             on_change: None,
             last_touch: None,
+            gear_pixels: Vec::new(),
+            gear_icon_size: (0, 0),
+            close_pixels: Vec::new(),
+            close_icon_size: (0, 0),
+            font,
         }
+    }
+
+    /// Set the gear icon from pre-decoded RGBA pixel data.
+    ///
+    /// `rgba` is a flat `[R, G, B, A, ...]` byte slice. Pixels with alpha == 0
+    /// are treated as transparent and skipped during drawing.
+    pub fn gear_icon(mut self, rgba: &[u8], width: u32, height: u32) -> Self {
+        self.gear_pixels = rgba
+            .chunks_exact(4)
+            .map(|c| Color(c[0], c[1], c[2], c[3]))
+            .collect();
+        self.gear_icon_size = (width, height);
+        self
+    }
+
+    /// Set the close (X) icon from pre-decoded RGBA pixel data.
+    pub fn close_icon(mut self, rgba: &[u8], width: u32, height: u32) -> Self {
+        self.close_pixels = rgba
+            .chunks_exact(4)
+            .map(|c| Color(c[0], c[1], c[2], c[3]))
+            .collect();
+        self.close_icon_size = (width, height);
+        self
     }
 
     /// Attach a callback invoked when the selected locale is applied (OK).
@@ -135,6 +179,28 @@ impl ConfigMenu {
         x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height
     }
 
+    /// Close the menu and start the clear countdown to erase stale pixels.
+    fn close_menu(&mut self) {
+        if self.visible {
+            self.clear_bounds = Some(self.panel_bounds());
+            self.clear_countdown = 3;
+            self.debounce = 4; // block gear reopen from touch bounce
+        }
+        self.visible = false;
+    }
+
+    /// Returns the draw-space bounds to clear if the menu just closed,
+    /// and decrements the internal counter. Returns `None` when no clearing
+    /// is needed.
+    pub fn take_clear_region(&mut self) -> Option<Rect> {
+        if self.clear_countdown > 0 && !self.visible {
+            self.clear_countdown -= 1;
+            self.clear_bounds
+        } else {
+            None
+        }
+    }
+
     fn fire_on_change(&mut self) {
         if let Some(cb) = self.on_change.as_mut() {
             cb(self.applied);
@@ -143,6 +209,7 @@ impl ConfigMenu {
 
     fn draw_checkbox(
         renderer: &mut dyn Renderer,
+        font: &BitmapFont,
         row: Rect,
         label: &str,
         checked: bool,
@@ -176,21 +243,23 @@ impl ConfigMenu {
 
         // Label text
         let text_x = row.x + CHECK_SIZE + 12;
-        let text_y = row.y + ROW_HEIGHT - 12;
-        renderer.draw_text((text_x, text_y), label, TEXT_COLOR);
+        let text_y = row.y + (ROW_HEIGHT - font.scaled_height()) / 2;
+        font.draw_str(renderer, text_x, text_y, label, TEXT_COLOR);
     }
 
     fn draw_button(
         renderer: &mut dyn Renderer,
+        font: &BitmapFont,
         bounds: Rect,
         label: &str,
         bg: Color,
     ) {
         fill_rounded_rect(renderer, bounds, bg, 6);
         draw_border(renderer, bounds, BORDER_COLOR, 1);
-        let text_x = bounds.x + (bounds.width - label.len() as i32 * 6) / 2;
-        let text_y = bounds.y + bounds.height - 12;
-        renderer.draw_text((text_x, text_y), label, TEXT_COLOR);
+        let char_w = font.scaled_width() + font.scale as i32;
+        let text_x = bounds.x + (bounds.width - label.len() as i32 * char_w) / 2;
+        let text_y = bounds.y + (bounds.height - font.scaled_height()) / 2;
+        font.draw_str(renderer, text_x, text_y, label, TEXT_COLOR);
     }
 
     /// Draw a simple gear/cog icon using fill_rect calls.
@@ -256,32 +325,15 @@ impl Widget for ConfigMenu {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        // Always draw the gear icon with label
-        Self::draw_gear(renderer, self.gear_bounds, GEAR_COLOR);
-        // Draw "SET" label below gear
-        let lx = self.gear_bounds.x + self.gear_bounds.width / 2 - 9;
-        let ly = self.gear_bounds.y + self.gear_bounds.height + 10;
-        renderer.draw_text((lx, ly), "SET", GEAR_COLOR);
-
-        // Debug: show last touch coordinates and a marker
-        if let Some((tx, ty)) = self.last_touch {
-            // Draw crosshair at touch point
-            renderer.fill_rect(
-                Rect { x: tx - 5, y: ty, width: 11, height: 1 },
-                Color(255, 0, 0, 255),
-            );
-            renderer.fill_rect(
-                Rect { x: tx, y: ty - 5, width: 1, height: 11 },
-                Color(255, 0, 0, 255),
-            );
-            // Show coordinates as text near the gear
-            use alloc::format;
-            let msg = format!("{},{} v={}", tx, ty, self.visible as u8);
-            renderer.draw_text(
-                (self.gear_bounds.x - 120, self.gear_bounds.y + 10),
-                &msg,
-                Color(255, 255, 0, 255),
-            );
+        // Draw gear icon: use pixel data if available, else fallback to rectangles
+        if !self.gear_pixels.is_empty() {
+            let (iw, ih) = self.gear_icon_size;
+            // Center the icon within the gear bounds
+            let ox = self.gear_bounds.x + (self.gear_bounds.width - iw as i32) / 2;
+            let oy = self.gear_bounds.y + (self.gear_bounds.height - ih as i32) / 2;
+            renderer.draw_pixels((ox, oy), &self.gear_pixels, iw, ih);
+        } else {
+            Self::draw_gear(renderer, self.gear_bounds, GEAR_COLOR);
         }
 
         if !self.visible {
@@ -294,34 +346,49 @@ impl Widget for ConfigMenu {
         draw_border(renderer, panel, BORDER_COLOR, 1);
 
         // Title
-        renderer.draw_text(
-            (panel.x + PANEL_PADDING, panel.y + TITLE_HEIGHT),
+        self.font.draw_str(
+            renderer,
+            panel.x + PANEL_PADDING,
+            panel.y + (TITLE_HEIGHT - self.font.scaled_height()) / 2,
             "Settings",
             TEXT_COLOR,
         );
 
-        // Close X
+        // Close icon (X) — pixel icon or fallback text
         let cb = self.close_bounds();
-        renderer.draw_text(
-            (cb.x + 8, cb.y + CLOSE_SIZE - 6),
-            "X",
-            CLOSE_COLOR,
-        );
+        if !self.close_pixels.is_empty() {
+            let (cw, ch) = self.close_icon_size;
+            let cx = cb.x + (cb.width - cw as i32) / 2;
+            let cy = cb.y + (cb.height - ch as i32) / 2;
+            renderer.draw_pixels((cx, cy), &self.close_pixels, cw, ch);
+        } else {
+            renderer.draw_text(
+                (cb.x + 8, cb.y + CLOSE_SIZE - 6),
+                "X",
+                CLOSE_COLOR,
+            );
+        }
 
         // Language checkboxes
-        Self::draw_checkbox(renderer, self.checkbox_row(0), "English", self.pending == 0);
-        Self::draw_checkbox(renderer, self.checkbox_row(1), "Fran\u{00e7}ais", self.pending == 1);
+        Self::draw_checkbox(renderer, self.font, self.checkbox_row(0), "English", self.pending == 0);
+        Self::draw_checkbox(renderer, self.font, self.checkbox_row(1), "Francais", self.pending == 1);
 
         // OK / Cancel buttons
-        Self::draw_button(renderer, self.ok_bounds(), "OK", BTN_OK_BG);
-        Self::draw_button(renderer, self.cancel_bounds(), "Cancel", BTN_BG);
+        Self::draw_button(renderer, self.font, self.ok_bounds(), "OK", BTN_OK_BG);
+        Self::draw_button(renderer, self.font, self.cancel_bounds(), "Cancel", BTN_BG);
+
+        // Debug: draw hit area outlines in red for close, ok, cancel
+        draw_border(renderer, self.close_bounds(), Color(255, 0, 0, 255), 1);
+        draw_border(renderer, self.ok_bounds(), Color(0, 255, 0, 255), 1);
+        draw_border(renderer, self.cancel_bounds(), Color(255, 255, 0, 255), 1);
+        draw_border(renderer, self.checkbox_row(0), Color(0, 255, 255, 255), 1);
+        draw_border(renderer, self.checkbox_row(1), Color(255, 0, 255, 255), 1);
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        // Tick decrements debounce counter
         if matches!(event, Event::Tick) {
-            if self.debounce > 0 {
-                self.debounce -= 1;
+            if self.clear_countdown > 0 {
+                self.clear_countdown -= 1;
             }
             return false;
         }
@@ -329,52 +396,71 @@ impl Widget for ConfigMenu {
         if let Event::PointerUp { x, y } = event {
             self.last_touch = Some((*x, *y));
 
-            // Debounce: swallow PointerUp events right after a visibility change
+            // Debounce: skip PointerUp events after a close action
             if self.debounce > 0 {
-                return self.visible;
+                self.debounce -= 1;
+                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                unsafe { (0x3800_064Cu32 as *mut u32).write_volatile(0xB0CE_0000 | self.debounce as u32); }
+                return true;
             }
 
             // Gear icon tap: toggle menu
             if Self::inside(self.gear_bounds, *x, *y) {
+                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                unsafe { (0x3800_064Cu32 as *mut u32).write_volatile(0x6EA2_0000 | self.visible as u32); }
                 self.visible = !self.visible;
                 if self.visible {
                     self.pending = self.applied;
                 }
                 self.dirty_frames = 2;
-                self.debounce = 3; // ignore next few PointerUp events
                 return true;
             }
 
             if self.visible {
+                // Write touch coords + hit result to D3 SRAM for probe-rs
+                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                unsafe {
+                    (0x3800_0640u32 as *mut u32).write_volatile(*x as u32);
+                    (0x3800_0644u32 as *mut u32).write_volatile(*y as u32);
+                }
+
                 // Close X
                 if Self::inside(self.close_bounds(), *x, *y) {
-                    self.pending = self.applied; // revert
-                    self.visible = false;
+                    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xC105_E000); }
+                    self.pending = self.applied;
+                    self.close_menu();
                     self.dirty_frames = 2;
                     return true;
                 }
 
                 // OK button — apply and close
                 if Self::inside(self.ok_bounds(), *x, *y) {
+                    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0x0000_0111); }
                     if self.pending != self.applied {
                         self.applied = self.pending;
                         self.fire_on_change();
                     }
-                    self.visible = false;
+                    self.close_menu();
                     self.dirty_frames = 2;
                     return true;
                 }
 
                 // Cancel button — revert and close
                 if Self::inside(self.cancel_bounds(), *x, *y) {
+                    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xCAA_CE100); }
                     self.pending = self.applied;
-                    self.visible = false;
+                    self.close_menu();
                     self.dirty_frames = 2;
                     return true;
                 }
 
                 // English checkbox
                 if Self::inside(self.checkbox_row(0), *x, *y) {
+                    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xE000_0000); }
                     self.pending = 0;
                     self.dirty_frames = 2;
                     return true;
@@ -382,6 +468,8 @@ impl Widget for ConfigMenu {
 
                 // French checkbox
                 if Self::inside(self.checkbox_row(1), *x, *y) {
+                    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xF000_0001); }
                     self.pending = 1;
                     self.dirty_frames = 2;
                     return true;
@@ -389,23 +477,22 @@ impl Widget for ConfigMenu {
 
                 // Tap outside panel: cancel
                 if !Self::inside(self.panel_bounds(), *x, *y) {
+                    #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                    unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0x0000_DEAD); }
                     self.pending = self.applied;
-                    self.visible = false;
+                    self.close_menu();
                     self.dirty_frames = 2;
                     return true;
                 }
+
+                // Inside panel but no specific hit
+                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                unsafe { (0x3800_0648u32 as *mut u32).write_volatile(0xFFFF_FFFF); }
 
                 return true;
             }
         }
 
-        if self.visible {
-            matches!(
-                event,
-                Event::PointerDown { .. } | Event::PointerMove { .. }
-            )
-        } else {
-            false
-        }
+        false
     }
 }

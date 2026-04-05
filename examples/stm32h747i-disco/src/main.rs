@@ -29,6 +29,7 @@ mod common_demo;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
+mod config_menu;
 mod ipc;
 // HAL BSP module is not required for this bring-up path
 
@@ -1258,9 +1259,30 @@ fn main() -> ! {
         let (w_fb, h_fb) = display.dimensions();
 
         // ── Settings gear icon (upper-right, 10px margin) ────────────────
-        {
-            use rlvgl::ui::ConfigMenu;
+        let config_menu = {
+            use crate::config_menu::ConfigMenu;
             use rlvgl::core::widget::Rect;
+
+            // Helper to decode RLEC blob → RGBA bytes
+            fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
+                let (w, h, pal_bytes, stream) =
+                    rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
+                let pal_count = pal_bytes.len() / 2;
+                let mut palette = alloc::vec![0u16; pal_count];
+                for i in 0..pal_count {
+                    palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+                }
+                let rgba = rlvgl_decomp::decode_rgba(
+                    w as usize, h as usize, &palette, stream,
+                ).expect("RLE decode");
+                (w as u32, h as u32, rgba)
+            }
+
+            static GEAR_RLE: &[u8] = include_bytes!("../assets/icons/gear.rle");
+            let (gw, gh, gear_rgba) = decode_rle(GEAR_RLE);
+
+            static CLOSE_RLE: &[u8] = include_bytes!("../assets/icons/close28.rle");
+            let (cw, ch, close_rgba) = decode_rle(CLOSE_RLE);
 
             let gear = Rc::new(RefCell::new(
                 ConfigMenu::new(
@@ -1273,7 +1295,10 @@ fn main() -> ! {
                         height: 60,
                     },
                     rlvgl_i18n::locale() as u8,
+                    &FONT_6X10,
                 )
+                .gear_icon(&gear_rgba, gw, gh)
+                .close_icon(&close_rgba, cw, ch)
                 .on_change(|idx| {
                     let locale = rlvgl_i18n::locale_from_u8(idx);
                     rlvgl_i18n::set_locale(locale);
@@ -1282,10 +1307,12 @@ fn main() -> ! {
 
             // Add as LAST child so it draws on top of everything
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-                widget: gear,
+                widget: gear.clone(),
                 children: alloc::vec![],
             });
-        }
+            gear // escape the block
+        };
+
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
         if display.back_buffer_addr() == display.front_buffer_addr() {
@@ -1545,6 +1572,29 @@ fn main() -> ! {
                         }
                     }
 
+                    // Restore pristine pixels under config menu when it closes
+                    if let Some(draw_rect) = config_menu.borrow_mut().take_clear_region() {
+                        // Transform draw coords to fb coords:
+                        // fb_x = w - draw_y - draw_h, fb_y = draw_x
+                        let fb_x = (w as i32 - draw_rect.y - draw_rect.height) as u32;
+                        let fb_y = draw_rect.x as u32;
+                        let fb_w = draw_rect.height as u32;
+                        let fb_h = draw_rect.width as u32;
+                        unsafe {
+                            for row in 0..fb_h {
+                                let y = fb_y + row;
+                                let off = y as usize * stride + fb_x as usize * 4;
+                                let len = fb_w as usize * 4;
+                                core::ptr::copy_nonoverlapping(
+                                    (DESKTOP_PRISTINE as *const u8).add(off),
+                                    (back as *mut u8).add(off),
+                                    len,
+                                );
+                            }
+                            cortex_m::asm::dsb();
+                        }
+                    }
+
                     let fb_slice = unsafe {
                         core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
                     };
@@ -1555,7 +1605,7 @@ fn main() -> ! {
                         BlitterRenderer::new(&mut render_blitter, surface);
                     let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
 
-                    // Draw widget tree (EventWindow only draws when visible)
+                    // Draw widget tree
                     root.borrow().draw(&mut renderer);
 
                     render_count += 1;
