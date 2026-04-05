@@ -1,5 +1,6 @@
 //! Binary checkbox widget.
 use alloc::string::String;
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -49,8 +50,9 @@ impl Widget for Checkbox {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
+        let r = self.style.radius;
         // Draw background
-        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
         // Draw check box square at the left side
         let square_size = 10;
@@ -60,7 +62,7 @@ impl Widget for Checkbox {
             width: square_size,
             height: square_size,
         };
-        renderer.fill_rect(box_rect, self.style.border_color.with_alpha(a));
+        fill_rounded_rect(renderer, box_rect, self.style.border_color.with_alpha(a), r);
 
         if self.checked {
             let inner = Rect {
@@ -69,7 +71,7 @@ impl Widget for Checkbox {
                 width: box_rect.width - 4,
                 height: box_rect.height - 4,
             };
-            renderer.fill_rect(inner, self.check_color.with_alpha(a));
+            fill_rounded_rect(renderer, inner, self.check_color.with_alpha(a), r);
         }
 
         // Draw label text to the right of the box with baseline at the bottom

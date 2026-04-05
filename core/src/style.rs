@@ -13,6 +13,8 @@ pub struct Style {
     ///
     /// Applied as a multiplier to all colors when the widget draws itself.
     pub alpha: u8,
+    /// Corner radius in pixels (`0` = sharp corners).
+    pub radius: u8,
 }
 
 impl Default for Style {
@@ -22,6 +24,7 @@ impl Default for Style {
             border_color: crate::widget::Color(0, 0, 0, 255),
             border_width: 0,
             alpha: 255,
+            radius: 0,
         }
     }
 }
@@ -66,6 +69,12 @@ impl StyleBuilder {
     /// Set the widget-level opacity (`255` = opaque, `0` = transparent).
     pub fn alpha(mut self, alpha: u8) -> Self {
         self.style.alpha = alpha;
+        self
+    }
+
+    /// Set the corner radius in pixels (`0` = sharp corners).
+    pub fn radius(mut self, radius: u8) -> Self {
+        self.style.radius = radius;
         self
     }
 

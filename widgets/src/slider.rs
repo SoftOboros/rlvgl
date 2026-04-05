@@ -1,4 +1,5 @@
 //! Horizontal slider widget.
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -57,9 +58,10 @@ impl Widget for Slider {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
-        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
+        let r = self.style.radius;
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
-        // Draw track
+        // Draw track (pill-shaped when radius > 0)
         let track_height = 4;
         let track_y = self.bounds.y + (self.bounds.height - track_height) / 2;
         let track_rect = Rect {
@@ -68,9 +70,10 @@ impl Widget for Slider {
             width: self.bounds.width,
             height: track_height,
         };
-        renderer.fill_rect(track_rect, self.style.border_color.with_alpha(a));
+        let track_r = if r > 0 { (track_height / 2) as u8 } else { 0 };
+        fill_rounded_rect(renderer, track_rect, self.style.border_color.with_alpha(a), track_r);
 
-        // Draw knob
+        // Draw knob (rounded when radius > 0)
         let knob_x = self.position_from_value();
         let knob_size = 10;
         let knob_rect = Rect {
@@ -79,7 +82,8 @@ impl Widget for Slider {
             width: knob_size,
             height: knob_size,
         };
-        renderer.fill_rect(knob_rect, self.knob_color.with_alpha(a));
+        let knob_r = if r > 0 { (knob_size / 2) as u8 } else { 0 };
+        fill_rounded_rect(renderer, knob_rect, self.knob_color.with_alpha(a), knob_r);
     }
 
     /// Update the slider value based on pointer release position.

@@ -1,5 +1,6 @@
 //! Vertical scrolling list of selectable strings.
 use alloc::{string::String, vec::Vec};
+use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -69,7 +70,7 @@ impl Widget for List {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
-        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
+        draw_widget_bg(renderer, self.bounds, &self.style);
         let row_height = 16;
         for (i, item) in self.items.iter().enumerate() {
             let y = self.bounds.y + (i as i32 * row_height);

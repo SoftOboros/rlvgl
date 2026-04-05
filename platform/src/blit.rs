@@ -505,6 +505,52 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
 }
 
 impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
+    fn blend_rect(&mut self, rect: WidgetRect, color: Color) {
+        let alpha = color.3 as u16;
+        if alpha == 0 {
+            return;
+        }
+        if alpha == 255 {
+            self.fill_rect(rect, color);
+            return;
+        }
+        // Inline source-over blending for ARGB8888 surfaces.
+        if self.surface.format == PixelFmt::Argb8888 {
+            let sw = self.surface.width as i32;
+            let sh = self.surface.height as i32;
+            let stride = self.surface.stride;
+            let inv = 255 - alpha;
+            let x0 = rect.x.max(0) as i32;
+            let y0 = rect.y.max(0) as i32;
+            let x1 = (rect.x + rect.width).min(sw);
+            let y1 = (rect.y + rect.height).min(sh);
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let off = y as usize * stride + x as usize * 4;
+                    let bg_b = self.surface.buf[off] as u16;
+                    let bg_g = self.surface.buf[off + 1] as u16;
+                    let bg_r = self.surface.buf[off + 2] as u16;
+                    self.surface.buf[off] =
+                        ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+                    self.surface.buf[off + 1] =
+                        ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+                    self.surface.buf[off + 2] =
+                        ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+                    self.surface.buf[off + 3] = 0xff;
+                }
+            }
+            self.planner.add(Rect {
+                x: rect.x,
+                y: rect.y,
+                w: rect.width as u32,
+                h: rect.height as u32,
+            });
+        } else {
+            // Fallback for non-ARGB8888 surfaces: just overwrite.
+            self.fill_rect(rect, color);
+        }
+    }
+
     fn fill_rect(&mut self, rect: WidgetRect, color: Color) {
         let r = Rect {
             x: rect.x,
@@ -639,6 +685,33 @@ impl Renderer for RotatedRenderer<'_> {
         }
 
         self.inner.fill_rect(
+            WidgetRect { x: fb_x, y: fb_y, width: fb_w, height: fb_h },
+            color,
+        );
+    }
+
+    fn blend_rect(&mut self, rect: WidgetRect, color: Color) {
+        let mut fb_x = self.fb_width - rect.y - rect.height;
+        let fb_y = rect.x;
+        let mut fb_w = rect.height;
+        let fb_h = rect.width;
+
+        if fb_w <= 0 || fb_h <= 0 {
+            return;
+        }
+
+        if fb_x < 0 {
+            fb_w += fb_x;
+            fb_x = 0;
+        }
+        if fb_x + fb_w > self.fb_width {
+            fb_w = self.fb_width - fb_x;
+        }
+        if fb_w <= 0 {
+            return;
+        }
+
+        self.inner.blend_rect(
             WidgetRect { x: fb_x, y: fb_y, width: fb_w, height: fb_h },
             color,
         );

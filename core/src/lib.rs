@@ -35,6 +35,8 @@ extern crate alloc;
 pub mod animation;
 pub mod application;
 pub mod bitmap_font;
+/// Drawing helpers for rounded rectangles and borders.
+pub mod draw;
 pub mod event;
 /// Variable-width packed font renderer (grayscale anti-aliased).
 pub mod packed_font;

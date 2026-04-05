@@ -1,4 +1,5 @@
 //! Simple pixel-buffer image widget.
+use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -33,7 +34,7 @@ impl<'a> Widget for Image<'a> {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(self.style.alpha));
+        draw_widget_bg(renderer, self.bounds, &self.style);
         renderer.draw_pixels(
             (self.bounds.x, self.bounds.y),
             self.pixels,

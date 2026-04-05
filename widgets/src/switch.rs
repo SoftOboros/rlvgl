@@ -1,5 +1,6 @@
 //! Binary on/off switch widget.
 
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -44,8 +45,9 @@ impl Widget for Switch {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
+        let r = self.style.radius;
         // Draw the background track.
-        renderer.fill_rect(self.bounds, self.style.bg_color.with_alpha(a));
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
         // Draw the knob on the left or right half depending on state.
         let knob_width = self.bounds.width / 2;
@@ -64,7 +66,7 @@ impl Widget for Switch {
                 height: self.bounds.height,
             }
         };
-        renderer.fill_rect(knob_rect, self.knob_color.with_alpha(a));
+        fill_rounded_rect(renderer, knob_rect, self.knob_color.with_alpha(a), r);
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
