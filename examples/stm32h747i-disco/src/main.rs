@@ -34,6 +34,7 @@ mod icon_strip;
 mod ipc;
 mod readme_crawl;
 mod star_crawl;
+mod sys_info;
 mod wing;
 // HAL BSP module is not required for this bring-up path
 
@@ -1401,30 +1402,22 @@ fn main() -> ! {
         // Wings are created first so icon strip callbacks can reference them.
         let settings_wing = {
             use crate::wing::Wing;
-            Rc::new(RefCell::new(Wing::new(
-                730, // strip x
-                47,  // parent center y (slot 0: y=17 + 30)
-                &[
-                    (include_bytes!("../assets/icons/48/audio48.rle"), false),
-                    (include_bytes!("../assets/icons/48/camera48.rle"), false),
-                    (include_bytes!("../assets/icons/48/monitor48.rle"), false),
-                    (include_bytes!("../assets/icons/48/globe48.rle"), true),
-                    (include_bytes!("../assets/icons/48/bug48.rle"), true),
-                ],
-            )))
+            Rc::new(RefCell::new(Wing::new(&[
+                (include_bytes!("../assets/icons/48/audio48.rle"), false),
+                (include_bytes!("../assets/icons/48/camera48.rle"), false),
+                (include_bytes!("../assets/icons/48/monitor48.rle"), false),
+                (include_bytes!("../assets/icons/48/globe48.rle"), true),
+                (include_bytes!("../assets/icons/48/bug48.rle"), true),
+            ])))
         };
 
         let info_wing = {
             use crate::wing::Wing;
-            Rc::new(RefCell::new(Wing::new(
-                730, // strip x
-                187, // parent center y (slot 2: y=157 + 30)
-                &[
-                    (include_bytes!("../assets/icons/48/cpu48.rle"), true),
-                    (include_bytes!("../assets/icons/48/favicon48.rle"), true),
-                    (include_bytes!("../assets/icons/48/play48.rle"), false),
-                ],
-            )))
+            Rc::new(RefCell::new(Wing::new(&[
+                (include_bytes!("../assets/icons/48/cpu48.rle"), true),
+                (include_bytes!("../assets/icons/48/favicon48.rle"), true),
+                (include_bytes!("../assets/icons/48/play48.rle"), false),
+            ])))
         };
 
         // Wire settings wing callbacks
@@ -1446,12 +1439,27 @@ fn main() -> ! {
                 }));
         }
 
+        // ── System info panel ────────────────────────────────────────────
+        let sys_info_panel = {
+            use rlvgl::core::packed_font::PackedFont;
+            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+            static UI_FONT: PackedFont = PackedFont {
+                height: 24,
+                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                data: FONT_DATA,
+            };
+            Rc::new(RefCell::new(crate::sys_info::SysInfoPanel::new(&UI_FONT)))
+        };
+
         // Wire info wing callbacks
-        // Slot 0 (system): stub — write to D3 SRAM
-        info_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
-            Some(alloc::boxed::Box::new(|_| {
-                unsafe { (0x3800_0680u32 as *mut u32).write_volatile(0xC0DE_0001); }
-            }));
+        // Slot 0 (system): toggle sys info panel
+        {
+            let sip = sys_info_panel.clone();
+            info_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    sip.borrow_mut().toggle();
+                }));
+        }
         // Slot 1 (favicon): trigger star wars crawl
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         {
@@ -1502,21 +1510,27 @@ fn main() -> ! {
                 iw2.borrow_mut().toggle_visible();
             }));
 
+            // Overlays dispatched first so they receive events when visible.
+            // Sys info panel consumes taps to close itself.
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: sys_info_panel.clone(),
+                children: alloc::vec![],
+            });
+            // Wings next — on the left edge, get events before icon strip.
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: settings_wing.clone(),
+                children: alloc::vec![],
+            });
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: info_wing.clone(),
+                children: alloc::vec![],
+            });
+            // Icon strip last — only gets events when no overlays are active.
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: Rc::new(RefCell::new(strip)),
                 children: alloc::vec![],
             });
         }
-
-        // Wings draw on top of icon strip
-        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-            widget: settings_wing.clone(),
-            children: alloc::vec![],
-        });
-        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-            widget: info_wing.clone(),
-            children: alloc::vec![],
-        });
 
         unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
@@ -1864,6 +1878,16 @@ fn main() -> ! {
                         compositor.mark_pristine_restore(info_wing.borrow().bounds());
                     }
                     unsafe { IW_WAS_VISIBLE = iw_vis; }
+                }
+                // Track sys info panel visibility
+                let sip_vis = sys_info_panel.borrow().is_visible();
+                static mut SIP_WAS_VISIBLE: bool = false;
+                if sip_vis != unsafe { SIP_WAS_VISIBLE } {
+                    dirty_frames = 4;
+                    if !sip_vis {
+                        compositor.mark_pristine_restore(sys_info_panel.borrow().bounds());
+                    }
+                    unsafe { SIP_WAS_VISIBLE = sip_vis; }
                 }
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;

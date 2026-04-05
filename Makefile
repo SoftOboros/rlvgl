@@ -35,7 +35,7 @@ gen-stm32h747i-disco-bsp:
 
 build-disco:
 	cargo build --target thumbv7em-none-eabihf \
-	  --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7
+	  --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7,splash,desktop
 
 build-disco-cm4:
 	cargo build --target thumbv7em-none-eabihf \
