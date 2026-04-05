@@ -496,8 +496,8 @@ fn main() -> ! {
         use rlvgl::platform::{
             CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
         };
-        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
-        use rlvgl::platform::{DiscoSdBlockDevice, mount_and_list_assets};
+        #[cfg(feature = "sd_storage")]
+        use rlvgl::platform::SdMmcBlockDev;
         use stm32h7xx_hal::prelude::*;
 
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
@@ -633,6 +633,7 @@ fn main() -> ! {
             GPIOH,
             GPIOI,
             I2C4,
+            #[cfg(feature = "backlight_pwm")]
             TIM8,
             DSIHOST: dsi,
             FMC: _fmc,
@@ -640,7 +641,11 @@ fn main() -> ! {
             #[cfg(feature = "dma2d")]
             DMA2D,
             GPIOC,
-            #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+            #[cfg(feature = "qspi_flash")]
+            GPIOB,
+            #[cfg(feature = "qspi_flash")]
+            QUADSPI,
+            #[cfg(feature = "sd_storage")]
             SDMMC1,
             ..
         } = dp;
@@ -690,6 +695,8 @@ fn main() -> ! {
         let gpioh = GPIOH.split(ccdr.peripheral.GPIOH);
         let gpioi = GPIOI.split(ccdr.peripheral.GPIOI);
         let gpioc = GPIOC.split(ccdr.peripheral.GPIOC);
+        #[cfg(feature = "qspi_flash")]
+        let gpiob = GPIOB.split(ccdr.peripheral.GPIOB);
         unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32); } // post-gpio-split
         // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
         struct HalResetPin<P>(P);
@@ -773,6 +780,62 @@ fn main() -> ! {
         af12_high!(gpioi.pi9);
         af12_high!(gpioi.pi10);
         unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32); } // post-FMC-pins
+
+        // ── QSPI flash init (MT25TL01G Bank 1) ──────────────────────────
+        #[cfg(feature = "qspi_flash")]
+        let qspi_flash = {
+            use rlvgl::platform::Mt25tlFlash;
+            use stm32h7xx_hal::xspi;
+
+            // Errata 2.8.5: Select PLL2R (150 MHz) as QSPI kernel clock
+            // D1CCIPR QSPISEL bits [5:4]: 00=HCLK, 01=PLL1Q, 10=PLL2R, 11=PER
+            unsafe {
+                let d1ccipr = 0x5802_4C18u32 as *mut u32;
+                let val = d1ccipr.read_volatile();
+                d1ccipr.write_volatile((val & !(0b11 << 4)) | (0b10 << 4));
+            }
+
+            // QSPI Bank 1 GPIO pins (AF numbers verified against DS12930 Table 9)
+            let qspi_clk = gpiob.pb2.into_alternate::<9>().speed(Speed::VeryHigh);
+            let qspi_io0 = gpiod.pd11.into_alternate::<9>().speed(Speed::VeryHigh);
+            let qspi_io1 = gpiof.pf9.into_alternate::<10>().speed(Speed::VeryHigh);
+            let qspi_io2 = gpiof.pf7.into_alternate::<9>().speed(Speed::VeryHigh);
+            let qspi_io3 = gpiof.pf6.into_alternate::<9>().speed(Speed::VeryHigh);
+            // NCS on PG6 (AF10) is managed by the HAL internally
+
+            let qspi = QUADSPI.bank1(
+                (qspi_clk, qspi_io0, qspi_io1, qspi_io2, qspi_io3),
+                xspi::Config::new(50.MHz()).fifo_threshold(4),
+                &ccdr.clocks,
+                ccdr.peripheral.QSPI,
+            );
+
+            let mut flash = Mt25tlFlash::new(qspi);
+
+            // Read and verify JEDEC ID
+            match flash.read_id() {
+                Ok(id) => {
+                    unsafe {
+                        // Breadcrumb: write JEDEC ID to D3 SRAM for debug
+                        let bc = 0x3800_0320u32 as *mut u32;
+                        bc.write_volatile(
+                            0x0F00_0000
+                                | (id[0] as u32) << 16
+                                | (id[1] as u32) << 8
+                                | id[2] as u32,
+                        );
+                    }
+                }
+                Err(_) => {
+                    unsafe {
+                        (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD);
+                    }
+                }
+            }
+            flash
+        };
+        #[cfg(feature = "qspi_flash")]
+        let _ = &qspi_flash; // suppress unused warning when not consumed yet
 
         // Panel reset GPIO on PG3 (LCD_RESET)
         let mut panel_reset_hal = gpiog.pg3.into_push_pull_output();
@@ -1043,88 +1106,70 @@ fn main() -> ! {
             widget: Rc::new(RefCell::new(InvisibleRoot)),
             children: alloc::vec![],
         }));
-        let pending: Rc<RefCell<alloc::vec::Vec<WidgetNode>>> =
-            Rc::new(RefCell::new(alloc::vec::Vec::new()));
-        let to_remove: Rc<RefCell<alloc::vec::Vec<Rc<RefCell<dyn rlvgl::core::widget::Widget>>>>> =
-            Rc::new(RefCell::new(alloc::vec::Vec::new()));
-
-        #[cfg(all(feature = "fatfs_nostd", feature = "sd_assets_demo"))]
+        #[cfg(feature = "sd_storage")]
         {
-            use alloc::{format, rc::Rc};
+            use alloc::rc::Rc;
             use core::cell::RefCell;
+            let pending: Rc<RefCell<alloc::vec::Vec<WidgetNode>>> =
+                Rc::new(RefCell::new(alloc::vec::Vec::new()));
+            let to_remove: Rc<RefCell<alloc::vec::Vec<Rc<RefCell<dyn rlvgl::core::widget::Widget>>>>> =
+                Rc::new(RefCell::new(alloc::vec::Vec::new()));
             use rlvgl::core::widget::Rect;
             use rlvgl::widgets::label::Label;
             use stm32h7xx_hal::gpio::Alternate;
+
+            // Card detect: PI8 is active-low (low = card inserted)
+            let sd_detect = gpioi.pi8.into_pull_up_input();
+            let card_present = sd_detect.is_low();
+
             // SDMMC1 pins: PC12=CK, PD2=CMD, PC8..PC11=D0..D3 (AF12)
+            use stm32h7xx_hal::sdmmc::SdmmcExt;
             let ck: stm32h7xx_hal::gpio::Pin<'C', 12, Alternate<12>> = gpioc.pc12.into_alternate();
             let cmd: stm32h7xx_hal::gpio::Pin<'D', 2, Alternate<12>> = gpiod.pd2.into_alternate();
             let d0: stm32h7xx_hal::gpio::Pin<'C', 8, Alternate<12>> = gpioc.pc8.into_alternate();
             let d1: stm32h7xx_hal::gpio::Pin<'C', 9, Alternate<12>> = gpioc.pc9.into_alternate();
             let d2: stm32h7xx_hal::gpio::Pin<'C', 10, Alternate<12>> = gpioc.pc10.into_alternate();
             let d3: stm32h7xx_hal::gpio::Pin<'C', 11, Alternate<12>> = gpioc.pc11.into_alternate();
-            let pins = (ck, cmd, d0, d1, d2, d3);
-            let sdmmc = stm32h7xx_hal::sdmmc::Sdmmc::new(
-                SDMMC1,
-                pins,
+            let sdmmc = SDMMC1.sdmmc(
+                (ck, cmd, d0, d1, d2, d3),
                 ccdr.peripheral.SDMMC1,
                 &ccdr.clocks,
             );
-            let mut bd = DiscoSdBlockDevice::new(sdmmc);
-            match mount_and_list_assets(&mut bd) {
-                Ok(names) => {
-                    if names.is_empty() {
-                        let label = Label::new(
-                            "SD: no assets",
-                            Rect {
-                                x: 10,
-                                y: 70,
-                                width: 180,
-                                height: 16,
-                            },
-                        );
-                        let node = rlvgl::core::WidgetNode {
-                            widget: Rc::new(RefCell::new(label)),
-                            children: alloc::vec![],
-                        };
-                        pending.borrow_mut().push(node);
-                    } else {
-                        for (i, name) in names.into_iter().take(4).enumerate() {
-                            let label = Label::new(
-                                format!("asset: {}", name),
-                                Rect {
-                                    x: 10,
-                                    y: 70 + (i as i32 * 18),
-                                    width: 260,
-                                    height: 16,
-                                },
-                            );
-                            let node = rlvgl::core::WidgetNode {
-                                widget: Rc::new(RefCell::new(label)),
-                                children: alloc::vec![],
-                            };
-                            pending.borrow_mut().push(node);
+            let bd = SdMmcBlockDev::new(sdmmc);
+
+            let sd_msg: &str = if !card_present {
+                "SD: no card"
+            } else {
+                use rlvgl::platform::sd_emmc_adapter as sda;
+                let volume_mgr = embedded_sdmmc::VolumeManager::new(bd, sda::DummyTimeSource);
+                match volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0)) {
+                    Ok(volume) => {
+                        match volume.open_root_dir() {
+                            Ok(root_dir) => {
+                                let mut count = 0u32;
+                                root_dir.iterate_dir(|entry| {
+                                    count += 1;
+                                    let _ = entry;
+                                }).ok();
+                                if count > 0 { "SD: mounted OK" } else { "SD: empty" }
+                            }
+                            Err(_) => "SD: root dir failed",
                         }
                     }
-                    common_demo::flush_pending(&root, &pending, &to_remove);
+                    Err(_) => "SD: mount failed",
                 }
-                Err(_) => {
-                    let label = Label::new(
-                        "SD: mount/list failed",
-                        Rect {
-                            x: 10,
-                            y: 70,
-                            width: 220,
-                            height: 16,
-                        },
-                    );
-                    let node = rlvgl::core::WidgetNode {
-                        widget: Rc::new(RefCell::new(label)),
-                        children: alloc::vec![],
-                    };
-                    pending.borrow_mut().push(node);
-                    common_demo::flush_pending(&root, &pending, &to_remove);
-                }
-            }
+            };
+
+            let label = Label::new(
+                sd_msg,
+                Rect { x: 10, y: 70, width: 260, height: 16 },
+            );
+            let node = rlvgl::core::WidgetNode {
+                widget: Rc::new(RefCell::new(label)),
+                children: alloc::vec![],
+            };
+            pending.borrow_mut().push(node);
+            common_demo::flush_pending(&root, &pending, &to_remove);
         }
 
         // ── USART1 serial helper (115200 8N1 already configured above) ──
@@ -1204,7 +1249,7 @@ fn main() -> ! {
         serial_puts("rlvgl: input proof loop started\r\n");
 
         // No boot discard — splash delay removed, pins are stable by now.
-        let btn_discard: u32 = 0;
+        let _btn_discard: u32 = 0;
 
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.

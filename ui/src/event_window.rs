@@ -67,6 +67,7 @@ impl EventWindow {
     }
 }
 
+#[allow(dead_code)]
 fn format_key(key: &Key) -> &'static str {
     match key {
         Key::Enter => "Sel",
@@ -139,7 +140,9 @@ impl Widget for EventWindow {
 
 /// Builder for [`EventWindow`] with the dark-overlay theme.
 pub struct EventWindowBuilder {
+    #[allow(dead_code)]
     screen_w: i32,
+    #[allow(dead_code)]
     screen_h: i32,
     window_w: i32,
     window_h: i32,

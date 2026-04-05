@@ -37,6 +37,13 @@ pub mod pixels_renderer;
 ))]
 /// No-std FATFS adapter to mount and list assets on SDMMC-backed block devices.
 pub mod sd_fatfs_adapter;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    feature = "sd_storage",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// SD card adapter for `embedded-sdmmc` filesystem access.
+pub mod sd_emmc_adapter;
 #[cfg(feature = "simulator")]
 pub mod simulator;
 #[cfg(feature = "st7789")]
@@ -46,6 +53,12 @@ pub mod st7789;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub mod stm32h747i_disco;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+/// QSPI flash driver for MT25TL01G (indirect + memory-mapped modes).
+pub mod qspi_flash;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
@@ -76,6 +89,12 @@ pub use rlvgl_core::event::Key;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub use sd_fatfs_adapter::{FatfsBlockStream, mount_and_list_assets};
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    feature = "sd_storage",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use sd_emmc_adapter::{DummyTimeSource, SdMmcBlockDev};
 #[cfg(feature = "simulator")]
 pub use simulator::WgpuDisplay;
 #[cfg(feature = "st7789")]
@@ -85,6 +104,11 @@ pub use st7789::St7789Display;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub use qspi_flash::{Mt25tlFlash, QspiMemoryMapped};
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")

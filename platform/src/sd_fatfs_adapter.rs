@@ -107,11 +107,30 @@ impl<'a, BD: BlockDevice> Seek for FatfsBlockStream<'a, BD> {
 }
 
 impl<'a, BD: BlockDevice> Write for FatfsBlockStream<'a, BD> {
-    fn write(&mut self, _buf: &[u8]) -> Result<usize> {
-        Err(Error::from(ErrorKind::Unsupported))
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        let mut written = 0usize;
+        while written < buf.len() && self.pos < self.total {
+            let (lba, off) = self.cur_lba_off();
+            // Read-modify-write: load the sector, patch our bytes, write back
+            self.load_lba(lba)?;
+            let avail = min(self.sector - off, buf.len() - written);
+            let tail = min(avail as u64, self.total - self.pos) as usize;
+            self.buf[off..off + tail].copy_from_slice(&buf[written..written + tail]);
+            self.bd
+                .write_blocks(lba, &self.buf)
+                .map_err(|_| Error::from(ErrorKind::Other))?;
+            // Keep cache consistent
+            self.buf_lba = lba;
+            self.pos += tail as u64;
+            written += tail;
+        }
+        Ok(written)
     }
     fn flush(&mut self) -> Result<()> {
-        Ok(())
+        self.bd.flush().map_err(|_| Error::from(ErrorKind::Other))
     }
 }
 
