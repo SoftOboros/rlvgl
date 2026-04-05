@@ -893,8 +893,8 @@ fn main() -> ! {
         use cortex_m::peripheral::syst::SystClkSource;
         cp.SYST.set_clock_source(SystClkSource::Core);
         let sys_hz = ccdr.clocks.sys_ck().to_Hz();
-        let flip_hz = 6u32; // loose 6 Hz flip for bring-up
-        let reload = (sys_hz / flip_hz).saturating_sub(1);
+        const FRAME_HZ: u32 = 30; // target frame rate (change to 25/60 as needed)
+        let reload = (sys_hz / FRAME_HZ).saturating_sub(1);
         cp.SYST.set_reload(reload);
         cp.SYST.clear_current();
         cp.SYST.enable_counter();
@@ -1354,7 +1354,9 @@ fn main() -> ! {
         use rlvgl_i18n::t;
 
         let event_win = Rc::new(RefCell::new(
-            EventWindowBuilder::new(&FONT_6X10).build(),
+            EventWindowBuilder::new(&FONT_6X10)
+                .expire_ticks(FRAME_HZ * 10) // 10-second timeout
+                .build(),
         ));
 
         root.borrow_mut().children.push(rlvgl::core::WidgetNode {
@@ -1681,7 +1683,7 @@ fn main() -> ! {
                 data: BOLD_FONT_DATA,
             };
 
-            star_crawl::StarCrawl::new(&BOLD_FONT, crate::readme_crawl::README_CRAWL)
+            star_crawl::StarCrawl::new(&BOLD_FONT, crate::readme_crawl::README_CRAWL, FRAME_HZ)
         };
 
         // Audio read cursor: tracks position in SDRAM PCM buffer.
@@ -2264,14 +2266,12 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // PK7: touch interrupt input
     let touch_int = GpioIn { base: GPIOK, pin: 7 };
 
-    // ── SysTick: loose ~6 Hz flip timer ─────────────────────────────────────
+    // ── SysTick: frame timer ──────────────────────────────────────────────────
     use cortex_m::peripheral::syst::SystClkSource;
     cp.SYST.set_clock_source(SystClkSource::Core);
-    // 400 MHz / 6 Hz — truncates to 24-bit SysTick register; actual rate
-    // will be higher, which is fine for a bring-up display flip.
     const SYS_HZ: u32 = 400_000_000;
-    const FLIP_HZ: u32 = 6;
-    cp.SYST.set_reload((SYS_HZ / FLIP_HZ).saturating_sub(1));
+    const FRAME_HZ: u32 = 30; // must match CM7 FRAME_HZ
+    cp.SYST.set_reload((SYS_HZ / FRAME_HZ).saturating_sub(1));
     cp.SYST.clear_current();
     cp.SYST.enable_counter();
 
@@ -2614,13 +2614,12 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             }
             display.present();
             // Periodic UART status (~1 Hz)
-            if frame_counter % 25 == 0 {
+            if frame_counter % (FRAME_HZ * 5) == 0 {
                 dbg_print(".");
             }
-            // Periodic semihosting SDRAM dump (~30s = every 180 frames at 6 Hz)
-            // Periodic semihosting SDRAM dump (~30s = every 180 frames at 6 Hz)
+            // Periodic semihosting SDRAM dump (~30s)
             #[cfg(feature = "semihosting")]
-            if frame_counter % 180 == 30 {
+            if frame_counter % (FRAME_HZ * 30) == FRAME_HZ {
                 sh_println("\n── Periodic SDRAM check ──");
                 // CFBAR is at LTDC+0xAC (aliased after LTDCEN — use pre-stored value)
                 let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };

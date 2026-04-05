@@ -14,8 +14,8 @@ use rlvgl_core::widget::{Color, Rect, Widget};
 
 use crate::draw_helpers::{draw_rounded_border, fill_rounded_rect};
 
-/// Number of ticks before an entry expires (10 s at 6 Hz).
-const EXPIRE_TICKS: u32 = 60;
+/// Default expiry if none specified (10 s at 6 Hz — legacy).
+const DEFAULT_EXPIRE_TICKS: u32 = 60;
 
 /// Maximum visible lines in the window.
 const MAX_LINES: usize = 10;
@@ -45,6 +45,8 @@ pub struct EventWindow {
     clear_countdown: u8,
     padding: i32,
     font: &'static BitmapFont,
+    /// Ticks before an entry expires (frame-rate dependent).
+    expire_ticks: u32,
 }
 
 impl EventWindow {
@@ -120,7 +122,7 @@ impl Widget for EventWindow {
                 for entry in &mut self.entries {
                     entry.age += 1;
                 }
-                self.entries.retain(|e| e.age < EXPIRE_TICKS);
+                self.entries.retain(|e| e.age < self.expire_ticks);
                 if self.entries.is_empty() && self.visible {
                     // Start clearing stale pixels from both framebuffers.
                     // The Compositor calls clear_region() to drive the countdown.
@@ -155,6 +157,7 @@ pub struct EventWindowBuilder {
     radius: u8,
     text_color: Color,
     font: &'static BitmapFont,
+    expire_ticks: u32,
 }
 
 impl EventWindowBuilder {
@@ -174,7 +177,16 @@ impl EventWindowBuilder {
             radius: 8,
             text_color: Color(220, 220, 220, 255),
             font,
+            expire_ticks: DEFAULT_EXPIRE_TICKS,
         }
+    }
+
+    /// Set the number of ticks before entries expire.
+    ///
+    /// For frame-rate-independent timing, pass `frame_hz * desired_seconds`.
+    pub fn expire_ticks(mut self, ticks: u32) -> Self {
+        self.expire_ticks = ticks;
+        self
     }
 
     /// Override the background color.
@@ -216,6 +228,7 @@ impl EventWindowBuilder {
             clear_countdown: 0,
             padding: 12,
             font: self.font,
+            expire_ticks: self.expire_ticks,
         }
     }
 }

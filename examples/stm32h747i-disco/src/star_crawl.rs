@@ -49,8 +49,8 @@ const CRAWL_FRAME_SIZE: usize = STARFIELD_SIZE;
 /// Line spacing multiplier for text layout (1.5x font height).
 const LINE_SPACING_NUM: u32 = 3;
 const LINE_SPACING_DEN: u32 = 2;
-/// Scroll speed in Q8 fixed-point pixels per tick (~6 Hz SysTick).
-const SCROLL_SPEED_Q8: i32 = 384; // 1.5 px/tick
+/// Target scroll speed in pixels per second.
+const SCROLL_PX_PER_SEC: u32 = 9;
 /// Yellow foreground color for DMA2D A8 blend (0x00RRGGBB).
 const YELLOW: u32 = 0x00FF_D700;
 /// Starfield background color (dark blue-black).
@@ -69,6 +69,8 @@ pub struct StarCrawl {
     active: bool,
     /// Scroll position in Q8 fixed-point (sub-pixel precision).
     scroll_q8: i32,
+    /// Scroll speed in Q8 fixed-point pixels per tick.
+    scroll_speed_q8: i32,
 
     // SDRAM buffer pointers (set once in activate).
     starfield: *mut u8,
@@ -88,10 +90,15 @@ pub struct StarCrawl {
 
 impl StarCrawl {
     /// Create a new crawl state (inactive). Call [`activate`] to start.
-    pub const fn new(font: &'static PackedFont, lines: &'static [&'static str]) -> Self {
+    ///
+    /// `frame_hz` is the render loop frame rate (e.g. 30). Scroll speed is
+    /// derived from [`SCROLL_PX_PER_SEC`] so visual speed is independent of
+    /// frame rate.
+    pub const fn new(font: &'static PackedFont, lines: &'static [&'static str], frame_hz: u32) -> Self {
         Self {
             active: false,
             scroll_q8: 0,
+            scroll_speed_q8: (SCROLL_PX_PER_SEC * 256 / frame_hz) as i32,
             starfield: core::ptr::null_mut(),
             crawl_frame: core::ptr::null_mut(),
             text_src: core::ptr::null_mut(),
@@ -211,7 +218,7 @@ impl StarCrawl {
         self.rotate_to_portrait(back_buf, fb_w, fb_h);
 
         // Advance scroll.
-        self.scroll_q8 += SCROLL_SPEED_Q8;
+        self.scroll_q8 += self.scroll_speed_q8;
 
         true
     }
