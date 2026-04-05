@@ -82,7 +82,7 @@ mod tests {
         let flag = Rc::new(Cell::new(false));
         let f = flag.clone();
         let mut t = Tag::new("rust", bounds).on_remove(move || f.set(true));
-        let event = Event::PointerUp { x: 5, y: 5 };
+        let event = Event::PressRelease { x: 5, y: 5 };
         t.handle_event(&event);
         assert!(flag.get());
     }

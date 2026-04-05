@@ -84,7 +84,7 @@ impl Widget for Slider {
 
     /// Update the slider value based on pointer release position.
     fn handle_event(&mut self, event: &Event) -> bool {
-        let Event::PointerUp { x, y } = event else {
+        let Event::PressRelease { x, y } = event else {
             return false;
         };
 

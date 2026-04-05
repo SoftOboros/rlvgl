@@ -1393,18 +1393,38 @@ fn main() -> ! {
         let _btn_discard: u32 = 0;
 
         // ── Tap gesture recognizer ────────────────────────────────────────
-        // Debounces FT5336 touch bounce by waiting for the contact to
-        // stabilize before emitting a single PointerUp to the widget tree.
-        // PointerDown dispatches immediately (widgets may want press feedback).
-        struct TapState {
-            /// Pending PointerUp coords (in widget space), or None.
-            pending_up: Option<(i32, i32)>,
-            /// Settle ticks remaining before firing the pending tap.
-            settle: u8,
+        use rlvgl::platform::gesture::TapRecognizer;
+        let mut tap = TapRecognizer::new(2); // 2 ticks (~330ms at 6Hz)
+
+        // ── Event telemetry ring buffer ──────────────────────────────────
+        // 16-entry ring at D3 SRAM 0x3800_0700, each entry = 4 words:
+        //   [0] tick_count  [1] event_code  [2] x  [3] y
+        // Event codes: 0x01=PointerDown, 0x02=PointerUp, 0x03=PressDown,
+        //              0x04=PressRelease, 0x10=GestureProcess, 0x11=GestureTick
+        const TELEM_BASE: u32 = 0x3800_0700;
+        const TELEM_ENTRIES: u32 = 16;
+        const TELEM_ENTRY_WORDS: u32 = 4;
+        // Ring index at 0x3800_06F0, dump tick counter at 0x3800_06F4
+        const TELEM_IDX_ADDR: u32 = 0x3800_06F0;
+        const TELEM_DUMP_TICK: u32 = 0x3800_06F4;
+
+        unsafe {
+            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
+            (TELEM_DUMP_TICK as *mut u32).write_volatile(0);
         }
-        let mut tap = TapState { pending_up: None, settle: 0 };
-        /// Number of Tick cycles to wait after PointerUp before firing.
-        const TAP_SETTLE_TICKS: u8 = 2;
+
+        fn telem_log(tick: u32, code: u32, x: i32, y: i32) {
+            unsafe {
+                let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                let slot = idx % TELEM_ENTRIES;
+                let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
+                (base as *mut u32).write_volatile(tick);
+                ((base + 4) as *mut u32).write_volatile(code);
+                ((base + 8) as *mut u32).write_volatile(x as u32);
+                ((base + 12) as *mut u32).write_volatile(y as u32);
+                (TELEM_IDX_ADDR as *mut u32).write_volatile(idx + 1);
+            }
+        }
 
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
@@ -1435,58 +1455,49 @@ fn main() -> ! {
             }
 
             // ── Poll touch ──
-            // Touch driver reports portrait coords. Transform to widget
-            // (landscape) space: wx = touch_y, wy = w_fb - 1 - touch_x.
+            // Transform portrait driver coords to landscape widget space,
+            // then feed through the gesture recognizer.
             if let Some(evt) = input.poll() {
-                match &evt {
+                // Coordinate transform: wx = touch_y, wy = w_fb - 1 - touch_x
+                let transformed = match &evt {
+                    Event::PointerDown { x, y } => Event::PointerDown {
+                        x: *y, y: w_fb as i32 - 1 - *x,
+                    },
+                    Event::PointerUp { x, y } => Event::PointerUp {
+                        x: *y, y: w_fb as i32 - 1 - *x,
+                    },
+                    Event::PointerMove { x, y } => Event::PointerMove {
+                        x: *y, y: w_fb as i32 - 1 - *x,
+                    },
+                    other => other.clone(),
+                };
+
+                // Log raw event to telemetry ring
+                // Log raw events to telemetry ring
+                match &transformed {
                     Event::PointerDown { x, y } => {
-                        let wx = *y;
-                        let wy = w_fb as i32 - 1 - *x;
-                        // Log to event window
+                        telem_log(tick_count, 0x01, *x, *y);
                         event_win.borrow_mut().push_event(
-                            t!("hw.touch", x = wx, y = wy),
+                            t!("hw.touch", x = *x, y = *y),
                         );
-                        dirty_frames = 2;
                         evt_count += 1;
-                        // Cancel any pending tap (bounce from previous touch)
-                        tap.pending_up = None;
-                        tap.settle = 0;
-                        // Dispatch PointerDown immediately for press feedback
-                        root.borrow_mut().dispatch_event(
-                            &Event::PointerDown { x: wx, y: wy },
-                        );
                     }
                     Event::PointerUp { x, y } => {
-                        let wx = *y;
-                        let wy = w_fb as i32 - 1 - *x;
-                        // Don't dispatch yet — queue for settle
-                        tap.pending_up = Some((wx, wy));
-                        tap.settle = TAP_SETTLE_TICKS;
-                        dirty_frames = 2;
+                        telem_log(tick_count, 0x02, *x, *y);
                         evt_count += 1;
                     }
-                    Event::PointerMove { x, y } => {
-                        let wx = *y;
-                        let wy = w_fb as i32 - 1 - *x;
-                        root.borrow_mut().dispatch_event(
-                            &Event::PointerMove { x: wx, y: wy },
-                        );
+                    _ => {}
+                }
+
+                // Feed to gesture recognizer → dispatch gestures to widgets
+                if let Some(gesture) = tap.process(&transformed) {
+                    match &gesture {
+                        Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
+                        Event::PressRelease { x, y } => telem_log(tick_count, 0x04, *x, *y),
+                        _ => {}
                     }
-                    Event::Touch { count, points } => {
-                        for tp in &points[..*count as usize] {
-                            let wx = tp.y;
-                            let wy = w_fb as i32 - 1 - tp.x;
-                            event_win.borrow_mut().push_event(
-                                t!("hw.touch", x = wx, y = wy),
-                            );
-                        }
-                        dirty_frames = 2;
-                        evt_count += 1;
-                        root.borrow_mut().dispatch_event(&evt);
-                    }
-                    other => {
-                        root.borrow_mut().dispatch_event(other);
-                    }
+                    dirty_frames = 2;
+                    root.borrow_mut().dispatch_event(&gesture);
                 }
             }
 
@@ -1546,17 +1557,18 @@ fn main() -> ! {
 
             // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
-                // Fire settled tap gesture
-                if tap.settle > 0 {
-                    tap.settle -= 1;
-                    if tap.settle == 0 {
-                        if let Some((wx, wy)) = tap.pending_up.take() {
-                            root.borrow_mut().dispatch_event(
-                                &Event::PointerUp { x: wx, y: wy },
-                            );
-                            dirty_frames = 2;
-                        }
+                // Advance gesture settle timer → may emit PressRelease
+                if let Some(gesture) = tap.tick() {
+                    if let Event::PressRelease { x, y } = &gesture {
+                        telem_log(tick_count, 0x14, *x, *y);
                     }
+                    dirty_frames = 4; // enough for double-buffer + clear countdown
+                    root.borrow_mut().dispatch_event(&gesture);
+                }
+
+                // Keep rendering while config menu is clearing stale pixels
+                if config_menu.borrow().clear_active() {
+                    dirty_frames = dirty_frames.max(2);
                 }
 
                 // Dispatch Tick to age EventWindow entries
@@ -1588,46 +1600,15 @@ fn main() -> ! {
                     let fb_bytes = (w * h * 4) as usize;
                     let stride = (w * 4) as usize;
 
-                    // Only restore splash when the EventWindow is NOT visible
-                    // (clearing both buffers after hide). When visible, the
-                    // EventWindow's fill_rounded_rect covers the full region —
-                    // no splash restore needed, and doing it causes visible
-                    // tearing as splash pixels flash before being overdrawn.
+                    // Restore EventWindow region from pristine when it hides.
+                    // The EW and config menu fb regions don't overlap so this
+                    // is always safe regardless of menu state.
                     if !vis {
                         unsafe {
                             for row in 0..EW_FB_H {
                                 let y = EW_FB_Y + row;
                                 let off = y as usize * stride + EW_FB_X as usize * 4;
                                 let len = EW_FB_W as usize * 4;
-                                core::ptr::copy_nonoverlapping(
-                                    (DESKTOP_PRISTINE as *const u8).add(off),
-                                    (back as *mut u8).add(off),
-                                    len,
-                                );
-                            }
-                            cortex_m::asm::dsb();
-                        }
-                    }
-
-                    // Restore pristine pixels under config menu when it closes
-                    if let Some(dr) = config_menu.borrow_mut().take_clear_region() {
-                        // Transform draw coords to fb coords:
-                        // fb_x = w - draw_y - draw_h, fb_y = draw_x
-                        let fb_x = ((w as i32 - dr.y - dr.height).max(0) as u32).min(w - 1);
-                        let fb_y = (dr.x.max(0) as u32).min(h - 1);
-                        let fb_w = (dr.height as u32).min(w - fb_x);
-                        let fb_h = (dr.width as u32).min(h - fb_y);
-                        unsafe {
-                            (0x3800_0650u32 as *mut u32).write_volatile(
-                                ((fb_x as u32) << 16) | fb_y as u32
-                            );
-                            (0x3800_0654u32 as *mut u32).write_volatile(
-                                ((fb_w as u32) << 16) | fb_h as u32
-                            );
-                            for row in 0..fb_h {
-                                let y = fb_y + row;
-                                let off = y as usize * stride + fb_x as usize * 4;
-                                let len = fb_w as usize * 4;
                                 core::ptr::copy_nonoverlapping(
                                     (DESKTOP_PRISTINE as *const u8).add(off),
                                     (back as *mut u8).add(off),
@@ -1688,6 +1669,34 @@ fn main() -> ! {
                     (0x3800_0644u32 as *mut u32).write_volatile(
                         event_win.borrow().entry_count() as u32
                     );
+
+                    // Dump event telemetry ring over serial every ~1s (6 ticks)
+                    let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile();
+                    if tick_count - last_dump >= 180 { // ~30s at 6Hz
+                        let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                        if idx > 0 {
+                            let dump_count = idx.min(TELEM_ENTRIES);
+                            let start = if idx > TELEM_ENTRIES { idx - TELEM_ENTRIES } else { 0 };
+                            serial_puts("TELEM:");
+                            for i in start..start + dump_count {
+                                let slot = i % TELEM_ENTRIES;
+                                let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
+                                let t = (base as *const u32).read_volatile();
+                                let code = ((base + 4) as *const u32).read_volatile();
+                                let x = ((base + 8) as *const u32).read_volatile();
+                                let y = ((base + 12) as *const u32).read_volatile();
+                                // Format: " T:code:x:y"
+                                use core::fmt::Write;
+                                let mut buf = alloc::string::String::new();
+                                let _ = write!(buf, " {}:{:02x}:{},{}", t, code, x as i32, y as i32);
+                                serial_puts(&buf);
+                            }
+                            serial_puts("\r\n");
+                            // Reset ring
+                            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
+                        }
+                        (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count);
+                    }
                 }
             }
             cortex_m::asm::nop();
@@ -2181,6 +2190,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     unsafe { ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); }
 
     // ── Display server main loop ─────────────────────────────────────────────
+    let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(2);
     let mut frame_counter: u32 = 0;
 
     loop {
@@ -2224,9 +2234,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             }
         }
 
-        // 2. Poll touch → dispatch to widget tree → forward to CM4
+        // 2. Poll touch → gesture → dispatch to widget tree → forward to CM4
         if let Some(evt) = input.poll() {
-            let widget_evt = match &evt {
+            let transformed = match &evt {
                 Event::PointerDown { x, y } => Event::PointerDown {
                     x: *y, y: w_fb as i32 - 1 - *x,
                 },
@@ -2238,7 +2248,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                 },
                 other => other.clone(),
             };
-            root.borrow_mut().dispatch_event(&widget_evt);
+            if let Some(gesture) = tap2.process(&transformed) {
+                root.borrow_mut().dispatch_event(&gesture);
+            }
             // Forward touch events to CM4 (primary point only for IPC)
             let ipc_evt = match &evt {
                 Event::PointerDown { x, y } => Some(ipc::evt_pointer_down(*x, *y)),

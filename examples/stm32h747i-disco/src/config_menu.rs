@@ -89,6 +89,16 @@ impl ConfigMenu {
         }
     }
 
+    /// Whether the config panel is currently visible.
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    /// Whether the menu is actively clearing stale pixels.
+    pub fn clear_active(&self) -> bool {
+        self.clear_countdown > 0
+    }
+
     /// Set the gear icon from pre-decoded RGBA pixel data.
     ///
     /// `rgba` is a flat `[R, G, B, A, ...]` byte slice. Pixels with alpha == 0
@@ -181,6 +191,8 @@ impl ConfigMenu {
         if self.visible {
             self.clear_bounds = Some(self.panel_bounds());
             self.clear_countdown = 3;
+            #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+            unsafe { (0x3800_0658u32 as *mut u32).write_volatile(0xD0_000000 | self.clear_countdown as u32); }
         }
         self.visible = false;
     }
@@ -389,12 +401,24 @@ impl Widget for ConfigMenu {
             return false;
         }
 
-        if let Event::PointerUp { x, y } = event {
+        if let Event::PressRelease { x, y } = event {
             self.last_touch = Some((*x, *y));
+
+            // Log every PressRelease received by config menu
+            #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+            unsafe {
+                let prev = (0x3800_0660u32 as *const u32).read_volatile();
+                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1)); // count
+                (0x3800_0664u32 as *mut u32).write_volatile(*x as u32); // last x
+                (0x3800_0668u32 as *mut u32).write_volatile(*y as u32); // last y
+                (0x3800_066Cu32 as *mut u32).write_volatile(self.visible as u32); // visible
+            }
 
             // Gear icon tap: toggle menu
             if Self::inside(self.gear_bounds, *x, *y) {
                 self.visible = !self.visible;
+                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                unsafe { (0x3800_065Cu32 as *mut u32).write_volatile(0x6E_000000 | self.visible as u32); }
                 if self.visible {
                     self.pending = self.applied;
                 }

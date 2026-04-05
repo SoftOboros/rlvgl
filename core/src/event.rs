@@ -74,6 +74,24 @@ pub enum Event {
         /// Per-point data. Entries beyond `count` are meaningless.
         points: [TouchPoint; MAX_TOUCH_POINTS],
     },
+    /// Stable contact began (debounced). Use for visual press feedback
+    /// such as button highlighting. Emitted by the gesture recognizer,
+    /// not by raw hardware input.
+    PressDown {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
+    /// Stable contact released (debounced). The primary "click/tap" action
+    /// trigger. Widgets should match this instead of `PointerUp` for
+    /// reliable single-fire behavior.
+    PressRelease {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
     /// A keyboard key was pressed.
     KeyDown {
         /// Key that was pressed.

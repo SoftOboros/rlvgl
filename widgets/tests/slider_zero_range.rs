@@ -17,7 +17,7 @@ fn slider_zero_range_behavior() {
     assert_eq!(s.bounds().height, rect.height);
 
     // event inside should keep value at min when range is zero
-    let evt = Event::PointerUp { x: 25, y: 15 };
+    let evt = Event::PressRelease { x: 25, y: 15 };
     assert!(s.handle_event(&evt));
     assert_eq!(s.value(), 5);
 }

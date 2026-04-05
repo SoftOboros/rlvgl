@@ -48,6 +48,6 @@ fn progress_value_clamp() {
     assert_eq!(bar.value(), 0);
     bar.set_value(10);
     assert_eq!(bar.value(), 5);
-    let evt = Event::PointerUp { x: 0, y: 0 };
+    let evt = Event::PressRelease { x: 0, y: 0 };
     assert!(!bar.handle_event(&evt));
 }
