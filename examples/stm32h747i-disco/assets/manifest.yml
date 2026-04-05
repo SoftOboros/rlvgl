@@ -52,6 +52,30 @@ assets:
   path: icons/window.raw
   hash: dadf122f1d6dd0c2fb71df97ac17e4081202bcaa12cb74266be9268b38637353
   license: MIT
+- name: FONT_DEJAVU_SANS_18_BIN
+  path: fonts/DejaVuSans-18.bin
+  hash: b542ccab3e45a645e01233b53f8b5d5d3443cd69c2a089bca663c0d232559953
+  license: MIT
+- name: FONT_DEJAVU_SANS_18_JSON
+  path: fonts/DejaVuSans-18.json
+  hash: 9096221123f61949f306a67cedcc2ee3f5d6eae2633efcb861b80056514ec0c0
+  license: MIT
+- name: FONT_DEJAVU_SANS_BOLD_18_BIN
+  path: fonts/DejaVuSans-Bold-18.bin
+  hash: b7af115c950ae4d0b2e6d31ddad21980fb98d22e7617e4482bc938e74db969a9
+  license: MIT
+- name: FONT_DEJAVU_SANS_BOLD_18_JSON
+  path: fonts/DejaVuSans-Bold-18.json
+  hash: bb119c87e92dbd60554c370bebf2f4b20ee8e08c1ea3c82a0cc77de4ca791c38
+  license: MIT
+- name: FONT_DEJAVU_SANS_OBLIQUE_18_BIN
+  path: fonts/DejaVuSans-Oblique-18.bin
+  hash: 23642b88aa3a3fd786b9464c0d60a6638fed028191ad45fa906f177ccda815d5
+  license: MIT
+- name: FONT_DEJAVU_SANS_OBLIQUE_18_JSON
+  path: fonts/DejaVuSans-Oblique-18.json
+  hash: 66f42b473c5d421be27d22563302bbb751ed6c4eeab2a469dd2cf8fabdd81739
+  license: MIT
 naming:
   prefixes:
     fonts: FONT_
