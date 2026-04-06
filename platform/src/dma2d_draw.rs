@@ -78,7 +78,7 @@ impl Dma2dOverlayCtx {
     // ── Rectangle fills ────────────────────────────────────────────────
 
     /// Fill a landscape-coordinate rectangle with solid color.
-    /// Uses CPU writes (not DMA2D) to avoid SDRAM bank contention with LTDC.
+    /// Uses CPU writes with periodic bus yield to prevent LTDC starvation.
     pub fn fill_rect_rotated(&mut self, wx: i32, wy: i32, ww: i32, wh: i32, color: Color) {
         if let Some((fx, fy, fw, fh)) = self.rotate_clip(wx, wy, ww, wh) {
             let argb = color.to_argb8888();
@@ -87,6 +87,10 @@ impl Dma2dOverlayCtx {
                 for col in 0..fw {
                     unsafe { ptr.add(col as usize).write_volatile(argb) };
                 }
+                // Yield AXI bus: ~2µs delay lets LTDC read ~200 bytes
+                // between each row of CPU writes. Without this, the tight
+                // write loop monopolizes the AXI bus and starves LTDC.
+                cortex_m::asm::delay(1000);
             }
         }
     }

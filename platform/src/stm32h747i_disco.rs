@@ -498,10 +498,26 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         d3(2, 0xB007_0003); // post-SDRAM init
         sdram_alloc::init(fb, 32 * 1024 * 1024);
         let fb_bytes = (width as usize) * (height as usize) * 4; // ARGB8888
-        let fb_addr = sdram_alloc::alloc(fb_bytes, 64).unwrap_or(fb);
-        let fb_back = sdram_alloc::alloc(fb_bytes, 64).unwrap_or(fb_addr);
+
+        // Place front and back buffers in DIFFERENT SDRAM internal banks
+        // to eliminate row conflicts between LTDC reads and CPU/DMA2D writes.
+        // IS42S32800J bank mapping (NC=9, NR=12, 32-bit):
+        //   Bank 0: 0xD000_0000  Bank 1: 0xD080_0000
+        //   Bank 2: 0xD100_0000  Bank 3: 0xD180_0000
+        let fb_addr = fb;                // Bank 0
+        let fb_back = fb + 0x0080_0000;  // Bank 1
         disp.fb_addr = fb_addr;
         disp.fb_addr_back = fb_back;
+
+        // Give LTDC highest AXI QoS priority so its reads aren't starved
+        // by CPU/DMA2D writes. AXI interconnect base = 0x5100_0000.
+        // INI5 = LTDC (offset 0x46100 for read QoS, 0x46104 for write QoS)
+        unsafe {
+            (0x5104_6100u32 as *mut u32).write_volatile(0xF); // LTDC read QoS = max
+            (0x5104_6104u32 as *mut u32).write_volatile(0xF); // LTDC write QoS = max
+        }
+        // Advance allocator past both reserved banks
+        let _ = sdram_alloc::alloc(0x0100_0000, 1); // reserve Banks 0+1 (16 MB)
         disp.width = width;
         disp.height = height;
         Self::configure_mpu_sdram_writethrough(0xD000_0000, 32 * 1024 * 1024);
@@ -1085,12 +1101,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             p.MPU.rbar.write(base);
             // RASR attributes:
             // XN=1 (execute never), AP=0b011 (full access)
-            // TEX=0, C=0, B=0, S=1 → Strongly-ordered / Device (no caching)
-            // This ensures LTDC AXI reads see the same data CM7 writes.
+            // TEX=0, C=1, B=0, S=0 → Write-Through, No Write-Allocate, Non-Shareable
+            // CRITICAL: S must be 0 — on Cortex-M7, Shareable Normal memory
+            // bypasses the internal D-cache entirely, defeating Write-Through.
+            // With S=0 + D-cache enabled, CPU writes go to BOTH cache and SDRAM
+            // via the AXI write buffer, which batches transactions and prevents
+            // CPU writes from monopolizing the bus (starving LTDC reads).
+            // LTDC reads directly from SDRAM, which is always up-to-date
+            // because Write-Through ensures every write reaches memory.
             let xn = 1u32 << 28;
             let ap = 0b011u32 << 24;
-            let tex_cb_s = (0u32 << 19) | (0u32 << 17) | (0u32 << 16); // TEX=0,C=0,B=0
-            let s = 1u32 << 18; // Shareable
+            let tex_cb_s = (0u32 << 19) | (1u32 << 17) | (0u32 << 16); // TEX=0,C=1,B=0
+            let s = 0u32 << 18; // Non-Shareable (required for CM7 D-cache to function)
             let size_field = (sz & 0x1F) << 1;
             let enable = 1u32;
             p.MPU
@@ -1102,6 +1124,32 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             p.MPU.ctrl.write(0x5);
             cortex_m::asm::dsb();
             cortex_m::asm::isb();
+
+            // Enable D-cache so Write-Through MPU attribute takes effect.
+            // Without D-cache, C=1 is ignored and writes go directly to AXI
+            // (strongly-ordered behavior), monopolizing the bus.
+            // SCB CCR register at 0xE000_ED14, D-cache enable = bit 16
+            let ccr = (0xE000_ED14 as *const u32).read_volatile();
+            if ccr & (1 << 16) == 0 {
+                // Invalidate D-cache before enabling (ARM requirement)
+                // DCISW approach: invalidate by set/way all cache sets
+                // For simplicity, use CSSELR=0 (L1 D-cache) then loop sets×ways
+                (0xE000_ED84 as *mut u32).write_volatile(0); // CSSELR = L1 data
+                cortex_m::asm::dsb();
+                // CM7 L1 D-cache: 32 KB, 8-way, 128 sets, 32-byte lines
+                for set in 0..128u32 {
+                    for way in 0..8u32 {
+                        let val = (way << 30) | (set << 5);
+                        (0xE000_EF60 as *mut u32).write_volatile(val); // DCISW
+                    }
+                }
+                cortex_m::asm::dsb();
+                cortex_m::asm::isb();
+                // Enable D-cache (set bit 16 of CCR)
+                (0xE000_ED14 as *mut u32).write_volatile(ccr | (1 << 16));
+                cortex_m::asm::dsb();
+                cortex_m::asm::isb();
+            }
         }
     }
 
