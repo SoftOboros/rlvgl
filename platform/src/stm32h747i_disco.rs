@@ -1111,8 +1111,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // because Write-Through ensures every write reaches memory.
             let xn = 1u32 << 28;
             let ap = 0b011u32 << 24;
-            let tex_cb_s = (0u32 << 19) | (1u32 << 17) | (0u32 << 16); // TEX=0,C=1,B=0
-            let s = 0u32 << 18; // Non-Shareable (required for CM7 D-cache to function)
+            let tex_cb_s = (0u32 << 19) | (0u32 << 17) | (0u32 << 16); // TEX=0,C=0,B=0
+            let s = 1u32 << 18; // Shareable
             let size_field = (sz & 0x1F) << 1;
             let enable = 1u32;
             p.MPU
@@ -1125,7 +1125,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             cortex_m::asm::dsb();
             cortex_m::asm::isb();
 
-            // Enable D-cache so Write-Through MPU attribute takes effect.
+            // D-cache disabled for now — causes display coherency issues.
+            // TODO: investigate Write-Through + D-cache interaction with LTDC.
+            if false { // D-cache enable block
             // Without D-cache, C=1 is ignored and writes go directly to AXI
             // (strongly-ordered behavior), monopolizing the bus.
             // SCB CCR register at 0xE000_ED14, D-cache enable = bit 16
@@ -1150,6 +1152,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 cortex_m::asm::dsb();
                 cortex_m::asm::isb();
             }
+            } // end if false (D-cache disabled)
         }
     }
 
@@ -1194,6 +1197,48 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
         // Re-pulse WCR LTDCEN each frame (adapted command mode)
         unsafe { (0x5000_0404 as *mut u32).write_volatile(0x0C) };
+    }
+
+    /// Wait for LTDC/DSI to finish scanning the current front buffer.
+    ///
+    /// Polls DSI_WISR.ERIF (End-of-Refresh) which is set when the DSI
+    /// wrapper completes a frame transfer in adapted command mode.
+    /// After this returns, the back buffer is safe to write at full speed
+    /// without starving LTDC reads.
+    ///
+    /// Returns `true` if EoR was detected, `false` on timeout.
+    pub fn wait_frame_done(&self) -> bool {
+        const WISR: *const u32 = 0x5000_040C as *const u32;
+        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
+        unsafe {
+            // Clear stale EoR flag
+            WIFCR.write_volatile(0x02); // CERIF
+            // Poll until EoR or timeout (~10 ms at 480 MHz)
+            let mut timeout = 5_000_000u32;
+            while timeout > 0 {
+                if WISR.read_volatile() & 0x02 != 0 {
+                    WIFCR.write_volatile(0x02); // clear for next frame
+                    return true;
+                }
+                timeout -= 1;
+            }
+        }
+        false // timeout — proceed in degraded mode
+    }
+
+    /// Check if LTDC FIFO underrun has occurred (diagnostic).
+    /// Returns `true` if underrun flag is set, and clears it.
+    pub fn check_fifo_underrun(&self) -> bool {
+        const LTDC_ISR: *const u32 = 0x5000_1038 as *const u32;
+        const LTDC_ICR: *mut u32 = 0x5000_103C as *mut u32;
+        unsafe {
+            let isr = LTDC_ISR.read_volatile();
+            if isr & 0x02 != 0 { // FUIF
+                LTDC_ICR.write_volatile(0x02); // CFUIF
+                return true;
+            }
+        }
+        false
     }
 
     #[cfg(all(

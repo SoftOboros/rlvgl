@@ -87,9 +87,7 @@ impl Dma2dOverlayCtx {
                 for col in 0..fw {
                     unsafe { ptr.add(col as usize).write_volatile(argb) };
                 }
-                // Yield AXI bus: ~2µs delay lets LTDC read ~200 bytes
-                // between each row of CPU writes. Without this, the tight
-                // write loop monopolizes the AXI bus and starves LTDC.
+                // Yield between rows until EoR gating is verified working
                 cortex_m::asm::delay(1000);
             }
         }

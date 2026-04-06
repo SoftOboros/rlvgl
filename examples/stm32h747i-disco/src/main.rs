@@ -34,6 +34,8 @@ mod icon_strip;
 mod ipc;
 mod readme_crawl;
 mod star_crawl;
+#[cfg(feature = "audio")]
+mod audio_scope;
 mod settings_dialog;
 mod sys_info;
 mod wing;
@@ -1255,9 +1257,9 @@ fn main() -> ! {
             // Enable SAI1 TX — codec is now receiving I2S frames
             sai.enable_tx();
 
-            // SAI4 PDM mic GPIO deferred — uncomment when mic capture is activated
-            // let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
-            // let _sai4_d1  = gpioc.pc1.into_alternate::<10>();
+            // SAI4 PDM mic GPIO (PE2=CK1, PC1=D1)
+            let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
+            let _sai4_d1  = gpioc.pc1.into_alternate::<10>();
 
             // Release I2C4 back so touch can use it
             codec.release().0
@@ -1553,11 +1555,15 @@ fn main() -> ! {
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         let crawl_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
 
+        // Audio scope toggle flag — set by settings wing audio icon callback.
+        #[cfg(feature = "audio")]
+        let scope_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
+
         // Wings are created first so icon strip callbacks can reference them.
         let settings_wing = {
             use crate::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
-                (include_bytes!("../assets/icons/48/audio48.rle"), false),
+                (include_bytes!("../assets/icons/48/audio48.rle"), true),
                 (include_bytes!("../assets/icons/48/camera48.rle"), false),
                 (include_bytes!("../assets/icons/48/monitor48.rle"), false),
                 (include_bytes!("../assets/icons/48/globe48.rle"), true),
@@ -1602,6 +1608,15 @@ fn main() -> ! {
 
         // Wire settings wing callbacks
         {
+            // Audio (slot 0): toggle audio scope
+            #[cfg(feature = "audio")]
+            {
+                let sf = scope_flag.clone();
+                settings_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
+                    Some(alloc::boxed::Box::new(move |_| {
+                        sf.set(true);
+                    }));
+            }
             // Globe (slot 3) + Bug (slot 4): both toggle the config menu
             let cm1 = config_menu.clone();
             settings_wing.borrow_mut().slots_mut()[3].as_mut().unwrap().on_tap =
@@ -1918,6 +1933,28 @@ fn main() -> ! {
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         let mut audio_read_cursor: u32 = core::cmp::min(2 * 4096, audio_pcm_len);
 
+        // ── Audio scope (MEMS mic oscilloscope) ─────────────────────────
+        #[cfg(feature = "audio")]
+        let mut mic_capture = rlvgl::platform::mic_capture::MicCapture::new();
+        #[cfg(feature = "audio")]
+        let mut audio_scope = audio_scope::AudioScope::new();
+        // SRAM4 addresses for PDM DMA buffers and PCM output
+        #[cfg(feature = "audio")]
+        const PDM_BUF0_ADDR: u32 = 0x3800_0800;
+        #[cfg(feature = "audio")]
+        const PDM_BUF1_ADDR: u32 = 0x3800_0C00;
+        #[cfg(feature = "audio")]
+        const PDM_BUF_LEN: usize = 512; // halfwords per buffer
+        #[cfg(feature = "audio")]
+        const PCM_OUT_ADDR: u32 = 0x3800_1000;
+        #[cfg(feature = "audio")]
+        const PCM_OUT_LEN: usize = 1080;
+        // Per-frame PCM accumulator
+        #[cfg(feature = "audio")]
+        let mut pcm_frame_buf = [0i16; 720];
+        #[cfg(feature = "audio")]
+        let mut pcm_frame_count: usize = 0;
+
         loop {
             // Loop heartbeat
             unsafe {
@@ -1964,6 +2001,29 @@ fn main() -> ! {
                         audio_player.stop(&sai);
                     }
                     _ => {}
+                }
+            }
+
+            // ── Poll mic capture for audio scope ──
+            #[cfg(feature = "audio")]
+            if audio_scope.is_active() {
+                if let Some(buf_idx) = mic_capture.poll_ready() {
+                    let pdm_buf: &[u16] = if buf_idx == 0 {
+                        unsafe { core::slice::from_raw_parts(PDM_BUF0_ADDR as *const u16, PDM_BUF_LEN) }
+                    } else {
+                        unsafe { core::slice::from_raw_parts(PDM_BUF1_ADDR as *const u16, PDM_BUF_LEN) }
+                    };
+                    let pcm_out = unsafe {
+                        core::slice::from_raw_parts_mut(PCM_OUT_ADDR as *mut i16, PCM_OUT_LEN)
+                    };
+                    let count = mic_capture.filter().process(pdm_buf, pcm_out);
+                    let remaining = 720usize.saturating_sub(pcm_frame_count);
+                    let to_copy = count.min(remaining);
+                    if to_copy > 0 {
+                        pcm_frame_buf[pcm_frame_count..pcm_frame_count + to_copy]
+                            .copy_from_slice(&pcm_out[..to_copy]);
+                        pcm_frame_count += to_copy;
+                    }
                 }
             }
 
@@ -2338,10 +2398,43 @@ fn main() -> ! {
                     if star_crawl.is_active() {
                         star_crawl.deactivate();
                         dirty_frames = 4; // restore desktop
-                    } else if let Some(raw) = display.take_dma2d_raw() {
-                        let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
-                        star_crawl.activate(&mut blitter);
-                        display.return_dma2d_raw(blitter.into_inner());
+                    } else {
+                        // Deactivate audio scope if active (shared SDRAM region)
+                        #[cfg(feature = "audio")]
+                        if audio_scope.is_active() {
+                            audio_scope.deactivate();
+                            mic_capture.stop();
+                        }
+                        if let Some(raw) = display.take_dma2d_raw() {
+                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            star_crawl.activate(&mut blitter);
+                            display.return_dma2d_raw(blitter.into_inner());
+                        }
+                    }
+                }
+
+                // ── Audio scope toggle + render override ─────────────────
+                #[cfg(feature = "audio")]
+                if scope_flag.get() {
+                    scope_flag.set(false);
+                    if audio_scope.is_active() {
+                        audio_scope.deactivate();
+                        mic_capture.stop();
+                        dirty_frames = 4; // restore desktop
+                    } else {
+                        // Deactivate star crawl if active (shared SDRAM region)
+                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                        if star_crawl.is_active() {
+                            star_crawl.deactivate();
+                        }
+                        mic_capture.init(
+                            unsafe { core::slice::from_raw_parts_mut(PDM_BUF0_ADDR as *mut u16, PDM_BUF_LEN) },
+                            unsafe { core::slice::from_raw_parts_mut(PDM_BUF1_ADDR as *mut u16, PDM_BUF_LEN) },
+                            64, 1, 37,
+                        );
+                        mic_capture.start();
+                        pcm_frame_count = 0;
+                        audio_scope.activate();
                     }
                 }
 
@@ -2349,6 +2442,11 @@ fn main() -> ! {
                 let crawl_active = star_crawl.is_active();
                 #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
                 let crawl_active = false;
+
+                #[cfg(feature = "audio")]
+                let scope_active = audio_scope.is_active();
+                #[cfg(not(feature = "audio"))]
+                let scope_active = false;
 
                 if crawl_active {
                     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -2365,6 +2463,21 @@ fn main() -> ! {
                         if !star_crawl.is_active() {
                             dirty_frames = 4;
                         }
+                    }
+                } else if scope_active {
+                    #[cfg(feature = "audio")]
+                    {
+                        // Pad frame buffer with zeros if we didn't collect 720 samples
+                        for i in pcm_frame_count..720 {
+                            pcm_frame_buf[i] = 0;
+                        }
+                        let back = display.back_buffer_addr();
+                        let (w, h) = display.dimensions();
+                        if audio_scope.tick(&pcm_frame_buf, back as *mut u8, w, h) {
+                            render_count += 1;
+                            display.present();
+                        }
+                        pcm_frame_count = 0;
                     }
                 } else {
                     let need_render = dirty_frames > 0;
@@ -2388,13 +2501,15 @@ fn main() -> ! {
 
                         root.borrow().draw(&mut renderer);
 
-                        // CPU overlay rendering — no DMA2D needed
+                        // CPU overlay rendering — gated on DSI End-of-Refresh
                         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                         {
                             let any_overlay = chip_info_panel.borrow().is_visible()
                                 || live_stats_panel.borrow().is_visible()
                                 || config_menu.borrow().is_visible();
                             if any_overlay {
+                                // EoR gate deferred — needs WISR address verification
+                                // display.wait_frame_done();
                                 let scratch = unsafe {
                                     core::slice::from_raw_parts_mut(
                                         0xD04C_0000 as *mut u8, 1024,
