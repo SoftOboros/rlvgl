@@ -2037,6 +2037,63 @@ fn main() -> ! {
                                 dirty_frames = 2;
                                 root.borrow_mut().dispatch_event(&tap_evt);
                                 serial_puts("OK\r\n");
+                            } else if cmd[0] == b'D' || cmd[0] == b'd' {
+                                serial_puts("D:GOT\r\n");
+                                // Dump framebuffer window: D<x>,<y>,<w>,<h>[,<frames>]
+                                // Coords in landscape widget space. Output: hex ARGB per pixel, one row per line.
+                                // Reads from the FRONT buffer (what the display is showing).
+                                let parts: [i32; 5] = {
+                                    let mut p = [0i32; 5];
+                                    p[4] = 1; // default 1 frame
+                                    let mut pi = 0;
+                                    let mut val: i32 = 0;
+                                    let mut has = false;
+                                    for &b in &cmd[1..] {
+                                        if b == b',' {
+                                            if has && pi < 5 { p[pi] = val; pi += 1; }
+                                            val = 0; has = false;
+                                        } else if b >= b'0' && b <= b'9' {
+                                            val = val * 10 + (b - b'0') as i32;
+                                            has = true;
+                                        }
+                                    }
+                                    if has && pi < 5 { p[pi] = val; }
+                                    p
+                                };
+                                let (wx, wy, ww, wh, nframes) = (parts[0], parts[1], parts[2].max(1).min(40), parts[3].max(1).min(40), parts[4].max(1).min(4));
+                                serial_puts("DUMP ");
+                                for frame in 0..nframes {
+                                    if frame > 0 {
+                                        // Wait for next present by spinning until tick advances
+                                        let t0 = tick_count;
+                                        while tick_count == t0 { cortex_m::asm::nop(); }
+                                    }
+                                    let fb = display.front_buffer_addr() as *const u8;
+                                    let fb_stride = (display.dimensions().0 * 4) as usize;
+                                    let fb_w = display.dimensions().0 as i32;
+                                    serial_puts("F");
+                                    // For each landscape pixel (wx+col, wy+row), compute portrait coords
+                                    for row in 0..wh {
+                                        for col in 0..ww {
+                                            let px = fb_w - 1 - (wy + row);
+                                            let py = wx + col;
+                                            if px >= 0 && py >= 0 {
+                                                let off = py as usize * fb_stride + px as usize * 4;
+                                                let argb = (fb.add(off) as *const u32).read_volatile();
+                                                // Print as 8-char hex
+                                                let hex = b"0123456789ABCDEF";
+                                                let mut hb = [0u8; 8];
+                                                for i in 0..8 {
+                                                    hb[7 - i] = hex[((argb >> (i * 4)) & 0xF) as usize];
+                                                }
+                                                serial_puts(core::str::from_utf8_unchecked(&hb));
+                                                if col < ww - 1 { serial_puts(" "); }
+                                            }
+                                        }
+                                        serial_puts("\r\n");
+                                    }
+                                }
+                                serial_puts("END\r\n");
                             } else {
                                 serial_puts("ERR: unknown cmd\r\n");
                             }
@@ -2361,6 +2418,29 @@ fn main() -> ! {
                             }
                         }
 
+                        // Flicker probe disabled — confirmed overlay renders to both buffers
+                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                        if false && (chip_info_panel.borrow().is_visible() || live_stats_panel.borrow().is_visible()) {
+                            static mut FP_DIV: u8 = 0;
+                            unsafe {
+                                FP_DIV = FP_DIV.wrapping_add(1);
+                                if FP_DIV % 60 == 0 {
+                                    // Panel center: landscape (400,240) → portrait row=400, col=239
+                                    let off = 400 * (w * 4) as usize + 239 * 4;
+                                    let px = ((back as *const u8).add(off) as *const u32).read_volatile();
+                                    // BG_COLOR at alpha=255 is 0xFF1E1E1E
+                                    // Desktop is typically 0xFFxxxxxx (splash)
+                                    // If px != 0xFF1E1E1E, overlay didn't draw here
+                                    serial_puts(if px == 0xFF1E1E1E { "PX:BG " } else { "PX:!BG " });
+                                    // Also dump back/front addrs
+                                    serial_puts(if back == display.front_buffer_addr() as u32 {
+                                        "SAME!\r\n"
+                                    } else {
+                                        "ok\r\n"
+                                    });
+                                }
+                            }
+                        }
                         render_count += 1;
                         if dirty_frames > 0 { dirty_frames -= 1; }
                         display.present();
