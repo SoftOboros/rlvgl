@@ -23,6 +23,13 @@ impl Dma2dBlitter {
     pub fn new(regs: DMA2D) -> Self {
         // Ensure the engine is stopped.
         regs.cr.write(|w| unsafe { w.bits(0) });
+        // Clear all stale interrupt flags (TCIF, TEIF, etc.) so that
+        // the first wait() doesn't return prematurely from a previous op.
+        regs.ifcr.write(|w| unsafe { w.bits(0x3F) });
+        // Enable AXI dead time to avoid starving LTDC scanout.
+        // DT=8 cycles between DMA2D AXI bursts gives LTDC room to read.
+        // AXI dead time disabled — overlay fills use CPU, not DMA2D.
+        // regs.amtcr.write(|w| unsafe { w.bits((16 << 8) | 1) });
         Self { regs }
     }
 
@@ -56,7 +63,9 @@ impl Dma2dBlitter {
     const CR_MODE_M2M_BLEND: u32 = 0x0002_0000;
     const CR_MODE_R2M: u32 = 0x0003_0000;
     const CR_TCIE: u32 = 1 << 9;
-    const ISR_TC: u32 = 1;
+    /// TCIF = bit 1 of DMA2D_ISR (transfer complete).
+    /// Note: bit 0 is TEIF (transfer error), NOT transfer complete.
+    const ISR_TC: u32 = 1 << 1;
 
     /// Enable the transfer-complete interrupt.
     pub fn enable_tc_interrupt(&mut self) {
@@ -87,9 +96,16 @@ impl Dma2dBlitter {
         self.regs.ifcr.write(|w| unsafe { w.bits(Self::ISR_TC) });
     }
 
+    const ISR_CEIF: u32 = 1 << 5; // Configuration error
+    const ISR_TEIF: u32 = 1 << 0; // Transfer error (note: bit 0 is TEIF, bit 1 is TCIF)
+
     fn wait(&mut self) {
-        while !self.is_complete() {}
-        self.clear_complete();
+        // Spin until START auto-clears (transfer complete or aborted).
+        while self.regs.cr.read().bits() & Self::CR_START != 0 {
+            cortex_m::asm::nop();
+        }
+        // Clear all interrupt flags for next operation.
+        self.regs.ifcr.write(|w| unsafe { w.bits(0x3F) });
     }
 
     fn start_fill(&mut self, dst: &mut Surface, area: Rect, color: u32) {
@@ -99,15 +115,15 @@ impl Dma2dBlitter {
                 .as_mut_ptr()
                 .add((area.y as usize * dst.stride) + (area.x as usize * bpp))
         } as u32;
-        let line_offset = dst.stride - (area.w as usize * bpp);
+        let line_offset_px = (dst.stride - (area.w as usize * bpp)) / bpp;
 
         unsafe {
             self.regs.omar.write(|w| w.bits(start));
             self.regs.ocolr.write(|w| w.bits(color));
-            self.regs.oor.write(|w| w.bits(line_offset as u32));
+            self.regs.oor.write(|w| w.bits(line_offset_px as u32));
             self.regs
                 .nlr
-                .write(|w| w.bits(((area.h as u32) << 16) | area.w as u32));
+                .write(|w| w.bits((area.w as u32) << 16 | area.h as u32));
         }
         self.regs.cr.write(|w| unsafe { w.bits(Self::CR_MODE_R2M) });
         self.regs
@@ -136,23 +152,23 @@ impl Dma2dBlitter {
                 .add((dst_pos.1 as usize * dst.stride) + (dst_pos.0 as usize * dst_bpp))
         } as u32;
 
-        let src_offset = src.stride - (src_area.w as usize * src_bpp);
-        let dst_offset = dst.stride - (src_area.w as usize * dst_bpp);
+        let src_offset_px = (src.stride - (src_area.w as usize * src_bpp)) / src_bpp;
+        let dst_offset_px = (dst.stride - (src_area.w as usize * dst_bpp)) / dst_bpp;
 
         unsafe {
             self.regs.fgmar.write(|w| w.bits(src_start));
-            self.regs.fgor.write(|w| w.bits(src_offset as u32));
+            self.regs.fgor.write(|w| w.bits(src_offset_px as u32));
             self.regs
                 .fgpfccr
                 .write(|w| w.bits(Self::dma2d_fmt(src.format)));
             self.regs.omar.write(|w| w.bits(dst_start));
-            self.regs.oor.write(|w| w.bits(dst_offset as u32));
+            self.regs.oor.write(|w| w.bits(dst_offset_px as u32));
             self.regs
                 .opfccr
                 .write(|w| w.bits(Self::dma2d_fmt(dst.format)));
             self.regs
                 .nlr
-                .write(|w| w.bits(((src_area.h as u32) << 16) | src_area.w as u32));
+                .write(|w| w.bits((src_area.w as u32) << 16 | src_area.h as u32));
         }
         self.regs
             .cr
@@ -183,25 +199,25 @@ impl Dma2dBlitter {
                 .add((dst_pos.1 as usize * dst.stride) + (dst_pos.0 as usize * dst_bpp))
         } as u32;
 
-        let fg_offset = src.stride - (src_area.w as usize * src_bpp);
-        let bg_offset = dst.stride - (src_area.w as usize * dst_bpp);
+        let fg_offset_px = (src.stride - (src_area.w as usize * src_bpp)) / src_bpp;
+        let bg_offset_px = (dst.stride - (src_area.w as usize * dst_bpp)) / dst_bpp;
 
         unsafe {
             self.regs.fgmar.write(|w| w.bits(fg_start));
-            self.regs.fgor.write(|w| w.bits(fg_offset as u32));
+            self.regs.fgor.write(|w| w.bits(fg_offset_px as u32));
             self.regs
                 .fgpfccr
                 .write(|w| w.bits(Self::dma2d_fmt(src.format)));
             self.regs.bgmar.write(|w| w.bits(bg_start));
-            self.regs.bgor.write(|w| w.bits(bg_offset as u32));
+            self.regs.bgor.write(|w| w.bits(bg_offset_px as u32));
             self.regs
                 .bgpfccr
                 .write(|w| w.bits(Self::dma2d_fmt(dst.format)));
             self.regs.omar.write(|w| w.bits(bg_start));
-            self.regs.oor.write(|w| w.bits(bg_offset as u32));
+            self.regs.oor.write(|w| w.bits(bg_offset_px as u32));
             self.regs
                 .nlr
-                .write(|w| w.bits(((src_area.h as u32) << 16) | src_area.w as u32));
+                .write(|w| w.bits((src_area.w as u32) << 16 | src_area.h as u32));
         }
         self.regs
             .cr
@@ -231,17 +247,16 @@ impl Dma2dBlitter {
         fmt: PixelFmt,
     ) {
         let bpp = Self::pixel_size(fmt) as u32;
-        let line_offset = dst_stride - width * bpp;
+        let line_offset_px = (dst_stride / bpp) - width;
         unsafe {
             self.regs.omar.write(|w| w.bits(dst as u32));
             self.regs.ocolr.write(|w| w.bits(color));
-            self.regs
-                .opfccr
-                .write(|w| w.bits(Self::dma2d_fmt(fmt)));
-            self.regs.oor.write(|w| w.bits(line_offset));
+            // OPFCCR reset default is 0 = ARGB8888 — skip write for R2M
+            self.regs.oor.write(|w| w.bits(line_offset_px));
+            // NLR: PL[29:16] = pixels per line (width), NL[15:0] = number of lines (height)
             self.regs
                 .nlr
-                .write(|w| w.bits((height << 16) | width));
+                .write(|w| w.bits((width << 16) | height));
         }
         self.regs
             .cr
@@ -265,19 +280,19 @@ impl Dma2dBlitter {
         fmt: PixelFmt,
     ) {
         let bpp = Self::pixel_size(fmt) as u32;
-        let src_offset = src_stride - width * bpp;
-        let dst_offset = dst_stride - width * bpp;
+        let src_offset_px = (src_stride - width * bpp) / bpp;
+        let dst_offset_px = (dst_stride - width * bpp) / bpp;
         let cm = Self::dma2d_fmt(fmt);
         unsafe {
             self.regs.fgmar.write(|w| w.bits(src as u32));
-            self.regs.fgor.write(|w| w.bits(src_offset));
+            self.regs.fgor.write(|w| w.bits(src_offset_px));
             self.regs.fgpfccr.write(|w| w.bits(cm));
             self.regs.omar.write(|w| w.bits(dst as u32));
-            self.regs.oor.write(|w| w.bits(dst_offset));
+            self.regs.oor.write(|w| w.bits(dst_offset_px));
             self.regs.opfccr.write(|w| w.bits(cm));
             self.regs
                 .nlr
-                .write(|w| w.bits((height << 16) | width));
+                .write(|w| w.bits((width << 16) | height));
         }
         self.regs
             .cr
@@ -310,7 +325,7 @@ impl Dma2dBlitter {
         dst_stride: u32,
     ) {
         let dst_bpp = 4u32; // ARGB8888
-        let dst_offset = dst_stride - width * dst_bpp;
+        let dst_offset_px = (dst_stride - width * dst_bpp) / dst_bpp;
         unsafe {
             // Foreground: A8 source with fixed color
             self.regs.fgmar.write(|w| w.bits(a8_src as u32));
@@ -323,17 +338,17 @@ impl Dma2dBlitter {
 
             // Background: ARGB8888 destination (read side)
             self.regs.bgmar.write(|w| w.bits(dst as u32));
-            self.regs.bgor.write(|w| w.bits(dst_offset));
+            self.regs.bgor.write(|w| w.bits(dst_offset_px));
             self.regs.bgpfccr.write(|w| w.bits(0)); // ARGB8888
 
             // Output: same as background (in-place blend)
             self.regs.omar.write(|w| w.bits(dst as u32));
-            self.regs.oor.write(|w| w.bits(dst_offset));
+            self.regs.oor.write(|w| w.bits(dst_offset_px));
             self.regs.opfccr.write(|w| w.bits(0)); // ARGB8888
 
             self.regs
                 .nlr
-                .write(|w| w.bits((height << 16) | width));
+                .write(|w| w.bits((width << 16) | height));
         }
         self.regs
             .cr

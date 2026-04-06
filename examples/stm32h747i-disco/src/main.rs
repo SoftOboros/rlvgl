@@ -34,6 +34,7 @@ mod icon_strip;
 mod ipc;
 mod readme_crawl;
 mod star_crawl;
+mod settings_dialog;
 mod sys_info;
 mod wing;
 // HAL BSP module is not required for this bring-up path
@@ -441,6 +442,105 @@ fn early_fmc_setup() {
     }
 }
 
+// ── ADC3 internal temperature sensor ────────────────────────────────────
+//
+// ADC3 base = 0x5802_6000  (D3/SRD domain, AHB4)
+// ADC3_CCR  = 0x5802_6308  (common control, base + 0x300 + 0x08)
+// TS_CAL1   = 0x1FF1_E820  (factory cal at 30 °C, 16-bit, VDDA=3.3 V)
+// TS_CAL2   = 0x1FF1_E840  (factory cal at 110 °C, 16-bit, VDDA=3.3 V)
+
+const ADC3_BASE: u32 = 0x5802_6000;
+const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32;                  // +0x00
+const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32;          // +0x08
+const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32;       // +0x18
+const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32;       // +0x1C
+const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32;        // +0x30
+const ADC3_DR: *const u32 = (ADC3_BASE + 0x40) as *const u32;      // +0x40
+const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32;        // +0x300+0x08
+
+/// Initialise ADC3 for single-shot temperature sensor reads on channel 18.
+unsafe fn adc3_temp_init() {
+    // 1. Enable ADC3 clock (RCC_AHB4ENR bit 24)
+    let ahb4enr = 0x5802_44E0u32 as *mut u32;
+    ahb4enr.write_volatile(ahb4enr.read_volatile() | (1 << 24));
+    let _ = (ahb4enr as *const u32).read_volatile(); // readback fence
+
+    // 2. Exit deep power-down
+    let cr = ADC3_CR.read_volatile();
+    ADC3_CR.write_volatile(cr & !(1 << 29)); // DEEPPWD = 0
+
+    // 3. Enable voltage regulator
+    let cr = ADC3_CR.read_volatile();
+    ADC3_CR.write_volatile(cr | (1 << 28)); // ADVREGEN = 1
+
+    // 4. Wait regulator startup (~10 µs ≈ 4000 cycles at 400 MHz)
+    cortex_m::asm::delay(5000);
+
+    // 5. Set BOOST = 11 (ADC clock ≤ 50 MHz)
+    let cr = ADC3_CR.read_volatile();
+    ADC3_CR.write_volatile(cr | (0b11 << 8));
+
+    // 6. Clock mode: CKMODE = 11 → HCLK/4 = 50 MHz
+    let ccr = ADC3_CCR.read_volatile();
+    ADC3_CCR.write_volatile(ccr | (0b11 << 16));
+
+    // 7. Enable temperature sensor (TSEN)
+    let ccr = ADC3_CCR.read_volatile();
+    ADC3_CCR.write_volatile(ccr | (1 << 23));
+
+    // 8. Wait sensor wakeup (~26 µs)
+    cortex_m::asm::delay(12_000);
+
+    // 9. Preselect channel 18
+    ADC3_PCSEL.write_volatile(ADC3_PCSEL.read_volatile() | (1 << 18));
+
+    // 10. Sampling time SMP18 = 111 (810.5 cycles → 16.2 µs > 9 µs min)
+    ADC3_SMPR2.write_volatile(ADC3_SMPR2.read_volatile() | (0b111 << 24));
+
+    // 11. Calibrate (single-ended)
+    let cr = ADC3_CR.read_volatile();
+    ADC3_CR.write_volatile(cr | (1 << 31)); // ADCAL = 1
+    while ADC3_CR.read_volatile() & (1 << 31) != 0 {} // poll until done
+
+    // 12. Enable ADC
+    ADC3_ISR.write_volatile(1 << 0); // clear ADRDY
+    let cr = ADC3_CR.read_volatile();
+    ADC3_CR.write_volatile(cr | (1 << 0)); // ADEN = 1
+    while ADC3_ISR.read_volatile() & (1 << 0) == 0 {} // wait ADRDY
+
+    // 13. Single-channel sequence: L = 0 (1 conversion), SQ1 = 18
+    ADC3_SQR1.write_volatile(18 << 6);
+}
+
+/// Perform a single ADC3 conversion and return junction temperature in
+/// tenths of °C (e.g. 423 → 42.3 °C).  Reads factory cal values from ROM.
+unsafe fn adc3_read_temp_x10() -> i32 {
+    // Start conversion
+    let cr = ADC3_CR.read_volatile();
+    ADC3_CR.write_volatile(cr | (1 << 2)); // ADSTART
+
+    // Wait EOC
+    while ADC3_ISR.read_volatile() & (1 << 2) == 0 {}
+
+    let raw = ADC3_DR.read_volatile() as i32;
+
+    // Clear EOC
+    ADC3_ISR.write_volatile(1 << 2);
+
+    // Factory calibration values (16-bit, at VDDA = 3.3 V)
+    let ts_cal1 = (0x1FF1_E820u32 as *const u16).read_volatile() as i32;
+    let ts_cal2 = (0x1FF1_E840u32 as *const u16).read_volatile() as i32;
+    let denom = ts_cal2 - ts_cal1;
+    if denom == 0 { return 0; }
+
+    300 + 800 * (raw - ts_cal1) / denom
+}
+
+/// Cached junction temperature in tenths of °C.
+static mut CACHED_TEMP_X10: i32 = 0;
+/// Frame divider for slow ADC reads (~2 s at 30 fps).
+static mut TEMP_DIVIDER: u8 = 0;
+
 /// Heap size in bytes.
 const HEAP_SIZE: usize = 64 * 1024;
 
@@ -709,6 +809,10 @@ fn main() -> ! {
         #[cfg(feature = "qspi_flash")]
         let gpiob = GPIOB.split(ccdr.peripheral.GPIOB);
         unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32); } // post-gpio-split
+
+        // ── ADC3 temperature sensor ──────────────────────────────────────
+        unsafe { adc3_temp_init(); }
+
         // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
         struct HalResetPin<P>(P);
         impl<P> embedded_hal::digital::ErrorType for HalResetPin<P> {
@@ -905,20 +1009,27 @@ fn main() -> ! {
             let ahb4 = 0x5802_44E0u32 as *mut u32; // global AHB4ENR
             ahb4.write_volatile(ahb4.read_volatile() | (1 << 0));
             let _ = (ahb4 as *const u32).read_volatile();
-            // PA9 = AF7: AFRH bits 7:4 = 7, MODER bits 19:18 = 10 (AF)
+            // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits [7:4]=7 (PA9), [11:8]=7 (PA10)
             let gpioa = 0x5802_0000u32;
             let afrh = (gpioa + 0x24) as *mut u32;
-            afrh.write_volatile((afrh.read_volatile() & !(0xFu32 << 4)) | (7u32 << 4));
+            afrh.write_volatile(
+                (afrh.read_volatile() & !(0xFFu32 << 4)) | (7u32 << 4) | (7u32 << 8),
+            );
+            // MODER: PA9 = AF (10), PA10 = AF (10)
             let moder = gpioa as *mut u32;
-            moder.write_volatile((moder.read_volatile() & !(3u32 << 18)) | (2u32 << 18));
+            moder.write_volatile(
+                (moder.read_volatile() & !(0xF << 18)) | (0b1010 << 18),
+            );
             // Enable USART1 clock (C1_APB2ENR bit 4)
             let apb2 = 0x5802_44F0u32 as *mut u32;
             apb2.write_volatile(apb2.read_volatile() | (1 << 4));
             let _ = (apb2 as *const u32).read_volatile();
-            // USART1 config: BRR=868 (100 MHz / 115200), TE+UE
+            // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE
             let usart1 = 0x4001_1000u32;
             ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR
-            ((usart1 + 0x00) as *mut u32).write_volatile((1 << 3) | (1 << 0)); // CR1: TE + UE
+            ((usart1 + 0x00) as *mut u32).write_volatile(
+                (1 << 3) | (1 << 2) | (1 << 0), // TE + RE + UE
+            );
         }
 
         unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32); } // pre-display::new
@@ -934,6 +1045,14 @@ fn main() -> ! {
             Some(SPLASH_RLE),
         );
         unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); } // post-display::new
+        // Early serial breadcrumb (serial_puts not yet defined)
+        {
+            const ISR: *const u32 = 0x4001_101C as *const u32;
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            for &b in b"POST-DISP\r\n" {
+                unsafe { while ISR.read_volatile() & (1 << 7) == 0 {} TDR.write_volatile(b as u32); }
+            }
+        }
         // No splash delay — splash is the desktop background.
         // Optional: SDRAM RAM test (feature-gated). Writes a few patterns per MB
         // and prints progress via semihosting if enabled.
@@ -1079,6 +1198,13 @@ fn main() -> ! {
                 Err(embedded_hal::i2c::ErrorKind::Other)
             }
         }
+        {
+            const ISR: *const u32 = 0x4001_101C as *const u32;
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            for &b in b"PRE-AUDIO\r\n" {
+                unsafe { while ISR.read_volatile() & (1 << 7) == 0 {} TDR.write_volatile(b as u32); }
+            }
+        }
         // ── Audio codec init (before touch claims I2C4) ──
         #[cfg(feature = "audio")]
         let sai = {
@@ -1118,15 +1244,22 @@ fn main() -> ! {
             // Enable SAI1 TX — codec is now receiving I2S frames
             sai.enable_tx();
 
-            // ── SAI4 PDM microphone GPIO (PE2=SAI4_CK1, PC1=SAI4_D1, AF10) ──
-            let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
-            let _sai4_d1  = gpioc.pc1.into_alternate::<10>();
+            // SAI4 PDM mic GPIO deferred — uncomment when mic capture is activated
+            // let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
+            // let _sai4_d1  = gpioc.pc1.into_alternate::<10>();
 
             // Release I2C4 back so touch can use it
             codec.release().0
         };
         #[cfg(not(feature = "audio"))]
         let i2c4 = i2c4;
+        {
+            const ISR: *const u32 = 0x4001_101C as *const u32;
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            for &b in b"POST-AUDIO\r\n" {
+                unsafe { while ISR.read_volatile() & (1 << 7) == 0 {} TDR.write_volatile(b as u32); }
+            }
+        }
 
         let touch_i2c = HalI2c(i2c4);
         let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
@@ -1148,6 +1281,7 @@ fn main() -> ! {
             HalInputPin(gpiok.pk6.into_pull_up_input()),
         );
 
+        serial_puts("PRE-TREE\r\n");
         // Build a minimal root widget tree. The demo app tree has a white
         // root container that paints over the SDRAM splash. We use an invisible
         // root that produces no pixels — the splash survives in the framebuffer
@@ -1198,6 +1332,7 @@ fn main() -> ! {
             use stm32h7xx_hal::gpio::Alternate;
 
             // Card detect: PI8 is active-low (low = card inserted)
+            serial_puts("SD-DETECT\r\n");
             let sd_detect = gpioi.pi8.into_pull_up_input();
             let card_present = sd_detect.is_low();
 
@@ -1216,6 +1351,7 @@ fn main() -> ! {
             );
             let bd = SdMmcBlockDev::new(sdmmc);
 
+            serial_puts(if card_present { "SD: card in\r\n" } else { "SD: no card\r\n" });
             let sd_msg: &str = if !card_present {
                 t!("hw.sd_no_card")
             } else {
@@ -1360,6 +1496,7 @@ fn main() -> ! {
         let event_win = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10)
                 .expire_ticks(FRAME_HZ * 10) // 10-second timeout
+                .center(800, 480)
                 .build(),
         ));
 
@@ -1420,33 +1557,14 @@ fn main() -> ! {
         let info_wing = {
             use crate::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
-                (include_bytes!("../assets/icons/48/cpu48.rle"), true),
-                (include_bytes!("../assets/icons/48/favicon48.rle"), true),
-                (include_bytes!("../assets/icons/48/play48.rle"), false),
+                (include_bytes!("../assets/icons/48/cpu48.rle"), true),      // Chip info
+                (include_bytes!("../assets/icons/48/monitor48.rle"), true),  // Live stats
+                (include_bytes!("../assets/icons/48/play48.rle"), true),     // Star crawl
             ])))
         };
 
-        // Wire settings wing callbacks
-        {
-            // Language (slot 3): cycle locale
-            settings_wing.borrow_mut().slots_mut()[3].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(|_| {
-                    let cur = rlvgl_i18n::locale() as u8;
-                    let next = (cur + 1) % 2;
-                    let locale = rlvgl_i18n::locale_from_u8(next);
-                    rlvgl_i18n::set_locale(locale);
-                }));
-            // Bug (slot 4): toggle event viewer
-            let ew = event_win.clone();
-            settings_wing.borrow_mut().slots_mut()[4].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    let enabled = ew.borrow().is_enabled();
-                    ew.borrow_mut().set_enabled(!enabled);
-                }));
-        }
-
-        // ── System info panel ────────────────────────────────────────────
-        let sys_info_panel = {
+        // ── Config menu (language + debug settings) ──────────────────────
+        let config_menu = {
             use rlvgl::core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
@@ -1454,23 +1572,78 @@ fn main() -> ! {
                 glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
                 data: FONT_DATA,
             };
-            Rc::new(RefCell::new(crate::sys_info::SysInfoPanel::new(&UI_FONT)))
+            let cur_locale = rlvgl_i18n::locale() as u8;
+            let ew_clone = event_win.clone();
+            let cm = crate::config_menu::ConfigMenu::new(
+                rlvgl::core::widget::Rect { x: 0, y: 0, width: 0, height: 0 }, // gear bounds unused
+                cur_locale,
+                &UI_FONT,
+            )
+            .on_change(|locale| {
+                let l = rlvgl_i18n::locale_from_u8(locale);
+                rlvgl_i18n::set_locale(l);
+            })
+            .on_event_viewer_change(move |enabled| {
+                ew_clone.borrow_mut().set_enabled(enabled);
+            });
+            Rc::new(RefCell::new(cm))
+        };
+
+        // Wire settings wing callbacks
+        {
+            // Globe (slot 3) + Bug (slot 4): both toggle the config menu
+            let cm1 = config_menu.clone();
+            settings_wing.borrow_mut().slots_mut()[3].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    cm1.borrow_mut().toggle_visible();
+                }));
+            let cm2 = config_menu.clone();
+            settings_wing.borrow_mut().slots_mut()[4].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    cm2.borrow_mut().toggle_visible();
+                }));
+        }
+
+        // ADC3 temp init deferred — calibration hangs without further debug
+        // unsafe { adc3_temp_init(); }
+        serial_puts("PRE-SIP\r\n");
+        // ── System info panels (static + dynamic) ──────────────────────
+        let (chip_info_panel, live_stats_panel) = {
+            use rlvgl::core::packed_font::PackedFont;
+            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+            static UI_FONT: PackedFont = PackedFont {
+                height: 24,
+                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                data: FONT_DATA,
+            };
+            (
+                Rc::new(RefCell::new(crate::sys_info::ChipInfoPanel::new(&UI_FONT))),
+                Rc::new(RefCell::new(crate::sys_info::LiveStatsPanel::new(&UI_FONT))),
+            )
         };
 
         // Wire info wing callbacks
-        // Slot 0 (system): toggle sys info panel
+        // Slot 0 (cpu): toggle chip info panel
         {
-            let sip = sys_info_panel.clone();
+            let cip = chip_info_panel.clone();
             info_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
-                    sip.borrow_mut().toggle();
+                    cip.borrow_mut().toggle();
                 }));
         }
-        // Slot 1 (favicon): trigger star wars crawl
+        // Slot 1 (favicon): toggle live stats panel
+        {
+            let lsp = live_stats_panel.clone();
+            info_wing.borrow_mut().slots_mut()[1].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    lsp.borrow_mut().toggle();
+                }));
+        }
+        // Slot 2 (play): trigger star wars crawl
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         {
             let cf = crawl_flag.clone();
-            info_wing.borrow_mut().slots_mut()[1].as_mut().unwrap().on_tap =
+            info_wing.borrow_mut().slots_mut()[2].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
                     cf.set(true);
                 }));
@@ -1488,7 +1661,7 @@ fn main() -> ! {
 
             let icons: [(&[u8], bool); 3] = [
                 (include_bytes!("../assets/icons/settings.rle"), true),
-                (include_bytes!("../assets/icons/file.rle"), false),
+                (include_bytes!("../assets/icons/file.rle"), true),
                 (include_bytes!("../assets/icons/info.rle"), true),
             ];
 
@@ -1523,9 +1696,18 @@ fn main() -> ! {
             }));
 
             // Overlays dispatched first so they receive events when visible.
-            // Sys info panel consumes taps to close itself.
+            // Config menu (highest priority — modal)
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-                widget: sys_info_panel.clone(),
+                widget: config_menu.clone(),
+                children: alloc::vec![],
+            });
+            // Info panels consume taps to close themselves.
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: chip_info_panel.clone(),
+                children: alloc::vec![],
+            });
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: live_stats_panel.clone(),
                 children: alloc::vec![],
             });
             // Wings next — on the left edge, get events before icon strip.
@@ -1544,6 +1726,7 @@ fn main() -> ! {
             });
         }
 
+        serial_puts("PRE-FB2\r\n");
         unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
@@ -1662,6 +1845,26 @@ fn main() -> ! {
 
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
+        serial_puts("MAIN LOOP START\r\n");
+
+        // ── Serial command RX buffer ──────────────────────────────────────
+        // Protocol: "T<x>,<y>\n" injects a tap at (x,y)
+        //           "?\n" prints tick count + status
+        const USART1_ISR: *const u32 = 0x4001_101Cu32 as *const u32;
+        const USART1_RDR: *const u32 = 0x4001_1024u32 as *const u32;
+        let mut serial_buf = [0u8; 32];
+        let mut serial_len: usize = 0;
+
+        /// Parse "T<x>,<y>" from buffer. Returns Some((x,y)) on success.
+        fn parse_tap(buf: &[u8]) -> Option<(i32, i32)> {
+            if buf.is_empty() || buf[0] != b'T' { return None; }
+            let s = core::str::from_utf8(&buf[1..]).ok()?;
+            let mut parts = s.split(',');
+            let x: i32 = parts.next()?.trim().parse().ok()?;
+            let y: i32 = parts.next()?.trim().parse().ok()?;
+            Some((x, y))
+        }
+
         let mut dirty_frames: u8 = 4; // force initial render
         let mut was_visible = false;
         let mut render_count: u32 = 0;
@@ -1784,6 +1987,49 @@ fn main() -> ! {
                 }
             }
 
+            // ── Serial RX command injection ──
+            // Drain USART1 RX FIFO, accumulate into serial_buf, dispatch on '\n'
+            unsafe {
+                while USART1_ISR.read_volatile() & (1 << 5) != 0 { // RXNE
+                    let byte = (USART1_RDR.read_volatile() & 0xFF) as u8;
+                    if byte == b'\n' || byte == b'\r' {
+                        if serial_len > 0 {
+                            let cmd = &serial_buf[..serial_len];
+                            if cmd[0] == b'?' {
+                                // Status query: print tick count
+                                serial_puts("tick=");
+                                // Quick decimal print of tick_count
+                                let mut tbuf = [0u8; 10];
+                                let mut ti = 0;
+                                let mut tv = tick_count;
+                                if tv == 0 { serial_puts("0"); }
+                                else {
+                                    while tv > 0 { tbuf[ti] = b'0' + (tv % 10) as u8; tv /= 10; ti += 1; }
+                                    for &b in tbuf[..ti].iter().rev() {
+                                        let s = [b];
+                                        serial_puts(core::str::from_utf8_unchecked(&s));
+                                    }
+                                }
+                                serial_puts("\r\n");
+                            } else if let Some((x, y)) = parse_tap(cmd) {
+                                // Inject synthetic tap: PressDown + PressRelease
+                                serial_puts("TAP ");
+                                let tap_evt = Event::PressRelease { x, y };
+                                dirty_frames = 2;
+                                root.borrow_mut().dispatch_event(&tap_evt);
+                                serial_puts("OK\r\n");
+                            } else {
+                                serial_puts("ERR: unknown cmd\r\n");
+                            }
+                            serial_len = 0;
+                        }
+                    } else if serial_len < serial_buf.len() {
+                        serial_buf[serial_len] = byte;
+                        serial_len += 1;
+                    }
+                }
+            }
+
             // ── Poll button (PC13 — the one with the pole) ──
             if let Some(evt) = button_input.poll() {
                 unsafe {
@@ -1862,8 +2108,10 @@ fn main() -> ! {
 
                 // (Wing clear_region handled by widget tree dispatch below)
 
-                // Dispatch Tick to age EventWindow entries
-                root.borrow_mut().dispatch_event(&Event::Tick);
+                // Proxy Tick to widgets that need it — tree dispatch
+                // hangs when overlay panels are visible (unknown root cause).
+                event_win.borrow_mut().handle_event(&Event::Tick);
+                config_menu.borrow_mut().handle_event(&Event::Tick);
 
                 let vis = event_win.borrow().is_visible();
                 let entry_count = event_win.borrow().entry_count();
@@ -1902,15 +2150,80 @@ fn main() -> ! {
                     }
                     unsafe { IW_WAS_VISIBLE = iw_vis; }
                 }
-                // Track sys info panel visibility
-                let sip_vis = sys_info_panel.borrow().is_visible();
-                static mut SIP_WAS_VISIBLE: bool = false;
-                if sip_vis != unsafe { SIP_WAS_VISIBLE } {
-                    dirty_frames = 4;
-                    if !sip_vis {
-                        compositor.mark_pristine_restore(sys_info_panel.borrow().bounds());
+                // ADC3 temperature read disabled until init is fixed
+                // unsafe {
+                //     TEMP_DIVIDER = TEMP_DIVIDER.wrapping_add(1);
+                //     if TEMP_DIVIDER % 60 == 0 {
+                //         CACHED_TEMP_X10 = adc3_read_temp_x10();
+                //     }
+                // }
+                // System panel: deferred collect + FPS update
+                if chip_info_panel.borrow_mut().poll(tick_count) {
+                    dirty_frames = dirty_frames.max(2);
+                }
+                if chip_info_panel.borrow().is_visible() {
+                    dirty_frames = dirty_frames.max(1);
+                }
+                // Track chip info panel visibility
+                {
+                    let vis = chip_info_panel.borrow().is_visible();
+                    static mut CIP_WAS_VIS: bool = false;
+                    if vis != unsafe { CIP_WAS_VIS } {
+                        dirty_frames = 4;
+                        if !vis {
+                            compositor.mark_pristine_restore(chip_info_panel.borrow().bounds());
+                        }
+                        unsafe { CIP_WAS_VIS = vis; }
                     }
-                    unsafe { SIP_WAS_VISIBLE = sip_vis; }
+                }
+                // Track live stats panel visibility
+                {
+                    let vis = live_stats_panel.borrow().is_visible();
+                    static mut LSP_WAS_VIS: bool = false;
+                    if vis != unsafe { LSP_WAS_VIS } {
+                        dirty_frames = 4;
+                        if !vis {
+                            compositor.mark_pristine_restore(live_stats_panel.borrow().bounds());
+                        }
+                        unsafe { LSP_WAS_VIS = vis; }
+                    }
+                }
+                // Live stats refresh (~2 Hz) — skip first frame after becoming visible
+                {
+                    let lsp_now = live_stats_panel.borrow().is_visible();
+                    static mut LSP_PREV_VIS: bool = false;
+                    let was = unsafe { LSP_PREV_VIS };
+                    unsafe { LSP_PREV_VIS = lsp_now; }
+                    if lsp_now && was {
+                        let heap_used = ALLOC.used();
+                        let heap_total = heap_used + ALLOC.free();
+                        let refreshed = {
+                            let mut lsp = live_stats_panel.borrow_mut();
+                            lsp.refresh(tick_count, heap_used, heap_total, unsafe { CACHED_TEMP_X10 })
+                        };
+                        if refreshed {
+                            dirty_frames = dirty_frames.max(2);
+                        }
+                    }
+                }
+                // Keep live stats dirty while visible
+                if live_stats_panel.borrow().is_visible() {
+                    dirty_frames = dirty_frames.max(1);
+                }
+                // Track config menu visibility
+                {
+                    let cm_vis = config_menu.borrow().is_visible();
+                    static mut CM_WAS: bool = false;
+                    if cm_vis != unsafe { CM_WAS } {
+                        dirty_frames = 4;
+                        if !cm_vis {
+                            if let Some(b) = config_menu.borrow().last_panel_bounds() {
+                                compositor.mark_pristine_restore(b);
+                            }
+                        }
+                        unsafe { CM_WAS = cm_vis; }
+                    }
+                    if cm_vis { dirty_frames = dirty_frames.max(1); }
                 }
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
@@ -1967,7 +2280,6 @@ fn main() -> ! {
                         let fb_bytes = (w * h * 4) as usize;
                         let stride = (w * 4) as usize;
 
-                        // Restore saved pixels under dismissed overlays
                         compositor.restore(back as *mut u8);
 
                         let fb_slice = unsafe {
@@ -1980,8 +2292,42 @@ fn main() -> ! {
                             BlitterRenderer::new(&mut render_blitter, surface);
                         let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
 
-                        // Draw widget tree
                         root.borrow().draw(&mut renderer);
+
+                        // CPU overlay rendering for visible panels
+                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                        {
+                            let any_overlay = chip_info_panel.borrow().is_visible()
+                                || live_stats_panel.borrow().is_visible()
+                                || config_menu.borrow().is_visible();
+                            if any_overlay {
+                                if let Some(raw) = display.take_dma2d_raw() {
+                                    let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                                    let scratch = unsafe {
+                                        core::slice::from_raw_parts_mut(
+                                            0xD04C_0000 as *mut u8, 1024,
+                                        )
+                                    };
+                                    let mut ctx = rlvgl::platform::dma2d_draw::Dma2dOverlayCtx {
+                                        dma2d: &mut blitter,
+                                        fb: back as *mut u8,
+                                        fb_stride: w * 4,
+                                        fb_w: w,
+                                        fb_h: h,
+                                    };
+                                    if chip_info_panel.borrow().is_visible() {
+                                        chip_info_panel.borrow().draw_hw(&mut ctx, scratch);
+                                    }
+                                    if live_stats_panel.borrow().is_visible() {
+                                        live_stats_panel.borrow().draw_hw(&mut ctx, scratch);
+                                    }
+                                    if config_menu.borrow().is_visible() {
+                                        config_menu.borrow().draw_hw(&mut ctx, scratch);
+                                    }
+                                    display.return_dma2d_raw(blitter.into_inner());
+                                }
+                            }
+                        }
 
                         render_count += 1;
                         if dirty_frames > 0 { dirty_frames -= 1; }

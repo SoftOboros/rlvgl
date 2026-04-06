@@ -1,0 +1,491 @@
+//! DMA2D-accelerated overlay drawing with built-in 90° CCW rotation.
+//!
+//! All public methods accept **landscape** widget coordinates (800×480) and
+//! internally rotate to portrait framebuffer coordinates (480×800).
+//!
+//! This module bypasses the `Renderer` trait pipeline entirely, writing
+//! directly to the SDRAM framebuffer via DMA2D hardware operations.
+
+use crate::blit::PixelFmt;
+use crate::dma2d::Dma2dBlitter;
+use rlvgl_core::packed_font::PackedFont;
+use rlvgl_core::widget::{Color, Rect};
+
+/// Maximum glyph scratch buffer size (bytes). Covers up to ~22×22 glyphs.
+const MAX_GLYPH_PIXELS: usize = 512;
+
+/// Context for DMA2D-accelerated overlay rendering on a portrait framebuffer.
+pub struct Dma2dOverlayCtx<'a> {
+    /// DMA2D blitter (borrowed from display).
+    pub dma2d: &'a mut Dma2dBlitter,
+    /// Back-buffer base address in SDRAM.
+    pub fb: *mut u8,
+    /// Bytes per framebuffer row (fb_w × 4 for ARGB8888).
+    pub fb_stride: u32,
+    /// Portrait framebuffer width (480 on STM32H747I-DISCO).
+    pub fb_w: u32,
+    /// Portrait framebuffer height (800 on STM32H747I-DISCO).
+    pub fb_h: u32,
+}
+
+impl<'a> Dma2dOverlayCtx<'a> {
+    // ── Coordinate rotation ────────────────────────────────────────────
+
+    /// Rotate a landscape widget rect to portrait FB coordinates.
+    /// Returns `(fb_x, fb_y, fb_w, fb_h)` or `None` if fully off-screen.
+    fn rotate_clip(
+        &self,
+        wx: i32,
+        wy: i32,
+        ww: i32,
+        wh: i32,
+    ) -> Option<(i32, i32, i32, i32)> {
+        let mut fx = self.fb_w as i32 - wy - wh;
+        let fy = wx;
+        let mut fw = wh;
+        let fh = ww;
+
+        if fw <= 0 || fh <= 0 {
+            return None;
+        }
+
+        // Clip left
+        if fx < 0 {
+            fw += fx;
+            fx = 0;
+        }
+        // Clip right
+        if fx + fw > self.fb_w as i32 {
+            fw = self.fb_w as i32 - fx;
+        }
+        if fw <= 0 {
+            return None;
+        }
+        // Clip top/bottom
+        if fy < 0 || fy + fh > self.fb_h as i32 {
+            return None;
+        }
+
+        Some((fx, fy, fw, fh))
+    }
+
+    /// Pointer to a pixel at portrait FB coordinates.
+    #[inline]
+    fn fb_ptr(&self, fx: i32, fy: i32) -> *mut u8 {
+        unsafe {
+            self.fb
+                .add(fy as usize * self.fb_stride as usize + fx as usize * 4)
+        }
+    }
+
+    // ── Rectangle fills ────────────────────────────────────────────────
+
+    /// Fill a landscape-coordinate rectangle with solid color.
+    /// Uses CPU writes (not DMA2D) to avoid SDRAM bank contention with LTDC.
+    pub fn fill_rect_rotated(&mut self, wx: i32, wy: i32, ww: i32, wh: i32, color: Color) {
+        if let Some((fx, fy, fw, fh)) = self.rotate_clip(wx, wy, ww, wh) {
+            let argb = color.to_argb8888();
+            for row in 0..fh {
+                let ptr = self.fb_ptr(fx, fy + row) as *mut u32;
+                for col in 0..fw {
+                    unsafe { ptr.add(col as usize).write_volatile(argb) };
+                }
+            }
+        }
+    }
+
+    /// CPU source-over blend of a single pixel at portrait FB coordinates.
+    /// Faster than DMA2D for 1×1 operations (avoids register setup overhead).
+    fn blend_pixel_cpu(&self, fx: i32, fy: i32, color: Color) {
+        if fx < 0 || fx >= self.fb_w as i32 || fy < 0 || fy >= self.fb_h as i32 {
+            return;
+        }
+        let alpha = color.3 as u16;
+        if alpha == 0 {
+            return;
+        }
+        let ptr = self.fb_ptr(fx, fy);
+        unsafe {
+            if alpha == 255 {
+                let argb = color.to_argb8888();
+                (ptr as *mut u32).write_volatile(argb);
+            } else {
+                let inv = 255 - alpha;
+                let bg_b = *ptr.add(0) as u16;
+                let bg_g = *ptr.add(1) as u16;
+                let bg_r = *ptr.add(2) as u16;
+                *ptr.add(0) = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+                *ptr.add(1) = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+                *ptr.add(2) = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+                *ptr.add(3) = 0xFF;
+            }
+        }
+    }
+
+    /// Blend a single pixel at landscape widget coordinates.
+    fn blend_pixel_rotated(&self, wx: i32, wy: i32, color: Color) {
+        let fx = self.fb_w as i32 - 1 - wy;
+        let fy = wx;
+        self.blend_pixel_cpu(fx, fy, color);
+    }
+
+    // ── Rounded rectangles ─────────────────────────────────────────────
+
+    /// Fill a rounded rectangle via DMA2D fills + CPU AA fringe blends.
+    pub fn fill_rounded_rect_hw(&mut self, rect: Rect, color: Color, radius: u8) {
+        let r = (radius as i32).min(rect.width / 2).min(rect.height / 2);
+        if r <= 0 {
+            self.fill_rect_rotated(rect.x, rect.y, rect.width, rect.height, color);
+            return;
+        }
+
+        // Body: full-width strip between top-radius and bottom-radius
+        if rect.height - 2 * r > 0 {
+            self.fill_rect_rotated(
+                rect.x,
+                rect.y + r,
+                rect.width,
+                rect.height - 2 * r,
+                color,
+            );
+        }
+
+        // Top strip between corners
+        if rect.width - 2 * r > 0 {
+            self.fill_rect_rotated(
+                rect.x + r,
+                rect.y,
+                rect.width - 2 * r,
+                r,
+                color,
+            );
+            // Bottom strip
+            self.fill_rect_rotated(
+                rect.x + r,
+                rect.y + rect.height - r,
+                rect.width - 2 * r,
+                r,
+                color,
+            );
+        }
+
+        // Corner arcs with AA fringe
+        let base_alpha = color.3 as u16;
+        for dy in 0..r {
+            let (dx_int, frac) = arc_dx(r, dy);
+
+            if dx_int > 0 {
+                // top-left
+                self.fill_rect_rotated(
+                    rect.x + r - dx_int, rect.y + dy, dx_int, 1, color,
+                );
+                // top-right
+                self.fill_rect_rotated(
+                    rect.x + rect.width - r, rect.y + dy, dx_int, 1, color,
+                );
+                // bottom-left
+                self.fill_rect_rotated(
+                    rect.x + r - dx_int, rect.y + rect.height - 1 - dy, dx_int, 1, color,
+                );
+                // bottom-right
+                self.fill_rect_rotated(
+                    rect.x + rect.width - r, rect.y + rect.height - 1 - dy, dx_int, 1, color,
+                );
+            }
+
+            // AA fringe pixel at each corner
+            if frac > 0 {
+                let aa_alpha = ((frac as u16 * base_alpha) / 255) as u8;
+                let aa = Color(color.0, color.1, color.2, aa_alpha);
+                self.blend_pixel_rotated(rect.x + r - dx_int - 1, rect.y + dy, aa);
+                self.blend_pixel_rotated(rect.x + rect.width - r + dx_int, rect.y + dy, aa);
+                self.blend_pixel_rotated(
+                    rect.x + r - dx_int - 1,
+                    rect.y + rect.height - 1 - dy,
+                    aa,
+                );
+                self.blend_pixel_rotated(
+                    rect.x + rect.width - r + dx_int,
+                    rect.y + rect.height - 1 - dy,
+                    aa,
+                );
+            }
+        }
+    }
+
+    // ── Borders ────────────────────────────────────────────────────────
+
+    /// Draw a straight (non-rounded) border via 4 DMA2D fills.
+    pub fn draw_border_hw(&mut self, rect: Rect, color: Color, width: u8) {
+        let w = width as i32;
+        if w == 0 {
+            return;
+        }
+        // Top
+        self.fill_rect_rotated(rect.x, rect.y, rect.width, w, color);
+        // Bottom
+        self.fill_rect_rotated(rect.x, rect.y + rect.height - w, rect.width, w, color);
+        // Left
+        self.fill_rect_rotated(rect.x, rect.y + w, w, rect.height - 2 * w, color);
+        // Right
+        self.fill_rect_rotated(
+            rect.x + rect.width - w,
+            rect.y + w,
+            w,
+            rect.height - 2 * w,
+            color,
+        );
+    }
+
+    /// Draw a rounded border via DMA2D fills + CPU AA fringe.
+    pub fn draw_rounded_border_hw(
+        &mut self,
+        rect: Rect,
+        color: Color,
+        border_width: u8,
+        radius: u8,
+    ) {
+        let bw = border_width as i32;
+        if bw == 0 {
+            return;
+        }
+        let rout = (radius as i32).min(rect.width / 2).min(rect.height / 2);
+        if rout <= 0 {
+            self.draw_border_hw(rect, color, border_width);
+            return;
+        }
+        let rin = (rout - bw).max(0);
+        let base_alpha = color.3 as u16;
+
+        // Corner arcs (ring between outer and inner radius)
+        for dy in 0..rout {
+            let (out_dx, out_frac) = arc_dx(rout, dy);
+            let (in_dx, in_frac) = if rin > 0 { arc_dx(rin, dy) } else { (0, 0) };
+
+            let ring_w = out_dx - in_dx;
+            if ring_w > 0 {
+                self.fill_rect_rotated(
+                    rect.x + rout - out_dx, rect.y + dy, ring_w, 1, color,
+                );
+                self.fill_rect_rotated(
+                    rect.x + rect.width - rout + in_dx, rect.y + dy, ring_w, 1, color,
+                );
+                self.fill_rect_rotated(
+                    rect.x + rout - out_dx, rect.y + rect.height - 1 - dy, ring_w, 1, color,
+                );
+                self.fill_rect_rotated(
+                    rect.x + rect.width - rout + in_dx,
+                    rect.y + rect.height - 1 - dy,
+                    ring_w,
+                    1,
+                    color,
+                );
+            }
+
+            // Outer AA fringe
+            if out_frac > 0 {
+                let aa = Color(
+                    color.0, color.1, color.2,
+                    ((out_frac as u16 * base_alpha) / 255) as u8,
+                );
+                self.blend_pixel_rotated(rect.x + rout - out_dx - 1, rect.y + dy, aa);
+                self.blend_pixel_rotated(
+                    rect.x + rect.width - rout + out_dx, rect.y + dy, aa,
+                );
+                self.blend_pixel_rotated(
+                    rect.x + rout - out_dx - 1, rect.y + rect.height - 1 - dy, aa,
+                );
+                self.blend_pixel_rotated(
+                    rect.x + rect.width - rout + out_dx,
+                    rect.y + rect.height - 1 - dy,
+                    aa,
+                );
+            }
+
+            // Inner AA fringe
+            if in_dx > 0 && in_frac > 0 {
+                let aa = Color(
+                    color.0, color.1, color.2,
+                    (((255 - in_frac as u16) * base_alpha) / 255) as u8,
+                );
+                self.blend_pixel_rotated(rect.x + rout - in_dx, rect.y + dy, aa);
+                self.blend_pixel_rotated(
+                    rect.x + rect.width - rout + in_dx - 1, rect.y + dy, aa,
+                );
+                self.blend_pixel_rotated(
+                    rect.x + rout - in_dx, rect.y + rect.height - 1 - dy, aa,
+                );
+                self.blend_pixel_rotated(
+                    rect.x + rect.width - rout + in_dx - 1,
+                    rect.y + rect.height - 1 - dy,
+                    aa,
+                );
+            }
+        }
+
+        // Straight border segments between corners
+        let straight_h = rect.height - 2 * rout;
+        if straight_h > 0 {
+            self.fill_rect_rotated(rect.x, rect.y + rout, bw, straight_h, color);
+            self.fill_rect_rotated(
+                rect.x + rect.width - bw, rect.y + rout, bw, straight_h, color,
+            );
+        }
+        let straight_w = rect.width - 2 * rout;
+        if straight_w > 0 {
+            self.fill_rect_rotated(rect.x + rout, rect.y, straight_w, bw, color);
+            self.fill_rect_rotated(
+                rect.x + rout, rect.y + rect.height - bw, straight_w, bw, color,
+            );
+        }
+    }
+
+    // ── Text rendering ─────────────────────────────────────────────────
+
+    /// Render a single glyph at landscape (gx, gy) using DMA2D A8 blend.
+    ///
+    /// `glyph_data` is the raw A8 alpha bitmap (row-major, `gw × gh`).
+    /// `scratch` is a caller-provided buffer in DMA2D-accessible memory
+    /// (SDRAM) for the rotated A8 data. Must be ≥ `gw * gh` bytes.
+    pub fn draw_glyph_rotated(
+        &mut self,
+        gx: i32,
+        gy: i32,
+        glyph_data: &[u8],
+        gw: u32,
+        gh: u32,
+        fg_color: Color,
+        scratch: &mut [u8],
+    ) {
+        let total = (gw * gh) as usize;
+        if total == 0 || total > scratch.len() || glyph_data.len() < total {
+            return;
+        }
+
+        // Rotated FB destination
+        let fx = self.fb_w as i32 - gy as i32 - gh as i32;
+        let fy = gx;
+
+        // Clip check
+        if fx < 0 || fy < 0 || fx + gh as i32 > self.fb_w as i32 || fy + gw as i32 > self.fb_h as i32
+        {
+            return;
+        }
+
+        // Rotate A8 bitmap 90° CCW into scratch buffer.
+        // Original pixel at (col, row) → rotated at (col * gh + (gh - 1 - row)).
+        // Rotated dimensions: gh wide × gw tall.
+        for row in 0..gh as usize {
+            for col in 0..gw as usize {
+                let src_alpha = glyph_data[row * gw as usize + col];
+                // Modulate by color alpha
+                let alpha = if fg_color.3 == 255 {
+                    src_alpha
+                } else {
+                    ((src_alpha as u16 * fg_color.3 as u16) / 255) as u8
+                };
+                scratch[col * gh as usize + (gh as usize - 1 - row)] = alpha;
+            }
+        }
+
+        // CPU source-over blend of rotated glyph — avoids DMA2D SDRAM
+        // bank contention with LTDC. Each pixel: read BG, blend, write.
+        let alpha_base = fg_color.3 as u16;
+        for rot_row in 0..gw as usize {
+            for rot_col in 0..gh as usize {
+                let a8 = scratch[rot_row * gh as usize + rot_col] as u16;
+                if a8 == 0 {
+                    continue;
+                }
+                let alpha = (a8 * alpha_base) / 255;
+                let px = fx + rot_col as i32;
+                let py = fy + rot_row as i32;
+                if px < 0 || px >= self.fb_w as i32 || py < 0 || py >= self.fb_h as i32 {
+                    continue;
+                }
+                let ptr = self.fb_ptr(px, py);
+                unsafe {
+                    if alpha >= 255 {
+                        let argb = fg_color.to_argb8888();
+                        (ptr as *mut u32).write_volatile(argb);
+                    } else {
+                        let inv = 255 - alpha;
+                        let bg_b = *ptr.add(0) as u16;
+                        let bg_g = *ptr.add(1) as u16;
+                        let bg_r = *ptr.add(2) as u16;
+                        *ptr.add(0) = ((fg_color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+                        *ptr.add(1) = ((fg_color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+                        *ptr.add(2) = ((fg_color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+                        *ptr.add(3) = 0xFF;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Render a string at landscape (x, y) using DMA2D glyph blending.
+    ///
+    /// `scratch` must be in DMA2D-accessible memory (SDRAM), ≥ 512 bytes.
+    pub fn draw_str_rotated(
+        &mut self,
+        font: &PackedFont,
+        x: i32,
+        y: i32,
+        text: &str,
+        color: Color,
+        scratch: &mut [u8],
+    ) {
+        let mut cx = x;
+        for ch in text.chars() {
+            if let Some(glyph) = font.glyph(ch) {
+                let gw = glyph.width as u32;
+                let gh = glyph.height as u32;
+                let off = glyph.offset as usize;
+                let total = (gw * gh) as usize;
+
+                // Center glyph vertically relative to font height
+                let gy = y + (font.height as i32 - gh as i32) / 2;
+
+                if total > 0 && total <= scratch.len() {
+                    if let Some(data) = font.data.get(off..off + total) {
+                        self.draw_glyph_rotated(cx, gy, data, gw, gh, color, scratch);
+                    }
+                }
+                cx += (glyph.advance_fp16 as i32 + 8) >> 4;
+            } else {
+                cx += font.height as i32 / 2;
+            }
+        }
+    }
+}
+
+// ── Arc math (copied from core/src/draw.rs) ────────────────────────────
+
+/// Integer square root (floor).
+fn isqrt(n: u32) -> u32 {
+    if n == 0 {
+        return 0;
+    }
+    let mut x = n;
+    let mut y = (x + 1) / 2;
+    while y < x {
+        x = y;
+        y = (x + n / x) / 2;
+    }
+    x
+}
+
+/// Arc x-extent at row `dy` for radius `r`. Returns (integer_dx, 0-255 frac).
+fn arc_dx(r: i32, dy: i32) -> (i32, u8) {
+    let r4 = r as u32 * 4;
+    let dy4 = dy as u32 * 4 + 2;
+    let sq = r4 * r4;
+    let dysq = dy4 * dy4;
+    if dysq >= sq {
+        return (0, 0);
+    }
+    let dx4 = isqrt(sq - dysq);
+    let dx_int = (dx4 / 4) as i32;
+    let frac = (dx4 % 4) as u8 * 64;
+    (dx_int, frac)
+}

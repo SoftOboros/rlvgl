@@ -15,6 +15,9 @@ pub mod cpu_blitter;
 pub mod display;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub mod dma2d;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+/// DMA2D-accelerated drawing with rotation for overlay rendering.
+pub mod dma2d_draw;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")

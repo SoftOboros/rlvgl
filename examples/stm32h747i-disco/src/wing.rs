@@ -54,6 +54,8 @@ pub struct Wing {
     bounds: Rect,
     clear_countdown: u8,
     clear_bounds: Option<Rect>,
+    /// Swallow the first PressRelease after becoming visible (it's the tap that opened us).
+    ignore_next_release: bool,
 }
 
 impl Wing {
@@ -83,13 +85,14 @@ impl Wing {
             slot_count: n,
             visible: false,
             bounds: Rect {
-                x: WING_X,
+                x: WING_X - BORDER_WIDTH as i32,
                 y: 0,
-                width: ICON_SIZE, // just the icon column width
+                width: ICON_SIZE + BORDER_WIDTH as i32 * 2,
                 height: total_h,
             },
             clear_countdown: 0,
             clear_bounds: None,
+            ignore_next_release: false,
         }
     }
 
@@ -104,6 +107,7 @@ impl Wing {
             self.close();
         } else {
             self.visible = true;
+            self.ignore_next_release = true;
         }
         self.visible
     }
@@ -114,6 +118,7 @@ impl Wing {
             self.clear_bounds = Some(self.bounds);
             self.clear_countdown = CLEAR_FRAMES;
             self.visible = false;
+            self.ignore_next_release = false;
         }
     }
 
@@ -200,6 +205,16 @@ impl Widget for Wing {
         }
 
         if let Event::PressRelease { x, y } = event {
+            // Swallow the PressRelease that opened us (same event frame),
+            // but let taps on the right icon strip (x >= 720) pass through
+            // so the strip's toggle can fire.
+            if self.ignore_next_release {
+                self.ignore_next_release = false;
+                if *x < 720 {
+                    return true;
+                }
+                return false;
+            }
             // Use same split-gap hit cell strategy as the right strip
             let step = ICON_SIZE + GAP;
             for i in 0..self.slot_count {
@@ -225,8 +240,11 @@ impl Widget for Wing {
                 }
             }
 
-            // Tap outside the wing column — close it
-            self.close();
+            // Tap outside the wing column — close it, unless the tap is on the
+            // right icon strip (x >= 720) which handles its own toggle.
+            if *x < 720 {
+                self.close();
+            }
             return false;
         }
 

@@ -151,6 +151,8 @@ impl Widget for EventWindow {
 pub struct EventWindowBuilder {
     window_w: i32,
     window_h: i32,
+    pos_x: Option<i32>,
+    pos_y: Option<i32>,
     bg_color: Color,
     border_color: Color,
     border_width: u8,
@@ -171,6 +173,8 @@ impl EventWindowBuilder {
         Self {
             window_w,
             window_h,
+            pos_x: None,
+            pos_y: None,
             bg_color: Color(25, 25, 25, 255),
             border_color: Color(80, 80, 80, 255),
             border_width: 2,
@@ -207,13 +211,26 @@ impl EventWindowBuilder {
         self
     }
 
+    /// Override the window width.
+    pub fn width(mut self, w: i32) -> Self {
+        self.window_w = w;
+        self
+    }
+
+    /// Center the window on a screen of the given dimensions.
+    pub fn center(mut self, screen_w: i32, screen_h: i32) -> Self {
+        self.pos_x = Some((screen_w - self.window_w) / 2);
+        self.pos_y = Some((screen_h - self.window_h) / 2);
+        self
+    }
+
     /// Consume the builder and produce an [`EventWindow`].
     pub fn build(self) -> EventWindow {
         let margin = 10;
         EventWindow {
             bounds: Rect {
-                x: margin,
-                y: margin,
+                x: self.pos_x.unwrap_or(margin),
+                y: self.pos_y.unwrap_or(margin),
                 width: self.window_w,
                 height: self.window_h,
             },

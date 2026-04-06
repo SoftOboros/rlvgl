@@ -395,6 +395,106 @@ impl ConfigMenu {
     }
 }
 
+impl ConfigMenu {
+    /// DMA2D-accelerated draw, bypassing the Renderer pipeline.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn draw_hw(
+        &self,
+        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        scratch: &mut [u8],
+    ) {
+        if !self.visible {
+            return;
+        }
+
+        let panel = self.panel_bounds();
+        ctx.fill_rounded_rect_hw(panel, BG_COLOR, PANEL_RADIUS);
+        ctx.draw_rounded_border_hw(panel, BORDER_COLOR, 1, PANEL_RADIUS);
+
+        // Title
+        ctx.draw_str_rotated(
+            self.font,
+            panel.x + PANEL_PADDING,
+            panel.y + (TITLE_HEIGHT - self.font.height as i32) / 2,
+            "Settings",
+            TEXT_COLOR,
+            scratch,
+        );
+
+        // Close X (text fallback)
+        let cb = self.close_bounds();
+        ctx.draw_str_rotated(self.font, cb.x + 8, cb.y + 4, "X", CLOSE_COLOR, scratch);
+
+        // Language checkboxes
+        self.draw_checkbox_hw(ctx, scratch, self.content_grid().cell(0, 0), "English", self.pending == 0);
+        self.draw_checkbox_hw(ctx, scratch, self.content_grid().cell(1, 0), "Francais", self.pending == 1);
+
+        // Separator
+        let sep_y = self.content_grid().cell(2, 0).y + ROW_HEIGHT / 2;
+        ctx.fill_rect_rotated(
+            panel.x + PANEL_PADDING, sep_y, PANEL_W - 2 * PANEL_PADDING, 1, BORDER_COLOR,
+        );
+
+        // Event Viewer toggle
+        self.draw_checkbox_hw(ctx, scratch, self.content_grid().cell(3, 0), "Event Viewer", self.event_viewer_pending);
+
+        // OK / Cancel buttons
+        self.draw_button_hw(ctx, scratch, self.ok_bounds(), "OK", BTN_OK_BG);
+        self.draw_button_hw(ctx, scratch, self.cancel_bounds(), "Cancel", BTN_BG);
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn draw_checkbox_hw(
+        &self,
+        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        scratch: &mut [u8],
+        row: Rect,
+        label: &str,
+        checked: bool,
+    ) {
+        let box_rect = Rect {
+            x: row.x,
+            y: row.y + (ROW_HEIGHT - CHECK_SIZE) / 2,
+            width: CHECK_SIZE,
+            height: CHECK_SIZE,
+        };
+        ctx.fill_rect_rotated(box_rect.x, box_rect.y, box_rect.width, box_rect.height, BORDER_COLOR);
+        if checked {
+            let inner = Rect {
+                x: box_rect.x + 4, y: box_rect.y + 4,
+                width: box_rect.width - 8, height: box_rect.height - 8,
+            };
+            ctx.fill_rect_rotated(inner.x, inner.y, inner.width, inner.height, CHECK_COLOR);
+        } else {
+            let inner = Rect {
+                x: box_rect.x + 2, y: box_rect.y + 2,
+                width: box_rect.width - 4, height: box_rect.height - 4,
+            };
+            ctx.fill_rect_rotated(inner.x, inner.y, inner.width, inner.height, BG_COLOR);
+        }
+        let text_x = row.x + CHECK_SIZE + 12;
+        let text_y = row.y + (ROW_HEIGHT - self.font.height as i32) / 2;
+        ctx.draw_str_rotated(self.font, text_x, text_y, label, TEXT_COLOR, scratch);
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn draw_button_hw(
+        &self,
+        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        scratch: &mut [u8],
+        bounds: Rect,
+        label: &str,
+        bg: Color,
+    ) {
+        ctx.fill_rounded_rect_hw(bounds, bg, 6);
+        ctx.draw_rounded_border_hw(bounds, BORDER_COLOR, 1, 6);
+        let tw = self.font.measure(label);
+        let tx = bounds.x + (bounds.width - tw) / 2;
+        let ty = bounds.y + (bounds.height - self.font.height as i32) / 2;
+        ctx.draw_str_rotated(self.font, tx, ty, label, TEXT_COLOR, scratch);
+    }
+}
+
 impl Widget for ConfigMenu {
     fn bounds(&self) -> Rect {
         if self.visible {
@@ -421,6 +521,11 @@ impl Widget for ConfigMenu {
         if !self.visible {
             return;
         }
+
+        // When DMA2D is available, draw_hw() handles rendering after
+        // the widget tree draw — skip the slow per-pixel Renderer path.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        return;
 
         // Panel background
         let panel = self.panel_bounds();

@@ -49,3 +49,9 @@ PROVIDE(_mailbox_size = LENGTH(MAILBOX));
 /* Place `.retained_d3` into D3_CM4 if required */
 PROVIDE(_retained_d3_start = ORIGIN(D3_CM4));
 PROVIDE(_retained_d3_size  = LENGTH(D3_CM4));
+
+/* Flash image size: from start of FLASH to end of last loaded section.
+ * cortex-m-rt places .vector_table + .text + .rodata + .data(LMA) in FLASH.
+ * __edata is the end of .data LMA (= end of flash image).
+ * If .data is empty, __sidata == __edata and the total is just .text+.rodata. */
+PROVIDE(_flash_image_end = __sidata + (__edata - __sdata));
