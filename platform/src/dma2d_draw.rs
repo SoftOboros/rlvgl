@@ -6,18 +6,15 @@
 //! This module bypasses the `Renderer` trait pipeline entirely, writing
 //! directly to the SDRAM framebuffer via DMA2D hardware operations.
 
-use crate::blit::PixelFmt;
-use crate::dma2d::Dma2dBlitter;
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::widget::{Color, Rect};
 
-/// Maximum glyph scratch buffer size (bytes). Covers up to ~22×22 glyphs.
-const MAX_GLYPH_PIXELS: usize = 512;
-
-/// Context for DMA2D-accelerated overlay rendering on a portrait framebuffer.
-pub struct Dma2dOverlayCtx<'a> {
-    /// DMA2D blitter (borrowed from display).
-    pub dma2d: &'a mut Dma2dBlitter,
+/// Context for CPU overlay rendering on a portrait framebuffer.
+///
+/// All public methods accept **landscape** widget coordinates (800×480) and
+/// internally rotate to portrait FB coordinates (480×800).
+/// Uses direct CPU writes to avoid SDRAM bank contention with LTDC.
+pub struct Dma2dOverlayCtx {
     /// Back-buffer base address in SDRAM.
     pub fb: *mut u8,
     /// Bytes per framebuffer row (fb_w × 4 for ARGB8888).
@@ -28,7 +25,7 @@ pub struct Dma2dOverlayCtx<'a> {
     pub fb_h: u32,
 }
 
-impl<'a> Dma2dOverlayCtx<'a> {
+impl Dma2dOverlayCtx {
     // ── Coordinate rotation ────────────────────────────────────────────
 
     /// Rotate a landscape widget rect to portrait FB coordinates.
@@ -131,7 +128,7 @@ impl<'a> Dma2dOverlayCtx<'a> {
 
     // ── Rounded rectangles ─────────────────────────────────────────────
 
-    /// Fill a rounded rectangle via DMA2D fills + CPU AA fringe blends.
+    /// Fill a rounded rectangle via CPU fills + AA fringe blends.
     pub fn fill_rounded_rect_hw(&mut self, rect: Rect, color: Color, radius: u8) {
         let r = (radius as i32).min(rect.width / 2).min(rect.height / 2);
         if r <= 0 {
@@ -169,46 +166,31 @@ impl<'a> Dma2dOverlayCtx<'a> {
             );
         }
 
-        // Corner arcs with AA fringe
-        let base_alpha = color.3 as u16;
-        for dy in 0..r {
-            let (dx_int, frac) = arc_dx(r, dy);
-
-            if dx_int > 0 {
-                // top-left
-                self.fill_rect_rotated(
-                    rect.x + r - dx_int, rect.y + dy, dx_int, 1, color,
-                );
-                // top-right
-                self.fill_rect_rotated(
-                    rect.x + rect.width - r, rect.y + dy, dx_int, 1, color,
-                );
-                // bottom-left
-                self.fill_rect_rotated(
-                    rect.x + r - dx_int, rect.y + rect.height - 1 - dy, dx_int, 1, color,
-                );
-                // bottom-right
-                self.fill_rect_rotated(
-                    rect.x + rect.width - r, rect.y + rect.height - 1 - dy, dx_int, 1, color,
-                );
-            }
-
-            // AA fringe pixel at each corner
-            if frac > 0 {
-                let aa_alpha = ((frac as u16 * base_alpha) / 255) as u8;
-                let aa = Color(color.0, color.1, color.2, aa_alpha);
-                self.blend_pixel_rotated(rect.x + r - dx_int - 1, rect.y + dy, aa);
-                self.blend_pixel_rotated(rect.x + rect.width - r + dx_int, rect.y + dy, aa);
-                self.blend_pixel_rotated(
-                    rect.x + r - dx_int - 1,
-                    rect.y + rect.height - 1 - dy,
-                    aa,
-                );
-                self.blend_pixel_rotated(
-                    rect.x + rect.width - r + dx_int,
-                    rect.y + rect.height - 1 - dy,
-                    aa,
-                );
+        // Corner arcs: per-pixel fill with correct distance formula
+        // for each corner. Arc center is at (r, r) offset from each corner.
+        let r2 = (r * r) as u32;
+        for cy in 0..r {
+            for cx in 0..r {
+                // Top-left: arc center at (+r, +r), distance = (r-cx, r-cy)
+                let d2_tl = ((r - cx) * (r - cx) + (r - cy) * (r - cy)) as u32;
+                if d2_tl <= r2 {
+                    self.blend_pixel_rotated(rect.x + cx, rect.y + cy, color);
+                }
+                // Top-right: arc center at (width-r, +r), distance = (cx, r-cy)
+                let d2_tr = (cx * cx + (r - cy) * (r - cy)) as u32;
+                if d2_tr <= r2 {
+                    self.blend_pixel_rotated(rect.x + rect.width - r + cx, rect.y + cy, color);
+                }
+                // Bottom-left: arc center at (+r, height-r), distance = (r-cx, cy)
+                let d2_bl = ((r - cx) * (r - cx) + cy * cy) as u32;
+                if d2_bl <= r2 {
+                    self.blend_pixel_rotated(rect.x + cx, rect.y + rect.height - r + cy, color);
+                }
+                // Bottom-right: arc center at (width-r, height-r), distance = (cx, cy)
+                let d2_br = (cx * cx + cy * cy) as u32;
+                if d2_br <= r2 {
+                    self.blend_pixel_rotated(rect.x + rect.width - r + cx, rect.y + rect.height - r + cy, color);
+                }
             }
         }
     }
@@ -237,7 +219,7 @@ impl<'a> Dma2dOverlayCtx<'a> {
         );
     }
 
-    /// Draw a rounded border via DMA2D fills + CPU AA fringe.
+    /// Draw a rounded border via CPU fills + AA fringe.
     pub fn draw_rounded_border_hw(
         &mut self,
         rect: Rect,
