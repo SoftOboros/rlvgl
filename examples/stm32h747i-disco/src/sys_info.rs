@@ -20,10 +20,10 @@ const PANEL_W: i32 = 340;
 const PANEL_PADDING: i32 = 16;
 const PANEL_RADIUS: u8 = 10;
 const CLEAR_FRAMES: u8 = 3;
-const MAX_LINES: usize = 4;
+const MAX_LINES: usize = 6;
 const VAL_BUF_LEN: usize = 32;
 
-const BG_COLOR: Color = Color(30, 30, 30, 240);
+const BG_COLOR: Color = Color(30, 30, 30, 255);
 const BORDER_COLOR: Color = Color(100, 100, 100, 255);
 const TITLE_COLOR: Color = Color(80, 180, 255, 255);
 const TEXT_COLOR: Color = Color(220, 220, 220, 255);
@@ -307,6 +307,12 @@ impl Widget for ChipInfoPanel {
 // LiveStatsPanel — dynamic telemetry (FPS, Heap%, Ticks)
 // ══���══════════════════��════════════════════════════════���═════════════════
 
+/// Optional CPU utilisation snapshot passed to [`LiveStatsPanel::refresh`].
+pub struct CpuSnapshot {
+    pub cm7_pct: u32,
+    pub cm4_pct: u32,
+}
+
 pub struct LiveStatsPanel {
     visible: bool,
     bounds: Rect,
@@ -359,14 +365,21 @@ impl LiveStatsPanel {
 
     /// Call every frame tick. Returns `true` if content changed.
     /// `temp_x10` is the cached junction temperature in tenths of °C.
-    pub fn refresh(&mut self, tick: u32, heap_used: usize, heap_total: usize, temp_x10: i32) -> bool {
+    pub fn refresh(
+        &mut self,
+        tick: u32,
+        heap_used: usize,
+        heap_total: usize,
+        temp_x10: i32,
+        cpu: Option<&CpuSnapshot>,
+    ) -> bool {
         if !self.visible { return false; }
         let _ = tick; // tick used only for throttle cadence
 
         self.refresh_divider = self.refresh_divider.wrapping_add(1);
         if self.refresh_divider % 15 != 0 { return false; }
 
-        self.collect_info(heap_used, heap_total, temp_x10);
+        self.collect_info(heap_used, heap_total, temp_x10, cpu);
         self.resize_to_content();
         true
     }
@@ -377,8 +390,27 @@ impl LiveStatsPanel {
         self.bounds.y = (480 - h) / 2;
     }
 
-    fn collect_info(&mut self, heap_used: usize, heap_total: usize, temp_x10: i32) {
+    fn collect_info(
+        &mut self,
+        heap_used: usize,
+        heap_total: usize,
+        temp_x10: i32,
+        cpu: Option<&CpuSnapshot>,
+    ) {
         self.line_count = 0;
+
+        // CPU utilisation (when cpu_stats feature is active)
+        if let Some(cpu) = cpu {
+            let mut buf = [0u8; VAL_BUF_LEN];
+            let n = fmt_dec_into(cpu.cm7_pct, &mut buf);
+            buf[n] = b'%';
+            push_line(&mut self.lines, &mut self.line_count, b"CM7 CPU", &buf[..n + 1]);
+
+            let mut buf = [0u8; VAL_BUF_LEN];
+            let n = fmt_dec_into(cpu.cm4_pct, &mut buf);
+            buf[n] = b'%';
+            push_line(&mut self.lines, &mut self.line_count, b"CM4 CPU", &buf[..n + 1]);
+        }
 
         // Junction temperature
         if temp_x10 != 0 {

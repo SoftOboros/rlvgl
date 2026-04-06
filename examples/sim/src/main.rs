@@ -53,9 +53,15 @@ fn run_with_app(
     headless_path: Option<String>,
     png_path: Option<String>,
 ) {
+    #[cfg(feature = "cpu_stats")]
+    let frame_count = std::cell::Cell::new(0u32);
+
     let frame_cb = {
         let root = root.clone();
         move |frame: &mut [u8], w: usize, h: usize| {
+            #[cfg(feature = "cpu_stats")]
+            let _frame_start = std::time::Instant::now();
+
             if use_wgpi {
                 let mut blitter = WgpuBlitter::new();
                 let surface = Surface::new(frame, w * 4, PixelFmt::Argb8888, w as u32, h as u32);
@@ -80,6 +86,16 @@ fn run_with_app(
                     w: w as u32,
                     h: h as u32,
                 });
+            }
+
+            #[cfg(feature = "cpu_stats")]
+            {
+                let n = frame_count.get() + 1;
+                frame_count.set(n);
+                if n % 60 == 0 {
+                    let elapsed = _frame_start.elapsed();
+                    eprintln!("cpu_stats: frame {n}  render {:.2}ms", elapsed.as_secs_f64() * 1000.0);
+                }
             }
         }
     };

@@ -37,6 +37,8 @@ mod star_crawl;
 mod settings_dialog;
 mod sys_info;
 mod wing;
+#[cfg(feature = "cpu_stats")]
+mod cpu_stats;
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
@@ -60,6 +62,13 @@ fn _bsp_log(args: core::fmt::Arguments) {
         }
     }
 }
+
+// SysTick exception handler — empty body; sole purpose is to wake WFI.
+// Without an enabled SysTick interrupt the core would sleep past the
+// frame boundary because has_wrapped() only polls the COUNTFLAG.
+#[cfg(all(feature = "cpu_stats", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cortex_m_rt::exception]
+fn SysTick() {}
 
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
@@ -1002,6 +1011,8 @@ fn main() -> ! {
         cp.SYST.set_reload(reload);
         cp.SYST.clear_current();
         cp.SYST.enable_counter();
+        #[cfg(feature = "cpu_stats")]
+        cp.SYST.enable_interrupt();
         // ── USART1 VCP init (PA9=TX AF7, 115200 8N1) ──────────────────────
         // Addresses from C HAL path (RCC C1 domain registers at 0x5802_44xx)
         unsafe {
@@ -1800,6 +1811,14 @@ fn main() -> ! {
             cortex_m::asm::dsb();
         }
 
+        // ── CPU stats (DWT cycle counter) ────────────────────────────────
+        #[cfg(feature = "cpu_stats")]
+        let mut cpu_stats = {
+            let mut s = cpu_stats::CpuStats::new();
+            unsafe { s.enable_dwt(); }
+            s
+        };
+
         // D3 breadcrumb: entering main loop
         unsafe { (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); }
         unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004); }
@@ -2086,6 +2105,8 @@ fn main() -> ! {
 
             // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
+                #[cfg(feature = "cpu_stats")]
+                cpu_stats.frame_start();
                 // Advance gesture settle timer → may emit PressRelease
                 if let Some(gesture) = tap.tick() {
                     let (e1, e2) = dtap.process(&gesture);
@@ -2110,7 +2131,15 @@ fn main() -> ! {
 
                 // Proxy Tick to widgets that need it — tree dispatch
                 // hangs when overlay panels are visible (unknown root cause).
-                event_win.borrow_mut().handle_event(&Event::Tick);
+                // Skip event_win Tick when overlays are active to prevent
+                // entry expiry from triggering compositor restores that
+                // overwrite the overlay area and cause flicker.
+                let overlay_up = chip_info_panel.borrow().is_visible()
+                    || live_stats_panel.borrow().is_visible()
+                    || config_menu.borrow().is_visible();
+                if !overlay_up {
+                    event_win.borrow_mut().handle_event(&Event::Tick);
+                }
                 config_menu.borrow_mut().handle_event(&Event::Tick);
 
                 let vis = event_win.borrow().is_visible();
@@ -2162,7 +2191,7 @@ fn main() -> ! {
                     dirty_frames = dirty_frames.max(2);
                 }
                 if chip_info_panel.borrow().is_visible() {
-                    dirty_frames = dirty_frames.max(1);
+                    dirty_frames = dirty_frames.max(2);
                 }
                 // Track chip info panel visibility
                 {
@@ -2197,9 +2226,17 @@ fn main() -> ! {
                     if lsp_now && was {
                         let heap_used = ALLOC.used();
                         let heap_total = heap_used + ALLOC.free();
+                        #[cfg(feature = "cpu_stats")]
+                        let cpu_snap = Some(sys_info::CpuSnapshot {
+                            cm7_pct: cpu_stats.cpu_pct(),
+                            cm4_pct: cpu_stats.cm4_cpu_pct(),
+                        });
+                        #[cfg(not(feature = "cpu_stats"))]
+                        let cpu_snap: Option<sys_info::CpuSnapshot> = None;
                         let refreshed = {
                             let mut lsp = live_stats_panel.borrow_mut();
-                            lsp.refresh(tick_count, heap_used, heap_total, unsafe { CACHED_TEMP_X10 })
+                            lsp.refresh(tick_count, heap_used, heap_total,
+                                        unsafe { CACHED_TEMP_X10 }, cpu_snap.as_ref())
                         };
                         if refreshed {
                             dirty_frames = dirty_frames.max(2);
@@ -2208,7 +2245,7 @@ fn main() -> ! {
                 }
                 // Keep live stats dirty while visible
                 if live_stats_panel.borrow().is_visible() {
-                    dirty_frames = dirty_frames.max(1);
+                    dirty_frames = dirty_frames.max(2);
                 }
                 // Track config menu visibility
                 {
@@ -2223,7 +2260,7 @@ fn main() -> ! {
                         }
                         unsafe { CM_WAS = cm_vis; }
                     }
-                    if cm_vis { dirty_frames = dirty_frames.max(1); }
+                    if cm_vis { dirty_frames = dirty_frames.max(2); }
                 }
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
@@ -2294,37 +2331,32 @@ fn main() -> ! {
 
                         root.borrow().draw(&mut renderer);
 
-                        // CPU overlay rendering for visible panels
+                        // CPU overlay rendering — no DMA2D needed
                         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                         {
                             let any_overlay = chip_info_panel.borrow().is_visible()
                                 || live_stats_panel.borrow().is_visible()
                                 || config_menu.borrow().is_visible();
                             if any_overlay {
-                                if let Some(raw) = display.take_dma2d_raw() {
-                                    let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
-                                    let scratch = unsafe {
-                                        core::slice::from_raw_parts_mut(
-                                            0xD04C_0000 as *mut u8, 1024,
-                                        )
-                                    };
-                                    let mut ctx = rlvgl::platform::dma2d_draw::Dma2dOverlayCtx {
-                                        dma2d: &mut blitter,
-                                        fb: back as *mut u8,
-                                        fb_stride: w * 4,
-                                        fb_w: w,
-                                        fb_h: h,
-                                    };
-                                    if chip_info_panel.borrow().is_visible() {
-                                        chip_info_panel.borrow().draw_hw(&mut ctx, scratch);
-                                    }
-                                    if live_stats_panel.borrow().is_visible() {
-                                        live_stats_panel.borrow().draw_hw(&mut ctx, scratch);
-                                    }
-                                    if config_menu.borrow().is_visible() {
-                                        config_menu.borrow().draw_hw(&mut ctx, scratch);
-                                    }
-                                    display.return_dma2d_raw(blitter.into_inner());
+                                let scratch = unsafe {
+                                    core::slice::from_raw_parts_mut(
+                                        0xD04C_0000 as *mut u8, 1024,
+                                    )
+                                };
+                                let mut ctx = rlvgl::platform::dma2d_draw::Dma2dOverlayCtx {
+                                    fb: back as *mut u8,
+                                    fb_stride: w * 4,
+                                    fb_w: w,
+                                    fb_h: h,
+                                };
+                                if chip_info_panel.borrow().is_visible() {
+                                    chip_info_panel.borrow().draw_hw(&mut ctx, scratch);
+                                }
+                                if live_stats_panel.borrow().is_visible() {
+                                    live_stats_panel.borrow().draw_hw(&mut ctx, scratch);
+                                }
+                                if config_menu.borrow().is_visible() {
+                                    config_menu.borrow().draw_hw(&mut ctx, scratch);
                                 }
                             }
                         }
@@ -2397,6 +2429,13 @@ fn main() -> ! {
                     }
                 }
             }
+            #[cfg(feature = "cpu_stats")]
+            {
+                cpu_stats.idle_enter();
+                cortex_m::asm::wfi();
+                cpu_stats.idle_exit();
+            }
+            #[cfg(not(feature = "cpu_stats"))]
             cortex_m::asm::nop();
         }
     }
@@ -2635,6 +2674,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     cp.SYST.set_reload((SYS_HZ / FRAME_HZ).saturating_sub(1));
     cp.SYST.clear_current();
     cp.SYST.enable_counter();
+    #[cfg(feature = "cpu_stats")]
+    cp.SYST.enable_interrupt();
 
     // ── Display ──────────────────────────────────────────────────────────────
     dbg_print("rlvgl: DSI+LTDC init start\r\n");
@@ -2892,6 +2933,13 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     let mut dtap2 = rlvgl::platform::gesture::DoubleTapRecognizer::new(FRAME_HZ);
     let mut frame_counter: u32 = 0;
 
+    #[cfg(feature = "cpu_stats")]
+    let mut cpu_stats = {
+        let mut s = cpu_stats::CpuStats::new();
+        unsafe { s.enable_dwt(); }
+        s
+    };
+
     loop {
         // 1. Drain command queue from CM4
         while let Some(cmd) = ipc::cmd_pop() {
@@ -2971,6 +3019,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
         // 3. SysTick → render frame → notify CM4
         if cp.SYST.has_wrapped() {
+            #[cfg(feature = "cpu_stats")]
+            cpu_stats.frame_start();
             // Advance gesture timers
             if let Some(gesture) = tap2.tick() {
                 let (e1, e2) = dtap2.process(&gesture);
@@ -3008,6 +3058,13 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             let _ = ipc::event_push(ipc::evt_frame_rendered(frame_counter));
         }
 
+        #[cfg(feature = "cpu_stats")]
+        {
+            cpu_stats.idle_enter();
+            cortex_m::asm::wfi();
+            cpu_stats.idle_exit();
+        }
+        #[cfg(not(feature = "cpu_stats"))]
         cortex_m::asm::nop();
     }
 }

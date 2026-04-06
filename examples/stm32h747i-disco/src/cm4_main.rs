@@ -23,6 +23,8 @@ use panic_halt as _;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm4/pac.rs"]
 mod bsp_pac;
+#[cfg(feature = "cpu_stats")]
+mod cpu_stats;
 mod ipc;
 
 /// Global allocator backed by a fixed-size heap in RAM.
@@ -129,7 +131,28 @@ fn write_u32_ascii(buf: &mut [u8], mut val: u32) -> usize {
     out_len
 }
 
+// SysTick handler for CM4 — empty, just wakes WFI.
+#[cfg(all(feature = "cpu_stats", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cortex_m_rt::exception]
+fn SysTick() {}
+
 fn cm4_app_loop() -> ! {
+    // ── CPU stats: enable DWT + SysTick for WFI wake ──────────────────
+    #[cfg(feature = "cpu_stats")]
+    let mut cpu_stats = {
+        let mut s = cpu_stats::CpuStats::new_cm4();
+        unsafe { s.enable_dwt(); }
+        // CM4 needs SysTick interrupt to wake from WFI.
+        // 200 MHz / 100 Hz = 2_000_000 reload → 10 ms tick.
+        let mut cp = unsafe { cortex_m::Peripherals::steal() };
+        cp.SYST.set_clock_source(cortex_m::peripheral::syst::SystClkSource::Core);
+        cp.SYST.set_reload(2_000_000 - 1);
+        cp.SYST.clear_current();
+        cp.SYST.enable_counter();
+        cp.SYST.enable_interrupt();
+        s
+    };
+
     // Wait for CM7's first FrameRendered event before sending any commands.
     // This ensures the display server widget tree is built and ready.
     loop {
@@ -199,8 +222,15 @@ fn cm4_app_loop() -> ! {
         // 2. Application logic placeholder: future sensor polling,
         //    state machines, communication protocols, etc. go here.
 
-        // 3. Yield — crude pacing; will be replaced with WFE + HSEM
-        //    interrupt in a future iteration.
-        cortex_m::asm::delay(1_000_000);
+        // 3. Yield — sleep until next interrupt (SysTick or HSEM).
+        #[cfg(feature = "cpu_stats")]
+        {
+            cpu_stats.frame_start();
+            cpu_stats.idle_enter();
+            cortex_m::asm::wfi();
+            cpu_stats.idle_exit();
+        }
+        #[cfg(not(feature = "cpu_stats"))]
+        cortex_m::asm::delay(1_000_000); // crude pacing; replaced by WFI when cpu_stats is on
     }
 }
