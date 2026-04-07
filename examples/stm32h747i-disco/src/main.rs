@@ -72,6 +72,211 @@ fn _bsp_log(args: core::fmt::Arguments) {
 #[cortex_m_rt::exception]
 fn SysTick() {}
 
+// ── Timer-driven touch input ──────────────────────────────────────────
+// TIM6 fires at 120 Hz, reads FT5336 over raw I2C4 PAC registers, and
+// pushes samples into a SPSC ring buffer drained by the main loop.
+// This decouples touch sampling from the main loop cadence (which may
+// WFI at 30 Hz) and fixes missed press/release events.
+
+#[cfg(all(not(feature = "c_hal"), any(target_arch = "arm", target_arch = "aarch64")))]
+mod touch_isr {
+    use core::ptr::{addr_of, addr_of_mut};
+    use core::sync::atomic::compiler_fence;
+    use core::sync::atomic::Ordering;
+
+    // I2C4 register addresses (base 0x5800_1C00, RM0399 §50.7)
+    const I2C4_CR2: *mut u32 = 0x5800_1C04 as *mut u32;
+    const I2C4_ISR: *const u32 = 0x5800_1C18 as *const u32;
+    const I2C4_ICR: *mut u32 = 0x5800_1C1C as *mut u32;
+    const I2C4_RXDR: *const u32 = 0x5800_1C24 as *const u32;
+    const I2C4_TXDR: *mut u32 = 0x5800_1C28 as *mut u32;
+
+    // GPIOK IDR for PK7 touch INT pin (active-low)
+    const GPIOK_IDR: *const u32 = 0x5802_2810 as *const u32;
+
+    // TIM6 SR (status register, clear UIF on entry)
+    const TIM6_SR: *mut u32 = 0x4000_1010 as *mut u32;
+
+    // FT5336 7-bit address, shifted left into SADD[7:1]
+    const FT5336_SADD: u32 = 0x38 << 1; // 0x70
+
+    // Timeout iterations for I2C wait loops (~125 µs at 400 MHz)
+    const I2C_TIMEOUT: u32 = 50_000;
+
+    #[derive(Copy, Clone)]
+    #[repr(C)]
+    pub struct RawTouchSample {
+        pub count: u8,
+        pub points: [(u8, u8, u16, u16); 5], // (id, event_flag, x, y) portrait
+    }
+
+    impl RawTouchSample {
+        pub const EMPTY: Self = Self {
+            count: 0,
+            points: [(0, 0, 0, 0); 5],
+        };
+    }
+
+    pub const TOUCH_RING_CAP: usize = 16;
+
+    pub struct TouchRing {
+        pub head: u32,
+        pub tail: u32,
+        pub slots: [RawTouchSample; TOUCH_RING_CAP],
+    }
+
+    pub static mut TOUCH_RING: TouchRing = TouchRing {
+        head: 0,
+        tail: 0,
+        slots: [RawTouchSample::EMPTY; TOUCH_RING_CAP],
+    };
+
+    static mut PREV_INT_LOW: bool = false;
+
+    /// Push a sample into the ring (ISR side, single writer).
+    #[inline]
+    pub unsafe fn touch_ring_push(sample: RawTouchSample) {
+        unsafe {
+        let ring = addr_of_mut!(TOUCH_RING);
+        let head = core::ptr::read_volatile(addr_of!((*ring).head));
+        let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
+        if head.wrapping_sub(tail) >= TOUCH_RING_CAP as u32 {
+            return; // full — drop newest
+        }
+        (*ring).slots[(head % TOUCH_RING_CAP as u32) as usize] = sample;
+        compiler_fence(Ordering::Release);
+        core::ptr::write_volatile(addr_of_mut!((*ring).head), head.wrapping_add(1));
+        }
+    }
+
+    /// Pop a sample from the ring (main-loop side, single reader).
+    #[inline]
+    pub unsafe fn touch_ring_pop() -> Option<RawTouchSample> {
+        unsafe {
+        let ring = addr_of_mut!(TOUCH_RING);
+        let head = core::ptr::read_volatile(addr_of!((*ring).head));
+        let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
+        if head == tail {
+            return None;
+        }
+        compiler_fence(Ordering::Acquire);
+        let sample = (*ring).slots[(tail % TOUCH_RING_CAP as u32) as usize];
+        compiler_fence(Ordering::Release);
+        core::ptr::write_volatile(addr_of_mut!((*ring).tail), tail.wrapping_add(1));
+        Some(sample)
+        }
+    }
+
+    /// Wait for a bit in I2C4_ISR with timeout.  Returns false on timeout.
+    #[inline]
+    unsafe fn i2c4_wait(bit: u32) -> bool {
+        unsafe {
+        for _ in 0..I2C_TIMEOUT {
+            let isr = I2C4_ISR.read_volatile();
+            if isr & (1 << 4) != 0 {
+                // NACKF — device didn't acknowledge
+                I2C4_ICR.write_volatile(1 << 4); // clear NACKCF
+                return false;
+            }
+            if isr & (1 << bit) != 0 {
+                return true;
+            }
+        }
+        false
+        }
+    }
+
+    /// Perform a blocking FT5336 read_touches via raw I2C4 registers.
+    ///
+    /// Equivalent to Ft5336::read_touches() but operates directly on PAC
+    /// addresses so the HAL I2C peripheral doesn't need to live in a static.
+    unsafe fn i2c4_read_touches_raw() -> RawTouchSample {
+        unsafe {
+        // ── Write phase: send register address 0x02 ──
+        // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
+        I2C4_CR2.write_volatile(
+            FT5336_SADD | (1 << 16) | (1 << 13),
+        );
+        // Wait TXIS (bit 1)
+        if !i2c4_wait(1) {
+            return RawTouchSample::EMPTY;
+        }
+        I2C4_TXDR.write_volatile(0x02);
+        // Wait TC (bit 6) — transfer complete (AUTOEND=0, RELOAD=0)
+        if !i2c4_wait(6) {
+            return RawTouchSample::EMPTY;
+        }
+
+        // ── Read phase: read 31 bytes ──
+        // CR2: SADD, NBYTES=31, RD_WRN=1, START=1, AUTOEND=1
+        I2C4_CR2.write_volatile(
+            FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25),
+        );
+        let mut buf = [0u8; 31];
+        for b in buf.iter_mut() {
+            // Wait RXNE (bit 2)
+            if !i2c4_wait(2) {
+                return RawTouchSample::EMPTY;
+            }
+            *b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
+        }
+        // AUTOEND generates STOP; wait STOPF (bit 5) then clear it
+        if i2c4_wait(5) {
+            I2C4_ICR.write_volatile(1 << 5); // STOPCF
+        }
+
+        // ── Parse (identical to ft5336.rs:48-79) ──
+        let count = (buf[0] & 0x0F).min(5);
+        let mut points = [(0u8, 0u8, 0u16, 0u16); 5];
+        for i in 0..count as usize {
+            let base = 1 + i * 6;
+            let event_flag = buf[base] >> 6;
+            let x = (((buf[base] & 0x0F) as u16) << 8) | buf[base + 1] as u16;
+            let id = buf[base + 2] >> 4;
+            let y = (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
+            points[i] = (id, event_flag, x, y);
+        }
+        RawTouchSample { count, points }
+        }
+    }
+
+    /// Called from the TIM6_DAC ISR — reads PK7 INT, performs I2C read
+    /// if needed, and pushes the sample into the ring.
+    pub unsafe fn tim6_dac_handler() {
+        unsafe {
+        // Clear UIF (bit 0)
+        TIM6_SR.write_volatile(TIM6_SR.read_volatile() & !1);
+
+        // Read PK7: low = touch data available
+        let int_low = GPIOK_IDR.read_volatile() & (1 << 7) == 0;
+
+        // Read when INT active OR on the LOW→HIGH edge (catches release)
+        let prev = core::ptr::read_volatile(addr_of!(PREV_INT_LOW));
+        let should_read = int_low || prev;
+
+        if should_read {
+            let sample = i2c4_read_touches_raw();
+            touch_ring_push(sample);
+        }
+
+        core::ptr::write_volatile(addr_of_mut!(PREV_INT_LOW), int_low);
+        }
+    }
+}
+
+#[cfg(all(not(feature = "c_hal"), any(target_arch = "arm", target_arch = "aarch64")))]
+use touch_isr::touch_ring_pop;
+
+/// TIM6 update interrupt — fires at 120 Hz for touch sampling.
+#[cfg(all(not(feature = "c_hal"), any(target_arch = "arm", target_arch = "aarch64")))]
+mod _tim6_isr {
+    use stm32h7::stm32h747cm7::interrupt;
+    #[interrupt]
+    unsafe fn TIM6_DAC() {
+        unsafe { super::touch_isr::tim6_dac_handler(); }
+    }
+}
+
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
@@ -616,7 +821,7 @@ fn main() -> ! {
         };
         use rlvgl::core::event::{Event, Key};
         use rlvgl::platform::{
-            CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
+            CpuBlitter, InputDevice, Stm32h747iDiscoDisplay,
         };
         #[cfg(feature = "sd_storage")]
         use rlvgl::platform::SdMmcBlockDev;
@@ -755,6 +960,7 @@ fn main() -> ! {
             GPIOH,
             GPIOI,
             I2C4,
+            TIM6,
             #[cfg(feature = "backlight_pwm")]
             TIM8,
             DSIHOST: dsi,
@@ -1274,11 +1480,56 @@ fn main() -> ! {
             }
         }
 
-        let touch_i2c = HalI2c(i2c4);
-        let touch_int = HalInputPin(gpiok.pk7.into_floating_input());
-        let mut input = Stm32h747iDiscoInput::new_with_int(
-            touch_i2c, touch_int, display.dimensions().0 as u16,
-        );
+        // I2C4 is now driven by the TIM6_DAC ISR via raw PAC registers.
+        // The HAL-configured timing persists; we just drop the Rust ownership.
+        // Configure PK7 as floating input so the ISR can read GPIOK_IDR.
+        let _ = i2c4; // drop HAL ownership — ISR uses raw registers
+        let _ = TIM6; // claim TIM6 — ISR uses raw registers
+        let _pk7 = gpiok.pk7.into_floating_input();
+
+        // ── TIM6 at 120 Hz for interrupt-driven touch sampling ──
+        unsafe {
+            // Enable TIM6 clock (RCC APB1LENR bit 4)
+            let apb1lenr = 0x5802_44E8u32 as *mut u32;
+            apb1lenr.write_volatile(apb1lenr.read_volatile() | (1 << 4));
+            let _ = (apb1lenr as *const u32).read_volatile(); // readback fence
+
+            let tim6 = 0x4000_1000u32;
+            let tim6_cr1  = tim6 as *mut u32;            // +0x00
+            let tim6_dier = (tim6 + 0x0C) as *mut u32;   // +0x0C
+            let tim6_egr  = (tim6 + 0x14) as *mut u32;   // +0x14
+            let tim6_psc  = (tim6 + 0x28) as *mut u32;   // +0x28
+            let tim6_arr  = (tim6 + 0x2C) as *mut u32;   // +0x2C
+
+            // Timer clock = 2 × APB1 = 200 MHz (APB1 prescaler > 1)
+            // 200 MHz / (199+1) = 1 MHz tick, / (8332+1) = 120.0 Hz
+            tim6_psc.write_volatile(199);
+            tim6_arr.write_volatile(8332);
+            tim6_dier.write_volatile(1); // UIE — update interrupt enable
+            tim6_egr.write_volatile(1);  // UG  — force load PSC/ARR shadow
+            // Clear any pending UIF before enabling
+            let tim6_sr = (tim6 + 0x10) as *mut u32;
+            tim6_sr.write_volatile(0);
+            tim6_cr1.write_volatile(1);  // CEN — start counter
+
+            // NVIC: enable TIM6_DAC at priority 2 (below SysTick default 0)
+            use stm32h7::stm32h747cm7::Interrupt;
+            cortex_m::peripheral::NVIC::unmask(Interrupt::TIM6_DAC);
+            cp.NVIC.set_priority(Interrupt::TIM6_DAC, 2);
+        }
+
+        // Touch event state machine (coordinate transform + pointer tracking)
+        // lives in the main loop, fed by the ISR ring buffer.
+        struct TouchState {
+            last: Option<(u16, u16)>,
+            last_count: u8,
+            display_width: u16,
+        }
+        let mut touch_state = TouchState {
+            last: None,
+            last_count: 0,
+            display_width: display.dimensions().0 as u16,
+        };
 
         // ── Real button: PC13 wakeup button (active-low, external pull-up) ──
         let button = HalInputPin(gpioc.pc13.into_floating_input());
@@ -2052,10 +2303,78 @@ fn main() -> ! {
                 }
             }
 
-            // ── Poll touch ──
-            // Poll touch — coords already in landscape widget space
-            // (portrait→landscape transform done inside InputDevice::poll)
-            if let Some(evt) = input.poll() {
+            // ── Drain touch ring buffer ──
+            // TIM6 ISR samples FT5336 at 120 Hz; we drain all queued samples
+            // and run the coordinate transform + event state machine here.
+            while let Some(sample) = unsafe { touch_ring_pop() } {
+                use rlvgl::core::event::{TouchPoint, TouchState as EvtTouchState, MAX_TOUCH_POINTS};
+                let dw = touch_state.display_width as i32;
+                let count = sample.count;
+                let raw = &sample.points;
+
+                // ── process_raw_touch: portrait→landscape + state machine ──
+                // (logic extracted from Stm32h747iDiscoInput::poll)
+                let evt = if count >= 2 {
+                    // Multi-touch path
+                    let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
+                    for i in 0..count as usize {
+                        let (id, flag, x, y) = raw[i];
+                        points[i] = TouchPoint {
+                            id,
+                            x: y as i32,
+                            y: dw - 1 - x as i32,
+                            state: match flag {
+                                0 => EvtTouchState::Down,
+                                1 => EvtTouchState::Up,
+                                _ => EvtTouchState::Contact,
+                            },
+                        };
+                    }
+                    let (_, _, x0, y0) = raw[0];
+                    touch_state.last = Some((x0, y0));
+                    touch_state.last_count = count;
+                    Some(Event::Touch { count, points })
+                } else {
+                    // Single-touch path: 0–1 contacts → PointerDown/Up/Move
+                    let touch = if count == 1 {
+                        let (_, _, x, y) = raw[0];
+                        Some((x, y))
+                    } else {
+                        None
+                    };
+                    let was_multi = touch_state.last_count >= 2;
+                    touch_state.last_count = count;
+                    let to_landscape = |px: u16, py: u16| -> (i32, i32) {
+                        (py as i32, dw - 1 - px as i32)
+                    };
+                    match (touch, touch_state.last) {
+                        (Some((x, y)), Some((lx, ly))) => {
+                            touch_state.last = Some((x, y));
+                            if was_multi {
+                                let (lx, ly) = to_landscape(x, y);
+                                Some(Event::PointerDown { x: lx, y: ly })
+                            } else if (x, y) != (lx, ly) {
+                                let (lx, ly) = to_landscape(x, y);
+                                Some(Event::PointerMove { x: lx, y: ly })
+                            } else {
+                                None
+                            }
+                        }
+                        (Some((x, y)), None) => {
+                            touch_state.last = Some((x, y));
+                            let (lx, ly) = to_landscape(x, y);
+                            Some(Event::PointerDown { x: lx, y: ly })
+                        }
+                        (None, Some((lx, ly))) => {
+                            touch_state.last = None;
+                            let (lx, ly) = to_landscape(lx, ly);
+                            Some(Event::PointerUp { x: lx, y: ly })
+                        }
+                        (None, None) => None,
+                    }
+                };
+
+                if let Some(evt) = evt {
                 // While crawl is active, consume all touch events.
                 // PointerDown deactivates; everything else is suppressed.
                 let mut consumed = false;
@@ -2110,6 +2429,7 @@ fn main() -> ! {
                 }
             } // if !consumed
             } // if let Some(evt)
+            } // while touch_ring_pop
 
             // ── Serial RX command injection ──
             // Drain USART1 RX FIFO, accumulate into serial_buf, dispatch on '\n'
