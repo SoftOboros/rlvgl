@@ -22,7 +22,10 @@ const CRAWL_H: u32 = FB_W;
 /// Pre-rendered text line width in pixels.
 const TEXT_W: u32 = 600;
 /// Perspective width at the top of the crawl.
-const TOP_W: u32 = 480;
+///
+/// Keep this narrower than the source text width so the FIR pass has enough
+/// decimation headroom to smooth distant glyph edges.
+const TOP_W: u32 = 360;
 /// Perspective width at the bottom of the crawl.
 const BOT_W: u32 = 600;
 /// ARGB8888 bytes per pixel.
@@ -45,19 +48,13 @@ const STAR_COUNT: usize = 200;
 
 /// SDRAM base address for crawl buffers.
 const CRAWL_BASE: usize = 0xD100_0000;
-/// D2 SRAM scanline staging buffer used as DMA2D A8 source.
-const D2_SCANLINE: usize = 0x3000_0000;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RenderStage {
     Idle = 0,
     StartStarRow = 1,
     WaitStarRow = 2,
-    RasterTextRow = 3,
-    FirTextRow = 4,
-    StartBlend = 5,
-    WaitBlend = 6,
-    FinalizeRow = 7,
+    ProcessTextRow = 3,
 }
 
 /// Result of advancing the crawl task by one step.
@@ -82,9 +79,7 @@ pub struct StarCrawl {
 
     starfield: *mut u8,
     text_src: *mut u8,
-    text_valid: *mut u8,
     text_h: u32,
-    line_h: u32,
 
     frame_id: u32,
     frame_active: bool,
@@ -96,14 +91,19 @@ pub struct StarCrawl {
     stage: RenderStage,
     bg_row: u32,
     text_row: u32,
-    current_text_src_row: u32,
-    current_target_w: u32,
-    current_dst_x_off: u32,
-    current_dst_col: u32,
-    current_has_text: bool,
+
+    scanline_buf: [u8; CRAWL_W as usize],
 
     lines: &'static [&'static str],
     font: &'static PackedFont,
+    diag_rows_with_text: u16,
+    diag_rows_blended: u16,
+    diag_last_blended_pixels: u16,
+    diag_last_target_w: u16,
+    diag_last_text_src_row: u16,
+    diag_completed_frames: u16,
+    diag_dropped_frames: u16,
+    diag_last_error: u16,
 }
 
 impl StarCrawl {
@@ -119,9 +119,7 @@ impl StarCrawl {
             star_scroll_q8: 0,
             starfield: core::ptr::null_mut(),
             text_src: core::ptr::null_mut(),
-            text_valid: core::ptr::null_mut(),
             text_h: 0,
-            line_h: 0,
             frame_id: 0,
             frame_active: false,
             frame_scroll_px: 0,
@@ -131,13 +129,17 @@ impl StarCrawl {
             stage: RenderStage::Idle,
             bg_row: 0,
             text_row: 0,
-            current_text_src_row: 0,
-            current_target_w: 0,
-            current_dst_x_off: 0,
-            current_dst_col: 0,
-            current_has_text: false,
+            scanline_buf: [0u8; CRAWL_W as usize],
             lines,
             font,
+            diag_rows_with_text: 0,
+            diag_rows_blended: 0,
+            diag_last_blended_pixels: 0,
+            diag_last_target_w: 0,
+            diag_last_text_src_row: 0,
+            diag_completed_frames: 0,
+            diag_dropped_frames: 0,
+            diag_last_error: 0,
         }
     }
 
@@ -177,45 +179,64 @@ impl StarCrawl {
 
     /// Returns `true` when the crawl is parked on a DMA completion.
     pub fn waiting_for_dma(&self) -> bool {
-        matches!(
-            self.stage,
-            RenderStage::WaitStarRow | RenderStage::WaitBlend
+        self.stage == RenderStage::WaitStarRow
+    }
+
+    /// Packed crawl diagnostics for D3 SRAM / serial telemetry.
+    pub fn diag_words(&self) -> (u32, u32, u32, u32) {
+        let flags = ((self.active as u32) << 7)
+            | ((self.frame_active as u32) << 6)
+            | ((self.waiting_for_dma() as u32) << 4)
+            | (((self.diag_last_error != 0) as u32) << 3);
+        (
+            ((self.stage as u32) << 24) | (flags << 16) | (self.frame_id & 0xFFFF),
+            ((self.diag_last_text_src_row as u32) << 16) | self.text_row.min(u16::MAX as u32),
+            ((self.diag_last_target_w as u32) << 16) | self.diag_last_blended_pixels as u32,
+            ((self.diag_rows_with_text.min(0xFF) as u32) << 24)
+                | ((self.diag_rows_blended.min(0xFF) as u32) << 16)
+                | ((self.diag_completed_frames.min(0xFF) as u32) << 8)
+                | (self.diag_dropped_frames.min(0xFF) as u32),
         )
     }
 
-    /// Drop the in-progress frame and restart on the next scheduler pass.
-    pub fn drop_frame(&mut self) {
+    fn reset_frame_state(&mut self) {
         self.frame_active = false;
         self.stage = RenderStage::Idle;
         self.bg_row = 0;
         self.text_row = 0;
-        self.current_has_text = false;
+    }
+
+    fn finish_frame(&mut self) {
+        self.diag_completed_frames = self.diag_completed_frames.saturating_add(1);
+        self.reset_frame_state();
+    }
+
+    /// Drop the in-progress frame and restart on the next scheduler pass.
+    pub fn drop_frame(&mut self) {
+        if self.frame_active {
+            self.diag_dropped_frames = self.diag_dropped_frames.saturating_add(1);
+        }
+        self.reset_frame_state();
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn activate(&mut self, dma2d: &mut Dma2dBlitter) {
-        self.line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
-        self.text_h = 120 + self.lines.len() as u32 * self.line_h + CRAWL_H;
+        let line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
+        self.text_h = 120 + self.lines.len() as u32 * line_h + CRAWL_H;
         self.starfield = CRAWL_BASE as *mut u8;
         self.text_src = (CRAWL_BASE + STAR_SIZE) as *mut u8;
-        self.text_valid = unsafe { self.text_src.add((TEXT_W * self.text_h) as usize) };
 
         unsafe {
             core::ptr::write_bytes(self.text_src, 0, (TEXT_W * self.text_h) as usize);
-            core::ptr::write_bytes(self.text_valid, 0, self.text_h as usize);
         }
 
         self.render_starfield(dma2d);
+        self.pre_render_text(line_h);
         self.scroll_q8 = -((CRAWL_H as i32) << 8);
         self.star_scroll_q8 = 0;
         self.frame_id = 0;
         self.active = true;
         self.drop_frame();
-
-        let prime_rows = self.text_h.min(8);
-        for row in 0..prime_rows {
-            self.ensure_text_row(row);
-        }
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -245,11 +266,18 @@ impl StarCrawl {
             self.fb_w = fb_w;
             self.bg_row = 0;
             self.text_row = 0;
-            self.current_has_text = false;
+            self.diag_rows_with_text = 0;
+            self.diag_rows_blended = 0;
+            self.diag_last_blended_pixels = 0;
+            self.diag_last_target_w = 0;
+            self.diag_last_text_src_row = 0;
+            self.diag_last_error = 0;
             self.stage = RenderStage::StartStarRow;
         }
 
-        if dma2d.read_error() != 0 {
+        let dma_error = dma2d.read_error();
+        if dma_error != 0 {
+            self.diag_last_error = dma_error.min(u16::MAX as u32) as u16;
             self.drop_frame();
             return StepResult::Pending;
         }
@@ -283,95 +311,68 @@ impl StarCrawl {
                 }
                 self.bg_row += 1;
                 if self.bg_row >= FB_H {
-                    self.stage = RenderStage::RasterTextRow;
+                    self.stage = RenderStage::ProcessTextRow;
                     self.text_row = 0;
                 } else {
                     self.stage = RenderStage::StartStarRow;
                 }
                 StepResult::Pending
             }
-            RenderStage::RasterTextRow => {
+            RenderStage::ProcessTextRow => {
                 if self.text_row >= CRAWL_H {
-                    self.drop_frame();
+                    self.finish_frame();
                     return StepResult::FrameReady;
                 }
-
                 let text_row_i = self.frame_scroll_px + self.text_row as i32;
-                if text_row_i < 0 || text_row_i as u32 >= self.text_h {
-                    self.current_has_text = false;
-                    self.stage = RenderStage::FinalizeRow;
-                    return StepResult::Pending;
+                if text_row_i >= 0 && (text_row_i as u32) < self.text_h {
+                    let src_row = text_row_i as u32;
+                    let target_w = TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
+                    let dst_x_off = (CRAWL_W - target_w) / 2;
+                    let dst_col = self.fb_w - 1 - self.text_row;
+                    self.diag_last_target_w = target_w.min(u16::MAX as u32) as u16;
+                    self.diag_last_text_src_row = src_row.min(u16::MAX as u32) as u16;
+                    if self.fir_resample_text_row(src_row, target_w) {
+                        self.diag_rows_with_text = self.diag_rows_with_text.saturating_add(1);
+                        let dst_stride = (self.fb_w * BPP) as usize;
+                        let mut blended = 0u32;
+                        for i in 0..target_w as usize {
+                            let alpha = self.scanline_buf[i] as u32;
+                            if alpha == 0 {
+                                continue;
+                            }
+                            let dst_off = (dst_x_off as usize + i) * dst_stride
+                                + dst_col as usize * BPP as usize;
+                            let dst_ptr =
+                                unsafe { self.back_buf.add(dst_off) as *mut u32 };
+                            let star = unsafe { dst_ptr.read_volatile() };
+                            let inv = 255 - alpha;
+                            let r = (((YELLOW >> 16) & 0xFF) * alpha
+                                + ((star >> 16) & 0xFF) * inv)
+                                / 255;
+                            let g = (((YELLOW >> 8) & 0xFF) * alpha
+                                + ((star >> 8) & 0xFF) * inv)
+                                / 255;
+                            let b =
+                                ((YELLOW & 0xFF) * alpha + (star & 0xFF) * inv) / 255;
+                            unsafe {
+                                dst_ptr.write_volatile(
+                                    0xFF00_0000 | (r << 16) | (g << 8) | b,
+                                );
+                            }
+                            blended += 1;
+                        }
+                        self.diag_last_blended_pixels =
+                            blended.min(u16::MAX as u32) as u16;
+                        if blended != 0 {
+                            self.diag_rows_blended =
+                                self.diag_rows_blended.saturating_add(1);
+                        }
+                    }
                 }
-
-                self.current_text_src_row = text_row_i as u32;
-                self.ensure_text_row(self.current_text_src_row);
-                self.stage = RenderStage::FirTextRow;
-                StepResult::Pending
-            }
-            RenderStage::FirTextRow => {
-                self.current_target_w = TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
-                self.current_dst_x_off = (CRAWL_W - self.current_target_w) / 2;
-                self.current_dst_col = self.fb_w - 1 - self.text_row;
-                self.current_has_text =
-                    self.fir_resample_text_row(self.current_text_src_row, self.current_target_w);
-                self.stage = if self.current_has_text {
-                    RenderStage::StartBlend
-                } else {
-                    RenderStage::FinalizeRow
-                };
-                StepResult::Pending
-            }
-            RenderStage::StartBlend => {
-                let dst = unsafe {
-                    self.back_buf.add(
-                        (self.current_dst_x_off * self.fb_w * BPP + self.current_dst_col * BPP)
-                            as usize,
-                    )
-                };
-                #[cfg(not(feature = "c_hal"))]
-                crate::dma2d_irq::note_start();
-                dma2d.start_blend_a8_color(
-                    self.scanline_ptr(),
-                    1,
-                    self.current_target_w,
-                    YELLOW,
-                    dst,
-                    self.fb_w * BPP,
-                );
-                self.stage = RenderStage::WaitBlend;
-                StepResult::Pending
-            }
-            RenderStage::WaitBlend => {
-                if dma2d.is_in_flight() {
-                    return StepResult::Pending;
-                }
-                if dma2d.poll_complete() {
-                    dma2d.ack_complete();
-                }
-                self.stage = RenderStage::FinalizeRow;
-                StepResult::Pending
-            }
-            RenderStage::FinalizeRow => {
                 self.text_row += 1;
-                if self.text_row >= CRAWL_H {
-                    self.drop_frame();
-                    StepResult::FrameReady
-                } else {
-                    self.stage = RenderStage::RasterTextRow;
-                    StepResult::Pending
-                }
+                StepResult::Pending
             }
         }
-    }
-
-    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn scanline_ptr(&self) -> *const u8 {
-        D2_SCANLINE as *const u8
-    }
-
-    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn scanline_mut(&mut self) -> &mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut(D2_SCANLINE as *mut u8, CRAWL_W as usize) }
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -379,52 +380,43 @@ impl StarCrawl {
         unsafe { self.text_src.add((text_row * TEXT_W) as usize) }
     }
 
+    /// Synchronously rasterize all text lines into `text_src` (A8 format).
+    ///
+    /// Uses `.get()` for bounds-checked font data access. Called once from
+    /// `activate()` before the scroll begins.
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn text_row_rendered(&self, text_row: u32) -> bool {
-        unsafe { self.text_valid.add(text_row as usize).read_volatile() != 0 }
-    }
-
-    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn ensure_text_row(&mut self, text_row: u32) {
-        if text_row >= self.text_h || self.text_row_rendered(text_row) {
-            return;
-        }
-        self.render_text_row(text_row);
-        unsafe {
-            self.text_valid.add(text_row as usize).write_volatile(1);
-        }
-    }
-
-    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn render_text_row(&mut self, text_row: u32) {
-        let dst = self.text_row_ptr(text_row);
-        unsafe {
-            core::ptr::write_bytes(dst, 0, TEXT_W as usize);
-        }
-
+    fn pre_render_text(&mut self, line_h: u32) {
         let mut cur_y = 120u32;
         for &line in self.lines {
             let text_w = self.font.measure(line);
             let mut cx = ((TEXT_W as i32 - text_w) / 2).max(0);
-
             for ch in line.chars() {
                 if let Some(glyph) = self.font.glyph(ch) {
                     let gw = glyph.width as usize;
-                    let gh = glyph.height as i32;
+                    let gh = glyph.height as usize;
                     let data_off = glyph.offset as usize;
-                    let gy = cur_y as i32 + self.font.ascent as i32 - glyph.ymin as i32 - gh;
-                    let row_in_glyph = text_row as i32 - gy;
-                    if row_in_glyph >= 0 && row_in_glyph < gh {
-                        let row = row_in_glyph as usize;
+                    let gy = cur_y as i32 + self.font.ascent as i32
+                        - glyph.ymin as i32
+                        - gh as i32;
+                    for row in 0..gh {
+                        let dy = gy + row as i32;
+                        if dy < 0 || dy as u32 >= self.text_h {
+                            continue;
+                        }
                         for col in 0..gw {
-                            let alpha = self.font.data[data_off + row * gw + col];
-                            if alpha == 0 {
-                                continue;
-                            }
-                            let dx = cx + col as i32;
-                            if dx >= 0 && (dx as u32) < TEXT_W {
+                            let src_idx = data_off + row * gw + col;
+                            if let Some(&alpha) = self.font.data.get(src_idx) {
+                                if alpha == 0 {
+                                    continue;
+                                }
+                                let dx = cx + col as i32;
+                                if dx < 0 || dx as u32 >= TEXT_W {
+                                    continue;
+                                }
                                 unsafe {
-                                    dst.add(dx as usize).write_volatile(alpha);
+                                    self.text_src
+                                        .add(dy as usize * TEXT_W as usize + dx as usize)
+                                        .write_volatile(alpha);
                                 }
                             }
                         }
@@ -434,8 +426,7 @@ impl StarCrawl {
                     cx += self.font.height as i32 / 2;
                 }
             }
-
-            cur_y += self.line_h;
+            cur_y += line_h;
         }
     }
 
@@ -449,7 +440,7 @@ impl StarCrawl {
         }
 
         let src = self.text_row_ptr(text_row) as *const u8;
-        let out = self.scanline_mut();
+        let out = &mut self.scanline_buf[..CRAWL_W as usize];
         out[..target_w as usize].fill(0);
 
         let words = TEXT_W as usize / 4;
@@ -586,4 +577,8 @@ impl StarCrawl {
     }
 
     pub fn drop_frame(&mut self) {}
+
+    pub fn diag_words(&self) -> (u32, u32, u32, u32) {
+        (0, 0, 0, 0)
+    }
 }
