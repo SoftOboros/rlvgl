@@ -206,7 +206,7 @@ where
         self.write_reg(REG_AIF1_DAC1_FILTER_1, 0x0000)?;
 
         // 15. DAC1 volume: 0 dB
-        self.write_reg(REG_DAC1_LEFT_VOL, 0x01C0)?;  // VU + 0dB
+        self.write_reg(REG_DAC1_LEFT_VOL, 0x01C0)?; // VU + 0dB
         self.write_reg(REG_DAC1_RIGHT_VOL, 0x01C0)?;
 
         // 16. AIF1 DAC1 volume: 0 dB

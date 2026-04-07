@@ -45,8 +45,7 @@ static CURRENT_LOCALE: AtomicU8 = AtomicU8::new(0);
 
 /// Pointer to the active translation blob.  Defaults to the built-in blob;
 /// can be swapped at runtime via [`load_translations`].
-static ACTIVE_BLOB: AtomicPtr<u8> =
-    AtomicPtr::new(core::ptr::null_mut());
+static ACTIVE_BLOB: AtomicPtr<u8> = AtomicPtr::new(core::ptr::null_mut());
 
 fn active_blob() -> &'static [u8] {
     let ptr = ACTIVE_BLOB.load(Ordering::Relaxed);
@@ -77,10 +76,7 @@ unsafe fn blob_len(ptr: *const u8) -> usize {
             *ptr.add(last_entry + 2),
             *ptr.add(last_entry + 3),
         ]) as usize;
-        let len = u16::from_le_bytes([
-            *ptr.add(last_entry + 4),
-            *ptr.add(last_entry + 5),
-        ]) as usize;
+        let len = u16::from_le_bytes([*ptr.add(last_entry + 4), *ptr.add(last_entry + 5)]) as usize;
         let data_start = HEADER_SIZE + num_entries * ENTRY_SIZE;
         data_start + offset + len
     }
@@ -119,16 +115,10 @@ fn lookup_in(blob: &[u8], locale: Locale, key: Key) -> &str {
     let num_keys = u16::from_le_bytes([blob[6], blob[7]]) as usize;
     let idx = (locale as usize) * num_keys + (key as usize);
     let base = HEADER_SIZE + idx * ENTRY_SIZE;
-    let offset = u32::from_le_bytes([
-        blob[base],
-        blob[base + 1],
-        blob[base + 2],
-        blob[base + 3],
-    ]) as usize;
+    let offset =
+        u32::from_le_bytes([blob[base], blob[base + 1], blob[base + 2], blob[base + 3]]) as usize;
     let len = u16::from_le_bytes([blob[base + 4], blob[base + 5]]) as usize;
-    let data_start = HEADER_SIZE + num_keys
-        * (blob[5] as usize)
-        * ENTRY_SIZE;
+    let data_start = HEADER_SIZE + num_keys * (blob[5] as usize) * ENTRY_SIZE;
     let start = data_start + offset;
     // Safety: build.rs guarantees valid UTF-8 in the string data region.
     unsafe { core::str::from_utf8_unchecked(&blob[start..start + len]) }

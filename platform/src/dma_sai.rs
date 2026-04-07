@@ -46,9 +46,9 @@ const RCC_AHB1ENR: u32 = 0x5802_44D8;
 
 const CR_EN: u32 = 1 << 0;
 #[allow(dead_code)]
-const CR_TCIE: u32 = 1 << 4;   // transfer complete interrupt enable
+const CR_TCIE: u32 = 1 << 4; // transfer complete interrupt enable
 #[allow(dead_code)]
-const CR_HTIE: u32 = 1 << 3;   // half-transfer interrupt enable
+const CR_HTIE: u32 = 1 << 3; // half-transfer interrupt enable
 const CR_DIR_M2P: u32 = 0b01 << 6;
 const CR_CIRC: u32 = 1 << 8;
 const CR_MINC: u32 = 1 << 10;
@@ -120,7 +120,13 @@ impl DmaSai1Tx {
     /// - `buf_bytes`: size of each buffer in bytes (must be even; transfers are 16-bit)
     ///
     /// The stream is left disabled after configuration; call `start()` to begin.
-    pub fn configure(&mut self, periph_addr: u32, buf0: *const u8, buf1: *const u8, buf_bytes: usize) {
+    pub fn configure(
+        &mut self,
+        periph_addr: u32,
+        buf0: *const u8,
+        buf1: *const u8,
+        buf_bytes: usize,
+    ) {
         let transfers = (buf_bytes / 2) as u16; // 16-bit transfers
         self.ndtr = transfers;
 
@@ -209,17 +215,23 @@ impl DmaSai1Tx {
 
     /// Clear the transfer-complete interrupt flag.
     pub fn clear_transfer_complete(&self) {
-        unsafe { (DMA1_LIFCR as *mut u32).write_volatile(LISR_TCIF0); }
+        unsafe {
+            (DMA1_LIFCR as *mut u32).write_volatile(LISR_TCIF0);
+        }
     }
 
     /// Clear the half-transfer interrupt flag.
     pub fn clear_half_transfer(&self) {
-        unsafe { (DMA1_LIFCR as *mut u32).write_volatile(LISR_HTIF0); }
+        unsafe {
+            (DMA1_LIFCR as *mut u32).write_volatile(LISR_HTIF0);
+        }
     }
 
     /// Clear all DMA stream 0 interrupt flags.
     pub fn clear_all_flags(&self) {
-        unsafe { (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0); }
+        unsafe {
+            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0);
+        }
     }
 
     /// Returns the number of 16-bit transfers per buffer.

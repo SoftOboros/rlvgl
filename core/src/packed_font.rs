@@ -50,14 +50,7 @@ impl PackedFont {
     }
 
     /// Render a string at `(x, y)` where y is the top of the line.
-    pub fn draw_str(
-        &self,
-        renderer: &mut dyn Renderer,
-        x: i32,
-        y: i32,
-        text: &str,
-        color: Color,
-    ) {
+    pub fn draw_str(&self, renderer: &mut dyn Renderer, x: i32, y: i32, text: &str, color: Color) {
         let mut cx = x;
         for ch in text.chars() {
             if let Some(glyph) = self.glyph(ch) {

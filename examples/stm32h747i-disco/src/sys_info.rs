@@ -124,7 +124,12 @@ fn draw_panel_hw(
 
 // ── Shared push helper ──────────────────────────────────────────────────
 
-fn push_line(lines: &mut [InfoLine; MAX_LINES], count: &mut usize, label: &'static [u8], val: &[u8]) {
+fn push_line(
+    lines: &mut [InfoLine; MAX_LINES],
+    count: &mut usize,
+    label: &'static [u8],
+    val: &[u8],
+) {
     if *count < MAX_LINES {
         let line = &mut lines[*count];
         line.label = label;
@@ -176,18 +181,26 @@ impl ChipInfoPanel {
         }
     }
 
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 
     /// Call from the main loop (outside dispatch) to collect deferred info
     /// and update FPS. Returns `true` if content changed (needs a render).
     pub fn poll(&mut self, tick: u32) -> bool {
-        if !self.visible { return false; }
+        if !self.visible {
+            return false;
+        }
 
         // FPS tracking
         self.frame_count += 1;
         let elapsed = tick.wrapping_sub(self.fps_last_tick);
         if elapsed >= 30 {
-            self.fps = if elapsed > 0 { self.frame_count * 30 / elapsed } else { 0 };
+            self.fps = if elapsed > 0 {
+                self.frame_count * 30 / elapsed
+            } else {
+                0
+            };
             self.frame_count = 0;
             self.fps_last_tick = tick;
         }
@@ -235,7 +248,12 @@ impl ChipInfoPanel {
     fn collect_info(&mut self) {
         self.line_count = 0;
 
-        push_line(&mut self.lines, &mut self.line_count, b"MCU", b"STM32H747XIH6");
+        push_line(
+            &mut self.lines,
+            &mut self.line_count,
+            b"MCU",
+            b"STM32H747XIH6",
+        );
         push_line(&mut self.lines, &mut self.line_count, b"Flash", b"2048 KB");
         push_line(&mut self.lines, &mut self.line_count, b"SYSCLK", b"480 MHz");
 
@@ -243,14 +261,20 @@ impl ChipInfoPanel {
         let mut buf = [0u8; VAL_BUF_LEN];
         let n = fmt_dec(self.fps, &mut buf);
         push_line(&mut self.lines, &mut self.line_count, b"FPS", &buf[..n]);
-        return;
 
         // Flash size
         let flash_kb = unsafe { (0x1FF1_E880u32 as *const u16).read_volatile() } as u32;
         let mut buf = [0u8; VAL_BUF_LEN];
         let n = fmt_dec(flash_kb, &mut buf);
-        buf[n] = b' '; buf[n+1] = b'K'; buf[n+2] = b'B';
-        push_line(&mut self.lines, &mut self.line_count, b"Flash", &buf[..n+3]);
+        buf[n] = b' ';
+        buf[n + 1] = b'K';
+        buf[n + 2] = b'B';
+        push_line(
+            &mut self.lines,
+            &mut self.line_count,
+            b"Flash",
+            &buf[..n + 3],
+        );
 
         // SYSCLK
         let rcc_cr = unsafe { (0x5802_4000u32 as *const u32).read_volatile() };
@@ -261,11 +285,21 @@ impl ChipInfoPanel {
             let p = (((pll1divr >> 9) & 0x7F) + 1) as u32;
             let m = ((pllckselr >> 4) & 0x3F) as u32;
             if m > 0 && p > 0 { 25 * n1 / m / p } else { 0 }
-        } else { 64 };
+        } else {
+            64
+        };
         let mut buf = [0u8; VAL_BUF_LEN];
         let n = fmt_dec(sysclk_mhz, &mut buf);
-        buf[n] = b' '; buf[n+1] = b'M'; buf[n+2] = b'H'; buf[n+3] = b'z';
-        push_line(&mut self.lines, &mut self.line_count, b"SYSCLK", &buf[..n+4]);
+        buf[n] = b' ';
+        buf[n + 1] = b'M';
+        buf[n + 2] = b'H';
+        buf[n + 3] = b'z';
+        push_line(
+            &mut self.lines,
+            &mut self.line_count,
+            b"SYSCLK",
+            &buf[..n + 4],
+        );
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -274,24 +308,48 @@ impl ChipInfoPanel {
         ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
     ) {
-        if !self.visible { return; }
-        draw_panel_hw(ctx, scratch, self.font, self.bounds, "System", &self.lines, self.line_count);
+        if !self.visible {
+            return;
+        }
+        draw_panel_hw(
+            ctx,
+            scratch,
+            self.font,
+            self.bounds,
+            "System",
+            &self.lines,
+            self.line_count,
+        );
     }
 }
 
 impl Widget for ChipInfoPanel {
-    fn bounds(&self) -> Rect { self.bounds }
+    fn bounds(&self) -> Rect {
+        self.bounds
+    }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        if !self.visible { return; }
-        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        return;
-        draw_panel_common(renderer, self.font, self.bounds, "System", &self.lines, self.line_count);
+        if !self.visible {
+            return;
+        }
+        draw_panel_common(
+            renderer,
+            self.font,
+            self.bounds,
+            "System",
+            &self.lines,
+            self.line_count,
+        );
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if !self.visible { return false; }
-        if let Event::PressRelease { .. } = event { self.hide(); return true; }
+        if !self.visible {
+            return false;
+        }
+        if let Event::PressRelease { .. } = event {
+            self.hide();
+            return true;
+        }
         false
     }
 
@@ -299,7 +357,9 @@ impl Widget for ChipInfoPanel {
         if self.clear_countdown > 0 && !self.visible {
             self.clear_countdown -= 1;
             self.clear_bounds
-        } else { None }
+        } else {
+            None
+        }
     }
 }
 
@@ -344,7 +404,9 @@ impl LiveStatsPanel {
         }
     }
 
-    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 
     pub fn hide(&mut self) {
         if self.visible {
@@ -373,11 +435,15 @@ impl LiveStatsPanel {
         temp_x10: i32,
         cpu: Option<&CpuSnapshot>,
     ) -> bool {
-        if !self.visible { return false; }
+        if !self.visible {
+            return false;
+        }
         let _ = tick; // tick used only for throttle cadence
 
         self.refresh_divider = self.refresh_divider.wrapping_add(1);
-        if self.refresh_divider % 15 != 0 { return false; }
+        if self.refresh_divider % 15 != 0 {
+            return false;
+        }
 
         self.collect_info(heap_used, heap_total, temp_x10, cpu);
         self.resize_to_content();
@@ -404,12 +470,22 @@ impl LiveStatsPanel {
             let mut buf = [0u8; VAL_BUF_LEN];
             let n = fmt_dec_into(cpu.cm7_pct, &mut buf);
             buf[n] = b'%';
-            push_line(&mut self.lines, &mut self.line_count, b"CM7 CPU", &buf[..n + 1]);
+            push_line(
+                &mut self.lines,
+                &mut self.line_count,
+                b"CM7 CPU",
+                &buf[..n + 1],
+            );
 
             let mut buf = [0u8; VAL_BUF_LEN];
             let n = fmt_dec_into(cpu.cm4_pct, &mut buf);
             buf[n] = b'%';
-            push_line(&mut self.lines, &mut self.line_count, b"CM4 CPU", &buf[..n + 1]);
+            push_line(
+                &mut self.lines,
+                &mut self.line_count,
+                b"CM4 CPU",
+                &buf[..n + 1],
+            );
         }
 
         // Junction temperature
@@ -419,10 +495,13 @@ impl LiveStatsPanel {
             let mut buf = [0u8; VAL_BUF_LEN];
             let mut pos = 0;
             pos += fmt_dec_into(whole, &mut buf[pos..]);
-            buf[pos] = b'.'; pos += 1;
+            buf[pos] = b'.';
+            pos += 1;
             pos += fmt_dec_into(frac, &mut buf[pos..]);
-            buf[pos] = b' '; pos += 1;
-            buf[pos] = b'C'; pos += 1;
+            buf[pos] = b' ';
+            pos += 1;
+            buf[pos] = b'C';
+            pos += 1;
             push_line(&mut self.lines, &mut self.line_count, b"Temp", &buf[..pos]);
         }
 
@@ -432,15 +511,22 @@ impl LiveStatsPanel {
             let mut buf = [0u8; VAL_BUF_LEN];
             let mut pos = 0;
             pos += fmt_dec_into(heap_used as u32 / 1024, &mut buf[pos..]);
-            buf[pos] = b'K'; pos += 1;
-            buf[pos] = b'/'; pos += 1;
+            buf[pos] = b'K';
+            pos += 1;
+            buf[pos] = b'/';
+            pos += 1;
             pos += fmt_dec_into(heap_total as u32 / 1024, &mut buf[pos..]);
-            buf[pos] = b'K'; pos += 1;
-            buf[pos] = b' '; pos += 1;
-            buf[pos] = b'('; pos += 1;
+            buf[pos] = b'K';
+            pos += 1;
+            buf[pos] = b' ';
+            pos += 1;
+            buf[pos] = b'(';
+            pos += 1;
             pos += fmt_dec_into(pct, &mut buf[pos..]);
-            buf[pos] = b'%'; pos += 1;
-            buf[pos] = b')'; pos += 1;
+            buf[pos] = b'%';
+            pos += 1;
+            buf[pos] = b')';
+            pos += 1;
             push_line(&mut self.lines, &mut self.line_count, b"Heap", &buf[..pos]);
         }
 
@@ -457,24 +543,48 @@ impl LiveStatsPanel {
         ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
     ) {
-        if !self.visible { return; }
-        draw_panel_hw(ctx, scratch, self.font, self.bounds, "Live Stats", &self.lines, self.line_count);
+        if !self.visible {
+            return;
+        }
+        draw_panel_hw(
+            ctx,
+            scratch,
+            self.font,
+            self.bounds,
+            "Live Stats",
+            &self.lines,
+            self.line_count,
+        );
     }
 }
 
 impl Widget for LiveStatsPanel {
-    fn bounds(&self) -> Rect { self.bounds }
+    fn bounds(&self) -> Rect {
+        self.bounds
+    }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        if !self.visible { return; }
-        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        return;
-        draw_panel_common(renderer, self.font, self.bounds, "Live Stats", &self.lines, self.line_count);
+        if !self.visible {
+            return;
+        }
+        draw_panel_common(
+            renderer,
+            self.font,
+            self.bounds,
+            "Live Stats",
+            &self.lines,
+            self.line_count,
+        );
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if !self.visible { return false; }
-        if let Event::PressRelease { .. } = event { self.hide(); return true; }
+        if !self.visible {
+            return false;
+        }
+        if let Event::PressRelease { .. } = event {
+            self.hide();
+            return true;
+        }
         false
     }
 
@@ -482,7 +592,9 @@ impl Widget for LiveStatsPanel {
         if self.clear_countdown > 0 && !self.visible {
             self.clear_countdown -= 1;
             self.clear_bounds
-        } else { None }
+        } else {
+            None
+        }
     }
 }
 
@@ -494,7 +606,9 @@ fn fmt_dec(v: u32, buf: &mut [u8]) -> usize {
 
 fn fmt_dec_into(mut v: u32, buf: &mut [u8]) -> usize {
     if v == 0 {
-        if !buf.is_empty() { buf[0] = b'0'; }
+        if !buf.is_empty() {
+            buf[0] = b'0';
+        }
         return 1;
     }
     let mut tmp = [0u8; 10];

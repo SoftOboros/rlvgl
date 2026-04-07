@@ -363,14 +363,24 @@ mod tests {
     fn short_tap(dtap: &mut DoubleTapRecognizer, x: i32, y: i32, hold_ticks: u8) -> Vec<Event> {
         let mut out = Vec::new();
         let (e1, e2) = dtap.process(&Event::PressDown { x, y });
-        if let Some(e) = e1 { out.push(e); }
-        if let Some(e) = e2 { out.push(e); }
+        if let Some(e) = e1 {
+            out.push(e);
+        }
+        if let Some(e) = e2 {
+            out.push(e);
+        }
         for _ in 0..hold_ticks {
-            if let Some(e) = dtap.tick() { out.push(e); }
+            if let Some(e) = dtap.tick() {
+                out.push(e);
+            }
         }
         let (e1, e2) = dtap.process(&Event::PressRelease { x, y });
-        if let Some(e) = e1 { out.push(e); }
-        if let Some(e) = e2 { out.push(e); }
+        if let Some(e) = e1 {
+            out.push(e);
+        }
+        if let Some(e) = e2 {
+            out.push(e);
+        }
         out
     }
 

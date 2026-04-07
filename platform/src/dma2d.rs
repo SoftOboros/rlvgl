@@ -21,11 +21,11 @@ impl Dma2dBlitter {
     /// The caller must enable the DMA2D clock before invoking this
     /// constructor.
     pub fn new(regs: DMA2D) -> Self {
-        // Ensure the engine is stopped.
-        regs.cr.write(|w| unsafe { w.bits(0) });
-        // Clear all stale interrupt flags (TCIF, TEIF, etc.) so that
-        // the first wait() doesn't return prematurely from a previous op.
-        regs.ifcr.write(|w| unsafe { w.bits(0x3F) });
+        // Preserve any in-flight transfer when the raw peripheral is moved
+        // in and out of the display wrapper between round-robin tasks.
+        if regs.cr.read().bits() & Self::CR_START == 0 {
+            regs.ifcr.write(|w| unsafe { w.bits(Self::IFCR_ALL) });
+        }
         // Enable AXI dead time to avoid starving LTDC scanout.
         // DT=8 cycles between DMA2D AXI bursts gives LTDC room to read.
         // AXI dead time disabled — overlay fills use CPU, not DMA2D.
@@ -62,23 +62,29 @@ impl Dma2dBlitter {
     const CR_MODE_M2M_PFC: u32 = 0x0001_0000;
     const CR_MODE_M2M_BLEND: u32 = 0x0002_0000;
     const CR_MODE_R2M: u32 = 0x0003_0000;
+    const CR_TEIE: u32 = 1 << 8;
     const CR_TCIE: u32 = 1 << 9;
+    const CR_IRQ_MASK: u32 = Self::CR_TEIE | Self::CR_TCIE;
     /// TCIF = bit 1 of DMA2D_ISR (transfer complete).
     /// Note: bit 0 is TEIF (transfer error), NOT transfer complete.
     const ISR_TC: u32 = 1 << 1;
+    const ISR_CEIF: u32 = 1 << 5; // Configuration error
+    const ISR_TEIF: u32 = 1 << 0; // Transfer error
+    const ISR_ERROR_MASK: u32 = Self::ISR_CEIF | Self::ISR_TEIF;
+    const IFCR_ALL: u32 = 0x3F;
 
     /// Enable the transfer-complete interrupt.
     pub fn enable_tc_interrupt(&mut self) {
         self.regs
             .cr
-            .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_TCIE) });
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_IRQ_MASK) });
     }
 
     /// Disable the transfer-complete interrupt.
     pub fn disable_tc_interrupt(&mut self) {
         self.regs
             .cr
-            .modify(|r, w| unsafe { w.bits(r.bits() & !Self::CR_TCIE) });
+            .modify(|r, w| unsafe { w.bits(r.bits() & !Self::CR_IRQ_MASK) });
     }
 
     /// Returns `true` if the engine is currently processing a command.
@@ -96,16 +102,40 @@ impl Dma2dBlitter {
         self.regs.ifcr.write(|w| unsafe { w.bits(Self::ISR_TC) });
     }
 
-    const ISR_CEIF: u32 = 1 << 5; // Configuration error
-    const ISR_TEIF: u32 = 1 << 0; // Transfer error (note: bit 0 is TEIF, bit 1 is TCIF)
+    /// Returns `true` when a transfer is still running.
+    pub fn is_in_flight(&self) -> bool {
+        self.is_busy()
+    }
+
+    /// Poll the DMA2D transfer-complete flag without blocking.
+    pub fn poll_complete(&self) -> bool {
+        self.is_complete()
+    }
+
+    /// Acknowledge the most recent transfer-complete interrupt source.
+    pub fn ack_complete(&mut self) {
+        self.clear_complete();
+    }
+
+    /// Return the currently asserted DMA2D error flags.
+    pub fn read_error(&self) -> u32 {
+        self.regs.isr.read().bits() & Self::ISR_ERROR_MASK
+    }
+
+    fn prepare_start(&mut self) {
+        self.regs.ifcr.write(|w| unsafe { w.bits(Self::IFCR_ALL) });
+    }
+
+    fn write_cr_mode(&mut self, mode: u32) {
+        let irq_bits = self.regs.cr.read().bits() & Self::CR_IRQ_MASK;
+        self.regs.cr.write(|w| unsafe { w.bits(mode | irq_bits) });
+    }
 
     fn wait(&mut self) {
-        // Spin until START auto-clears (transfer complete or aborted).
-        while self.regs.cr.read().bits() & Self::CR_START != 0 {
+        while self.is_in_flight() {
             cortex_m::asm::nop();
         }
-        // Clear all interrupt flags for next operation.
-        self.regs.ifcr.write(|w| unsafe { w.bits(0x3F) });
+        self.regs.ifcr.write(|w| unsafe { w.bits(Self::IFCR_ALL) });
     }
 
     fn start_fill(&mut self, dst: &mut Surface, area: Rect, color: u32) {
@@ -125,7 +155,8 @@ impl Dma2dBlitter {
                 .nlr
                 .write(|w| w.bits((area.w as u32) << 16 | area.h as u32));
         }
-        self.regs.cr.write(|w| unsafe { w.bits(Self::CR_MODE_R2M) });
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_R2M);
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
@@ -170,9 +201,8 @@ impl Dma2dBlitter {
                 .nlr
                 .write(|w| w.bits((src_area.w as u32) << 16 | src_area.h as u32));
         }
-        self.regs
-            .cr
-            .write(|w| unsafe { w.bits(Self::CR_MODE_M2M_PFC) });
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_M2M_PFC);
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
@@ -219,9 +249,8 @@ impl Dma2dBlitter {
                 .nlr
                 .write(|w| w.bits((src_area.w as u32) << 16 | src_area.h as u32));
         }
-        self.regs
-            .cr
-            .write(|w| unsafe { w.bits(Self::CR_MODE_M2M_BLEND) });
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_M2M_BLEND);
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
@@ -237,7 +266,7 @@ impl Dma2dBlitter {
 impl Dma2dBlitter {
     /// R2M fill by raw pointer. Fills `width × height` pixels at `dst` with
     /// a solid color. `dst_stride` is in bytes.
-    pub fn fill_raw(
+    pub fn start_fill_raw(
         &mut self,
         dst: *mut u8,
         dst_stride: u32,
@@ -254,22 +283,32 @@ impl Dma2dBlitter {
             // OPFCCR reset default is 0 = ARGB8888 — skip write for R2M
             self.regs.oor.write(|w| w.bits(line_offset_px));
             // NLR: PL[29:16] = pixels per line (width), NL[15:0] = number of lines (height)
-            self.regs
-                .nlr
-                .write(|w| w.bits((width << 16) | height));
+            self.regs.nlr.write(|w| w.bits((width << 16) | height));
         }
-        self.regs
-            .cr
-            .write(|w| unsafe { w.bits(Self::CR_MODE_R2M) });
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_R2M);
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+    }
+
+    /// Blocking compatibility wrapper for [`Self::start_fill_raw`].
+    pub fn fill_raw(
+        &mut self,
+        dst: *mut u8,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        color: u32,
+        fmt: PixelFmt,
+    ) {
+        self.start_fill_raw(dst, dst_stride, width, height, color, fmt);
         self.wait();
     }
 
     /// M2M copy by raw pointer. Copies `width × height` pixels from `src` to
     /// `dst`. Both must be the same pixel format. Strides are in bytes.
-    pub fn blit_raw(
+    pub fn start_blit_raw(
         &mut self,
         src: *const u8,
         src_stride: u32,
@@ -290,16 +329,27 @@ impl Dma2dBlitter {
             self.regs.omar.write(|w| w.bits(dst as u32));
             self.regs.oor.write(|w| w.bits(dst_offset_px));
             self.regs.opfccr.write(|w| w.bits(cm));
-            self.regs
-                .nlr
-                .write(|w| w.bits((width << 16) | height));
+            self.regs.nlr.write(|w| w.bits((width << 16) | height));
         }
-        self.regs
-            .cr
-            .write(|w| unsafe { w.bits(Self::CR_MODE_M2M_PFC) });
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_M2M_PFC);
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+    }
+
+    /// Blocking compatibility wrapper for [`Self::start_blit_raw`].
+    pub fn blit_raw(
+        &mut self,
+        src: *const u8,
+        src_stride: u32,
+        dst: *mut u8,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        fmt: PixelFmt,
+    ) {
+        self.start_blit_raw(src, src_stride, dst, dst_stride, width, height, fmt);
         self.wait();
     }
 
@@ -315,7 +365,7 @@ impl Dma2dBlitter {
     /// `a8_src` must be contiguous (stride == width).
     /// `dst` points to the first ARGB8888 pixel to blend onto.
     /// `dst_stride` is in bytes.
-    pub fn blend_a8_color(
+    pub fn start_blend_a8_color(
         &mut self,
         a8_src: *const u8,
         width: u32,
@@ -331,9 +381,7 @@ impl Dma2dBlitter {
             self.regs.fgmar.write(|w| w.bits(a8_src as u32));
             self.regs.fgor.write(|w| w.bits(0)); // contiguous A8
             // CM=0x9 (A8), AM=00 (no alpha modify), ALPHA=0xFF
-            self.regs
-                .fgpfccr
-                .write(|w| w.bits(0xFF00_0000 | 9));
+            self.regs.fgpfccr.write(|w| w.bits(0xFF00_0000 | 9));
             self.regs.fgcolr.write(|w| w.bits(fg_color));
 
             // Background: ARGB8888 destination (read side)
@@ -346,16 +394,26 @@ impl Dma2dBlitter {
             self.regs.oor.write(|w| w.bits(dst_offset_px));
             self.regs.opfccr.write(|w| w.bits(0)); // ARGB8888
 
-            self.regs
-                .nlr
-                .write(|w| w.bits((width << 16) | height));
+            self.regs.nlr.write(|w| w.bits((width << 16) | height));
         }
-        self.regs
-            .cr
-            .write(|w| unsafe { w.bits(Self::CR_MODE_M2M_BLEND) });
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_M2M_BLEND);
         self.regs
             .cr
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+    }
+
+    /// Blocking compatibility wrapper for [`Self::start_blend_a8_color`].
+    pub fn blend_a8_color(
+        &mut self,
+        a8_src: *const u8,
+        width: u32,
+        height: u32,
+        fg_color: u32,
+        dst: *mut u8,
+        dst_stride: u32,
+    ) {
+        self.start_blend_a8_color(a8_src, width, height, fg_color, dst, dst_stride);
         self.wait();
     }
 }

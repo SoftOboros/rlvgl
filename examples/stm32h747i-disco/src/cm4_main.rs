@@ -132,7 +132,10 @@ fn write_u32_ascii(buf: &mut [u8], mut val: u32) -> usize {
 }
 
 // SysTick handler for CM4 — empty, just wakes WFI.
-#[cfg(all(feature = "cpu_stats", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    feature = "cpu_stats",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 #[cortex_m_rt::exception]
 fn SysTick() {}
 
@@ -141,11 +144,14 @@ fn cm4_app_loop() -> ! {
     #[cfg(feature = "cpu_stats")]
     let mut cpu_stats = {
         let mut s = cpu_stats::CpuStats::new_cm4();
-        unsafe { s.enable_dwt(); }
+        unsafe {
+            s.enable_dwt();
+        }
         // CM4 needs SysTick interrupt to wake from WFI.
         // 200 MHz / 100 Hz = 2_000_000 reload → 10 ms tick.
         let mut cp = unsafe { cortex_m::Peripherals::steal() };
-        cp.SYST.set_clock_source(cortex_m::peripheral::syst::SystClkSource::Core);
+        cp.SYST
+            .set_clock_source(cortex_m::peripheral::syst::SystClkSource::Core);
         cp.SYST.set_reload(2_000_000 - 1);
         cp.SYST.clear_current();
         cp.SYST.enable_counter();

@@ -68,7 +68,12 @@ mod tests {
     #[test]
     fn rounded_rect_zero_radius_single_call() {
         let mut r = CountRenderer(0);
-        let rect = Rect { x: 0, y: 0, width: 100, height: 50 };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 50,
+        };
         fill_rounded_rect(&mut r, rect, Color(0, 0, 0, 255), 0);
         assert_eq!(r.0, 1);
     }
@@ -76,7 +81,12 @@ mod tests {
     #[test]
     fn border_four_strips() {
         let mut r = CountRenderer(0);
-        let rect = Rect { x: 0, y: 0, width: 100, height: 50 };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 50,
+        };
         draw_border(&mut r, rect, Color(0, 0, 0, 255), 2);
         assert_eq!(r.0, 4);
     }

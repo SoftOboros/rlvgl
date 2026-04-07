@@ -109,9 +109,7 @@ impl AudioPlayer {
     /// Returns `false` if the WAV format is unsupported.
     pub fn prepare(&mut self, header: &WavHeader) -> bool {
         // Phase 1: only support 48 kHz, 16-bit, stereo
-        if header.sample_rate != 48_000
-            || header.bits_per_sample != 16
-            || header.num_channels != 2
+        if header.sample_rate != 48_000 || header.bits_per_sample != 16 || header.num_channels != 2
         {
             return false;
         }
@@ -119,10 +117,7 @@ impl AudioPlayer {
         self.data_file_offset = header.data_offset;
         self.data_total = header.data_length;
         // Both buffers are pre-filled
-        self.bytes_queued = core::cmp::min(
-            (self.buf_bytes as u32) * 2,
-            header.data_length,
-        );
+        self.bytes_queued = core::cmp::min((self.buf_bytes as u32) * 2, header.data_length);
         self.last_target = 0;
         self.state = PlayState::Ready;
         true
@@ -141,7 +136,8 @@ impl AudioPlayer {
 
         // Configure DMA: SAI1_A DR ← double-buffer
         let periph_addr = sai.tx_data_register_addr();
-        self.dma.configure(periph_addr, self.buf0, self.buf1, self.buf_bytes);
+        self.dma
+            .configure(periph_addr, self.buf0, self.buf1, self.buf_bytes);
 
         // Enable SAI1 DMA requests
         sai.enable_dma_tx();
@@ -257,9 +253,13 @@ fn clean_dcache(ptr: *const u8, len: usize) {
     let end = ((ptr as usize) + len + CACHE_LINE - 1) & !(CACHE_LINE - 1);
     let mut addr = start;
     while addr < end {
-        unsafe { DCCMVAC.write_volatile(addr as u32); }
+        unsafe {
+            DCCMVAC.write_volatile(addr as u32);
+        }
         addr += CACHE_LINE;
     }
     // Data synchronization barrier
-    unsafe { core::arch::asm!("dsb sy", options(nostack, preserves_flags)); }
+    unsafe {
+        core::arch::asm!("dsb sy", options(nostack, preserves_flags));
+    }
 }

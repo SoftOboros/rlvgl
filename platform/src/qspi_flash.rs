@@ -328,7 +328,9 @@ impl Mt25tlFlash {
                 let fifo_free = 32 - sr.flevel().bits() as usize;
                 let to_write = core::cmp::min(fifo_free, data.len() - idx);
                 for _ in 0..to_write {
-                    unsafe { ptr::write_volatile(core::cell::UnsafeCell::raw_get(dr_ptr), data[idx]) };
+                    unsafe {
+                        ptr::write_volatile(core::cell::UnsafeCell::raw_get(dr_ptr), data[idx])
+                    };
                     idx += 1;
                 }
             }

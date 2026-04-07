@@ -96,7 +96,13 @@ impl Widget for EventWindow {
 
         // Background + border
         fill_rounded_rect(renderer, self.bounds, self.bg_color, self.radius);
-        draw_rounded_border(renderer, self.bounds, self.border_color, self.border_width, self.radius);
+        draw_rounded_border(
+            renderer,
+            self.bounds,
+            self.border_color,
+            self.border_width,
+            self.radius,
+        );
 
         // Text entries stacked vertically
         let line_h = self.font.scaled_height() + 4;

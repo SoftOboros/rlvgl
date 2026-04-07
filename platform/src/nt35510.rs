@@ -40,7 +40,14 @@ impl Nt35510 {
             return false;
         }
         dsi.ghcr.write(|w| unsafe {
-            w.dt().bits(0x05).vcid().bits(0).wclsb().bits(cmd).wcmsb().bits(0)
+            w.dt()
+                .bits(0x05)
+                .vcid()
+                .bits(0)
+                .wclsb()
+                .bits(cmd)
+                .wcmsb()
+                .bits(0)
         });
         true
     }
@@ -52,7 +59,14 @@ impl Nt35510 {
             return false;
         }
         dsi.ghcr.write(|w| unsafe {
-            w.dt().bits(0x15).vcid().bits(0).wclsb().bits(cmd).wcmsb().bits(param)
+            w.dt()
+                .bits(0x15)
+                .vcid()
+                .bits(0)
+                .wclsb()
+                .bits(cmd)
+                .wcmsb()
+                .bits(param)
         });
         true
     }
@@ -196,7 +210,7 @@ impl Nt35510 {
                 (1 << 0)   // TEARE
                 | (1 << 16) // DSW0TX (short write 0p in LP)
                 | (1 << 17) // DSW1TX (short write 1p in LP)
-                | (1 << 19) // DLWTX  (long write in LP)
+                | (1 << 19), // DLWTX  (long write in LP)
             )
         });
         cortex_m::asm::delay(400_000);
@@ -206,24 +220,24 @@ impl Nt35510 {
         // Set row 0..9
         Self::dcs_long_write(dsi, &[0x2B, 0x00, 0x00, 0x00, 0x09]);
         // Write Memory Start: 10 green pixels (row 0)
-        Self::dcs_long_write(dsi, &[
-            0x2C,
-            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-            0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-        ]);
+        Self::dcs_long_write(
+            dsi,
+            &[
+                0x2C, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00,
+                0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00,
+                0x00, 0xFF, 0x00,
+            ],
+        );
         // Rows 1..9 via Write Memory Continue
         for _ in 1..10 {
-            Self::dcs_long_write(dsi, &[
-                0x3C,
-                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-                0x00, 0xFF, 0x00,  0x00, 0xFF, 0x00,
-            ]);
+            Self::dcs_long_write(
+                dsi,
+                &[
+                    0x3C, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00,
+                    0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00,
+                    0xFF, 0x00, 0x00, 0xFF, 0x00,
+                ],
+            );
         }
 
         // Restore column/page to full panel

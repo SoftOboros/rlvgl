@@ -9,7 +9,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::icon_bitmap::{IconBitmap, ICON_FILE, ICON_FOLDER};
+use rlvgl_core::icon_bitmap::{ICON_FILE, ICON_FOLDER, IconBitmap};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -85,11 +85,7 @@ pub trait StorageBrowser {
     /// `device_index` identifies which root device (from `list_devices`).
     /// `path` is `"/"` for the device root or a subdirectory path like
     /// `"/audio/drums"`.
-    fn list_directory(
-        &mut self,
-        device_index: usize,
-        path: &str,
-    ) -> Result<Vec<FileEntry>, ()>;
+    fn list_directory(&mut self, device_index: usize, path: &str) -> Result<Vec<FileEntry>, ()>;
 }
 
 // ── Navigation state ───────────────────────────────────────────────────────
@@ -100,10 +96,7 @@ enum BrowseLevel {
     /// Root device list.
     DeviceList,
     /// Inside a specific device at a directory path.
-    Directory {
-        device_index: usize,
-        path: String,
-    },
+    Directory { device_index: usize, path: String },
 }
 
 // ── Widget ─────────────────────────────────────────────────────────────────
@@ -172,9 +165,9 @@ impl FileBrowser {
 
         let entries = match &nav {
             BrowseLevel::DeviceList => storage.list_devices(),
-            BrowseLevel::Directory { device_index, path } => {
-                storage.list_directory(*device_index, path).unwrap_or_default()
-            }
+            BrowseLevel::Directory { device_index, path } => storage
+                .list_directory(*device_index, path)
+                .unwrap_or_default(),
         };
 
         self.entries = entries;
@@ -230,7 +223,11 @@ impl FileBrowser {
                 });
             }
             EntryKind::Directory => {
-                if let BrowseLevel::Directory { device_index, ref path } = self.level {
+                if let BrowseLevel::Directory {
+                    device_index,
+                    ref path,
+                } = self.level
+                {
                     let new_path = if entry.name == ".." {
                         // Navigate up
                         if path == "/" {
@@ -289,9 +286,7 @@ impl Widget for FileBrowser {
             let row_y = self.bounds.y + i as i32 * ROW_HEIGHT - self.scroll_offset;
 
             // Skip rows outside visible area
-            if row_y + ROW_HEIGHT <= self.bounds.y
-                || row_y >= self.bounds.y + self.bounds.height
-            {
+            if row_y + ROW_HEIGHT <= self.bounds.y || row_y >= self.bounds.y + self.bounds.height {
                 continue;
             }
 
@@ -370,17 +365,37 @@ mod tests {
 
     fn sample_entries() -> Vec<FileEntry> {
         alloc::vec![
-            FileEntry { name: String::from(".."), kind: EntryKind::Directory },
-            FileEntry { name: String::from("drums"), kind: EntryKind::Directory },
-            FileEntry { name: String::from("kick.wav"), kind: EntryKind::WavFile },
-            FileEntry { name: String::from("readme.txt"), kind: EntryKind::OtherFile },
-            FileEntry { name: String::from("snare.wav"), kind: EntryKind::WavFile },
+            FileEntry {
+                name: String::from(".."),
+                kind: EntryKind::Directory
+            },
+            FileEntry {
+                name: String::from("drums"),
+                kind: EntryKind::Directory
+            },
+            FileEntry {
+                name: String::from("kick.wav"),
+                kind: EntryKind::WavFile
+            },
+            FileEntry {
+                name: String::from("readme.txt"),
+                kind: EntryKind::OtherFile
+            },
+            FileEntry {
+                name: String::from("snare.wav"),
+                kind: EntryKind::WavFile
+            },
         ]
     }
 
     #[test]
     fn greyed_out_entries_not_selectable() {
-        let mut fb = FileBrowser::new(Rect { x: 0, y: 0, width: 200, height: 200 });
+        let mut fb = FileBrowser::new(Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        });
         fb.entries = sample_entries();
 
         // Tap on "readme.txt" (index 3, row_y = 3*24 = 72..96)
@@ -391,7 +406,12 @@ mod tests {
 
     #[test]
     fn interactive_entries_selectable() {
-        let mut fb = FileBrowser::new(Rect { x: 0, y: 0, width: 200, height: 200 });
+        let mut fb = FileBrowser::new(Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        });
         fb.entries = sample_entries();
 
         // Tap on "kick.wav" (index 2, row_y = 2*24 = 48..72)
@@ -402,7 +422,12 @@ mod tests {
 
     #[test]
     fn double_tap_directory_sets_pending_nav() {
-        let mut fb = FileBrowser::new(Rect { x: 0, y: 0, width: 200, height: 200 });
+        let mut fb = FileBrowser::new(Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        });
         fb.entries = sample_entries();
         fb.level = BrowseLevel::Directory {
             device_index: 0,
@@ -417,7 +442,12 @@ mod tests {
 
     #[test]
     fn double_tap_other_file_ignored() {
-        let mut fb = FileBrowser::new(Rect { x: 0, y: 0, width: 200, height: 200 });
+        let mut fb = FileBrowser::new(Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        });
         fb.entries = sample_entries();
         fb.pending_nav = None; // clear initial pending nav
 
@@ -429,7 +459,12 @@ mod tests {
 
     #[test]
     fn navigate_up_from_root_goes_to_device_list() {
-        let mut fb = FileBrowser::new(Rect { x: 0, y: 0, width: 200, height: 200 });
+        let mut fb = FileBrowser::new(Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        });
         fb.entries = sample_entries();
         fb.level = BrowseLevel::Directory {
             device_index: 0,
@@ -444,9 +479,33 @@ mod tests {
 
     #[test]
     fn is_interactive_classification() {
-        assert!(FileEntry { name: String::from("sd"), kind: EntryKind::Device }.is_interactive());
-        assert!(FileEntry { name: String::from("d"), kind: EntryKind::Directory }.is_interactive());
-        assert!(FileEntry { name: String::from("a.wav"), kind: EntryKind::WavFile }.is_interactive());
-        assert!(!FileEntry { name: String::from("a.txt"), kind: EntryKind::OtherFile }.is_interactive());
+        assert!(
+            FileEntry {
+                name: String::from("sd"),
+                kind: EntryKind::Device
+            }
+            .is_interactive()
+        );
+        assert!(
+            FileEntry {
+                name: String::from("d"),
+                kind: EntryKind::Directory
+            }
+            .is_interactive()
+        );
+        assert!(
+            FileEntry {
+                name: String::from("a.wav"),
+                kind: EntryKind::WavFile
+            }
+            .is_interactive()
+        );
+        assert!(
+            !FileEntry {
+                name: String::from("a.txt"),
+                kind: EntryKind::OtherFile
+            }
+            .is_interactive()
+        );
     }
 }

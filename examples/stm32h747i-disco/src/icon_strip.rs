@@ -140,8 +140,16 @@ impl Widget for IconStrip {
                     }
                     // Hit cell: icon position with gap split between neighbors.
                     // First slot gets full top margin, last gets full bottom.
-                    let cell_top = if i == 0 { 0 } else { mt + i as i32 * step - gap / 2 };
-                    let cell_bot = if i == SLOT_COUNT - 1 { 480 } else { mt + (i as i32 + 1) * step - gap / 2 };
+                    let cell_top = if i == 0 {
+                        0
+                    } else {
+                        mt + i as i32 * step - gap / 2
+                    };
+                    let cell_bot = if i == SLOT_COUNT - 1 {
+                        480
+                    } else {
+                        mt + (i as i32 + 1) * step - gap / 2
+                    };
                     // x extends from icon to screen edge (>= is inclusive)
                     if *x >= sx && *y >= cell_top && *y < cell_bot {
                         if let Some(cb) = s.on_tap.as_mut() {

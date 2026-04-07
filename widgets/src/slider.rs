@@ -71,7 +71,12 @@ impl Widget for Slider {
             height: track_height,
         };
         let track_r = if r > 0 { (track_height / 2) as u8 } else { 0 };
-        fill_rounded_rect(renderer, track_rect, self.style.border_color.with_alpha(a), track_r);
+        fill_rounded_rect(
+            renderer,
+            track_rect,
+            self.style.border_color.with_alpha(a),
+            track_r,
+        );
 
         // Draw knob (rounded when radius > 0)
         let knob_x = self.position_from_value();

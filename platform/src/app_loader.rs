@@ -47,7 +47,8 @@ impl LoadedApp {
         unsafe {
             let library = Library::new(path.as_ref().as_os_str())?;
 
-            let create: Symbol<CreateFn> = library.get(rlvgl_core::application::CREATE_APP_SYMBOL)?;
+            let create: Symbol<CreateFn> =
+                library.get(rlvgl_core::application::CREATE_APP_SYMBOL)?;
             let destroy: Symbol<DestroyFn> =
                 library.get(rlvgl_core::application::DESTROY_APP_SYMBOL)?;
 

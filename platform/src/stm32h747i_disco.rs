@@ -19,7 +19,7 @@ use crate::{Blitter, DisplayDriver, InputDevice};
 use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 #[cfg(feature = "stm32h747i_disco")]
 use embedded_hal::{digital::OutputPin, pwm::SetDutyCycle};
-use rlvgl_core::event::{Event, TouchPoint, TouchState, MAX_TOUCH_POINTS};
+use rlvgl_core::event::{Event, MAX_TOUCH_POINTS, TouchPoint, TouchState};
 use rlvgl_core::widget::{Color, Rect};
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use stm32h7::stm32h747cm7::DMA2D;
@@ -187,8 +187,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         dsi: DSIHOST,
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         dma2d: DMA2D,
-        #[cfg(feature = "splash")]
-        splash: Option<&[u8]>,
+        #[cfg(feature = "splash")] splash: Option<&[u8]>,
     ) -> Self
     where
         BL: SetDutyCycle,
@@ -228,12 +227,12 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Ref: STM32CubeH7 nt35510.h, stm32h747i_discovery_lcd.c
         let width = 480u16;
         let height = 800u16;
-        let hsw: u16 = 2;    // HSYNC width
-        let hbp: u16 = 34;   // Horizontal back porch
-        let hfp: u16 = 34;   // Horizontal front porch
-        let vsw: u16 = 120;  // VSYNC width
-        let vbp: u16 = 150;  // Vertical back porch
-        let vfp: u16 = 150;  // Vertical front porch
+        let hsw: u16 = 2; // HSYNC width
+        let hbp: u16 = 34; // Horizontal back porch
+        let hfp: u16 = 34; // Horizontal front porch
+        let vsw: u16 = 120; // VSYNC width
+        let vbp: u16 = 150; // Vertical back porch
+        let vfp: u16 = 150; // Vertical front porch
 
         // ── Serial debug helper (UART8 + USART1 VCP dual output) ────────
         fn dbg(s: &str) {
@@ -268,7 +267,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
 
         fn dbg_dec(mut val: u32) {
-            if val == 0 { dbg("0"); return; }
+            if val == 0 {
+                dbg("0");
+                return;
+            }
             let mut buf = [0u8; 10];
             let mut i = 0usize;
             while val > 0 {
@@ -316,12 +318,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         d3(10, 0xD510_0002); // post LTDC timing
         // Step 2: DSI regulator enable + wait ready
         // RM0399 §34.16.4 WISR: RRS=bit12, PLLLS=bit8 (PAC is correct)
-        disp.dsi.wrpcr.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 24)) }); // REGEN
+        disp.dsi
+            .wrpcr
+            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 24)) }); // REGEN
         {
             let mut tries = 1_000_000u32;
             while !disp.dsi.wisr.read().rrs().bit() {
                 tries -= 1;
-                if tries == 0 { break; }
+                if tries == 0 {
+                    break;
+                }
                 cortex_m::asm::nop();
             }
         }
@@ -345,15 +351,19 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let mut tries = 1_000_000u32;
             while !disp.dsi.wisr.read().pllls().bit() {
                 tries -= 1;
-                if tries == 0 { break; }
+                if tries == 0 {
+                    break;
+                }
                 cortex_m::asm::nop();
             }
             let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() };
-            dbg("  PLL: WISR="); dbg_hex(wisr);
-            if tries == 0 { dbg(" TIMEOUT"); }
+            dbg("  PLL: WISR=");
+            dbg_hex(wisr);
+            if tries == 0 {
+                dbg(" TIMEOUT");
+            }
             dbg("\r\n");
         }
-
 
         // ══════════════════════════════════════════════════════════════════
         // DSI init — follows ST HAL sequence (HAL_DSI_Init → ConfigAdapted
@@ -373,8 +383,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Step 4d: Configure number of lanes
         disp.dsi.pconfr.write(|w| unsafe {
-            w.nl().bits(1)          // 2 lanes
-             .sw_time().bits(0x28)
+            w.nl()
+                .bits(1) // 2 lanes
+                .sw_time()
+                .bits(0x28)
         });
 
         // Step 4e: Wait for PHY lane stop state (HAL waits for PSS0+PSS1+PSSC)
@@ -386,7 +398,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // For 2 lanes: wait for PSS0 (bit 1) + PSS1 (bit 2) + PSSC (bit 3) = 0x0E
             loop {
                 let psr = unsafe { psr_addr.read_volatile() };
-                if psr & 0x0E == 0x0E { break; }
+                if psr & 0x0E == 0x0E {
+                    break;
+                }
                 tries -= 1;
                 if tries == 0 {
                     dbg("  PSR timeout! PSR=");
@@ -400,9 +414,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Step 4f: UIX4 — set bit period in WPCR0
         // UIX4 = 4000000 * IDF * (1 << ODF) / (HSE_kHz * NDIV) = 8
-        disp.dsi.wpcr0.modify(|r, w| unsafe {
-            w.bits((r.bits() & !0x3F) | 8)
-        });
+        disp.dsi
+            .wpcr0
+            .modify(|r, w| unsafe { w.bits((r.bits() & !0x3F) | 8) });
 
         // Step 4g: Disable DSI host (HAL does this after PHY init!)
         disp.dsi.cr.write(|w| unsafe { w.bits(0) }); // CR.EN=0
@@ -416,10 +430,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         dbg("  PHY init done (CLCR=0x03 ACR+DPCC)\r\n");
 
         // Step 5: Lane timings (while DSI disabled)
-        disp.dsi.cltcr.write(|w| unsafe {
-            w.bits((50 << 16) | 50)
-        });
-        disp.dsi.dltcr.write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
+        disp.dsi.cltcr.write(|w| unsafe { w.bits((50 << 16) | 50) });
+        disp.dsi
+            .dltcr
+            .write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
 
         // Step 6: Flow control
         disp.dsi.pcr.write(|w| unsafe { w.bits(0x15) }); // ETTXE + BTAE + ECCRXE
@@ -433,7 +447,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Step 8: Video mode timing (needed even for adapted cmd mode per HAL)
         let lane_byte_clk: u32 = 62500; // kHz
-        let pixel_clk: u32 = 32000;     // kHz
+        let pixel_clk: u32 = 32000; // kHz
         let total_pixels = (hsw as u32) + (hbp as u32) + (width as u32) + (hfp as u32);
         let hsa_dsi = (hsw as u32) * lane_byte_clk / pixel_clk;
         let hbp_dsi = (hbp as u32) * lane_byte_clk / pixel_clk;
@@ -452,8 +466,14 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.dsi.vnpcr.write(|w| unsafe { w.bits(0xFFF) });
         disp.dsi.vmcr.write(|w| unsafe {
             w.bits(
-                (0b10 << 0) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11)
-                | (1 << 12) | (1 << 13) | (1 << 15)
+                (0b10 << 0)
+                    | (1 << 8)
+                    | (1 << 9)
+                    | (1 << 10)
+                    | (1 << 11)
+                    | (1 << 12)
+                    | (1 << 13)
+                    | (1 << 15),
             )
         });
         disp.dsi.lpmcr.write(|w| unsafe { w.bits((64 << 16) | 64) });
@@ -478,7 +498,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 (1 << 0)    // DSIM = 1 (adapted command mode)
                 | (5 << 1)  // COLMUX = 5 (RGB888)
                 | (1 << 4)  // TESRC = 1 (external TE pin)
-                | (1 << 6)  // AR = 1 (automatic refresh)
+                | (1 << 6), // AR = 1 (automatic refresh)
             )
         });
         // CMCR: TEARE=1 for TE handshake
@@ -497,13 +517,20 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Enable LP command transmission in CMCR for DCS writes
         // Use PAC bit positions: DSW0TX=16, DSW1TX=17, DLWTX=19, MRDPS=24
         disp.dsi.cmcr.write(|w| {
-            w.dlwtx().set_bit()   // DCS long write in LP
-             .dsw1tx().set_bit()  // DCS short write 1p in LP
-             .dsw0tx().set_bit()  // DCS short write 0p in LP
-             .glwtx().set_bit()   // Generic long write in LP
-             .gsw2tx().set_bit()  // Generic short write 2p in LP
-             .gsw1tx().set_bit()  // Generic short write 1p in LP
-             .gsw0tx().set_bit()  // Generic short write 0p in LP
+            w.dlwtx()
+                .set_bit() // DCS long write in LP
+                .dsw1tx()
+                .set_bit() // DCS short write 1p in LP
+                .dsw0tx()
+                .set_bit() // DCS short write 0p in LP
+                .glwtx()
+                .set_bit() // Generic long write in LP
+                .gsw2tx()
+                .set_bit() // Generic short write 2p in LP
+                .gsw1tx()
+                .set_bit() // Generic short write 1p in LP
+                .gsw0tx()
+                .set_bit() // Generic short write 0p in LP
         });
         disp.reset_panel();
         cortex_m::asm::delay(4_000_000);
@@ -512,7 +539,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         dbg("  NT35510 init: ");
         dbg(if panel_ok { "ok" } else { "FAIL" });
         let gpsr = unsafe { (0x5000_0074u32 as *const u32).read_volatile() };
-        dbg(" GPSR="); dbg_hex(gpsr); dbg("\r\n");
+        dbg(" GPSR=");
+        dbg_hex(gpsr);
+        dbg("\r\n");
         // Clear LP command overrides — adapted cmd mode takes over
         // Keep TEARE=1 (bit 0) for TE handshake in adapted command mode
         disp.dsi.cmcr.write(|w| unsafe { w.bits(1) }); // TEARE=1 only
@@ -529,8 +558,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // IS42S32800J bank mapping (NC=9, NR=12, 32-bit):
         //   Bank 0: 0xD000_0000  Bank 1: 0xD080_0000
         //   Bank 2: 0xD100_0000  Bank 3: 0xD180_0000
-        let fb_addr = fb;                // Bank 0
-        let fb_back = fb + 0x0080_0000;  // Bank 1
+        let fb_addr = fb; // Bank 0
+        let fb_back = fb + 0x0080_0000; // Bank 1
         disp.fb_addr = fb_addr;
         disp.fb_addr_back = fb_back;
 
@@ -558,28 +587,42 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Fill BOTH framebuffers: splash if provided, otherwise solid black.
         #[cfg(feature = "splash")]
-        let splash_ok = splash.and_then(|blob| {
-            let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).ok()?;
-            if (w as usize) * (h as usize) * 4 != fb_bytes { return None; }
-            let pal_count = pal_bytes.len() / 2;
-            let mut palette = [0u16; 192];
-            for i in 0..pal_count {
-                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
-            }
+        let splash_ok = splash
+            .and_then(|blob| {
+                let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).ok()?;
+                if (w as usize) * (h as usize) * 4 != fb_bytes {
+                    return None;
+                }
+                let pal_count = pal_bytes.len() / 2;
+                let mut palette = [0u16; 192];
+                for i in 0..pal_count {
+                    palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+                }
 
-            // Decode into front buffer
-            let fb0 = unsafe { core::slice::from_raw_parts_mut(fb_addr as *mut u8, fb_bytes) };
-            rlvgl_decomp::decode_argb_into(
-                w as usize, h as usize, &palette[..pal_count], stream, fb0,
-            ).ok()?;
-            // Decode into back buffer
-            let fb1 = unsafe { core::slice::from_raw_parts_mut(fb_back as *mut u8, fb_bytes) };
-            rlvgl_decomp::decode_argb_into(
-                w as usize, h as usize, &palette[..pal_count], stream, fb1,
-            ).ok()?;
-            cortex_m::asm::dsb();
-            Some(())
-        }).is_some();
+                // Decode into front buffer
+                let fb0 = unsafe { core::slice::from_raw_parts_mut(fb_addr as *mut u8, fb_bytes) };
+                rlvgl_decomp::decode_argb_into(
+                    w as usize,
+                    h as usize,
+                    &palette[..pal_count],
+                    stream,
+                    fb0,
+                )
+                .ok()?;
+                // Decode into back buffer
+                let fb1 = unsafe { core::slice::from_raw_parts_mut(fb_back as *mut u8, fb_bytes) };
+                rlvgl_decomp::decode_argb_into(
+                    w as usize,
+                    h as usize,
+                    &palette[..pal_count],
+                    stream,
+                    fb1,
+                )
+                .ok()?;
+                cortex_m::asm::dsb();
+                Some(())
+            })
+            .is_some();
         #[cfg(not(feature = "splash"))]
         let splash_ok = false;
         if !splash_ok {
@@ -599,13 +642,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         cortex_m::asm::isb();
 
         d3(5, if splash_ok { 0x5F1A_0001 } else { 0x5F1A_0000 }); // splash result
-        dbg("  FB filled: "); dbg_hex(fb_addr);
+        dbg("  FB filled: ");
+        dbg_hex(fb_addr);
         dbg(if splash_ok { " (splash)" } else { " (solid)" });
-        dbg(" ("); dbg_hex((width as u32) * (height as u32)); dbg(" px)\r\n");
+        dbg(" (");
+        dbg_hex((width as u32) * (height as u32));
+        dbg(" px)\r\n");
 
         // Readback a few FB pixels for telemetry
         unsafe {
-            d3(6, (fb_addr as *const u32).read_volatile());          // pixel[0]
+            d3(6, (fb_addr as *const u32).read_volatile()); // pixel[0]
             d3(7, (fb_addr as *const u32).add(256).read_volatile()); // pixel[256]
             d3(8, (fb_addr as *const u32).add(480).read_volatile()); // pixel[480] (row 1)
         }
@@ -615,16 +661,22 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Readback layer regs BEFORE GCR enable (no aliasing yet)
         unsafe {
-            let l1cr   = (0x5000_1084u32 as *const u32).read_volatile();
-            let cfbar  = (0x5000_10ACu32 as *const u32).read_volatile();
-            let cfblr  = (0x5000_10B0u32 as *const u32).read_volatile();
+            let l1cr = (0x5000_1084u32 as *const u32).read_volatile();
+            let cfbar = (0x5000_10ACu32 as *const u32).read_volatile();
+            let cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
             let cfblnr = (0x5000_10B4u32 as *const u32).read_volatile();
-            let pfcr   = (0x5000_1094u32 as *const u32).read_volatile();
-            dbg("  L1 pre-en: CR="); dbg_hex(l1cr);
-            dbg(" CFBAR="); dbg_hex(cfbar);
-            dbg(" CFBLR="); dbg_hex(cfblr);
-            dbg(" CFBLNR="); dbg_hex(cfblnr);
-            dbg(" PFCR="); dbg_hex(pfcr); dbg("\r\n");
+            let pfcr = (0x5000_1094u32 as *const u32).read_volatile();
+            dbg("  L1 pre-en: CR=");
+            dbg_hex(l1cr);
+            dbg(" CFBAR=");
+            dbg_hex(cfbar);
+            dbg(" CFBLR=");
+            dbg_hex(cfblr);
+            dbg(" CFBLNR=");
+            dbg_hex(cfblnr);
+            dbg(" PFCR=");
+            dbg_hex(pfcr);
+            dbg("\r\n");
             // Store at 0x24070120
             (0x2407_0120u32 as *mut u32).write_volatile(0xBEEF_0002);
             (0x2407_0124u32 as *mut u32).write_volatile(l1cr);
@@ -642,36 +694,52 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Verify all layer registers before LTDCEN (no aliasing yet)
         unsafe {
-            let l1_cr    = (0x5000_1084u32 as *const u32).read_volatile();
+            let l1_cr = (0x5000_1084u32 as *const u32).read_volatile();
             let l1_whpcr = (0x5000_1088u32 as *const u32).read_volatile();
             let l1_wvpcr = (0x5000_108Cu32 as *const u32).read_volatile();
-            let l1_pfcr  = (0x5000_1094u32 as *const u32).read_volatile();
-            let l1_cacr  = (0x5000_1098u32 as *const u32).read_volatile();
-            let l1_bfcr  = (0x5000_10A0u32 as *const u32).read_volatile();
+            let l1_pfcr = (0x5000_1094u32 as *const u32).read_volatile();
+            let l1_cacr = (0x5000_1098u32 as *const u32).read_volatile();
+            let l1_bfcr = (0x5000_10A0u32 as *const u32).read_volatile();
             let l1_cfbar = (0x5000_10ACu32 as *const u32).read_volatile();
             let l1_cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
-            let l1_cfblnr= (0x5000_10B4u32 as *const u32).read_volatile();
-            let sscr     = (0x5000_1008u32 as *const u32).read_volatile();
-            let bpcr     = (0x5000_100Cu32 as *const u32).read_volatile();
-            let awcr     = (0x5000_1010u32 as *const u32).read_volatile();
-            let twcr     = (0x5000_1014u32 as *const u32).read_volatile();
-            let gcr      = (0x5000_1018u32 as *const u32).read_volatile();
+            let l1_cfblnr = (0x5000_10B4u32 as *const u32).read_volatile();
+            let sscr = (0x5000_1008u32 as *const u32).read_volatile();
+            let bpcr = (0x5000_100Cu32 as *const u32).read_volatile();
+            let awcr = (0x5000_1010u32 as *const u32).read_volatile();
+            let twcr = (0x5000_1014u32 as *const u32).read_volatile();
+            let gcr = (0x5000_1018u32 as *const u32).read_volatile();
             // Store comprehensive pre-LTDCEN dump at 0x24070140
             let base_dump: u32 = 0x2407_0140;
             let dump_vals: [u32; 16] = [
                 0xBEEF_0003, // sentinel
-                l1_cr, l1_whpcr, l1_wvpcr, l1_pfcr, l1_cacr,
-                l1_bfcr, l1_cfbar, l1_cfblr, l1_cfblnr,
-                sscr, bpcr, awcr, twcr, gcr,
+                l1_cr,
+                l1_whpcr,
+                l1_wvpcr,
+                l1_pfcr,
+                l1_cacr,
+                l1_bfcr,
+                l1_cfbar,
+                l1_cfblr,
+                l1_cfblnr,
+                sscr,
+                bpcr,
+                awcr,
+                twcr,
+                gcr,
                 0xBEEF_EEEE, // end
             ];
             for (i, &v) in dump_vals.iter().enumerate() {
                 ((base_dump + i as u32 * 4) as *mut u32).write_volatile(v);
             }
-            dbg("  pre-LTDCEN: L1CR="); dbg_hex(l1_cr);
-            dbg(" CFBAR="); dbg_hex(l1_cfbar);
-            dbg(" CFBLR="); dbg_hex(l1_cfblr);
-            dbg(" GCR="); dbg_hex(gcr); dbg("\r\n");
+            dbg("  pre-LTDCEN: L1CR=");
+            dbg_hex(l1_cr);
+            dbg(" CFBAR=");
+            dbg_hex(l1_cfbar);
+            dbg(" CFBLR=");
+            dbg_hex(l1_cfblr);
+            dbg(" GCR=");
+            dbg_hex(gcr);
+            dbg("\r\n");
         }
 
         // Step 15: Enable LTDC, then start DSI wrapper bridge.
@@ -688,45 +756,61 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         let gcr = unsafe { (0x5000_1018u32 as *const u32).read_volatile() };
         let l1cr = unsafe { (0x5000_1084u32 as *const u32).read_volatile() };
         let cfbar = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() };
-        dbg("  LTDC: GCR="); dbg_hex(gcr);
-        dbg(" L1CR="); dbg_hex(l1cr);
-        dbg(" CFBAR="); dbg_hex(cfbar);
-        dbg(" fb="); dbg_hex(fb_addr); dbg("\r\n");
+        dbg("  LTDC: GCR=");
+        dbg_hex(gcr);
+        dbg(" L1CR=");
+        dbg_hex(l1cr);
+        dbg(" CFBAR=");
+        dbg_hex(cfbar);
+        dbg(" fb=");
+        dbg_hex(fb_addr);
+        dbg("\r\n");
 
         // Extended layer register readback
         unsafe {
             let whpcr = (0x5000_1088u32 as *const u32).read_volatile();
             let wvpcr = (0x5000_108Cu32 as *const u32).read_volatile();
-            let pfcr  = (0x5000_1094u32 as *const u32).read_volatile();
-            let cacr  = (0x5000_1098u32 as *const u32).read_volatile();
+            let pfcr = (0x5000_1094u32 as *const u32).read_volatile();
+            let cacr = (0x5000_1098u32 as *const u32).read_volatile();
             let cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
-            let cfblnr= (0x5000_10B4u32 as *const u32).read_volatile();
-            dbg("  L1: WHPCR="); dbg_hex(whpcr);
-            dbg(" WVPCR="); dbg_hex(wvpcr);
-            dbg(" PFCR="); dbg_hex(pfcr);
+            let cfblnr = (0x5000_10B4u32 as *const u32).read_volatile();
+            dbg("  L1: WHPCR=");
+            dbg_hex(whpcr);
+            dbg(" WVPCR=");
+            dbg_hex(wvpcr);
+            dbg(" PFCR=");
+            dbg_hex(pfcr);
             dbg("\r\n");
-            dbg("  L1: CACR="); dbg_hex(cacr);
-            dbg(" CFBLR="); dbg_hex(cfblr);
-            dbg(" CFBLNR="); dbg_hex(cfblnr);
+            dbg("  L1: CACR=");
+            dbg_hex(cacr);
+            dbg(" CFBLR=");
+            dbg_hex(cfblr);
+            dbg(" CFBLNR=");
+            dbg_hex(cfblnr);
             dbg("\r\n");
 
             // Framebuffer content: first 4 pixels (ARGB8888)
             dbg("  FB[0..3]: ");
             for i in 0..4u32 {
                 let px = ((fb_addr + i * 4) as *const u32).read_volatile();
-                dbg_hex(px); dbg(" ");
+                dbg_hex(px);
+                dbg(" ");
             }
             dbg("\r\n");
 
             // DSI state
-            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile();  // wrapper WCFGR
-            let wcr   = (0x5000_0404u32 as *const u32).read_volatile();  // wrapper WCR
-            let cmcr  = (0x5000_0068u32 as *const u32).read_volatile();  // host CMCR
-            let mcr   = (0x5000_0004u32 as *const u32).read_volatile();  // host CR (EN)
-            dbg("  DSI: WCFGR="); dbg_hex(wcfgr);
-            dbg(" WCR="); dbg_hex(wcr);
-            dbg(" CMCR="); dbg_hex(cmcr);
-            dbg(" CR="); dbg_hex(mcr);
+            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile(); // wrapper WCFGR
+            let wcr = (0x5000_0404u32 as *const u32).read_volatile(); // wrapper WCR
+            let cmcr = (0x5000_0068u32 as *const u32).read_volatile(); // host CMCR
+            let mcr = (0x5000_0004u32 as *const u32).read_volatile(); // host CR (EN)
+            dbg("  DSI: WCFGR=");
+            dbg_hex(wcfgr);
+            dbg(" WCR=");
+            dbg_hex(wcr);
+            dbg(" CMCR=");
+            dbg_hex(cmcr);
+            dbg(" CR=");
+            dbg_hex(mcr);
             dbg("\r\n");
 
             // LTDC timing readback
@@ -734,11 +818,15 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let bpcr = (0x5000_100Cu32 as *const u32).read_volatile();
             let awcr = (0x5000_1010u32 as *const u32).read_volatile();
             let twcr = (0x5000_1014u32 as *const u32).read_volatile();
-            dbg("  TIM: SSCR="); dbg_hex(sscr);
-            dbg(" BPCR="); dbg_hex(bpcr);
+            dbg("  TIM: SSCR=");
+            dbg_hex(sscr);
+            dbg(" BPCR=");
+            dbg_hex(bpcr);
             dbg("\r\n");
-            dbg("  TIM: AWCR="); dbg_hex(awcr);
-            dbg(" TWCR="); dbg_hex(twcr);
+            dbg("  TIM: AWCR=");
+            dbg_hex(awcr);
+            dbg(" TWCR=");
+            dbg_hex(twcr);
             dbg("\r\n");
 
             // ── SRAM diagnostic dump at 0x24070000 (probe-rs readable) ──
@@ -751,15 +839,31 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let base: u32 = 0x2407_0000;
             let vals: [u32; 27] = [
                 0xD1A6_0000, // sentinel: "DIAG"
-                gcr, l1cr, cfbar, fb_addr,
-                whpcr, wvpcr, pfcr, cacr, cfblr, cfblnr,
-                wcfgr, wcr, cmcr, mcr,
-                sscr, bpcr, awcr, twcr,
+                gcr,
+                l1cr,
+                cfbar,
+                fb_addr,
+                whpcr,
+                wvpcr,
+                pfcr,
+                cacr,
+                cfblr,
+                cfblnr,
+                wcfgr,
+                wcr,
+                cmcr,
+                mcr,
+                sscr,
+                bpcr,
+                awcr,
+                twcr,
                 ((fb_addr) as *const u32).read_volatile(),
                 ((fb_addr + 4) as *const u32).read_volatile(),
                 ((fb_addr + 8) as *const u32).read_volatile(),
                 ((fb_addr + 12) as *const u32).read_volatile(),
-                0, 0, 0, // placeholders for post-LTDCEN WISR/VMCCR/PHYSTS
+                0,
+                0,
+                0,           // placeholders for post-LTDCEN WISR/VMCCR/PHYSTS
                 0xD1A6_FFFF, // end sentinel
             ];
             for (i, &v) in vals.iter().enumerate() {
@@ -796,7 +900,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let cyc_a = (0xE000_1004u32 as *const u32).read_volatile();
             cortex_m::asm::delay(1000);
             let cyc_b = (0xE000_1004u32 as *const u32).read_volatile();
-            dbg("  DWT check: "); dbg_dec(cyc_b.wrapping_sub(cyc_a)); dbg(" cyc\r\n");
+            dbg("  DWT check: ");
+            dbg_dec(cyc_b.wrapping_sub(cyc_a));
+            dbg(" cyc\r\n");
 
             // Measure single-frame scan time:
             // 1. Temporarily disable auto-refresh (AR=0) so only our manual
@@ -812,7 +918,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             cortex_m::asm::dsb();
 
             let wisr_pre = (0x5000_040Cu32 as *const u32).read_volatile();
-            dbg("  pre-pulse WISR: "); dbg_hex(wisr_pre); dbg("\r\n");
+            dbg("  pre-pulse WISR: ");
+            dbg_hex(wisr_pre);
+            dbg("\r\n");
 
             // Single manual LTDCEN pulse
             (0x5000_0404u32 as *mut u32).write_volatile(0x0C); // DSIEN+LTDCEN
@@ -833,9 +941,13 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             if timeout == 0 {
                 dbg("TIMEOUT ");
             }
-            dbg_dec(elapsed / 400); dbg("us (");
-            dbg_dec(elapsed); dbg(" cyc)");
-            dbg(" WISR="); dbg_hex(wisr_post); dbg("\r\n");
+            dbg_dec(elapsed / 400);
+            dbg("us (");
+            dbg_dec(elapsed);
+            dbg(" cyc)");
+            dbg(" WISR=");
+            dbg_hex(wisr_post);
+            dbg("\r\n");
 
             // Restore AR and clear flags
             (0x5000_0400u32 as *mut u32).write_volatile(wcfgr); // restore AR=1
@@ -844,7 +956,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
         // Read WISR from wrapper (safe — wrapper regs don't hang debug port)
         let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() };
-        dbg("  post-LTDCEN: WISR="); dbg_hex(wisr); dbg("\r\n");
+        dbg("  post-LTDCEN: WISR=");
+        dbg_hex(wisr);
+        dbg("\r\n");
         unsafe {
             (0x2407_0060u32 as *mut u32).write_volatile(wisr);
             (0x2407_0064u32 as *mut u32).write_volatile(0xAA55_AA55); // done marker
@@ -896,11 +1010,11 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Raw writes — PAC LTDC struct has wrong offsets (missing initial padding)
         const LTDC: u32 = 0x5000_1000;
         unsafe {
-            ((LTDC + 0x08) as *mut u32).write_volatile((hswm1 << 16) | vshm1);   // SSCR
-            ((LTDC + 0x0C) as *mut u32).write_volatile((ahbp << 16) | avbp);     // BPCR
-            ((LTDC + 0x10) as *mut u32).write_volatile((aaw << 16) | aah);       // AWCR
+            ((LTDC + 0x08) as *mut u32).write_volatile((hswm1 << 16) | vshm1); // SSCR
+            ((LTDC + 0x0C) as *mut u32).write_volatile((ahbp << 16) | avbp); // BPCR
+            ((LTDC + 0x10) as *mut u32).write_volatile((aaw << 16) | aah); // AWCR
             ((LTDC + 0x14) as *mut u32).write_volatile((totalw << 16) | totalh); // TWCR
-            ((LTDC + 0x2C) as *mut u32).write_volatile(0);                        // BCCR
+            ((LTDC + 0x2C) as *mut u32).write_volatile(0); // BCCR
         }
     }
     #[cfg(feature = "stm32h747i_disco")]
@@ -949,18 +1063,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Layer 1 base = LTDC(0x50001000) + 0x84
         const L1: u32 = 0x5000_1084;
         unsafe {
-            ((L1 + 0x04) as *mut u32).write_volatile((x1 << 16) | x0);       // WHPCR
-            ((L1 + 0x08) as *mut u32).write_volatile((y1 << 16) | y0);       // WVPCR
-            ((L1 + 0x10) as *mut u32).write_volatile(0);                      // PFCR = ARGB8888
-            ((L1 + 0x14) as *mut u32).write_volatile(255);                    // CACR
-            ((L1 + 0x1C) as *mut u32).write_volatile(0x0405);                 // BFCR
-            ((L1 + 0x28) as *mut u32).write_volatile(fb);                     // CFBAR
+            ((L1 + 0x04) as *mut u32).write_volatile((x1 << 16) | x0); // WHPCR
+            ((L1 + 0x08) as *mut u32).write_volatile((y1 << 16) | y0); // WVPCR
+            ((L1 + 0x10) as *mut u32).write_volatile(0); // PFCR = ARGB8888
+            ((L1 + 0x14) as *mut u32).write_volatile(255); // CACR
+            ((L1 + 0x1C) as *mut u32).write_volatile(0x0405); // BFCR
+            ((L1 + 0x28) as *mut u32).write_volatile(fb); // CFBAR
             // CFBLR: bits[28:16]=CFBP (pitch), bits[12:0]=CFBLL (line_len + 7)
             ((L1 + 0x2C) as *mut u32).write_volatile((pitch << 16) | (pitch + 7)); // CFBLR
-            ((L1 + 0x30) as *mut u32).write_volatile(height as u32);          // CFBLNR
+            ((L1 + 0x30) as *mut u32).write_volatile(height as u32); // CFBLNR
             // Enable layer (CR bit 0 = LEN)
             let cr = ((L1) as *const u32).read_volatile();
-            ((L1) as *mut u32).write_volatile(cr | 1);                        // CR.LEN
+            ((L1) as *mut u32).write_volatile(cr | 1); // CR.LEN
         }
         unsafe { (0x5000_1024 as *mut u32).write_volatile(1) } // SRCR.IMR;
     }
@@ -1336,7 +1450,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         const LTDC_ICR: *mut u32 = 0x5000_103C as *mut u32;
         unsafe {
             let isr = LTDC_ISR.read_volatile();
-            if isr & 0x02 != 0 { // FUIF
+            if isr & 0x02 != 0 {
+                // FUIF
                 LTDC_ICR.write_volatile(0x02); // CFUIF
                 return true;
             }
@@ -1390,8 +1505,15 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         unsafe {
             // Enable GPIO D-I clocks (AHB4ENR bits 3-8)
             let ahb4enr = 0x5802_44E0u32 as *mut u32;
-            ahb4enr.write_volatile(ahb4enr.read_volatile()
-                | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8));
+            ahb4enr.write_volatile(
+                ahb4enr.read_volatile()
+                    | (1 << 3)
+                    | (1 << 4)
+                    | (1 << 5)
+                    | (1 << 6)
+                    | (1 << 7)
+                    | (1 << 8),
+            );
             let _ = (ahb4enr as *const u32).read_volatile();
 
             // Enable FMC clock (AHB3ENR bit 12)
@@ -1431,12 +1553,24 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         const GPIOH: u32 = 0x5802_1C00;
         const GPIOI: u32 = 0x5802_2000;
 
-        for &p in &[0,1,8,9,10,14,15]          { fmc_pin(GPIOD, p); }
-        for &p in &[0,1,7,8,9,10,11,12,13,14,15] { fmc_pin(GPIOE, p); }
-        for &p in &[0,1,2,3,4,5,11,12,13,14,15]  { fmc_pin(GPIOF, p); }
-        for &p in &[0,1,2,4,5,8,15]            { fmc_pin(GPIOG, p); }
-        for &p in &[5,6,7,8,9,10,11,12,13,14,15] { fmc_pin(GPIOH, p); }
-        for &p in &[0,1,2,3,4,5,6,7,9,10]      { fmc_pin(GPIOI, p); }
+        for &p in &[0, 1, 8, 9, 10, 14, 15] {
+            fmc_pin(GPIOD, p);
+        }
+        for &p in &[0, 1, 7, 8, 9, 10, 11, 12, 13, 14, 15] {
+            fmc_pin(GPIOE, p);
+        }
+        for &p in &[0, 1, 2, 3, 4, 5, 11, 12, 13, 14, 15] {
+            fmc_pin(GPIOF, p);
+        }
+        for &p in &[0, 1, 2, 4, 5, 8, 15] {
+            fmc_pin(GPIOG, p);
+        }
+        for &p in &[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] {
+            fmc_pin(GPIOH, p);
+        }
+        for &p in &[0, 1, 2, 3, 4, 5, 6, 7, 9, 10] {
+            fmc_pin(GPIOI, p);
+        }
 
         // GPIO telemetry: verify clocks and pin config
         const D3_GPIO: *mut u32 = 0x3800_0500u32 as *mut u32;
@@ -1445,7 +1579,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let gpiod_moder = (GPIOD as *const u32).read_volatile();
             let gpiod_afrh = ((GPIOD + 0x24) as *const u32).read_volatile();
             let gpiof_moder = (GPIOF as *const u32).read_volatile();
-            D3_GPIO.write_volatile(0x6F10_0001);  // sentinel
+            D3_GPIO.write_volatile(0x6F10_0001); // sentinel
             D3_GPIO.add(1).write_volatile(ahb4enr);
             D3_GPIO.add(2).write_volatile(gpiod_moder);
             D3_GPIO.add(3).write_volatile(gpiod_afrh);
@@ -1454,14 +1588,14 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // ── FMC SDRAM controller init ───────────────────────────────────
         // STM32H747I-DISCO: SDRAM on FMC Bank 2 (SDNE1=PH6, SDCKE1=PH7)
-        const FMC_BCR1:  *mut u32 = 0x5200_4000u32 as *mut u32;
+        const FMC_BCR1: *mut u32 = 0x5200_4000u32 as *mut u32;
         const FMC_SDCR1: *mut u32 = 0x5200_4140u32 as *mut u32;
         const FMC_SDCR2: *mut u32 = 0x5200_4144u32 as *mut u32;
         const FMC_SDTR1: *mut u32 = 0x5200_4148u32 as *mut u32;
         const FMC_SDTR2: *mut u32 = 0x5200_414Cu32 as *mut u32;
         const FMC_SDCMR: *mut u32 = 0x5200_4150u32 as *mut u32;
         const FMC_SDRTR: *mut u32 = 0x5200_4154u32 as *mut u32;
-        const FMC_SDSR:  *const u32 = 0x5200_4158u32 as *const u32;
+        const FMC_SDSR: *const u32 = 0x5200_4158u32 as *const u32;
 
         #[inline(always)]
         fn sdram_busy_wait() {
@@ -1476,7 +1610,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                     ((mrd & 0x1FFF) << 9)
                     | ((nrfs & 0xF) << 5)
                     | (1 << 3)          // CTB2 = bank 2 (SDNE1/SDCKE1 on H747I-DISCO)
-                    | (mode & 0x7)
+                    | (mode & 0x7),
                 );
             }
             sdram_busy_wait();
@@ -1493,9 +1627,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // timing params. Reset the FMC and reinitialize from scratch.
 
             let old_sdcr1 = FMC_SDCR1.read_volatile();
-            let old_sdsr  = FMC_SDSR.read_volatile();
+            let old_sdsr = FMC_SDSR.read_volatile();
             D3.add(1).write_volatile(old_sdcr1); // old SDCR1
-            D3.add(4).write_volatile(old_sdsr);  // old SDSR
+            D3.add(4).write_volatile(old_sdsr); // old SDSR
 
             // Step 1: FMC peripheral reset via RCC_AHB3RSTR bit 12
             const RCC_AHB3RSTR: *mut u32 = (0x5802_4400 + 0x7C) as *mut u32;
@@ -1525,7 +1659,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             FMC_SDCR1.write_volatile(
                 (0b00 << 13)  // RPIPE  = 0 (shared, only in SDCR1)
                 | (1 << 12)   // RBURST = 1 (shared, only in SDCR1)
-                | (0b10 << 10)// SDCLK  = hclk3/2 (shared, only in SDCR1)
+                | (0b10 << 10), // SDCLK  = hclk3/2 (shared, only in SDCR1)
             );
             // SDCR2: bank-specific config for IS42S32800J
             FMC_SDCR2.write_volatile(
@@ -1534,13 +1668,13 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 | (1 << 6)    // NB     = 4 banks
                 | (0b10 << 4) // MWID   = 32-bit
                 | (0b01 << 2) // NR     = 12-bit row
-                | (0b01 << 0) // NC     = 9-bit column
+                | (0b01 << 0), // NC     = 9-bit column
             );
 
             // SDTR1: shared timing (TRP, TRC must be in SDTR1 per RM0399)
             FMC_SDTR1.write_volatile(
                 (1 << 20) // TRP  = 1 → 2 cycles (20 ns ≥ 18 ns) — shared
-                | (5 << 12) // TRC  = 5 → 6 cycles (60 ns ≥ 60 ns) — shared
+                | (5 << 12), // TRC  = 5 → 6 cycles (60 ns ≥ 60 ns) — shared
             );
             // SDTR2: bank-specific timing for IS42S32800J-6 at 100 MHz
             FMC_SDTR2.write_volatile(
@@ -1548,7 +1682,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 | (1 << 16) // TWR  = 1 → 2 cycles
                 | (4 << 8)  // TRAS = 4 → 5 cycles (50 ns ≥ 42 ns)
                 | (7 << 4)  // TXSR = 7 → 8 cycles (80 ns ≥ 72 ns)
-                | (1 << 0)  // TMRD = 1 → 2 cycles
+                | (1 << 0), // TMRD = 1 → 2 cycles
             );
             cortex_m::asm::dsb();
 
@@ -1560,35 +1694,47 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Step 4: Full JEDEC cold init at the new clock rate (RM0399 §23.9.3).
         // Capture SDSR after each command to verify execution.
-        sdram_cmd(0b001, 0, 0);             // clock config enable
-        unsafe { D3.add(11).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after clk_en
-        cortex_m::asm::delay(1_000_000);    // generous 2.5 ms (≥ 100 µs required)
-        sdram_cmd(0b010, 0, 0);             // precharge all
-        unsafe { D3.add(12).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after precharge
-        sdram_cmd(0b011, 7, 0);             // 8× auto-refresh
-        unsafe { D3.add(13).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after refresh
-        sdram_cmd(0b100, 0, 0x0230);        // load mode register (BL=1, CAS=3, sequential)
-        unsafe { D3.add(14).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after LMR
-        sdram_cmd(0b000, 0, 0);             // normal mode
-        unsafe { D3.add(15).write_volatile(FMC_SDSR.read_volatile()); } // SDSR after normal
+        sdram_cmd(0b001, 0, 0); // clock config enable
+        unsafe {
+            D3.add(11).write_volatile(FMC_SDSR.read_volatile());
+        } // SDSR after clk_en
+        cortex_m::asm::delay(1_000_000); // generous 2.5 ms (≥ 100 µs required)
+        sdram_cmd(0b010, 0, 0); // precharge all
+        unsafe {
+            D3.add(12).write_volatile(FMC_SDSR.read_volatile());
+        } // SDSR after precharge
+        sdram_cmd(0b011, 7, 0); // 8× auto-refresh
+        unsafe {
+            D3.add(13).write_volatile(FMC_SDSR.read_volatile());
+        } // SDSR after refresh
+        sdram_cmd(0b100, 0, 0x0230); // load mode register (BL=1, CAS=3, sequential)
+        unsafe {
+            D3.add(14).write_volatile(FMC_SDSR.read_volatile());
+        } // SDSR after LMR
+        sdram_cmd(0b000, 0, 0); // normal mode
+        unsafe {
+            D3.add(15).write_volatile(FMC_SDSR.read_volatile());
+        } // SDSR after normal
 
         // Refresh: 64 ms / 4096 rows at 100 MHz → 1562; use 683 (conservative)
-        unsafe { FMC_SDRTR.write_volatile(683 << 1); }
+        unsafe {
+            FMC_SDRTR.write_volatile(683 << 1);
+        }
         sdram_busy_wait();
 
         // Also capture SDCMR readback, BCR1, SDTR1 for full picture
         unsafe {
             D3.add(16).write_volatile(FMC_SDCMR.read_volatile()); // SDCMR (should be 0)
-            D3.add(17).write_volatile(FMC_BCR1.read_volatile());  // BCR1
+            D3.add(17).write_volatile(FMC_BCR1.read_volatile()); // BCR1
             D3.add(18).write_volatile(FMC_SDTR1.read_volatile()); // SDTR1
         }
 
         // Diagnostics: readback registers + multi-address RAM test
         unsafe {
             let new_sdcr1 = FMC_SDCR1.read_volatile();
-            let new_sdsr  = FMC_SDSR.read_volatile();
+            let new_sdsr = FMC_SDSR.read_volatile();
             D3.add(2).write_volatile(new_sdcr1); // new SDCR1
-            D3.add(5).write_volatile(new_sdsr);  // new SDSR
+            D3.add(5).write_volatile(new_sdsr); // new SDSR
 
             // Write 4 distinct values to 4 widely-spaced addresses
             let p0 = 0xD000_0000u32 as *mut u32;
@@ -1605,10 +1751,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let r1 = p1.read_volatile();
             let r2 = p2.read_volatile();
             let r3 = p3.read_volatile();
-            D3.add(6).write_volatile(r0);  // expect 0xCAFE_0000
-            D3.add(7).write_volatile(r1);  // expect 0xCAFE_1111
-            D3.add(8).write_volatile(r2);  // expect 0xCAFE_2222
-            D3.add(9).write_volatile(r3);  // expect 0xCAFE_3333
+            D3.add(6).write_volatile(r0); // expect 0xCAFE_0000
+            D3.add(7).write_volatile(r1); // expect 0xCAFE_1111
+            D3.add(8).write_volatile(r2); // expect 0xCAFE_2222
+            D3.add(9).write_volatile(r3); // expect 0xCAFE_3333
             D3.write_volatile(0x5D_000002); // reinit complete
         }
 
@@ -1729,16 +1875,31 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Top 2/3: 75% white, yellow, cyan, green, magenta, red, blue
         let top = [
-            argb(191, 191, 191), argb(191, 191, 0), argb(0, 191, 191),
-            argb(0, 191, 0), argb(191, 0, 191), argb(191, 0, 0), argb(0, 0, 191),
+            argb(191, 191, 191),
+            argb(191, 191, 0),
+            argb(0, 191, 191),
+            argb(0, 191, 0),
+            argb(191, 0, 191),
+            argb(191, 0, 0),
+            argb(0, 0, 191),
         ];
         // Middle 1/6: blue, black, magenta, black, cyan, black, gray
         let mid = [
-            argb(0, 0, 191), argb(0, 0, 0), argb(191, 0, 191),
-            argb(0, 0, 0), argb(0, 191, 191), argb(0, 0, 0), argb(96, 96, 96),
+            argb(0, 0, 191),
+            argb(0, 0, 0),
+            argb(191, 0, 191),
+            argb(0, 0, 0),
+            argb(0, 191, 191),
+            argb(0, 0, 0),
+            argb(96, 96, 96),
         ];
         // Bottom 1/6: dark, near-black, black, white
-        let bot = [argb(8, 8, 8), argb(2, 2, 2), argb(0, 0, 0), argb(255, 255, 255)];
+        let bot = [
+            argb(8, 8, 8),
+            argb(2, 2, 2),
+            argb(0, 0, 0),
+            argb(255, 255, 255),
+        ];
 
         let fill_rows = |colors: &[u32], y0: usize, y1: usize| {
             let seg = w / colors.len();
@@ -1746,9 +1907,15 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 let row = y * w;
                 for (i, &c) in colors.iter().enumerate() {
                     let x0 = i * seg;
-                    let x1 = if i + 1 == colors.len() { w } else { (i + 1) * seg };
+                    let x1 = if i + 1 == colors.len() {
+                        w
+                    } else {
+                        (i + 1) * seg
+                    };
                     for x in x0..x1 {
-                        unsafe { fb.add(row + x).write_volatile(c); }
+                        unsafe {
+                            fb.add(row + x).write_volatile(c);
+                        }
                     }
                 }
             }
@@ -2008,9 +2175,7 @@ where
         self.last_count = count;
 
         // Helper: portrait (px, py) → landscape (py, dw-1-px)
-        let to_landscape = |px: u16, py: u16| -> (i32, i32) {
-            (py as i32, dw - 1 - px as i32)
-        };
+        let to_landscape = |px: u16, py: u16| -> (i32, i32) { (py as i32, dw - 1 - px as i32) };
 
         match (touch, self.last) {
             (Some((x, y)), Some((lx, ly))) => {

@@ -116,7 +116,8 @@ impl Sai4Pdm {
             // Set SAI4ASEL[2:0] in D3CCIPR bits [23:21]
             let d3ccipr = RCC_D3CCIPR as *mut u32;
             let val = d3ccipr.read_volatile();
-            d3ccipr.write_volatile((val & !(0b111 << 21)) | (((clock_source as u32) & 0b111) << 21));
+            d3ccipr
+                .write_volatile((val & !(0b111 << 21)) | (((clock_source as u32) & 0b111) << 21));
         }
     }
 
@@ -174,9 +175,7 @@ impl Sai4Pdm {
 
             // PDM control: 1 mic pair (MICNBR = 0b00), enable CK1, enable PDM
             // PDM must be enabled BEFORE SAI_A is enabled
-            let pdmcr = PDMCR_PDMEN
-                | (0b00 << PDMCR_MICNBR_SHIFT)
-                | PDMCR_CKEN1;
+            let pdmcr = PDMCR_PDMEN | (0b00 << PDMCR_MICNBR_SHIFT) | PDMCR_CKEN1;
             self.reg(PDMCR).write_volatile(pdmcr);
         }
     }

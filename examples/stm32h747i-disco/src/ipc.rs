@@ -104,7 +104,13 @@ pub struct CommandRaw {
 
 impl Default for CommandRaw {
     fn default() -> Self {
-        Self { kind: 0, a: 0, b: 0, c: 0, d: 0 }
+        Self {
+            kind: 0,
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+        }
     }
 }
 
@@ -121,7 +127,13 @@ pub struct EventRaw {
 
 impl Default for EventRaw {
     fn default() -> Self {
-        Self { kind: 0, a: 0, b: 0, c: 0, d: 0 }
+        Self {
+            kind: 0,
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+        }
     }
 }
 

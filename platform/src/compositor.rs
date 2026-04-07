@@ -82,7 +82,12 @@ impl Compositor {
         let fb_y = draw_rect.x.max(0) as u32;
         let fb_w = (draw_rect.height as u32).min(self.fb_width.saturating_sub(fb_x));
         let fb_h = (draw_rect.width as u32).min(self.fb_height.saturating_sub(fb_y));
-        FbRect { x: fb_x, y: fb_y, w: fb_w, h: fb_h }
+        FbRect {
+            x: fb_x,
+            y: fb_y,
+            w: fb_w,
+            h: fb_h,
+        }
     }
 
     /// Save the framebuffer pixels under an overlay region.
@@ -111,7 +116,8 @@ impl Compositor {
         }
         // Remove any existing save for this overlay
         self.saves.retain(|(id, _)| *id != overlay_id);
-        self.saves.push((overlay_id, SaveUnder { region: fb, pixels }));
+        self.saves
+            .push((overlay_id, SaveUnder { region: fb, pixels }));
     }
 
     /// Queue restoration from the pristine background copy.
@@ -156,11 +162,7 @@ impl Compositor {
                     let off = y as usize * stride + region.x as usize * 4;
                     let len = region.w as usize * 4;
                     unsafe {
-                        core::ptr::copy_nonoverlapping(
-                            prist.add(off),
-                            back_buffer.add(off),
-                            len,
-                        );
+                        core::ptr::copy_nonoverlapping(prist.add(off), back_buffer.add(off), len);
                     }
                 }
             }
@@ -204,7 +206,12 @@ mod tests {
     #[test]
     fn draw_to_fb_transforms_correctly() {
         let comp = Compositor::new(480, 800, 0);
-        let fb = comp.draw_to_fb(Rect { x: 100, y: 50, width: 200, height: 100 });
+        let fb = comp.draw_to_fb(Rect {
+            x: 100,
+            y: 50,
+            width: 200,
+            height: 100,
+        });
         // fb_x = 480 - 50 - 100 = 330, fb_y = 100, fb_w = 100, fb_h = 200
         assert_eq!((fb.x, fb.y, fb.w, fb.h), (330, 100, 100, 200));
     }

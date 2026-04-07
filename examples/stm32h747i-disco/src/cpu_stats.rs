@@ -16,26 +16,42 @@ const DWT_LAR_KEY: u32 = 0xC5AC_CE55;
 
 // ── D3 SRAM telemetry slots ────────────────────────────────────────────
 //
-// Located after the event telemetry ring (0x3800_0700–0x07FF).
+// Located above the audio DMA staging buffers in SRAM4.
 
-const D3_CM7_CPU_PCT: u32 = 0x3800_0800;
-const D3_CM7_BUSY: u32 = 0x3800_0804;
-const D3_CM7_TOTAL: u32 = 0x3800_0808;
-const D3_CM4_CPU_PCT: u32 = 0x3800_080C;
+const D3_CM7_CPU_PCT: u32 = 0x3800_1C00;
+const D3_CM7_BUSY: u32 = 0x3800_1C04;
+const D3_CM7_TOTAL: u32 = 0x3800_1C08;
+const D3_CM4_CPU_PCT: u32 = 0x3800_1C0C;
 #[allow(dead_code)]
-const D3_CM4_BUSY: u32 = 0x3800_0810;
+const D3_CM4_BUSY: u32 = 0x3800_1C10;
 #[allow(dead_code)]
-const D3_CM4_TOTAL: u32 = 0x3800_0814;
+const D3_CM4_TOTAL: u32 = 0x3800_1C14;
 
 // Driver metric stubs — reserved for future per-subsystem timing.
 #[allow(dead_code)]
-const D3_DMA2D_CYCLES: u32 = 0x3800_0818;
+const D3_DMA2D_CYCLES: u32 = 0x3800_1C18;
 #[allow(dead_code)]
-const D3_TOUCH_CYCLES: u32 = 0x3800_081C;
+const D3_TOUCH_CYCLES: u32 = 0x3800_1C1C;
 #[allow(dead_code)]
-const D3_SERIAL_CYCLES: u32 = 0x3800_0820;
+const D3_SERIAL_CYCLES: u32 = 0x3800_1C20;
 #[allow(dead_code)]
-const D3_WIFI_RESERVED: u32 = 0x3800_0824;
+const D3_FRAME_IDLE_CYCLES: u32 = 0x3800_1C24;
+#[allow(dead_code)]
+const D3_LOOP_COUNT: u32 = 0x3800_1C28;
+#[allow(dead_code)]
+const D3_DMA2D_MAX_CYCLES: u32 = 0x3800_1C2C;
+#[allow(dead_code)]
+const D3_DMA2D_COUNTS: u32 = 0x3800_1C30;
+#[allow(dead_code)]
+const D3_SERIAL_DEPTHS: u32 = 0x3800_1C34;
+#[allow(dead_code)]
+const D3_SERIAL_DROPS: u32 = 0x3800_1C38;
+#[allow(dead_code)]
+const D3_PIPELINE_STAGE: u32 = 0x3800_1C3C;
+#[allow(dead_code)]
+const D3_SPIN_COUNTS: u32 = 0x3800_1C40;
+#[allow(dead_code)]
+const D3_WIFI_RESERVED: u32 = 0x3800_1C44;
 
 /// CPU utilisation tracker backed by the DWT cycle counter.
 pub struct CpuStats {
@@ -45,6 +61,8 @@ pub struct CpuStats {
     idle_start: u32,
     /// Accumulated idle (sleeping) cycles within the current frame.
     idle_accum: u32,
+    /// Idle cycles published for the most recent completed frame.
+    idle_last: u32,
     /// Last computed CPU utilisation percentage (0–100).
     cpu_pct: u32,
     /// Whether DWT CYCCNT has been successfully enabled.
@@ -60,6 +78,7 @@ impl CpuStats {
             frame_start: 0,
             idle_start: 0,
             idle_accum: 0,
+            idle_last: 0,
             cpu_pct: 0,
             enabled: false,
             is_cm4: false,
@@ -72,6 +91,7 @@ impl CpuStats {
             frame_start: 0,
             idle_start: 0,
             idle_accum: 0,
+            idle_last: 0,
             cpu_pct: 0,
             enabled: false,
             is_cm4: true,
@@ -113,6 +133,7 @@ impl CpuStats {
 
         // Previous frame duration (wrapping arithmetic handles CYCCNT wrap).
         let total = now.wrapping_sub(self.frame_start);
+        self.idle_last = self.idle_accum;
         let busy = total.wrapping_sub(self.idle_accum);
         self.cpu_pct = if total > 0 {
             ((busy as u64 * 100) / total as u64) as u32
@@ -130,6 +151,7 @@ impl CpuStats {
                 (D3_CM7_CPU_PCT as *mut u32).write_volatile(self.cpu_pct);
                 (D3_CM7_BUSY as *mut u32).write_volatile(busy);
                 (D3_CM7_TOTAL as *mut u32).write_volatile(total);
+                (D3_FRAME_IDLE_CYCLES as *mut u32).write_volatile(self.idle_last);
             }
         }
 
@@ -154,12 +176,19 @@ impl CpuStats {
             return;
         }
         let now = unsafe { (DWT_CYCCNT as *const u32).read_volatile() };
-        self.idle_accum = self.idle_accum.wrapping_add(now.wrapping_sub(self.idle_start));
+        self.idle_accum = self
+            .idle_accum
+            .wrapping_add(now.wrapping_sub(self.idle_start));
     }
 
     /// Last computed CPU utilisation percentage (0–100).
     pub fn cpu_pct(&self) -> u32 {
         self.cpu_pct
+    }
+
+    /// Idle cycles measured in the most recently completed frame.
+    pub fn idle_cycles(&self) -> u32 {
+        self.idle_last
     }
 
     /// Read the CM4's CPU% from D3 SRAM (written by the CM4 core).
@@ -184,20 +213,93 @@ impl CpuStats {
     #[inline]
     #[allow(dead_code)]
     pub fn record_dma2d_cycles(&self, cycles: u32) {
-        unsafe { (D3_DMA2D_CYCLES as *mut u32).write_volatile(cycles); }
+        unsafe {
+            (D3_DMA2D_CYCLES as *mut u32).write_volatile(cycles);
+        }
     }
 
     /// Record touch poll cycles.  Stub — reserved for future use.
     #[inline]
     #[allow(dead_code)]
     pub fn record_touch_cycles(&self, cycles: u32) {
-        unsafe { (D3_TOUCH_CYCLES as *mut u32).write_volatile(cycles); }
+        unsafe {
+            (D3_TOUCH_CYCLES as *mut u32).write_volatile(cycles);
+        }
     }
 
     /// Record serial poll cycles.  Stub — reserved for future use.
     #[inline]
     #[allow(dead_code)]
     pub fn record_serial_cycles(&self, cycles: u32) {
-        unsafe { (D3_SERIAL_CYCLES as *mut u32).write_volatile(cycles); }
+        unsafe {
+            (D3_SERIAL_CYCLES as *mut u32).write_volatile(cycles);
+        }
+    }
+
+    /// Publish loop iterations executed in the current frame.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_loop_count(&self, loops: u32) {
+        unsafe {
+            (D3_LOOP_COUNT as *mut u32).write_volatile(loops);
+        }
+    }
+
+    /// Publish DMA2D max-cycle telemetry.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_dma2d_max_cycles(&self, cycles: u32) {
+        unsafe {
+            (D3_DMA2D_MAX_CYCLES as *mut u32).write_volatile(cycles);
+        }
+    }
+
+    /// Publish DMA2D completion/error counters packed as `complete << 16 | error`.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_dma2d_counts(&self, complete: u16, error: u16) {
+        unsafe {
+            (D3_DMA2D_COUNTS as *mut u32).write_volatile(((complete as u32) << 16) | error as u32);
+        }
+    }
+
+    /// Publish serial queue depths packed as `rx << 16 | tx`.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_serial_depths(&self, rx_depth: u16, tx_depth: u16) {
+        unsafe {
+            (D3_SERIAL_DEPTHS as *mut u32)
+                .write_volatile(((rx_depth as u32) << 16) | tx_depth as u32);
+        }
+    }
+
+    /// Publish serial drop counters packed as `rx << 16 | tx`.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_serial_drops(&self, rx_drop: u16, tx_drop: u16) {
+        unsafe {
+            (D3_SERIAL_DROPS as *mut u32).write_volatile(((rx_drop as u32) << 16) | tx_drop as u32);
+        }
+    }
+
+    /// Publish pipeline stage and frame identifiers packed into one word.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_pipeline_stage(&self, stage: u8, current_frame: u16, queued_frame: u8) {
+        unsafe {
+            (D3_PIPELINE_STAGE as *mut u32).write_volatile(
+                ((stage as u32) << 24) | ((queued_frame as u32) << 16) | current_frame as u32,
+            );
+        }
+    }
+
+    /// Publish legacy spin counters packed as `serial << 16 | dma`.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_spin_counts(&self, serial_spins: u16, dma_spins: u16) {
+        unsafe {
+            (D3_SPIN_COUNTS as *mut u32)
+                .write_volatile(((serial_spins as u32) << 16) | dma_spins as u32);
+        }
     }
 }

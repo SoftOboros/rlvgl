@@ -36,9 +36,7 @@ impl IconBitmap {
                 let bit_index = row * w + col;
                 let byte_index = bit_index / 8;
                 let bit_offset = 7 - (bit_index % 8);
-                if byte_index < self.data.len()
-                    && (self.data[byte_index] >> bit_offset) & 1 == 1
-                {
+                if byte_index < self.data.len() && (self.data[byte_index] >> bit_offset) & 1 == 1 {
                     renderer.fill_rect(
                         crate::widget::Rect {
                             x: x + col as i32 * scale,

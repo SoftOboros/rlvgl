@@ -184,7 +184,11 @@ impl MicCapture {
             self.sai.clear_overrun();
             // TC means DMA just finished one full buffer and switched.
             // The buffer that just completed is the opposite of current_target.
-            let completed = if self.bdma.current_target() == 0 { 1 } else { 0 };
+            let completed = if self.bdma.current_target() == 0 {
+                1
+            } else {
+                0
+            };
             if completed != self.last_processed {
                 self.last_processed = completed;
                 return Some(completed);

@@ -50,7 +50,10 @@ fn main() {
         .collect();
     locale_files.sort_by_key(|e| e.file_name());
 
-    assert!(!locale_files.is_empty(), "no locale JSON files found in locales/");
+    assert!(
+        !locale_files.is_empty(),
+        "no locale JSON files found in locales/"
+    );
 
     // Parse each locale into an ordered map.
     let mut locales: Vec<(String, BTreeMap<String, String>)> = Vec::new();
@@ -66,7 +69,10 @@ fn main() {
             .map(|(k, v)| {
                 let s = match v {
                     Value::String(s) => s,
-                    _ => panic!("value for key \"{k}\" in {} must be a string", path.display()),
+                    _ => panic!(
+                        "value for key \"{k}\" in {} must be a string",
+                        path.display()
+                    ),
                 };
                 (k, s)
             })
@@ -139,8 +145,11 @@ fn main() {
     fs::write(out_path.join("translations.bin"), &blob).unwrap();
 
     // Print the blob path so it can be copied to SD / media.
-    eprintln!("cargo:warning=i18n blob: {}/translations.bin ({} bytes)",
-              out_dir, blob.len());
+    eprintln!(
+        "cargo:warning=i18n blob: {}/translations.bin ({} bytes)",
+        out_dir,
+        blob.len()
+    );
 
     // ── Generate Rust source ───────────────────────────────────────────
     let mut out = String::with_capacity(4096);
@@ -201,7 +210,11 @@ fn main() {
     writeln!(out, "/// Translate a key, optionally with parameters.").unwrap();
     writeln!(out, "///").unwrap();
     writeln!(out, "/// - `t!(\"key\")` returns `&'static str`").unwrap();
-    writeln!(out, "/// - `t!(\"key\", param = value, ...)` returns `alloc::string::String`").unwrap();
+    writeln!(
+        out,
+        "/// - `t!(\"key\", param = value, ...)` returns `alloc::string::String`"
+    )
+    .unwrap();
     writeln!(out, "#[macro_export]").unwrap();
     writeln!(out, "macro_rules! t {{").unwrap();
     for (key, variant) in keys.iter().zip(pascal_keys.iter()) {

@@ -8,12 +8,12 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use rlvgl::core::packed_font::PackedFont;
 use rlvgl::core::event::Event;
+use rlvgl::core::packed_font::PackedFont;
 use rlvgl::core::renderer::Renderer;
 use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
 use rlvgl::ui::GridCalc;
+use rlvgl::ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
 
 // ── D3 SRAM debug slots (readable via probe-rs) ──────────────────
 // ConfigMenu writes to 0x3800_0640..0x3800_066F for live debugging.
@@ -274,11 +274,12 @@ impl ConfigMenu {
             self.clear_bounds = Some(self.panel_bounds());
             self.clear_countdown = 3;
             #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-            unsafe { d3::CLEAR_STATE.write_volatile(0xD0_000000 | self.clear_countdown as u32); }
+            unsafe {
+                d3::CLEAR_STATE.write_volatile(0xD0_000000 | self.clear_countdown as u32);
+            }
         }
         self.visible = false;
     }
-
 
     fn fire_on_change(&mut self) {
         if let Some(cb) = self.on_change.as_mut() {
@@ -364,17 +365,32 @@ impl ConfigMenu {
 
         // Center hub
         renderer.fill_rect(
-            Rect { x: cx - ir, y: cy - ir, width: ir * 2, height: ir * 2 },
+            Rect {
+                x: cx - ir,
+                y: cy - ir,
+                width: ir * 2,
+                height: ir * 2,
+            },
             color,
         );
         // Horizontal bar (left-right teeth)
         renderer.fill_rect(
-            Rect { x: cx - r, y: cy - tw, width: r * 2, height: tw * 2 },
+            Rect {
+                x: cx - r,
+                y: cy - tw,
+                width: r * 2,
+                height: tw * 2,
+            },
             color,
         );
         // Vertical bar (top-bottom teeth)
         renderer.fill_rect(
-            Rect { x: cx - tw, y: cy - r, width: tw * 2, height: r * 2 },
+            Rect {
+                x: cx - tw,
+                y: cy - r,
+                width: tw * 2,
+                height: r * 2,
+            },
             color,
         );
         // Diagonal teeth
@@ -382,14 +398,24 @@ impl ConfigMenu {
         let ts = tw + 1;
         for &(dx, dy) in &[(d, d), (d, -d), (-d, d), (-d, -d)] {
             renderer.fill_rect(
-                Rect { x: cx + dx - ts / 2, y: cy + dy - ts / 2, width: ts, height: ts },
+                Rect {
+                    x: cx + dx - ts / 2,
+                    y: cy + dy - ts / 2,
+                    width: ts,
+                    height: ts,
+                },
                 color,
             );
         }
         // Center hole
         let hole = ir * 2 / 3;
         renderer.fill_rect(
-            Rect { x: cx - hole / 2, y: cy - hole / 2, width: hole, height: hole },
+            Rect {
+                x: cx - hole / 2,
+                y: cy - hole / 2,
+                width: hole,
+                height: hole,
+            },
             BG_COLOR,
         );
     }
@@ -426,17 +452,39 @@ impl ConfigMenu {
         ctx.draw_str_rotated(self.font, cb.x + 8, cb.y + 4, "X", CLOSE_COLOR, scratch);
 
         // Language checkboxes
-        self.draw_checkbox_hw(ctx, scratch, self.content_grid().cell(0, 0), "English", self.pending == 0);
-        self.draw_checkbox_hw(ctx, scratch, self.content_grid().cell(1, 0), "Francais", self.pending == 1);
+        self.draw_checkbox_hw(
+            ctx,
+            scratch,
+            self.content_grid().cell(0, 0),
+            "English",
+            self.pending == 0,
+        );
+        self.draw_checkbox_hw(
+            ctx,
+            scratch,
+            self.content_grid().cell(1, 0),
+            "Francais",
+            self.pending == 1,
+        );
 
         // Separator
         let sep_y = self.content_grid().cell(2, 0).y + ROW_HEIGHT / 2;
         ctx.fill_rect_rotated(
-            panel.x + PANEL_PADDING, sep_y, PANEL_W - 2 * PANEL_PADDING, 1, BORDER_COLOR,
+            panel.x + PANEL_PADDING,
+            sep_y,
+            PANEL_W - 2 * PANEL_PADDING,
+            1,
+            BORDER_COLOR,
         );
 
         // Event Viewer toggle
-        self.draw_checkbox_hw(ctx, scratch, self.content_grid().cell(3, 0), "Event Viewer", self.event_viewer_pending);
+        self.draw_checkbox_hw(
+            ctx,
+            scratch,
+            self.content_grid().cell(3, 0),
+            "Event Viewer",
+            self.event_viewer_pending,
+        );
 
         // OK / Cancel buttons
         self.draw_button_hw(ctx, scratch, self.ok_bounds(), "OK", BTN_OK_BG);
@@ -458,17 +506,27 @@ impl ConfigMenu {
             width: CHECK_SIZE,
             height: CHECK_SIZE,
         };
-        ctx.fill_rect_rotated(box_rect.x, box_rect.y, box_rect.width, box_rect.height, BORDER_COLOR);
+        ctx.fill_rect_rotated(
+            box_rect.x,
+            box_rect.y,
+            box_rect.width,
+            box_rect.height,
+            BORDER_COLOR,
+        );
         if checked {
             let inner = Rect {
-                x: box_rect.x + 4, y: box_rect.y + 4,
-                width: box_rect.width - 8, height: box_rect.height - 8,
+                x: box_rect.x + 4,
+                y: box_rect.y + 4,
+                width: box_rect.width - 8,
+                height: box_rect.height - 8,
             };
             ctx.fill_rect_rotated(inner.x, inner.y, inner.width, inner.height, CHECK_COLOR);
         } else {
             let inner = Rect {
-                x: box_rect.x + 2, y: box_rect.y + 2,
-                width: box_rect.width - 4, height: box_rect.height - 4,
+                x: box_rect.x + 2,
+                y: box_rect.y + 2,
+                width: box_rect.width - 4,
+                height: box_rect.height - 4,
             };
             ctx.fill_rect_rotated(inner.x, inner.y, inner.width, inner.height, BG_COLOR);
         }
@@ -501,8 +559,7 @@ impl Widget for ConfigMenu {
             let panel = self.panel_bounds();
             let min_x = self.gear_bounds.x.min(panel.x);
             let min_y = self.gear_bounds.y;
-            let max_x = (self.gear_bounds.x + self.gear_bounds.width)
-                .max(panel.x + panel.width);
+            let max_x = (self.gear_bounds.x + self.gear_bounds.width).max(panel.x + panel.width);
             let max_y = panel.y + panel.height;
             Rect {
                 x: min_x,
@@ -521,11 +578,6 @@ impl Widget for ConfigMenu {
         if !self.visible {
             return;
         }
-
-        // When DMA2D is available, draw_hw() handles rendering after
-        // the widget tree draw — skip the slow per-pixel Renderer path.
-        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        return;
 
         // Panel background
         let panel = self.panel_bounds();
@@ -549,26 +601,45 @@ impl Widget for ConfigMenu {
             let cy = cb.y + (cb.height - ch as i32) / 2;
             renderer.draw_pixels((cx, cy), &self.close_pixels, cw, ch);
         } else {
-            renderer.draw_text(
-                (cb.x + 8, cb.y + CLOSE_SIZE - 6),
-                "X",
-                CLOSE_COLOR,
-            );
+            renderer.draw_text((cb.x + 8, cb.y + CLOSE_SIZE - 6), "X", CLOSE_COLOR);
         }
 
         // Language checkboxes
-        Self::draw_checkbox(renderer, self.font, self.content_grid().cell(0, 0), "English", self.pending == 0);
-        Self::draw_checkbox(renderer, self.font, self.content_grid().cell(1, 0), "Francais", self.pending == 1);
+        Self::draw_checkbox(
+            renderer,
+            self.font,
+            self.content_grid().cell(0, 0),
+            "English",
+            self.pending == 0,
+        );
+        Self::draw_checkbox(
+            renderer,
+            self.font,
+            self.content_grid().cell(1, 0),
+            "Francais",
+            self.pending == 1,
+        );
 
         // Separator line between language and options sections
         let sep_y = self.content_grid().cell(2, 0).y + ROW_HEIGHT / 2;
         renderer.fill_rect(
-            Rect { x: panel.x + PANEL_PADDING, y: sep_y, width: PANEL_W - 2 * PANEL_PADDING, height: 1 },
+            Rect {
+                x: panel.x + PANEL_PADDING,
+                y: sep_y,
+                width: PANEL_W - 2 * PANEL_PADDING,
+                height: 1,
+            },
             BORDER_COLOR,
         );
 
         // Event Viewer toggle
-        Self::draw_checkbox(renderer, self.font, self.content_grid().cell(3, 0), "Event Viewer", self.event_viewer_pending);
+        Self::draw_checkbox(
+            renderer,
+            self.font,
+            self.content_grid().cell(3, 0),
+            "Event Viewer",
+            self.event_viewer_pending,
+        );
 
         // OK / Cancel buttons
         Self::draw_button(renderer, self.font, self.ok_bounds(), "OK", BTN_OK_BG);
@@ -578,9 +649,24 @@ impl Widget for ConfigMenu {
         draw_border(renderer, self.close_bounds(), Color(255, 0, 0, 255), 1);
         draw_border(renderer, self.ok_bounds(), Color(0, 255, 0, 255), 1);
         draw_border(renderer, self.cancel_bounds(), Color(255, 255, 0, 255), 1);
-        draw_border(renderer, self.content_grid().cell(0, 0), Color(0, 255, 255, 255), 1);
-        draw_border(renderer, self.content_grid().cell(1, 0), Color(255, 0, 255, 255), 1);
-        draw_border(renderer, self.content_grid().cell(3, 0), Color(0, 255, 255, 255), 1);
+        draw_border(
+            renderer,
+            self.content_grid().cell(0, 0),
+            Color(0, 255, 255, 255),
+            1,
+        );
+        draw_border(
+            renderer,
+            self.content_grid().cell(1, 0),
+            Color(255, 0, 255, 255),
+            1,
+        );
+        draw_border(
+            renderer,
+            self.content_grid().cell(3, 0),
+            Color(0, 255, 255, 255),
+            1,
+        );
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
@@ -617,7 +703,9 @@ impl Widget for ConfigMenu {
                 // Close X
                 if Self::inside(self.close_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_CLOSE); }
+                    unsafe {
+                        d3::HIT_CODE.write_volatile(d3::ACT_CLOSE);
+                    }
                     self.pending = self.applied;
                     self.fire_on_preview();
                     self.event_viewer_pending = self.event_viewer_applied;
@@ -629,7 +717,9 @@ impl Widget for ConfigMenu {
                 // OK button — apply and close
                 if Self::inside(self.ok_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_OK); }
+                    unsafe {
+                        d3::HIT_CODE.write_volatile(d3::ACT_OK);
+                    }
                     if self.pending != self.applied {
                         self.applied = self.pending;
                         self.fire_on_change();
@@ -646,7 +736,9 @@ impl Widget for ConfigMenu {
                 // Cancel button — revert and close
                 if Self::inside(self.cancel_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_CANCEL); }
+                    unsafe {
+                        d3::HIT_CODE.write_volatile(d3::ACT_CANCEL);
+                    }
                     self.pending = self.applied;
                     self.fire_on_preview();
                     self.event_viewer_pending = self.event_viewer_applied;
@@ -658,7 +750,9 @@ impl Widget for ConfigMenu {
                 // English checkbox
                 if Self::inside(self.content_grid().cell(0, 0), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_ENGLISH); }
+                    unsafe {
+                        d3::HIT_CODE.write_volatile(d3::ACT_ENGLISH);
+                    }
                     self.pending = 0;
                     self.fire_on_preview();
                     self.dirty_frames = 2;
@@ -668,7 +762,9 @@ impl Widget for ConfigMenu {
                 // French checkbox
                 if Self::inside(self.content_grid().cell(1, 0), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_FRENCH); }
+                    unsafe {
+                        d3::HIT_CODE.write_volatile(d3::ACT_FRENCH);
+                    }
                     self.pending = 1;
                     self.fire_on_preview();
                     self.dirty_frames = 2;
@@ -685,7 +781,9 @@ impl Widget for ConfigMenu {
                 // Tap outside panel: cancel
                 if !Self::inside(self.panel_bounds(), *x, *y) {
                     #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                    unsafe { d3::HIT_CODE.write_volatile(d3::ACT_OUTSIDE); }
+                    unsafe {
+                        d3::HIT_CODE.write_volatile(d3::ACT_OUTSIDE);
+                    }
                     self.pending = self.applied;
                     self.fire_on_preview();
                     self.event_viewer_pending = self.event_viewer_applied;
@@ -696,7 +794,9 @@ impl Widget for ConfigMenu {
 
                 // Inside panel but no specific hit
                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-                unsafe { d3::HIT_CODE.write_volatile(d3::ACT_MISS); }
+                unsafe {
+                    d3::HIT_CODE.write_volatile(d3::ACT_MISS);
+                }
 
                 return true;
             }

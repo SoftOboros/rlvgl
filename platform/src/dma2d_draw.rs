@@ -42,13 +42,7 @@ impl Dma2dOverlayCtx {
 
     /// Rotate a landscape widget rect to portrait FB coordinates.
     /// Returns `(fb_x, fb_y, fb_w, fb_h)` or `None` if fully off-screen.
-    fn rotate_clip(
-        &self,
-        wx: i32,
-        wy: i32,
-        ww: i32,
-        wh: i32,
-    ) -> Option<(i32, i32, i32, i32)> {
+    fn rotate_clip(&self, wx: i32, wy: i32, ww: i32, wh: i32) -> Option<(i32, i32, i32, i32)> {
         let mut fx = self.fb_w as i32 - wy - wh;
         let fy = wx;
         let mut fw = wh;
@@ -173,24 +167,12 @@ impl Dma2dOverlayCtx {
 
         // Body: full-width strip between top-radius and bottom-radius
         if rect.height - 2 * r > 0 {
-            self.fill_rect_rotated(
-                rect.x,
-                rect.y + r,
-                rect.width,
-                rect.height - 2 * r,
-                color,
-            );
+            self.fill_rect_rotated(rect.x, rect.y + r, rect.width, rect.height - 2 * r, color);
         }
 
         // Top strip between corners
         if rect.width - 2 * r > 0 {
-            self.fill_rect_rotated(
-                rect.x + r,
-                rect.y,
-                rect.width - 2 * r,
-                r,
-                color,
-            );
+            self.fill_rect_rotated(rect.x + r, rect.y, rect.width - 2 * r, r, color);
             // Bottom strip
             self.fill_rect_rotated(
                 rect.x + r,
@@ -224,7 +206,11 @@ impl Dma2dOverlayCtx {
                 // Bottom-right: arc center at (width-r, height-r), distance = (cx, cy)
                 let d2_br = (cx * cx + cy * cy) as u32;
                 if d2_br <= r2 {
-                    self.blend_pixel_rotated(rect.x + rect.width - r + cx, rect.y + rect.height - r + cy, color);
+                    self.blend_pixel_rotated(
+                        rect.x + rect.width - r + cx,
+                        rect.y + rect.height - r + cy,
+                        color,
+                    );
                 }
             }
         }
@@ -281,14 +267,20 @@ impl Dma2dOverlayCtx {
 
             let ring_w = out_dx - in_dx;
             if ring_w > 0 {
+                self.fill_rect_rotated(rect.x + rout - out_dx, rect.y + dy, ring_w, 1, color);
                 self.fill_rect_rotated(
-                    rect.x + rout - out_dx, rect.y + dy, ring_w, 1, color,
+                    rect.x + rect.width - rout + in_dx,
+                    rect.y + dy,
+                    ring_w,
+                    1,
+                    color,
                 );
                 self.fill_rect_rotated(
-                    rect.x + rect.width - rout + in_dx, rect.y + dy, ring_w, 1, color,
-                );
-                self.fill_rect_rotated(
-                    rect.x + rout - out_dx, rect.y + rect.height - 1 - dy, ring_w, 1, color,
+                    rect.x + rout - out_dx,
+                    rect.y + rect.height - 1 - dy,
+                    ring_w,
+                    1,
+                    color,
                 );
                 self.fill_rect_rotated(
                     rect.x + rect.width - rout + in_dx,
@@ -302,15 +294,17 @@ impl Dma2dOverlayCtx {
             // Outer AA fringe
             if out_frac > 0 {
                 let aa = Color(
-                    color.0, color.1, color.2,
+                    color.0,
+                    color.1,
+                    color.2,
                     ((out_frac as u16 * base_alpha) / 255) as u8,
                 );
                 self.blend_pixel_rotated(rect.x + rout - out_dx - 1, rect.y + dy, aa);
+                self.blend_pixel_rotated(rect.x + rect.width - rout + out_dx, rect.y + dy, aa);
                 self.blend_pixel_rotated(
-                    rect.x + rect.width - rout + out_dx, rect.y + dy, aa,
-                );
-                self.blend_pixel_rotated(
-                    rect.x + rout - out_dx - 1, rect.y + rect.height - 1 - dy, aa,
+                    rect.x + rout - out_dx - 1,
+                    rect.y + rect.height - 1 - dy,
+                    aa,
                 );
                 self.blend_pixel_rotated(
                     rect.x + rect.width - rout + out_dx,
@@ -322,16 +316,14 @@ impl Dma2dOverlayCtx {
             // Inner AA fringe
             if in_dx > 0 && in_frac > 0 {
                 let aa = Color(
-                    color.0, color.1, color.2,
+                    color.0,
+                    color.1,
+                    color.2,
                     (((255 - in_frac as u16) * base_alpha) / 255) as u8,
                 );
                 self.blend_pixel_rotated(rect.x + rout - in_dx, rect.y + dy, aa);
-                self.blend_pixel_rotated(
-                    rect.x + rect.width - rout + in_dx - 1, rect.y + dy, aa,
-                );
-                self.blend_pixel_rotated(
-                    rect.x + rout - in_dx, rect.y + rect.height - 1 - dy, aa,
-                );
+                self.blend_pixel_rotated(rect.x + rect.width - rout + in_dx - 1, rect.y + dy, aa);
+                self.blend_pixel_rotated(rect.x + rout - in_dx, rect.y + rect.height - 1 - dy, aa);
                 self.blend_pixel_rotated(
                     rect.x + rect.width - rout + in_dx - 1,
                     rect.y + rect.height - 1 - dy,
@@ -345,14 +337,22 @@ impl Dma2dOverlayCtx {
         if straight_h > 0 {
             self.fill_rect_rotated(rect.x, rect.y + rout, bw, straight_h, color);
             self.fill_rect_rotated(
-                rect.x + rect.width - bw, rect.y + rout, bw, straight_h, color,
+                rect.x + rect.width - bw,
+                rect.y + rout,
+                bw,
+                straight_h,
+                color,
             );
         }
         let straight_w = rect.width - 2 * rout;
         if straight_w > 0 {
             self.fill_rect_rotated(rect.x + rout, rect.y, straight_w, bw, color);
             self.fill_rect_rotated(
-                rect.x + rout, rect.y + rect.height - bw, straight_w, bw, color,
+                rect.x + rout,
+                rect.y + rect.height - bw,
+                straight_w,
+                bw,
+                color,
             );
         }
     }
@@ -384,7 +384,10 @@ impl Dma2dOverlayCtx {
         let fy = gx;
 
         // Clip check
-        if fx < 0 || fy < 0 || fx + gh as i32 > self.fb_w as i32 || fy + gw as i32 > self.fb_h as i32
+        if fx < 0
+            || fy < 0
+            || fx + gh as i32 > self.fb_w as i32
+            || fy + gw as i32 > self.fb_h as i32
         {
             return;
         }
@@ -413,9 +416,8 @@ impl Dma2dOverlayCtx {
                         scratch[i] = ((scratch[i] as u16 * base) / 255) as u8;
                     }
                 }
-                let fg_rgb = ((fg_color.0 as u32) << 16)
-                    | ((fg_color.1 as u32) << 8)
-                    | (fg_color.2 as u32);
+                let fg_rgb =
+                    ((fg_color.0 as u32) << 16) | ((fg_color.1 as u32) << 8) | (fg_color.2 as u32);
                 let dst = self.fb_ptr(fx, fy);
                 unsafe {
                     (*dma2d_ptr).blend_a8_color(

@@ -313,7 +313,15 @@ pub struct GridCalc {
 impl GridCalc {
     /// Create a grid calculator with the given origin, column count, and cell size.
     pub const fn new(x: i32, y: i32, cols: usize, col_w: i32, row_h: i32) -> Self {
-        Self { x, y, cols, col_w, row_h, col_gap: 0, row_gap: 0 }
+        Self {
+            x,
+            y,
+            cols,
+            col_w,
+            row_h,
+            col_gap: 0,
+            row_gap: 0,
+        }
     }
 
     /// Set inter-cell gaps.
@@ -405,16 +413,40 @@ mod tests {
     fn grid_calc_cell() {
         let g = GridCalc::new(10, 20, 2, 100, 40).gap(4, 2);
         let r = g.cell(0, 0);
-        assert_eq!(r, Rect { x: 10, y: 20, width: 100, height: 40 });
+        assert_eq!(
+            r,
+            Rect {
+                x: 10,
+                y: 20,
+                width: 100,
+                height: 40
+            }
+        );
         let r = g.cell(1, 1);
-        assert_eq!(r, Rect { x: 114, y: 62, width: 100, height: 40 });
+        assert_eq!(
+            r,
+            Rect {
+                x: 114,
+                y: 62,
+                width: 100,
+                height: 40
+            }
+        );
     }
 
     #[test]
     fn grid_calc_row_span() {
         let g = GridCalc::new(0, 0, 3, 50, 30).gap(10, 5);
         let r = g.row_span(0);
-        assert_eq!(r, Rect { x: 0, y: 0, width: 170, height: 30 });
+        assert_eq!(
+            r,
+            Rect {
+                x: 0,
+                y: 0,
+                width: 170,
+                height: 30
+            }
+        );
         assert_eq!(g.total_width(), 170);
         assert_eq!(g.total_height(2), 65);
     }

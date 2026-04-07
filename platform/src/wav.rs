@@ -40,7 +40,12 @@ fn read_u16_le(buf: &[u8], offset: usize) -> u16 {
 }
 
 fn read_u32_le(buf: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes([buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]])
+    u32::from_le_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
 }
 
 /// Parse a WAV header from the first bytes of a file.

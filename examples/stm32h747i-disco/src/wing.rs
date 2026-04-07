@@ -66,10 +66,7 @@ impl Wing {
     pub fn new(icons: &[(&'static [u8], bool)]) -> Self {
         let n = icons.len().min(MAX_SLOTS);
         // Total height: same calculation as right strip
-        let total_h = MARGIN_TOP
-            + n as i32 * ICON_SIZE
-            + (n as i32 - 1).max(0) * GAP
-            + MARGIN_TOP; // bottom margin matches top
+        let total_h = MARGIN_TOP + n as i32 * ICON_SIZE + (n as i32 - 1).max(0) * GAP + MARGIN_TOP; // bottom margin matches top
 
         let mut slots: [Option<WingSlot>; MAX_SLOTS] = [const { None }; MAX_SLOTS];
         for (i, &(rle, enabled)) in icons.iter().enumerate().take(MAX_SLOTS) {
@@ -218,7 +215,11 @@ impl Widget for Wing {
             // Use same split-gap hit cell strategy as the right strip
             let step = ICON_SIZE + GAP;
             for i in 0..self.slot_count {
-                let cell_top = if i == 0 { 0 } else { MARGIN_TOP + i as i32 * step - GAP / 2 };
+                let cell_top = if i == 0 {
+                    0
+                } else {
+                    MARGIN_TOP + i as i32 * step - GAP / 2
+                };
                 let cell_bot = if i == self.slot_count - 1 {
                     480
                 } else {

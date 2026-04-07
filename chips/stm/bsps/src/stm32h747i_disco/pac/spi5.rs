@@ -20,7 +20,9 @@ pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
     #[cfg(feature = "c_hal")]
     {
         let _ = dp;
-        unsafe { super::super::c_ffi::c_spi5_enable_gpio_clocks(); }
+        unsafe {
+            super::super::c_ffi::c_spi5_enable_gpio_clocks();
+        }
     }
     #[cfg(not(feature = "c_hal"))]
     {
@@ -37,7 +39,9 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
     #[cfg(feature = "c_hal")]
     {
         let _ = dp;
-        unsafe { super::super::c_ffi::c_spi5_configure_pins(); }
+        unsafe {
+            super::super::c_ffi::c_spi5_configure_pins();
+        }
     }
     #[cfg(not(feature = "c_hal"))]
     {
@@ -153,7 +157,9 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
 
 pub fn enable_peripherals(_dp: &pac::Peripherals) {
     #[cfg(feature = "c_hal")]
-    unsafe { super::super::c_ffi::c_spi5_enable_peripherals(); }
+    unsafe {
+        super::super::c_ffi::c_spi5_enable_peripherals();
+    }
 }
 
 /// De-initializes board pins to their analog state.
@@ -164,7 +170,9 @@ pub fn deinit_board_pac(dp: &pac::Peripherals) {
     #[cfg(feature = "c_hal")]
     {
         let _ = dp;
-        unsafe { super::super::c_ffi::c_spi5_deinit(); }
+        unsafe {
+            super::super::c_ffi::c_spi5_deinit();
+        }
     }
     #[cfg(not(feature = "c_hal"))]
     {

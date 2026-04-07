@@ -84,12 +84,18 @@ pub(crate) fn ingest(input: &Path, out: &Path) -> Result<()> {
 
     // Ensure required rlvgl keys
     if !all_colors.contains_key("primary") {
-        if let Some(v) = default_colors.get("brand.solid").or(palette.get("brand.500")) {
+        if let Some(v) = default_colors
+            .get("brand.solid")
+            .or(palette.get("brand.500"))
+        {
             all_colors.insert("primary".into(), v.clone());
         }
     }
     if !all_colors.contains_key("background") {
-        all_colors.insert("background".into(), palette.get("gray.900").cloned().unwrap_or("#171923".into()));
+        all_colors.insert(
+            "background".into(),
+            palette.get("gray.900").cloned().unwrap_or("#171923".into()),
+        );
     }
     if !all_colors.contains_key("text") {
         if let Some(v) = default_colors.get("text") {
@@ -98,7 +104,8 @@ pub(crate) fn ingest(input: &Path, out: &Path) -> Result<()> {
     }
 
     // Build YAML output
-    let mut yaml = String::from("# Auto-generated from Chakra theme by rlvgl-creator\nversion: 1\n");
+    let mut yaml =
+        String::from("# Auto-generated from Chakra theme by rlvgl-creator\nversion: 1\n");
     yaml.push_str("colors:\n");
     for (k, v) in &all_colors {
         let key = sanitize_key(k);
@@ -222,7 +229,9 @@ fn parse_js_obj(s: &str) -> Result<(JsObj, usize)> {
             map.insert(key, JsValue::Str(val));
         } else {
             // Skip unrecognized values until comma/closing brace/newline
-            let end = rest.find(|c: char| c == ',' || c == '}' || c == '\n').unwrap_or(rest.len());
+            let end = rest
+                .find(|c: char| c == ',' || c == '}' || c == '\n')
+                .unwrap_or(rest.len());
             let raw = rest[..end].trim();
             pos += end;
             map.insert(key, JsValue::Str(raw.to_string()));
@@ -237,7 +246,9 @@ fn parse_js_key(s: &str) -> Result<(String, usize)> {
         parse_js_string(s)
     } else {
         // Unquoted key: ident chars or digits (for Chakra numeric keys like `50`, `100`)
-        let end = s.find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$').unwrap_or(s.len());
+        let end = s
+            .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+            .unwrap_or(s.len());
         if end == 0 {
             bail!("empty unquoted key");
         }
@@ -363,7 +374,13 @@ fn resolve_refs_map(
 fn sanitize_key(key: &str) -> String {
     key.replace('.', "-")
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect()
 }
 

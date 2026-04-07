@@ -1,44 +1,63 @@
-//! Audio oscilloscope visualization with phosphor persistence effect.
+//! Audio oscilloscope visualization rendered as a stepped task.
 //!
-//! Renders PCM waveform data from the onboard MEMS microphone as a green
-//! oscilloscope trace across the 720×480 landscape viewport. Three history
-//! buffers provide a phosphor decay effect with decreasing intensity.
-//!
-//! ## SDRAM buffer layout (shared with star crawl at [`SCOPE_BASE`])
-//!
-//! | Buffer       | Size          | Format   | Purpose                        |
-//! |-------------|---------------|----------|--------------------------------|
-//! | Scope frame | 720×480×4     | ARGB8888 | Per-frame composited output    |
+//! The scope advances in small chunks so the CM7 round-robin loop stays
+//! responsive while a frame is being cleared, drawn, and rotated.
 
-#![allow(dead_code)]
-
-/// Landscape width of the scope drawing area (excluding icon bar).
+/// Landscape width of the scope drawing area.
 const SCOPE_W: u32 = 720;
 /// Landscape height of the scope drawing area.
 const SCOPE_H: u32 = 480;
 /// ARGB8888 bytes per pixel.
 const BPP: u32 = 4;
-/// Number of PCM samples per frame (one per pixel column).
+/// Number of PCM samples per frame.
 const SAMPLES: usize = 720;
-/// SDRAM base address for scope frame buffer (shared with star crawl).
+/// SDRAM base address for the scope working buffer.
 const SCOPE_BASE: usize = 0xD048_0000;
-/// Background color (near-black).
+/// Background colour.
 const BG_COLOR: u32 = 0xFF0A_0A0A;
-/// Vertical center of the scope (y = 240).
+/// Vertical centre of the scope.
 const CENTER_Y: i32 = (SCOPE_H / 2) as i32;
+/// Samples processed per scheduler step.
+const STEP_SAMPLES: usize = 32;
+/// Rows cleared per scheduler step.
+const CLEAR_ROWS_PER_STEP: u32 = 16;
 
-/// Green intensity for each trace (center pixel), oldest to newest.
+/// Green intensity for each trace, oldest to newest.
 const TRACE_GREEN: [u8; 4] = [0x40, 0x80, 0xC0, 0xFF];
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum ScopeStage {
+    Idle = 0,
+    Clear = 1,
+    Draw = 2,
+    Rotate = 3,
+}
+
+/// Result of a single scope scheduler step.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum StepResult {
+    /// Scope is inactive.
+    Idle,
+    /// More work remains before the back buffer can be presented.
+    Pending,
+    /// The frame is complete and ready to present.
+    FrameReady,
+}
 
 /// Audio oscilloscope state machine.
 pub struct AudioScope {
     active: bool,
-    /// Pointer to 720×480 ARGB8888 landscape working buffer in SDRAM.
     scope_buf: *mut u8,
-    /// Ring of 4 waveform buffers: current + 3 history.
     waveforms: [[i16; SAMPLES]; 4],
-    /// Index of the current (newest) waveform in the ring.
     waveform_idx: usize,
+    frame_id: u32,
+    frame_active: bool,
+    clear_row: u32,
+    draw_x: usize,
+    rotate_x: u32,
+    back_buf: *mut u8,
+    fb_w: u32,
+    stage: ScopeStage,
 }
 
 impl AudioScope {
@@ -49,6 +68,14 @@ impl AudioScope {
             scope_buf: core::ptr::null_mut(),
             waveforms: [[0i16; SAMPLES]; 4],
             waveform_idx: 0,
+            frame_id: 0,
+            frame_active: false,
+            clear_row: 0,
+            draw_x: 0,
+            rotate_x: 0,
+            back_buf: core::ptr::null_mut(),
+            fb_w: 0,
+            stage: ScopeStage::Idle,
         }
     }
 
@@ -56,74 +83,137 @@ impl AudioScope {
         self.active
     }
 
-    /// Activate the scope: set up SDRAM buffer pointer, clear state.
+    /// Activate the scope and reset frame state.
     pub fn activate(&mut self) {
         self.scope_buf = SCOPE_BASE as *mut u8;
         self.waveforms = [[0i16; SAMPLES]; 4];
         self.waveform_idx = 0;
+        self.frame_id = 0;
         self.active = true;
+        self.frame_active = false;
+        self.stage = ScopeStage::Idle;
     }
 
     /// Deactivate the scope.
     pub fn deactivate(&mut self) {
         self.active = false;
+        self.frame_active = false;
+        self.stage = ScopeStage::Idle;
     }
 
-    /// Render one frame of the oscilloscope.
-    ///
-    /// `samples` must contain exactly 720 PCM samples (i16).
-    /// Renders to the intermediate landscape buffer, then rotates into the
-    /// portrait back buffer. Returns `true` if a frame was produced.
+    /// Numeric stage identifier for telemetry.
+    pub fn stage_code(&self) -> u32 {
+        self.stage as u32
+    }
+
+    /// Current frame identifier for telemetry.
+    pub fn frame_id(&self) -> u32 {
+        self.frame_id
+    }
+
+    /// Drop the current in-progress frame.
+    pub fn drop_frame(&mut self) {
+        self.frame_active = false;
+        self.stage = ScopeStage::Idle;
+        self.clear_row = 0;
+        self.draw_x = 0;
+        self.rotate_x = 0;
+    }
+
+    /// Advance the scope renderer by one bounded step.
     pub fn tick(
         &mut self,
         samples: &[i16],
         back_buf: *mut u8,
         fb_w: u32,
-        fb_h: u32,
-    ) -> bool {
+        _fb_h: u32,
+    ) -> StepResult {
         if !self.active || self.scope_buf.is_null() {
-            return false;
+            return StepResult::Idle;
         }
 
-        // Advance ring and store new samples
-        self.waveform_idx = (self.waveform_idx + 1) % 4;
-        let idx = self.waveform_idx;
-        for i in 0..SAMPLES {
-            self.waveforms[idx][i] = if i < samples.len() { samples[i] } else { 0 };
-        }
+        if !self.frame_active {
+            self.frame_id = self.frame_id.wrapping_add(1);
+            self.frame_active = true;
+            self.clear_row = 0;
+            self.draw_x = 0;
+            self.rotate_x = 0;
+            self.back_buf = back_buf;
+            self.fb_w = fb_w;
+            self.stage = ScopeStage::Clear;
 
-        // Clear scope buffer to background
-        let pixel_count = (SCOPE_W * SCOPE_H) as usize;
-        let buf32 = self.scope_buf as *mut u32;
-        unsafe {
-            for i in 0..pixel_count {
-                buf32.add(i).write_volatile(BG_COLOR);
+            self.waveform_idx = (self.waveform_idx + 1) % 4;
+            let waveform = &mut self.waveforms[self.waveform_idx];
+            for (i, slot) in waveform.iter_mut().enumerate() {
+                *slot = samples.get(i).copied().unwrap_or(0);
             }
         }
 
-        // Draw 4 traces, oldest first so newest overwrites at overlaps
+        match self.stage {
+            ScopeStage::Idle => StepResult::Pending,
+            ScopeStage::Clear => {
+                self.clear_rows();
+                if self.clear_row >= SCOPE_H {
+                    self.stage = ScopeStage::Draw;
+                }
+                StepResult::Pending
+            }
+            ScopeStage::Draw => {
+                self.draw_chunk();
+                if self.draw_x >= SAMPLES {
+                    self.stage = ScopeStage::Rotate;
+                }
+                StepResult::Pending
+            }
+            ScopeStage::Rotate => {
+                self.rotate_chunk();
+                if self.rotate_x >= SCOPE_W {
+                    self.drop_frame();
+                    StepResult::FrameReady
+                } else {
+                    StepResult::Pending
+                }
+            }
+        }
+    }
+
+    fn clear_rows(&mut self) {
+        let buf32 = self.scope_buf as *mut u32;
+        let stride = SCOPE_W as usize;
+        let end = (self.clear_row + CLEAR_ROWS_PER_STEP).min(SCOPE_H);
+        for row in self.clear_row..end {
+            let row_ptr = unsafe { buf32.add(row as usize * stride) };
+            for col in 0..stride {
+                unsafe {
+                    row_ptr.add(col).write_volatile(BG_COLOR);
+                }
+            }
+        }
+        self.clear_row = end;
+    }
+
+    fn draw_chunk(&mut self) {
+        let start = self.draw_x;
+        let end = (start + STEP_SAMPLES).min(SAMPLES);
+        let stride = SCOPE_W as usize;
+        let buf32 = self.scope_buf as *mut u32;
+
         for age in 0..4u8 {
-            // age 0 = oldest (3 frames ago), age 3 = current
             let ring_idx = (self.waveform_idx + 1 + age as usize) % 4;
             let green_center = TRACE_GREEN[age as usize];
             let green_mid = green_center / 2;
             let green_outer = green_center / 4;
-
             let waveform = &self.waveforms[ring_idx];
-            let stride = SCOPE_W as usize;
 
-            for x in 0..SAMPLES {
-                // Scale sample to pixel offset from center.
-                // i16 range is -32768..32767 → map to -240..+240 pixels.
+            for x in start..end {
                 let sample = waveform[x] as i32;
                 let y_offset = (sample * CENTER_Y) / 32768;
-                let y_center = CENTER_Y - y_offset; // invert: positive sample → up
+                let y_center = CENTER_Y - y_offset;
 
-                // Draw 5-pixel vertical spread at this x column
-                let spreads: [(i32, u8); 5] = [
+                let spreads = [
                     (y_center - 2, green_outer),
                     (y_center - 1, green_mid),
-                    (y_center,     green_center),
+                    (y_center, green_center),
                     (y_center + 1, green_mid),
                     (y_center + 2, green_outer),
                 ];
@@ -140,33 +230,26 @@ impl AudioScope {
             }
         }
 
-        // Rotate landscape buffer → portrait back buffer
-        self.rotate_to_portrait(back_buf, fb_w, fb_h);
-
-        true
+        self.draw_x = end;
     }
 
-    /// Copy landscape scope frame → portrait back buffer with 90° rotation.
-    ///
-    /// Landscape (720×480 ARGB8888) → Portrait (480×800 ARGB8888).
-    /// Only writes the left 720 columns (portrait rows 0..719), leaving
-    /// the icon bar untouched.
-    fn rotate_to_portrait(&self, dst: *mut u8, fb_w: u32, _fb_h: u32) {
+    fn rotate_chunk(&mut self) {
         let src_stride = SCOPE_W * BPP;
-        let dst_stride = fb_w * BPP;
+        let dst_stride = self.fb_w * BPP;
+        let end = (self.rotate_x + STEP_SAMPLES as u32).min(SCOPE_W);
 
-        for ly in 0..SCOPE_H {
-            let src_row = unsafe { self.scope_buf.add((ly * src_stride) as usize) };
-            // Landscape (lx, ly) → portrait (fb_w - 1 - ly, lx)
-            let dst_col = fb_w - 1 - ly;
-
-            for lx in 0..SCOPE_W {
+        for lx in self.rotate_x..end {
+            for ly in 0..SCOPE_H {
+                let dst_col = self.fb_w - 1 - ly;
                 let dst_offset = (lx * dst_stride + dst_col * BPP) as usize;
+                let src_offset = (ly * src_stride + lx * BPP) as usize;
                 unsafe {
-                    let pixel = (src_row.add((lx * BPP) as usize) as *const u32).read_volatile();
-                    (dst.add(dst_offset) as *mut u32).write_volatile(pixel);
+                    let pixel = (self.scope_buf.add(src_offset) as *const u32).read_volatile();
+                    (self.back_buf.add(dst_offset) as *mut u32).write_volatile(pixel);
                 }
             }
         }
+
+        self.rotate_x = end;
     }
 }

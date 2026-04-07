@@ -16,25 +16,22 @@ pub fn run(input: &Path, output: &Path) -> Result<()> {
     let (w, h, rgba) = if input.extension().and_then(|e| e.to_str()) == Some("raw") {
         let seq = raw::Sequence::decode(input)
             .map_err(|e| anyhow!("failed to decode {}: {}", input.display(), e))?;
-        let frame = seq.frames.first().ok_or_else(|| anyhow!("empty raw sequence"))?;
+        let frame = seq
+            .frames
+            .first()
+            .ok_or_else(|| anyhow!("empty raw sequence"))?;
         (frame.width, frame.height, frame.data.clone())
     } else {
-        let img = image::open(input)
-            .map_err(|e| anyhow!("failed to open {}: {}", input.display(), e))?;
+        let img =
+            image::open(input).map_err(|e| anyhow!("failed to open {}: {}", input.display(), e))?;
         let (w, h) = img.dimensions();
         (w, h, img.to_rgba8().into_raw())
     };
 
-    eprintln!(
-        "compress: {}x{} ({} bytes raw RGBA)",
-        w,
-        h,
-        rgba.len()
-    );
+    eprintln!("compress: {}x{} ({} bytes raw RGBA)", w, h, rgba.len());
 
-    let (palette, stream) =
-        rlvgl_decomp::encode_rgba(w as usize, h as usize, &rgba)
-            .map_err(|e| anyhow!("RLE encode failed: {:?}", e))?;
+    let (palette, stream) = rlvgl_decomp::encode_rgba(w as usize, h as usize, &rgba)
+        .map_err(|e| anyhow!("RLE encode failed: {:?}", e))?;
 
     let mut blob = Vec::new();
     rlvgl_decomp::write_rle_blob(w as u16, h as u16, &palette, &stream, &mut blob);
@@ -55,8 +52,8 @@ pub fn run(input: &Path, output: &Path) -> Result<()> {
 
 /// Decompress an RLEC `.rle` blob back to a PNG image.
 pub fn decompress(input: &Path, output: &Path) -> Result<()> {
-    let data = std::fs::read(input)
-        .map_err(|e| anyhow!("failed to read {}: {}", input.display(), e))?;
+    let data =
+        std::fs::read(input).map_err(|e| anyhow!("failed to read {}: {}", input.display(), e))?;
 
     let (w, h, pal_bytes, stream) =
         rlvgl_decomp::parse_rle_blob(&data).map_err(|e| anyhow!("bad RLEC blob: {:?}", e))?;
@@ -75,12 +72,7 @@ pub fn decompress(input: &Path, output: &Path) -> Result<()> {
     img.save(output)
         .map_err(|e| anyhow!("failed to write {}: {}", output.display(), e))?;
 
-    eprintln!(
-        "decompress: {}x{} RLEC -> {}",
-        w,
-        h,
-        output.display()
-    );
+    eprintln!("decompress: {}x{} RLEC -> {}", w, h, output.display());
 
     Ok(())
 }

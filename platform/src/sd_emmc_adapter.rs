@@ -58,38 +58,24 @@ impl SdMmcBlockDev {
 impl BlockDevice for SdMmcBlockDev {
     type Error = SdError;
 
-    fn read(
-        &self,
-        blocks: &mut [Block],
-        start_block_idx: BlockIdx,
-    ) -> Result<(), Self::Error> {
+    fn read(&self, blocks: &mut [Block], start_block_idx: BlockIdx) -> Result<(), Self::Error> {
         let mut sdmmc = self.sdmmc.borrow_mut();
         for (i, block) in blocks.iter_mut().enumerate() {
             Self::invalidate(&mut block.contents);
             sdmmc
-                .read_blocks(
-                    start_block_idx.0 + i as u32,
-                    &mut block.contents,
-                )
+                .read_blocks(start_block_idx.0 + i as u32, &mut block.contents)
                 .map_err(|_| SdError::Hal)?;
             Self::invalidate(&mut block.contents);
         }
         Ok(())
     }
 
-    fn write(
-        &self,
-        blocks: &[Block],
-        start_block_idx: BlockIdx,
-    ) -> Result<(), Self::Error> {
+    fn write(&self, blocks: &[Block], start_block_idx: BlockIdx) -> Result<(), Self::Error> {
         let mut sdmmc = self.sdmmc.borrow_mut();
         for (i, block) in blocks.iter().enumerate() {
             Self::clean(&block.contents);
             sdmmc
-                .write_blocks(
-                    start_block_idx.0 + i as u32,
-                    &block.contents,
-                )
+                .write_blocks(start_block_idx.0 + i as u32, &block.contents)
                 .map_err(|_| SdError::Hal)?;
         }
         Ok(())

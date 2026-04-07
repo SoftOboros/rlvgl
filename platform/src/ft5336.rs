@@ -45,9 +45,7 @@ where
     /// `points[..count]` holds `(id, event_flag, x, y)`.
     ///
     /// `event_flag`: 0 = press down, 1 = lift up, 2 = contact (held/moved).
-    pub fn read_touches(
-        &mut self,
-    ) -> Result<(u8, [(u8, u8, u16, u16); 5]), I2C::Error> {
+    pub fn read_touches(&mut self) -> Result<(u8, [(u8, u8, u16, u16); 5]), I2C::Error> {
         // Bulk read registers 0x02..0x20 (31 bytes):
         //   byte 0     = TD_STATUS (touch count in low nibble)
         //   bytes 1–6  = touch point 0
@@ -72,8 +70,7 @@ where
             let event_flag = buf[base] >> 6;
             let x = (((buf[base] & 0x0F) as u16) << 8) | buf[base + 1] as u16;
             let id = buf[base + 2] >> 4;
-            let y =
-                (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
+            let y = (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
             points[i] = (id, event_flag, x, y);
         }
         Ok((count, points))

@@ -105,22 +105,42 @@ pub fn fill_rounded_rect(renderer: &mut dyn Renderer, rect: Rect, color: Color, 
         if dx_int > 0 {
             // top-left
             renderer.fill_rect(
-                Rect { x: rect.x + r - dx_int, y: rect.y + dy, width: dx_int, height: 1 },
+                Rect {
+                    x: rect.x + r - dx_int,
+                    y: rect.y + dy,
+                    width: dx_int,
+                    height: 1,
+                },
                 color,
             );
             // top-right
             renderer.fill_rect(
-                Rect { x: rect.x + rect.width - r, y: rect.y + dy, width: dx_int, height: 1 },
+                Rect {
+                    x: rect.x + rect.width - r,
+                    y: rect.y + dy,
+                    width: dx_int,
+                    height: 1,
+                },
                 color,
             );
             // bottom-left
             renderer.fill_rect(
-                Rect { x: rect.x + r - dx_int, y: rect.y + rect.height - 1 - dy, width: dx_int, height: 1 },
+                Rect {
+                    x: rect.x + r - dx_int,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: dx_int,
+                    height: 1,
+                },
                 color,
             );
             // bottom-right
             renderer.fill_rect(
-                Rect { x: rect.x + rect.width - r, y: rect.y + rect.height - 1 - dy, width: dx_int, height: 1 },
+                Rect {
+                    x: rect.x + rect.width - r,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: dx_int,
+                    height: 1,
+                },
                 color,
             );
         }
@@ -131,22 +151,42 @@ pub fn fill_rounded_rect(renderer: &mut dyn Renderer, rect: Rect, color: Color, 
             let aa = Color(color.0, color.1, color.2, aa_alpha);
             // top-left
             renderer.blend_rect(
-                Rect { x: rect.x + r - dx_int - 1, y: rect.y + dy, width: 1, height: 1 },
+                Rect {
+                    x: rect.x + r - dx_int - 1,
+                    y: rect.y + dy,
+                    width: 1,
+                    height: 1,
+                },
                 aa,
             );
             // top-right
             renderer.blend_rect(
-                Rect { x: rect.x + rect.width - r + dx_int, y: rect.y + dy, width: 1, height: 1 },
+                Rect {
+                    x: rect.x + rect.width - r + dx_int,
+                    y: rect.y + dy,
+                    width: 1,
+                    height: 1,
+                },
                 aa,
             );
             // bottom-left
             renderer.blend_rect(
-                Rect { x: rect.x + r - dx_int - 1, y: rect.y + rect.height - 1 - dy, width: 1, height: 1 },
+                Rect {
+                    x: rect.x + r - dx_int - 1,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: 1,
+                    height: 1,
+                },
                 aa,
             );
             // bottom-right
             renderer.blend_rect(
-                Rect { x: rect.x + rect.width - r + dx_int, y: rect.y + rect.height - 1 - dy, width: 1, height: 1 },
+                Rect {
+                    x: rect.x + rect.width - r + dx_int,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: 1,
+                    height: 1,
+                },
                 aa,
             );
         }
@@ -200,22 +240,42 @@ pub fn draw_rounded_border(
         if ring_w > 0 {
             // top-left
             renderer.fill_rect(
-                Rect { x: rect.x + rout - out_dx, y: rect.y + dy, width: ring_w, height: 1 },
+                Rect {
+                    x: rect.x + rout - out_dx,
+                    y: rect.y + dy,
+                    width: ring_w,
+                    height: 1,
+                },
                 color,
             );
             // top-right
             renderer.fill_rect(
-                Rect { x: rect.x + rect.width - rout + in_dx, y: rect.y + dy, width: ring_w, height: 1 },
+                Rect {
+                    x: rect.x + rect.width - rout + in_dx,
+                    y: rect.y + dy,
+                    width: ring_w,
+                    height: 1,
+                },
                 color,
             );
             // bottom-left
             renderer.fill_rect(
-                Rect { x: rect.x + rout - out_dx, y: rect.y + rect.height - 1 - dy, width: ring_w, height: 1 },
+                Rect {
+                    x: rect.x + rout - out_dx,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: ring_w,
+                    height: 1,
+                },
                 color,
             );
             // bottom-right
             renderer.fill_rect(
-                Rect { x: rect.x + rect.width - rout + in_dx, y: rect.y + rect.height - 1 - dy, width: ring_w, height: 1 },
+                Rect {
+                    x: rect.x + rect.width - rout + in_dx,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: ring_w,
+                    height: 1,
+                },
                 color,
             );
         }
@@ -225,13 +285,41 @@ pub fn draw_rounded_border(
             let aa_alpha = ((out_frac as u16 * base_alpha) / 255) as u8;
             let aa = Color(color.0, color.1, color.2, aa_alpha);
             renderer.blend_rect(
-                Rect { x: rect.x + rout - out_dx - 1, y: rect.y + dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rout - out_dx - 1,
+                    y: rect.y + dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
             renderer.blend_rect(
-                Rect { x: rect.x + rect.width - rout + out_dx, y: rect.y + dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rect.width - rout + out_dx,
+                    y: rect.y + dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
             renderer.blend_rect(
-                Rect { x: rect.x + rout - out_dx - 1, y: rect.y + rect.height - 1 - dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rout - out_dx - 1,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
             renderer.blend_rect(
-                Rect { x: rect.x + rect.width - rout + out_dx, y: rect.y + rect.height - 1 - dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rect.width - rout + out_dx,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
         }
 
         // --- Inner AA fringe ---
@@ -240,13 +328,41 @@ pub fn draw_rounded_border(
             let aa_alpha = (((255 - in_frac as u16) * base_alpha) / 255) as u8;
             let aa = Color(color.0, color.1, color.2, aa_alpha);
             renderer.blend_rect(
-                Rect { x: rect.x + rout - in_dx, y: rect.y + dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rout - in_dx,
+                    y: rect.y + dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
             renderer.blend_rect(
-                Rect { x: rect.x + rect.width - rout + in_dx - 1, y: rect.y + dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rect.width - rout + in_dx - 1,
+                    y: rect.y + dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
             renderer.blend_rect(
-                Rect { x: rect.x + rout - in_dx, y: rect.y + rect.height - 1 - dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rout - in_dx,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
             renderer.blend_rect(
-                Rect { x: rect.x + rect.width - rout + in_dx - 1, y: rect.y + rect.height - 1 - dy, width: 1, height: 1 }, aa);
+                Rect {
+                    x: rect.x + rect.width - rout + in_dx - 1,
+                    y: rect.y + rect.height - 1 - dy,
+                    width: 1,
+                    height: 1,
+                },
+                aa,
+            );
         }
     }
 
@@ -254,11 +370,21 @@ pub fn draw_rounded_border(
     let straight_h = rect.height - 2 * rout;
     if straight_h > 0 {
         renderer.fill_rect(
-            Rect { x: rect.x, y: rect.y + rout, width: bw, height: straight_h },
+            Rect {
+                x: rect.x,
+                y: rect.y + rout,
+                width: bw,
+                height: straight_h,
+            },
             color,
         );
         renderer.fill_rect(
-            Rect { x: rect.x + rect.width - bw, y: rect.y + rout, width: bw, height: straight_h },
+            Rect {
+                x: rect.x + rect.width - bw,
+                y: rect.y + rout,
+                width: bw,
+                height: straight_h,
+            },
             color,
         );
     }
@@ -266,41 +392,66 @@ pub fn draw_rounded_border(
     let straight_w = rect.width - 2 * rout;
     if straight_w > 0 {
         renderer.fill_rect(
-            Rect { x: rect.x + rout, y: rect.y, width: straight_w, height: bw },
+            Rect {
+                x: rect.x + rout,
+                y: rect.y,
+                width: straight_w,
+                height: bw,
+            },
             color,
         );
         renderer.fill_rect(
-            Rect { x: rect.x + rout, y: rect.y + rect.height - bw, width: straight_w, height: bw },
+            Rect {
+                x: rect.x + rout,
+                y: rect.y + rect.height - bw,
+                width: straight_w,
+                height: bw,
+            },
             color,
         );
     }
 }
 
 /// Draw a rectangular border as four straight `fill_rect` strips (no rounding).
-pub fn draw_border_straight(
-    renderer: &mut dyn Renderer,
-    rect: Rect,
-    color: Color,
-    width: u8,
-) {
+pub fn draw_border_straight(renderer: &mut dyn Renderer, rect: Rect, color: Color, width: u8) {
     let w = width as i32;
     if w == 0 {
         return;
     }
     renderer.fill_rect(
-        Rect { x: rect.x, y: rect.y, width: rect.width, height: w },
+        Rect {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: w,
+        },
         color,
     );
     renderer.fill_rect(
-        Rect { x: rect.x, y: rect.y + rect.height - w, width: rect.width, height: w },
+        Rect {
+            x: rect.x,
+            y: rect.y + rect.height - w,
+            width: rect.width,
+            height: w,
+        },
         color,
     );
     renderer.fill_rect(
-        Rect { x: rect.x, y: rect.y + w, width: w, height: rect.height - 2 * w },
+        Rect {
+            x: rect.x,
+            y: rect.y + w,
+            width: w,
+            height: rect.height - 2 * w,
+        },
         color,
     );
     renderer.fill_rect(
-        Rect { x: rect.x + rect.width - w, y: rect.y + w, width: w, height: rect.height - 2 * w },
+        Rect {
+            x: rect.x + rect.width - w,
+            y: rect.y + w,
+            width: w,
+            height: rect.height - 2 * w,
+        },
         color,
     );
 }
@@ -367,8 +518,16 @@ mod tests {
 
     #[test]
     fn zero_radius_single_fill() {
-        let mut r = CountRenderer { fills: 0, blends: 0 };
-        let rect = Rect { x: 0, y: 0, width: 100, height: 50 };
+        let mut r = CountRenderer {
+            fills: 0,
+            blends: 0,
+        };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 50,
+        };
         fill_rounded_rect(&mut r, rect, Color(0, 0, 0, 255), 0);
         assert_eq!(r.fills, 1);
         assert_eq!(r.blends, 0);
@@ -376,16 +535,32 @@ mod tests {
 
     #[test]
     fn radius_clamped_for_pill_shape() {
-        let mut r = CountRenderer { fills: 0, blends: 0 };
-        let rect = Rect { x: 0, y: 0, width: 40, height: 20 };
+        let mut r = CountRenderer {
+            fills: 0,
+            blends: 0,
+        };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 40,
+            height: 20,
+        };
         fill_rounded_rect(&mut r, rect, Color(0, 0, 0, 255), 30);
         assert!(r.fills > 1, "expected corners, got {} fills", r.fills);
     }
 
     #[test]
     fn aa_fringe_produces_blend_calls() {
-        let mut r = CountRenderer { fills: 0, blends: 0 };
-        let rect = Rect { x: 0, y: 0, width: 100, height: 100 };
+        let mut r = CountRenderer {
+            fills: 0,
+            blends: 0,
+        };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        };
         fill_rounded_rect(&mut r, rect, Color(255, 0, 0, 255), 10);
         assert!(r.blends > 0, "expected AA blend calls, got 0");
     }
@@ -393,23 +568,44 @@ mod tests {
     #[test]
     fn rounded_border_produces_ring() {
         let mut r = RecordRenderer::new();
-        let rect = Rect { x: 0, y: 0, width: 60, height: 60 };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 60,
+            height: 60,
+        };
         draw_rounded_border(&mut r, rect, Color(0, 0, 0, 255), 2, 8);
         assert!(!r.fill_rects.is_empty(), "expected border fills");
     }
 
     #[test]
     fn straight_border_four_strips() {
-        let mut r = CountRenderer { fills: 0, blends: 0 };
-        let rect = Rect { x: 0, y: 0, width: 100, height: 50 };
+        let mut r = CountRenderer {
+            fills: 0,
+            blends: 0,
+        };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 50,
+        };
         draw_border_straight(&mut r, rect, Color(0, 0, 0, 255), 2);
         assert_eq!(r.fills, 4);
     }
 
     #[test]
     fn draw_widget_bg_uses_radius() {
-        let mut r = CountRenderer { fills: 0, blends: 0 };
-        let rect = Rect { x: 0, y: 0, width: 80, height: 40 };
+        let mut r = CountRenderer {
+            fills: 0,
+            blends: 0,
+        };
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 80,
+            height: 40,
+        };
         let style = Style {
             bg_color: Color(100, 100, 100, 255),
             border_color: Color(0, 0, 0, 255),

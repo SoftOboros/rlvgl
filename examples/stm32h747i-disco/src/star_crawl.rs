@@ -1,135 +1,117 @@
-//! Star Wars opening crawl effect with DMA2D-accelerated rendering.
+//! Star Wars opening crawl effect with DMA2D-stepped rendering.
 //!
-//! Yellow bold text scrolls bottom-to-top with perspective foreshortening.
-//! A procedural starfield provides the background.
-//!
-//! ## Scroll buffer architecture
-//!
-//! A double-height ARGB8888 buffer in SDRAM holds pre-composited scanlines
-//! (starfield + blended text). Each frame, only the NEW scanlines entering
-//! the visible window are composited — typically 1-2 lines per frame.
-//! The visible CRAWL_H-row window is rotated to the portrait FB via CPU copy.
-//!
-//! The buffer is 2×CRAWL_H rows so a contiguous CRAWL_H window can always
-//! be read without wrap. When the write pointer passes CRAWL_H, rows
-//! 0..CRAWL_H-1 are a copy of rows CRAWL_H..2*CRAWL_H-1 (kept in sync).
-
-#![allow(dead_code)]
+//! The crawl is rendered as a round-robin task. Each call advances exactly
+//! one small unit of work and then returns so the main loop can service touch,
+//! serial, and new DMA completions without spin-waiting.
 
 use rlvgl::core::packed_font::PackedFont;
 
-#[cfg(all(
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-use rlvgl::platform::dma2d::Dma2dBlitter;
-#[cfg(all(
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use rlvgl::platform::blit::PixelFmt;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+use rlvgl::platform::dma2d::Dma2dBlitter;
 
-// ── Debug serial output ────────────────────────────────────────────────
-
-fn dbg(s: &str) {
-    const ISR: *const u32 = 0x4001_101C as *const u32;
-    const TDR: *mut u32 = 0x4001_1028 as *mut u32;
-    for b in s.bytes() {
-        unsafe {
-            while ISR.read_volatile() & (1 << 7) == 0 {}
-            TDR.write_volatile(b as u32);
-        }
-    }
-}
-
-fn dbg_dec(mut v: u32) {
-    if v == 0 { dbg("0"); return; }
-    let mut buf = [0u8; 10];
-    let mut i = 0usize;
-    while v > 0 { buf[i] = b'0' + (v % 10) as u8; v /= 10; i += 1; }
-    while i > 0 { i -= 1; dbg(unsafe { core::str::from_utf8_unchecked(core::slice::from_ref(&buf[i])) }); }
-}
-
-#[allow(dead_code)]
-fn dbg_hex(val: u32) {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    const ISR: *const u32 = 0x4001_101C as *const u32;
-    const TDR: *mut u32 = 0x4001_1028 as *mut u32;
-    for i in (0..8).rev() {
-        let nibble = ((val >> (i * 4)) & 0xF) as usize;
-        unsafe {
-            while ISR.read_volatile() & (1 << 7) == 0 {}
-            TDR.write_volatile(HEX[nibble] as u32);
-        }
-    }
-}
-
-// ── Constants ───────────────────────────────────────────────────────────────
-
-/// Portrait FB width (physical display columns).
+/// Portrait framebuffer width.
 const FB_W: u32 = 480;
-/// Portrait rows used by the crawl (800 - 80 icon bar).
+/// Portrait rows used by the crawl.
 const FB_H: u32 = 720;
-/// Landscape crawl width (maps to portrait Y = FB_H).
+/// Landscape crawl width.
 const CRAWL_W: u32 = FB_H;
-/// Landscape crawl height (maps to portrait X = FB_W, the scroll axis).
+/// Landscape crawl height.
 const CRAWL_H: u32 = FB_W;
 /// Pre-rendered text line width in pixels.
 const TEXT_W: u32 = 600;
-/// Perspective width at landscape top (vanishing point).
+/// Perspective width at the top of the crawl.
 const TOP_W: u32 = 480;
-/// Perspective width at landscape bottom (text entrance).
+/// Perspective width at the bottom of the crawl.
 const BOT_W: u32 = 600;
 /// ARGB8888 bytes per pixel.
 const BPP: u32 = 4;
-/// Starfield in portrait orientation: FB_W wide × double-height mirrored.
-/// Top half = random stars, bottom half = mirror of top (row-reversed).
-const STAR_ROWS: u32 = FB_H * 2; // 1440 portrait rows
-const STAR_STRIDE: u32 = FB_W * BPP; // 1920 bytes per portrait row
+/// Double-height mirrored portrait starfield.
+const STAR_ROWS: u32 = FB_H * 2;
+const STAR_STRIDE: u32 = FB_W * BPP;
 const STAR_SIZE: usize = (STAR_ROWS * STAR_STRIDE) as usize;
-/// Line spacing multiplier for text layout (1.5x font height).
+/// Line spacing multiplier for text layout.
 const LINE_SPACING_NUM: u32 = 3;
 const LINE_SPACING_DEN: u32 = 2;
 /// Target scroll speed in pixels per second.
 const SCROLL_PX_PER_SEC: u32 = 40;
-/// Yellow foreground color for DMA2D A8 blend (0x00RRGGBB).
+/// Yellow DMA2D blend colour.
 const YELLOW: u32 = 0x00FF_D700;
-/// Starfield background color (dark blue-black).
+/// Background colour for the starfield.
 const BG_COLOR: u32 = 0xFF0A_0A20;
 /// Number of stars to scatter.
 const STAR_COUNT: usize = 200;
 
-/// SDRAM base address for crawl buffers (Bank 2).
+/// SDRAM base address for crawl buffers.
 const CRAWL_BASE: usize = 0xD100_0000;
-
-/// D2 SRAM base for FIR scanline (DMA2D-accessible).
+/// D2 SRAM scanline staging buffer used as DMA2D A8 source.
 const D2_SCANLINE: usize = 0x3000_0000;
 
-// ── Public API ──────────────────────────────────────────────────────────────
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum RenderStage {
+    Idle = 0,
+    StartStarRow = 1,
+    WaitStarRow = 2,
+    RasterTextRow = 3,
+    FirTextRow = 4,
+    StartBlend = 5,
+    WaitBlend = 6,
+    FinalizeRow = 7,
+}
 
+/// Result of advancing the crawl task by one step.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum StepResult {
+    /// Crawl is inactive.
+    Idle,
+    /// More work remains before the frame can be presented.
+    Pending,
+    /// The back buffer is complete and ready to present.
+    FrameReady,
+    /// Crawl reached the end of the script and deactivated.
+    Finished,
+}
+
+/// Star crawl renderer with non-blocking internal state.
 pub struct StarCrawl {
     active: bool,
-    /// Text scroll position (Q8). Negative = text off-screen below.
     scroll_q8: i32,
     scroll_speed_q8: i32,
-    /// Starfield scroll position (Q8). Advances downward (opposite to text).
     star_scroll_q8: i32,
 
-    // SDRAM pointers.
-    starfield: *mut u8,   // CRAWL_W × STAR_ROWS × 4 (double-height mirrored)
-    text_src: *mut u8,    // TEXT_W × text_h (A8 pre-rendered glyphs + logos)
-
+    starfield: *mut u8,
+    text_src: *mut u8,
+    text_valid: *mut u8,
     text_h: u32,
+    line_h: u32,
 
-    // CPU-side FIR work buffer (DTCM, fast).
-    scanline_buf: [u8; CRAWL_W as usize],
+    frame_id: u32,
+    frame_active: bool,
+    frame_scroll_px: i32,
+    frame_star_row: u32,
+    back_buf: *mut u8,
+    fb_w: u32,
+
+    stage: RenderStage,
+    bg_row: u32,
+    text_row: u32,
+    current_text_src_row: u32,
+    current_target_w: u32,
+    current_dst_x_off: u32,
+    current_dst_col: u32,
+    current_has_text: bool,
 
     lines: &'static [&'static str],
     font: &'static PackedFont,
 }
 
 impl StarCrawl {
-    pub const fn new(font: &'static PackedFont, lines: &'static [&'static str], frame_hz: u32) -> Self {
+    pub const fn new(
+        font: &'static PackedFont,
+        lines: &'static [&'static str],
+        frame_hz: u32,
+    ) -> Self {
         Self {
             active: false,
             scroll_q8: 0,
@@ -137,327 +119,312 @@ impl StarCrawl {
             star_scroll_q8: 0,
             starfield: core::ptr::null_mut(),
             text_src: core::ptr::null_mut(),
+            text_valid: core::ptr::null_mut(),
             text_h: 0,
-            scanline_buf: [0u8; CRAWL_W as usize],
+            line_h: 0,
+            frame_id: 0,
+            frame_active: false,
+            frame_scroll_px: 0,
+            frame_star_row: 0,
+            back_buf: core::ptr::null_mut(),
+            fb_w: FB_W,
+            stage: RenderStage::Idle,
+            bg_row: 0,
+            text_row: 0,
+            current_text_src_row: 0,
+            current_target_w: 0,
+            current_dst_x_off: 0,
+            current_dst_col: 0,
+            current_has_text: false,
             lines,
             font,
         }
     }
 
-    pub fn is_active(&self) -> bool { self.active }
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
 
-    pub fn deactivate(&mut self) { self.active = false; }
-
-    /// Advance scroll by one tick. Call AFTER present() so both
-    /// double-buffer frames render at the same scroll position.
-    /// Text scrolls up, starfield scrolls down (parallax).
-    pub fn advance_scroll(&mut self) {
-        self.scroll_q8 += self.scroll_speed_q8;
-        // Starfield moves at 1/3 text speed, downward.
-        self.star_scroll_q8 += self.scroll_speed_q8 / 3;
+    pub fn deactivate(&mut self) {
+        self.active = false;
+        self.drop_frame();
     }
 
     pub fn touch_deactivate(&mut self, _px: i32, _py: i32) -> bool {
-        if self.active { self.active = false; true } else { false }
+        if self.active {
+            self.deactivate();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Advance the logical scroll position after a successful present.
+    pub fn advance_scroll(&mut self) {
+        self.scroll_q8 += self.scroll_speed_q8;
+        self.star_scroll_q8 += self.scroll_speed_q8 / 3;
+    }
+
+    /// Numeric stage identifier for telemetry.
+    pub fn stage_code(&self) -> u32 {
+        self.stage as u32
+    }
+
+    /// Current frame counter for telemetry.
+    pub fn frame_id(&self) -> u32 {
+        self.frame_id
+    }
+
+    /// Returns `true` when the crawl is parked on a DMA completion.
+    pub fn waiting_for_dma(&self) -> bool {
+        matches!(
+            self.stage,
+            RenderStage::WaitStarRow | RenderStage::WaitBlend
+        )
+    }
+
+    /// Drop the in-progress frame and restart on the next scheduler pass.
+    pub fn drop_frame(&mut self) {
+        self.frame_active = false;
+        self.stage = RenderStage::Idle;
+        self.bg_row = 0;
+        self.text_row = 0;
+        self.current_has_text = false;
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn activate(&mut self, dma2d: &mut Dma2dBlitter) {
-        let line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
-        let text_lines = self.lines.len() as u32;
-        // Lead-in (120 rows starfield) + text + lead-out (full screen).
-        self.text_h = 120 + text_lines * line_h + CRAWL_H;
-
-        // Assign SDRAM pointers.
+        self.line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
+        self.text_h = 120 + self.lines.len() as u32 * self.line_h + CRAWL_H;
         self.starfield = CRAWL_BASE as *mut u8;
         self.text_src = (CRAWL_BASE + STAR_SIZE) as *mut u8;
+        self.text_valid = unsafe { self.text_src.add((TEXT_W * self.text_h) as usize) };
 
-        let text_end = self.text_src as u32 + TEXT_W * self.text_h;
-        dbg("SC:sf="); dbg_hex(self.starfield as u32);
-        dbg(" ts="); dbg_hex(self.text_src as u32);
-        dbg(" te="); dbg_hex(text_end);
-        dbg(" th="); dbg_dec(self.text_h);
-        dbg("\r\n");
+        unsafe {
+            core::ptr::write_bytes(self.text_src, 0, (TEXT_W * self.text_h) as usize);
+            core::ptr::write_bytes(self.text_valid, 0, self.text_h as usize);
+        }
 
-        // Render double-height mirrored starfield.
         self.render_starfield(dma2d);
-
-        // Pre-render all text into A8 buffer.
-        dbg("SC:text...\r\n");
-        self.pre_render_text();
-
-        // Text starts off-screen below. Starfield starts at 0.
         self.scroll_q8 = -((CRAWL_H as i32) << 8);
         self.star_scroll_q8 = 0;
+        self.frame_id = 0;
         self.active = true;
-        dbg("SC:ready\r\n");
+        self.drop_frame();
+
+        let prime_rows = self.text_h.min(8);
+        for row in 0..prime_rows {
+            self.ensure_text_row(row);
+        }
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn tick(
         &mut self,
-        _dma2d: &mut Dma2dBlitter,
+        dma2d: &mut Dma2dBlitter,
         back_buf: *mut u8,
         fb_w: u32,
         _fb_h: u32,
-    ) -> bool {
-        if !self.active { return false; }
-
-        let scroll_px = self.scroll_q8 >> 8;
-        // Deactivate after last text scrolls fully off the top of screen.
-        if scroll_px >= (self.text_h + CRAWL_H) as i32 {
-            self.active = false;
-            return false;
+    ) -> StepResult {
+        if !self.active {
+            return StepResult::Idle;
         }
 
-        let t0 = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
-
-        // ── Step 1: DMA2D blit starfield → portrait back buffer ──────────
-        // The starfield is portrait-oriented (FB_W × STAR_ROWS).
-        // Blit FB_H rows starting at star_scroll offset. DMA2D handles
-        // the row-major copy — zero CPU per-pixel work.
-        let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
-        let rows_before_wrap = STAR_ROWS - star_row;
-        if rows_before_wrap >= FB_H {
-            // No wrap: one blit.
-            let star_src = unsafe {
-                self.starfield.add((star_row * STAR_STRIDE) as usize)
-            };
-            _dma2d.blit_raw(
-                star_src as *const u8, STAR_STRIDE,
-                back_buf, fb_w * BPP,
-                FB_W, FB_H,
-                PixelFmt::Argb8888,
-            );
-        } else {
-            // Wraps: two blits.
-            let src1 = unsafe {
-                self.starfield.add((star_row * STAR_STRIDE) as usize)
-            };
-            _dma2d.blit_raw(
-                src1 as *const u8, STAR_STRIDE,
-                back_buf, fb_w * BPP,
-                FB_W, rows_before_wrap,
-                PixelFmt::Argb8888,
-            );
-            let dst2 = unsafe {
-                back_buf.add((rows_before_wrap * fb_w * BPP) as usize)
-            };
-            _dma2d.blit_raw(
-                self.starfield as *const u8, STAR_STRIDE,
-                dst2, fb_w * BPP,
-                FB_W, FB_H - rows_before_wrap,
-                PixelFmt::Argb8888,
-            );
-        }
-
-        let t1 = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
-
-        // ── Step 2: FIR text overlay + alpha blend onto portrait FB ──────
-        // For each landscape row (vis_y), FIR the A8 text, then write
-        // blended pixels into the portrait FB column. Only rows with
-        // text data are processed; the starfield is already in the FB.
-        let dst_stride = fb_w * BPP;
-
-        for vis_y in 0..CRAWL_H {
-            let text_row_i = scroll_px + vis_y as i32;
-            if text_row_i < 0 || text_row_i as u32 >= self.text_h {
-                continue; // starfield already in FB, nothing to overlay
+        if !self.frame_active {
+            let scroll_px = self.scroll_q8 >> 8;
+            if scroll_px >= (self.text_h + CRAWL_H) as i32 {
+                self.deactivate();
+                return StepResult::Finished;
             }
 
-            // Perspective width.
-            let target_w = TOP_W + (BOT_W - TOP_W) * vis_y / (CRAWL_H - 1);
-            let dst_x_off = (CRAWL_W - target_w) / 2;
+            self.frame_id = self.frame_id.wrapping_add(1);
+            self.frame_active = true;
+            self.frame_scroll_px = scroll_px;
+            self.frame_star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+            self.back_buf = back_buf;
+            self.fb_w = fb_w;
+            self.bg_row = 0;
+            self.text_row = 0;
+            self.current_has_text = false;
+            self.stage = RenderStage::StartStarRow;
+        }
 
-            // FIR resample (skips all-zero rows internally).
-            self.fir_resample_text_row(text_row_i as u32, target_w);
+        if dma2d.read_error() != 0 {
+            self.drop_frame();
+            return StepResult::Pending;
+        }
 
-            // Alpha-blend FIR'd text onto the starfield already in the FB.
-            // Write to portrait column (fb_w - 1 - vis_y).
-            let dst_col = fb_w - 1 - vis_y;
-            for lx in dst_x_off..dst_x_off + target_w {
-                let trap_x = (lx - dst_x_off) as usize;
-                let alpha = self.scanline_buf[trap_x] as u32;
-                if alpha == 0 { continue; } // skip transparent — starfield intact
+        match self.stage {
+            RenderStage::Idle => StepResult::Pending,
+            RenderStage::StartStarRow => {
+                let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
+                let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
+                let dst = unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };
+                #[cfg(not(feature = "c_hal"))]
+                crate::dma2d_irq::note_start();
+                dma2d.start_blit_raw(
+                    src as *const u8,
+                    STAR_STRIDE,
+                    dst,
+                    self.fb_w * BPP,
+                    FB_W,
+                    1,
+                    PixelFmt::Argb8888,
+                );
+                self.stage = RenderStage::WaitStarRow;
+                StepResult::Pending
+            }
+            RenderStage::WaitStarRow => {
+                if dma2d.is_in_flight() {
+                    return StepResult::Pending;
+                }
+                if dma2d.poll_complete() {
+                    dma2d.ack_complete();
+                }
+                self.bg_row += 1;
+                if self.bg_row >= FB_H {
+                    self.stage = RenderStage::RasterTextRow;
+                    self.text_row = 0;
+                } else {
+                    self.stage = RenderStage::StartStarRow;
+                }
+                StepResult::Pending
+            }
+            RenderStage::RasterTextRow => {
+                if self.text_row >= CRAWL_H {
+                    self.drop_frame();
+                    return StepResult::FrameReady;
+                }
 
-                // Read existing starfield pixel from portrait FB.
-                let dst_off = (lx * dst_stride + dst_col * BPP) as usize;
-                let star = unsafe { (back_buf.add(dst_off) as *const u32).read() };
+                let text_row_i = self.frame_scroll_px + self.text_row as i32;
+                if text_row_i < 0 || text_row_i as u32 >= self.text_h {
+                    self.current_has_text = false;
+                    self.stage = RenderStage::FinalizeRow;
+                    return StepResult::Pending;
+                }
 
-                let inv = 255 - alpha;
-                let r = (((YELLOW >> 16) & 0xFF) * alpha + ((star >> 16) & 0xFF) * inv) / 255;
-                let g = (((YELLOW >> 8) & 0xFF) * alpha + ((star >> 8) & 0xFF) * inv) / 255;
-                let b = ((YELLOW & 0xFF) * alpha + (star & 0xFF) * inv) / 255;
-                let blended = 0xFF00_0000 | (r << 16) | (g << 8) | b;
-
-                unsafe { (back_buf.add(dst_off) as *mut u32).write(blended); }
+                self.current_text_src_row = text_row_i as u32;
+                self.ensure_text_row(self.current_text_src_row);
+                self.stage = RenderStage::FirTextRow;
+                StepResult::Pending
+            }
+            RenderStage::FirTextRow => {
+                self.current_target_w = TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
+                self.current_dst_x_off = (CRAWL_W - self.current_target_w) / 2;
+                self.current_dst_col = self.fb_w - 1 - self.text_row;
+                self.current_has_text =
+                    self.fir_resample_text_row(self.current_text_src_row, self.current_target_w);
+                self.stage = if self.current_has_text {
+                    RenderStage::StartBlend
+                } else {
+                    RenderStage::FinalizeRow
+                };
+                StepResult::Pending
+            }
+            RenderStage::StartBlend => {
+                let dst = unsafe {
+                    self.back_buf.add(
+                        (self.current_dst_x_off * self.fb_w * BPP + self.current_dst_col * BPP)
+                            as usize,
+                    )
+                };
+                #[cfg(not(feature = "c_hal"))]
+                crate::dma2d_irq::note_start();
+                dma2d.start_blend_a8_color(
+                    self.scanline_ptr(),
+                    1,
+                    self.current_target_w,
+                    YELLOW,
+                    dst,
+                    self.fb_w * BPP,
+                );
+                self.stage = RenderStage::WaitBlend;
+                StepResult::Pending
+            }
+            RenderStage::WaitBlend => {
+                if dma2d.is_in_flight() {
+                    return StepResult::Pending;
+                }
+                if dma2d.poll_complete() {
+                    dma2d.ack_complete();
+                }
+                self.stage = RenderStage::FinalizeRow;
+                StepResult::Pending
+            }
+            RenderStage::FinalizeRow => {
+                self.text_row += 1;
+                if self.text_row >= CRAWL_H {
+                    self.drop_frame();
+                    StepResult::FrameReady
+                } else {
+                    self.stage = RenderStage::RasterTextRow;
+                    StepResult::Pending
+                }
             }
         }
-
-        let t2 = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
-
-        // Timing report.
-        static mut FRAME_CT: u32 = 0;
-        let fc = unsafe { FRAME_CT };
-        if fc < 5 || fc % 30 == 0 {
-            dbg("SC:star="); dbg_dec(t1.wrapping_sub(t0) / 400);
-            dbg(" txt="); dbg_dec(t2.wrapping_sub(t1) / 400);
-            dbg(" tot="); dbg_dec(t2.wrapping_sub(t0) / 400);
-            dbg("us s="); dbg_dec(scroll_px as u32);
-            dbg("\r\n");
-        }
-        unsafe { FRAME_CT = fc + 1; }
-
-        true
     }
 
-    // ── Incremental composition ─────────────────────────────────────────
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn scanline_ptr(&self) -> *const u8 {
+        D2_SCANLINE as *const u8
+    }
 
-    /// FIR-resample one text source row from TEXT_W → target_w.
-    /// Uses 7-tap raised-cosine kernel for anti-aliased downsampling.
-    /// Skips runs of zero source pixels (transparent spans) for speed.
-    /// Output: A8 alpha values in self.scanline_buf[0..target_w].
-    #[inline(always)]
-    fn fir_resample_text_row(&mut self, text_row: u32, target_w: u32) {
-        if text_row >= self.text_h { return; }
-        let src = unsafe { self.text_src.add((text_row * TEXT_W) as usize) };
-        let step_q16 = (TEXT_W << 16) / target_w;
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn scanline_mut(&mut self) -> &mut [u8] {
+        unsafe { core::slice::from_raw_parts_mut(D2_SCANLINE as *mut u8, CRAWL_W as usize) }
+    }
 
-        // Check if entire row is zero (common for line spacing gaps).
-        // Scan in u32 chunks (4 A8 bytes at a time) for speed.
-        let mut all_zero = true;
-        let words = TEXT_W as usize / 4;
-        let src32 = src as *const u32;
-        for i in 0..words {
-            if unsafe { src32.add(i).read() } != 0 {
-                all_zero = false;
-                break;
-            }
-        }
-        if all_zero {
-            for ox in 0..target_w as usize {
-                self.scanline_buf[ox] = 0;
-            }
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn text_row_ptr(&self, text_row: u32) -> *mut u8 {
+        unsafe { self.text_src.add((text_row * TEXT_W) as usize) }
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn text_row_rendered(&self, text_row: u32) -> bool {
+        unsafe { self.text_valid.add(text_row as usize).read_volatile() != 0 }
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn ensure_text_row(&mut self, text_row: u32) {
+        if text_row >= self.text_h || self.text_row_rendered(text_row) {
             return;
         }
-
-        let mut ox = 0usize;
-        while ox < target_w as usize {
-            let cx_q16 = ox as u32 * step_q16 + (step_q16 >> 1);
-            let cx = (cx_q16 >> 16) as i32;
-
-            // Check if center and neighbors are all zero → skip this span.
-            if cx >= 3 && cx + 3 < TEXT_W as i32 {
-                let center = unsafe { *src.add(cx as usize) };
-                if center == 0 {
-                    // Check tap range: if all 7 taps are zero, output is zero.
-                    let any_nonzero = unsafe {
-                        *src.add((cx - 3) as usize) != 0
-                        || *src.add((cx - 2) as usize) != 0
-                        || *src.add((cx - 1) as usize) != 0
-                        || *src.add((cx + 1) as usize) != 0
-                        || *src.add((cx + 2) as usize) != 0
-                        || *src.add((cx + 3) as usize) != 0
-                    };
-                    if !any_nonzero {
-                        self.scanline_buf[ox] = 0;
-                        ox += 1;
-                        continue;
-                    }
-                }
-            }
-
-            // Full 7-tap FIR.
-            let mut acc: u32 = 0;
-            let mut wsum: u32 = 0;
-            const TAPS: [(i32, u32); 7] = [(-3,8),(-2,24),(-1,48),(0,64),(1,48),(2,24),(3,8)];
-            for &(tap, w) in &TAPS {
-                let sx = cx + tap;
-                if sx >= 0 && sx < TEXT_W as i32 {
-                    let v = unsafe { *src.add(sx as usize) } as u32;
-                    acc += v * w;
-                    wsum += w;
-                }
-            }
-            self.scanline_buf[ox] = if wsum > 0 { (acc / wsum).min(255) as u8 } else { 0 };
-            ox += 1;
+        self.render_text_row(text_row);
+        unsafe {
+            self.text_valid.add(text_row as usize).write_volatile(1);
         }
     }
 
-    // ── Starfield ───────────────────────────────────────────────────────
-
-    /// Render portrait-oriented double-height mirrored starfield.
-    /// FB_W wide × STAR_ROWS tall. Top half = random stars,
-    /// bottom half = mirror of top. DMA2D can blit directly to portrait FB.
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn render_starfield(&mut self, dma2d: &mut Dma2dBlitter) {
-        // Fill full buffer with BG_COLOR.
-        dma2d.fill_raw(
-            self.starfield, STAR_STRIDE, FB_W, STAR_ROWS,
-            BG_COLOR, PixelFmt::Argb8888,
-        );
-
-        // Scatter stars in the top half (portrait rows 0..FB_H-1).
-        let mut rng = 0xDEAD_BEEFu32;
-        let pixel_count = FB_W * FB_H;
-        for _ in 0..STAR_COUNT {
-            rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
-            let idx = rng % pixel_count;
-            let brightness = 128 + (rng >> 24) as u8 / 2;
-            let color = 0xFF00_0000
-                | ((brightness as u32) << 16)
-                | ((brightness as u32) << 8)
-                | (brightness as u32);
-            unsafe {
-                (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color);
-            }
-            rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+    fn render_text_row(&mut self, text_row: u32) {
+        let dst = self.text_row_ptr(text_row);
+        unsafe {
+            core::ptr::write_bytes(dst, 0, TEXT_W as usize);
         }
 
-        // Mirror: copy top half to bottom half in reverse row order.
-        let row_bytes = STAR_STRIDE as usize;
-        for i in 0..FB_H {
-            let src = unsafe { self.starfield.add((i * STAR_STRIDE) as usize) };
-            let dst_row = STAR_ROWS - 1 - i;
-            let dst = unsafe { self.starfield.add((dst_row * STAR_STRIDE) as usize) };
-            unsafe { core::ptr::copy_nonoverlapping(src, dst, row_bytes); }
-        }
-    }
-
-    // ── Text pre-render ─────────────────────────────────────────────────
-
-    fn pre_render_text(&mut self) {
-        let total_bytes = (TEXT_W * self.text_h) as usize;
-        unsafe { core::ptr::write_bytes(self.text_src, 0, total_bytes); }
-
-        let line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
-        let mut cur_y = 120u32; // lead-in
-
+        let mut cur_y = 120u32;
         for &line in self.lines {
             let text_w = self.font.measure(line);
-            let x_off = ((TEXT_W as i32 - text_w) / 2).max(0);
-            let mut cx = x_off;
+            let mut cx = ((TEXT_W as i32 - text_w) / 2).max(0);
+
             for ch in line.chars() {
                 if let Some(glyph) = self.font.glyph(ch) {
                     let gw = glyph.width as usize;
-                    let gh = glyph.height as usize;
+                    let gh = glyph.height as i32;
                     let data_off = glyph.offset as usize;
-                    let gy = cur_y as i32 + self.font.ascent as i32 - glyph.ymin as i32 - gh as i32;
-                    for row in 0..gh {
+                    let gy = cur_y as i32 + self.font.ascent as i32 - glyph.ymin as i32 - gh;
+                    let row_in_glyph = text_row as i32 - gy;
+                    if row_in_glyph >= 0 && row_in_glyph < gh {
+                        let row = row_in_glyph as usize;
                         for col in 0..gw {
-                            let src_idx = data_off + row * gw + col;
-                            if let Some(&alpha) = self.font.data.get(src_idx) {
-                                if alpha > 0 {
-                                    let dx = cx + col as i32;
-                                    let dy = gy + row as i32;
-                                    if dx >= 0 && (dx as u32) < TEXT_W
-                                        && dy >= 0 && (dy as u32) < self.text_h
-                                    {
-                                        unsafe {
-                                            self.text_src.add((dy as u32 * TEXT_W + dx as u32) as usize)
-                                                .write_volatile(alpha);
-                                        }
-                                    }
+                            let alpha = self.font.data[data_off + row * gw + col];
+                            if alpha == 0 {
+                                continue;
+                            }
+                            let dx = cx + col as i32;
+                            if dx >= 0 && (dx as u32) < TEXT_W {
+                                unsafe {
+                                    dst.add(dx as usize).write_volatile(alpha);
                                 }
                             }
                         }
@@ -467,13 +434,156 @@ impl StarCrawl {
                     cx += self.font.height as i32 / 2;
                 }
             }
-            cur_y += line_h;
+
+            cur_y += self.line_h;
+        }
+    }
+
+    /// FIR-resample one text source row from `TEXT_W` to `target_w`.
+    ///
+    /// Returns `true` when the output contains at least one non-zero alpha.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn fir_resample_text_row(&mut self, text_row: u32, target_w: u32) -> bool {
+        if text_row >= self.text_h || target_w == 0 {
+            return false;
+        }
+
+        let src = self.text_row_ptr(text_row) as *const u8;
+        let out = self.scanline_mut();
+        out[..target_w as usize].fill(0);
+
+        let words = TEXT_W as usize / 4;
+        let src32 = src as *const u32;
+        let mut all_zero = true;
+        for i in 0..words {
+            if unsafe { src32.add(i).read_volatile() } != 0 {
+                all_zero = false;
+                break;
+            }
+        }
+        if all_zero {
+            return false;
+        }
+
+        let step_q16 = (TEXT_W << 16) / target_w;
+        let mut any_nonzero = false;
+        let mut ox = 0usize;
+        while ox < target_w as usize {
+            let cx_q16 = ox as u32 * step_q16 + (step_q16 >> 1);
+            let cx = (cx_q16 >> 16) as i32;
+
+            if cx >= 3 && cx + 3 < TEXT_W as i32 {
+                let center = unsafe { *src.add(cx as usize) };
+                if center == 0 {
+                    let any_neighbor = unsafe {
+                        *src.add((cx - 3) as usize) != 0
+                            || *src.add((cx - 2) as usize) != 0
+                            || *src.add((cx - 1) as usize) != 0
+                            || *src.add((cx + 1) as usize) != 0
+                            || *src.add((cx + 2) as usize) != 0
+                            || *src.add((cx + 3) as usize) != 0
+                    };
+                    if !any_neighbor {
+                        ox += 1;
+                        continue;
+                    }
+                }
+            }
+
+            let mut acc: u32 = 0;
+            let mut wsum: u32 = 0;
+            const TAPS: [(i32, u32); 7] = [
+                (-3, 8),
+                (-2, 24),
+                (-1, 48),
+                (0, 64),
+                (1, 48),
+                (2, 24),
+                (3, 8),
+            ];
+            for &(tap, w) in &TAPS {
+                let sx = cx + tap;
+                if sx >= 0 && sx < TEXT_W as i32 {
+                    let v = unsafe { *src.add(sx as usize) } as u32;
+                    acc += v * w;
+                    wsum += w;
+                }
+            }
+            let alpha = if wsum > 0 {
+                (acc / wsum).min(255) as u8
+            } else {
+                0
+            };
+            out[ox] = alpha;
+            any_nonzero |= alpha != 0;
+            ox += 1;
+        }
+
+        any_nonzero
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn render_starfield(&mut self, dma2d: &mut Dma2dBlitter) {
+        dma2d.fill_raw(
+            self.starfield,
+            STAR_STRIDE,
+            FB_W,
+            STAR_ROWS,
+            BG_COLOR,
+            PixelFmt::Argb8888,
+        );
+
+        let mut rng = 0xDEAD_BEEFu32;
+        let pixel_count = FB_W * FB_H;
+        for _ in 0..STAR_COUNT {
+            rng ^= rng << 13;
+            rng ^= rng >> 17;
+            rng ^= rng << 5;
+            let idx = rng % pixel_count;
+            let brightness = 128 + (rng >> 24) as u8 / 2;
+            let color = 0xFF00_0000
+                | ((brightness as u32) << 16)
+                | ((brightness as u32) << 8)
+                | brightness as u32;
+            unsafe {
+                (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color);
+            }
+            rng ^= rng << 13;
+            rng ^= rng >> 17;
+            rng ^= rng << 5;
+        }
+
+        let row_bytes = STAR_STRIDE as usize;
+        for i in 0..FB_H {
+            let src = unsafe { self.starfield.add((i * STAR_STRIDE) as usize) };
+            let dst_row = STAR_ROWS - 1 - i;
+            let dst = unsafe { self.starfield.add((dst_row * STAR_STRIDE) as usize) };
+            unsafe {
+                core::ptr::copy_nonoverlapping(src, dst, row_bytes);
+            }
         }
     }
 }
 
-// Non-DMA2D stubs for compilation on non-ARM targets.
 #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
 impl StarCrawl {
     pub fn activate(&mut self) {}
+
+    pub fn tick(&mut self, _back_buf: *mut u8, _fb_w: u32, _fb_h: u32) -> StepResult {
+        StepResult::Idle
+    }
+
+    pub fn stage_code(&self) -> u32 {
+        0
+    }
+
+    pub fn frame_id(&self) -> u32 {
+        0
+    }
+
+    pub fn waiting_for_dma(&self) -> bool {
+        false
+    }
+
+    pub fn drop_frame(&mut self) {}
 }

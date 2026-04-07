@@ -530,12 +530,9 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
                     let bg_b = self.surface.buf[off] as u16;
                     let bg_g = self.surface.buf[off + 1] as u16;
                     let bg_r = self.surface.buf[off + 2] as u16;
-                    self.surface.buf[off] =
-                        ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
-                    self.surface.buf[off + 1] =
-                        ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
-                    self.surface.buf[off + 2] =
-                        ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+                    self.surface.buf[off] = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+                    self.surface.buf[off + 1] = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+                    self.surface.buf[off + 2] = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
                     self.surface.buf[off + 3] = 0xff;
                 }
             }
@@ -574,13 +571,7 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
         }
     }
 
-    fn draw_pixels(
-        &mut self,
-        position: (i32, i32),
-        pixels: &[Color],
-        width: u32,
-        height: u32,
-    ) {
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
         // Fast path: write ARGB8888 pixels directly into the surface buffer,
         // then record the dirty rectangle. Avoids per-pixel fill_rect overhead.
         if self.surface.format == PixelFmt::Argb8888 {
@@ -685,7 +676,12 @@ impl Renderer for RotatedRenderer<'_> {
         }
 
         self.inner.fill_rect(
-            WidgetRect { x: fb_x, y: fb_y, width: fb_w, height: fb_h },
+            WidgetRect {
+                x: fb_x,
+                y: fb_y,
+                width: fb_w,
+                height: fb_h,
+            },
             color,
         );
     }
@@ -712,7 +708,12 @@ impl Renderer for RotatedRenderer<'_> {
         }
 
         self.inner.blend_rect(
-            WidgetRect { x: fb_x, y: fb_y, width: fb_w, height: fb_h },
+            WidgetRect {
+                x: fb_x,
+                y: fb_y,
+                width: fb_w,
+                height: fb_h,
+            },
             color,
         );
     }
@@ -724,13 +725,7 @@ impl Renderer for RotatedRenderer<'_> {
         }
     }
 
-    fn draw_pixels(
-        &mut self,
-        position: (i32, i32),
-        pixels: &[Color],
-        width: u32,
-        height: u32,
-    ) {
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
         for py in 0..height as i32 {
             for px in 0..width as i32 {
                 let idx = (py as u32 * width + px as u32) as usize;

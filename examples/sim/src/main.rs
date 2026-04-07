@@ -94,7 +94,10 @@ fn run_with_app(
                 frame_count.set(n);
                 if n % 60 == 0 {
                     let elapsed = _frame_start.elapsed();
-                    eprintln!("cpu_stats: frame {n}  render {:.2}ms", elapsed.as_secs_f64() * 1000.0);
+                    eprintln!(
+                        "cpu_stats: frame {n}  render {:.2}ms",
+                        elapsed.as_secs_f64() * 1000.0
+                    );
                 }
             }
         }
@@ -202,7 +205,15 @@ fn main() {
         // delegates to LoadedApp since LoadedApp isn't Clone/Rc-compatible.
         // For the dynamic path, we use a simpler inline loop.
         let app: Rc<RefCell<dyn Application>> = Rc::new(RefCell::new(LoadedAppWrapper(loaded)));
-        run_with_app(&app, &root, width, height, use_wgpi, headless_path, png_path);
+        run_with_app(
+            &app,
+            &root,
+            width,
+            height,
+            use_wgpi,
+            headless_path,
+            png_path,
+        );
     } else {
         // Static path: use the built-in demo app.
         let mut demo = rlvgl_app_demo::create_app();
@@ -226,23 +237,25 @@ fn main() {
             #[cfg(feature = "png")]
             root.borrow_mut()
                 .children
-                .push(rlvgl_app_demo::build_png_demo(
-                    width as u32,
-                    height as u32,
-                ));
+                .push(rlvgl_app_demo::build_png_demo(width as u32, height as u32));
         }
         if show_gif {
             #[cfg(feature = "gif")]
             root.borrow_mut()
                 .children
-                .push(rlvgl_app_demo::build_gif_demo(
-                    width as u32,
-                    height as u32,
-                ));
+                .push(rlvgl_app_demo::build_gif_demo(width as u32, height as u32));
         }
 
         let app: Rc<RefCell<dyn Application>> = Rc::new(RefCell::new(BoxedAppWrapper(demo)));
-        run_with_app(&app, &root, width, height, use_wgpi, headless_path, png_path);
+        run_with_app(
+            &app,
+            &root,
+            width,
+            height,
+            use_wgpi,
+            headless_path,
+            png_path,
+        );
     };
 }
 

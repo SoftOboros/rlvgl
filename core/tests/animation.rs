@@ -1,6 +1,6 @@
 //! Tests for animation primitives.
 use rlvgl_core::animation::{
-    Easing, FadeTransition, Fade, KeyFade, LoopMode, Motion, Slide, Timeline,
+    Easing, Fade, FadeTransition, KeyFade, LoopMode, Motion, Slide, Timeline,
 };
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect};
@@ -115,9 +115,19 @@ fn easing_bounce_endpoints() {
 
 #[test]
 fn loop_mode_once_finishes() {
-    let mut rect = Rect { x: 0, y: 0, width: 10, height: 10 };
+    let mut rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let start = rect;
-    let end = Rect { x: 100, y: 0, width: 10, height: 10 };
+    let end = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let mut m = Motion::new(&mut rect, start, end, 100);
     m.tick(100);
     assert!(m.finished());
@@ -126,9 +136,19 @@ fn loop_mode_once_finishes() {
 
 #[test]
 fn loop_mode_repeat_cycles() {
-    let mut rect = Rect { x: 0, y: 0, width: 10, height: 10 };
+    let mut rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let start = rect;
-    let end = Rect { x: 100, y: 0, width: 10, height: 10 };
+    let end = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let mut m = Motion::new(&mut rect, start, end, 100).with_loop(LoopMode::Repeat(2));
 
     m.tick(50);
@@ -149,9 +169,19 @@ fn loop_mode_repeat_cycles() {
 
 #[test]
 fn loop_mode_repeat_infinite() {
-    let mut rect = Rect { x: 0, y: 0, width: 10, height: 10 };
+    let mut rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let start = rect;
-    let end = Rect { x: 100, y: 0, width: 10, height: 10 };
+    let end = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let mut m = Motion::new(&mut rect, start, end, 100).with_loop(LoopMode::Repeat(0));
 
     m.tick(250);
@@ -162,9 +192,19 @@ fn loop_mode_repeat_infinite() {
 
 #[test]
 fn loop_mode_pingpong() {
-    let mut rect = Rect { x: 0, y: 0, width: 10, height: 10 };
+    let mut rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let start = rect;
-    let end = Rect { x: 100, y: 0, width: 10, height: 10 };
+    let end = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let mut m = Motion::new(&mut rect, start, end, 100).with_loop(LoopMode::PingPong(1));
 
     // Forward half
@@ -188,9 +228,19 @@ fn loop_mode_pingpong() {
 
 #[test]
 fn motion_with_ease_in() {
-    let mut rect = Rect { x: 0, y: 0, width: 10, height: 10 };
+    let mut rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let start = rect;
-    let end = Rect { x: 100, y: 0, width: 10, height: 10 };
+    let end = Rect {
+        x: 100,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let mut m = Motion::new(&mut rect, start, end, 100).with_easing(Easing::EaseIn);
 
     m.tick(50);
@@ -276,8 +326,8 @@ fn key_fade_three_keys() {
 fn key_fade_with_per_segment_easing() {
     let mut alpha: u8 = 0;
     let mut kf = KeyFade::new(&mut alpha)
-        .key(0, 0, Easing::EaseIn)      // ease-in from 0→255
-        .key(100, 255, Easing::Linear);  // (last key easing ignored)
+        .key(0, 0, Easing::EaseIn) // ease-in from 0→255
+        .key(100, 255, Easing::Linear); // (last key easing ignored)
 
     // At t=50ms: EaseIn on segment 0→100, local t=0.5, eased=0.25, alpha=63
     kf.tick(50);
@@ -309,15 +359,35 @@ fn key_fade_looping() {
 fn timeline_mixes_all_types() {
     let mut style = Style::default();
     style.bg_color = Color(0, 0, 0, 255);
-    let mut rect = Rect { x: 0, y: 0, width: 10, height: 10 };
+    let mut rect = Rect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+    };
     let mut alpha: u8 = 255;
 
     let mut tl = Timeline::new();
-    tl.add_fade(Fade::new(&mut style, Color(0, 0, 0, 255), Color(255, 0, 0, 255), 100));
+    tl.add_fade(Fade::new(
+        &mut style,
+        Color(0, 0, 0, 255),
+        Color(255, 0, 0, 255),
+        100,
+    ));
     tl.add_motion(Motion::new(
         &mut rect,
-        Rect { x: 0, y: 0, width: 10, height: 10 },
-        Rect { x: 100, y: 0, width: 10, height: 10 },
+        Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        Rect {
+            x: 100,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
         100,
     ));
     tl.add_fade_transition(FadeTransition::new(&mut alpha, 255, 0, 100));

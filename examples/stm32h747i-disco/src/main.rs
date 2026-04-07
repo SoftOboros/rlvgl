@@ -24,23 +24,23 @@ use panic_halt as _;
 
 // Auto-generated board support — pin constants and PAC helpers are a reference
 // library; not all are consumed in every build configuration.
+#[cfg(feature = "audio")]
+mod audio_scope;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
 #[allow(dead_code)]
 mod config_menu;
+#[cfg(feature = "cpu_stats")]
+mod cpu_stats;
 mod fonts;
 mod icon_strip;
 mod ipc;
 mod readme_crawl;
-mod star_crawl;
-#[cfg(feature = "audio")]
-mod audio_scope;
 mod settings_dialog;
+mod star_crawl;
 mod sys_info;
 mod wing;
-#[cfg(feature = "cpu_stats")]
-mod cpu_stats;
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
@@ -50,7 +50,6 @@ static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
 /// behind widgets when they hide.  Independent of the splash boot screen.
 #[cfg(feature = "desktop")]
 static DESKTOP_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
-
 
 // Optional: route BSP log messages to semihosting when enabled.
 #[cfg(feature = "bsp_log")]
@@ -68,7 +67,10 @@ fn _bsp_log(args: core::fmt::Arguments) {
 // SysTick exception handler — empty body; sole purpose is to wake WFI.
 // Without an enabled SysTick interrupt the core would sleep past the
 // frame boundary because has_wrapped() only polls the COUNTFLAG.
-#[cfg(all(feature = "cpu_stats", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    feature = "cpu_stats",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 #[cortex_m_rt::exception]
 fn SysTick() {}
 
@@ -78,11 +80,14 @@ fn SysTick() {}
 // This decouples touch sampling from the main loop cadence (which may
 // WFI at 30 Hz) and fixes missed press/release events.
 
-#[cfg(all(not(feature = "c_hal"), any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 mod touch_isr {
     use core::ptr::{addr_of, addr_of_mut};
-    use core::sync::atomic::compiler_fence;
     use core::sync::atomic::Ordering;
+    use core::sync::atomic::compiler_fence;
 
     // I2C4 register addresses (base 0x5800_1C00, RM0399 §50.7)
     const I2C4_CR2: *mut u32 = 0x5800_1C04 as *mut u32;
@@ -137,15 +142,15 @@ mod touch_isr {
     #[inline]
     pub unsafe fn touch_ring_push(sample: RawTouchSample) {
         unsafe {
-        let ring = addr_of_mut!(TOUCH_RING);
-        let head = core::ptr::read_volatile(addr_of!((*ring).head));
-        let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
-        if head.wrapping_sub(tail) >= TOUCH_RING_CAP as u32 {
-            return; // full — drop newest
-        }
-        (*ring).slots[(head % TOUCH_RING_CAP as u32) as usize] = sample;
-        compiler_fence(Ordering::Release);
-        core::ptr::write_volatile(addr_of_mut!((*ring).head), head.wrapping_add(1));
+            let ring = addr_of_mut!(TOUCH_RING);
+            let head = core::ptr::read_volatile(addr_of!((*ring).head));
+            let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
+            if head.wrapping_sub(tail) >= TOUCH_RING_CAP as u32 {
+                return; // full — drop newest
+            }
+            (*ring).slots[(head % TOUCH_RING_CAP as u32) as usize] = sample;
+            compiler_fence(Ordering::Release);
+            core::ptr::write_volatile(addr_of_mut!((*ring).head), head.wrapping_add(1));
         }
     }
 
@@ -153,17 +158,17 @@ mod touch_isr {
     #[inline]
     pub unsafe fn touch_ring_pop() -> Option<RawTouchSample> {
         unsafe {
-        let ring = addr_of_mut!(TOUCH_RING);
-        let head = core::ptr::read_volatile(addr_of!((*ring).head));
-        let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
-        if head == tail {
-            return None;
-        }
-        compiler_fence(Ordering::Acquire);
-        let sample = (*ring).slots[(tail % TOUCH_RING_CAP as u32) as usize];
-        compiler_fence(Ordering::Release);
-        core::ptr::write_volatile(addr_of_mut!((*ring).tail), tail.wrapping_add(1));
-        Some(sample)
+            let ring = addr_of_mut!(TOUCH_RING);
+            let head = core::ptr::read_volatile(addr_of!((*ring).head));
+            let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
+            if head == tail {
+                return None;
+            }
+            compiler_fence(Ordering::Acquire);
+            let sample = (*ring).slots[(tail % TOUCH_RING_CAP as u32) as usize];
+            compiler_fence(Ordering::Release);
+            core::ptr::write_volatile(addr_of_mut!((*ring).tail), tail.wrapping_add(1));
+            Some(sample)
         }
     }
 
@@ -171,18 +176,18 @@ mod touch_isr {
     #[inline]
     unsafe fn i2c4_wait(bit: u32) -> bool {
         unsafe {
-        for _ in 0..I2C_TIMEOUT {
-            let isr = I2C4_ISR.read_volatile();
-            if isr & (1 << 4) != 0 {
-                // NACKF — device didn't acknowledge
-                I2C4_ICR.write_volatile(1 << 4); // clear NACKCF
-                return false;
+            for _ in 0..I2C_TIMEOUT {
+                let isr = I2C4_ISR.read_volatile();
+                if isr & (1 << 4) != 0 {
+                    // NACKF — device didn't acknowledge
+                    I2C4_ICR.write_volatile(1 << 4); // clear NACKCF
+                    return false;
+                }
+                if isr & (1 << bit) != 0 {
+                    return true;
+                }
             }
-            if isr & (1 << bit) != 0 {
-                return true;
-            }
-        }
-        false
+            false
         }
     }
 
@@ -192,51 +197,47 @@ mod touch_isr {
     /// addresses so the HAL I2C peripheral doesn't need to live in a static.
     unsafe fn i2c4_read_touches_raw() -> RawTouchSample {
         unsafe {
-        // ── Write phase: send register address 0x02 ──
-        // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
-        I2C4_CR2.write_volatile(
-            FT5336_SADD | (1 << 16) | (1 << 13),
-        );
-        // Wait TXIS (bit 1)
-        if !i2c4_wait(1) {
-            return RawTouchSample::EMPTY;
-        }
-        I2C4_TXDR.write_volatile(0x02);
-        // Wait TC (bit 6) — transfer complete (AUTOEND=0, RELOAD=0)
-        if !i2c4_wait(6) {
-            return RawTouchSample::EMPTY;
-        }
-
-        // ── Read phase: read 31 bytes ──
-        // CR2: SADD, NBYTES=31, RD_WRN=1, START=1, AUTOEND=1
-        I2C4_CR2.write_volatile(
-            FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25),
-        );
-        let mut buf = [0u8; 31];
-        for b in buf.iter_mut() {
-            // Wait RXNE (bit 2)
-            if !i2c4_wait(2) {
+            // ── Write phase: send register address 0x02 ──
+            // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
+            I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
+            // Wait TXIS (bit 1)
+            if !i2c4_wait(1) {
                 return RawTouchSample::EMPTY;
             }
-            *b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
-        }
-        // AUTOEND generates STOP; wait STOPF (bit 5) then clear it
-        if i2c4_wait(5) {
-            I2C4_ICR.write_volatile(1 << 5); // STOPCF
-        }
+            I2C4_TXDR.write_volatile(0x02);
+            // Wait TC (bit 6) — transfer complete (AUTOEND=0, RELOAD=0)
+            if !i2c4_wait(6) {
+                return RawTouchSample::EMPTY;
+            }
 
-        // ── Parse (identical to ft5336.rs:48-79) ──
-        let count = (buf[0] & 0x0F).min(5);
-        let mut points = [(0u8, 0u8, 0u16, 0u16); 5];
-        for i in 0..count as usize {
-            let base = 1 + i * 6;
-            let event_flag = buf[base] >> 6;
-            let x = (((buf[base] & 0x0F) as u16) << 8) | buf[base + 1] as u16;
-            let id = buf[base + 2] >> 4;
-            let y = (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
-            points[i] = (id, event_flag, x, y);
-        }
-        RawTouchSample { count, points }
+            // ── Read phase: read 31 bytes ──
+            // CR2: SADD, NBYTES=31, RD_WRN=1, START=1, AUTOEND=1
+            I2C4_CR2.write_volatile(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
+            let mut buf = [0u8; 31];
+            for b in buf.iter_mut() {
+                // Wait RXNE (bit 2)
+                if !i2c4_wait(2) {
+                    return RawTouchSample::EMPTY;
+                }
+                *b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
+            }
+            // AUTOEND generates STOP; wait STOPF (bit 5) then clear it
+            if i2c4_wait(5) {
+                I2C4_ICR.write_volatile(1 << 5); // STOPCF
+            }
+
+            // ── Parse (identical to ft5336.rs:48-79) ──
+            let count = (buf[0] & 0x0F).min(5);
+            let mut points = [(0u8, 0u8, 0u16, 0u16); 5];
+            for i in 0..count as usize {
+                let base = 1 + i * 6;
+                let event_flag = buf[base] >> 6;
+                let x = (((buf[base] & 0x0F) as u16) << 8) | buf[base + 1] as u16;
+                let id = buf[base + 2] >> 4;
+                let y = (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
+                points[i] = (id, event_flag, x, y);
+            }
+            RawTouchSample { count, points }
         }
     }
 
@@ -244,36 +245,633 @@ mod touch_isr {
     /// if needed, and pushes the sample into the ring.
     pub unsafe fn tim6_dac_handler() {
         unsafe {
-        // Clear UIF (bit 0)
-        TIM6_SR.write_volatile(TIM6_SR.read_volatile() & !1);
+            // Clear UIF (bit 0)
+            TIM6_SR.write_volatile(TIM6_SR.read_volatile() & !1);
 
-        // Read PK7: low = touch data available
-        let int_low = GPIOK_IDR.read_volatile() & (1 << 7) == 0;
+            // Read PK7: low = touch data available
+            let int_low = GPIOK_IDR.read_volatile() & (1 << 7) == 0;
 
-        // Read when INT active OR on the LOW→HIGH edge (catches release)
-        let prev = core::ptr::read_volatile(addr_of!(PREV_INT_LOW));
-        let should_read = int_low || prev;
+            // Read when INT active OR on the LOW→HIGH edge (catches release)
+            let prev = core::ptr::read_volatile(addr_of!(PREV_INT_LOW));
+            let should_read = int_low || prev;
 
-        if should_read {
-            let sample = i2c4_read_touches_raw();
-            touch_ring_push(sample);
-        }
+            if should_read {
+                let sample = i2c4_read_touches_raw();
+                touch_ring_push(sample);
+            }
 
-        core::ptr::write_volatile(addr_of_mut!(PREV_INT_LOW), int_low);
+            core::ptr::write_volatile(addr_of_mut!(PREV_INT_LOW), int_low);
         }
     }
 }
 
-#[cfg(all(not(feature = "c_hal"), any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 use touch_isr::touch_ring_pop;
 
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
-#[cfg(all(not(feature = "c_hal"), any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 mod _tim6_isr {
     use stm32h7::stm32h747cm7::interrupt;
     #[interrupt]
     unsafe fn TIM6_DAC() {
-        unsafe { super::touch_isr::tim6_dac_handler(); }
+        unsafe {
+            super::touch_isr::tim6_dac_handler();
+        }
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod _usart1_isr {
+    use stm32h7::stm32h747cm7::interrupt;
+
+    #[interrupt]
+    unsafe fn USART1() {
+        unsafe {
+            super::runtime_serial::irq_handler();
+        }
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    feature = "dma2d",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod _dma2d_isr {
+    use stm32h7::stm32h747cm7::interrupt;
+
+    #[interrupt]
+    unsafe fn DMA2D() {
+        unsafe {
+            super::dma2d_irq::irq_handler();
+        }
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod runtime_serial {
+    use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
+
+    const USART1_CR1: *mut u32 = 0x4001_1000 as *mut u32;
+    const USART1_ISR: *const u32 = 0x4001_101C as *const u32;
+    const USART1_ICR: *mut u32 = 0x4001_1020 as *mut u32;
+    const USART1_RDR: *const u32 = 0x4001_1024 as *const u32;
+    const USART1_TDR: *mut u32 = 0x4001_1028 as *mut u32;
+
+    const CR1_RXNEIE_RXFNEIE: u32 = 1 << 5;
+    const CR1_TXEIE_TXFNFIE: u32 = 1 << 7;
+    const ISR_RXNE_RXFNE: u32 = 1 << 5;
+    const ISR_TXE_TXFNF: u32 = 1 << 7;
+    const ISR_ORE: u32 = 1 << 3;
+    const ISR_NE: u32 = 1 << 2;
+    const ISR_FE: u32 = 1 << 1;
+    const ISR_PE: u32 = 1 << 0;
+    const ICR_ORECF: u32 = 1 << 3;
+    const ICR_NECF: u32 = 1 << 2;
+    const ICR_FECF: u32 = 1 << 1;
+    const ICR_PECF: u32 = 1 << 0;
+    const ERROR_FLAGS: u32 = ISR_ORE | ISR_NE | ISR_FE | ISR_PE;
+    const ERROR_CLEAR: u32 = ICR_ORECF | ICR_NECF | ICR_FECF | ICR_PECF;
+
+    const RX_CAP: usize = 256;
+    const TX_CAP: usize = 4096;
+
+    static READY: AtomicBool = AtomicBool::new(false);
+    static RX_HEAD: AtomicU16 = AtomicU16::new(0);
+    static RX_TAIL: AtomicU16 = AtomicU16::new(0);
+    static TX_HEAD: AtomicU16 = AtomicU16::new(0);
+    static TX_TAIL: AtomicU16 = AtomicU16::new(0);
+    static RX_DROPPED: AtomicU32 = AtomicU32::new(0);
+    static TX_DROPPED: AtomicU32 = AtomicU32::new(0);
+
+    static mut RX_BUF: [u8; RX_CAP] = [0; RX_CAP];
+    static mut TX_BUF: [u8; TX_CAP] = [0; TX_CAP];
+
+    #[inline]
+    fn blocking_write_byte(byte: u8) {
+        unsafe {
+            while USART1_ISR.read_volatile() & ISR_TXE_TXFNF == 0 {}
+            USART1_TDR.write_volatile(byte as u32);
+        }
+    }
+
+    #[inline]
+    fn depth(head: u16, tail: u16) -> usize {
+        head.wrapping_sub(tail) as usize
+    }
+
+    fn push_tx(byte: u8) -> bool {
+        let head = TX_HEAD.load(Ordering::Relaxed);
+        let tail = TX_TAIL.load(Ordering::Acquire);
+        if depth(head, tail) >= TX_CAP {
+            return false;
+        }
+        unsafe {
+            TX_BUF[(head as usize) % TX_CAP] = byte;
+        }
+        TX_HEAD.store(head.wrapping_add(1), Ordering::Release);
+        true
+    }
+
+    fn push_rx(byte: u8) -> bool {
+        let head = RX_HEAD.load(Ordering::Relaxed);
+        let tail = RX_TAIL.load(Ordering::Acquire);
+        if depth(head, tail) >= RX_CAP {
+            return false;
+        }
+        unsafe {
+            RX_BUF[(head as usize) % RX_CAP] = byte;
+        }
+        RX_HEAD.store(head.wrapping_add(1), Ordering::Release);
+        true
+    }
+
+    fn pop_tx() -> Option<u8> {
+        let tail = TX_TAIL.load(Ordering::Relaxed);
+        let head = TX_HEAD.load(Ordering::Acquire);
+        if tail == head {
+            return None;
+        }
+        let byte = unsafe { TX_BUF[(tail as usize) % TX_CAP] };
+        TX_TAIL.store(tail.wrapping_add(1), Ordering::Release);
+        Some(byte)
+    }
+
+    pub fn pop_rx() -> Option<u8> {
+        let tail = RX_TAIL.load(Ordering::Relaxed);
+        let head = RX_HEAD.load(Ordering::Acquire);
+        if tail == head {
+            return None;
+        }
+        let byte = unsafe { RX_BUF[(tail as usize) % RX_CAP] };
+        RX_TAIL.store(tail.wrapping_add(1), Ordering::Release);
+        Some(byte)
+    }
+
+    pub fn init(nvic: &mut cortex_m::peripheral::NVIC) {
+        RX_HEAD.store(0, Ordering::Relaxed);
+        RX_TAIL.store(0, Ordering::Relaxed);
+        TX_HEAD.store(0, Ordering::Relaxed);
+        TX_TAIL.store(0, Ordering::Relaxed);
+        RX_DROPPED.store(0, Ordering::Relaxed);
+        TX_DROPPED.store(0, Ordering::Relaxed);
+
+        unsafe {
+            USART1_ICR.write_volatile(ERROR_CLEAR);
+            let cr1 = USART1_CR1.read_volatile();
+            USART1_CR1.write_volatile((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
+
+            use stm32h7::stm32h747cm7::Interrupt;
+            cortex_m::peripheral::NVIC::unmask(Interrupt::USART1);
+            nvic.set_priority(Interrupt::USART1, 3);
+        }
+
+        READY.store(true, Ordering::Release);
+    }
+
+    pub fn kick_tx() {
+        if !READY.load(Ordering::Acquire) {
+            return;
+        }
+        if TX_HEAD.load(Ordering::Acquire) == TX_TAIL.load(Ordering::Acquire) {
+            return;
+        }
+        unsafe {
+            let cr1 = USART1_CR1.read_volatile();
+            USART1_CR1.write_volatile(cr1 | CR1_TXEIE_TXFNFIE);
+        }
+    }
+
+    pub fn write_bytes(bytes: &[u8]) {
+        if !READY.load(Ordering::Acquire) {
+            for &byte in bytes {
+                blocking_write_byte(byte);
+            }
+            return;
+        }
+
+        let mut queued = false;
+        for &byte in bytes {
+            if push_tx(byte) {
+                queued = true;
+            } else {
+                TX_DROPPED.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        if queued {
+            kick_tx();
+        }
+    }
+
+    pub fn write_str(s: &str) {
+        write_bytes(s.as_bytes());
+    }
+
+    pub fn stats() -> (u16, u16, u16, u16) {
+        let rx_depth = depth(
+            RX_HEAD.load(Ordering::Acquire),
+            RX_TAIL.load(Ordering::Acquire),
+        ) as u16;
+        let tx_depth = depth(
+            TX_HEAD.load(Ordering::Acquire),
+            TX_TAIL.load(Ordering::Acquire),
+        ) as u16;
+        let rx_drop = RX_DROPPED.load(Ordering::Relaxed).min(u16::MAX as u32) as u16;
+        let tx_drop = TX_DROPPED.load(Ordering::Relaxed).min(u16::MAX as u32) as u16;
+        (rx_depth, tx_depth, rx_drop, tx_drop)
+    }
+
+    pub unsafe fn irq_handler() {
+        let isr = unsafe { USART1_ISR.read_volatile() };
+        if isr & ERROR_FLAGS != 0 {
+            unsafe {
+                USART1_ICR.write_volatile(ERROR_CLEAR);
+            }
+        }
+
+        while unsafe { USART1_ISR.read_volatile() } & ISR_RXNE_RXFNE != 0 {
+            let byte = unsafe { (USART1_RDR.read_volatile() & 0xFF) as u8 };
+            if !push_rx(byte) {
+                RX_DROPPED.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        while unsafe { USART1_ISR.read_volatile() } & ISR_TXE_TXFNF != 0 {
+            if let Some(byte) = pop_tx() {
+                unsafe {
+                    USART1_TDR.write_volatile(byte as u32);
+                }
+            } else {
+                unsafe {
+                    let cr1 = USART1_CR1.read_volatile();
+                    USART1_CR1.write_volatile(cr1 & !CR1_TXEIE_TXFNFIE);
+                }
+                break;
+            }
+        }
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    feature = "dma2d",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod dma2d_irq {
+    use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
+
+    static START_CYCLES: AtomicU32 = AtomicU32::new(0);
+    static LAST_CYCLES: AtomicU32 = AtomicU32::new(0);
+    static MAX_CYCLES: AtomicU32 = AtomicU32::new(0);
+    static COMPLETE_COUNT: AtomicU16 = AtomicU16::new(0);
+    static ERROR_COUNT: AtomicU16 = AtomicU16::new(0);
+    static COMPLETE_LATCH: AtomicBool = AtomicBool::new(false);
+    static ERROR_LATCH: AtomicU32 = AtomicU32::new(0);
+
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+
+    pub fn init(nvic: &mut cortex_m::peripheral::NVIC) {
+        use stm32h7::stm32h747cm7::Interrupt;
+
+        START_CYCLES.store(0, Ordering::Relaxed);
+        LAST_CYCLES.store(0, Ordering::Relaxed);
+        MAX_CYCLES.store(0, Ordering::Relaxed);
+        COMPLETE_COUNT.store(0, Ordering::Relaxed);
+        ERROR_COUNT.store(0, Ordering::Relaxed);
+        COMPLETE_LATCH.store(false, Ordering::Relaxed);
+        ERROR_LATCH.store(0, Ordering::Relaxed);
+
+        unsafe {
+            cortex_m::peripheral::NVIC::unmask(Interrupt::DMA2D);
+            nvic.set_priority(Interrupt::DMA2D, 3);
+        }
+    }
+
+    pub fn note_start() {
+        let now = unsafe { DWT_CYCCNT.read_volatile() };
+        START_CYCLES.store(now, Ordering::Relaxed);
+    }
+
+    pub fn take_complete() -> bool {
+        COMPLETE_LATCH.swap(false, Ordering::AcqRel)
+    }
+
+    pub fn take_error() -> u32 {
+        ERROR_LATCH.swap(0, Ordering::AcqRel)
+    }
+
+    pub fn last_cycles() -> u32 {
+        LAST_CYCLES.load(Ordering::Acquire)
+    }
+
+    pub fn max_cycles() -> u32 {
+        MAX_CYCLES.load(Ordering::Acquire)
+    }
+
+    pub fn counts() -> (u16, u16) {
+        (
+            COMPLETE_COUNT.load(Ordering::Acquire),
+            ERROR_COUNT.load(Ordering::Acquire),
+        )
+    }
+
+    pub unsafe fn irq_handler() {
+        let regs = unsafe { &*stm32h7::stm32h747cm7::DMA2D::ptr() };
+        let isr = regs.isr.read().bits();
+        let clear = isr & 0x3F;
+        if clear != 0 {
+            unsafe {
+                regs.ifcr.write(|w| w.bits(clear));
+            }
+        }
+
+        let start = START_CYCLES.load(Ordering::Relaxed);
+        let now = unsafe { DWT_CYCCNT.read_volatile() };
+        let elapsed = now.wrapping_sub(start);
+
+        if isr & (1 << 1) != 0 {
+            LAST_CYCLES.store(elapsed, Ordering::Release);
+            let mut max = MAX_CYCLES.load(Ordering::Acquire);
+            while elapsed > max
+                && MAX_CYCLES
+                    .compare_exchange(max, elapsed, Ordering::AcqRel, Ordering::Acquire)
+                    .is_err()
+            {
+                max = MAX_CYCLES.load(Ordering::Acquire);
+            }
+            COMPLETE_COUNT.fetch_add(1, Ordering::Relaxed);
+            COMPLETE_LATCH.store(true, Ordering::Release);
+        }
+
+        let errors = isr & ((1 << 5) | (1 << 0));
+        if errors != 0 {
+            ERROR_COUNT.fetch_add(1, Ordering::Relaxed);
+            ERROR_LATCH.fetch_or(errors, Ordering::AcqRel);
+        }
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn serial_puts(s: &str) {
+    runtime_serial::write_str(s);
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn serial_dec(mut v: u32) {
+    if v == 0 {
+        serial_puts("0");
+        return;
+    }
+    let mut buf = [0u8; 10];
+    let mut i = 0usize;
+    while v > 0 {
+        buf[i] = b'0' + (v % 10) as u8;
+        v /= 10;
+        i += 1;
+    }
+    while i > 0 {
+        i -= 1;
+        runtime_serial::write_bytes(&buf[i..=i]);
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn serial_hex_u32(v: u32) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut out = [0u8; 8];
+    for i in 0..8 {
+        out[7 - i] = HEX[((v >> (i * 4)) & 0xF) as usize];
+    }
+    runtime_serial::write_bytes(&out);
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn parse_tap(buf: &[u8]) -> Option<(i32, i32)> {
+    if buf.is_empty() || buf[0] != b'T' {
+        return None;
+    }
+    let s = core::str::from_utf8(&buf[1..]).ok()?;
+    let mut parts = s.split(',');
+    let x: i32 = parts.next()?.trim().parse().ok()?;
+    let y: i32 = parts.next()?.trim().parse().ok()?;
+    Some((x, y))
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct DumpRequest {
+    wx: i32,
+    wy: i32,
+    ww: i32,
+    wh: i32,
+    remaining: u8,
+    last_present_seen: u32,
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+enum SerialAction {
+    InjectTap(i32, i32),
+    ToggleCrawl,
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct SerialTask {
+    line_buf: [u8; 64],
+    line_len: usize,
+    dump: Option<DumpRequest>,
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+impl SerialTask {
+    const fn new() -> Self {
+        Self {
+            line_buf: [0; 64],
+            line_len: 0,
+            dump: None,
+        }
+    }
+
+    fn poll<F>(
+        &mut self,
+        tick_count: u32,
+        present_count: u32,
+        front_buf: u32,
+        fb_w: u32,
+        mut dispatch: F,
+    ) where
+        F: FnMut(SerialAction),
+    {
+        while let Some(byte) = runtime_serial::pop_rx() {
+            if byte == b'\n' || byte == b'\r' {
+                if self.line_len > 0 {
+                    let line_len = self.line_len;
+                    let mut line = [0u8; 64];
+                    line[..line_len].copy_from_slice(&self.line_buf[..line_len]);
+                    self.handle_line(&line[..line_len], tick_count, present_count, &mut dispatch);
+                    self.line_len = 0;
+                }
+            } else if self.line_len < self.line_buf.len() {
+                self.line_buf[self.line_len] = byte;
+                self.line_len += 1;
+            }
+        }
+
+        self.emit_dump_if_ready(present_count, front_buf as *const u8, fb_w);
+        runtime_serial::kick_tx();
+    }
+
+    fn handle_line<F>(&mut self, cmd: &[u8], tick_count: u32, present_count: u32, dispatch: &mut F)
+    where
+        F: FnMut(SerialAction),
+    {
+        if cmd.is_empty() {
+            return;
+        }
+
+        match cmd[0] {
+            b'?' => {
+                let (rx_depth, tx_depth, rx_drop, tx_drop) = runtime_serial::stats();
+                serial_puts("tick=");
+                serial_dec(tick_count);
+                serial_puts(" rx=");
+                serial_dec(rx_depth as u32);
+                serial_puts(" tx=");
+                serial_dec(tx_depth as u32);
+                serial_puts(" drop=");
+                serial_dec(rx_drop as u32);
+                serial_puts("/");
+                serial_dec(tx_drop as u32);
+                serial_puts("\r\n");
+            }
+            b'T' => {
+                if let Some((x, y)) = parse_tap(cmd) {
+                    dispatch(SerialAction::InjectTap(x, y));
+                    serial_puts("OK\r\n");
+                } else {
+                    serial_puts("ERR: bad tap\r\n");
+                }
+            }
+            b'D' | b'd' => {
+                if let Some(req) = Self::parse_dump(cmd, present_count) {
+                    self.dump = Some(req);
+                    serial_puts("DUMP:queued\r\n");
+                } else {
+                    serial_puts("ERR: bad dump\r\n");
+                }
+            }
+            b'C' | b'c' => {
+                dispatch(SerialAction::ToggleCrawl);
+                serial_puts("CRAWL:toggled\r\n");
+            }
+            _ => serial_puts("ERR: unknown cmd\r\n"),
+        }
+    }
+
+    fn parse_dump(cmd: &[u8], present_count: u32) -> Option<DumpRequest> {
+        let mut parts = [0i32; 5];
+        parts[4] = 1;
+        let mut idx = 0usize;
+        let mut value = 0i32;
+        let mut have_digits = false;
+
+        for &byte in &cmd[1..] {
+            if byte == b',' {
+                if have_digits && idx < parts.len() {
+                    parts[idx] = value;
+                    idx += 1;
+                }
+                value = 0;
+                have_digits = false;
+            } else if byte.is_ascii_digit() {
+                value = value * 10 + (byte - b'0') as i32;
+                have_digits = true;
+            } else {
+                return None;
+            }
+        }
+        if have_digits && idx < parts.len() {
+            parts[idx] = value;
+        }
+
+        Some(DumpRequest {
+            wx: parts[0],
+            wy: parts[1],
+            ww: parts[2].max(1).min(40),
+            wh: parts[3].max(1).min(40),
+            remaining: parts[4].max(1).min(4) as u8,
+            last_present_seen: present_count,
+        })
+    }
+
+    fn emit_dump_if_ready(&mut self, present_count: u32, front_buf: *const u8, fb_w: u32) {
+        let Some(req) = self.dump.as_mut() else {
+            return;
+        };
+        if present_count == req.last_present_seen {
+            return;
+        }
+
+        let fb_stride = (fb_w * 4) as usize;
+        let fb_w = fb_w as i32;
+        serial_puts("F\r\n");
+        for row in 0..req.wh {
+            for col in 0..req.ww {
+                let px = fb_w - 1 - (req.wy + row);
+                let py = req.wx + col;
+                if px >= 0 && py >= 0 {
+                    let off = py as usize * fb_stride + px as usize * 4;
+                    let argb = unsafe { (front_buf.add(off) as *const u32).read_volatile() };
+                    serial_hex_u32(argb);
+                    if col < req.ww - 1 {
+                        serial_puts(" ");
+                    }
+                }
+            }
+            serial_puts("\r\n");
+        }
+
+        req.remaining -= 1;
+        req.last_present_seen = present_count;
+        if req.remaining == 0 {
+            serial_puts("END\r\n");
+            self.dump = None;
+        }
     }
 }
 
@@ -474,7 +1072,7 @@ fn issue_sdram_command(
                 .ctb1()
                 .clear_bit()
                 .ctb2()
-                .set_bit()  // Bank 2 (SDNE1/SDCKE1 on H747I-DISCO)
+                .set_bit() // Bank 2 (SDNE1/SDCKE1 on H747I-DISCO)
                 .nrfs()
                 .bits(auto_refresh)
                 .mrd()
@@ -519,7 +1117,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
         let sdtr1 = 0x5200_4148u32 as *mut u32;
         sdtr1.write_volatile(
             (1 << 20) // TRP = 2 cycles
-            | (6 << 12) // TRC = 7 cycles
+            | (6 << 12), // TRC = 7 cycles
         );
         // SDTR2: bank-specific timing
         // PAC sdbank2().sdtr offset = 0x148 = SDTR1 (same PAC bug pattern).
@@ -530,7 +1128,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
             | (1 << 16) // TWR = 2 cycles
             | (4 << 8)  // TRAS = 5 cycles
             | (6 << 4)  // TXSR = 7 cycles
-            | (1 << 0)  // TMRD = 2 cycles
+            | (1 << 0), // TMRD = 2 cycles
         );
     }
 
@@ -644,13 +1242,15 @@ fn early_fmc_setup() {
 
     let fmc = unsafe { &*stm32h7::stm32h747cm7::FMC::ptr() };
     // D3 SRAM telemetry for early FMC init
-    unsafe { (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32); }
+    unsafe {
+        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32);
+    }
     configure_fmc_sdram(fmc);
     // Capture SDCR1, SDTR1, SDSR after init
     unsafe {
         let sdcr1 = (0x5200_4140u32 as *const u32).read_volatile();
         let sdtr1 = (0x5200_4148u32 as *const u32).read_volatile();
-        let sdsr  = (0x5200_4158u32 as *const u32).read_volatile();
+        let sdsr = (0x5200_4158u32 as *const u32).read_volatile();
         (0x3800_0204u32 as *mut u32).write_volatile(sdcr1);
         (0x3800_0208u32 as *mut u32).write_volatile(sdtr1);
         (0x3800_020Cu32 as *mut u32).write_volatile(sdsr);
@@ -666,13 +1266,13 @@ fn early_fmc_setup() {
 // TS_CAL2   = 0x1FF1_E840  (factory cal at 110 °C, 16-bit, VDDA=3.3 V)
 
 const ADC3_BASE: u32 = 0x5802_6000;
-const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32;                  // +0x00
-const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32;          // +0x08
-const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32;       // +0x18
-const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32;       // +0x1C
-const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32;        // +0x30
-const ADC3_DR: *const u32 = (ADC3_BASE + 0x40) as *const u32;      // +0x40
-const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32;        // +0x300+0x08
+const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32; // +0x00
+const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32; // +0x08
+const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32; // +0x18
+const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32; // +0x1C
+const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32; // +0x30
+const ADC3_DR: *const u32 = (ADC3_BASE + 0x40) as *const u32; // +0x40
+const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08
 
 /// Initialise ADC3 for single-shot temperature sensor reads on channel 18.
 unsafe fn adc3_temp_init() {
@@ -747,7 +1347,9 @@ unsafe fn adc3_read_temp_x10() -> i32 {
     let ts_cal1 = (0x1FF1_E820u32 as *const u16).read_volatile() as i32;
     let ts_cal2 = (0x1FF1_E840u32 as *const u16).read_volatile() as i32;
     let denom = ts_cal2 - ts_cal1;
-    if denom == 0 { return 0; }
+    if denom == 0 {
+        return 0;
+    }
 
     300 + 800 * (raw - ts_cal1) / denom
 }
@@ -798,7 +1400,9 @@ fn main() -> ! {
     ))]
     {
         // D3 breadcrumb: very first thing in Rust HAL path
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32); }
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32);
+        }
         // Early spin delay to give debuggers time to attach before
         // peripheral clocks and pin configuration. This is a coarse, cycle-based
         // busy-wait that does not rely on any timers being configured yet.
@@ -808,10 +1412,14 @@ fn main() -> ! {
             cortex_m::asm::delay(10_000_000);
         }
 
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32); } // post-delay
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32);
+        } // post-delay
         let mut cp = cortex_m::Peripherals::take().unwrap();
         configure_mpu_regions(&mut cp);
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32); } // post-MPU
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32);
+        } // post-MPU
 
         use core::convert::Infallible;
         use embedded_hal::{
@@ -820,11 +1428,9 @@ fn main() -> ! {
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
         use rlvgl::core::event::{Event, Key};
-        use rlvgl::platform::{
-            CpuBlitter, InputDevice, Stm32h747iDiscoDisplay,
-        };
         #[cfg(feature = "sd_storage")]
         use rlvgl::platform::SdMmcBlockDev;
+        use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay};
         use stm32h7xx_hal::prelude::*;
 
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
@@ -898,14 +1504,23 @@ fn main() -> ! {
         /// Joystick input: polls 5 GPIO pins (SEL, DOWN, LEFT, RIGHT, UP)
         /// and generates KeyDown/KeyUp events on edge transitions.
         struct JoystickInput<S: InputPin, D: InputPin, L: InputPin, R: InputPin, U: InputPin> {
-            sel: S, down: D, left: L, right: R, up: U,
+            sel: S,
+            down: D,
+            left: L,
+            right: R,
+            up: U,
             last: [bool; 5],
         }
-        impl<S: InputPin, D: InputPin, L: InputPin, R: InputPin, U: InputPin>
-            JoystickInput<S, D, L, R, U>
-        {
+        impl<S: InputPin, D: InputPin, L: InputPin, R: InputPin, U: InputPin> JoystickInput<S, D, L, R, U> {
             fn new(sel: S, down: D, left: L, right: R, up: U) -> Self {
-                Self { sel, down, left, right, up, last: [false; 5] }
+                Self {
+                    sel,
+                    down,
+                    left,
+                    right,
+                    up,
+                    last: [false; 5],
+                }
             }
             fn poll(&mut self) -> Option<Event> {
                 let pins: [bool; 5] = [
@@ -916,16 +1531,23 @@ fn main() -> ! {
                     self.up.is_low().unwrap_or(false),
                 ];
                 const KEYS: [Key; 5] = [
-                    Key::Enter, Key::ArrowDown, Key::ArrowLeft,
-                    Key::ArrowRight, Key::ArrowUp,
+                    Key::Enter,
+                    Key::ArrowDown,
+                    Key::ArrowLeft,
+                    Key::ArrowRight,
+                    Key::ArrowUp,
                 ];
                 for i in 0..5 {
                     if pins[i] != self.last[i] {
                         self.last[i] = pins[i];
                         return Some(if pins[i] {
-                            Event::KeyDown { key: KEYS[i].clone() }
+                            Event::KeyDown {
+                                key: KEYS[i].clone(),
+                            }
                         } else {
-                            Event::KeyUp { key: KEYS[i].clone() }
+                            Event::KeyUp {
+                                key: KEYS[i].clone(),
+                            }
                         });
                     }
                 }
@@ -1013,7 +1635,9 @@ fn main() -> ! {
             // Safe to call; function is a no-op in unified builds
             let _ = bsp_pac::signal_clocks_ready();
         }
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32); } // pre-gpio-split
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32);
+        } // pre-gpio-split
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
         let gpiog = GPIOG.split(ccdr.peripheral.GPIOG);
         let gpiok = GPIOK.split(ccdr.peripheral.GPIOK);
@@ -1025,10 +1649,14 @@ fn main() -> ! {
         let gpioc = GPIOC.split(ccdr.peripheral.GPIOC);
         #[cfg(feature = "qspi_flash")]
         let gpiob = GPIOB.split(ccdr.peripheral.GPIOB);
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32); } // post-gpio-split
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32);
+        } // post-gpio-split
 
         // ── ADC3 temperature sensor ──────────────────────────────────────
-        unsafe { adc3_temp_init(); }
+        unsafe {
+            adc3_temp_init();
+        }
 
         // Panel reset via HAL + adapter to embedded-hal 1.0 OutputPin
         struct HalResetPin<P>(P);
@@ -1111,7 +1739,9 @@ fn main() -> ! {
         af12_high!(gpioi.pi7);
         af12_high!(gpioi.pi9);
         af12_high!(gpioi.pi10);
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32); } // post-FMC-pins
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32);
+        } // post-FMC-pins
 
         // ── QSPI flash init (MT25TL01G Bank 1) ──────────────────────────
         #[cfg(feature = "qspi_flash")]
@@ -1151,18 +1781,13 @@ fn main() -> ! {
                         // Breadcrumb: write JEDEC ID to D3 SRAM for debug
                         let bc = 0x3800_0320u32 as *mut u32;
                         bc.write_volatile(
-                            0x0F00_0000
-                                | (id[0] as u32) << 16
-                                | (id[1] as u32) << 8
-                                | id[2] as u32,
+                            0x0F00_0000 | (id[0] as u32) << 16 | (id[1] as u32) << 8 | id[2] as u32,
                         );
                     }
                 }
-                Err(_) => {
-                    unsafe {
-                        (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD);
-                    }
-                }
+                Err(_) => unsafe {
+                    (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD);
+                },
             }
             flash
         };
@@ -1236,9 +1861,7 @@ fn main() -> ! {
             );
             // MODER: PA9 = AF (10), PA10 = AF (10)
             let moder = gpioa as *mut u32;
-            moder.write_volatile(
-                (moder.read_volatile() & !(0xF << 18)) | (0b1010 << 18),
-            );
+            moder.write_volatile((moder.read_volatile() & !(0xF << 18)) | (0b1010 << 18));
             // Enable USART1 clock (C1_APB2ENR bit 4)
             let apb2 = 0x5802_44F0u32 as *mut u32;
             apb2.write_volatile(apb2.read_volatile() | (1 << 4));
@@ -1251,7 +1874,9 @@ fn main() -> ! {
             );
         }
 
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32); } // pre-display::new
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32);
+        } // pre-display::new
         let mut display = Stm32h747iDiscoDisplay::new(
             blitter,
             backlight,
@@ -1263,13 +1888,18 @@ fn main() -> ! {
             #[cfg(feature = "splash")]
             Some(SPLASH_RLE),
         );
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); } // post-display::new
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32);
+        } // post-display::new
         // Early serial breadcrumb (serial_puts not yet defined)
         {
             const ISR: *const u32 = 0x4001_101C as *const u32;
             const TDR: *mut u32 = 0x4001_1028 as *mut u32;
             for &b in b"POST-DISP\r\n" {
-                unsafe { while ISR.read_volatile() & (1 << 7) == 0 {} TDR.write_volatile(b as u32); }
+                unsafe {
+                    while ISR.read_volatile() & (1 << 7) == 0 {}
+                    TDR.write_volatile(b as u32);
+                }
             }
         }
         // No splash delay — splash is the desktop background.
@@ -1385,14 +2015,19 @@ fn main() -> ! {
         ipc::init();
 
         // ── I2C4 for FT5336 touch controller (PD12=SCL, PD13=SDA, AF4 OD) ──
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32); } // pre-I2C4
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32);
+        } // pre-I2C4
         let _scl = gpiod.pd12.into_alternate_open_drain::<4>();
         let _sda = gpiod.pd13.into_alternate_open_drain::<4>();
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32); } // post-I2C4-pins
-        let i2c4 = stm32h7xx_hal::i2c::I2c::i2c4(
-            I2C4, 400.kHz(), ccdr.peripheral.I2C4, &ccdr.clocks,
-        );
-        unsafe { (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32); } // post-I2C4-init
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32);
+        } // post-I2C4-pins
+        let i2c4 =
+            stm32h7xx_hal::i2c::I2c::i2c4(I2C4, 400.kHz(), ccdr.peripheral.I2C4, &ccdr.clocks);
+        unsafe {
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32);
+        } // post-I2C4-init
         // Wrap for embedded-hal 1.0 (stm32h7xx-hal I2c implements eh 0.2 I2C)
         struct HalI2c<I>(I);
         impl<I> embedded_hal::i2c::ErrorType for HalI2c<I> {
@@ -1405,15 +2040,30 @@ fn main() -> ! {
                 + stm32h7xx_hal::hal::blocking::i2c::Read,
         {
             fn read(&mut self, addr: SevenBitAddress, buf: &mut [u8]) -> Result<(), Self::Error> {
-                self.0.read(addr, buf).map_err(|_| embedded_hal::i2c::ErrorKind::Other)
+                self.0
+                    .read(addr, buf)
+                    .map_err(|_| embedded_hal::i2c::ErrorKind::Other)
             }
             fn write(&mut self, addr: SevenBitAddress, bytes: &[u8]) -> Result<(), Self::Error> {
-                self.0.write(addr, bytes).map_err(|_| embedded_hal::i2c::ErrorKind::Other)
+                self.0
+                    .write(addr, bytes)
+                    .map_err(|_| embedded_hal::i2c::ErrorKind::Other)
             }
-            fn write_read(&mut self, addr: SevenBitAddress, bytes: &[u8], buf: &mut [u8]) -> Result<(), Self::Error> {
-                self.0.write_read(addr, bytes, buf).map_err(|_| embedded_hal::i2c::ErrorKind::Other)
+            fn write_read(
+                &mut self,
+                addr: SevenBitAddress,
+                bytes: &[u8],
+                buf: &mut [u8],
+            ) -> Result<(), Self::Error> {
+                self.0
+                    .write_read(addr, bytes, buf)
+                    .map_err(|_| embedded_hal::i2c::ErrorKind::Other)
             }
-            fn transaction(&mut self, _addr: SevenBitAddress, _ops: &mut [Operation<'_>]) -> Result<(), Self::Error> {
+            fn transaction(
+                &mut self,
+                _addr: SevenBitAddress,
+                _ops: &mut [Operation<'_>],
+            ) -> Result<(), Self::Error> {
                 Err(embedded_hal::i2c::ErrorKind::Other)
             }
         }
@@ -1421,7 +2071,10 @@ fn main() -> ! {
             const ISR: *const u32 = 0x4001_101C as *const u32;
             const TDR: *mut u32 = 0x4001_1028 as *mut u32;
             for &b in b"PRE-AUDIO\r\n" {
-                unsafe { while ISR.read_volatile() & (1 << 7) == 0 {} TDR.write_volatile(b as u32); }
+                unsafe {
+                    while ISR.read_volatile() & (1 << 7) == 0 {}
+                    TDR.write_volatile(b as u32);
+                }
             }
         }
         // ── Audio codec init (before touch claims I2C4) ──
@@ -1438,8 +2091,8 @@ fn main() -> ! {
 
             // SAI1 GPIO pins (AF6, VeryHigh speed)
             let _sai1_mclk = gpiog.pg7.into_alternate::<6>().speed(Speed::VeryHigh);
-            let _sai1_sck  = gpioe.pe5.into_alternate::<6>().speed(Speed::VeryHigh);
-            let _sai1_fs   = gpioe.pe4.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_sck = gpioe.pe5.into_alternate::<6>().speed(Speed::VeryHigh);
+            let _sai1_fs = gpioe.pe4.into_alternate::<6>().speed(Speed::VeryHigh);
             let _sai1_sd_a = gpioe.pe6.into_alternate::<6>().speed(Speed::VeryHigh);
             let _sai1_sd_b = gpioe.pe3.into_alternate::<6>().speed(Speed::VeryHigh);
 
@@ -1465,7 +2118,7 @@ fn main() -> ! {
 
             // SAI4 PDM mic GPIO (PE2=CK1, PC1=D1)
             let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
-            let _sai4_d1  = gpioc.pc1.into_alternate::<10>();
+            let _sai4_d1 = gpioc.pc1.into_alternate::<10>();
 
             // Release I2C4 back so touch can use it
             codec.release().0
@@ -1476,7 +2129,10 @@ fn main() -> ! {
             const ISR: *const u32 = 0x4001_101C as *const u32;
             const TDR: *mut u32 = 0x4001_1028 as *mut u32;
             for &b in b"POST-AUDIO\r\n" {
-                unsafe { while ISR.read_volatile() & (1 << 7) == 0 {} TDR.write_volatile(b as u32); }
+                unsafe {
+                    while ISR.read_volatile() & (1 << 7) == 0 {}
+                    TDR.write_volatile(b as u32);
+                }
             }
         }
 
@@ -1495,28 +2151,32 @@ fn main() -> ! {
             let _ = (apb1lenr as *const u32).read_volatile(); // readback fence
 
             let tim6 = 0x4000_1000u32;
-            let tim6_cr1  = tim6 as *mut u32;            // +0x00
-            let tim6_dier = (tim6 + 0x0C) as *mut u32;   // +0x0C
-            let tim6_egr  = (tim6 + 0x14) as *mut u32;   // +0x14
-            let tim6_psc  = (tim6 + 0x28) as *mut u32;   // +0x28
-            let tim6_arr  = (tim6 + 0x2C) as *mut u32;   // +0x2C
+            let tim6_cr1 = tim6 as *mut u32; // +0x00
+            let tim6_dier = (tim6 + 0x0C) as *mut u32; // +0x0C
+            let tim6_egr = (tim6 + 0x14) as *mut u32; // +0x14
+            let tim6_psc = (tim6 + 0x28) as *mut u32; // +0x28
+            let tim6_arr = (tim6 + 0x2C) as *mut u32; // +0x2C
 
             // Timer clock = 2 × APB1 = 200 MHz (APB1 prescaler > 1)
             // 200 MHz / (199+1) = 1 MHz tick, / (8332+1) = 120.0 Hz
             tim6_psc.write_volatile(199);
             tim6_arr.write_volatile(8332);
             tim6_dier.write_volatile(1); // UIE — update interrupt enable
-            tim6_egr.write_volatile(1);  // UG  — force load PSC/ARR shadow
+            tim6_egr.write_volatile(1); // UG  — force load PSC/ARR shadow
             // Clear any pending UIF before enabling
             let tim6_sr = (tim6 + 0x10) as *mut u32;
             tim6_sr.write_volatile(0);
-            tim6_cr1.write_volatile(1);  // CEN — start counter
+            tim6_cr1.write_volatile(1); // CEN — start counter
 
             // NVIC: enable TIM6_DAC at priority 2 (below SysTick default 0)
             use stm32h7::stm32h747cm7::Interrupt;
             cortex_m::peripheral::NVIC::unmask(Interrupt::TIM6_DAC);
             cp.NVIC.set_priority(Interrupt::TIM6_DAC, 2);
         }
+
+        runtime_serial::init(&mut cp.NVIC);
+        #[cfg(feature = "dma2d")]
+        dma2d_irq::init(&mut cp.NVIC);
 
         // Touch event state machine (coordinate transform + pointer tracking)
         // lives in the main loop, fed by the ISR ring buffer.
@@ -1557,10 +2217,17 @@ fn main() -> ! {
         impl rlvgl::core::widget::Widget for InvisibleRoot {
             fn bounds(&self) -> rlvgl::core::widget::Rect {
                 // Landscape widget space: 800 wide × 480 tall
-                rlvgl::core::widget::Rect { x: 0, y: 0, width: 800, height: 480 }
+                rlvgl::core::widget::Rect {
+                    x: 0,
+                    y: 0,
+                    width: 800,
+                    height: 480,
+                }
             }
             fn draw(&self, _renderer: &mut dyn rlvgl::core::renderer::Renderer) {}
-            fn handle_event(&mut self, _event: &Event) -> bool { false }
+            fn handle_event(&mut self, _event: &Event) -> bool {
+                false
+            }
         }
 
         let root = Rc::new(RefCell::new(WidgetNode {
@@ -1588,8 +2255,9 @@ fn main() -> ! {
             use core::cell::RefCell;
             let pending: Rc<RefCell<alloc::vec::Vec<WidgetNode>>> =
                 Rc::new(RefCell::new(alloc::vec::Vec::new()));
-            let to_remove: Rc<RefCell<alloc::vec::Vec<Rc<RefCell<dyn rlvgl::core::widget::Widget>>>>> =
-                Rc::new(RefCell::new(alloc::vec::Vec::new()));
+            let to_remove: Rc<
+                RefCell<alloc::vec::Vec<Rc<RefCell<dyn rlvgl::core::widget::Widget>>>>,
+            > = Rc::new(RefCell::new(alloc::vec::Vec::new()));
             use rlvgl::core::widget::Rect;
             use rlvgl::widgets::label::Label;
             use rlvgl_i18n::t;
@@ -1615,7 +2283,11 @@ fn main() -> ! {
             );
             let bd = SdMmcBlockDev::new(sdmmc);
 
-            serial_puts(if card_present { "SD: card in\r\n" } else { "SD: no card\r\n" });
+            serial_puts(if card_present {
+                "SD: card in\r\n"
+            } else {
+                "SD: no card\r\n"
+            });
             let sd_msg: &str = if !card_present {
                 t!("hw.sd_no_card")
             } else {
@@ -1627,35 +2299,47 @@ fn main() -> ! {
                             Ok(root_dir) => {
                                 let mut count = 0u32;
                                 #[cfg(feature = "audio")]
-                                let mut wav_name: Option<alloc::string::String> = None;
-                                root_dir.iterate_dir(|entry| {
-                                    count += 1;
-                                    #[cfg(feature = "audio")]
-                                    if wav_name.is_none() && !entry.attributes.is_directory() {
-                                        let ext = entry.name.extension();
-                                        if ext.eq_ignore_ascii_case(b"WAV") {
-                                            let base = entry.name.base_name();
-                                            let base_s = core::str::from_utf8(base).unwrap_or("");
-                                            let ext_s = core::str::from_utf8(ext).unwrap_or("");
-                                            let mut s = alloc::string::String::from(base_s.trim_end());
-                                            s.push('.');
-                                            s.push_str(ext_s.trim_end());
-                                            wav_name = Some(s);
+                                let mut wav_name: Option<
+                                    alloc::string::String,
+                                > = None;
+                                root_dir
+                                    .iterate_dir(|entry| {
+                                        count += 1;
+                                        #[cfg(feature = "audio")]
+                                        if wav_name.is_none() && !entry.attributes.is_directory() {
+                                            let ext = entry.name.extension();
+                                            if ext.eq_ignore_ascii_case(b"WAV") {
+                                                let base = entry.name.base_name();
+                                                let base_s =
+                                                    core::str::from_utf8(base).unwrap_or("");
+                                                let ext_s = core::str::from_utf8(ext).unwrap_or("");
+                                                let mut s =
+                                                    alloc::string::String::from(base_s.trim_end());
+                                                s.push('.');
+                                                s.push_str(ext_s.trim_end());
+                                                wav_name = Some(s);
+                                            }
                                         }
-                                    }
-                                }).ok();
+                                    })
+                                    .ok();
 
                                 // ── Load WAV into SDRAM and start playback ──
                                 #[cfg(feature = "audio")]
                                 if let Some(ref name) = wav_name {
                                     if let Ok(f) = root_dir.open_file_in_dir(
-                                        name.as_str(), embedded_sdmmc::Mode::ReadOnly,
+                                        name.as_str(),
+                                        embedded_sdmmc::Mode::ReadOnly,
                                     ) {
                                         let mut hdr_buf = [0u8; 256];
                                         if let Ok(hdr_len) = f.read(&mut hdr_buf) {
-                                            if let Ok(wav_hdr) = rlvgl::platform::parse_wav_header(&hdr_buf[..hdr_len]) {
+                                            if let Ok(wav_hdr) = rlvgl::platform::parse_wav_header(
+                                                &hdr_buf[..hdr_len],
+                                            ) {
                                                 let pcm_max: usize = 24 * 1024 * 1024;
-                                                let pcm_len = core::cmp::min(wav_hdr.data_length as usize, pcm_max);
+                                                let pcm_len = core::cmp::min(
+                                                    wav_hdr.data_length as usize,
+                                                    pcm_max,
+                                                );
                                                 let sdram_dst = AUDIO_PCM_BASE as *mut u8;
                                                 let mut loaded: usize = 0;
 
@@ -1675,10 +2359,12 @@ fn main() -> ! {
                                                 }
                                                 // Stream rest into SDRAM
                                                 while loaded < pcm_len && !f.is_eof() {
-                                                    let chunk = core::cmp::min(pcm_len - loaded, 4096);
+                                                    let chunk =
+                                                        core::cmp::min(pcm_len - loaded, 4096);
                                                     let dst = unsafe {
                                                         core::slice::from_raw_parts_mut(
-                                                            sdram_dst.add(loaded), chunk,
+                                                            sdram_dst.add(loaded),
+                                                            chunk,
                                                         )
                                                     };
                                                     match f.read(dst) {
@@ -1691,19 +2377,36 @@ fn main() -> ! {
                                                 // Pre-fill DMA double-buffers
                                                 let buf_sz = 4096usize;
                                                 let fill0 = core::cmp::min(buf_sz, loaded);
-                                                let fill1 = core::cmp::min(buf_sz, loaded.saturating_sub(buf_sz));
+                                                let fill1 = core::cmp::min(
+                                                    buf_sz,
+                                                    loaded.saturating_sub(buf_sz),
+                                                );
                                                 unsafe {
                                                     let buf0 = 0xD048_0000u32 as *mut u8;
                                                     let buf1 = 0xD048_1000u32 as *mut u8;
-                                                    core::ptr::copy_nonoverlapping(sdram_dst, buf0, fill0);
+                                                    core::ptr::copy_nonoverlapping(
+                                                        sdram_dst, buf0, fill0,
+                                                    );
                                                     if fill0 < buf_sz {
-                                                        core::ptr::write_bytes(buf0.add(fill0), 0, buf_sz - fill0);
+                                                        core::ptr::write_bytes(
+                                                            buf0.add(fill0),
+                                                            0,
+                                                            buf_sz - fill0,
+                                                        );
                                                     }
                                                     if fill1 > 0 {
-                                                        core::ptr::copy_nonoverlapping(sdram_dst.add(buf_sz), buf1, fill1);
+                                                        core::ptr::copy_nonoverlapping(
+                                                            sdram_dst.add(buf_sz),
+                                                            buf1,
+                                                            fill1,
+                                                        );
                                                     }
                                                     if fill1 < buf_sz {
-                                                        core::ptr::write_bytes(buf1.add(fill1), 0, buf_sz - fill1);
+                                                        core::ptr::write_bytes(
+                                                            buf1.add(fill1),
+                                                            0,
+                                                            buf_sz - fill1,
+                                                        );
                                                     }
                                                     cortex_m::asm::dsb();
                                                 }
@@ -1716,7 +2419,11 @@ fn main() -> ! {
                                     }
                                 }
 
-                                if count > 0 { t!("hw.sd_mounted_ok") } else { t!("hw.sd_empty") }
+                                if count > 0 {
+                                    t!("hw.sd_mounted_ok")
+                                } else {
+                                    t!("hw.sd_empty")
+                                }
                             }
                             Err(_) => t!("hw.sd_root_dir_failed"),
                         }
@@ -1727,7 +2434,12 @@ fn main() -> ! {
 
             let label = Label::new(
                 sd_msg,
-                Rect { x: 10, y: 70, width: 260, height: 16 },
+                Rect {
+                    x: 10,
+                    y: 70,
+                    width: 260,
+                    height: 16,
+                },
             );
             let node = rlvgl::core::WidgetNode {
                 widget: Rc::new(RefCell::new(label)),
@@ -1737,41 +2449,12 @@ fn main() -> ! {
             rlvgl_app_demo::flush_pending(&root, &pending, &to_remove);
         }
 
-        // ── USART1 serial helper (115200 8N1 already configured above) ──
-        fn serial_puts(s: &str) {
-            const USART1_ISR: *const u32 = 0x4001_101C as *const u32;
-            const USART1_TDR: *mut u32 = 0x4001_1028 as *mut u32;
-            for b in s.bytes() {
-                unsafe {
-                    while USART1_ISR.read_volatile() & (1 << 7) == 0 {} // TXE
-                    USART1_TDR.write_volatile(b as u32);
-                }
-            }
-        }
-
-        /// Print a u32 as decimal over serial.
-        fn serial_dec(mut v: u32) {
-            if v == 0 { serial_puts("0"); return; }
-            let mut buf = [0u8; 10];
-            let mut i = 0;
-            while v > 0 {
-                buf[i] = b'0' + (v % 10) as u8;
-                v /= 10;
-                i += 1;
-            }
-            while i > 0 {
-                i -= 1;
-                let s = unsafe { core::str::from_utf8_unchecked(core::slice::from_ref(&buf[i])) };
-                serial_puts(s);
-            }
-        }
-
         // ── EventWindow widget (replaces direct-framebuffer toasts) ──────
         use alloc::rc::Rc;
         use core::cell::RefCell;
         use rlvgl::core::bitmap_font::FONT_6X10;
+        use rlvgl::platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
         use rlvgl::ui::EventWindowBuilder;
-        use rlvgl::platform::blit::{BlitterRenderer, RotatedRenderer, Surface, PixelFmt};
         use rlvgl_i18n::t;
 
         let event_win = Rc::new(RefCell::new(
@@ -1794,25 +2477,28 @@ fn main() -> ! {
         // buffer into it.
         let (w_fb, h_fb) = display.dimensions();
 
-        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001); }
+        unsafe {
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001);
+        }
         // ── RLE decode helper ─────────────────────────────────────────────
         fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
-            let (w, h, pal_bytes, stream) =
-                rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
+            let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
             let pal_count = pal_bytes.len() / 2;
             let mut palette = alloc::vec![0u16; pal_count];
             for i in 0..pal_count {
                 palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
-            let rgba = rlvgl_decomp::decode_rgba(
-                w as usize, h as usize, &palette, stream,
-            ).expect("RLE decode");
+            let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
+                .expect("RLE decode");
             (w as u32, h as u32, rgba)
         }
 
-        fn decode_rle_colors(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<rlvgl::core::widget::Color>) {
+        fn decode_rle_colors(
+            blob: &[u8],
+        ) -> (u32, u32, alloc::vec::Vec<rlvgl::core::widget::Color>) {
             let (w, h, rgba) = decode_rle(blob);
-            let colors = rgba.chunks_exact(4)
+            let colors = rgba
+                .chunks_exact(4)
                 .map(|c| rlvgl::core::widget::Color(c[0], c[1], c[2], c[3]))
                 .collect();
             (w, h, colors)
@@ -1842,9 +2528,9 @@ fn main() -> ! {
         let info_wing = {
             use crate::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
-                (include_bytes!("../assets/icons/48/cpu48.rle"), true),      // Chip info
-                (include_bytes!("../assets/icons/48/monitor48.rle"), true),  // Live stats
-                (include_bytes!("../assets/icons/48/play48.rle"), true),     // Star crawl
+                (include_bytes!("../assets/icons/48/cpu48.rle"), true), // Chip info
+                (include_bytes!("../assets/icons/48/monitor48.rle"), true), // Live stats
+                (include_bytes!("../assets/icons/48/play48.rle"), true), // Star crawl
             ])))
         };
 
@@ -1861,7 +2547,12 @@ fn main() -> ! {
             let cur_locale = rlvgl_i18n::locale() as u8;
             let ew_clone = event_win.clone();
             let cm = crate::config_menu::ConfigMenu::new(
-                rlvgl::core::widget::Rect { x: 0, y: 0, width: 0, height: 0 }, // gear bounds unused
+                rlvgl::core::widget::Rect {
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                }, // gear bounds unused
                 cur_locale,
                 &UI_FONT,
             )
@@ -1881,22 +2572,28 @@ fn main() -> ! {
             #[cfg(feature = "audio")]
             {
                 let sf = scope_flag.clone();
-                settings_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
-                    Some(alloc::boxed::Box::new(move |_| {
-                        sf.set(true);
-                    }));
+                settings_wing.borrow_mut().slots_mut()[0]
+                    .as_mut()
+                    .unwrap()
+                    .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                    sf.set(true);
+                }));
             }
             // Globe (slot 3) + Bug (slot 4): both toggle the config menu
             let cm1 = config_menu.clone();
-            settings_wing.borrow_mut().slots_mut()[3].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    cm1.borrow_mut().toggle_visible();
-                }));
+            settings_wing.borrow_mut().slots_mut()[3]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                cm1.borrow_mut().toggle_visible();
+            }));
             let cm2 = config_menu.clone();
-            settings_wing.borrow_mut().slots_mut()[4].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    cm2.borrow_mut().toggle_visible();
-                }));
+            settings_wing.borrow_mut().slots_mut()[4]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                cm2.borrow_mut().toggle_visible();
+            }));
         }
 
         // ADC3 temp init deferred — calibration hangs without further debug
@@ -1922,31 +2619,37 @@ fn main() -> ! {
         // Slot 0 (cpu): toggle chip info panel
         {
             let cip = chip_info_panel.clone();
-            info_wing.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    cip.borrow_mut().toggle();
-                }));
+            info_wing.borrow_mut().slots_mut()[0]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                cip.borrow_mut().toggle();
+            }));
         }
         // Slot 1 (favicon): toggle live stats panel
         {
             let lsp = live_stats_panel.clone();
-            info_wing.borrow_mut().slots_mut()[1].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    lsp.borrow_mut().toggle();
-                }));
+            info_wing.borrow_mut().slots_mut()[1]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                lsp.borrow_mut().toggle();
+            }));
         }
         // Slot 2 (play): trigger star wars crawl
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         {
             let cf = crawl_flag.clone();
-            info_wing.borrow_mut().slots_mut()[2].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    cf.set(true);
-                }));
+            info_wing.borrow_mut().slots_mut()[2]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                cf.set(true);
+            }));
         }
 
         {
-            use crate::icon_strip::{IconStrip, IconSlot};
+            use crate::icon_strip::{IconSlot, IconStrip};
 
             let mut strip = IconStrip::new(
                 730, // x position
@@ -1962,34 +2665,47 @@ fn main() -> ! {
             ];
 
             for (i, (rle, enabled)) in icons.iter().enumerate() {
-                strip.set_slot(i, IconSlot {
-                    rle,
-                    enabled: *enabled,
-                    on_tap: None,
-                });
+                strip.set_slot(
+                    i,
+                    IconSlot {
+                        rle,
+                        enabled: *enabled,
+                        on_tap: None,
+                    },
+                );
             }
 
             // Settings tap (slot 0) → close info wing, toggle settings wing
             let sw = settings_wing.clone();
             let iw = info_wing.clone();
-            strip.slots_mut()[0].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
-                iw.borrow_mut().close();
-                let vis = sw.borrow_mut().toggle_visible();
-                unsafe { (0x3800_06A0u32 as *mut u32).write_volatile(
-                    if vis { 0x5E77_0001 } else { 0x5E77_0000 }
-                ); }
-            }));
+            strip.slots_mut()[0].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    iw.borrow_mut().close();
+                    let vis = sw.borrow_mut().toggle_visible();
+                    unsafe {
+                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis {
+                            0x5E77_0001
+                        } else {
+                            0x5E77_0000
+                        });
+                    }
+                }));
 
             // Info tap (slot 2) → close settings wing, toggle info wing
             let sw2 = settings_wing.clone();
             let iw2 = info_wing.clone();
-            strip.slots_mut()[2].as_mut().unwrap().on_tap = Some(alloc::boxed::Box::new(move |_| {
-                sw2.borrow_mut().close();
-                let vis = iw2.borrow_mut().toggle_visible();
-                unsafe { (0x3800_06A4u32 as *mut u32).write_volatile(
-                    if vis { 0x1AF0_0001 } else { 0x1AF0_0000 }
-                ); }
-            }));
+            strip.slots_mut()[2].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    sw2.borrow_mut().close();
+                    let vis = iw2.borrow_mut().toggle_visible();
+                    unsafe {
+                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis {
+                            0x1AF0_0001
+                        } else {
+                            0x1AF0_0000
+                        });
+                    }
+                }));
 
             // Overlays dispatched first so they receive events when visible.
             // Config menu (highest priority — modal)
@@ -2023,7 +2739,9 @@ fn main() -> ! {
         }
 
         serial_puts("PRE-FB2\r\n");
-        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); }
+        unsafe {
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003);
+        }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
         if display.back_buffer_addr() == display.front_buffer_addr() {
@@ -2054,20 +2772,24 @@ fn main() -> ! {
                 palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
             let fb0 = unsafe {
-                core::slice::from_raw_parts_mut(
-                    display.front_buffer_addr() as *mut u8, fb_bytes,
-                )
+                core::slice::from_raw_parts_mut(display.front_buffer_addr() as *mut u8, fb_bytes)
             };
             let _ = rlvgl_decomp::decode_argb_into(
-                dw as usize, dh as usize, &palette[..pal_count], stream, fb0,
+                dw as usize,
+                dh as usize,
+                &palette[..pal_count],
+                stream,
+                fb0,
             );
             let fb1 = unsafe {
-                core::slice::from_raw_parts_mut(
-                    display.back_buffer_addr() as *mut u8, fb_bytes,
-                )
+                core::slice::from_raw_parts_mut(display.back_buffer_addr() as *mut u8, fb_bytes)
             };
             let _ = rlvgl_decomp::decode_argb_into(
-                dw as usize, dh as usize, &palette[..pal_count], stream, fb1,
+                dw as usize,
+                dh as usize,
+                &palette[..pal_count],
+                stream,
+                fb1,
             );
             cortex_m::asm::dsb();
             serial_puts("DESKTOP: decoded into both FBs\r\n");
@@ -2100,20 +2822,26 @@ fn main() -> ! {
         #[cfg(feature = "cpu_stats")]
         let mut cpu_stats = {
             let mut s = cpu_stats::CpuStats::new();
-            unsafe { s.enable_dwt(); }
+            unsafe {
+                s.enable_dwt();
+            }
             s
         };
 
         // D3 breadcrumb: entering main loop
-        unsafe { (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); }
-        unsafe { (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004); }
+        unsafe {
+            (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001);
+        }
+        unsafe {
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004);
+        }
         serial_puts("rlvgl: input proof loop started\r\n");
 
         // No boot discard — splash delay removed, pins are stable by now.
         let _btn_discard: u32 = 0;
 
         // ── Gesture recognizers ───────────────────────────────────────────
-        use rlvgl::platform::gesture::{TapRecognizer, DoubleTapRecognizer};
+        use rlvgl::platform::gesture::{DoubleTapRecognizer, TapRecognizer};
         let mut tap = TapRecognizer::new(FRAME_HZ);
         let mut dtap = DoubleTapRecognizer::new(FRAME_HZ);
 
@@ -2150,24 +2878,8 @@ fn main() -> ! {
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
         serial_puts("MAIN LOOP START\r\n");
-
-        // ── Serial command RX buffer ──────────────────────────────────────
-        // Protocol: "T<x>,<y>\n" injects a tap at (x,y)
-        //           "?\n" prints tick count + status
-        const USART1_ISR: *const u32 = 0x4001_101Cu32 as *const u32;
-        const USART1_RDR: *const u32 = 0x4001_1024u32 as *const u32;
-        let mut serial_buf = [0u8; 32];
-        let mut serial_len: usize = 0;
-
-        /// Parse "T<x>,<y>" from buffer. Returns Some((x,y)) on success.
-        fn parse_tap(buf: &[u8]) -> Option<(i32, i32)> {
-            if buf.is_empty() || buf[0] != b'T' { return None; }
-            let s = core::str::from_utf8(&buf[1..]).ok()?;
-            let mut parts = s.split(',');
-            let x: i32 = parts.next()?.trim().parse().ok()?;
-            let y: i32 = parts.next()?.trim().parse().ok()?;
-            Some((x, y))
-        }
+        let mut serial_task = SerialTask::new();
+        let mut present_count: u32 = 0;
 
         let mut dirty_frames: u8 = 4; // force initial render
         // Pipelined render state: decouple render from present.
@@ -2178,6 +2890,7 @@ fn main() -> ! {
         let mut was_visible = false;
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
+        let mut loop_count: u32 = 0;
 
         // Save-under compositor: saves fb pixels when overlays open,
         // restores when they close.
@@ -2192,8 +2905,7 @@ fn main() -> ! {
         let mut star_crawl = {
             use rlvgl::core::packed_font::PackedFont;
 
-            static BOLD_FONT_DATA: &[u8] =
-                include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
+            static BOLD_FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
             static BOLD_FONT: PackedFont = PackedFont {
                 height: 32,
                 ascent: 30,
@@ -2232,6 +2944,7 @@ fn main() -> ! {
         let mut pcm_frame_count: usize = 0;
 
         loop {
+            loop_count = loop_count.wrapping_add(1);
             // Loop heartbeat
             unsafe {
                 let prev = (0x3800_0660u32 as *const u32).read_volatile();
@@ -2251,7 +2964,11 @@ fn main() -> ! {
             {
                 use rlvgl::platform::audio_player::PollResult;
                 match audio_player.poll() {
-                    PollResult::NeedRefill { buf, file_offset: _, max_bytes } => {
+                    PollResult::NeedRefill {
+                        buf,
+                        file_offset: _,
+                        max_bytes,
+                    } => {
                         let pcm_base = AUDIO_PCM_BASE as *const u8;
                         let cursor = audio_read_cursor;
                         let remaining = audio_pcm_len.saturating_sub(cursor) as usize;
@@ -2285,9 +3002,13 @@ fn main() -> ! {
             if audio_scope.is_active() {
                 if let Some(buf_idx) = mic_capture.poll_ready() {
                     let pdm_buf: &[u16] = if buf_idx == 0 {
-                        unsafe { core::slice::from_raw_parts(PDM_BUF0_ADDR as *const u16, PDM_BUF_LEN) }
+                        unsafe {
+                            core::slice::from_raw_parts(PDM_BUF0_ADDR as *const u16, PDM_BUF_LEN)
+                        }
                     } else {
-                        unsafe { core::slice::from_raw_parts(PDM_BUF1_ADDR as *const u16, PDM_BUF_LEN) }
+                        unsafe {
+                            core::slice::from_raw_parts(PDM_BUF1_ADDR as *const u16, PDM_BUF_LEN)
+                        }
                     };
                     let pcm_out = unsafe {
                         core::slice::from_raw_parts_mut(PCM_OUT_ADDR as *mut i16, PCM_OUT_LEN)
@@ -2303,11 +3024,28 @@ fn main() -> ! {
                 }
             }
 
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            {
+                let dma_errors = dma2d_irq::take_error();
+                if dma_errors != 0 {
+                    serial_puts("DMA2D:error ");
+                    serial_hex_u32(dma_errors);
+                    serial_puts("\r\n");
+                    star_crawl.drop_frame();
+                    buffer_ready = false;
+                    if star_crawl.is_active() {
+                        render_active = true;
+                    }
+                }
+            }
+
             // ── Drain touch ring buffer ──
             // TIM6 ISR samples FT5336 at 120 Hz; we drain all queued samples
             // and run the coordinate transform + event state machine here.
             while let Some(sample) = unsafe { touch_ring_pop() } {
-                use rlvgl::core::event::{TouchPoint, TouchState as EvtTouchState, MAX_TOUCH_POINTS};
+                use rlvgl::core::event::{
+                    MAX_TOUCH_POINTS, TouchPoint, TouchState as EvtTouchState,
+                };
                 let dw = touch_state.display_width as i32;
                 let count = sample.count;
                 let raw = &sample.points;
@@ -2344,9 +3082,8 @@ fn main() -> ! {
                     };
                     let was_multi = touch_state.last_count >= 2;
                     touch_state.last_count = count;
-                    let to_landscape = |px: u16, py: u16| -> (i32, i32) {
-                        (py as i32, dw - 1 - px as i32)
-                    };
+                    let to_landscape =
+                        |px: u16, py: u16| -> (i32, i32) { (py as i32, dw - 1 - px as i32) };
                     match (touch, touch_state.last) {
                         (Some((x, y)), Some((lx, ly))) => {
                             touch_state.last = Some((x, y));
@@ -2375,176 +3112,104 @@ fn main() -> ! {
                 };
 
                 if let Some(evt) = evt {
-                // While crawl is active, consume all touch events.
-                // PointerDown deactivates; everything else is suppressed.
-                let mut consumed = false;
-                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                if star_crawl.is_active() {
-                    if matches!(&evt, Event::PointerDown { .. }) {
-                        star_crawl.deactivate();
-                        serial_puts("CRAWL:touch_exit\r\n");
-                        // Full screen restore from pristine desktop.
-                        let (cw, ch) = display.dimensions();
-                        compositor.mark_pristine_restore(
-                            rlvgl_core::widget::Rect { x: 0, y: 0, width: ch as i32, height: cw as i32 },
-                        );
-                        dirty_frames = 4;
+                    // While crawl is active, consume all touch events.
+                    // PointerDown deactivates; everything else is suppressed.
+                    let mut consumed = false;
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    if star_crawl.is_active() {
+                        if matches!(&evt, Event::PointerDown { .. }) {
+                            star_crawl.deactivate();
+                            serial_puts("CRAWL:touch_exit\r\n");
+                            // Full screen restore from pristine desktop.
+                            let (cw, ch) = display.dimensions();
+                            compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                x: 0,
+                                y: 0,
+                                width: ch as i32,
+                                height: cw as i32,
+                            });
+                            dirty_frames = 4;
+                        }
+                        consumed = true; // suppress ALL events during crawl
                     }
-                    consumed = true; // suppress ALL events during crawl
-                }
 
-                if !consumed {
-                // Log to telemetry + event window
-                match &evt {
-                    Event::PointerDown { x, y } => {
-                        telem_log(tick_count, 0x01, *x, *y);
-                        event_win.borrow_mut().push_event(
-                            t!("hw.touch", x = *x, y = *y),
-                        );
-                        dirty_frames = dirty_frames.max(2);
-                        evt_count += 1;
-                    }
-                    Event::PointerUp { x, y } => {
-                        telem_log(tick_count, 0x02, *x, *y);
-                        evt_count += 1;
-                    }
-                    _ => {}
-                }
-
-                // Feed to gesture recognizer → double-tap → dispatch to widgets
-                if let Some(gesture) = tap.process(&evt) {
-                    let (e1, e2) = dtap.process(&gesture);
-                    for ge in [e1, e2].into_iter().flatten() {
-                        match &ge {
-                            Event::PressDown { x, y } => telem_log(tick_count, 0x03, *x, *y),
-                            Event::PressRelease { x, y } => {
-                                telem_log(tick_count, 0x04, *x, *y);
+                    if !consumed {
+                        // Log to telemetry + event window
+                        match &evt {
+                            Event::PointerDown { x, y } => {
+                                telem_log(tick_count, 0x01, *x, *y);
+                                event_win
+                                    .borrow_mut()
+                                    .push_event(t!("hw.touch", x = *x, y = *y));
+                                dirty_frames = dirty_frames.max(2);
+                                evt_count += 1;
                             }
-                            Event::DoubleTap { x, y } => telem_log(tick_count, 0x05, *x, *y),
+                            Event::PointerUp { x, y } => {
+                                telem_log(tick_count, 0x02, *x, *y);
+                                evt_count += 1;
+                            }
                             _ => {}
                         }
-                        dirty_frames = 2;
-                        root.borrow_mut().dispatch_event(&ge);
-                    }
-                }
-            } // if !consumed
-            } // if let Some(evt)
+
+                        // Feed to gesture recognizer → double-tap → dispatch to widgets
+                        if let Some(gesture) = tap.process(&evt) {
+                            let (e1, e2) = dtap.process(&gesture);
+                            for ge in [e1, e2].into_iter().flatten() {
+                                match &ge {
+                                    Event::PressDown { x, y } => {
+                                        telem_log(tick_count, 0x03, *x, *y)
+                                    }
+                                    Event::PressRelease { x, y } => {
+                                        telem_log(tick_count, 0x04, *x, *y);
+                                    }
+                                    Event::DoubleTap { x, y } => {
+                                        telem_log(tick_count, 0x05, *x, *y)
+                                    }
+                                    _ => {}
+                                }
+                                dirty_frames = 2;
+                                root.borrow_mut().dispatch_event(&ge);
+                            }
+                        }
+                    } // if !consumed
+                } // if let Some(evt)
             } // while touch_ring_pop
 
-            // ── Serial RX command injection ──
-            // Drain USART1 RX FIFO, accumulate into serial_buf, dispatch on '\n'
-            unsafe {
-                let rxne = USART1_ISR.read_volatile() & (1 << 5) != 0;
-                // Debug: log first RX byte detection
-                static mut RX_DBG: bool = false;
-                if rxne && !RX_DBG {
-                    serial_puts("RX!\r\n");
-                    RX_DBG = true;
+            let serial_start = {
+                #[cfg(feature = "cpu_stats")]
+                {
+                    cpu_stats.cyccnt()
                 }
-                while USART1_ISR.read_volatile() & (1 << 5) != 0 { // RXNE
-                    let byte = (USART1_RDR.read_volatile() & 0xFF) as u8;
-                    if byte == b'\n' || byte == b'\r' {
-                        if serial_len > 0 {
-                            let cmd = &serial_buf[..serial_len];
-                            serial_puts("CMD:");
-                            serial_puts(core::str::from_utf8(&serial_buf[..serial_len]).unwrap_or("?"));
-                            serial_puts("\r\n");
-                            if cmd[0] == b'?' {
-                                // Status query: print tick count
-                                serial_puts("tick=");
-                                // Quick decimal print of tick_count
-                                let mut tbuf = [0u8; 10];
-                                let mut ti = 0;
-                                let mut tv = tick_count;
-                                if tv == 0 { serial_puts("0"); }
-                                else {
-                                    while tv > 0 { tbuf[ti] = b'0' + (tv % 10) as u8; tv /= 10; ti += 1; }
-                                    for &b in tbuf[..ti].iter().rev() {
-                                        let s = [b];
-                                        serial_puts(core::str::from_utf8_unchecked(&s));
-                                    }
-                                }
-                                serial_puts("\r\n");
-                            } else if let Some((x, y)) = parse_tap(cmd) {
-                                // Inject synthetic tap: PressDown + PressRelease
-                                serial_puts("TAP ");
-                                let tap_evt = Event::PressRelease { x, y };
-                                dirty_frames = 2;
-                                root.borrow_mut().dispatch_event(&tap_evt);
-                                serial_puts("OK\r\n");
-                            } else if cmd[0] == b'D' || cmd[0] == b'd' {
-                                serial_puts("D:GOT\r\n");
-                                // Dump framebuffer window: D<x>,<y>,<w>,<h>[,<frames>]
-                                // Coords in landscape widget space. Output: hex ARGB per pixel, one row per line.
-                                // Reads from the FRONT buffer (what the display is showing).
-                                let parts: [i32; 5] = {
-                                    let mut p = [0i32; 5];
-                                    p[4] = 1; // default 1 frame
-                                    let mut pi = 0;
-                                    let mut val: i32 = 0;
-                                    let mut has = false;
-                                    for &b in &cmd[1..] {
-                                        if b == b',' {
-                                            if has && pi < 5 { p[pi] = val; pi += 1; }
-                                            val = 0; has = false;
-                                        } else if b >= b'0' && b <= b'9' {
-                                            val = val * 10 + (b - b'0') as i32;
-                                            has = true;
-                                        }
-                                    }
-                                    if has && pi < 5 { p[pi] = val; }
-                                    p
-                                };
-                                let (wx, wy, ww, wh, nframes) = (parts[0], parts[1], parts[2].max(1).min(40), parts[3].max(1).min(40), parts[4].max(1).min(4));
-                                serial_puts("DUMP ");
-                                for frame in 0..nframes {
-                                    if frame > 0 {
-                                        // Wait for next present by spinning until tick advances
-                                        let t0 = tick_count;
-                                        while tick_count == t0 { cortex_m::asm::nop(); }
-                                    }
-                                    let fb = display.front_buffer_addr() as *const u8;
-                                    let fb_stride = (display.dimensions().0 * 4) as usize;
-                                    let fb_w = display.dimensions().0 as i32;
-                                    serial_puts("F");
-                                    // For each landscape pixel (wx+col, wy+row), compute portrait coords
-                                    for row in 0..wh {
-                                        for col in 0..ww {
-                                            let px = fb_w - 1 - (wy + row);
-                                            let py = wx + col;
-                                            if px >= 0 && py >= 0 {
-                                                let off = py as usize * fb_stride + px as usize * 4;
-                                                let argb = (fb.add(off) as *const u32).read_volatile();
-                                                // Print as 8-char hex
-                                                let hex = b"0123456789ABCDEF";
-                                                let mut hb = [0u8; 8];
-                                                for i in 0..8 {
-                                                    hb[7 - i] = hex[((argb >> (i * 4)) & 0xF) as usize];
-                                                }
-                                                serial_puts(core::str::from_utf8_unchecked(&hb));
-                                                if col < ww - 1 { serial_puts(" "); }
-                                            }
-                                        }
-                                        serial_puts("\r\n");
-                                    }
-                                }
-                                serial_puts("END\r\n");
-                            } else if cmd[0] == b'C' || cmd[0] == b'c' {
-                                // Toggle star crawl
-                                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                                crawl_flag.set(true);
-                                serial_puts("CRAWL:toggled\r\n");
-                            } else {
-                                serial_puts("ERR: unknown cmd\r\n");
-                            }
-                            serial_len = 0;
-                        }
-                    } else if serial_len < serial_buf.len() {
-                        serial_buf[serial_len] = byte;
-                        serial_len += 1;
+                #[cfg(not(feature = "cpu_stats"))]
+                {
+                    0
+                }
+            };
+            serial_task.poll(
+                tick_count,
+                present_count,
+                display.front_buffer_addr(),
+                display.dimensions().0,
+                |action| match action {
+                    SerialAction::InjectTap(x, y) => {
+                        let tap_evt = Event::PressRelease { x, y };
+                        dirty_frames = 2;
+                        root.borrow_mut().dispatch_event(&tap_evt);
                     }
-                }
-            }
+                    SerialAction::ToggleCrawl => {
+                        #[cfg(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        ))]
+                        crawl_flag.set(true);
+                    }
+                },
+            );
+            #[cfg(feature = "cpu_stats")]
+            cpu_stats.record_serial_cycles(cpu_stats.cyccnt().wrapping_sub(serial_start));
 
             // ── Poll button (PC13 — the one with the pole) ──
             if let Some(evt) = button_input.poll() {
@@ -2558,9 +3223,9 @@ fn main() -> ! {
                 }
                 if matches!(evt, Event::KeyDown { .. }) {
                     serial_puts("BTN: PRESS\r\n");
-                    event_win.borrow_mut().push_event(
-                        alloc::string::String::from(t!("hw.btn_press")),
-                    );
+                    event_win
+                        .borrow_mut()
+                        .push_event(alloc::string::String::from(t!("hw.btn_press")));
                     dirty_frames = 2;
                     evt_count += 1;
                 }
@@ -2571,10 +3236,17 @@ fn main() -> ! {
             if let Some(evt) = joystick.poll() {
                 unsafe {
                     let code: u32 = match &evt {
-                        Event::KeyDown { key } => 0x4A00_0000 | match key {
-                            Key::Enter => 1, Key::ArrowUp => 2, Key::ArrowDown => 3,
-                            Key::ArrowLeft => 4, Key::ArrowRight => 5, _ => 0xFF,
-                        },
+                        Event::KeyDown { key } => {
+                            0x4A00_0000
+                                | match key {
+                                    Key::Enter => 1,
+                                    Key::ArrowUp => 2,
+                                    Key::ArrowDown => 3,
+                                    Key::ArrowLeft => 4,
+                                    Key::ArrowRight => 5,
+                                    _ => 0xFF,
+                                }
+                        }
                         Event::KeyUp { .. } => 0x4A00_8000,
                         _ => 0x4A00_FFFF,
                     };
@@ -2591,9 +3263,9 @@ fn main() -> ! {
                     };
                     serial_puts(label);
                     serial_puts("\r\n");
-                    event_win.borrow_mut().push_event(
-                        alloc::string::String::from(label),
-                    );
+                    event_win
+                        .borrow_mut()
+                        .push_event(alloc::string::String::from(label));
                     dirty_frames = 2;
                     evt_count += 1;
                 }
@@ -2603,16 +3275,22 @@ fn main() -> ! {
             // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
                 #[cfg(feature = "cpu_stats")]
-                cpu_stats.frame_start();
+                {
+                    cpu_stats.record_loop_count(loop_count);
+                    cpu_stats.frame_start();
+                }
+                #[cfg(not(feature = "cpu_stats"))]
+                let _ = loop_count;
+                loop_count = 0;
                 // Advance gesture settle timer → may emit PressRelease
                 if let Some(gesture) = tap.tick() {
                     let (e1, e2) = dtap.process(&gesture);
                     for ge in [e1, e2].into_iter().flatten() {
                         if let Event::PressRelease { x, y } = &ge {
                             telem_log(tick_count, 0x14, *x, *y);
-                            event_win.borrow_mut().push_event(
-                                t!("hw.touch", x = *x, y = *y),
-                            );
+                            event_win
+                                .borrow_mut()
+                                .push_event(t!("hw.touch", x = *x, y = *y));
                         }
                         dirty_frames = 4;
                         root.borrow_mut().dispatch_event(&ge);
@@ -2665,7 +3343,9 @@ fn main() -> ! {
                     if !sw_vis {
                         compositor.mark_pristine_restore(settings_wing.borrow().bounds());
                     }
-                    unsafe { SW_WAS_VISIBLE = sw_vis; }
+                    unsafe {
+                        SW_WAS_VISIBLE = sw_vis;
+                    }
                 }
                 let iw_vis = info_wing.borrow().is_visible();
                 static mut IW_WAS_VISIBLE: bool = false;
@@ -2674,7 +3354,9 @@ fn main() -> ! {
                     if !iw_vis {
                         compositor.mark_pristine_restore(info_wing.borrow().bounds());
                     }
-                    unsafe { IW_WAS_VISIBLE = iw_vis; }
+                    unsafe {
+                        IW_WAS_VISIBLE = iw_vis;
+                    }
                 }
                 // ADC3 temperature read disabled until init is fixed
                 // unsafe {
@@ -2699,7 +3381,9 @@ fn main() -> ! {
                         if !vis {
                             compositor.mark_pristine_restore(chip_info_panel.borrow().bounds());
                         }
-                        unsafe { CIP_WAS_VIS = vis; }
+                        unsafe {
+                            CIP_WAS_VIS = vis;
+                        }
                     }
                 }
                 // Track live stats panel visibility
@@ -2711,7 +3395,9 @@ fn main() -> ! {
                         if !vis {
                             compositor.mark_pristine_restore(live_stats_panel.borrow().bounds());
                         }
-                        unsafe { LSP_WAS_VIS = vis; }
+                        unsafe {
+                            LSP_WAS_VIS = vis;
+                        }
                     }
                 }
                 // Live stats refresh (~2 Hz) — skip first frame after becoming visible
@@ -2719,7 +3405,9 @@ fn main() -> ! {
                     let lsp_now = live_stats_panel.borrow().is_visible();
                     static mut LSP_PREV_VIS: bool = false;
                     let was = unsafe { LSP_PREV_VIS };
-                    unsafe { LSP_PREV_VIS = lsp_now; }
+                    unsafe {
+                        LSP_PREV_VIS = lsp_now;
+                    }
                     if lsp_now && was {
                         let heap_used = ALLOC.used();
                         let heap_total = heap_used + ALLOC.free();
@@ -2732,8 +3420,13 @@ fn main() -> ! {
                         let cpu_snap: Option<sys_info::CpuSnapshot> = None;
                         let refreshed = {
                             let mut lsp = live_stats_panel.borrow_mut();
-                            lsp.refresh(tick_count, heap_used, heap_total,
-                                        unsafe { CACHED_TEMP_X10 }, cpu_snap.as_ref())
+                            lsp.refresh(
+                                tick_count,
+                                heap_used,
+                                heap_total,
+                                unsafe { CACHED_TEMP_X10 },
+                                cpu_snap.as_ref(),
+                            )
                         };
                         if refreshed {
                             dirty_frames = dirty_frames.max(2);
@@ -2755,18 +3448,26 @@ fn main() -> ! {
                                 compositor.mark_pristine_restore(b);
                             }
                         }
-                        unsafe { CM_WAS = cm_vis; }
+                        unsafe {
+                            CM_WAS = cm_vis;
+                        }
                     }
-                    if cm_vis { dirty_frames = dirty_frames.max(2); }
+                    if cm_vis {
+                        dirty_frames = dirty_frames.max(2);
+                    }
                 }
                 // Event viewer visible → keep rendering (scrolling text, expiry)
-                if vis { dirty_frames = dirty_frames.max(2); }
+                if vis {
+                    dirty_frames = dirty_frames.max(2);
+                }
 
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
                 let ec = entry_count;
                 if ec != unsafe { LAST_ENTRY_COUNT } {
-                    unsafe { LAST_ENTRY_COUNT = ec; }
+                    unsafe {
+                        LAST_ENTRY_COUNT = ec;
+                    }
                     dirty_frames = 2;
                 }
                 // Keep rendering while restores are pending
@@ -2792,10 +3493,12 @@ fn main() -> ! {
                         }
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            blitter.enable_tc_interrupt();
                             serial_puts("CRAWL:activate()\r\n");
                             star_crawl.activate(&mut blitter);
                             serial_puts("CRAWL:active!\r\n");
                             display.return_dma2d_raw(blitter.into_inner());
+                            render_active = true;
                         } else {
                             serial_puts("CRAWL:no dma2d!\r\n");
                         }
@@ -2812,24 +3515,43 @@ fn main() -> ! {
                         dirty_frames = 4; // restore desktop
                     } else {
                         // Deactivate star crawl if active (shared SDRAM region)
-                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                        #[cfg(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        ))]
                         if star_crawl.is_active() {
                             star_crawl.deactivate();
                         }
                         mic_capture.init(
-                            unsafe { core::slice::from_raw_parts_mut(PDM_BUF0_ADDR as *mut u16, PDM_BUF_LEN) },
-                            unsafe { core::slice::from_raw_parts_mut(PDM_BUF1_ADDR as *mut u16, PDM_BUF_LEN) },
-                            64, 1, 37,
+                            unsafe {
+                                core::slice::from_raw_parts_mut(
+                                    PDM_BUF0_ADDR as *mut u16,
+                                    PDM_BUF_LEN,
+                                )
+                            },
+                            unsafe {
+                                core::slice::from_raw_parts_mut(
+                                    PDM_BUF1_ADDR as *mut u16,
+                                    PDM_BUF_LEN,
+                                )
+                            },
+                            64,
+                            1,
+                            37,
                         );
                         mic_capture.start();
                         pcm_frame_count = 0;
                         audio_scope.activate();
+                        render_active = true;
                     }
                 }
 
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_active = star_crawl.is_active();
-                #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+                #[cfg(not(all(
+                    feature = "dma2d",
+                    any(target_arch = "arm", target_arch = "aarch64")
+                )))]
                 let crawl_active = false;
 
                 #[cfg(feature = "audio")]
@@ -2859,38 +3581,39 @@ fn main() -> ! {
                     (0x3800_060Cu32 as *mut u32).write_volatile(render_count);
                     (0x3800_0610u32 as *mut u32).write_volatile(
                         ((dirty_frames as u32) << 16)
-                        | ((was_visible as u32) << 8)
-                        | (event_win.borrow().is_visible() as u32)
+                            | ((was_visible as u32) << 8)
+                            | (event_win.borrow().is_visible() as u32),
                     );
-                    (0x3800_0614u32 as *mut u32).write_volatile(
-                        display.back_buffer_addr()
-                    );
-                    (0x3800_0618u32 as *mut u32).write_volatile(
-                        (0x5000_10ACu32 as *const u32).read_volatile()
-                    );
+                    (0x3800_0614u32 as *mut u32).write_volatile(display.back_buffer_addr());
+                    (0x3800_0618u32 as *mut u32)
+                        .write_volatile((0x5000_10ACu32 as *const u32).read_volatile());
                     // Cortex-M fault registers
                     (0x3800_0638u32 as *mut u32).write_volatile(
-                        (0xE000_ED28u32 as *const u32).read_volatile() // CFSR
+                        (0xE000_ED28u32 as *const u32).read_volatile(), // CFSR
                     );
                     (0x3800_063Cu32 as *mut u32).write_volatile(
-                        (0xE000_ED38u32 as *const u32).read_volatile() // MMFAR/BFAR
+                        (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR
                     );
                     // LTDC ISR — check for underrun (bit 1) or error flags
                     (0x3800_0640u32 as *mut u32).write_volatile(
-                        (0x5000_1010u32 as *const u32).read_volatile() // LTDC ISR
+                        (0x5000_1010u32 as *const u32).read_volatile(), // LTDC ISR
                     );
                     // EventWindow entry count for debugging
-                    (0x3800_0644u32 as *mut u32).write_volatile(
-                        event_win.borrow().entry_count() as u32
-                    );
+                    (0x3800_0644u32 as *mut u32)
+                        .write_volatile(event_win.borrow().entry_count() as u32);
 
                     // Dump event telemetry ring over serial every ~1s (6 ticks)
                     let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile();
-                    if tick_count - last_dump >= 180 { // ~30s at 6Hz
+                    if tick_count - last_dump >= 180 {
+                        // ~30s at 6Hz
                         let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
                         if idx > 0 {
                             let dump_count = idx.min(TELEM_ENTRIES);
-                            let start = if idx > TELEM_ENTRIES { idx - TELEM_ENTRIES } else { 0 };
+                            let start = if idx > TELEM_ENTRIES {
+                                idx - TELEM_ENTRIES
+                            } else {
+                                0
+                            };
                             serial_puts("TELEM:");
                             for i in start..start + dump_count {
                                 let slot = i % TELEM_ENTRIES;
@@ -2902,7 +3625,8 @@ fn main() -> ! {
                                 // Format: " T:code:x:y"
                                 use core::fmt::Write;
                                 let mut buf = alloc::string::String::new();
-                                let _ = write!(buf, " {}:{:02x}:{},{}", t, code, x as i32, y as i32);
+                                let _ =
+                                    write!(buf, " {}:{:02x}:{},{}", t, code, x as i32, y as i32);
                                 serial_puts(&buf);
                             }
                             serial_puts("\r\n");
@@ -2911,6 +3635,53 @@ fn main() -> ! {
                         }
                         (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count);
                     }
+                }
+
+                #[cfg(feature = "cpu_stats")]
+                {
+                    let (rx_depth, tx_depth, rx_drop, tx_drop) = runtime_serial::stats();
+                    cpu_stats.record_serial_depths(rx_depth, tx_depth);
+                    cpu_stats.record_serial_drops(rx_drop, tx_drop);
+                    cpu_stats.record_spin_counts(0, 0);
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    {
+                        cpu_stats.record_dma2d_cycles(dma2d_irq::last_cycles());
+                        cpu_stats.record_dma2d_max_cycles(dma2d_irq::max_cycles());
+                        let (complete, error) = dma2d_irq::counts();
+                        cpu_stats.record_dma2d_counts(complete, error);
+                    }
+                    #[cfg(feature = "audio")]
+                    let scope_stage = audio_scope.stage_code() as u8;
+                    #[cfg(not(feature = "audio"))]
+                    let scope_stage = 0u8;
+                    #[cfg(feature = "audio")]
+                    let scope_frame = audio_scope.frame_id() as u16;
+                    #[cfg(not(feature = "audio"))]
+                    let scope_frame = 0u16;
+
+                    let stage = if crawl_active {
+                        star_crawl.stage_code() as u8
+                    } else if scope_active {
+                        0x80 | scope_stage
+                    } else if buffer_ready {
+                        0xF0
+                    } else if render_active {
+                        0x40
+                    } else {
+                        0
+                    };
+                    let current_frame = if crawl_active {
+                        star_crawl.frame_id() as u16
+                    } else if scope_active {
+                        scope_frame
+                    } else {
+                        render_count as u16
+                    };
+                    let queued_frame = ((buffer_ready as u8) << 1) | (render_active as u8);
+                    cpu_stats.record_pipeline_stage(stage, current_frame, queued_frame);
                 }
             }
 
@@ -2924,7 +3695,10 @@ fn main() -> ! {
 
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let is_crawl = star_crawl.is_active();
-                #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+                #[cfg(not(all(
+                    feature = "dma2d",
+                    any(target_arch = "arm", target_arch = "aarch64")
+                )))]
                 let is_crawl = false;
 
                 #[cfg(feature = "audio")]
@@ -2934,34 +3708,64 @@ fn main() -> ! {
 
                 let back = display.back_buffer_addr();
                 let (w, h) = display.dimensions();
-                let mut drew = true;
+                let mut frame_ready = false;
+                let mut keep_rendering = false;
 
                 if is_crawl {
                     // ── Star crawl render ──
-                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
                     if let Some(raw) = display.take_dma2d_raw() {
                         let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
-                        drew = star_crawl.tick(&mut blitter, back as *mut u8, w, h);
-                        display.return_dma2d_raw(blitter.into_inner());
-                        if !star_crawl.is_active() {
-                            serial_puts("CRAWL:done\r\n");
-                            // Full screen restore from pristine desktop.
-                            let (w, h) = display.dimensions();
-                            compositor.mark_pristine_restore(
-                                rlvgl_core::widget::Rect { x: 0, y: 0, width: h as i32, height: w as i32 },
-                            );
-                            dirty_frames = 4;
+                        blitter.enable_tc_interrupt();
+                        match star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
+                            star_crawl::StepResult::Idle => {
+                                render_active = false;
+                            }
+                            star_crawl::StepResult::Pending => {
+                                keep_rendering = true;
+                            }
+                            star_crawl::StepResult::FrameReady => {
+                                frame_ready = true;
+                            }
+                            star_crawl::StepResult::Finished => {
+                                render_active = false;
+                                serial_puts("CRAWL:done\r\n");
+                                let (w, h) = display.dimensions();
+                                compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                    x: 0,
+                                    y: 0,
+                                    width: h as i32,
+                                    height: w as i32,
+                                });
+                                dirty_frames = 4;
+                            }
                         }
+                        display.return_dma2d_raw(blitter.into_inner());
                     }
                 } else if is_scope {
                     // ── Audio scope render ──
                     #[cfg(feature = "audio")]
                     {
-                        for i in pcm_frame_count..720 {
-                            pcm_frame_buf[i] = 0;
+                        if pcm_frame_count < 720 {
+                            for i in pcm_frame_count..720 {
+                                pcm_frame_buf[i] = 0;
+                            }
                         }
-                        drew = audio_scope.tick(&pcm_frame_buf, back as *mut u8, w, h);
-                        pcm_frame_count = 0;
+                        match audio_scope.tick(&pcm_frame_buf, back as *mut u8, w, h) {
+                            audio_scope::StepResult::Idle => {
+                                render_active = false;
+                            }
+                            audio_scope::StepResult::Pending => {
+                                keep_rendering = true;
+                            }
+                            audio_scope::StepResult::FrameReady => {
+                                frame_ready = true;
+                                pcm_frame_count = 0;
+                            }
+                        }
                     }
                 } else {
                     // ── Normal tree + overlay render ──
@@ -2970,60 +3774,15 @@ fn main() -> ! {
 
                     compositor.restore(back as *mut u8);
 
-                    let fb_slice = unsafe {
-                        core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
-                    };
-                    let surface = Surface::new(
-                        fb_slice, stride, PixelFmt::Argb8888, w, h,
-                    );
+                    let fb_slice =
+                        unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };
+                    let surface = Surface::new(fb_slice, stride, PixelFmt::Argb8888, w, h);
                     let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
                         BlitterRenderer::new(&mut render_blitter, surface);
                     let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
 
                     root.borrow().draw(&mut renderer);
-
-                    // CPU overlay rendering
-                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                    {
-                        let any_overlay = chip_info_panel.borrow().is_visible()
-                            || live_stats_panel.borrow().is_visible()
-                            || config_menu.borrow().is_visible();
-                        if any_overlay {
-                            let scratch = unsafe {
-                                core::slice::from_raw_parts_mut(
-                                    0xD04C_0000 as *mut u8, 1024,
-                                )
-                            };
-                            // Take DMA2D for hardware-accelerated overlay rendering
-                            let mut blitter_opt = display.take_dma2d_raw()
-                                .map(rlvgl::platform::Dma2dBlitter::new);
-                            let dma2d_ptr = blitter_opt.as_mut()
-                                .map(|b| b as *mut rlvgl::platform::Dma2dBlitter);
-                            let mut ctx = rlvgl::platform::dma2d_draw::Dma2dOverlayCtx {
-                                fb: back as *mut u8,
-                                fb_stride: w * 4,
-                                fb_w: w,
-                                fb_h: h,
-                                eor_gated: true,
-                                eor_wait_cycles: 0,
-                                dma2d: dma2d_ptr,
-                            };
-                            if chip_info_panel.borrow().is_visible() {
-                                chip_info_panel.borrow().draw_hw(&mut ctx, scratch);
-                            }
-                            if live_stats_panel.borrow().is_visible() {
-                                live_stats_panel.borrow().draw_hw(&mut ctx, scratch);
-                            }
-                            if config_menu.borrow().is_visible() {
-                                config_menu.borrow().draw_hw(&mut ctx, scratch);
-                            }
-                            // Return DMA2D peripheral
-                            ctx.dma2d = None;
-                            if let Some(blitter) = blitter_opt {
-                                display.return_dma2d_raw(blitter.into_inner());
-                            }
-                        }
-                    }
+                    frame_ready = true;
                 }
 
                 let t_done = unsafe { DWT_CYCCNT.read_volatile() };
@@ -3031,22 +3790,31 @@ fn main() -> ! {
                 // DSB: flush WT cache writes to SDRAM before presenting
                 cortex_m::asm::dsb();
 
-                if drew {
+                if frame_ready {
                     render_count += 1;
                     buffer_ready = true;
+                    render_active = false;
+                } else if keep_rendering {
+                    render_active = true;
+                } else if !is_crawl && !is_scope {
+                    render_active = false;
                 }
-                render_active = false;
 
                 // Frame timing report every 10 renders
-                if render_count % 10 == 0 {
+                if frame_ready && render_count % 10 == 0 {
                     let total_us = t_done.wrapping_sub(t_frame_start) / 400;
                     let fuif = display.check_fifo_underrun();
                     serial_puts("R:");
                     serial_dec(total_us);
                     serial_puts("us");
-                    if is_crawl { serial_puts(" crawl"); }
-                    else if is_scope { serial_puts(" scope"); }
-                    if fuif { serial_puts(" FUIF!"); }
+                    if is_crawl {
+                        serial_puts(" crawl");
+                    } else if is_scope {
+                        serial_puts(" scope");
+                    }
+                    if fuif {
+                        serial_puts(" FUIF!");
+                    }
                     serial_puts("\r\n");
                 }
             }
@@ -3057,10 +3825,14 @@ fn main() -> ! {
             if buffer_ready && display.check_erif() {
                 display.present();
                 buffer_ready = false;
+                present_count = present_count.wrapping_add(1);
 
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
-                #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+                #[cfg(not(all(
+                    feature = "dma2d",
+                    any(target_arch = "arm", target_arch = "aarch64")
+                )))]
                 let crawl_running = false;
                 #[cfg(feature = "audio")]
                 let scope_running = audio_scope.is_active();
@@ -3070,16 +3842,39 @@ fn main() -> ! {
                 if crawl_running || scope_running {
                     // Continuous mode: advance scroll AFTER present so both
                     // double-buffer frames show the same position. Then re-arm.
-                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                    if crawl_running { star_crawl.advance_scroll(); }
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    if crawl_running {
+                        star_crawl.advance_scroll();
+                    }
                     render_active = true;
                 } else if dirty_frames > 0 {
                     dirty_frames -= 1;
                 }
             }
 
-            // ── Idle: only spin-wait in the system ───────────────────────
-            if !render_active && !buffer_ready {
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            let crawl_waiting_dma = star_crawl.is_active() && star_crawl.waiting_for_dma();
+            #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+            let crawl_waiting_dma = false;
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            let crawl_active = star_crawl.is_active();
+            #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+            let crawl_active = false;
+            #[cfg(feature = "audio")]
+            let scope_active = audio_scope.is_active();
+            #[cfg(not(feature = "audio"))]
+            let scope_active = false;
+
+            let normal_render_busy = render_active && !crawl_active && !scope_active;
+            let scope_render_busy = render_active && scope_active;
+            let should_idle = !normal_render_busy
+                && !scope_render_busy
+                && (!render_active || crawl_waiting_dma || buffer_ready);
+
+            if should_idle {
                 #[cfg(feature = "cpu_stats")]
                 {
                     cpu_stats.idle_enter();
@@ -3094,8 +3889,16 @@ fn main() -> ! {
 
     // Fallback: non-ARM / non-disco / doc builds
     #[cfg(not(any(
-        all(feature = "c_hal",       feature = "stm32h747i_disco_cm7", any(target_arch = "arm", target_arch = "aarch64")),
-        all(not(feature = "c_hal"),  feature = "stm32h747i_disco_cm7", any(target_arch = "arm", target_arch = "aarch64"))
+        all(
+            feature = "c_hal",
+            feature = "stm32h747i_disco_cm7",
+            any(target_arch = "arm", target_arch = "aarch64")
+        ),
+        all(
+            not(feature = "c_hal"),
+            feature = "stm32h747i_disco_cm7",
+            any(target_arch = "arm", target_arch = "aarch64")
+        )
     )))]
     loop {
         cortex_m::asm::nop();
@@ -3122,9 +3925,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         pwm::{ErrorType as PwmError, SetDutyCycle},
     };
     use rlvgl::core::event::{Event, Key};
-    use rlvgl::platform::{
-        CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput,
-    };
+    use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
 
     // ── Disable D-cache to ensure SDRAM coherency with LTDC ─────────────────
     unsafe {
@@ -3143,8 +3944,13 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     let mut cp = unsafe { cortex_m::Peripherals::steal() };
 
     // ── Direct GPIO output pin (BSRR-based, no HAL ownership chain) ─────────
-    struct GpioOut { base: u32, pin: u8 }
-    impl DigitalError for GpioOut { type Error = Infallible; }
+    struct GpioOut {
+        base: u32,
+        pin: u8,
+    }
+    impl DigitalError for GpioOut {
+        type Error = Infallible;
+    }
     impl OutputPin for GpioOut {
         fn set_high(&mut self) -> Result<(), Infallible> {
             unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << self.pin) }
@@ -3158,17 +3964,30 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── Backlight: GPIO output wrapped as SetDutyCycle ───────────────────────
     struct GpioBacklight(GpioOut);
-    impl PwmError for GpioBacklight { type Error = Infallible; }
+    impl PwmError for GpioBacklight {
+        type Error = Infallible;
+    }
     impl SetDutyCycle for GpioBacklight {
-        fn max_duty_cycle(&self) -> u16 { u16::MAX }
+        fn max_duty_cycle(&self) -> u16 {
+            u16::MAX
+        }
         fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Infallible> {
-            if duty == 0 { self.0.set_low() } else { self.0.set_high() }
+            if duty == 0 {
+                self.0.set_low()
+            } else {
+                self.0.set_high()
+            }
         }
     }
 
     // ── Direct GPIO input pin ────────────────────────────────────────────────
-    struct GpioIn { base: u32, pin: u8 }
-    impl DigitalError for GpioIn { type Error = Infallible; }
+    struct GpioIn {
+        base: u32,
+        pin: u8,
+    }
+    impl DigitalError for GpioIn {
+        type Error = Infallible;
+    }
     impl InputPin for GpioIn {
         fn is_high(&mut self) -> Result<bool, Infallible> {
             let idr = unsafe { ((self.base + 0x10) as *const u32).read_volatile() };
@@ -3181,32 +4000,71 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── Dummy I2C (touch controller not yet wired) ───────────────────────────
     struct DummyI2c;
-    impl I2cError for DummyI2c { type Error = Infallible; }
+    impl I2cError for DummyI2c {
+        type Error = Infallible;
+    }
     impl EhI2c<SevenBitAddress> for DummyI2c {
-        fn read(&mut self, _a: SevenBitAddress, _b: &mut [u8]) -> Result<(), Infallible> { Ok(()) }
-        fn write(&mut self, _a: SevenBitAddress, _b: &[u8]) -> Result<(), Infallible> { Ok(()) }
-        fn write_read(&mut self, _a: SevenBitAddress, _b: &[u8], _r: &mut [u8]) -> Result<(), Infallible> { Ok(()) }
-        fn transaction(&mut self, _a: SevenBitAddress, _ops: &mut [Operation<'_>]) -> Result<(), Infallible> { Ok(()) }
+        fn read(&mut self, _a: SevenBitAddress, _b: &mut [u8]) -> Result<(), Infallible> {
+            Ok(())
+        }
+        fn write(&mut self, _a: SevenBitAddress, _b: &[u8]) -> Result<(), Infallible> {
+            Ok(())
+        }
+        fn write_read(
+            &mut self,
+            _a: SevenBitAddress,
+            _b: &[u8],
+            _r: &mut [u8],
+        ) -> Result<(), Infallible> {
+            Ok(())
+        }
+        fn transaction(
+            &mut self,
+            _a: SevenBitAddress,
+            _ops: &mut [Operation<'_>],
+        ) -> Result<(), Infallible> {
+            Ok(())
+        }
     }
 
     // ── Dummy button ─────────────────────────────────────────────────────────
     struct DummyButton;
-    impl DigitalError for DummyButton { type Error = Infallible; }
+    impl DigitalError for DummyButton {
+        type Error = Infallible;
+    }
     impl InputPin for DummyButton {
-        fn is_high(&mut self) -> Result<bool, Infallible> { Ok(false) }
-        fn is_low(&mut self)  -> Result<bool, Infallible> { Ok(true)  }
+        fn is_high(&mut self) -> Result<bool, Infallible> {
+            Ok(false)
+        }
+        fn is_low(&mut self) -> Result<bool, Infallible> {
+            Ok(true)
+        }
     }
 
-    struct ButtonInput<B: InputPin> { button: B, last: bool }
+    struct ButtonInput<B: InputPin> {
+        button: B,
+        last: bool,
+    }
     impl<B: InputPin> ButtonInput<B> {
-        fn new(b: B) -> Self { Self { button: b, last: false } }
+        fn new(b: B) -> Self {
+            Self {
+                button: b,
+                last: false,
+            }
+        }
     }
     impl<B: InputPin> InputDevice for ButtonInput<B> {
         fn poll(&mut self) -> Option<Event> {
             let pressed = self.button.is_low().ok()?;
             match (pressed, self.last) {
-                (true,  false) => { self.last = true;  Some(Event::KeyDown { key: Key::Enter }) }
-                (false, true)  => { self.last = false; Some(Event::KeyUp   { key: Key::Enter }) }
+                (true, false) => {
+                    self.last = true;
+                    Some(Event::KeyDown { key: Key::Enter })
+                }
+                (false, true) => {
+                    self.last = false;
+                    Some(Event::KeyUp { key: Key::Enter })
+                }
                 _ => None,
             }
         }
@@ -3224,7 +4082,10 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         // Clear bits 7:6 (pin 3 MODER) and set to 01 (GP output)
         (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
     }
-    let panel_reset = GpioOut { base: GPIOG, pin: 3 };
+    let panel_reset = GpioOut {
+        base: GPIOG,
+        pin: 3,
+    };
 
     // PJ12: LCD backlight control (DSI_BL_CTRL per UM2411 CN15 pin 53)
     // Configure PJ12 as GP output (clear bits 25:24, set to 01)
@@ -3232,7 +4093,10 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         let moder = (GPIOJ as *mut u32).read_volatile();
         (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
     }
-    let backlight = GpioBacklight(GpioOut { base: GPIOJ, pin: 12 });
+    let backlight = GpioBacklight(GpioOut {
+        base: GPIOJ,
+        pin: 12,
+    });
 
     // PJ6: debug toggle probe — Arduino D9 on CN5, scope-accessible
     // Configure PJ6 as GP output (MODER bits 13:12 = 01)
@@ -3245,13 +4109,16 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     fn dbg_pulse() {
         const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32;
         unsafe {
-            GPIOJ_BSRR.write_volatile(1u32 << 6);       // set PJ6
-            cortex_m::asm::delay(40);                     // ~100ns pulse
+            GPIOJ_BSRR.write_volatile(1u32 << 6); // set PJ6
+            cortex_m::asm::delay(40); // ~100ns pulse
             GPIOJ_BSRR.write_volatile(1u32 << (6 + 16)); // reset PJ6
         }
     }
     // Quick triple-pulse to confirm probe is alive
-    for _ in 0..3 { dbg_pulse(); cortex_m::asm::delay(4_000); }
+    for _ in 0..3 {
+        dbg_pulse();
+        cortex_m::asm::delay(4_000);
+    }
 
     // ── UART8 debug serial (PJ8=TX on Arduino D1/CN6, 115200 8N1) ─────
     // PJ8 = UART8_TX (AF8) — Port J clock already enabled
@@ -3271,7 +4138,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR
         ((UART8 + 0x00) as *mut u32).write_volatile(
             (1 << 3)  // TE (transmitter enable)
-            | (1 << 0) // UE (USART enable)
+            | (1 << 0), // UE (USART enable)
         );
     }
 
@@ -3285,14 +4152,10 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         (0x5802_44E0u32 as *const u32).read_volatile();
         // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits 7:4 and 11:8 = 7
         let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile();
-        ((GPIOA + 0x24) as *mut u32).write_volatile(
-            (afrh & !(0xFFu32 << 4)) | (0x77u32 << 4),
-        );
+        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFFu32 << 4)) | (0x77u32 << 4));
         // MODER: PA9 = AF (10), PA10 = AF (10)
         let moder = (GPIOA as *mut u32).read_volatile();
-        (GPIOA as *mut u32).write_volatile(
-            (moder & !(0xF << 18)) | (0b1010 << 18),
-        );
+        (GPIOA as *mut u32).write_volatile((moder & !(0xF << 18)) | (0b1010 << 18));
         // Enable USART1 clock (APB2ENR bit 4)
         let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile();
         (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4));
@@ -3321,7 +4184,10 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     dbg_pulse();
 
     // PK7: touch interrupt input
-    let touch_int = GpioIn { base: GPIOK, pin: 7 };
+    let touch_int = GpioIn {
+        base: GPIOK,
+        pin: 7,
+    };
 
     // ── SysTick: frame timer ──────────────────────────────────────────────────
     use cortex_m::peripheral::syst::SystClkSource;
@@ -3353,7 +4219,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // Hold splash for ~2s
     #[cfg(feature = "splash")]
-    for _ in 0..200u32 { cortex_m::asm::delay(4_000_000); }
+    for _ in 0..200u32 {
+        cortex_m::asm::delay(4_000_000);
+    }
 
     // Re-assert PJ12 as GP output and PG3 as GP output — the display
     // constructor or PAC peripheral take() may reset GPIO MODER.
@@ -3371,9 +4239,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── IPC + input ──────────────────────────────────────────────────────────
     ipc::init();
-    let mut input = Stm32h747iDiscoInput::new_with_int(
-        DummyI2c, touch_int, display.dimensions().0 as u16,
-    );
+    let mut input =
+        Stm32h747iDiscoInput::new_with_int(DummyI2c, touch_int, display.dimensions().0 as u16);
     let mut _button_input = ButtonInput::new(DummyButton);
 
     // ── Display server widget tree ───────────────────────────────────────────
@@ -3381,35 +4248,55 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     use alloc::{rc::Rc, vec::Vec};
     use core::cell::RefCell;
     use rlvgl::core::WidgetNode;
-    use rlvgl::widgets::{button::Button, container::Container, label::Label};
     use rlvgl::core::widget::Rect;
+    use rlvgl::widgets::{button::Button, container::Container, label::Label};
     use rlvgl_i18n::t;
 
     let title_label = Rc::new(RefCell::new(Label::new(
         t!("hw.title", version = env!("CARGO_PKG_VERSION")),
-        Rect { x: 10, y: 10, width: 200, height: 20 },
+        Rect {
+            x: 10,
+            y: 10,
+            width: 200,
+            height: 20,
+        },
     )));
 
     let counter_button = Rc::new(RefCell::new(Button::new(
         t!("demo.clicks_zero"),
-        Rect { x: 10, y: 40, width: 120, height: 30 },
+        Rect {
+            x: 10,
+            y: 40,
+            width: 120,
+            height: 30,
+        },
     )));
 
     // When the button is tapped locally, forward ButtonPressed to CM4
     {
-        counter_button.borrow_mut().set_on_click(|_btn: &mut Button| {
-            let _ = ipc::event_push(ipc::evt_button_pressed(ipc::widget_id::CLICK_COUNTER));
-        });
+        counter_button
+            .borrow_mut()
+            .set_on_click(|_btn: &mut Button| {
+                let _ = ipc::event_push(ipc::evt_button_pressed(ipc::widget_id::CLICK_COUNTER));
+            });
     }
 
     let status_label = Rc::new(RefCell::new(Label::new(
         t!("hw.cm4_waiting"),
-        Rect { x: 10, y: 80, width: 300, height: 20 },
+        Rect {
+            x: 10,
+            y: 80,
+            width: 300,
+            height: 20,
+        },
     )));
 
     let root = Rc::new(RefCell::new(WidgetNode {
         widget: Rc::new(RefCell::new(Container::new(Rect {
-            x: 0, y: 0, width: 800, height: 480,
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 480,
         }))),
         children: Vec::new(),
     }));
@@ -3560,8 +4447,13 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             (test_addr as *mut u32).write_volatile(before); // restore
             use core::fmt::Write;
             if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
-                let _ = writeln!(out, "  [0xC0000000] before=0x{:08X} wrote=0xDEADBEEF readback=0x{:08X} {}",
-                    before, after, if after == 0xDEAD_BEEF { "OK" } else { "FAIL" });
+                let _ = writeln!(
+                    out,
+                    "  [0xC0000000] before=0x{:08X} wrote=0xDEADBEEF readback=0x{:08X} {}",
+                    before,
+                    after,
+                    if after == 0xDEAD_BEEF { "OK" } else { "FAIL" }
+                );
             }
         }
 
@@ -3583,7 +4475,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         }
     }
     // Leave backlight ON
-    unsafe { ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); }
+    unsafe {
+        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+    }
 
     // ── Display server main loop ─────────────────────────────────────────────
     let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(FRAME_HZ);
@@ -3593,7 +4487,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     #[cfg(feature = "cpu_stats")]
     let mut cpu_stats = {
         let mut s = cpu_stats::CpuStats::new();
-        unsafe { s.enable_dwt(); }
+        unsafe {
+            s.enable_dwt();
+        }
         s
     };
 
@@ -3642,13 +4538,16 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         if let Some(evt) = input.poll() {
             let transformed = match &evt {
                 Event::PointerDown { x, y } => Event::PointerDown {
-                    x: *y, y: w_fb as i32 - 1 - *x,
+                    x: *y,
+                    y: w_fb as i32 - 1 - *x,
                 },
                 Event::PointerUp { x, y } => Event::PointerUp {
-                    x: *y, y: w_fb as i32 - 1 - *x,
+                    x: *y,
+                    y: w_fb as i32 - 1 - *x,
                 },
                 Event::PointerMove { x, y } => Event::PointerMove {
-                    x: *y, y: w_fb as i32 - 1 - *x,
+                    x: *y,
+                    y: w_fb as i32 - 1 - *x,
                 },
                 other => other.clone(),
             };

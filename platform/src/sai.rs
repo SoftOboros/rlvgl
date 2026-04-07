@@ -187,7 +187,7 @@ impl Sai1Audio {
             // Slot config: 2 slots (NBSLOT=1), slot size = data size,
             // enable slots 0 and 1
             let slotr = (1u32 << 8)        // NBSLOT = 2 - 1
-                | (0b11u32 << 16);          // SLOTEN: slots 0 and 1
+                | (0b11u32 << 16); // SLOTEN: slots 0 and 1
             self.reg(ASLOTR).write_volatile(slotr);
 
             // Disable all interrupts
@@ -214,9 +214,7 @@ impl Sai1Audio {
             bcr2.write_volatile(CR2_FTH_QUARTER | CR2_FFLUSH);
 
             // CR1: slave RX, 16-bit, synchronous with sub-block A
-            let cr1 = CR1_MODE_SLAVE_RX
-                | CR1_DS_16BIT
-                | CR1_SYNCEN_INTERNAL;
+            let cr1 = CR1_MODE_SLAVE_RX | CR1_DS_16BIT | CR1_SYNCEN_INTERNAL;
             bcr1.write_volatile(cr1);
 
             // CR2: FIFO threshold = 1/4

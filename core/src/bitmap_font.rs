@@ -36,33 +36,22 @@ impl BitmapFont {
     }
 
     /// Render a single character at `(x, y)`.
-    pub fn draw_char(
-        &self,
-        renderer: &mut dyn Renderer,
-        x: i32,
-        y: i32,
-        ch: char,
-        color: Color,
-    ) {
+    pub fn draw_char(&self, renderer: &mut dyn Renderer, x: i32, y: i32, ch: char, color: Color) {
         let idx = if (0x20..=0x7E).contains(&(ch as u32)) {
             (ch as u32 - 0x20) as usize
         } else {
             return; // non-printable, skip
         };
-        let bits_per_glyph =
-            self.glyph_width as usize * self.glyph_height as usize;
+        let bits_per_glyph = self.glyph_width as usize * self.glyph_height as usize;
         let bit_offset = idx * bits_per_glyph;
         let s = self.scale as i32;
 
         for row in 0..self.glyph_height as usize {
             for col in 0..self.glyph_width as usize {
-                let bit =
-                    bit_offset + row * self.glyph_width as usize + col;
+                let bit = bit_offset + row * self.glyph_width as usize + col;
                 let byte_idx = bit / 8;
                 let bit_idx = 7 - (bit % 8); // MSB first
-                if byte_idx < self.data.len()
-                    && (self.data[byte_idx] >> bit_idx) & 1 != 0
-                {
+                if byte_idx < self.data.len() && (self.data[byte_idx] >> bit_idx) & 1 != 0 {
                     renderer.fill_rect(
                         Rect {
                             x: x + col as i32 * s,
@@ -78,14 +67,7 @@ impl BitmapFont {
     }
 
     /// Render a string at `(x, y)` advancing horizontally (increasing x).
-    pub fn draw_str(
-        &self,
-        renderer: &mut dyn Renderer,
-        x: i32,
-        y: i32,
-        text: &str,
-        color: Color,
-    ) {
+    pub fn draw_str(&self, renderer: &mut dyn Renderer, x: i32, y: i32, text: &str, color: Color) {
         let advance = self.scaled_width() + self.scale as i32;
         let mut cx = x;
         for ch in text.chars() {

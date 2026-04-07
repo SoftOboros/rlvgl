@@ -63,7 +63,12 @@ impl Widget for Radio {
             width: size,
             height: size,
         };
-        fill_rounded_rect(renderer, circle_rect, self.style.border_color.with_alpha(a), (size / 2) as u8);
+        fill_rounded_rect(
+            renderer,
+            circle_rect,
+            self.style.border_color.with_alpha(a),
+            (size / 2) as u8,
+        );
 
         if self.selected {
             let inner = Rect {
@@ -72,7 +77,12 @@ impl Widget for Radio {
                 width: circle_rect.width - 6,
                 height: circle_rect.height - 6,
             };
-            fill_rounded_rect(renderer, inner, self.dot_color.with_alpha(a), ((size - 6) / 2) as u8);
+            fill_rounded_rect(
+                renderer,
+                inner,
+                self.dot_color.with_alpha(a),
+                ((size - 6) / 2) as u8,
+            );
         }
 
         // Draw label text to the right of the circle with baseline at the bottom.

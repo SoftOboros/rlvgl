@@ -554,9 +554,7 @@ pub fn run() -> Result<()> {
             threshold,
         } => svg::run(&svg, &out, &dpi, threshold)?,
         Command::Svelte { cmd } => match cmd {
-            SvelteCommand::Chakra { input, out } => {
-                chakra::ingest(&input, &out)?
-            }
+            SvelteCommand::Chakra { input, out } => chakra::ingest(&input, &out)?,
             SvelteCommand::Tokens { input, out, mode } => {
                 svelte::tokens(&input, &out, mode.as_deref())?
             }

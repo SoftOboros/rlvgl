@@ -68,7 +68,12 @@ impl SettingsDialog {
             options: Vec::new(),
             selected_idx: 0,
             original_idx: 0,
-            bounds: Rect { x: 0, y: 0, width: PANEL_W, height: 100 },
+            bounds: Rect {
+                x: 0,
+                y: 0,
+                width: PANEL_W,
+                height: 100,
+            },
             font,
             clear_countdown: 0,
             clear_bounds: None,
@@ -99,7 +104,7 @@ impl SettingsDialog {
             + self.options.len() as i32 * line_h // options
             + PANEL_PADDING                     // gap
             + BTN_H                             // buttons
-            + PANEL_PADDING;                    // bottom padding
+            + PANEL_PADDING; // bottom padding
         self.bounds = Rect {
             x: (800 - PANEL_W) / 2,
             y: (480 - content_h) / 2,
@@ -130,13 +135,23 @@ impl SettingsDialog {
     fn btn_ok_rect(&self) -> Rect {
         let bx = self.bounds.x + self.bounds.width / 2 - BTN_W - BTN_GAP / 2;
         let by = self.bounds.y + self.bounds.height - PANEL_PADDING - BTN_H;
-        Rect { x: bx, y: by, width: BTN_W, height: BTN_H }
+        Rect {
+            x: bx,
+            y: by,
+            width: BTN_W,
+            height: BTN_H,
+        }
     }
 
     fn btn_cancel_rect(&self) -> Rect {
         let bx = self.bounds.x + self.bounds.width / 2 + BTN_GAP / 2;
         let by = self.bounds.y + self.bounds.height - PANEL_PADDING - BTN_H;
-        Rect { x: bx, y: by, width: BTN_W, height: BTN_H }
+        Rect {
+            x: bx,
+            y: by,
+            width: BTN_W,
+            height: BTN_H,
+        }
     }
 }
 
@@ -161,8 +176,7 @@ impl SettingsDialog {
 
         // Title bar
         ctx.draw_str_rotated(self.font, x, y, &self.title, TITLE_COLOR, scratch);
-        let close_x =
-            self.bounds.x + self.bounds.width - PANEL_PADDING - self.font.measure("X");
+        let close_x = self.bounds.x + self.bounds.width - PANEL_PADDING - self.font.measure("X");
         ctx.draw_str_rotated(self.font, close_x, y, "X", CLOSE_COLOR, scratch);
         y += line_h + PANEL_PADDING;
 
@@ -233,8 +247,7 @@ impl Widget for SettingsDialog {
         // Title bar
         self.font.draw_str(renderer, x, y, &self.title, TITLE_COLOR);
         // Close X in top right
-        let close_x = self.bounds.x + self.bounds.width - PANEL_PADDING
-            - self.font.measure("X");
+        let close_x = self.bounds.x + self.bounds.width - PANEL_PADDING - self.font.measure("X");
         self.font.draw_str(renderer, close_x, y, "X", CLOSE_COLOR);
         y += line_h + PANEL_PADDING;
 
@@ -248,9 +261,11 @@ impl Widget for SettingsDialog {
             };
             if i == self.selected_idx {
                 fill_rounded_rect(renderer, opt_rect, SELECTED_BG, 4);
-                self.font.draw_str(renderer, x, y + 2, &opt.label, TEXT_COLOR);
+                self.font
+                    .draw_str(renderer, x, y + 2, &opt.label, TEXT_COLOR);
             } else {
-                self.font.draw_str(renderer, x, y + 2, &opt.label, DIM_COLOR);
+                self.font
+                    .draw_str(renderer, x, y + 2, &opt.label, DIM_COLOR);
             }
             y += line_h;
         }

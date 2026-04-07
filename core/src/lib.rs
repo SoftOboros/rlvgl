@@ -38,13 +38,13 @@ pub mod bitmap_font;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
 pub mod event;
-/// 1-bit bitmap icons (folder, file) rendered at font height.
-pub mod icon_bitmap;
-/// Variable-width packed font renderer (grayscale anti-aliased).
-pub mod packed_font;
 #[cfg(feature = "fs")]
 pub mod fs;
+/// 1-bit bitmap icons (folder, file) rendered at font height.
+pub mod icon_bitmap;
 pub mod interface;
+/// Variable-width packed font renderer (grayscale anti-aliased).
+pub mod packed_font;
 pub mod plugins;
 pub mod renderer;
 pub mod style;

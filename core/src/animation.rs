@@ -42,7 +42,13 @@ impl Easing {
     ///
     /// Returns the eased value, also in `[0, 1]`.
     pub fn apply(self, t: f32) -> f32 {
-        let t = if t < 0.0 { 0.0 } else if t > 1.0 { 1.0 } else { t };
+        let t = if t < 0.0 {
+            0.0
+        } else if t > 1.0 {
+            1.0
+        } else {
+            t
+        };
         match self {
             Easing::Linear => t,
             Easing::EaseIn => t * t,
@@ -127,7 +133,11 @@ fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, b
     }
     match loop_mode {
         LoopMode::Once => {
-            let e = if elapsed > duration_ms { duration_ms } else { elapsed };
+            let e = if elapsed > duration_ms {
+                duration_ms
+            } else {
+                elapsed
+            };
             (e as f32 / duration_ms as f32, elapsed >= duration_ms)
         }
         LoopMode::Repeat(n) => {

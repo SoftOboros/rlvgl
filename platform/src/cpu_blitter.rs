@@ -137,7 +137,9 @@ impl Blitter for CpuBlitter {
                 for row in sy..ey {
                     let start = row as usize * dst.stride + sx as usize * bpp;
                     let end = start + cw as usize * bpp;
-                    if end > dst.buf.len() { break; }
+                    if end > dst.buf.len() {
+                        break;
+                    }
                     let line = &mut dst.buf[start..end];
                     for px in line.chunks_exact_mut(4) {
                         px.copy_from_slice(&color.to_le_bytes());
@@ -150,7 +152,9 @@ impl Blitter for CpuBlitter {
                 for row in sy..ey {
                     let start = row as usize * dst.stride + sx as usize * bpp;
                     let end = start + cw as usize * bpp;
-                    if end > dst.buf.len() { break; }
+                    if end > dst.buf.len() {
+                        break;
+                    }
                     let line = &mut dst.buf[start..end];
                     for px in line.chunks_exact_mut(2) {
                         px.copy_from_slice(&c.to_le_bytes());
@@ -185,10 +189,8 @@ impl Blitter for CpuBlitter {
         if src.format == dst.format {
             let bpp = Self::pixel_size(src.format);
             for row in 0..h {
-                let src_start =
-                    ((src_y0 + row) as usize * src.stride) + (src_x0 as usize * bpp);
-                let dst_start =
-                    ((dst_y + row) as usize * dst.stride) + (dst_x as usize * bpp);
+                let src_start = ((src_y0 + row) as usize * src.stride) + (src_x0 as usize * bpp);
+                let dst_start = ((dst_y + row) as usize * dst.stride) + (dst_x as usize * bpp);
                 let len = w as usize * bpp;
                 dst.buf[dst_start..dst_start + len]
                     .copy_from_slice(&src.buf[src_start..src_start + len]);

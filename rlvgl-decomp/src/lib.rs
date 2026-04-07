@@ -279,13 +279,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
 /// Write an RLEC binary blob: magic + header + palette (LE u16s) + stream.
 ///
 /// This is the on-disk format consumed by `parse_rle_blob`.
-pub fn write_rle_blob(
-    width: u16,
-    height: u16,
-    palette: &[u16],
-    stream: &[u8],
-    out: &mut Vec<u8>,
-) {
+pub fn write_rle_blob(width: u16, height: u16, palette: &[u16], stream: &[u8], out: &mut Vec<u8>) {
     use consts::BLOB_MAGIC;
     out.extend_from_slice(&BLOB_MAGIC);
     out.extend_from_slice(&width.to_le_bytes());
@@ -464,7 +458,7 @@ mod tests {
         // Row 0: red pixels
         for x in 0..w {
             let off = x * 4;
-            rgba[off] = 0xFF;     // R
+            rgba[off] = 0xFF; // R
             rgba[off + 1] = 0x00; // G
             rgba[off + 2] = 0x00; // B
             rgba[off + 3] = 0xFF; // A
