@@ -66,10 +66,14 @@ fn dbg_hex(val: u32) {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-/// Crawl frame width = landscape horizontal (portrait Y span).
-const CRAWL_W: u32 = 720;
-/// Crawl frame height = landscape vertical = scroll axis (portrait X span).
-const CRAWL_H: u32 = 480;
+/// Portrait FB width (physical display columns).
+const FB_W: u32 = 480;
+/// Portrait rows used by the crawl (800 - 80 icon bar).
+const FB_H: u32 = 720;
+/// Landscape crawl width (maps to portrait Y = FB_H).
+const CRAWL_W: u32 = FB_H;
+/// Landscape crawl height (maps to portrait X = FB_W, the scroll axis).
+const CRAWL_H: u32 = FB_W;
 /// Pre-rendered text line width in pixels.
 const TEXT_W: u32 = 600;
 /// Perspective width at landscape top (vanishing point).
@@ -78,10 +82,11 @@ const TOP_W: u32 = 480;
 const BOT_W: u32 = 600;
 /// ARGB8888 bytes per pixel.
 const BPP: u32 = 4;
-/// Scroll buffer: 2× CRAWL_H rows for contiguous window without wrap.
-const SCROLL_BUF_ROWS: u32 = CRAWL_H * 2;
-/// Scroll buffer size in bytes.
-const SCROLL_BUF_SIZE: usize = (SCROLL_BUF_ROWS * CRAWL_W * BPP) as usize;
+/// Starfield in portrait orientation: FB_W wide × double-height mirrored.
+/// Top half = random stars, bottom half = mirror of top (row-reversed).
+const STAR_ROWS: u32 = FB_H * 2; // 1440 portrait rows
+const STAR_STRIDE: u32 = FB_W * BPP; // 1920 bytes per portrait row
+const STAR_SIZE: usize = (STAR_ROWS * STAR_STRIDE) as usize;
 /// Line spacing multiplier for text layout (1.5x font height).
 const LINE_SPACING_NUM: u32 = 3;
 const LINE_SPACING_DEN: u32 = 2;
@@ -104,17 +109,17 @@ const D2_SCANLINE: usize = 0x3000_0000;
 
 pub struct StarCrawl {
     active: bool,
+    /// Text scroll position (Q8). Negative = text off-screen below.
     scroll_q8: i32,
     scroll_speed_q8: i32,
+    /// Starfield scroll position (Q8). Advances downward (opposite to text).
+    star_scroll_q8: i32,
 
     // SDRAM pointers.
-    starfield: *mut u8,   // CRAWL_W × CRAWL_H × 4 (one screen of stars)
-    scroll_buf: *mut u8,  // CRAWL_W × SCROLL_BUF_ROWS × 4 (double-height composited)
-    text_src: *mut u8,    // TEXT_W × text_h (A8 pre-rendered glyphs)
+    starfield: *mut u8,   // CRAWL_W × STAR_ROWS × 4 (double-height mirrored)
+    text_src: *mut u8,    // TEXT_W × text_h (A8 pre-rendered glyphs + logos)
 
     text_h: u32,
-    /// How many scroll_buf rows have been composited so far.
-    composed_up_to: u32,
 
     // CPU-side FIR work buffer (DTCM, fast).
     scanline_buf: [u8; CRAWL_W as usize],
@@ -129,11 +134,10 @@ impl StarCrawl {
             active: false,
             scroll_q8: 0,
             scroll_speed_q8: ((SCROLL_PX_PER_SEC * 256) / frame_hz) as i32,
+            star_scroll_q8: 0,
             starfield: core::ptr::null_mut(),
-            scroll_buf: core::ptr::null_mut(),
             text_src: core::ptr::null_mut(),
             text_h: 0,
-            composed_up_to: 0,
             scanline_buf: [0u8; CRAWL_W as usize],
             lines,
             font,
@@ -146,8 +150,11 @@ impl StarCrawl {
 
     /// Advance scroll by one tick. Call AFTER present() so both
     /// double-buffer frames render at the same scroll position.
+    /// Text scrolls up, starfield scrolls down (parallax).
     pub fn advance_scroll(&mut self) {
         self.scroll_q8 += self.scroll_speed_q8;
+        // Starfield moves at 1/3 text speed, downward.
+        self.star_scroll_q8 += self.scroll_speed_q8 / 3;
     }
 
     pub fn touch_deactivate(&mut self, _px: i32, _py: i32) -> bool {
@@ -162,54 +169,26 @@ impl StarCrawl {
         self.text_h = 120 + text_lines * line_h + CRAWL_H;
 
         // Assign SDRAM pointers.
-        let starfield_size = (CRAWL_W * CRAWL_H * BPP) as usize;
         self.starfield = CRAWL_BASE as *mut u8;
-        self.scroll_buf = (CRAWL_BASE + starfield_size) as *mut u8;
-        self.text_src = (CRAWL_BASE + starfield_size + SCROLL_BUF_SIZE) as *mut u8;
+        self.text_src = (CRAWL_BASE + STAR_SIZE) as *mut u8;
 
         let text_end = self.text_src as u32 + TEXT_W * self.text_h;
         dbg("SC:sf="); dbg_hex(self.starfield as u32);
-        dbg(" sb="); dbg_hex(self.scroll_buf as u32);
         dbg(" ts="); dbg_hex(self.text_src as u32);
         dbg(" te="); dbg_hex(text_end);
         dbg(" th="); dbg_dec(self.text_h);
         dbg("\r\n");
 
-        // Render starfield (one screen).
+        // Render double-height mirrored starfield.
         self.render_starfield(dma2d);
 
         // Pre-render all text into A8 buffer.
         dbg("SC:text...\r\n");
         self.pre_render_text();
 
-        // Start with text fully off-screen below. The visible window
-        // [scroll_px .. scroll_px+CRAWL_H] will be negative → pure starfield.
-        // Text enters from the bottom as scroll advances past 0.
-        // Dump a few text source rows to verify glyph data
-        dbg("SC:text_src dump:\r\n");
-        for check_row in [120u32, 130, 140, 150] {
-            if check_row < self.text_h {
-                let row_base = unsafe { self.text_src.add((check_row * TEXT_W) as usize) };
-                let mut nz = 0u32;
-                let mut first_nz: i32 = -1;
-                let mut last_nz: i32 = -1;
-                for i in 0..TEXT_W as usize {
-                    let v = unsafe { *row_base.add(i) };
-                    if v > 0 {
-                        nz += 1;
-                        if first_nz < 0 { first_nz = i as i32; }
-                        last_nz = i as i32;
-                    }
-                }
-                dbg("  r"); dbg_dec(check_row);
-                dbg(": nz="); dbg_dec(nz);
-                dbg(" span="); dbg_dec(first_nz as u32);
-                dbg(".."); dbg_dec(last_nz as u32);
-                dbg("\r\n");
-            }
-        }
-
+        // Text starts off-screen below. Starfield starts at 0.
         self.scroll_q8 = -((CRAWL_H as i32) << 8);
+        self.star_scroll_q8 = 0;
         self.active = true;
         dbg("SC:ready\r\n");
     }
@@ -233,93 +212,101 @@ impl StarCrawl {
 
         let t0 = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
 
-        let t1 = t0; // no composition step needed — FIR reads text_src directly
+        // ── Step 1: DMA2D blit starfield → portrait back buffer ──────────
+        // The starfield is portrait-oriented (FB_W × STAR_ROWS).
+        // Blit FB_H rows starting at star_scroll offset. DMA2D handles
+        // the row-major copy — zero CPU per-pixel work.
+        let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+        let rows_before_wrap = STAR_ROWS - star_row;
+        if rows_before_wrap >= FB_H {
+            // No wrap: one blit.
+            let star_src = unsafe {
+                self.starfield.add((star_row * STAR_STRIDE) as usize)
+            };
+            _dma2d.blit_raw(
+                star_src as *const u8, STAR_STRIDE,
+                back_buf, fb_w * BPP,
+                FB_W, FB_H,
+                PixelFmt::Argb8888,
+            );
+        } else {
+            // Wraps: two blits.
+            let src1 = unsafe {
+                self.starfield.add((star_row * STAR_STRIDE) as usize)
+            };
+            _dma2d.blit_raw(
+                src1 as *const u8, STAR_STRIDE,
+                back_buf, fb_w * BPP,
+                FB_W, rows_before_wrap,
+                PixelFmt::Argb8888,
+            );
+            let dst2 = unsafe {
+                back_buf.add((rows_before_wrap * fb_w * BPP) as usize)
+            };
+            _dma2d.blit_raw(
+                self.starfield as *const u8, STAR_STRIDE,
+                dst2, fb_w * BPP,
+                FB_W, FB_H - rows_before_wrap,
+                PixelFmt::Argb8888,
+            );
+        }
 
-        // Per-scanline: FIR text → blend onto starfield → rotate to portrait FB.
-        let stride = CRAWL_W * BPP;
+        let t1 = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
+
+        // ── Step 2: FIR text overlay + alpha blend onto portrait FB ──────
+        // For each landscape row (vis_y), FIR the A8 text, then write
+        // blended pixels into the portrait FB column. Only rows with
+        // text data are processed; the starfield is already in the FB.
         let dst_stride = fb_w * BPP;
-        let star_stride = stride;
 
         for vis_y in 0..CRAWL_H {
             let text_row_i = scroll_px + vis_y as i32;
+            if text_row_i < 0 || text_row_i as u32 >= self.text_h {
+                continue; // starfield already in FB, nothing to overlay
+            }
 
-            // Perspective: narrow at top (vis_y=0), wide at bottom (vis_y=479).
+            // Perspective width.
             let target_w = TOP_W + (BOT_W - TOP_W) * vis_y / (CRAWL_H - 1);
             let dst_x_off = (CRAWL_W - target_w) / 2;
 
-            // FIR-resample the text row at this perspective width.
-            // Only if the text row is in range; otherwise scanline_buf is unused.
-            let has_text = text_row_i >= 0
-                && (text_row_i as u32) < self.text_h;
-            if has_text {
-                self.fir_resample_text_row(text_row_i as u32, target_w);
-            }
+            // FIR resample (skips all-zero rows internally).
+            self.fir_resample_text_row(text_row_i as u32, target_w);
 
-            // Starfield row (tiled).
-            let star_row = if text_row_i >= 0 {
-                text_row_i as u32 % CRAWL_H
-            } else {
-                (text_row_i.rem_euclid(CRAWL_H as i32)) as u32
-            };
-            let star_ptr = unsafe {
-                self.starfield.add((star_row * star_stride) as usize)
-            };
-
-            // Write one portrait column: read starfield, blend FIR'd text, rotate.
+            // Alpha-blend FIR'd text onto the starfield already in the FB.
+            // Write to portrait column (fb_w - 1 - vis_y).
             let dst_col = fb_w - 1 - vis_y;
-            for lx in 0..CRAWL_W {
-                let pixel = if lx >= dst_x_off && lx < dst_x_off + target_w {
-                    // Starfield pixel at this position
-                    let star_px = unsafe {
-                        (star_ptr.add((lx * BPP) as usize) as *const u32).read()
-                    };
-                    if has_text {
-                        // Blend FIR'd text alpha onto starfield
-                        let trap_x = (lx - dst_x_off) as usize;
-                        let alpha = self.scanline_buf[trap_x] as u32;
-                        if alpha > 0 {
-                            // Source-over: yellow text on starfield
-                            let inv = 255 - alpha;
-                            let sr = (YELLOW >> 16) & 0xFF;
-                            let sg = (YELLOW >> 8) & 0xFF;
-                            let sb = YELLOW & 0xFF;
-                            let dr = (star_px >> 16) & 0xFF;
-                            let dg = (star_px >> 8) & 0xFF;
-                            let db = star_px & 0xFF;
-                            let r = (sr * alpha + dr * inv) / 255;
-                            let g = (sg * alpha + dg * inv) / 255;
-                            let b = (sb * alpha + db * inv) / 255;
-                            0xFF00_0000 | (r << 16) | (g << 8) | b
-                        } else {
-                            star_px
-                        }
-                    } else {
-                        star_px
-                    }
-                } else {
-                    BG_COLOR
-                };
-                unsafe {
-                    let dst_off = (lx * dst_stride + dst_col * BPP) as usize;
-                    (back_buf.add(dst_off) as *mut u32).write(pixel);
-                }
+            for lx in dst_x_off..dst_x_off + target_w {
+                let trap_x = (lx - dst_x_off) as usize;
+                let alpha = self.scanline_buf[trap_x] as u32;
+                if alpha == 0 { continue; } // skip transparent — starfield intact
+
+                // Read existing starfield pixel from portrait FB.
+                let dst_off = (lx * dst_stride + dst_col * BPP) as usize;
+                let star = unsafe { (back_buf.add(dst_off) as *const u32).read() };
+
+                let inv = 255 - alpha;
+                let r = (((YELLOW >> 16) & 0xFF) * alpha + ((star >> 16) & 0xFF) * inv) / 255;
+                let g = (((YELLOW >> 8) & 0xFF) * alpha + ((star >> 8) & 0xFF) * inv) / 255;
+                let b = ((YELLOW & 0xFF) * alpha + (star & 0xFF) * inv) / 255;
+                let blended = 0xFF00_0000 | (r << 16) | (g << 8) | b;
+
+                unsafe { (back_buf.add(dst_off) as *mut u32).write(blended); }
             }
         }
 
         let t2 = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
 
-        // DON'T advance scroll here — caller advances after present()
-        // so both double-buffer frames show the same scroll position.
-
         // Timing report.
-        let frame_num = ((scroll_px + (CRAWL_H as i32)) as u32) / 10; // rough frame counter
-        if frame_num < 5 || frame_num % 30 == 0 {
-            dbg("SC:fir="); dbg_dec(fir_cycles / 400);
-            dbg(" rot="); dbg_dec(rot_cycles / 400);
+        static mut FRAME_CT: u32 = 0;
+        let fc = unsafe { FRAME_CT };
+        if fc < 5 || fc % 30 == 0 {
+            dbg("SC:star="); dbg_dec(t1.wrapping_sub(t0) / 400);
+            dbg(" txt="); dbg_dec(t2.wrapping_sub(t1) / 400);
             dbg(" tot="); dbg_dec(t2.wrapping_sub(t0) / 400);
             dbg("us s="); dbg_dec(scroll_px as u32);
             dbg("\r\n");
         }
+        unsafe { FRAME_CT = fc + 1; }
 
         true
     }
@@ -328,6 +315,7 @@ impl StarCrawl {
 
     /// FIR-resample one text source row from TEXT_W → target_w.
     /// Uses 7-tap raised-cosine kernel for anti-aliased downsampling.
+    /// Skips runs of zero source pixels (transparent spans) for speed.
     /// Output: A8 alpha values in self.scanline_buf[0..target_w].
     #[inline(always)]
     fn fir_resample_text_row(&mut self, text_row: u32, target_w: u32) {
@@ -335,11 +323,51 @@ impl StarCrawl {
         let src = unsafe { self.text_src.add((text_row * TEXT_W) as usize) };
         let step_q16 = (TEXT_W << 16) / target_w;
 
-        for ox in 0..target_w as usize {
+        // Check if entire row is zero (common for line spacing gaps).
+        // Scan in u32 chunks (4 A8 bytes at a time) for speed.
+        let mut all_zero = true;
+        let words = TEXT_W as usize / 4;
+        let src32 = src as *const u32;
+        for i in 0..words {
+            if unsafe { src32.add(i).read() } != 0 {
+                all_zero = false;
+                break;
+            }
+        }
+        if all_zero {
+            for ox in 0..target_w as usize {
+                self.scanline_buf[ox] = 0;
+            }
+            return;
+        }
+
+        let mut ox = 0usize;
+        while ox < target_w as usize {
             let cx_q16 = ox as u32 * step_q16 + (step_q16 >> 1);
             let cx = (cx_q16 >> 16) as i32;
 
-            // 7-tap weighted average: [8, 24, 48, 64, 48, 24, 8] / 224
+            // Check if center and neighbors are all zero → skip this span.
+            if cx >= 3 && cx + 3 < TEXT_W as i32 {
+                let center = unsafe { *src.add(cx as usize) };
+                if center == 0 {
+                    // Check tap range: if all 7 taps are zero, output is zero.
+                    let any_nonzero = unsafe {
+                        *src.add((cx - 3) as usize) != 0
+                        || *src.add((cx - 2) as usize) != 0
+                        || *src.add((cx - 1) as usize) != 0
+                        || *src.add((cx + 1) as usize) != 0
+                        || *src.add((cx + 2) as usize) != 0
+                        || *src.add((cx + 3) as usize) != 0
+                    };
+                    if !any_nonzero {
+                        self.scanline_buf[ox] = 0;
+                        ox += 1;
+                        continue;
+                    }
+                }
+            }
+
+            // Full 7-tap FIR.
             let mut acc: u32 = 0;
             let mut wsum: u32 = 0;
             const TAPS: [(i32, u32); 7] = [(-3,8),(-2,24),(-1,48),(0,64),(1,48),(2,24),(3,8)];
@@ -352,18 +380,26 @@ impl StarCrawl {
                 }
             }
             self.scanline_buf[ox] = if wsum > 0 { (acc / wsum).min(255) as u8 } else { 0 };
+            ox += 1;
         }
     }
 
     // ── Starfield ───────────────────────────────────────────────────────
 
+    /// Render portrait-oriented double-height mirrored starfield.
+    /// FB_W wide × STAR_ROWS tall. Top half = random stars,
+    /// bottom half = mirror of top. DMA2D can blit directly to portrait FB.
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn render_starfield(&mut self, dma2d: &mut Dma2dBlitter) {
-        let stride = CRAWL_W * BPP;
-        dma2d.fill_raw(self.starfield, stride, CRAWL_W, CRAWL_H, BG_COLOR, PixelFmt::Argb8888);
+        // Fill full buffer with BG_COLOR.
+        dma2d.fill_raw(
+            self.starfield, STAR_STRIDE, FB_W, STAR_ROWS,
+            BG_COLOR, PixelFmt::Argb8888,
+        );
 
+        // Scatter stars in the top half (portrait rows 0..FB_H-1).
         let mut rng = 0xDEAD_BEEFu32;
-        let pixel_count = CRAWL_W * CRAWL_H;
+        let pixel_count = FB_W * FB_H;
         for _ in 0..STAR_COUNT {
             rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
             let idx = rng % pixel_count;
@@ -376,6 +412,15 @@ impl StarCrawl {
                 (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color);
             }
             rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+        }
+
+        // Mirror: copy top half to bottom half in reverse row order.
+        let row_bytes = STAR_STRIDE as usize;
+        for i in 0..FB_H {
+            let src = unsafe { self.starfield.add((i * STAR_STRIDE) as usize) };
+            let dst_row = STAR_ROWS - 1 - i;
+            let dst = unsafe { self.starfield.add((dst_row * STAR_STRIDE) as usize) };
+            unsafe { core::ptr::copy_nonoverlapping(src, dst, row_bytes); }
         }
     }
 
