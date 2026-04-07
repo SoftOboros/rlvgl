@@ -19,6 +19,13 @@ struct GlyphMetric {
     height: usize,
     advance: f32,
     offset: usize,
+    ymin: i32,
+}
+
+#[derive(Serialize)]
+struct FontPack {
+    ascent: f32,
+    glyphs: Vec<GlyphMetric>,
 }
 
 /// Pack font files under `root` into binary and JSON outputs.
@@ -40,6 +47,12 @@ pub(crate) fn pack(root: &Path, manifest_path: &Path, size: f32, chars: &str) ->
         let mut metrics = Vec::new();
         let mut offset = 0usize;
 
+        // Compute line metrics for ascent
+        let line_metrics = font
+            .horizontal_line_metrics(size)
+            .ok_or_else(|| anyhow!("missing horizontal line metrics"))?;
+        let ascent = line_metrics.ascent;
+
         for ch in chars.chars() {
             let (m, bitmap) = font.rasterize(ch, size);
             metrics.push(GlyphMetric {
@@ -48,6 +61,7 @@ pub(crate) fn pack(root: &Path, manifest_path: &Path, size: f32, chars: &str) ->
                 height: m.height,
                 advance: m.advance_width,
                 offset,
+                ymin: m.ymin,
             });
             bin.extend_from_slice(&bitmap);
             offset += bitmap.len();
@@ -57,7 +71,8 @@ pub(crate) fn pack(root: &Path, manifest_path: &Path, size: f32, chars: &str) ->
         let bin_path = path.with_file_name(format!("{}-{}.bin", stem, size as usize));
         let json_path = path.with_file_name(format!("{}-{}.json", stem, size as usize));
         fs::write(&bin_path, &bin)?;
-        fs::write(&json_path, serde_json::to_vec(&metrics)?)?;
+        let font_pack = FontPack { ascent, glyphs: metrics };
+        fs::write(&json_path, serde_json::to_vec(&font_pack)?)?;
         println!(
             "Packed {} -> {}, {}",
             path.display(),
@@ -70,6 +85,52 @@ pub(crate) fn pack(root: &Path, manifest_path: &Path, size: f32, chars: &str) ->
     check::run(root, manifest_path, true)?;
     Ok(())
 }
+#[cfg(test)]
+mod font_gen {
+    use fontdue::{Font, FontSettings};
+    use std::path::Path;
+
+    /// Run with: RUSTFLAGS="" cargo test --features creator gen_packed_font_rs -- --nocapture
+    ///
+    /// Generates Rust source for GlyphMetric arrays with ymin fields.
+    #[test]
+    fn gen_packed_font_rs() {
+        let charset = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u{00e0}\u{00e2}\u{00e6}\u{00e7}\u{00e9}\u{00e8}\u{00ea}\u{00eb}\u{00ee}\u{00ef}\u{00f4}\u{0153}\u{00f9}\u{00fb}\u{00fc}\u{00ff}\u{00c0}\u{00c2}\u{00c6}\u{00c7}\u{00c9}\u{00c8}\u{00ca}\u{00cb}\u{00ce}\u{00cf}\u{00d4}\u{0152}\u{00d9}\u{00db}\u{00dc}\u{0178}\u{00ab}\u{00bb}\u{20ac}\u{2039}\u{203a}";
+
+        let fonts = [
+            ("DejaVuSans", 24.0f32),
+            ("DejaVuSans-Bold", 32.0f32),
+        ];
+
+        for (name, size) in &fonts {
+            let ttf_path = format!("examples/stm32h747i-disco/assets/fonts/{}.ttf", name);
+            let data = std::fs::read(Path::new(&ttf_path)).unwrap();
+            let font = Font::from_bytes(data, FontSettings::default()).unwrap();
+            let lm = font.horizontal_line_metrics(*size).unwrap();
+            let ascent_i16 = lm.ascent.round() as i16;
+
+            let rust_name = name.replace('-', "_").to_uppercase();
+            let count = charset.chars().count();
+
+            println!("// {} glyphs, auto-generated from {}-{}", count, name, *size as usize);
+            println!("// ascent = {}", ascent_i16);
+
+            let mut offset = 0usize;
+            for ch in charset.chars() {
+                let (m, bitmap) = font.rasterize(ch, *size);
+                let advance_fp16 = (m.advance_width * 16.0).round() as u16;
+                println!(
+                    "    GlyphMetric {{ ch: '\\u{{{:04X}}}', width: {}, height: {}, advance_fp16: {}, offset: {}, ymin: {} }},",
+                    ch as u32, m.width, m.height, advance_fp16, offset, m.ymin
+                );
+                offset += bitmap.len();
+            }
+            println!("// total data bytes: {}", offset);
+            println!();
+        }
+    }
+}
+
 #[cfg(all(test, feature = "regression"))]
 mod tests {
     use super::*;

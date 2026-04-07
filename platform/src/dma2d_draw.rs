@@ -6,14 +6,19 @@
 //! This module bypasses the `Renderer` trait pipeline entirely, writing
 //! directly to the SDRAM framebuffer via DMA2D hardware operations.
 
+use crate::blit::PixelFmt;
+use crate::dma2d::Dma2dBlitter;
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::widget::{Color, Rect};
 
-/// Context for CPU overlay rendering on a portrait framebuffer.
+/// Minimum pixel count before using DMA2D instead of CPU.
+const DMA2D_THRESHOLD: u32 = 64;
+
+/// Context for overlay rendering on a portrait framebuffer.
 ///
 /// All public methods accept **landscape** widget coordinates (800×480) and
 /// internally rotate to portrait FB coordinates (480×800).
-/// Uses direct CPU writes to avoid SDRAM bank contention with LTDC.
+/// Uses DMA2D hardware for bulk operations and CPU for small ones.
 pub struct Dma2dOverlayCtx {
     /// Back-buffer base address in SDRAM.
     pub fb: *mut u8,
@@ -23,6 +28,13 @@ pub struct Dma2dOverlayCtx {
     pub fb_w: u32,
     /// Portrait framebuffer height (800 on STM32H747I-DISCO).
     pub fb_h: u32,
+    /// When `true`, EoR gate confirmed safe write window — skip per-row delay.
+    pub eor_gated: bool,
+    /// DWT cycles waited for EoR (diagnostic). u32::MAX = timeout.
+    pub eor_wait_cycles: u32,
+    /// Optional DMA2D blitter for hardware-accelerated fills and blends.
+    /// Raw pointer to avoid lifetime propagation; caller must ensure validity.
+    pub dma2d: Option<*mut Dma2dBlitter>,
 }
 
 impl Dma2dOverlayCtx {
@@ -78,17 +90,38 @@ impl Dma2dOverlayCtx {
     // ── Rectangle fills ────────────────────────────────────────────────
 
     /// Fill a landscape-coordinate rectangle with solid color.
-    /// Uses CPU writes with periodic bus yield to prevent LTDC starvation.
+    /// Uses DMA2D R2M fill for large areas, CPU writes for small ones.
     pub fn fill_rect_rotated(&mut self, wx: i32, wy: i32, ww: i32, wh: i32, color: Color) {
         if let Some((fx, fy, fw, fh)) = self.rotate_clip(wx, wy, ww, wh) {
             let argb = color.to_argb8888();
+
+            // Use DMA2D for large fills
+            if fw as u32 * fh as u32 >= DMA2D_THRESHOLD {
+                if let Some(dma2d_ptr) = self.dma2d {
+                    let dst = self.fb_ptr(fx, fy);
+                    unsafe {
+                        (*dma2d_ptr).fill_raw(
+                            dst,
+                            self.fb_stride,
+                            fw as u32,
+                            fh as u32,
+                            argb,
+                            PixelFmt::Argb8888,
+                        );
+                    }
+                    return;
+                }
+            }
+
+            // CPU fallback for small fills or when DMA2D unavailable
             for row in 0..fh {
                 let ptr = self.fb_ptr(fx, fy + row) as *mut u32;
                 for col in 0..fw {
                     unsafe { ptr.add(col as usize).write_volatile(argb) };
                 }
-                // Yield between rows until EoR gating is verified working
-                cortex_m::asm::delay(1000);
+                if !self.eor_gated {
+                    cortex_m::asm::delay(1000);
+                }
             }
         }
     }
@@ -362,18 +395,43 @@ impl Dma2dOverlayCtx {
         for row in 0..gh as usize {
             for col in 0..gw as usize {
                 let src_alpha = glyph_data[row * gw as usize + col];
-                // Modulate by color alpha
-                let alpha = if fg_color.3 == 255 {
-                    src_alpha
-                } else {
-                    ((src_alpha as u16 * fg_color.3 as u16) / 255) as u8
-                };
-                scratch[col * gh as usize + (gh as usize - 1 - row)] = alpha;
+                scratch[col * gh as usize + (gh as usize - 1 - row)] = src_alpha;
             }
         }
 
-        // CPU source-over blend of rotated glyph — avoids DMA2D SDRAM
-        // bank contention with LTDC. Each pixel: read BG, blend, write.
+        // Rotated glyph dimensions: gh wide × gw tall
+        let rot_w = gh;
+        let rot_h = gw;
+
+        // Use DMA2D A8 blend for large glyphs
+        if rot_w * rot_h >= DMA2D_THRESHOLD {
+            if let Some(dma2d_ptr) = self.dma2d {
+                // Pre-modulate scratch alpha by fg_color.3 if not fully opaque
+                if fg_color.3 != 255 {
+                    let base = fg_color.3 as u16;
+                    for i in 0..(rot_w * rot_h) as usize {
+                        scratch[i] = ((scratch[i] as u16 * base) / 255) as u8;
+                    }
+                }
+                let fg_rgb = ((fg_color.0 as u32) << 16)
+                    | ((fg_color.1 as u32) << 8)
+                    | (fg_color.2 as u32);
+                let dst = self.fb_ptr(fx, fy);
+                unsafe {
+                    (*dma2d_ptr).blend_a8_color(
+                        scratch.as_ptr(),
+                        rot_w,
+                        rot_h,
+                        fg_rgb,
+                        dst,
+                        self.fb_stride,
+                    );
+                }
+                return;
+            }
+        }
+
+        // CPU source-over blend fallback
         let alpha_base = fg_color.3 as u16;
         for rot_row in 0..gw as usize {
             for rot_col in 0..gh as usize {
@@ -427,8 +485,8 @@ impl Dma2dOverlayCtx {
                 let off = glyph.offset as usize;
                 let total = (gw * gh) as usize;
 
-                // Center glyph vertically relative to font height
-                let gy = y + (font.height as i32 - gh as i32) / 2;
+                // Position glyph relative to baseline using ymin
+                let gy = y + font.ascent as i32 - glyph.ymin as i32 - gh as i32;
 
                 if total > 0 && total <= scratch.len() {
                     if let Some(data) = font.data.get(off..off + total) {

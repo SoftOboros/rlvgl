@@ -1037,11 +1037,11 @@ fn main() -> ! {
             let apb2 = 0x5802_44F0u32 as *mut u32;
             apb2.write_volatile(apb2.read_volatile() | (1 << 4));
             let _ = (apb2 as *const u32).read_volatile();
-            // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE
+            // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE+FIFOEN
             let usart1 = 0x4001_1000u32;
             ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR
             ((usart1 + 0x00) as *mut u32).write_volatile(
-                (1 << 3) | (1 << 2) | (1 << 0), // TE + RE + UE
+                (1 << 29) | (1 << 3) | (1 << 2) | (1 << 0), // FIFOEN + TE + RE + UE
             );
         }
 
@@ -1498,6 +1498,23 @@ fn main() -> ! {
             }
         }
 
+        /// Print a u32 as decimal over serial.
+        fn serial_dec(mut v: u32) {
+            if v == 0 { serial_puts("0"); return; }
+            let mut buf = [0u8; 10];
+            let mut i = 0;
+            while v > 0 {
+                buf[i] = b'0' + (v % 10) as u8;
+                v /= 10;
+                i += 1;
+            }
+            while i > 0 {
+                i -= 1;
+                let s = unsafe { core::str::from_utf8_unchecked(core::slice::from_ref(&buf[i])) };
+                serial_puts(s);
+            }
+        }
+
         // ── EventWindow widget (replaces direct-framebuffer toasts) ──────
         use alloc::rc::Rc;
         use core::cell::RefCell;
@@ -1586,6 +1603,7 @@ fn main() -> ! {
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
                 height: 24,
+                ascent: 22,
                 glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
                 data: FONT_DATA,
             };
@@ -1639,6 +1657,7 @@ fn main() -> ! {
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
                 height: 24,
+                ascent: 22,
                 glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
                 data: FONT_DATA,
             };
@@ -1900,6 +1919,11 @@ fn main() -> ! {
         }
 
         let mut dirty_frames: u8 = 4; // force initial render
+        // Pipelined render state: decouple render from present.
+        // render_active: back buffer is being rendered to (don't present).
+        // buffer_ready: render complete, waiting for back porch to present.
+        let mut render_active = false;
+        let mut buffer_ready = false;
         let mut was_visible = false;
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
@@ -1921,6 +1945,7 @@ fn main() -> ! {
                 include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
             static BOLD_FONT: PackedFont = PackedFont {
                 height: 32,
+                ascent: 30,
                 glyphs: &crate::fonts::DEJAVU_SANS_BOLD_32_GLYPHS,
                 data: BOLD_FONT_DATA,
             };
@@ -2031,6 +2056,25 @@ fn main() -> ! {
             // Poll touch — coords already in landscape widget space
             // (portrait→landscape transform done inside InputDevice::poll)
             if let Some(evt) = input.poll() {
+                // While crawl is active, consume all touch events.
+                // PointerDown deactivates; everything else is suppressed.
+                let mut consumed = false;
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                if star_crawl.is_active() {
+                    if matches!(&evt, Event::PointerDown { .. }) {
+                        star_crawl.deactivate();
+                        serial_puts("CRAWL:touch_exit\r\n");
+                        // Full screen restore from pristine desktop.
+                        let (cw, ch) = display.dimensions();
+                        compositor.mark_pristine_restore(
+                            rlvgl_core::widget::Rect { x: 0, y: 0, width: ch as i32, height: cw as i32 },
+                        );
+                        dirty_frames = 4;
+                    }
+                    consumed = true; // suppress ALL events during crawl
+                }
+
+                if !consumed {
                 // Log to telemetry + event window
                 match &evt {
                     Event::PointerDown { x, y } => {
@@ -2064,16 +2108,27 @@ fn main() -> ! {
                         root.borrow_mut().dispatch_event(&ge);
                     }
                 }
-            }
+            } // if !consumed
+            } // if let Some(evt)
 
             // ── Serial RX command injection ──
             // Drain USART1 RX FIFO, accumulate into serial_buf, dispatch on '\n'
             unsafe {
+                let rxne = USART1_ISR.read_volatile() & (1 << 5) != 0;
+                // Debug: log first RX byte detection
+                static mut RX_DBG: bool = false;
+                if rxne && !RX_DBG {
+                    serial_puts("RX!\r\n");
+                    RX_DBG = true;
+                }
                 while USART1_ISR.read_volatile() & (1 << 5) != 0 { // RXNE
                     let byte = (USART1_RDR.read_volatile() & 0xFF) as u8;
                     if byte == b'\n' || byte == b'\r' {
                         if serial_len > 0 {
                             let cmd = &serial_buf[..serial_len];
+                            serial_puts("CMD:");
+                            serial_puts(core::str::from_utf8(&serial_buf[..serial_len]).unwrap_or("?"));
+                            serial_puts("\r\n");
                             if cmd[0] == b'?' {
                                 // Status query: print tick count
                                 serial_puts("tick=");
@@ -2154,6 +2209,11 @@ fn main() -> ! {
                                     }
                                 }
                                 serial_puts("END\r\n");
+                            } else if cmd[0] == b'C' || cmd[0] == b'c' {
+                                // Toggle star crawl
+                                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                                crawl_flag.set(true);
+                                serial_puts("CRAWL:toggled\r\n");
                             } else {
                                 serial_puts("ERR: unknown cmd\r\n");
                             }
@@ -2379,6 +2439,9 @@ fn main() -> ! {
                     }
                     if cm_vis { dirty_frames = dirty_frames.max(2); }
                 }
+                // Event viewer visible → keep rendering (scrolling text, expiry)
+                if vis { dirty_frames = dirty_frames.max(2); }
+
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
                 let ec = entry_count;
@@ -2396,9 +2459,11 @@ fn main() -> ! {
                 if crawl_flag.get() {
                     crawl_flag.set(false);
                     if star_crawl.is_active() {
+                        serial_puts("CRAWL:off\r\n");
                         star_crawl.deactivate();
                         dirty_frames = 4; // restore desktop
                     } else {
+                        serial_puts("CRAWL:activating\r\n");
                         // Deactivate audio scope if active (shared SDRAM region)
                         #[cfg(feature = "audio")]
                         if audio_scope.is_active() {
@@ -2407,8 +2472,12 @@ fn main() -> ! {
                         }
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            serial_puts("CRAWL:activate()\r\n");
                             star_crawl.activate(&mut blitter);
+                            serial_puts("CRAWL:active!\r\n");
                             display.return_dma2d_raw(blitter.into_inner());
+                        } else {
+                            serial_puts("CRAWL:no dma2d!\r\n");
                         }
                     }
                 }
@@ -2448,117 +2517,17 @@ fn main() -> ! {
                 #[cfg(not(feature = "audio"))]
                 let scope_active = false;
 
-                if crawl_active {
-                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                    if let Some(raw) = display.take_dma2d_raw() {
-                        let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
-                        let back = display.back_buffer_addr();
-                        let (w, h) = display.dimensions();
-                        if star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
-                            render_count += 1;
-                            display.present();
-                        }
-                        display.return_dma2d_raw(blitter.into_inner());
-                        // Auto-deactivation: crawl finished scrolling
-                        if !star_crawl.is_active() {
-                            dirty_frames = 4;
-                        }
-                    }
-                } else if scope_active {
-                    #[cfg(feature = "audio")]
-                    {
-                        // Pad frame buffer with zeros if we didn't collect 720 samples
-                        for i in pcm_frame_count..720 {
-                            pcm_frame_buf[i] = 0;
-                        }
-                        let back = display.back_buffer_addr();
-                        let (w, h) = display.dimensions();
-                        if audio_scope.tick(&pcm_frame_buf, back as *mut u8, w, h) {
-                            render_count += 1;
-                            display.present();
-                        }
-                        pcm_frame_count = 0;
+                // All render paths use the pipeline: set render_active,
+                // actual work happens in the render stage below.
+                if crawl_active || scope_active {
+                    // Crawl/scope render continuously while active.
+                    if !render_active && !buffer_ready {
+                        render_active = true;
                     }
                 } else {
-                    let need_render = dirty_frames > 0;
-                    if need_render {
-                        let back = display.back_buffer_addr();
-                        let (w, h) = display.dimensions();
-                        let fb_bytes = (w * h * 4) as usize;
-                        let stride = (w * 4) as usize;
-
-                        compositor.restore(back as *mut u8);
-
-                        let fb_slice = unsafe {
-                            core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
-                        };
-                        let surface = Surface::new(
-                            fb_slice, stride, PixelFmt::Argb8888, w, h,
-                        );
-                        let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
-                            BlitterRenderer::new(&mut render_blitter, surface);
-                        let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
-
-                        root.borrow().draw(&mut renderer);
-
-                        // CPU overlay rendering — gated on DSI End-of-Refresh
-                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                        {
-                            let any_overlay = chip_info_panel.borrow().is_visible()
-                                || live_stats_panel.borrow().is_visible()
-                                || config_menu.borrow().is_visible();
-                            if any_overlay {
-                                // EoR gate deferred — needs WISR address verification
-                                // display.wait_frame_done();
-                                let scratch = unsafe {
-                                    core::slice::from_raw_parts_mut(
-                                        0xD04C_0000 as *mut u8, 1024,
-                                    )
-                                };
-                                let mut ctx = rlvgl::platform::dma2d_draw::Dma2dOverlayCtx {
-                                    fb: back as *mut u8,
-                                    fb_stride: w * 4,
-                                    fb_w: w,
-                                    fb_h: h,
-                                };
-                                if chip_info_panel.borrow().is_visible() {
-                                    chip_info_panel.borrow().draw_hw(&mut ctx, scratch);
-                                }
-                                if live_stats_panel.borrow().is_visible() {
-                                    live_stats_panel.borrow().draw_hw(&mut ctx, scratch);
-                                }
-                                if config_menu.borrow().is_visible() {
-                                    config_menu.borrow().draw_hw(&mut ctx, scratch);
-                                }
-                            }
-                        }
-
-                        // Flicker probe disabled — confirmed overlay renders to both buffers
-                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                        if false && (chip_info_panel.borrow().is_visible() || live_stats_panel.borrow().is_visible()) {
-                            static mut FP_DIV: u8 = 0;
-                            unsafe {
-                                FP_DIV = FP_DIV.wrapping_add(1);
-                                if FP_DIV % 60 == 0 {
-                                    // Panel center: landscape (400,240) → portrait row=400, col=239
-                                    let off = 400 * (w * 4) as usize + 239 * 4;
-                                    let px = ((back as *const u8).add(off) as *const u32).read_volatile();
-                                    // BG_COLOR at alpha=255 is 0xFF1E1E1E
-                                    // Desktop is typically 0xFFxxxxxx (splash)
-                                    // If px != 0xFF1E1E1E, overlay didn't draw here
-                                    serial_puts(if px == 0xFF1E1E1E { "PX:BG " } else { "PX:!BG " });
-                                    // Also dump back/front addrs
-                                    serial_puts(if back == display.front_buffer_addr() as u32 {
-                                        "SAME!\r\n"
-                                    } else {
-                                        "ok\r\n"
-                                    });
-                                }
-                            }
-                        }
-                        render_count += 1;
-                        if dirty_frames > 0 { dirty_frames -= 1; }
-                        display.present();
+                    // Normal path: render when dirty.
+                    if dirty_frames > 0 && !render_active && !buffer_ready {
+                        render_active = true;
                     }
                 }
 
@@ -2624,14 +2593,179 @@ fn main() -> ! {
                     }
                 }
             }
-            #[cfg(feature = "cpu_stats")]
-            {
-                cpu_stats.idle_enter();
-                cortex_m::asm::wfi();
-                cpu_stats.idle_exit();
+
+            // ── Pipeline stage: RENDER ────────────────────────────────────
+            // Runs when SysTick marked render_active. Draws to back buffer.
+            // LTDC reads front buffer undisturbed during this time.
+            // Three modes: star crawl, audio scope, or normal tree+overlay.
+            if render_active && !buffer_ready {
+                const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+                let t_frame_start = unsafe { DWT_CYCCNT.read_volatile() };
+
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                let is_crawl = star_crawl.is_active();
+                #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+                let is_crawl = false;
+
+                #[cfg(feature = "audio")]
+                let is_scope = audio_scope.is_active();
+                #[cfg(not(feature = "audio"))]
+                let is_scope = false;
+
+                let back = display.back_buffer_addr();
+                let (w, h) = display.dimensions();
+                let mut drew = true;
+
+                if is_crawl {
+                    // ── Star crawl render ──
+                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    if let Some(raw) = display.take_dma2d_raw() {
+                        let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                        drew = star_crawl.tick(&mut blitter, back as *mut u8, w, h);
+                        display.return_dma2d_raw(blitter.into_inner());
+                        if !star_crawl.is_active() {
+                            serial_puts("CRAWL:done\r\n");
+                            // Full screen restore from pristine desktop.
+                            let (w, h) = display.dimensions();
+                            compositor.mark_pristine_restore(
+                                rlvgl_core::widget::Rect { x: 0, y: 0, width: h as i32, height: w as i32 },
+                            );
+                            dirty_frames = 4;
+                        }
+                    }
+                } else if is_scope {
+                    // ── Audio scope render ──
+                    #[cfg(feature = "audio")]
+                    {
+                        for i in pcm_frame_count..720 {
+                            pcm_frame_buf[i] = 0;
+                        }
+                        drew = audio_scope.tick(&pcm_frame_buf, back as *mut u8, w, h);
+                        pcm_frame_count = 0;
+                    }
+                } else {
+                    // ── Normal tree + overlay render ──
+                    let fb_bytes = (w * h * 4) as usize;
+                    let stride = (w * 4) as usize;
+
+                    compositor.restore(back as *mut u8);
+
+                    let fb_slice = unsafe {
+                        core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
+                    };
+                    let surface = Surface::new(
+                        fb_slice, stride, PixelFmt::Argb8888, w, h,
+                    );
+                    let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                        BlitterRenderer::new(&mut render_blitter, surface);
+                    let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+
+                    root.borrow().draw(&mut renderer);
+
+                    // CPU overlay rendering
+                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    {
+                        let any_overlay = chip_info_panel.borrow().is_visible()
+                            || live_stats_panel.borrow().is_visible()
+                            || config_menu.borrow().is_visible();
+                        if any_overlay {
+                            let scratch = unsafe {
+                                core::slice::from_raw_parts_mut(
+                                    0xD04C_0000 as *mut u8, 1024,
+                                )
+                            };
+                            // Take DMA2D for hardware-accelerated overlay rendering
+                            let mut blitter_opt = display.take_dma2d_raw()
+                                .map(rlvgl::platform::Dma2dBlitter::new);
+                            let dma2d_ptr = blitter_opt.as_mut()
+                                .map(|b| b as *mut rlvgl::platform::Dma2dBlitter);
+                            let mut ctx = rlvgl::platform::dma2d_draw::Dma2dOverlayCtx {
+                                fb: back as *mut u8,
+                                fb_stride: w * 4,
+                                fb_w: w,
+                                fb_h: h,
+                                eor_gated: true,
+                                eor_wait_cycles: 0,
+                                dma2d: dma2d_ptr,
+                            };
+                            if chip_info_panel.borrow().is_visible() {
+                                chip_info_panel.borrow().draw_hw(&mut ctx, scratch);
+                            }
+                            if live_stats_panel.borrow().is_visible() {
+                                live_stats_panel.borrow().draw_hw(&mut ctx, scratch);
+                            }
+                            if config_menu.borrow().is_visible() {
+                                config_menu.borrow().draw_hw(&mut ctx, scratch);
+                            }
+                            // Return DMA2D peripheral
+                            ctx.dma2d = None;
+                            if let Some(blitter) = blitter_opt {
+                                display.return_dma2d_raw(blitter.into_inner());
+                            }
+                        }
+                    }
+                }
+
+                let t_done = unsafe { DWT_CYCCNT.read_volatile() };
+
+                // DSB: flush WT cache writes to SDRAM before presenting
+                cortex_m::asm::dsb();
+
+                if drew {
+                    render_count += 1;
+                    buffer_ready = true;
+                }
+                render_active = false;
+
+                // Frame timing report every 10 renders
+                if render_count % 10 == 0 {
+                    let total_us = t_done.wrapping_sub(t_frame_start) / 400;
+                    let fuif = display.check_fifo_underrun();
+                    serial_puts("R:");
+                    serial_dec(total_us);
+                    serial_puts("us");
+                    if is_crawl { serial_puts(" crawl"); }
+                    else if is_scope { serial_puts(" scope"); }
+                    if fuif { serial_puts(" FUIF!"); }
+                    serial_puts("\r\n");
+                }
             }
-            #[cfg(not(feature = "cpu_stats"))]
-            cortex_m::asm::nop();
+
+            // ── Pipeline stage: PRESENT (non-blocking ERIF check) ────────
+            // Only fires when render is done AND LTDC finished scanning
+            // (back porch). Falls through in ~10ns if not ready.
+            if buffer_ready && display.check_erif() {
+                display.present();
+                buffer_ready = false;
+
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                let crawl_running = star_crawl.is_active();
+                #[cfg(not(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))))]
+                let crawl_running = false;
+                #[cfg(feature = "audio")]
+                let scope_running = audio_scope.is_active();
+                #[cfg(not(feature = "audio"))]
+                let scope_running = false;
+
+                if crawl_running || scope_running {
+                    // Continuous mode: immediately re-arm for next frame.
+                    render_active = true;
+                } else if dirty_frames > 0 {
+                    dirty_frames -= 1;
+                }
+            }
+
+            // ── Idle: only spin-wait in the system ───────────────────────
+            if !render_active && !buffer_ready {
+                #[cfg(feature = "cpu_stats")]
+                {
+                    cpu_stats.idle_enter();
+                    cortex_m::asm::wfi();
+                    cpu_stats.idle_exit();
+                }
+                #[cfg(not(feature = "cpu_stats"))]
+                cortex_m::asm::wfi();
+            }
         }
     }
 
@@ -2826,18 +2960,23 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         let ahb4 = (0x5802_44E0u32 as *mut u32).read_volatile();
         (0x5802_44E0u32 as *mut u32).write_volatile(ahb4 | (1 << 0));
         (0x5802_44E0u32 as *const u32).read_volatile();
-        // PA9 = AF7: AFRH bits 7:4 = 7, MODER bits 19:18 = 10 (AF)
+        // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits 7:4 and 11:8 = 7
         let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile();
-        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32 << 4)) | (7u32 << 4));
+        ((GPIOA + 0x24) as *mut u32).write_volatile(
+            (afrh & !(0xFFu32 << 4)) | (0x77u32 << 4),
+        );
+        // MODER: PA9 = AF (10), PA10 = AF (10)
         let moder = (GPIOA as *mut u32).read_volatile();
-        (GPIOA as *mut u32).write_volatile((moder & !(3u32 << 18)) | (2u32 << 18));
+        (GPIOA as *mut u32).write_volatile(
+            (moder & !(0xF << 18)) | (0b1010 << 18),
+        );
         // Enable USART1 clock (APB2ENR bit 4)
         let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile();
         (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4));
         (0x5802_44F0u32 as *const u32).read_volatile();
         // BRR = APB2_clk / baud = 100_000_000 / 115200 ≈ 868
         ((USART1 + 0x0C) as *mut u32).write_volatile(868);
-        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 3) | (1 << 0)); // TE + UE
+        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE
     }
 
     /// Send a string over UART8 + USART1 VCP (blocking, dual output).

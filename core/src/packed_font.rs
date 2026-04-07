@@ -24,12 +24,16 @@ pub struct GlyphMetric {
     pub advance_fp16: u16,
     /// Byte offset into the glyph data blob.
     pub offset: u32,
+    /// Vertical offset from baseline (fontdue convention: positive = above baseline).
+    pub ymin: i16,
 }
 
 /// A proportionally-spaced font with grayscale anti-aliased glyphs.
 pub struct PackedFont {
-    /// Font height (ascent line, used for baseline positioning).
+    /// Font height (line height for layout).
     pub height: u16,
+    /// Font ascent in pixels (distance from top of line to baseline).
+    pub ascent: i16,
     /// Glyph metrics table, sorted by codepoint for binary search.
     pub glyphs: &'static [GlyphMetric],
     /// Raw grayscale glyph bitmap data.
@@ -93,8 +97,8 @@ impl PackedFont {
         let gw = glyph.width as usize;
         let gh = glyph.height as usize;
         let off = glyph.offset as usize;
-        // Center glyph vertically relative to font height
-        let gy = y + (self.height as i32 - gh as i32) / 2;
+        // Position glyph relative to baseline using ymin
+        let gy = y + self.ascent as i32 - glyph.ymin as i32 - gh as i32;
 
         for row in 0..gh {
             for col in 0..gw {
