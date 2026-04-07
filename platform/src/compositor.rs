@@ -49,6 +49,14 @@ pub struct Compositor {
     stride: usize,
     /// Next overlay ID.
     next_id: u32,
+    /// Number of pristine regions copied during the most recent restore pass.
+    last_pristine_regions: u16,
+    /// Number of save-under regions copied during the most recent restore pass.
+    last_save_regions: u16,
+    /// Total bytes copied during the most recent restore pass.
+    last_restore_bytes: u32,
+    /// Monotonic restore sequence number.
+    restore_seq: u32,
 }
 
 impl Compositor {
@@ -66,6 +74,10 @@ impl Compositor {
             fb_height,
             stride: (fb_width * 4) as usize,
             next_id: 1,
+            last_pristine_regions: 0,
+            last_save_regions: 0,
+            last_restore_bytes: 0,
+            restore_seq: 0,
         }
     }
 
@@ -152,11 +164,15 @@ impl Compositor {
     /// `back_buffer` must point to a valid framebuffer.
     pub fn restore(&mut self, back_buffer: *mut u8) {
         let stride = self.stride;
+        let mut pristine_regions = 0u16;
+        let mut save_regions = 0u16;
+        let mut restore_bytes = 0u32;
 
         // Restore from pristine background copy (multi-frame for double-buffer)
         if self.pristine_addr != 0 {
             let prist = self.pristine_addr as *const u8;
             for (region, _) in &self.pending_pristine {
+                pristine_regions = pristine_regions.saturating_add(1);
                 for row in 0..region.h {
                     let y = region.y + row;
                     let off = y as usize * stride + region.x as usize * 4;
@@ -164,6 +180,7 @@ impl Compositor {
                     unsafe {
                         core::ptr::copy_nonoverlapping(prist.add(off), back_buffer.add(off), len);
                     }
+                    restore_bytes = restore_bytes.saturating_add(len as u32);
                 }
             }
         }
@@ -175,6 +192,7 @@ impl Compositor {
 
         // Restore from save-under buffers
         for save in &self.pending_restore {
+            save_regions = save_regions.saturating_add(1);
             let fb = &save.region;
             let row_bytes = fb.w as usize * 4;
             for row in 0..fb.h {
@@ -188,14 +206,33 @@ impl Compositor {
                         row_bytes,
                     );
                 }
+                restore_bytes = restore_bytes.saturating_add(row_bytes as u32);
             }
         }
         self.pending_restore.clear();
+        self.last_pristine_regions = pristine_regions;
+        self.last_save_regions = save_regions;
+        self.last_restore_bytes = restore_bytes;
+        self.restore_seq = self.restore_seq.wrapping_add(1);
     }
 
     /// Whether there are pending restores of any kind.
     pub fn has_pending(&self) -> bool {
         !self.pending_restore.is_empty() || !self.pending_pristine.is_empty()
+    }
+
+    /// Return a packed summary of compositor queue state.
+    pub fn diag_counts(&self) -> u32 {
+        ((self.saves.len().min(0xFF) as u32) << 24)
+            | ((self.pending_restore.len().min(0xFF) as u32) << 16)
+            | ((self.pending_pristine.len().min(0xFF) as u32) << 8)
+            | ((self.last_pristine_regions.min(0x0F) as u32) << 4)
+            | (self.last_save_regions.min(0x0F) as u32)
+    }
+
+    /// Return the most recent restore sequence and byte count.
+    pub fn diag_bytes(&self) -> u32 {
+        ((self.restore_seq & 0xFFFF) << 16) | (self.last_restore_bytes.min(0xFFFF))
     }
 }
 

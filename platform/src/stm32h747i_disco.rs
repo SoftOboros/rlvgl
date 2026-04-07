@@ -1468,16 +1468,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     }
 
     /// Read DSI/LTDC diagnostic registers.
-    /// Returns `(wisr, ltdc_isr, cpsr)`:
+    /// Returns `(wisr, ltdc_isr, cpsr, cdsr)`:
     /// - wisr: DSI_WISR — ERIF (bit 1), TEIF (bit 0)
     /// - ltdc_isr: LTDC_ISR — FUIF (bit 1), LIF (bit 0)
     /// - cpsr: LTDC_CPSR — current scan position
-    pub fn diagnose_dsi_state(&self) -> (u32, u32, u32) {
+    /// - cdsr: LTDC_CDSR — VSYNC/HSYNC/data-enable phase state
+    pub fn diagnose_dsi_state(&self) -> (u32, u32, u32, u32) {
         unsafe {
             let wisr = (0x5000_040Cu32 as *const u32).read_volatile();
             let ltdc_isr = (0x5000_1038u32 as *const u32).read_volatile();
             let cpsr = (0x5000_1044u32 as *const u32).read_volatile();
-            (wisr, ltdc_isr, cpsr)
+            let cdsr = (0x5000_1048u32 as *const u32).read_volatile();
+            (wisr, ltdc_isr, cpsr, cdsr)
         }
     }
 

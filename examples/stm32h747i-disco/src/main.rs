@@ -37,8 +37,10 @@ mod fonts;
 mod icon_strip;
 mod ipc;
 mod readme_crawl;
+#[allow(dead_code)]
 mod settings_dialog;
 mod star_crawl;
+#[allow(dead_code)]
 mod sys_info;
 mod wing;
 // HAL BSP module is not required for this bring-up path
@@ -565,10 +567,6 @@ mod dma2d_irq {
         START_CYCLES.store(now, Ordering::Relaxed);
     }
 
-    pub fn take_complete() -> bool {
-        COMPLETE_LATCH.swap(false, Ordering::AcqRel)
-    }
-
     pub fn take_error() -> u32 {
         ERROR_LATCH.swap(0, Ordering::AcqRel)
     }
@@ -719,12 +717,31 @@ struct SerialTask {
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 impl SerialTask {
+    const D3_DISPLAY_FLAGS: u32 = 0x3800_1C44;
+    const D3_DISPLAY_FRONT: u32 = 0x3800_1C48;
+    const D3_DISPLAY_BACK: u32 = 0x3800_1C4C;
+    const D3_DISPLAY_ACTIVE: u32 = 0x3800_1C50;
+    const D3_DISPLAY_STATUS: u32 = 0x3800_1C54;
+    const D3_DISPLAY_CPSR: u32 = 0x3800_1C58;
+    const D3_OVERLAY_COUNTS: u32 = 0x3800_1C5C;
+    const D3_OVERLAY_BYTES: u32 = 0x3800_1C60;
+    const D3_EVENT_STATE: u32 = 0x3800_1C64;
+    const D3_EVENT_DRAW_SEQ: u32 = 0x3800_1C68;
+    const D3_CRAWL_DIAG0: u32 = 0x3800_1C6C;
+    const D3_CRAWL_DIAG1: u32 = 0x3800_1C70;
+    const D3_CRAWL_DIAG2: u32 = 0x3800_1C74;
+    const D3_CRAWL_DIAG3: u32 = 0x3800_1C78;
+
     const fn new() -> Self {
         Self {
             line_buf: [0; 64],
             line_len: 0,
             dump: None,
         }
+    }
+
+    fn read_diag(addr: u32) -> u32 {
+        unsafe { (addr as *const u32).read_volatile() }
     }
 
     fn poll<F>(
@@ -769,6 +786,8 @@ impl SerialTask {
                 let (rx_depth, tx_depth, rx_drop, tx_drop) = runtime_serial::stats();
                 serial_puts("tick=");
                 serial_dec(tick_count);
+                serial_puts(" present=");
+                serial_dec(present_count);
                 serial_puts(" rx=");
                 serial_dec(rx_depth as u32);
                 serial_puts(" tx=");
@@ -777,6 +796,39 @@ impl SerialTask {
                 serial_dec(rx_drop as u32);
                 serial_puts("/");
                 serial_dec(tx_drop as u32);
+                serial_puts("\r\n");
+                serial_puts("disp flags=");
+                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_FLAGS));
+                serial_puts(" front=");
+                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_FRONT));
+                serial_puts(" back=");
+                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_BACK));
+                serial_puts(" active=");
+                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_ACTIVE));
+                serial_puts("\r\n");
+                serial_puts("disp stat=");
+                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_STATUS));
+                serial_puts(" cpsr=");
+                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_CPSR));
+                serial_puts("\r\n");
+                serial_puts("ovl counts=");
+                serial_hex_u32(Self::read_diag(Self::D3_OVERLAY_COUNTS));
+                serial_puts(" bytes=");
+                serial_hex_u32(Self::read_diag(Self::D3_OVERLAY_BYTES));
+                serial_puts("\r\n");
+                serial_puts("evt state=");
+                serial_hex_u32(Self::read_diag(Self::D3_EVENT_STATE));
+                serial_puts(" draw=");
+                serial_hex_u32(Self::read_diag(Self::D3_EVENT_DRAW_SEQ));
+                serial_puts("\r\n");
+                serial_puts("crawl ");
+                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG0));
+                serial_puts(" ");
+                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG1));
+                serial_puts(" ");
+                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG2));
+                serial_puts(" ");
+                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG3));
                 serial_puts("\r\n");
             }
             b'T' => {
@@ -1271,7 +1323,6 @@ const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32; // +0x08
 const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32; // +0x18
 const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32; // +0x1C
 const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32; // +0x30
-const ADC3_DR: *const u32 = (ADC3_BASE + 0x40) as *const u32; // +0x40
 const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08
 
 /// Initialise ADC3 for single-shot temperature sensor reads on channel 18.
@@ -1328,37 +1379,8 @@ unsafe fn adc3_temp_init() {
     ADC3_SQR1.write_volatile(18 << 6);
 }
 
-/// Perform a single ADC3 conversion and return junction temperature in
-/// tenths of °C (e.g. 423 → 42.3 °C).  Reads factory cal values from ROM.
-unsafe fn adc3_read_temp_x10() -> i32 {
-    // Start conversion
-    let cr = ADC3_CR.read_volatile();
-    ADC3_CR.write_volatile(cr | (1 << 2)); // ADSTART
-
-    // Wait EOC
-    while ADC3_ISR.read_volatile() & (1 << 2) == 0 {}
-
-    let raw = ADC3_DR.read_volatile() as i32;
-
-    // Clear EOC
-    ADC3_ISR.write_volatile(1 << 2);
-
-    // Factory calibration values (16-bit, at VDDA = 3.3 V)
-    let ts_cal1 = (0x1FF1_E820u32 as *const u16).read_volatile() as i32;
-    let ts_cal2 = (0x1FF1_E840u32 as *const u16).read_volatile() as i32;
-    let denom = ts_cal2 - ts_cal1;
-    if denom == 0 {
-        return 0;
-    }
-
-    300 + 800 * (raw - ts_cal1) / denom
-}
-
 /// Cached junction temperature in tenths of °C.
 static mut CACHED_TEMP_X10: i32 = 0;
-/// Frame divider for slow ADC reads (~2 s at 30 fps).
-static mut TEMP_DIVIDER: u8 = 0;
-
 /// Heap size in bytes.
 const HEAP_SIZE: usize = 64 * 1024;
 
@@ -2472,38 +2494,15 @@ fn main() -> ! {
         let mut render_blitter = CpuBlitter;
 
         // ── Fix double-buffering ──────────────────────────────────────────
-        // The sdram_alloc may have given both framebuffers the same address.
-        // Force a second buffer at a known SDRAM offset and copy the front
-        // buffer into it.
+        // The display path expects the front and back buffers to live in
+        // different SDRAM internal banks. If startup leaves them aliased or
+        // in the same bank, CPU redraws can briefly clobber visible scanout
+        // and show up as black blocks while text repaints.
         let (w_fb, h_fb) = display.dimensions();
 
         unsafe {
             (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001);
         }
-        // ── RLE decode helper ─────────────────────────────────────────────
-        fn decode_rle(blob: &[u8]) -> (u32, u32, alloc::vec::Vec<u8>) {
-            let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).expect("RLE parse");
-            let pal_count = pal_bytes.len() / 2;
-            let mut palette = alloc::vec![0u16; pal_count];
-            for i in 0..pal_count {
-                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
-            }
-            let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
-                .expect("RLE decode");
-            (w as u32, h as u32, rgba)
-        }
-
-        fn decode_rle_colors(
-            blob: &[u8],
-        ) -> (u32, u32, alloc::vec::Vec<rlvgl::core::widget::Color>) {
-            let (w, h, rgba) = decode_rle(blob);
-            let colors = rgba
-                .chunks_exact(4)
-                .map(|c| rlvgl::core::widget::Color(c[0], c[1], c[2], c[3]))
-                .collect();
-            (w, h, colors)
-        }
-
         // ── Icon strip (right edge, 3 slots) + wings ────────────────────
         // Shared crawl toggle flag — set by info wing favicon callback.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -2743,12 +2742,18 @@ fn main() -> ! {
             (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003);
         }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
-        const FB2_ADDR: u32 = 0xD018_0000; // 1.5MB into 32MB SDRAM
-        if display.back_buffer_addr() == display.front_buffer_addr() {
-            serial_puts("FIX: double-buffer was single — setting FB2\r\n");
+        const SDRAM_BANK_STRIDE: u32 = 0x0080_0000;
+        const FB2_ADDR: u32 = 0xD080_0000; // SDRAM internal bank 1
+        let front_addr = display.front_buffer_addr();
+        let back_addr = display.back_buffer_addr();
+        let same_buffer = back_addr == front_addr;
+        let same_bank = ((back_addr - 0xD000_0000) / SDRAM_BANK_STRIDE)
+            == ((front_addr - 0xD000_0000) / SDRAM_BANK_STRIDE);
+        if same_buffer || same_bank {
+            serial_puts("FIX: relocating back buffer to SDRAM bank 1\r\n");
             unsafe {
                 core::ptr::copy_nonoverlapping(
-                    display.front_buffer_addr() as *const u8,
+                    front_addr as *const u8,
                     FB2_ADDR as *mut u8,
                     fb_bytes,
                 );
@@ -2841,9 +2846,8 @@ fn main() -> ! {
         let _btn_discard: u32 = 0;
 
         // ── Gesture recognizers ───────────────────────────────────────────
-        use rlvgl::platform::gesture::{DoubleTapRecognizer, TapRecognizer};
+        use rlvgl::platform::gesture::TapRecognizer;
         let mut tap = TapRecognizer::new(FRAME_HZ);
-        let mut dtap = DoubleTapRecognizer::new(FRAME_HZ);
 
         // ── Event telemetry ring buffer ──────────────────────────────────
         // 16-entry ring at D3 SRAM 0x3800_0700, each entry = 4 words:
@@ -3154,25 +3158,15 @@ fn main() -> ! {
                             _ => {}
                         }
 
-                        // Feed to gesture recognizer → double-tap → dispatch to widgets
+                        // Feed the debounced tap recognizer directly into the widget tree.
+                        // This demo does not consume DoubleTap, so buffering single taps
+                        // behind the double-tap timeout only makes the UI feel sluggish.
                         if let Some(gesture) = tap.process(&evt) {
-                            let (e1, e2) = dtap.process(&gesture);
-                            for ge in [e1, e2].into_iter().flatten() {
-                                match &ge {
-                                    Event::PressDown { x, y } => {
-                                        telem_log(tick_count, 0x03, *x, *y)
-                                    }
-                                    Event::PressRelease { x, y } => {
-                                        telem_log(tick_count, 0x04, *x, *y);
-                                    }
-                                    Event::DoubleTap { x, y } => {
-                                        telem_log(tick_count, 0x05, *x, *y)
-                                    }
-                                    _ => {}
-                                }
-                                dirty_frames = 2;
-                                root.borrow_mut().dispatch_event(&ge);
+                            if let Event::PressDown { x, y } = &gesture {
+                                telem_log(tick_count, 0x03, *x, *y);
                             }
+                            dirty_frames = 2;
+                            root.borrow_mut().dispatch_event(&gesture);
                         }
                     } // if !consumed
                 } // if let Some(evt)
@@ -3283,21 +3277,13 @@ fn main() -> ! {
                 let _ = loop_count;
                 loop_count = 0;
                 // Advance gesture settle timer → may emit PressRelease
-                if let Some(gesture) = tap.tick() {
-                    let (e1, e2) = dtap.process(&gesture);
-                    for ge in [e1, e2].into_iter().flatten() {
-                        if let Event::PressRelease { x, y } = &ge {
-                            telem_log(tick_count, 0x14, *x, *y);
-                            event_win
-                                .borrow_mut()
-                                .push_event(t!("hw.touch", x = *x, y = *y));
-                        }
-                        dirty_frames = 4;
-                        root.borrow_mut().dispatch_event(&ge);
+                if let Some(held) = tap.tick() {
+                    if let Event::PressRelease { x, y } = &held {
+                        telem_log(tick_count, 0x14, *x, *y);
+                        event_win
+                            .borrow_mut()
+                            .push_event(t!("hw.touch", x = *x, y = *y));
                     }
-                }
-                // Advance double-tap window timer
-                if let Some(held) = dtap.tick() {
                     dirty_frames = 4;
                     root.borrow_mut().dispatch_event(&held);
                 }
@@ -3594,10 +3580,9 @@ fn main() -> ! {
                     (0x3800_063Cu32 as *mut u32).write_volatile(
                         (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR
                     );
-                    // LTDC ISR — check for underrun (bit 1) or error flags
-                    (0x3800_0640u32 as *mut u32).write_volatile(
-                        (0x5000_1010u32 as *const u32).read_volatile(), // LTDC ISR
-                    );
+                    // LTDC ISR — FUIF (bit 1) / LIF (bit 0)
+                    (0x3800_0640u32 as *mut u32)
+                        .write_volatile((0x5000_1038u32 as *const u32).read_volatile());
                     // EventWindow entry count for debugging
                     (0x3800_0644u32 as *mut u32)
                         .write_volatile(event_win.borrow().entry_count() as u32);
@@ -3682,6 +3667,55 @@ fn main() -> ! {
                     };
                     let queued_frame = ((buffer_ready as u8) << 1) | (render_active as u8);
                     cpu_stats.record_pipeline_stage(stage, current_frame, queued_frame);
+                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    let crawl_waiting_dma = crawl_active && star_crawl.waiting_for_dma();
+                    #[cfg(not(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    )))]
+                    let crawl_waiting_dma = false;
+                    let (wisr, ltdc_isr, cpsr, cdsr) = display.diagnose_dsi_state();
+                    let display_flags = ((dirty_frames as u32) << 24)
+                        | ((buffer_ready as u32) << 23)
+                        | ((render_active as u32) << 22)
+                        | ((crawl_active as u32) << 21)
+                        | ((scope_active as u32) << 20)
+                        | ((crawl_waiting_dma as u32) << 19)
+                        | ((display.check_erif() as u32) << 18)
+                        | (present_count & 0xFFFF);
+                    let active_fb = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() };
+                    let ltdc_status = (((cdsr & 0xFF) as u16) << 8) | (ltdc_isr as u16 & 0xFF);
+                    cpu_stats.record_display_diag(
+                        display_flags,
+                        display.front_buffer_addr(),
+                        display.back_buffer_addr(),
+                        active_fb,
+                        wisr as u16,
+                        ltdc_status,
+                        cpsr,
+                    );
+                    cpu_stats
+                        .record_overlay_diag(compositor.diag_counts(), compositor.diag_bytes());
+                    {
+                        let event_ref = event_win.borrow();
+                        cpu_stats.record_event_diag(event_ref.diag_state(), event_ref.draw_seq());
+                    }
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    let crawl_diag = star_crawl.diag_words();
+                    #[cfg(not(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    )))]
+                    let crawl_diag = (0, 0, 0, 0);
+                    cpu_stats.record_crawl_diag(
+                        crawl_diag.0,
+                        crawl_diag.1,
+                        crawl_diag.2,
+                        crawl_diag.3,
+                    );
                 }
             }
 
@@ -3926,14 +3960,6 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     };
     use rlvgl::core::event::{Event, Key};
     use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
-
-    // ── Disable D-cache to ensure SDRAM coherency with LTDC ─────────────────
-    unsafe {
-        let ccr = (0xE000_ED14u32 as *const u32).read_volatile();
-        (0xE000_ED14u32 as *mut u32).write_volatile(ccr & !(1 << 16));
-        cortex_m::asm::dsb();
-        cortex_m::asm::isb();
-    }
 
     // ── Signal clocks ready to CM4 ──────────────────────────────────────────
     #[allow(clippy::let_unit_value)]

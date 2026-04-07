@@ -28,8 +28,7 @@ impl Dma2dBlitter {
         }
         // Enable AXI dead time to avoid starving LTDC scanout.
         // DT=8 cycles between DMA2D AXI bursts gives LTDC room to read.
-        // AXI dead time disabled — overlay fills use CPU, not DMA2D.
-        // regs.amtcr.write(|w| unsafe { w.bits((16 << 8) | 1) });
+        regs.amtcr.write(|w| unsafe { w.bits((8 << 8) | 1) });
         Self { regs }
     }
 

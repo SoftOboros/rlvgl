@@ -152,15 +152,6 @@ impl StarCrawl {
         self.drop_frame();
     }
 
-    pub fn touch_deactivate(&mut self, _px: i32, _py: i32) -> bool {
-        if self.active {
-            self.deactivate();
-            true
-        } else {
-            false
-        }
-    }
-
     /// Advance the logical scroll position after a successful present.
     pub fn advance_scroll(&mut self) {
         self.scroll_q8 += self.scroll_speed_q8;

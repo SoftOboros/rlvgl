@@ -54,8 +54,6 @@ pub struct Wing {
     bounds: Rect,
     clear_countdown: u8,
     clear_bounds: Option<Rect>,
-    /// Swallow the first PressRelease after becoming visible (it's the tap that opened us).
-    ignore_next_release: bool,
 }
 
 impl Wing {
@@ -89,7 +87,6 @@ impl Wing {
             },
             clear_countdown: 0,
             clear_bounds: None,
-            ignore_next_release: false,
         }
     }
 
@@ -104,7 +101,6 @@ impl Wing {
             self.close();
         } else {
             self.visible = true;
-            self.ignore_next_release = true;
         }
         self.visible
     }
@@ -115,7 +111,6 @@ impl Wing {
             self.clear_bounds = Some(self.bounds);
             self.clear_countdown = CLEAR_FRAMES;
             self.visible = false;
-            self.ignore_next_release = false;
         }
     }
 
@@ -202,16 +197,6 @@ impl Widget for Wing {
         }
 
         if let Event::PressRelease { x, y } = event {
-            // Swallow the PressRelease that opened us (same event frame),
-            // but let taps on the right icon strip (x >= 720) pass through
-            // so the strip's toggle can fire.
-            if self.ignore_next_release {
-                self.ignore_next_release = false;
-                if *x < 720 {
-                    return true;
-                }
-                return false;
-            }
             // Use same split-gap hit cell strategy as the right strip
             let step = ICON_SIZE + GAP;
             for i in 0..self.slot_count {

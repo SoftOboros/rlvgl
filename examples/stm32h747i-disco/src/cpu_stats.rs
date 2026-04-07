@@ -51,7 +51,33 @@ const D3_PIPELINE_STAGE: u32 = 0x3800_1C3C;
 #[allow(dead_code)]
 const D3_SPIN_COUNTS: u32 = 0x3800_1C40;
 #[allow(dead_code)]
-const D3_WIFI_RESERVED: u32 = 0x3800_1C44;
+const D3_DISPLAY_FLAGS: u32 = 0x3800_1C44;
+#[allow(dead_code)]
+const D3_DISPLAY_FRONT: u32 = 0x3800_1C48;
+#[allow(dead_code)]
+const D3_DISPLAY_BACK: u32 = 0x3800_1C4C;
+#[allow(dead_code)]
+const D3_DISPLAY_ACTIVE: u32 = 0x3800_1C50;
+#[allow(dead_code)]
+const D3_DISPLAY_STATUS: u32 = 0x3800_1C54;
+#[allow(dead_code)]
+const D3_DISPLAY_CPSR: u32 = 0x3800_1C58;
+#[allow(dead_code)]
+const D3_OVERLAY_COUNTS: u32 = 0x3800_1C5C;
+#[allow(dead_code)]
+const D3_OVERLAY_BYTES: u32 = 0x3800_1C60;
+#[allow(dead_code)]
+const D3_EVENT_STATE: u32 = 0x3800_1C64;
+#[allow(dead_code)]
+const D3_EVENT_DRAW_SEQ: u32 = 0x3800_1C68;
+#[allow(dead_code)]
+const D3_CRAWL_DIAG0: u32 = 0x3800_1C6C;
+#[allow(dead_code)]
+const D3_CRAWL_DIAG1: u32 = 0x3800_1C70;
+#[allow(dead_code)]
+const D3_CRAWL_DIAG2: u32 = 0x3800_1C74;
+#[allow(dead_code)]
+const D3_CRAWL_DIAG3: u32 = 0x3800_1C78;
 
 /// CPU utilisation tracker backed by the DWT cycle counter.
 pub struct CpuStats {
@@ -82,19 +108,6 @@ impl CpuStats {
             cpu_pct: 0,
             enabled: false,
             is_cm4: false,
-        }
-    }
-
-    /// Create a tracker that publishes to the CM4 telemetry slot.
-    pub const fn new_cm4() -> Self {
-        Self {
-            frame_start: 0,
-            idle_start: 0,
-            idle_accum: 0,
-            idle_last: 0,
-            cpu_pct: 0,
-            enabled: false,
-            is_cm4: true,
         }
     }
 
@@ -184,11 +197,6 @@ impl CpuStats {
     /// Last computed CPU utilisation percentage (0–100).
     pub fn cpu_pct(&self) -> u32 {
         self.cpu_pct
-    }
-
-    /// Idle cycles measured in the most recently completed frame.
-    pub fn idle_cycles(&self) -> u32 {
-        self.idle_last
     }
 
     /// Read the CM4's CPU% from D3 SRAM (written by the CM4 core).
@@ -300,6 +308,61 @@ impl CpuStats {
         unsafe {
             (D3_SPIN_COUNTS as *mut u32)
                 .write_volatile(((serial_spins as u32) << 16) | dma_spins as u32);
+        }
+    }
+
+    /// Publish display/present diagnostics.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_display_diag(
+        &self,
+        flags: u32,
+        front: u32,
+        back: u32,
+        active: u32,
+        wisr: u16,
+        status: u16,
+        cpsr: u32,
+    ) {
+        unsafe {
+            (D3_DISPLAY_FLAGS as *mut u32).write_volatile(flags);
+            (D3_DISPLAY_FRONT as *mut u32).write_volatile(front);
+            (D3_DISPLAY_BACK as *mut u32).write_volatile(back);
+            (D3_DISPLAY_ACTIVE as *mut u32).write_volatile(active);
+            (D3_DISPLAY_STATUS as *mut u32).write_volatile(((wisr as u32) << 16) | status as u32);
+            (D3_DISPLAY_CPSR as *mut u32).write_volatile(cpsr);
+        }
+    }
+
+    /// Publish compositor/save-under diagnostics.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_overlay_diag(&self, counts: u32, bytes: u32) {
+        unsafe {
+            (D3_OVERLAY_COUNTS as *mut u32).write_volatile(counts);
+            (D3_OVERLAY_BYTES as *mut u32).write_volatile(bytes);
+        }
+    }
+
+    /// Publish event-window diagnostics.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_event_diag(&self, state: u32, draw_seq: u32) {
+        unsafe {
+            (D3_EVENT_STATE as *mut u32).write_volatile(state);
+            (D3_EVENT_DRAW_SEQ as *mut u32).write_volatile(draw_seq);
+        }
+    }
+
+    /// Publish crawl renderer diagnostics.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn record_crawl_diag(&self, word0: u32, word1: u32, word2: u32, word3: u32) {
+        unsafe {
+            (D3_CRAWL_DIAG0 as *mut u32).write_volatile(word0);
+            (D3_CRAWL_DIAG1 as *mut u32).write_volatile(word1);
+            (D3_CRAWL_DIAG2 as *mut u32).write_volatile(word2);
+            (D3_CRAWL_DIAG3 as *mut u32).write_volatile(word3);
         }
     }
 }

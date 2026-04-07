@@ -6,6 +6,7 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cell::Cell;
 
 use rlvgl_core::bitmap_font::BitmapFont;
 use rlvgl_core::event::Event;
@@ -47,6 +48,10 @@ pub struct EventWindow {
     font: &'static BitmapFont,
     /// Ticks before an entry expires (frame-rate dependent).
     expire_ticks: u32,
+    /// Number of text lines rendered during the most recent draw pass.
+    last_draw_lines: Cell<u8>,
+    /// Monotonic draw sequence number for telemetry.
+    draw_seq: Cell<u32>,
 }
 
 impl EventWindow {
@@ -68,6 +73,20 @@ impl EventWindow {
     /// Enable or disable event collection. When disabled, `push_event` is a no-op.
     pub fn set_enabled(&mut self, val: bool) {
         self.enabled = val;
+    }
+
+    /// Packed event-window diagnostic state.
+    pub fn diag_state(&self) -> u32 {
+        ((self.last_draw_lines.get() as u32) << 24)
+            | ((self.clear_countdown as u32) << 16)
+            | ((self.entries.len().min(0xFF) as u32) << 8)
+            | ((self.visible as u32) << 1)
+            | (self.enabled as u32)
+    }
+
+    /// Monotonic draw sequence number.
+    pub fn draw_seq(&self) -> u32 {
+        self.draw_seq.get()
     }
 
     /// Push a pre-formatted event string into the display list.
@@ -110,6 +129,8 @@ impl Widget for EventWindow {
         let start = self.entries.len().saturating_sub(MAX_LINES);
         let inner_x = self.bounds.x + self.padding;
         let inner_y = self.bounds.y + self.padding;
+        self.last_draw_lines.set(max_lines as u8);
+        self.draw_seq.set(self.draw_seq.get().wrapping_add(1));
 
         for (i, entry) in self.entries[start..].iter().enumerate() {
             if i >= max_lines {
@@ -252,6 +273,8 @@ impl EventWindowBuilder {
             padding: 12,
             font: self.font,
             expire_ticks: self.expire_ticks,
+            last_draw_lines: Cell::new(0),
+            draw_seq: Cell::new(0),
         }
     }
 }
