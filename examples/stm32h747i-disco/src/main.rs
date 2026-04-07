@@ -3068,7 +3068,10 @@ fn main() -> ! {
                 let scope_running = false;
 
                 if crawl_running || scope_running {
-                    // Continuous mode: immediately re-arm for next frame.
+                    // Continuous mode: advance scroll AFTER present so both
+                    // double-buffer frames show the same position. Then re-arm.
+                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    if crawl_running { star_crawl.advance_scroll(); }
                     render_active = true;
                 } else if dirty_frames > 0 {
                     dirty_frames -= 1;

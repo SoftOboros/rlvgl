@@ -267,6 +267,31 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
 
+        fn dbg_dec(mut val: u32) {
+            if val == 0 { dbg("0"); return; }
+            let mut buf = [0u8; 10];
+            let mut i = 0usize;
+            while val > 0 {
+                buf[i] = b'0' + (val % 10) as u8;
+                val /= 10;
+                i += 1;
+            }
+            while i > 0 {
+                i -= 1;
+                let ch = buf[i];
+                const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
+                const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
+                const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
+                const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+                unsafe {
+                    while U8_ISR.read_volatile() & (1 << 7) == 0 {}
+                    U8_TDR.write_volatile(ch as u32);
+                    while U1_ISR.read_volatile() & (1 << 7) == 0 {}
+                    U1_TDR.write_volatile(ch as u32);
+                }
+            }
+        }
+
         // PLL3 is now enabled in main.rs after HAL freeze().
         // No LTDC/DSI reset — HAL enable() provides a clean state.
         unsafe {
@@ -748,7 +773,75 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // In the ST HAL, LTDCEN is indeed toggled per-refresh in adapted mode.
         disp.dsi.wcr.modify(|_, w| w.ltdcen().set_bit());
         cortex_m::asm::dsb();
-        cortex_m::asm::delay(8_000_000); // wait another frame
+        cortex_m::asm::delay(8_000_000); // let first frame complete
+
+        // DWT-timed EoR probe: measure LTDC scan duration for one full frame.
+        // Sequence: clear ERIF → pulse LTDCEN → poll ERIF → timestamp delta.
+        unsafe {
+            // Ensure DWT CYCCNT is running (may not be enabled yet).
+            // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
+            let demcr = (0xE000_EDFCu32 as *const u32).read_volatile();
+            (0xE000_EDFCu32 as *mut u32).write_volatile(demcr | (1 << 24));
+            (0xE000_1FB0u32 as *mut u32).write_volatile(0xC5AC_CE55); // LAR unlock
+            let ctrl = (0xE000_1000u32 as *const u32).read_volatile();
+            (0xE000_1000u32 as *mut u32).write_volatile(ctrl | 1); // CYCCNTENA
+            (0xE000_1004u32 as *mut u32).write_volatile(0); // reset CYCCNT
+            cortex_m::asm::dsb();
+
+            // Clear stale flags
+            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // CERIF + CTEIF
+            cortex_m::asm::dsb();
+
+            // Verify DWT is counting
+            let cyc_a = (0xE000_1004u32 as *const u32).read_volatile();
+            cortex_m::asm::delay(1000);
+            let cyc_b = (0xE000_1004u32 as *const u32).read_volatile();
+            dbg("  DWT check: "); dbg_dec(cyc_b.wrapping_sub(cyc_a)); dbg(" cyc\r\n");
+
+            // Measure single-frame scan time:
+            // 1. Temporarily disable auto-refresh (AR=0) so only our manual
+            //    LTDCEN pulse triggers a frame.
+            // 2. Wait for any in-flight transfer to finish.
+            // 3. Clear ERIF, pulse LTDCEN, measure time to ERIF.
+            // 4. Re-enable AR.
+            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile();
+            (0x5000_0400u32 as *mut u32).write_volatile(wcfgr & !(1 << 6)); // AR=0
+            cortex_m::asm::dsb();
+            cortex_m::asm::delay(16_000_000); // 40ms — let any in-flight frame finish
+            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // clear ERIF+TEIF
+            cortex_m::asm::dsb();
+
+            let wisr_pre = (0x5000_040Cu32 as *const u32).read_volatile();
+            dbg("  pre-pulse WISR: "); dbg_hex(wisr_pre); dbg("\r\n");
+
+            // Single manual LTDCEN pulse
+            (0x5000_0404u32 as *mut u32).write_volatile(0x0C); // DSIEN+LTDCEN
+            cortex_m::asm::dsb();
+
+            let t0 = (0xE000_1004u32 as *const u32).read_volatile();
+            let mut timeout = 20_000_000u32;
+            while timeout > 0 {
+                if (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 {
+                    break;
+                }
+                timeout -= 1;
+            }
+            let t1 = (0xE000_1004u32 as *const u32).read_volatile();
+            let elapsed = t1.wrapping_sub(t0);
+            let wisr_post = (0x5000_040Cu32 as *const u32).read_volatile();
+            dbg("  EoR: ");
+            if timeout == 0 {
+                dbg("TIMEOUT ");
+            }
+            dbg_dec(elapsed / 400); dbg("us (");
+            dbg_dec(elapsed); dbg(" cyc)");
+            dbg(" WISR="); dbg_hex(wisr_post); dbg("\r\n");
+
+            // Restore AR and clear flags
+            (0x5000_0400u32 as *mut u32).write_volatile(wcfgr); // restore AR=1
+            (0x5000_0410u32 as *mut u32).write_volatile(0x03);
+            cortex_m::asm::dsb();
+        }
         // Read WISR from wrapper (safe — wrapper regs don't hang debug port)
         let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() };
         dbg("  post-LTDCEN: WISR="); dbg_hex(wisr); dbg("\r\n");
@@ -1111,8 +1204,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // because Write-Through ensures every write reaches memory.
             let xn = 1u32 << 28;
             let ap = 0b011u32 << 24;
-            let tex_cb_s = (0u32 << 19) | (0u32 << 17) | (0u32 << 16); // TEX=0,C=0,B=0
-            let s = 1u32 << 18; // Shareable
+            let tex_cb_s = (0u32 << 19) | (1u32 << 17) | (0u32 << 16); // TEX=0,C=1,B=0
+            let s = 0u32 << 18; // Non-Shareable (required for CM7 D-cache WT)
             let size_field = (sz & 0x1F) << 1;
             let enable = 1u32;
             p.MPU
@@ -1125,9 +1218,6 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             cortex_m::asm::dsb();
             cortex_m::asm::isb();
 
-            // D-cache disabled for now — causes display coherency issues.
-            // TODO: investigate Write-Through + D-cache interaction with LTDC.
-            if false { // D-cache enable block
             // Without D-cache, C=1 is ignored and writes go directly to AXI
             // (strongly-ordered behavior), monopolizing the bus.
             // SCB CCR register at 0xE000_ED14, D-cache enable = bit 16
@@ -1152,7 +1242,6 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 cortex_m::asm::dsb();
                 cortex_m::asm::isb();
             }
-            } // end if false (D-cache disabled)
         }
     }
 
@@ -1188,42 +1277,56 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         self.dma2d = Some(dma2d);
     }
 
-    /// Swap LTDC layer address between front/back buffers and reload
+    /// Swap LTDC layer address between front/back buffers and reload.
+    ///
+    /// Clears ERIF before triggering LTDCEN so the next `wait_frame_done()`
+    /// detects THIS frame's scan completion rather than a stale flag.
     pub fn present(&mut self) {
+        // Ensure all Write-Through cache writes have drained to SDRAM
+        // before LTDC starts reading the new buffer.
+        cortex_m::asm::dsb();
         let next = self.fb_addr_back;
-        // Raw write to real CFBAR (PAC offset is wrong — see setup_ltdc_layer)
-        unsafe { (0x5000_10AC as *mut u32).write_volatile(next) }; // L1CFBAR
-        unsafe { (0x5000_1024 as *mut u32).write_volatile(1) } // SRCR.IMR;
+        unsafe {
+            // Clear ERIF before triggering so wait_frame_done() sees fresh flag
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
+            // Swap layer address
+            (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR
+            (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR
+        }
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
-        // Re-pulse WCR LTDCEN each frame (adapted command mode)
+        // Pulse LTDCEN — triggers LTDC to scan the new front buffer (~14ms).
+        // ERIF will fire when the scan completes.
         unsafe { (0x5000_0404 as *mut u32).write_volatile(0x0C) };
     }
 
-    /// Wait for LTDC/DSI to finish scanning the current front buffer.
+    /// Block until LTDC finishes scanning the current front buffer.
     ///
-    /// Polls DSI_WISR.ERIF (End-of-Refresh) which is set when the DSI
-    /// wrapper completes a frame transfer in adapted command mode.
-    /// After this returns, the back buffer is safe to write at full speed
-    /// without starving LTDC reads.
+    /// ERIF was cleared by the preceding `present()`. This polls until
+    /// ERIF fires, indicating the scan is done and the AXI bus is free.
+    /// Measured scan time: ~14.3ms (5.7M cycles at 400MHz).
+    /// At 30fps (33ms frame budget), this leaves ~19ms safe write window.
     ///
-    /// Returns `true` if EoR was detected, `false` on timeout.
-    pub fn wait_frame_done(&self) -> bool {
+    /// Returns DWT cycles waited. 0 means scan was already done.
+    /// `u32::MAX` means timeout (LTDC stuck).
+    pub fn wait_frame_done(&self) -> u32 {
         const WISR: *const u32 = 0x5000_040C as *const u32;
         const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
+        const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
         unsafe {
-            // Clear stale EoR flag
-            WIFCR.write_volatile(0x02); // CERIF
-            // Poll until EoR or timeout (~10 ms at 480 MHz)
-            let mut timeout = 5_000_000u32;
+            let t0 = DWT_CYCCNT.read_volatile();
+            // Poll until ERIF fires (cleared by present()).
+            // Budget 20ms (8M iterations) for timeout.
+            let mut timeout = 8_000_000u32;
             while timeout > 0 {
                 if WISR.read_volatile() & 0x02 != 0 {
-                    WIFCR.write_volatile(0x02); // clear for next frame
-                    return true;
+                    WIFCR.write_volatile(0x02); // clear for next cycle
+                    let t1 = DWT_CYCCNT.read_volatile();
+                    return t1.wrapping_sub(t0);
                 }
                 timeout -= 1;
             }
         }
-        false // timeout — proceed in degraded mode
+        u32::MAX
     }
 
     /// Check if LTDC FIFO underrun has occurred (diagnostic).
@@ -1239,6 +1342,28 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
         false
+    }
+
+    /// Non-blocking check: has LTDC finished scanning the front buffer?
+    /// Returns true if DSI_WISR.ERIF is set (we're in the back porch).
+    /// Does NOT clear the flag — present() handles that.
+    #[inline]
+    pub fn check_erif(&self) -> bool {
+        unsafe { (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 }
+    }
+
+    /// Read DSI/LTDC diagnostic registers.
+    /// Returns `(wisr, ltdc_isr, cpsr)`:
+    /// - wisr: DSI_WISR — ERIF (bit 1), TEIF (bit 0)
+    /// - ltdc_isr: LTDC_ISR — FUIF (bit 1), LIF (bit 0)
+    /// - cpsr: LTDC_CPSR — current scan position
+    pub fn diagnose_dsi_state(&self) -> (u32, u32, u32) {
+        unsafe {
+            let wisr = (0x5000_040Cu32 as *const u32).read_volatile();
+            let ltdc_isr = (0x5000_1038u32 as *const u32).read_volatile();
+            let cpsr = (0x5000_1044u32 as *const u32).read_volatile();
+            (wisr, ltdc_isr, cpsr)
+        }
     }
 
     #[cfg(all(

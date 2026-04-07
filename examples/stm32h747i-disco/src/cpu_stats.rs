@@ -83,6 +83,10 @@ impl CpuStats {
     /// # Safety
     /// Writes to DWT control registers in the PPB region.
     pub unsafe fn enable_dwt(&mut self) {
+        // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
+        const DEMCR: u32 = 0xE000_EDFC;
+        let demcr = (DEMCR as *const u32).read_volatile();
+        (DEMCR as *mut u32).write_volatile(demcr | (1 << 24));
         // Unlock the DWT LAR (some implementations lock DWT on reset).
         (DWT_LAR as *mut u32).write_volatile(DWT_LAR_KEY);
         // Set CYCCNTENA (bit 0) in DWT_CTRL.
@@ -159,8 +163,10 @@ impl CpuStats {
     }
 
     /// Read the CM4's CPU% from D3 SRAM (written by the CM4 core).
+    /// Returns 0 if the CM4 hasn't written a valid value (garbage guard).
     pub fn cm4_cpu_pct(&self) -> u32 {
-        unsafe { (D3_CM4_CPU_PCT as *const u32).read_volatile() }
+        let raw = unsafe { (D3_CM4_CPU_PCT as *const u32).read_volatile() };
+        if raw > 100 { 0 } else { raw }
     }
 
     /// Read the raw CYCCNT value (for driver-level bracket timing).

@@ -418,7 +418,7 @@ strip = true
 incremental = false
 
 [profile.dev]
-opt-level = 1
+opt-level = 2
 debug = true
 incremental = false
 
