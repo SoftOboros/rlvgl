@@ -563,12 +563,15 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         disp.fb_addr = fb_addr;
         disp.fb_addr_back = fb_back;
 
-        // Give LTDC highest AXI QoS priority so its reads aren't starved
-        // by CPU/DMA2D writes. AXI interconnect base = 0x5100_0000.
-        // INI5 = LTDC (offset 0x46100 for read QoS, 0x46104 for write QoS)
+        // AXI interconnect QoS — base 0x5100_0000, INIx_READ_QOS = 0x41100 + 0x1000*x
+        // RM0399 §2.1: INI2=CM7, INI4=MDMA, INI5=DMA2D, INI6=LTDC
+        // LTDC needs highest read priority to keep its line FIFO fed.
+        // DMA2D gets moderate priority so starfield blits don't starve LTDC.
         unsafe {
-            (0x5104_6100u32 as *mut u32).write_volatile(0xF); // LTDC read QoS = max
-            (0x5104_6104u32 as *mut u32).write_volatile(0xF); // LTDC write QoS = max
+            (0x5104_7100u32 as *mut u32).write_volatile(0xF); // INI6 LTDC read QoS = max
+            (0x5104_7104u32 as *mut u32).write_volatile(0x4); // INI6 LTDC write QoS = low
+            (0x5104_6100u32 as *mut u32).write_volatile(0x4); // INI5 DMA2D read QoS = moderate
+            (0x5104_6104u32 as *mut u32).write_volatile(0x4); // INI5 DMA2D write QoS = moderate
         }
         // Advance allocator past both reserved banks
         let _ = sdram_alloc::alloc(0x0100_0000, 1); // reserve Banks 0+1 (16 MB)
@@ -1401,16 +1404,21 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         cortex_m::asm::dsb();
         let next = self.fb_addr_back;
         unsafe {
-            // Clear ERIF before triggering so wait_frame_done() sees fresh flag
-            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
             // Swap layer address
             (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR
             (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR
         }
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
-        // Pulse LTDCEN — triggers LTDC to scan the new front buffer (~14ms).
-        // ERIF will fire when the scan completes.
-        unsafe { (0x5000_0404 as *mut u32).write_volatile(0x0C) };
+        unsafe {
+            // Enable LTDCEN — next TE edge triggers LTDC to scan the new
+            // front buffer (~14ms).  ERIF fires when the scan completes.
+            (0x5000_0404 as *mut u32).write_volatile(0x0C); // DSI_WCR: DSIEN+LTDCEN
+            // DSB ensures LTDCEN write reaches the peripheral before we
+            // clear ERIF, so any spurious "already done" ERIF from the
+            // re-enable is discarded by this clear.
+            cortex_m::asm::dsb();
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
+        }
     }
 
     /// Block until LTDC finishes scanning the current front buffer.
@@ -1465,6 +1473,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     #[inline]
     pub fn check_erif(&self) -> bool {
         unsafe { (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 }
+    }
+
+    /// Returns true when LTDC is NOT actively reading from SDRAM.
+    ///
+    /// Reads LTDC_CDSR.VDES (bit 0): 1 = vertical data enable active
+    /// (LTDC is generating display data from memory).  When VDES is 0,
+    /// the SDRAM bus is free for DMA2D / CPU.
+    #[inline]
+    pub fn ltdc_bus_idle(&self) -> bool {
+        unsafe { (0x5000_1048u32 as *const u32).read_volatile() & 0x01 == 0 }
     }
 
     /// Read DSI/LTDC diagnostic registers.

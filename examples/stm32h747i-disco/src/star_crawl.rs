@@ -276,11 +276,19 @@ impl StarCrawl {
         match self.stage {
             RenderStage::Idle => StepResult::Pending,
             RenderStage::StartStarRow => {
+                // DMA2D burst transfers compete with LTDC for SDRAM.
+                // Defer until LTDC is idle (CDSR.VDES = 0).  CPU text
+                // blend (ProcessTextRow) is fine during LTDC scans —
+                // its scattered accesses don't starve the FIFO.
+                if unsafe { (0x5000_1048u32 as *const u32).read_volatile() & 1 != 0 } {
+                    return StepResult::Pending; // LTDC busy, retry
+                }
                 let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
                 let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
                 let dst = unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };
                 #[cfg(not(feature = "c_hal"))]
                 crate::dma2d_irq::note_start();
+                crate::scope_probe::dma2d_active();
                 dma2d.start_blit_raw(
                     src as *const u8,
                     STAR_STRIDE,
@@ -300,8 +308,25 @@ impl StarCrawl {
                 if dma2d.poll_complete() {
                     dma2d.ack_complete();
                 }
+                crate::scope_probe::dma2d_idle();
                 self.bg_row += 1;
                 if self.bg_row >= FB_H {
+                    // DMA2D wrote starfield directly to SDRAM, bypassing D-cache.
+                    // Invalidate the entire D-cache so the CPU text-blend loop
+                    // reads fresh starfield pixels instead of stale cached data.
+                    unsafe {
+                        cortex_m::asm::dsb();
+                        // CM7 D-cache: 32KB, 4-way, 32B lines → 256 sets
+                        // DCISW at 0xE000_EF60: way[31:30], set[12:5]
+                        for way in 0..4u32 {
+                            for set in 0..256u32 {
+                                (0xE000_EF60u32 as *mut u32)
+                                    .write_volatile((way << 30) | (set << 5));
+                            }
+                        }
+                        cortex_m::asm::dsb();
+                        cortex_m::asm::isb();
+                    }
                     self.stage = RenderStage::ProcessTextRow;
                     self.text_row = 0;
                 } else {

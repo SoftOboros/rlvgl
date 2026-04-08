@@ -39,6 +39,7 @@ mod ipc;
 mod readme_crawl;
 #[allow(dead_code)]
 mod settings_dialog;
+mod scope_probe;
 mod star_crawl;
 #[allow(dead_code)]
 mod sys_info;
@@ -829,6 +830,11 @@ impl SerialTask {
                 serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG2));
                 serial_puts(" ");
                 serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG3));
+                serial_puts("\r\n");
+                serial_puts("gpio J_MODER=");
+                serial_hex_u32(unsafe { (0x5802_2400u32 as *const u32).read_volatile() });
+                serial_puts(" J_IDR=");
+                serial_hex_u32(unsafe { (0x5802_2410u32 as *const u32).read_volatile() });
                 serial_puts("\r\n");
             }
             b'T' => {
@@ -2947,8 +2953,23 @@ fn main() -> ! {
         #[cfg(feature = "audio")]
         let mut pcm_frame_count: usize = 0;
 
+        scope_probe::init();
+
         loop {
             loop_count = loop_count.wrapping_add(1);
+            // Scope: PJ0 tracks LTDC SDRAM activity (CDSR.VDES).
+            if display.ltdc_bus_idle() {
+                scope_probe::ltdc_idle();
+            } else {
+                scope_probe::ltdc_active();
+            }
+            // When ERIF fires (scan complete), disable LTDCEN so TE edges
+            // don't trigger new scans while we're rendering.  Must be
+            // ERIF-based, not VDES-based — VDES goes idle before the first
+            // TE after present(), which would race and kill the scan.
+            if display.check_erif() {
+                scope_probe::disable_ltdc_auto_refresh();
+            }
             // Loop heartbeat
             unsafe {
                 let prev = (0x3800_0660u32 as *const u32).read_volatile();
@@ -3747,37 +3768,45 @@ fn main() -> ! {
 
                 if is_crawl {
                     // ── Star crawl render ──
-                    #[cfg(all(
-                        feature = "dma2d",
-                        any(target_arch = "arm", target_arch = "aarch64")
-                    ))]
-                    if let Some(raw) = display.take_dma2d_raw() {
-                        let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
-                        blitter.enable_tc_interrupt();
-                        match star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
-                            star_crawl::StepResult::Idle => {
-                                render_active = false;
+                    // LTDCEN is cleared after ERIF, so at most one LTDC
+                    // scan overlaps with rendering. QoS gives LTDC read
+                    // priority; DMA2D row blits are short enough that the
+                    // LTDC line FIFO doesn't underrun.
+                    {
+                        #[cfg(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        ))]
+                        if let Some(raw) = display.take_dma2d_raw() {
+                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            blitter.enable_tc_interrupt();
+                            match star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
+                                star_crawl::StepResult::Idle => {
+                                    render_active = false;
+                                }
+                                star_crawl::StepResult::Pending => {
+                                    keep_rendering = true;
+                                }
+                                star_crawl::StepResult::FrameReady => {
+                                    frame_ready = true;
+                                }
+                                star_crawl::StepResult::Finished => {
+                                    render_active = false;
+                                    serial_puts("CRAWL:done\r\n");
+                                    let (w, h) = display.dimensions();
+                                    compositor.mark_pristine_restore(
+                                        rlvgl_core::widget::Rect {
+                                            x: 0,
+                                            y: 0,
+                                            width: h as i32,
+                                            height: w as i32,
+                                        },
+                                    );
+                                    dirty_frames = 4;
+                                }
                             }
-                            star_crawl::StepResult::Pending => {
-                                keep_rendering = true;
-                            }
-                            star_crawl::StepResult::FrameReady => {
-                                frame_ready = true;
-                            }
-                            star_crawl::StepResult::Finished => {
-                                render_active = false;
-                                serial_puts("CRAWL:done\r\n");
-                                let (w, h) = display.dimensions();
-                                compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
-                                    x: 0,
-                                    y: 0,
-                                    width: h as i32,
-                                    height: w as i32,
-                                });
-                                dirty_frames = 4;
-                            }
+                            display.return_dma2d_raw(blitter.into_inner());
                         }
-                        display.return_dma2d_raw(blitter.into_inner());
                     }
                 } else if is_scope {
                     // ── Audio scope render ──
@@ -3858,6 +3887,7 @@ fn main() -> ! {
             // (back porch). Falls through in ~10ns if not ready.
             if buffer_ready && display.check_erif() {
                 display.present();
+                scope_probe::ltdc_active();
                 buffer_ready = false;
                 present_count = present_count.wrapping_add(1);
 
@@ -3874,8 +3904,8 @@ fn main() -> ! {
                 let scope_running = false;
 
                 if crawl_running || scope_running {
-                    // Continuous mode: advance scroll AFTER present so both
-                    // double-buffer frames show the same position. Then re-arm.
+                    // Advance scroll AFTER present so both double-buffer
+                    // frames show the same position.
                     #[cfg(all(
                         feature = "dma2d",
                         any(target_arch = "arm", target_arch = "aarch64")
@@ -3883,9 +3913,32 @@ fn main() -> ! {
                     if crawl_running {
                         star_crawl.advance_scroll();
                     }
-                    render_active = true;
+                    // DON'T set render_active yet — wait for ERIF so
+                    // DMA2D starfield blit doesn't overlap LTDC scan.
                 } else if dirty_frames > 0 {
                     dirty_frames -= 1;
+                }
+            }
+
+            // ── Pipeline stage: GATE RENDER ON LTDC IDLE ─────────────────
+            // For continuous modes (crawl, scope): only start rendering
+            // when LTDC is not reading SDRAM (CDSR.VDES = 0), so DMA2D
+            // and LTDC never fight for the bus simultaneously.
+            if !render_active && !buffer_ready && display.ltdc_bus_idle() {
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                let crawl_running = star_crawl.is_active();
+                #[cfg(not(all(
+                    feature = "dma2d",
+                    any(target_arch = "arm", target_arch = "aarch64")
+                )))]
+                let crawl_running = false;
+                #[cfg(feature = "audio")]
+                let scope_running = audio_scope.is_active();
+                #[cfg(not(feature = "audio"))]
+                let scope_running = false;
+
+                if crawl_running || scope_running {
+                    render_active = true;
                 }
             }
 
@@ -4124,27 +4177,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         pin: 12,
     });
 
-    // PJ6: debug toggle probe — Arduino D9 on CN5, scope-accessible
-    // Configure PJ6 as GP output (MODER bits 13:12 = 01)
-    unsafe {
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 12)) | (1u32 << 12));
-    }
-    /// Toggle PJ6 high then low as a scope breadcrumb.
-    #[inline(always)]
-    fn dbg_pulse() {
-        const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32;
-        unsafe {
-            GPIOJ_BSRR.write_volatile(1u32 << 6); // set PJ6
-            cortex_m::asm::delay(40); // ~100ns pulse
-            GPIOJ_BSRR.write_volatile(1u32 << (6 + 16)); // reset PJ6
-        }
-    }
-    // Quick triple-pulse to confirm probe is alive
-    for _ in 0..3 {
-        dbg_pulse();
-        cortex_m::asm::delay(4_000);
-    }
+    scope_probe::init();
 
     // ── UART8 debug serial (PJ8=TX on Arduino D1/CN6, 115200 8N1) ─────
     // PJ8 = UART8_TX (AF8) — Port J clock already enabled
@@ -4620,7 +4653,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                 let odr = GPIOJ_ODR.read_volatile();
                 GPIOJ_ODR.write_volatile(odr ^ (1 << 6));
             }
+            scope_probe::ltdc_idle();
             display.present();
+            scope_probe::ltdc_active();
             // Periodic UART status (~1 Hz)
             if frame_counter % (FRAME_HZ * 5) == 0 {
                 dbg_print(".");
