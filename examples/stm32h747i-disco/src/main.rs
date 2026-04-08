@@ -26,6 +26,8 @@ use panic_halt as _;
 // library; not all are consumed in every build configuration.
 #[cfg(feature = "audio")]
 mod audio_scope;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod event_overlay;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
@@ -2557,6 +2559,14 @@ fn main() -> ! {
             children: alloc::vec![],
         });
 
+        // Enable DMA2D rendering mode for the event window so its draw()
+        // becomes a no-op — the DMA2D overlay pipeline handles it.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        event_win.borrow_mut().set_dma2d_mode(true);
+
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let mut event_overlay = event_overlay::EventOverlay::new();
+
         let mut render_blitter = CpuBlitter;
 
         // ── Fix double-buffering ──────────────────────────────────────────
@@ -2960,6 +2970,8 @@ fn main() -> ! {
         // buffer_ready: render complete, waiting for back porch to present.
         let mut render_active = false;
         let mut buffer_ready = false;
+        let mut normal_render_pending = false;
+        let mut first_normal_render = true; // bypass ERIF wait on first frame (no scan pending)
         let mut was_visible = false;
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
@@ -3245,9 +3257,11 @@ fn main() -> ! {
                         match &evt {
                             Event::PointerDown { x, y } => {
                                 telem_log(tick_count, 0x01, *x, *y);
-                                event_win
-                                    .borrow_mut()
-                                    .push_event(t!("hw.touch", x = *x, y = *y));
+                                {
+                                    let mut ew = event_win.borrow_mut();
+                                    ew.push_event(t!("hw.touch", x = *x, y = *y));
+                                    ew.set_frozen(true);
+                                }
                                 dirty_frames = dirty_frames.max(2);
                                 evt_count += 1;
                             }
@@ -3317,9 +3331,11 @@ fn main() -> ! {
                 }
                 if matches!(evt, Event::KeyDown { .. }) {
                     serial_puts("BTN: PRESS\r\n");
-                    event_win
-                        .borrow_mut()
-                        .push_event(alloc::string::String::from(t!("hw.btn_press")));
+                    {
+                        let mut ew = event_win.borrow_mut();
+                        ew.push_event(alloc::string::String::from(t!("hw.btn_press")));
+                        ew.set_frozen(true);
+                    }
                     dirty_frames = 2;
                     evt_count += 1;
                 }
@@ -3357,9 +3373,11 @@ fn main() -> ! {
                     };
                     serial_puts(label);
                     serial_puts("\r\n");
-                    event_win
-                        .borrow_mut()
-                        .push_event(alloc::string::String::from(label));
+                    {
+                        let mut ew = event_win.borrow_mut();
+                        ew.push_event(alloc::string::String::from(label));
+                        ew.set_frozen(true);
+                    }
                     dirty_frames = 2;
                     evt_count += 1;
                 }
@@ -3384,9 +3402,11 @@ fn main() -> ! {
                 if let Some(held) = tap.tick() {
                     if let Event::PressRelease { x, y } = &held {
                         telem_log(tick_count, 0x14, *x, *y);
-                        event_win
-                            .borrow_mut()
-                            .push_event(t!("hw.touch", x = *x, y = *y));
+                        {
+                            let mut ew = event_win.borrow_mut();
+                            ew.push_event(t!("hw.touch", x = *x, y = *y));
+                            ew.set_frozen(true);
+                        }
                     }
                     dirty_frames = 4;
                     root.borrow_mut().dispatch_event(&held);
@@ -3394,17 +3414,10 @@ fn main() -> ! {
 
                 // (Wing clear_region handled by widget tree dispatch below)
 
-                // Proxy Tick to widgets that need it — tree dispatch
-                // hangs when overlay panels are visible (unknown root cause).
-                // Skip event_win Tick when overlays are active to prevent
-                // entry expiry from triggering compositor restores that
-                // overwrite the overlay area and cause flicker.
-                let overlay_up = chip_info_panel.borrow().is_visible()
-                    || live_stats_panel.borrow().is_visible()
-                    || config_menu.borrow().is_visible();
-                if !overlay_up {
-                    event_win.borrow_mut().handle_event(&Event::Tick);
-                }
+                // Tick the event window unconditionally. The freeze mechanism
+                // (set_frozen) handles double-buffer consistency during
+                // multi-frame dirty renders, replacing the old overlay_up guard.
+                event_win.borrow_mut().handle_event(&Event::Tick);
                 config_menu.borrow_mut().handle_event(&Event::Tick);
 
                 let vis = event_win.borrow().is_visible();
@@ -3419,6 +3432,9 @@ fn main() -> ! {
                 use rlvgl::core::widget::Widget as _;
                 if vis != was_visible {
                     dirty_frames = 4;
+                    // Freeze event aging so all dirty frame renders show
+                    // identical content (prevents double-buffer flicker).
+                    event_win.borrow_mut().set_frozen(true);
                     if !vis {
                         // EventWindow just hid — restore from pristine
                         compositor.mark_pristine_restore(event_win.borrow().bounds());
@@ -3658,9 +3674,18 @@ fn main() -> ! {
                         render_active = true;
                     }
                 } else {
-                    // Normal path: render when dirty.
+                    // Normal path: render when dirty — ERIF-gated below.
+                    // Don't start rendering mid-scan; wait for LTDC to finish
+                    // reading the front buffer (same pattern as star crawl).
                     if dirty_frames > 0 && !render_active && !buffer_ready {
-                        render_active = true;
+                        if first_normal_render {
+                            // No scan pending on first frame (adapted cmd mode),
+                            // so ERIF won't fire until after first present().
+                            render_active = true;
+                            first_normal_render = false;
+                        } else {
+                            normal_render_pending = true;
+                        }
                     }
                 }
 
@@ -3916,20 +3941,89 @@ fn main() -> ! {
                     }
                 } else {
                     // ── Normal tree + overlay render ──
-                    let fb_bytes = (w * h * 4) as usize;
-                    let stride = (w * 4) as usize;
+                    // Two phases: (1) CPU tree draw, (2) DMA2D event overlay.
+                    // Phase 2 runs over multiple loop iterations via
+                    // keep_rendering, like the star crawl pipeline.
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    let overlay_active = event_overlay.is_active();
+                    #[cfg(not(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    )))]
+                    let overlay_active = false;
 
-                    compositor.restore(back as *mut u8);
+                    if overlay_active {
+                        // DMA2D overlay pipeline in progress — step it.
+                        #[cfg(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        ))]
+                        if let Some(raw) = display.take_dma2d_raw() {
+                            let mut blitter =
+                                rlvgl::platform::Dma2dBlitter::new(raw);
+                            blitter.enable_tc_interrupt();
+                            match event_overlay.tick(&mut blitter) {
+                                event_overlay::StepResult::Pending => {
+                                    keep_rendering = true;
+                                }
+                                event_overlay::StepResult::FrameReady
+                                | event_overlay::StepResult::Idle => {
+                                    frame_ready = true;
+                                }
+                            }
+                            display.return_dma2d_raw(blitter.into_inner());
+                        } else {
+                            keep_rendering = true; // DMA2D borrowed, retry
+                        }
+                    } else {
+                        // Phase 1: CPU tree draw (EventWindow.draw() is
+                        // no-op in dma2d_mode; DMA2D pipeline draws it).
+                        let fb_bytes = (w * h * 4) as usize;
+                        let stride = (w * 4) as usize;
 
-                    let fb_slice =
-                        unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };
-                    let surface = Surface::new(fb_slice, stride, PixelFmt::Argb8888, w, h);
-                    let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
-                        BlitterRenderer::new(&mut render_blitter, surface);
-                    let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
+                        compositor.restore(back as *mut u8);
 
-                    root.borrow().draw(&mut renderer);
-                    frame_ready = true;
+                        let fb_slice = unsafe {
+                            core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
+                        };
+                        let surface =
+                            Surface::new(fb_slice, stride, PixelFmt::Argb8888, w, h);
+                        let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                            BlitterRenderer::new(&mut render_blitter, surface);
+                        let mut renderer =
+                            RotatedRenderer::new(&mut blit_renderer, w);
+
+                        root.borrow().draw(&mut renderer);
+
+                        // If event window visible, start DMA2D overlay pipeline.
+                        #[cfg(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        ))]
+                        {
+                            let ew = event_win.borrow();
+                            if ew.is_visible() && ew.is_dma2d_mode() {
+                                event_overlay.begin_frame(
+                                    &ew,
+                                    back as *mut u8,
+                                    w,
+                                );
+                                keep_rendering = true;
+                            } else {
+                                frame_ready = true;
+                            }
+                        }
+                        #[cfg(not(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        )))]
+                        {
+                            frame_ready = true;
+                        }
+                    }
                 }
 
                 let t_done = unsafe { DWT_CYCCNT.read_volatile() };
@@ -4003,13 +4097,19 @@ fn main() -> ! {
                     render_active = true;
                 } else if dirty_frames > 0 {
                     dirty_frames -= 1;
+                    if dirty_frames == 0 {
+                        // All dirty frame renders complete — unfreeze event
+                        // aging so entries resume normal expiry.
+                        event_win.borrow_mut().set_frozen(false);
+                    }
                 }
             }
 
             // ── Pipeline stage: GATE RENDER ON ERIF ──────────────────────
-            // For continuous modes (crawl, scope): only start rendering
-            // after the LTDC scan fully completes (ERIF set). ERIF is
-            // one-shot per scan — cleared by present(), set on scan done.
+            // Start rendering only after LTDC scan completes (ERIF set).
+            // Applies to ALL render modes: crawl, scope, and normal dirty
+            // frames. Prevents AXI bus contention between CPU/DMA2D writes
+            // to the back buffer and LTDC reads from the front buffer.
             if !render_active && !buffer_ready && take_erif() {
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
@@ -4025,6 +4125,9 @@ fn main() -> ! {
 
                 if crawl_running || scope_running {
                     render_active = true;
+                } else if normal_render_pending {
+                    render_active = true;
+                    normal_render_pending = false;
                 }
             }
 

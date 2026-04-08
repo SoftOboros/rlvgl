@@ -52,6 +52,13 @@ pub struct EventWindow {
     last_draw_lines: Cell<u8>,
     /// Monotonic draw sequence number for telemetry.
     draw_seq: Cell<u32>,
+    /// When true, `handle_event(Tick)` is a no-op — entries don't age or
+    /// expire. Used during multi-frame dirty renders to ensure both
+    /// double-buffer frames show identical content.
+    frozen: bool,
+    /// When true, `draw()` is a no-op — the DMA2D overlay pipeline
+    /// handles rendering externally.
+    dma2d_mode: bool,
 }
 
 impl EventWindow {
@@ -89,6 +96,55 @@ impl EventWindow {
         self.draw_seq.get()
     }
 
+    /// Freeze event aging. While frozen, `handle_event(Tick)` is a no-op
+    /// so entries don't age or expire during multi-frame dirty renders.
+    pub fn set_frozen(&mut self, val: bool) {
+        self.frozen = val;
+    }
+
+    /// Whether event aging is currently frozen.
+    pub fn is_frozen(&self) -> bool {
+        self.frozen
+    }
+
+    /// Enable DMA2D rendering mode. When true, `draw()` becomes a no-op
+    /// because the DMA2D overlay pipeline handles rendering externally.
+    pub fn set_dma2d_mode(&mut self, val: bool) {
+        self.dma2d_mode = val;
+    }
+
+    /// Whether DMA2D rendering mode is active.
+    pub fn is_dma2d_mode(&self) -> bool {
+        self.dma2d_mode
+    }
+
+    /// Iterate visible entries, calling `f(line_index, text)` for each.
+    pub fn for_each_visible<F: FnMut(usize, &str)>(&self, mut f: F) {
+        let max_lines = MAX_LINES.min(self.entries.len());
+        let start = self.entries.len().saturating_sub(MAX_LINES);
+        for (i, entry) in self.entries[start..].iter().enumerate() {
+            if i >= max_lines {
+                break;
+            }
+            f(i, &entry.text);
+        }
+    }
+
+    /// Reference to the font used for text rendering.
+    pub fn font(&self) -> &'static BitmapFont {
+        self.font
+    }
+
+    /// Inner padding in pixels.
+    pub fn padding(&self) -> i32 {
+        self.padding
+    }
+
+    /// Line height: font scaled_height + gap.
+    pub fn line_height(&self) -> i32 {
+        self.font.scaled_height() + 4
+    }
+
     /// Push a pre-formatted event string into the display list.
     pub fn push_event(&mut self, text: String) {
         if !self.enabled {
@@ -109,7 +165,7 @@ impl Widget for EventWindow {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        if !self.visible {
+        if !self.visible || self.dma2d_mode {
             return;
         }
 
@@ -145,6 +201,10 @@ impl Widget for EventWindow {
     fn handle_event(&mut self, event: &Event) -> bool {
         match event {
             Event::Tick => {
+                // Skip aging while frozen (multi-frame dirty render in progress).
+                if self.frozen {
+                    return false;
+                }
                 // Age all entries and remove expired ones.
                 for entry in &mut self.entries {
                     entry.age += 1;
@@ -275,6 +335,8 @@ impl EventWindowBuilder {
             expire_ticks: self.expire_ticks,
             last_draw_lines: Cell::new(0),
             draw_seq: Cell::new(0),
+            frozen: false,
+            dma2d_mode: false,
         }
     }
 }
