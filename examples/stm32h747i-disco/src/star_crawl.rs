@@ -49,16 +49,23 @@ const STAR_COUNT: usize = 200;
 /// SDRAM base address for crawl buffers.
 const CRAWL_BASE: usize = 0xD100_0000;
 
-/// D2 SRAM address for FIR output — DMA2D-accessible, CPU-writable.
-const D2_SCANLINE: usize = 0x3000_0000;
+/// D2 SRAM base for the portrait A8 text buffer.
+///
+/// 480 × 600 = 288,000 bytes. D2 SRAM is 288 KiB total; IPC mailbox at
+/// 0x3004_7000 leaves 2,816 bytes headroom.
+const A8_BUF: usize = 0x3000_0000;
+const A8_WIDTH: u32 = FB_W; // 480 portrait columns
+const A8_HEIGHT: u32 = BOT_W; // 600 rows (max text extent)
+/// Minimum dst_x_off across all text rows (when target_w == BOT_W).
+const A8_Y_BASE: u32 = (CRAWL_W - BOT_W) / 2; // 60
+const A8_SIZE: usize = (A8_WIDTH * A8_HEIGHT) as usize; // 288,000
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RenderStage {
     Idle = 0,
-    StartStarRow = 1,
-    WaitStarRow = 2,
-    ProcessTextRow = 3,
-    WaitTextBlend = 4,
+    RenderFrame = 1,
+    StartTextBlend = 2,
+    WaitTextBlend = 3,
 }
 
 /// Result of advancing the crawl task by one step.
@@ -174,7 +181,7 @@ impl StarCrawl {
 
     /// Returns `true` when the crawl is parked on a DMA completion.
     pub fn waiting_for_dma(&self) -> bool {
-        self.stage == RenderStage::WaitStarRow || self.stage == RenderStage::WaitTextBlend
+        self.stage == RenderStage::WaitTextBlend
     }
 
     /// Packed crawl diagnostics for D3 SRAM / serial telemetry.
@@ -216,6 +223,13 @@ impl StarCrawl {
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn activate(&mut self, dma2d: &mut Dma2dBlitter) {
+        // Enable D2 SRAM1 + SRAM2 + SRAM3 clocks for the A8 portrait buffer.
+        // RCC_AHB2ENR: bit 29 = SRAM1EN, 30 = SRAM2EN, 31 = SRAM3EN.
+        unsafe {
+            let ahb2enr = (0x5802_44DCu32) as *mut u32;
+            ahb2enr.write_volatile(ahb2enr.read_volatile() | 0xE000_0000);
+        }
+
         let line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
         self.text_h = 120 + self.lines.len() as u32 * line_h + CRAWL_H;
         self.starfield = CRAWL_BASE as *mut u8;
@@ -267,7 +281,11 @@ impl StarCrawl {
             self.diag_last_target_w = 0;
             self.diag_last_text_src_row = 0;
             self.diag_last_error = 0;
-            self.stage = RenderStage::StartStarRow;
+            // Zero the portrait A8 buffer in D2 SRAM before FIR fills columns.
+            unsafe {
+                core::ptr::write_bytes(A8_BUF as *mut u8, 0, A8_SIZE);
+            }
+            self.stage = RenderStage::RenderFrame;
         }
 
         let dma_error = dma2d.read_error();
@@ -279,130 +297,120 @@ impl StarCrawl {
 
         match self.stage {
             RenderStage::Idle => StepResult::Pending,
-            RenderStage::StartStarRow => {
-                // Don't start DMA2D burst transfers until LTDC scan is done.
-                // ERIF_FLAG is set by ISR when scan completes; present() clears
-                // it, so this naturally waits one scan period after present.
-                if !crate::ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire) {
+            RenderStage::RenderFrame => {
+                // Gate: wait for LTDC scan to finish before first DMA2D burst.
+                // Skip the gate on the very first frame after activation
+                // (frame_id == 1) — no scan is pending in adapted command
+                // mode so ERIF will never fire until we present().
+                if self.bg_row == 0
+                    && self.frame_id > 1
+                    && !crate::ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire)
+                {
                     return StepResult::Pending;
                 }
-                let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
-                let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
-                let dst = unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };
-                #[cfg(not(feature = "c_hal"))]
-                crate::dma2d_irq::note_start();
-                crate::scope_probe::dma2d_active();
-                dma2d.start_blit_raw(
-                    src as *const u8,
-                    STAR_STRIDE,
-                    dst,
-                    self.fb_w * BPP,
-                    FB_W,
-                    1,
-                    PixelFmt::Argb8888,
-                );
-                self.stage = RenderStage::WaitStarRow;
-                StepResult::Pending
-            }
-            RenderStage::WaitStarRow => {
-                if dma2d.is_in_flight() {
-                    return StepResult::Pending;
+
+                // --- DMA2D starfield management ---
+                // Use the ISR completion latch instead of poll_complete():
+                // the DMA2D ISR clears TCIF before poll_complete() can
+                // see it, causing a race that prevents bg_row from advancing.
+                if !dma2d.is_in_flight() && crate::dma2d_irq::take_complete() {
+                    crate::scope_probe::dma2d_idle();
+                    self.bg_row += 1;
                 }
-                if dma2d.poll_complete() {
-                    dma2d.ack_complete();
+
+                if self.bg_row < FB_H && !dma2d.is_in_flight() {
+                    let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
+                    let src =
+                        unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
+                    let dst = unsafe {
+                        self.back_buf
+                            .add((self.bg_row * self.fb_w * BPP) as usize)
+                    };
+                    #[cfg(not(feature = "c_hal"))]
+                    crate::dma2d_irq::note_start();
+                    crate::scope_probe::dma2d_active();
+                    dma2d.start_blit_raw(
+                        src as *const u8,
+                        STAR_STRIDE,
+                        dst,
+                        self.fb_w * BPP,
+                        FB_W,
+                        1,
+                        PixelFmt::Argb8888,
+                    );
                 }
-                crate::scope_probe::dma2d_idle();
-                self.bg_row += 1;
-                if self.bg_row >= FB_H {
-                    // DMA2D wrote starfield directly to SDRAM, bypassing D-cache.
-                    // Invalidate the entire D-cache so the CPU text-blend loop
-                    // reads fresh starfield pixels instead of stale cached data.
-                    unsafe {
-                        cortex_m::asm::dsb();
-                        // CM7 D-cache: 32KB, 4-way, 32B lines → 256 sets
-                        // DCISW at 0xE000_EF60: way[31:30], set[12:5]
-                        for way in 0..4u32 {
-                            for set in 0..256u32 {
-                                (0xE000_EF60u32 as *mut u32)
-                                    .write_volatile((way << 30) | (set << 5));
+
+                // --- CPU FIR: one text row → D2 SRAM A8 portrait buffer ---
+                if self.text_row < CRAWL_H {
+                    let text_row_i = self.frame_scroll_px + self.text_row as i32;
+                    if text_row_i >= 0 && (text_row_i as u32) < self.text_h {
+                        let src_row = text_row_i as u32;
+                        let target_w =
+                            TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
+                        let dst_x_off = (CRAWL_W - target_w) / 2;
+                        self.diag_last_target_w = target_w.min(u16::MAX as u32) as u16;
+                        self.diag_last_text_src_row =
+                            src_row.min(u16::MAX as u32) as u16;
+                        if self.fir_resample_text_row(src_row, target_w) {
+                            self.diag_rows_with_text =
+                                self.diag_rows_with_text.saturating_add(1);
+                            // Copy FIR output into portrait A8 column in D2 SRAM.
+                            let x_col =
+                                (self.fb_w - 1 - self.text_row) as usize;
+                            let y_off = (dst_x_off - A8_Y_BASE) as usize;
+                            for i in 0..target_w as usize {
+                                unsafe {
+                                    let a8_ptr = (A8_BUF
+                                        + (y_off + i) * A8_WIDTH as usize
+                                        + x_col)
+                                        as *mut u8;
+                                    a8_ptr.write_volatile(self.scanline_buf[i]);
+                                }
                             }
-                        }
-                        cortex_m::asm::dsb();
-                        cortex_m::asm::isb();
-                    }
-                    self.stage = RenderStage::ProcessTextRow;
-                    self.text_row = 0;
-                } else {
-                    self.stage = RenderStage::StartStarRow;
-                }
-                StepResult::Pending
-            }
-            RenderStage::ProcessTextRow => {
-                if self.text_row >= CRAWL_H {
-                    self.finish_frame();
-                    return StepResult::FrameReady;
-                }
-                let text_row_i = self.frame_scroll_px + self.text_row as i32;
-                if text_row_i >= 0 && (text_row_i as u32) < self.text_h {
-                    let src_row = text_row_i as u32;
-                    let target_w = TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
-                    let dst_x_off = (CRAWL_W - target_w) / 2;
-                    let dst_col = self.fb_w - 1 - self.text_row;
-                    self.diag_last_target_w = target_w.min(u16::MAX as u32) as u16;
-                    self.diag_last_text_src_row = src_row.min(u16::MAX as u32) as u16;
-                    if self.fir_resample_text_row(src_row, target_w) {
-                        self.diag_rows_with_text = self.diag_rows_with_text.saturating_add(1);
-                        // CPU blend (reference path — known working).
-                        let dst_stride = (self.fb_w * BPP) as usize;
-                        let mut blended = 0u32;
-                        for i in 0..target_w as usize {
-                            let alpha = self.scanline_buf[i] as u32;
-                            if alpha == 0 {
-                                continue;
-                            }
-                            let dst_off = (dst_x_off as usize + i) * dst_stride
-                                + dst_col as usize * BPP as usize;
-                            let dst_ptr =
-                                unsafe { self.back_buf.add(dst_off) as *mut u32 };
-                            let star = unsafe { dst_ptr.read_volatile() };
-                            let inv = 255 - alpha;
-                            let r = (((YELLOW >> 16) & 0xFF) * alpha
-                                + ((star >> 16) & 0xFF) * inv)
-                                / 255;
-                            let g = (((YELLOW >> 8) & 0xFF) * alpha
-                                + ((star >> 8) & 0xFF) * inv)
-                                / 255;
-                            let b =
-                                ((YELLOW & 0xFF) * alpha + (star & 0xFF) * inv) / 255;
-                            unsafe {
-                                dst_ptr.write_volatile(
-                                    0xFF00_0000 | (r << 16) | (g << 8) | b,
-                                );
-                            }
-                            blended += 1;
-                        }
-                        self.diag_last_blended_pixels =
-                            blended.min(u16::MAX as u32) as u16;
-                        if blended != 0 {
                             self.diag_rows_blended =
                                 self.diag_rows_blended.saturating_add(1);
                         }
                     }
+                    self.text_row += 1;
                 }
-                self.text_row += 1;
+
+                // --- Check completion ---
+                let star_done = self.bg_row >= FB_H;
+                let text_done = self.text_row >= CRAWL_H;
+                let dma_done = !dma2d.is_in_flight();
+                if star_done && text_done && dma_done {
+                    self.stage = RenderStage::StartTextBlend;
+                }
+                StepResult::Pending
+            }
+            RenderStage::StartTextBlend => {
+                // Single DMA2D A8→ARGB blend of the entire text layer.
+                let dst_offset =
+                    (A8_Y_BASE * self.fb_w * BPP) as usize;
+                let dst = unsafe { self.back_buf.add(dst_offset) };
+                #[cfg(not(feature = "c_hal"))]
+                crate::dma2d_irq::note_start();
+                crate::scope_probe::dma2d_active();
+                dma2d.start_blend_a8_color(
+                    A8_BUF as *const u8,
+                    A8_WIDTH,
+                    A8_HEIGHT,
+                    YELLOW,
+                    dst,
+                    self.fb_w * BPP,
+                );
+                self.stage = RenderStage::WaitTextBlend;
                 StepResult::Pending
             }
             RenderStage::WaitTextBlend => {
                 if dma2d.is_in_flight() {
                     return StepResult::Pending;
                 }
-                if dma2d.poll_complete() {
-                    dma2d.ack_complete();
-                }
+                // ISR already cleared TCIF; use latch to confirm done.
+                let _ = crate::dma2d_irq::take_complete();
                 crate::scope_probe::dma2d_idle();
-                self.text_row += 1;
-                self.stage = RenderStage::ProcessTextRow;
-                StepResult::Pending
+                self.finish_frame();
+                StepResult::FrameReady
             }
         }
     }

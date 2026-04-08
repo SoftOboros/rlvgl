@@ -642,6 +642,11 @@ mod dma2d_irq {
         )
     }
 
+    /// Consume the completion latch (set by ISR, races poll_complete).
+    pub fn take_complete() -> bool {
+        COMPLETE_LATCH.swap(false, Ordering::AcqRel)
+    }
+
     pub unsafe fn irq_handler() {
         let regs = unsafe { &*stm32h7::stm32h747cm7::DMA2D::ptr() };
         let isr = regs.isr.read().bits();
@@ -2568,6 +2573,9 @@ fn main() -> ! {
         // Shared crawl toggle flag — set by info wing favicon callback.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         let crawl_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
+        // Grace period counter: ignore touch-deactivation while > 0.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let mut crawl_touch_guard: u32 = 0;
 
         // Audio scope toggle flag — set by settings wing audio icon callback.
         #[cfg(feature = "audio")]
@@ -3205,13 +3213,18 @@ fn main() -> ! {
                 if let Some(evt) = evt {
                     // While crawl is active, consume all touch events.
                     // PointerDown deactivates; everything else is suppressed.
+                    // Grace period: ignore PointerDown for first few ticks
+                    // after activation (the 120 Hz touch ISR queues extra
+                    // samples from the activating tap).
                     let mut consumed = false;
                     #[cfg(all(
                         feature = "dma2d",
                         any(target_arch = "arm", target_arch = "aarch64")
                     ))]
                     if star_crawl.is_active() {
-                        if matches!(&evt, Event::PointerDown { .. }) {
+                        if matches!(&evt, Event::PointerDown { .. })
+                            && crawl_touch_guard == 0
+                        {
                             star_crawl.deactivate();
                             serial_puts("CRAWL:touch_exit\r\n");
                             // Full screen restore from pristine desktop.
@@ -3355,6 +3368,10 @@ fn main() -> ! {
 
             // ── SysTick: tick widgets, render, present ──
             if cp.SYST.has_wrapped() {
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                {
+                    crawl_touch_guard = crawl_touch_guard.saturating_sub(1);
+                }
                 #[cfg(feature = "cpu_stats")]
                 {
                     cpu_stats.record_loop_count(loop_count);
@@ -3572,6 +3589,7 @@ fn main() -> ! {
                             serial_puts("CRAWL:active!\r\n");
                             display.return_dma2d_raw(blitter.into_inner());
                             render_active = true;
+                            crawl_touch_guard = 20; // ~330ms at 60Hz
                         } else {
                             serial_puts("CRAWL:no dma2d!\r\n");
                         }
