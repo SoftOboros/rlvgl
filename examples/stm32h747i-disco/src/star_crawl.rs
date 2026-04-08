@@ -280,6 +280,12 @@ impl StarCrawl {
         match self.stage {
             RenderStage::Idle => StepResult::Pending,
             RenderStage::StartStarRow => {
+                // Don't start DMA2D burst transfers until LTDC scan is done.
+                // ERIF_FLAG is set by ISR when scan completes; present() clears
+                // it, so this naturally waits one scan period after present.
+                if !crate::ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire) {
+                    return StepResult::Pending;
+                }
                 let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
                 let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
                 let dst = unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };

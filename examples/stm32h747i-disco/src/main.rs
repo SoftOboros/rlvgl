@@ -3982,8 +3982,7 @@ fn main() -> ! {
                     if crawl_running {
                         star_crawl.advance_scroll();
                     }
-                    // DON'T set render_active yet — wait for ERIF so
-                    // DMA2D starfield blit doesn't overlap LTDC scan.
+                    render_active = true;
                 } else if dirty_frames > 0 {
                     dirty_frames -= 1;
                 }
