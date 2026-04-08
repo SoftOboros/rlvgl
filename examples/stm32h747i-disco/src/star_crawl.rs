@@ -276,13 +276,6 @@ impl StarCrawl {
         match self.stage {
             RenderStage::Idle => StepResult::Pending,
             RenderStage::StartStarRow => {
-                // DMA2D burst transfers compete with LTDC for SDRAM.
-                // Defer until LTDC is idle (CDSR.VDES = 0).  CPU text
-                // blend (ProcessTextRow) is fine during LTDC scans —
-                // its scattered accesses don't starve the FIFO.
-                if unsafe { (0x5000_1048u32 as *const u32).read_volatile() & 1 != 0 } {
-                    return StepResult::Pending; // LTDC busy, retry
-                }
                 let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
                 let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
                 let dst = unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };

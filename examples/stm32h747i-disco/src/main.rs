@@ -2963,13 +2963,6 @@ fn main() -> ! {
             } else {
                 scope_probe::ltdc_active();
             }
-            // When ERIF fires (scan complete), disable LTDCEN so TE edges
-            // don't trigger new scans while we're rendering.  Must be
-            // ERIF-based, not VDES-based — VDES goes idle before the first
-            // TE after present(), which would race and kill the scan.
-            if display.check_erif() {
-                scope_probe::disable_ltdc_auto_refresh();
-            }
             // Loop heartbeat
             unsafe {
                 let prev = (0x3800_0660u32 as *const u32).read_volatile();
@@ -3768,10 +3761,10 @@ fn main() -> ! {
 
                 if is_crawl {
                     // ── Star crawl render ──
-                    // LTDCEN is cleared after ERIF, so at most one LTDC
-                    // scan overlaps with rendering. QoS gives LTDC read
-                    // priority; DMA2D row blits are short enough that the
-                    // LTDC line FIFO doesn't underrun.
+                    // No per-tick bus gating. QoS gives LTDC read priority
+                    // (INI6=0xF). D-cache invalidated after DMA2D blit.
+                    // Render-start is ERIF-gated (below) so we don't begin
+                    // a new frame mid-scan, but once started, run freely.
                     {
                         #[cfg(all(
                             feature = "dma2d",
@@ -3920,11 +3913,11 @@ fn main() -> ! {
                 }
             }
 
-            // ── Pipeline stage: GATE RENDER ON LTDC IDLE ─────────────────
+            // ── Pipeline stage: GATE RENDER ON ERIF ──────────────────────
             // For continuous modes (crawl, scope): only start rendering
-            // when LTDC is not reading SDRAM (CDSR.VDES = 0), so DMA2D
-            // and LTDC never fight for the bus simultaneously.
-            if !render_active && !buffer_ready && display.ltdc_bus_idle() {
+            // after the LTDC scan fully completes (ERIF set). ERIF is
+            // one-shot per scan — cleared by present(), set on scan done.
+            if !render_active && !buffer_ready && display.check_erif() {
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
                 #[cfg(not(all(
