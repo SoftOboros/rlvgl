@@ -116,6 +116,12 @@ impl EventOverlay {
             render_str_a8(font, draw_x, draw_y, text);
         });
 
+        // D2 SRAM at 0x3000_0000 falls under the default MPU background map
+        // (Write-Back Write-Allocate). CPU writes sit in D-cache; DMA2D
+        // reads directly from physical SRAM. Clean the cache lines so
+        // DMA2D sees the A8 text data we just wrote.
+        dcache_clean_range(A8_BUF, A8_SIZE);
+
         self.stage = Stage::FillBorder;
     }
 
@@ -306,4 +312,29 @@ fn render_str_a8(font: &BitmapFont, draw_x: i32, draw_y: i32, text: &str) {
         }
         cx += advance;
     }
+}
+
+// ── D-cache maintenance ─────────────────────────────────────────────────────
+
+/// Clean D-cache lines covering `[addr, addr+size)` so DMA2D sees CPU writes.
+///
+/// D2 SRAM at 0x3000_0000 falls under the default Cortex-M7 background map
+/// (Write-Back Write-Allocate). Without an explicit cache clean, CPU writes
+/// stay in the D-cache and DMA2D reads stale data from physical SRAM.
+///
+/// Uses DCCMVAC (Data Cache Clean by MVA to Point of Coherency) at
+/// 0xE000_EF68, one write per 32-byte cache line.
+fn dcache_clean_range(addr: usize, size: usize) {
+    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32;
+    const LINE_SIZE: usize = 32;
+    let start = addr & !(LINE_SIZE - 1);
+    let end = (addr + size + LINE_SIZE - 1) & !(LINE_SIZE - 1);
+    let mut a = start;
+    while a < end {
+        unsafe {
+            DCCMVAC.write_volatile(a as u32);
+        }
+        a += LINE_SIZE;
+    }
+    cortex_m::asm::dsb();
 }

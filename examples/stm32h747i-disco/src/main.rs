@@ -3562,10 +3562,11 @@ fn main() -> ! {
                         dirty_frames = dirty_frames.max(2);
                     }
                 }
-                // Event viewer visible → keep rendering (scrolling text, expiry)
-                if vis {
-                    dirty_frames = dirty_frames.max(2);
-                }
+                // Event viewer: no continuous re-render needed. In DSI adapted
+                // command mode, the display latches the last frame. The freeze
+                // mechanism ensures both double-buffer frames match. Only
+                // re-render on actual visual changes (visibility transition,
+                // entry count change, new event push).
 
                 // Detect entry count change (expiry or new push)
                 static mut LAST_ENTRY_COUNT: usize = 0;
@@ -4107,10 +4108,11 @@ fn main() -> ! {
 
             // ── Pipeline stage: GATE RENDER ON ERIF ──────────────────────
             // Start rendering only after LTDC scan completes (ERIF set).
-            // Applies to ALL render modes: crawl, scope, and normal dirty
-            // frames. Prevents AXI bus contention between CPU/DMA2D writes
-            // to the back buffer and LTDC reads from the front buffer.
-            if !render_active && !buffer_ready && take_erif() {
+            // IMPORTANT: Only consume ERIF when there's a pending render.
+            // In adapted command mode, ERIF fires only after present().
+            // Consuming it when nothing is pending creates a deadlock:
+            // no render → no present → no ERIF → no render.
+            if !render_active && !buffer_ready {
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
                 #[cfg(not(all(
@@ -4123,11 +4125,13 @@ fn main() -> ! {
                 #[cfg(not(feature = "audio"))]
                 let scope_running = false;
 
-                if crawl_running || scope_running {
+                let wants_render =
+                    crawl_running || scope_running || normal_render_pending;
+                if wants_render && take_erif() {
                     render_active = true;
-                } else if normal_render_pending {
-                    render_active = true;
-                    normal_render_pending = false;
+                    if normal_render_pending {
+                        normal_render_pending = false;
+                    }
                 }
             }
 
