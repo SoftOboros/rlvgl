@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Toast component for rlvgl-ui.
 //!
-//! Built from a [`Container`](rlvgl_widgets::container::Container) and
-//! [`Label`](rlvgl_widgets::label::Label) to provide lightweight dismissible
+//! Built from a [`Container`] and [`Label`] to provide lightweight dismissible
 //! notifications.
 
 use rlvgl_core::{

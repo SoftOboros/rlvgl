@@ -20,22 +20,35 @@ Package: `rlvgl`
 - Use existing Rust crates where possible (e.g., embedded-graphics, heapless, tinybmp)
 
 ## Features
-- no_std + allocator support
-- Component-based module layout (core, widgets, platform)
-- Simulatable via std-enabled feature flag
-- Pluggable display and input backends
-- Optional Lottie support via the `rlottie` crate for dynamic playback.
-  Embedded targets should pre-render animations to APNG for minimal size.
+- no_std + allocator support with simulator-friendly std features
+- Modular workspace crates for core widgets, platform backends, UI helpers, API bindings, and i18n
+- `rlvgl-creator` support for asset preparation, vendor database browsing, and STM32 BSP generation from CubeMX `.ioc` files
+- Vendor chip database crates and generated STM BSP crates for board-aware tooling
+- Flagship STM32H747I-DISCO demo covering DSI display, touch, SDRAM, SD/MMC, audio, and DMA2D-assisted rendering
+- Motion, compositor, dirty-region, and accelerated blitting primitives for richer embedded UIs
+- Pluggable display and input backends for both embedded targets and host simulation
+- Optional Lottie support for dynamic playback and offline asset conversion workflows
 
 ## Project Structure
 - [core](./core/README.md) – Widget base trait, layout, event dispatch
 - [widgets](./widgets/README.md) – Rust-native reimplementations of LVGL widgets
 - [platform](./platform/README.md) – Display/input traits and HAL adapters
 - [ui](./ui/README.md) – Higher-level UI components
+- [api](./api/src/lib.rs) – Shared ABI types for bindings and coprocessor integrations
+- [i18n](./i18n/src/lib.rs) – Compile-time translations with runtime-selectable locale blobs
+- [chipdb](./chipdb/README.md) – Vendor chip databases used by creator and BSP generation
+- [chips/stm/bsps](./chips/stm/bsps/README.md) – Generated STM32 BSP modules
+- [rlvgl-creator](./src/bin/creator/README.md) – Asset and BSP workflows for command-line and UI tooling
 - [examples](./examples/README.md) – Sample applications and board demos
 - [docs](./docs/README.md) – Project documentation and task lists
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
-- [chips/stm/bsps](./chips/stm/bsps/README.md) 🆕 – Generated STM32 BSP stubs
+
+## What's New in 0.1.9
+
+- `rlvgl-creator` now covers vendor import, board IR generation, and Rust BSP rendering with bundled alternate-function databases.
+- STM32H747I-DISCO moved from bring-up into a flagship demo path with dual-core startup, DSI display, touch, storage, audio, and richer UI flows.
+- The rendering stack gained `EventWindow`, compositor/save-under behavior, motion helpers, DMA2D acceleration, and display-pipeline fixes for smoother presentation.
+- The workspace now includes first-class i18n, API, chip database, and generated BSP crates alongside the core UI crates.
 
 ## Vendor chip databases
 
@@ -154,9 +167,10 @@ See `docs/TODO-CREATOR-BSP.md` for remaining work.
 
 As-built. See [docs](./docs/README.md) for component-by-component progress and outstanding tasks.
 
-As of 0.1.0 many features are implemented and an 87% unit test coverage
-is achived, but functional testing has and bare metal testing have not
-occured.
+`v0.1.9` shifts rlvgl from a core-library-first workspace toward a fuller
+embedded UI product stack. The main areas of growth are the creator/BSP
+pipeline, the STM32H747I-DISCO showcase target, and the runtime pieces needed
+for more polished embedded applications.
 
 ## Quick Example
 
@@ -209,10 +223,12 @@ LLVM coverage instrumentation is configured via `.cargo/config.toml` and the
 with instrumentation and generate an HTML report under `./coverage/`.
 
 ## [rlvgl crate](https://crates.io/crates/rlvgl)
-- The link above is for the top crate which bundles the others and include the simulator.
+- The link above is for the top crate which bundles the others and includes the simulator.
 - [rlvgl-core crate](https://crates.io/crates/rlvgl-core)
 - [rlvgl-widgets crate](https://crates.io/crates/rlvgl-widgets)
 - [rlvgl-platform crate](https://crates.io/crates/rlvgl-platform)
+- [rlvgl-ui crate](https://crates.io/crates/rlvgl-ui)
+- [rlvgl-i18n crate](https://crates.io/crates/rlvgl-i18n)
 
 Run the following Cargo command in your project directory:
 ```bash
@@ -220,7 +236,7 @@ cargo add rlvgl
 ```
 Or add the following line to your Cargo.toml:
 ```toml
-rlvgl = "0.1.5"
+rlvgl = "0.1.9"
 ```
 
 ## Community

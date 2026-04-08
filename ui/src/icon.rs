@@ -2,8 +2,7 @@
 //! Icon font helpers and Button extension for rlvgl-ui.
 //!
 //! Maps human-readable icon names to LVGL symbol codepoints and extends the
-//! [`Button`](rlvgl_widgets::button::Button) widget with a fluent `icon`
-//! method.
+//! [`rlvgl_widgets::button::Button`] widget with a fluent `icon` method.
 
 use alloc::string::{String, ToString};
 use core::fmt::Write;

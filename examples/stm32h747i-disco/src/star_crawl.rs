@@ -46,6 +46,16 @@ const BG_COLOR: u32 = 0xFF0A_0A20;
 /// Number of stars to scatter.
 const STAR_COUNT: usize = 200;
 
+/// Splash graphic crop: 384×384 from DESKTOP_PRISTINE.
+/// Portrait coords in the framebuffer at 0xD030_0000.
+const GRAPHIC_CROP_X: u32 = 48;
+const GRAPHIC_CROP_Y: u32 = 208;
+const GRAPHIC_SIZE: u32 = 384;
+const GRAPHIC_GAP: u32 = 40; // gap below graphic before text
+
+/// Softoboros letter logo: 250×64 RLVGLRAW.
+const LOGO_GAP: u32 = 40; // gap above logo after text
+
 /// SDRAM base address for crawl buffers.
 const CRAWL_BASE: usize = 0xD100_0000;
 
@@ -231,7 +241,11 @@ impl StarCrawl {
         }
 
         let line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
-        self.text_h = 120 + self.lines.len() as u32 * line_h + CRAWL_H;
+        // Layout: margin(120) + graphic(384) + gap(40) + text + gap(40) + logo(64) + padding(CRAWL_H)
+        let logo_h = Self::logo_height();
+        self.text_h = 120 + GRAPHIC_SIZE + GRAPHIC_GAP
+            + self.lines.len() as u32 * line_h
+            + LOGO_GAP + logo_h + CRAWL_H;
         self.starfield = CRAWL_BASE as *mut u8;
         self.text_src = (CRAWL_BASE + STAR_SIZE) as *mut u8;
 
@@ -441,7 +455,10 @@ impl StarCrawl {
     /// `activate()` before the scroll begins.
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn pre_render_text(&mut self, line_h: u32) {
-        let mut cur_y = 120u32;
+        // Blit the splash graphic (384×384) as A8 alpha at the top.
+        self.blit_splash_crop_a8(120);
+
+        let mut cur_y = 120 + GRAPHIC_SIZE + GRAPHIC_GAP;
         for &line in self.lines {
             let text_w = self.font.measure(line);
             let mut cx = ((TEXT_W as i32 - text_w) / 2).max(0);
@@ -482,6 +499,93 @@ impl StarCrawl {
                 }
             }
             cur_y += line_h;
+        }
+
+        // Blit the softoboros letter logo after the text.
+        self.blit_logo_a8(cur_y + LOGO_GAP);
+    }
+
+    /// Parse logo RLVGLRAW header and return height.
+    fn logo_height() -> u32 {
+        let raw: &[u8] = include_bytes!("../assets/icons/softoboros-letter-logo.raw");
+        if raw.len() < 24 {
+            return 0;
+        }
+        u32::from_le_bytes([raw[12], raw[13], raw[14], raw[15]])
+    }
+
+    /// Blit the 384×384 splash crop from DESKTOP_PRISTINE into the text
+    /// source buffer as A8 alpha. Converts white→transparent, color→opaque.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn blit_splash_crop_a8(&mut self, dst_y: u32) {
+        const PRISTINE: *const u8 = 0xD030_0000 as *const u8;
+        const PFB_W: u32 = 480; // portrait framebuffer width
+
+        let x_off = ((TEXT_W - GRAPHIC_SIZE) / 2) as usize;
+
+        for row in 0..GRAPHIC_SIZE {
+            for col in 0..GRAPHIC_SIZE {
+                let fb_off = ((GRAPHIC_CROP_Y + row) as usize * PFB_W as usize
+                    + (GRAPHIC_CROP_X + col) as usize)
+                    * 4;
+                let (b, g, r) = unsafe {
+                    (
+                        *PRISTINE.add(fb_off),
+                        *PRISTINE.add(fb_off + 1),
+                        *PRISTINE.add(fb_off + 2),
+                    )
+                };
+                // White background → alpha 0; colored → darker = more opaque
+                let lum = (r as u32 * 77 + g as u32 * 150 + b as u32 * 29) >> 8;
+                let alpha = 255u8.saturating_sub(lum as u8);
+                if alpha > 0 {
+                    // -90° CCW rotation: portrait (col, row) →
+                    // landscape (row, GRAPHIC_SIZE-1-col) so the
+                    // splash appears upright in the landscape crawl.
+                    let dst_off = (dst_y + GRAPHIC_SIZE - 1 - col) as usize
+                        * TEXT_W as usize
+                        + x_off
+                        + row as usize;
+                    if dst_off < (TEXT_W * self.text_h) as usize {
+                        unsafe {
+                            self.text_src.add(dst_off).write_volatile(alpha);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Blit the softoboros letter logo (RLVGLRAW) into the text source
+    /// buffer as A8 alpha.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn blit_logo_a8(&mut self, dst_y: u32) {
+        let raw: &[u8] = include_bytes!("../assets/icons/softoboros-letter-logo.raw");
+        if raw.len() < 24 {
+            return;
+        }
+        let w = u32::from_le_bytes([raw[8], raw[9], raw[10], raw[11]]);
+        let h = u32::from_le_bytes([raw[12], raw[13], raw[14], raw[15]]);
+        let pixels = &raw[24..];
+        let x_off = ((TEXT_W - w) / 2) as usize;
+
+        for row in 0..h {
+            for col in 0..w {
+                let off = (row * w + col) as usize * 4;
+                if off + 3 >= pixels.len() {
+                    break;
+                }
+                let a = pixels[off + 3];
+                if a > 0 {
+                    let dst_off =
+                        (dst_y + row) as usize * TEXT_W as usize + x_off + col as usize;
+                    if dst_off < (TEXT_W * self.text_h) as usize {
+                        unsafe {
+                            self.text_src.add(dst_off).write_volatile(a);
+                        }
+                    }
+                }
+            }
         }
     }
 

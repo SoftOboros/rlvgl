@@ -93,7 +93,7 @@ pub enum Event {
         y: i32,
     },
     /// Two consecutive short taps detected at the given coordinates.
-    /// Emitted by [`DoubleTapRecognizer`] when two `PressRelease` events
+    /// Emitted by the `DoubleTapRecognizer` when two `PressRelease` events
     /// with short hold durations occur within the double-tap time window.
     DoubleTap {
         /// Horizontal coordinate.

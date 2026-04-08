@@ -4,13 +4,13 @@
 //! the widget tree, converting noisy touch events into clean gesture events
 //! (PressDown/PressRelease/DoubleTap).
 //!
-//! The [`TapRecognizer`] debounces capacitive touch bounce by requiring
-//! the contact to settle before emitting a single `PressRelease`. Visual
-//! press feedback (`PressDown`) is emitted immediately on first contact.
+//! The [`crate::gesture::TapRecognizer`] debounces capacitive touch bounce by
+//! requiring the contact to settle before emitting a single `PressRelease`.
+//! Visual press feedback (`PressDown`) is emitted immediately on first contact.
 //!
-//! The [`DoubleTapRecognizer`] sits downstream of `TapRecognizer` and detects
-//! two consecutive short taps, emitting `DoubleTap` instead of the second
-//! `PressRelease`.
+//! The [`crate::gesture::DoubleTapRecognizer`] sits downstream of
+//! [`crate::gesture::TapRecognizer`] and detects two consecutive short taps,
+//! emitting `DoubleTap` instead of the second `PressRelease`.
 
 use rlvgl_core::event::Event;
 

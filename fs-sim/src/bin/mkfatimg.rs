@@ -2,7 +2,8 @@
 //!
 //! This CLI utility builds a FAT-formatted disk image of a specified size
 //! and populates it with the contents of a host directory. The resulting
-//! image can be mounted by [`SimBlockDevice`] for simulator testing.
+//! image can be mounted by [`rlvgl_fs_sim::SimBlockDevice`] for simulator
+//! testing.
 
 use std::env;
 use std::fs::{File, OpenOptions};

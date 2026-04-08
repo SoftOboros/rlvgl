@@ -130,9 +130,9 @@ pub trait Blitter {
 /// Collects dirty rectangles for a frame and optionally coalesces them.
 ///
 /// The planner stores up to `N` rectangles in a stack-allocated buffer. Call
-/// [`add`] to register a region that changed during rendering and [`rects`] to
-/// obtain the batched list for flushing. After presenting the frame, call
-/// [`clear`] to reuse the planner for the next frame.
+/// [`Self::add`] to register a region that changed during rendering and
+/// [`Self::rects`] to obtain the batched list for flushing. After presenting
+/// the frame, call [`Self::clear`] to reuse the planner for the next frame.
 pub struct BlitPlanner<const N: usize> {
     rects: HVec<Rect, N>,
 }

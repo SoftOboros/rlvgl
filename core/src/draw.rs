@@ -1,8 +1,8 @@
-//! Drawing helpers that compose [`Renderer`] calls to produce rounded
-//! rectangles and borders without extending the renderer trait.
+//! Drawing helpers that compose [`crate::renderer::Renderer`] calls to produce
+//! rounded rectangles and borders without extending the renderer trait.
 //!
-//! All functions work with any [`Renderer`] implementation, making rounded
-//! corners available on every backend.
+//! All functions work with any [`crate::renderer::Renderer`] implementation,
+//! making rounded corners available on every backend.
 
 use crate::renderer::Renderer;
 use crate::style::Style;

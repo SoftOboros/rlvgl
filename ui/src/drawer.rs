@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Drawer component for rlvgl-ui.
 //!
-//! Built from a [`Container`](rlvgl_widgets::container::Container) and
-//! [`Label`](rlvgl_widgets::label::Label) to provide a side panel for
+//! Built from a [`Container`] and [`Label`] to provide a side panel for
 //! navigation or menus.
 
 use rlvgl_core::{

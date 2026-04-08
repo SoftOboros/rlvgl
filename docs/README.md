@@ -17,6 +17,7 @@ See crate overviews for:
 - [chip database](../chipdb/README.md)
 
 ## Guides
+- [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) – Product-level release notes for the v0.1.9 publish.
 - [CREATOR-CLI.md](./CREATOR-CLI.md) – Command-line reference and workflows for rlvgl-creator.
 - [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) – MiniJinja template guidelines for BSP generation.
 - [STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) – STM32 BSP generation behavior, flags, and roadmap.

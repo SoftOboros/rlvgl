@@ -1,9 +1,9 @@
 //! Minimal bitmap font for `no_std` text rendering.
 //!
 //! Provides a fixed-width ASCII font that can render text via any
-//! [`Renderer`](crate::renderer::Renderer). The built-in stub font covers
-//! ASCII 0x20–0x7E in a 6×10 pixel grid. The creator tool will later
-//! generate optimised font data to replace this stub.
+//! [`crate::renderer::Renderer`]. The built-in stub font covers ASCII 0x20-0x7E
+//! in a 6x10 pixel grid. The creator tool will later generate optimized font
+//! data to replace this stub.
 
 use crate::renderer::Renderer;
 use crate::widget::{Color, Rect};

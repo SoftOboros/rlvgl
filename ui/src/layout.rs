@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-//! Basic layout helpers for arranging [`Widget`](rlvgl_core::widget::Widget)
-//! instances from [`rlvgl-widgets`](rlvgl_widgets).
+//! Basic layout helpers for arranging [`Widget`] instances from
+//! [`rlvgl_widgets`].
 //!
 //! Provides vertical and horizontal stacks, a simple grid, a box wrapper,
 //! and a lightweight [`GridCalc`] geometry calculator.
@@ -15,8 +15,8 @@ use rlvgl_widgets::container::Container;
 
 /// Container that positions children vertically.
 ///
-/// Accepts any [`Widget`](rlvgl_core::widget::Widget) from
-/// [`rlvgl_widgets`](rlvgl_widgets) and arranges them top-to-bottom.
+/// Accepts any [`Widget`] from [`rlvgl_widgets`] and arranges them
+/// top-to-bottom.
 pub struct VStack {
     bounds: Rect,
     spacing: i32,
@@ -88,9 +88,8 @@ impl Widget for VStack {
 
 /// Container that positions children horizontally.
 ///
-/// Like [`VStack`](crate::layout::VStack), this operates on
-/// [`Widget`](rlvgl_core::widget::Widget) instances from
-/// [`rlvgl_widgets`](rlvgl_widgets).
+/// Like [`VStack`], this operates on [`Widget`] instances from
+/// [`rlvgl_widgets`].
 pub struct HStack {
     bounds: Rect,
     spacing: i32,
