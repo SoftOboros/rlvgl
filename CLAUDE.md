@@ -21,7 +21,7 @@ RUSTFLAGS="-C target-cpu=cortex-m7" \
 cargo build \
   --target thumbv7em-none-eabihf \
   --bin rlvgl-stm32h747i-disco \
-  --features stm32h747i_disco_cm7,splash,desktop,dma2d,cpu_stats
+  --features stm32h747i_disco_cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
 ```
 
 - This is the current rust-only profiling build.

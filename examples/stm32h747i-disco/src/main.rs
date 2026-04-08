@@ -3360,6 +3360,25 @@ fn main() -> ! {
                         consumed = true; // suppress ALL events during crawl
                     }
 
+                    // Touch-to-dismiss for audio scope (same pattern as crawl)
+                    #[cfg(feature = "audio")]
+                    if !consumed && audio_scope.is_active() {
+                        if matches!(&evt, Event::PointerDown { .. }) {
+                            audio_scope.deactivate();
+                            mic_capture.stop();
+                            serial_puts("SCOPE:touch_exit\r\n");
+                            let (cw, ch) = display.dimensions();
+                            compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                x: 0,
+                                y: 0,
+                                width: ch as i32,
+                                height: cw as i32,
+                            });
+                            dirty_frames = 4;
+                        }
+                        consumed = true;
+                    }
+
                     if !consumed {
                         // Log to telemetry + event window
                         match &evt {
