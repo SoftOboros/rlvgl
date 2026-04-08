@@ -357,6 +357,13 @@ mod _dsi_isr {
             if wisr & 0x02 != 0 {
                 // PJ0 LOW — LTDC scan done (exact ISR timing, no poll jitter)
                 (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16);
+                // Clear LTDCEN to prevent auto-refresh from re-scanning
+                // before present() swaps the buffer. AR=1 in WCFGR would
+                // otherwise trigger another TE-driven scan immediately,
+                // creating two unlocked clocks (panel TE vs render loop).
+                // present() re-enables LTDCEN after the buffer swap.
+                const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
+                DSI_WCR.write_volatile(0x08); // DSIEN only, clear LTDCEN
                 super::ERIF_FLAG.store(true, core::sync::atomic::Ordering::Release);
             }
             // Clear any pending host-level flags
@@ -2972,6 +2979,7 @@ fn main() -> ! {
         let mut buffer_ready = false;
         let mut normal_render_pending = false;
         let mut first_normal_render = true; // bypass ERIF wait on first frame (no scan pending)
+        let mut tick_pending = false;
         let mut was_visible = false;
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
@@ -3385,7 +3393,16 @@ fn main() -> ! {
             }
 
             // ── SysTick: tick widgets, render, present ──
+            // Latch SysTick wrap immediately (COUNTFLAG clears on read).
+            // Defer processing while the crawl/scope render pipeline is
+            // active — the SysTick handler's event/input processing adds
+            // variable latency that shifts present timing, creating a
+            // visible beat-frequency flicker between the two clocks.
             if cp.SYST.has_wrapped() {
+                tick_pending = true;
+            }
+            if tick_pending && !render_active {
+                tick_pending = false;
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 {
                     crawl_touch_guard = crawl_touch_guard.saturating_sub(1);

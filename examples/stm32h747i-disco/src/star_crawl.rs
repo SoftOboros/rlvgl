@@ -384,6 +384,11 @@ impl StarCrawl {
                 StepResult::Pending
             }
             RenderStage::StartTextBlend => {
+                // Flush D-cache for the A8 buffer so DMA2D sees all CPU
+                // writes. D2 SRAM at 0x3000_0000 is Write-Back cached
+                // under the default Cortex-M7 background map.
+                dcache_clean_range(A8_BUF, A8_SIZE);
+
                 // Single DMA2D A8→ARGB blend of the entire text layer.
                 let dst_offset =
                     (A8_Y_BASE * self.fb_w * BPP) as usize;
@@ -621,4 +626,26 @@ impl StarCrawl {
     pub fn diag_words(&self) -> (u32, u32, u32, u32) {
         (0, 0, 0, 0)
     }
+}
+
+// ── D-cache maintenance ─────────────────────────────────────────────────────
+
+/// Clean D-cache lines covering `[addr, addr+size)` so DMA2D sees CPU writes.
+///
+/// D2 SRAM at 0x3000_0000 is Write-Back Write-Allocate under the default
+/// Cortex-M7 background map. Without a clean, DMA2D reads stale data.
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+fn dcache_clean_range(addr: usize, size: usize) {
+    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32;
+    const LINE_SIZE: usize = 32;
+    let start = addr & !(LINE_SIZE - 1);
+    let end = (addr + size + LINE_SIZE - 1) & !(LINE_SIZE - 1);
+    let mut a = start;
+    while a < end {
+        unsafe {
+            DCCMVAC.write_volatile(a as u32);
+        }
+        a += LINE_SIZE;
+    }
+    cortex_m::asm::dsb();
 }
