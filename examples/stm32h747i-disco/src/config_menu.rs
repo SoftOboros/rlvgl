@@ -206,11 +206,11 @@ impl ConfigMenu {
         self
     }
 
-    /// The panel rect: 10px below the gear, right edge at gear's left edge.
+    /// The panel rect: centered on the 800×480 landscape display.
     fn panel_bounds(&self) -> Rect {
         Rect {
-            x: self.gear_bounds.x - PANEL_W,
-            y: self.gear_bounds.y + self.gear_bounds.height + 10,
+            x: (800 - PANEL_W) / 2,
+            y: (480 - PANEL_H) / 2,
             width: PANEL_W,
             height: PANEL_H,
         }

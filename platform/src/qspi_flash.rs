@@ -91,32 +91,53 @@ impl Mt25tlFlash {
     /// Must be executed upon reset and upon switching from memory-mapped to
     /// any other mode.
     fn errata_2_8_3_reset(&mut self) {
+        const BC: *mut u32 = 0x3800_0314 as *mut u32;
         let rb = self.qspi.inner_mut();
         unsafe {
-            // Step 1: Disable the peripheral, ensure prescaler is not max
+            // Save the HAL-configured CR value so we can restore it after
+            // the timing-critical reset sequence.
+            let saved_cr = rb.cr.read().bits();
+
+            // Step 1: Disable the peripheral
             rb.cr.write(|w| w.bits(0));
-            while rb.sr.read().busy().bit_is_set() {}
+            for _ in 0..100_000u32 {
+                if rb.sr.read().busy().bit_is_clear() {
+                    break;
+                }
+            }
 
             // Step 2: Set maximum prescaler and enable
             rb.cr.write(|w| w.bits(0xFF00_0001));
 
             // Step 3: Activate free-running clock
             rb.ccr.write(|w| w.bits(0x2000_0000));
-            // Repeat to prevent back-to-back disable
             rb.ccr.write(|w| w.bits(0x2000_0000));
 
             // Step 4: Disable within 127 kernel clocks
             rb.cr.write(|w| w.bits(0));
-            while rb.sr.read().busy().bit_is_set() {}
+            for _ in 0..100_000u32 {
+                if rb.sr.read().busy().bit_is_clear() {
+                    break;
+                }
+            }
 
-            // Step 5: Re-enable with normal prescaler (will be set by HAL)
-            // For now, just enable with a reasonable prescaler
-            rb.cr.modify(|_, w| w.en().set_bit());
+            // Step 5: Restore the HAL-configured CR (prescaler, FSIZE, etc.)
+            // with EN bit set.
+            rb.cr.write(|w| w.bits(saved_cr | 1));
+            // Abort any in-progress transfer from the free-running clock
+            rb.cr.modify(|_, w| w.abort().set_bit());
+            while rb.cr.read().abort().bit_is_set() {}
+            // Clear all flags
+            rb.fcr.write(|w| w.ctcf().set_bit().ctef().set_bit().csmf().set_bit().ctof().set_bit());
+            // Reset CCR to idle
+            rb.ccr.write(|w| w.bits(0));
+            BC.write_volatile(0xE283_0005);
         }
 
         // Issue software reset to the flash device
         let _ = self.command_only(cmd::RESET_ENABLE);
         let _ = self.command_only(cmd::RESET_MEMORY);
+        unsafe { BC.write_volatile(0xE283_0007); }
         // Wait 30us for reset to complete (at 400 MHz, ~12000 cycles)
         cortex_m::asm::delay(12_000);
     }

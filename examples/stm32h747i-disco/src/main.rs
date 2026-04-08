@@ -33,6 +33,8 @@ mod event_overlay;
 mod bsp_pac;
 #[allow(dead_code)]
 mod config_menu;
+mod device_storage;
+mod file_browser_panel;
 #[cfg(feature = "cpu_stats")]
 mod cpu_stats;
 mod fonts;
@@ -1765,6 +1767,10 @@ fn main() -> ! {
             .sys_ck(400.MHz())
             .hclk(200.MHz())
             .pll1_strategy(PllConfigStrategy::Iterative)
+            // PLL1_Q needed for SDMMC kernel clock. 200 MHz = VCO/4 keeps
+            // VCO at 800 MHz (same as sys_ck=400 with P_div=2), avoiding
+            // any disturbance to PLL1_P or display timing.
+            .pll1_q_ck(200.MHz())
             .pll2_r_ck(150.MHz())
             // Target ~33 MHz pixel clock for 800x480 panel bring-up
             .pll3_r_ck(32.MHz())
@@ -1945,7 +1951,16 @@ fn main() -> ! {
             flash
         };
         #[cfg(feature = "qspi_flash")]
-        let _ = &qspi_flash; // suppress unused warning when not consumed yet
+        let qspi_flash = Rc::new(RefCell::new(qspi_flash));
+        // Format QSPI FAT partition if not already formatted.
+        #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
+        {
+            if crate::device_storage::ensure_qspi_formatted(&qspi_flash) {
+                serial_puts("QSPI: formatted FAT\r\n");
+            } else {
+                serial_puts("QSPI: FAT ok\r\n");
+            }
+        }
 
         // Panel reset GPIO on PG3 (LCD_RESET)
         let mut panel_reset_hal = gpiog.pg3.into_push_pull_output();
@@ -2403,23 +2418,16 @@ fn main() -> ! {
         let mut audio_pcm_len: u32 = 0;
 
         #[cfg(feature = "sd_storage")]
+        let mut sd_card_detected = false;
+        #[cfg(feature = "sd_storage")]
         {
-            use alloc::rc::Rc;
-            use core::cell::RefCell;
-            let pending: Rc<RefCell<alloc::vec::Vec<WidgetNode>>> =
-                Rc::new(RefCell::new(alloc::vec::Vec::new()));
-            let to_remove: Rc<
-                RefCell<alloc::vec::Vec<Rc<RefCell<dyn rlvgl::core::widget::Widget>>>>,
-            > = Rc::new(RefCell::new(alloc::vec::Vec::new()));
-            use rlvgl::core::widget::Rect;
-            use rlvgl::widgets::label::Label;
             use rlvgl_i18n::t;
             use stm32h7xx_hal::gpio::Alternate;
 
             // Card detect: PI8 is active-low (low = card inserted)
-            serial_puts("SD-DETECT\r\n");
             let sd_detect = gpioi.pi8.into_pull_up_input();
             let card_present = sd_detect.is_low();
+            sd_card_detected = card_present;
 
             // SDMMC1 pins: PC12=CK, PD2=CMD, PC8..PC11=D0..D3 (AF12)
             use stm32h7xx_hal::sdmmc::SdmmcExt;
@@ -2585,21 +2593,10 @@ fn main() -> ! {
                 }
             };
 
-            let label = Label::new(
-                sd_msg,
-                Rect {
-                    x: 10,
-                    y: 70,
-                    width: 260,
-                    height: 16,
-                },
-            );
-            let node = rlvgl::core::WidgetNode {
-                widget: Rc::new(RefCell::new(label)),
-                children: alloc::vec![],
-            };
-            pending.borrow_mut().push(node);
-            rlvgl_app_demo::flush_pending(&root, &pending, &to_remove);
+            // SD status logged to serial instead of a visible label.
+            serial_puts("SD-STATUS: ");
+            serial_puts(sd_msg);
+            serial_puts("\r\n");
         }
 
         // ── EventWindow widget (replaces direct-framebuffer toasts) ──────
@@ -2672,6 +2669,7 @@ fn main() -> ! {
                 (include_bytes!("../assets/icons/48/cpu48.rle"), true), // Chip info
                 (include_bytes!("../assets/icons/48/monitor48.rle"), true), // Live stats
                 (include_bytes!("../assets/icons/48/play48.rle"), true), // Star crawl
+                (include_bytes!("../assets/icons/48/audio48.rle"), true), // Audio scope
             ])))
         };
 
@@ -2756,6 +2754,28 @@ fn main() -> ! {
             )
         };
 
+        // ── File browser panel ────────────────────────────────────────────
+        let file_browser_panel = {
+            use rlvgl::core::packed_font::PackedFont;
+            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+            static UI_FONT_FB: PackedFont = PackedFont {
+                height: 24,
+                ascent: 22,
+                glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                data: FONT_DATA,
+            };
+            let mut dev_storage = crate::device_storage::DeviceStorage::new();
+            #[cfg(feature = "qspi_flash")]
+            dev_storage.set_qspi(qspi_flash.clone());
+            #[cfg(feature = "sd_storage")]
+            dev_storage.set_sd_present(sd_card_detected);
+            let storage: Rc<RefCell<dyn rlvgl::ui::file_browser::StorageBrowser>> =
+                Rc::new(RefCell::new(dev_storage));
+            Rc::new(RefCell::new(
+                crate::file_browser_panel::FileBrowserPanel::new(&UI_FONT_FB, storage),
+            ))
+        };
+
         // Wire info wing callbacks
         // Slot 0 (cpu): toggle chip info panel
         {
@@ -2786,6 +2806,17 @@ fn main() -> ! {
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
                 cf.set(true);
+            }));
+        }
+        // Slot 3 (audio): toggle audio scope
+        #[cfg(feature = "audio")]
+        {
+            let sf = scope_flag.clone();
+            info_wing.borrow_mut().slots_mut()[3]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                sf.set(true);
             }));
         }
 
@@ -2832,6 +2863,13 @@ fn main() -> ! {
                     }
                 }));
 
+            // File tap (slot 1) → toggle file browser panel
+            let fbp = file_browser_panel.clone();
+            strip.slots_mut()[1].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    fbp.borrow_mut().toggle();
+                }));
+
             // Info tap (slot 2) → close settings wing, toggle info wing
             let sw2 = settings_wing.clone();
             let iw2 = info_wing.clone();
@@ -2861,6 +2899,11 @@ fn main() -> ! {
             });
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: live_stats_panel.clone(),
+                children: alloc::vec![],
+            });
+            // File browser panel — same priority as info panels.
+            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+                widget: file_browser_panel.clone(),
                 children: alloc::vec![],
             });
             // Wings next — on the left edge, get events before icon strip.
@@ -3580,6 +3623,24 @@ fn main() -> ! {
                         }
                     }
                 }
+                // Track file browser panel visibility
+                {
+                    let vis = file_browser_panel.borrow().is_visible();
+                    static mut FBP_WAS_VIS: bool = false;
+                    if vis != unsafe { FBP_WAS_VIS } {
+                        dirty_frames = 4;
+                        if !vis {
+                            compositor
+                                .mark_pristine_restore(file_browser_panel.borrow().bounds());
+                        }
+                        unsafe {
+                            FBP_WAS_VIS = vis;
+                        }
+                    }
+                    if vis {
+                        dirty_frames = dirty_frames.max(2);
+                    }
+                }
                 // Live stats refresh (~2 Hz) — skip first frame after becoming visible
                 {
                     let lsp_now = live_stats_panel.borrow().is_visible();
@@ -4080,7 +4141,9 @@ fn main() -> ! {
                         ))]
                         {
                             let ew = event_win.borrow();
-                            if ew.is_visible() && ew.is_dma2d_mode() {
+                            let modal_up = file_browser_panel.borrow().is_visible()
+                                || config_menu.borrow().is_visible();
+                            if ew.is_visible() && ew.is_dma2d_mode() && !modal_up {
                                 event_overlay.begin_frame(
                                     &ew,
                                     back as *mut u8,
