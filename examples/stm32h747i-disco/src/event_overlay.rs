@@ -143,6 +143,10 @@ impl EventOverlay {
             Stage::Idle => StepResult::Idle,
 
             Stage::FillBorder => {
+                // Border fill: ~100K cycles. Check budget.
+                if !crate::dma2d_admits(100_000) {
+                    return StepResult::Pending;
+                }
                 // DMA2D R2M fill: entire event rect with border color.
                 let dst = unsafe {
                     self.back_buf
@@ -208,6 +212,9 @@ impl EventOverlay {
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn tick_fill_interior(&mut self, dma2d: &mut Dma2dBlitter) -> StepResult {
+        if !crate::dma2d_admits(100_000) {
+            return StepResult::Pending;
+        }
         let dst = unsafe {
             self.back_buf.add(
                 ((EV_FB_Y + BORDER_W) * self.fb_w * BPP
@@ -230,6 +237,9 @@ impl EventOverlay {
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn tick_blend_text(&mut self, dma2d: &mut Dma2dBlitter) -> StepResult {
+        if !crate::dma2d_admits(400_000) {
+            return StepResult::Pending;
+        }
         let dst = unsafe {
             self.back_buf
                 .add((EV_FB_Y * self.fb_w * BPP + EV_FB_X * BPP) as usize)

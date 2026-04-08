@@ -319,6 +319,11 @@ impl StarCrawl {
                 }
 
                 if self.bg_row < FB_H && !dma2d.is_in_flight() {
+                    // Admission: each row blit is ~500 cycles.
+                    // Don't start if we'd run into the next scan window.
+                    if !crate::dma2d_admits(500) {
+                        return StepResult::Pending;
+                    }
                     let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
                     let src =
                         unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
@@ -384,6 +389,11 @@ impl StarCrawl {
                 StepResult::Pending
             }
             RenderStage::StartTextBlend => {
+                // A8 blend is ~800K cycles. Don't start if budget is tight.
+                if !crate::dma2d_admits(800_000) {
+                    return StepResult::Pending;
+                }
+
                 // Flush D-cache for the A8 buffer so DMA2D sees all CPU
                 // writes. D2 SRAM at 0x3000_0000 is Write-Back cached
                 // under the default Cortex-M7 background map.

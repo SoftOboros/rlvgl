@@ -330,6 +330,22 @@ mod _dma2d_isr {
 ))]
 static ERIF_FLAG: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
+/// DWT_CYCCNT snapshot at the instant ERIF fired. T=0 for all scheduling.
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+static ERIF_CYCCNT: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(0);
+/// Measured ERIF-to-ERIF interval (cycles). Adapts to actual panel TE rate.
+/// Default 33ms = 13.2M cycles at 400MHz (one full frame at 30fps).
+/// Must be generous initially — too small blocks all DMA2D admission.
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(13_200_000);
 
 #[cfg(all(
     not(feature = "c_hal"),
@@ -355,15 +371,16 @@ mod _dsi_isr {
             // Clear ALL wrapper flags (bits 13..0)
             WIFCR.write_volatile(wisr & 0x3FFF);
             if wisr & 0x02 != 0 {
+                // Snapshot DWT_CYCCNT first — T=0 for all scheduling.
+                let cyc = (0xE000_1004u32 as *const u32).read_volatile();
                 // PJ0 LOW — LTDC scan done (exact ISR timing, no poll jitter)
                 (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16);
                 // Clear LTDCEN to prevent auto-refresh from re-scanning
-                // before present() swaps the buffer. AR=1 in WCFGR would
-                // otherwise trigger another TE-driven scan immediately,
-                // creating two unlocked clocks (panel TE vs render loop).
-                // present() re-enables LTDCEN after the buffer swap.
+                // before present() swaps the buffer.
                 const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
                 DSI_WCR.write_volatile(0x08); // DSIEN only, clear LTDCEN
+                // Timestamp BEFORE flag so consumers see consistent pair.
+                super::ERIF_CYCCNT.store(cyc, core::sync::atomic::Ordering::Release);
                 super::ERIF_FLAG.store(true, core::sync::atomic::Ordering::Release);
             }
             // Clear any pending host-level flags
@@ -382,6 +399,30 @@ mod _dsi_isr {
 ))]
 fn take_erif() -> bool {
     ERIF_FLAG.swap(false, core::sync::atomic::Ordering::AcqRel)
+}
+
+/// Cycles elapsed since last ERIF (T=0 for all scheduling decisions).
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub fn cycles_since_erif() -> u32 {
+    let now = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
+    now.wrapping_sub(ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire))
+}
+
+/// True if `cost` cycles of DMA2D work can finish before the guard window.
+/// The guard starts 1ms (400K cycles) before the expected next TE/ERIF.
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub fn dma2d_admits(cost: u32) -> bool {
+    const GUARD: u32 = 400_000; // 1ms safety margin at 400MHz
+    let budget = FRAME_BUDGET_CYCLES.load(core::sync::atomic::Ordering::Relaxed);
+    let elapsed = cycles_since_erif();
+    let remaining = budget.saturating_sub(elapsed);
+    remaining > cost + GUARD
 }
 
 #[cfg(all(
@@ -905,6 +946,21 @@ impl SerialTask {
                 serial_puts(" J_IDR=");
                 serial_hex_u32(unsafe { (0x5802_2410u32 as *const u32).read_volatile() });
                 serial_puts("\r\n");
+                #[cfg(all(
+                    not(feature = "c_hal"),
+                    any(target_arch = "arm", target_arch = "aarch64")
+                ))]
+                {
+                    serial_puts("TE budget=");
+                    serial_dec(
+                        FRAME_BUDGET_CYCLES
+                            .load(core::sync::atomic::Ordering::Relaxed)
+                            / 400,
+                    );
+                    serial_puts("us phase=");
+                    serial_dec(cycles_since_erif() / 400);
+                    serial_puts("us\r\n");
+                }
             }
             b'T' => {
                 if let Some((x, y)) = parse_tap(cmd) {
@@ -2980,6 +3036,7 @@ fn main() -> ! {
         let mut normal_render_pending = false;
         let mut first_normal_render = true; // bypass ERIF wait on first frame (no scan pending)
         let mut tick_pending = false;
+        let mut prev_erif_cyc: u32 = 0; // for ERIF-to-ERIF period measurement
         let mut was_visible = false;
         let mut render_count: u32 = 0;
         let mut tick_count: u32 = 0;
@@ -4078,10 +4135,42 @@ fn main() -> ! {
                 }
             }
 
-            // ── Pipeline stage: PRESENT (non-blocking ERIF check) ────────
-            // Only fires when render is done AND LTDC finished scanning
-            // (back porch). Falls through in ~10ns if not ready.
-            if buffer_ready && take_erif() {
+            // ── Pipeline stage: PRESENT (phase-locked to ERIF) ─────────
+            // Hold off present until a fixed offset after ERIF, so we
+            // always target the same TE slot. This eliminates the
+            // beat-frequency drift between TE and the render loop.
+            //
+            // With LTDCEN cleared in the ERIF ISR, no scan runs until
+            // present() re-enables LTDCEN. ERIF_FLAG stays true until
+            // consumed, so take_erif() succeeds whenever we check.
+            //
+            // Holdoff = 15ms (6M cycles): safely after render (~10ms),
+            // before TE+1 (~19ms after ERIF). Ensures every frame
+            // catches the same TE slot → constant frame period.
+            const PRESENT_HOLDOFF: u32 = 6_000_000; // 15ms at 400MHz
+            if buffer_ready
+                && cycles_since_erif() >= PRESENT_HOLDOFF
+                && take_erif()
+            {
+                // Update ERIF-to-ERIF period estimate (EMA, α=1/8).
+                {
+                    let now_cyc =
+                        ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire);
+                    let delta = now_cyc.wrapping_sub(prev_erif_cyc);
+                    // Sanity: 8ms..80ms at 400MHz (3.2M..32M cycles)
+                    if prev_erif_cyc != 0
+                        && delta > 3_200_000
+                        && delta < 32_000_000
+                    {
+                        let old = FRAME_BUDGET_CYCLES
+                            .load(core::sync::atomic::Ordering::Relaxed);
+                        let smoothed = (old / 8) * 7 + delta / 8;
+                        FRAME_BUDGET_CYCLES
+                            .store(smoothed, core::sync::atomic::Ordering::Relaxed);
+                    }
+                    prev_erif_cyc = now_cyc;
+                }
+
                 display.present();
                 // Clear any flag the ISR might have set during present()'s
                 // ERIF clear window, then mark scan active.
