@@ -1404,24 +1404,24 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         cortex_m::asm::dsb();
         let next = self.fb_addr_back;
         unsafe {
-            // Swap layer address
+            // 1. Clear stale ERIF so the DSI ISR doesn't fire on the
+            //    previous scan's flag before we finish the swap.
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
+            cortex_m::asm::dsb();
+
+            // 2. Swap layer address and trigger shadow reload.
             (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR
             (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR
         }
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
         unsafe {
-            // Enable LTDCEN — next TE edge triggers LTDC to scan the new
-            // front buffer (~14ms).  ERIF fires when the scan completes.
+            // 3. Enable LTDCEN — next TE edge triggers LTDC to scan.
             (0x5000_0404 as *mut u32).write_volatile(0x0C); // DSI_WCR: DSIEN+LTDCEN
-            // DSB ensures LTDCEN write reaches the peripheral before we
-            // clear ERIF, so any spurious "already done" ERIF from the
-            // re-enable is discarded by this clear.
+            // 4. Clear any spurious ERIF from the LTDCEN re-enable.
             cortex_m::asm::dsb();
             (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
         }
-        // The real ERIF will fire ~14ms later when the scan completes.
-        // The DSI ISR handles that; we just need to make sure no stale
-        // flag from the LTDCEN re-enable leaks through.
+        // The real ERIF fires ~14ms later when the scan completes.
     }
 
     /// Block until LTDC finishes scanning the current front buffer.

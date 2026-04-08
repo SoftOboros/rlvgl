@@ -49,12 +49,16 @@ const STAR_COUNT: usize = 200;
 /// SDRAM base address for crawl buffers.
 const CRAWL_BASE: usize = 0xD100_0000;
 
+/// D2 SRAM address for FIR output — DMA2D-accessible, CPU-writable.
+const D2_SCANLINE: usize = 0x3000_0000;
+
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RenderStage {
     Idle = 0,
     StartStarRow = 1,
     WaitStarRow = 2,
     ProcessTextRow = 3,
+    WaitTextBlend = 4,
 }
 
 /// Result of advancing the crawl task by one step.
@@ -170,7 +174,7 @@ impl StarCrawl {
 
     /// Returns `true` when the crawl is parked on a DMA completion.
     pub fn waiting_for_dma(&self) -> bool {
-        self.stage == RenderStage::WaitStarRow
+        self.stage == RenderStage::WaitStarRow || self.stage == RenderStage::WaitTextBlend
     }
 
     /// Packed crawl diagnostics for D3 SRAM / serial telemetry.
@@ -342,6 +346,7 @@ impl StarCrawl {
                     self.diag_last_text_src_row = src_row.min(u16::MAX as u32) as u16;
                     if self.fir_resample_text_row(src_row, target_w) {
                         self.diag_rows_with_text = self.diag_rows_with_text.saturating_add(1);
+                        // CPU blend (reference path — known working).
                         let dst_stride = (self.fb_w * BPP) as usize;
                         let mut blended = 0u32;
                         for i in 0..target_w as usize {
@@ -379,6 +384,18 @@ impl StarCrawl {
                     }
                 }
                 self.text_row += 1;
+                StepResult::Pending
+            }
+            RenderStage::WaitTextBlend => {
+                if dma2d.is_in_flight() {
+                    return StepResult::Pending;
+                }
+                if dma2d.poll_complete() {
+                    dma2d.ack_complete();
+                }
+                crate::scope_probe::dma2d_idle();
+                self.text_row += 1;
+                self.stage = RenderStage::ProcessTextRow;
                 StepResult::Pending
             }
         }

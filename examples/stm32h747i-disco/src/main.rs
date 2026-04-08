@@ -353,6 +353,8 @@ mod _dsi_isr {
             // Clear ALL wrapper flags (bits 13..0)
             WIFCR.write_volatile(wisr & 0x3FFF);
             if wisr & 0x02 != 0 {
+                // PJ0 LOW — LTDC scan done (exact ISR timing, no poll jitter)
+                (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16);
                 super::ERIF_FLAG.store(true, core::sync::atomic::Ordering::Release);
             }
             // Clear any pending host-level flags
@@ -3032,12 +3034,8 @@ fn main() -> ! {
 
         loop {
             loop_count = loop_count.wrapping_add(1);
-            // Scope: PJ0 tracks LTDC SDRAM activity (CDSR.VDES).
-            if display.ltdc_bus_idle() {
-                scope_probe::ltdc_idle();
-            } else {
-                scope_probe::ltdc_active();
-            }
+            // PJ0 is now driven by ISR (ERIF→LOW) and present() (→HIGH).
+            // No polling — shows exact scan window without main-loop jitter.
             // Loop heartbeat
             unsafe {
                 let prev = (0x3800_0660u32 as *const u32).read_volatile();
@@ -3955,6 +3953,9 @@ fn main() -> ! {
             // (back porch). Falls through in ~10ns if not ready.
             if buffer_ready && take_erif() {
                 display.present();
+                // Clear any flag the ISR might have set during present()'s
+                // ERIF clear window, then mark scan active.
+                ERIF_FLAG.store(false, core::sync::atomic::Ordering::Release);
                 scope_probe::ltdc_active();
                 buffer_ready = false;
                 present_count = present_count.wrapping_add(1);

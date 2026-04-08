@@ -402,6 +402,55 @@ impl Dma2dBlitter {
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
     }
 
+    /// Start a non-blocking A8 alpha blend where the A8 source is
+    /// contiguous but the ARGB destination has a custom line offset.
+    ///
+    /// This handles the portrait-column write pattern: NLR width=1,
+    /// height=`pixel_count`, with `dst_line_offset_px` pixels between
+    /// consecutive output rows.  DMA2D handles the stride-separated
+    /// writes internally with AXI burst optimization.
+    ///
+    /// `a8_src`: contiguous A8 alpha values (`pixel_count` bytes).
+    /// `pixel_count`: number of pixels to blend.
+    /// `fg_color`: 0x00RRGGBB foreground colour.
+    /// `dst`: first ARGB8888 pixel in the destination column.
+    /// `dst_line_offset_px`: pixels to skip between consecutive output
+    ///   rows (fb_width − 1 for a single-pixel-wide vertical column).
+    pub fn start_blend_a8_column(
+        &mut self,
+        a8_src: *const u8,
+        pixel_count: u32,
+        fg_color: u32,
+        dst: *mut u8,
+        dst_line_offset_px: u32,
+    ) {
+        unsafe {
+            // Foreground: A8 source, 1 pixel per line, contiguous
+            self.regs.fgmar.write(|w| w.bits(a8_src as u32));
+            self.regs.fgor.write(|w| w.bits(0)); // 1 byte/line, no gap
+            self.regs.fgpfccr.write(|w| w.bits(0xFF00_0000 | 9)); // A8, full alpha
+            self.regs.fgcolr.write(|w| w.bits(fg_color));
+
+            // Background: ARGB8888 column with large line offset
+            self.regs.bgmar.write(|w| w.bits(dst as u32));
+            self.regs.bgor.write(|w| w.bits(dst_line_offset_px));
+            self.regs.bgpfccr.write(|w| w.bits(0)); // ARGB8888
+
+            // Output: same layout as background (in-place blend)
+            self.regs.omar.write(|w| w.bits(dst as u32));
+            self.regs.oor.write(|w| w.bits(dst_line_offset_px));
+            self.regs.opfccr.write(|w| w.bits(0)); // ARGB8888
+
+            // NLR: 1 pixel wide, pixel_count lines tall
+            self.regs.nlr.write(|w| w.bits((1 << 16) | pixel_count));
+        }
+        self.prepare_start();
+        self.write_cr_mode(Self::CR_MODE_M2M_BLEND);
+        self.regs
+            .cr
+            .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
+    }
+
     /// Blocking compatibility wrapper for [`Self::start_blend_a8_color`].
     pub fn blend_a8_color(
         &mut self,
