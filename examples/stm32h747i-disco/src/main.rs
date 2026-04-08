@@ -320,6 +320,59 @@ mod _dma2d_isr {
     }
 }
 
+/// DSI end-of-refresh flag — set by DSI ISR, consumed by main loop.
+/// Replaces polling DSI_WISR.ERIF with zero-latency interrupt detection.
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+static ERIF_FLAG: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod _dsi_isr {
+    use stm32h7::stm32h747cm7::interrupt;
+
+    /// DSI interrupt — all DSI events merge into IRQ 123.
+    /// We only care about ERIF (end of refresh, WISR bit 1).
+    /// Clear ALL flags to prevent non-ERIF events from re-triggering.
+    #[interrupt]
+    unsafe fn DSI() {
+        const WISR: *const u32 = 0x5000_040C as *const u32;
+        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
+        // DSI Host flag clear registers (prevent re-trigger from host events)
+        const ISR0: *const u32 = 0x5000_00BC as *const u32;
+        const ISR1: *const u32 = 0x5000_00C0 as *const u32;
+        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32;
+        const FIR1: *mut u32 = 0x5000_00DC as *mut u32;
+        unsafe {
+            let wisr = WISR.read_volatile();
+            // Clear ALL wrapper flags (bits 13..0)
+            WIFCR.write_volatile(wisr & 0x3FFF);
+            if wisr & 0x02 != 0 {
+                super::ERIF_FLAG.store(true, core::sync::atomic::Ordering::Release);
+            }
+            // Clear any pending host-level flags
+            let isr0 = ISR0.read_volatile();
+            if isr0 != 0 { FIR0.write_volatile(isr0); }
+            let isr1 = ISR1.read_volatile();
+            if isr1 != 0 { FIR1.write_volatile(isr1); }
+        }
+    }
+}
+
+/// Consume the ERIF flag (set by DSI ISR). Returns true once per scan.
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn take_erif() -> bool {
+    ERIF_FLAG.swap(false, core::sync::atomic::Ordering::AcqRel)
+}
+
 #[cfg(all(
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
@@ -2955,6 +3008,28 @@ fn main() -> ! {
 
         scope_probe::init();
 
+        // ── DSI ERIF interrupt ───────────────────────────────────────────
+        // Enable AFTER all other init so a pending ERIF doesn't fire
+        // into an incompletely-initialized system.
+        unsafe {
+            // Disable ALL DSI host interrupts — only wrapper ERIE matters.
+            (0x5000_00C4u32 as *mut u32).write_volatile(0); // IER0 = 0
+            (0x5000_00C8u32 as *mut u32).write_volatile(0); // IER1 = 0
+            // Set WIER to ONLY ERIE (bit 1), clearing all others.
+            (0x5000_0408u32 as *mut u32).write_volatile(1 << 1);
+            // Clear all pending wrapper + host flags
+            (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // WIFCR: all wrapper flags
+            let isr0 = (0x5000_00BCu32 as *const u32).read_volatile();
+            if isr0 != 0 { (0x5000_00D8u32 as *mut u32).write_volatile(isr0); }
+            let isr1 = (0x5000_00C0u32 as *const u32).read_volatile();
+            if isr1 != 0 { (0x5000_00DCu32 as *mut u32).write_volatile(isr1); }
+            // Clear NVIC pending bit, then unmask
+            cortex_m::peripheral::NVIC::unpend(stm32h7::stm32h747cm7::Interrupt::DSI);
+            cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
+            let mut nvic: cortex_m::peripheral::NVIC = core::mem::transmute(());
+            nvic.set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 1);
+        }
+
         loop {
             loop_count = loop_count.wrapping_add(1);
             // Scope: PJ0 tracks LTDC SDRAM activity (CDSR.VDES).
@@ -3878,7 +3953,7 @@ fn main() -> ! {
             // ── Pipeline stage: PRESENT (non-blocking ERIF check) ────────
             // Only fires when render is done AND LTDC finished scanning
             // (back porch). Falls through in ~10ns if not ready.
-            if buffer_ready && display.check_erif() {
+            if buffer_ready && take_erif() {
                 display.present();
                 scope_probe::ltdc_active();
                 buffer_ready = false;
@@ -3917,7 +3992,7 @@ fn main() -> ! {
             // For continuous modes (crawl, scope): only start rendering
             // after the LTDC scan fully completes (ERIF set). ERIF is
             // one-shot per scan — cleared by present(), set on scan done.
-            if !render_active && !buffer_ready && display.check_erif() {
+            if !render_active && !buffer_ready && take_erif() {
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
                 #[cfg(not(all(

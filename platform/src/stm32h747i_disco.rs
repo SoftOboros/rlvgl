@@ -1419,6 +1419,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             cortex_m::asm::dsb();
             (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
         }
+        // The real ERIF will fire ~14ms later when the scan completes.
+        // The DSI ISR handles that; we just need to make sure no stale
+        // flag from the LTDCEN re-enable leaks through.
     }
 
     /// Block until LTDC finishes scanning the current front buffer.
