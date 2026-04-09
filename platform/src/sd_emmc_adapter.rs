@@ -34,12 +34,17 @@ impl SdMmcBlockDev {
         }
     }
 
-    /// Invalidate D-Cache for a buffer (before and after DMA reads).
+    /// Clean + invalidate D-Cache for a buffer (before and after DMA reads).
+    ///
+    /// Uses `clean_invalidate_dcache_by_address` instead of bare
+    /// `invalidate_dcache_by_slice` because the latter asserts cache-line
+    /// alignment.  `embedded-sdmmc` `Block` buffers are stack-allocated
+    /// and may not be 32-byte aligned.
     fn invalidate(buf: &mut [u8]) {
         unsafe {
             cortex_m::Peripherals::steal()
                 .SCB
-                .invalidate_dcache_by_slice(buf);
+                .clean_invalidate_dcache_by_address(buf.as_ptr() as usize, buf.len());
         }
         asm::dmb();
     }

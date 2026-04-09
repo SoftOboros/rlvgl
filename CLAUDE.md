@@ -22,15 +22,14 @@ cargo build \
   --target thumbv7em-none-eabihf \
   -p rlvgl-example-disco \
   --bin rlvgl-stm32h747i-disco \
-  --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage
+  --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
 ```
 
 - This is the current rust-only profiling build.
 - It links and boots successfully as a dev build.
 - `cpu_stats` is for DWT/D3 telemetry and is not the known flashable release profile.
-- `audio` is excluded: the WM8994 I2C4 init hangs at boot, blocking the
-  main loop.  SAI1 clocks run (open-channel noise audible) but the codec
-  never completes configuration.  Re-enable after fixing the I2C4 timeout.
+- `audio` enables WM8994 codec init over I2C4 + SAI1 I2S TX + SAI4 PDM mic.
+- `sd_storage` enables SDMMC block device; file browser listing is still a stub.
 
 ### Compile-safety check for the leaner profiling feature set
 

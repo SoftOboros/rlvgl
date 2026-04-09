@@ -2257,8 +2257,10 @@ fn main() -> ! {
         #[cfg(feature = "audio")]
         let sai = {
             use rlvgl_platform::Sai1Audio;
+
             let sai = Sai1Audio::new();
             sai.enable_clock(1); // 1 = PLL2_P
+
             sai
         };
         #[cfg(feature = "audio")]
@@ -2272,9 +2274,11 @@ fn main() -> ! {
             let _sai1_sd_a = gpioe.pe6.into_alternate::<6>().speed(Speed::VeryHigh);
             let _sai1_sd_b = gpioe.pe3.into_alternate::<6>().speed(Speed::VeryHigh);
 
+
             // Configure SAI1 sub-block A as I2S master TX
             // MCKDIV=0 means /1; the WM8994 FLL handles exact audio frequency
             sai.configure_tx(0);
+
 
             // Init WM8994 codec over I2C4 (temporary ownership, then release)
             let codec_i2c = HalI2c(i2c4);
@@ -2283,24 +2287,29 @@ fn main() -> ! {
             // configures FLL for exact audio clocking, and sets up DAC routing.
             // PLL2_P provides the SAI1 kernel clock; MCKDIV=0 means MCLK = kernel_ck.
             // The WM8994 FLL locks to whatever MCLK we provide.
+
             let _ = codec.init_playback(
                 48_000,
                 150_000_000, // approximate MCLK from PLL2_P
                 rlvgl_platform::wm8994::OutputDevice::Headphone,
             );
 
+
             // Enable SAI1 TX — codec is now receiving I2S frames
             sai.enable_tx();
+
 
             // SAI4 PDM mic GPIO (PE2=CK1, PC1=D1)
             let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
             let _sai4_d1 = gpioc.pc1.into_alternate::<10>();
 
             // Release I2C4 back so touch can use it
+
             codec.release().0
         };
         #[cfg(not(feature = "audio"))]
         let i2c4 = i2c4;
+
         {
             const ISR: *const u32 = 0x4001_101C as *const u32;
             const TDR: *mut u32 = 0x4001_1028 as *mut u32;
@@ -2311,6 +2320,7 @@ fn main() -> ! {
                 }
             }
         }
+
 
         // I2C4 is now driven by the TIM6_DAC ISR via raw PAC registers.
         // The HAL-configured timing persists; we just drop the Rust ownership.
@@ -3051,8 +3061,9 @@ fn main() -> ! {
         let _btn_discard: u32 = 0;
 
         // ── Gesture recognizers ───────────────────────────────────────────
-        use rlvgl_platform::gesture::TapRecognizer;
+        use rlvgl_platform::gesture::{DoubleTapRecognizer, TapRecognizer};
         let mut tap = TapRecognizer::new(FRAME_HZ);
+        let mut dtap = DoubleTapRecognizer::new(FRAME_HZ);
 
         // ── Event telemetry ring buffer ──────────────────────────────────
         // 16-entry ring at D3 SRAM 0x3800_0700, each entry = 4 words:
@@ -3430,15 +3441,18 @@ fn main() -> ! {
                             _ => {}
                         }
 
-                        // Feed the debounced tap recognizer directly into the widget tree.
-                        // This demo does not consume DoubleTap, so buffering single taps
-                        // behind the double-tap timeout only makes the UI feel sluggish.
+                        // Feed the debounced tap recognizer through the double-tap
+                        // detector, then into the widget tree.  The file browser
+                        // requires DoubleTap to drill into directories.
                         if let Some(gesture) = tap.process(&evt) {
-                            if let Event::PressDown { x, y } = &gesture {
-                                telem_log(tick_count, 0x03, *x, *y);
+                            let (a, b) = dtap.process(&gesture);
+                            for dtap_evt in a.into_iter().chain(b) {
+                                if let Event::PressDown { x, y } = &dtap_evt {
+                                    telem_log(tick_count, 0x03, *x, *y);
+                                }
+                                dirty_frames = 2;
+                                root.borrow_mut().dispatch_event(&dtap_evt);
                             }
-                            dirty_frames = 2;
-                            root.borrow_mut().dispatch_event(&gesture);
                         }
                     } // if !consumed
                 } // if let Some(evt)
@@ -3559,7 +3573,23 @@ fn main() -> ! {
                 loop_count = 0;
                 // Advance gesture settle timer → may emit PressRelease
                 if let Some(held) = tap.tick() {
-                    if let Event::PressRelease { x, y } = &held {
+                    let (a, b) = dtap.process(&held);
+                    for dtap_evt in a.into_iter().chain(b) {
+                        if let Event::PressRelease { x, y } = &dtap_evt {
+                            telem_log(tick_count, 0x14, *x, *y);
+                            {
+                                let mut ew = event_win.borrow_mut();
+                                ew.push_event(t!("hw.touch", x = *x, y = *y));
+                                ew.set_frozen(true);
+                            }
+                        }
+                        dirty_frames = 4;
+                        root.borrow_mut().dispatch_event(&dtap_evt);
+                    }
+                }
+                // Advance double-tap window timer → may emit buffered PressRelease
+                if let Some(expired) = dtap.tick() {
+                    if let Event::PressRelease { x, y } = &expired {
                         telem_log(tick_count, 0x14, *x, *y);
                         {
                             let mut ew = event_win.borrow_mut();
@@ -3568,7 +3598,7 @@ fn main() -> ! {
                         }
                     }
                     dirty_frames = 4;
-                    root.borrow_mut().dispatch_event(&held);
+                    root.borrow_mut().dispatch_event(&expired);
                 }
 
                 // (Wing clear_region handled by widget tree dispatch below)
