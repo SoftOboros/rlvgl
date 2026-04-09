@@ -1,59 +1,129 @@
-.PHONY: help gen-stm32h747i-disco-bsp build-disco build-disco-cm4 build-disco-all \
-	openocd openocd-dual openocd-erase probe-rs-gdb \
+# ── Canonical build variables ─────────────────────────────────────
+PACKAGE       := rlvgl-example-disco
+BIN_CM7       := rlvgl-stm32h747i-disco
+BIN_CM4       := rlvgl-stm32h747i-disco-cm4
+TARGET        := thumbv7em-none-eabihf
+FEATURES_CM7  := cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
+FEATURES_CM4  := cm4
+CHIP          := STM32H747XIHx
+FLASH_BASE    := 0x08000000
+OBJCOPY       := rust-objcopy
+PROBE_ID      ?= 0483:374e:004F00273133510837363734
+PROBE_SPEED   ?= 1000
+
+# Derived paths
+ELF_CM7       := target/$(TARGET)/debug/$(BIN_CM7)
+ELF_CM7_REL   := target/$(TARGET)/release/$(BIN_CM7)
+ELF_CM4       := target/$(TARGET)/debug/$(BIN_CM4)
+
+.PHONY: help build-disco build-disco-release build-disco-cm4 build-disco-all \
+	objcopy-disco objcopy-disco-release \
+	flash-disco flash-disco-hex flash-disco-bin \
+	probe-rs-gdb \
+	openocd openocd-dual openocd-erase \
+	gen-stm32h747i-disco-bsp \
 	translate-all-i18n translate-all-i18n-force translate-all-i18n-dry-run \
 	extract-i18n-keys extract-icons import-icons
 
-ELF_CM7 := target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco
-PROBE_ID ?= 0483:374e:004F00273133510837363734
-PROBE_SPEED_KHZ ?= 50
-
 help:
-	@echo "Convenience targets:"
-	@echo "  make gen-stm32h747i-disco-bsp   # Regenerate H747I-DISCO BSP (SMPS/VOS1)"
-	@echo "  make build-disco                # Build CM7 example"
-	@echo "  make build-disco-cm4            # Build CM4 example"
-	@echo "  make build-disco-all            # Build both cores"
-	@echo "  make openocd                    # Start OpenOCD (ST-Link + STM32H7)"
-	@echo "  make openocd-dual               # Start OpenOCD with dual-core cfg (CM7 on 3333, CM4 on 3334)"
-	@echo "  make openocd-erase              # Full chip erase via OpenOCD (DANGER)"
-	@echo "  make probe-rs-gdb               # Flash CM7 image, then launch probe-rs GDB server"
+	@echo "Build targets:"
+	@echo "  make build-disco              # Build CM7 debug + generate .hex/.bin"
+	@echo "  make build-disco-release      # Build CM7 release + generate .hex/.bin"
+	@echo "  make build-disco-cm4          # Build CM4 debug"
+	@echo "  make build-disco-all          # Build both cores"
+	@echo ""
+	@echo "Flash & debug:"
+	@echo "  make flash-disco              # Build + flash CM7 via probe-rs (ELF)"
+	@echo "  make flash-disco-hex          # Flash from .hex"
+	@echo "  make flash-disco-bin          # Flash from .bin (with base address)"
+	@echo "  make probe-rs-gdb             # Flash + launch probe-rs GDB server"
+	@echo ""
+	@echo "OpenOCD:"
+	@echo "  make openocd                  # Start OpenOCD (ST-Link + STM32H7)"
+	@echo "  make openocd-dual             # Dual-core cfg (CM7 on 3333, CM4 on 3334)"
+	@echo "  make openocd-erase            # Full chip erase (DANGER)"
+	@echo ""
+	@echo "BSP generation:"
+	@echo "  make gen-stm32h747i-disco-bsp # Regenerate H747I-DISCO BSP (SMPS/VOS1)"
 	@echo ""
 	@echo "i18n translation:"
-	@echo "  make translate-locale-de         # Translate en.json to German"
-	@echo "  make translate-all-i18n          # Translate en.json to all locales (skip existing)"
-	@echo "  make translate-all-i18n-force    # Regenerate all locale translations"
-	@echo "  make translate-all-i18n-dry-run  # Preview translation targets"
-	@echo "  make extract-i18n-keys           # Sync keys from Rust source to en.json"
+	@echo "  make translate-locale-de       # Translate en.json to German"
+	@echo "  make translate-all-i18n        # Translate en.json to all locales (skip existing)"
+	@echo "  make translate-all-i18n-force  # Regenerate all locale translations"
+	@echo "  make translate-all-i18n-dry-run# Preview translation targets"
+	@echo "  make extract-i18n-keys         # Sync keys from Rust source to en.json"
 	@echo ""
 	@echo "Icon extraction:"
-	@echo "  make extract-icons               # Extract Lucide SVGs to assets/icons/"
-	@echo "  make import-icons                # Extract + convert to .raw via creator"
+	@echo "  make extract-icons             # Extract Lucide SVGs to assets/icons/"
+	@echo "  make import-icons              # Extract + convert to .raw via creator"
 
+# ── Build ─────────────────────────────────────────────────────────
+build-disco:
+	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	cargo build --target $(TARGET) \
+	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7)
+	$(MAKE) objcopy-disco
+
+build-disco-release:
+	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	cargo build --target $(TARGET) --release \
+	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7)
+	$(MAKE) objcopy-disco-release
+
+build-disco-cm4:
+	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	cargo build --target $(TARGET) \
+	  -p $(PACKAGE) --bin $(BIN_CM4) --features $(FEATURES_CM4)
+
+build-disco-all: build-disco build-disco-cm4
+
+# ── Objcopy (hex + trimmed bin) ───────────────────────────────────
+objcopy-disco:
+	$(OBJCOPY) -O ihex $(ELF_CM7) $(ELF_CM7).hex
+	$(OBJCOPY) -O binary -R .noinit $(ELF_CM7) $(ELF_CM7).bin
+	@echo "── artifacts ──"
+	@ls -lh $(ELF_CM7) $(ELF_CM7).hex $(ELF_CM7).bin
+
+objcopy-disco-release:
+	$(OBJCOPY) -O ihex $(ELF_CM7_REL) $(ELF_CM7_REL).hex
+	$(OBJCOPY) -O binary -R .noinit $(ELF_CM7_REL) $(ELF_CM7_REL).bin
+	@echo "── artifacts ──"
+	@ls -lh $(ELF_CM7_REL) $(ELF_CM7_REL).hex $(ELF_CM7_REL).bin
+
+# ── Flash (probe-rs) ─────────────────────────────────────────────
+flash-disco: build-disco
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset \
+	  --probe $(PROBE_ID) $(ELF_CM7)
+
+flash-disco-hex: build-disco
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset \
+	  --probe $(PROBE_ID) \
+	  --binary-format iHex $(ELF_CM7).hex
+
+flash-disco-bin: build-disco
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset \
+	  --probe $(PROBE_ID) \
+	  --binary-format bin --base-address $(FLASH_BASE) $(ELF_CM7).bin
+
+# ── Debug (build + flash + GDB server) ───────────────────────────
+probe-rs-gdb: flash-disco
+	probe-rs gdb --chip $(CHIP) \
+	  --protocol swd --speed 50 \
+	  --non-interactive --connect-under-reset --reset-halt \
+	  --probe $(PROBE_ID)
+
+# ── BSP generation ───────────────────────────────────────────────
 gen-stm32h747i-disco-bsp:
 	STM32_PWR_SUPPLY=SMPS STM32_PWR_SDLEVEL=VOS1 \
 		./examples/stm32h747i-disco/gen-bsp.sh
 
-build-disco:
-	cargo build --target thumbv7em-none-eabihf \
-	  --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7,splash,desktop
-
-build-disco-cm4:
-	cargo build --target thumbv7em-none-eabihf \
-	  --bin rlvgl-stm32h747i-disco-cm4 --features stm32h747i_disco_cm4
-
-build-disco-all: build-disco build-disco-cm4
-
-probe-rs-gdb: build-disco
-	probe-rs download --chip STM32H747XIHx \
-	  --protocol swd --speed $(PROBE_SPEED_KHZ) \
-	  --non-interactive --connect-under-reset \
-	  --probe $(PROBE_ID) $(ELF_CM7) && \
-	probe-rs gdb --chip STM32H747XIHx \
-	  --protocol swd --speed $(PROBE_SPEED_KHZ) \
-	  --non-interactive --connect-under-reset --reset-halt \
-	  --probe $(PROBE_ID)
-
-# Basic OpenOCD sessions; adjust interface/target as needed
+# ── OpenOCD ──────────────────────────────────────────────────────
 openocd:
 	openocd -f interface/stlink.cfg -f target/stm32h7x.cfg -c init -c "reset halt"
 
@@ -64,7 +134,7 @@ openocd-erase:
 	openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
 	  -c init -c "reset halt" -c "stm32h7x mass_erase 0" -c shutdown
 
-# ── i18n translation ───────────────────────────────────────────────
+# ── i18n translation ─────────────────────────────────────────────
 translate-locale-%:
 	python3 i18n/translate_locale.py --locale $*
 
@@ -80,7 +150,7 @@ translate-all-i18n-dry-run:
 extract-i18n-keys:
 	python3 i18n/extract_keys.py
 
-# ── Icon extraction ────────────────────────────────────────────────
+# ── Icon extraction ──────────────────────────────────────────────
 extract-icons:
 	npx tsx scripts/extract-lucide-icons.ts
 

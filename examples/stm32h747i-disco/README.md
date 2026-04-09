@@ -32,28 +32,36 @@ hal::init_board_hal(&dp);
 - `arm-none-eabi` cross toolchain
 
 ## Building
+
 ```bash
 rustup target add thumbv7em-none-eabihf
-cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco,qrcode,png,jpeg,fontdue" \
-    --target thumbv7em-none-eabihf
+make build-disco        # build CM7 debug + generate .hex/.bin
 ```
 
-Alternatively, use the top-level Makefile shortcuts:
+Or explicitly:
+
+```bash
+RUSTFLAGS="-C target-cpu=cortex-m7" \
+cargo build --target thumbv7em-none-eabihf \
+  -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco \
+  --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
+```
+
+Top-level Makefile targets (`make help` for all):
 
 ```
+make build-disco                # Build CM7 debug + .hex/.bin
+make build-disco-release        # Build CM7 release + .hex/.bin
+make build-disco-cm4            # Build CM4
+make flash-disco                # Build + flash via probe-rs
+make probe-rs-gdb               # Build + flash + GDB server
 make gen-stm32h747i-disco-bsp   # Regenerate BSP (defaults SMPS/VOS1)
-make build-disco                # Build CM7 example
-make build-disco-cm4            # Build CM4 example
-make build-disco-all            # Build both
-make openocd                    # Start OpenOCD (stlink + stm32h7x)
-make openocd-erase              # Mass erase (DANGER)
 ```
 
 Notes:
-- The workspace `build.rs` stages this example’s `memory.x` into the Cargo
-  build directory and passes `-Tmemory.x` to the linker automatically on
-  embedded targets. No global `.cargo/config.toml` is required.
+- The crate `build.rs` stages `memory.x` into the Cargo build directory and
+  passes `-Tlink.x` to the linker automatically on embedded targets.
+- `rust-objcopy` generates `.hex` and `.bin` alongside the ELF after each build.
 - Optional `backlight_pwm` enables TIM8 PWM on `PJ6` for the LCD backlight. The
   default build uses a simple GPIO high/low fallback for bring‑up.
 

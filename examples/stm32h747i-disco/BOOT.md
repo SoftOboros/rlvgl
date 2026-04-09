@@ -4,11 +4,10 @@ This file summarizes the essential state, decisions, and next steps for the CM7 
 
 ## Target, Build, Debug
 - Target: STM32H747I‑DISCO (CM7 core)
-- Build task: `build-disco (cm7)` with features:
-  - `stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest`
-- VSCode launch: “CM7 attach (external OpenOCD)”
-  - `runToEntryPoint: main`
-  - No semihosting post‑launch commands
+- Build: `make build-disco` (or `make flash-disco` to build + flash)
+  - Features: `cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio`
+- VSCode launch: **”CM7 (probe-rs)”** — builds, flashes, halts at reset
+  - **”CM7 attach (probe-rs)”** — debug after external load (no reflash)
 
 ## Boot Sequence Snapshot
 The CM7 path now consistently completes the early bring-up steps:

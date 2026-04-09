@@ -47,41 +47,47 @@ The most recent cached successful release fingerprint under
 records:
 
 ```text
-stm32h747i_disco_cm7,dma2d,splash,desktop,audio
+cm7,dma2d,splash,desktop,audio
 ```
 
 Cached artifact expectations from `target/`:
 
 - `target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco`: about `321K`
 - `target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco.bin`: about `152K`
-- `target/rlvgl-disco.hex`: about `448K`
+- `target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco.hex`: about `448K`
 
 Do not assume a new `cpu_stats` build will still fit flash just because the
 cached `.hex` does.
 
 ## Flashing And Debug
 
-### Probe-rs via Makefile
+All flash/debug workflows use `make` targets. Run `make help` for the full list.
+
+### Build + flash (preferred)
+
+```bash
+make flash-disco          # build debug + flash ELF via probe-rs
+make flash-disco-hex      # flash from .hex
+make flash-disco-bin      # flash from .bin (with --base-address 0x08000000)
+```
+
+### Build + flash + GDB server
 
 ```bash
 make probe-rs-gdb
 ```
 
-That target builds the disco image, downloads it, and starts a probe-rs GDB
-server.
+### VS Code one-click
+
+Use the **"CM7 (probe-rs)"** launch config — it builds, flashes, and halts at
+reset.  To debug after loading via any other method (CLI, CubeProgrammer, etc.),
+use **"CM7 attach (probe-rs)"** which provides symbols without reflashing.
 
 ### Direct probe-rs flash
 
 ```bash
-probe-rs download --chip STM32H747XIHx target/rlvgl-disco.hex
-```
-
-For ELF-based downloads, point `probe-rs download` at the matching ELF instead.
-
-### Direct probe-rs GDB server
-
-```bash
-probe-rs gdb --chip STM32H747XIHx --gdb-connection-string 127.0.0.1:3333
+probe-rs download --chip STM32H747XIHx \
+  target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco
 ```
 
 ## Serial Helper

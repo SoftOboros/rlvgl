@@ -559,6 +559,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         //   Bank 2: 0xD100_0000  Bank 3: 0xD180_0000
         let fb_addr = fb; // Bank 0
         let fb_back = fb + 0x0080_0000; // Bank 1
+        let fb_bytes = (width as usize) * (height as usize) * 4; // ARGB8888
         disp.fb_addr = fb_addr;
         disp.fb_addr_back = fb_back;
 

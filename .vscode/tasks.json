@@ -1,63 +1,38 @@
 {
-  // VS Code tasks for rlvgl STM32H747I-DISCO builds
   "version": "2.0.0",
   "tasks": [
     {
       "label": "build-disco (cm7)",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest"
-      ],
-      "options": { "env": { "RUSTFLAGS": "" } },
+      "command": "make",
+      "args": ["build-disco"],
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": ["$rustc"]
     },
     {
       "label": "build-disco (cm7, release)",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--release",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest"
-      ],
-      "options": { "env": { "RUSTFLAGS": "" } },
-      "group": "build",
-      "problemMatcher": ["$rustc"]
-    },
-    {
-      "label": "build-disco (cm7 + sdram)",
-      "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,sdram_ramtest"
-      ],
-      "options": { "env": { "RUSTFLAGS": "" } },
+      "command": "make",
+      "args": ["build-disco-release"],
       "group": "build",
       "problemMatcher": ["$rustc"]
     },
     {
       "label": "build-disco (cm4)",
       "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco-cm4",
-        "--features", "stm32h747i_disco_cm4"
-      ],
-      "options": { "env": { "RUSTFLAGS": "" } },
+      "command": "make",
+      "args": ["build-disco-cm4"],
       "group": "build",
       "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "flash-disco (cm7)",
+      "type": "shell",
+      "command": "make",
+      "args": ["flash-disco"],
+      "dependsOn": "build-disco (cm7)",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
     },
     {
       "label": "build-sim",
@@ -65,8 +40,8 @@
       "command": "cargo",
       "args": [
         "build",
-        "--bin", "rlvgl-sim",
-        "--features", "simulator,qrcode,png,jpeg,gif,fontdue"
+        "-p", "rlvgl-example-sim",
+        "--bin", "rlvgl-sim"
       ],
       "group": "build",
       "problemMatcher": ["$rustc"]
@@ -82,188 +57,6 @@
       ],
       "group": "build",
       "problemMatcher": ["$rustc"]
-    },
-    {
-      "label": "build-disco (cm4, c_hal)",
-      "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco-cm4",
-        "--features", "stm32h747i_disco_cm4,c_hal_cm4"
-      ],
-      "options": {
-        "env": {
-          "RUSTFLAGS": ""
-        }
-      },
-      "group": "build",
-      "problemMatcher": ["$rustc", "$gcc"]
-    },
-    {
-      "label": "build-disco (cm7, c_hal)",
-      "type": "shell",
-      "command": "cargo",
-      "args": [
-        "build",
-        "--target", "thumbv7em-none-eabihf",
-        "--bin", "rlvgl-stm32h747i-disco",
-        "--features", "stm32h747i_disco_cm7,dma2d,backlight_pwm,pac_sdram_init,c_hal,semihosting"
-      ],
-      "options": {
-        "env": {
-          "RUSTFLAGS": ""
-          // Set ARM_NONE_EABI_GCC if arm-none-eabi-gcc is not in PATH,
-          // e.g. "ARM_NONE_EABI_GCC": "/opt/homebrew/bin/arm-none-eabi-gcc"
-        }
-      },
-      "group": "build",
-      "problemMatcher": ["$rustc", "$gcc"]
-    },
-    {
-      "label": "probe-rs download (cm7, c_hal)",
-      "type": "shell",
-      "dependsOn": "build-disco (cm7, c_hal)",
-      "dependsOrder": "sequence",
-      "command": "probe-rs",
-      "args": [
-        "download",
-        "--chip", "STM32H747XIHx",
-        "--protocol", "swd",
-        "--speed", "1000",
-        "--non-interactive",
-        "--connect-under-reset",
-        "--probe", "0483:374e:004F00273133510837363734",
-        "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco"
-      ],
-      "problemMatcher": {
-        "owner": "probe-rs",
-        "pattern": [
-          {
-            "regexp": "^((?:.:)?[^:]+):(\\d+):\\s*(.*)$",
-            "file": 1,
-            "line": 2,
-            "message": 3
-          }
-        ]
-      }
-    },
-    {
-      "label": "probe-rs gdb (cm7, c_hal)",
-      "type": "shell",
-      "isBackground": true,
-      "dependsOn": ["probe-rs download (cm7, c_hal)"],
-      "dependsOrder": "sequence",
-      "command": "probe-rs",
-      "args": [
-        "gdb",
-        "--chip", "STM32H747XIHx",
-        "--protocol", "swd",
-        "--speed", "50",
-        "--non-interactive",
-        "--connect-under-reset",
-        "--probe", "0483:374e:004F00273133510837363734",
-        "--reset-halt"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
-      },
-      "problemMatcher": {
-        "owner": "probe-rs",
-        "pattern": [
-          {
-            "regexp": "^((?:.:)?[^:]+):(\\d+):\\s*(.*)$",
-            "file": 1,
-            "line": 2,
-            "message": 3
-          }
-        ],
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".*Firing up GDB stub.*",
-          "endsPattern": ".*Firing up GDB stub.*"
-        }
-      }
-    },
-    {
-      "label": "probe-rs download (cm7)",
-      "type": "shell",
-      "dependsOn": "build-disco (cm7)",
-      "dependsOrder": "sequence",
-      "command": "probe-rs",
-      "args": [
-        "download",
-        "--chip",
-        "STM32H747XIHx",
-        "--protocol",
-        "swd",
-        "--speed",
-        "1000",
-        "--non-interactive",
-        "--connect-under-reset",
-        "--probe",
-        "0483:374e:004F00273133510837363734",
-        "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco"
-      ],
-      "problemMatcher": {
-        "owner": "probe-rs",
-        "pattern": [
-          {
-            "regexp": "^((?:.:)?[^:]+):(\\d+):\\s*(.*)$",
-            "file": 1,
-            "line": 2,
-            "message": 3
-          }
-        ]
-      }
-    },
-    {
-      "label": "probe-rs gdb (cm7)",
-      "type": "shell",
-      "isBackground": true,
-      "dependsOn": [
-        "probe-rs download (cm7)"
-      ],
-      "dependsOrder": "sequence",
-      "command": "probe-rs",
-      "args": [
-        "gdb",
-        "--chip",
-        "STM32H747XIHx",
-        "--protocol",
-        "swd",
-        "--speed",
-        "50",
-        "--non-interactive",
-        "--connect-under-reset",
-        "--probe",
-        "0483:374e:004F00273133510837363734",
-        "--reset-halt"
-      ],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": false
-      },
-      "problemMatcher": {
-        "owner": "probe-rs",
-        "pattern": [
-          {
-            "regexp": "^((?:.:)?[^:]+):(\\d+):\\s*(.*)$",
-            "file": 1,
-            "line": 2,
-            "message": 3
-          }
-        ],
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".*Firing up GDB stub.*",
-          "endsPattern": ".*Firing up GDB stub.*"
-        }
-      }
     }
   ]
 }

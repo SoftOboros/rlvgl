@@ -1539,7 +1539,7 @@ fn main() -> ! {
     // which calls back into rlvgl_app_main() when hardware is ready.
     #[cfg(all(
         feature = "c_hal",
-        feature = "stm32h747i_disco_cm7",
+        feature = "cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
@@ -1554,7 +1554,7 @@ fn main() -> ! {
     // ── Rust HAL path (no c_hal feature) ────────────────────────────────────
     #[cfg(all(
         not(feature = "c_hal"),
-        feature = "stm32h747i_disco_cm7",
+        feature = "cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
@@ -4375,12 +4375,12 @@ fn main() -> ! {
     #[cfg(not(any(
         all(
             feature = "c_hal",
-            feature = "stm32h747i_disco_cm7",
+            feature = "cm7",
             any(target_arch = "arm", target_arch = "aarch64")
         ),
         all(
             not(feature = "c_hal"),
-            feature = "stm32h747i_disco_cm7",
+            feature = "cm7",
             any(target_arch = "arm", target_arch = "aarch64")
         )
     )))]
@@ -4397,7 +4397,7 @@ fn main() -> ! {
 // Peripherals::take().
 #[cfg(all(
     feature = "c_hal",
-    feature = "stm32h747i_disco_cm7",
+    feature = "cm7",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 #[unsafe(no_mangle)]

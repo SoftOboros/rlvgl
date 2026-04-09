@@ -48,7 +48,7 @@ fn main() -> ! {
     // ── C HAL path ──────────────────────────────────────────────────────────
     #[cfg(all(
         feature = "c_hal_cm4",
-        feature = "stm32h747i_disco_cm4",
+        feature = "cm4",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
@@ -63,7 +63,7 @@ fn main() -> ! {
     // ── PAC-only path (no c_hal_cm4 feature) ────────────────────────────────
     #[cfg(all(
         not(feature = "c_hal_cm4"),
-        feature = "stm32h747i_disco_cm4",
+        feature = "cm4",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
@@ -80,7 +80,7 @@ fn main() -> ! {
 
     // Fallback: non-ARM / non-disco / doc builds
     #[cfg(not(all(
-        feature = "stm32h747i_disco_cm4",
+        feature = "cm4",
         any(target_arch = "arm", target_arch = "aarch64")
     )))]
     loop {
@@ -93,7 +93,7 @@ fn main() -> ! {
 // Called by c_bsp_init_cm4() after CM4 MPU and D2 peripheral clocks are ready.
 #[cfg(all(
     feature = "c_hal_cm4",
-    feature = "stm32h747i_disco_cm4",
+    feature = "cm4",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 #[unsafe(no_mangle)]
