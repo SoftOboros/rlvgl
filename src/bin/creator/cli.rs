@@ -38,6 +38,16 @@ pub mod sync;
 pub mod util;
 pub mod vendor;
 
+fn resolve_out_arg(
+    positional: Option<PathBuf>,
+    flagged: Option<PathBuf>,
+    command: &str,
+) -> Result<PathBuf> {
+    positional
+        .or(flagged)
+        .ok_or_else(|| anyhow!("missing output path for `{command}`"))
+}
+
 /// Dual-core selector for BSP generation.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum CoreSel {
@@ -122,7 +132,20 @@ enum Command {
         /// Root path containing assets
         path: PathBuf,
         /// Directory to copy assets into
-        out: PathBuf,
+        #[arg(
+            value_name = "OUT",
+            required_unless_present = "out_flag",
+            conflicts_with = "out_flag"
+        )]
+        out: Option<PathBuf>,
+        /// Directory to copy assets into
+        #[arg(
+            long = "out",
+            value_name = "OUT",
+            required_unless_present = "out",
+            conflicts_with = "out"
+        )]
+        out_flag: Option<PathBuf>,
         /// Allow only assets with these licenses
         #[arg(long, value_name = "LICENSE")]
         allow: Vec<String>,
@@ -167,7 +190,20 @@ enum Command {
     /// Regenerate Cargo features and an asset index from the manifest
     Sync {
         /// Directory to write generated files
-        out: PathBuf,
+        #[arg(
+            value_name = "OUT",
+            required_unless_present = "out_flag",
+            conflicts_with = "out_flag"
+        )]
+        out: Option<PathBuf>,
+        /// Directory to write generated files
+        #[arg(
+            long = "out",
+            value_name = "OUT",
+            required_unless_present = "out",
+            conflicts_with = "out"
+        )]
+        out_flag: Option<PathBuf>,
         /// Print changes instead of writing files
         #[arg(long)]
         dry_run: bool,
@@ -510,9 +546,13 @@ pub fn run() -> Result<()> {
         Command::Vendor {
             path,
             out,
+            out_flag,
             allow,
             deny,
-        } => vendor::run(&path, &cli.manifest, &out, &allow, &deny)?,
+        } => {
+            let out = resolve_out_arg(out, out_flag, "vendor")?;
+            vendor::run(&path, &cli.manifest, &out, &allow, &deny)?
+        }
         Command::Convert { path, force } => convert::run(&path, &cli.manifest, force)?,
         Command::Compress { input, output } => compress::run(&input, &output)?,
         Command::Decompress { input, output } => compress::decompress(&input, &output)?,
@@ -520,7 +560,14 @@ pub fn run() -> Result<()> {
         Command::AddTarget { name, vendor_dir } => {
             add_target::run(&cli.manifest, &name, &vendor_dir)?
         }
-        Command::Sync { out, dry_run } => sync::run(&cli.manifest, &out, dry_run)?,
+        Command::Sync {
+            out,
+            out_flag,
+            dry_run,
+        } => {
+            let out = resolve_out_arg(out, out_flag, "sync")?;
+            sync::run(&cli.manifest, &out, dry_run)?
+        }
         Command::Scaffold { path } => scaffold::run(&path, &cli.manifest)?,
         Command::Apng {
             frames,

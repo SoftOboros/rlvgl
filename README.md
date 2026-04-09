@@ -34,8 +34,9 @@ Package: `rlvgl`
 - [widgets](./widgets/README.md) – Rust-native reimplementations of LVGL widgets
 - [platform](./platform/README.md) – Display/input traits and HAL adapters
 - [ui](./ui/README.md) – Higher-level UI components
+- [examples/apps/demo](./examples/apps/demo/README.md) – Packaged demo application crate
 - [api](./api/src/lib.rs) – Shared ABI types for bindings and coprocessor integrations
-- [i18n](./i18n/src/lib.rs) – Compile-time translations with runtime-selectable locale blobs
+- [i18n](./i18n/README.md) – Compile-time translations with runtime-selectable locale blobs
 - [chipdb](./chipdb/README.md) – Vendor chip databases used by creator and BSP generation
 - [chips/stm/bsps](./chips/stm/bsps/README.md) – Generated STM32 BSP modules
 - [rlvgl-creator](./src/bin/creator/README.md) – Asset and BSP workflows for command-line and UI tooling
@@ -256,3 +257,13 @@ Other useful helper scripts may be found in [`/scripts`](https://github.com/Soft
 ## License
 rlvgl is licensed under the MIT license. See [LICENSE](./LICENSE) for more details.
 Third-party license notices are summarized in [NOTICES.md](./NOTICES.md).
+
+## More Information
+
+For more information, visit [softoboros.com](https://softoboros.com).
+
+<p>
+  <a href="https://softoboros.com">
+    <img src="./assets/branding/Softoboros-Letter-Logo.svg" alt="Softoboros" width="240" />
+  </a>
+</p>

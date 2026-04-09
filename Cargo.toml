@@ -46,13 +46,28 @@ name = "rlvgl-creator"
 path = "src/bin/rlvgl_creator/main.rs"
 required-features = ["creator"]
 
+[[test]]
+name = "creator_new"
+path = "tests/creator_new.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_run"
+path = "tests/creator_run.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "headless"
+path = "tests/headless.rs"
+required-features = ["simulator", "qrcode", "png", "jpeg", "gif", "fontdue"]
+
 [dependencies]
-rlvgl-core = { version = "0.1.6", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.1.5", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.1.6", path = "platform", default-features = false }
-rlvgl-ui = { version = "0.1.2", path = "ui", default-features = false }
-rlvgl-i18n = { version = "0.1.0", path = "i18n" }
-rlvgl-app-demo = { path = "examples/apps/demo", default-features = false, optional = true }
+rlvgl-core = { version = "0.1.7", path = "core", default-features = false }
+rlvgl-widgets = { version = "0.1.6", path = "widgets", default-features = false }
+rlvgl-platform = { version = "0.1.7", path = "platform", default-features = false }
+rlvgl-ui = { version = "0.1.3", path = "ui", default-features = false }
+rlvgl-i18n = { version = "0.1.1", path = "i18n" }
+rlvgl-app-demo = { version = "0.1.1", path = "examples/apps/demo", default-features = false, optional = true }
 embedded-hal = { version = "1.0", optional = true }
 embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", optional = true }
 stm32h7 = { version = "0.15.1", optional = true, features = ["rt"] }
@@ -216,41 +231,51 @@ version = "0.16.0"
 optional = true
 
 [dependencies.rlvgl-bsps-stm]
+version = "0.1.1"
 path = "chips/stm/bsps"
 optional = true
 [dependencies.rlvgl-chips-stm]
+version = "0.1.1"
 path = "chipdb/rlvgl-chips-stm"
 optional = true
 
 [dependencies.rlvgl-chips-nrf]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-nrf"
 optional = true
 
 [dependencies.rlvgl-chips-esp]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-esp"
 optional = true
 
 [dependencies.rlvgl-chips-nxp]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-nxp"
 optional = true
 
 [dependencies.rlvgl-chips-silabs]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-silabs"
 optional = true
 
 [dependencies.rlvgl-chips-microchip]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-microchip"
 optional = true
 
 [dependencies.rlvgl-chips-renesas]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-renesas"
 optional = true
 
 [dependencies.rlvgl-chips-ti]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-ti"
 optional = true
 
 [dependencies.rlvgl-chips-rp2040]
+version = "0.0.2"
 path = "chipdb/rlvgl-chips-rp2040"
 optional = true
 
@@ -261,15 +286,15 @@ optional = true
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
-rlvgl-chips-stm = { path = "chipdb/rlvgl-chips-stm" }
-rlvgl-chips-nrf = { path = "chipdb/rlvgl-chips-nrf" }
-rlvgl-chips-esp = { path = "chipdb/rlvgl-chips-esp" }
-rlvgl-chips-nxp = { path = "chipdb/rlvgl-chips-nxp" }
-rlvgl-chips-silabs = { path = "chipdb/rlvgl-chips-silabs" }
-rlvgl-chips-microchip = { path = "chipdb/rlvgl-chips-microchip" }
-rlvgl-chips-renesas = { path = "chipdb/rlvgl-chips-renesas" }
-rlvgl-chips-ti = { path = "chipdb/rlvgl-chips-ti" }
-rlvgl-chips-rp2040 = { path = "chipdb/rlvgl-chips-rp2040" }
+rlvgl-chips-stm = { version = "0.1.1", path = "chipdb/rlvgl-chips-stm" }
+rlvgl-chips-nrf = { version = "0.0.2", path = "chipdb/rlvgl-chips-nrf" }
+rlvgl-chips-esp = { version = "0.0.2", path = "chipdb/rlvgl-chips-esp" }
+rlvgl-chips-nxp = { version = "0.0.2", path = "chipdb/rlvgl-chips-nxp" }
+rlvgl-chips-silabs = { version = "0.0.2", path = "chipdb/rlvgl-chips-silabs" }
+rlvgl-chips-microchip = { version = "0.0.2", path = "chipdb/rlvgl-chips-microchip" }
+rlvgl-chips-renesas = { version = "0.0.2", path = "chipdb/rlvgl-chips-renesas" }
+rlvgl-chips-ti = { version = "0.0.2", path = "chipdb/rlvgl-chips-ti" }
+rlvgl-chips-rp2040 = { version = "0.0.2", path = "chipdb/rlvgl-chips-rp2040" }
 serde_json = "1"
 anyhow = "1"
 indexmap = { version = "2", features = ["serde"] }
