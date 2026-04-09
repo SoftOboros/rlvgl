@@ -117,7 +117,9 @@ for crate in "${changed[@]}"; do
   echo "Publishing $crate"
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
     scripts/stm32_afdb_pipeline.sh
-    git add chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
+    # The packaged chip database archive is generated during publish and is
+    # intentionally gitignored in-tree, so force-add it for cargo packaging.
+    git add -f chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty
   elif [[ "$crate" == "rlvgl-bsps-stm" ]]; then
     scripts/gen_ioc_bsps.sh
