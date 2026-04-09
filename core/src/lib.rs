@@ -112,9 +112,29 @@ pub struct WidgetNode {
     pub widget: Rc<RefCell<dyn widget::Widget>>,
     /// Child nodes that make up this widget's hierarchy.
     pub children: Vec<WidgetNode>,
+    /// Optional test-automation tag for addressing this node by name.
+    ///
+    /// Used by `rlvgl-playit` to locate widgets in the tree without
+    /// relying on coordinates. Zero-cost when `None`.
+    pub tag: Option<&'static str>,
 }
 
 impl WidgetNode {
+    /// Create a new node with no children and no tag.
+    pub fn new(widget: Rc<RefCell<dyn widget::Widget>>) -> Self {
+        Self {
+            widget,
+            children: Vec::new(),
+            tag: None,
+        }
+    }
+
+    /// Attach a test-automation tag to this node.
+    pub fn with_tag(mut self, tag: &'static str) -> Self {
+        self.tag = Some(tag);
+        self
+    }
+
     /// Propagate an event to this node and its children.
     ///
     /// Returns `true` if any widget handled the event.
@@ -201,12 +221,15 @@ mod tests {
                 WidgetNode {
                     widget: child_b.clone(),
                     children: alloc::vec![],
+                    tag: None,
                 },
                 WidgetNode {
                     widget: child_c.clone(),
                     children: alloc::vec![],
+                    tag: None,
                 },
             ],
+            tag: None,
         };
 
         let consumed = tree.dispatch_event(&Event::Tick);
@@ -230,12 +253,15 @@ mod tests {
                 WidgetNode {
                     widget: child_b,
                     children: alloc::vec![],
+                    tag: None,
                 },
                 WidgetNode {
                     widget: child_c,
                     children: alloc::vec![],
+                    tag: None,
                 },
             ],
+            tag: None,
         };
 
         let mut renderer = TestRenderer(alloc::vec::Vec::new());

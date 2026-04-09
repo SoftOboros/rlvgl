@@ -156,6 +156,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
             height,
         }))),
         children: Vec::new(),
+        tag: None,
     }));
 
     let label = Label::new(
@@ -170,10 +171,12 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     root.borrow_mut().children.push(WidgetNode {
         widget: Rc::new(RefCell::new(label)),
         children: Vec::new(),
+        tag: None,
     });
     root.borrow_mut().children.push(WidgetNode {
         widget: button.clone(),
         children: Vec::new(),
+        tag: None,
     });
 
     let plugins = Rc::new(RefCell::new(Button::new(
@@ -252,6 +255,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     children.push(WidgetNode {
                         widget: qr_button,
                         children: Vec::new(),
+                        tag: None,
                     });
                 }
 
@@ -288,6 +292,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     children.push(WidgetNode {
                         widget: png_button,
                         children: Vec::new(),
+                        tag: None,
                     });
                 }
 
@@ -324,6 +329,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     children.push(WidgetNode {
                         widget: gif_button,
                         children: Vec::new(),
+                        tag: None,
                     });
                 }
 
@@ -360,12 +366,14 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     children.push(WidgetNode {
                         widget: jpeg_button,
                         children: Vec::new(),
+                        tag: None,
                     });
                 }
 
                 let menu = WidgetNode {
                     widget: menu_w.clone(),
                     children,
+                    tag: None,
                 };
                 menu_ref.borrow_mut().replace(menu_w);
                 pending_add.borrow_mut().push(menu);
@@ -375,6 +383,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     root.borrow_mut().children.push(WidgetNode {
         widget: plugins.clone(),
         children: Vec::new(),
+        tag: None,
     });
 
     Demo {
@@ -423,6 +432,7 @@ pub fn build_plugin_demo(root_w: u32, root_h: u32) -> WidgetNode {
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -475,6 +485,7 @@ pub fn build_png_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -537,6 +548,7 @@ pub fn build_gif_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -595,6 +607,7 @@ pub fn build_jpeg_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNod
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 

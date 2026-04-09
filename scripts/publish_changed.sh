@@ -192,6 +192,9 @@ fi
 if path_changed '^i18n/'; then
   append_unique "rlvgl-i18n"
 fi
+if path_changed '^playit/'; then
+  append_unique "rlvgl-playit"
+fi
 if path_changed '^examples/apps/demo/'; then
   append_unique "rlvgl-app-demo"
 fi

@@ -61,6 +61,7 @@ fn dispatch_and_draw_tree() {
     let mut root = WidgetNode {
         widget: root_widget,
         children: Vec::new(),
+        tag: None,
     };
 
     let draw_child = Rc::new(RefCell::new(0));
@@ -78,6 +79,7 @@ fn dispatch_and_draw_tree() {
     root.children.push(WidgetNode {
         widget: child_widget,
         children: Vec::new(),
+        tag: None,
     });
 
     let mut renderer = DummyRenderer;
@@ -105,6 +107,7 @@ fn tree_mutation_and_drop() {
     let mut root = WidgetNode {
         widget,
         children: Vec::new(),
+        tag: None,
     };
 
     // Push and pop children to test mutation APIs
@@ -121,6 +124,7 @@ fn tree_mutation_and_drop() {
                 Rc::new(RefCell::new(0)),
             ))),
             children: Vec::new(),
+            tag: None,
         };
         root.children.push(child);
     }
@@ -170,7 +174,9 @@ fn stop_propagation() {
                 counter_child.clone(),
             ))),
             children: Vec::new(),
+            tag: None,
         }],
+        tag: None,
     };
 
     assert!(root.dispatch_event(&Event::Tick));

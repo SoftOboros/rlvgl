@@ -116,6 +116,7 @@ fn main() -> Result<()> {
     let mut tree = WidgetNode {
         widget: root,
         children: vec![],
+        tag: None,
     };
 
     // 3. Initialize the Simulator Window

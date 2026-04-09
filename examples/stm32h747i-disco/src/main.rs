@@ -2409,6 +2409,7 @@ fn main() -> ! {
         let root = Rc::new(RefCell::new(WidgetNode {
             widget: Rc::new(RefCell::new(InvisibleRoot)),
             children: alloc::vec![],
+            tag: None,
         }));
 
         // ── Audio player (created before SD block, started after WAV load) ──
@@ -2625,6 +2626,7 @@ fn main() -> ! {
         root.borrow_mut().children.push(rlvgl::core::WidgetNode {
             widget: event_win.clone(),
             children: alloc::vec![],
+            tag: None,
         });
 
         // Enable DMA2D rendering mode for the event window so its draw()
@@ -2902,34 +2904,41 @@ fn main() -> ! {
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: config_menu.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // Info panels consume taps to close themselves.
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: chip_info_panel.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: live_stats_panel.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // File browser panel — same priority as info panels.
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: file_browser_panel.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // Wings next — on the left edge, get events before icon strip.
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: settings_wing.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: info_wing.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // Icon strip last — only gets events when no overlays are active.
             root.borrow_mut().children.push(rlvgl::core::WidgetNode {
                 widget: Rc::new(RefCell::new(strip)),
                 children: alloc::vec![],
+                tag: None,
             });
         }
 
@@ -4627,6 +4636,16 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             }
         }
     }
+
+    /// Short debug pulse on PJ6 (CN5 D9) to mark major runtime milestones.
+    fn dbg_pulse() {
+        const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32;
+        unsafe {
+            GPIOJ_BSRR.write_volatile(1u32 << 6);
+            cortex_m::asm::delay(4_000_000);
+            GPIOJ_BSRR.write_volatile(1u32 << (6 + 16));
+        }
+    }
     dbg_print("rlvgl: UART8+VCP alive\r\n");
     dbg_pulse();
 
@@ -4690,75 +4709,50 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         Stm32h747iDiscoInput::new_with_int(DummyI2c, touch_int, display.dimensions().0 as u16);
     let mut _button_input = ButtonInput::new(DummyButton);
 
-    // ── Display server widget tree ───────────────────────────────────────────
-    // Static widget tree with well-known IDs that CM4 drives via IPC commands.
-    use alloc::{rc::Rc, vec::Vec};
-    use core::cell::RefCell;
-    use rlvgl::core::WidgetNode;
-    use rlvgl::core::widget::Rect;
-    use rlvgl::widgets::{button::Button, container::Container, label::Label};
-    use rlvgl_i18n::t;
+    // ── Shared disco runtime ─────────────────────────────────────────────────
+    use rlvgl::platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
+    use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 
-    let title_label = Rc::new(RefCell::new(Label::new(
-        t!("hw.title", version = env!("CARGO_PKG_VERSION")),
-        Rect {
-            x: 10,
-            y: 10,
-            width: 200,
-            height: 20,
-        },
-    )));
+    let (w_fb, h_fb) = display.dimensions();
+    let mut controller = DiscoController::new(w_fb, h_fb, DiscoCapabilities::stm32h747i_disco());
+    let root = controller.root();
 
-    let counter_button = Rc::new(RefCell::new(Button::new(
-        t!("demo.clicks_zero"),
-        Rect {
-            x: 10,
-            y: 40,
-            width: 120,
-            height: 30,
-        },
-    )));
-
-    // When the button is tapped locally, forward ButtonPressed to CM4
+    fn apply_disco_commands<B, BL, RST>(
+        controller: &mut DiscoController,
+        display: &mut Stm32h747iDiscoDisplay<B, BL, RST>,
+    ) where
+        B: rlvgl::platform::Blitter,
+        BL: SetDutyCycle,
     {
-        counter_button
-            .borrow_mut()
-            .set_on_click(|_btn: &mut Button| {
-                let _ = ipc::event_push(ipc::evt_button_pressed(ipc::widget_id::CLICK_COUNTER));
-            });
+        for command in controller.drain_commands() {
+            match command {
+                DiscoCommand::SetBacklight(level) => {
+                    let duty = ((level as u32 * u16::MAX as u32) / 100) as u16;
+                    display.set_brightness(duty);
+                }
+                DiscoCommand::LoadStorageSummary => {
+                    controller.publish_status("STM32 runtime acknowledged storage refresh");
+                }
+                DiscoCommand::StartEffect(effect) => match effect {
+                    DiscoEffect::AudioScope => {
+                        controller.publish_status("STM32 runtime acknowledged audio scope");
+                    }
+                    DiscoEffect::StarCrawl => {
+                        controller.publish_status("STM32 runtime acknowledged star crawl");
+                    }
+                },
+                DiscoCommand::StopEffect(effect) => match effect {
+                    DiscoEffect::AudioScope => {
+                        controller.publish_status("STM32 runtime stopped audio scope");
+                    }
+                    DiscoEffect::StarCrawl => {
+                        controller.publish_status("STM32 runtime stopped star crawl");
+                    }
+                },
+                DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}
+            }
+        }
     }
-
-    let status_label = Rc::new(RefCell::new(Label::new(
-        t!("hw.cm4_waiting"),
-        Rect {
-            x: 10,
-            y: 80,
-            width: 300,
-            height: 20,
-        },
-    )));
-
-    let root = Rc::new(RefCell::new(WidgetNode {
-        widget: Rc::new(RefCell::new(Container::new(Rect {
-            x: 0,
-            y: 0,
-            width: 800,
-            height: 480,
-        }))),
-        children: Vec::new(),
-    }));
-    root.borrow_mut().children.push(WidgetNode {
-        widget: title_label.clone(),
-        children: Vec::new(),
-    });
-    root.borrow_mut().children.push(WidgetNode {
-        widget: counter_button.clone(),
-        children: Vec::new(),
-    });
-    root.borrow_mut().children.push(WidgetNode {
-        widget: status_label.clone(),
-        children: Vec::new(),
-    });
 
     // ── Semihosting SDRAM inspector ──────────────────────────────────────────
     // CM7 reads SDRAM perfectly; semihosting passes data via BKPT trap to the
@@ -4946,36 +4940,13 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             match ipc::CmdKind::from_u32(cmd.kind) {
                 ipc::CmdKind::SetBacklight => {
                     let duty = (cmd.a & 0xFFFF) as u16;
-                    let level = if duty < 512 { 0 } else { u16::MAX };
-                    display.set_brightness(level);
+                    display.set_brightness(duty);
                 }
-                ipc::CmdKind::UpdateLabel => {
-                    let mut buf = [0u8; 12];
-                    let len = ipc::extract_label_text(&cmd, &mut buf);
-                    if let Ok(text) = core::str::from_utf8(&buf[..len]) {
-                        let text_owned = alloc::string::String::from(text);
-                        match cmd.a {
-                            ipc::widget_id::TITLE => {
-                                title_label.borrow_mut().set_text(text_owned);
-                            }
-                            ipc::widget_id::CLICK_COUNTER => {
-                                counter_button.borrow_mut().set_text(text_owned);
-                            }
-                            ipc::widget_id::STATUS_LABEL => {
-                                status_label.borrow_mut().set_text(text_owned);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                ipc::CmdKind::Navigate => {
-                    // Screen navigation — placeholder for future screens
-                }
-                ipc::CmdKind::UpdateValue => {
-                    // Numeric value update — placeholder
-                }
-                ipc::CmdKind::ShowWidget => {
-                    // Widget visibility — placeholder
+                ipc::CmdKind::UpdateLabel
+                | ipc::CmdKind::Navigate
+                | ipc::CmdKind::UpdateValue
+                | ipc::CmdKind::ShowWidget => {
+                    controller.publish_status("CM4 IPC command received by shared runtime");
                 }
                 ipc::CmdKind::None => {}
             }
@@ -5001,7 +4972,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             if let Some(gesture) = tap2.process(&transformed) {
                 let (e1, e2) = dtap2.process(&gesture);
                 for ge in [e1, e2].into_iter().flatten() {
-                    root.borrow_mut().dispatch_event(&ge);
+                    controller.dispatch_event(&ge);
+                    apply_disco_commands(&mut controller, &mut display);
                 }
             }
             // Forward touch events to CM4 (primary point only for IPC)
@@ -5028,12 +5000,28 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             if let Some(gesture) = tap2.tick() {
                 let (e1, e2) = dtap2.process(&gesture);
                 for ge in [e1, e2].into_iter().flatten() {
-                    root.borrow_mut().dispatch_event(&ge);
+                    controller.dispatch_event(&ge);
+                    apply_disco_commands(&mut controller, &mut display);
                 }
             }
             if let Some(held) = dtap2.tick() {
-                root.borrow_mut().dispatch_event(&held);
+                controller.dispatch_event(&held);
+                apply_disco_commands(&mut controller, &mut display);
             }
+
+            controller.tick();
+            apply_disco_commands(&mut controller, &mut display);
+
+            let back = display.back_buffer_addr();
+            let fb_bytes = (w_fb * h_fb * 4) as usize;
+            let stride = (w_fb * 4) as usize;
+            let fb_slice = unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };
+            let surface = Surface::new(fb_slice, stride, PixelFmt::Argb8888, w_fb, h_fb);
+            let mut frame_blitter = CpuBlitter;
+            let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                BlitterRenderer::new(&mut frame_blitter, surface);
+            let mut renderer = RotatedRenderer::new(&mut blit_renderer, w_fb);
+            root.borrow().draw(&mut renderer);
 
             // Heartbeat toggle on PJ6 (CN5 D9)
             unsafe {
