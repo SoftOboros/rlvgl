@@ -123,6 +123,8 @@ pub mod stm32h747i_disco;
     any(target_arch = "arm", target_os = "none")
 ))]
 pub mod stm32h747i_disco_sd;
+#[cfg(feature = "uefi")]
+pub mod uefi;
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",
@@ -202,6 +204,8 @@ pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
     any(target_arch = "arm", target_os = "none")
 ))]
 pub use stm32h747i_disco_sd::DiscoSdBlockDevice;
+#[cfg(feature = "uefi")]
+pub use uefi::{SyntheticKeyRelease, UefiDisplay, UefiInput};
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",
