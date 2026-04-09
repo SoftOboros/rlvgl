@@ -120,12 +120,12 @@ for crate in "${changed[@]}"; do
     # The packaged chip database archive is generated during publish and is
     # intentionally gitignored in-tree, so force-add it for cargo packaging.
     git add -f chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
-    cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty
+    cargo publish -p "$crate" --no-verify --allow-dirty
   elif [[ "$crate" == "rlvgl-bsps-stm" ]]; then
     scripts/gen_ioc_bsps.sh
-    cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty
+    cargo publish -p "$crate" --no-verify --allow-dirty
   else
-    cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify
+    cargo publish -p "$crate" --no-verify
   fi
   prev="$crate"
 done
