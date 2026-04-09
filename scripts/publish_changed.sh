@@ -4,6 +4,14 @@ set -euo pipefail
 BASE=${1:-origin/main}
 DRY_RUN=${DRY_RUN:-0}
 INDEX_WAIT_SECONDS=${INDEX_WAIT_SECONDS:-30}
+METADATA_JSON=$(mktemp)
+VERSIONS_TSV=$(mktemp)
+
+cleanup() {
+  rm -f "$METADATA_JSON" "$VERSIONS_TSV"
+}
+
+trap cleanup EXIT
 
 changed=()
 
@@ -23,6 +31,63 @@ path_changed() {
   grep -qE "$pattern" <<<"$DIFF_FILES"
 }
 
+crate_version() {
+  local crate="$1"
+  awk -F '\t' -v crate="$crate" '$1 == crate { print $2; exit }' "$VERSIONS_TSV"
+}
+
+crate_version_exists() {
+  local crate="$1"
+  local version="$2"
+  local status
+
+  if command -v curl >/dev/null 2>&1; then
+    status=$(curl -sS -o /dev/null -w '%{http_code}' \
+      --connect-timeout 20 \
+      --user-agent 'rlvgl-publish-script' \
+      "https://crates.io/api/v1/crates/${crate}/${version}") || {
+      echo "Failed to query crates.io for $crate v$version via curl." >&2
+      return 2
+    }
+  else
+    status=$(python3 - "$crate" "$version" <<'PY'
+import sys
+import urllib.error
+import urllib.request
+
+crate, version = sys.argv[1], sys.argv[2]
+url = f"https://crates.io/api/v1/crates/{crate}/{version}"
+request = urllib.request.Request(url, headers={"User-Agent": "rlvgl-publish-script"})
+
+try:
+    with urllib.request.urlopen(request, timeout=20) as response:
+        print(response.status)
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+except Exception as exc:
+    print(f"ERR:{exc}")
+PY
+)
+  fi
+
+  case "$status" in
+    200)
+      return 0
+      ;;
+    404)
+      return 1
+      ;;
+    ERR:*)
+      echo "Failed to query crates.io for $crate v$version: ${status#ERR:}" >&2
+      return 2
+      ;;
+    *)
+      echo "Unexpected crates.io response for $crate v$version: $status" >&2
+      return 2
+      ;;
+  esac
+}
+
 if ! git rev-parse --verify "${BASE}^{commit}" >/dev/null 2>&1; then
   echo "Base commit not found: $BASE" >&2
   exit 1
@@ -33,6 +98,18 @@ HEAD_SHA=$(git rev-parse HEAD)
 BASE_DESC=$(git describe --tags --always "$BASE_SHA" 2>/dev/null || echo "$BASE_SHA")
 HEAD_DESC=$(git describe --tags --always "$HEAD_SHA" 2>/dev/null || echo "$HEAD_SHA")
 DIFF_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+cargo metadata --no-deps --format-version 1 >"$METADATA_JSON"
+python3 - "$METADATA_JSON" >"$VERSIONS_TSV" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    metadata = json.load(handle)
+
+for package in metadata["packages"]:
+    print(f"{package['name']}\t{package['version']}")
+PY
 
 echo "Publish diff:"
 echo "  base: $BASE_SHA ($BASE_DESC)"
@@ -107,14 +184,30 @@ if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
   exit 1
 fi
 
-prev=""
+prev_published=""
 for crate in "${changed[@]}"; do
+  version=$(crate_version "$crate")
+  if [[ -z "$version" ]]; then
+    echo "Could not determine workspace version for $crate." >&2
+    exit 1
+  fi
+
+  if crate_version_exists "$crate" "$version"; then
+    echo "Skipping $crate v$version (already published on crates.io)"
+    continue
+  else
+    status=$?
+    if [[ "$status" -ne 1 ]]; then
+      exit "$status"
+    fi
+  fi
+
   # crates.io needs time to index a new publish before dependents can resolve it.
-  if [[ -n "$prev" ]]; then
-    echo "Waiting ${INDEX_WAIT_SECONDS}s for crates.io to index $prev..."
+  if [[ -n "$prev_published" ]]; then
+    echo "Waiting ${INDEX_WAIT_SECONDS}s for crates.io to index $prev_published..."
     sleep "$INDEX_WAIT_SECONDS"
   fi
-  echo "Publishing $crate"
+  echo "Publishing $crate v$version"
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
     scripts/stm32_afdb_pipeline.sh
     # The packaged chip database archive is generated during publish and is
@@ -127,5 +220,5 @@ for crate in "${changed[@]}"; do
   else
     cargo publish -p "$crate" --no-verify
   fi
-  prev="$crate"
+  prev_published="$crate"
 done
