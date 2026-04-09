@@ -8,7 +8,7 @@ extern crate alloc;
 
 use core::time::Duration;
 
-use rlvgl::platform::{UefiDisplay, UefiInput};
+use rlvgl_platform::{UefiDisplay, UefiInput};
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use uefi::{Status, boot, entry, helpers, proto::console::gop::GraphicsOutput, system};
 
@@ -65,8 +65,8 @@ fn main() -> Status {
             apply_runtime_commands(&mut controller);
             if matches!(
                 event,
-                rlvgl::core::event::Event::KeyDown {
-                    key: rlvgl::core::event::Key::Character('q')
+                rlvgl_core::event::Event::KeyDown {
+                    key: rlvgl_core::event::Key::Character('q')
                 }
             ) {
                 return Status::SUCCESS;
@@ -74,7 +74,7 @@ fn main() -> Status {
         }
         apply_runtime_commands(&mut controller);
 
-        display.clear(rlvgl::core::widget::Color(13, 19, 30, 255));
+        display.clear(rlvgl_core::widget::Color(13, 19, 30, 255));
         display.render(&root.borrow());
         display
             .present(&mut gop)

@@ -7,12 +7,12 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
 
-use rlvgl::core::event::Event;
-use rlvgl::core::packed_font::PackedFont;
-use rlvgl::core::renderer::Renderer;
-use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
-use rlvgl::ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
+use rlvgl_core::event::Event;
+use rlvgl_core::packed_font::PackedFont;
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 
 // ── Layout constants ──────────────────────────────────────────────────────
 

@@ -8,12 +8,12 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use rlvgl::core::event::Event;
-use rlvgl::core::packed_font::PackedFont;
-use rlvgl::core::renderer::Renderer;
-use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::GridCalc;
-use rlvgl::ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
+use rlvgl_core::event::Event;
+use rlvgl_core::packed_font::PackedFont;
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_ui::GridCalc;
+use rlvgl_ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
 
 // ── D3 SRAM debug slots (readable via probe-rs) ──────────────────
 // ConfigMenu writes to 0x3800_0640..0x3800_066F for live debugging.
@@ -426,7 +426,7 @@ impl ConfigMenu {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn draw_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
     ) {
         if !self.visible {
@@ -494,7 +494,7 @@ impl ConfigMenu {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn draw_checkbox_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
         row: Rect,
         label: &str,
@@ -538,7 +538,7 @@ impl ConfigMenu {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn draw_button_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
         bounds: Rect,
         label: &str,

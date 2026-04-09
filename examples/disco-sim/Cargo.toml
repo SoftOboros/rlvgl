@@ -1,0 +1,14 @@
+[package]
+name = "rlvgl-example-disco-sim"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "rlvgl-disco-sim"
+path = "src/main.rs"
+
+[dependencies]
+rlvgl-core = { path = "../../core" }
+rlvgl-platform = { path = "../../platform", features = ["simulator"] }
+rlvgl-app-disco-demo = { path = "../apps/disco-demo" }

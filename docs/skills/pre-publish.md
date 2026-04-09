@@ -14,9 +14,10 @@ will enforce.
 | 3 | `RUSTFLAGS="" cargo test -p rlvgl-playit` | playit standalone tests |
 | 3b | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo check --target thumbv7em-none-eabihf -p rlvgl-playit` | playit no_std cross-compile |
 | 3c | `cd playit && cargo package --list --allow-dirty && cd ..` | playit package listing |
-| 4 | `RUSTFLAGS="" cargo test --tests --features "creator simulator qrcode png jpeg gif fontdue"` | Simulator + creator tests |
+| 4 | `RUSTFLAGS="" cargo test -p rlvgl-example-sim` | Simulator tests |
+| 4b | `RUSTFLAGS="" cargo test --tests --features "creator" -p rlvgl` | Creator tests |
 | 5 | `RUSTFLAGS="" cargo doc --workspace --no-deps` | Documentation build |
-| 6 | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo check --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7 -p rlvgl` | Embedded target build |
+| 6 | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo check --target thumbv7em-none-eabihf -p rlvgl-example-disco --features cm7` | Embedded target build |
 | 7 | `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` | Publish dry run |
 
 ## Notes

@@ -1,0 +1,15 @@
+[package]
+name = "rlvgl-example-uefi-disco"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "rlvgl-uefi-disco"
+path = "src/main.rs"
+
+[dependencies]
+rlvgl-core = { path = "../../core" }
+rlvgl-platform = { path = "../../platform", features = ["uefi"] }
+rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+uefi = { version = "0.36.1", features = ["alloc", "global_allocator", "panic_handler"] }

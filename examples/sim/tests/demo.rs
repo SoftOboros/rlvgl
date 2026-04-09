@@ -1,5 +1,5 @@
 //! Tests for the simulator demonstrations.
-use rlvgl::core::{
+use rlvgl_core::{
     application::Application,
     event::Event,
     renderer::Renderer,
@@ -51,7 +51,7 @@ impl Renderer for FramebufferRenderer {
 }
 
 /// Helper: build the demo app and return app + root.
-fn setup_demo() -> (Box<dyn Application>, Rc<RefCell<rlvgl::core::WidgetNode>>) {
+fn setup_demo() -> (Box<dyn Application>, Rc<RefCell<rlvgl_core::WidgetNode>>) {
     let mut app = rlvgl_app_demo::create_app();
     let root_node = app.build(320, 240);
     let root = Rc::new(RefCell::new(root_node));

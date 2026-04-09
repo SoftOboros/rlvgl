@@ -15,9 +15,10 @@ fi
 echo "[phase 2] build+test: creator CLI & Simulator"
 # Build creator CLI and run its tests (no UI)
 cargo build --bin rlvgl-creator --features creator
-# Build simulator (required for headless tests)
-cargo build --bin rlvgl-sim --features "simulator qrcode png jpeg gif fontdue"
-cargo test --tests --features "creator simulator qrcode png jpeg gif fontdue"
+# Build simulator (in its own crate)
+cargo build -p rlvgl-example-sim
+cargo test -p rlvgl-example-sim
+cargo test --tests --features "creator"
 
 echo "[phase 3] build+test: creator UI"
 # Layer UI feature on top of creator and run UI-focused tests
@@ -33,7 +34,7 @@ RUSTDOCFLAGS="--cfg docsrs --cfg nightly" \
 
 echo "[phase 5] embedded example (stm32h747i-disco)"
 # Ensure the STM32H747I-DISCO example builds for its target (optional toolchain)
-RUSTFLAGS="" cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7 || {
+RUSTFLAGS="" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --features cm7 || {
   echo "warning: embedded target build skipped or failed (toolchain/target may be missing)" >&2
 }
 

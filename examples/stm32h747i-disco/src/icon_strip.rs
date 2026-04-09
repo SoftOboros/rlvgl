@@ -6,9 +6,9 @@
 
 use alloc::boxed::Box;
 
-use rlvgl::core::event::Event;
-use rlvgl::core::renderer::Renderer;
-use rlvgl::core::widget::{Color, Rect, Widget};
+use rlvgl_core::event::Event;
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
 
 /// Number of icon slots in the strip.
 pub const SLOT_COUNT: usize = 3;

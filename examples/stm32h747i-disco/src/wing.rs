@@ -9,10 +9,10 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use rlvgl::core::event::Event;
-use rlvgl::core::renderer::Renderer;
-use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl_core::event::Event;
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_ui::draw_helpers::{draw_border, fill_rounded_rect};
 
 /// Maximum number of sub-icon slots in a wing.
 const MAX_SLOTS: usize = 5;

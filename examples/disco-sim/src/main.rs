@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 //! Desktop simulator entrypoint for the shared 747-style disco demo runtime.
 
-use rlvgl::platform::{
+use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
+use rlvgl_platform::{
     BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Surface, WgpuDisplay,
 };
-use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use std::{cell::RefCell, env, fs, path::Path, rc::Rc};
 
 /// Default screen width in pixels.

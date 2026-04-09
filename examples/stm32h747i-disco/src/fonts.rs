@@ -1,5 +1,5 @@
 // 132 glyphs, auto-generated from DejaVuSans-24.json
-use rlvgl::core::packed_font::GlyphMetric;
+use rlvgl_core::packed_font::GlyphMetric;
 pub static DEJAVU_SANS_24_GLYPHS: [GlyphMetric; 132] = [
     GlyphMetric {
         ch: '\u{0020}',

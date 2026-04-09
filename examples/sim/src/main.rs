@@ -1,8 +1,8 @@
 //! Runs the rlvgl simulator with demonstrations of core widgets and plugin features.
 
-use rlvgl::core::application::Application;
-use rlvgl::core::event::Event;
-use rlvgl::platform::{
+use rlvgl_core::application::Application;
+use rlvgl_core::event::Event;
+use rlvgl_platform::{
     BlitRect, BlitterRenderer, CpuBlitter, InputEvent, LoadedApp, PixelFmt, Surface, WgpuBlitter,
     WgpuDisplay,
 };
@@ -46,7 +46,7 @@ fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {
 /// Run the simulator with the given application.
 fn run_with_app(
     app: &Rc<RefCell<dyn Application>>,
-    root: &Rc<RefCell<rlvgl::core::WidgetNode>>,
+    root: &Rc<RefCell<rlvgl_core::WidgetNode>>,
     width: usize,
     height: usize,
     use_wgpi: bool,
@@ -263,16 +263,16 @@ fn main() {
 struct BoxedAppWrapper(Box<dyn Application>);
 
 impl Application for BoxedAppWrapper {
-    fn info(&self) -> rlvgl::core::application::AppInfo {
+    fn info(&self) -> rlvgl_core::application::AppInfo {
         self.0.info()
     }
-    fn build(&mut self, width: u32, height: u32) -> rlvgl::core::WidgetNode {
+    fn build(&mut self, width: u32, height: u32) -> rlvgl_core::WidgetNode {
         self.0.build(width, height)
     }
-    fn after_event(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>, event: &Event) {
+    fn after_event(&mut self, root: &Rc<RefCell<rlvgl_core::WidgetNode>>, event: &Event) {
         self.0.after_event(root, event);
     }
-    fn tick(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>) {
+    fn tick(&mut self, root: &Rc<RefCell<rlvgl_core::WidgetNode>>) {
         self.0.tick(root);
     }
     fn destroy(&mut self) {
@@ -284,16 +284,16 @@ impl Application for BoxedAppWrapper {
 struct LoadedAppWrapper(LoadedApp);
 
 impl Application for LoadedAppWrapper {
-    fn info(&self) -> rlvgl::core::application::AppInfo {
+    fn info(&self) -> rlvgl_core::application::AppInfo {
         self.0.app().info()
     }
-    fn build(&mut self, width: u32, height: u32) -> rlvgl::core::WidgetNode {
+    fn build(&mut self, width: u32, height: u32) -> rlvgl_core::WidgetNode {
         self.0.app_mut().build(width, height)
     }
-    fn after_event(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>, event: &Event) {
+    fn after_event(&mut self, root: &Rc<RefCell<rlvgl_core::WidgetNode>>, event: &Event) {
         self.0.app_mut().after_event(root, event);
     }
-    fn tick(&mut self, root: &Rc<RefCell<rlvgl::core::WidgetNode>>) {
+    fn tick(&mut self, root: &Rc<RefCell<rlvgl_core::WidgetNode>>) {
         self.0.app_mut().tick(root);
     }
     fn destroy(&mut self) {

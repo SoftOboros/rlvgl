@@ -7,12 +7,12 @@
 //! contention with LTDC scanout.
 
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-use rlvgl::platform::blit::PixelFmt;
+use rlvgl_platform::blit::PixelFmt;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-use rlvgl::platform::dma2d::Dma2dBlitter;
+use rlvgl_platform::dma2d::Dma2dBlitter;
 
-use rlvgl::core::bitmap_font::BitmapFont;
-use rlvgl::ui::EventWindow;
+use rlvgl_core::bitmap_font::BitmapFont;
+use rlvgl_ui::EventWindow;
 
 // ── Portrait framebuffer constants ──────────────────────────────────────────
 const FB_W: u32 = 480;

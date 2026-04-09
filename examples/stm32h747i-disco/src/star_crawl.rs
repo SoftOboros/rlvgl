@@ -4,12 +4,12 @@
 //! one small unit of work and then returns so the main loop can service touch,
 //! serial, and new DMA completions without spin-waiting.
 
-use rlvgl::core::packed_font::PackedFont;
+use rlvgl_core::packed_font::PackedFont;
 
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-use rlvgl::platform::blit::PixelFmt;
+use rlvgl_platform::blit::PixelFmt;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-use rlvgl::platform::dma2d::Dma2dBlitter;
+use rlvgl_platform::dma2d::Dma2dBlitter;
 
 /// Portrait framebuffer width.
 const FB_W: u32 = 480;

@@ -1587,10 +1587,10 @@ fn main() -> ! {
             digital::InputPin,
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
-        use rlvgl::core::event::{Event, Key};
+        use rlvgl_core::event::{Event, Key};
         #[cfg(feature = "sd_storage")]
-        use rlvgl::platform::SdMmcBlockDev;
-        use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay};
+        use rlvgl_platform::SdMmcBlockDev;
+        use rlvgl_platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay};
         use stm32h7xx_hal::prelude::*;
 
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
@@ -1910,7 +1910,7 @@ fn main() -> ! {
         // ── QSPI flash init (MT25TL01G Bank 1) ──────────────────────────
         #[cfg(feature = "qspi_flash")]
         let qspi_flash = {
-            use rlvgl::platform::Mt25tlFlash;
+            use rlvgl_platform::Mt25tlFlash;
             use stm32h7xx_hal::xspi;
 
             // Errata 2.8.5: Select PLL2R (150 MHz) as QSPI kernel clock
@@ -2256,14 +2256,14 @@ fn main() -> ! {
         // ── Audio codec init (before touch claims I2C4) ──
         #[cfg(feature = "audio")]
         let sai = {
-            use rlvgl::platform::Sai1Audio;
+            use rlvgl_platform::Sai1Audio;
             let sai = Sai1Audio::new();
             sai.enable_clock(1); // 1 = PLL2_P
             sai
         };
         #[cfg(feature = "audio")]
         let i2c4 = {
-            use rlvgl::platform::Wm8994;
+            use rlvgl_platform::Wm8994;
 
             // SAI1 GPIO pins (AF6, VeryHigh speed)
             let _sai1_mclk = gpiog.pg7.into_alternate::<6>().speed(Speed::VeryHigh);
@@ -2286,7 +2286,7 @@ fn main() -> ! {
             let _ = codec.init_playback(
                 48_000,
                 150_000_000, // approximate MCLK from PLL2_P
-                rlvgl::platform::wm8994::OutputDevice::Headphone,
+                rlvgl_platform::wm8994::OutputDevice::Headphone,
             );
 
             // Enable SAI1 TX — codec is now receiving I2S frames
@@ -2386,21 +2386,21 @@ fn main() -> ! {
         // root container that paints over the SDRAM splash. We use an invisible
         // root that produces no pixels — the splash survives in the framebuffer
         // and the EventWindow draws on top when visible.
-        use rlvgl::core::WidgetNode;
+        use rlvgl_core::WidgetNode;
 
         /// Root widget that draws nothing (splash stays in the framebuffer).
         struct InvisibleRoot;
-        impl rlvgl::core::widget::Widget for InvisibleRoot {
-            fn bounds(&self) -> rlvgl::core::widget::Rect {
+        impl rlvgl_core::widget::Widget for InvisibleRoot {
+            fn bounds(&self) -> rlvgl_core::widget::Rect {
                 // Landscape widget space: 800 wide × 480 tall
-                rlvgl::core::widget::Rect {
+                rlvgl_core::widget::Rect {
                     x: 0,
                     y: 0,
                     width: 800,
                     height: 480,
                 }
             }
-            fn draw(&self, _renderer: &mut dyn rlvgl::core::renderer::Renderer) {}
+            fn draw(&self, _renderer: &mut dyn rlvgl_core::renderer::Renderer) {}
             fn handle_event(&mut self, _event: &Event) -> bool {
                 false
             }
@@ -2415,7 +2415,7 @@ fn main() -> ! {
         // ── Audio player (created before SD block, started after WAV load) ──
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         let mut audio_player = {
-            use rlvgl::platform::AudioPlayer;
+            use rlvgl_platform::AudioPlayer;
             const AUDIO_BUF0: u32 = 0xD048_0000;
             const AUDIO_BUF1: u32 = 0xD048_1000;
             const AUDIO_BUF_SIZE: usize = 4096;
@@ -2461,7 +2461,7 @@ fn main() -> ! {
             let sd_msg: &str = if !card_present {
                 t!("hw.sd_no_card")
             } else {
-                use rlvgl::platform::sd_emmc_adapter as sda;
+                use rlvgl_platform::sd_emmc_adapter as sda;
                 let volume_mgr = embedded_sdmmc::VolumeManager::new(bd, sda::DummyTimeSource);
                 match volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0)) {
                     Ok(volume) => {
@@ -2502,7 +2502,7 @@ fn main() -> ! {
                                     ) {
                                         let mut hdr_buf = [0u8; 256];
                                         if let Ok(hdr_len) = f.read(&mut hdr_buf) {
-                                            if let Ok(wav_hdr) = rlvgl::platform::parse_wav_header(
+                                            if let Ok(wav_hdr) = rlvgl_platform::parse_wav_header(
                                                 &hdr_buf[..hdr_len],
                                             ) {
                                                 let pcm_max: usize = 24 * 1024 * 1024;
@@ -2611,10 +2611,10 @@ fn main() -> ! {
         // ── EventWindow widget (replaces direct-framebuffer toasts) ──────
         use alloc::rc::Rc;
         use core::cell::RefCell;
-        use rlvgl::core::bitmap_font::FONT_6X10;
-        use rlvgl::platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
-        use rlvgl::ui::EventWindowBuilder;
+        use rlvgl_core::bitmap_font::FONT_6X10;
         use rlvgl_i18n::t;
+        use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
+        use rlvgl_ui::EventWindowBuilder;
 
         let event_win = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10)
@@ -2623,7 +2623,7 @@ fn main() -> ! {
                 .build(),
         ));
 
-        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+        root.borrow_mut().children.push(rlvgl_core::WidgetNode {
             widget: event_win.clone(),
             children: alloc::vec![],
             tag: None,
@@ -2685,7 +2685,7 @@ fn main() -> ! {
 
         // ── Config menu (language + debug settings) ──────────────────────
         let config_menu = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
                 height: 24,
@@ -2696,7 +2696,7 @@ fn main() -> ! {
             let cur_locale = rlvgl_i18n::locale() as u8;
             let ew_clone = event_win.clone();
             let cm = crate::config_menu::ConfigMenu::new(
-                rlvgl::core::widget::Rect {
+                rlvgl_core::widget::Rect {
                     x: 0,
                     y: 0,
                     width: 0,
@@ -2750,7 +2750,7 @@ fn main() -> ! {
         serial_puts("PRE-SIP\r\n");
         // ── System info panels (static + dynamic) ──────────────────────
         let (chip_info_panel, live_stats_panel) = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
                 height: 24,
@@ -2766,7 +2766,7 @@ fn main() -> ! {
 
         // ── File browser panel ────────────────────────────────────────────
         let file_browser_panel = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT_FB: PackedFont = PackedFont {
                 height: 24,
@@ -2782,7 +2782,7 @@ fn main() -> ! {
             dev_storage.set_qspi(qspi_flash.clone());
             #[cfg(feature = "sd_storage")]
             dev_storage.set_sd_present(sd_card_detected);
-            let storage: Rc<RefCell<dyn rlvgl::ui::file_browser::StorageBrowser>> =
+            let storage: Rc<RefCell<dyn rlvgl_ui::file_browser::StorageBrowser>> =
                 Rc::new(RefCell::new(dev_storage));
             Rc::new(RefCell::new(
                 crate::file_browser_panel::FileBrowserPanel::new(&UI_FONT_FB, storage),
@@ -2901,41 +2901,41 @@ fn main() -> ! {
 
             // Overlays dispatched first so they receive events when visible.
             // Config menu (highest priority — modal)
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: config_menu.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
             // Info panels consume taps to close themselves.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: chip_info_panel.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: live_stats_panel.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
             // File browser panel — same priority as info panels.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: file_browser_panel.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
             // Wings next — on the left edge, get events before icon strip.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: settings_wing.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: info_wing.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
             // Icon strip last — only gets events when no overlays are active.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: Rc::new(RefCell::new(strip)),
                 children: alloc::vec![],
                 tag: None,
@@ -3051,7 +3051,7 @@ fn main() -> ! {
         let _btn_discard: u32 = 0;
 
         // ── Gesture recognizers ───────────────────────────────────────────
-        use rlvgl::platform::gesture::TapRecognizer;
+        use rlvgl_platform::gesture::TapRecognizer;
         let mut tap = TapRecognizer::new(FRAME_HZ);
 
         // ── Event telemetry ring buffer ──────────────────────────────────
@@ -3107,7 +3107,7 @@ fn main() -> ! {
 
         // Save-under compositor: saves fb pixels when overlays open,
         // restores when they close.
-        use rlvgl::platform::compositor::Compositor;
+        use rlvgl_platform::compositor::Compositor;
         let mut compositor = Compositor::new(w_fb, h_fb, DESKTOP_PRISTINE);
 
         // Event counter written to D3 SRAM for probe-rs inspection
@@ -3116,7 +3116,7 @@ fn main() -> ! {
         // ── Star Wars opening crawl ─────────────────────────────────────
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         let mut star_crawl = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
 
             static BOLD_FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
             static BOLD_FONT: PackedFont = PackedFont {
@@ -3136,7 +3136,7 @@ fn main() -> ! {
 
         // ── Audio scope (MEMS mic oscilloscope) ─────────────────────────
         #[cfg(feature = "audio")]
-        let mut mic_capture = rlvgl::platform::mic_capture::MicCapture::new();
+        let mut mic_capture = rlvgl_platform::mic_capture::MicCapture::new();
         #[cfg(feature = "audio")]
         let mut audio_scope = audio_scope::AudioScope::new();
         // SRAM4 addresses for PDM DMA buffers and PCM output
@@ -3205,7 +3205,7 @@ fn main() -> ! {
             // ── Poll audio player ──
             #[cfg(all(feature = "audio", feature = "sd_storage"))]
             {
-                use rlvgl::platform::audio_player::PollResult;
+                use rlvgl_platform::audio_player::PollResult;
                 match audio_player.poll() {
                     PollResult::NeedRefill {
                         buf,
@@ -3286,7 +3286,7 @@ fn main() -> ! {
             // TIM6 ISR samples FT5336 at 120 Hz; we drain all queued samples
             // and run the coordinate transform + event state machine here.
             while let Some(sample) = unsafe { touch_ring_pop() } {
-                use rlvgl::core::event::{
+                use rlvgl_core::event::{
                     MAX_TOUCH_POINTS, TouchPoint, TouchState as EvtTouchState,
                 };
                 let dw = touch_state.display_width as i32;
@@ -3588,7 +3588,7 @@ fn main() -> ! {
                 // - dirty_frames > 0 (second buffer needs sync)
                 // Track overlay visibility transitions — restore from
                 // pristine desktop when overlays hide.
-                use rlvgl::core::widget::Widget as _;
+                use rlvgl_core::widget::Widget as _;
                 if vis != was_visible {
                     dirty_frames = 4;
                     // Freeze event aging so all dirty frame renders show
@@ -3775,7 +3775,7 @@ fn main() -> ! {
                             mic_capture.stop();
                         }
                         if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
                             serial_puts("CRAWL:activate()\r\n");
                             star_crawl.activate(&mut blitter);
@@ -4076,7 +4076,7 @@ fn main() -> ! {
                             any(target_arch = "arm", target_arch = "aarch64")
                         ))]
                         if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
                             match star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
                                 star_crawl::StepResult::Idle => {
@@ -4149,7 +4149,7 @@ fn main() -> ! {
                             any(target_arch = "arm", target_arch = "aarch64")
                         ))]
                         if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
                             match event_overlay.tick(&mut blitter) {
                                 event_overlay::StepResult::Pending => {
@@ -4408,8 +4408,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         i2c::{ErrorType as I2cError, I2c as EhI2c, Operation, SevenBitAddress},
         pwm::{ErrorType as PwmError, SetDutyCycle},
     };
-    use rlvgl::core::event::{Event, Key};
-    use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+    use rlvgl_core::event::{Event, Key};
+    use rlvgl_platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
 
     // ── Signal clocks ready to CM4 ──────────────────────────────────────────
     #[allow(clippy::let_unit_value)]
@@ -4710,8 +4710,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     let mut _button_input = ButtonInput::new(DummyButton);
 
     // ── Shared disco runtime ─────────────────────────────────────────────────
-    use rlvgl::platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
     use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
+    use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
 
     let (w_fb, h_fb) = display.dimensions();
     let mut controller = DiscoController::new(w_fb, h_fb, DiscoCapabilities::stm32h747i_disco());
@@ -4721,7 +4721,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         controller: &mut DiscoController,
         display: &mut Stm32h747iDiscoDisplay<B, BL, RST>,
     ) where
-        B: rlvgl::platform::Blitter,
+        B: rlvgl_platform::Blitter,
         BL: SetDutyCycle,
     {
         for command in controller.drain_commands() {
@@ -4921,8 +4921,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
 
     // ── Display server main loop ─────────────────────────────────────────────
-    let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(FRAME_HZ);
-    let mut dtap2 = rlvgl::platform::gesture::DoubleTapRecognizer::new(FRAME_HZ);
+    let mut tap2 = rlvgl_platform::gesture::TapRecognizer::new(FRAME_HZ);
+    let mut dtap2 = rlvgl_platform::gesture::DoubleTapRecognizer::new(FRAME_HZ);
     let mut frame_counter: u32 = 0;
 
     #[cfg(feature = "cpu_stats")]

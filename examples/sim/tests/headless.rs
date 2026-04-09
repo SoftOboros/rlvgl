@@ -1,12 +1,4 @@
 //! Integration test verifying headless ASCII output from rlvgl-sim.
-#![cfg(all(
-    feature = "simulator",
-    feature = "qrcode",
-    feature = "png",
-    feature = "jpeg",
-    feature = "gif",
-    feature = "fontdue"
-))]
 use std::{fs, process::Command};
 
 use tempfile::tempdir;
