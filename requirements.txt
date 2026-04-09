@@ -12,6 +12,7 @@ Jinja2==3.1.6
 jsonschema==4.23.0
 jsonschema-specifications==2025.4.1
 MarkupSafe==3.0.2
+openai>=2.30.0
 orjson==3.10.1
 packaging==25.0
 patch-ng==1.18.1
