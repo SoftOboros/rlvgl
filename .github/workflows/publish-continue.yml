@@ -1,0 +1,68 @@
+# Continues crates.io publishing for the latest release tag by diffing the two most recent release tags.
+name: Publish Continue
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 4,12,20 * * *'
+
+concurrency:
+  group: publish-continue
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Resolve latest two release tags
+        id: tags
+        shell: bash
+        run: |
+          mapfile -t tags < <(git tag -l 'v*' --sort=-version:refname)
+          if [[ ${#tags[@]} -lt 2 ]]; then
+            echo "Need at least two release tags to continue publishing." >&2
+            exit 1
+          fi
+
+          head_tag="${tags[0]}"
+          base_tag="${tags[1]}"
+          head_sha="$(git rev-parse "$head_tag")"
+          base_sha="$(git rev-parse "$base_tag")"
+
+          echo "head_tag=$head_tag" >> "$GITHUB_OUTPUT"
+          echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+          echo "Publish continue diff:"
+          echo "  latest tag:   $head_tag ($head_sha)"
+          echo "  previous tag: $base_tag ($base_sha)"
+
+      - name: Checkout latest release tag
+        shell: bash
+        run: |
+          git checkout --detach "${{ steps.tags.outputs.head_tag }}"
+          git submodule update --init --recursive
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Publish remaining crates from latest release diff
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: bash scripts/publish_changed.sh "${{ steps.tags.outputs.base_sha }}"

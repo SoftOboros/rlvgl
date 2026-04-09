@@ -88,6 +88,41 @@ PY
   esac
 }
 
+publish_crate() {
+  local crate="$1"
+  local version="$2"
+  shift 2
+
+  local log_file
+  local publish_status
+  local retry_after
+
+  log_file=$(mktemp)
+
+  set +e
+  "$@" 2>&1 | tee "$log_file"
+  publish_status=${PIPESTATUS[0]}
+  set -e
+
+  if [[ "$publish_status" -eq 0 ]]; then
+    rm -f "$log_file"
+    return 0
+  fi
+
+  echo "Publish failed for $crate v$version." >&2
+  if grep -q '429 Too Many Requests' "$log_file"; then
+    retry_after=$(sed -n 's/.*Please try again after \(.* GMT\) and see.*/\1/p' "$log_file" | tail -n 1)
+    if [[ -n "$retry_after" ]]; then
+      echo "crates.io rate limit hit while publishing $crate v$version. Retry after $retry_after." >&2
+    else
+      echo "crates.io rate limit hit while publishing $crate v$version. Retry this workflow after the limit window resets." >&2
+    fi
+  fi
+
+  rm -f "$log_file"
+  return "$publish_status"
+}
+
 if ! git rev-parse --verify "${BASE}^{commit}" >/dev/null 2>&1; then
   echo "Base commit not found: $BASE" >&2
   exit 1
@@ -213,12 +248,12 @@ for crate in "${changed[@]}"; do
     # The packaged chip database archive is generated during publish and is
     # intentionally gitignored in-tree, so force-add it for cargo packaging.
     git add -f chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
-    cargo publish -p "$crate" --no-verify --allow-dirty
+    publish_crate "$crate" "$version" cargo publish -p "$crate" --no-verify --allow-dirty
   elif [[ "$crate" == "rlvgl-bsps-stm" ]]; then
     scripts/gen_ioc_bsps.sh
-    cargo publish -p "$crate" --no-verify --allow-dirty
+    publish_crate "$crate" "$version" cargo publish -p "$crate" --no-verify --allow-dirty
   else
-    cargo publish -p "$crate" --no-verify
+    publish_crate "$crate" "$version" cargo publish -p "$crate" --no-verify
   fi
   prev_published="$crate"
 done
