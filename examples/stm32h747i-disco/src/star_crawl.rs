@@ -243,9 +243,13 @@ impl StarCrawl {
         let line_h = (self.font.height as u32 * LINE_SPACING_NUM) / LINE_SPACING_DEN;
         // Layout: margin(120) + graphic(384) + gap(40) + text + gap(40) + logo(64) + padding(CRAWL_H)
         let logo_h = Self::logo_height();
-        self.text_h = 120 + GRAPHIC_SIZE + GRAPHIC_GAP
+        self.text_h = 120
+            + GRAPHIC_SIZE
+            + GRAPHIC_GAP
             + self.lines.len() as u32 * line_h
-            + LOGO_GAP + logo_h + CRAWL_H;
+            + LOGO_GAP
+            + logo_h
+            + CRAWL_H;
         self.starfield = CRAWL_BASE as *mut u8;
         self.text_src = (CRAWL_BASE + STAR_SIZE) as *mut u8;
 
@@ -339,12 +343,9 @@ impl StarCrawl {
                         return StepResult::Pending;
                     }
                     let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
-                    let src =
-                        unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
-                    let dst = unsafe {
-                        self.back_buf
-                            .add((self.bg_row * self.fb_w * BPP) as usize)
-                    };
+                    let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
+                    let dst =
+                        unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };
                     #[cfg(not(feature = "c_hal"))]
                     crate::dma2d_irq::note_start();
                     crate::scope_probe::dma2d_active();
@@ -364,30 +365,23 @@ impl StarCrawl {
                     let text_row_i = self.frame_scroll_px + self.text_row as i32;
                     if text_row_i >= 0 && (text_row_i as u32) < self.text_h {
                         let src_row = text_row_i as u32;
-                        let target_w =
-                            TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
+                        let target_w = TOP_W + (BOT_W - TOP_W) * self.text_row / (CRAWL_H - 1);
                         let dst_x_off = (CRAWL_W - target_w) / 2;
                         self.diag_last_target_w = target_w.min(u16::MAX as u32) as u16;
-                        self.diag_last_text_src_row =
-                            src_row.min(u16::MAX as u32) as u16;
+                        self.diag_last_text_src_row = src_row.min(u16::MAX as u32) as u16;
                         if self.fir_resample_text_row(src_row, target_w) {
-                            self.diag_rows_with_text =
-                                self.diag_rows_with_text.saturating_add(1);
+                            self.diag_rows_with_text = self.diag_rows_with_text.saturating_add(1);
                             // Copy FIR output into portrait A8 column in D2 SRAM.
-                            let x_col =
-                                (self.fb_w - 1 - self.text_row) as usize;
+                            let x_col = (self.fb_w - 1 - self.text_row) as usize;
                             let y_off = (dst_x_off - A8_Y_BASE) as usize;
                             for i in 0..target_w as usize {
                                 unsafe {
-                                    let a8_ptr = (A8_BUF
-                                        + (y_off + i) * A8_WIDTH as usize
-                                        + x_col)
+                                    let a8_ptr = (A8_BUF + (y_off + i) * A8_WIDTH as usize + x_col)
                                         as *mut u8;
                                     a8_ptr.write_volatile(self.scanline_buf[i]);
                                 }
                             }
-                            self.diag_rows_blended =
-                                self.diag_rows_blended.saturating_add(1);
+                            self.diag_rows_blended = self.diag_rows_blended.saturating_add(1);
                         }
                     }
                     self.text_row += 1;
@@ -414,8 +408,7 @@ impl StarCrawl {
                 dcache_clean_range(A8_BUF, A8_SIZE);
 
                 // Single DMA2D A8→ARGB blend of the entire text layer.
-                let dst_offset =
-                    (A8_Y_BASE * self.fb_w * BPP) as usize;
+                let dst_offset = (A8_Y_BASE * self.fb_w * BPP) as usize;
                 let dst = unsafe { self.back_buf.add(dst_offset) };
                 #[cfg(not(feature = "c_hal"))]
                 crate::dma2d_irq::note_start();
@@ -467,9 +460,7 @@ impl StarCrawl {
                     let gw = glyph.width as usize;
                     let gh = glyph.height as usize;
                     let data_off = glyph.offset as usize;
-                    let gy = cur_y as i32 + self.font.ascent as i32
-                        - glyph.ymin as i32
-                        - gh as i32;
+                    let gy = cur_y as i32 + self.font.ascent as i32 - glyph.ymin as i32 - gh as i32;
                     for row in 0..gh {
                         let dy = gy + row as i32;
                         if dy < 0 || dy as u32 >= self.text_h {
@@ -542,8 +533,7 @@ impl StarCrawl {
                     // -90° CCW rotation: portrait (col, row) →
                     // landscape (row, GRAPHIC_SIZE-1-col) so the
                     // splash appears upright in the landscape crawl.
-                    let dst_off = (dst_y + GRAPHIC_SIZE - 1 - col) as usize
-                        * TEXT_W as usize
+                    let dst_off = (dst_y + GRAPHIC_SIZE - 1 - col) as usize * TEXT_W as usize
                         + x_off
                         + row as usize;
                     if dst_off < (TEXT_W * self.text_h) as usize {
@@ -577,8 +567,7 @@ impl StarCrawl {
                 }
                 let a = pixels[off + 3];
                 if a > 0 {
-                    let dst_off =
-                        (dst_y + row) as usize * TEXT_W as usize + x_off + col as usize;
+                    let dst_off = (dst_y + row) as usize * TEXT_W as usize + x_off + col as usize;
                     if dst_off < (TEXT_W * self.text_h) as usize {
                         unsafe {
                             self.text_src.add(dst_off).write_volatile(a);

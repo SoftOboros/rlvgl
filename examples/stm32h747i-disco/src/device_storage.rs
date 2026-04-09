@@ -75,10 +75,16 @@ impl embedded_sdmmc::blockdevice::BlockDevice for QspiBlockDev {
 
             // Read-modify-write at 4KB subsector granularity
             let mut ss_buf = [0u8; 4096];
-            flash.read(ss_base, &mut ss_buf).map_err(|_| QspiError::Flash)?;
+            flash
+                .read(ss_base, &mut ss_buf)
+                .map_err(|_| QspiError::Flash)?;
             ss_buf[ss_off..ss_off + 512].copy_from_slice(&block.contents);
-            flash.erase_subsector(ss_base).map_err(|_| QspiError::Flash)?;
-            flash.write(ss_base, &ss_buf).map_err(|_| QspiError::Flash)?;
+            flash
+                .erase_subsector(ss_base)
+                .map_err(|_| QspiError::Flash)?;
+            flash
+                .write(ss_base, &ss_buf)
+                .map_err(|_| QspiError::Flash)?;
         }
         Ok(())
     }
@@ -232,7 +238,9 @@ impl DeviceStorage {
         let flash = self.qspi.as_ref().ok_or(())?;
         let bd = QspiBlockDev::new(flash.clone());
         let vm = embedded_sdmmc::VolumeManager::new(bd, DummyTimeSource);
-        let volume = vm.open_volume(embedded_sdmmc::VolumeIdx(0)).map_err(|_| ())?;
+        let volume = vm
+            .open_volume(embedded_sdmmc::VolumeIdx(0))
+            .map_err(|_| ())?;
         let root_dir = volume.open_root_dir().map_err(|_| ())?;
 
         let mut entries = Vec::new();

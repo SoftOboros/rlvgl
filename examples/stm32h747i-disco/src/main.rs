@@ -26,24 +26,24 @@ use panic_halt as _;
 // library; not all are consumed in every build configuration.
 #[cfg(feature = "audio")]
 mod audio_scope;
-#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-mod event_overlay;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
 #[allow(dead_code)]
 mod config_menu;
-mod device_storage;
-mod file_browser_panel;
 #[cfg(feature = "cpu_stats")]
 mod cpu_stats;
+mod device_storage;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod event_overlay;
+mod file_browser_panel;
 mod fonts;
 mod icon_strip;
 mod ipc;
 mod readme_crawl;
+mod scope_probe;
 #[allow(dead_code)]
 mod settings_dialog;
-mod scope_probe;
 mod star_crawl;
 #[allow(dead_code)]
 mod sys_info;
@@ -330,15 +330,13 @@ mod _dma2d_isr {
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static ERIF_FLAG: core::sync::atomic::AtomicBool =
-    core::sync::atomic::AtomicBool::new(false);
+static ERIF_FLAG: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 /// DWT_CYCCNT snapshot at the instant ERIF fired. T=0 for all scheduling.
 #[cfg(all(
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static ERIF_CYCCNT: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
+static ERIF_CYCCNT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 /// Measured ERIF-to-ERIF interval (cycles). Adapts to actual panel TE rate.
 /// Default 33ms = 13.2M cycles at 400MHz (one full frame at 30fps).
 /// Must be generous initially — too small blocks all DMA2D admission.
@@ -387,9 +385,13 @@ mod _dsi_isr {
             }
             // Clear any pending host-level flags
             let isr0 = ISR0.read_volatile();
-            if isr0 != 0 { FIR0.write_volatile(isr0); }
+            if isr0 != 0 {
+                FIR0.write_volatile(isr0);
+            }
             let isr1 = ISR1.read_volatile();
-            if isr1 != 0 { FIR1.write_volatile(isr1); }
+            if isr1 != 0 {
+                FIR1.write_volatile(isr1);
+            }
         }
     }
 }
@@ -955,9 +957,7 @@ impl SerialTask {
                 {
                     serial_puts("TE budget=");
                     serial_dec(
-                        FRAME_BUDGET_CYCLES
-                            .load(core::sync::atomic::Ordering::Relaxed)
-                            / 400,
+                        FRAME_BUDGET_CYCLES.load(core::sync::atomic::Ordering::Relaxed) / 400,
                     );
                     serial_puts("us phase=");
                     serial_dec(cycles_since_erif() / 400);
@@ -3150,9 +3150,13 @@ fn main() -> ! {
             // Clear all pending wrapper + host flags
             (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // WIFCR: all wrapper flags
             let isr0 = (0x5000_00BCu32 as *const u32).read_volatile();
-            if isr0 != 0 { (0x5000_00D8u32 as *mut u32).write_volatile(isr0); }
+            if isr0 != 0 {
+                (0x5000_00D8u32 as *mut u32).write_volatile(isr0);
+            }
             let isr1 = (0x5000_00C0u32 as *const u32).read_volatile();
-            if isr1 != 0 { (0x5000_00DCu32 as *mut u32).write_volatile(isr1); }
+            if isr1 != 0 {
+                (0x5000_00DCu32 as *mut u32).write_volatile(isr1);
+            }
             // Clear NVIC pending bit, then unmask
             cortex_m::peripheral::NVIC::unpend(stm32h7::stm32h747cm7::Interrupt::DSI);
             cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
@@ -3342,9 +3346,7 @@ fn main() -> ! {
                         any(target_arch = "arm", target_arch = "aarch64")
                     ))]
                     if star_crawl.is_active() {
-                        if matches!(&evt, Event::PointerDown { .. })
-                            && crawl_touch_guard == 0
-                        {
+                        if matches!(&evt, Event::PointerDown { .. }) && crawl_touch_guard == 0 {
                             star_crawl.deactivate();
                             serial_puts("CRAWL:touch_exit\r\n");
                             // Full screen restore from pristine desktop.
@@ -3649,8 +3651,7 @@ fn main() -> ! {
                     if vis != unsafe { FBP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
-                            compositor
-                                .mark_pristine_restore(file_browser_panel.borrow().bounds());
+                            compositor.mark_pristine_restore(file_browser_panel.borrow().bounds());
                         }
                         unsafe {
                             FBP_WAS_VIS = vis;
@@ -3952,7 +3953,10 @@ fn main() -> ! {
                     };
                     let queued_frame = ((buffer_ready as u8) << 1) | (render_active as u8);
                     cpu_stats.record_pipeline_stage(stage, current_frame, queued_frame);
-                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
                     let crawl_waiting_dma = crawl_active && star_crawl.waiting_for_dma();
                     #[cfg(not(all(
                         feature = "dma2d",
@@ -4058,14 +4062,12 @@ fn main() -> ! {
                                     render_active = false;
                                     serial_puts("CRAWL:done\r\n");
                                     let (w, h) = display.dimensions();
-                                    compositor.mark_pristine_restore(
-                                        rlvgl_core::widget::Rect {
-                                            x: 0,
-                                            y: 0,
-                                            width: h as i32,
-                                            height: w as i32,
-                                        },
-                                    );
+                                    compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                        x: 0,
+                                        y: 0,
+                                        width: h as i32,
+                                        height: w as i32,
+                                    });
                                     dirty_frames = 4;
                                 }
                             }
@@ -4117,8 +4119,7 @@ fn main() -> ! {
                             any(target_arch = "arm", target_arch = "aarch64")
                         ))]
                         if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter =
-                                rlvgl::platform::Dma2dBlitter::new(raw);
+                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
                             match event_overlay.tick(&mut blitter) {
                                 event_overlay::StepResult::Pending => {
@@ -4141,15 +4142,12 @@ fn main() -> ! {
 
                         compositor.restore(back as *mut u8);
 
-                        let fb_slice = unsafe {
-                            core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes)
-                        };
-                        let surface =
-                            Surface::new(fb_slice, stride, PixelFmt::Argb8888, w, h);
+                        let fb_slice =
+                            unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };
+                        let surface = Surface::new(fb_slice, stride, PixelFmt::Argb8888, w, h);
                         let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
                             BlitterRenderer::new(&mut render_blitter, surface);
-                        let mut renderer =
-                            RotatedRenderer::new(&mut blit_renderer, w);
+                        let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
 
                         root.borrow().draw(&mut renderer);
 
@@ -4163,11 +4161,7 @@ fn main() -> ! {
                             let modal_up = file_browser_panel.borrow().is_visible()
                                 || config_menu.borrow().is_visible();
                             if ew.is_visible() && ew.is_dma2d_mode() && !modal_up {
-                                event_overlay.begin_frame(
-                                    &ew,
-                                    back as *mut u8,
-                                    w,
-                                );
+                                event_overlay.begin_frame(&ew, back as *mut u8, w);
                                 keep_rendering = true;
                             } else {
                                 frame_ready = true;
@@ -4230,25 +4224,16 @@ fn main() -> ! {
             // before TE+1 (~19ms after ERIF). Ensures every frame
             // catches the same TE slot → constant frame period.
             const PRESENT_HOLDOFF: u32 = 6_000_000; // 15ms at 400MHz
-            if buffer_ready
-                && cycles_since_erif() >= PRESENT_HOLDOFF
-                && take_erif()
-            {
+            if buffer_ready && cycles_since_erif() >= PRESENT_HOLDOFF && take_erif() {
                 // Update ERIF-to-ERIF period estimate (EMA, α=1/8).
                 {
-                    let now_cyc =
-                        ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire);
+                    let now_cyc = ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire);
                     let delta = now_cyc.wrapping_sub(prev_erif_cyc);
                     // Sanity: 8ms..80ms at 400MHz (3.2M..32M cycles)
-                    if prev_erif_cyc != 0
-                        && delta > 3_200_000
-                        && delta < 32_000_000
-                    {
-                        let old = FRAME_BUDGET_CYCLES
-                            .load(core::sync::atomic::Ordering::Relaxed);
+                    if prev_erif_cyc != 0 && delta > 3_200_000 && delta < 32_000_000 {
+                        let old = FRAME_BUDGET_CYCLES.load(core::sync::atomic::Ordering::Relaxed);
                         let smoothed = (old / 8) * 7 + delta / 8;
-                        FRAME_BUDGET_CYCLES
-                            .store(smoothed, core::sync::atomic::Ordering::Relaxed);
+                        FRAME_BUDGET_CYCLES.store(smoothed, core::sync::atomic::Ordering::Relaxed);
                     }
                     prev_erif_cyc = now_cyc;
                 }
@@ -4313,8 +4298,7 @@ fn main() -> ! {
                 #[cfg(not(feature = "audio"))]
                 let scope_running = false;
 
-                let wants_render =
-                    crawl_running || scope_running || normal_render_pending;
+                let wants_render = crawl_running || scope_running || normal_render_pending;
                 if wants_render && take_erif() {
                     render_active = true;
                     if normal_render_pending {

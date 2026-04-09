@@ -31,14 +31,14 @@ const EV_FB_H: u32 = 380; // portrait height (from draw width)
 // Shared address with star crawl — mutually exclusive (crawl replaces
 // normal rendering while active).
 const A8_BUF: usize = 0x3000_0000;
-const A8_WIDTH: u32 = EV_FB_W;  // 264
+const A8_WIDTH: u32 = EV_FB_W; // 264
 const A8_HEIGHT: u32 = EV_FB_H; // 380
 const A8_SIZE: usize = (A8_WIDTH * A8_HEIGHT) as usize; // 100,320 bytes
 
 // ── Colors ──────────────────────────────────────────────────────────────────
-const BG_COLOR: u32 = 0xFF19_1919;       // Color(25, 25, 25, 255)
-const BORDER_COLOR: u32 = 0xFF50_5050;   // Color(80, 80, 80, 255)
-const TEXT_FG: u32 = 0x00DC_DCDC;        // Color(220, 220, 220) for A8 blend
+const BG_COLOR: u32 = 0xFF19_1919; // Color(25, 25, 25, 255)
+const BORDER_COLOR: u32 = 0xFF50_5050; // Color(80, 80, 80, 255)
+const TEXT_FG: u32 = 0x00DC_DCDC; // Color(220, 220, 220) for A8 blend
 const BORDER_W: u32 = 2;
 
 // ── State machine ───────────────────────────────────────────────────────────
@@ -90,12 +90,7 @@ impl EventOverlay {
     ///
     /// Call once per frame when the event window is visible.
     /// `back_buf` is the SDRAM back-buffer address.
-    pub fn begin_frame(
-        &mut self,
-        event_win: &EventWindow,
-        back_buf: *mut u8,
-        fb_w: u32,
-    ) {
+    pub fn begin_frame(&mut self, event_win: &EventWindow, back_buf: *mut u8, fb_w: u32) {
         self.back_buf = back_buf;
         self.fb_w = fb_w;
 
@@ -216,10 +211,8 @@ impl EventOverlay {
             return StepResult::Pending;
         }
         let dst = unsafe {
-            self.back_buf.add(
-                ((EV_FB_Y + BORDER_W) * self.fb_w * BPP
-                    + (EV_FB_X + BORDER_W) * BPP) as usize,
-            )
+            self.back_buf
+                .add(((EV_FB_Y + BORDER_W) * self.fb_w * BPP + (EV_FB_X + BORDER_W) * BPP) as usize)
         };
         crate::dma2d_irq::note_start();
         crate::scope_probe::dma2d_active();
@@ -289,9 +282,7 @@ fn render_str_a8(font: &BitmapFont, draw_x: i32, draw_y: i32, text: &str) {
                 let bit = bit_offset + row * gw + col;
                 let byte_idx = bit / 8;
                 let bit_idx = 7 - (bit % 8);
-                if byte_idx < font.data.len()
-                    && (font.data[byte_idx] >> bit_idx) & 1 != 0
-                {
+                if byte_idx < font.data.len() && (font.data[byte_idx] >> bit_idx) & 1 != 0 {
                     // Landscape pixel at (cx + col*scale, draw_y + row*scale)
                     // with size (scale, scale).
                     let lx = cx + col as i32 * scale;
@@ -308,10 +299,9 @@ fn render_str_a8(font: &BitmapFont, draw_x: i32, draw_y: i32, text: &str) {
                             let py = (a8_y + dy) as u32;
                             if px < A8_WIDTH && py < A8_HEIGHT {
                                 unsafe {
-                                    let ptr = (A8_BUF
-                                        + py as usize * A8_WIDTH as usize
-                                        + px as usize)
-                                        as *mut u8;
+                                    let ptr =
+                                        (A8_BUF + py as usize * A8_WIDTH as usize + px as usize)
+                                            as *mut u8;
                                     ptr.write_volatile(0xFF);
                                 }
                             }

@@ -251,6 +251,7 @@ Summary of what exists in this repository today versus the plan above.
 ### Level 2 – Python extraction & conversion
 - [x] **STM32 XML scraper** – Parse `STM32_open_pin_data` `mcu/` and `ip/` directories into canonical `mcu` IR. Depends on: Pre-setup
 - [ ] **Ignore undefined MCUs** – Skip or delete MCUs without pin definitions after scraping to prevent `.ioc` conversion failures; accepts `--skip-list` for bulk exclusions. Depends on: STM32 XML scraper
+  Current temporary workaround: `scripts/stm32_afdb_pipeline.sh` skips `N01_Discovery_STM32G0316-DISCO_STM32G031J6M_Board_AllConfig` because `tools/afdb/pin_context.py` currently raises `ValueError(... evaluated to a null context)` for that IOC. Replace the script-local skip with a proper parser/scraper fix.
 - [ ] **.ioc overlay generation** – Populate IR JSON with pin contexts when converting `.ioc` files into `boards` entries using the canonical `mcu` data. Depends on: STM32 XML scraper
 - [ ] **User .ioc conversion** – Provide a CLI that accepts a CubeMX `.ioc` and emits a `boards` overlay using the canonical schema. Depends on: .ioc overlay generation
 - [x] **CSV parser integration** – Extend `tools/st_extract_af.py` to parse CSV pin descriptions into the same intermediate representation. Depends on: Pre-setup

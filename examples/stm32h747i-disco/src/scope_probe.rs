@@ -45,9 +45,7 @@ pub fn init() {
     unsafe {
         let m = GPIOJ_MODER.read_volatile();
         // PJ0: MODER[1:0] = 01, PJ6: MODER[13:12] = 01
-        GPIOJ_MODER.write_volatile(
-            (m & !(3u32 << 0) & !(3u32 << 12)) | (1u32 << 0) | (1u32 << 12),
-        );
+        GPIOJ_MODER.write_volatile((m & !(3u32 << 0) & !(3u32 << 12)) | (1u32 << 0) | (1u32 << 12));
         GPIOJ_BSRR.write_volatile(PJ0_RESET | PJ6_RESET);
         for _ in 0..4u32 {
             GPIOJ_BSRR.write_volatile(PJ0_SET | PJ6_SET);

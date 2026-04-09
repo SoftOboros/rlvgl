@@ -128,7 +128,16 @@ impl Mt25tlFlash {
             rb.cr.modify(|_, w| w.abort().set_bit());
             while rb.cr.read().abort().bit_is_set() {}
             // Clear all flags
-            rb.fcr.write(|w| w.ctcf().set_bit().ctef().set_bit().csmf().set_bit().ctof().set_bit());
+            rb.fcr.write(|w| {
+                w.ctcf()
+                    .set_bit()
+                    .ctef()
+                    .set_bit()
+                    .csmf()
+                    .set_bit()
+                    .ctof()
+                    .set_bit()
+            });
             // Reset CCR to idle
             rb.ccr.write(|w| w.bits(0));
             BC.write_volatile(0xE283_0005);
@@ -137,7 +146,9 @@ impl Mt25tlFlash {
         // Issue software reset to the flash device
         let _ = self.command_only(cmd::RESET_ENABLE);
         let _ = self.command_only(cmd::RESET_MEMORY);
-        unsafe { BC.write_volatile(0xE283_0007); }
+        unsafe {
+            BC.write_volatile(0xE283_0007);
+        }
         // Wait 30us for reset to complete (at 400 MHz, ~12000 cycles)
         cortex_m::asm::delay(12_000);
     }
