@@ -3,12 +3,12 @@ PACKAGE       := rlvgl-example-disco
 BIN_CM7       := rlvgl-stm32h747i-disco
 BIN_CM4       := rlvgl-stm32h747i-disco-cm4
 TARGET        := thumbv7em-none-eabihf
-FEATURES_CM7  := cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
+FEATURES_CM7  := cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage
 FEATURES_CM4  := cm4
 CHIP          := STM32H747XIHx
 FLASH_BASE    := 0x08000000
 OBJCOPY       := rust-objcopy
-PROBE_ID      ?= 0483:374e:004F00273133510837363734
+PROBE_ID      ?= 0483:3754:004F00273133510837363734
 PROBE_SPEED   ?= 1000
 
 # Derived paths
@@ -96,6 +96,7 @@ flash-disco: build-disco
 	  --protocol swd --speed $(PROBE_SPEED) \
 	  --non-interactive --connect-under-reset \
 	  --probe $(PROBE_ID) $(ELF_CM7)
+	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
 
 flash-disco-hex: build-disco
 	probe-rs download --chip $(CHIP) \

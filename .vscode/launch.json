@@ -6,7 +6,7 @@
       "type": "probe-rs-debug",
       "request": "launch",
       "chip": "STM32H747XIHx",
-      "probe": "0483:374e:004F00273133510837363734",
+      "probe": "0483:3754:004F00273133510837363734",
       "connectUnderReset": true,
       "speed": 1000,
       "coreConfigs": [
@@ -26,7 +26,7 @@
       "type": "probe-rs-debug",
       "request": "attach",
       "chip": "STM32H747XIHx",
-      "probe": "0483:374e:004F00273133510837363734",
+      "probe": "0483:3754:004F00273133510837363734",
       "connectUnderReset": false,
       "speed": 1000,
       "coreConfigs": [
@@ -45,7 +45,7 @@
       "type": "probe-rs-debug",
       "request": "launch",
       "chip": "STM32H747XIHx",
-      "probe": "0483:374e:004F00273133510837363734",
+      "probe": "0483:3754:004F00273133510837363734",
       "connectUnderReset": true,
       "speed": 1000,
       "coreConfigs": [
