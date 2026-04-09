@@ -59,6 +59,10 @@ mod vendor;
 #[allow(dead_code)]
 pub mod boards;
 
+// BSP generation utilities
+#[path = "../creator/bsp_gen.rs"]
+mod bsp_gen;
+
 mod board_select;
 
 mod types;
@@ -143,7 +147,7 @@ pub fn run() -> Result<()> {
     let options = NativeOptions::default();
     let manifest_path_clone = manifest_path.clone();
     eframe::run_native(
-        "rlgvl Creator",
+        &format!("rlvgl Creator v{}", env!("CARGO_PKG_VERSION")),
         options,
         Box::new(move |_cc| Ok(Box::new(CreatorApp::new(manifest, manifest_path_clone)))),
     )

@@ -1,0 +1,10 @@
+version: 1
+packages: {}
+groups: {}
+features: {}
+expose: {}
+targets: []
+assets: []
+naming:
+  prefixes: {}
+  case: screaming_snake

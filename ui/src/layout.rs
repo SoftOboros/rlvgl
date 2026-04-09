@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-//! Basic layout helpers for arranging [`Widget`](rlvgl_core::widget::Widget)
-//! instances from [`rlvgl-widgets`](rlvgl_widgets).
+//! Basic layout helpers for arranging [`Widget`] instances from
+//! [`rlvgl_widgets`].
 //!
-//! Provides vertical and horizontal stacks, a simple grid, and a box wrapper.
+//! Provides vertical and horizontal stacks, a simple grid, a box wrapper,
+//! and a lightweight [`GridCalc`] geometry calculator.
 
 use alloc::{boxed::Box, vec::Vec};
 use rlvgl_core::{
@@ -14,8 +15,8 @@ use rlvgl_widgets::container::Container;
 
 /// Container that positions children vertically.
 ///
-/// Accepts any [`Widget`](rlvgl_core::widget::Widget) from
-/// [`rlvgl_widgets`](rlvgl_widgets) and arranges them top-to-bottom.
+/// Accepts any [`Widget`] from [`rlvgl_widgets`] and arranges them
+/// top-to-bottom.
 pub struct VStack {
     bounds: Rect,
     spacing: i32,
@@ -87,9 +88,8 @@ impl Widget for VStack {
 
 /// Container that positions children horizontally.
 ///
-/// Like [`VStack`](crate::layout::VStack), this operates on
-/// [`Widget`](rlvgl_core::widget::Widget) instances from
-/// [`rlvgl_widgets`](rlvgl_widgets).
+/// Like [`VStack`], this operates on [`Widget`] instances from
+/// [`rlvgl_widgets`].
 pub struct HStack {
     bounds: Rect,
     spacing: i32,
@@ -279,6 +279,101 @@ impl Widget for BoxLayout {
     }
 }
 
+/// Pure-geometry grid calculator for manual widget layouts.
+///
+/// Unlike [`Grid`], this does not own widgets — it only computes
+/// cell [`Rect`]s from `(row, col)` indices, making it suitable for
+/// custom widgets that do their own drawing and hit-testing.
+///
+/// ```
+/// # use rlvgl_core::widget::Rect;
+/// # use rlvgl_ui::layout::GridCalc;
+/// let g = GridCalc::new(10, 20, 2, 100, 40).gap(4, 2);
+/// let r = g.cell(1, 0);
+/// assert_eq!(r, Rect { x: 10, y: 62, width: 100, height: 40 });
+/// ```
+pub struct GridCalc {
+    /// Top-left origin X.
+    pub x: i32,
+    /// Top-left origin Y.
+    pub y: i32,
+    /// Number of columns.
+    pub cols: usize,
+    /// Width of each cell.
+    pub col_w: i32,
+    /// Height of each cell.
+    pub row_h: i32,
+    /// Horizontal gap between columns.
+    pub col_gap: i32,
+    /// Vertical gap between rows.
+    pub row_gap: i32,
+}
+
+impl GridCalc {
+    /// Create a grid calculator with the given origin, column count, and cell size.
+    pub const fn new(x: i32, y: i32, cols: usize, col_w: i32, row_h: i32) -> Self {
+        Self {
+            x,
+            y,
+            cols,
+            col_w,
+            row_h,
+            col_gap: 0,
+            row_gap: 0,
+        }
+    }
+
+    /// Set inter-cell gaps.
+    pub const fn gap(mut self, col_gap: i32, row_gap: i32) -> Self {
+        self.col_gap = col_gap;
+        self.row_gap = row_gap;
+        self
+    }
+
+    /// Return the `Rect` for the cell at `(row, col)`.
+    pub const fn cell(&self, row: usize, col: usize) -> Rect {
+        Rect {
+            x: self.x + col as i32 * (self.col_w + self.col_gap),
+            y: self.y + row as i32 * (self.row_h + self.row_gap),
+            width: self.col_w,
+            height: self.row_h,
+        }
+    }
+
+    /// Return a `Rect` spanning all columns for the given `row`.
+    pub const fn row_span(&self, row: usize) -> Rect {
+        let total_w = if self.cols == 0 {
+            0
+        } else {
+            self.cols as i32 * self.col_w + (self.cols as i32 - 1) * self.col_gap
+        };
+        Rect {
+            x: self.x,
+            y: self.y + row as i32 * (self.row_h + self.row_gap),
+            width: total_w,
+            height: self.row_h,
+        }
+    }
+
+    /// Total width of the grid (all columns + gaps).
+    pub const fn total_width(&self) -> i32 {
+        if self.cols == 0 {
+            0
+        } else {
+            self.cols as i32 * self.col_w + (self.cols as i32 - 1) * self.col_gap
+        }
+    }
+
+    /// Total height of the grid for the given number of rows.
+    pub const fn total_height(&self, rows: usize) -> i32 {
+        if rows == 0 {
+            0
+        } else {
+            rows as i32 * self.row_h + (rows as i32 - 1) * self.row_gap
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,5 +406,47 @@ mod tests {
             .child(|r| Label::new("c", r));
         assert_eq!(grid.bounds().height, 11);
         assert_eq!(grid.bounds().width, 11);
+    }
+
+    #[test]
+    fn grid_calc_cell() {
+        let g = GridCalc::new(10, 20, 2, 100, 40).gap(4, 2);
+        let r = g.cell(0, 0);
+        assert_eq!(
+            r,
+            Rect {
+                x: 10,
+                y: 20,
+                width: 100,
+                height: 40
+            }
+        );
+        let r = g.cell(1, 1);
+        assert_eq!(
+            r,
+            Rect {
+                x: 114,
+                y: 62,
+                width: 100,
+                height: 40
+            }
+        );
+    }
+
+    #[test]
+    fn grid_calc_row_span() {
+        let g = GridCalc::new(0, 0, 3, 50, 30).gap(10, 5);
+        let r = g.row_span(0);
+        assert_eq!(
+            r,
+            Rect {
+                x: 0,
+                y: 0,
+                width: 170,
+                height: 30
+            }
+        );
+        assert_eq!(g.total_width(), 170);
+        assert_eq!(g.total_height(2), 65);
     }
 }

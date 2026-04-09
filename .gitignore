@@ -12,3 +12,12 @@ venv
 *.pyc
 **/boards.json
 **/mcu.json
+codex_state/
+.codex/
+.makeitso/
+.svd/
+cookies.txt
+.mcp.json
+tmp/
+**/.cache/
+i18n/translations.bin

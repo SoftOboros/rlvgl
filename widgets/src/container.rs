@@ -1,4 +1,5 @@
 //! Simple container grouping child widgets.
+use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -27,7 +28,7 @@ impl Widget for Container {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        draw_widget_bg(renderer, self.bounds, &self.style);
     }
 
     /// Containers are currently passive and do not react to events.

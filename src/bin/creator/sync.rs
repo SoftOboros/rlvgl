@@ -65,8 +65,8 @@ pub(crate) fn run(manifest_path: &Path, out: &Path, dry_run: bool) -> Result<()>
 
     let mut env = Environment::new();
     const FEATURES_TOML: &str = r#"[features]
-all = [{% for f in all %}"{{ f }}"{% if !loop.last %}, {% endif %}{% endfor %}]
-{% for f in features %}{{ f.name }} = [{% for d in f.deps %}"{{ d }}"{% if !loop.last %}, {% endif %}{% endfor %}]
+all = [{% for f in all %}"{{ f }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% for f in features %}{{ f.name }} = [{% for d in f.deps %}"{{ d }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 {% endfor %}"#;
     const INDEX_RS: &str = r#"//! Auto-generated asset index
 

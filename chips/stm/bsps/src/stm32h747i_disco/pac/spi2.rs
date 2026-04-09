@@ -12,192 +12,227 @@
 #![allow(clippy::too_many_arguments)]
 #![cfg(feature = "spi2")]
 
-use stm32h7::stm32h747 as pac;
+use stm32h7::stm32h747cm7 as pac;
 
 /// Enables GPIO clocks required by the generated board.
 
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    const MASK: u32 = (1u32 << 0) | (1u32 << 2);
-    dp.RCC
-        .ahb4enr
-        .modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe {
+            super::super::c_ffi::c_spi2_enable_gpio_clocks();
+        }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {
+        const MASK: u32 = (1u32 << 0) | (1u32 << 2);
+        dp.RCC
+            .ahb4enr
+            .modify(|r, w| unsafe { w.bits(r.bits() | MASK) });
+    }
 }
 
 /// Configures pins using PAC registers.
 
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
-    // GPIOA
-    dp.GPIOA.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 11 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        let shift = 12 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        bits &= !(1 << 11);
-        bits &= !(1 << 12);
-        w.bits(bits)
-    });
-    dp.GPIOA.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 11 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        let shift = 12 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.afrl.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        w.bits(bits)
-    });
-    dp.GPIOA.afrh.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let afr_shift = (11 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        let afr_shift = (12 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 11 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        let shift = 12 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        w.bits(bits)
-    });
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe {
+            super::super::c_ffi::c_spi2_configure_pins();
+        }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {
+        // GPIOA
+        dp.GPIOA.pupdr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 11 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            let shift = 12 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOA.otyper.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            bits &= !(1 << 11);
+            bits &= !(1 << 12);
+            w.bits(bits)
+        });
+        dp.GPIOA.ospeedr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 11 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            let shift = 12 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOA.afrl.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            w.bits(bits)
+        });
+        dp.GPIOA.afrh.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let afr_shift = (11 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            let afr_shift = (12 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            w.bits(bits)
+        });
+        dp.GPIOA.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 11 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            let shift = 12 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            w.bits(bits)
+        });
 
-    // GPIOC
-    dp.GPIOC.pupdr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 2 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        let shift = 3 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b00 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.otyper.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        bits &= !(1 << 2);
-        bits &= !(1 << 3);
-        w.bits(bits)
-    });
-    dp.GPIOC.ospeedr.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 2 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        let shift = 3 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.afrl.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        w.bits(bits)
-    });
-    dp.GPIOC.afrh.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let afr_shift = (2 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        let afr_shift = (3 % 8) * 4;
-        bits &= !(0xF << afr_shift);
-        bits |= (0u32 & 0xF) << afr_shift;
-        w.bits(bits)
-    });
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits();
-        let shift = 2 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        let shift = 3 * 2;
-        bits &= !(0b11 << shift);
-        bits |= 0b10 << shift;
-        w.bits(bits)
-    });
+        // GPIOC
+        dp.GPIOC.pupdr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 2 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            let shift = 3 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b00 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOC.otyper.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            bits &= !(1 << 2);
+            bits &= !(1 << 3);
+            w.bits(bits)
+        });
+        dp.GPIOC.ospeedr.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 2 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            let shift = 3 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOC.afrl.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            w.bits(bits)
+        });
+        dp.GPIOC.afrh.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let afr_shift = (2 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            let afr_shift = (3 % 8) * 4;
+            bits &= !(0xF << afr_shift);
+            bits |= (0u32 & 0xF) << afr_shift;
+            w.bits(bits)
+        });
+        dp.GPIOC.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits();
+            let shift = 2 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            let shift = 3 * 2;
+            bits &= !(0b11 << shift);
+            bits |= 0b10 << shift;
+            w.bits(bits)
+        });
+    }
 }
 
 /// Disables unused peripherals and masks their interrupts.
 
 /// Enables peripheral clocks for the generated board using PAC registers.
 
-pub fn enable_peripherals(_dp: &pac::Peripherals) {}
+pub fn enable_peripherals(_dp: &pac::Peripherals) {
+    #[cfg(feature = "c_hal")]
+    unsafe {
+        super::super::c_ffi::c_spi2_enable_peripherals();
+    }
+}
 
 /// De-initializes board pins to their analog state.
 
 /// De-initializes board peripherals and clocks using PAC registers.
 
 pub fn deinit_board_pac(dp: &pac::Peripherals) {
-    // Return pins to analog and remove pulls/open-drain
-    let shift = 11 * 2;
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOA
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
-    let shift = 12 * 2;
-    dp.GPIOA.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOA
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOA
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
-    let shift = 2 * 2;
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOC
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
-    let shift = 3 * 2;
-    dp.GPIOC.moder.modify(|r, w| unsafe {
-        let mut bits = r.bits() & !(0b11 << shift);
-        bits |= 0b11 << shift;
-        w.bits(bits)
-    });
-    dp.GPIOC
-        .pupdr
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
-    dp.GPIOC
-        .otyper
-        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    #[cfg(feature = "c_hal")]
+    {
+        let _ = dp;
+        unsafe {
+            super::super::c_ffi::c_spi2_deinit();
+        }
+    }
+    #[cfg(not(feature = "c_hal"))]
+    {
+        // Return pins to analog and remove pulls/open-drain
+        let shift = 11 * 2;
+        dp.GPIOA.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOA
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOA
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 11)) });
+        let shift = 12 * 2;
+        dp.GPIOA.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOA
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOA
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 12)) });
+        let shift = 2 * 2;
+        dp.GPIOC.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOC
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOC
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 2)) });
+        let shift = 3 * 2;
+        dp.GPIOC.moder.modify(|r, w| unsafe {
+            let mut bits = r.bits() & !(0b11 << shift);
+            bits |= 0b11 << shift;
+            w.bits(bits)
+        });
+        dp.GPIOC
+            .pupdr
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(0b11 << shift)) });
+        dp.GPIOC
+            .otyper
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
 
-    // Gate peripheral clocks
+        // Gate peripheral clocks
 
-    // Disable DMA controllers and mask their interrupts
+        // Disable DMA controllers and mask their interrupts
 
-    // Disable interrupts
-    unsafe {
-        pac::NVIC::mask(pac::Interrupt::SPI2);
+        // Disable interrupts
+        unsafe {
+            pac::NVIC::mask(pac::Interrupt::SPI2);
+        }
     }
 }

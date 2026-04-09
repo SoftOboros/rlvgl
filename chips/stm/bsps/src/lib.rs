@@ -4,284 +4,424 @@
 /// Ergonomic re-exports of the default form.
 pub mod prelude {}
 
+#[cfg(feature = "stm32-h7")]
 pub mod b_g473e_zest1s;
 
+#[cfg(feature = "stm32-h7")]
 pub mod b_g474e_dpow1;
 
+#[cfg(feature = "stm32-h7")]
 pub mod b_l072z_lrwan1;
 
+#[cfg(feature = "stm32-l4")]
 pub mod b_l462e_cell1;
 
+#[cfg(feature = "stm32-l4")]
 pub mod b_l475e_iot01a1;
 
+#[cfg(feature = "stm32-l4")]
 pub mod b_l475e_iot01a2;
 
+#[cfg(feature = "stm32-l4")]
 pub mod b_l4s5i_iot01a;
 
+#[cfg(feature = "stm32-u5")]
 pub mod b_u585i_iot02a;
 
+#[cfg(feature = "stm32-wb")]
 pub mod b_wb1m_wpan1;
 
+#[cfg(feature = "stm32-wba")]
 pub mod b_wba5m_wpan;
 
+#[cfg(feature = "stm32-wba")]
 pub mod b_wba6m_wpan;
 
+#[cfg(feature = "stm32-wl")]
 pub mod b_wl5m_subg1;
 
+#[cfg(feature = "stm32-c0")]
 pub mod nucleo_c031c6;
 
+#[cfg(feature = "stm32-c0")]
 pub mod nucleo_c051c8;
 
+#[cfg(feature = "stm32-c0")]
 pub mod nucleo_c071rb;
 
+#[cfg(feature = "stm32-c0")]
 pub mod nucleo_c092rc;
 
+#[cfg(feature = "stm32-f0")]
 pub mod nucleo_f030r8;
 
+#[cfg(feature = "stm32-f0")]
 pub mod nucleo_f031k6;
 
+#[cfg(feature = "stm32-f0")]
 pub mod nucleo_f042k6;
 
+#[cfg(feature = "stm32-f0")]
 pub mod nucleo_f070rb;
 
+#[cfg(feature = "stm32-f0")]
 pub mod nucleo_f072rb;
 
+#[cfg(feature = "stm32-f0")]
 pub mod nucleo_f091rc;
 
+#[cfg(feature = "stm32-f1")]
 pub mod nucleo_f103rb;
 
+#[cfg(feature = "stm32-f1")]
 pub mod nucleo_f103rb2;
 
+#[cfg(feature = "stm32-f2")]
 pub mod nucleo_f207zg;
 
+#[cfg(feature = "stm32-f3")]
 pub mod nucleo_f302r8;
 
+#[cfg(feature = "stm32-f3")]
 pub mod nucleo_f303k8;
 
+#[cfg(feature = "stm32-f3")]
 pub mod nucleo_f303re;
 
+#[cfg(feature = "stm32-f3")]
 pub mod nucleo_f303ze;
 
+#[cfg(feature = "stm32-f3")]
 pub mod nucleo_f334r8;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f401re;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f401re2;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f410rb;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f411re;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f411re2;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f412zg;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f413zh;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f429zi;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f439zi;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f446re;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f446re2;
 
+#[cfg(feature = "stm32-f4")]
 pub mod nucleo_f446ze;
 
+#[cfg(feature = "stm32-f7")]
 pub mod nucleo_f722ze;
 
+#[cfg(feature = "stm32-f7")]
 pub mod nucleo_f746zg;
 
+#[cfg(feature = "stm32-f7")]
 pub mod nucleo_f756zg;
 
+#[cfg(feature = "stm32-f7")]
 pub mod nucleo_f767zi;
 
+#[cfg(feature = "stm32-g0")]
 pub mod nucleo_g031k8;
 
+#[cfg(feature = "stm32-g0")]
 pub mod nucleo_g070rb;
 
+#[cfg(feature = "stm32-g0")]
 pub mod nucleo_g071rb;
 
+#[cfg(feature = "stm32-g0")]
 pub mod nucleo_g0b1re;
 
+#[cfg(feature = "stm32-g4")]
 pub mod nucleo_g431kb;
 
+#[cfg(feature = "stm32-g4")]
 pub mod nucleo_g431rb;
 
+#[cfg(feature = "stm32-g4")]
 pub mod nucleo_g474re;
 
+#[cfg(feature = "stm32-g4")]
 pub mod nucleo_g491re;
 
+#[cfg(feature = "stm32-h5")]
 pub mod nucleo_h503rb;
 
+#[cfg(feature = "stm32-h5")]
 pub mod nucleo_h533re;
 
+#[cfg(feature = "stm32-h5")]
 pub mod nucleo_h563zi;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h723zg;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h743zi;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h743zi2;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h745zi_q;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h753zi;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h755zi_q;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h7a3zi_q;
 
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod nucleo_h7s3l8;
 
+#[cfg(feature = "stm32-l0")]
 pub mod nucleo_l010rb;
 
+#[cfg(feature = "stm32-l0")]
 pub mod nucleo_l011k4;
 
+#[cfg(feature = "stm32-l0")]
 pub mod nucleo_l031k6;
 
+#[cfg(feature = "stm32-l0")]
 pub mod nucleo_l053r8;
 
+#[cfg(feature = "stm32-l0")]
 pub mod nucleo_l073rz;
 
+#[cfg(feature = "stm32-l1")]
 pub mod nucleo_l152re;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l412kb;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l412rb_p;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l432kc;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l433rc_p;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l452re;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l452re_p;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l476rg;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l476rg2;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l496zg;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l496zg_p;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l4a6zg;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l4p5zg;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l4r5zi;
 
+#[cfg(feature = "stm32-l4")]
 pub mod nucleo_l4r5zi_p;
 
+#[cfg(feature = "stm32-l5")]
 pub mod nucleo_l552ze_q;
 
+#[cfg(feature = "stm32-n6")]
 pub mod nucleo_n657x0_q;
 
+#[cfg(feature = "stm32-u0")]
 pub mod nucleo_u031r8;
 
+#[cfg(feature = "stm32-u0")]
 pub mod nucleo_u083rc;
 
+#[cfg(feature = "stm32-u3")]
 pub mod nucleo_u385rg_q;
 
+#[cfg(feature = "stm32-u5")]
 pub mod nucleo_u545re_q;
 
+#[cfg(feature = "stm32-u5")]
 pub mod nucleo_u575zi_q;
 
+#[cfg(feature = "stm32-u5")]
 pub mod nucleo_u5a5zj_q;
 
+#[cfg(feature = "stm32-wb")]
 pub mod nucleo_wb05kz;
 
+#[cfg(feature = "stm32-wb")]
 pub mod nucleo_wb07cc;
 
+#[cfg(feature = "stm32-wb")]
 pub mod nucleo_wb09ke;
 
+#[cfg(feature = "stm32-wb")]
 pub mod nucleo_wb15cc;
 
+#[cfg(feature = "stm32-wb")]
 pub mod nucleo_wb52vgy;
 
+#[cfg(feature = "stm32-wb")]
 pub mod nucleo_wb55rg;
 
+#[cfg(feature = "stm32-wba")]
 pub mod nucleo_wba52cg;
 
+#[cfg(feature = "stm32-wba")]
 pub mod nucleo_wba55cg;
 
+#[cfg(feature = "stm32-wba")]
 pub mod nucleo_wba65ri;
 
+#[cfg(feature = "stm32-wl")]
 pub mod nucleo_wl33cc1;
 
+#[cfg(feature = "stm32-wl")]
 pub mod nucleo_wl33cc2;
 
+#[cfg(feature = "stm32-wl")]
 pub mod nucleo_wl55jc1;
 
+#[cfg(feature = "stm32-wl")]
 pub mod nucleo_wl55jc2;
 
+#[cfg(feature = "stm32-l4")]
 pub mod p_l496g_cell01;
 
+#[cfg(feature = "stm32-l4")]
 pub mod p_l496g_cell02;
 
+#[cfg(feature = "stm32-wb")]
 pub mod p_nucleo_wb55_nucleo;
 
+#[cfg(feature = "stm32-wb")]
 pub mod p_nucleo_wb55_usbdongle;
 
+#[cfg(feature = "stm32-wb")]
 pub mod steval_astra1b;
 
+#[cfg(feature = "stm32-f4")]
 pub mod steval_idp005v1;
 
+#[cfg(feature = "stm32-f4")]
 pub mod steval_idp005v2;
 
+#[cfg(feature = "stm32-u5")]
 pub mod steval_mkboxpro;
 
+#[cfg(feature = "stm32-l4")]
 pub mod steval_mksbox1v1;
 
+#[cfg(feature = "stm32-wb")]
 pub mod steval_proteus1;
 
+#[cfg(feature = "stm32-l4")]
 pub mod steval_smartag2;
 
+#[cfg(feature = "stm32-u5")]
 pub mod steval_stwinbx1;
 
+#[cfg(feature = "stm32-l4")]
 pub mod steval_stwinkt1;
 
+#[cfg(feature = "stm32-l4")]
 pub mod steval_stwinkt1b;
 
+#[cfg(feature = "stm32-f0")]
 pub mod stm320518_eval;
 
+#[cfg(feature = "stm32-f0")]
 pub mod stm32072b_eval;
 
+#[cfg(feature = "stm32-f0")]
 pub mod stm32091c_eval;
 
+#[cfg(feature = "stm32-f1")]
 pub mod stm32100e_eval;
 
+#[cfg(feature = "stm32-f1")]
 pub mod stm3210c_eval;
 
+#[cfg(feature = "stm32-f1")]
 pub mod stm3210e_eval;
 
+#[cfg(feature = "stm32-f2")]
 pub mod stm3220g_eval;
 
+#[cfg(feature = "stm32-f2")]
 pub mod stm3221g_eval;
 
+#[cfg(feature = "stm32-f3")]
 pub mod stm32303c_eval;
 
+#[cfg(feature = "stm32-f3")]
 pub mod stm32303e_eval;
 
+#[cfg(feature = "stm32-f3")]
 pub mod stm32373c_eval;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm3240g_eval;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm3241g_eval;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm32429i_eval1;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm32439i_eval2;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm32446e_eval;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm32469i_eval;
 
+#[cfg(feature = "stm32-f4")]
 pub mod stm32479i_eval;
 
+#[cfg(feature = "stm32-f7")]
 pub mod stm32746g_eval2;
 
+#[cfg(feature = "stm32-f7")]
 pub mod stm32756g_eval2;
 
 #[cfg(feature = "stm32-c0")]
@@ -383,19 +523,19 @@ pub mod stm32g484e_eval;
 #[cfg(feature = "stm32-h5")]
 pub mod stm32h573i_dk;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h735g_dk;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h743i_disco;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h743i_eval;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h743i_eval2;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h745i_disco;
 
 #[cfg(feature = "stm32-h7")]
@@ -407,25 +547,25 @@ pub mod stm32h747i_disco;
 #[cfg(feature = "stm32-h7")]
 pub mod stm32h747i_eval;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h750b_dk;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h753i_eval;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h753i_eval2;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h757i_eval;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h7b3i_dk;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h7b3i_eval;
 
-#[cfg(feature = "stm32-h7")]
+#[cfg(all(feature = "stm32-h7", not(feature = "pac")))]
 pub mod stm32h7s78_dk;
 
 #[cfg(feature = "stm32-l0")]
@@ -434,7 +574,7 @@ pub mod stm32l0538_disco;
 #[cfg(feature = "stm32-l0")]
 pub mod stm32l073z_eval;
 
-#[cfg(feature = "stm32-l1")]
+#[cfg(feature = "stm32-l0")]
 pub mod stm32l100c_disco;
 
 #[cfg(feature = "stm32-l1")]
@@ -467,22 +607,31 @@ pub mod stm32l552e_ev;
 #[cfg(feature = "stm32-l5")]
 pub mod stm32l562e_dk;
 
+#[cfg(feature = "stm32-l0")]
 pub mod stm32l_discovery;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp135f_dk;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp157d_dk1;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp157d_ev1;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp157f_dk2;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp157f_ev1;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp215f_dk;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp257f_dk;
 
+#[cfg(feature = "stm32-mp")]
 pub mod stm32mp257f_ev1;
 
 #[cfg(feature = "stm32-n6")]
@@ -503,10 +652,14 @@ pub mod stm32u5g9j_dk1;
 #[cfg(feature = "stm32-u5")]
 pub mod stm32u5g9j_dk2;
 
+#[cfg(feature = "stm32-f1")]
 pub mod stm32vldiscovery;
 
+#[cfg(feature = "stm32-wb")]
 pub mod stm32wb5mm_dk;
 
+#[cfg(feature = "stm32-wba")]
 pub mod stm32wba55g_dk1;
 
+#[cfg(feature = "stm32-h7")]
 pub mod stm32wba65i_dk1;

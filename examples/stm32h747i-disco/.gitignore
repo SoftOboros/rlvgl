@@ -1,3 +1,17 @@
 # Ignore build artifacts for the STM32H747I-DISCO example.
 /target
 /out
+
+# DiscoBiscuit CubeMX project build artifacts
+DiscoBiscuit/build/
+DiscoBiscuit/CMakeFiles/
+DiscoBiscuit/cmake_install.cmake
+DiscoBiscuit/Makefile
+DiscoBiscuit/CM7/build/
+DiscoBiscuit/CM7/tmp/
+DiscoBiscuit/CM4/build/
+DiscoBiscuit/CM4/tmp/
+DiscoBiscuit/.settings/
+DiscoBiscuit/.vscode/
+
+.DS_Store

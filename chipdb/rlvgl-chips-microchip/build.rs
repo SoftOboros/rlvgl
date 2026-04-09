@@ -18,7 +18,7 @@ fn main() {
                 let entry = entry.expect("entry");
                 if entry.file_type().expect("ft").is_file() {
                     let name = entry.file_name().into_string().unwrap();
-                    writeln!(out_file, ">{}", name).unwrap();
+                    writeln!(out_file, ">{name}").unwrap();
                     let data = fs::read(entry.path()).expect("read file");
                     out_file.write_all(&data).unwrap();
                     writeln!(out_file, "<").unwrap();

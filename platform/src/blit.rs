@@ -4,16 +4,15 @@
 //! accelerated by different platform implementations.
 
 #[cfg(any(
-    feature = "png",
-    feature = "jpeg",
-    feature = "qrcode",
-    feature = "lottie",
     feature = "canvas",
     feature = "gif",
     feature = "apng",
     feature = "nes",
-    feature = "pinyin",
-    feature = "fatfs",
+    feature = "png",
+    feature = "jpeg",
+    feature = "qrcode",
+    feature = "lottie",
+    feature = "fontdue",
     test,
 ))]
 use alloc::vec::Vec;
@@ -28,6 +27,17 @@ use rlvgl_core::widget::{Color, Rect as WidgetRect};
 
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
+
+#[cfg(feature = "fontdue")]
+fn round_to_i32(value: f32) -> i32 {
+    if value.is_nan() {
+        0
+    } else if value >= 0.0 {
+        (value + 0.5) as i32
+    } else {
+        (value - 0.5) as i32
+    }
+}
 
 #[cfg(feature = "fontdue")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -135,9 +145,9 @@ pub trait Blitter {
 /// Collects dirty rectangles for a frame and optionally coalesces them.
 ///
 /// The planner stores up to `N` rectangles in a stack-allocated buffer. Call
-/// [`add`] to register a region that changed during rendering and [`rects`] to
-/// obtain the batched list for flushing. After presenting the frame, call
-/// [`clear`] to reuse the planner for the next frame.
+/// [`Self::add`] to register a region that changed during rendering and
+/// [`Self::rects`] to obtain the batched list for flushing. After presenting
+/// the frame, call [`Self::clear`] to reuse the planner for the next frame.
 pub struct BlitPlanner<const N: usize> {
     rects: HVec<Rect, N>,
 }
@@ -180,16 +190,14 @@ pub struct BlitterRenderer<'a, B: Blitter, const N: usize> {
     surface: Surface<'a>,
     planner: BlitPlanner<N>,
     #[cfg(any(
-        feature = "png",
-        feature = "jpeg",
-        feature = "qrcode",
-        feature = "lottie",
         feature = "canvas",
         feature = "gif",
         feature = "apng",
         feature = "nes",
-        feature = "pinyin",
-        feature = "fatfs",
+        all(feature = "png", not(target_os = "none")),
+        all(feature = "jpeg", not(target_os = "none")),
+        all(feature = "qrcode", not(target_os = "none")),
+        feature = "lottie",
         test,
     ))]
     scratch: Option<Vec<u8>>,
@@ -205,16 +213,14 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             surface,
             planner: BlitPlanner::new(),
             #[cfg(any(
-                feature = "png",
-                feature = "jpeg",
-                feature = "qrcode",
-                feature = "lottie",
                 feature = "canvas",
                 feature = "gif",
                 feature = "apng",
                 feature = "nes",
-                feature = "pinyin",
-                feature = "fatfs",
+                all(feature = "png", not(target_os = "none")),
+                all(feature = "jpeg", not(target_os = "none")),
+                all(feature = "qrcode", not(target_os = "none")),
+                feature = "lottie",
                 test,
             ))]
             scratch: None,
@@ -229,16 +235,14 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
     }
 
     #[cfg(any(
-        feature = "png",
-        feature = "jpeg",
-        feature = "qrcode",
-        feature = "lottie",
         feature = "canvas",
         feature = "gif",
         feature = "apng",
         feature = "nes",
-        feature = "pinyin",
-        feature = "fatfs",
+        all(feature = "png", not(target_os = "none")),
+        all(feature = "jpeg", not(target_os = "none")),
+        all(feature = "qrcode", not(target_os = "none")),
+        feature = "lottie",
         test,
     ))]
     fn blit_colors(&mut self, position: (i32, i32), pixels: &[Color], w: u32, h: u32) {
@@ -267,7 +271,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         });
     }
 
-    #[cfg(feature = "png")]
+    #[cfg(all(feature = "png", not(target_os = "none")))]
     /// Decode a PNG image and blit it onto the target surface.
     pub fn draw_png(
         &mut self,
@@ -279,7 +283,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         Ok(())
     }
 
-    #[cfg(feature = "jpeg")]
+    #[cfg(all(feature = "jpeg", not(target_os = "none")))]
     /// Decode a JPEG image and blit it onto the target surface.
     pub fn draw_jpeg(
         &mut self,
@@ -291,7 +295,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         Ok(())
     }
 
-    #[cfg(feature = "qrcode")]
+    #[cfg(all(feature = "qrcode", not(target_os = "none")))]
     /// Generate a QR code from `data` and blit it onto the target surface.
     pub fn draw_qr(
         &mut self,
@@ -316,8 +320,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         height: u32,
     ) -> Result<(), rlvgl_core::lottie::Error> {
         let pixels =
-            rlvgl_core::lottie::render_lottie_frame(json, frame, width as usize, height as usize)
-                .ok_or(rlvgl_core::lottie::Error::InvalidJson)?;
+            rlvgl_core::lottie::render_lottie_frame(json, frame, width as usize, height as usize)?;
         self.blit_colors(position, &pixels, width, height);
         Ok(())
     }
@@ -448,7 +451,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         px: f32,
     ) {
         let vm = line_metrics(font_data, px).unwrap();
-        let ascent = vm.ascent.round() as i32;
+        let ascent = round_to_i32(vm.ascent);
         let baseline = position.1 + ascent;
         let mut x_cursor = position.0;
         for ch in text.chars() {
@@ -467,7 +470,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             let w = metrics.width as i32;
             let h = metrics.height as i32;
             if w == 0 || h == 0 {
-                x_cursor += metrics.advance_width.round() as i32;
+                x_cursor += round_to_i32(metrics.advance_width);
                 continue;
             }
             let mut argb = vec![0u8; (w * h * 4) as usize];
@@ -509,7 +512,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
                 w: w as u32,
                 h: h as u32,
             });
-            x_cursor += metrics.advance_width.round() as i32;
+            x_cursor += round_to_i32(metrics.advance_width);
         }
     }
 
@@ -528,6 +531,49 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
 }
 
 impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
+    fn blend_rect(&mut self, rect: WidgetRect, color: Color) {
+        let alpha = color.3 as u16;
+        if alpha == 0 {
+            return;
+        }
+        if alpha == 255 {
+            self.fill_rect(rect, color);
+            return;
+        }
+        // Inline source-over blending for ARGB8888 surfaces.
+        if self.surface.format == PixelFmt::Argb8888 {
+            let sw = self.surface.width as i32;
+            let sh = self.surface.height as i32;
+            let stride = self.surface.stride;
+            let inv = 255 - alpha;
+            let x0 = rect.x.max(0);
+            let y0 = rect.y.max(0);
+            let x1 = (rect.x + rect.width).min(sw);
+            let y1 = (rect.y + rect.height).min(sh);
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let off = y as usize * stride + x as usize * 4;
+                    let bg_b = self.surface.buf[off] as u16;
+                    let bg_g = self.surface.buf[off + 1] as u16;
+                    let bg_r = self.surface.buf[off + 2] as u16;
+                    self.surface.buf[off] = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+                    self.surface.buf[off + 1] = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+                    self.surface.buf[off + 2] = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+                    self.surface.buf[off + 3] = 0xff;
+                }
+            }
+            self.planner.add(Rect {
+                x: rect.x,
+                y: rect.y,
+                w: rect.width as u32,
+                h: rect.height as u32,
+            });
+        } else {
+            // Fallback for non-ARGB8888 surfaces: just overwrite.
+            self.fill_rect(rect, color);
+        }
+    }
+
     fn fill_rect(&mut self, rect: WidgetRect, color: Color) {
         let r = Rect {
             x: rect.x,
@@ -548,6 +594,179 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
         #[cfg(not(feature = "fontdue"))]
         {
             let _ = (position, text, color);
+        }
+    }
+
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        // Fast path: write ARGB8888 pixels directly into the surface buffer,
+        // then record the dirty rectangle. Avoids per-pixel fill_rect overhead.
+        if self.surface.format == PixelFmt::Argb8888 {
+            let sw = self.surface.width as i32;
+            let sh = self.surface.height as i32;
+            let stride = self.surface.stride;
+            for y in 0..height as i32 {
+                let dy = position.1 + y;
+                if dy < 0 || dy >= sh {
+                    continue;
+                }
+                for x in 0..width as i32 {
+                    let dx = position.0 + x;
+                    if dx < 0 || dx >= sw {
+                        continue;
+                    }
+                    let src_idx = (y as u32 * width + x as u32) as usize;
+                    if let Some(&c) = pixels.get(src_idx) {
+                        let off = dy as usize * stride + dx as usize * 4;
+                        self.surface.buf[off..off + 4]
+                            .copy_from_slice(&c.to_argb8888().to_le_bytes());
+                    }
+                }
+            }
+            self.planner.add(Rect {
+                x: position.0,
+                y: position.1,
+                w: width,
+                h: height,
+            });
+        } else {
+            // Fallback: per-pixel fill_rect for non-ARGB8888 surfaces
+            for y in 0..height as i32 {
+                for x in 0..width as i32 {
+                    let idx = (y as u32 * width + x as u32) as usize;
+                    if let Some(&c) = pixels.get(idx) {
+                        self.fill_rect(
+                            WidgetRect {
+                                x: position.0 + x,
+                                y: position.1 + y,
+                                width: 1,
+                                height: 1,
+                            },
+                            c,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Renderer wrapper that applies 90° CCW rotation for platforms where the
+/// physical display is landscape but the framebuffer is portrait.
+///
+/// Maps logical coordinates (800×480 landscape) to framebuffer coordinates
+/// (480×800 portrait):
+///   fb_x = fb_width - logical_y - logical_height
+///   fb_y = logical_x
+///   fb_w = logical_height
+///   fb_h = logical_width
+pub struct RotatedRenderer<'a> {
+    inner: &'a mut dyn Renderer,
+    /// Portrait framebuffer width (the short dimension, e.g. 480).
+    fb_width: i32,
+}
+
+impl<'a> RotatedRenderer<'a> {
+    /// Create a rotated renderer wrapping `inner`.
+    ///
+    /// `fb_width` is the portrait framebuffer width (480 on STM32H747I-DISCO).
+    pub fn new(inner: &'a mut dyn Renderer, fb_width: u32) -> Self {
+        Self {
+            inner,
+            fb_width: fb_width as i32,
+        }
+    }
+}
+
+impl Renderer for RotatedRenderer<'_> {
+    fn fill_rect(&mut self, rect: WidgetRect, color: Color) {
+        let mut fb_x = self.fb_width - rect.y - rect.height;
+        let fb_y = rect.x;
+        let mut fb_w = rect.height;
+        let fb_h = rect.width;
+
+        if fb_w <= 0 || fb_h <= 0 {
+            return;
+        }
+
+        // Clamp left edge: rect extends off-screen left
+        if fb_x < 0 {
+            fb_w += fb_x; // shrink width by the overshoot
+            fb_x = 0;
+        }
+        // Clamp right edge
+        if fb_x + fb_w > self.fb_width {
+            fb_w = self.fb_width - fb_x;
+        }
+        if fb_w <= 0 {
+            return;
+        }
+
+        self.inner.fill_rect(
+            WidgetRect {
+                x: fb_x,
+                y: fb_y,
+                width: fb_w,
+                height: fb_h,
+            },
+            color,
+        );
+    }
+
+    fn blend_rect(&mut self, rect: WidgetRect, color: Color) {
+        let mut fb_x = self.fb_width - rect.y - rect.height;
+        let fb_y = rect.x;
+        let mut fb_w = rect.height;
+        let fb_h = rect.width;
+
+        if fb_w <= 0 || fb_h <= 0 {
+            return;
+        }
+
+        if fb_x < 0 {
+            fb_w += fb_x;
+            fb_x = 0;
+        }
+        if fb_x + fb_w > self.fb_width {
+            fb_w = self.fb_width - fb_x;
+        }
+        if fb_w <= 0 {
+            return;
+        }
+
+        self.inner.blend_rect(
+            WidgetRect {
+                x: fb_x,
+                y: fb_y,
+                width: fb_w,
+                height: fb_h,
+            },
+            color,
+        );
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        let fx = self.fb_width - 1 - position.1;
+        if fx >= 0 {
+            self.inner.draw_text((fx, position.0), text, color);
+        }
+    }
+
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        for py in 0..height as i32 {
+            for px in 0..width as i32 {
+                let idx = (py as u32 * width + px as u32) as usize;
+                if let Some(&c) = pixels.get(idx) {
+                    self.fill_rect(
+                        WidgetRect {
+                            x: position.0 + px,
+                            y: position.1 + py,
+                            width: 1,
+                            height: 1,
+                        },
+                        c,
+                    );
+                }
+            }
         }
     }
 }
@@ -605,7 +824,7 @@ mod text_tests {
     }
 }
 
-#[cfg(all(test, feature = "png"))]
+#[cfg(all(test, feature = "png", not(target_os = "none")))]
 mod png_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
@@ -640,7 +859,7 @@ mod png_tests {
     }
 }
 
-#[cfg(all(test, feature = "jpeg"))]
+#[cfg(all(test, feature = "jpeg", not(target_os = "none")))]
 mod jpeg_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
@@ -756,7 +975,7 @@ mod canvas_tests {
     }
 }
 
-#[cfg(all(test, feature = "qrcode"))]
+#[cfg(all(test, feature = "qrcode", not(target_os = "none")))]
 mod qrcode_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;

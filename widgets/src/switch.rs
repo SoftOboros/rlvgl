@@ -1,5 +1,6 @@
 //! Binary on/off switch widget.
 
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -43,8 +44,10 @@ impl Widget for Switch {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        let a = self.style.alpha;
+        let r = self.style.radius;
         // Draw the background track.
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
         // Draw the knob on the left or right half depending on state.
         let knob_width = self.bounds.width / 2;
@@ -63,11 +66,11 @@ impl Widget for Switch {
                 height: self.bounds.height,
             }
         };
-        renderer.fill_rect(knob_rect, self.knob_color);
+        fill_rounded_rect(renderer, knob_rect, self.knob_color.with_alpha(a), r);
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if let Event::PointerUp { x, y } = event {
+        if let Event::PressRelease { x, y } = event {
             let inside = *x >= self.bounds.x
                 && *x < self.bounds.x + self.bounds.width
                 && *y >= self.bounds.y
@@ -99,7 +102,7 @@ mod tests {
         assert_eq!(sw.bounds().y, rect.y);
         assert_eq!(sw.bounds().width, rect.width);
         assert_eq!(sw.bounds().height, rect.height);
-        let evt = Event::PointerUp { x: 5, y: 5 };
+        let evt = Event::PressRelease { x: 5, y: 5 };
         assert!(sw.handle_event(&evt));
         assert!(sw.is_on());
     }

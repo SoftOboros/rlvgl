@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Input and textarea components for rlvgl-ui.
 //!
-//! Wrap the [`Label`](rlvgl_widgets::label::Label) widget to provide simple
-//! text fields backed by `rlvgl-widgets`.
+//! Wrap the [`rlvgl_widgets::label::Label`] widget to provide simple text
+//! fields backed by `rlvgl-widgets`.
 
 use alloc::boxed::Box;
 use rlvgl_core::{
@@ -31,7 +31,7 @@ impl Input {
         }
     }
 
-    /// Register a change handler invoked when [`set_text`] is called.
+    /// Register a change handler invoked when [`Self::set_text`] is called.
     pub fn on_change<F: FnMut(&str) + 'static>(mut self, handler: F) -> Self {
         self.on_change = Some(Box::new(handler));
         self

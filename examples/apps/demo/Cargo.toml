@@ -1,0 +1,30 @@
+[package]
+name = "rlvgl-app-demo"
+version = "0.1.1"
+edition = "2024"
+license = "MIT"
+description = "Demo application for rlvgl showcasing core widgets and plugin features."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-app-demo"
+publish = true
+
+[lib]
+# Build as rlib for static linking. To also build a cdylib for dynamic
+# loading, run: cargo build -p rlvgl-app-demo --features dylib
+crate-type = ["rlib"]
+
+[dependencies]
+rlvgl-core = { path = "../../../core", version = "0.1.7", default-features = false }
+rlvgl-widgets = { path = "../../../widgets", version = "0.1.6", default-features = false }
+rlvgl-i18n = { path = "../../../i18n", version = "0.1.1" }
+
+[features]
+default = []
+dylib = []
+png = ["rlvgl-core/png"]
+jpeg = ["rlvgl-core/jpeg"]
+gif = ["rlvgl-core/gif"]
+qrcode = ["rlvgl-core/qrcode"]
+fontdue = ["rlvgl-core/fontdue"]

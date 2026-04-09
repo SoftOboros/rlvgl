@@ -16,7 +16,7 @@ fn radio_event_selects() {
         height: 20,
     };
     let mut radio = Radio::new("A", rect);
-    let event = Event::PointerUp { x: 5, y: 5 };
+    let event = Event::PressRelease { x: 5, y: 5 };
     assert!(radio.handle_event(&event));
     assert!(radio.is_selected());
 }

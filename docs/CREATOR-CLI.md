@@ -68,6 +68,28 @@ rlvgl-creator convert <path> [--force]
 * `path` – root directory containing assets.
 * `--force` – rebuild all assets even if cached outputs exist.
 
+### compress
+Encodes an image as an RLEC binary blob for firmware use. Accepts standard image
+formats (PNG, BMP, JPEG, etc.) as well as the creator's own `.raw` files
+produced by the `svg` command. The output can be loaded at runtime via
+`rlvgl-decomp`.
+
+```
+rlvgl-creator compress <input> <output>
+```
+* `input` – source image or `.raw` file.
+* `output` – path for the RLEC `.rle` blob.
+
+### decompress
+Decodes an RLEC `.rle` blob back to a PNG image. Useful for inspecting
+compressed assets or generating preview images for documentation.
+
+```
+rlvgl-creator decompress <input> <output>
+```
+* `input` – RLEC `.rle` blob file.
+* `output` – output PNG file.
+
 ### preview
 Generates thumbnails under `thumbs/` for quick visual inspection.
 
@@ -130,8 +152,11 @@ rlvgl-creator fonts pack <path> [--size PX] [--chars STRING]
 * `--size` – point size for rasterization (default `32`).
 * `--chars` – string of characters to include in the pack.
 
-### lottie import
-Imports a Lottie JSON animation into PNG frames and optionally an APNG.
+### lottie import (Linux only)
+Imports a Lottie JSON animation into PNG frames and optionally an APNG using the
+`rlottie` FFI library. This subcommand is only available on Linux where
+`librlottie` can be installed. On macOS and other platforms use `lottie cli`
+with an external converter instead.
 
 ```
 rlvgl-creator lottie import <json> <out> [--apng FILE]
@@ -141,7 +166,7 @@ rlvgl-creator lottie import <json> <out> [--apng FILE]
 * `--apng` – optional APNG file to generate.
 
 ### lottie cli
-Uses an external CLI to convert a Lottie JSON animation.
+Uses an external CLI to convert a Lottie JSON animation. Works on all platforms.
 
 ```
 rlvgl-creator lottie cli [--bin PATH] <json> <out> [--apng FILE]
@@ -161,20 +186,6 @@ rlvgl-creator svg <svg> <out> [--dpi DPI...] [--threshold VAL]
 * `out` – directory where raw images are written.
 * `--dpi` – one or more DPI values to render at (default `96`).
 * `--threshold` – monochrome threshold (0–255).
-
-### board from-ioc
-Converts a CubeMX project into a board overlay JSON.
-
-```
-rlvgl-creator board from-ioc <ioc> <board> <out> [--hal | --pac | --template <template>] [--bsp-out <dir>]
-```
-* `ioc` – path to the CubeMX `.ioc` file.
-* `board` – name to embed in the overlay.
-* `out` – path to write the generated JSON.
-* `--hal` – embed HAL template selection.
-* `--pac` – embed PAC template selection.
-* `--template` – record a custom template path.
-* `--bsp-out` – directory to emit BSP code.
 
 ### bsp from-ioc
 Renders Rust source from a CubeMX project using a MiniJinja template.
@@ -200,6 +211,10 @@ rlvgl-creator bsp from-ioc <ioc> [--emit-hal] [--emit-pac] [--template <template
   registers, including DMAMUX routing and stream/channel edge cases.
   Covers controllers across F0, F1, F2, F3, F4, F7, H5, H7, L0, L1, L4,
   L5, G0, G4, U5, WB, and WL variants.
+
+See also: STM32 BSP generation behavior, flags, and roadmap in
+[STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) — includes dual-core split,
+power (SCUEN/VOS), and clock (PLL1/prescalers) details.
 
 #### Advanced configuration examples
 
@@ -227,22 +242,22 @@ rlvgl-creator bsp from-ioc minimal.ioc \
 
 Walk through a bus-aware STM32F769I-DISCO BSP with full DMA cleanup:
 
-Generate HAL and PAC code with grouped writes, per-peripheral layout, and deinit hooks:
+1. Generate HAL and PAC code with grouped writes, per-peripheral layout, and deinit hooks:
    ```bash
    rlvgl-creator bsp from-ioc f769.ioc \\
        --emit-hal --emit-pac --grouped-writes \\
        --per-peripheral --with-deinit --out bsp
    ```
-3. Call `board::deinit()` during shutdown to gate clocks, mask interrupts, and reset DMA/BDMA/MDMA state.
+2. Call `board::deinit()` during shutdown to gate clocks, mask interrupts, and reset DMA/BDMA/MDMA state.
 
 Walk through a bus-aware STM32H573I-DISCO BSP with ungrouped writes:
 
-Generate HAL code in a single file without grouped RCC writes:
+ 1. Generate HAL code in a single file without grouped RCC writes:
   ```bash
   rlvgl-creator bsp from-ioc h573.ioc \\
       --emit-hal --one-file --out bsp
   ```
-3. Call `board::deinit()` during shutdown to gate clocks and reset pin state.
+2. Call `board::deinit()` during shutdown to gate clocks and reset pin state.
 
 ### Edge cases and gotchas
 
@@ -254,12 +269,11 @@ Generate HAL code in a single file without grouped RCC writes:
   deinit hooks for custom or rare IP blocks.
 
 ## Workflow: STM32 `.ioc` to BSP
-Convert the `.ioc` file into a BSP crate:
+1. Convert the `.ioc` file into intermediate representation and render a BSP crate (AFs derived from embedded vendor data):
    ```bash
    rlvgl-creator bsp from-ioc simple.ioc --emit-hal --out bsp
    ```
-   The command parses pin assignments and clock configuration from `simple.ioc`, resolves alternate functions via the canonical STM32 database, and renders Rust source into the `bsp/` directory.
-3. Use the generated BSP in a project:
+2. Use the generated BSP in a project:
    ```rust
    // Cargo.toml
    // [dependencies]
@@ -303,6 +317,81 @@ Convert the `.ioc` file into a BSP crate:
    use assets_pack::images::LOGO;
    ```
    The crate provides strongly typed accessors for fonts and graphics that can be embedded or vendored depending on build features.
+
+## Workflow: Lucide icon extraction
+
+Icons are sourced from the [Lucide](https://lucide.dev) icon set (ISC license)
+via the `lucide-react` npm package installed in the sibling `softoboros`
+frontend. A TypeScript extractor parses the JS icon modules and reconstructs
+standalone SVG files, which are then rendered and compressed for firmware use.
+
+### End-to-end pipeline
+
+```bash
+make import-icons
+```
+
+This runs three stages:
+
+1. **Extract** – `npx tsx scripts/extract-lucide-icons.ts` reads Lucide JS
+   modules and writes SVG files to `assets/icons/`.
+2. **Render** – `rlvgl-creator svg` converts each SVG to RLVGLRAW format at
+   96 DPI in `assets/icons/raw/`.
+3. **Compress** – `rlvgl-creator compress` encodes each `.raw` file to an RLEC
+   blob in `assets/icons/rle/` for runtime loading via `rlvgl-decomp`.
+
+### Example icons
+
+The default icon set after running `make import-icons`:
+
+| Settings | File | Trash | Folder Open | Close |
+|:--------:|:----:|:-----:|:-----------:|:-----:|
+| ![settings](icons/settings_96dpi.png) | ![file](icons/file_96dpi.png) | ![trash](icons/trash_96dpi.png) | ![folder-open](icons/folder-open_96dpi.png) | ![close](icons/close_96dpi.png) |
+| 414 B | 241 B | 276 B | 255 B | 188 B |
+
+Sizes shown are RLEC blob sizes. All icons are 24x24 pixels at 96 DPI.
+
+### Adding new icons
+
+Edit the `ICONS` map in `scripts/extract-lucide-icons.ts` to add or remove
+icons. Keys are the output filenames; values are Lucide module filenames in
+`node_modules/lucide-react/dist/esm/icons/`. Browse available icons at
+<https://lucide.dev/icons>.
+
+```typescript
+const DEFAULT_ICONS: Record<string, string> = {
+  "settings":    "settings.js",     // gear/config
+  "file":        "file.js",         // file document
+  "trash":       "trash-2.js",      // delete
+  "folder-open": "folder-open.js",  // open file
+  "close":       "x.js",            // close/dismiss
+};
+```
+
+After editing, run `make import-icons` to regenerate all stages.
+
+### Extractor options
+
+```
+npx tsx scripts/extract-lucide-icons.ts [options]
+```
+* `--lucide-path <path>` – Lucide icons directory (default: `../softoboros/frontend/node_modules/lucide-react/dist/esm/icons`).
+* `--out <dir>` – output directory for SVG files (default: `assets/icons`).
+* `--stroke <color>` – SVG stroke color (default: `#FFFFFF`).
+* `--size <px>` – icon viewport size (default: `24`).
+* `--icons <list>` – comma-separated icon names to extract.
+
+## Platform notes
+
+### rlottie (Linux only)
+
+The `lottie import` subcommand uses `rlottie` (C++ FFI) for in-process Lottie
+rendering. This library is only available on Linux. On macOS the `rlottie`
+dependency is excluded at compile time and the `lottie import` subcommand is not
+present. Use `lottie cli` with an external converter on non-Linux platforms.
+
+All other creator commands (svg, compress, fonts, apng, bsp, etc.) work on all
+platforms.
 
 ## Examples of use
 * **BSP** – Include the generated board crate in a firmware project and call `board::init()` to configure clocks and pin multiplexing.

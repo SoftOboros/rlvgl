@@ -23,10 +23,25 @@ pub struct Otm8009a;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 impl Otm8009a {
+    /// Wait for command FIFO space with timeout.  Returns false if timed out.
+    /// Wait for command FIFO empty (CMDFE) — matches ST HAL_DSI_ShortWrite.
+    fn wait_fifo(dsi: &DSIHOST) -> bool {
+        let mut tries = 1_000_000u32;
+        while !dsi.gpsr.read().cmdfe().bit_is_set() {
+            tries -= 1;
+            if tries == 0 {
+                return false;
+            }
+            cortex_m::asm::nop();
+        }
+        true
+    }
+
     /// Issue a DCS short write command without parameters.
-    fn dcs_short_write(dsi: &mut DSIHOST, cmd: u8) {
-        // Wait for command FIFO space
-        while dsi.gpsr.read().cmdff().bit_is_set() {}
+    fn dcs_short_write(dsi: &mut DSIHOST, cmd: u8) -> bool {
+        if !Self::wait_fifo(dsi) {
+            return false;
+        }
         dsi.ghcr.write(|w| unsafe {
             w.dt()
                 .bits(0x05)
@@ -37,14 +52,68 @@ impl Otm8009a {
                 .wcmsb()
                 .bits(0)
         });
+        true
     }
 
-    /// Initialize the panel for basic operation.
-    ///
-    /// This sequence exits sleep mode and turns the display on. A complete
-    /// bring-up would configure power, pixel format, and gamma tables.
-    pub fn init(dsi: &mut DSIHOST) {
-        Self::dcs_short_write(dsi, 0x11); // Exit sleep
-        Self::dcs_short_write(dsi, 0x29); // Display on
+    /// Issue a DCS short write command with one parameter.
+    fn dcs_short_write1(dsi: &mut DSIHOST, cmd: u8, param: u8) -> bool {
+        if !Self::wait_fifo(dsi) {
+            return false;
+        }
+        dsi.ghcr.write(|w| unsafe {
+            w.dt()
+                .bits(0x15) // DCS short write, 1 param
+                .vcid()
+                .bits(0)
+                .wclsb()
+                .bits(param)
+                .wcmsb()
+                .bits(cmd)
+        });
+        true
+    }
+
+    /// Initialize the panel for basic operation.  Returns false if DSI
+    /// command FIFO is unresponsive (DSI host not initialized).
+    pub fn init(dsi: &mut DSIHOST) -> bool {
+        // Exit sleep
+        if !Self::dcs_short_write(dsi, 0x11) {
+            return false;
+        }
+        // 120 ms delay for sleep-out (at 400 MHz ≈ 48M cycles)
+        cortex_m::asm::delay(48_000_000);
+        // Set pixel format to 24-bit (RGB888) — matches LCOLCR.COLC = 5
+        if !Self::dcs_short_write1(dsi, 0x3A, 0x77) {
+            return false;
+        }
+        // Memory access control: landscape orientation
+        if !Self::dcs_short_write1(dsi, 0x36, 0x60) {
+            return false;
+        }
+        // Set column address (0..799)
+        // Set page address (0..479)
+        // (These use long writes which we skip for now — defaults should work)
+
+        // Enable backlight control via CABC (Content Adaptive Brightness Control)
+        // WRDISBV (0x51): Set display brightness to maximum (0xFF)
+        if !Self::dcs_short_write1(dsi, 0x51, 0xFF) {
+            return false;
+        }
+        // WRCTRLD (0x53): Enable brightness control (BL=1, DD=1, BL_EN=1)
+        if !Self::dcs_short_write1(dsi, 0x53, 0x24) {
+            return false;
+        }
+        // WRCABC (0x55): CABC off (still use manual brightness)
+        if !Self::dcs_short_write1(dsi, 0x55, 0x00) {
+            return false;
+        }
+
+        // Display on
+        if !Self::dcs_short_write(dsi, 0x29) {
+            return false;
+        }
+        // Small delay after display-on
+        cortex_m::asm::delay(4_000_000);
+        true
     }
 }

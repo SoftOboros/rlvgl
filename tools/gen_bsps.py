@@ -22,22 +22,26 @@ def main() -> None:
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     for ioc in args.input.glob("*.ioc"):
-        module = ioc.stem.replace("-", "_")
-        tmp_json = Path(tempfile.mkstemp(suffix=".json")[1])
         subprocess.run(
             [
                 "rlvgl-creator",
-                "board",
+                "bsp",
                 "from-ioc",
                 str(ioc),
-                module,
-                str(tmp_json),
-                "--bsp-out",
+                "--emit-hal",
+                "--emit-pac",
+                "--grouped-writes",
+                "--per-peripheral",
+                "--with-deinit",
+                "--use-label-names",
+                "--emit-label-consts",
+                "--label-prefix",
+                "pin_",
+                "--out",
                 str(args.output),
             ],
             check=True,
         )
-        tmp_json.unlink(missing_ok=True)
 
     tmpl_path = Path(__file__).resolve().parents[1] / "src/bin/creator/bsp/templates"
     env = Environment(loader=FileSystemLoader(tmpl_path))

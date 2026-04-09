@@ -2,79 +2,266 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "ST MCU",
-      "type": "debugpy",
+      "name": "CM7 attach (external OpenOCD)",
+      "type": "cortex-debug",
       "request": "launch",
-      "program": "tools/afdb/stm32_xml_scraper.py",
-      "console": "integratedTerminal",
-      "args": ["--root", "chips/stm/STM32_open_pin_data", "--output", "chips/stm/mcu.json"],
-      "cwd": "${workspaceFolder}"
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:3333",
+      "gdbPath": "arm-none-eabi-gdb",
+      "objdumpPath": "/opt/homebrew/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+
+      "showDevDebugOutput": "raw",
+      "preLaunchCommands": [
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "preLaunchTask": "build-disco (cm7)",
+      "postLaunchCommands": []
     },
     {
-      "name": "Debug sim",
-      "type": "lldb",
+      "name": "CM7 attach (probe-rs gdb)",
+      "type": "cortex-debug",
       "request": "launch",
-      "program": "${workspaceFolder}/target/x86_64-apple-darwin/debug/rlvgl-sim",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "cargo": {
-        "args": [
-          "build",
-          "--bin=rlvgl-sim",
-          "--features=simulator,fontdue,qrcode,png,jpeg",
-          "--target=x86_64-apple-darwin"
-        ]
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:1337",
+      "gdbPath": "arm-none-eabi-gdb",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
       },
-      "sourceLanguages": [
-        "rust"
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "probe-rs gdb (cm7)",
+      "preLaunchCommands": [
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "noLoad": true,
+      "postLaunchCommands": []
+    },
+    {
+      "name": "CM7 attach + run (no reset)",
+      "type": "cortex-debug",
+      "request": "attach",
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:3333",
+      "gdbPath": "arm-none-eabi-gdb",
+      "objdumpPath": "/opt/homebrew/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "build-disco (cm7)",
+      "preLaunchCommands": [
+        "set mem inaccessible-by-default off",
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "postAttachCommands": [
+        "continue"
       ]
     },
     {
-      "name": "Debug Creator",
-      "type": "lldb",
+      "name": "CM4 attach (external OpenOCD)",
+      "type": "cortex-debug",
       "request": "launch",
-      "program": "${workspaceFolder}/target/x86_64-apple-darwin/debug/rlvgl-creator",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "cargo": {
-        "args": [
-          "build",
-          "--bin=rlvgl-creator",
-          "--features=creator,creator_ui",
-          "--target=x86_64-apple-darwin"
-        ]
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco-cm4",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM4.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:3334",
+      "gdbPath": "arm-none-eabi-gdb",
+      "objdumpPath": "/opt/homebrew/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
       },
-      "sourceLanguages": [
-        "rust"
-      ]
+      
+      "showDevDebugOutput": "raw",
+      "preLaunchCommands": [
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "preLaunchTask": "build-disco (cm4)",
+      "postLaunchCommands": []
     },
     {
-      "name": "DISCO",
+      "name": "CM7: c_hal (probe-rs gdb)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "external",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbTarget": "localhost:1337",
+      "gdbPath": "arm-none-eabi-gdb",
+      "objdumpPath": "/opt/homebrew/bin/arm-none-eabi-objdump",
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "probe-rs gdb (cm7, c_hal)",
+      "noLoad": true,
+      "loadFiles": [],
+      "showDisassembly": "auto",
+      "disassemblyConfig": {
+        "useObjdump": false
+      },
+      "runToEntryPoint": "main",
+      "preLaunchCommands": [
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit",
+        "set language auto",
+        "directory ${workspaceFolder}/chips/stm/bsps/csrc/stm32h747i_disco"
+      ],
+      "postLaunchCommands": []
+    },
+    {
+      "name": "CM7 (probe-rs)",
+      "type": "probe-rs-debug",
+      "request": "launch",
+      "chip": "STM32H747XIHx",
+      "probe": "0483:374e:004F00273133510837363734",
+      "connectUnderReset": true,
+      "speed": 1000,
+      "coreConfigs": [
+        {
+          "programBinary": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+          "svdFile": "${workspaceFolder}/.svd/STM32H747_CM7.svd",
+          "flashingConfig": {
+            "flashingEnabled": true,
+            "haltAfterReset": true
+          }
+        }
+      ],
+      "preLaunchTask": "build-disco (cm7)"
+    },
+    {
+      "name": "CM7: c_hal (probe-rs)",
+      "type": "probe-rs-debug",
+      "request": "launch",
+      "chip": "STM32H747XIHx",
+      "probe": "0483:374e:004F00273133510837363734",
+      "connectUnderReset": true,
+      "speed": 1000,
+      "coreConfigs": [
+        {
+          "programBinary": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+          "svdFile": "${workspaceFolder}/.svd/STM32H747_CM7.svd",
+          "flashingConfig": {
+            "flashingEnabled": true,
+            "haltAfterReset": true
+          }
+        }
+      ],
+      "preLaunchTask": "probe-rs download (cm7, c_hal)"
+    },
+    {
+      "name": "Host: rlvgl-sim",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/rlvgl-sim",
+      "args": [],
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": "build-sim"
+    },
+    {
+      "name": "Host: rlvgl-creator",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/rlvgl-creator",
+      "args": [],
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": "build-creator"
+    },
+    {
+      "name": "CM7: rlvgl-stm32h747i-disco",
       "type": "cortex-debug",
       "request": "launch",
       "servertype": "openocd",
-      "cwd": "${workspaceFolder}",
-      "executable": "${workspaceFolder}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
-      "device": "STM32H747XI",
-      "interface": "swd",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM7.svd",
+      "device": "STM32H747",
+      "gdbPath": "arm-none-eabi-gdb",
+
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "build-disco (cm7)",
+      "preLaunchCommands": [
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
+      ],
+      "searchDir": [
+        "${workspaceRoot}",
+        "/opt/homebrew/share/openocd/scripts",
+        "/usr/local/share/openocd/scripts",
+        "/usr/share/openocd/scripts"
+      ],
       "configFiles": [
         "interface/stlink.cfg",
         "target/stm32h7x.cfg"
       ],
-      "searchDir": [
-        "/usr/local/Cellar/open-ocd/0.12.0_1/share/openocd/scripts"
-      ],
-      "toolchainPrefix": "arm-none-eabi-",
-      "svdFile": "${workspaceFolder}/STM32H747.svd",
-      "runToEntryPoint": "main",
-      "preLaunchTask": "Build: rlvgl-stm32h747i-disco",
+      "objdumpPath": "/opt/homebrew/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      "postLaunchCommands": []
+    },
+    {
+      "name": "CM4: rlvgl-stm32h747i-disco-cm4",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "openocd",
+      "cwd": "${workspaceRoot}",
+      "executable": "${workspaceRoot}/target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-disco-cm4",
+      "svdFile": "${workspaceRoot}/.svd/STM32H747_CM4.svd",
+      "device": "STM32H747",
+      "gdbPath": "arm-none-eabi-gdb",
+
+      "showDevDebugOutput": "raw",
+      "preLaunchTask": "build-disco (cm4)",
       "preLaunchCommands": [
-        "monitor reset init",
-        "load",
-        "monitor mdw 0x08000000 2",
-        "monitor reset init"
+        "add-auto-load-safe-path ${workspaceFolder}/.gdbinit",
+        "set mem inaccessible-by-default off",
+        "source ${workspaceFolder}/.gdbinit"
       ],
-      "showDevDebugOutput": "raw"
+      "searchDir": [
+        "${workspaceRoot}",
+        "/opt/homebrew/share/openocd/scripts",
+        "/usr/local/share/openocd/scripts",
+        "/usr/share/openocd/scripts"
+      ],
+      "configFiles": [
+        "interface/stlink.cfg",
+        "target/stm32h7x.cfg"
+      ],
+      "objdumpPath": "/opt/homebrew/bin/arm-none-eabi-objdump",
+      "showDisassembly": "always",
+      "disassemblyConfig": {
+        "useObjdump": true
+      },
+      "postLaunchCommands": []
     }
   ]
 }

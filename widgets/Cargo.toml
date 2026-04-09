@@ -1,21 +1,21 @@
 [package]
 name = "rlvgl-widgets"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
-description = "A modular, idiomatic Rust reimplementation of the LVGL graphics library for embedded and simulator use."
+description = "Built-in widgets for rlvgl."
 readme = "README.md"
 repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"
-documentation = "https://docs.rs/rlvgl"
+documentation = "https://docs.rs/rlvgl-widgets"
 keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
 categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
 [dependencies]
-rlvgl-core = { version = "0.1.6", path = "../core", default-features = false }
+rlvgl-core = { version = "0.1.7", path = "../core", default-features = false }
 
 [dev-dependencies]
-rlvgl-platform = { path = "../platform" }
+rlvgl-platform = { version = "0.1.6", path = "../platform" }
 rand = "0.9.2"

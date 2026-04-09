@@ -14,8 +14,9 @@ use crate::scan;
 use crate::util::{const_name, valid_root};
 use serde_yaml;
 
-/// Maximum allowed asset file size in bytes.
-const MAX_FILE_BYTES: u64 = 1_048_576;
+/// Maximum allowed asset file size in bytes (2 MiB covers full-screen
+/// 800×480 RGBA raw assets used by boards like the STM32H747I-DISCO).
+const MAX_FILE_BYTES: u64 = 2_097_152;
 
 /// Verify manifest paths, hashes, and names, optionally fixing issues.
 pub(crate) fn run(root: &Path, manifest_path: &Path, fix: bool) -> Result<()> {

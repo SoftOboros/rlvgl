@@ -1,0 +1,29 @@
+# tokens-modes.yaml - Token fixture with modes for svelte checks.
+version: 1
+colors:
+  primary: "#3366ff"
+  background: "#ffffff"
+  text: "#111111"
+spacing:
+  xs: 2
+  sm: 4
+  md: 8
+  lg: 16
+  xl: 24
+radii:
+  none: 0
+  sm: 2
+  md: 4
+  lg: 8
+  full: 255
+fonts:
+  small: "tiny"
+  body: "default"
+  heading: "bold"
+modes:
+  default:
+    colors:
+      primary: "#ff0000"
+  dark:
+    colors:
+      background: "#000000"

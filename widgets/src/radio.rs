@@ -2,6 +2,7 @@
 //! Radio button widget for mutually exclusive selections.
 
 use alloc::string::String;
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -50,10 +51,11 @@ impl Widget for Radio {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        let a = self.style.alpha;
         // Draw background.
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
-        // Draw outer circle approximated by a square.
+        // Draw outer circle (radius = half the size makes it round).
         let size = 10;
         let circle_rect = Rect {
             x: self.bounds.x,
@@ -61,7 +63,12 @@ impl Widget for Radio {
             width: size,
             height: size,
         };
-        renderer.fill_rect(circle_rect, self.style.border_color);
+        fill_rounded_rect(
+            renderer,
+            circle_rect,
+            self.style.border_color.with_alpha(a),
+            (size / 2) as u8,
+        );
 
         if self.selected {
             let inner = Rect {
@@ -70,16 +77,21 @@ impl Widget for Radio {
                 width: circle_rect.width - 6,
                 height: circle_rect.height - 6,
             };
-            renderer.fill_rect(inner, self.dot_color);
+            fill_rounded_rect(
+                renderer,
+                inner,
+                self.dot_color.with_alpha(a),
+                ((size - 6) / 2) as u8,
+            );
         }
 
         // Draw label text to the right of the circle with baseline at the bottom.
         let text_pos = (self.bounds.x + size + 4, self.bounds.y + self.bounds.height);
-        renderer.draw_text(text_pos, &self.text, self.text_color);
+        renderer.draw_text(text_pos, &self.text, self.text_color.with_alpha(a));
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if let Event::PointerUp { x, y } = event {
+        if let Event::PressRelease { x, y } = event {
             let inside = *x >= self.bounds.x
                 && *x < self.bounds.x + self.bounds.width
                 && *y >= self.bounds.y
@@ -109,7 +121,7 @@ mod tests {
         let mut radio = Radio::new("A", rect);
         assert_eq!(radio.bounds().x, rect.x);
         assert_eq!(radio.bounds().y, rect.y);
-        let evt = Event::PointerUp { x: 5, y: 5 };
+        let evt = Event::PressRelease { x: 5, y: 5 };
         assert!(radio.handle_event(&evt));
         assert!(radio.is_selected());
     }

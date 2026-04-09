@@ -33,4 +33,5 @@ pub const MENU_GROUPS: &[(&str, &[&str])] = &[
         "Deploy",
         &["Lottie Import", "Lottie CLI", "Run Preset", "Save Preset"],
     ),
+    ("Emulator", &["Simulator"]),
 ];

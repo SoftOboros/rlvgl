@@ -31,8 +31,8 @@ fn progress_clamp_and_zero_range() {
 
     let mut rend = CaptureRenderer { rects: Vec::new() };
     bar.draw(&mut rend);
-    // second rect is progress bar
-    assert_eq!(rend.rects[1].width, 0);
+    // Zero-range bar produces only the background rect (no zero-width bar).
+    assert_eq!(rend.rects.len(), 1);
 }
 
 #[test]
@@ -48,6 +48,6 @@ fn progress_value_clamp() {
     assert_eq!(bar.value(), 0);
     bar.set_value(10);
     assert_eq!(bar.value(), 5);
-    let evt = Event::PointerUp { x: 0, y: 0 };
+    let evt = Event::PressRelease { x: 0, y: 0 };
     assert!(!bar.handle_event(&evt));
 }

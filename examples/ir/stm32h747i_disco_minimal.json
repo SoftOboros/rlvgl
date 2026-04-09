@@ -1,0 +1,73 @@
+{
+  "$comment": "examples/ir/stm32h747i_disco_minimal.json - Minimal unified Config IR sample for STM32H747I-DISCO.",
+  "version": "0.1",
+  "board": "STM32H747I-DISCO Demo",
+  "mcu": "STM32H747XIHx",
+  "package": "LQFP176",
+  "metadata": {
+    "vendor": "st",
+    "source": "examples/stm32h747i-disco/DiscoBiscuit.ioc"
+  },
+  "pins": [
+    {
+      "name": "PA9",
+      "function": "USART1_TX",
+      "label": "STLINK_RX",
+      "af": 7,
+      "electrical": { "mode": "alternate", "pull": "up" }
+    },
+    {
+      "name": "PA10",
+      "function": "USART1_RX",
+      "label": "STLINK_TX",
+      "af": 7,
+      "electrical": { "mode": "alternate", "pull": "up" }
+    },
+    {
+      "name": "PB6",
+      "function": "I2C1_SCL",
+      "af": 4,
+      "electrical": { "mode": "alternate", "otype": "open_drain", "pull": "up" }
+    },
+    {
+      "name": "PB7",
+      "function": "I2C1_SDA",
+      "af": 4,
+      "electrical": { "mode": "alternate", "otype": "open_drain", "pull": "up" }
+    },
+    {
+      "name": "PA5",
+      "function": "SPI1_SCK",
+      "af": 5,
+      "electrical": { "mode": "alternate" }
+    },
+    {
+      "name": "PA6",
+      "function": "SPI1_MISO",
+      "af": 5,
+      "electrical": { "mode": "alternate" }
+    },
+    {
+      "name": "PA7",
+      "function": "SPI1_MOSI",
+      "af": 5,
+      "electrical": { "mode": "alternate" }
+    }
+  ],
+  "clocks": {
+    "pll": {
+      "pll1": { "m": 4, "n": 200, "p": 2, "q": 4, "r": 2 }
+    },
+    "kernels": {
+      "usart1": "pclk2",
+      "i2c1": "pclk1",
+      "spi1": "pll2p"
+    }
+  },
+  "peripherals": {
+    "usart1": { "class": "serial", "signals": { "tx": "PA9", "rx": "PA10" } },
+    "i2c1": { "class": "i2c", "signals": { "scl": "PB6", "sda": "PB7" } },
+    "spi1": { "class": "spi", "signals": { "sck": "PA5", "miso": "PA6", "mosi": "PA7" } }
+  }
+}
+

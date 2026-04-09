@@ -23,6 +23,12 @@ pub struct WgpuBlitter {
     fill_pipeline: wgpu::RenderPipeline,
 }
 
+impl Default for WgpuBlitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // WGSL shader drawing a textured quad.
 const TEXTURE_SHADER: &str = r#"
 @group(0) @binding(0) var u_texture: texture_2d<f32>;
@@ -268,7 +274,7 @@ impl WgpuBlitter {
 
         let row_bytes = (surf.width as usize) * 4;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-        if surf.stride == row_bytes && row_bytes % align == 0 {
+        if surf.stride == row_bytes && row_bytes.is_multiple_of(align) {
             self.queue.write_texture(
                 wgpu::ImageCopyTexture {
                     texture: &texture,
@@ -285,7 +291,7 @@ impl WgpuBlitter {
                 extent,
             );
         } else {
-            let padded = ((row_bytes + align - 1) / align) * align;
+            let padded = row_bytes.div_ceil(align) * align;
             let mut tmp = vec![0u8; padded * surf.height as usize];
             for y in 0..surf.height as usize {
                 let src_off = y * surf.stride;
@@ -342,7 +348,7 @@ impl WgpuBlitter {
                 .copy_from_slice(&surf.buf[src_off..src_off + row_bytes]);
         }
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-        if row_bytes % align == 0 {
+        if row_bytes.is_multiple_of(align) {
             self.queue.write_texture(
                 wgpu::ImageCopyTexture {
                     texture: &texture,
@@ -359,7 +365,7 @@ impl WgpuBlitter {
                 extent,
             );
         } else {
-            let padded = ((row_bytes + align - 1) / align) * align;
+            let padded = row_bytes.div_ceil(align) * align;
             let mut tmp = vec![0u8; padded * area.h as usize];
             for y in 0..area.h as usize {
                 let src_off = y * row_bytes;
@@ -390,7 +396,7 @@ impl WgpuBlitter {
     fn download_surface(&self, tex: &wgpu::Texture, surf: &mut Surface) {
         let row_bytes = surf.width as usize * 4;
         let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-        let padded = ((row_bytes + align - 1) / align) * align;
+        let padded = row_bytes.div_ceil(align) * align;
         let size = padded * surf.height as usize;
         let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("readback"),

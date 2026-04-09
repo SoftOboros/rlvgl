@@ -1,0 +1,21 @@
+[package]
+name = "rlvgl-i18n"
+version = "0.1.1"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "Thin compile-time i18n for rlvgl with RLTN binary blob format."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-i18n"
+keywords = ["embedded", "i18n", "no_std", "lvgl", "localization"]
+categories = ["embedded", "internationalization", "no-std"]
+publish = true
+exclude = [
+  "translations.bin",
+  "extract_keys.py",
+]
+
+[build-dependencies]
+serde_json = "1"

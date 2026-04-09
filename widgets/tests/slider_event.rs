@@ -20,12 +20,12 @@ fn slider_clamp_and_event_handling() {
 
     s.set_value(50);
     // Event outside vertical bounds should not change value
-    let evt = Event::PointerUp { x: 10, y: -1 };
+    let evt = Event::PressRelease { x: 10, y: -1 };
     assert!(!s.handle_event(&evt));
     assert_eq!(s.value(), 50);
 
     // Event at rightmost edge selects near max
-    let evt = Event::PointerUp {
+    let evt = Event::PressRelease {
         x: rect.x + rect.width - 1,
         y: rect.y + rect.height / 2,
     };

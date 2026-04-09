@@ -1,20 +1,20 @@
 [package]
 name = "rlvgl-platform"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
-description = "A modular, idiomatic Rust reimplementation of the LVGL graphics library for embedded and simulator use."
+description = "Platform backends, blitters, and hardware integration for rlvgl."
 readme = "README.md"
 repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"
-documentation = "https://docs.rs/rlvgl"
+documentation = "https://docs.rs/rlvgl-platform"
 keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
 categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
 [dependencies]
-rlvgl-core = { version = "0.1.6", path = "../core", default-features = false }
+rlvgl-core = { version = "0.1.7", path = "../core", default-features = false }
 embedded-hal = { version = "1.0", optional = true }
 display-interface = { version = "0.5", optional = true }
 display-interface-spi = { version = "0.5", optional = true }
@@ -27,19 +27,33 @@ image = { version = "0.25", default-features = false, features = ["png"], option
 bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt"] }
+embedded-sdmmc = { version = "0.9", default-features = false, optional = true }
+rlvgl-decomp = { version = "0.1.0", path = "../rlvgl-decomp", optional = true }
+libloading = { version = "0.8", optional = true }
 
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
-stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc"] }
+stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc", "xspi"] }
 cortex-m = { version = "0.7", optional = true, features = ["critical-section-single-core", "cm7"] }
+cortex-m-semihosting = { version = "0.5", optional = true }
+fatfs = { version = "0.3", default-features = false, features = ["alloc", "core_io"], optional = true }
 
 [features]
 default = []
 regression = []
-simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster", "dep:image", "tracing-subscriber"]
+## Enable optional SDRAM RAM test blocks in platform
+sdram_ramtest = []
+simulator = ["wgpu", "winit", "embedded-graphics", "eframe", "pollster", "dep:image", "tracing-subscriber", "dep:libloading"]
 st7789 = ["embedded-hal", "display-interface", "display-interface-spi"]
 stm32h747i_disco = ["stm32h7", "embedded-hal", "stm32h7xx-hal", "cortex-m", "rlvgl-core/fs"]
+## Opt-in to the experimental DSI host bring-up sequence
+experimental_dsi_host = []
+semihosting = ["dep:cortex-m-semihosting"]
+fatfs_nostd = ["dep:fatfs"]
+sd_storage = ["dep:embedded-sdmmc"]
+audio = ["stm32h7", "embedded-hal"]
 dma2d = ["stm32h7"]
+splash = ["dep:rlvgl-decomp"]
 fontdue = ["rlvgl-core/fontdue"]
 png = ["rlvgl-core/png"]
 jpeg = ["rlvgl-core/jpeg"]

@@ -79,7 +79,7 @@ impl Default for Case {
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum LottieMode {
-    /// Play Lottie JSON directly at runtime via the `rlottie` crate.
+    /// Play Lottie JSON directly at runtime via the configured renderer.
     Direct,
     /// Convert Lottie JSON into an APNG during asset processing.
     Apng,

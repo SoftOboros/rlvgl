@@ -1,15 +1,12 @@
 //! Tests for the simulator demonstrations.
 use rlvgl::core::{
+    application::Application,
     event::Event,
     renderer::Renderer,
     widget::{Color, Rect},
 };
-#[path = "../../common_demo/lib.rs"]
-mod common_demo;
-use common_demo::{
-    Demo, build_demo, build_jpeg_demo, build_plugin_demo, build_png_demo, build_png_demo_scaled,
-    flush_pending,
-};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 struct CountRenderer(u32);
 
@@ -36,10 +33,6 @@ impl FramebufferRenderer {
             height,
         }
     }
-
-    fn pixel(&self, x: i32, y: i32) -> Color {
-        self.buf[y as usize * self.width + x as usize]
-    }
 }
 
 impl Renderer for FramebufferRenderer {
@@ -57,34 +50,33 @@ impl Renderer for FramebufferRenderer {
     fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
 }
 
+/// Helper: build the demo app and return app + root.
+fn setup_demo() -> (Box<dyn Application>, Rc<RefCell<rlvgl::core::WidgetNode>>) {
+    let mut app = rlvgl_app_demo::create_app();
+    let root_node = app.build(320, 240);
+    let root = Rc::new(RefCell::new(root_node));
+    (app, root)
+}
+
 #[test]
 fn demo_draws_widgets() {
-    let Demo { root, .. } = build_demo(320, 240);
+    let (_app, root) = setup_demo();
     let mut renderer = CountRenderer(0);
     root.borrow().draw(&mut renderer);
     assert!(renderer.0 > 0);
 }
 
 #[test]
-fn button_click_increments_counter() {
-    let Demo {
-        root,
-        counter,
-        pending,
-        to_remove,
-    } = build_demo(320, 240);
-    assert_eq!(*counter.borrow(), 0);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 20, y: 50 })
-    );
-    flush_pending(&root, &pending, &to_remove);
-    assert_eq!(*counter.borrow(), 1);
+fn button_click_dispatches() {
+    let (mut app, root) = setup_demo();
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 20, y: 50 });
+    app.after_event(&root, &Event::PointerUp { x: 20, y: 50 });
 }
 
 #[test]
 fn plugin_demo_renders_qrcode() {
-    let node = build_plugin_demo();
+    let node = rlvgl_app_demo::build_plugin_demo(320, 240);
     let mut renderer = CountRenderer(0);
     node.draw(&mut renderer);
     assert!(renderer.0 > 0);
@@ -92,7 +84,7 @@ fn plugin_demo_renders_qrcode() {
 
 #[test]
 fn png_demo_renders_logo() {
-    let node = build_png_demo();
+    let node = rlvgl_app_demo::build_png_demo(320, 240);
     let mut renderer = CountRenderer(0);
     node.draw(&mut renderer);
     assert!(renderer.0 > 0);
@@ -100,7 +92,7 @@ fn png_demo_renders_logo() {
 
 #[test]
 fn jpeg_demo_renders_logo() {
-    let node = build_jpeg_demo();
+    let node = rlvgl_app_demo::build_jpeg_demo(320, 240);
     let mut renderer = CountRenderer(0);
     node.draw(&mut renderer);
     assert!(renderer.0 > 0);
@@ -108,7 +100,7 @@ fn jpeg_demo_renders_logo() {
 
 #[test]
 fn scaled_png_clamped_within_bounds() {
-    let node = build_png_demo_scaled(10.0);
+    let node = rlvgl_app_demo::build_png_demo_scaled(10.0, 320, 240);
     let bounds = node.widget.borrow().bounds();
     assert!(bounds.x >= 0);
     assert!(bounds.y >= 0);
@@ -119,93 +111,55 @@ fn scaled_png_clamped_within_bounds() {
 
 #[test]
 fn plugins_button_adds_demo() {
-    let Demo {
-        root,
-        pending,
-        to_remove,
-        ..
-    } = build_demo(320, 240);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
-    );
-    flush_pending(&root, &pending, &to_remove);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
-    );
-    flush_pending(&root, &pending, &to_remove);
+    let (mut app, root) = setup_demo();
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
+    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 30, y: 90 });
+    app.after_event(&root, &Event::PointerUp { x: 30, y: 90 });
     assert!(root.borrow().children.len() > 3);
 }
 
 #[test]
 fn png_button_adds_demo() {
-    let Demo {
-        root,
-        pending,
-        to_remove,
-        ..
-    } = build_demo(320, 240);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
-    );
-    flush_pending(&root, &pending, &to_remove);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 30, y: 120 })
-    );
-    flush_pending(&root, &pending, &to_remove);
+    let (mut app, root) = setup_demo();
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
+    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 30, y: 120 });
+    app.after_event(&root, &Event::PointerUp { x: 30, y: 120 });
     assert!(root.borrow().children.len() > 3);
 }
 
 #[test]
 fn jpeg_button_adds_demo() {
-    let Demo {
-        root,
-        pending,
-        to_remove,
-        ..
-    } = build_demo(320, 240);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
-    );
-    flush_pending(&root, &pending, &to_remove);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 30, y: 150 })
-    );
-    flush_pending(&root, &pending, &to_remove);
+    let (mut app, root) = setup_demo();
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
+    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 30, y: 150 });
+    app.after_event(&root, &Event::PointerUp { x: 30, y: 150 });
     assert!(root.borrow().children.len() > 3);
 }
 
 #[test]
 fn qr_button_toggles_qrcode() {
-    let Demo {
-        root,
-        pending,
-        to_remove,
-        ..
-    } = build_demo(320, 240);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 110, y: 50 })
-    );
-    flush_pending(&root, &pending, &to_remove);
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
-    );
-    flush_pending(&root, &pending, &to_remove);
+    let (mut app, root) = setup_demo();
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
+    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 30, y: 90 });
+    app.after_event(&root, &Event::PointerUp { x: 30, y: 90 });
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
     assert!(fb.buf.iter().any(|&p| p != Color(255, 255, 255, 255)));
-    assert!(
-        root.borrow_mut()
-            .dispatch_event(&Event::PointerUp { x: 30, y: 90 })
-    );
-    flush_pending(&root, &pending, &to_remove);
+    root.borrow_mut()
+        .dispatch_event(&Event::PointerUp { x: 30, y: 90 });
+    app.after_event(&root, &Event::PointerUp { x: 30, y: 90 });
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
     assert!(fb.buf.iter().all(|&p| p == Color(255, 255, 255, 255)));

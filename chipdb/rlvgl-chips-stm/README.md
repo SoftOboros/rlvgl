@@ -50,3 +50,12 @@ configuration offsets.
 - Optional `serde` support for serialising the board database: enable the
   `serde` feature if integration with external tooling requires it.
 
+## More Information
+
+For more information, visit [softoboros.com](https://softoboros.com).
+
+<p>
+  <a href="https://softoboros.com">
+    <img src="../../assets/branding/Softoboros-Letter-Logo.svg" alt="Softoboros" width="240" />
+  </a>
+</p>

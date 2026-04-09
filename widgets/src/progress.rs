@@ -1,4 +1,5 @@
 //! Horizontal progress indicator.
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -56,16 +57,20 @@ impl Widget for ProgressBar {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        let a = self.style.alpha;
+        let r = self.style.radius;
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
         let bar_width = self.width_from_value();
-        let bar_rect = Rect {
-            x: self.bounds.x,
-            y: self.bounds.y,
-            width: bar_width,
-            height: self.bounds.height,
-        };
-        renderer.fill_rect(bar_rect, self.bar_color);
+        if bar_width > 0 {
+            let bar_rect = Rect {
+                x: self.bounds.x,
+                y: self.bounds.y,
+                width: bar_width,
+                height: self.bounds.height,
+            };
+            fill_rounded_rect(renderer, bar_rect, self.bar_color.with_alpha(a), r);
+        }
     }
 
     /// Progress bars are display only and ignore events.

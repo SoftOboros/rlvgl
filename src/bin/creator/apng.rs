@@ -6,8 +6,8 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use apng::{Encoder, Frame as ApngFrameInfo, PNGImage, create_config};
-use png::{BitDepth, ColorType};
+use apng::{Encoder, Frame as ApngFrameInfo, PNGImage, create_config, image_png};
+use image_png::{BitDepth, ColorType};
 
 /// Assemble an APNG from the given frame directory.
 pub(crate) fn run(frames_dir: &Path, out: &Path, delay: u16, loops: u32) -> Result<()> {

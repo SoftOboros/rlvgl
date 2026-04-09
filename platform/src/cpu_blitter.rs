@@ -121,11 +121,26 @@ impl Blitter for CpuBlitter {
     }
 
     fn fill(&mut self, dst: &mut Surface, area: Rect, color: u32) {
+        // Clamp to surface bounds to prevent out-of-bounds writes.
+        let sx = if area.x < 0 { 0i32 } else { area.x };
+        let sy = if area.y < 0 { 0i32 } else { area.y };
+        let ex = (area.x + area.w as i32).min(dst.width as i32);
+        let ey = (area.y + area.h as i32).min(dst.height as i32);
+        if sx >= ex || sy >= ey {
+            return;
+        }
+        let cw = (ex - sx) as u32;
+
         match dst.format {
             PixelFmt::Argb8888 => {
-                for row in 0..area.h as i32 {
-                    let start = ((area.y + row) as usize * dst.stride) + (area.x as usize * 4);
-                    let line = &mut dst.buf[start..start + area.w as usize * 4];
+                let bpp = 4usize;
+                for row in sy..ey {
+                    let start = row as usize * dst.stride + sx as usize * bpp;
+                    let end = start + cw as usize * bpp;
+                    if end > dst.buf.len() {
+                        break;
+                    }
+                    let line = &mut dst.buf[start..end];
                     for px in line.chunks_exact_mut(4) {
                         px.copy_from_slice(&color.to_le_bytes());
                     }
@@ -133,17 +148,22 @@ impl Blitter for CpuBlitter {
             }
             PixelFmt::Rgb565 => {
                 let c = Self::argb8888_to_rgb565(color);
-                for row in 0..area.h as i32 {
-                    let start = ((area.y + row) as usize * dst.stride) + (area.x as usize * 2);
-                    let line = &mut dst.buf[start..start + area.w as usize * 2];
+                let bpp = 2usize;
+                for row in sy..ey {
+                    let start = row as usize * dst.stride + sx as usize * bpp;
+                    let end = start + cw as usize * bpp;
+                    if end > dst.buf.len() {
+                        break;
+                    }
+                    let line = &mut dst.buf[start..end];
                     for px in line.chunks_exact_mut(2) {
                         px.copy_from_slice(&c.to_le_bytes());
                     }
                 }
             }
             _ => {
-                for y in area.y..area.y + area.h as i32 {
-                    for x in area.x..area.x + area.w as i32 {
+                for y in sy..ey {
+                    for x in sx..ex {
                         Self::write_pixel(dst, x, y, color);
                     }
                 }
@@ -152,45 +172,61 @@ impl Blitter for CpuBlitter {
     }
 
     fn blit(&mut self, src: &Surface, src_area: Rect, dst: &mut Surface, dst_pos: (i32, i32)) {
+        // Clip source rect to destination bounds.
+        let clip_x = if dst_pos.0 < 0 { -dst_pos.0 } else { 0 };
+        let clip_y = if dst_pos.1 < 0 { -dst_pos.1 } else { 0 };
+        let dst_x = dst_pos.0.max(0);
+        let dst_y = dst_pos.1.max(0);
+        let w = (src_area.w as i32 - clip_x).min(dst.width as i32 - dst_x);
+        let h = (src_area.h as i32 - clip_y).min(dst.height as i32 - dst_y);
+        if w <= 0 || h <= 0 {
+            return;
+        }
+
+        let src_x0 = src_area.x + clip_x;
+        let src_y0 = src_area.y + clip_y;
+
         if src.format == dst.format {
             let bpp = Self::pixel_size(src.format);
-            for row in 0..src_area.h as i32 {
-                let src_start =
-                    ((src_area.y + row) as usize * src.stride) + (src_area.x as usize * bpp);
-                let dst_start =
-                    ((dst_pos.1 + row) as usize * dst.stride) + (dst_pos.0 as usize * bpp);
-                let len = src_area.w as usize * bpp;
+            for row in 0..h {
+                let src_start = ((src_y0 + row) as usize * src.stride) + (src_x0 as usize * bpp);
+                let dst_start = ((dst_y + row) as usize * dst.stride) + (dst_x as usize * bpp);
+                let len = w as usize * bpp;
                 dst.buf[dst_start..dst_start + len]
                     .copy_from_slice(&src.buf[src_start..src_start + len]);
             }
             return;
         }
 
-        if src.format == PixelFmt::Argb8888 && dst.format == PixelFmt::Rgb565 {
-            for row in 0..src_area.h as i32 {
-                for col in 0..src_area.w as i32 {
-                    let px = Self::read_pixel(src, src_area.x + col, src_area.y + row);
-                    Self::write_pixel(dst, dst_pos.0 + col, dst_pos.1 + row, px);
-                }
-            }
-            return;
-        }
-
-        for row in 0..src_area.h as i32 {
-            for col in 0..src_area.w as i32 {
-                let px = Self::read_pixel(src, src_area.x + col, src_area.y + row);
-                Self::write_pixel(dst, dst_pos.0 + col, dst_pos.1 + row, px);
+        for row in 0..h {
+            for col in 0..w {
+                let px = Self::read_pixel(src, src_x0 + col, src_y0 + row);
+                Self::write_pixel(dst, dst_x + col, dst_y + row, px);
             }
         }
     }
 
     fn blend(&mut self, src: &Surface, src_area: Rect, dst: &mut Surface, dst_pos: (i32, i32)) {
-        for row in 0..src_area.h as i32 {
-            for col in 0..src_area.w as i32 {
-                let s = Self::read_pixel(src, src_area.x + col, src_area.y + row);
-                let d = Self::read_pixel(dst, dst_pos.0 + col, dst_pos.1 + row);
+        // Clip source rect to destination bounds.
+        let clip_x = if dst_pos.0 < 0 { -dst_pos.0 } else { 0 };
+        let clip_y = if dst_pos.1 < 0 { -dst_pos.1 } else { 0 };
+        let dst_x = dst_pos.0.max(0);
+        let dst_y = dst_pos.1.max(0);
+        let w = (src_area.w as i32 - clip_x).min(dst.width as i32 - dst_x);
+        let h = (src_area.h as i32 - clip_y).min(dst.height as i32 - dst_y);
+        if w <= 0 || h <= 0 {
+            return;
+        }
+
+        let src_x0 = src_area.x + clip_x;
+        let src_y0 = src_area.y + clip_y;
+
+        for row in 0..h {
+            for col in 0..w {
+                let s = Self::read_pixel(src, src_x0 + col, src_y0 + row);
+                let d = Self::read_pixel(dst, dst_x + col, dst_y + row);
                 let out = Self::blend_pixel(s, d);
-                Self::write_pixel(dst, dst_pos.0 + col, dst_pos.1 + row, out);
+                Self::write_pixel(dst, dst_x + col, dst_y + row, out);
             }
         }
     }

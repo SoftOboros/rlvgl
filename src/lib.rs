@@ -24,6 +24,7 @@ pub use rlvgl_core::lottie;
 pub use rlvgl_core::nes;
 #[cfg(feature = "pinyin")]
 pub use rlvgl_core::pinyin;
+pub use rlvgl_i18n as i18n;
 pub use rlvgl_platform as platform;
 pub use rlvgl_ui as ui;
 pub use rlvgl_widgets as widgets;

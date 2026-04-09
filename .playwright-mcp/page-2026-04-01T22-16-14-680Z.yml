@@ -1,0 +1,343 @@
+- generic [ref=e2]:
+  - generic: 
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - link "Skip to main content" [ref=e5] [cursor=pointer]:
+        - /url: "#content-main"
+      - generic [ref=e6]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - link "Careers" [ref=e11] [cursor=pointer]:
+              - /url: /content/st_com/en/about/careers.html
+              - img [ref=e12]
+              - text: Careers
+          - listitem [ref=e14] [cursor=pointer]:
+            - link "Sample & buy" [ref=e15]:
+              - /url: "#"
+              - img [ref=e16]
+              - text: Sample & buy
+              - img [ref=e18]
+            - list:
+              - listitem [ref=e20]:
+                - link [ref=e21]:
+                  - /url: https://estore.st.com
+                  - text: Buy from eStore
+              - listitem [ref=e22]:
+                - link [ref=e23]:
+                  - /url: /content/st_com/en/contact-us.html
+                  - text: Contact our sales offices & distributors
+          - listitem [ref=e24] [cursor=pointer]:
+            - link "Support & community" [ref=e25]:
+              - /url: "#"
+              - img [ref=e26]
+              - text: Support & community
+              - img [ref=e28]
+            - list:
+              - listitem [ref=e30]:
+                - link [ref=e31]:
+                  - /url: /content/st_com/en/support/support-home.html
+                  - text: Support
+              - listitem [ref=e32]:
+                - link [ref=e33]:
+                  - /url: /content/st_com/en/partner/partner-program.html
+                  - text: Partner program
+              - listitem [ref=e34]:
+                - link [ref=e35]:
+                  - /url: /content/st_com/en/support/learning.html
+                  - text: Learning
+              - listitem [ref=e36]:
+                - link [ref=e37]:
+                  - /url: /content/st_com/en/support/learning/video-page.html
+                  - text: Video center
+              - listitem [ref=e38]:
+                - link [ref=e39]:
+                  - /url: https://community.st.com
+                  - text: ST community
+              - listitem [ref=e40]:
+                - link [ref=e41]:
+                  - /url: /content/st_com/en/wiki/wiki-portal.html
+                  - text: ST wiki
+          - listitem [ref=e42]:
+            - list [ref=e43]:
+              - listitem [ref=e44] [cursor=pointer]:
+                - link "日本語" [ref=e45]:
+                  - /url: https://www.st.com/ja/microcontrollers-microprocessors/stm32h747-757/documentation.html
+              - listitem [ref=e46] [cursor=pointer]:
+                - link "中文" [ref=e47]:
+                  - /url: https://www.st.com.cn/zh/microcontrollers-microprocessors/stm32h747-757/documentation.html
+              - listitem [ref=e48] [cursor=pointer]:
+                - generic [ref=e49]: English
+        - generic [ref=e50]:
+          - link "STMicroelectronics home" [ref=e52] [cursor=pointer]:
+            - /url: /content/st_com/en.html
+            - img [ref=e53]
+          - navigation [ref=e58]:
+            - list [ref=e61]:
+              - listitem [ref=e62] [cursor=pointer]:
+                - generic [ref=e63]:
+                  - img "menu-fill logo"
+                  - link "Products" [ref=e65]:
+                    - /url: "#"
+              - listitem [ref=e66] [cursor=pointer]:
+                - link "Tools & software" [ref=e69]:
+                  - /url: "#"
+              - listitem [ref=e70] [cursor=pointer]:
+                - link "Applications" [ref=e73]:
+                  - /url: "#"
+              - listitem [ref=e74] [cursor=pointer]:
+                - link "Solutions" [ref=e77]:
+                  - /url: "#"
+              - listitem [ref=e78] [cursor=pointer]:
+                - generic [ref=e81]:
+                  - text: 
+                  - link "ST Developer Zone" [ref=e83]:
+                    - /url: "#"
+              - listitem [ref=e84] [cursor=pointer]:
+                - link "About us" [ref=e87]:
+                  - /url: "#"
+          - generic [ref=e95]:
+            - img [ref=e97]
+            - combobox "Search a RPN, a product category..." [ref=e99]
+          - generic [ref=e100]:
+            - link "Go to eStore" [ref=e102] [cursor=pointer]:
+              - /url: https://estore.st.com/en/checkout/cart/
+              - img [ref=e103]
+            - list [ref=e105]:
+              - listitem [ref=e106] [cursor=pointer]:
+                - link "Log in to myST" [ref=e107]:
+                  - /url: https://my.st.com/cas/login?lang=en&service=https%3A%2F%2Fwww.st.com%2Fen%2Fmicrocontrollers-microprocessors%2Fstm32h747-757%2Fdocumentation.html
+                  - img
+    - main [ref=e108]:
+      - generic [ref=e109]:
+        - button "Close sidebar" [ref=e110] [cursor=pointer]:
+          - img [ref=e111]
+        - generic [ref=e113]:
+          - paragraph [ref=e114]:
+            - link "Microcontrollers & microprocessors" [ref=e115] [cursor=pointer]:
+              - /url: /en/microcontrollers-microprocessors.html
+            - button "Minimize menu" [ref=e116] [cursor=pointer]
+          - menu [ref=e117]:
+            - menuitem "Expand STM32 32-bit Arm Cortex MCUs STM32 32-bit Arm Cortex MCUs (1631)" [ref=e118]:
+              - generic [ref=e119]:
+                - button "Expand STM32 32-bit Arm Cortex MCUs" [ref=e120] [cursor=pointer]:
+                  - img
+                - link "STM32 32-bit Arm Cortex MCUs (1631)" [ref=e121] [cursor=pointer]:
+                  - /url: /en/microcontrollers-microprocessors/stm32-32-bit-arm-cortex-mcus.html
+            - menuitem "Expand STM32 Arm Cortex MPUs STM32 Arm Cortex MPUs (64)" [ref=e122]:
+              - generic [ref=e123]:
+                - button "Expand STM32 Arm Cortex MPUs" [ref=e124] [cursor=pointer]:
+                  - img
+                - link "STM32 Arm Cortex MPUs (64)" [ref=e125] [cursor=pointer]:
+                  - /url: /en/microcontrollers-microprocessors/stm32-arm-cortex-mpus.html
+            - menuitem "Expand STM8 8-bit MCUs STM8 8-bit MCUs (135)" [ref=e126]:
+              - generic [ref=e127]:
+                - button "Expand STM8 8-bit MCUs" [ref=e128] [cursor=pointer]:
+                  - img
+                - link "STM8 8-bit MCUs (135)" [ref=e129] [cursor=pointer]:
+                  - /url: /en/microcontrollers-microprocessors/stm8-8-bit-mcus.html
+      - generic [ref=e130]:
+        - generic [ref=e136]:
+          - heading "STM32H747/757 - PDF Documentation" [level=1] [ref=e138]
+          - button "Save this product to myST" [ref=e140] [cursor=pointer]:
+            - img
+            - text: Save to myST
+        - generic [ref=e141]:
+          - generic "Tabs" [ref=e145]:
+            - tab "Overview" [ref=e146] [cursor=pointer]:
+              - generic [ref=e148]: Overview
+            - tab "Product selector" [ref=e149] [cursor=pointer]:
+              - generic [ref=e151]:
+                - text: Product selector
+                - img
+            - tab "Documentation" [selected] [ref=e152] [cursor=pointer]:
+              - generic [ref=e154]: Documentation
+            - tab "CAD Resources" [ref=e155] [cursor=pointer]:
+              - generic [ref=e157]: CAD Resources
+            - tab "Tools & Software" [ref=e158] [cursor=pointer]:
+              - generic [ref=e160]: Tools & Software
+          - generic [ref=e165]:
+            - generic [ref=e167]:
+              - generic [ref=e169] [cursor=pointer]:
+                - button "All documents" [ref=e170]
+                - link "Minify" [ref=e171]:
+                  - /url: "#"
+              - generic [ref=e173]:
+                - generic [ref=e174]:
+                  - button "Technical Literature" [ref=e175] [cursor=pointer]:
+                    - generic [ref=e176]:
+                      - img
+                    - text: Technical Literature
+                  - generic [ref=e177]:
+                    - link "Application Note (60)" [ref=e178] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Technical Note (7)" [ref=e179] [cursor=pointer]:
+                      - /url: "#"
+                    - link "User Manual (3)" [ref=e180] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Datasheet (2)" [ref=e181] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Programming Manual (2)" [ref=e182] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Design Tip (1)" [ref=e183] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Errata Sheet (1)" [ref=e184] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Reference Manual (1)" [ref=e185] [cursor=pointer]:
+                      - /url: "#"
+                - generic [ref=e186]:
+                  - button "Flyers and Brochures" [ref=e187] [cursor=pointer]:
+                    - generic [ref=e188]:
+                      - img
+                    - text: Flyers and Brochures
+                  - generic [ref=e189]:
+                    - link "Flyer (3)" [ref=e190] [cursor=pointer]:
+                      - /url: "#"
+                    - link "Brochures (1)" [ref=e191] [cursor=pointer]:
+                      - /url: "#"
+                - generic [ref=e192]:
+                  - button "Presentations" [ref=e193] [cursor=pointer]:
+                    - generic [ref=e194]:
+                      - img
+                    - text: Presentations
+                  - link "Product Presentation (7)" [ref=e196] [cursor=pointer]:
+                    - /url: "#"
+                - generic [ref=e197]:
+                  - button "Security Documents" [ref=e198] [cursor=pointer]:
+                    - generic [ref=e199]:
+                      - img
+                    - text: Security Documents
+                  - link "Security Bulletin (2)" [ref=e201] [cursor=pointer]:
+                    - /url: "#"
+            - generic [ref=e202]:
+              - generic [ref=e203] [cursor=pointer]: Search documents by title
+              - generic [ref=e204]:
+                - textbox "Search documents by title" [ref=e205]
+                - generic "Search" [ref=e206] [cursor=pointer]
+              - button "Reset" [ref=e207] [cursor=pointer]
+        - generic [ref=e208]:
+          - text: Development tools Embedded software Embedded software Evaluation tools Evaluation tools
+          - tabpanel "Documentation" [ref=e209]
+    - contentinfo [ref=e212]:
+      - generic [ref=e213]:
+        - generic [ref=e214]:
+          - link "STMicroelectronics home" [ref=e216] [cursor=pointer]:
+            - /url: /content/st_com/en.html
+            - img "STMicroelectronics Logo" [ref=e217]
+          - generic [ref=e218]:
+            - navigation [ref=e220]:
+              - list [ref=e221]:
+                - listitem [ref=e222]: About STMicroelectronics
+                - listitem [ref=e223]:
+                  - link "Who we are" [ref=e224] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/about/st_company_information/who-we-are.html
+                - listitem [ref=e225]:
+                  - link "Investor relations" [ref=e226] [cursor=pointer]:
+                    - /url: https://investors.st.com/
+                - listitem [ref=e227]:
+                  - link "Sustainability" [ref=e228] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/about/sustainability.html
+                - listitem [ref=e229]:
+                  - link "Innovation & technology" [ref=e230] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com/en/about/innovation-and-technology.html
+                - listitem [ref=e231]:
+                  - link "Careers" [ref=e232] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/about/careers.html
+                - listitem [ref=e233]:
+                  - link "Suppliers to ST" [ref=e234] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com/en/about/who-we-are/suppliers-to-st.html
+                - listitem [ref=e235]:
+                  - link "Blog" [ref=e236] [cursor=pointer]:
+                    - /url: https://blog.st.com/
+                - listitem [ref=e237]:
+                  - link "General terms and conditions" [ref=e238] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com/en/about/procurement/general-terms-and-conditions.html
+            - navigation [ref=e240]:
+              - list [ref=e241]:
+                - listitem [ref=e242]: Connect with us
+                - listitem [ref=e243]:
+                  - link "Go to Contact Us page to contact ST officers" [ref=e244] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/contact-us.html
+                    - text: Contact ST offices
+                - listitem [ref=e245]:
+                  - link "Go to Contact Us page to contact Sales offices and distributors" [ref=e246] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com/en/contact-us.html
+                    - text: Find sales offices & distributors
+                - listitem [ref=e247]:
+                  - link "Community" [ref=e248] [cursor=pointer]:
+                    - /url: https://community.st.com
+                - listitem [ref=e249]:
+                  - link "Newsroom" [ref=e250] [cursor=pointer]:
+                    - /url: https://newsroom.st.com/
+                - listitem [ref=e251]:
+                  - link "Events & trainings" [ref=e252] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/about/events/upcoming-events-and-technical-seminars.html
+                - listitem [ref=e253]:
+                  - link "AI at ST" [ref=e254] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com/en/about/ai-at-st.html
+            - navigation [ref=e256]:
+              - list [ref=e257]:
+                - listitem [ref=e258]: Browse
+                - listitem [ref=e259]:
+                  - link "Shortcuts" [ref=e260] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/shortcuts.html
+                - listitem [ref=e261]:
+                  - link "Sitemap" [ref=e262] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/sitemap.html
+            - navigation [ref=e264]:
+              - list [ref=e265]:
+                - listitem [ref=e266]: Compliance, ethics, security & privacy
+                - listitem [ref=e267]:
+                  - link "Ethics and compliance" [ref=e268] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/about/st_company_information/ethics-and-compliance.html
+                - listitem [ref=e269]:
+                  - link "ST ethics hotline" [ref=e270] [cursor=pointer]:
+                    - /url: https://st.integrityline.io/
+                - listitem [ref=e271]:
+                  - link "Security & privacy portal" [ref=e272] [cursor=pointer]:
+                    - /url: https://www.st.com/content/st_com_cx/en/about/security-and-privacy.html
+          - generic [ref=e273]:
+            - list [ref=e275]:
+              - listitem [ref=e276]: Newsletter sign up
+              - listitem [ref=e277]:
+                - generic [ref=e278]:
+                  - generic [ref=e279] [cursor=pointer]: Your email address
+                  - generic [ref=e280]:
+                    - textbox "Your email address" [ref=e281]
+                    - button "Submit"
+            - generic [ref=e282]:
+              - paragraph [ref=e283]: Follow us
+              - list [ref=e284]:
+                - listitem [ref=e285]:
+                  - link "Go to STMicroelectronics X page" [ref=e286] [cursor=pointer]:
+                    - /url: https://twitter.com/st_world
+                    - img "X logo" [ref=e287]
+                - listitem [ref=e289]:
+                  - link "Go to STMicroelectronics Linkedin page" [ref=e290] [cursor=pointer]:
+                    - /url: https://www.linkedin.com/company/stmicroelectronics
+                    - img "Linkedin logo" [ref=e291]
+                - listitem [ref=e293]:
+                  - link "Go to STMicroelectronics Instagram page" [ref=e294] [cursor=pointer]:
+                    - /url: https://www.instagram.com/stmicroelectronics.nv/
+                    - img "Instagram logo" [ref=e295]
+                - listitem [ref=e297]:
+                  - link "Go to STMicroelectronics Facebook page" [ref=e298] [cursor=pointer]:
+                    - /url: https://www.facebook.com/STMicroelectronics.NV
+                    - img "Facebook logo" [ref=e299]
+                - listitem [ref=e301]:
+                  - link "Go to STMicroelectronics YouTube page" [ref=e302] [cursor=pointer]:
+                    - /url: https://www.youtube.com/user/STonlineMedia
+                    - img "YouTube logo" [ref=e303]
+        - generic [ref=e307]:
+          - text: All rights reserved © 2026 STMicroelectronics |
+          - generic [ref=e308]:
+            - link "Terms of use" [ref=e309] [cursor=pointer]:
+              - /url: https://www.st.com/content/st_com_cx/en/about/terms-of-use.html
+            - link "| Sales terms & conditions" [ref=e310] [cursor=pointer]:
+              - /url: https://www.st.com/content/ccc/resource/legal/legal_agreement/sales_agreement/49/05/8c/68/a0/35/4a/6e/ST%20Terms%20and%20Conditions%20of%20Sales.pdf/files/ST%20Terms%20and%20Conditions%20of%20Sales.pdf/jcr:content/translations/en.ST%20Terms%20and%20Conditions%20of%20Sales.pdf
+            - link "| Trademarks" [ref=e311] [cursor=pointer]:
+              - /url: https://www.st.com/content/st_com_cx/en/about/st-trademark-list.html
+            - link "| Security & privacy portal" [ref=e312] [cursor=pointer]:
+              - /url: https://www.st.com/content/st_com_cx/en/about/security-and-privacy.html
+            - button "| Manage cookies" [ref=e313] [cursor=pointer]
+      - generic [ref=e314] [cursor=pointer]:
+        - img "Arrow up"

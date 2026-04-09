@@ -1,0 +1,16 @@
+[package]
+name = "rlvgl-decomp"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Core compressed image (RLE) codec for rlvgl: mirror of example splashscreen RLE with RGBA pipeline."
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+
+[dependencies]
+

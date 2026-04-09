@@ -1,5 +1,43 @@
 //! Basic UI events used for widgets.
 
+/// Maximum number of simultaneous touch contacts reported in a single frame.
+pub const MAX_TOUCH_POINTS: usize = 5;
+
+/// Per-point event flag reported by a touch controller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TouchState {
+    /// New contact this frame.
+    Down,
+    /// Contact lifted this frame.
+    Up,
+    /// Contact still held, possibly moved.
+    Contact,
+}
+
+/// A single touch contact point within a frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TouchPoint {
+    /// Touch tracking ID assigned by the controller (0–4 for FT5336).
+    pub id: u8,
+    /// Horizontal coordinate.
+    pub x: i32,
+    /// Vertical coordinate.
+    pub y: i32,
+    /// Per-point event flag.
+    pub state: TouchState,
+}
+
+impl Default for TouchPoint {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            x: 0,
+            y: 0,
+            state: TouchState::Up,
+        }
+    }
+}
+
 /// Event types propagated through the widget tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -24,6 +62,43 @@ pub enum Event {
         /// Horizontal coordinate relative to the widget origin.
         x: i32,
         /// Vertical coordinate relative to the widget origin.
+        y: i32,
+    },
+    /// Multi-touch frame with per-point data.
+    ///
+    /// Emitted when two or more simultaneous contacts are detected.
+    /// Only `points[..count]` entries are valid.
+    Touch {
+        /// Number of active contact points (2..=[`MAX_TOUCH_POINTS`]).
+        count: u8,
+        /// Per-point data. Entries beyond `count` are meaningless.
+        points: [TouchPoint; MAX_TOUCH_POINTS],
+    },
+    /// Stable contact began (debounced). Use for visual press feedback
+    /// such as button highlighting. Emitted by the gesture recognizer,
+    /// not by raw hardware input.
+    PressDown {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
+    /// Stable contact released (debounced). The primary "click/tap" action
+    /// trigger. Widgets should match this instead of `PointerUp` for
+    /// reliable single-fire behavior.
+    PressRelease {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
+    /// Two consecutive short taps detected at the given coordinates.
+    /// Emitted by the `DoubleTapRecognizer` when two `PressRelease` events
+    /// with short hold durations occur within the double-tap time window.
+    DoubleTap {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
         y: i32,
     },
     /// A keyboard key was pressed.

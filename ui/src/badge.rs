@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Badge component for rlvgl-ui.
 //!
-//! Wraps a [`Label`](rlvgl_widgets::label::Label) from `rlvgl-widgets`
-//! to display compact status or counter text.
+//! Wraps a [`Label`] from `rlvgl-widgets` to display compact status or counter
+//! text.
 
 use rlvgl_core::{
     event::Event,

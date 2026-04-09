@@ -34,7 +34,7 @@ fn list_draw_selected_highlight() {
     list.add_item("a");
     list.add_item("b");
 
-    let evt = Event::PointerUp { x: 5, y: 0 };
+    let evt = Event::PressRelease { x: 5, y: 0 };
     assert!(list.handle_event(&evt));
     list.draw(&mut renderer);
 

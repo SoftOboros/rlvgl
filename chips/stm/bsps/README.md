@@ -1,52 +1,51 @@
 <!--
-chips/stm/bsps/README.md - STM32 BSP stub generation notes.
+README.md - Publish-facing overview for the rlvgl-bsps-stm crate.
 -->
-<p align="center">
-  <img src="../../../rlvgl-logo.png" alt="rlvgl" />
+
+# rlvgl-bsps-stm
+Package: `rlvgl-bsps-stm`
+
+`rlvgl-bsps-stm` contains generated STM32 board-support modules used by the
+`rlvgl-creator` BSP workflow. The crate packages Rust modules produced from
+STM32CubeMX `.ioc` files so board-aware generation can target a published,
+versioned crate instead of relying only on in-repo generated output.
+
+## What It Provides
+
+- generated STM32 board support modules under `src/`
+- feature-gated family support across STM32 C0, F0/F1/F2/F3/F4/F7, G0/G4, H5/H7,
+  L0/L1/L4/L5, WB, and WL lines
+- a stable output target for `rlvgl-creator` and the workspace BSP scripts
+
+## Regeneration Workflow
+
+Regenerate the crate contents with:
+
+```sh
+scripts/gen_ioc_bsps.sh
+```
+
+That script runs the creator pipeline across the STM32CubeMX board set under
+`chips/stm/STM32_open_pin_data/boards` and writes the generated modules into
+this crate. MCU metadata comes from `rlvgl-chips-stm`.
+
+## Notes
+
+- the older board-overlay path is still present for compatibility, but the
+  generated BSP path is the preferred direction
+- some upstream boards are skipped when the required HAL family support or
+  importer coverage is not ready yet
+
+## License
+
+BSD-3-Clause
+
+## More Information
+
+For more information, visit [softoboros.com](https://softoboros.com).
+
+<p>
+  <a href="https://softoboros.com">
+    <img src="../../../assets/branding/Softoboros-Letter-Logo.svg" alt="Softoboros" width="240" />
+  </a>
 </p>
-
-# rlvgl-bsps-stm 🆕
-Package: `rlvgl-bsps-stm` 🆕
-
-Board support package stubs for STM32 boards used by `rlvgl-creator` 🆕.
-The legacy `board` overlay path is kept for compatibility but is deprecated.
-This crate now includes simple modules generated from CubeMX `.ioc`
-files with basic pin mappings.
-
-Regenerate the stubs with `scripts/gen_ioc_bsps.sh`. The script invokes
-`rlvgl-creator` 🆕 for every `.ioc` under
-`chips/stm/STM32_open_pin_data/boards` and writes the modules to
-`chips/stm/bsps/src`. MCU data comes from the bundled `rlvgl-chips-stm`
-archive, so no separate `mcu.json` is needed.
-
-## Supported devices
-
-- `stm32-c0` – `dep:stm32c0xx-hal`
-- `stm32-f0` – `dep:stm32f0xx-hal`
-- `stm32-f3` – `dep:stm32f3xx-hal`
-- `stm32-f4` – `dep:stm32f4xx-hal`
-- `stm32-f7` – `dep:stm32f7xx-hal`
-- `stm32-g0` – `dep:stm32g0xx-hal`
-- `stm32-g4` – `dep:stm32g4xx-hal`
-- `stm32-h5` – `dep:stm32h5xx-hal`
-- `stm32-h7` – `dep:stm32h7xx-hal`
-- `stm32-l0` – `dep:stm32l0xx-hal`
-- `stm32-l1` – `dep:stm32l1xx-hal`
-- `stm32-l4` – `dep:stm32l4xx-hal`
-- `stm32-l5` – `dep:stm32l5xx-hal`
-- `stm32-wb` – `dep:stm32wb-hal`
-- `stm32-wl` – `dep:stm32wlxx-hal`
-
-## Unsupported devices (partial)
-
-The following boards are known to be unsupported or require vendor
-crates that are not yet integrated. They are skipped by the BSP
-generation script.
-
-- `stm32-n6`
-- `stm32-u0`
-- `stm32-u5`
-- `stm32wba65i_dk1`
-
-*This list of unsupported devices is not complete; other boards in the
-archive may also fail to build.*

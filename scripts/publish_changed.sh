@@ -22,6 +22,14 @@ changed=()
 # Detect vendor chip database crates chaged - active
 chipdb_crates=(
   rlvgl-chips-stm
+  rlvgl-chips-nrf
+  rlvgl-chips-esp
+  rlvgl-chips-nxp
+  rlvgl-chips-silabs
+  rlvgl-chips-microchip
+  rlvgl-chips-renesas
+  rlvgl-chips-ti
+  rlvgl-chips-rp2040
 )
 
 for crate in "${chipdb_crates[@]}"; do
@@ -53,23 +61,36 @@ fi
 if git diff --name-only "$BASE" HEAD | grep -q '^platform/'; then
   changed+=("rlvgl-platform")
 fi
+if git diff --name-only "$BASE" HEAD | grep -q '^i18n/'; then
+  changed+=("rlvgl-i18n")
+fi
+if git diff --name-only "$BASE" HEAD | grep -q '^examples/apps/demo/'; then
+  changed+=("rlvgl-app-demo")
+fi
 if git diff --name-only "$BASE" HEAD | grep -q -e '^src/' -e '^Cargo.toml' -e '^examples/'; then
   changed+=("rlvgl")
 fi
 if git diff --name-only "$BASE" HEAD | grep -q '^chips/stm/bsps/'; then
-  changed+=("rlvgl-stm-bsps")
+  changed+=("rlvgl-bsps-stm")
 fi
 
+prev=""
 for crate in "${changed[@]}"; do
+  # crates.io needs time to index a new publish before dependents can resolve it.
+  if [[ -n "$prev" ]]; then
+    echo "Waiting 30s for crates.io to index $prev…"
+    sleep 30
+  fi
   echo "Publishing $crate"
   if [[ "$crate" == "rlvgl-chips-stm" ]]; then
     scripts/stm32_afdb_pipeline.sh
     git add chipdb/rlvgl-chips-stm/assets/chipdb.bin.zst
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty || echo "⚠️ publish $crate failed."
-  elif [[ "$crate" == "rlvgl-stm-bsps" ]]; then
+  elif [[ "$crate" == "rlvgl-bsps-stm" ]]; then
     scripts/gen_ioc_bsps.sh
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify --allow-dirty || echo "⚠️ publish $crate failed."
   else
     cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" --no-verify || echo "⚠️ publish $crate failed."
   fi
+  prev="$crate"
 done

@@ -9,7 +9,7 @@ fn bumps_patch_version() {
     let src = repo.join("chipdb/rlvgl-chips-stm/Cargo.toml");
     let tmp = tempfile::tempdir().unwrap();
     let dst = tmp.path().join("Cargo.toml");
-    fs::copy(src, &dst).unwrap();
+    fs::copy(&src, &dst).unwrap();
 
     let status = Command::new("python3")
         .arg("tools/bump_vendor_versions.py")
@@ -20,5 +20,18 @@ fn bumps_patch_version() {
     assert!(status.success());
 
     let out = fs::read_to_string(dst).unwrap();
-    assert!(out.contains("version = \"0.0.2\""));
+    // Compute expected version by reading the source manifest's version and bumping patch.
+    let src_text = fs::read_to_string(src).unwrap();
+    let re = regex::Regex::new(r#"(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)""#).unwrap();
+    let caps = re
+        .captures(&src_text)
+        .expect("source manifest should have version");
+    let major: u64 = caps[1].parse().unwrap();
+    let minor: u64 = caps[2].parse().unwrap();
+    let patch: u64 = caps[3].parse().unwrap();
+    let expected = format!("version = \"{}.{}.{}\"", major, minor, patch + 1);
+    assert!(
+        out.contains(&expected),
+        "expected {expected} in bumped manifest"
+    );
 }

@@ -1,6 +1,7 @@
 //! Application state and core asset management helpers.
 
 use super::*;
+use serde::{Deserialize, Serialize};
 
 pub(crate) struct CreatorApp {
     /// Asset manifest loaded from disk.
@@ -69,6 +70,60 @@ pub(crate) struct CreatorApp {
     pub(crate) layout_open: bool,
     /// Items placed in the layout editor.
     pub(crate) layout_items: Vec<LayoutItem>,
+    /// Whether the About window is open.
+    pub(crate) about_open: bool,
+    /// Cached texture for the rlvgl logo in the About window.
+    pub(crate) about_logo: Option<TextureHandle>,
+    /// Whether the BSP generation window is open.
+    pub(crate) bsp_open: bool,
+    /// Input `.ioc` path for BSP generation.
+    pub(crate) bsp_ioc_path: String,
+    /// Output directory for BSP generation.
+    pub(crate) bsp_out_dir: String,
+    /// BSP option: emit HAL template.
+    pub(crate) bsp_emit_hal: bool,
+    /// BSP option: emit PAC template.
+    pub(crate) bsp_emit_pac: bool,
+    /// BSP option: grouped writes.
+    pub(crate) bsp_grouped_writes: bool,
+    /// BSP option: per-peripheral layout (else one file).
+    pub(crate) bsp_per_peripheral: bool,
+    /// BSP option: include deinit helpers.
+    pub(crate) bsp_with_deinit: bool,
+    /// BSP option: allow reserved pins (PA13/PA14).
+    pub(crate) bsp_allow_reserved: bool,
+    /// BSP option: use label names for identifiers (HAL).
+    pub(crate) bsp_use_label_names: bool,
+    /// BSP option: emit label constants (PAC).
+    pub(crate) bsp_emit_label_consts: bool,
+    /// BSP option: label prefix for identifiers.
+    pub(crate) bsp_label_prefix: String,
+    /// BSP option: fail on duplicate labels after sanitization.
+    pub(crate) bsp_fail_on_duplicate_labels: bool,
+    /// Last error while saving/loading BSP prefs (if any), transient.
+    pub(crate) bsp_prefs_error: Option<String>,
+    /// BSP generation error log window state.
+    pub(crate) bsp_error_open: bool,
+    /// BSP generation error messages.
+    pub(crate) bsp_errors: Vec<String>,
+    /// Whether the simulator window is open.
+    pub(crate) sim_open: bool,
+    /// Simulator screen width.
+    pub(crate) sim_width: String,
+    /// Simulator screen height.
+    pub(crate) sim_height: String,
+    /// Simulator option: use the wgpu blitter.
+    pub(crate) sim_use_wgpu: bool,
+    /// Simulator option: show QR code demo.
+    pub(crate) sim_show_qrcode: bool,
+    /// Simulator option: show PNG demo.
+    pub(crate) sim_show_png: bool,
+    /// Simulator option: show GIF demo.
+    pub(crate) sim_show_gif: bool,
+    /// Simulator option: show JPEG demo.
+    pub(crate) sim_show_jpeg: bool,
+    /// Last error while saving/loading simulator prefs (if any), transient.
+    pub(crate) sim_prefs_error: Option<String>,
 }
 
 impl CreatorApp {
@@ -229,7 +284,37 @@ impl CreatorApp {
             screen_preset: None,
             layout_open: false,
             layout_items: Vec::new(),
+            about_open: false,
+            about_logo: None,
+            bsp_open: false,
+            bsp_ioc_path: String::new(),
+            bsp_out_dir: String::new(),
+            bsp_emit_hal: true,
+            bsp_emit_pac: false,
+            bsp_grouped_writes: true,
+            bsp_per_peripheral: false,
+            bsp_with_deinit: true,
+            bsp_allow_reserved: false,
+            bsp_use_label_names: true,
+            bsp_emit_label_consts: true,
+            bsp_label_prefix: "pin_".to_string(),
+            bsp_fail_on_duplicate_labels: false,
+            bsp_prefs_error: None,
+            bsp_error_open: false,
+            bsp_errors: Vec::new(),
+            sim_open: false,
+            sim_width: "320".to_string(),
+            sim_height: "240".to_string(),
+            sim_use_wgpu: false,
+            sim_show_qrcode: false,
+            sim_show_png: false,
+            sim_show_gif: false,
+            sim_show_jpeg: false,
+            sim_prefs_error: None,
         };
+        // Attempt to load persisted BSP preferences
+        app.load_bsp_prefs();
+        app.load_sim_prefs();
         app.generate_thumbnails();
         app
     }
@@ -602,4 +687,168 @@ impl CreatorApp {
             }
         }
     }
+
+    fn bsp_prefs_path(&self) -> Option<PathBuf> {
+        Path::new(&self.manifest_path)
+            .parent()
+            .map(|p| p.join(".creator_bsp.yml"))
+    }
+
+    fn sim_prefs_path(&self) -> Option<PathBuf> {
+        Path::new(&self.manifest_path)
+            .parent()
+            .map(|p| p.join(".creator_sim.yml"))
+    }
+
+    pub(crate) fn save_bsp_prefs(&mut self) {
+        if let Some(path) = self.bsp_prefs_path() {
+            let prefs = self.current_bsp_prefs();
+            match serde_yaml::to_string(&prefs)
+                .and_then(|y| Ok(std::fs::write(&path, y).map(|_| ())))
+            {
+                Ok(_) => self.bsp_prefs_error = None,
+                Err(e) => self.bsp_prefs_error = Some(format!("save prefs: {}", e)),
+            }
+        }
+    }
+
+    fn load_bsp_prefs(&mut self) {
+        if let Some(path) = self.bsp_prefs_path() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                match serde_yaml::from_str::<BspPrefs>(&text) {
+                    Ok(p) => self.apply_bsp_prefs(&p),
+                    Err(e) => self.bsp_prefs_error = Some(format!("load prefs: {}", e)),
+                }
+            }
+        }
+    }
+
+    pub(crate) fn save_sim_prefs(&mut self) {
+        if let Some(path) = self.sim_prefs_path() {
+            let prefs = match self.current_sim_prefs() {
+                Ok(prefs) => prefs,
+                Err(e) => {
+                    self.sim_prefs_error = Some(format!("save prefs: {}", e));
+                    return;
+                }
+            };
+            match serde_yaml::to_string(&prefs)
+                .map_err(anyhow::Error::from)
+                .and_then(|y| std::fs::write(&path, y).map_err(anyhow::Error::from))
+            {
+                Ok(_) => self.sim_prefs_error = None,
+                Err(e) => self.sim_prefs_error = Some(format!("save prefs: {}", e)),
+            }
+        }
+    }
+
+    fn load_sim_prefs(&mut self) {
+        if let Some(path) = self.sim_prefs_path() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                match serde_yaml::from_str::<SimPrefs>(&text) {
+                    Ok(p) => self.apply_sim_prefs(&p),
+                    Err(e) => self.sim_prefs_error = Some(format!("load prefs: {}", e)),
+                }
+            }
+        }
+    }
+
+    pub(crate) fn sim_screen(&self) -> Result<(u32, u32)> {
+        let w: u32 = self
+            .sim_width
+            .trim()
+            .parse()
+            .map_err(|_| anyhow::anyhow!("invalid simulator width"))?;
+        let h: u32 = self
+            .sim_height
+            .trim()
+            .parse()
+            .map_err(|_| anyhow::anyhow!("invalid simulator height"))?;
+        if w == 0 || h == 0 {
+            return Err(anyhow::anyhow!("simulator dimensions must be non-zero"));
+        }
+        Ok((w, h))
+    }
+
+    fn current_bsp_prefs(&self) -> BspPrefs {
+        BspPrefs {
+            ioc_path: self.bsp_ioc_path.clone(),
+            out_dir: self.bsp_out_dir.clone(),
+            emit_hal: self.bsp_emit_hal,
+            emit_pac: self.bsp_emit_pac,
+            grouped_writes: self.bsp_grouped_writes,
+            per_peripheral: self.bsp_per_peripheral,
+            with_deinit: self.bsp_with_deinit,
+            allow_reserved: self.bsp_allow_reserved,
+            use_label_names: self.bsp_use_label_names,
+            emit_label_consts: self.bsp_emit_label_consts,
+            label_prefix: self.bsp_label_prefix.clone(),
+            fail_on_duplicate_labels: self.bsp_fail_on_duplicate_labels,
+        }
+    }
+
+    fn current_sim_prefs(&self) -> Result<SimPrefs> {
+        let (width, height) = self.sim_screen()?;
+        Ok(SimPrefs {
+            width,
+            height,
+            use_wgpu: self.sim_use_wgpu,
+            show_qrcode: self.sim_show_qrcode,
+            show_png: self.sim_show_png,
+            show_gif: self.sim_show_gif,
+            show_jpeg: self.sim_show_jpeg,
+        })
+    }
+
+    fn apply_bsp_prefs(&mut self, p: &BspPrefs) {
+        self.bsp_ioc_path = p.ioc_path.clone();
+        self.bsp_out_dir = p.out_dir.clone();
+        self.bsp_emit_hal = p.emit_hal;
+        self.bsp_emit_pac = p.emit_pac;
+        self.bsp_grouped_writes = p.grouped_writes;
+        self.bsp_per_peripheral = p.per_peripheral;
+        self.bsp_with_deinit = p.with_deinit;
+        self.bsp_allow_reserved = p.allow_reserved;
+        self.bsp_use_label_names = p.use_label_names;
+        self.bsp_emit_label_consts = p.emit_label_consts;
+        self.bsp_label_prefix = p.label_prefix.clone();
+        self.bsp_fail_on_duplicate_labels = p.fail_on_duplicate_labels;
+    }
+
+    fn apply_sim_prefs(&mut self, p: &SimPrefs) {
+        self.sim_width = p.width.to_string();
+        self.sim_height = p.height.to_string();
+        self.sim_use_wgpu = p.use_wgpu;
+        self.sim_show_qrcode = p.show_qrcode;
+        self.sim_show_png = p.show_png;
+        self.sim_show_gif = p.show_gif;
+        self.sim_show_jpeg = p.show_jpeg;
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BspPrefs {
+    ioc_path: String,
+    out_dir: String,
+    emit_hal: bool,
+    emit_pac: bool,
+    grouped_writes: bool,
+    per_peripheral: bool,
+    with_deinit: bool,
+    allow_reserved: bool,
+    use_label_names: bool,
+    emit_label_consts: bool,
+    label_prefix: String,
+    fail_on_duplicate_labels: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SimPrefs {
+    width: u32,
+    height: u32,
+    use_wgpu: bool,
+    show_qrcode: bool,
+    show_png: bool,
+    show_gif: bool,
+    show_jpeg: bool,
 }

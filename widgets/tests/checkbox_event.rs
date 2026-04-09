@@ -16,12 +16,12 @@ fn checkbox_toggle_and_bounds() {
     assert_eq!(cb.bounds().width, rect.width);
     assert_eq!(cb.bounds().height, rect.height);
     // click inside toggles
-    let evt = Event::PointerUp { x: 5, y: 5 };
+    let evt = Event::PressRelease { x: 5, y: 5 };
     assert!(cb.handle_event(&evt));
     assert!(cb.is_checked());
 
     // click outside does nothing
-    let evt = Event::PointerUp { x: 30, y: 30 };
+    let evt = Event::PressRelease { x: 30, y: 30 };
     assert!(!cb.handle_event(&evt));
     assert!(cb.is_checked());
 }

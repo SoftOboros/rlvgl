@@ -10,6 +10,11 @@ examples/stm32h747i-disco/README.md - STM32H747I-DISCO board demo.
 Demonstrates rlvgl on the STM32H747I-DISCO discovery board using placeholder
 display and touch drivers.
 
+## Quick Links
+- Boot options and dual-core flow: see `BOOT.md`
+- Memory map and regions: see `MEMORY.md`
+- STM32 BSP generation behavior and flags: see `docs/STM_BSP_GENERATION.md`
+
 ## BSP Generation
 The `bsp` directory is produced by `rlvgl-creator` and demonstrates
 bus-aware clock gating. GPIO and peripheral enables target the H7's `AHB4ENR`
@@ -34,6 +39,24 @@ cargo build --bin rlvgl-stm32h747i-disco \
     --target thumbv7em-none-eabihf
 ```
 
+Alternatively, use the top-level Makefile shortcuts:
+
+```
+make gen-stm32h747i-disco-bsp   # Regenerate BSP (defaults SMPS/VOS1)
+make build-disco                # Build CM7 example
+make build-disco-cm4            # Build CM4 example
+make build-disco-all            # Build both
+make openocd                    # Start OpenOCD (stlink + stm32h7x)
+make openocd-erase              # Mass erase (DANGER)
+```
+
+Notes:
+- The workspace `build.rs` stages this example’s `memory.x` into the Cargo
+  build directory and passes `-Tmemory.x` to the linker automatically on
+  embedded targets. No global `.cargo/config.toml` is required.
+- Optional `backlight_pwm` enables TIM8 PWM on `PJ6` for the LCD backlight. The
+  default build uses a simple GPIO high/low fallback for bring‑up.
+
 ## Flashing
 ```bash
 cargo objcopy --bin rlvgl-stm32h747i-disco \
@@ -46,3 +69,53 @@ st-flash write firmware.bin 0x08000000
 1. Reset the board and confirm the demo UI matches the simulator layout.
 2. Tap widgets to ensure touch events propagate correctly.
 
+## Display Status (Bring‑up)
+
+- Pixel clock: 32 MHz (PLL3R) — conservative default; adjust later.
+- LTDC timings (typical OTM8009A 800×480):
+  - HSW=20, HBP=140, HFP=20
+  - VSW=4,  VBP=34,  VFP=10
+- Layer 1: RGB565 framebuffer; DMA2D planned for blits/fills.
+- Notes:
+  - These values are labeled in `platform/src/stm32h747i_disco.rs::configure_ltdc_timing()`
+    for easy tweaking during tuning.
+  - DSI panel init is stubbed; LTDC draws are WIP.
+
+## Touch (FT5336)
+
+- I²C bus: I2C4
+  - PD12 = I2C4_SCL (AF4, open‑drain, pull‑up)
+  - PD13 = I2C4_SDA (AF4, open‑drain, pull‑up)
+- Interrupt: PK7 = TOUCH_INT
+- Ownership: CM4 initializes I2C4 and polls FT5336; CM7 executes display work.
+- A PAC‑based I2C4 init for CM4 will be added; FT5336 support uses an
+  embedded‑hal 1.0 adapter.
+
+## Backlight and Reset (Temporary)
+
+- Backlight GPIO fallback: PJ6 (high = on). PWM bring‑up is optional on TIM8
+  (PJ6 supports TIM8 CH1/CH2; routed to LCD_BL_CTRL).
+- Panel reset: PG3 (LCD_RESET on MB1166). Early bring‑up may toggle this via
+  GPIO; add datasheet‑compliant delays.
+
+## Optional: SD Assets
+
+- Enable the no_std FATFS adapter and the SD block device when building. For a
+  minimal on-boot listing demo, also enable `sd_assets_demo`:
+
+```bash
+cargo build --bin rlvgl-stm32h747i-disco \
+    --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+    --target thumbv7em-none-eabihf --release
+```
+
+- The `DiscoSdBlockDevice` driver (SDMMC1 + DMA + D‑Cache hygiene) is available
+  behind the above features. A lightweight `fatfs` adapter is included in the
+  platform crate (`sd_fatfs_adapter`). With `sd_assets_demo`, the firmware will
+  attempt to mount and list `/assets` at startup and render a few names.
+
+### On‑screen indicators
+
+- `asset: <name>`: FAT mounted and `/assets` contains entries; up to 4 are shown.
+- `SD: no assets`: FAT mounted but `/assets` (or root) is empty.
+- `SD: mount/list failed`: FAT mount or directory listing failed (check pins/clock/SD card).

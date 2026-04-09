@@ -1,41 +1,53 @@
 <!--
-README.md - Usage and format notes for the rlvgl-chips-rp2040 vendor crate.
+README.md - Publish-facing overview for the rlvgl-chips-rp2040 crate.
 -->
-<p align="center">
-  <img src="../../rlvgl-logo.png" alt="rlvgl" />
-</p>
 
 # rlvgl-chips-rp2040
 Package: `rlvgl-chips-rp2040`
 
-Provides a board database for generic RP2040 devices used by `rlvgl-creator`.
+`rlvgl-chips-rp2040` is the RP2040 board catalog crate used by `rlvgl-creator`
+and related code-generation tooling.
 
-## Usage
+## What It Provides
 
-This crate expects board definition files extracted by [`tools/st_extract_af.py`](../../tools/st_extract_af.py). During build, set the
-`RLVGL_CHIP_SRC` environment variable to the directory containing those
-extracted files:
+- `vendor()` returning the stable vendor key: `"rp2040"`
+- `boards()` for a lightweight list of known boards
+- `find()` for exact-name board lookup
+- `raw_db()` for the embedded raw board-definition blob produced at build time
+
+## Build-Time Data Source
+
+When building from a workspace checkout, set `RLVGL_CHIP_SRC` to a directory of
+vendor board-definition files before compiling the crate:
 
 ```sh
 RLVGL_CHIP_SRC=build/chipdb/rp2040 cargo build -p rlvgl-chips-rp2040
 ```
 
-The library exposes helper functions for consumers:
+If `RLVGL_CHIP_SRC` is not set, the crate still builds and its baked-in board
+catalog remains available. The raw embedded database blob simply reflects
+whatever the build script packaged during that build.
 
-- `vendor()` – returns `"rp2040"`.
-- `boards()` – lists supported boards as `BoardInfo` entries.
-- `find(name)` – looks up a board by its exact name.
+## Status
 
-`rlvgl-creator` integrates this crate to populate vendor and board drop-downs.
-Other vendor crates follow the same layout and API.
-
-## BoardInfo format
-
-Each `BoardInfo` describes a board with at least a human-friendly board name
-and associated chip. Future versions may include package information and pin
-configuration offsets.
+The public API is intentionally small and uniform across the vendor chip crates.
+Its main job today is to feed board-selection and BSP-generation flows in
+`rlvgl-creator`.
 
 ## Features
 
-- Optional `serde` support for serialising the board database: enable the
-  `serde` feature if integration with external tooling requires it.
+- `serde`: enable serialization support for the exposed data types
+
+## License
+
+MIT
+
+## More Information
+
+For more information, visit [softoboros.com](https://softoboros.com).
+
+<p>
+  <a href="https://softoboros.com">
+    <img src="../../assets/branding/Softoboros-Letter-Logo.svg" alt="Softoboros" width="240" />
+  </a>
+</p>

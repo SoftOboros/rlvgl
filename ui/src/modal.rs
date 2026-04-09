@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! Modal component for rlvgl-ui.
 //!
-//! Built from a [`Container`](rlvgl_widgets::container::Container) and
-//! [`Label`](rlvgl_widgets::label::Label) to provide a full-screen dialog with
-//! centered text.
+//! Built from a [`Container`] and [`Label`] to provide a full-screen dialog
+//! with centered text.
 
 use rlvgl_core::{
     event::Event,

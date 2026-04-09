@@ -1,16 +1,21 @@
 //! Dynamic Lottie rendering utilities.
 //!
-//! This module exposes helpers built on the `rlottie` crate for loading a
-//! Lottie JSON string and rendering frames into [`Color`] buffers.
+//! This module exposes helpers for loading a Lottie JSON string and rendering
+//! frames into [`Color`] buffers.
+//!
+//! The public `lottie` feature enables the API surface. Native `rlottie`
+//! rendering is only compiled when the internal `lottie_backend` feature is
+//! also enabled.
 
 use crate::widget::Color;
-use rlottie::{Animation, Size, Surface};
 
 /// Errors that can occur when rendering a Lottie animation frame.
 #[derive(Debug, Clone)]
 pub enum Error {
     /// The provided Lottie JSON data was invalid.
     InvalidJson,
+    /// Native Lottie rendering support is not available in this build.
+    BackendUnavailable,
 }
 
 /// Render a single frame of a Lottie JSON animation.
@@ -19,26 +24,55 @@ pub enum Error {
 /// * `frame` - Zero-based frame index to render.
 /// * `width`/`height` - Output dimensions in pixels.
 ///
-/// Returns `None` if the JSON data is invalid.
 pub fn render_lottie_frame(
     json: &str,
     frame: usize,
     width: usize,
     height: usize,
-) -> Option<alloc::vec::Vec<Color>> {
-    let mut anim = Animation::from_data(json, "mem", ".")?;
-    let mut surface = Surface::new(Size::new(width, height));
-    anim.render(frame, &mut surface);
-    Some(
-        surface
-            .data()
-            .iter()
-            .map(|px| Color(px.r, px.g, px.b, 255))
-            .collect(),
-    )
+) -> Result<alloc::vec::Vec<Color>, Error> {
+    render_lottie_frame_impl(json, frame, width, height)
 }
 
-#[cfg(test)]
+#[cfg(all(
+    feature = "lottie_backend",
+    any(target_os = "linux", target_os = "android")
+))]
+fn render_lottie_frame_impl(
+    json: &str,
+    frame: usize,
+    width: usize,
+    height: usize,
+) -> Result<alloc::vec::Vec<Color>, Error> {
+    use rlottie::{Animation, Size, Surface};
+
+    let mut anim = Animation::from_data(json, "mem", ".").ok_or(Error::InvalidJson)?;
+    let mut surface = Surface::new(Size::new(width, height));
+    anim.render(frame, &mut surface);
+    Ok(surface
+        .data()
+        .iter()
+        .map(|px| Color(px.r, px.g, px.b, 255))
+        .collect())
+}
+
+#[cfg(not(all(
+    feature = "lottie_backend",
+    any(target_os = "linux", target_os = "android")
+)))]
+fn render_lottie_frame_impl(
+    _json: &str,
+    _frame: usize,
+    _width: usize,
+    _height: usize,
+) -> Result<alloc::vec::Vec<Color>, Error> {
+    Err(Error::BackendUnavailable)
+}
+
+#[cfg(all(
+    test,
+    feature = "lottie_backend",
+    any(target_os = "linux", target_os = "android")
+))]
 mod tests {
     use super::*;
 

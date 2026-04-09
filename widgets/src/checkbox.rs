@@ -1,5 +1,6 @@
 //! Binary checkbox widget.
 use alloc::string::String;
+use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -48,8 +49,10 @@ impl Widget for Checkbox {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        let a = self.style.alpha;
+        let r = self.style.radius;
         // Draw background
-        renderer.fill_rect(self.bounds, self.style.bg_color);
+        draw_widget_bg(renderer, self.bounds, &self.style);
 
         // Draw check box square at the left side
         let square_size = 10;
@@ -59,7 +62,7 @@ impl Widget for Checkbox {
             width: square_size,
             height: square_size,
         };
-        renderer.fill_rect(box_rect, self.style.border_color);
+        fill_rounded_rect(renderer, box_rect, self.style.border_color.with_alpha(a), r);
 
         if self.checked {
             let inner = Rect {
@@ -68,7 +71,7 @@ impl Widget for Checkbox {
                 width: box_rect.width - 4,
                 height: box_rect.height - 4,
             };
-            renderer.fill_rect(inner, self.check_color);
+            fill_rounded_rect(renderer, inner, self.check_color.with_alpha(a), r);
         }
 
         // Draw label text to the right of the box with baseline at the bottom
@@ -76,12 +79,12 @@ impl Widget for Checkbox {
             self.bounds.x + square_size + 4,
             self.bounds.y + self.bounds.height,
         );
-        renderer.draw_text(text_pos, &self.text, self.text_color);
+        renderer.draw_text(text_pos, &self.text, self.text_color.with_alpha(a));
     }
 
     /// Toggle the checked state when clicked.
     fn handle_event(&mut self, event: &Event) -> bool {
-        if let Event::PointerUp { x, y } = event {
+        if let Event::PressRelease { x, y } = event {
             let inside = *x >= self.bounds.x
                 && *x < self.bounds.x + self.bounds.width
                 && *y >= self.bounds.y

@@ -18,7 +18,7 @@ pub mod gif;
 #[cfg(feature = "apng")]
 pub mod apng;
 
-#[cfg(feature = "jpeg")]
+#[cfg(all(feature = "jpeg", not(target_os = "none")))]
 pub mod jpeg;
 
 #[cfg(feature = "lottie")]
@@ -30,10 +30,10 @@ pub mod nes;
 #[cfg(feature = "pinyin")]
 pub mod pinyin;
 
-#[cfg(feature = "png")]
+#[cfg(all(feature = "png", not(target_os = "none")))]
 pub mod png;
 
-#[cfg(feature = "qrcode")]
+#[cfg(all(feature = "qrcode", not(target_os = "none")))]
 pub mod qrcode;
-#[cfg(feature = "qrcode")]
+#[cfg(all(feature = "qrcode", not(target_os = "none")))]
 pub use qrcode::*;

@@ -3,6 +3,7 @@
 use super::presets::{CommandPreset, run_preset_commands};
 use super::wizard::run_scan_convert_preview_wizard;
 use super::*;
+use std::process::Command;
 
 impl CreatorApp {
     /// Display a modal message and toast based on the command result.
@@ -227,6 +228,11 @@ impl CreatorApp {
         self.svg_open = true;
     }
 
+    /// Handle the simulator window action.
+    pub(crate) fn handle_simulator(&mut self) {
+        self.sim_open = true;
+    }
+
     /// Load a command preset from JSON and execute it.
     pub(crate) fn handle_run_preset(&mut self) {
         if let Some(file) = FileDialog::new()
@@ -281,6 +287,55 @@ impl CreatorApp {
             self.show_feedback("Scan→Convert→Preview", res);
         }
     }
+
+    /// Launch the desktop simulator with the current settings.
+    pub(crate) fn launch_simulator(&mut self) {
+        let (width, height) = match self.sim_screen() {
+            Ok(screen) => screen,
+            Err(e) => {
+                self.toasts
+                    .push((format!("Simulator config error: {}", e), Instant::now()));
+                return;
+            }
+        };
+        let exe = match std::env::current_exe() {
+            Ok(path) => path,
+            Err(e) => {
+                self.toasts
+                    .push((format!("Simulator launch failed: {}", e), Instant::now()));
+                return;
+            }
+        };
+        let mut cmd = Command::new(exe);
+        cmd.arg("sim")
+            .arg("--screen")
+            .arg(format!("{}x{}", width, height));
+        if self.sim_use_wgpu {
+            cmd.arg("--wgpu");
+        }
+        if self.sim_show_qrcode {
+            cmd.arg("--qrcode");
+        }
+        if self.sim_show_png {
+            cmd.arg("--png");
+        }
+        if self.sim_show_gif {
+            cmd.arg("--gif");
+        }
+        if self.sim_show_jpeg {
+            cmd.arg("--jpeg");
+        }
+        match cmd.spawn() {
+            Ok(_) => {
+                self.toasts
+                    .push(("Simulator launched".into(), Instant::now()));
+            }
+            Err(e) => {
+                self.toasts
+                    .push((format!("Simulator launch failed: {}", e), Instant::now()));
+            }
+        }
+    }
 }
 
 impl CreatorApp {
@@ -306,6 +361,7 @@ impl CreatorApp {
             "Run Preset" => self.handle_run_preset(),
             "Save Preset" => self.handle_save_preset(),
             "Scan Convert Preview" => self.handle_scan_convert_preview(),
+            "Simulator" => self.handle_simulator(),
             _ => {}
         }
     }

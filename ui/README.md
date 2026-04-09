@@ -1,158 +1,54 @@
 <!--
-ui/README.md - Unified documentation for rlvgl-ui.
+README.md - Publish-facing overview for the rlvgl-ui crate.
 -->
-<p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
-</p>
 
-# rlvgl-ui ─ Unified Documentation
+# rlvgl-ui
 Package: `rlvgl-ui`
-*(Copy-paste this single file into `ui/README.md` or anywhere you like.)*
 
----
+`rlvgl-ui` is the higher-level component crate in the `rlvgl` workspace. It
+builds on top of `rlvgl-core` and `rlvgl-widgets` to provide themed controls,
+layout helpers, style builders, and overlay utilities for application code.
 
-## 1 ▸ Overview
+## What It Provides
 
-**rlvgl-ui** is a second-layer crate that sits atop the low-level `rlvgl` bindings
-(and therefore the C-based **LVGL** engine).
+- ready-to-use components such as `Alert`, `Badge`, `Button`, `Checkbox`,
+  `Drawer`, `Input`, `Modal`, `Radio`, `Switch`, `Tag`, `Text`, and `Toast`
+- layout helpers including `HStack`, `VStack`, `Grid`, and `BoxLayout`
+- a theme/token layer with `Theme`, `Tokens`, `Style`, and `StyleBuilder`
+- overlay and transient UI helpers such as `EventWindow`
+- an optional `view` feature for view-oriented helpers
 
-It offers a **Chakra / React-inspired API**—themes, tokens, fluent styles, and
-composable components—without sacrificing the raw speed and tiny footprint that
-make LVGL the go-to GUI for micro-controllers and small MPUs.
+## How It Fits
 
-┌─────────────┐ Your app (Button::new().on_click(save))
-├─────────────┤ rlvgl-ui (Theme, Style, VStack …)
-├─────────────┤ rlvgl (safe Rust LVGL wrappers)
-├─────────────┤ lvgl-sys (raw C FFI)
-└─────────────┘
+- `rlvgl-core` supplies the runtime primitives: events, rendering, styles,
+  applications, and plugin hooks
+- `rlvgl-widgets` supplies lower-level widget implementations
+- `rlvgl-ui` composes those pieces into a more ergonomic application-facing API
 
-### Why another layer?
+This crate is `no_std` by default and is intended to work on both embedded
+targets and simulator builds.
 
-| Benefit        | Details                                                             |
-|----------------|---------------------------------------------------------------------|
-| Familiarity    | React / Chakra devs feel at home.                                   |
-| Productivity   | `Style::new().bg(...)` replaces dozens of `lv_obj_set_style_*()` calls. |
-| Interoperable  | 100 % compatible with LVGL themes & styles; C and Rust can mix.     |
-| Tiny Footprint | Adds ergonomics, **not** a JS engine or GC.                         |
+## Features
 
----
+- `view`: enables the optional `view` module
 
-## 2 ▸ Quick Start
+## Typical Use
 
-#### `Cargo.toml`
-```toml
-[dependencies]
-rlvgl     = "0.2"
-rlvgl-ui  = { path = "ui" }   # local path while hacking
-```
+Use `rlvgl-ui` when you want to build application screens from themed controls
+instead of wiring raw widget types and style values by hand. It is a good fit
+for demo shells, control panels, settings screens, and overlay-driven UIs where
+you want a consistent look across simulator and hardware targets.
 
-Minimal code
+## License
 
-```rust
-use rlvgl_ui::{Theme, Style, Button, VStack};
+MIT
 
-fn ui() {
-    let theme = Theme::material_light();
-    theme.apply_global();               // push tokens to LVGL
+## More Information
 
-    VStack::new()
-        .spacing(theme.spacing.md)
-        .child(
-            Button::new("Save")
-                .icon("save")           // built-in icon font
-                .style(
-                    Style::new()
-                        .bg(theme.colors.primary)
-                        .radius(theme.radii.md)
-                )
-                .on_click(|| { println!("Saved!"); })
-        )
-        .mount(lv_scr_act());
-}
-```
+For more information, visit [softoboros.com](https://softoboros.com).
 
-Build & run
-
-Desktop simulator:
-
-```
-cargo run --example demo -p rlvgl-ui
-```
-
-MCU target (e.g. STM32-H723):
-
-```
-cargo build --release --target thumbv7em-none-eabihf -p rlvgl-ui
-```
-
-## 3 ▸ Roadmap / TODO
-
-### Phase 1 · LVGL-Compatible Style & Theme
-- [x] Audit LVGL style APIs
-- [x] StyleBuilder (padding, margin, bg, text, border, radius)
-- [x] Part/State helpers
-- [x] Token structs (Spacing, Colors, Radii, Fonts)
-- [x] Legacy theme bridge (material, mono)
-- [x] Demo + CI tests
-- [x] Tag v0.1.0
-
-### Phase 2 · rlvgl-ui Core
-- [x] Layout helpers (HStack, VStack, Grid, Box)
-- [x] Event hooks (on_click, on_change)
-- [x] Icon font integration
-- [x] Optional macro DSL (view!) behind feature flag
-- [x] Publish rlvgl-ui v0.1
-
-### Phase 3 · Chakra-Inspired Components
- - [x] Button / IconButton
- - [x] Text / Heading
- - [x] Input / Textarea
- - [x] Checkbox
- - [x] Switch
- - [x] Radio
- - [x] Badge / Tag / Alert
- - [x] Modal / Drawer / Toast
- - [ ] Storybook-style demo app
- - [ ] Release v0.2 and draft 1.0
-
-## 4 ▸ Agent Specification (temperature = 0 %)
-
-Deterministic instructions for any LLM or tool generating or refactoring code
-inside ui/.
-Modify files only within ui/ unless explicitly instructed.
-Preserve public API signatures unless version number is bumped.
-All generated styles must compile to valid `lv_style_t` data.
-Token namespaces are fixed: spacing, colors, radii, fonts.
-Maximum source-line length: 100 columns.
-MIT-license header: MIT / Apache-2.0.
-
-## 5 ▸ Example (ui/examples/demo.rs)
-
-```rust
-use rlvgl_ui::{Theme, Style, Button, VStack};
-
-pub fn build() {
-    let theme = Theme::material_light();
-    theme.apply_global();
-
-    VStack::new()
-        .spacing(theme.spacing.md)
-        .child(
-            Button::new("Save")
-                .icon("save")
-                .style(
-                    Style::new()
-                        .bg(theme.colors.primary)
-                        .radius(theme.radii.md)
-                )
-                .on_click(|| { println!("Saved!"); })
-        )
-        .mount(lv_scr_act());
-}
-```
-
-## 6 ▸ License
-
-MIT-licensed: MIT.
-
-“Tiny screens deserve great UX, too.”
+<p>
+  <a href="https://softoboros.com">
+    <img src="../assets/branding/Softoboros-Letter-Logo.svg" alt="Softoboros" width="240" />
+  </a>
+</p>

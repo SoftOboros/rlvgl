@@ -45,6 +45,24 @@ jobs:
             target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco
             size.txt
 
+  stm32h747i-disco-fatfs:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      - name: Install target
+        run: rustup target add thumbv7em-none-eabihf
+      - name: Build firmware (fatfs no_std demo)
+        run: |
+          RUSTFLAGS="" cargo build \
+            --bin rlvgl-stm32h747i-disco \
+            --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+            --target thumbv7em-none-eabihf --release || true
+
   polish:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

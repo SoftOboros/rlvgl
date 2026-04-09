@@ -1,5 +1,6 @@
 ---
 source: tests/bsp_espressif.rs
+assertion_line: 15
 expression: "&spec"
 ---
 mcu: ESP32C3
@@ -7,12 +8,15 @@ package: QFN48
 clocks:
   pll: {}
   kernels: {}
+  init_by: ~
 pinctrl:
   - pin: GPIO18
     func: SPI0_SCK
+    label: ~
     af: 0
   - pin: GPIO19
     func: SPI0_MOSI
+    label: ~
     af: 0
 peripherals:
   spi0:
@@ -20,3 +24,4 @@ peripherals:
     signals:
       sck: GPIO18
       mosi: GPIO19
+    core: ~

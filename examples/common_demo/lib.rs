@@ -5,11 +5,15 @@
 //! placeholder graphics. Designed for `no_std` builds so that the same
 //! module powers both simulator and embedded demonstrations.
 
+// Not all items are used by every binary that includes this module.
+#![allow(dead_code)]
+
 extern crate alloc;
 
 #[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]
 use alloc::boxed::Box;
-use alloc::{format, rc::Rc, vec::Vec};
+use alloc::{rc::Rc, vec::Vec};
+use rlvgl_i18n::t;
 use core::cell::RefCell;
 
 #[cfg(feature = "gif")]
@@ -126,7 +130,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     let root_h = height as u32;
 
     let button = Rc::new(RefCell::new(Button::new(
-        "Clicks: 0",
+        t!("demo.clicks_zero"),
         Rect {
             x: 10,
             y: 40,
@@ -140,7 +144,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
         button.borrow_mut().set_on_click(move |btn: &mut Button| {
             let mut count = counter.borrow_mut();
             *count += 1;
-            btn.set_text(format!("Clicks: {}", *count));
+            btn.set_text(t!("demo.clicks", count = *count));
         });
     }
 
@@ -155,11 +159,11 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     }));
 
     let label = Label::new(
-        "rlvgl Demo",
+        t!("demo.title", version = env!("CARGO_PKG_VERSION")),
         Rect {
             x: 10,
             y: 10,
-            width: 120,
+            width: 200,
             height: 20,
         },
     );
@@ -173,7 +177,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
     });
 
     let plugins = Rc::new(RefCell::new(Button::new(
-        "Plugins",
+        t!("demo.plugins"),
         Rect {
             x: 100,
             y: 40,
@@ -202,8 +206,8 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
         let gif_ref = gif_demo.clone();
         #[cfg(feature = "jpeg")]
         let jpeg_ref = jpeg_demo.clone();
-        let root_w = root_w;
-        let root_h = root_h;
+        let _root_w = root_w;
+        let _root_h = root_h;
         plugins.borrow_mut().set_on_click(move |_btn: &mut Button| {
             if let Some(menu_w) = menu_ref.borrow_mut().take() {
                 pending_rm.borrow_mut().push(menu_w);
@@ -214,12 +218,13 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                     width: 100,
                     height: 170,
                 })));
+                #[allow(unused_mut)]
                 let mut children = Vec::new();
 
                 #[cfg(feature = "qrcode")]
                 {
                     let qr_button = Rc::new(RefCell::new(Button::new(
-                        "QR Code",
+                        t!("demo.qr_code"),
                         Rect {
                             x: 20,
                             y: 80,
@@ -253,7 +258,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                 #[cfg(feature = "png")]
                 {
                     let png_button = Rc::new(RefCell::new(Button::new(
-                        "PNG",
+                        t!("demo.png"),
                         Rect {
                             x: 20,
                             y: 110,
@@ -289,7 +294,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                 #[cfg(feature = "gif")]
                 {
                     let gif_button = Rc::new(RefCell::new(Button::new(
-                        "GIF",
+                        t!("demo.gif"),
                         Rect {
                             x: 20,
                             y: 140,
@@ -325,7 +330,7 @@ pub fn build_demo(width: i32, height: i32) -> Demo {
                 #[cfg(feature = "jpeg")]
                 {
                     let jpeg_button = Rc::new(RefCell::new(Button::new(
-                        "JPEG",
+                        t!("demo.jpeg"),
                         Rect {
                             x: 20,
                             y: 170,

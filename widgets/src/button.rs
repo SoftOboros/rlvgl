@@ -71,7 +71,7 @@ impl Widget for Button {
     /// Delegate pointer events and invoke the click handler when released.
     fn handle_event(&mut self, event: &Event) -> bool {
         match event {
-            Event::PointerUp { x, y } if self.inside_bounds(*x, *y) => {
+            Event::PressRelease { x, y } if self.inside_bounds(*x, *y) => {
                 if let Some(mut cb) = self.on_click.take() {
                     cb(self);
                     self.on_click = Some(cb);

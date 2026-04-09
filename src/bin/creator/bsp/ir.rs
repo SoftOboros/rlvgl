@@ -7,6 +7,16 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+/// CPU core selector for dual-core MCUs (e.g., STM32H747 CM7/CM4).
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Core {
+    /// Cortex-M7 core
+    Cm7,
+    /// Cortex-M4 core
+    Cm4,
+}
+
 /// Top-level intermediate representation describing the board.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Ir {
@@ -20,6 +30,9 @@ pub struct Ir {
     pub pinctrl: Vec<Pin>,
     /// Discovered peripherals keyed by instance name.
     pub peripherals: IndexMap<String, Peripheral>,
+    /// Optional power configuration (supply/VOS) extracted from the `.ioc`.
+    #[serde(default)]
+    pub pwr: Power,
 }
 
 /// Clock configuration extracted from the vendor project.
@@ -31,6 +44,43 @@ pub struct Clocks {
     /// Kernel clock selections per peripheral (`usart1` → `pclk2`).
     #[serde(default)]
     pub kernels: IndexMap<String, String>,
+    /// Which core is responsible for system clock/PLL initialization.
+    ///
+    /// If `None`, generators should assume unified initialization is handled
+    /// externally or select a sensible default.
+    #[serde(default)]
+    pub init_by: Option<Core>,
+    /// System clock source (e.g., "HSI", "HSE", "PLL1").
+    #[serde(default)]
+    pub sys_src: Option<String>,
+    /// PLL source (e.g., "HSE", "HSI", "CSI").
+    #[serde(default)]
+    pub pll_src: Option<String>,
+    /// Optional HSE frequency in Hz (e.g., 25000000).
+    #[serde(default)]
+    pub hse_hz: Option<u32>,
+    /// Domain prescalers from .ioc (raw tokens).
+    #[serde(default)]
+    pub d1cpu: Option<String>,
+    #[serde(default)]
+    pub d1ppre: Option<String>,
+    #[serde(default)]
+    pub d2ppre1: Option<String>,
+    #[serde(default)]
+    pub d2ppre2: Option<String>,
+    #[serde(default)]
+    pub d3ppre: Option<String>,
+}
+
+/// Power configuration (supply/VOS) as declared in the vendor project.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+pub struct Power {
+    /// Supply mode selected in CubeMX (e.g., "SMPS", "LDO").
+    #[serde(default)]
+    pub supply: Option<String>,
+    /// VOS/SDLEVEL (e.g., "VOS1").
+    #[serde(default)]
+    pub sdlevel: Option<String>,
 }
 
 /// PLL parameter block.
@@ -48,13 +98,19 @@ pub struct Pll {
     pub r: u8,
 }
 
-/// Pin description capturing function and alternate function number.
+/// Pin description capturing function, label, and alternate function number.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Pin {
     /// Pin name, e.g. "PA9".
     pub pin: String,
     /// Signal name, e.g. "USART1_TX" or "GPIO_Output".
     pub func: String,
+    /// Optional user-assigned label from the vendor project (e.g. `GPIO_Label` in `.ioc`).
+    ///
+    /// When present, code generators can surface this label in comments or use
+    /// it to derive identifier aliases.
+    #[serde(default)]
+    pub label: Option<String>,
     /// Alternate function number for the signal (0 for GPIO).
     pub af: u8,
 }
@@ -67,4 +123,9 @@ pub struct Peripheral {
     /// Mapping of signal role (tx, rx, sck, …) to pin name.
     #[serde(default)]
     pub signals: IndexMap<String, String>,
+    /// Owning core for this peripheral when targeting dual-core devices.
+    ///
+    /// If `None`, ownership is unspecified/unified.
+    #[serde(default)]
+    pub core: Option<Core>,
 }

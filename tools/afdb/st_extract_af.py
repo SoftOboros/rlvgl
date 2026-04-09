@@ -81,13 +81,25 @@ def _convert_file(in_path: Path, out_path: Path, mcu_root: Optional[Path]) -> No
                     mcu_pins = {}
                     for pin, info in data.get("pins", {}).items():
                         sigs = {}
-                        for sig_name, sig in info.get("sigs", {}).items():
-                            af = sig.get("af")
-                            try:
-                                af = int(af) if af is not None else 0
-                            except (TypeError, ValueError):
-                                af = 0
-                            sigs[sig_name] = af
+                        # Support either {"sigs": {"NAME": {"af": N}}} or a list of entries
+                        if isinstance(info, list):
+                            for ent in info:
+                                sig_name = ent.get("signal")
+                                af = ent.get("af")
+                                try:
+                                    af_val = int(af) if af is not None else 0
+                                except (TypeError, ValueError):
+                                    af_val = 0
+                                if sig_name:
+                                    sigs[sig_name] = af_val
+                        else:
+                            for sig_name, sig in info.get("sigs", {}).items():
+                                af = sig.get("af")
+                                try:
+                                    af_val = int(af) if af is not None else 0
+                                except (TypeError, ValueError):
+                                    af_val = 0
+                                sigs[sig_name] = af_val
                         mcu_pins[pin] = sigs
         db = _parse_ioc(in_path, mcu_pins)
         #print(db)

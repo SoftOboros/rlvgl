@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 //! Alert component for rlvgl-ui built from a
-//! [`Container`](rlvgl_widgets::container::Container) and
-//! [`Label`](rlvgl_widgets::label::Label).
+//! [`Container`] and [`Label`].
 //!
 //! Useful for displaying informational messages.
 

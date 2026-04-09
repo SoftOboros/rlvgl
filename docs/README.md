@@ -17,8 +17,11 @@ See crate overviews for:
 - [chip database](../chipdb/README.md)
 
 ## Guides
+- [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) – Product-level release notes for the v0.1.9 publish.
 - [CREATOR-CLI.md](./CREATOR-CLI.md) – Command-line reference and workflows for rlvgl-creator.
 - [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) – MiniJinja template guidelines for BSP generation.
+- [STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) – STM32 BSP generation behavior, flags, and roadmap.
+- [MAKE.md](./MAKE.md) – Makefile convenience targets and typical flows.
 - [CUSTOM-SIMULATOR.md](./CUSTOM-SIMULATOR.md) – Notes on building a custom simulator backend.
 - [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) – Details for the STM32H747I-DISCO board.
 - [CROSS-TESTING.md](./CROSS-TESTING.md) – Cross-target test linker requirements.
@@ -31,7 +34,9 @@ See crate overviews for:
 - [TODO-CHIP-SUPPORT.md](./TODO-CHIP-SUPPORT.md) – Chip support backlog.
 - [TODO-CREATOR.md](./TODO-CREATOR.md) – Outstanding work for rlvgl-creator.
 - [TODO-CREATOR-BSP.md](./TODO-CREATOR-BSP.md) – BSP generator tasks.
-- [TODO-CREATOR-UI-FULL.md](./TODO-CREATOR-UI-FULL.md) – Creator UI completion list.
+- [TODO-CREATOR-UI-FULL.md](./TODO-CREATOR-UI-FULL.md) – Roadmap for the full GUI version of the creator tool.
+- [TODO-CREATOR-WORKSPACES.md](./TODO-CREATOR-WORKSPACES.md) – Roadmap for workspace-first project scaffolding and simulator integration.
+- [TODO-DECOMP.md](./TODO-DECOMP.md) – Plans for the image decompression module.
 - [TODO-FATFS-ASSETS.md](./TODO-FATFS-ASSETS.md) – FATFS asset storage notes.
 - [TODO-MICROPYTHON-DISCO.md](./TODO-MICROPYTHON-DISCO.md) – MicroPython support tasks.
 - [TODO-PLUGGABLE-BLITTER.md](./TODO-PLUGGABLE-BLITTER.md) – Pluggable blitter work items.

@@ -1,10 +1,18 @@
 # Configuration for rlvgl-chips-silabs crate.
 [package]
 name = "rlvgl-chips-silabs"
-version = "0.0.1"
+version = "0.0.2"
+authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2021"
+license = "MIT"
+description = "Silicon Labs chip database adapter for rlvgl code generation."
 publish = true
 readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-chips-silabs"
+keywords = ["embedded", "silabs", "mcu", "chipdb", "no_std"]
+categories = ["config", "embedded"]
 
 [lib]
 crate-type = ["rlib"]

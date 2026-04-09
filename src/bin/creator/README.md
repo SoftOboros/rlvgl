@@ -13,19 +13,19 @@ A combined UI and command-line tool for normalizing assets and generating dual-m
 
 1. **Initialize folders and manifest**
    ```sh
-   cargo run --bin rlgvl-creator --features creator,creator_ui,fontdue -- init
+   cargo run --bin rlgvl-creator --features creator,creator_ui -- init
    ```
    Creates `icons/`, `fonts/`, `media/`, and a `manifest.yml` in the working directory.
 
 2. **Scan for new or changed assets**
    ```sh
-   cargo run --bin rlgvl-creator --features creator,creator_ui,fontdue -- scan .
+   cargo run --bin rlgvl-creator --features creator,creator_ui -- scan .
    ```
    Updates hashes in the manifest for assets under the allowed roots.
 
 3. **Convert assets into raw sequences and font packs**
    ```sh
-   cargo run --bin rlgvl-creator --features creator,creator_ui,fontdue -- convert
+   cargo run --bin rlgvl-creator --features creator,creator_ui -- convert
    ```
    Raster images become raw RGBA sequences, and fonts are packed into bitmap binaries and metrics. Conversions run in parallel
    with stable ordering. Use `--force` to rebuild all assets regardless of cache.
@@ -38,23 +38,37 @@ A combined UI and command-line tool for normalizing assets and generating dual-m
 
 4. **Synchronize feature flags, constants, and index**
    ```sh
-   cargo run --bin rlgvl-creator --features creator,creator_ui,fontdue -- sync
+   cargo run --bin rlgvl-creator --features creator,creator_ui -- sync
    ```
    Regenerates manifest-driven code without touching asset bytes.
 
 5. **Scaffold a consumer assets crate**
    ```sh
-   cargo run --bin rlgvl-creator --features creator,creator_ui,fontdue -- scaffold assets-crate
+   cargo run --bin rlgvl-creator --features creator,creator_ui -- scaffold assets-crate
    ```
    Generates a crate with `embed` and `vendor` features that exposes your processed assets.
 
 6. **Vendor assets for build output**
    ```sh
-   cargo run --bin rlgvl-creator --features creator,creator_ui,fontdue -- vendor
+   cargo run --bin rlgvl-creator --features creator,creator_ui -- vendor
    ```
    Copies processed assets to `$OUT_DIR` and emits an `rlvgl_assets.rs` module for inclusion.
 
 The resulting crate can be built with `--features embed` to include raw bytes or `--features vendor` to copy files at build time while importing the generated module.
+
+## Desktop UI and Emulator
+
+Launch the desktop UI explicitly:
+
+```sh
+cargo run --bin rlgvl-creator --features creator,creator_ui -- ui
+```
+
+Run the simulator from the same binary:
+
+```sh
+cargo run --bin rlgvl-creator --features creator,creator_ui -- sim --screen=800x480 --png --qrcode
+```
 
 ## Developer Notes
 
