@@ -12,4 +12,5 @@ path = "src/main.rs"
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", features = ["uefi"] }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+rlvgl-playit = { path = "../../playit", default-features = false }
 uefi = { version = "0.36.1", features = ["alloc", "global_allocator", "panic_handler"] }

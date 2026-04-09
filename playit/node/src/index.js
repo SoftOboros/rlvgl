@@ -501,3 +501,62 @@ export async function launchDiscoSim(options = {}) {
 
   return new DiscoSimSession({ child, socket, commandTimeoutMs });
 }
+
+/**
+ * Connect to an already-running playit socket (e.g., UEFI QEMU instance).
+ *
+ * Unlike `launchDiscoSim`, this does not spawn a child process.
+ * When `waitForReady` is true, reads and discards lines from the socket
+ * until a line starting with `PLAYIT_READY` is received (useful for UEFI
+ * targets where firmware boot messages appear before the app starts).
+ *
+ * @param {{ host?: string, port: number, commandTimeoutMs?: number, waitForReady?: boolean }} options
+ * @returns {Promise<DiscoSimSession>}
+ */
+export async function connectDiscoSession(options = {}) {
+  const host = options.host ?? DEFAULT_HOST;
+  const port = options.port;
+  const commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
+  const waitForReady = options.waitForReady ?? false;
+  if (!port) {
+    throw new Error('connectDiscoSession requires a port');
+  }
+  const socket = await connectSocket({ host, port, timeoutMs: commandTimeoutMs });
+
+  if (waitForReady) {
+    // Drain boot noise until we see the PLAYIT_READY marker.
+    // We avoid readline.createInterface because it over-reads the socket
+    // buffer and consumes data past the ready line.
+    const readyTimeoutMs = options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
+    let accum = '';
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        socket.removeListener('data', onData);
+        reject(new Error('timed out waiting for PLAYIT_READY on serial'));
+      }, readyTimeoutMs);
+      function onData(chunk) {
+        accum += chunk.toString();
+        const lines = accum.split(/\r?\n/);
+        // Keep the last (possibly incomplete) line
+        accum = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('PLAYIT_READY')) {
+            clearTimeout(timer);
+            socket.removeListener('data', onData);
+            // Push back any leftover data that arrived after the ready marker
+            if (accum.length > 0) {
+              socket.unshift(Buffer.from(accum));
+            }
+            resolve();
+            return;
+          }
+        }
+      }
+      socket.on('data', onData);
+    });
+    // Wait for the target's handshake loop to finish before sending commands.
+    await delay(options.readySettleMs ?? 6000);
+  }
+
+  return new DiscoSimSession({ child: null, socket, commandTimeoutMs });
+}

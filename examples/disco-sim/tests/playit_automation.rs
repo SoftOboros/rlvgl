@@ -184,3 +184,152 @@ fn automation_headless_emits_ready_status_and_dump_frames() {
     );
     assert_eq!(session.read_line(), "END");
 }
+
+#[test]
+fn keyboard_opens_settings_wing() {
+    let mut session = SimulatorSession::launch();
+
+    // Initial state: settings wing collapsed
+    session.send("QB:disco.settings.audio");
+    assert_eq!(parse_bounds(&session.read_line()), (0, 0, 0, 0));
+
+    // Send Enter to open settings wing (focus starts on Settings)
+    session.send("KD:Enter");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    session.send("QB:disco.settings.audio");
+    let (_, _, width, height) = parse_bounds(&session.read_line());
+    assert!(width > 0, "settings wing did not open after Enter");
+    assert!(height > 0);
+}
+
+#[test]
+fn escape_closes_wing() {
+    let mut session = SimulatorSession::launch();
+
+    session.send("KD:Enter");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    session.send("QB:disco.settings.audio");
+    let (_, _, width, _) = parse_bounds(&session.read_line());
+    assert!(width > 0, "settings wing should be open");
+
+    session.send("KD:Escape");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    session.send("QB:disco.settings.audio");
+    assert_eq!(parse_bounds(&session.read_line()), (0, 0, 0, 0));
+}
+
+#[test]
+fn hotkey_shortcuts_via_playit() {
+    let mut session = SimulatorSession::launch();
+
+    // 's' opens settings wing
+    session.send("KD:s");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    session.send("QB:disco.settings.audio");
+    let (_, _, width, _) = parse_bounds(&session.read_line());
+    assert!(width > 0, "settings wing should be open after 's'");
+
+    // Escape to close
+    session.send("KD:Escape");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    // 'i' opens info wing
+    session.send("KD:i");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    session.send("QB:disco.info.diagnostics");
+    let (_, _, width, _) = parse_bounds(&session.read_line());
+    assert!(width > 0, "info wing should be open after 'i'");
+}
+
+#[test]
+fn all_tags_exist_at_startup() {
+    let mut session = SimulatorSession::launch();
+
+    let tags = [
+        "disco.root",
+        "disco.dashboard",
+        "disco.subtitle",
+        "disco.footer",
+        "disco.events",
+        "disco.main.settings",
+        "disco.main.files",
+        "disco.main.info",
+        "disco.settings.audio",
+        "disco.settings.camera",
+        "disco.settings.display",
+        "disco.settings.locale",
+        "disco.settings.backlight",
+        "disco.info.diagnostics",
+        "disco.info.live_stats",
+        "disco.info.star_crawl",
+        "disco.info.audio_scope",
+    ];
+
+    for tag in tags {
+        session.send(&format!("QE:{tag}"));
+        assert_eq!(session.read_line(), "EXISTS:1", "missing tag: {tag}");
+    }
+}
+
+#[test]
+fn framebuffer_has_content_at_startup() {
+    let mut session = SimulatorSession::launch();
+
+    session.send("D0,0,40,20,1");
+    assert_eq!(session.read_line(), "DUMP:queued");
+    assert_eq!(session.read_line(), "F");
+
+    let mut has_content = false;
+    for _ in 0..20 {
+        let row = session.read_line();
+        if row.split_whitespace().any(|pixel| pixel != "00000000") {
+            has_content = true;
+        }
+    }
+    assert_eq!(session.read_line(), "END");
+    assert!(has_content, "framebuffer was blank at startup");
+}
+
+#[test]
+fn focus_highlight_moves_with_arrow_keys() {
+    let mut session = SimulatorSession::launch();
+
+    // Dump a small region over the icon strip area
+    session.send("D740,10,40,20,1");
+    assert_eq!(session.read_line(), "DUMP:queued");
+    assert_eq!(session.read_line(), "F");
+    let mut pixels_a = Vec::new();
+    for _ in 0..20 {
+        pixels_a.push(session.read_line());
+    }
+    assert_eq!(session.read_line(), "END");
+
+    // Move focus down
+    session.send("KD:ArrowDown");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    // Dump same region after focus moved
+    session.send("D740,10,40,20,1");
+    assert_eq!(session.read_line(), "DUMP:queued");
+    assert_eq!(session.read_line(), "F");
+    let mut pixels_b = Vec::new();
+    for _ in 0..20 {
+        pixels_b.push(session.read_line());
+    }
+    assert_eq!(session.read_line(), "END");
+
+    // The pixel content should differ because the highlight border moved
+    assert_ne!(pixels_a, pixels_b, "icon strip pixels should differ after focus change");
+}

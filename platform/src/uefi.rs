@@ -45,6 +45,7 @@ pub struct UefiDisplay {
     height: usize,
     frame: Vec<u8>,
     present: Vec<BltPixel>,
+    present_count: u32,
 }
 
 impl UefiDisplay {
@@ -58,6 +59,7 @@ impl UefiDisplay {
             height,
             frame: alloc::vec![0; width * height * 4],
             present: alloc::vec![BltPixel::from(0xff00_0000); width * height],
+            present_count: 0,
         }
     }
 
@@ -101,12 +103,16 @@ impl UefiDisplay {
             self.present[index] = BltPixel::from(argb);
         }
 
-        gop.blt(BltOp::BufferToVideo {
+        let result = gop.blt(BltOp::BufferToVideo {
             buffer: &self.present,
             src: BltRegion::Full,
             dest: (0, 0),
             dims: (self.width, self.height),
-        })
+        });
+        if result.is_ok() {
+            self.present_count = self.present_count.wrapping_add(1);
+        }
+        result
     }
 }
 
@@ -210,5 +216,45 @@ fn map_key(key: UefiKey) -> Option<Key> {
         UefiKey::Printable(ch) if ch == ' ' => Some(Key::Space),
         UefiKey::Printable(ch) => Some(Key::Character(char::from(ch))),
         UefiKey::Special(scan) => Some(Key::Other(scan.0 as u32)),
+    }
+}
+
+impl rlvgl_playit::FramebufferReader for UefiDisplay {
+    fn read_pixel(&self, x: i32, y: i32) -> u32 {
+        let ux = x as usize;
+        let uy = y as usize;
+        if ux >= self.width || uy >= self.height {
+            return 0;
+        }
+        let offset = (uy * self.width + ux) * 4;
+        u32::from_le_bytes([
+            self.frame[offset],
+            self.frame[offset + 1],
+            self.frame[offset + 2],
+            self.frame[offset + 3],
+        ])
+    }
+
+    fn read_row(&self, x: i32, y: i32, width: u16, out: &mut [u32]) -> usize {
+        let ux = x.max(0) as usize;
+        let uy = y.max(0) as usize;
+        if uy >= self.height || ux >= self.width {
+            return 0;
+        }
+        let available = (self.width - ux).min(width as usize).min(out.len());
+        for i in 0..available {
+            let offset = (uy * self.width + ux + i) * 4;
+            out[i] = u32::from_le_bytes([
+                self.frame[offset],
+                self.frame[offset + 1],
+                self.frame[offset + 2],
+                self.frame[offset + 3],
+            ]);
+        }
+        available
+    }
+
+    fn present_count(&self) -> u32 {
+        self.present_count
     }
 }

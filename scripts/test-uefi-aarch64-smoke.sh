@@ -27,8 +27,8 @@ rm -f "$MONITOR_SOCK" "$BOOT_SHOT" "$INPUT_SHOT"
 cd "$ROOT_DIR"
 mkdir -p target/uefi-esp/EFI/BOOT
 cp "$UEFI_VARS" target/AAVMF_VARS.fd
-cargo build --bin rlvgl-uefi-disco --target "$TARGET_TRIPLE" --features uefi
-cp "target/$TARGET_TRIPLE/debug/rlvgl-uefi-disco.efi" target/uefi-esp/EFI/BOOT/BOOTAA64.EFI
+cargo build --manifest-path "$ROOT_DIR/examples/uefi-disco/Cargo.toml" --target "$TARGET_TRIPLE"
+cp "examples/uefi-disco/target/$TARGET_TRIPLE/debug/rlvgl-uefi-disco.efi" target/uefi-esp/EFI/BOOT/BOOTAA64.EFI
 
 "$QEMU_BIN" \
   -machine virt \

@@ -8,7 +8,9 @@ use rlvgl_core::{
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
-use rlvgl_ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl_ui::draw_helpers::{draw_border, draw_border_straight, fill_rounded_rect};
+
+use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR};
 
 const MAX_SLOTS: usize = 5;
 const ICON_SIZE: i32 = 60;
@@ -38,6 +40,7 @@ pub struct Wing {
     visible: bool,
     bounds: Rect,
     clear_countdown: u8,
+    focused_slot: Option<usize>,
 }
 
 impl Wing {
@@ -65,7 +68,18 @@ impl Wing {
                 height: total_height,
             },
             clear_countdown: 0,
+            focused_slot: None,
         }
+    }
+
+    /// Set the focused slot index for highlight rendering.
+    pub fn set_focused_slot(&mut self, index: Option<usize>) {
+        self.focused_slot = index;
+    }
+
+    /// Returns the currently focused slot index.
+    pub fn focused_slot(&self) -> Option<usize> {
+        self.focused_slot
     }
 
     /// Returns whether the wing is visible.
@@ -158,6 +172,10 @@ impl Widget for Wing {
                         }
                     }
                     renderer.draw_pixels((x, y), &buf, width, height);
+                }
+                if self.focused_slot == Some(index) {
+                    let rect = self.icon_rect(index);
+                    draw_border_straight(renderer, rect, FOCUS_HIGHLIGHT_COLOR, FOCUS_BORDER_WIDTH);
                 }
             }
         }

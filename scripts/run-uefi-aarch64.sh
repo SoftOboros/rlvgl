@@ -13,6 +13,7 @@ UEFI_CODE="${UEFI_CODE:-}"
 UEFI_VARS="${UEFI_VARS:-}"
 ESP_DIR="${ESP_DIR:-$ROOT_DIR/target/uefi-esp}"
 VARS_COPY="${VARS_COPY:-$ROOT_DIR/target/AAVMF_VARS.fd}"
+PLAYIT_PORT="${PLAYIT_PORT:-4567}"
 QEMU_EXTRA_ARGS="${QEMU_EXTRA_ARGS:-}"
 
 if [[ -z "$UEFI_CODE" ]]; then
@@ -74,8 +75,10 @@ mkdir -p "$ESP_DIR/EFI/BOOT"
 cp "$UEFI_VARS" "$VARS_COPY"
 
 cd "$ROOT_DIR"
-cargo build --bin rlvgl-uefi-disco --target "$TARGET_TRIPLE" --features uefi
-cp "target/$TARGET_TRIPLE/debug/rlvgl-uefi-disco.efi" "$ESP_DIR/EFI/BOOT/BOOTAA64.EFI"
+cargo build --manifest-path "$ROOT_DIR/examples/uefi-disco/Cargo.toml" --target "$TARGET_TRIPLE"
+cp "examples/uefi-disco/target/$TARGET_TRIPLE/debug/rlvgl-uefi-disco.efi" "$ESP_DIR/EFI/BOOT/BOOTAA64.EFI"
+
+echo "Playit automation socket: tcp://127.0.0.1:$PLAYIT_PORT"
 
 exec "$QEMU_BIN" \
   -machine virt \

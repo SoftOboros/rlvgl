@@ -8,8 +8,11 @@ extern crate alloc;
 
 use core::time::Duration;
 
-use rlvgl_platform::{UefiDisplay, UefiInput};
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
+use rlvgl_platform::UefiDisplay;
+use rlvgl_playit::executor::NullPipeline;
+use rlvgl_playit::{FramebufferReader as _, PlayitExecutor, PlayitTransport, StatusData};
+use uefi::proto::console::text::{Input, Key as UefiKey};
 use uefi::{Status, boot, entry, helpers, proto::console::gop::GraphicsOutput, system};
 
 fn apply_runtime_commands(controller: &mut DiscoController) {
@@ -44,6 +47,47 @@ fn apply_runtime_commands(controller: &mut DiscoController) {
     }
 }
 
+// ── Hybrid transport: MMIO TX + ConIn RX ────────────────────────────
+// QEMU virt has a single pl011 UART at 0x0900_0000.  EDK2's ConIn driver
+// owns the receiver, so raw MMIO reads see an empty FIFO.  We use:
+//   TX → raw MMIO write to UART DR (works, EDK2 doesn't interfere)
+//   RX → UEFI ConIn (read_key) which buffers UART RX for us
+
+const UART0_DR: *mut u8 = 0x0900_0000 as *mut u8;
+const UART0_FR: *const u32 = 0x0900_0018 as *const u32;
+const UART0_FR_TXFF: u32 = 1 << 5;
+
+/// PlayitTransport: MMIO TX + ConIn RX.
+struct ConsoleTransport;
+
+impl PlayitTransport for ConsoleTransport {
+    fn read_byte(&mut self) -> Option<u8> {
+        system::with_stdin(|stdin: &mut Input| -> Option<u8> {
+            match stdin.read_key() {
+                Ok(Some(key)) => match key {
+                    UefiKey::Printable(ch) => {
+                        let c = char::from(ch);
+                        if c == '\r' {
+                            Some(b'\n')
+                        } else {
+                            Some(c as u8)
+                        }
+                    }
+                    UefiKey::Special(_) => None,
+                },
+                _ => None,
+            }
+        })
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            while unsafe { UART0_FR.read_volatile() } & UART0_FR_TXFF != 0 {}
+            unsafe { UART0_DR.write_volatile(byte) };
+        }
+    }
+}
+
 #[entry]
 fn main() -> Status {
     helpers::init().expect("failed to initialize UEFI services");
@@ -56,22 +100,39 @@ fn main() -> Status {
 
     let mut controller = DiscoController::new(width, height, DiscoCapabilities::uefi());
     let root = controller.root();
-    let mut input = UefiInput::new();
+
+    let mut transport = ConsoleTransport;
+
+    // Handshake: signal readiness repeatedly for clients connecting at any time.
+    for _ in 0..10 {
+        transport.write_bytes(b"PLAYIT_READY serial\r\n");
+        boot::stall(Duration::from_millis(500));
+    }
+
+    let mut playit: PlayitExecutor<ConsoleTransport, 256> = PlayitExecutor::new(transport);
+    let mut tick_count: u32 = 0;
+
+    // Disable cursor blinking once
+    let _ = system::with_stdout(|stdout| stdout.enable_cursor(false));
 
     loop {
-        controller.tick();
-        while let Some(event) = input.poll().expect("failed to poll keyboard input") {
-            controller.dispatch_event(&event);
-            apply_runtime_commands(&mut controller);
-            if matches!(
-                event,
-                rlvgl_core::event::Event::KeyDown {
-                    key: rlvgl_core::event::Key::Character('q')
-                }
-            ) {
-                return Status::SUCCESS;
-            }
+        {
+            let status = StatusData {
+                tick_count,
+                present_count: display.present_count(),
+            };
+            playit.poll(
+                &mut root.borrow_mut(),
+                &status,
+                Some(&display),
+                &mut NullPipeline,
+                |_| {},
+            );
         }
+
+        controller.tick();
+        tick_count = tick_count.wrapping_add(1);
+
         apply_runtime_commands(&mut controller);
 
         display.clear(rlvgl_core::widget::Color(13, 19, 30, 255));
@@ -81,6 +142,5 @@ fn main() -> Status {
             .expect("failed to present GOP frame");
 
         boot::stall(Duration::from_millis(16));
-        let _ = system::with_stdout(|stdout| stdout.enable_cursor(false));
     }
 }

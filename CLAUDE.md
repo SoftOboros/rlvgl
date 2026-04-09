@@ -152,6 +152,11 @@ RUSTFLAGS="" cargo build -p rlvgl-example-sim
 RUSTFLAGS="" cargo test -p rlvgl-example-sim
 RUSTFLAGS="" cargo test --tests --features "creator" -p rlvgl
 
+# Phase 4.5: disco demo + simulator automation tests
+RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
+RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
+cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test && cd ../..
+
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
 

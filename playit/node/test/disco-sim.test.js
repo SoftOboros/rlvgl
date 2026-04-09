@@ -5,16 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { launchDiscoSim } from '../src/index.js';
-
-function dumpHasVisiblePixels(dump) {
-  return dump.frames.some((frame) =>
-    frame.some((row) => row.some((pixel) => pixel !== 0))
-  );
-}
-
-function dumpSignature(dump) {
-  return JSON.stringify(dump.frames);
-}
+import { dumpHasVisiblePixels, dumpSignature, assertAllTagsExist } from './shared-assertions.js';
 
 test('headless disco sim reports advancing status and exposes frame dumps', async () => {
   const session = await launchDiscoSim({

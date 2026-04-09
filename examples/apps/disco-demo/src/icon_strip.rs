@@ -8,6 +8,9 @@ use rlvgl_core::{
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
+use rlvgl_ui::draw_helpers::draw_border_straight;
+
+use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR};
 
 /// Number of icon slots in the strip.
 pub const SLOT_COUNT: usize = 3;
@@ -29,6 +32,7 @@ pub struct IconStrip {
     margin_top: i32,
     gap: i32,
     icon_size: i32,
+    focused_slot: Option<usize>,
 }
 
 impl IconStrip {
@@ -40,6 +44,7 @@ impl IconStrip {
             margin_top,
             gap,
             icon_size,
+            focused_slot: None,
         }
     }
 
@@ -53,6 +58,16 @@ impl IconStrip {
         if index < SLOT_COUNT {
             self.slots[index] = Some(slot);
         }
+    }
+
+    /// Set the focused slot index for highlight rendering.
+    pub fn set_focused_slot(&mut self, index: Option<usize>) {
+        self.focused_slot = index;
+    }
+
+    /// Returns the currently focused slot index.
+    pub fn focused_slot(&self) -> Option<usize> {
+        self.focused_slot
     }
 
     fn slot_bounds(&self, index: usize) -> Rect {
@@ -113,6 +128,10 @@ impl Widget for IconStrip {
                         }
                     }
                     renderer.draw_pixels((x, y), &buf, width, height);
+                }
+                if self.focused_slot == Some(index) {
+                    let bounds = self.slot_bounds(index);
+                    draw_border_straight(renderer, bounds, FOCUS_HIGHLIGHT_COLOR, FOCUS_BORDER_WIDTH);
                 }
             }
         }

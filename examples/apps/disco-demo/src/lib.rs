@@ -248,6 +248,7 @@ struct ControllerState {
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
     event_window: Rc<RefCell<EventWindow>>,
+    icon_strip: Rc<RefCell<IconStrip>>,
     settings_wing: Rc<RefCell<Wing>>,
     info_wing: Rc<RefCell<Wing>>,
     focus: FocusState,
@@ -262,22 +263,26 @@ impl ControllerState {
         subtitle: Rc<RefCell<Label>>,
         footer: Rc<RefCell<Label>>,
         event_window: Rc<RefCell<EventWindow>>,
+        icon_strip: Rc<RefCell<IconStrip>>,
         settings_wing: Rc<RefCell<Wing>>,
         info_wing: Rc<RefCell<Wing>>,
     ) -> Self {
-        Self {
+        let this = Self {
             capabilities,
             commands: Vec::new(),
             dashboard,
             subtitle,
             footer,
             event_window,
+            icon_strip,
             settings_wing,
             info_wing,
             focus: FocusState::Main(0),
             tick_count: 0,
             backlight: 75,
-        }
+        };
+        this.sync_focus_highlights();
+        this
     }
 
     fn set_subtitle(&mut self, text: impl Into<String>) {
@@ -377,6 +382,7 @@ impl ControllerState {
         };
         self.focus = FocusState::Main(focus_index.min(2));
         self.refresh_focus_hint();
+        self.sync_focus_highlights();
     }
 
     fn open_settings(&mut self) {
@@ -389,6 +395,7 @@ impl ControllerState {
         };
         self.focus = next_focus;
         self.refresh_focus_hint();
+        self.sync_focus_highlights();
         self.show_info(
             "Settings Wing",
             "Shared settings actions without board registers",
@@ -411,6 +418,7 @@ impl ControllerState {
         };
         self.focus = next_focus;
         self.refresh_focus_hint();
+        self.sync_focus_highlights();
         self.show_info(
             "Info Wing",
             "Diagnostics and effect hooks shared across runtimes",
@@ -437,6 +445,28 @@ impl ControllerState {
         self.set_subtitle(text);
     }
 
+    fn sync_focus_highlights(&self) {
+        match self.focus {
+            FocusState::Main(index) => {
+                self.icon_strip.borrow_mut().set_focused_slot(Some(index));
+                self.settings_wing.borrow_mut().set_focused_slot(None);
+                self.info_wing.borrow_mut().set_focused_slot(None);
+            }
+            FocusState::Wing(WingKind::Settings, index) => {
+                self.icon_strip.borrow_mut().set_focused_slot(None);
+                self.settings_wing
+                    .borrow_mut()
+                    .set_focused_slot(Some(index));
+                self.info_wing.borrow_mut().set_focused_slot(None);
+            }
+            FocusState::Wing(WingKind::Info, index) => {
+                self.icon_strip.borrow_mut().set_focused_slot(None);
+                self.settings_wing.borrow_mut().set_focused_slot(None);
+                self.info_wing.borrow_mut().set_focused_slot(Some(index));
+            }
+        }
+    }
+
     fn cycle_main_focus(&mut self, delta: i32) {
         let current = match self.focus {
             FocusState::Main(index) => index as i32,
@@ -445,6 +475,7 @@ impl ControllerState {
         let next = (current + delta).rem_euclid(3) as usize;
         self.focus = FocusState::Main(next);
         self.refresh_focus_hint();
+        self.sync_focus_highlights();
     }
 
     fn cycle_wing_focus(&mut self, delta: i32) {
@@ -460,10 +491,12 @@ impl ControllerState {
             other => other,
         };
         self.refresh_focus_hint();
+        self.sync_focus_highlights();
     }
 
     fn activate_main(&mut self, slot: MainSlot) {
         self.focus = FocusState::Main(slot as usize);
+        self.sync_focus_highlights();
         match slot {
             MainSlot::Settings => self.open_settings(),
             MainSlot::Files => {
@@ -483,6 +516,7 @@ impl ControllerState {
 
     fn activate_settings(&mut self, slot: SettingsSlot) {
         self.focus = FocusState::Wing(WingKind::Settings, slot as usize);
+        self.sync_focus_highlights();
         match slot {
             SettingsSlot::Audio => {
                 if self.capabilities.audio {
@@ -538,6 +572,7 @@ impl ControllerState {
 
     fn activate_info(&mut self, slot: InfoSlot) {
         self.focus = FocusState::Wing(WingKind::Info, slot as usize);
+        self.sync_focus_highlights();
         match slot {
             InfoSlot::Diagnostics => {
                 let mut lines = vec![
@@ -733,62 +768,66 @@ impl DiscoController {
             (assets::ICON_AUDIO_48, capabilities.audio),
         ])));
 
+        let icon_strip = {
+            let mut strip = IconStrip::new(
+                width - STRIP_X_OFFSET,
+                STRIP_ICON_SIZE,
+                STRIP_MARGIN_TOP,
+                STRIP_GAP,
+            );
+            strip.set_slot(
+                0,
+                IconSlot {
+                    rle: assets::ICON_SETTINGS,
+                    enabled: true,
+                    on_tap: None,
+                },
+            );
+            strip.set_slot(
+                1,
+                IconSlot {
+                    rle: assets::ICON_FILE,
+                    enabled: true,
+                    on_tap: None,
+                },
+            );
+            strip.set_slot(
+                2,
+                IconSlot {
+                    rle: assets::ICON_INFO,
+                    enabled: true,
+                    on_tap: None,
+                },
+            );
+            Rc::new(RefCell::new(strip))
+        };
+
         let state = Rc::new(RefCell::new(ControllerState::new(
             capabilities,
             dashboard.clone(),
             subtitle.clone(),
             footer.clone(),
             event_window.clone(),
+            icon_strip.clone(),
             settings_wing.clone(),
             info_wing.clone(),
         )));
 
-        let mut icon_strip = IconStrip::new(
-            width - STRIP_X_OFFSET,
-            STRIP_ICON_SIZE,
-            STRIP_MARGIN_TOP,
-            STRIP_GAP,
-        );
-        icon_strip.set_slot(
-            0,
-            IconSlot {
-                rle: assets::ICON_SETTINGS,
-                enabled: true,
-                on_tap: None,
-            },
-        );
-        icon_strip.set_slot(
-            1,
-            IconSlot {
-                rle: assets::ICON_FILE,
-                enabled: true,
-                on_tap: None,
-            },
-        );
-        icon_strip.set_slot(
-            2,
-            IconSlot {
-                rle: assets::ICON_INFO,
-                enabled: true,
-                on_tap: None,
-            },
-        );
-
         {
             let state_for_settings = state.clone();
-            icon_strip.slots_mut()[0].as_mut().unwrap().on_tap =
+            icon_strip.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
                     state_for_settings
                         .borrow_mut()
                         .activate_main(MainSlot::Settings);
                 }));
             let state_for_files = state.clone();
-            icon_strip.slots_mut()[1].as_mut().unwrap().on_tap =
+            icon_strip.borrow_mut().slots_mut()[1].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
                     state_for_files.borrow_mut().activate_main(MainSlot::Files);
                 }));
             let state_for_info = state.clone();
-            icon_strip.slots_mut()[2].as_mut().unwrap().on_tap =
+            icon_strip.borrow_mut().slots_mut()[2].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
                     state_for_info.borrow_mut().activate_main(MainSlot::Info);
                 }));
@@ -854,7 +893,7 @@ impl DiscoController {
             tag: None,
         });
         root.borrow_mut().children.push(WidgetNode {
-            widget: Rc::new(RefCell::new(icon_strip)),
+            widget: icon_strip.clone(),
             children: Vec::new(),
             tag: None,
         });
@@ -1273,5 +1312,241 @@ mod tests {
                 .iter()
                 .any(|cmd| { matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::StarCrawl)) })
         );
+    }
+
+    // ── Focus navigation tests ──────────────────────────────────────
+
+    fn key_down(controller: &mut DiscoController, key: Key) {
+        controller.dispatch_event(&Event::KeyDown { key });
+    }
+
+    fn focus(controller: &DiscoController) -> FocusState {
+        controller.state.borrow().focus
+    }
+
+    #[test]
+    fn arrow_down_cycles_main_focus() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        assert_eq!(focus(&c), FocusState::Main(0));
+        key_down(&mut c, Key::ArrowDown);
+        assert_eq!(focus(&c), FocusState::Main(1));
+        key_down(&mut c, Key::ArrowDown);
+        assert_eq!(focus(&c), FocusState::Main(2));
+        key_down(&mut c, Key::ArrowDown);
+        assert_eq!(focus(&c), FocusState::Main(0));
+    }
+
+    #[test]
+    fn arrow_up_wraps_from_first_slot() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        assert_eq!(focus(&c), FocusState::Main(0));
+        key_down(&mut c, Key::ArrowUp);
+        assert_eq!(focus(&c), FocusState::Main(2));
+    }
+
+    #[test]
+    fn enter_opens_wing_escape_closes() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        let root = c.root();
+        key_down(&mut c, Key::Enter);
+        {
+            let root = root.borrow();
+            let audio = find_node(&root, "disco.settings.audio").unwrap();
+            assert!(audio.widget.borrow().bounds().width > 0);
+        }
+        key_down(&mut c, Key::Escape);
+        {
+            let root = root.borrow();
+            let audio = find_node(&root, "disco.settings.audio").unwrap();
+            assert_eq!(audio.widget.borrow().bounds().width, 0);
+        }
+    }
+
+    #[test]
+    fn arrow_left_from_wing_returns_to_main() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Enter);
+        assert!(matches!(focus(&c), FocusState::Wing(WingKind::Settings, _)));
+        key_down(&mut c, Key::ArrowLeft);
+        assert!(matches!(focus(&c), FocusState::Main(_)));
+    }
+
+    #[test]
+    fn wing_focus_cycles_all_settings_items() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Enter);
+        assert_eq!(focus(&c), FocusState::Wing(WingKind::Settings, 0));
+        for i in 1..5 {
+            key_down(&mut c, Key::ArrowDown);
+            assert_eq!(focus(&c), FocusState::Wing(WingKind::Settings, i));
+        }
+        key_down(&mut c, Key::ArrowDown);
+        assert_eq!(focus(&c), FocusState::Wing(WingKind::Settings, 0));
+    }
+
+    #[test]
+    fn wing_focus_cycles_all_info_items() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Character('i'));
+        assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, 0));
+        for i in 1..4 {
+            key_down(&mut c, Key::ArrowDown);
+            assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, i));
+        }
+        key_down(&mut c, Key::ArrowDown);
+        assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, 0));
+    }
+
+    #[test]
+    fn hotkey_s_activates_settings() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::ArrowDown); // move to Files
+        key_down(&mut c, Key::Character('s'));
+        let root = c.root();
+        let root = root.borrow();
+        let audio = find_node(&root, "disco.settings.audio").unwrap();
+        assert!(audio.widget.borrow().bounds().width > 0);
+    }
+
+    #[test]
+    fn hotkey_f_emits_storage_command() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Character('f'));
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::LoadStorageSummary)));
+    }
+
+    #[test]
+    fn hotkey_i_activates_info_wing() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Character('i'));
+        let root = c.root();
+        let root = root.borrow();
+        let diag = find_node(&root, "disco.info.diagnostics").unwrap();
+        assert!(diag.widget.borrow().bounds().width > 0);
+    }
+
+    #[test]
+    fn hotkey_b_cycles_backlight() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        // Default backlight is 75
+        key_down(&mut c, Key::Character('b'));
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(100))));
+
+        key_down(&mut c, Key::Character('b'));
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(25))));
+
+        key_down(&mut c, Key::Character('b'));
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(50))));
+
+        key_down(&mut c, Key::Character('b'));
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(75))));
+    }
+
+    #[test]
+    fn audio_on_capable_platform_emits_start_effect() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::stm32h747i_disco());
+        key_down(&mut c, Key::Enter); // open settings wing
+        key_down(&mut c, Key::Enter); // activate audio (index 0)
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| {
+            matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::AudioScope))
+        }));
+    }
+
+    #[test]
+    fn info_diagnostics_emits_show_status() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Character('i'));
+        key_down(&mut c, Key::Enter); // activate diagnostics (index 0)
+        let commands = c.drain_commands();
+        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::ShowStatus(_))));
+    }
+
+    #[test]
+    fn pointer_ignored_on_uefi_caps() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::uefi());
+        c.dispatch_event(&Event::PressRelease { x: 100, y: 100 });
+        // Should not panic — UEFI has pointer: false, events go through normally
+        // but no widget should consume them in the hotspot path
+    }
+
+    #[test]
+    fn opening_info_closes_settings() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        let root = c.root();
+        key_down(&mut c, Key::Enter); // open settings
+        {
+            let root = root.borrow();
+            assert!(find_node(&root, "disco.settings.audio").unwrap().widget.borrow().bounds().width > 0);
+        }
+        key_down(&mut c, Key::Character('i')); // open info
+        {
+            let root = root.borrow();
+            assert_eq!(find_node(&root, "disco.settings.audio").unwrap().widget.borrow().bounds().width, 0);
+            assert!(find_node(&root, "disco.info.diagnostics").unwrap().widget.borrow().bounds().width > 0);
+        }
+    }
+
+    #[test]
+    fn drain_commands_clears_queue() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Character('f'));
+        let first = c.drain_commands();
+        assert!(!first.is_empty());
+        let second = c.drain_commands();
+        assert!(second.is_empty());
+    }
+
+    #[test]
+    fn custom_display_size_respected() {
+        let c = DiscoController::new(1024, 600, DiscoCapabilities::simulator());
+        let root = c.root();
+        let root = root.borrow();
+        let bounds = root.widget.borrow().bounds();
+        assert_eq!(bounds.width, 1024);
+        assert_eq!(bounds.height, 600);
+    }
+
+    // ── Focus highlight tests ───────────────────────────────────────
+
+    #[test]
+    fn initial_focus_highlight_on_slot_zero() {
+        let c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        let state = c.state.borrow();
+        assert_eq!(state.icon_strip.borrow().focused_slot(), Some(0));
+        assert_eq!(state.settings_wing.borrow().focused_slot(), None);
+        assert_eq!(state.info_wing.borrow().focused_slot(), None);
+    }
+
+    #[test]
+    fn arrow_down_moves_highlight_to_next_slot() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::ArrowDown);
+        let state = c.state.borrow();
+        assert_eq!(state.icon_strip.borrow().focused_slot(), Some(1));
+    }
+
+    #[test]
+    fn enter_moves_highlight_to_wing() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Enter);
+        let state = c.state.borrow();
+        assert_eq!(state.icon_strip.borrow().focused_slot(), None);
+        assert_eq!(state.settings_wing.borrow().focused_slot(), Some(0));
+    }
+
+    #[test]
+    fn escape_restores_highlight_to_main() {
+        let mut c = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        key_down(&mut c, Key::Enter);
+        key_down(&mut c, Key::Escape);
+        let state = c.state.borrow();
+        assert!(state.icon_strip.borrow().focused_slot().is_some());
+        assert_eq!(state.settings_wing.borrow().focused_slot(), None);
     }
 }

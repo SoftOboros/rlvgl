@@ -43,3 +43,9 @@ pub static ICON_CPU_48: &[u8] =
 /// Play icon used for effect demos.
 pub static ICON_PLAY_48: &[u8] =
     include_bytes!("../../../stm32h747i-disco/assets/icons/48/play48.rle");
+
+/// Focus highlight border color (cyan accent).
+pub const FOCUS_HIGHLIGHT_COLOR: rlvgl_core::widget::Color =
+    rlvgl_core::widget::Color(0, 180, 255, 255);
+/// Focus highlight border width in pixels.
+pub const FOCUS_BORDER_WIDTH: u8 = 2;
