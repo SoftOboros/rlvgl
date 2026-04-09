@@ -33,7 +33,10 @@ pub fn render_lottie_frame(
     render_lottie_frame_impl(json, frame, width, height)
 }
 
-#[cfg(feature = "lottie_backend")]
+#[cfg(all(
+    feature = "lottie_backend",
+    any(target_os = "linux", target_os = "android")
+))]
 fn render_lottie_frame_impl(
     json: &str,
     frame: usize,
@@ -52,7 +55,10 @@ fn render_lottie_frame_impl(
         .collect())
 }
 
-#[cfg(not(feature = "lottie_backend"))]
+#[cfg(not(all(
+    feature = "lottie_backend",
+    any(target_os = "linux", target_os = "android")
+)))]
 fn render_lottie_frame_impl(
     _json: &str,
     _frame: usize,
@@ -62,7 +68,11 @@ fn render_lottie_frame_impl(
     Err(Error::BackendUnavailable)
 }
 
-#[cfg(all(test, feature = "lottie_backend"))]
+#[cfg(all(
+    test,
+    feature = "lottie_backend",
+    any(target_os = "linux", target_os = "android")
+))]
 mod tests {
     use super::*;
 

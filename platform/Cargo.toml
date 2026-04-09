@@ -27,7 +27,6 @@ image = { version = "0.25", default-features = false, features = ["png"], option
 bitflags = { version = "2", default-features = false }
 heapless = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt"] }
-fatfs = { version = "0.3", default-features = false, features = ["alloc", "core_io"], optional = true }
 embedded-sdmmc = { version = "0.9", default-features = false, optional = true }
 rlvgl-decomp = { version = "0.1.0", path = "../rlvgl-decomp", optional = true }
 libloading = { version = "0.8", optional = true }
@@ -37,6 +36,7 @@ stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt
 stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc", "xspi"] }
 cortex-m = { version = "0.7", optional = true, features = ["critical-section-single-core", "cm7"] }
 cortex-m-semihosting = { version = "0.5", optional = true }
+fatfs = { version = "0.3", default-features = false, features = ["alloc", "core_io"], optional = true }
 
 [features]
 default = []

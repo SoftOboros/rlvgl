@@ -30,21 +30,25 @@ path = "src/lib.rs"
 name = "rlvgl-sim"
 path = "examples/sim/src/main.rs"
 required-features = ["simulator", "qrcode", "png", "jpeg", "gif", "fontdue"]
+doc = false
 
 [[bin]]
 name = "rlvgl-stm32h747i-disco"
 path = "examples/stm32h747i-disco/src/main.rs"
 required-features = ["stm32h747i_disco_cm7"]
+doc = false
 
 [[bin]]
 name = "rlvgl-stm32h747i-disco-cm4"
 path = "examples/stm32h747i-disco/src/cm4_main.rs"
 required-features = ["stm32h747i_disco_cm4"]
+doc = false
 
 [[bin]]
 name = "rlvgl-creator"
 path = "src/bin/rlvgl_creator/main.rs"
 required-features = ["creator"]
+doc = false
 
 [[test]]
 name = "creator_new"
