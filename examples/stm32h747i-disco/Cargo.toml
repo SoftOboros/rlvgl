@@ -51,6 +51,7 @@ rlvgl-i18n = { path = "../../i18n" }
 rlvgl-app-demo = { path = "../apps/demo", default-features = false, optional = true }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo", default-features = false }
 rlvgl-decomp = { path = "../../rlvgl-decomp" }
+rlvgl-playit = { path = "../../playit", default-features = false }
 rlvgl-bsps-stm = { path = "../../chips/stm/bsps", optional = true }
 cortex-m-rt = "0.7"
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }

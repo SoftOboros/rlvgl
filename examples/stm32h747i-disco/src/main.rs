@@ -639,6 +639,76 @@ mod runtime_serial {
     }
 }
 
+// ── PlayitTransport over USART1 ring buffers ────────────────────────
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct UsartTransport;
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+impl rlvgl_playit::PlayitTransport for UsartTransport {
+    fn read_byte(&mut self) -> Option<u8> {
+        runtime_serial::pop_rx()
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) {
+        runtime_serial::write_bytes(bytes);
+        runtime_serial::kick_tx();
+    }
+}
+
+// ── FramebufferReader for SDRAM front buffer ────────────────────────
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct SdramFbReader {
+    fb_addr: u32,
+    width: u32,
+    height: u32,
+    present_count: u32,
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+impl rlvgl_playit::FramebufferReader for SdramFbReader {
+    fn read_pixel(&self, x: i32, y: i32) -> u32 {
+        let ux = x as u32;
+        let uy = y as u32;
+        if ux >= self.width || uy >= self.height {
+            return 0;
+        }
+        let offset = ((uy * self.width + ux) * 4) as usize;
+        let ptr = (self.fb_addr as usize + offset) as *const u32;
+        unsafe { ptr.read_volatile() }
+    }
+
+    fn read_row(&self, x: i32, y: i32, width: u16, out: &mut [u32]) -> usize {
+        let ux = x.max(0) as u32;
+        let uy = y.max(0) as u32;
+        if uy >= self.height || ux >= self.width {
+            return 0;
+        }
+        let available = ((self.width - ux) as usize).min(width as usize).min(out.len());
+        for i in 0..available {
+            let offset = ((uy * self.width + ux + i as u32) * 4) as usize;
+            let ptr = (self.fb_addr as usize + offset) as *const u32;
+            out[i] = unsafe { ptr.read_volatile() };
+        }
+        available
+    }
+
+    fn present_count(&self) -> u32 {
+        self.present_count
+    }
+}
+
 #[cfg(all(
     not(feature = "c_hal"),
     feature = "dma2d",
@@ -3093,7 +3163,14 @@ fn main() -> ! {
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
         serial_puts("MAIN LOOP START\r\n");
-        let mut serial_task = SerialTask::new();
+        let mut playit_executor: rlvgl_playit::PlayitExecutor<UsartTransport, 256> =
+            rlvgl_playit::PlayitExecutor::new(UsartTransport);
+        let mut fb_reader = SdramFbReader {
+            fb_addr: display.front_buffer_addr(),
+            width: display.dimensions().0,
+            height: display.dimensions().1,
+            present_count: 0,
+        };
         let mut present_count: u32 = 0;
 
         let mut dirty_frames: u8 = 4; // force initial render
@@ -3455,26 +3532,32 @@ fn main() -> ! {
 
             #[cfg(feature = "cpu_stats")]
             let serial_start = cpu_stats.cyccnt();
-            serial_task.poll(
-                tick_count,
-                present_count,
-                display.front_buffer_addr(),
-                display.dimensions().0,
-                |action| match action {
-                    SerialAction::InjectTap(x, y) => {
-                        let tap_evt = Event::PressRelease { x, y };
-                        dirty_frames = 2;
-                        root.borrow_mut().dispatch_event(&tap_evt);
-                    }
-                    SerialAction::ToggleCrawl => {
-                        #[cfg(all(
-                            feature = "dma2d",
-                            any(target_arch = "arm", target_arch = "aarch64")
-                        ))]
-                        crawl_flag.set(true);
-                    }
-                },
-            );
+            {
+                fb_reader.fb_addr = display.front_buffer_addr();
+                fb_reader.present_count = present_count;
+                let status = rlvgl_playit::StatusData {
+                    tick_count,
+                    present_count,
+                };
+                playit_executor.poll(
+                    &mut root.borrow_mut(),
+                    &status,
+                    Some(&fb_reader),
+                    &mut rlvgl_playit::executor::NullPipeline,
+                    |ext| {
+                        // Extension command 'C' toggles the star crawl
+                        if ext.first() == Some(&b'C') || ext.first() == Some(&b'c') {
+                            #[cfg(all(
+                                feature = "dma2d",
+                                any(target_arch = "arm", target_arch = "aarch64")
+                            ))]
+                            crawl_flag.set(true);
+                            runtime_serial::write_bytes(b"CRAWL:toggled\r\n");
+                            runtime_serial::kick_tx();
+                        }
+                    },
+                );
+            }
             #[cfg(feature = "cpu_stats")]
             cpu_stats.record_serial_cycles(cpu_stats.cyccnt().wrapping_sub(serial_start));
 
