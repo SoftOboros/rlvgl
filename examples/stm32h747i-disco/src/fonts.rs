@@ -1060,6 +1060,7 @@ pub static DEJAVU_SANS_24_GLYPHS: [GlyphMetric; 132] = [
 ];
 
 // 132 glyphs, auto-generated from DejaVuSans-Bold-32.json
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 pub static DEJAVU_SANS_BOLD_32_GLYPHS: [GlyphMetric; 132] = [
     GlyphMetric {
         ch: '\u{0020}',

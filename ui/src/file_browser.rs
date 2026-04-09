@@ -72,6 +72,13 @@ impl FileEntry {
 
 // ── Storage trait ──────────────────────────────────────────────────────────
 
+/// Errors returned while listing storage devices or directories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageBrowserError {
+    /// The requested device or directory could not be accessed.
+    Unavailable,
+}
+
 /// Abstraction for listing storage device contents.
 ///
 /// Platform code implements this trait using the appropriate storage drivers
@@ -85,7 +92,11 @@ pub trait StorageBrowser {
     /// `device_index` identifies which root device (from `list_devices`).
     /// `path` is `"/"` for the device root or a subdirectory path like
     /// `"/audio/drums"`.
-    fn list_directory(&mut self, device_index: usize, path: &str) -> Result<Vec<FileEntry>, ()>;
+    fn list_directory(
+        &mut self,
+        device_index: usize,
+        path: &str,
+    ) -> Result<Vec<FileEntry>, StorageBrowserError>;
 }
 
 // ── Navigation state ───────────────────────────────────────────────────────
@@ -110,6 +121,8 @@ enum BrowseLevel {
 /// Navigation is deferred: the widget sets a `pending_nav` flag on
 /// double-tap, and the application must call [`apply_navigation`](Self::apply_navigation)
 /// with a [`StorageBrowser`] to populate the new listing.
+type FileSelectedCallback = dyn FnMut(&str);
+
 pub struct FileBrowser {
     bounds: Rect,
     /// Visual style (background, border).
@@ -121,7 +134,7 @@ pub struct FileBrowser {
     scroll_offset: i32,
     level: BrowseLevel,
     pending_nav: Option<BrowseLevel>,
-    on_file_selected: Option<Box<dyn FnMut(&str)>>,
+    on_file_selected: Option<Box<FileSelectedCallback>>,
 }
 
 impl FileBrowser {
@@ -255,14 +268,14 @@ impl FileBrowser {
                 }
             }
             EntryKind::WavFile => {
-                if let Some(ref mut cb) = self.on_file_selected {
-                    if let BrowseLevel::Directory { ref path, .. } = self.level {
-                        let base = path.trim_end_matches('/');
-                        let mut full = String::from(base);
-                        full.push('/');
-                        full.push_str(&entry.name);
-                        cb(&full);
-                    }
+                if let (Some(cb), BrowseLevel::Directory { path, .. }) =
+                    (self.on_file_selected.as_mut(), &self.level)
+                {
+                    let base = path.trim_end_matches('/');
+                    let mut full = String::from(base);
+                    full.push('/');
+                    full.push_str(&entry.name);
+                    cb(&full);
                 }
             }
             EntryKind::OtherFile => {}
@@ -334,11 +347,11 @@ impl Widget for FileBrowser {
                 if !self.hit_test(*x, *y) {
                     return false;
                 }
-                if let Some(idx) = self.index_at(*y) {
-                    if self.entries[idx].is_interactive() {
-                        self.selected = Some(idx);
-                        return true;
-                    }
+                if let Some(idx) = self.index_at(*y)
+                    && self.entries[idx].is_interactive()
+                {
+                    self.selected = Some(idx);
+                    return true;
                 }
                 false
             }
@@ -346,11 +359,11 @@ impl Widget for FileBrowser {
                 if !self.hit_test(*x, *y) {
                     return false;
                 }
-                if let Some(idx) = self.index_at(*y) {
-                    if self.entries[idx].is_interactive() {
-                        self.navigate(idx);
-                        return true;
-                    }
+                if let Some(idx) = self.index_at(*y)
+                    && self.entries[idx].is_interactive()
+                {
+                    self.navigate(idx);
+                    return true;
                 }
                 false
             }

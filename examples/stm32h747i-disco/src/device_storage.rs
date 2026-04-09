@@ -6,13 +6,16 @@
 
 extern crate alloc;
 
+#[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
 use alloc::rc::Rc;
 use alloc::string::String;
+#[cfg(feature = "sd_storage")]
 use alloc::vec;
 use alloc::vec::Vec;
+#[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
 use core::cell::RefCell;
 
-use rlvgl::ui::file_browser::{EntryKind, FileEntry, StorageBrowser};
+use rlvgl::ui::file_browser::{EntryKind, FileEntry, StorageBrowser, StorageBrowserError};
 
 // ── QSPI block device for embedded-sdmmc ──────────────────────────────────
 
@@ -232,16 +235,18 @@ impl DeviceStorage {
     }
 
     #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
-    fn list_qspi_dir(&self, path: &str) -> Result<Vec<FileEntry>, ()> {
+    fn list_qspi_dir(&self, path: &str) -> Result<Vec<FileEntry>, StorageBrowserError> {
         use rlvgl::platform::sd_emmc_adapter::DummyTimeSource;
 
-        let flash = self.qspi.as_ref().ok_or(())?;
+        let flash = self.qspi.as_ref().ok_or(StorageBrowserError::Unavailable)?;
         let bd = QspiBlockDev::new(flash.clone());
         let vm = embedded_sdmmc::VolumeManager::new(bd, DummyTimeSource);
         let volume = vm
             .open_volume(embedded_sdmmc::VolumeIdx(0))
-            .map_err(|_| ())?;
-        let root_dir = volume.open_root_dir().map_err(|_| ())?;
+            .map_err(|_| StorageBrowserError::Unavailable)?;
+        let root_dir = volume
+            .open_root_dir()
+            .map_err(|_| StorageBrowserError::Unavailable)?;
 
         let mut entries = Vec::new();
 
@@ -259,14 +264,16 @@ impl DeviceStorage {
                 .iterate_dir(|entry| {
                     push_sdmmc_entry(&mut entries, entry);
                 })
-                .map_err(|_| ())?;
+                .map_err(|_| StorageBrowserError::Unavailable)?;
         } else {
             let stripped = path.trim_start_matches('/');
-            let sub = root_dir.open_dir(stripped).map_err(|_| ())?;
+            let sub = root_dir
+                .open_dir(stripped)
+                .map_err(|_| StorageBrowserError::Unavailable)?;
             sub.iterate_dir(|entry| {
                 push_sdmmc_entry(&mut entries, entry);
             })
-            .map_err(|_| ())?;
+            .map_err(|_| StorageBrowserError::Unavailable)?;
         }
 
         Ok(entries)
@@ -338,14 +345,19 @@ impl StorageBrowser for DeviceStorage {
         devices
     }
 
-    fn list_directory(&mut self, device_index: usize, path: &str) -> Result<Vec<FileEntry>, ()> {
+    fn list_directory(
+        &mut self,
+        _device_index: usize,
+        _path: &str,
+    ) -> Result<Vec<FileEntry>, StorageBrowserError> {
+        #[cfg(feature = "sd_storage")]
         let mut dev_idx = 0usize;
 
         #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
         {
             if self.qspi.is_some() {
-                if device_index == dev_idx {
-                    return self.list_qspi_dir(path);
+                if _device_index == dev_idx {
+                    return self.list_qspi_dir(_path);
                 }
                 dev_idx += 1;
             }
@@ -353,7 +365,7 @@ impl StorageBrowser for DeviceStorage {
 
         #[cfg(feature = "sd_storage")]
         {
-            if self.sd_present && device_index == dev_idx {
+            if self.sd_present && _device_index == dev_idx {
                 let mut entries = vec![FileEntry {
                     name: String::from(".."),
                     kind: EntryKind::Directory,
@@ -367,6 +379,6 @@ impl StorageBrowser for DeviceStorage {
             let _ = dev_idx;
         }
 
-        Err(())
+        Err(StorageBrowserError::Unavailable)
     }
 }

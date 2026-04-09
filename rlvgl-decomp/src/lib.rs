@@ -292,12 +292,17 @@ pub fn write_rle_blob(width: u16, height: u16, palette: &[u16], stream: &[u8], o
     out.extend_from_slice(stream);
 }
 
+/// Zero-copy view of a parsed RLEC blob.
+///
+/// The tuple layout is `(width, height, palette_bytes, stream)`.
+pub type ParsedRleBlob<'a> = (u16, u16, &'a [u8], &'a [u8]);
+
 /// Parse an RLEC binary blob into (width, height, palette_bytes, stream).
 ///
 /// Returns raw palette bytes (pairs of LE u16) and the RLE stream slice.
 /// Both are zero-copy references into `data`. The caller must read palette
 /// entries as `u16::from_le_bytes` since alignment is not guaranteed.
-pub fn parse_rle_blob(data: &[u8]) -> Result<(u16, u16, &[u8], &[u8]), Error> {
+pub fn parse_rle_blob(data: &[u8]) -> Result<ParsedRleBlob<'_>, Error> {
     use consts::{BLOB_HEADER_SIZE, BLOB_MAGIC};
     if data.len() < BLOB_HEADER_SIZE {
         return Err(Error::Truncated);

@@ -96,24 +96,24 @@ impl PackedFont {
         for row in 0..gh {
             for col in 0..gw {
                 let idx = off + row * gw + col;
-                if let Some(&alpha) = self.data.get(idx) {
-                    if alpha > 0 {
-                        let c = Color(
-                            color.0,
-                            color.1,
-                            color.2,
-                            ((color.3 as u16 * alpha as u16) / 255) as u8,
-                        );
-                        renderer.fill_rect(
-                            Rect {
-                                x: x + col as i32,
-                                y: gy + row as i32,
-                                width: 1,
-                                height: 1,
-                            },
-                            c,
-                        );
-                    }
+                if let Some(&alpha) = self.data.get(idx)
+                    && alpha > 0
+                {
+                    let c = Color(
+                        color.0,
+                        color.1,
+                        color.2,
+                        ((color.3 as u16 * alpha as u16) / 255) as u8,
+                    );
+                    renderer.fill_rect(
+                        Rect {
+                            x: x + col as i32,
+                            y: gy + row as i32,
+                            width: 1,
+                            height: 1,
+                        },
+                        c,
+                    );
                 }
             }
         }

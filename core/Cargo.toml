@@ -14,23 +14,25 @@ categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
 [dependencies]
-
-# Use `png` in no_std by disabling default features; the crate works with
-# `alloc` without an explicit feature flag in 0.17.x.
-png = { version = "0.17", default-features = false, optional = true }
-jpeg-decoder = { version = "0.3", optional = true }
-qrcode = { version = "0.14", default-features = false, optional = true }
 gif = { version = "0.13", optional = true }
 fontdue = { version = "0.9.3", default-features = false, optional = true }
-rlottie = { version = "0.5.2", optional = true }
 embedded-canvas = { version = "0.3.1", default-features = true, optional = true }
 embedded-graphics = { version = "0.8", optional = true }
 fatfs = { version = "0.3", optional = true }
 fscommon = { version = "0.1", optional = true }
 yane = { version = "1", default-features = false, optional = true }
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
-once_cell = {version = "1.19", optional = true }
-blake3 = {version = "1.5", optional = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+rlottie = { version = "0.5.2", optional = true }
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+png = { version = "0.17", default-features = false, optional = true }
+qrcode = { version = "0.14", default-features = false, optional = true }
+once_cell = { version = "1.19", optional = true }
+blake3 = { version = "1.5", default-features = false, optional = true }
+jpeg-decoder = { version = "0.3", default-features = false, optional = true }
+
 [features]
 default = []
 png = ["dep:png"]
@@ -38,7 +40,8 @@ jpeg = ["dep:jpeg-decoder"]
 gif = ["dep:gif"]
 qrcode = ["dep:qrcode"]
 fontdue = ["dep:fontdue", "dep:once_cell", "dep:blake3"]
-lottie = ["dep:rlottie"]
+lottie = []
+lottie_backend = ["dep:rlottie"]
 canvas = ["dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = []
 fatfs = ["dep:fatfs", "dep:fscommon"]
@@ -54,7 +57,7 @@ apng = "0.3"
 png = "0.17"
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["png", "jpeg", "gif", "qrcode", "fontdue", "lottie", "canvas", "pinyin", "fatfs", "nes", "apng", "fs"]
 rustdoc-args = ["--cfg", "docsrs", "--cfg", "nightly"]
 
 [lints.rust]

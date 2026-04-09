@@ -711,24 +711,6 @@ impl StarCrawl {
     pub fn tick(&mut self, _back_buf: *mut u8, _fb_w: u32, _fb_h: u32) -> StepResult {
         StepResult::Idle
     }
-
-    pub fn stage_code(&self) -> u32 {
-        0
-    }
-
-    pub fn frame_id(&self) -> u32 {
-        0
-    }
-
-    pub fn waiting_for_dma(&self) -> bool {
-        false
-    }
-
-    pub fn drop_frame(&mut self) {}
-
-    pub fn diag_words(&self) -> (u32, u32, u32, u32) {
-        (0, 0, 0, 0)
-    }
 }
 
 // ── D-cache maintenance ─────────────────────────────────────────────────────

@@ -17,16 +17,15 @@
 // harness can link successfully.
 #[cfg(any(
     test,
-    feature = "png",
-    feature = "jpeg",
-    feature = "qrcode",
     feature = "gif",
-    feature = "fontdue",
     feature = "lottie",
     feature = "pinyin",
     feature = "fatfs",
     feature = "nes",
-    feature = "apng"
+    feature = "apng",
+    all(feature = "jpeg", not(target_os = "none")),
+    all(feature = "png", not(target_os = "none")),
+    all(feature = "qrcode", not(target_os = "none"))
 ))]
 extern crate std;
 
@@ -71,7 +70,7 @@ pub use plugins::gif;
 #[cfg_attr(docsrs, doc(cfg(feature = "apng")))]
 pub use plugins::apng;
 
-#[cfg(feature = "jpeg")]
+#[cfg(all(feature = "jpeg", not(target_os = "none")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "jpeg")))]
 pub use plugins::jpeg;
@@ -87,11 +86,11 @@ pub use plugins::nes;
 #[cfg_attr(docsrs, doc(cfg(feature = "pinyin")))]
 pub use plugins::pinyin;
 
-#[cfg(feature = "png")]
+#[cfg(all(feature = "png", not(target_os = "none")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "png")))]
 pub use plugins::png;
 
-#[cfg(feature = "qrcode")]
+#[cfg(all(feature = "qrcode", not(target_os = "none")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "qrcode")))]
 pub use plugins::qrcode;
 

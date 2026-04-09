@@ -551,7 +551,6 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         let fb = Self::init_sdram();
         d3(2, 0xB007_0003); // post-SDRAM init
         sdram_alloc::init(fb, 32 * 1024 * 1024);
-        let fb_bytes = (width as usize) * (height as usize) * 4; // ARGB8888
 
         // Place front and back buffers in DIFFERENT SDRAM internal banks
         // to eliminate row conflicts between LTDC reads and CPU/DMA2D writes.

@@ -4,6 +4,10 @@
 //! accelerated by different platform implementations.
 
 #[cfg(any(
+    feature = "canvas",
+    feature = "gif",
+    feature = "apng",
+    feature = "nes",
     feature = "png",
     feature = "jpeg",
     feature = "qrcode",
@@ -23,6 +27,17 @@ use rlvgl_core::widget::{Color, Rect as WidgetRect};
 
 #[cfg(feature = "fontdue")]
 const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
+
+#[cfg(feature = "fontdue")]
+fn round_to_i32(value: f32) -> i32 {
+    if value.is_nan() {
+        0
+    } else if value >= 0.0 {
+        (value + 0.5) as i32
+    } else {
+        (value - 0.5) as i32
+    }
+}
 
 #[cfg(feature = "fontdue")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -175,9 +190,13 @@ pub struct BlitterRenderer<'a, B: Blitter, const N: usize> {
     surface: Surface<'a>,
     planner: BlitPlanner<N>,
     #[cfg(any(
-        feature = "png",
-        feature = "jpeg",
-        feature = "qrcode",
+        feature = "canvas",
+        feature = "gif",
+        feature = "apng",
+        feature = "nes",
+        all(feature = "png", not(target_os = "none")),
+        all(feature = "jpeg", not(target_os = "none")),
+        all(feature = "qrcode", not(target_os = "none")),
         feature = "lottie",
         test,
     ))]
@@ -194,9 +213,13 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             surface,
             planner: BlitPlanner::new(),
             #[cfg(any(
-                feature = "png",
-                feature = "jpeg",
-                feature = "qrcode",
+                feature = "canvas",
+                feature = "gif",
+                feature = "apng",
+                feature = "nes",
+                all(feature = "png", not(target_os = "none")),
+                all(feature = "jpeg", not(target_os = "none")),
+                all(feature = "qrcode", not(target_os = "none")),
                 feature = "lottie",
                 test,
             ))]
@@ -212,9 +235,13 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
     }
 
     #[cfg(any(
-        feature = "png",
-        feature = "jpeg",
-        feature = "qrcode",
+        feature = "canvas",
+        feature = "gif",
+        feature = "apng",
+        feature = "nes",
+        all(feature = "png", not(target_os = "none")),
+        all(feature = "jpeg", not(target_os = "none")),
+        all(feature = "qrcode", not(target_os = "none")),
         feature = "lottie",
         test,
     ))]
@@ -244,7 +271,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         });
     }
 
-    #[cfg(feature = "png")]
+    #[cfg(all(feature = "png", not(target_os = "none")))]
     /// Decode a PNG image and blit it onto the target surface.
     pub fn draw_png(
         &mut self,
@@ -256,7 +283,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         Ok(())
     }
 
-    #[cfg(feature = "jpeg")]
+    #[cfg(all(feature = "jpeg", not(target_os = "none")))]
     /// Decode a JPEG image and blit it onto the target surface.
     pub fn draw_jpeg(
         &mut self,
@@ -268,7 +295,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         Ok(())
     }
 
-    #[cfg(feature = "qrcode")]
+    #[cfg(all(feature = "qrcode", not(target_os = "none")))]
     /// Generate a QR code from `data` and blit it onto the target surface.
     pub fn draw_qr(
         &mut self,
@@ -293,8 +320,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         height: u32,
     ) -> Result<(), rlvgl_core::lottie::Error> {
         let pixels =
-            rlvgl_core::lottie::render_lottie_frame(json, frame, width as usize, height as usize)
-                .ok_or(rlvgl_core::lottie::Error::InvalidJson)?;
+            rlvgl_core::lottie::render_lottie_frame(json, frame, width as usize, height as usize)?;
         self.blit_colors(position, &pixels, width, height);
         Ok(())
     }
@@ -425,7 +451,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
         px: f32,
     ) {
         let vm = line_metrics(font_data, px).unwrap();
-        let ascent = vm.ascent.round() as i32;
+        let ascent = round_to_i32(vm.ascent);
         let baseline = position.1 + ascent;
         let mut x_cursor = position.0;
         for ch in text.chars() {
@@ -444,7 +470,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
             let w = metrics.width as i32;
             let h = metrics.height as i32;
             if w == 0 || h == 0 {
-                x_cursor += metrics.advance_width.round() as i32;
+                x_cursor += round_to_i32(metrics.advance_width);
                 continue;
             }
             let mut argb = vec![0u8; (w * h * 4) as usize];
@@ -486,7 +512,7 @@ impl<'a, B: Blitter, const N: usize> BlitterRenderer<'a, B, N> {
                 w: w as u32,
                 h: h as u32,
             });
-            x_cursor += metrics.advance_width.round() as i32;
+            x_cursor += round_to_i32(metrics.advance_width);
         }
     }
 
@@ -520,8 +546,8 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
             let sh = self.surface.height as i32;
             let stride = self.surface.stride;
             let inv = 255 - alpha;
-            let x0 = rect.x.max(0) as i32;
-            let y0 = rect.y.max(0) as i32;
+            let x0 = rect.x.max(0);
+            let y0 = rect.y.max(0);
             let x1 = (rect.x + rect.width).min(sw);
             let y1 = (rect.y + rect.height).min(sh);
             for y in y0..y1 {
@@ -798,7 +824,7 @@ mod text_tests {
     }
 }
 
-#[cfg(all(test, feature = "png"))]
+#[cfg(all(test, feature = "png", not(target_os = "none")))]
 mod png_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
@@ -833,7 +859,7 @@ mod png_tests {
     }
 }
 
-#[cfg(all(test, feature = "jpeg"))]
+#[cfg(all(test, feature = "jpeg", not(target_os = "none")))]
 mod jpeg_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;
@@ -949,7 +975,7 @@ mod canvas_tests {
     }
 }
 
-#[cfg(all(test, feature = "qrcode"))]
+#[cfg(all(test, feature = "qrcode", not(target_os = "none")))]
 mod qrcode_tests {
     use super::*;
     use crate::cpu_blitter::CpuBlitter;

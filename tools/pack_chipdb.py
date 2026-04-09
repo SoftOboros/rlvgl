@@ -11,7 +11,14 @@ from __future__ import annotations
 
 import argparse
 import pathlib
-import zstandard as zstd
+import shutil
+import subprocess
+import tempfile
+
+try:
+    import zstandard as zstd
+except ModuleNotFoundError:
+    zstd = None
 
 
 def build_blob(src: pathlib.Path) -> bytes:
@@ -28,6 +35,29 @@ def build_blob(src: pathlib.Path) -> bytes:
     return b"".join(parts)
 
 
+def compress_blob(blob: bytes) -> bytes:
+    """Return a zstd-compressed chip database blob."""
+    if zstd is not None:
+        cctx = zstd.ZstdCompressor(level=19)
+        return cctx.compress(blob)
+
+    zstd_bin = shutil.which("zstd")
+    if zstd_bin is None:
+        raise RuntimeError(
+            "pack_chipdb.py requires either the Python 'zstandard' module or the 'zstd' CLI"
+        )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        src = pathlib.Path(tmp_dir) / "chipdb.bin"
+        dst = pathlib.Path(tmp_dir) / "chipdb.bin.zst"
+        src.write_bytes(blob)
+        subprocess.run(
+            [zstd_bin, "-19", "-f", str(src), "-o", str(dst)],
+            check=True,
+        )
+        return dst.read_bytes()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=pathlib.Path, required=True)
@@ -35,9 +65,8 @@ def main() -> None:
     args = parser.parse_args()
 
     blob = build_blob(args.input)
-    cctx = zstd.ZstdCompressor(level=19)
     with args.output.open("wb") as dst:
-        dst.write(cctx.compress(blob))
+        dst.write(compress_blob(blob))
 
 
 if __name__ == "__main__":

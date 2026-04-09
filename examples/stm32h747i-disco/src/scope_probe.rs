@@ -31,6 +31,7 @@ const PJ6_SET: u32 = 1 << 6;
 const PJ6_RESET: u32 = 1 << 22;
 
 /// DSI Wrapper Configuration Register — controls LTDCEN (bit 2) and DSIEN (bit 3).
+#[allow(dead_code)]
 const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
 
 /// Configure PJ0 and PJ6 as GP push-pull outputs and pulse both to
@@ -63,6 +64,7 @@ pub fn ltdc_active() {
 }
 
 /// PJ0 LOW — LTDC is not reading SDRAM (VDES inactive).
+#[allow(dead_code)]
 #[inline(always)]
 pub fn ltdc_idle() {
     unsafe { GPIOJ_BSRR.write_volatile(PJ0_RESET) }
@@ -72,6 +74,7 @@ pub fn ltdc_idle() {
 /// new scan while DMA2D or CPU use the SDRAM bus.  Call this when ERIF
 /// fires (scan completed), not on VDES — VDES goes idle before the
 /// first TE, which would race with present().
+#[allow(dead_code)]
 #[inline(always)]
 pub fn disable_ltdc_auto_refresh() {
     // DSI_WCR: keep DSIEN (bit 3), clear LTDCEN (bit 2).
@@ -79,12 +82,14 @@ pub fn disable_ltdc_auto_refresh() {
 }
 
 /// PJ6 HIGH — DMA2D transfer started.
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 #[inline(always)]
 pub fn dma2d_active() {
     unsafe { GPIOJ_BSRR.write_volatile(PJ6_SET) }
 }
 
 /// PJ6 LOW — DMA2D transfer completed.
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 #[inline(always)]
 pub fn dma2d_idle() {
     unsafe { GPIOJ_BSRR.write_volatile(PJ6_RESET) }

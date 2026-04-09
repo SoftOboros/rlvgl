@@ -337,9 +337,8 @@ enum SvelteCommand {
 
 #[derive(Subcommand)]
 enum LottieCommand {
-    /// Import a Lottie JSON into PNG frames and an optional APNG via rlottie FFI
-    /// (Linux only — requires librlottie)
-    #[cfg(target_os = "linux")]
+    /// Import a Lottie JSON into PNG frames and an optional APNG using the
+    /// default `lottie-cli` executable on `PATH`
     Import {
         /// Path to the Lottie JSON file
         json: PathBuf,
@@ -536,7 +535,6 @@ pub fn run() -> Result<()> {
             }
         },
         Command::Lottie { cmd } => match cmd {
-            #[cfg(target_os = "linux")]
             LottieCommand::Import { json, out, apng } => {
                 lottie::import(&json, &out, apng.as_deref())?
             }

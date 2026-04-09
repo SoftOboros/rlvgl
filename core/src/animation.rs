@@ -15,9 +15,10 @@ use crate::widget::{Color, Rect};
 ///
 /// All variants use polynomial or piecewise-polynomial math and require no
 /// trigonometric functions or `libm`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Easing {
     /// No easing — constant speed.
+    #[default]
     Linear,
     /// Accelerate from zero velocity (quadratic).
     EaseIn,
@@ -42,13 +43,7 @@ impl Easing {
     ///
     /// Returns the eased value, also in `[0, 1]`.
     pub fn apply(self, t: f32) -> f32 {
-        let t = if t < 0.0 {
-            0.0
-        } else if t > 1.0 {
-            1.0
-        } else {
-            t
-        };
+        let t = t.clamp(0.0, 1.0);
         match self {
             Easing::Linear => t,
             Easing::EaseIn => t * t,
@@ -98,31 +93,20 @@ impl Easing {
     }
 }
 
-impl Default for Easing {
-    fn default() -> Self {
-        Easing::Linear
-    }
-}
-
 // ---------------------------------------------------------------------------
 // LoopMode
 // ---------------------------------------------------------------------------
 
 /// Controls how an animation repeats after completing one cycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LoopMode {
     /// Play once and stop (default).
+    #[default]
     Once,
     /// Repeat from the start. `0` means infinite.
     Repeat(u16),
     /// Play forward then backward. `0` means infinite round-trips.
     PingPong(u16),
-}
-
-impl Default for LoopMode {
-    fn default() -> Self {
-        LoopMode::Once
-    }
 }
 
 /// Compute the effective progress `t ∈ [0,1]` and whether the animation is
@@ -159,7 +143,7 @@ fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, b
             } else {
                 let within = elapsed % duration_ms;
                 let t = within as f32 / duration_ms as f32;
-                if half_cycle % 2 == 0 {
+                if half_cycle.is_multiple_of(2) {
                     (t, false)
                 } else {
                     (1.0 - t, false)

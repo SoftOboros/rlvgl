@@ -36,7 +36,7 @@ pub const DOUBLE_TAP_MAX_DISTANCE: i32 = 20;
 /// Convert a duration in milliseconds to tick counts at the given frame rate,
 /// rounding up so we never undercount.
 fn ms_to_ticks(ms: u32, frame_hz: u32) -> u8 {
-    ((ms * frame_hz + 999) / 1000) as u8
+    (ms * frame_hz).div_ceil(1000) as u8
 }
 
 // ── TapRecognizer ──────────────────────────────────────────────────────────

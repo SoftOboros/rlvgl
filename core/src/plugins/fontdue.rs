@@ -1,23 +1,30 @@
 //! Glyph rasterization using `fontdue`.
 use crate::widget::Color;
 use alloc::vec::Vec;
+#[cfg(not(target_os = "none"))]
 use blake3;
 use fontdue::{Font, FontResult, FontSettings};
 pub use fontdue::{LineMetrics, Metrics};
+#[cfg(not(target_os = "none"))]
 use once_cell::sync::OnceCell;
+#[cfg(not(target_os = "none"))]
 use std::collections::HashMap;
+#[cfg(not(target_os = "none"))]
 use std::sync::Mutex;
 
 /// Global font cache: hashed by blake3(font_data)
+#[cfg(not(target_os = "none"))]
 static FONT_CACHE: OnceCell<Mutex<HashMap<u64, Font>>> = OnceCell::new();
 
 /// Hash the font data into a u64 using blake3
+#[cfg(not(target_os = "none"))]
 fn hash_font_data(font_data: &[u8]) -> u64 {
     let key = blake3::hash(font_data);
     u64::from_le_bytes(key.as_bytes()[..8].try_into().unwrap())
 }
 
 /// Retrieve or insert a font into the cache
+#[cfg(not(target_os = "none"))]
 fn get_cached_font(font_data: &[u8]) -> Font {
     let key = hash_font_data(font_data);
     let cache = FONT_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
@@ -28,6 +35,23 @@ fn get_cached_font(font_data: &[u8]) -> Font {
             Font::from_bytes(font_data, FontSettings::default()).expect("valid font")
         })
         .clone()
+}
+
+/// Retrieve a font for rasterization on `no_std` targets.
+#[cfg(target_os = "none")]
+fn get_cached_font(font_data: &[u8]) -> Font {
+    Font::from_bytes(font_data, FontSettings::default()).expect("valid font")
+}
+
+/// Round an `f32` to the nearest pixel without relying on `std`.
+fn round_to_i32(value: f32) -> i32 {
+    if value.is_nan() {
+        0
+    } else if value >= 0.0 {
+        (value + 0.5) as i32
+    } else {
+        (value - 0.5) as i32
+    }
 }
 
 /// Rasterize `ch` from the provided font data at the given pixel height.
@@ -71,7 +95,7 @@ pub fn render_text<R: FontdueRenderTarget>(
     px: f32,
 ) -> FontResult<()> {
     let vm = line_metrics(font_data, px)?;
-    let ascent = vm.ascent.round() as i32;
+    let ascent = round_to_i32(vm.ascent);
     let baseline = position.1 + ascent;
     let (width, height) = target.dimensions();
     let mut x_cursor = position.0;
@@ -96,7 +120,7 @@ pub fn render_text<R: FontdueRenderTarget>(
                     }
                 }
             }
-            x_cursor += metrics.advance_width.round() as i32;
+            x_cursor += round_to_i32(metrics.advance_width);
         }
     }
     Ok(())

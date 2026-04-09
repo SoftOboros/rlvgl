@@ -40,10 +40,12 @@ mod file_browser_panel;
 mod fonts;
 mod icon_strip;
 mod ipc;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod readme_crawl;
 mod scope_probe;
 #[allow(dead_code)]
 mod settings_dialog;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod star_crawl;
 #[allow(dead_code)]
 mod sys_info;
@@ -1460,56 +1462,58 @@ const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08
 
 /// Initialise ADC3 for single-shot temperature sensor reads on channel 18.
 unsafe fn adc3_temp_init() {
-    // 1. Enable ADC3 clock (RCC_AHB4ENR bit 24)
-    let ahb4enr = 0x5802_44E0u32 as *mut u32;
-    ahb4enr.write_volatile(ahb4enr.read_volatile() | (1 << 24));
-    let _ = (ahb4enr as *const u32).read_volatile(); // readback fence
+    unsafe {
+        // 1. Enable ADC3 clock (RCC_AHB4ENR bit 24)
+        let ahb4enr = 0x5802_44E0u32 as *mut u32;
+        ahb4enr.write_volatile(ahb4enr.read_volatile() | (1 << 24));
+        let _ = (ahb4enr as *const u32).read_volatile(); // readback fence
 
-    // 2. Exit deep power-down
-    let cr = ADC3_CR.read_volatile();
-    ADC3_CR.write_volatile(cr & !(1 << 29)); // DEEPPWD = 0
+        // 2. Exit deep power-down
+        let cr = ADC3_CR.read_volatile();
+        ADC3_CR.write_volatile(cr & !(1 << 29)); // DEEPPWD = 0
 
-    // 3. Enable voltage regulator
-    let cr = ADC3_CR.read_volatile();
-    ADC3_CR.write_volatile(cr | (1 << 28)); // ADVREGEN = 1
+        // 3. Enable voltage regulator
+        let cr = ADC3_CR.read_volatile();
+        ADC3_CR.write_volatile(cr | (1 << 28)); // ADVREGEN = 1
 
-    // 4. Wait regulator startup (~10 µs ≈ 4000 cycles at 400 MHz)
-    cortex_m::asm::delay(5000);
+        // 4. Wait regulator startup (~10 µs ≈ 4000 cycles at 400 MHz)
+        cortex_m::asm::delay(5000);
 
-    // 5. Set BOOST = 11 (ADC clock ≤ 50 MHz)
-    let cr = ADC3_CR.read_volatile();
-    ADC3_CR.write_volatile(cr | (0b11 << 8));
+        // 5. Set BOOST = 11 (ADC clock ≤ 50 MHz)
+        let cr = ADC3_CR.read_volatile();
+        ADC3_CR.write_volatile(cr | (0b11 << 8));
 
-    // 6. Clock mode: CKMODE = 11 → HCLK/4 = 50 MHz
-    let ccr = ADC3_CCR.read_volatile();
-    ADC3_CCR.write_volatile(ccr | (0b11 << 16));
+        // 6. Clock mode: CKMODE = 11 → HCLK/4 = 50 MHz
+        let ccr = ADC3_CCR.read_volatile();
+        ADC3_CCR.write_volatile(ccr | (0b11 << 16));
 
-    // 7. Enable temperature sensor (TSEN)
-    let ccr = ADC3_CCR.read_volatile();
-    ADC3_CCR.write_volatile(ccr | (1 << 23));
+        // 7. Enable temperature sensor (TSEN)
+        let ccr = ADC3_CCR.read_volatile();
+        ADC3_CCR.write_volatile(ccr | (1 << 23));
 
-    // 8. Wait sensor wakeup (~26 µs)
-    cortex_m::asm::delay(12_000);
+        // 8. Wait sensor wakeup (~26 µs)
+        cortex_m::asm::delay(12_000);
 
-    // 9. Preselect channel 18
-    ADC3_PCSEL.write_volatile(ADC3_PCSEL.read_volatile() | (1 << 18));
+        // 9. Preselect channel 18
+        ADC3_PCSEL.write_volatile(ADC3_PCSEL.read_volatile() | (1 << 18));
 
-    // 10. Sampling time SMP18 = 111 (810.5 cycles → 16.2 µs > 9 µs min)
-    ADC3_SMPR2.write_volatile(ADC3_SMPR2.read_volatile() | (0b111 << 24));
+        // 10. Sampling time SMP18 = 111 (810.5 cycles → 16.2 µs > 9 µs min)
+        ADC3_SMPR2.write_volatile(ADC3_SMPR2.read_volatile() | (0b111 << 24));
 
-    // 11. Calibrate (single-ended)
-    let cr = ADC3_CR.read_volatile();
-    ADC3_CR.write_volatile(cr | (1 << 31)); // ADCAL = 1
-    while ADC3_CR.read_volatile() & (1 << 31) != 0 {} // poll until done
+        // 11. Calibrate (single-ended)
+        let cr = ADC3_CR.read_volatile();
+        ADC3_CR.write_volatile(cr | (1 << 31)); // ADCAL = 1
+        while ADC3_CR.read_volatile() & (1 << 31) != 0 {} // poll until done
 
-    // 12. Enable ADC
-    ADC3_ISR.write_volatile(1 << 0); // clear ADRDY
-    let cr = ADC3_CR.read_volatile();
-    ADC3_CR.write_volatile(cr | (1 << 0)); // ADEN = 1
-    while ADC3_ISR.read_volatile() & (1 << 0) == 0 {} // wait ADRDY
+        // 12. Enable ADC
+        ADC3_ISR.write_volatile(1 << 0); // clear ADRDY
+        let cr = ADC3_CR.read_volatile();
+        ADC3_CR.write_volatile(cr | (1 << 0)); // ADEN = 1
+        while ADC3_ISR.read_volatile() & (1 << 0) == 0 {} // wait ADRDY
 
-    // 13. Single-channel sequence: L = 0 (1 conversion), SQ1 = 18
-    ADC3_SQR1.write_volatile(18 << 6);
+        // 13. Single-channel sequence: L = 0 (1 conversion), SQ1 = 18
+        ADC3_SQR1.write_volatile(18 << 6);
+    }
 }
 
 /// Cached junction temperature in tenths of °C.
@@ -1577,9 +1581,10 @@ fn main() -> ! {
         } // post-MPU
 
         use core::convert::Infallible;
+        #[cfg(feature = "audio")]
+        use embedded_hal::i2c::{I2c as EhI2c, Operation, SevenBitAddress};
         use embedded_hal::{
             digital::InputPin,
-            i2c::{I2c as EhI2c, Operation, SevenBitAddress},
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
         use rlvgl::core::event::{Event, Key};
@@ -2197,10 +2202,13 @@ fn main() -> ! {
             (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32);
         } // post-I2C4-init
         // Wrap for embedded-hal 1.0 (stm32h7xx-hal I2c implements eh 0.2 I2C)
+        #[cfg(feature = "audio")]
         struct HalI2c<I>(I);
+        #[cfg(feature = "audio")]
         impl<I> embedded_hal::i2c::ErrorType for HalI2c<I> {
             type Error = embedded_hal::i2c::ErrorKind;
         }
+        #[cfg(feature = "audio")]
         impl<I> EhI2c<SevenBitAddress> for HalI2c<I>
         where
             I: stm32h7xx_hal::hal::blocking::i2c::WriteRead
@@ -2764,7 +2772,10 @@ fn main() -> ! {
                 glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
                 data: FONT_DATA,
             };
+            #[cfg(any(feature = "qspi_flash", feature = "sd_storage"))]
             let mut dev_storage = crate::device_storage::DeviceStorage::new();
+            #[cfg(not(any(feature = "qspi_flash", feature = "sd_storage")))]
+            let dev_storage = crate::device_storage::DeviceStorage::new();
             #[cfg(feature = "qspi_flash")]
             dev_storage.set_qspi(qspi_flash.clone());
             #[cfg(feature = "sd_storage")]
@@ -3340,7 +3351,16 @@ fn main() -> ! {
                     // Grace period: ignore PointerDown for first few ticks
                     // after activation (the 120 Hz touch ISR queues extra
                     // samples from the activating tap).
+                    #[cfg(any(
+                        feature = "audio",
+                        all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))
+                    ))]
                     let mut consumed = false;
+                    #[cfg(not(any(
+                        feature = "audio",
+                        all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))
+                    )))]
+                    let consumed = false;
                     #[cfg(all(
                         feature = "dma2d",
                         any(target_arch = "arm", target_arch = "aarch64")
@@ -3415,16 +3435,8 @@ fn main() -> ! {
                 } // if let Some(evt)
             } // while touch_ring_pop
 
-            let serial_start = {
-                #[cfg(feature = "cpu_stats")]
-                {
-                    cpu_stats.cyccnt()
-                }
-                #[cfg(not(feature = "cpu_stats"))]
-                {
-                    0
-                }
-            };
+            #[cfg(feature = "cpu_stats")]
+            let serial_start = cpu_stats.cyccnt();
             serial_task.poll(
                 tick_count,
                 present_count,
@@ -4032,7 +4044,16 @@ fn main() -> ! {
                 let back = display.back_buffer_addr();
                 let (w, h) = display.dimensions();
                 let mut frame_ready = false;
+                #[cfg(any(
+                    feature = "audio",
+                    all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))
+                ))]
                 let mut keep_rendering = false;
+                #[cfg(not(any(
+                    feature = "audio",
+                    all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64"))
+                )))]
+                let keep_rendering = false;
 
                 if is_crawl {
                     // ── Star crawl render ──
@@ -4140,7 +4161,9 @@ fn main() -> ! {
                         let fb_bytes = (w * h * 4) as usize;
                         let stride = (w * 4) as usize;
 
-                        compositor.restore(back as *mut u8);
+                        unsafe {
+                            compositor.restore(back as *mut u8);
+                        }
 
                         let fb_slice =
                             unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };

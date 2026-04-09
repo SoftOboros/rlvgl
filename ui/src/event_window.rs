@@ -199,28 +199,25 @@ impl Widget for EventWindow {
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        match event {
-            Event::Tick => {
-                // Skip aging while frozen (multi-frame dirty render in progress).
-                if self.frozen {
-                    return false;
-                }
-                // Age all entries and remove expired ones.
-                for entry in &mut self.entries {
-                    entry.age += 1;
-                }
-                self.entries.retain(|e| e.age < self.expire_ticks);
-                if self.entries.is_empty() && self.visible {
-                    // Start clearing stale pixels from both framebuffers.
-                    // The Compositor calls clear_region() to drive the countdown.
-                    self.clear_countdown = CLEAR_FRAMES;
-                    self.visible = false;
-                }
+        if event == &Event::Tick {
+            // Skip aging while frozen (multi-frame dirty render in progress).
+            if self.frozen {
+                return false;
             }
-            // Input events are pushed by the application via push_event()
-            // so it can label the source (joystick vs button vs touch).
-            _ => {}
+            // Age all entries and remove expired ones.
+            for entry in &mut self.entries {
+                entry.age += 1;
+            }
+            self.entries.retain(|e| e.age < self.expire_ticks);
+            if self.entries.is_empty() && self.visible {
+                // Start clearing stale pixels from both framebuffers.
+                // The Compositor calls clear_region() to drive the countdown.
+                self.clear_countdown = CLEAR_FRAMES;
+                self.visible = false;
+            }
         }
+        // Input events are pushed by the application via push_event()
+        // so it can label the source (joystick vs button vs touch).
         false // never consume — let other widgets see the event too
     }
 

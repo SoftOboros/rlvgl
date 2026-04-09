@@ -298,6 +298,7 @@ simulator = ["rlvgl-platform/simulator", "dep:rlvgl-app-demo"]
 st7789 = ["rlvgl-platform/st7789"]
 splash = ["dep:rlvgl-decomp", "rlvgl-platform/splash"]
 desktop = ["dep:rlvgl-decomp"]
+stm32h747i_disco = ["stm32h747i_disco_cm7"]
 stm32h747i_disco_cm7 = [
     "rlvgl-platform/stm32h747i_disco",
     "dep:cortex-m-rt",
@@ -324,6 +325,7 @@ stm32h747i_disco_cm4 = [
 ]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue", "rlvgl-app-demo?/fontdue"]
 lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie"]
+lottie_runtime = ["lottie", "rlvgl-core/lottie_backend"]
 canvas = ["rlvgl-core/canvas", "rlvgl-platform/canvas", "dep:embedded-canvas", "dep:embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin", "rlvgl-platform/pinyin"]
 fatfs = ["rlvgl-core/fatfs", "rlvgl-platform/fatfs", "dep:fatfs", "dep:fscommon"]

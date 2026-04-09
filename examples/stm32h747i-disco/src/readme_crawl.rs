@@ -1,3 +1,5 @@
+#![cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+
 /// README.md crawl text (curated for Star Wars opening crawl).
 pub static README_CRAWL: &[&str] = &[
     "RLVGL",

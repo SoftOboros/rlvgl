@@ -110,7 +110,7 @@ impl Compositor {
     ///
     /// # Safety
     /// `front_buffer` must point to a valid framebuffer.
-    pub fn save(&mut self, overlay_id: u32, draw_rect: Rect, front_buffer: *const u8) {
+    pub unsafe fn save(&mut self, overlay_id: u32, draw_rect: Rect, front_buffer: *const u8) {
         let fb = self.draw_to_fb(draw_rect);
         if fb.w == 0 || fb.h == 0 {
             return;
@@ -162,7 +162,7 @@ impl Compositor {
     ///
     /// # Safety
     /// `back_buffer` must point to a valid framebuffer.
-    pub fn restore(&mut self, back_buffer: *mut u8) {
+    pub unsafe fn restore(&mut self, back_buffer: *mut u8) {
         let stride = self.stride;
         let mut pristine_regions = 0u16;
         let mut save_regions = 0u16;

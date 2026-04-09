@@ -9,11 +9,10 @@ extern crate alloc;
 
 #[cfg(any(
     test,
-    feature = "png",
-    feature = "jpeg",
     feature = "gif",
-    feature = "qrcode",
-    feature = "fontdue",
+    all(feature = "jpeg", not(target_os = "none")),
+    all(feature = "png", not(target_os = "none")),
+    all(feature = "qrcode", not(target_os = "none"))
 ))]
 extern crate std;
 
@@ -23,14 +22,18 @@ use core::cell::RefCell;
 
 #[cfg(feature = "gif")]
 use rlvgl_core::gif;
-#[cfg(feature = "jpeg")]
+#[cfg(all(feature = "jpeg", not(target_os = "none")))]
 use rlvgl_core::jpeg;
-#[cfg(feature = "png")]
+#[cfg(all(feature = "png", not(target_os = "none")))]
 use rlvgl_core::png;
-#[cfg(feature = "qrcode")]
+#[cfg(all(feature = "qrcode", not(target_os = "none")))]
 use rlvgl_core::qrcode;
 
-#[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]
+#[cfg(any(
+    all(feature = "png", not(target_os = "none")),
+    all(feature = "jpeg", not(target_os = "none")),
+    feature = "gif"
+))]
 use rlvgl_core::widget::Color;
 use rlvgl_core::{
     WidgetNode,
@@ -38,7 +41,11 @@ use rlvgl_core::{
     event::Event,
     widget::{Rect, Widget},
 };
-#[cfg(any(feature = "png", feature = "jpeg", feature = "gif"))]
+#[cfg(any(
+    all(feature = "png", not(target_os = "none")),
+    all(feature = "jpeg", not(target_os = "none")),
+    feature = "gif"
+))]
 use rlvgl_widgets::image::Image;
 use rlvgl_widgets::{button::Button, container::Container, label::Label};
 
@@ -49,7 +56,7 @@ type WidgetSlot = Rc<RefCell<Option<WidgetHandle>>>;
 
 // 1x1 pixel PNG and JPEG images used to exercise the decoders without relying on
 // external binary assets.
-#[cfg(feature = "png")]
+#[cfg(all(feature = "png", not(target_os = "none")))]
 const PNG_LOGO: &[u8] = &[
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
@@ -58,7 +65,7 @@ const PNG_LOGO: &[u8] = &[
     0x44, 0xae, 0x42, 0x60, 0x82,
 ];
 
-#[cfg(feature = "jpeg")]
+#[cfg(all(feature = "jpeg", not(target_os = "none")))]
 const JPEG_LOGO: &[u8] = &[
     0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
     0x00, 0x01, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
@@ -188,25 +195,25 @@ impl Application for DemoApp {
             },
         )));
         let menu_widget: WidgetSlot = Rc::new(RefCell::new(None));
-        #[cfg(feature = "qrcode")]
+        #[cfg(all(feature = "qrcode", not(target_os = "none")))]
         let qr_demo: WidgetSlot = Rc::new(RefCell::new(None));
-        #[cfg(feature = "png")]
+        #[cfg(all(feature = "png", not(target_os = "none")))]
         let png_demo: WidgetSlot = Rc::new(RefCell::new(None));
         #[cfg(feature = "gif")]
         let gif_demo: WidgetSlot = Rc::new(RefCell::new(None));
-        #[cfg(feature = "jpeg")]
+        #[cfg(all(feature = "jpeg", not(target_os = "none")))]
         let jpeg_demo: WidgetSlot = Rc::new(RefCell::new(None));
         {
             let pending_add = self.pending.clone();
             let pending_rm = self.to_remove.clone();
             let menu_ref = menu_widget.clone();
-            #[cfg(feature = "qrcode")]
+            #[cfg(all(feature = "qrcode", not(target_os = "none")))]
             let qr_ref = qr_demo.clone();
-            #[cfg(feature = "png")]
+            #[cfg(all(feature = "png", not(target_os = "none")))]
             let png_ref = png_demo.clone();
             #[cfg(feature = "gif")]
             let gif_ref = gif_demo.clone();
-            #[cfg(feature = "jpeg")]
+            #[cfg(all(feature = "jpeg", not(target_os = "none")))]
             let jpeg_ref = jpeg_demo.clone();
             let _root_w = root_w;
             let _root_h = root_h;
@@ -223,7 +230,7 @@ impl Application for DemoApp {
                     #[allow(unused_mut)]
                     let mut children = Vec::new();
 
-                    #[cfg(feature = "qrcode")]
+                    #[cfg(all(feature = "qrcode", not(target_os = "none")))]
                     {
                         let qr_button = Rc::new(RefCell::new(Button::new(
                             t!("demo.qr_code"),
@@ -257,7 +264,7 @@ impl Application for DemoApp {
                         });
                     }
 
-                    #[cfg(feature = "png")]
+                    #[cfg(all(feature = "png", not(target_os = "none")))]
                     {
                         let png_button = Rc::new(RefCell::new(Button::new(
                             t!("demo.png"),
@@ -329,7 +336,7 @@ impl Application for DemoApp {
                         });
                     }
 
-                    #[cfg(feature = "jpeg")]
+                    #[cfg(all(feature = "jpeg", not(target_os = "none")))]
                     {
                         let jpeg_button = Rc::new(RefCell::new(Button::new(
                             t!("demo.jpeg"),
@@ -450,7 +457,7 @@ pub unsafe extern "C" fn rlvgl_destroy_app(ptr: *mut dyn Application) {
 // Plugin demo builders (feature-gated)
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "qrcode")]
+#[cfg(all(feature = "qrcode", not(target_os = "none")))]
 /// Build a widget demonstrating plugin features such as QR code generation.
 pub fn build_plugin_demo(root_w: u32, root_h: u32) -> WidgetNode {
     let (pixels_vec, width, _) = qrcode::generate(b"https://github.com/SoftOboros/rlvgl").unwrap();
@@ -490,7 +497,7 @@ pub fn build_plugin_demo(root_w: u32, root_h: u32) -> WidgetNode {
     }
 }
 
-#[cfg(feature = "png")]
+#[cfg(all(feature = "png", not(target_os = "none")))]
 /// Build a widget displaying an embedded PNG at the given scale.
 pub fn build_png_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode {
     let (pixels_vec, width, height) =
@@ -538,7 +545,7 @@ pub fn build_png_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode
     }
 }
 
-#[cfg(feature = "png")]
+#[cfg(all(feature = "png", not(target_os = "none")))]
 /// Build a PNG demo using the default scale of `0.5`.
 pub fn build_png_demo(root_w: u32, root_h: u32) -> WidgetNode {
     build_png_demo_scaled(0.5, root_w, root_h)
@@ -604,7 +611,7 @@ pub fn build_gif_demo(root_w: u32, root_h: u32) -> WidgetNode {
     build_gif_demo_scaled(0.5, root_w, root_h)
 }
 
-#[cfg(feature = "jpeg")]
+#[cfg(all(feature = "jpeg", not(target_os = "none")))]
 /// Build a widget displaying an embedded JPEG at the given scale.
 pub fn build_jpeg_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode {
     let (pixels_vec, width, height) =
@@ -654,7 +661,7 @@ pub fn build_jpeg_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNod
     }
 }
 
-#[cfg(feature = "jpeg")]
+#[cfg(all(feature = "jpeg", not(target_os = "none")))]
 /// Build a JPEG demo using the default scale of `0.5`.
 pub fn build_jpeg_demo(root_w: u32, root_h: u32) -> WidgetNode {
     build_jpeg_demo_scaled(0.5, root_w, root_h)
