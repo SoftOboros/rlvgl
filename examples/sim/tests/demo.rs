@@ -70,8 +70,8 @@ fn demo_draws_widgets() {
 fn button_click_dispatches() {
     let (mut app, root) = setup_demo();
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 20, y: 50 });
-    app.after_event(&root, &Event::PointerUp { x: 20, y: 50 });
+        .dispatch_event(&Event::PressRelease { x: 20, y: 50 });
+    app.after_event(&root, &Event::PressRelease { x: 20, y: 50 });
 }
 
 #[test]
@@ -113,11 +113,11 @@ fn scaled_png_clamped_within_bounds() {
 fn plugins_button_adds_demo() {
     let (mut app, root) = setup_demo();
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
-    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+        .dispatch_event(&Event::PressRelease { x: 110, y: 50 });
+    app.after_event(&root, &Event::PressRelease { x: 110, y: 50 });
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 30, y: 90 });
-    app.after_event(&root, &Event::PointerUp { x: 30, y: 90 });
+        .dispatch_event(&Event::PressRelease { x: 30, y: 90 });
+    app.after_event(&root, &Event::PressRelease { x: 30, y: 90 });
     assert!(root.borrow().children.len() > 3);
 }
 
@@ -125,11 +125,11 @@ fn plugins_button_adds_demo() {
 fn png_button_adds_demo() {
     let (mut app, root) = setup_demo();
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
-    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+        .dispatch_event(&Event::PressRelease { x: 110, y: 50 });
+    app.after_event(&root, &Event::PressRelease { x: 110, y: 50 });
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 30, y: 120 });
-    app.after_event(&root, &Event::PointerUp { x: 30, y: 120 });
+        .dispatch_event(&Event::PressRelease { x: 30, y: 120 });
+    app.after_event(&root, &Event::PressRelease { x: 30, y: 120 });
     assert!(root.borrow().children.len() > 3);
 }
 
@@ -137,11 +137,11 @@ fn png_button_adds_demo() {
 fn jpeg_button_adds_demo() {
     let (mut app, root) = setup_demo();
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
-    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+        .dispatch_event(&Event::PressRelease { x: 110, y: 50 });
+    app.after_event(&root, &Event::PressRelease { x: 110, y: 50 });
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 30, y: 150 });
-    app.after_event(&root, &Event::PointerUp { x: 30, y: 150 });
+        .dispatch_event(&Event::PressRelease { x: 30, y: 150 });
+    app.after_event(&root, &Event::PressRelease { x: 30, y: 150 });
     assert!(root.borrow().children.len() > 3);
 }
 
@@ -149,17 +149,17 @@ fn jpeg_button_adds_demo() {
 fn qr_button_toggles_qrcode() {
     let (mut app, root) = setup_demo();
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 110, y: 50 });
-    app.after_event(&root, &Event::PointerUp { x: 110, y: 50 });
+        .dispatch_event(&Event::PressRelease { x: 110, y: 50 });
+    app.after_event(&root, &Event::PressRelease { x: 110, y: 50 });
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 30, y: 90 });
-    app.after_event(&root, &Event::PointerUp { x: 30, y: 90 });
+        .dispatch_event(&Event::PressRelease { x: 30, y: 90 });
+    app.after_event(&root, &Event::PressRelease { x: 30, y: 90 });
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
     assert!(fb.buf.iter().any(|&p| p != Color(255, 255, 255, 255)));
     root.borrow_mut()
-        .dispatch_event(&Event::PointerUp { x: 30, y: 90 });
-    app.after_event(&root, &Event::PointerUp { x: 30, y: 90 });
+        .dispatch_event(&Event::PressRelease { x: 30, y: 90 });
+    app.after_event(&root, &Event::PressRelease { x: 30, y: 90 });
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
     assert!(fb.buf.iter().all(|&p| p == Color(255, 255, 255, 255)));

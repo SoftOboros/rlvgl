@@ -79,10 +79,7 @@ fn main() -> ! {
     }
 
     // Fallback: non-ARM / non-disco / doc builds
-    #[cfg(not(all(
-        feature = "cm4",
-        any(target_arch = "arm", target_arch = "aarch64")
-    )))]
+    #[cfg(not(all(feature = "cm4", any(target_arch = "arm", target_arch = "aarch64"))))]
     loop {
         cortex_m::asm::nop();
     }

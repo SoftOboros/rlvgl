@@ -1,6 +1,6 @@
 //! GPU-accelerated blitter used by the desktop simulator.
 //!
-//! `WgpuBlitter` implements the [`Blitter`](crate::blit::Blitter) trait using
+//! `WgpuBlitter` implements the [`Blitter`] trait using
 //! the [`wgpu`](https://github.com/gfx-rs/wgpu) graphics API. Pixel operations
 //! such as filling, blitting and alpha blending are executed on the GPU by
 //! uploading surfaces to textures and rendering through small shader programs.

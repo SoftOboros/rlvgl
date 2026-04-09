@@ -2274,11 +2274,9 @@ fn main() -> ! {
             let _sai1_sd_a = gpioe.pe6.into_alternate::<6>().speed(Speed::VeryHigh);
             let _sai1_sd_b = gpioe.pe3.into_alternate::<6>().speed(Speed::VeryHigh);
 
-
             // Configure SAI1 sub-block A as I2S master TX
             // MCKDIV=0 means /1; the WM8994 FLL handles exact audio frequency
             sai.configure_tx(0);
-
 
             // Init WM8994 codec over I2C4 (temporary ownership, then release)
             let codec_i2c = HalI2c(i2c4);
@@ -2294,10 +2292,8 @@ fn main() -> ! {
                 rlvgl_platform::wm8994::OutputDevice::Headphone,
             );
 
-
             // Enable SAI1 TX — codec is now receiving I2S frames
             sai.enable_tx();
-
 
             // SAI4 PDM mic GPIO (PE2=CK1, PC1=D1)
             let _sai4_ck1 = gpioe.pe2.into_alternate::<10>().speed(Speed::VeryHigh);
@@ -2320,7 +2316,6 @@ fn main() -> ! {
                 }
             }
         }
-
 
         // I2C4 is now driven by the TIM6_DAC ISR via raw PAC registers.
         // The HAL-configured timing persists; we just drop the Rust ownership.
