@@ -12,3 +12,4 @@ path = "src/main.rs"
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", features = ["simulator"] }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+rlvgl-playit = { path = "../../playit", features = ["std"] }

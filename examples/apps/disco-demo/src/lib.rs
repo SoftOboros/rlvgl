@@ -12,6 +12,7 @@ extern crate alloc;
 
 mod assets;
 mod dashboard_panel;
+mod hotspot;
 mod icon_strip;
 mod wing;
 
@@ -19,6 +20,7 @@ use alloc::{format, rc::Rc, string::String, vec, vec::Vec};
 use core::cell::RefCell;
 
 use dashboard_panel::DashboardPanel;
+use hotspot::ActionHotspot;
 use icon_strip::{IconSlot, IconStrip};
 use rlvgl_core::{
     WidgetNode,
@@ -179,6 +181,15 @@ enum InfoSlot {
     AudioScope = 3,
 }
 
+const STRIP_ICON_SIZE: i32 = 60;
+const STRIP_MARGIN_TOP: i32 = 17;
+const STRIP_GAP: i32 = 10;
+const STRIP_X_OFFSET: i32 = 70;
+const WING_X: i32 = 10;
+const WING_ICON_SIZE: i32 = 60;
+const WING_MARGIN_TOP: i32 = 17;
+const WING_GAP: i32 = 10;
+
 impl InfoSlot {
     fn from_index(index: usize) -> Self {
         match index {
@@ -187,6 +198,46 @@ impl InfoSlot {
             3 => Self::AudioScope,
             _ => Self::Diagnostics,
         }
+    }
+}
+
+fn strip_slot_bounds(display_width: i32, index: usize) -> Rect {
+    let step = STRIP_ICON_SIZE + STRIP_GAP;
+    let top = if index == 0 {
+        0
+    } else {
+        STRIP_MARGIN_TOP + index as i32 * step - STRIP_GAP / 2
+    };
+    let bottom = if index == icon_strip::SLOT_COUNT - 1 {
+        STRIP_MARGIN_TOP + icon_strip::SLOT_COUNT as i32 * step
+    } else {
+        STRIP_MARGIN_TOP + (index as i32 + 1) * step - STRIP_GAP / 2
+    };
+    Rect {
+        x: display_width - STRIP_X_OFFSET,
+        y: top,
+        width: STRIP_ICON_SIZE,
+        height: bottom - top,
+    }
+}
+
+fn wing_slot_bounds(index: usize, slot_count: usize) -> Rect {
+    let step = WING_ICON_SIZE + WING_GAP;
+    let top = if index == 0 {
+        0
+    } else {
+        WING_MARGIN_TOP + index as i32 * step - WING_GAP / 2
+    };
+    let bottom = if index + 1 == slot_count {
+        WING_MARGIN_TOP + slot_count as i32 * step
+    } else {
+        WING_MARGIN_TOP + (index as i32 + 1) * step - WING_GAP / 2
+    };
+    Rect {
+        x: WING_X,
+        y: top,
+        width: WING_ICON_SIZE,
+        height: bottom - top,
     }
 }
 
@@ -614,7 +665,7 @@ impl DiscoController {
         let root = Rc::new(RefCell::new(WidgetNode {
             widget: Rc::new(RefCell::new(root_container)),
             children: Vec::new(),
-            tag: None,
+            tag: Some("disco.root"),
         }));
 
         let title = themed_label(
@@ -692,7 +743,12 @@ impl DiscoController {
             info_wing.clone(),
         )));
 
-        let mut icon_strip = IconStrip::new(width - 70, 60, 17, 10);
+        let mut icon_strip = IconStrip::new(
+            width - STRIP_X_OFFSET,
+            STRIP_ICON_SIZE,
+            STRIP_MARGIN_TOP,
+            STRIP_GAP,
+        );
         icon_strip.set_slot(
             0,
             IconSlot {
@@ -770,30 +826,30 @@ impl DiscoController {
         root.borrow_mut().children.push(WidgetNode {
             widget: subtitle.clone(),
             children: Vec::new(),
-            tag: None,
+            tag: Some("disco.subtitle"),
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: dashboard,
             children: Vec::new(),
-            tag: None,
+            tag: Some("disco.dashboard"),
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: footer.clone(),
             children: Vec::new(),
-            tag: None,
+            tag: Some("disco.footer"),
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: event_window,
             children: Vec::new(),
-            tag: None,
+            tag: Some("disco.events"),
         });
         root.borrow_mut().children.push(WidgetNode {
-            widget: settings_wing,
+            widget: settings_wing.clone(),
             children: Vec::new(),
             tag: None,
         });
         root.borrow_mut().children.push(WidgetNode {
-            widget: info_wing,
+            widget: info_wing.clone(),
             children: Vec::new(),
             tag: None,
         });
@@ -801,6 +857,172 @@ impl DiscoController {
             widget: Rc::new(RefCell::new(icon_strip)),
             children: Vec::new(),
             tag: None,
+        });
+
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(ActionHotspot::new(
+                strip_slot_bounds(width, 0),
+                {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_main(MainSlot::Settings)
+                },
+            ))),
+            children: Vec::new(),
+            tag: Some("disco.main.settings"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(ActionHotspot::new(
+                strip_slot_bounds(width, 1),
+                {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_main(MainSlot::Files)
+                },
+            ))),
+            children: Vec::new(),
+            tag: Some("disco.main.files"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(ActionHotspot::new(
+                strip_slot_bounds(width, 2),
+                {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_main(MainSlot::Info)
+                },
+            ))),
+            children: Vec::new(),
+            tag: Some("disco.main.info"),
+        });
+
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(0, 5), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_settings(SettingsSlot::Audio)
+                })
+                .with_visibility({
+                    let wing = settings_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.settings.audio"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(1, 5), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_settings(SettingsSlot::Camera)
+                })
+                .with_visibility({
+                    let wing = settings_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.settings.camera"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(2, 5), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_settings(SettingsSlot::Display)
+                })
+                .with_visibility({
+                    let wing = settings_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.settings.display"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(3, 5), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_settings(SettingsSlot::Locale)
+                })
+                .with_visibility({
+                    let wing = settings_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.settings.locale"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(4, 5), {
+                    let state = state.clone();
+                    move || {
+                        state
+                            .borrow_mut()
+                            .activate_settings(SettingsSlot::Backlight)
+                    }
+                })
+                .with_visibility({
+                    let wing = settings_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.settings.backlight"),
+        });
+
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(0, 4), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_info(InfoSlot::Diagnostics)
+                })
+                .with_visibility({
+                    let wing = info_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.info.diagnostics"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(1, 4), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_info(InfoSlot::LiveStats)
+                })
+                .with_visibility({
+                    let wing = info_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.info.live_stats"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(2, 4), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_info(InfoSlot::StarCrawl)
+                })
+                .with_visibility({
+                    let wing = info_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.info.star_crawl"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(3, 4), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_info(InfoSlot::AudioScope)
+                })
+                .with_visibility({
+                    let wing = info_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.info.audio_scope"),
         });
 
         let controller = Self { root, state };
@@ -877,14 +1099,126 @@ fn themed_label(text: impl Into<String>, bounds: Rect, text_color: Color) -> Rc<
 mod tests {
     use super::*;
 
+    fn find_node<'a>(root: &'a WidgetNode, tag: &str) -> Option<&'a WidgetNode> {
+        if root.tag == Some(tag) {
+            return Some(root);
+        }
+        for child in &root.children {
+            if let Some(found) = find_node(child, tag) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    fn find_node_mut<'a>(root: &'a mut WidgetNode, tag: &str) -> Option<&'a mut WidgetNode> {
+        if root.tag == Some(tag) {
+            return Some(root);
+        }
+        for child in &mut root.children {
+            if let Some(found) = find_node_mut(child, tag) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
     #[test]
-    fn controller_builds_for_all_runtime_presets() {
+    fn controller_builds_shared_automation_surface_for_all_runtime_presets() {
         let sim = DiscoController::new(800, 480, DiscoCapabilities::simulator());
         let uefi = DiscoController::new(800, 480, DiscoCapabilities::uefi());
         let stm = DiscoController::new(800, 480, DiscoCapabilities::stm32h747i_disco());
-        assert_eq!(sim.root.borrow().children.len(), 8);
-        assert_eq!(uefi.root.borrow().children.len(), 8);
-        assert_eq!(stm.root.borrow().children.len(), 8);
+
+        let required_tags = [
+            "disco.root",
+            "disco.dashboard",
+            "disco.subtitle",
+            "disco.footer",
+            "disco.events",
+            "disco.main.settings",
+            "disco.main.files",
+            "disco.main.info",
+            "disco.settings.audio",
+            "disco.settings.camera",
+            "disco.settings.display",
+            "disco.settings.locale",
+            "disco.settings.backlight",
+            "disco.info.diagnostics",
+            "disco.info.live_stats",
+            "disco.info.star_crawl",
+            "disco.info.audio_scope",
+        ];
+
+        for controller in [&sim, &uefi, &stm] {
+            let root = controller.root.borrow();
+            for tag in required_tags {
+                assert!(find_node(&root, tag).is_some(), "missing tag {tag}");
+            }
+        }
+    }
+
+    #[test]
+    fn wing_hotspots_collapse_bounds_until_their_wing_is_open() {
+        let mut controller = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        let root = controller.root();
+
+        {
+            let root = root.borrow();
+            let main = find_node(&root, "disco.main.settings").unwrap();
+            assert!(main.widget.borrow().bounds().width > 0);
+            assert!(main.widget.borrow().bounds().height > 0);
+
+            let settings = find_node(&root, "disco.settings.audio").unwrap();
+            assert_eq!(settings.widget.borrow().bounds().width, 0);
+            assert_eq!(settings.widget.borrow().bounds().height, 0);
+
+            let info = find_node(&root, "disco.info.live_stats").unwrap();
+            assert_eq!(info.widget.borrow().bounds().width, 0);
+            assert_eq!(info.widget.borrow().bounds().height, 0);
+        }
+
+        controller.dispatch_event(&Event::KeyDown { key: Key::Enter });
+
+        {
+            let root = root.borrow();
+            let settings = find_node(&root, "disco.settings.audio").unwrap();
+            assert!(settings.widget.borrow().bounds().width > 0);
+            assert!(settings.widget.borrow().bounds().height > 0);
+        }
+
+        controller.dispatch_event(&Event::KeyDown {
+            key: Key::Character('i'),
+        });
+
+        {
+            let root = root.borrow();
+            let settings = find_node(&root, "disco.settings.audio").unwrap();
+            assert_eq!(settings.widget.borrow().bounds().width, 0);
+            assert_eq!(settings.widget.borrow().bounds().height, 0);
+
+            let info = find_node(&root, "disco.info.live_stats").unwrap();
+            assert!(info.widget.borrow().bounds().width > 0);
+            assert!(info.widget.borrow().bounds().height > 0);
+        }
+    }
+
+    #[test]
+    fn tagged_hotspot_dispatch_triggers_the_same_controller_actions() {
+        let mut controller = DiscoController::new(800, 480, DiscoCapabilities::simulator());
+        let root = controller.root();
+
+        {
+            let mut root = root.borrow_mut();
+            let hotspot = find_node_mut(&mut root, "disco.main.files").unwrap();
+            assert!(hotspot.dispatch_event(&Event::PressRelease { x: 0, y: 0 }));
+        }
+
+        let commands = controller.drain_commands();
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::LoadStorageSummary))
+        );
     }
 
     #[test]

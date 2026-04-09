@@ -120,9 +120,26 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
         status: &StatusData,
         fb: Option<&dyn FramebufferReader>,
         pipeline: &mut P,
-        mut on_extension: F,
+        on_extension: F,
     ) where
         F: FnMut(&[u8]),
+    {
+        self.poll_with_callback(root, status, fb, pipeline, on_extension, |_event| {});
+    }
+
+    /// Variant of [`poll`](Self::poll) that invokes `after_dispatch` after
+    /// every event delivered to the widget tree.
+    pub fn poll_with_callback<P: EventPipeline, F, A>(
+        &mut self,
+        root: &mut WidgetNode,
+        status: &StatusData,
+        fb: Option<&dyn FramebufferReader>,
+        pipeline: &mut P,
+        mut on_extension: F,
+        mut after_dispatch: A,
+    ) where
+        F: FnMut(&[u8]),
+        A: FnMut(&Event),
     {
         // Drain transport bytes and accumulate lines.
         while let Some(byte) = self.transport.read_byte() {
@@ -132,7 +149,14 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
                     let mut line = [0u8; MAX_LINE];
                     line[..len].copy_from_slice(&self.line_buf[..len]);
                     self.line_len = 0;
-                    self.handle_line(&line[..len], root, status, pipeline, &mut on_extension);
+                    self.handle_line(
+                        &line[..len],
+                        root,
+                        status,
+                        pipeline,
+                        &mut on_extension,
+                        &mut after_dispatch,
+                    );
                 }
             } else if self.line_len < MAX_LINE {
                 self.line_buf[self.line_len] = byte;
@@ -141,15 +165,7 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
         }
 
         // Advance pipeline timers and dispatch any deferred gesture events.
-        {
-            let (a, b) = pipeline.tick();
-            if let Some(evt) = a {
-                root.dispatch_event(&evt);
-            }
-            if let Some(evt) = b {
-                root.dispatch_event(&evt);
-            }
-        }
+        self.dispatch_output_events(root, pipeline.tick(), &mut after_dispatch);
 
         // Advance recorder tick counter.
         self.recorder.tick();
@@ -160,19 +176,35 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
         }
     }
 
+    /// Dispatch one runtime input event through the same gesture pipeline used
+    /// for transport commands.
+    pub fn dispatch_event<P: EventPipeline, A>(
+        &mut self,
+        event: Event,
+        root: &mut WidgetNode,
+        pipeline: &mut P,
+        mut after_dispatch: A,
+    ) where
+        A: FnMut(&Event),
+    {
+        self.dispatch_output_events(root, pipeline.process(event), &mut after_dispatch);
+    }
+
     // ------------------------------------------------------------------
     // Internal dispatch
     // ------------------------------------------------------------------
 
-    fn handle_line<P: EventPipeline, F>(
+    fn handle_line<P: EventPipeline, F, A>(
         &mut self,
         line: &[u8],
         root: &mut WidgetNode,
         status: &StatusData,
         pipeline: &mut P,
         on_extension: &mut F,
+        after_dispatch: &mut A,
     ) where
         F: FnMut(&[u8]),
+        A: FnMut(&Event),
     {
         let Some(cmd) = parse_command(line) else {
             self.send_response(&Response::Error("parse error"));
@@ -185,7 +217,7 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
             }
 
             Command::Inject(spec) => {
-                self.inject_event(spec, root, pipeline);
+                self.inject_event(spec, root, pipeline, after_dispatch);
                 self.send_response(&Response::Ok);
             }
 
@@ -197,6 +229,7 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
                         self.recorder.record(spec);
                     }
                     node.dispatch_event(&event);
+                    after_dispatch(&event);
                     self.send_response(&Response::Ok);
                 } else {
                     self.send_response(&Response::Error("tag not found"));
@@ -238,23 +271,38 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
 
     /// Inject an event through the pipeline and into the widget tree,
     /// recording if the recorder is active.
-    fn inject_event<P: EventPipeline>(
+    fn inject_event<P: EventPipeline, A>(
         &mut self,
         spec: EventSpec,
         root: &mut WidgetNode,
         pipeline: &mut P,
-    ) {
+        after_dispatch: &mut A,
+    ) where
+        A: FnMut(&Event),
+    {
         if self.recorder.is_running() {
             self.recorder.record(spec);
         }
 
         let event = spec.to_event();
-        let (a, b) = pipeline.process(event);
-        if let Some(evt) = a {
+        self.dispatch_output_events(root, pipeline.process(event), after_dispatch);
+    }
+
+    fn dispatch_output_events<A>(
+        &mut self,
+        root: &mut WidgetNode,
+        outputs: (Option<Event>, Option<Event>),
+        after_dispatch: &mut A,
+    ) where
+        A: FnMut(&Event),
+    {
+        if let Some(evt) = outputs.0 {
             root.dispatch_event(&evt);
+            after_dispatch(&evt);
         }
-        if let Some(evt) = b {
+        if let Some(evt) = outputs.1 {
             root.dispatch_event(&evt);
+            after_dispatch(&evt);
         }
     }
 
@@ -392,5 +440,191 @@ impl<T: PlayitTransport, const REC_CAP: usize> PlayitExecutor<T, REC_CAP> {
 
     fn send_str(&mut self, s: &[u8]) {
         self.transport.write_bytes(s);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transport::PlayitTransport;
+    use rlvgl_core::renderer::Renderer;
+    use rlvgl_core::widget::{Rect, Widget};
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::rc::Rc;
+
+    #[derive(Default)]
+    struct VecTransport {
+        incoming: VecDeque<u8>,
+        outgoing: Vec<u8>,
+    }
+
+    impl VecTransport {
+        fn with_input(input: &[u8]) -> Self {
+            Self {
+                incoming: input.iter().copied().collect(),
+                outgoing: Vec::new(),
+            }
+        }
+    }
+
+    impl PlayitTransport for VecTransport {
+        fn read_byte(&mut self) -> Option<u8> {
+            self.incoming.pop_front()
+        }
+
+        fn write_bytes(&mut self, bytes: &[u8]) {
+            self.outgoing.extend_from_slice(bytes);
+        }
+    }
+
+    type TestExecutor = PlayitExecutor<VecTransport, 16>;
+
+    struct RecordingWidget {
+        bounds: Rect,
+        events: Rc<RefCell<Vec<Event>>>,
+    }
+
+    impl Widget for RecordingWidget {
+        fn bounds(&self) -> Rect {
+            self.bounds
+        }
+
+        fn draw(&self, _renderer: &mut dyn Renderer) {}
+
+        fn handle_event(&mut self, event: &Event) -> bool {
+            self.events.borrow_mut().push(event.clone());
+            false
+        }
+    }
+
+    fn recording_node(
+        tag: Option<&'static str>,
+        events: Rc<RefCell<Vec<Event>>>,
+        bounds: Rect,
+    ) -> WidgetNode {
+        WidgetNode {
+            widget: Rc::new(RefCell::new(RecordingWidget { bounds, events })),
+            children: Vec::new(),
+            tag,
+        }
+    }
+
+    struct TickPipeline {
+        emit_tick: bool,
+    }
+
+    impl EventPipeline for TickPipeline {
+        fn process(&mut self, event: Event) -> (Option<Event>, Option<Event>) {
+            (Some(event), None)
+        }
+
+        fn tick(&mut self) -> (Option<Event>, Option<Event>) {
+            if self.emit_tick {
+                self.emit_tick = false;
+                (Some(Event::Tick), None)
+            } else {
+                (None, None)
+            }
+        }
+    }
+
+    #[test]
+    fn poll_with_callback_reports_dispatches_from_transport_and_pipeline_tick() {
+        let widget_events = Rc::new(RefCell::new(Vec::new()));
+        let mut root = recording_node(
+            Some("root"),
+            widget_events.clone(),
+            Rect {
+                x: 0,
+                y: 0,
+                width: 10,
+                height: 10,
+            },
+        );
+        let mut executor = TestExecutor::new(VecTransport::with_input(b"T10,20\r\n"));
+        let mut pipeline = TickPipeline { emit_tick: true };
+        let mut callback_events = Vec::new();
+
+        executor.poll_with_callback(
+            &mut root,
+            &StatusData::default(),
+            None,
+            &mut pipeline,
+            |_payload| {},
+            |event| callback_events.push(event.clone()),
+        );
+
+        assert_eq!(
+            callback_events,
+            vec![Event::PressRelease { x: 10, y: 20 }, Event::Tick]
+        );
+        assert_eq!(*widget_events.borrow(), callback_events);
+    }
+
+    #[test]
+    fn tagged_inject_and_runtime_dispatch_both_invoke_after_dispatch() {
+        let root_events = Rc::new(RefCell::new(Vec::new()));
+        let child_events = Rc::new(RefCell::new(Vec::new()));
+        let mut root = recording_node(
+            Some("root"),
+            root_events,
+            Rect {
+                x: 0,
+                y: 0,
+                width: 10,
+                height: 10,
+            },
+        );
+        root.children.push(recording_node(
+            Some("target"),
+            child_events.clone(),
+            Rect {
+                x: 5,
+                y: 6,
+                width: 20,
+                height: 30,
+            },
+        ));
+
+        let mut executor = TestExecutor::new(VecTransport::with_input(b"T@target:15,16\r\n"));
+        let mut pipeline = TickPipeline { emit_tick: false };
+        let mut callback_events = Vec::new();
+
+        executor.poll_with_callback(
+            &mut root,
+            &StatusData::default(),
+            None,
+            &mut pipeline,
+            |_payload| {},
+            |event| callback_events.push(event.clone()),
+        );
+        executor.dispatch_event(
+            Event::KeyDown {
+                key: rlvgl_core::event::Key::Enter,
+            },
+            &mut root,
+            &mut pipeline,
+            |event| callback_events.push(event.clone()),
+        );
+
+        assert_eq!(
+            callback_events,
+            vec![
+                Event::PressRelease { x: 15, y: 16 },
+                Event::KeyDown {
+                    key: rlvgl_core::event::Key::Enter
+                }
+            ]
+        );
+        assert_eq!(
+            *child_events.borrow(),
+            vec![
+                Event::PressRelease { x: 15, y: 16 },
+                Event::KeyDown {
+                    key: rlvgl_core::event::Key::Enter
+                }
+            ]
+        );
     }
 }

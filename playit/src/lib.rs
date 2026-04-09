@@ -28,6 +28,7 @@
 //! | [`recorder`] | `EventRecorder` — timed input capture for replay |
 //! | [`tag`] | `find_by_tag` / `find_by_tag_mut` tree walkers |
 //! | [`framebuffer`] | `FramebufferReader` pixel inspection trait |
+//! | [`tcp`] | Loopback TCP transport for simulator / host automation (`std`) |
 //!
 //! # `no_std` support
 //!
@@ -44,6 +45,8 @@ pub mod protocol;
 pub mod recorder;
 pub mod response;
 pub mod tag;
+#[cfg(feature = "std")]
+pub mod tcp;
 pub mod transport;
 
 pub use command::{
@@ -54,4 +57,6 @@ pub use framebuffer::FramebufferReader;
 pub use recorder::{EventRecorder, RecordEntry};
 pub use response::{Response, StatusData};
 pub use tag::{find_by_tag, find_by_tag_mut};
+#[cfg(feature = "std")]
+pub use tcp::TcpServerTransport;
 pub use transport::PlayitTransport;
