@@ -206,6 +206,12 @@ mod touch_isr {
     /// addresses so the HAL I2C peripheral doesn't need to live in a static.
     unsafe fn i2c4_read_touches_raw() -> RawTouchSample {
         unsafe {
+            // Clear stale status flags from any prior aborted transaction.
+            // STOPCF=5, NACKCF=4, BERRCF=8, ARLOCF=9, OVRCF=10.
+            // Without this, a prior timeout leaves STOPF set and new
+            // transactions can hang or return stale data.
+            I2C4_ICR.write_volatile((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+
             // ── Write phase: send register address 0x02 ──
             // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
             I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
@@ -1717,7 +1723,10 @@ fn main() -> ! {
         }
         impl<B: InputPin> InputDevice for ButtonInput<B> {
             fn poll(&mut self) -> Option<Event> {
-                let pressed = self.button.is_low().ok()?;
+                // PC13 (B2 wakeup button) on STM32H747I-DISCO is active HIGH:
+                // external pull-down holds the pin LOW when released; pressing
+                // connects PC13 to VDD, reading HIGH.
+                let pressed = self.button.is_high().ok()?;
                 match (pressed, self.last) {
                     (true, false) => {
                         self.last = true;
@@ -2442,8 +2451,10 @@ fn main() -> ! {
             display_width: display.dimensions().0 as u16,
         };
 
-        // ── Real button: PC13 wakeup button (active-low, external pull-up) ──
-        let button = HalInputPin(gpioc.pc13.into_floating_input());
+        // ── Real button: PC13 B2 wakeup button (active HIGH, external pull-down) ──
+        // Configure internal pull-down for a defined LOW idle state; the
+        // button pulls the pin HIGH when pressed.
+        let button = HalInputPin(gpioc.pc13.into_pull_down_input());
         let mut button_input = ButtonInput::new(button);
 
         // ── Joystick: PK2=SEL, PK3=DOWN, PK4=LEFT, PK5=RIGHT, PK6=UP ──
