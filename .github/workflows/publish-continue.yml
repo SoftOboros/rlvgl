@@ -45,11 +45,23 @@ jobs:
           echo "  latest tag:   $head_tag ($head_sha)"
           echo "  previous tag: $base_tag ($base_sha)"
 
+      - name: Preserve publish helper from workflow revision
+        id: helper
+        shell: bash
+        run: |
+          helper_sha="$(git rev-parse HEAD)"
+          cp scripts/publish_changed.sh /tmp/publish_changed.sh
+          chmod +x /tmp/publish_changed.sh
+
+          echo "helper_sha=$helper_sha" >> "$GITHUB_OUTPUT"
+          echo "Preserved publish helper from workflow revision: $helper_sha"
+
       - name: Checkout latest release tag
         shell: bash
         run: |
           git checkout --detach "${{ steps.tags.outputs.head_tag }}"
           git submodule update --init --recursive
+          echo "Checked out release tag ${{ steps.tags.outputs.head_tag }} at $(git rev-parse HEAD)"
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -65,4 +77,4 @@ jobs:
       - name: Publish remaining crates from latest release diff
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: bash scripts/publish_changed.sh "${{ steps.tags.outputs.base_sha }}"
+        run: /tmp/publish_changed.sh "${{ steps.tags.outputs.base_sha }}"
