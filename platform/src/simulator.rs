@@ -23,6 +23,7 @@ use winit::{
 };
 
 use crate::input::InputEvent;
+use crate::screen::Screen;
 
 /// Initialize logging for `wgpu` validation messages.
 fn init_wgpu_logger() {
@@ -312,6 +313,7 @@ impl WgpuState {
 
 /// Desktop simulator display backed by `winit` and `wgpu`.
 pub struct WgpuDisplay {
+    screen: Screen,
     width: usize,
     height: usize,
     event_loop: EventLoop<()>,
@@ -324,7 +326,28 @@ pub struct WgpuDisplay {
 }
 
 impl WgpuDisplay {
+    /// Return the [`Screen`] this window was constructed for.
+    ///
+    /// Simulator windows always use [`crate::screen::Rotation::Deg0`] —
+    /// the window size matches the application's logical coordinates.
+    pub fn screen(&self) -> Screen {
+        self.screen
+    }
+
+    /// Create a new window sized to `screen.logical_size()`.
+    ///
+    /// The simulator always uses `Rotation::Deg0`, so the window
+    /// reflects the application's logical coordinate space directly.
+    pub fn with_screen(screen: Screen) -> Self {
+        let (w, h) = screen.logical_size();
+        let mut display = Self::new(w as usize, h as usize);
+        display.screen = screen;
+        display
+    }
+
     /// Create a new window with the given size.
+    ///
+    /// Equivalent to [`Self::with_screen`] with `Screen::landscape(width, height)`.
     ///
     /// Any panic during simulator execution opens a resizable window
     /// displaying the panic and a captured call stack. The window is
@@ -357,6 +380,7 @@ impl WgpuDisplay {
             phys.height as f64 / height as f64,
         );
         Self {
+            screen: Screen::landscape(width as u32, height as u32),
             width,
             height,
             event_loop,
@@ -381,6 +405,7 @@ impl WgpuDisplay {
         mut event_callback: impl FnMut(InputEvent) + 'static,
     ) {
         let WgpuDisplay {
+            screen: _,
             width,
             height,
             event_loop,

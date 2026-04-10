@@ -4560,10 +4560,12 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── Shared disco runtime ─────────────────────────────────────────────────
     use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
+    use rlvgl_platform::DisplayDriver;
     use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
 
     let (w_fb, h_fb) = display.dimensions();
-    let mut controller = DiscoController::new(w_fb, h_fb, DiscoCapabilities::stm32h747i_disco());
+    let mut controller =
+        DiscoController::new(display.screen(), DiscoCapabilities::stm32h747i_disco());
     let root = controller.root();
 
     fn apply_disco_commands<B, BL, RST>(

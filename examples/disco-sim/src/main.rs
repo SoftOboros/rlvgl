@@ -4,7 +4,7 @@
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_core::{WidgetNode, event::Event};
 use rlvgl_platform::{
-    BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Surface, WgpuDisplay,
+    BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Screen, Surface, WgpuDisplay,
     gesture::{DoubleTapRecognizer, TapRecognizer},
 };
 use rlvgl_playit::{
@@ -237,9 +237,11 @@ struct DiscoRuntime {
 }
 
 impl DiscoRuntime {
-    fn new(width: usize, height: usize, transport: RuntimeTransport) -> Self {
-        let controller =
-            DiscoController::new(width as u32, height as u32, DiscoCapabilities::simulator());
+    fn new(screen: Screen, transport: RuntimeTransport) -> Self {
+        let (logical_w, logical_h) = screen.logical_size();
+        let width = logical_w as usize;
+        let height = logical_h as usize;
+        let controller = DiscoController::new(screen, DiscoCapabilities::simulator());
         let root = controller.root();
         Self {
             controller,
@@ -438,8 +440,8 @@ fn run_automation_headless(runtime: Rc<RefCell<DiscoRuntime>>) {
     }
 }
 
-fn run_windowed(runtime: Rc<RefCell<DiscoRuntime>>, width: usize, height: usize) {
-    WgpuDisplay::new(width, height).run(
+fn run_windowed(runtime: Rc<RefCell<DiscoRuntime>>, screen: Screen) {
+    WgpuDisplay::with_screen(screen).run(
         {
             let runtime = runtime.clone();
             move |output, _w, _h| {
@@ -470,11 +472,8 @@ fn main() {
         .expect("failed to bind playit transport");
     emit_ready_line(ready_uri.as_deref());
 
-    let runtime = Rc::new(RefCell::new(DiscoRuntime::new(
-        options.width,
-        options.height,
-        transport,
-    )));
+    let screen = Screen::landscape(options.width as u32, options.height as u32);
+    let runtime = Rc::new(RefCell::new(DiscoRuntime::new(screen, transport)));
 
     if let Some(path) = options.headless_path.as_deref() {
         render_ascii(&runtime, path);
@@ -489,6 +488,6 @@ fn main() {
     if options.automation_headless {
         run_automation_headless(runtime);
     } else {
-        run_windowed(runtime, options.width, options.height);
+        run_windowed(runtime, screen);
     }
 }

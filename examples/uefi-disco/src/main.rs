@@ -9,7 +9,7 @@ extern crate alloc;
 use core::time::Duration;
 
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
-use rlvgl_platform::UefiDisplay;
+use rlvgl_platform::{DisplayDriver, UefiDisplay};
 use rlvgl_playit::executor::NullPipeline;
 use rlvgl_playit::{FramebufferReader as _, PlayitExecutor, PlayitTransport, StatusData};
 use uefi::proto::console::text::{Input, Key as UefiKey};
@@ -96,9 +96,8 @@ fn main() -> Status {
     let mut gop =
         boot::open_protocol_exclusive::<GraphicsOutput>(gop_handle).expect("failed to open GOP");
     let mut display = UefiDisplay::new(&mut gop);
-    let (width, height) = display.dimensions();
-
-    let mut controller = DiscoController::new(width, height, DiscoCapabilities::uefi());
+    let screen = display.screen();
+    let mut controller = DiscoController::new(screen, DiscoCapabilities::uefi());
     let root = controller.root();
 
     let mut transport = ConsoleTransport;
