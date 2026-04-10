@@ -2,6 +2,8 @@
 
 /target
 /Cargo.lock
+examples/uefi-disco/target/
+examples/uefi-disco/Cargo.lock
 **/*.rs.bk
 /coverage
 .envrc

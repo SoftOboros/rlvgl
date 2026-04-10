@@ -44,6 +44,49 @@ Package: `rlvgl`
 - [docs](./docs/README.md) – Project documentation and task lists
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
 
+## Building Binary Targets
+
+The workspace currently ships six user-facing binaries. Their package names,
+required targets, and applicable feature flags differ enough that it is best to
+treat them individually instead of relying on `cargo build --workspace`.
+
+### Host tools and simulators
+
+| Binary | Package | Default feature set | Build command | Notes |
+| --- | --- | --- | --- | --- |
+| `rlvgl-creator` | `rlvgl` | none | `cargo build -p rlvgl --bin rlvgl-creator --features creator` | The binary is gated behind `creator`. Add `creator_ui` for the desktop UI: `--features creator,creator_ui`. Without `creator_ui`, running with no arguments falls back to the CLI. |
+| `rlvgl-sim` | `rlvgl-example-sim` | `png,jpeg,gif,qrcode,fontdue` | `cargo build -p rlvgl-example-sim --bin rlvgl-sim` | Use `--no-default-features` for a leaner simulator, then opt back into only the codecs you need. `cpu_stats` is the only additional feature flag on this package. |
+| `rlvgl-disco-sim` | `rlvgl-example-disco-sim` | none | `cargo build -p rlvgl-example-disco-sim --bin rlvgl-disco-sim` | Host-only simulator for the shared disco demo runtime. This package currently has no Cargo feature flags. |
+| `rlvgl-uefi-disco` | `rlvgl-example-uefi-disco` | none | `cargo build --manifest-path examples/uefi-disco/Cargo.toml --target aarch64-unknown-uefi --bin rlvgl-uefi-disco` | This crate is intentionally excluded from the workspace because it conflicts with the normal host `std` build. Build it explicitly with the UEFI target triple. |
+
+### STM32H747I-DISCO firmware
+
+The firmware package is `rlvgl-example-disco` and it produces two binaries from
+the same crate:
+
+| Binary | Required target | Required feature | Minimal build | Current convenience wrapper |
+| --- | --- | --- | --- | --- |
+| `rlvgl-stm32h747i-disco` | `thumbv7em-none-eabihf` | `cm7` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7` | `make build-disco` builds the richer CM7 profile from the `Makefile`: `cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
+| `rlvgl-stm32h747i-disco-cm4` | `thumbv7em-none-eabihf` | `cm4` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` | `make build-disco-cm4` builds the CM4 helper core with its current default profile |
+
+Only the STM32H747I-DISCO package understands the following board-specific
+feature flags: `splash`, `desktop`, `dma2d`, `cpu_stats`, `audio`,
+`qspi_flash`, `sd_storage`, `c_hal`, `c_hal_cm4`, `pac_sdram_init`,
+`sdram_ramtest`, `hal_sdram`, `backlight_pwm`, `semihosting`, and `bsp_log`.
+They are all opt-in; `default = []`.
+
+### Where to find feature details
+
+Every crate in the workspace now has an `OPTIONS.md` file next to its
+`Cargo.toml`. Start with the umbrella crate's [OPTIONS.md](./OPTIONS.md), then
+use the crate-local file for the package you are building:
+
+- [examples/sim/OPTIONS.md](./examples/sim/OPTIONS.md)
+- [examples/disco-sim/OPTIONS.md](./examples/disco-sim/OPTIONS.md)
+- [examples/stm32h747i-disco/OPTIONS.md](./examples/stm32h747i-disco/OPTIONS.md)
+- [examples/uefi-disco/OPTIONS.md](./examples/uefi-disco/OPTIONS.md)
+- [src/bin/creator/README.md](./src/bin/creator/README.md) for CLI and UI workflow details
+
 ## What's New in 0.1.9
 
 - `rlvgl-creator` now covers vendor import, board IR generation, and Rust BSP rendering with bundled alternate-function databases.
