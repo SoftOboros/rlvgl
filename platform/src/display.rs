@@ -3,9 +3,22 @@ use alloc::vec;
 use alloc::vec::Vec;
 use rlvgl_core::widget::{Color, Rect};
 
+use crate::screen::Screen;
+
 /// Trait implemented by display drivers.
 pub trait DisplayDriver {
+    /// Return the screen geometry (logical size + scan rotation).
+    ///
+    /// Applications use [`Screen::logical_size`] to size widgets;
+    /// renderers and compositors consult [`Screen::rotation`] to map
+    /// logical coordinates onto the physical framebuffer.
+    fn screen(&self) -> Screen;
+
     /// Flush a rectangular region of pixels to the display.
+    ///
+    /// `area` and `colors` are in **logical** coordinates. The driver
+    /// is responsible for rotating them into the physical framebuffer
+    /// according to its [`Screen::rotation`].
     fn flush(&mut self, area: Rect, colors: &[Color]);
 
     /// Optional vertical sync hook.
@@ -16,6 +29,9 @@ pub trait DisplayDriver {
 pub struct DummyDisplay;
 
 impl DisplayDriver for DummyDisplay {
+    fn screen(&self) -> Screen {
+        Screen::landscape(0, 0)
+    }
     fn flush(&mut self, _area: Rect, _colors: &[Color]) {}
 }
 
@@ -41,6 +57,9 @@ impl BufferDisplay {
 }
 
 impl DisplayDriver for BufferDisplay {
+    fn screen(&self) -> Screen {
+        Screen::landscape(self.width as u32, self.height as u32)
+    }
     fn flush(&mut self, area: Rect, colors: &[Color]) {
         for y in 0..area.height as usize {
             for x in 0..area.width as usize {

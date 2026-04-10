@@ -8,7 +8,9 @@
 
 use alloc::vec::Vec;
 
-use crate::{BlitterRenderer, CpuBlitter, PixelFmt, Surface, display::DisplayDriver};
+use crate::{
+    BlitterRenderer, CpuBlitter, PixelFmt, Surface, display::DisplayDriver, screen::Screen,
+};
 use rlvgl_core::{
     WidgetNode,
     event::{Event, Key},
@@ -117,6 +119,9 @@ impl UefiDisplay {
 }
 
 impl DisplayDriver for UefiDisplay {
+    fn screen(&self) -> Screen {
+        Screen::landscape(self.width as u32, self.height as u32)
+    }
     fn flush(&mut self, area: Rect, colors: &[Color]) {
         let width = area.width.max(0) as usize;
         let height = area.height.max(0) as usize;

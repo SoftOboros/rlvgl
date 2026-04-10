@@ -74,6 +74,8 @@ pub mod nt35510;
 pub mod pdm_filter;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
+/// Display geometry abstraction: logical dimensions + scan rotation.
+pub mod screen;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
@@ -175,6 +177,7 @@ pub use pixels_renderer::PixelsRenderer;
 ))]
 pub use qspi_flash::{Mt25tlFlash, QspiMemoryMapped};
 pub use rlvgl_core::event::Key;
+pub use screen::{Rotation, Screen};
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",

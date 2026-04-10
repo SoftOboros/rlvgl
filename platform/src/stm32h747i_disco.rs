@@ -1950,6 +1950,14 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 }
 
 impl<B: Blitter> DisplayDriver for Stm32h747iDiscoDisplay<B> {
+    fn screen(&self) -> crate::screen::Screen {
+        // Step 2: expose the current dimensions via the Screen trait
+        // without changing behaviour. The hardcoded 480x800 physical
+        // framebuffer is reported as logical Deg0; Task 3 step 5 will
+        // switch this to Deg90 with logical (800, 480) once flush() and
+        // the compositor are Screen-aware.
+        crate::screen::Screen::landscape(self.width as u32, self.height as u32)
+    }
     fn flush(&mut self, area: Rect, colors: &[Color]) {
         // Clip to screen bounds
         let sw = self.width as i32;
