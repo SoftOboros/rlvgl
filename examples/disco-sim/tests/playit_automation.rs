@@ -333,3 +333,192 @@ fn focus_highlight_moves_with_arrow_keys() {
     // The pixel content should differ because the highlight border moved
     assert_ne!(pixels_a, pixels_b, "icon strip pixels should differ after focus change");
 }
+
+// ── Screen rendering regression tests ──────────────────────────────────
+//
+// These tests freeze the simulator's pixel-level output for three
+// behaviours that have regressed in the past:
+//
+// 1. The dashboard panel rounded corners must trace a convex
+//    quarter-circle (not the inverted "L-bracket" shape).
+// 2. Widgets with fully transparent backgrounds (alpha=0) must NOT
+//    overwrite the underlying framebuffer with zero pixels — they
+//    used to render as solid black bars on the wgpu sRGB surface.
+// 3. The platform `ColorFormat` profile must end-to-end quantize the
+//    PNG output so an Argb8888 snapshot differs from a Mono snapshot.
+
+/// Parse a row of `D` dump pixels into 24-bit (R, G, B) tuples,
+/// dropping the alpha channel. The dump format is the packed u32
+/// printed in `AARRGGBB` order.
+fn parse_pixels(line: &str) -> Vec<(u8, u8, u8)> {
+    line.split_whitespace()
+        .map(|hex| {
+            let v = u32::from_str_radix(hex, 16).expect("invalid pixel hex");
+            (((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8)
+        })
+        .collect()
+}
+
+/// Brightness (sum of channels) used by the corner-shape test below.
+fn brightness(p: (u8, u8, u8)) -> u32 {
+    p.0 as u32 + p.1 as u32 + p.2 as u32
+}
+
+#[test]
+fn dashboard_rounded_corner_arcs_outward() {
+    // Regression for the bug where draw_rounded_border called
+    // arc_dx(r, dy) with dy as a row index instead of an axis distance,
+    // producing a triangle that cut INTO the corner. With the fix the
+    // top-left arc tangent sits near the top-right of the corner box
+    // and curves down to the bottom-left.
+    //
+    // Dashboard panel is at PANEL_X=84, PANEL_Y=84, radius 18.
+    let mut session = SimulatorSession::launch();
+
+    // Dump a 20x20 region from the panel's top-left corner.
+    session.send("D84,84,20,20,1");
+    assert_eq!(session.read_line(), "DUMP:queued");
+    assert_eq!(session.read_line(), "F");
+    let mut rows = Vec::with_capacity(20);
+    for _ in 0..20 {
+        rows.push(parse_pixels(&session.read_line()));
+    }
+    assert_eq!(session.read_line(), "END");
+
+    // Border colour PANEL_BORDER = (75, 94, 122) ≈ brightness 291;
+    // panel fill ≈ brightness 92; window bg ≈ brightness 62. Pick a
+    // mid threshold that catches border pixels and AA fringe.
+    let border_threshold = 200u32;
+    let bright_cols_in_row = |row: &[(u8, u8, u8)]| -> Vec<usize> {
+        row.iter()
+            .enumerate()
+            .filter_map(|(i, p)| (brightness(*p) >= border_threshold).then_some(i))
+            .collect()
+    };
+
+    // Top row (y=84): the arc is tangent to the top edge near col 18,
+    // so the brightest pixels should sit in the right half of the
+    // 20-wide window, NOT at the left edge.
+    let top_row = bright_cols_in_row(&rows[0]);
+    assert!(
+        !top_row.is_empty(),
+        "no border pixels visible in top row of corner: {:?}",
+        rows[0]
+    );
+    let min_top = *top_row.iter().min().unwrap();
+    assert!(
+        min_top >= 12,
+        "top row arc is too far left (col {min_top}); the corner is \
+         drawn upside-down. Bright cols: {top_row:?}"
+    );
+
+    // Bottom row of the arc region (y=84+17=101): the arc reaches the
+    // left edge, so brightest pixels should be at small column indices.
+    let bottom_row = bright_cols_in_row(&rows[17]);
+    assert!(
+        !bottom_row.is_empty(),
+        "no border pixels visible in bottom row of corner: {:?}",
+        rows[17]
+    );
+    let min_bot = *bottom_row.iter().min().unwrap();
+    assert!(
+        min_bot <= 5,
+        "bottom row arc is too far right (col {min_bot}); the corner \
+         is drawn upside-down. Bright cols: {bottom_row:?}"
+    );
+}
+
+#[test]
+fn transparent_label_backgrounds_do_not_blacken_window() {
+    // Regression for the disco sim "black bars" bug. themed_label()
+    // creates labels with bg_color = Color(0,0,0,0) and style.alpha = 0,
+    // which used to call fill_rect with a fully transparent colour.
+    // CpuBlitter overwrote the destination with 0x00000000 instead of
+    // leaving the underlying pixels alone, producing solid black bars
+    // where the title/subtitle/footer labels live.
+    //
+    // After the fix the label bands should be the dark navy window
+    // background (Color(13, 19, 30) = 0xFF0D131E), not 0x00000000.
+    let mut session = SimulatorSession::launch();
+
+    // Title sits at y=24..42 (themed_label rect at lib.rs:712-717).
+    // Subtitle at y=48..66. Footer at the bottom (y = h - 32 .. h - 14).
+    // Sample inside each band, well to the left of the panel border
+    // and to the right of the screen edge.
+    //
+    // The dump command caps width and height at 40 each.
+    let sample_xs: [(i32, &str); 3] = [(110, "title"), (110, "subtitle"), (250, "footer")];
+    let sample_ys: [(i32, &str); 3] = [(30, "title"), (54, "subtitle"), (450, "footer")];
+
+    // Window background should be a non-zero "dark navy" colour with
+    // sum of channels around 62. We just need to ensure pixels are
+    // NOT 0x00000000 — that's the regression.
+    let dump_command = |y: i32| format!("D110,{y},20,1,1");
+
+    for ((_, label), (y, _)) in sample_xs.iter().zip(sample_ys.iter()) {
+        session.send(&dump_command(*y));
+        assert_eq!(session.read_line(), "DUMP:queued");
+        assert_eq!(session.read_line(), "F");
+        let row = session.read_line();
+        assert_eq!(session.read_line(), "END");
+
+        let pixels = parse_pixels(&row);
+        assert!(
+            pixels.iter().all(|p| brightness(*p) > 0),
+            "{label} band at y={y} contains zero pixels: {pixels:?}"
+        );
+    }
+}
+
+#[test]
+fn color_format_cli_changes_png_output() {
+    // Regression test for the Screen::color_format pipeline. Spawning
+    // the simulator with --color=argb and --color=mono should produce
+    // PNG snapshots that differ at the byte level, because the mono
+    // path runs every pixel through ColorFormat::Mono::quantize.
+    //
+    // We don't compare against a golden image (anti-aliasing across
+    // wgpu adapters makes that brittle); we just confirm that the
+    // colour profile actually flows from the CLI through the headless
+    // path into the saved PNG.
+    use std::fs;
+    use std::process::Command;
+
+    let bin = SimulatorSession::binary_path();
+    let dir = std::env::temp_dir();
+    let argb_path = dir.join("rlvgl_test_color_argb.png");
+    let mono_path = dir.join("rlvgl_test_color_mono.png");
+
+    let _ = fs::remove_file(&argb_path);
+    let _ = fs::remove_file(&mono_path);
+
+    let run = |fmt: &str, path: &std::path::Path| {
+        let status = Command::new(&bin)
+            .arg(format!("--color={fmt}"))
+            .arg(path)
+            .status()
+            .expect("failed to spawn disco-sim for headless dump");
+        assert!(
+            status.success(),
+            "disco-sim --color={fmt} exited with status {status:?}"
+        );
+    };
+
+    run("argb", &argb_path);
+    run("mono", &mono_path);
+
+    let argb_bytes = fs::read(&argb_path).expect("failed to read argb png");
+    let mono_bytes = fs::read(&mono_path).expect("failed to read mono png");
+
+    assert!(!argb_bytes.is_empty(), "argb png is empty");
+    assert!(!mono_bytes.is_empty(), "mono png is empty");
+    assert_ne!(
+        argb_bytes, mono_bytes,
+        "argb and mono color profiles produced byte-identical PNGs; \
+         the --color CLI flag is not flowing into the headless path"
+    );
+
+    // Best-effort cleanup; ignore errors.
+    let _ = fs::remove_file(&argb_path);
+    let _ = fs::remove_file(&mono_path);
+}
