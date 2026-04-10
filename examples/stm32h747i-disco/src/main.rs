@@ -2232,17 +2232,20 @@ fn main() -> ! {
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         let mut audio_pcm_len: u32 = 0;
 
+        // Card detect: PI8 is active-low (low = card inserted).
+        // Captured outside the SDMMC init block so it survives for
+        // dev_storage.set_sd_present() later.
         #[cfg(feature = "sd_storage")]
-        let mut sd_card_detected = false;
+        let sd_card_detected = {
+            let sd_detect = gpioi.pi8.into_pull_up_input();
+            sd_detect.is_low()
+        };
         #[cfg(feature = "sd_storage")]
         {
             use rlvgl_i18n::t;
             use stm32h7xx_hal::gpio::Alternate;
 
-            // Card detect: PI8 is active-low (low = card inserted)
-            let sd_detect = gpioi.pi8.into_pull_up_input();
-            let card_present = sd_detect.is_low();
-            sd_card_detected = card_present;
+            let card_present = sd_card_detected;
 
             // SDMMC1 pins: PC12=CK, PD2=CMD, PC8..PC11=D0..D3 (AF12)
             use stm32h7xx_hal::sdmmc::SdmmcExt;

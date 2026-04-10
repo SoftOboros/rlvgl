@@ -116,17 +116,19 @@ impl CpuStats {
     /// # Safety
     /// Writes to DWT control registers in the PPB region.
     pub unsafe fn enable_dwt(&mut self) {
-        // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
-        const DEMCR: u32 = 0xE000_EDFC;
-        let demcr = (DEMCR as *const u32).read_volatile();
-        (DEMCR as *mut u32).write_volatile(demcr | (1 << 24));
-        // Unlock the DWT LAR (some implementations lock DWT on reset).
-        (DWT_LAR as *mut u32).write_volatile(DWT_LAR_KEY);
-        // Set CYCCNTENA (bit 0) in DWT_CTRL.
-        let ctrl = (DWT_CTRL as *const u32).read_volatile();
-        (DWT_CTRL as *mut u32).write_volatile(ctrl | 1);
-        // Reset the cycle counter.
-        (DWT_CYCCNT as *mut u32).write_volatile(0);
+        unsafe {
+            // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
+            const DEMCR: u32 = 0xE000_EDFC;
+            let demcr = (DEMCR as *const u32).read_volatile();
+            (DEMCR as *mut u32).write_volatile(demcr | (1 << 24));
+            // Unlock the DWT LAR (some implementations lock DWT on reset).
+            (DWT_LAR as *mut u32).write_volatile(DWT_LAR_KEY);
+            // Set CYCCNTENA (bit 0) in DWT_CTRL.
+            let ctrl = (DWT_CTRL as *const u32).read_volatile();
+            (DWT_CTRL as *mut u32).write_volatile(ctrl | 1);
+            // Reset the cycle counter.
+            (DWT_CYCCNT as *mut u32).write_volatile(0);
+        }
         cortex_m::asm::dsb();
         self.enabled = true;
     }
