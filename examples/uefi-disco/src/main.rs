@@ -8,11 +8,13 @@ extern crate alloc;
 
 use core::time::Duration;
 
+use alloc::collections::VecDeque;
+
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_platform::{DisplayDriver, UefiDisplay};
 use rlvgl_playit::executor::NullPipeline;
 use rlvgl_playit::{FramebufferReader as _, PlayitExecutor, PlayitTransport, StatusData};
-use uefi::proto::console::text::{Input, Key as UefiKey};
+use uefi::proto::console::text::{Input, Key as UefiKey, ScanCode};
 use uefi::{Status, boot, entry, helpers, proto::console::gop::GraphicsOutput, system};
 
 fn apply_runtime_commands(controller: &mut DiscoController) {
@@ -52,32 +54,85 @@ fn apply_runtime_commands(controller: &mut DiscoController) {
 // owns the receiver, so raw MMIO reads see an empty FIFO.  We use:
 //   TX → raw MMIO write to UART DR (works, EDK2 doesn't interfere)
 //   RX → UEFI ConIn (read_key) which buffers UART RX for us
+//
+// When QEMU runs with `-display default` the GUI keyboard feeds ConIn
+// through the USB / ANSI console input path, and arrow / escape / fn
+// keys show up as `Key::Special(ScanCode::...)` — not as printable
+// characters. Without translation the playit protocol never sees
+// them. `ConsoleTransport` therefore synthesises the matching
+// `KD:<name>\n` wire command into a small pending-byte queue and
+// drains it on subsequent `read_byte` calls. Printable characters
+// pass through unchanged so the `-serial tcp:...` playit test client
+// (which sends raw ASCII command lines) keeps working.
 
 const UART0_DR: *mut u8 = 0x0900_0000 as *mut u8;
 const UART0_FR: *const u32 = 0x0900_0018 as *const u32;
 const UART0_FR_TXFF: u32 = 1 << 5;
 
-/// PlayitTransport: MMIO TX + ConIn RX.
-struct ConsoleTransport;
+/// PlayitTransport: MMIO TX + ConIn RX with special-key translation.
+struct ConsoleTransport {
+    /// Bytes queued from a previous `read_key` that span more than one
+    /// byte (e.g. a synthesised `KD:ArrowDown\n` line).
+    pending: VecDeque<u8>,
+}
+
+impl ConsoleTransport {
+    fn new() -> Self {
+        Self {
+            pending: VecDeque::new(),
+        }
+    }
+
+    /// Push an entire `KD:<name>\n` playit command into the pending
+    /// byte queue so `read_byte` can drain it one character at a time.
+    fn queue_key_down(&mut self, name: &str) {
+        self.pending.extend(b"KD:");
+        self.pending.extend(name.as_bytes());
+        self.pending.push_back(b'\n');
+    }
+}
 
 impl PlayitTransport for ConsoleTransport {
     fn read_byte(&mut self) -> Option<u8> {
-        system::with_stdin(|stdin: &mut Input| -> Option<u8> {
-            match stdin.read_key() {
-                Ok(Some(key)) => match key {
-                    UefiKey::Printable(ch) => {
-                        let c = char::from(ch);
-                        if c == '\r' {
-                            Some(b'\n')
-                        } else {
-                            Some(c as u8)
-                        }
-                    }
-                    UefiKey::Special(_) => None,
-                },
-                _ => None,
+        if let Some(byte) = self.pending.pop_front() {
+            return Some(byte);
+        }
+        let key = system::with_stdin(|stdin: &mut Input| stdin.read_key().ok().flatten());
+        let key = key?;
+        match key {
+            UefiKey::Printable(ch) => {
+                let c = char::from(ch);
+                if c == '\r' { Some(b'\n') } else { Some(c as u8) }
             }
-        })
+            UefiKey::Special(scan) => {
+                let name = match scan {
+                    ScanCode::UP => "ArrowUp",
+                    ScanCode::DOWN => "ArrowDown",
+                    ScanCode::LEFT => "ArrowLeft",
+                    ScanCode::RIGHT => "ArrowRight",
+                    ScanCode::ESCAPE => "Escape",
+                    ScanCode::HOME => "Home",
+                    ScanCode::END => "End",
+                    ScanCode::PAGE_UP => "PageUp",
+                    ScanCode::PAGE_DOWN => "PageDown",
+                    ScanCode::FUNCTION_1 => "F1",
+                    ScanCode::FUNCTION_2 => "F2",
+                    ScanCode::FUNCTION_3 => "F3",
+                    ScanCode::FUNCTION_4 => "F4",
+                    ScanCode::FUNCTION_5 => "F5",
+                    ScanCode::FUNCTION_6 => "F6",
+                    ScanCode::FUNCTION_7 => "F7",
+                    ScanCode::FUNCTION_8 => "F8",
+                    ScanCode::FUNCTION_9 => "F9",
+                    ScanCode::FUNCTION_10 => "F10",
+                    ScanCode::FUNCTION_11 => "F11",
+                    ScanCode::FUNCTION_12 => "F12",
+                    _ => return None,
+                };
+                self.queue_key_down(name);
+                self.pending.pop_front()
+            }
+        }
     }
 
     fn write_bytes(&mut self, bytes: &[u8]) {
@@ -100,7 +155,7 @@ fn main() -> Status {
     let mut controller = DiscoController::new(screen, DiscoCapabilities::uefi());
     let root = controller.root();
 
-    let mut transport = ConsoleTransport;
+    let mut transport = ConsoleTransport::new();
 
     // Handshake: signal readiness repeatedly for clients connecting at any time.
     for _ in 0..10 {
