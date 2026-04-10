@@ -16,6 +16,8 @@ pub mod image;
 pub mod label;
 /// Scrollable list widget.
 pub mod list;
+/// UI motion components (crawls, scrollers, tickers).
+pub mod motion;
 /// Progress bar widget.
 pub mod progress;
 /// Radio button widget for mutually exclusive options.
