@@ -1,7 +1,12 @@
 //! Drawing helpers for rounded rectangles and borders.
 //!
-//! Core algorithms live in [`rlvgl_core::draw`] and are re-exported here for
-//! convenience.  This module also provides the [`Rotated90`] renderer wrapper.
+//! Core algorithms live in [`rlvgl_core::draw`] and are re-exported here
+//! for convenience.
+//!
+//! Display rotation used to live here as a `Rotated90` renderer wrapper,
+//! but it was unused and rotation now belongs in the platform layer
+//! (see [`rlvgl_platform::screen::Screen`] and the display driver's
+//! `flush` implementation). This module is rotation-agnostic.
 
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
@@ -14,43 +19,6 @@ pub use rlvgl_core::draw::{
 /// Legacy alias — draws a straight (non-rounded) border.
 pub fn draw_border(renderer: &mut dyn Renderer, rect: Rect, color: Color, width: u8) {
     draw_border_straight(renderer, rect, color, width);
-}
-
-/// Renderer wrapper that rotates all drawing 90° CCW.
-///
-/// Maps logical (x, y) → framebuffer (y, x) so that content designed
-/// for a landscape orientation renders correctly on a portrait
-/// framebuffer whose scan direction is rotated.
-pub struct Rotated90<'a>(pub &'a mut dyn Renderer);
-
-impl Renderer for Rotated90<'_> {
-    fn fill_rect(&mut self, rect: Rect, color: Color) {
-        self.0.fill_rect(
-            Rect {
-                x: rect.y,
-                y: rect.x,
-                width: rect.height,
-                height: rect.width,
-            },
-            color,
-        );
-    }
-
-    fn blend_rect(&mut self, rect: Rect, color: Color) {
-        self.0.blend_rect(
-            Rect {
-                x: rect.y,
-                y: rect.x,
-                width: rect.height,
-                height: rect.width,
-            },
-            color,
-        );
-    }
-
-    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
-        self.0.draw_text((position.1, position.0), text, color);
-    }
 }
 
 #[cfg(test)]
