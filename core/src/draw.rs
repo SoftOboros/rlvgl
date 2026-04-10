@@ -469,16 +469,30 @@ pub fn draw_border_straight(renderer: &mut dyn Renderer, rect: Rect, color: Colo
 ///
 /// Respects `style.radius` for rounded corners, `style.border_width` for
 /// borders, and `style.alpha` for opacity.
+///
+/// Fully transparent backgrounds (`alpha == 0`) are skipped entirely so the
+/// underlying pixels show through. Partially transparent backgrounds are
+/// alpha-blended via [`Renderer::blend_rect`]; opaque backgrounds use
+/// [`Renderer::fill_rect`] for the fast overwrite path. Without this guard
+/// a transparent background would write zero-valued pixels over the
+/// framebuffer, which presents as solid black on backends whose surface
+/// has nothing to composite against (e.g. the `wgpu` simulator).
 pub fn draw_widget_bg(renderer: &mut dyn Renderer, rect: Rect, style: &Style) {
     let bg = style.bg_color.with_alpha(style.alpha);
-    if style.radius > 0 {
-        fill_rounded_rect(renderer, rect, bg, style.radius);
-    } else {
-        renderer.fill_rect(rect, bg);
+    if bg.3 != 0 {
+        if style.radius > 0 {
+            fill_rounded_rect(renderer, rect, bg, style.radius);
+        } else if bg.3 == 255 {
+            renderer.fill_rect(rect, bg);
+        } else {
+            renderer.blend_rect(rect, bg);
+        }
     }
     if style.border_width > 0 {
         let border = style.border_color.with_alpha(style.alpha);
-        draw_rounded_border(renderer, rect, border, style.border_width, style.radius);
+        if border.3 != 0 {
+            draw_rounded_border(renderer, rect, border, style.border_width, style.radius);
+        }
     }
 }
 
