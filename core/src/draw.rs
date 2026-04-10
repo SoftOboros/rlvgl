@@ -97,9 +97,14 @@ pub fn fill_rounded_rect(renderer: &mut dyn Renderer, rect: Rect, color: Color, 
     }
 
     // Corner arcs with anti-aliased fringe.
+    //
+    // `arc_dx(r, dy)` returns the x-extent at `dy` rows from the arc's
+    // horizontal centre axis. The loop walks pixel rows from the *top edge*
+    // of the corner box, so dy=0 is the tangent row (extent ≈ 0) and dy=r-1
+    // is adjacent to the body (extent ≈ r). Pass `r - 1 - dy` to convert.
     let base_alpha = color.3 as u16;
     for dy in 0..r {
-        let (dx_int, frac) = arc_dx(r, dy);
+        let (dx_int, frac) = arc_dx(r, r - 1 - dy);
 
         // --- fully opaque interior of each corner ---
         if dx_int > 0 {
@@ -225,10 +230,14 @@ pub fn draw_rounded_border(
     let base_alpha = color.3 as u16;
 
     // --- Corner arcs (ring between outer and inner radius) ---
+    // See the matching comment in `fill_rounded_rect`: `arc_dx` measures
+    // from the arc centre axis, so we invert `dy` to turn the loop index
+    // (row from top of corner box) into the axis distance.
     for dy in 0..rout {
-        let (out_dx, out_frac) = arc_dx(rout, dy);
+        let axis_dy = rout - 1 - dy;
+        let (out_dx, out_frac) = arc_dx(rout, axis_dy);
         let (in_dx, in_frac) = if rin > 0 {
-            let (d, f) = arc_dx(rin, dy);
+            let (d, f) = arc_dx(rin, axis_dy);
             // arc_dx returns (0,0) when dy is outside the inner circle
             (d, f)
         } else {
