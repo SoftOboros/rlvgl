@@ -177,7 +177,7 @@ pub use pixels_renderer::PixelsRenderer;
 ))]
 pub use qspi_flash::{Mt25tlFlash, QspiMemoryMapped};
 pub use rlvgl_core::event::Key;
-pub use screen::{Rotation, Screen};
+pub use screen::{ColorFormat, Rotation, Screen};
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",

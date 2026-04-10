@@ -23,7 +23,7 @@ use winit::{
 };
 
 use crate::input::InputEvent;
-use crate::screen::Screen;
+use crate::screen::{ColorFormat, Screen};
 
 /// Initialize logging for `wgpu` validation messages.
 fn init_wgpu_logger() {
@@ -104,6 +104,11 @@ struct WgpuState {
     fb_height: u32,
     blit_buf: Vec<u8>,
     max_texture_dim: u32,
+    /// Target panel colour format. The CPU framebuffer is always
+    /// 8-bit-per-channel; this field tells the simulator which colour
+    /// format to **simulate** by quantizing each presented frame so the
+    /// preview matches what the target panel would actually display.
+    color_format: ColorFormat,
 }
 
 impl WgpuState {
@@ -114,6 +119,7 @@ impl WgpuState {
         fb_height: u32,
         surface_width: u32,
         surface_height: u32,
+        color_format: ColorFormat,
     ) -> Self {
         init_wgpu_logger();
         let instance = wgpu::Instance::default();
@@ -175,6 +181,7 @@ impl WgpuState {
             fb_height,
             blit_buf: Vec::new(),
             max_texture_dim,
+            color_format,
         }
     }
 
@@ -238,8 +245,28 @@ impl WgpuState {
                 }
             }
         }
+        // Apply target colour-format quantization. blit_buf is in BGRA
+        // byte order; quantize through (R, G, B) and write back. For
+        // ColorFormat::Argb8888 this is a no-op so we skip the loop.
+        if self.color_format != ColorFormat::Argb8888 {
+            for px in self.blit_buf.chunks_exact_mut(4) {
+                let (qr, qg, qb) = self.color_format.quantize(px[2], px[1], px[0]);
+                px[0] = qb;
+                px[1] = qg;
+                px[2] = qr;
+            }
+        }
+
+        // The CPU framebuffer is filled by CpuBlitter via to_argb8888()+
+        // to_le_bytes(), which produces BGRA byte order in memory. The
+        // wgpu surface format we select is also BGRA (Bgra8UnormSrgb),
+        // so byte order matches and no swap is required. If a non-BGRA
+        // surface is ever selected, swap R/B before upload.
         let data: Cow<[u8]> = match self.config.format {
             wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
+                Cow::Borrowed(&self.blit_buf)
+            }
+            wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Rgba8UnormSrgb => {
                 for px in self.blit_buf.chunks_exact_mut(4) {
                     px.swap(0, 2);
                 }
@@ -338,11 +365,57 @@ impl WgpuDisplay {
     ///
     /// The simulator always uses `Rotation::Deg0`, so the window
     /// reflects the application's logical coordinate space directly.
+    /// The screen's [`ColorFormat`](crate::screen::ColorFormat) is
+    /// applied as a per-pixel quantization on the preview, allowing
+    /// the host to faithfully simulate target panels with reduced
+    /// colour depth (e.g. RGB565 banding).
     pub fn with_screen(screen: Screen) -> Self {
-        let (w, h) = screen.logical_size();
-        let mut display = Self::new(w as usize, h as usize);
-        display.screen = screen;
-        display
+        panic::set_hook(Box::new(|info| {
+            let backtrace = Backtrace::force_capture();
+            let message = format!("{info}\n\n{backtrace}");
+            eprintln!("{message}");
+            show_panic_window(message);
+            std::process::exit(1);
+        }));
+        let (logical_w, logical_h) = screen.logical_size();
+        let width = logical_w as usize;
+        let height = logical_h as usize;
+        let event_loop = EventLoop::new().expect("failed to create event loop");
+        #[allow(deprecated)]
+        let window = event_loop
+            .create_window(
+                Window::default_attributes()
+                    .with_title("rlvgl simulator")
+                    .with_inner_size(LogicalSize::new(width as f64, height as f64)),
+            )
+            .expect("failed to create window");
+        let window = Box::leak(Box::new(window));
+        let phys = window.inner_size();
+        let state = WgpuState::new(
+            window,
+            width as u32,
+            height as u32,
+            phys.width,
+            phys.height,
+            screen.color_format,
+        );
+        let window: &'static Window = &*window;
+        let scale = (
+            phys.width as f64 / width as f64,
+            phys.height as f64 / height as f64,
+        );
+        Self {
+            screen,
+            width,
+            height,
+            event_loop,
+            window,
+            state,
+            scale,
+            present_scale: (1.0, 1.0),
+            dest_size: (phys.width, phys.height),
+            surface_offset: (0.0, 0.0),
+        }
     }
 
     /// Create a new window with the given size.
@@ -355,42 +428,7 @@ impl WgpuDisplay {
     /// messages, and offers copy and close controls. Closing the window
     /// terminates the process.
     pub fn new(width: usize, height: usize) -> Self {
-        panic::set_hook(Box::new(|info| {
-            let backtrace = Backtrace::force_capture();
-            let message = format!("{info}\n\n{backtrace}");
-            eprintln!("{message}");
-            show_panic_window(message);
-            std::process::exit(1);
-        }));
-        let event_loop = EventLoop::new().expect("failed to create event loop");
-        #[allow(deprecated)]
-        let window = event_loop
-            .create_window(
-                Window::default_attributes()
-                    .with_title("rlvgl simulator")
-                    .with_inner_size(LogicalSize::new(width as f64, height as f64)),
-            )
-            .expect("failed to create window");
-        let window = Box::leak(Box::new(window));
-        let phys = window.inner_size();
-        let state = WgpuState::new(window, width as u32, height as u32, phys.width, phys.height);
-        let window: &'static Window = &*window;
-        let scale = (
-            phys.width as f64 / width as f64,
-            phys.height as f64 / height as f64,
-        );
-        Self {
-            screen: Screen::landscape(width as u32, height as u32),
-            width,
-            height,
-            event_loop,
-            window,
-            state,
-            scale,
-            present_scale: (1.0, 1.0),
-            dest_size: (phys.width, phys.height),
-            surface_offset: (0.0, 0.0),
-        }
+        Self::with_screen(Screen::landscape(width as u32, height as u32))
     }
 
     /// Run the simulator event loop.
@@ -602,15 +640,52 @@ impl WgpuDisplay {
     /// Render a single frame off-screen and save it as a PNG.
     ///
     /// This helper enables headless CI tests that compare rendered
-    /// output against golden images.
+    /// output against golden images. Defaults to true-colour ARGB8888;
+    /// use [`Self::headless_with_color_format`] to bake target panel
+    /// quantization into the saved image.
     pub fn headless(
         width: usize,
         height: usize,
+        frame_callback: impl FnMut(&mut [u8]),
+        path: impl AsRef<Path>,
+    ) -> Result<(), ImageError> {
+        Self::headless_with_color_format(
+            width,
+            height,
+            ColorFormat::Argb8888,
+            frame_callback,
+            path,
+        )
+    }
+
+    /// Render a single frame off-screen, quantize through `color_format`,
+    /// and save it as a PNG.
+    ///
+    /// The CPU framebuffer is filled by [`crate::CpuBlitter`] via
+    /// `Color::to_argb8888().to_le_bytes()`, which produces **BGRA**
+    /// byte order in memory. PNG output expects RGBA8, so we apply the
+    /// quantization (operating on R/G/B in the BGRA buffer) and then
+    /// swap red and blue per pixel before encoding.
+    pub fn headless_with_color_format(
+        width: usize,
+        height: usize,
+        color_format: ColorFormat,
         mut frame_callback: impl FnMut(&mut [u8]),
         path: impl AsRef<Path>,
     ) -> Result<(), ImageError> {
         let mut frame = vec![0u8; width * height * 4];
         frame_callback(&mut frame);
+        if color_format != ColorFormat::Argb8888 {
+            for px in frame.chunks_exact_mut(4) {
+                let (qr, qg, qb) = color_format.quantize(px[2], px[1], px[0]);
+                px[0] = qb;
+                px[1] = qg;
+                px[2] = qr;
+            }
+        }
+        for px in frame.chunks_exact_mut(4) {
+            px.swap(0, 2);
+        }
         save_buffer(path, &frame, width as u32, height as u32, ColorType::Rgba8)
     }
 }

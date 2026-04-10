@@ -4,7 +4,8 @@
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_core::{WidgetNode, event::Event};
 use rlvgl_platform::{
-    BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Screen, Surface, WgpuDisplay,
+    BlitRect, BlitterRenderer, ColorFormat, CpuBlitter, InputEvent, PixelFmt, Screen, Surface,
+    WgpuDisplay,
     gesture::{DoubleTapRecognizer, TapRecognizer},
 };
 use rlvgl_playit::{
@@ -335,6 +336,19 @@ struct CliOptions {
     headless_path: Option<String>,
     automation_headless: bool,
     playit_port: Option<u16>,
+    color_format: Option<ColorFormat>,
+}
+
+fn parse_color_format(value: &str) -> Result<ColorFormat, String> {
+    match value {
+        "argb" | "argb8888" | "8888" | "32" => Ok(ColorFormat::Argb8888),
+        "rgb888" | "888" | "24" => Ok(ColorFormat::Rgb888),
+        "rgb565" | "565" | "16" => Ok(ColorFormat::Rgb565),
+        "rgb444" | "444" | "12" => Ok(ColorFormat::Rgb444),
+        "l8" | "grey" | "gray" | "8" => Ok(ColorFormat::L8),
+        "mono" | "1" => Ok(ColorFormat::Mono),
+        _ => Err(format!("invalid --color value: {value}")),
+    }
 }
 
 fn parse_args() -> Result<CliOptions, String> {
@@ -377,6 +391,13 @@ fn parse_args() -> Result<CliOptions, String> {
                 port.parse::<u16>()
                     .map_err(|_| format!("invalid --playit-port value: {port}"))?,
             );
+        } else if arg == "--color" {
+            let Some(value) = args.next() else {
+                return Err("--color requires a value (argb|rgb888|rgb565|rgb444|l8|mono)".into());
+            };
+            options.color_format = Some(parse_color_format(&value)?);
+        } else if let Some(value) = arg.strip_prefix("--color=") {
+            options.color_format = Some(parse_color_format(value)?);
         } else {
             options.png_path = Some(arg);
         }
@@ -413,11 +434,18 @@ fn render_ascii(runtime: &Rc<RefCell<DiscoRuntime>>, path: &str) {
     fs::write(Path::new(path), ascii).expect("failed to write headless output");
 }
 
-fn render_png(runtime: &Rc<RefCell<DiscoRuntime>>, width: usize, height: usize, path: &str) {
+fn render_png(
+    runtime: &Rc<RefCell<DiscoRuntime>>,
+    width: usize,
+    height: usize,
+    color_format: ColorFormat,
+    path: &str,
+) {
     let runtime = runtime.clone();
-    WgpuDisplay::headless(
+    WgpuDisplay::headless_with_color_format(
         width,
         height,
+        color_format,
         move |output| {
             let mut runtime = runtime.borrow_mut();
             runtime.step();
@@ -472,7 +500,10 @@ fn main() {
         .expect("failed to bind playit transport");
     emit_ready_line(ready_uri.as_deref());
 
-    let screen = Screen::landscape(options.width as u32, options.height as u32);
+    let mut screen = Screen::landscape(options.width as u32, options.height as u32);
+    if let Some(fmt) = options.color_format {
+        screen = screen.with_color_format(fmt);
+    }
     let runtime = Rc::new(RefCell::new(DiscoRuntime::new(screen, transport)));
 
     if let Some(path) = options.headless_path.as_deref() {
@@ -481,7 +512,13 @@ fn main() {
     }
 
     if let Some(path) = options.png_path.as_deref() {
-        render_png(&runtime, options.width, options.height, path);
+        render_png(
+            &runtime,
+            options.width,
+            options.height,
+            screen.color_format,
+            path,
+        );
         return;
     }
 
