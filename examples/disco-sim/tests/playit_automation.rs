@@ -331,7 +331,10 @@ fn focus_highlight_moves_with_arrow_keys() {
     assert_eq!(session.read_line(), "END");
 
     // The pixel content should differ because the highlight border moved
-    assert_ne!(pixels_a, pixels_b, "icon strip pixels should differ after focus change");
+    assert_ne!(
+        pixels_a, pixels_b,
+        "icon strip pixels should differ after focus change"
+    );
 }
 
 // ── Screen rendering regression tests ──────────────────────────────────
@@ -354,7 +357,11 @@ fn parse_pixels(line: &str) -> Vec<(u8, u8, u8)> {
     line.split_whitespace()
         .map(|hex| {
             let v = u32::from_str_radix(hex, 16).expect("invalid pixel hex");
-            (((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8)
+            (
+                ((v >> 16) & 0xFF) as u8,
+                ((v >> 8) & 0xFF) as u8,
+                (v & 0xFF) as u8,
+            )
         })
         .collect()
 }
@@ -468,6 +475,113 @@ fn transparent_label_backgrounds_do_not_blacken_window() {
             "{label} band at y={y} contains zero pixels: {pixels:?}"
         );
     }
+}
+
+/// Sample a 3x3 grid of 40x40 regions spread across the screen and
+/// return the concatenated pixel vector. Used by the star crawl test
+/// below so a single sparse starfield (≈200 stars over 384 000
+/// visible pixels → ~0.4 expected stars per 40x40 dump) still
+/// reliably catches at least a handful of star pixels.
+fn sample_screen_grid(session: &mut SimulatorSession) -> Vec<(u8, u8, u8)> {
+    // Positions chosen to land fully inside the 800x480 window and
+    // sample the dashboard area plus the outer margins.
+    let origins = [
+        (20, 20),
+        (380, 20),
+        (740, 20),
+        (20, 220),
+        (380, 220),
+        (740, 220),
+        (20, 420),
+        (380, 420),
+        (740, 420),
+    ];
+    let mut combined = Vec::with_capacity(origins.len() * 40 * 40);
+    for (x, y) in origins {
+        // Clamp so (x + 40, y + 40) stays inside the framebuffer.
+        let x = x.min(760);
+        let y = y.min(440);
+        session.send(&format!("D{x},{y},40,40,1"));
+        assert_eq!(session.read_line(), "DUMP:queued");
+        assert_eq!(session.read_line(), "F");
+        for _ in 0..40 {
+            combined.extend(parse_pixels(&session.read_line()));
+        }
+        assert_eq!(session.read_line(), "END");
+    }
+    combined
+}
+
+#[test]
+fn star_crawl_activates_and_scrolls() {
+    // Regression for the UI-motion-hierarchy integration (commit 4):
+    // activating the info wing's "Star Crawl" slot should build a
+    // `CrawlWindow<StarCrawl<'static>>` through `crawl_buffers`, paint
+    // a starfield background over the dashboard, and advance the scroll
+    // on each `Event::Tick`.
+    //
+    // We verify three things:
+    // 1. Before activation the screen is the dashboard — no starfield
+    //    bg pixels present.
+    // 2. After activation the sampled grid is dominated by the
+    //    starfield bg colour 0xFF0A0A20 and contains at least a few
+    //    brighter star pixels.
+    // 3. A second grid sample taken after a few more frames differs
+    //    from the first — proving Event::Tick advances the scroll.
+    let mut session = SimulatorSession::launch();
+
+    let before = sample_screen_grid(&mut session);
+    let starfield_bg: (u8, u8, u8) = (10, 10, 32);
+    assert!(
+        !before.iter().any(|p| *p == starfield_bg),
+        "pre-activation screen unexpectedly contains starfield bg pixels"
+    );
+
+    // Open the info wing (`i`), step focus down twice from Diagnostics →
+    // LiveStats → Star Crawl, then Enter.
+    session.send("KD:i");
+    assert_eq!(session.read_line(), "OK");
+    session.send("KD:ArrowDown");
+    assert_eq!(session.read_line(), "OK");
+    session.send("KD:ArrowDown");
+    assert_eq!(session.read_line(), "OK");
+    session.send("KD:Enter");
+    assert_eq!(session.read_line(), "OK");
+
+    // Give the runtime a handful of frames to build buffers, paint the
+    // starfield background, and advance the scroll accumulator.
+    std::thread::sleep(Duration::from_millis(200));
+
+    let frame_a = sample_screen_grid(&mut session);
+
+    // Starfield bg pixels should dominate the sample.
+    let bg_count_a = frame_a.iter().filter(|p| **p == starfield_bg).count();
+    assert!(
+        bg_count_a > frame_a.len() / 2,
+        "after activation, starfield bg pixels ({bg_count_a}) are not \
+         dominant in a {}-pixel grid sample",
+        frame_a.len()
+    );
+
+    // At least a few bright star pixels should be visible across the
+    // combined 9x40x40 = 14 400 pixel sample.
+    let star_count_a = frame_a.iter().filter(|p| brightness(**p) > 256).count();
+    assert!(
+        star_count_a > 0,
+        "sampled grid contains zero bright star pixels after activation"
+    );
+
+    // Wait a few more frames and sample again; the scroll should
+    // shift star positions enough for the overall pixel vector to
+    // differ.
+    std::thread::sleep(Duration::from_millis(300));
+    let frame_b = sample_screen_grid(&mut session);
+    assert_ne!(
+        frame_a, frame_b,
+        "sampled grid pixels did not change across frames — scroll \
+         advance is not flowing from Event::Tick through \
+         CrawlWindow::handle_event into the paint path"
+    );
 }
 
 #[test]

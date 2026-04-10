@@ -50,12 +50,18 @@ pub struct DiscoCapabilities {
 
 impl DiscoCapabilities {
     /// Capability preset for simulator hosts.
+    ///
+    /// `effects: true` so the simulator can run the Star Wars crawl and
+    /// other motion demos through the shared motion engine in
+    /// `rlvgl_widgets::motion`. The simulator runtime is responsible for
+    /// actually building and driving those effects when it sees the
+    /// matching `StartEffect` / `StopEffect` commands.
     pub const fn simulator() -> Self {
         Self {
             audio: false,
             storage: true,
             diagnostics: true,
-            effects: false,
+            effects: true,
             pointer: true,
         }
     }
@@ -264,6 +270,7 @@ struct ControllerState {
 }
 
 impl ControllerState {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         capabilities: DiscoCapabilities,
         dashboard: Rc<RefCell<DashboardPanel>>,
@@ -899,22 +906,28 @@ impl DiscoController {
 
         {
             let state_for_settings = state.clone();
-            icon_strip.borrow_mut().slots_mut()[0].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    state_for_settings
-                        .borrow_mut()
-                        .activate_main(MainSlot::Settings);
-                }));
+            icon_strip.borrow_mut().slots_mut()[0]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                state_for_settings
+                    .borrow_mut()
+                    .activate_main(MainSlot::Settings);
+            }));
             let state_for_files = state.clone();
-            icon_strip.borrow_mut().slots_mut()[1].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    state_for_files.borrow_mut().activate_main(MainSlot::Files);
-                }));
+            icon_strip.borrow_mut().slots_mut()[1]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                state_for_files.borrow_mut().activate_main(MainSlot::Files);
+            }));
             let state_for_info = state.clone();
-            icon_strip.borrow_mut().slots_mut()[2].as_mut().unwrap().on_tap =
-                Some(alloc::boxed::Box::new(move |_| {
-                    state_for_info.borrow_mut().activate_main(MainSlot::Info);
-                }));
+            icon_strip.borrow_mut().slots_mut()[2]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                state_for_info.borrow_mut().activate_main(MainSlot::Info);
+            }));
         }
 
         for index in 0..5 {
@@ -1263,9 +1276,18 @@ mod tests {
 
     #[test]
     fn controller_builds_shared_automation_surface_for_all_runtime_presets() {
-        let sim = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
-        let uefi = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::uefi());
-        let stm = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::stm32h747i_disco());
+        let sim = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        let uefi = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::uefi(),
+        );
+        let stm = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::stm32h747i_disco(),
+        );
 
         let required_tags = [
             "disco.root",
@@ -1297,7 +1319,10 @@ mod tests {
 
     #[test]
     fn wing_hotspots_collapse_bounds_until_their_wing_is_open() {
-        let mut controller = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         let root = controller.root();
 
         {
@@ -1342,7 +1367,10 @@ mod tests {
 
     #[test]
     fn tagged_hotspot_dispatch_triggers_the_same_controller_actions() {
-        let mut controller = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         let root = controller.root();
 
         {
@@ -1361,7 +1389,10 @@ mod tests {
 
     #[test]
     fn unsupported_audio_action_neutralizes_without_panicking() {
-        let mut controller = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::uefi());
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::uefi(),
+        );
         controller.dispatch_event(&Event::KeyDown { key: Key::Enter });
         controller.dispatch_event(&Event::KeyDown { key: Key::Enter });
         let commands = controller.drain_commands();
@@ -1375,7 +1406,10 @@ mod tests {
 
     #[test]
     fn storage_command_is_emitted_from_main_strip_flow() {
-        let mut controller = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         controller.dispatch_event(&Event::KeyDown {
             key: Key::ArrowDown,
         });
@@ -1390,7 +1424,10 @@ mod tests {
 
     #[test]
     fn effect_command_is_emitted_for_enabled_platforms() {
-        let mut controller = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::stm32h747i_disco());
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::stm32h747i_disco(),
+        );
         controller.dispatch_event(&Event::KeyDown {
             key: Key::ArrowDown,
         });
@@ -1425,7 +1462,10 @@ mod tests {
 
     #[test]
     fn arrow_down_cycles_main_focus() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         assert_eq!(focus(&c), FocusState::Main(0));
         key_down(&mut c, Key::ArrowDown);
         assert_eq!(focus(&c), FocusState::Main(1));
@@ -1437,7 +1477,10 @@ mod tests {
 
     #[test]
     fn arrow_up_wraps_from_first_slot() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         assert_eq!(focus(&c), FocusState::Main(0));
         key_down(&mut c, Key::ArrowUp);
         assert_eq!(focus(&c), FocusState::Main(2));
@@ -1445,7 +1488,10 @@ mod tests {
 
     #[test]
     fn enter_opens_wing_escape_closes() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         let root = c.root();
         key_down(&mut c, Key::Enter);
         {
@@ -1463,7 +1509,10 @@ mod tests {
 
     #[test]
     fn arrow_left_from_wing_returns_to_main() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Enter);
         assert!(matches!(focus(&c), FocusState::Wing(WingKind::Settings, _)));
         key_down(&mut c, Key::ArrowLeft);
@@ -1472,7 +1521,10 @@ mod tests {
 
     #[test]
     fn wing_focus_cycles_all_settings_items() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Enter);
         assert_eq!(focus(&c), FocusState::Wing(WingKind::Settings, 0));
         for i in 1..5 {
@@ -1485,7 +1537,10 @@ mod tests {
 
     #[test]
     fn wing_focus_cycles_all_info_items() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Character('i'));
         assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, 0));
         for i in 1..4 {
@@ -1498,7 +1553,10 @@ mod tests {
 
     #[test]
     fn hotkey_s_activates_settings() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::ArrowDown); // move to Files
         key_down(&mut c, Key::Character('s'));
         let root = c.root();
@@ -1509,15 +1567,25 @@ mod tests {
 
     #[test]
     fn hotkey_f_emits_storage_command() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Character('f'));
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::LoadStorageSummary)));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::LoadStorageSummary))
+        );
     }
 
     #[test]
     fn hotkey_i_activates_info_wing() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Character('i'));
         let root = c.root();
         let root = root.borrow();
@@ -1527,48 +1595,82 @@ mod tests {
 
     #[test]
     fn hotkey_b_cycles_backlight() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         // Default backlight is 75
         key_down(&mut c, Key::Character('b'));
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(100))));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(100)))
+        );
 
         key_down(&mut c, Key::Character('b'));
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(25))));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(25)))
+        );
 
         key_down(&mut c, Key::Character('b'));
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(50))));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(50)))
+        );
 
         key_down(&mut c, Key::Character('b'));
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(75))));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(75)))
+        );
     }
 
     #[test]
     fn audio_on_capable_platform_emits_start_effect() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::stm32h747i_disco());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::stm32h747i_disco(),
+        );
         key_down(&mut c, Key::Enter); // open settings wing
         key_down(&mut c, Key::Enter); // activate audio (index 0)
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| {
-            matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::AudioScope))
-        }));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| { matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::AudioScope)) })
+        );
     }
 
     #[test]
     fn info_diagnostics_emits_show_status() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Character('i'));
         key_down(&mut c, Key::Enter); // activate diagnostics (index 0)
         let commands = c.drain_commands();
-        assert!(commands.iter().any(|cmd| matches!(cmd, DiscoCommand::ShowStatus(_))));
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::ShowStatus(_)))
+        );
     }
 
     #[test]
     fn pointer_ignored_on_uefi_caps() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::uefi());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::uefi(),
+        );
         c.dispatch_event(&Event::PressRelease { x: 100, y: 100 });
         // Should not panic — UEFI has pointer: false, events go through normally
         // but no widget should consume them in the hotspot path
@@ -1576,24 +1678,54 @@ mod tests {
 
     #[test]
     fn opening_info_closes_settings() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         let root = c.root();
         key_down(&mut c, Key::Enter); // open settings
         {
             let root = root.borrow();
-            assert!(find_node(&root, "disco.settings.audio").unwrap().widget.borrow().bounds().width > 0);
+            assert!(
+                find_node(&root, "disco.settings.audio")
+                    .unwrap()
+                    .widget
+                    .borrow()
+                    .bounds()
+                    .width
+                    > 0
+            );
         }
         key_down(&mut c, Key::Character('i')); // open info
         {
             let root = root.borrow();
-            assert_eq!(find_node(&root, "disco.settings.audio").unwrap().widget.borrow().bounds().width, 0);
-            assert!(find_node(&root, "disco.info.diagnostics").unwrap().widget.borrow().bounds().width > 0);
+            assert_eq!(
+                find_node(&root, "disco.settings.audio")
+                    .unwrap()
+                    .widget
+                    .borrow()
+                    .bounds()
+                    .width,
+                0
+            );
+            assert!(
+                find_node(&root, "disco.info.diagnostics")
+                    .unwrap()
+                    .widget
+                    .borrow()
+                    .bounds()
+                    .width
+                    > 0
+            );
         }
     }
 
     #[test]
     fn drain_commands_clears_queue() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Character('f'));
         let first = c.drain_commands();
         assert!(!first.is_empty());
@@ -1603,7 +1735,10 @@ mod tests {
 
     #[test]
     fn custom_display_size_respected() {
-        let c = DiscoController::new(rlvgl_platform::Screen::landscape(1024, 600), DiscoCapabilities::simulator());
+        let c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(1024, 600),
+            DiscoCapabilities::simulator(),
+        );
         let root = c.root();
         let root = root.borrow();
         let bounds = root.widget.borrow().bounds();
@@ -1615,7 +1750,10 @@ mod tests {
 
     #[test]
     fn initial_focus_highlight_on_slot_zero() {
-        let c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         let state = c.state.borrow();
         assert_eq!(state.icon_strip.borrow().focused_slot(), Some(0));
         assert_eq!(state.settings_wing.borrow().focused_slot(), None);
@@ -1624,7 +1762,10 @@ mod tests {
 
     #[test]
     fn arrow_down_moves_highlight_to_next_slot() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::ArrowDown);
         let state = c.state.borrow();
         assert_eq!(state.icon_strip.borrow().focused_slot(), Some(1));
@@ -1632,7 +1773,10 @@ mod tests {
 
     #[test]
     fn enter_moves_highlight_to_wing() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Enter);
         let state = c.state.borrow();
         assert_eq!(state.icon_strip.borrow().focused_slot(), None);
@@ -1641,7 +1785,10 @@ mod tests {
 
     #[test]
     fn escape_restores_highlight_to_main() {
-        let mut c = DiscoController::new(rlvgl_platform::Screen::landscape(800, 480), DiscoCapabilities::simulator());
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
         key_down(&mut c, Key::Enter);
         key_down(&mut c, Key::Escape);
         let state = c.state.borrow();

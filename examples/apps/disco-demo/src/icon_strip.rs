@@ -132,7 +132,12 @@ impl Widget for IconStrip {
                 }
                 if self.focused_slot == Some(index) {
                     let bounds = self.slot_bounds(index);
-                    draw_border_straight(renderer, bounds, FOCUS_HIGHLIGHT_COLOR, FOCUS_BORDER_WIDTH);
+                    draw_border_straight(
+                        renderer,
+                        bounds,
+                        FOCUS_HIGHLIGHT_COLOR,
+                        FOCUS_BORDER_WIDTH,
+                    );
                 }
             }
         }

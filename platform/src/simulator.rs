@@ -649,13 +649,7 @@ impl WgpuDisplay {
         frame_callback: impl FnMut(&mut [u8]),
         path: impl AsRef<Path>,
     ) -> Result<(), ImageError> {
-        Self::headless_with_color_format(
-            width,
-            height,
-            ColorFormat::Argb8888,
-            frame_callback,
-            path,
-        )
+        Self::headless_with_color_format(width, height, ColorFormat::Argb8888, frame_callback, path)
     }
 
     /// Render a single frame off-screen, quantize through `color_format`,

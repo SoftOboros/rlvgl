@@ -120,11 +120,7 @@ impl<C: Crawl> CrawlWindow<C> {
     ///
     /// Returns `true` if paint actually ran (the widget was active),
     /// `false` if it was skipped because the crawl was inactive.
-    pub fn paint_frame<B: Blitter>(
-        &mut self,
-        blitter: &mut B,
-        dst: &mut Surface<'_>,
-    ) -> bool {
+    pub fn paint_frame<B: Blitter>(&mut self, blitter: &mut B, dst: &mut Surface<'_>) -> bool {
         if !self.active {
             return false;
         }
@@ -286,9 +282,9 @@ mod tests {
 
     #[test]
     fn paint_frame_calls_crawl_paint_when_active() {
+        use alloc::vec;
         use rlvgl_platform::CpuBlitter;
         use rlvgl_platform::blit::{PixelFmt, Surface};
-        use alloc::vec;
         let mut w = CrawlWindow::new(bounds(), MockCrawl::new(10));
         w.activate();
         let mut dst_buf = vec![0u8; 8 * 4 * 4];
@@ -300,9 +296,9 @@ mod tests {
 
     #[test]
     fn paint_frame_skips_when_inactive() {
+        use alloc::vec;
         use rlvgl_platform::CpuBlitter;
         use rlvgl_platform::blit::{PixelFmt, Surface};
-        use alloc::vec;
         let mut w = CrawlWindow::new(bounds(), MockCrawl::new(10));
         let mut dst_buf = vec![0u8; 8 * 4 * 4];
         let mut dst = Surface::new(&mut dst_buf, 8 * 4, PixelFmt::Argb8888, 8, 4);
@@ -357,7 +353,10 @@ mod tests {
             }
         }
         let w = CrawlWindow::new(bounds(), MockCrawl::new(10));
-        let mut r = CountRenderer { fills: 0, pixels: 0 };
+        let mut r = CountRenderer {
+            fills: 0,
+            pixels: 0,
+        };
         w.draw(&mut r);
         assert_eq!(r.fills, 0);
         assert_eq!(r.pixels, 0);

@@ -106,7 +106,8 @@ impl Widget for DashboardPanel {
         let caption_line_h = self.font.scaled_height() + 4;
         let mut caption_y = title_y + 24;
         for line in self.caption.split('\n') {
-            self.font.draw_str(renderer, title_x, caption_y, line, BODY_COLOR);
+            self.font
+                .draw_str(renderer, title_x, caption_y, line, BODY_COLOR);
             caption_y += caption_line_h;
         }
 
@@ -195,7 +196,10 @@ mod tests {
     fn wraps_long_sentence() {
         let lines = wrap_text("the quick brown fox jumps over the lazy dog", 12);
         assert!(lines.iter().all(|l| l.chars().count() <= 12), "{lines:?}");
-        assert_eq!(lines.join(" "), "the quick brown fox jumps over the lazy dog");
+        assert_eq!(
+            lines.join(" "),
+            "the quick brown fox jumps over the lazy dog"
+        );
     }
 
     #[test]

@@ -43,4 +43,4 @@ pub use background::{BackgroundPattern, StarField};
 pub use crawl::{Crawl, CrawlState, CrawlWindow, StarCrawl, TextCrawl};
 pub use direction::Direction;
 pub use jumbo::{JumboBuffer, JumboOrientation};
-pub use rate::{FrameRoundedRate, MotionRate};
+pub use rate::{FrameRoundedRate, MotionRate, SubPixelRate};

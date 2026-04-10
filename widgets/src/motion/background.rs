@@ -68,12 +68,7 @@ impl Default for StarField {
 impl StarField {
     /// Create a custom starfield configuration.
     #[inline]
-    pub const fn new(
-        star_count: u16,
-        prng_seed: u32,
-        bg_color: u32,
-        brightness: (u8, u8),
-    ) -> Self {
+    pub const fn new(star_count: u16, prng_seed: u32, bg_color: u32, brightness: (u8, u8)) -> Self {
         Self {
             star_count,
             prng_seed,

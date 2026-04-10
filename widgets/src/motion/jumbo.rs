@@ -123,12 +123,8 @@ impl<'a> JumboBuffer<'a> {
     /// same blit path that operates on the screen back buffer.
     pub fn as_surface(&mut self) -> Surface<'_> {
         let (w, h) = match self.orientation {
-            JumboOrientation::Horizontal => {
-                (self.visible_w * self.scale as u32, self.visible_h)
-            }
-            JumboOrientation::Vertical => {
-                (self.visible_w, self.visible_h * self.scale as u32)
-            }
+            JumboOrientation::Horizontal => (self.visible_w * self.scale as u32, self.visible_h),
+            JumboOrientation::Vertical => (self.visible_w, self.visible_h * self.scale as u32),
         };
         Surface::new(self.buf, self.stride, self.format, w, h)
     }

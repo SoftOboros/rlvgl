@@ -701,7 +701,9 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
         if uy >= self.height || ux >= self.width {
             return 0;
         }
-        let available = ((self.width - ux) as usize).min(width as usize).min(out.len());
+        let available = ((self.width - ux) as usize)
+            .min(width as usize)
+            .min(out.len());
         for i in 0..available {
             let offset = ((uy * self.width + ux + i as u32) * 4) as usize;
             let ptr = (self.fb_addr as usize + offset) as *const u32;

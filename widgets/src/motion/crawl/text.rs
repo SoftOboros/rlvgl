@@ -98,6 +98,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> TextCrawl<'buf, R, B> {
     /// [`PixelFmt::A8`]. `scanline` is a scratch buffer at least
     /// `max(visible_w, visible_h) * 4` bytes long — used to stage
     /// composite scanlines before they are handed to the blitter.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         direction: Direction,
         rate: R,
@@ -293,22 +294,41 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
     }
 
     fn paint<BL: Blitter>(&mut self, blitter: &mut BL, dst: &mut Surface<'_>) {
-        // 1. Blit the jumbo background's head half into `dst`. V1
-        //    treats the jumbo as a static surface so we just copy the
-        //    whole visible region once per frame.
+        // 1. Blit the jumbo background into `dst`, wrapping around the
+        //    jumbo's long axis so the scroll cursor can slide through
+        //    a pre-painted pattern without visible seams. For
+        //    `scale = 1` jumbos this collapses to a single blit of
+        //    the whole head half; for `scale >= 2` jumbos with a
+        //    `mirror_tail()` it's a two-slab blit that wraps the
+        //    visible window around the buffer boundary.
         let bg_w = self.visible_w();
         let bg_h = self.visible_h();
         let copy_w = bg_w.min(dst.width);
         let copy_h = bg_h.min(dst.height);
+        let scroll_px = (self.state.scroll_q8 >> 8).max(0) as u32;
+        let long_axis = self.jumbo_bg.long_axis_pixels().max(1);
+        let bg_scroll = scroll_px % long_axis;
+        let (slab_a, slab_b) = self.jumbo_bg.window_range(bg_scroll, copy_h);
         {
             let bg_surface = self.jumbo_bg.as_surface();
-            let src_rect = BlitRect {
+            // First slab — always present.
+            let src_rect_a = BlitRect {
                 x: 0,
-                y: 0,
+                y: slab_a.0 as i32,
                 w: copy_w,
-                h: copy_h,
+                h: slab_a.1,
             };
-            blitter.blit(&bg_surface, src_rect, dst, (0, 0));
+            blitter.blit(&bg_surface, src_rect_a, dst, (0, 0));
+            // Second slab — non-zero only when the window wraps.
+            if slab_b.1 > 0 {
+                let src_rect_b = BlitRect {
+                    x: 0,
+                    y: slab_b.0 as i32,
+                    w: copy_w,
+                    h: slab_b.1,
+                };
+                blitter.blit(&bg_surface, src_rect_b, dst, (0, slab_a.1 as i32));
+            }
         }
 
         // 2. Overlay the text column with A8 alpha blending. V1 is
@@ -326,7 +346,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
             return;
         }
 
-        let scroll_px = (self.state.scroll_q8 >> 8) as i32;
+        let scroll_px = self.state.scroll_q8 >> 8;
         let visible_h = bg_h as i32;
         let visible_w = bg_w as i32;
         let text_h = self.text_height_px as i32;
@@ -458,7 +478,10 @@ mod tests {
 
         crawl.activate();
         assert!(crawl.state().active);
-        assert!(crawl.text_height_px() > 0, "text should have non-zero height");
+        assert!(
+            crawl.text_height_px() > 0,
+            "text should have non-zero height"
+        );
         // Background bytes (first head row) should be non-zero now.
         assert!(jumbo.iter().take(32).any(|&b| b != 0));
         // Some text alpha bytes should be non-zero.
@@ -478,7 +501,10 @@ mod tests {
         for _ in 0..(total + 5) {
             crawl.tick();
         }
-        assert!(!crawl.state().active, "crawl should have deactivated at end");
+        assert!(
+            !crawl.state().active,
+            "crawl should have deactivated at end"
+        );
         assert!(crawl.state().finished);
     }
 

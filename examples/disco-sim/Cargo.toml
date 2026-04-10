@@ -11,5 +11,6 @@ path = "src/main.rs"
 [dependencies]
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", features = ["simulator"] }
+rlvgl-widgets = { path = "../../widgets" }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
 rlvgl-playit = { path = "../../playit", features = ["std"] }

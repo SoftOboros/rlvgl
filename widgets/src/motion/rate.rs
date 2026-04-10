@@ -89,6 +89,62 @@ impl MotionRate for FrameRoundedRate {
     }
 }
 
+/// Sub-pixel rate model: Q8 fractional-pixel advance per frame.
+///
+/// Where [`FrameRoundedRate`] collapses `pixels_per_sec / frame_hz` to a
+/// whole-pixel step (and thus quantises the real motion to the nearest
+/// integer multiple of `frame_hz`), `SubPixelRate` keeps the fractional
+/// remainder in the Q8 accumulator so the observed speed matches
+/// `pixels_per_sec` exactly — the same approach the hardware star crawl
+/// uses at 30 Hz with 40 px/s (1.33 px/frame).
+///
+/// Use this for motion that needs to match a declared wall-clock speed
+/// on a host whose frame rate isn't an even divisor of that speed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SubPixelRate {
+    /// Target scroll speed in pixels per second.
+    pub pixels_per_sec: u32,
+    /// Frame rate the host will call [`MotionRate::advance`] at.
+    pub frame_hz: u32,
+}
+
+impl SubPixelRate {
+    /// Create a new sub-pixel rate.
+    #[inline]
+    pub const fn new(pixels_per_sec: u32, frame_hz: u32) -> Self {
+        Self {
+            pixels_per_sec,
+            frame_hz,
+        }
+    }
+
+    /// Q8 pixels advanced per frame. For the hardware preset of
+    /// 40 px/s at 30 Hz this is `(40 * 256) / 30 = 341` Q8, which the
+    /// accumulator integrates to exactly 40 pixels per 30 frames.
+    #[inline]
+    pub const fn q8_per_frame(&self) -> i32 {
+        if self.frame_hz == 0 {
+            return 0;
+        }
+        ((self.pixels_per_sec * 256) / self.frame_hz) as i32
+    }
+}
+
+impl MotionRate for SubPixelRate {
+    #[inline]
+    fn advance(&self, scroll_q8: &mut i32) {
+        *scroll_q8 = scroll_q8.wrapping_add(self.q8_per_frame());
+    }
+
+    #[inline]
+    fn pixels_per_frame(&self) -> i32 {
+        // Integer whole-pixel hint for diagnostics. Fractional rates
+        // report the floor value; callers that need the Q8 precision
+        // should read `q8_per_frame()` directly.
+        self.q8_per_frame() >> 8
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,5 +219,58 @@ mod tests {
         let rate = FrameRoundedRate::new(90, 30);
         assert_eq!(rate.pixels_per_frame(), 3);
         assert_eq!(rate.px_per_frame() as i32, rate.pixels_per_frame());
+    }
+
+    #[test]
+    fn subpixel_forty_pps_at_thirty_hz_matches_hardware() {
+        // 40 px/s at 30 Hz is the legacy hardware star crawl config.
+        // (40 * 256) / 30 = 341 Q8 per frame; 30 frames × 341 Q8 =
+        // 10230 Q8 = 39.96 px — effectively 40 px/s over 1 s.
+        let rate = SubPixelRate::new(40, 30);
+        assert_eq!(rate.q8_per_frame(), 341);
+        let mut scroll = 0;
+        for _ in 0..30 {
+            rate.advance(&mut scroll);
+        }
+        assert!(
+            (39..=41).contains(&(scroll >> 8)),
+            "expected ~40 integer px after 30 frames, got {}",
+            scroll >> 8
+        );
+    }
+
+    #[test]
+    fn subpixel_forty_pps_at_sixty_hz_also_matches_forty() {
+        // Different host frame rate, same declared speed. After 60
+        // frames the integer pixel count should be within 1 of 40.
+        let rate = SubPixelRate::new(40, 60);
+        let mut scroll = 0;
+        for _ in 0..60 {
+            rate.advance(&mut scroll);
+        }
+        assert!(
+            (39..=41).contains(&(scroll >> 8)),
+            "expected ~40 integer px after 60 frames, got {}",
+            scroll >> 8
+        );
+    }
+
+    #[test]
+    fn subpixel_zero_frame_hz_is_safe() {
+        let rate = SubPixelRate::new(40, 0);
+        assert_eq!(rate.q8_per_frame(), 0);
+        let mut scroll = 0;
+        rate.advance(&mut scroll);
+        assert_eq!(scroll, 0);
+    }
+
+    #[test]
+    fn subpixel_pixels_per_frame_is_integer_floor() {
+        // 60 px/s at 30 Hz = 2 px/frame exactly.
+        let rate = SubPixelRate::new(60, 30);
+        assert_eq!(rate.pixels_per_frame(), 2);
+        // 40 px/s at 30 Hz = 1.33 px/frame, floor = 1.
+        let rate = SubPixelRate::new(40, 30);
+        assert_eq!(rate.pixels_per_frame(), 1);
     }
 }

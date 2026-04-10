@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 //! Desktop simulator entrypoint for the shared 747-style disco demo runtime.
 
+mod crawl_buffers;
+
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
-use rlvgl_core::{WidgetNode, event::Event};
+use rlvgl_core::{WidgetNode, event::Event, widget::Widget};
 use rlvgl_platform::{
     BlitRect, BlitterRenderer, ColorFormat, CpuBlitter, InputEvent, PixelFmt, Screen, Surface,
     WgpuDisplay,
@@ -12,6 +14,7 @@ use rlvgl_playit::{
     EventPipeline, FramebufferReader, PlayitExecutor, PlayitTransport, StatusData,
     TcpServerTransport,
 };
+use rlvgl_widgets::motion::{CrawlWindow, StarCrawl};
 use std::{
     cell::RefCell,
     env, fs,
@@ -28,8 +31,6 @@ const DEFAULT_WIDTH: usize = 800;
 const DEFAULT_HEIGHT: usize = 480;
 /// Default output path for headless ASCII dumps.
 const DEFAULT_HEADLESS_PATH: &str = "disco-headless.txt";
-/// Fixed automation frame rate used by the headless loop.
-const FRAME_RATE_HZ: u32 = 60;
 
 fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {
     let mut out = String::with_capacity((width + 1) * height);
@@ -55,7 +56,17 @@ fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {
     out
 }
 
-fn apply_runtime_commands(controller: &mut DiscoController) {
+/// Outcome of draining the controller's command queue for one step.
+#[derive(Default)]
+struct RuntimeCommandOutcome {
+    /// True if a star crawl effect should be started this step.
+    start_star_crawl: bool,
+    /// True if the running star crawl (if any) should be stopped.
+    stop_star_crawl: bool,
+}
+
+fn apply_runtime_commands(controller: &mut DiscoController) -> RuntimeCommandOutcome {
+    let mut outcome = RuntimeCommandOutcome::default();
     for command in controller.drain_commands() {
         match command {
             DiscoCommand::SetBacklight(level) => {
@@ -66,16 +77,23 @@ fn apply_runtime_commands(controller: &mut DiscoController) {
             }
             DiscoCommand::StartEffect(effect) => match effect {
                 DiscoEffect::AudioScope => eprintln!("sim runtime: audio scope requested"),
-                DiscoEffect::StarCrawl => eprintln!("sim runtime: star crawl requested"),
+                DiscoEffect::StarCrawl => {
+                    eprintln!("sim runtime: star crawl requested");
+                    outcome.start_star_crawl = true;
+                }
             },
             DiscoCommand::StopEffect(effect) => match effect {
                 DiscoEffect::AudioScope => eprintln!("sim runtime: audio scope stop requested"),
-                DiscoEffect::StarCrawl => eprintln!("sim runtime: star crawl stop requested"),
+                DiscoEffect::StarCrawl => {
+                    eprintln!("sim runtime: star crawl stop requested");
+                    outcome.stop_star_crawl = true;
+                }
             },
             DiscoCommand::ShowStatus(status) => eprintln!("sim status: {status}"),
             DiscoCommand::NoOp => {}
         }
     }
+    outcome
 }
 
 /// Owned front-buffer mirror used for playit pixel dumps.
@@ -235,6 +253,19 @@ struct DiscoRuntime {
     pipeline: DiscoGesturePipeline,
     frame: FrameMirror,
     tick_count: u32,
+    /// Target refresh rate in Hz, carried over from [`Screen::frame_hz`]
+    /// so every timing loop in the runtime agrees on cadence: the
+    /// headless frame sleep, the gesture recognisers, and the star
+    /// crawl's sub-pixel rate model all read from this single source.
+    frame_hz: u32,
+    /// Currently-running star crawl effect, if any. Sits outside the
+    /// regular widget tree because its paint path is `Blitter`-based
+    /// rather than `Renderer`-based (the widget's own `draw` is a
+    /// deliberate no-op). The runtime dispatches `Event::Tick` to it
+    /// directly each frame and blits its output over the framebuffer
+    /// after the widget tree draw, so the crawl naturally overlays
+    /// the dashboard.
+    active_crawl: Option<CrawlWindow<StarCrawl<'static>>>,
 }
 
 impl DiscoRuntime {
@@ -242,16 +273,23 @@ impl DiscoRuntime {
         let (logical_w, logical_h) = screen.logical_size();
         let width = logical_w as usize;
         let height = logical_h as usize;
+        let frame_hz = screen.frame_hz.max(1);
         let controller = DiscoController::new(screen, DiscoCapabilities::simulator());
         let root = controller.root();
         Self {
             controller,
             root,
             playit: PlayitExecutor::new(transport),
-            pipeline: DiscoGesturePipeline::new(FRAME_RATE_HZ),
+            pipeline: DiscoGesturePipeline::new(frame_hz),
             frame: FrameMirror::new(width, height),
             tick_count: 0,
+            frame_hz,
+            active_crawl: None,
         }
+    }
+
+    fn frame_hz(&self) -> u32 {
+        self.frame_hz
     }
 
     fn status(&self) -> StatusData {
@@ -262,8 +300,11 @@ impl DiscoRuntime {
     }
 
     fn post_dispatch(controller: &mut DiscoController, event: &Event) {
+        // Only dispatch the event here. The command queue is drained
+        // once per `step()` — draining inside the playit callback
+        // would swallow StartEffect/StopEffect outcomes before the
+        // runtime gets a chance to action them.
         controller.handle_event(event);
-        apply_runtime_commands(controller);
     }
 
     fn poll_playit(&mut self) {
@@ -294,24 +335,61 @@ impl DiscoRuntime {
             });
     }
 
+    fn apply_effect_outcome(&mut self, outcome: RuntimeCommandOutcome) {
+        if outcome.stop_star_crawl {
+            if let Some(crawl) = self.active_crawl.as_mut() {
+                crawl.deactivate();
+            }
+            self.active_crawl = None;
+        }
+        if outcome.start_star_crawl {
+            // Drop any previous instance first so its leaked buffers
+            // don't stay referenced alongside the new window.
+            if let Some(crawl) = self.active_crawl.as_mut() {
+                crawl.deactivate();
+            }
+            self.active_crawl = None;
+            let mut window = crawl_buffers::build_star_crawl_window(
+                self.frame.width as u32,
+                self.frame.height as u32,
+                self.frame_hz,
+            );
+            window.activate();
+            self.active_crawl = Some(window);
+        }
+    }
+
     fn render_frame(&mut self) {
-        let mut blitter = CpuBlitter;
-        let surface = Surface::new(
-            &mut self.frame.buf,
-            self.frame.width * 4,
-            PixelFmt::Argb8888,
-            self.frame.width as u32,
-            self.frame.height as u32,
-        );
-        let mut renderer: BlitterRenderer<'_, CpuBlitter, 16> =
-            BlitterRenderer::new(&mut blitter, surface);
-        self.root.borrow().draw(&mut renderer);
-        renderer.planner().add(BlitRect {
-            x: 0,
-            y: 0,
-            w: self.frame.width as u32,
-            h: self.frame.height as u32,
-        });
+        {
+            let mut blitter = CpuBlitter;
+            let surface = Surface::new(
+                &mut self.frame.buf,
+                self.frame.width * 4,
+                PixelFmt::Argb8888,
+                self.frame.width as u32,
+                self.frame.height as u32,
+            );
+            let mut renderer: BlitterRenderer<'_, CpuBlitter, 16> =
+                BlitterRenderer::new(&mut blitter, surface);
+            self.root.borrow().draw(&mut renderer);
+            renderer.planner().add(BlitRect {
+                x: 0,
+                y: 0,
+                w: self.frame.width as u32,
+                h: self.frame.height as u32,
+            });
+        }
+        if let Some(crawl) = self.active_crawl.as_mut() {
+            let mut blitter = CpuBlitter;
+            let mut surface = Surface::new(
+                &mut self.frame.buf,
+                self.frame.width * 4,
+                PixelFmt::Argb8888,
+                self.frame.width as u32,
+                self.frame.height as u32,
+            );
+            crawl.paint_frame(&mut blitter, &mut surface);
+        }
         self.frame.present_count = self.frame.present_count.wrapping_add(1);
     }
 
@@ -319,7 +397,14 @@ impl DiscoRuntime {
         self.poll_playit();
         self.tick_count = self.tick_count.wrapping_add(1);
         self.controller.tick();
-        apply_runtime_commands(&mut self.controller);
+        let outcome = apply_runtime_commands(&mut self.controller);
+        self.apply_effect_outcome(outcome);
+        if let Some(crawl) = self.active_crawl.as_mut() {
+            crawl.handle_event(&Event::Tick);
+            if !crawl.is_active() {
+                self.active_crawl = None;
+            }
+        }
         self.render_frame();
     }
 
@@ -457,7 +542,8 @@ fn render_png(
 }
 
 fn run_automation_headless(runtime: Rc<RefCell<DiscoRuntime>>) {
-    let frame_time = Duration::from_secs_f64(1.0 / FRAME_RATE_HZ as f64);
+    let frame_hz = runtime.borrow().frame_hz().max(1);
+    let frame_time = Duration::from_secs_f64(1.0 / frame_hz as f64);
     loop {
         let started = Instant::now();
         runtime.borrow_mut().step();

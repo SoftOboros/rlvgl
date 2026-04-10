@@ -128,6 +128,14 @@ impl ColorFormat {
     }
 }
 
+/// Default display refresh rate used by [`Screen::new`] when the
+/// caller does not explicitly pick one via [`Screen::with_frame_hz`].
+///
+/// 60 Hz is the most common host refresh rate and the default the
+/// simulator used before `frame_hz` became a screen property; pinning
+/// the default here keeps every existing caller's behaviour identical.
+pub const DEFAULT_FRAME_HZ: u32 = 60;
+
 /// Logical display geometry plus the scan rotation used to reach the
 /// physical framebuffer.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -146,12 +154,27 @@ pub struct Screen {
     /// visible on the host. Hardware drivers ignore the field — their
     /// own `flush` already targets the panel's native format.
     pub color_format: ColorFormat,
+    /// Target display refresh rate in Hz.
+    ///
+    /// Declared by the target project and consumed by every timing
+    /// loop that wants to match the hardware cadence: the simulator's
+    /// frame sleep, the gesture recognisers' tap / double-tap
+    /// timeouts, and motion engines like
+    /// [`rlvgl_widgets::motion::crawl::StarCrawl`](../../rlvgl_widgets/motion/crawl/type.StarCrawl.html)
+    /// that need `pixels_per_sec / frame_hz` to turn into the right
+    /// Q8 scroll-advance value.
+    ///
+    /// Hardware drivers may still read this to program SysTick; the
+    /// field is purely advisory for drivers whose own cadence comes
+    /// from a real display controller.
+    pub frame_hz: u32,
 }
 
 impl Screen {
     /// Create a screen with an explicit rotation. Defaults to true-colour
-    /// [`ColorFormat::Argb8888`]; use [`Self::with_color_format`] to opt
-    /// into a lower-depth simulation.
+    /// [`ColorFormat::Argb8888`] and [`DEFAULT_FRAME_HZ`] (60 Hz); use
+    /// [`Self::with_color_format`] and [`Self::with_frame_hz`] to opt
+    /// into a lower-depth simulation or a different refresh rate.
     #[inline]
     pub const fn new(width: u32, height: u32, rotation: Rotation) -> Self {
         Self {
@@ -159,11 +182,12 @@ impl Screen {
             height,
             rotation,
             color_format: ColorFormat::Argb8888,
+            frame_hz: DEFAULT_FRAME_HZ,
         }
     }
 
     /// Create an unrotated landscape screen (`Rotation::Deg0`,
-    /// 32-bit ARGB).
+    /// 32-bit ARGB, 60 Hz).
     #[inline]
     pub const fn landscape(width: u32, height: u32) -> Self {
         Self::new(width, height, Rotation::Deg0)
@@ -181,6 +205,15 @@ impl Screen {
             color_format,
             ..self
         }
+    }
+
+    /// Return a copy of this screen with a different target refresh
+    /// rate. `frame_hz = 0` is clamped to 1 to keep divide-by-zero
+    /// guards further down the stack trivial.
+    #[inline]
+    pub const fn with_frame_hz(self, frame_hz: u32) -> Self {
+        let frame_hz = if frame_hz == 0 { 1 } else { frame_hz };
+        Self { frame_hz, ..self }
     }
 
     /// Logical size in the application's coordinate space.
@@ -281,8 +314,14 @@ mod tests {
     #[test]
     fn rgb444_quantize_uses_4_bits_per_channel() {
         // Pure colours should round-trip cleanly.
-        assert_eq!(ColorFormat::Rgb444.quantize(0xFF, 0xFF, 0xFF), (0xFF, 0xFF, 0xFF));
-        assert_eq!(ColorFormat::Rgb444.quantize(0x00, 0x00, 0x00), (0x00, 0x00, 0x00));
+        assert_eq!(
+            ColorFormat::Rgb444.quantize(0xFF, 0xFF, 0xFF),
+            (0xFF, 0xFF, 0xFF)
+        );
+        assert_eq!(
+            ColorFormat::Rgb444.quantize(0x00, 0x00, 0x00),
+            (0x00, 0x00, 0x00)
+        );
         // 0x12 = 00010010 → top 4 = 0x10 → 0x10 | 0x01 = 0x11
         let (r, _, _) = ColorFormat::Rgb444.quantize(0x12, 0, 0);
         assert_eq!(r, 0x11);

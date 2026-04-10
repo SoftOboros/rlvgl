@@ -1,4 +1,7 @@
-#![cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+// Previously gated behind `#[cfg(feature = "dma2d")]` because only the
+// hardware build consumed it. The sim's star crawl now pulls in the
+// same array via `#[path]` inclusion, so the gate is gone and the
+// constant is always available.
 
 /// README.md crawl text (curated for Star Wars opening crawl).
 pub static README_CRAWL: &[&str] = &[
