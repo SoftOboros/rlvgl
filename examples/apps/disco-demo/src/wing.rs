@@ -78,6 +78,7 @@ impl Wing {
     }
 
     /// Returns the currently focused slot index.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn focused_slot(&self) -> Option<usize> {
         self.focused_slot
     }
