@@ -10,16 +10,30 @@ examples/sim/README.md - Desktop simulator example.
 Demonstrates core widgets alongside plugin features such as QR code generation
 and PNG/JPEG image decoding.
 
+## Build
+
+The simulator's package is `rlvgl-example-sim` and its binary is `rlvgl-sim`.
+The default feature set is `png,jpeg,gif,qrcode,fontdue`.
+
+| Method | Command |
+| --- | --- |
+| Make | `make build-sim` |
+| Cargo (default features) | `cargo build -p rlvgl-example-sim --bin rlvgl-sim --features png,jpeg,gif,qrcode,fontdue` |
+| Cargo (lean, no codecs) | `cargo build -p rlvgl-example-sim --bin rlvgl-sim --no-default-features` |
+
+Add `cpu_stats` to the feature list for in-frame timing telemetry. Per-feature
+documentation lives in [`OPTIONS.md`](./OPTIONS.md).
+
 ## Usage
 
 Run the simulator with a custom screen resolution using:
 
 ```bash
-cargo run --bin rlvgl-sim -- --screen=800x480
+cargo run -p rlvgl-example-sim --bin rlvgl-sim -- --screen=800x480
 ```
 
 Omit `--screen` to use the default 320x240 resolution. By default the simulator
-uses the CPU fallback blitter for rendering. Pass `--wgpi` to enable the wgpu
+uses the CPU fallback blitter for rendering. Pass `--wgpu` to enable the wgpu
 accelerated blitter instead. Provide a file path as an additional argument to
 export a single frame to a PNG instead of launching the interactive window.
 

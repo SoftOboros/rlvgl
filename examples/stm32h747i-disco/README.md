@@ -33,19 +33,26 @@ hal::init_board_hal(&dp);
 
 ## Building
 
+The package is `rlvgl-example-disco` and produces two binaries from the same
+crate: `rlvgl-stm32h747i-disco` (CM7, gated by `cm7`) and
+`rlvgl-stm32h747i-disco-cm4` (CM4, gated by `cm4`).  The default profiling
+feature set for CM7 is `cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio`.
+
 ```bash
 rustup target add thumbv7em-none-eabihf
-make build-disco        # build CM7 debug + generate .hex/.bin
 ```
 
-Or explicitly:
+| Method | Command |
+| --- | --- |
+| Make (CM7 debug) | `make build-disco` |
+| Make (CM7 release) | `make build-disco-release` |
+| Make (CM4) | `make build-disco-cm4` |
+| Make (both cores) | `make build-disco-all` |
+| Cargo (CM7 explicit) | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
+| Cargo (CM4 explicit) | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` |
 
-```bash
-RUSTFLAGS="-C target-cpu=cortex-m7" \
-cargo build --target thumbv7em-none-eabihf \
-  -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco \
-  --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
-```
+All make `build-disco*` targets call `rust-objcopy` to emit `.hex` and `.bin`
+artifacts beside the ELF.
 
 Top-level Makefile targets (`make help` for all):
 
@@ -53,10 +60,14 @@ Top-level Makefile targets (`make help` for all):
 make build-disco                # Build CM7 debug + .hex/.bin
 make build-disco-release        # Build CM7 release + .hex/.bin
 make build-disco-cm4            # Build CM4
+make build-disco-all            # Build CM7 + CM4
 make flash-disco                # Build + flash via probe-rs
 make probe-rs-gdb               # Build + flash + GDB server
 make gen-stm32h747i-disco-bsp   # Regenerate BSP (defaults SMPS/VOS1)
+make test-stm32h747i-disco      # Bridge USART1 to TCP and run playit tests
 ```
+
+Per-feature documentation lives in [`OPTIONS.md`](./OPTIONS.md).
 
 Notes:
 - The crate `build.rs` stages `memory.x` into the Cargo build directory and

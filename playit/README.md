@@ -153,6 +153,23 @@ Commands are single lines terminated by `\n` or `\r\n`.
 | `alloc` | Enables heap-backed helpers |
 | `std` | Enables `alloc` plus standard-library integrations |
 
+See [`OPTIONS.md`](./OPTIONS.md) for the full feature reference.
+
+## Test runners
+
+The repository ships ready-to-run playit test suites for every target:
+
+| Target | Make target | Description |
+| --- | --- | --- |
+| Disco simulator (host) | `make test-disco-sim` | Builds `rlvgl-disco-sim` and runs Rust + Node.js suites over a TCP socket |
+| Disco-demo unit tests | `make test-disco-demo` | Pure no_std controller tests (`cargo test -p rlvgl-app-disco-demo`) |
+| UEFI simulation | `make test-uefi-disco` | Boots `rlvgl-uefi-disco` headless under QEMU and runs the Node.js suite |
+| STM32H747I-DISCO hardware | `make test-stm32h747i-disco` | Bridges USART1 (ST-Link VCP) to TCP and runs the Node.js suite |
+| All of the above | `make test-playit-all` | Runs every suite in sequence |
+
+The `rlvgl-playit` Node.js client is in `playit/node/`.  See
+`playit/node/test/` for the test files driven by the runners above.
+
 ## License
 
 MIT

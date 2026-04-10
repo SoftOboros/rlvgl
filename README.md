@@ -48,26 +48,54 @@ Package: `rlvgl`
 
 The workspace currently ships six user-facing binaries. Their package names,
 required targets, and applicable feature flags differ enough that it is best to
-treat them individually instead of relying on `cargo build --workspace`.
+treat them individually instead of relying on `cargo build --workspace`. Every
+binary has a top-level `make` target — run `make help` to see them all, or
+`make build-all-bins` to build every binary in one command.
 
 ### Host tools and simulators
 
-| Binary | Package | Default feature set | Build command | Notes |
-| --- | --- | --- | --- | --- |
-| `rlvgl-creator` | `rlvgl` | none | `cargo build -p rlvgl --bin rlvgl-creator --features creator` | The binary is gated behind `creator`. Add `creator_ui` for the desktop UI: `--features creator,creator_ui`. Without `creator_ui`, running with no arguments falls back to the CLI. |
-| `rlvgl-sim` | `rlvgl-example-sim` | `png,jpeg,gif,qrcode,fontdue` | `cargo build -p rlvgl-example-sim --bin rlvgl-sim` | Use `--no-default-features` for a leaner simulator, then opt back into only the codecs you need. `cpu_stats` is the only additional feature flag on this package. |
-| `rlvgl-disco-sim` | `rlvgl-example-disco-sim` | none | `cargo build -p rlvgl-example-disco-sim --bin rlvgl-disco-sim` | Host-only simulator for the shared disco demo runtime. This package currently has no Cargo feature flags. |
-| `rlvgl-uefi-disco` | `rlvgl-example-uefi-disco` | none | `cargo build --manifest-path examples/uefi-disco/Cargo.toml --target aarch64-unknown-uefi --bin rlvgl-uefi-disco` | This crate is intentionally excluded from the workspace because it conflicts with the normal host `std` build. Build it explicitly with the UEFI target triple. |
+| Binary | Package | Make target | Cargo command |
+| --- | --- | --- | --- |
+| `rlvgl-creator` | `rlvgl` | `make build-creator` | `cargo build -p rlvgl --bin rlvgl-creator --features creator` |
+| `rlvgl-sim` | `rlvgl-example-sim` | `make build-sim` | `cargo build -p rlvgl-example-sim --bin rlvgl-sim --features png,jpeg,gif,qrcode,fontdue` |
+| `rlvgl-disco-sim` | `rlvgl-example-disco-sim` | `make build-disco-sim` | `cargo build -p rlvgl-example-disco-sim --bin rlvgl-disco-sim` |
+| `rlvgl-uefi-disco` | `rlvgl-example-uefi-disco` | `make build-uefi-disco` | `cargo build --manifest-path examples/uefi-disco/Cargo.toml --target aarch64-unknown-uefi --bin rlvgl-uefi-disco` |
+
+Notes: `rlvgl-creator` is gated behind the `creator` feature; add `creator_ui`
+for the desktop UI. `rlvgl-sim` accepts `--no-default-features` for a lean
+build. `rlvgl-uefi-disco` is intentionally excluded from the workspace.
 
 ### STM32H747I-DISCO firmware
 
 The firmware package is `rlvgl-example-disco` and it produces two binaries from
 the same crate:
 
-| Binary | Required target | Required feature | Minimal build | Current convenience wrapper |
+| Binary | Required target | Required feature | Make target | Cargo command |
 | --- | --- | --- | --- | --- |
-| `rlvgl-stm32h747i-disco` | `thumbv7em-none-eabihf` | `cm7` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7` | `make build-disco` builds the richer CM7 profile from the `Makefile`: `cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
-| `rlvgl-stm32h747i-disco-cm4` | `thumbv7em-none-eabihf` | `cm4` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` | `make build-disco-cm4` builds the CM4 helper core with its current default profile |
+| `rlvgl-stm32h747i-disco` | `thumbv7em-none-eabihf` | `cm7` | `make build-disco` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
+| `rlvgl-stm32h747i-disco-cm4` | `thumbv7em-none-eabihf` | `cm4` | `make build-disco-cm4` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` |
+
+`make build-disco{,-release}` also runs `rust-objcopy` to emit `.hex` and
+`.bin` artifacts beside the ELF.
+
+### Playit test runners
+
+Every binary that supports the playit automation protocol has a matching
+make target that builds it (where applicable) and runs the playit test
+suite against it:
+
+| Target | Make target | Description |
+| --- | --- | --- |
+| Disco-demo controller (no_std) | `make test-disco-demo` | `cargo test -p rlvgl-app-disco-demo` — 26 unit tests |
+| Disco simulator (host) | `make test-disco-sim` | Builds `rlvgl-disco-sim` and runs the Rust + Node.js suites over a TCP playit socket |
+| UEFI disco (QEMU) | `make test-uefi-disco` | Builds `rlvgl-uefi-disco`, boots it headless under QEMU, and runs the Node.js suite over the pl011 UART |
+| STM32H747I-DISCO hardware | `make test-stm32h747i-disco` | Bridges `/dev/cu.usbmodem*` (ST-Link VCP) to TCP and runs the Node.js suite against live firmware |
+| All of the above | `make test-playit-all` | Runs every suite in sequence |
+
+The hardware runner depends on flashing `make build-disco` first; the UEFI
+runner depends on `qemu-system-aarch64` plus EDK2 firmware (`brew install
+qemu` on macOS provides both). See `playit/README.md` for the full wire
+protocol.
 
 Only the STM32H747I-DISCO package understands the following board-specific
 feature flags: `splash`, `desktop`, `dma2d`, `cpu_stats`, `audio`,

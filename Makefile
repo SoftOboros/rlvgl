@@ -1,4 +1,5 @@
 # ── Canonical build variables ─────────────────────────────────────
+# STM32H747I-DISCO firmware (Cortex-M7 / M4 dual core)
 PACKAGE       := rlvgl-example-disco
 BIN_CM7       := rlvgl-stm32h747i-disco
 BIN_CM4       := rlvgl-stm32h747i-disco-cm4
@@ -11,10 +12,29 @@ OBJCOPY       := rust-objcopy
 PROBE_ID      ?= 0483:3754:004F00273133510837363734
 PROBE_SPEED   ?= 1000
 
+# Host simulators and tools
+SIM_PACKAGE        := rlvgl-example-sim
+SIM_BIN            := rlvgl-sim
+SIM_FEATURES       := png,jpeg,gif,qrcode,fontdue
+DISCO_SIM_PACKAGE  := rlvgl-example-disco-sim
+DISCO_SIM_BIN      := rlvgl-disco-sim
+CREATOR_PACKAGE    := rlvgl
+CREATOR_BIN        := rlvgl-creator
+CREATOR_FEATURES   := creator
+
+# UEFI simulation (excluded from workspace)
+UEFI_MANIFEST      := examples/uefi-disco/Cargo.toml
+UEFI_TARGET        := aarch64-unknown-uefi
+UEFI_BIN           := rlvgl-uefi-disco
+
+# Host triple — detected from rustc, used for locating host binaries.
+HOST_TRIPLE := $(shell rustc -vV | sed -n 's/^host: //p')
+
 # Derived paths
 ELF_CM7       := target/$(TARGET)/debug/$(BIN_CM7)
 ELF_CM7_REL   := target/$(TARGET)/release/$(BIN_CM7)
 ELF_CM4       := target/$(TARGET)/debug/$(BIN_CM4)
+DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 
 .PHONY: help build-disco build-disco-release build-disco-cm4 build-disco-all \
 	objcopy-disco objcopy-disco-release \
@@ -22,15 +42,32 @@ ELF_CM4       := target/$(TARGET)/debug/$(BIN_CM4)
 	probe-rs-gdb \
 	openocd openocd-dual openocd-erase \
 	gen-stm32h747i-disco-bsp \
+	build-sim build-disco-sim build-uefi-disco build-creator build-all-bins \
+	test-disco-sim test-uefi-disco test-stm32h747i-disco test-playit-all \
+	test-disco-demo test-disco-sim-rust \
 	translate-all-i18n translate-all-i18n-force translate-all-i18n-dry-run \
 	extract-i18n-keys extract-icons import-icons
 
 help:
-	@echo "Build targets:"
+	@echo "STM32H747I-DISCO firmware:"
 	@echo "  make build-disco              # Build CM7 debug + generate .hex/.bin"
 	@echo "  make build-disco-release      # Build CM7 release + generate .hex/.bin"
 	@echo "  make build-disco-cm4          # Build CM4 debug"
 	@echo "  make build-disco-all          # Build both cores"
+	@echo ""
+	@echo "Host simulators and tools:"
+	@echo "  make build-sim                # Build rlvgl-sim (generic simulator)"
+	@echo "  make build-disco-sim          # Build rlvgl-disco-sim (disco demo simulator)"
+	@echo "  make build-creator            # Build rlvgl-creator (asset/project tool)"
+	@echo "  make build-uefi-disco         # Build rlvgl-uefi-disco (aarch64-unknown-uefi)"
+	@echo "  make build-all-bins           # Build every binary target above"
+	@echo ""
+	@echo "Playit test runners:"
+	@echo "  make test-disco-sim           # Rust + Node.js playit tests vs disco-sim"
+	@echo "  make test-disco-demo          # Disco-demo unit tests (no_std controller)"
+	@echo "  make test-uefi-disco          # Headless QEMU + playit tests vs UEFI"
+	@echo "  make test-stm32h747i-disco    # Serial bridge + playit tests vs hardware"
+	@echo "  make test-playit-all          # Run all playit test suites in sequence"
 	@echo ""
 	@echo "Flash & debug:"
 	@echo "  make flash-disco              # Build + flash CM7 via probe-rs (ELF)"
@@ -76,6 +113,39 @@ build-disco-cm4:
 	  -p $(PACKAGE) --bin $(BIN_CM4) --features $(FEATURES_CM4)
 
 build-disco-all: build-disco build-disco-cm4
+
+# ── Host simulators and tools ─────────────────────────────────────
+build-sim:
+	RUSTFLAGS="" cargo build -p $(SIM_PACKAGE) --bin $(SIM_BIN) --features $(SIM_FEATURES)
+
+build-disco-sim:
+	RUSTFLAGS="" cargo build -p $(DISCO_SIM_PACKAGE) --bin $(DISCO_SIM_BIN)
+
+build-creator:
+	RUSTFLAGS="" cargo build -p $(CREATOR_PACKAGE) --bin $(CREATOR_BIN) --features $(CREATOR_FEATURES)
+
+build-uefi-disco:
+	cargo build --manifest-path $(UEFI_MANIFEST) --target $(UEFI_TARGET) --bin $(UEFI_BIN)
+
+build-all-bins: build-sim build-disco-sim build-creator build-uefi-disco build-disco build-disco-cm4
+
+# ── Playit test runners ───────────────────────────────────────────
+test-disco-demo:
+	RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
+
+test-disco-sim-rust:
+	RUSTFLAGS="" cargo test -p $(DISCO_SIM_PACKAGE)
+
+test-disco-sim: build-disco-sim test-disco-demo test-disco-sim-rust
+	cd playit/node && RLVGL_DISCO_SIM_BIN="$(CURDIR)/$(DISCO_SIM_ELF)" node --test test/disco-sim.test.js test/disco-navigation.test.js
+
+test-uefi-disco:
+	bash scripts/test-uefi-aarch64-playit.sh
+
+test-stm32h747i-disco:
+	bash scripts/test-stm32h747i-disco-playit.sh
+
+test-playit-all: test-disco-sim test-uefi-disco test-stm32h747i-disco
 
 # ── Objcopy (hex + trimmed bin) ───────────────────────────────────
 objcopy-disco:
