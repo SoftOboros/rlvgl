@@ -12,15 +12,28 @@ documentation = "https://docs.rs/rlvgl"
 keywords = ["embedded", "graphics", "ui", "lvgl", "no_std"]
 categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
-exclude = [
-  "lvgl/**",
-  "docs/**",
-  ".github/**",
-  "scripts/**",
-  "target/**",
-  "assets/**",
-  ".vscode/**",
-  "codex/**"
+include = [
+  "/.cargo/config.toml",
+  "/Cargo.toml",
+  "/Cargo.lock",
+  "/README.md",
+  "/README-CREATOR.md",
+  "/LICENSE",
+  "/NOTICES.md",
+  "/CODE_OF_CONDUCT.md",
+  "/build.rs",
+  "/rlvgl-logo.png",
+  "/src/**",
+  "/tests/**",
+  "/examples/sim/src/main.rs",
+  "/examples/stm32h747i-disco/src/**/*.rs",
+  "/examples/stm32h747i-disco/assets/fonts/**",
+  "/examples/stm32h747i-disco/assets/icons/**",
+  "/examples/stm32h747i-disco/assets/media/**",
+  "/examples/stm32h747i-disco/assets/manifest.yml",
+  "/examples/stm32h747i-disco/memory.x",
+  "/examples/stm32h747i-disco/memory_cm4.x",
+  "/examples/stm32h747i-disco/memory_STM32H747XI.x"
 ]
 
 [lib]
