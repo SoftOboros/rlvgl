@@ -255,6 +255,12 @@ struct ControllerState {
     tick_count: u64,
     backlight: u8,
     focus_dirty: bool,
+    /// Info page currently rendered on the dashboard, if any.
+    ///
+    /// When set, the `Tick` handler re-renders the dashboard lines so
+    /// live data (uptime ticker, FPS, heap, etc.) updates at frame
+    /// rate instead of freezing at activation time.
+    active_info: Option<InfoSlot>,
 }
 
 impl ControllerState {
@@ -282,6 +288,7 @@ impl ControllerState {
             tick_count: 0,
             backlight: 75,
             focus_dirty: false,
+            active_info: None,
         };
         this.sync_focus_highlights();
         this
@@ -307,6 +314,7 @@ impl ControllerState {
     }
 
     fn show_home(&mut self) {
+        self.active_info = None;
         self.dashboard.borrow_mut().set_title("Flight Deck");
         self.dashboard
             .borrow_mut()
@@ -377,6 +385,7 @@ impl ControllerState {
     }
 
     fn close_wings(&mut self) {
+        self.active_info = None;
         self.settings_wing.borrow_mut().close();
         self.info_wing.borrow_mut().close();
         let focus_index = match self.focus {
@@ -514,6 +523,7 @@ impl ControllerState {
     }
 
     fn activate_settings(&mut self, slot: SettingsSlot) {
+        self.active_info = None;
         self.focus = FocusState::Wing(WingKind::Settings, slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -574,36 +584,17 @@ impl ControllerState {
         self.sync_focus_highlights();
         match slot {
             InfoSlot::Diagnostics => {
-                let mut lines = vec![
-                    "Diagnostics page extracted from the board demo.".into(),
-                    "Runtimes decide how much hardware detail to expose.".into(),
-                ];
-                lines.push(format!(
-                    "Capability flag: diagnostics = {}",
-                    self.capabilities.diagnostics
-                ));
-                self.show_info(
-                    "Diagnostics",
-                    "Board-neutral controller page",
-                    Color(0xF2, 0x85, 0x85, 0xFF),
-                    lines,
-                );
+                self.active_info = Some(slot);
+                self.render_info_page(slot);
                 self.push_status("Diagnostics page opened");
             }
             InfoSlot::LiveStats => {
-                self.show_info(
-                    "Live Stats",
-                    "Shared update loop placeholder",
-                    Color(0x58, 0xB3, 0xF5, 0xFF),
-                    vec![
-                        format!("Ticks observed: {}", self.tick_count),
-                        format!("Backlight target: {}%", self.backlight),
-                        "STM32 can replace this with board telemetry.".into(),
-                    ],
-                );
+                self.active_info = Some(slot);
+                self.render_info_page(slot);
                 self.push_status("Live stats panel refreshed");
             }
             InfoSlot::StarCrawl => {
+                self.active_info = None;
                 if self.capabilities.effects {
                     self.push_status("Queued star crawl effect");
                     self.queue(DiscoCommand::StartEffect(DiscoEffect::StarCrawl));
@@ -613,6 +604,7 @@ impl ControllerState {
                 }
             }
             InfoSlot::AudioScope => {
+                self.active_info = None;
                 if self.capabilities.audio {
                     self.push_status("Queued audio scope effect");
                     self.queue(DiscoCommand::StartEffect(DiscoEffect::AudioScope));
@@ -622,6 +614,94 @@ impl ControllerState {
                 }
             }
         }
+    }
+
+    /// Render the content for an info page using the current controller
+    /// state. Called on activation and then every `Event::Tick` while the
+    /// page is displayed, so live counters (uptime, FPS, heap) update at
+    /// frame rate instead of freezing at activation time.
+    fn render_info_page(&mut self, slot: InfoSlot) {
+        match slot {
+            InfoSlot::Diagnostics => {
+                let lines = self.mock_diagnostics_lines();
+                self.show_info(
+                    "Diagnostics",
+                    "STM32H747XIH6 — simulated telemetry",
+                    Color(0xF2, 0x85, 0x85, 0xFF),
+                    lines,
+                );
+            }
+            InfoSlot::LiveStats => {
+                let lines = self.mock_live_stats_lines();
+                self.show_info(
+                    "Live Stats",
+                    "Frame-rate ticker + mock hw counters",
+                    Color(0x58, 0xB3, 0xF5, 0xFF),
+                    lines,
+                );
+            }
+            InfoSlot::StarCrawl | InfoSlot::AudioScope => {
+                // Effects don't render a page; intentionally no-op.
+            }
+        }
+    }
+
+    /// Produce the mock diagnostics lines shown on the Diagnostics page.
+    ///
+    /// These match the shape of the hardware ChipInfoPanel (MCU, flash,
+    /// clocks, memory, capabilities) but with values that are
+    /// representative rather than scraped from real registers. They are
+    /// intentionally stable across ticks so the page reads calmly.
+    fn mock_diagnostics_lines(&self) -> Vec<String> {
+        vec![
+            "MCU: STM32H747XIH6  (rev Y)".into(),
+            "SYSCLK: 400 MHz    HCLK: 200 MHz".into(),
+            "Flash: 2048 KB     SRAM: 1024 KB".into(),
+            format!(
+                "Diagnostics: {}   Audio: {}",
+                yes_no(self.capabilities.diagnostics),
+                yes_no(self.capabilities.audio),
+            ),
+            format!(
+                "Storage: {}       Effects: {}",
+                yes_no(self.capabilities.storage),
+                yes_no(self.capabilities.effects),
+            ),
+            "LTDC: 800x480 ARGB8888  @ 60 Hz".into(),
+            "Bus: AXI 200 MHz  QoS: high".into(),
+        ]
+    }
+
+    /// Live stats: updates every tick.
+    ///
+    /// Uptime is derived from `tick_count` and the shared 60 Hz tick
+    /// cadence. Heap and DMA counts are mocked deterministic functions
+    /// of `tick_count` so the numbers visibly change without using a
+    /// PRNG (which would be noisy).
+    fn mock_live_stats_lines(&self) -> Vec<String> {
+        const TICK_HZ: u64 = 60;
+        let seconds_whole = self.tick_count / TICK_HZ;
+        let seconds_frac = (self.tick_count % TICK_HZ) * 100 / TICK_HZ;
+        let heap_used_kb = 48 + ((self.tick_count / 30) % 16) as u32;
+        let heap_total_kb = 256;
+        let heap_pct = heap_used_kb * 100 / heap_total_kb;
+        let dma_frames = self.tick_count / 2;
+        vec![
+            format!("Uptime: {seconds_whole}.{seconds_frac:02} s"),
+            format!("Ticks: {}", self.tick_count),
+            format!("FPS: {TICK_HZ}   Frame: {:?} ms", 1000 / TICK_HZ),
+            format!("Heap: {heap_used_kb}/{heap_total_kb} KB  ({heap_pct}%)"),
+            format!("DMA2D frames: {dma_frames}"),
+            format!("Backlight: {}%", self.backlight),
+            format!(
+                "Focus: {}",
+                match self.focus {
+                    FocusState::Main(i) => format!("main[{i}]"),
+                    FocusState::Wing(WingKind::Settings, i) => format!("settings[{i}]"),
+                    FocusState::Wing(WingKind::Info, i) => format!("info[{i}]"),
+                }
+            ),
+        ]
     }
 
     fn handle_key(&mut self, key: &Key) {
@@ -1105,6 +1185,13 @@ impl DiscoController {
                         "Ready: {tick_count} ticks | backlight {backlight}%"
                     ));
                 }
+                // Keep live info pages updating at frame rate. Only the
+                // slots with dynamic mock data (Live Stats, Diagnostics)
+                // are currently refreshable — effects clear active_info
+                // when they activate.
+                if let Some(slot) = state.active_info {
+                    state.render_info_page(slot);
+                }
             }
             Event::KeyDown { key } => state.handle_key(key),
             Event::PressRelease { x, y } if !state.capabilities.pointer => {
@@ -1129,6 +1216,11 @@ impl DiscoController {
     pub fn publish_status(&mut self, text: impl Into<String>) {
         self.state.borrow_mut().push_status(text.into());
     }
+}
+
+/// Format a bool as `"yes"` / `"no"` for status pages.
+fn yes_no(b: bool) -> &'static str {
+    if b { "yes" } else { "no" }
 }
 
 fn themed_label(text: impl Into<String>, bounds: Rect, text_color: Color) -> Rc<RefCell<Label>> {
