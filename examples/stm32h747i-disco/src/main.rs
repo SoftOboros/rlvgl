@@ -3163,8 +3163,11 @@ fn main() -> ! {
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
         serial_puts("MAIN LOOP START\r\n");
-        let mut playit_executor: rlvgl_playit::PlayitExecutor<UsartTransport, 256> =
-            rlvgl_playit::PlayitExecutor::new(UsartTransport);
+        // Box the executor — at REC_CAP=32 it's ~2.2KB, but combined with
+        // the dump state and line buffer it's safer on the heap than the stack.
+        let mut playit_executor: alloc::boxed::Box<
+            rlvgl_playit::PlayitExecutor<UsartTransport, 32>,
+        > = alloc::boxed::Box::new(rlvgl_playit::PlayitExecutor::new(UsartTransport));
         let mut fb_reader = SdramFbReader {
             fb_addr: display.front_buffer_addr(),
             width: display.dimensions().0,
@@ -3534,7 +3537,11 @@ fn main() -> ! {
             let serial_start = cpu_stats.cyccnt();
             {
                 fb_reader.fb_addr = display.front_buffer_addr();
-                fb_reader.present_count = present_count;
+                // Use tick_count for the dump gate so dumps complete even
+                // when the render loop is idle (display.present() is gated
+                // by dirty_frames). Reporting present_count separately in
+                // StatusData keeps the host visibility into actual frames.
+                fb_reader.present_count = tick_count;
                 let status = rlvgl_playit::StatusData {
                     tick_count,
                     present_count,
