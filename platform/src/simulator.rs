@@ -335,6 +335,7 @@ impl WgpuDisplay {
         panic::set_hook(Box::new(|info| {
             let backtrace = Backtrace::force_capture();
             let message = format!("{info}\n\n{backtrace}");
+            eprintln!("{message}");
             show_panic_window(message);
             std::process::exit(1);
         }));

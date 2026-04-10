@@ -254,6 +254,7 @@ struct ControllerState {
     focus: FocusState,
     tick_count: u64,
     backlight: u8,
+    focus_dirty: bool,
 }
 
 impl ControllerState {
@@ -267,7 +268,7 @@ impl ControllerState {
         settings_wing: Rc<RefCell<Wing>>,
         info_wing: Rc<RefCell<Wing>>,
     ) -> Self {
-        let this = Self {
+        let mut this = Self {
             capabilities,
             commands: Vec::new(),
             dashboard,
@@ -280,6 +281,7 @@ impl ControllerState {
             focus: FocusState::Main(0),
             tick_count: 0,
             backlight: 75,
+            focus_dirty: false,
         };
         this.sync_focus_highlights();
         this
@@ -445,25 +447,22 @@ impl ControllerState {
         self.set_subtitle(text);
     }
 
-    fn sync_focus_highlights(&self) {
-        match self.focus {
-            FocusState::Main(index) => {
-                self.icon_strip.borrow_mut().set_focused_slot(Some(index));
-                self.settings_wing.borrow_mut().set_focused_slot(None);
-                self.info_wing.borrow_mut().set_focused_slot(None);
-            }
-            FocusState::Wing(WingKind::Settings, index) => {
-                self.icon_strip.borrow_mut().set_focused_slot(None);
-                self.settings_wing
-                    .borrow_mut()
-                    .set_focused_slot(Some(index));
-                self.info_wing.borrow_mut().set_focused_slot(None);
-            }
-            FocusState::Wing(WingKind::Info, index) => {
-                self.icon_strip.borrow_mut().set_focused_slot(None);
-                self.settings_wing.borrow_mut().set_focused_slot(None);
-                self.info_wing.borrow_mut().set_focused_slot(Some(index));
-            }
+    fn sync_focus_highlights(&mut self) {
+        let (strip_slot, settings_slot, info_slot) = match self.focus {
+            FocusState::Main(index) => (Some(index), None, None),
+            FocusState::Wing(WingKind::Settings, index) => (None, Some(index), None),
+            FocusState::Wing(WingKind::Info, index) => (None, None, Some(index)),
+        };
+        let strip = self.icon_strip.try_borrow_mut();
+        let settings = self.settings_wing.try_borrow_mut();
+        let info = self.info_wing.try_borrow_mut();
+        if let (Ok(mut strip), Ok(mut settings), Ok(mut info)) = (strip, settings, info) {
+            strip.set_focused_slot(strip_slot);
+            settings.set_focused_slot(settings_slot);
+            info.set_focused_slot(info_slot);
+            self.focus_dirty = false;
+        } else {
+            self.focus_dirty = true;
         }
     }
 
@@ -1088,6 +1087,9 @@ impl DiscoController {
     /// Handle an event after widget dispatch.
     pub fn handle_event(&mut self, event: &Event) {
         let mut state = self.state.borrow_mut();
+        if state.focus_dirty {
+            state.sync_focus_highlights();
+        }
         match event {
             Event::Tick => {
                 state.tick_count = state.tick_count.wrapping_add(1);
