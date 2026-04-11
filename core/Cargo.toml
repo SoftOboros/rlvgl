@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.1.7"
+version = "0.2.0"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -50,7 +50,7 @@ apng = ["dep:image"]
 fs = []
 
 [dev-dependencies]
-rlvgl-widgets = { version = "0.1.5", path = "../widgets" }
+rlvgl-widgets = { version = "0.2.0", path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"
 apng = "0.3"
