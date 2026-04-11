@@ -1,0 +1,311 @@
+# ESP32-C3 chip inventory IR.
+#
+# Source: Espressif ESP32-C3 Technical Reference Manual v1.4 and ESP32-C3
+# Series Datasheet v2.3. Field names and register paths target the `esp32c3`
+# PAC crate (https://docs.rs/esp32c3). Register paths use snake_case PAC form,
+# e.g. `system.perip_clk_en0.uart_clk_en`.
+#
+# On ESP32-C3 peripheral clock gating and reset live in the SYSTEM block
+# (Chapter 16 SYSREG). This is different from C6/H2 which use PCR.
+
+name: ESP32-C3
+arch: rv32imc
+package: QFN32-5x5
+pac_crate: esp32c3
+gpio_count: 22
+
+memory:
+  # Internal ROM and SRAM (TRM Chapter 3 Table 3.3-1).
+  - { name: irom_internal, base: 0x40000000, size: 0x00040000, access: rx  } # Internal ROM 0
+  - { name: irom1_internal, base: 0x40040000, size: 0x00020000, access: rx } # Internal ROM 1 (I-bus)
+  - { name: drom1_internal, base: 0x3FF00000, size: 0x00020000, access: r  } # Internal ROM 1 (D-bus)
+  - { name: iram,          base: 0x4037C000, size: 0x00064000, access: rwx } # Internal SRAM 1 (I-bus, 400 KB incl. 16 KB cache)
+  - { name: dram,          base: 0x3FC80000, size: 0x00050000, access: rw  } # Internal SRAM 1 (D-bus alias)
+  # Cache-mapped flash windows (TRM Chapter 3 Table 3.3-2).
+  - { name: drom,          base: 0x3C000000, size: 0x00800000, access: r   } # External flash via cache (D-bus)
+  - { name: irom,          base: 0x42000000, size: 0x00800000, access: rx  } # External flash via cache (I-bus)
+  # RTC memory (TRM Chapter 3 Table 3.3-2).
+  - { name: rtc_fast_data, base: 0x3FF80000, size: 0x00002000, access: rw  } # RTC FAST (D-bus)
+  - { name: rtc_fast_inst, base: 0x400C0000, size: 0x00002000, access: rwx } # RTC FAST (I-bus alias)
+  - { name: rtc_slow,      base: 0x50000000, size: 0x00002000, access: rwx } # RTC SLOW
+
+clock_tree:
+  xtal_hz: 40000000
+  pll_freqs_hz: [320000000, 480000000]
+  cpu_freqs_hz: [80000000, 160000000]
+  apb_hz: 80000000
+  rtc_fast_src: [xtal_d2, rc_fast]
+  rtc_slow_src: [rc_slow, xtal32k, rc_fast_d256]
+  # SYSTEM block clock enables / resets. Bits confirmed against TRM
+  # Chapter 16 SYSREG Table 16.3-2 / Register 16.4 / Register 16.5.
+  # Clock enable: set bit to 1 to ungate. Reset: set bit to 1 to assert reset,
+  # 0 to release. Templates emit: write ClkEn=1, RstEn=1, RstEn=0.
+  system_gates:
+    uart0:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: uart_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    uart_rst
+    uart1:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: uart1_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    uart1_rst
+    spi2:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: spi2_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    spi2_rst
+    i2c0:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: i2c_ext0_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    i2c_ext0_rst
+    timg0:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: timergroup_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    timergroup_rst
+    timg1:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: timergroup1_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    timergroup1_rst
+    systimer:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: systimer_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    systimer_rst
+    ledc:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: ledc_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    ledc_rst
+    i2s0:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: i2s1_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    i2s1_rst
+    rmt:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: rmt_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    rmt_rst
+    twai:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: twai_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    twai_rst
+    usb_sj:
+      clk_en_reg:   system.perip_clk_en0
+      clk_en_field: usb_device_clk_en
+      rst_reg:      system.perip_rst_en0
+      rst_field:    usb_device_rst
+    gdma:
+      clk_en_reg:   system.perip_clk_en1
+      clk_en_field: dma_clk_en
+      rst_reg:      system.perip_rst_en1
+      rst_field:    dma_rst
+
+peripherals:
+  # Base addresses from TRM Chapter 3 Table 3.3-3 (Peripheral Base Addresses).
+  # Interrupt source numbers from TRM Chapter 8 Table 8.3-1.
+  # Signals list peripheral-side roles; gpio_matrix_id is the signal index
+  # used by GPIO.func<n>_out_sel_cfg / func<n>_in_sel_cfg.
+  # iomux_pin/iomux_fn describe the direct fast path when available.
+  uart0:
+    class: uart
+    instance: uart0
+    base: 0x60000000
+    irq: 21
+    signals:
+      - { role: tx,  direction: out, gpio_matrix_id: 6, iomux_pin: 21, iomux_fn: 0 }
+      - { role: rx,  direction: in,  gpio_matrix_id: 6, iomux_pin: 20, iomux_fn: 0 }
+      - { role: rts, direction: out, gpio_matrix_id: 7 }
+      - { role: cts, direction: in,  gpio_matrix_id: 7 }
+
+  uart1:
+    class: uart
+    instance: uart1
+    base: 0x60010000
+    irq: 22
+    signals:
+      - { role: tx,  direction: out, gpio_matrix_id: 9 }
+      - { role: rx,  direction: in,  gpio_matrix_id: 9 }
+      - { role: rts, direction: out, gpio_matrix_id: 10 }
+      - { role: cts, direction: in,  gpio_matrix_id: 10 }
+
+  spi2:
+    class: spi_master
+    instance: spi2
+    base: 0x60024000
+    irq: 19
+    signals:
+      - { role: sck,   direction: out, gpio_matrix_id: 63, iomux_pin: 6,  iomux_fn: 2 }
+      - { role: mosi,  direction: out, gpio_matrix_id: 64, iomux_pin: 7,  iomux_fn: 2 }
+      - { role: miso,  direction: in,  gpio_matrix_id: 61, iomux_pin: 2,  iomux_fn: 2 }
+      - { role: cs0,   direction: out, gpio_matrix_id: 68, iomux_pin: 10, iomux_fn: 2 }
+      - { role: hd,    direction: out, gpio_matrix_id: 65, iomux_pin: 4,  iomux_fn: 2 }
+      - { role: wp,    direction: out, gpio_matrix_id: 67, iomux_pin: 5,  iomux_fn: 2 }
+
+  i2c0:
+    class: i2c
+    instance: i2c0
+    base: 0x60013000
+    irq: 29
+    signals:
+      - { role: scl, direction: inout, gpio_matrix_id: 45 }
+      - { role: sda, direction: inout, gpio_matrix_id: 46 }
+
+  timg0:
+    class: timg
+    instance: timg0
+    base: 0x6001F000
+    irq: 14
+    signals: []
+
+  timg1:
+    class: timg
+    instance: timg1
+    base: 0x60020000
+    irq: 15
+    signals: []
+
+  systimer:
+    class: systimer
+    instance: systimer
+    base: 0x60023000
+    irq: 37
+    signals: []
+
+  ledc:
+    class: ledc
+    instance: ledc
+    base: 0x60019000
+    irq: 23
+    signals:
+      - { role: ch0, direction: out, gpio_matrix_id: 37 }
+      - { role: ch1, direction: out, gpio_matrix_id: 38 }
+      - { role: ch2, direction: out, gpio_matrix_id: 39 }
+      - { role: ch3, direction: out, gpio_matrix_id: 40 }
+      - { role: ch4, direction: out, gpio_matrix_id: 41 }
+      - { role: ch5, direction: out, gpio_matrix_id: 42 }
+
+  i2s0:
+    class: i2s
+    instance: i2s0
+    base: 0x6002D000
+    irq: 20
+    signals: []
+
+  adc1:
+    class: adc
+    instance: adc1
+    base: 0x60040000
+    irq: null
+    signals: []
+
+  adc2:
+    class: adc
+    instance: adc2
+    base: 0x60040000
+    irq: null
+    signals: []
+
+  rmt:
+    class: rmt
+    instance: rmt
+    base: 0x60016000
+    irq: 28
+    signals: []
+
+  twai:
+    class: twai
+    instance: twai
+    base: 0x6002B000
+    irq: 25
+    signals:
+      - { role: tx, direction: out, gpio_matrix_id: 51 }
+      - { role: rx, direction: in,  gpio_matrix_id: 52 }
+
+  usb_sj:
+    class: usb_serial_jtag
+    instance: usb_sj
+    base: 0x60043000
+    irq: 26
+    signals:
+      - { role: dm, direction: inout, iomux_pin: 18, iomux_fn: 0 }
+      - { role: dp, direction: inout, iomux_pin: 19, iomux_fn: 0 }
+
+  gdma:
+    class: gdma
+    instance: gdma
+    base: 0x6003F000
+    irq: null
+    signals: []
+
+# IO_MUX pin summary (TRM Chapter 5 §5.12 Table 5.12-1). ESP32-C3 has exactly
+# four function slots (F0..F3) per pin. The `pad_name` column matches the TRM
+# Pin Name (the silk-screen or schematic name), which is sometimes different
+# from GPIO<n> (e.g. GPIO4's pad is MTMS).
+#
+# GPIOs 11..17 are consumed by the in-package SPI flash on MINI-1 modules
+# (ESP32-C3-DevKitM-1) and are marked flash_reserved.
+# GPIOs 2, 8, 9 are strapping pins.
+io_mux:
+  - { gpio: 0,  pad_name: XTAL_32K_P, fn0: GPIO0,  fn1: GPIO0,  rtc_fn: RTC_GPIO0, analog: ADC1_CH0 }
+  - { gpio: 1,  pad_name: XTAL_32K_N, fn0: GPIO1,  fn1: GPIO1,  rtc_fn: RTC_GPIO1, analog: ADC1_CH1 }
+  - { gpio: 2,  pad_name: GPIO2,      fn0: GPIO2,  fn1: GPIO2,  fn2: FSPIQ, rtc_fn: RTC_GPIO2, analog: ADC1_CH2, strap: true }
+  - { gpio: 3,  pad_name: GPIO3,      fn0: GPIO3,  fn1: GPIO3,  rtc_fn: RTC_GPIO3, analog: ADC1_CH3 }
+  - { gpio: 4,  pad_name: MTMS,       fn0: MTMS,   fn1: GPIO4,  fn2: FSPIHD, rtc_fn: RTC_GPIO4, analog: ADC1_CH4 }
+  - { gpio: 5,  pad_name: MTDI,       fn0: MTDI,   fn1: GPIO5,  fn2: FSPIWP, rtc_fn: RTC_GPIO5, analog: ADC2_CH0 }
+  - { gpio: 6,  pad_name: MTCK,       fn0: MTCK,   fn1: GPIO6,  fn2: FSPICLK }
+  - { gpio: 7,  pad_name: MTDO,       fn0: MTDO,   fn1: GPIO7,  fn2: FSPID }
+  - { gpio: 8,  pad_name: GPIO8,      fn0: GPIO8,  fn1: GPIO8,  strap: true }
+  - { gpio: 9,  pad_name: GPIO9,      fn0: GPIO9,  fn1: GPIO9,  strap: true }
+  - { gpio: 10, pad_name: GPIO10,     fn0: GPIO10, fn1: GPIO10, fn2: FSPICS0 }
+  - { gpio: 11, pad_name: VDD_SPI,    fn0: GPIO11, fn1: GPIO11, flash_reserved: true }
+  - { gpio: 12, pad_name: SPIHD,      fn0: SPIHD,  fn1: GPIO12, flash_reserved: true }
+  - { gpio: 13, pad_name: SPIWP,      fn0: SPIWP,  fn1: GPIO13, flash_reserved: true }
+  - { gpio: 14, pad_name: SPICS0,     fn0: SPICS0, fn1: GPIO14, flash_reserved: true }
+  - { gpio: 15, pad_name: SPICLK,     fn0: SPICLK, fn1: GPIO15, flash_reserved: true }
+  - { gpio: 16, pad_name: SPID,       fn0: SPID,   fn1: GPIO16, flash_reserved: true }
+  - { gpio: 17, pad_name: SPIQ,       fn0: SPIQ,   fn1: GPIO17, flash_reserved: true }
+  - { gpio: 18, pad_name: GPIO18,     fn0: GPIO18, fn1: GPIO18 } # USB D-
+  - { gpio: 19, pad_name: GPIO19,     fn0: GPIO19, fn1: GPIO19 } # USB D+
+  - { gpio: 20, pad_name: U0RXD,      fn0: U0RXD,  fn1: GPIO20 } # direct UART0 RX
+  - { gpio: 21, pad_name: U0TXD,      fn0: U0TXD,  fn1: GPIO21 } # direct UART0 TX
+
+# GPIO matrix signal IDs (TRM Chapter 5 §5.14 Tables 5.2 & 5.3). The full
+# table has 128 slots; this is the commonly-used subset for UART/SPI2/I2C0/
+# LEDC/RMT/TWAI/USB_SJ. Unused slots omitted; extend as needed.
+gpio_matrix:
+  - { id: 6,  name: U0RXD,        direction: in  }
+  - { id: 6,  name: U0TXD,        direction: out }
+  - { id: 7,  name: U0CTS,        direction: in  }
+  - { id: 7,  name: U0RTS,        direction: out }
+  - { id: 9,  name: U1RXD,        direction: in  }
+  - { id: 9,  name: U1TXD,        direction: out }
+  - { id: 10, name: U1CTS,        direction: in  }
+  - { id: 10, name: U1RTS,        direction: out }
+  - { id: 37, name: LEDC_CH0,     direction: out }
+  - { id: 38, name: LEDC_CH1,     direction: out }
+  - { id: 39, name: LEDC_CH2,     direction: out }
+  - { id: 40, name: LEDC_CH3,     direction: out }
+  - { id: 41, name: LEDC_CH4,     direction: out }
+  - { id: 42, name: LEDC_CH5,     direction: out }
+  - { id: 45, name: I2CEXT0_SCL,  direction: inout }
+  - { id: 46, name: I2CEXT0_SDA,  direction: inout }
+  - { id: 51, name: TWAI_TX,      direction: out }
+  - { id: 52, name: TWAI_RX,      direction: in  }
+  - { id: 61, name: FSPIQ,        direction: in  }
+  - { id: 62, name: FSPID,        direction: out }
+  - { id: 63, name: FSPICLK,      direction: out }
+  - { id: 64, name: FSPID_OUT,    direction: out }
+  - { id: 65, name: FSPIHD,       direction: out }
+  - { id: 67, name: FSPIWP,       direction: out }
+  - { id: 68, name: FSPICS0,      direction: out }
+  - { id: 87, name: RMT_SIG_IN0,  direction: in  }
+  - { id: 88, name: RMT_SIG_IN1,  direction: in  }
+  - { id: 89, name: RMT_SIG_OUT0, direction: out }
+  - { id: 90, name: RMT_SIG_OUT1, direction: out }

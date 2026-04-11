@@ -16,6 +16,8 @@ mod ui;
 pub mod af;
 #[path = "../creator/ast.rs"]
 pub mod ast;
+#[path = "../creator/bsp/espressif/mod.rs"]
+pub mod espressif;
 #[path = "../creator/bsp/ioc.rs"]
 pub mod ioc;
 #[path = "../creator/bsp/ir.rs"]
@@ -24,6 +26,7 @@ pub mod ir;
 /// Re-exported board support modules for CLI utilities.
 mod bsp {
     pub use super::af;
+    pub use super::espressif;
     pub use super::ioc;
     pub use super::ir;
 }

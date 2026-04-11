@@ -1,0 +1,31 @@
+# ESP32-C3-DevKitM-1 board IR.
+#
+# Espressif reference dev-kit built around the ESP32-C3-MINI-1 module
+# (in-package 4 MB SPI flash). Schematic: docs.espressif.com ESP32-C3-DevKitM-1.
+#
+# Note: GPIOs 11..17 are consumed by the MINI-1 module's in-package flash
+# and must not be reassigned on this board.
+
+name: ESP32-C3-DevKitM-1
+chip: ESP32-C3
+module: ESP32-C3-MINI-1
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  - { gpio: 21, signal: UART0_TX, peripheral: uart0,  direction: out,   label: u0_tx }
+  - { gpio: 20, signal: UART0_RX, peripheral: uart0,  direction: in,    label: u0_rx }
+  - { gpio: 8,  signal: LED,                           direction: out,   label: led }        # WS2812 RGB on DevKitM-1
+  - { gpio: 9,  signal: BOOT,                          direction: in,    label: boot_btn, pull: up }
+  - { gpio: 18, signal: USB_DM,   peripheral: usb_sj, direction: inout, label: usb_dm }
+  - { gpio: 19, signal: USB_DP,   peripheral: usb_sj, direction: inout, label: usb_dp }
+
+features:
+  led: gpio8
+  led_type: ws2812
+  boot_button: gpio9
+  usb: usb_sj

@@ -17,5 +17,11 @@ categories = ["config", "embedded"]
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = ["std"]
+std = ["dep:serde", "dep:serde_yaml", "dep:indexmap"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
+serde_yaml = { version = "0.9", optional = true }
+indexmap = { version = "2", features = ["serde"], optional = true }

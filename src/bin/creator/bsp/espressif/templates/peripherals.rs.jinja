@@ -1,0 +1,62 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Only the peripherals actually used by the board are referenced. v1 of the
+//! generator emits real register writes for UART0 (when it is the console)
+//! and leaves stubs for everything else with TODO markers pointing at the
+//! relevant PAC register paths so a human can finish the init sequence.
+
+use {{ ir.chip.pac_crate }} as pac;
+
+use crate::board::APB_HZ;
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and IO MUX are configured.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% set periph = ir.chip.peripherals[name] %}
+{% if periph %}
+{% if name == "uart0" and ir.board.console and ir.board.console.peripheral == "uart0" %}
+/// Bring up UART0 as the console at {{ ir.board.console.baud }} baud, 8N1.
+///
+/// Clock divider is computed from `APB_HZ` ({{ ir.clocks.apb_hz }} Hz) and
+/// the console baud rate ({{ ir.board.console.baud }} baud).
+pub fn init_uart0() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const BAUD: u32 = {{ ir.board.console.baud }};
+    // ESP32-C3 UART clkdiv is in Q20.4 fixed point: (APB << 4) / BAUD.
+    let clkdiv: u32 = (APB_HZ << 4) / BAUD;
+    p.uart0.clkdiv().write(|w| unsafe { w.clkdiv().bits(clkdiv >> 4).frag().bits((clkdiv & 0xF) as u8) });
+    // 8 data bits, no parity, 1 stop bit.
+    p.uart0.conf0().modify(|_, w| unsafe {
+        w.bit_num().bits(0b11) // 8 data bits
+         .parity_en().clear_bit()
+         .stop_bit_num().bits(0b01) // 1 stop bit
+         .tick_ref_always_on().set_bit()
+    });
+    // Reset FIFOs and wait for TX idle.
+    p.uart0.conf0().modify(|_, w| w.rxfifo_rst().set_bit().txfifo_rst().set_bit());
+    p.uart0.conf0().modify(|_, w| w.rxfifo_rst().clear_bit().txfifo_rst().clear_bit());
+    while p.uart0.status().read().st_utx_out().bits() != 0 {}
+}
+{% else %}
+/// TODO: initialize {{ name }} (class `{{ periph.class }}`, base {{ periph.base }}).
+///
+/// Populate this function by writing into the `{{ ir.chip.pac_crate }}::{{ name | upper }}`
+/// register block. Clock gating is already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: {{ periph.class }} init sequence for {{ name }}
+}
+{% endif %}
+{% else %}
+/// TODO: unknown peripheral `{{ name }}` (no entry in chip IR).
+pub fn init_{{ name }}() {}
+{% endif %}
+
+{% endfor %}
