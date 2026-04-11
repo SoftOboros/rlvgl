@@ -89,3 +89,81 @@ fn snapshot_board_rs() {
     let text = fs::read_to_string(bsp_dir.join("board.rs")).expect("read board.rs");
     insta::assert_snapshot!("esp32c3_devkitm_1__board", text);
 }
+
+// --- DFR0868 Beetle ESP32-C3 --------------------------------------------
+
+fn render_beetle_esp32c3_to_tempdir() -> (tempfile::TempDir, std::path::PathBuf) {
+    let chip = load_chip_db("esp32c3").expect("chip yaml");
+    let board = load_board_db("beetle_esp32c3").expect("beetle board yaml");
+    let ir = merge(chip, board).expect("merge ok");
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let written = render_esp_pac(&ir, tmp.path()).expect("render ok");
+    assert_eq!(written.len(), 6);
+    let bsp_dir = tmp.path().join("dfr0868_beetle_esp32_c3");
+    assert!(bsp_dir.is_dir(), "bsp dir created: {}", bsp_dir.display());
+    (tmp, bsp_dir)
+}
+
+#[test]
+fn beetle_produces_expected_file_set() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    for name in [
+        "mod.rs",
+        "pac.rs",
+        "clocks.rs",
+        "io_mux.rs",
+        "peripherals.rs",
+        "board.rs",
+    ] {
+        let p = bsp_dir.join(name);
+        assert!(p.is_file(), "expected {}", p.display());
+        let content = fs::read_to_string(&p).expect("read");
+        assert!(
+            !content.trim().is_empty(),
+            "{} should not be empty",
+            p.display()
+        );
+    }
+}
+
+#[test]
+fn beetle_snapshot_mod_rs() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("mod.rs")).expect("read mod.rs");
+    insta::assert_snapshot!("beetle_esp32c3__mod", text);
+}
+
+#[test]
+fn beetle_snapshot_pac_rs() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("pac.rs")).expect("read pac.rs");
+    insta::assert_snapshot!("beetle_esp32c3__pac", text);
+}
+
+#[test]
+fn beetle_snapshot_clocks_rs() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("clocks.rs")).expect("read clocks.rs");
+    insta::assert_snapshot!("beetle_esp32c3__clocks", text);
+}
+
+#[test]
+fn beetle_snapshot_io_mux_rs() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("io_mux.rs")).expect("read io_mux.rs");
+    insta::assert_snapshot!("beetle_esp32c3__io_mux", text);
+}
+
+#[test]
+fn beetle_snapshot_peripherals_rs() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("peripherals.rs")).expect("read peripherals.rs");
+    insta::assert_snapshot!("beetle_esp32c3__peripherals", text);
+}
+
+#[test]
+fn beetle_snapshot_board_rs() {
+    let (_tmp, bsp_dir) = render_beetle_esp32c3_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("board.rs")).expect("read board.rs");
+    insta::assert_snapshot!("beetle_esp32c3__board", text);
+}

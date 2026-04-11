@@ -1,8 +1,4 @@
----
-source: tests/bsp_esp32c3_render.rs
-expression: text
----
-//! Clock tree initialization for ESP32-C3-DevKitM-1.
+//! Clock tree initialization for DFR0868 Beetle ESP32-C3.
 //!
 //! On ESP32-C3 peripheral clock gating and reset live in the `SYSTEM` block
 //! (TRM Chapter 16 SYSREG). To bring up a peripheral this file:
@@ -23,23 +19,26 @@ use esp32c3 as pac;
 /// configuration so that peripheral registers are writable.
 pub fn init() {
     let p = unsafe { pac::Peripherals::steal() };
-    
-    
-    
-    // uart0 — clock enable uart_clk_en, reset uart_rst
-    p.SYSTEM.perip_rst_en0().modify(|_, w| w.uart_rst().set_bit());
-    p.SYSTEM.perip_clk_en0().modify(|_, w| w.uart_clk_en().set_bit());
-    p.SYSTEM.perip_rst_en0().modify(|_, w| w.uart_rst().clear_bit());
-    
-    
-    
-    
-    
+
+    // i2c0 — clock enable i2c_ext0_clk_en, reset i2c_ext0_rst
+    p.SYSTEM
+        .perip_rst_en0()
+        .modify(|_, w| w.i2c_ext0_rst().set_bit());
+    p.SYSTEM
+        .perip_clk_en0()
+        .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
+    p.SYSTEM
+        .perip_rst_en0()
+        .modify(|_, w| w.i2c_ext0_rst().clear_bit());
+
     // usb_sj — clock enable usb_device_clk_en, reset usb_device_rst
-    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().set_bit());
-    p.SYSTEM.perip_clk_en0().modify(|_, w| w.usb_device_clk_en().set_bit());
-    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().clear_bit());
-    
-    
-    
+    p.SYSTEM
+        .perip_rst_en0()
+        .modify(|_, w| w.usb_device_rst().set_bit());
+    p.SYSTEM
+        .perip_clk_en0()
+        .modify(|_, w| w.usb_device_clk_en().set_bit());
+    p.SYSTEM
+        .perip_rst_en0()
+        .modify(|_, w| w.usb_device_rst().clear_bit());
 }

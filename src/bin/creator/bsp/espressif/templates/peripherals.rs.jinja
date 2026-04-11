@@ -7,7 +7,8 @@
 
 use {{ ir.chip.pac_crate }} as pac;
 
-use crate::board::APB_HZ;
+#[allow(unused_imports)]
+use super::board::{APB_HZ, XTAL_HZ};
 
 /// Initialize every board peripheral in dependency order.
 ///
@@ -29,20 +30,84 @@ pub fn init() {
 pub fn init_uart0() {
     let p = unsafe { pac::Peripherals::steal() };
     const BAUD: u32 = {{ ir.board.console.baud }};
-    // ESP32-C3 UART clkdiv is in Q20.4 fixed point: (APB << 4) / BAUD.
+    // UART0 CLKDIV on ESP32-C3 is Q20.4 fixed point: integer part in bits
+    // [19:0], fractional part in bits [23:20]. Compute `(APB << 4) / BAUD`,
+    // then write the integer and fractional halves as raw register bits to
+    // sidestep field-width type errors in svd2rust 0.31.
     let clkdiv: u32 = (APB_HZ << 4) / BAUD;
-    p.uart0.clkdiv().write(|w| unsafe { w.clkdiv().bits(clkdiv >> 4).frag().bits((clkdiv & 0xF) as u8) });
+    let integer = clkdiv >> 4;
+    let frag = clkdiv & 0xF;
+    p.UART0
+        .clkdiv()
+        .write(|w| unsafe { w.bits((integer & 0xF_FFFF) | (frag << 20)) });
     // 8 data bits, no parity, 1 stop bit.
-    p.uart0.conf0().modify(|_, w| unsafe {
+    p.UART0.conf0().modify(|_, w| unsafe {
         w.bit_num().bits(0b11) // 8 data bits
          .parity_en().clear_bit()
          .stop_bit_num().bits(0b01) // 1 stop bit
-         .tick_ref_always_on().set_bit()
     });
-    // Reset FIFOs and wait for TX idle.
-    p.uart0.conf0().modify(|_, w| w.rxfifo_rst().set_bit().txfifo_rst().set_bit());
-    p.uart0.conf0().modify(|_, w| w.rxfifo_rst().clear_bit().txfifo_rst().clear_bit());
-    while p.uart0.status().read().st_utx_out().bits() != 0 {}
+    // Reset FIFOs. Skipping the TX-idle poll: C3's UART0_STATUS layout
+    // differs across PAC revisions and the FIFO reset alone is enough for
+    // a cold bring-up.
+    p.UART0.conf0().modify(|_, w| w.rxfifo_rst().set_bit().txfifo_rst().set_bit());
+    p.UART0.conf0().modify(|_, w| w.rxfifo_rst().clear_bit().txfifo_rst().clear_bit());
+}
+{% elif periph.class == "i2c" %}
+/// Bring up {{ name }} as an I2C master at {{ ir.board.i2c_configs[name].scl_hz | default(100000) }} Hz.
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// Clock gating is already done by `crate::clocks::init` — this function
+/// only sets up the peripheral-internal timing and leaves it ready for
+/// per-transaction command-list writes.
+///
+/// TRM reference: ESP32-C3 Chapter 16 "I2C Controller", register map and
+/// timing formulas. The template writes all *_period / *_hold / *_sample
+/// registers as raw half-period counts derived from the source clock
+/// (XTAL_HZ = {{ ir.clocks.xtal_hz }} Hz on C3 — the I2C controller uses
+/// XTAL directly when `sclk_sel = 0`).
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const SCL_HZ: u32 = {{ ir.board.i2c_configs[name].scl_hz | default(100000) }};
+    // Full SCL period in XTAL cycles. Split 50/50 between low and high
+    // halves. For 400 kHz @ 40 MHz XTAL that's 100 cycles, 50 per half.
+    let period: u32 = XTAL_HZ / SCL_HZ;
+    let half: u32 = period / 2;
+
+    // Select XTAL_CLK as the source (sclk_sel = 0) and enable the clock.
+    p.{{ name | upper }}.clk_conf().modify(|_, w| unsafe {
+        w.sclk_sel().clear_bit()
+         .sclk_active().set_bit()
+         .sclk_div_num().bits(0)
+    });
+    // Master mode, MSB-first on both directions.
+    p.{{ name | upper }}.ctr().modify(|_, w| {
+        w.ms_mode().set_bit()
+         .tx_lsb_first().clear_bit()
+         .rx_lsb_first().clear_bit()
+         .clk_en().set_bit()
+    });
+    // SCL low/high periods (raw register writes — field widths vary across
+    // PAC revisions, so stay register-level).
+    p.{{ name | upper }}.scl_low_period().write(|w| unsafe { w.bits(half) });
+    p.{{ name | upper }}.scl_high_period().write(|w| unsafe { w.bits(half) });
+    // SDA hold/sample timings — conservative quarter-period defaults.
+    let quarter: u32 = half / 2;
+    p.{{ name | upper }}.sda_hold().write(|w| unsafe { w.bits(quarter) });
+    p.{{ name | upper }}.sda_sample().write(|w| unsafe { w.bits(quarter) });
+    // START / repeated-START / STOP setup + hold times.
+    p.{{ name | upper }}.scl_start_hold().write(|w| unsafe { w.bits(half) });
+    p.{{ name | upper }}.scl_rstart_setup().write(|w| unsafe { w.bits(half) });
+    p.{{ name | upper }}.scl_stop_hold().write(|w| unsafe { w.bits(half) });
+    p.{{ name | upper }}.scl_stop_setup().write(|w| unsafe { w.bits(half) });
+    // Reset TX + RX FIFOs so subsequent transactions start clean.
+    p.{{ name | upper }}.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit()
+    });
+    p.{{ name | upper }}.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit()
+    });
+    // Publish the config — `conf_upgate` latches the new timings.
+    p.{{ name | upper }}.ctr().modify(|_, w| w.conf_upgate().set_bit());
 }
 {% else %}
 /// TODO: initialize {{ name }} (class `{{ periph.class }}`, base {{ periph.base }}).

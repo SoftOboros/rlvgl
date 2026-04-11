@@ -141,3 +141,87 @@ fn merge_rejects_flash_reserved_pin_assignment() {
     let err = merge(chip, board).expect_err("merge should reject flash pin");
     assert!(err.to_string().contains("flash"));
 }
+
+#[test]
+fn beetle_esp32c3_board_yaml_parses_and_merges() {
+    let board = load_board_db("beetle_esp32c3").expect("beetle board yaml");
+    assert_eq!(board.name, "DFR0868 Beetle ESP32-C3");
+    assert_eq!(board.chip, "ESP32-C3");
+    assert_eq!(board.module.as_deref(), Some("ESP32-C3-MINI-1"));
+    assert_eq!(board.flash_mb, 4);
+    // Console is USB Serial/JTAG on the Beetle, not UART0 — it's USB-native.
+    let console = board.console.as_ref().expect("console config");
+    assert_eq!(console.peripheral, "usb_sj");
+
+    let sda = board
+        .pins
+        .iter()
+        .find(|p| p.signal == "I2C0_SDA")
+        .expect("SDA pin");
+    assert_eq!(sda.gpio, 1);
+    assert_eq!(sda.peripheral.as_deref(), Some("i2c0"));
+    assert_eq!(sda.direction, EspDir::Inout);
+    assert_eq!(sda.pull.as_deref(), Some("up"));
+
+    let scl = board
+        .pins
+        .iter()
+        .find(|p| p.signal == "I2C0_SCL")
+        .expect("SCL pin");
+    assert_eq!(scl.gpio, 2);
+    assert_eq!(scl.peripheral.as_deref(), Some("i2c0"));
+
+    // Must merge cleanly against the ESP32-C3 chip IR.
+    let chip = load_chip_db("esp32c3").expect("chip yaml");
+    let ir = merge(chip, board).expect("beetle merge ok");
+    assert_eq!(ir.pins.len(), 5);
+    assert!(
+        ir.pins
+            .iter()
+            .any(|p| p.signal == "I2C0_SDA" && p.gpio == 1),
+        "merged IR must retain the SDA pin"
+    );
+}
+
+#[test]
+fn beetle_esp32c3_i2c0_pins_resolve_to_distinct_matrix_routes() {
+    // Use the same `resolve_pin_routes` path the render pipeline takes so
+    // this test catches regressions in the SDA/SCL disambiguation logic.
+    // (We need to reach into `render::` for this — `#[path]` already pulled
+    // the whole espressif module in above.)
+    use espressif::{PinRouteKind, render_esp_pac};
+
+    let chip = load_chip_db("esp32c3").expect("chip yaml");
+    let board = load_board_db("beetle_esp32c3").expect("beetle board yaml");
+    let ir = merge(chip, board).expect("beetle merge ok");
+
+    // Render to a tempdir just to drive `resolve_pin_routes` end-to-end.
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let _ = render_esp_pac(&ir, tmp.path()).expect("render ok");
+
+    // Read back io_mux.rs and assert both signal ids appear. This is a
+    // black-box check: the direct `resolve_pin_routes` helper is private
+    // to the render module, but its decisions end up as `signal_id` tokens
+    // in the rendered file.
+    let io_mux =
+        std::fs::read_to_string(tmp.path().join("dfr0868_beetle_esp32_c3").join("io_mux.rs"))
+            .expect("read io_mux.rs");
+    // Chip YAML: I2C0 role `sda` → matrix id 46, role `scl` → matrix id 45.
+    assert!(
+        io_mux.contains("signal id 46"),
+        "io_mux.rs missing SDA matrix id 46:\n{io_mux}"
+    );
+    assert!(
+        io_mux.contains("signal id 45"),
+        "io_mux.rs missing SCL matrix id 45:\n{io_mux}"
+    );
+    // And both pins should configure fun_ie + fun_wpu (open-drain inout
+    // with pull-up), not just mcu_sel.
+    assert!(
+        io_mux.matches("fun_wpu().set_bit()").count() >= 2,
+        "both I2C pins should set fun_wpu:\n{io_mux}"
+    );
+
+    // Silence unused warning when the code above still compiles.
+    let _ = PinRouteKind::Plain;
+}

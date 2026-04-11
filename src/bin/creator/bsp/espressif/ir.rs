@@ -256,6 +256,10 @@ pub struct EspBoard {
     /// Console peripheral and baud rate for `println!`/panic output.
     #[serde(default)]
     pub console: Option<EspConsoleConfig>,
+    /// Optional per-I2C-instance timing overrides. Keyed by peripheral
+    /// instance name (e.g. `"i2c0"`). Missing entries default to 100 kHz.
+    #[serde(default)]
+    pub i2c_configs: IndexMap<String, EspI2cConfig>,
 }
 
 /// A single board-level pin assignment.
@@ -288,6 +292,23 @@ pub struct EspConsoleConfig {
     pub peripheral: String,
     /// Baud rate (only meaningful for UART consoles).
     pub baud: u32,
+}
+
+/// Board-level I2C timing config.
+///
+/// The generator renders `peripherals::init_i2c<N>()` with the SCL period
+/// derived from this struct. Falls back to 100 kHz if a board doesn't
+/// specify an I2C peripheral here.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EspI2cConfig {
+    /// Target SCL frequency in Hz (typical: 100_000 or 400_000).
+    pub scl_hz: u32,
+}
+
+impl Default for EspI2cConfig {
+    fn default() -> Self {
+        Self { scl_hz: 100_000 }
+    }
 }
 
 /// Resolved per-build clock configuration.

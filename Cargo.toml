@@ -269,6 +269,10 @@ syn = { version = "2", features = ["full"] }
 [features]
 default = []
 regression = []
+## Opt-in: run the ESP32-C3 BSP generator and `cargo check` its output against
+## the real `esp32c3` PAC crate on `riscv32imc-unknown-none-elf`. Heavy — needs
+## the riscv32imc target + network access to fetch `esp32c3` from crates.io.
+compile-verify = ["creator", "regression"]
 playit = ["dep:rlvgl-playit"]
 png = ["rlvgl-core/png", "rlvgl-platform/png", "rlvgl-app-demo?/png"]
 jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg", "rlvgl-app-demo?/jpeg"]

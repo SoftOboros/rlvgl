@@ -18,8 +18,8 @@ pub mod render;
 
 pub use ir::{
     EspBoard, EspChip, EspClockTree, EspClocksConfig, EspConsoleConfig, EspDir,
-    EspGpioMatrixSignal, EspIoMuxPin, EspIr, EspMemoryRegion, EspPeripheral, EspPeripheralSignal,
-    EspPinAssignment, EspSystemGate,
+    EspGpioMatrixSignal, EspI2cConfig, EspIoMuxPin, EspIr, EspMemoryRegion, EspPeripheral,
+    EspPeripheralSignal, EspPinAssignment, EspSystemGate,
 };
 pub use load::{
     load_board_db, load_board_file, load_chip_db, load_chip_file, merge, yaml_to_board,

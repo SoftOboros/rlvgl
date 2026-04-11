@@ -1,0 +1,61 @@
+# DFR0868 Beetle ESP32-C3 board IR.
+#
+# DFRobot Beetle ESP32-C3 (SKU DFR0868) — an ESP32-C3-MINI-1-based USB-C
+# development board with a V-shaped gilded I/O edge. Used in the rlvgl
+# workspace by the `examples/beetle-esp32c3/` crate to drive an SSD1306
+# 128x64 I2C OLED over the exposed GPIO1 / GPIO2 pads.
+#
+# Reference:
+#   - Board spec:    chipdb/rlvgl-chips-esp/db/chips/esp32c3.yaml
+#   - Pad schematic: memalpha notebook 15, DFR0868_schematic_v2.pdf
+#   - Wiki:          memalpha notebook 15, DFR0868_wiki.pdf
+#
+# Exposed edge pads on DFR0868 (from DFR0868_schematic_v2):
+#   IO0, IO1, IO2, IO3 (TXD), IO4 (RX), IO5, IO6, IO7, IO18, IO19,
+#   3V3, GND, BAT, VUSB.
+#
+# GPIOs 11..17 are consumed by the MINI-1 module's in-package flash and
+# must not be reassigned on this board — this matches DevKitM-1.
+#
+# Console is native USB-Serial/JTAG (GPIO18/GPIO19). There is no UART0
+# header on the Beetle — USART0 TX/RX (GPIO21/GPIO20) are not broken out.
+
+name: DFR0868 Beetle ESP32-C3
+chip: ESP32-C3
+module: ESP32-C3-MINI-1
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: usb_sj
+  baud: 115200
+
+pins:
+  # I2C0 to the onboard SSD1306 module. Inout + pull-up because SSD1306
+  # modules expose the open-drain I2C bus directly; no external pull-ups
+  # on the V-edge pads.
+  - { gpio: 1,  signal: I2C0_SDA, peripheral: i2c0,  direction: inout, pull: up, label: sda }
+  - { gpio: 2,  signal: I2C0_SCL, peripheral: i2c0,  direction: inout, pull: up, label: scl }
+
+  # USB Serial/JTAG — native USB-C on the DFR0868.
+  - { gpio: 18, signal: USB_DM,   peripheral: usb_sj, direction: inout, label: usb_dm }
+  - { gpio: 19, signal: USB_DP,   peripheral: usb_sj, direction: inout, label: usb_dp }
+
+  # LED on GPIO8 (shared with DevKitM-1 — WS2812 on that board, monochrome
+  # on some Beetle variants; treated as plain GPIO out here).
+  - { gpio: 8,  signal: LED,                         direction: out, label: led }
+
+i2c_configs:
+  i2c0:
+    # SSD1306 modules happily run at 400 kHz fast-mode; most I2C OLEDs in
+    # this form factor are rated up to 1 MHz in datasheets but 400 kHz is
+    # the conservative sweet spot.
+    scl_hz: 400000
+
+features:
+  led: gpio8
+  i2c_bus: i2c0
+  i2c_sda: gpio1
+  i2c_scl: gpio2
+  usb: usb_sj
+  display: ssd1306_128x64_i2c

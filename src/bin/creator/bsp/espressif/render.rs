@@ -135,19 +135,22 @@ fn peripherals_used(ir: &EspIr) -> Vec<String> {
 /// For each board pin we try, in order:
 /// 1. Direct IO MUX fast path — the owning peripheral has a signal whose
 ///    `iomux_pin` matches this GPIO.
-/// 2. GPIO matrix routing — the owning peripheral has a signal with a
-///    matching role and a `gpio_matrix_id`.
+/// 2. GPIO matrix routing — the owning peripheral has a signal whose
+///    role matches the pin's signal name and has a `gpio_matrix_id`.
 /// 3. Plain GPIO.
 fn resolve_pin_routes(ir: &EspIr) -> Vec<PinRoute> {
     ir.pins
         .iter()
         .map(|pin| {
+            let role_hint = pin_role_hint(&pin.signal, pin.peripheral.as_deref());
             let route = match pin.peripheral.as_deref() {
                 Some(periph_name) => ir
                     .chip
                     .peripherals
                     .get(periph_name)
-                    .map(|periph| pick_route_for_signal(periph, pin.gpio, pin.direction))
+                    .map(|periph| {
+                        pick_route_for_signal(periph, pin.gpio, pin.direction, role_hint.as_deref())
+                    })
                     .unwrap_or(PinRouteKind::Plain),
                 None => PinRouteKind::Plain,
             };
@@ -164,12 +167,44 @@ fn resolve_pin_routes(ir: &EspIr) -> Vec<PinRoute> {
         .collect()
 }
 
+/// Extract a lower-case role hint from a board pin's signal name.
+///
+/// Board YAMLs label pins like `I2C0_SDA`, `UART0_TX`, `USB_DM`. Strip the
+/// peripheral-name prefix (e.g. `I2C0_`) and lowercase the remainder so we
+/// can match it against a peripheral signal's `role` field (e.g. `sda`).
+/// Falls back to the entire signal name lowercased if the prefix doesn't
+/// match the peripheral.
+fn pin_role_hint(signal: &str, peripheral: Option<&str>) -> Option<String> {
+    if signal.is_empty() {
+        return None;
+    }
+    let lowered = signal.to_ascii_lowercase();
+    if let Some(p) = peripheral {
+        let prefix = format!("{}_", p.to_ascii_lowercase());
+        if let Some(rest) = lowered.strip_prefix(&prefix) {
+            return Some(rest.to_string());
+        }
+    }
+    // Otherwise take the substring after the last underscore, if any.
+    if let Some(idx) = lowered.rfind('_') {
+        return Some(lowered[idx + 1..].to_string());
+    }
+    Some(lowered)
+}
+
 /// Pick the best routing for a peripheral signal on a specific GPIO.
+///
+/// `role_hint` is used to disambiguate peripherals with multiple matrix
+/// signals (e.g. I2C SDA vs SCL): when set, prefer a signal whose `role`
+/// matches it before falling back to the first direction-compatible signal.
 fn pick_route_for_signal(
     periph: &super::ir::EspPeripheral,
     gpio: u8,
     direction: EspDir,
+    role_hint: Option<&str>,
 ) -> PinRouteKind {
+    // Direct IO MUX fast path takes priority: peripheral signal pinned
+    // directly to this GPIO.
     for sig in &periph.signals {
         if !direction_compatible(direction, sig.direction) {
             continue;
@@ -180,6 +215,22 @@ fn pick_route_for_signal(
             }
         }
     }
+    // Matrix route: if we have a role hint, try to match it first so that
+    // e.g. I2C0_SDA → role `sda` rather than latching onto the first
+    // matrix signal on the peripheral.
+    if let Some(hint) = role_hint {
+        for sig in &periph.signals {
+            if !direction_compatible(direction, sig.direction) {
+                continue;
+            }
+            if sig.role.eq_ignore_ascii_case(hint) {
+                if let Some(id) = sig.gpio_matrix_id {
+                    return PinRouteKind::Matrix { signal_id: id };
+                }
+            }
+        }
+    }
+    // Fallback: first direction-compatible signal with a matrix id.
     for sig in &periph.signals {
         if !direction_compatible(direction, sig.direction) {
             continue;
@@ -206,15 +257,23 @@ fn dir_to_str(d: EspDir) -> &'static str {
     }
 }
 
-/// Convert a spec-level dotted PAC path like `system.perip_clk_en0` into
-/// method-call form like `system().perip_clk_en0()` that svd2rust-style
-/// PAC crates expect.
+/// Convert a spec-level dotted PAC path like `system.perip_clk_en0` into the
+/// svd2rust form `SYSTEM.perip_clk_en0()`. The first segment is the
+/// peripheral instance — in svd2rust-generated PAC crates that's an
+/// uppercase field on `Peripherals`, not a method. Subsequent segments are
+/// registers or blocks within the instance and stay as method calls.
 fn pac_path_filter(value: String) -> String {
-    value
-        .split('.')
-        .map(|segment| format!("{segment}()"))
-        .collect::<Vec<_>>()
-        .join(".")
+    let mut segments = value.split('.');
+    let mut out = match segments.next() {
+        Some(first) => first.to_ascii_uppercase(),
+        None => return String::new(),
+    };
+    for rest in segments {
+        out.push('.');
+        out.push_str(rest);
+        out.push_str("()");
+    }
+    out
 }
 
 /// Convert an arbitrary board/chip name into a snake_case file stem.
@@ -258,11 +317,12 @@ mod tests {
     }
 
     #[test]
-    fn pac_path_filter_adds_method_parens() {
+    fn pac_path_filter_uppercases_instance_and_method_chains_registers() {
         assert_eq!(
             pac_path_filter("system.perip_clk_en0".into()),
-            "system().perip_clk_en0()"
+            "SYSTEM.perip_clk_en0()"
         );
-        assert_eq!(pac_path_filter("gpio".into()), "gpio()");
+        assert_eq!(pac_path_filter("gpio".into()), "GPIO");
+        assert_eq!(pac_path_filter("uart0.conf0".into()), "UART0.conf0()");
     }
 }

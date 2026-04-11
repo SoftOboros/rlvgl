@@ -157,6 +157,21 @@ RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
 RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
 cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test && cd ../..
 
+# Phase 4.6: ESP32-C3 BSP generator + beetle-esp32c3 both feature sets
+# The `compile-verify` feature spins up a throwaway cargo project around the
+# generated BSP and type-checks it against real `esp32c3 = 0.31` on
+# `riscv32imc-unknown-none-elf`; it needs `rustup target add riscv32imc-unknown-none-elf`
+# and network access for the PAC crate, so it's opt-in.
+RUSTFLAGS="" cargo test -p rlvgl-chips-esp
+RUSTFLAGS="" cargo test -p rlvgl --test esp_ir_roundtrip --features creator
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c3_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c3_cli --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c3_compile --features compile-verify -- --test-threads=1
+RUSTFLAGS="" cargo check -p rlvgl-example-beetle-esp32c3 --features esp_hal --target riscv32imc-unknown-none-elf
+RUSTFLAGS="" cargo check -p rlvgl-example-beetle-esp32c3 --features bsp_pac --target riscv32imc-unknown-none-elf
+RUSTFLAGS="" cargo clippy -p rlvgl-example-beetle-esp32c3 --features esp_hal --target riscv32imc-unknown-none-elf -- -D warnings
+RUSTFLAGS="" cargo clippy -p rlvgl-example-beetle-esp32c3 --features bsp_pac --target riscv32imc-unknown-none-elf -- -D warnings
+
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
 
@@ -177,3 +192,71 @@ DRY_RUN=1 scripts/publish_changed.sh HEAD~1
 - Relevant telemetry now includes idle cycles, loop count, pipeline stage/frame,
   DMA2D last/max cycles, DMA completion/error counts, and serial queue/drop
   counters.
+
+## ESP32-C3 BSP Generator
+
+`rlvgl-creator bsp from-yaml --vendor esp` generates raw-PAC bring-up code
+for ESP32-C3 boards from chipdb YAML:
+
+- **Chip inventory**: `chipdb/rlvgl-chips-esp/db/chips/esp32c3.yaml` —
+  memory map, clock tree, SYSTEM clock-gate table, IO MUX per-pin function
+  table, GPIO matrix signal subset. Derived from the ESP32-C3 TRM.
+- **Board specs**: `chipdb/rlvgl-chips-esp/db/boards/*.yaml` — pin
+  assignments, console config, optional `i2c_configs:` SCL frequency map.
+  Ships with `esp32c3_devkitm_1.yaml` and `beetle_esp32c3.yaml`.
+- **Generated output**: 6 files per board (`mod.rs`, `pac.rs`, `clocks.rs`,
+  `io_mux.rs`, `peripherals.rs`, `board.rs`) emitting svd2rust-style writes
+  against `esp32c3 = 0.31`. Peripheral instances use uppercase field access
+  (`p.UART0.clkdiv()`, `p.IO_MUX.gpio(21)`). Sibling module references use
+  `super::` so the output works both as a crate root and as a child module
+  of a host crate.
+- **Templates**: `src/bin/creator/bsp/espressif/templates/*.rs.jinja` —
+  edit these to grow peripheral init coverage. `peripherals.rs.jinja`
+  currently has real UART0-as-console and I2C0 master init; everything
+  else is a TODO stub pointing at the relevant PAC register block.
+
+### Regenerate a board's BSP
+
+```bash
+cargo run --features creator --bin rlvgl-creator -- --silent bsp from-yaml \
+    --vendor esp \
+    --board beetle_esp32c3 \
+    --out /tmp/rlvgl-bsp \
+    --emit-pac
+```
+
+Copy the five child files (`board.rs`, `clocks.rs`, `io_mux.rs`, `pac.rs`,
+`peripherals.rs`) from `/tmp/rlvgl-bsp/dfr0868_beetle_esp32_c3/` to the
+consuming crate's `src/bsp_generated/`. The host `mod.rs` is written by
+hand as a module index; the generator's own `mod.rs` is crate-root-shaped
+and not copied in.
+
+### Compile-verify the output
+
+The snapshot tests (`tests/bsp_esp32c3_render.rs`) only check *text*. To
+prove the generated code actually type-checks against the real
+`esp32c3 0.31` PAC crate on `riscv32imc-unknown-none-elf`, run:
+
+```bash
+rustup target add riscv32imc-unknown-none-elf
+cargo test --test bsp_esp32c3_compile --features compile-verify -- --test-threads=1
+```
+
+This materializes a throwaway cargo project around the generated files for
+every chipdb board and runs `cargo check`. The target dir is cached under
+`$TMPDIR/rlvgl-bsp-<tag>-compile-verify-target` so reruns are fast. Template
+edits that break compilation surface here first.
+
+### beetle-esp32c3 feature matrix
+
+`examples/beetle-esp32c3/` has two parallel entry points selected by
+mutually exclusive features:
+
+- `--features esp_hal` → `src/esp_hal_main.rs`, uses esp-hal's high-level
+  I2C/Delay/`#[esp_hal::main]`. Known-working rlvgl + SSD1306 path.
+- `--features bsp_pac` → `src/bsp_pac_main.rs`, consumes the generated
+  BSP under `src/bsp_generated/` and drives an LED blink via raw PAC. Proves
+  the chipdb → generator → compile → boot pipeline. Does **not** currently
+  include SSD1306 or rlvgl — SSD1306 over raw PAC needs command-list
+  chunking (ESP32-C3 TX FIFO is 32 bytes, SSD1306 framebuffer writes are
+  ~1 KB) and is deferred to a follow-up milestone.

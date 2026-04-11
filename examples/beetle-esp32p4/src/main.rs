@@ -10,8 +10,8 @@
 #![no_std]
 #![no_main]
 
-use esp32p4::Peripherals;
 use esp_riscv_rt::entry;
+use esp32p4::Peripherals;
 use panic_halt as _;
 
 #[entry]

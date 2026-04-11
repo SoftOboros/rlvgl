@@ -20,7 +20,7 @@ pub fn init() {
     // GPIO{{ pin.gpio }} — {{ pin.signal }}{% if pin.peripheral %} ({{ pin.peripheral }}){% endif %}
     {% if pin.route.kind == "direct" %}
     // Direct IO MUX fast path: fn{{ pin.route.fn_slot }}
-    p.io_mux().gpio{{ pin.gpio }}().modify(|_, w| unsafe {
+    p.IO_MUX.gpio({{ pin.gpio }}).modify(|_, w| unsafe {
         w.mcu_sel().bits({{ pin.route.fn_slot }})
          .fun_ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
          .fun_wpu().{% if pin.pull == "up" %}set_bit{% else %}clear_bit{% endif %}()
@@ -29,22 +29,30 @@ pub fn init() {
     {% elif pin.route.kind == "matrix" %}
     // Route via GPIO matrix: signal id {{ pin.route.signal_id }}
     {% if pin.direction == "out" or pin.direction == "inout" %}
-    p.gpio().func_out_sel_cfg({{ pin.gpio }}).modify(|_, w| unsafe { w.out_sel().bits({{ pin.route.signal_id }}) });
+    p.GPIO.func_out_sel_cfg({{ pin.gpio }}).modify(|_, w| unsafe { w.out_sel().bits({{ pin.route.signal_id }}) });
     {% endif %}
     {% if pin.direction == "in" or pin.direction == "inout" %}
-    p.gpio().func_in_sel_cfg({{ pin.route.signal_id }}).modify(|_, w| unsafe { w.in_sel().bits({{ pin.gpio }}).in_inv_sel().clear_bit().sig_in_sel().set_bit() });
+    p.GPIO.func_in_sel_cfg({{ pin.route.signal_id }}).modify(|_, w| unsafe { w.in_sel().bits({{ pin.gpio }}).in_inv_sel().clear_bit() });
     {% endif %}
-    p.io_mux().gpio{{ pin.gpio }}().modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+    // mcu_sel=1 selects the GPIO matrix function. Also configure input
+    // enable + pulls so matrix-routed inout signals like I2C SDA/SCL
+    // actually reach the peripheral.
+    p.IO_MUX.gpio({{ pin.gpio }}).modify(|_, w| unsafe {
+        w.mcu_sel().bits(1)
+         .fun_ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
+         .fun_wpu().{% if pin.pull == "up" %}set_bit{% else %}clear_bit{% endif %}()
+         .fun_wpd().{% if pin.pull == "down" %}set_bit{% else %}clear_bit{% endif %}()
+    });
     {% else %}
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
-    p.io_mux().gpio{{ pin.gpio }}().modify(|_, w| unsafe {
+    p.IO_MUX.gpio({{ pin.gpio }}).modify(|_, w| unsafe {
         w.mcu_sel().bits(1)
          .fun_ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
          .fun_wpu().{% if pin.pull == "up" %}set_bit{% else %}clear_bit{% endif %}()
          .fun_wpd().{% if pin.pull == "down" %}set_bit{% else %}clear_bit{% endif %}()
     });
     {% if pin.direction == "out" %}
-    p.gpio().enable_w1ts().write(|w| unsafe { w.bits(1 << {{ pin.gpio }}) });
+    p.GPIO.enable_w1ts().write(|w| unsafe { w.bits(1 << {{ pin.gpio }}) });
     {% endif %}
     {% endif %}
     {% endfor %}
