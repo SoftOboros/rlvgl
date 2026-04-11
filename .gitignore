@@ -20,6 +20,8 @@ codex_state/
 .svd/
 cookies.txt
 .mcp.json
+.playwright-mcp/
+.playwright*
 tmp/
 **/.cache/
 i18n/translations.bin
