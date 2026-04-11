@@ -80,6 +80,16 @@ cp "examples/uefi-disco/target/$TARGET_TRIPLE/debug/rlvgl-uefi-disco.efi" "$ESP_
 
 echo "Playit automation socket: tcp://127.0.0.1:$PLAYIT_PORT"
 
+#
+# Input devices:
+#   `-machine virt` ships without USB, so EDK2's UsbKbDxe has no
+#   keyboard to enumerate and ConIn sees nothing from the GUI window.
+#   Adding qemu-xhci + usb-kbd gives EDK2 a real HID keyboard whose
+#   arrow / escape / function keys flow through ConIn and into the
+#   `ConsoleTransport` special-key translator in main.rs. We
+#   intentionally do NOT attach a usb-mouse: `DiscoCapabilities::uefi`
+#   has `pointer: false`, and omitting the mouse stops QEMU's display
+#   backend from grabbing the host cursor.
 exec "$QEMU_BIN" \
   -machine virt \
   -cpu cortex-a72 \
@@ -87,6 +97,8 @@ exec "$QEMU_BIN" \
   -serial stdio \
   -display default \
   -device ramfb \
+  -device qemu-xhci,id=xhci \
+  -device usb-kbd,bus=xhci.0 \
   -drive if=pflash,format=raw,readonly=on,file="$UEFI_CODE" \
   -drive if=pflash,format=raw,file="$VARS_COPY" \
   -drive format=raw,file="fat:rw:$ESP_DIR" \

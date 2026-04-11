@@ -175,12 +175,22 @@ fn main() -> Status {
                 tick_count,
                 present_count: display.present_count(),
             };
-            playit.poll(
-                &mut root.borrow_mut(),
+            // Route events through `DiscoController::handle_event` after
+            // the playit executor has dispatched them to the widget
+            // tree. The controller owns focus navigation and hotkey
+            // dispatch (`state.handle_key`) — without this callback,
+            // `KD:ArrowDown` and `KD:Enter` would reach the widget tree
+            // but never move focus or activate a highlighted slot.
+            let root_cell = root.clone();
+            let mut root_ref = root_cell.borrow_mut();
+            let controller_ref = &mut controller;
+            playit.poll_with_callback(
+                &mut root_ref,
                 &status,
                 Some(&display),
                 &mut NullPipeline,
                 |_| {},
+                |event| controller_ref.handle_event(event),
             );
         }
 

@@ -8,5 +8,6 @@
     "x86_64-apple-darwin"
   ],
   "rust-analyzer.diagnostics.disabled": ["cyclic-deps"],
-  "cortex-debug.gdbPath": "/opt/homebrew/bin/arm-none-eabi-gdb"
+  "cortex-debug.gdbPath": "/opt/homebrew/bin/arm-none-eabi-gdb",
+  "cmake.sourceDirectory": "/Users/iraabbott/rlvgl/lvgl"
 }
