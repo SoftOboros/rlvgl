@@ -1,4 +1,5 @@
-# Continues crates.io publishing for the latest release tag by diffing the two most recent release tags.
+# Continues crates.io publishing from the current workflow revision by diffing
+# against the previous release tag.
 name: Publish Continue
 
 on:
@@ -21,7 +22,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Resolve latest two release tags
+      - name: Resolve release baseline
         id: tags
         shell: bash
         run: |
@@ -33,23 +34,31 @@ jobs:
 
           head_tag="${tags[0]}"
           base_tag="${tags[1]}"
-          head_sha="$(git rev-parse "$head_tag")"
+          workflow_sha="$(git rev-parse HEAD)"
+          tag_sha="$(git rev-parse "$head_tag")"
           base_sha="$(git rev-parse "$base_tag")"
 
           echo "head_tag=$head_tag" >> "$GITHUB_OUTPUT"
           echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "workflow_sha=$workflow_sha" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=$tag_sha" >> "$GITHUB_OUTPUT"
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
 
           echo "Publish continue diff:"
-          echo "  latest tag:   $head_tag ($head_sha)"
-          echo "  previous tag: $base_tag ($base_sha)"
+          echo "  workflow head: $workflow_sha"
+          echo "  latest tag:    $head_tag ($tag_sha)"
+          echo "  previous tag:  $base_tag ($base_sha)"
 
-      - name: Checkout latest release tag
+      - name: Preserve publish helper from workflow revision
+        id: helper
         shell: bash
         run: |
-          git checkout --detach "${{ steps.tags.outputs.head_tag }}"
-          git submodule update --init --recursive
+          helper_sha="$(git rev-parse HEAD)"
+          cp scripts/publish_changed.sh /tmp/publish_changed.sh
+          chmod +x /tmp/publish_changed.sh
+
+          echo "helper_sha=$helper_sha" >> "$GITHUB_OUTPUT"
+          echo "Preserved publish helper from workflow revision: $helper_sha"
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -65,4 +74,4 @@ jobs:
       - name: Publish remaining crates from latest release diff
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: bash scripts/publish_changed.sh "${{ steps.tags.outputs.base_sha }}"
+        run: /tmp/publish_changed.sh "${{ steps.tags.outputs.base_sha }}"

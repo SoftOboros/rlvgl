@@ -186,6 +186,9 @@ fi
 if path_changed '^ui/'; then
   append_unique "rlvgl-ui"
 fi
+if path_changed '^rlvgl-decomp/'; then
+  append_unique "rlvgl-decomp"
+fi
 if path_changed '^platform/'; then
   append_unique "rlvgl-platform"
 fi
