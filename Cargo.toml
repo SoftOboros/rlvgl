@@ -383,6 +383,8 @@ members = [
     "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
     "examples/apps/demo", "examples/apps/disco-demo",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
+    "examples/beetle-esp32c3",
+    "examples/beetle-esp32p4",
     "examples/stm32h747i-disco/assets/disco-assets",
     "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp",
     "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip",
@@ -391,4 +393,4 @@ members = [
 ]
 # UEFI example is excluded from workspace — it conflicts with std on host targets.
 # Build it explicitly: cargo build -p rlvgl-example-uefi-disco --target aarch64-unknown-uefi
-exclude = ["examples/uefi-disco"]
+exclude = ["examples/uefi-disco", "examples/beetle-avr"]

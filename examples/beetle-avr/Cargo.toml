@@ -1,0 +1,42 @@
+[package]
+name = "rlvgl-example-beetle-avr"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# This crate is excluded from the workspace because it targets `avr-none`
+# with nightly-only `-Zbuild-std=core`, and its dep tree (avr-hal, avr-device)
+# doesn't build for the host. Build it explicitly with:
+#
+#   cd examples/beetle-avr && cargo build --release
+#
+# `rust-toolchain.toml` pins the nightly channel and avr-specific components.
+
+[[bin]]
+name = "rlvgl-beetle-avr"
+path = "src/main.rs"
+
+[dependencies]
+panic-halt = "1.0.0"
+embedded-hal = "1.0"
+embedded-graphics = { version = "0.8", default-features = false }
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"] }
+
+[dependencies.arduino-hal]
+git = "https://github.com/Rahix/avr-hal"
+rev = "e5c8f37fe48419956e722490a82b9ca9b9fc61a2"
+features = ["arduino-uno"]
+
+[dependencies.avr-device]
+version = "0.8.1"
+
+[profile.dev]
+panic = "abort"
+lto = true
+opt-level = "s"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"

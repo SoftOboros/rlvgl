@@ -1,0 +1,45 @@
+[package]
+name = "rlvgl-example-beetle-esp32p4"
+version = "0.1.0"
+edition = "2024"
+publish = false
+build = "build.rs"
+rust-version = "1.88"
+
+# DFRobot DFR1172 FireBeetle 2 ESP32-P4 AI Vision Board driving a Riverdi
+# RVT70HSMFWN00 (7", 1024x600 IPS, cap-touch) over the board's 2-lane
+# MIPI-DSI interface.
+#
+# This crate is bare-metal against the `esp32p4` PAC + `esp-riscv-rt`
+# runtime. No HAL, no ESP-IDF. The register-level bring-up is done against
+# the ESP32-P4 Technical Reference Manual (ingested in memalpha notebook 15
+# "Beetle BLE") — same pattern as `examples/stm32h747i-disco/`.
+#
+# Build:
+#   rustup target add riscv32imafc-unknown-none-elf
+#   cargo build -p rlvgl-example-beetle-esp32p4 --features esp32p4 \
+#     --target riscv32imafc-unknown-none-elf
+
+[[bin]]
+name = "rlvgl-beetle-esp32p4"
+path = "src/main.rs"
+required-features = ["esp32p4"]
+
+[features]
+default = []
+## Target the ESP32-P4 on the DFRobot DFR1172 FireBeetle 2 AI Vision board.
+esp32p4 = [
+    "dep:esp32p4",
+    "dep:esp-riscv-rt",
+    "dep:panic-halt",
+]
+
+[dependencies]
+rlvgl-core = { path = "../../core", default-features = false }
+rlvgl-platform = { path = "../../platform", default-features = false }
+rlvgl-widgets = { path = "../../widgets", default-features = false }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+esp32p4 = { version = "0.2", features = ["rt", "critical-section"], optional = true }
+esp-riscv-rt = { version = "0.13", optional = true }
+panic-halt = { version = "1", optional = true }

@@ -113,6 +113,8 @@ pub mod sd_emmc_adapter;
 pub mod sd_fatfs_adapter;
 #[cfg(feature = "simulator")]
 pub mod simulator;
+#[cfg(feature = "ssd1306")]
+pub mod ssd1306;
 #[cfg(feature = "st7789")]
 pub mod st7789;
 #[cfg(all(
@@ -198,6 +200,8 @@ pub use sd_emmc_adapter::{DummyTimeSource, SdMmcBlockDev};
 pub use sd_fatfs_adapter::{FatfsBlockStream, mount_and_list_assets};
 #[cfg(feature = "simulator")]
 pub use simulator::WgpuDisplay;
+#[cfg(feature = "ssd1306")]
+pub use ssd1306::Ssd1306Display;
 #[cfg(feature = "st7789")]
 pub use st7789::St7789Display;
 #[cfg(all(

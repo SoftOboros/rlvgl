@@ -1,0 +1,36 @@
+[package]
+name = "rlvgl-example-beetle-esp32c3"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+
+[[bin]]
+name = "rlvgl-beetle-esp32c3"
+path = "src/main.rs"
+required-features = ["esp32c3"]
+
+[features]
+default = []
+## Target the ESP32-C3 on the DFRobot DFR0868 Beetle board.
+esp32c3 = [
+    "dep:esp-hal",
+    "dep:esp-backtrace",
+    "dep:esp-println",
+    "dep:esp-alloc",
+    "dep:ssd1306",
+    "rlvgl-platform/ssd1306",
+]
+
+[dependencies]
+rlvgl-core = { path = "../../core", default-features = false }
+rlvgl-platform = { path = "../../platform", default-features = false }
+rlvgl-widgets = { path = "../../widgets", default-features = false }
+
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+esp-hal = { version = "=1.0.0-beta.0", features = ["esp32c3", "unstable"], optional = true }
+esp-backtrace = { version = "0.15", features = ["esp32c3", "panic-handler", "println"], optional = true }
+esp-println = { version = "0.13", features = ["esp32c3", "log"], optional = true }
+esp-alloc = { version = "0.6", optional = true }
