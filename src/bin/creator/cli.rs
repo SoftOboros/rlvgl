@@ -505,6 +505,40 @@ enum BspCommand {
         #[arg(long)]
         emit_label_consts: bool,
     },
+    /// Render Rust source from a vendor YAML chip/board spec.
+    ///
+    /// Currently supports `--vendor esp` which consumes the `rlvgl-chips-esp`
+    /// YAML chipdb (or explicit `--chip-yaml`/`--board-yaml` overrides) to
+    /// produce a PAC-style ESP32-C3 board support crate.
+    FromYaml {
+        /// Vendor key selecting the YAML adapter (`esp`, `espressif`).
+        #[arg(long)]
+        vendor: String,
+        /// Board spec file stem in `chipdb/rlvgl-chips-esp/db/boards/`.
+        #[arg(long)]
+        board: String,
+        /// Override the chip spec file stem (defaults to `board.chip`).
+        #[arg(long)]
+        chip: Option<String>,
+        /// Output directory for generated files.
+        #[arg(long)]
+        out: PathBuf,
+        /// Emit PAC-style initialization code (currently the only option).
+        #[arg(long)]
+        emit_pac: bool,
+        /// Override the resolved CPU frequency in hertz.
+        #[arg(long)]
+        cpu_hz: Option<u32>,
+        /// Override the console baud rate.
+        #[arg(long)]
+        baud: Option<u32>,
+        /// Load chip spec from a YAML file instead of the embedded chipdb.
+        #[arg(long)]
+        chip_yaml: Option<PathBuf>,
+        /// Load board spec from a YAML file instead of the embedded chipdb.
+        #[arg(long)]
+        board_yaml: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -850,6 +884,54 @@ pub fn run() -> Result<()> {
                 }
                 if per_peripheral {
                     bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
+                }
+            }
+            BspCommand::FromYaml {
+                vendor,
+                board,
+                chip,
+                out,
+                emit_pac,
+                cpu_hz,
+                baud,
+                chip_yaml,
+                board_yaml,
+            } => {
+                if !emit_pac {
+                    return Err(anyhow!("bsp from-yaml currently only supports --emit-pac"));
+                }
+                match vendor.as_str() {
+                    "esp" | "espressif" => {
+                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
+                            crate::bsp::espressif::load_chip_file(path)?
+                        } else {
+                            let name = chip.as_deref().unwrap_or("esp32c3");
+                            crate::bsp::espressif::load_chip_db(name)?
+                        };
+                        let board_ir = if let Some(path) = board_yaml.as_ref() {
+                            crate::bsp::espressif::load_board_file(path)?
+                        } else {
+                            crate::bsp::espressif::load_board_db(&board)?
+                        };
+                        let mut ir = crate::bsp::espressif::merge(chip_ir, board_ir)?;
+                        if let Some(hz) = cpu_hz {
+                            ir.clocks.cpu_hz = hz;
+                        }
+                        if let Some(baud) = baud {
+                            if let Some(console) = ir.board.console.as_mut() {
+                                console.baud = baud;
+                            }
+                        }
+                        let written = crate::bsp::espressif::render_esp_pac(&ir, &out)?;
+                        if !cli.silent {
+                            println!("generated {} files in {}", written.len(), out.display());
+                        }
+                    }
+                    other => {
+                        return Err(anyhow!(
+                            "bsp from-yaml does not support vendor '{other}' (supported: esp, espressif)"
+                        ));
+                    }
                 }
             }
         },

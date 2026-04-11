@@ -16,7 +16,13 @@ macro_rules! vendor_check {
 
 vendor_check!(stm, rlvgl_chips_stm, "stm", "STM32F4DISCOVERY", "STM32F407");
 vendor_check!(nrf, rlvgl_chips_nrf, "nrf", "nRF52840-DK", "nRF52840");
-vendor_check!(esp, rlvgl_chips_esp, "esp", "ESP32-DevKitC", "ESP32");
+vendor_check!(
+    esp,
+    rlvgl_chips_esp,
+    "esp",
+    "ESP32-C3-DevKitM-1",
+    "ESP32-C3"
+);
 vendor_check!(nxp, rlvgl_chips_nxp, "nxp", "LPC1768", "LPC1768");
 vendor_check!(
     silabs,

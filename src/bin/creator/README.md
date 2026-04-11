@@ -56,6 +56,63 @@ A combined UI and command-line tool for normalizing assets and generating dual-m
 
 The resulting crate can be built with `--features embed` to include raw bytes or `--features vendor` to copy files at build time while importing the generated module.
 
+## BSP Generation
+
+`rlvgl-creator` can generate board support crates from two different vendor
+inputs:
+
+### STM32 (.ioc input)
+
+```sh
+cargo run --bin rlgvl-creator --features creator -- bsp from-ioc \
+    path/to/board.ioc --out gen/ --emit-hal --emit-pac
+```
+
+Runs the STM32 CubeMX `.ioc` → generic IR → MiniJinja → Rust pipeline
+using the embedded `rlvgl-chips-stm` alternate-function database. Supports
+HAL, PAC, and custom MiniJinja templates, single-file and per-peripheral
+layouts, label-based identifier generation, and STM32H7 dual-core splits.
+
+### Espressif (YAML chipdb input)
+
+```sh
+cargo run --bin rlgvl-creator --features creator -- bsp from-yaml \
+    --vendor esp \
+    --board esp32c3_devkitm_1 \
+    --out gen/ \
+    --emit-pac
+```
+
+Consumes the YAML chip and board specs embedded in `rlvgl-chips-esp` and
+emits a PAC-style BSP targeting the `esp32c3` PAC crate. Each board spec
+identifies its chip by name; `--chip` / `--chip-yaml` / `--board-yaml` are
+available to override the chipdb lookups for out-of-tree data.
+
+The generated BSP consists of six files under `gen/<board_stem>/`:
+
+- `mod.rs` — `pub mod board; pub mod clocks; pub mod io_mux; pub mod pac;
+  pub mod peripherals; pub use pac::init;`
+- `pac.rs` — `pub fn init()` entry sequencing clocks → IO MUX → peripherals
+- `clocks.rs` — `SYSTEM` peripheral clock enables and resets
+- `io_mux.rs` — per-pin IO MUX / GPIO matrix routing
+- `peripherals.rs` — per-instance init (UART0 real when it is the console,
+  others stubbed with TODOs pointing at the PAC register path)
+- `board.rs` — board constants and labeled pin consts (`LED`, `BOOT_BTN`, …)
+
+Overrides:
+
+| Flag            | Effect                                              |
+|-----------------|-----------------------------------------------------|
+| `--cpu-hz`      | Override the resolved CPU frequency in hertz        |
+| `--baud`        | Override the console baud rate                      |
+| `--chip`        | Use a different chip spec file stem (default: esp32c3) |
+| `--chip-yaml`   | Load chip spec from a file (bypasses chipdb)        |
+| `--board-yaml`  | Load board spec from a file (bypasses chipdb)       |
+
+Add or edit chips and boards by dropping new YAML files into
+`chipdb/rlvgl-chips-esp/db/chips/` and `chipdb/rlvgl-chips-esp/db/boards/`
+and rebuilding.
+
 ## Desktop UI and Emulator
 
 Launch the desktop UI explicitly:
