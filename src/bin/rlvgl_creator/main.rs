@@ -26,6 +26,8 @@ pub mod ir;
 pub mod nordic;
 #[path = "../creator/bsp/nxp/mod.rs"]
 pub mod nxp;
+#[path = "../creator/bsp/rp/mod.rs"]
+pub mod rp;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {
@@ -35,6 +37,7 @@ mod bsp {
     pub use super::ir;
     pub use super::nordic;
     pub use super::nxp;
+    pub use super::rp;
 }
 
 pub use cli::*;

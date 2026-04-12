@@ -916,6 +916,11 @@ pub fn run() -> Result<()> {
                         println!("{name}");
                     }
                 }
+                "rp" | "rp2040" => {
+                    for name in rlvgl_chips_rp2040::chip_names() {
+                        println!("{name}");
+                    }
+                }
                 other => return Err(anyhow!("unsupported vendor: {other}")),
             },
             BspCommand::ListBoards { vendor, chip } => match vendor.as_str() {
@@ -941,6 +946,16 @@ pub fn run() -> Result<()> {
                 }
                 "nxp" | "imxrt" => {
                     for info in rlvgl_chips_nxp::boards() {
+                        if let Some(ref filter) = chip {
+                            if !info.chip.eq_ignore_ascii_case(filter) {
+                                continue;
+                            }
+                        }
+                        println!("{:<40} {}", info.board, info.chip);
+                    }
+                }
+                "rp" | "rp2040" => {
+                    for info in rlvgl_chips_rp2040::boards() {
                         if let Some(ref filter) = chip {
                             if !info.chip.eq_ignore_ascii_case(filter) {
                                 continue;
@@ -1037,10 +1052,31 @@ pub fn run() -> Result<()> {
                             println!("generated {} files in {}", written.len(), out.display());
                         }
                     }
+                    "rp" | "rp2040" => {
+                        let board_ir = if let Some(path) = board_yaml.as_ref() {
+                            crate::bsp::rp::load_board_file(path)?
+                        } else {
+                            crate::bsp::rp::load_board_db(&board)?
+                        };
+                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
+                            crate::bsp::rp::load_chip_file(path)?
+                        } else {
+                            let name = match chip.as_deref() {
+                                Some(c) => c.to_string(),
+                                None => board_ir.chip.to_ascii_lowercase(),
+                            };
+                            crate::bsp::rp::load_chip_db(&name)?
+                        };
+                        let ir = crate::bsp::rp::merge(chip_ir, board_ir)?;
+                        let written = crate::bsp::rp::render_rp_pac(&ir, &out)?;
+                        if !cli.silent {
+                            println!("generated {} files in {}", written.len(), out.display());
+                        }
+                    }
                     other => {
                         return Err(anyhow!(
                             "bsp from-yaml does not support vendor '{other}' \
-                             (supported: esp, espressif, nrf, nordic, nxp, imxrt)"
+                             (supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040)"
                         ));
                     }
                 }
