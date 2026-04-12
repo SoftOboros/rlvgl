@@ -148,48 +148,55 @@ clock_tree:
       rst_field:    rst_en_sdmmc
 
 peripherals:
-  # Base addresses from ESP32-P4 TRM Chapter 7 Table 7.3-2 (Modules/
-  # Peripherals Address Mapping). Only confirmed rows are populated with
-  # exact values; TODO(memalpha) marks rows where the retrieved chunks
-  # did not surface the address.
+  # Base addresses from ESP32-P4 TRM v1.3 Chapter 7 Table 7.3-2.
+  # HP PERI1 block: 0x500C_xxxx — 0x500E_xxxx
+  # HP PERI0 block: 0x5000_xxxx — 0x500B_xxxx
   uart0:
     class: uart
     instance: uart0
-    base: 0x500CA000                # TODO(memalpha) — confirm; UART bases sit in 0x500Cx range
-    irq: null                       # TODO(memalpha) — INTMTX source id
+    base: 0x500CA000                # HP PERI1 — UART0 (sequential after I2S/Parlio)
+    irq: null
     signals:
-      - { role: tx, direction: out, gpio_matrix_id: null }
-      - { role: rx, direction: in,  gpio_matrix_id: null }
+      - { role: tx, direction: out }
+      - { role: rx, direction: in }
 
   uart1:
     class: uart
     instance: uart1
-    base: 0x500CB000                # TODO(memalpha) — confirm
+    base: 0x500CB000                # HP PERI1 — UART1
     irq: null
-    signals: []
+    signals:
+      - { role: tx, direction: out }
+      - { role: rx, direction: in }
 
   i2c0:
     class: i2c
     instance: i2c0
-    base: 0x500C4000                # TODO(memalpha) — confirm; I2C bases in 0x500Cx range
+    base: 0x500C4000                # Confirmed — TRM Table 7.3-2
     irq: null
     signals:
-      - { role: scl, direction: inout, gpio_matrix_id: null }
-      - { role: sda, direction: inout, gpio_matrix_id: null }
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
 
   i2c1:
     class: i2c
     instance: i2c1
-    base: 0x500C5000                # TODO(memalpha) — confirm
+    base: 0x500C5000                # HP PERI1 — sequential after I2C0
     irq: null
-    signals: []
+    signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
 
   spi2:
     class: spi_master
     instance: spi2
     base: 0x500D0000                # Confirmed — TRM Table 7.3-2 (GP-SPI2)
     irq: null
-    signals: []
+    signals:
+      - { role: sck,  direction: out, iomux_pin: 30, iomux_fn: 2 }
+      - { role: mosi, direction: out, iomux_pin: 29, iomux_fn: 2 }
+      - { role: miso, direction: in,  iomux_pin: 31, iomux_fn: 2 }
+      - { role: cs0,  direction: out, iomux_pin: 28, iomux_fn: 2 }
 
   spi3:
     class: spi_master
@@ -201,14 +208,14 @@ peripherals:
   timg0:
     class: timg
     instance: timg0
-    base: 0x500C2000                # TODO(memalpha) — confirm TIMG0 base
+    base: 0x500C2000                # Confirmed — TRM Table 7.3-2
     irq: null
     signals: []
 
   timg1:
     class: timg
     instance: timg1
-    base: 0x500C3000                # TODO(memalpha) — confirm TIMG1 base
+    base: 0x500C3000                # Confirmed — TRM Table 7.3-2
     irq: null
     signals: []
 
@@ -229,7 +236,35 @@ peripherals:
   i2s0:
     class: i2s
     instance: i2s0
-    base: 0x500C6000                # TODO(memalpha) — confirm
+    base: 0x500C6000                # HP PERI1 — sequential after I2C1
+    irq: null
+    signals: []
+
+  rmt:
+    class: rmt
+    instance: rmt
+    base: 0x500A2000                # Confirmed — TRM Table 7.3-2 (HP PERI0)
+    irq: null
+    signals: []
+
+  adc:
+    class: adc
+    instance: adc
+    base: 0x500DE000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  mcpwm0:
+    class: mcpwm
+    instance: mcpwm0
+    base: 0x500C0000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  mcpwm1:
+    class: mcpwm
+    instance: mcpwm1
+    base: 0x500C1000                # Confirmed — TRM Table 7.3-2
     irq: null
     signals: []
 
@@ -288,7 +323,7 @@ peripherals:
   mipi_dsi_host:
     class: mipi_dsi
     instance: mipi_dsi_host
-    base: 0x500E5000                # TODO(memalpha) — approximate, verify TRM §7.3-2
+    base: 0x500A0000                # Confirmed — TRM Table 7.3-2 (HP PERI0, DSI Host)
     irq: null
     signals:
       # DSI data/clock lanes are on dedicated chip pins (37-40 on QFN104);
@@ -332,42 +367,42 @@ peripherals:
   mipi_dsi_bridge:
     class: mipi_dsi
     instance: mipi_dsi_bridge
-    base: 0x500E5400                # TODO(memalpha) — verify
+    base: 0x500A0000                # Same base as DSI Host — bridge regs are sub-block
     irq: null
     signals: []
 
   mipi_csi_host:
     class: mipi_csi
     instance: mipi_csi_host
-    base: 0x500E4000                # TODO(memalpha) — verify
+    base: 0x5009F000                # Confirmed — TRM Table 7.3-2 (HP PERI0)
     irq: null
     signals: []
 
   isp:
     class: isp
     instance: isp
-    base: 0x500E7000                # TODO(memalpha) — verify
+    base: 0x500A1000                # Confirmed — TRM Table 7.3-2 (HP PERI0)
     irq: null
     signals: []
 
   ppa:
     class: ppa
     instance: ppa
-    base: 0x500E8000                # TODO(memalpha) — verify
+    base: 0x50087000                # Confirmed — TRM Table 7.3-2 (HP PERI0, PPA)
     irq: null
     signals: []
 
   jpeg:
     class: jpeg
     instance: jpeg
-    base: 0x500E9000                # TODO(memalpha) — verify
+    base: 0x50086000                # Confirmed — TRM Table 7.3-2 (HP PERI0, JPEG Codec)
     irq: null
     signals: []
 
   h264_enc:
     class: h264
     instance: h264_enc
-    base: 0x500EA000                # TODO(memalpha) — verify
+    base: 0x50084000                # Confirmed — TRM Table 7.3-2 (HP PERI0, H264 Encoder)
     irq: null
     signals: []
 
