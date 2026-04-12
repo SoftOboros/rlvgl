@@ -20,12 +20,33 @@ backends used during desktop development.
 ## Common Feature Groups
 
 - `simulator`: desktop integration and dynamic app loading
+- `uefi`: UEFI GOP display + keyboard + serial transport for pre-OS runtimes
 - `stm32h747i_disco`: board-specific hardware support for the flagship demo
   target
 - `dma2d`, `audio`, `sd_storage`, `fatfs_nostd`, `splash`: optional embedded
   subsystems layered onto that board support
 - passthrough asset features such as `png`, `jpeg`, `gif`, `qrcode`, `apng`,
   `fontdue`, `lottie`, and `canvas`
+
+## UEFI backend
+
+The optional `uefi` feature enables a pre-OS display and input backend
+targeting UEFI GOP (Graphics Output Protocol). This allows rlvgl
+applications to run directly from the UEFI shell or as UEFI boot
+applications — no OS kernel required.
+
+Modules:
+
+- `uefi.rs` — GOP framebuffer display driver with software blitting,
+  keyboard polling via SimpleTextInput (with synthesized KeyUp events),
+  and `Screen`/`DisplayDriver` trait implementations.
+- `uefi_serial_transport.rs` — `PlayitTransport` implementation over UEFI
+  Serial I/O protocol, enabling playit test automation over a QEMU
+  virtio-serial chardev exposed as a TCP socket on the host.
+
+The `uefi-disco` example (`examples/uefi-disco/`) demonstrates the full
+pipeline: disco-demo controller running on GOP with serial-based playit
+test driving.
 
 ## stm32h747i_disco backend
 
