@@ -1,0 +1,63 @@
+---
+source: tests/bsp_nxp_render.rs
+expression: content
+---
+//! CCM clock gating for MIMXRT1060-EVKB.
+//!
+//! Ungates the CCGR fields for each peripheral used by the board.
+//! XTAL: 24000000 Hz, CPU: 600000000 Hz,
+//! AHB: 600000000 Hz, IPG: 150000000 Hz.
+
+/// XTAL frequency in Hz.
+pub const XTAL_HZ: u32 = 24000000;
+
+/// CPU core clock in Hz.
+pub const CPU_HZ: u32 = 600000000;
+
+/// AHB bus clock in Hz.
+pub const AHB_HZ: u32 = 600000000;
+
+/// IPG bus clock in Hz.
+pub const IPG_HZ: u32 = 150000000;
+
+/// Ungate all peripheral clocks used by this board.
+pub fn init() {
+    // IOMUXC clock gate (required before pad configuration).
+    
+    // IOMUXC — CCGR4[CG1]
+    unsafe {
+        let ccgr = (0x400FC068u32 + 4 * 4) as *mut u32;
+        let val = core::ptr::read_volatile(ccgr);
+        core::ptr::write_volatile(ccgr, val | (0b11 << (2 * 1)));
+    }
+    
+
+    
+    
+    // lpuart1 — CCGR5[CG12]
+    unsafe {
+        let ccgr = (0x400FC068u32 + 4 * 5) as *mut u32;
+        let val = core::ptr::read_volatile(ccgr);
+        core::ptr::write_volatile(ccgr, val | (0b11 << (2 * 12)));
+    }
+    
+    
+    
+    // lpi2c1 — CCGR2[CG3]
+    unsafe {
+        let ccgr = (0x400FC068u32 + 4 * 2) as *mut u32;
+        let val = core::ptr::read_volatile(ccgr);
+        core::ptr::write_volatile(ccgr, val | (0b11 << (2 * 3)));
+    }
+    
+    
+    
+    // usdhc1 — CCGR6[CG1]
+    unsafe {
+        let ccgr = (0x400FC068u32 + 4 * 6) as *mut u32;
+        let val = core::ptr::read_volatile(ccgr);
+        core::ptr::write_volatile(ccgr, val | (0b11 << (2 * 1)));
+    }
+    
+    
+}

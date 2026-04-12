@@ -1,0 +1,178 @@
+---
+source: tests/bsp_nxp_render.rs
+expression: content
+---
+//! Board-level constants for MIMXRT1060-EVKB.
+//!
+//! Chip: MIMXRT1062 (cortex-m7, BGA196)
+//! PAC crate: imxrt_ral
+
+/// Board name.
+pub const BOARD_NAME: &str = "MIMXRT1060-EVKB";
+
+/// Chip identifier.
+pub const CHIP: &str = "MIMXRT1062";
+
+/// Target architecture.
+pub const ARCH: &str = "cortex-m7";
+
+/// PAC crate name.
+pub const PAC_CRATE: &str = "imxrt_ral";
+
+/// CPU clock in Hz.
+pub const CPU_HZ: u32 = 600000000;
+
+/// AHB bus clock in Hz.
+pub const AHB_HZ: u32 = 600000000;
+
+/// IPG bus clock in Hz.
+pub const IPG_HZ: u32 = 150000000;
+
+/// Crystal oscillator frequency in Hz.
+pub const XTAL_HZ: u32 = 24000000;
+
+
+/// On-board flash size in MB.
+pub const FLASH_MB: u32 = 8;
+
+
+
+/// On-board SDRAM size in MB.
+pub const SDRAM_MB: u32 = 32;
+
+
+// --- Pin constants ---
+
+
+
+/// GPIO_AD_B0_12 — LPUART1_TX (ALT2)
+
+pub const CONSOLE_TX_GPIO_PORT: u8 = none;
+pub const CONSOLE_TX_GPIO_PIN: u8 = none;
+
+pub const CONSOLE_TX_PAD: &str = "GPIO_AD_B0_12";
+
+
+
+
+/// GPIO_AD_B0_13 — LPUART1_RX (ALT2)
+
+pub const CONSOLE_RX_GPIO_PORT: u8 = none;
+pub const CONSOLE_RX_GPIO_PIN: u8 = none;
+
+pub const CONSOLE_RX_PAD: &str = "GPIO_AD_B0_13";
+
+
+
+
+/// GPIO_AD_B0_09 — GPIO (ALT5)
+
+pub const USER_LED_GPIO_PORT: u8 = 1;
+pub const USER_LED_GPIO_PIN: u8 = 9;
+
+pub const USER_LED_PAD: &str = "GPIO_AD_B0_09";
+
+
+
+
+/// GPIO_AD_B1_00 — LPI2C1_SCL (ALT3)
+
+pub const I2C1_SCL_GPIO_PORT: u8 = none;
+pub const I2C1_SCL_GPIO_PIN: u8 = none;
+
+pub const I2C1_SCL_PAD: &str = "GPIO_AD_B1_00";
+
+
+
+
+/// GPIO_AD_B1_01 — LPI2C1_SDA (ALT3)
+
+pub const I2C1_SDA_GPIO_PORT: u8 = none;
+pub const I2C1_SDA_GPIO_PIN: u8 = none;
+
+pub const I2C1_SDA_PAD: &str = "GPIO_AD_B1_01";
+
+
+
+
+/// GPIO_SD_B0_00 — USDHC1_CMD (ALT0)
+
+pub const SD_CMD_GPIO_PORT: u8 = none;
+pub const SD_CMD_GPIO_PIN: u8 = none;
+
+pub const SD_CMD_PAD: &str = "GPIO_SD_B0_00";
+
+
+
+
+/// GPIO_SD_B0_01 — USDHC1_CLK (ALT0)
+
+pub const SD_CLK_GPIO_PORT: u8 = none;
+pub const SD_CLK_GPIO_PIN: u8 = none;
+
+pub const SD_CLK_PAD: &str = "GPIO_SD_B0_01";
+
+
+
+
+/// GPIO_SD_B0_02 — USDHC1_DATA0 (ALT0)
+
+pub const SD_DAT0_GPIO_PORT: u8 = none;
+pub const SD_DAT0_GPIO_PIN: u8 = none;
+
+pub const SD_DAT0_PAD: &str = "GPIO_SD_B0_02";
+
+
+
+
+/// GPIO_SD_B0_03 — USDHC1_DATA1 (ALT0)
+
+pub const SD_DAT1_GPIO_PORT: u8 = none;
+pub const SD_DAT1_GPIO_PIN: u8 = none;
+
+pub const SD_DAT1_PAD: &str = "GPIO_SD_B0_03";
+
+
+
+
+/// GPIO_SD_B0_04 — USDHC1_DATA2 (ALT0)
+
+pub const SD_DAT2_GPIO_PORT: u8 = none;
+pub const SD_DAT2_GPIO_PIN: u8 = none;
+
+pub const SD_DAT2_PAD: &str = "GPIO_SD_B0_04";
+
+
+
+
+/// GPIO_SD_B0_05 — USDHC1_DATA3 (ALT0)
+
+pub const SD_DAT3_GPIO_PORT: u8 = none;
+pub const SD_DAT3_GPIO_PIN: u8 = none;
+
+pub const SD_DAT3_PAD: &str = "GPIO_SD_B0_05";
+
+
+
+// --- Feature flags ---
+
+/// Feature: accelerometer
+pub const FEATURE_ACCELEROMETER: &str = "fxos8700";
+
+/// Feature: audio_codec
+pub const FEATURE_AUDIO_CODEC: &str = "wm8960";
+
+/// Feature: debugger
+pub const FEATURE_DEBUGGER: &str = "opensda";
+
+/// Feature: lcd
+pub const FEATURE_LCD: &str = "rk043fn02h_ct";
+
+/// Feature: lcd_interface
+pub const FEATURE_LCD_INTERFACE: &str = "parallel_rgb";
+
+/// Feature: sdcard
+pub const FEATURE_SDCARD: &str = "microsd";
+
+/// Feature: vendor
+pub const FEATURE_VENDOR: &str = "nxp";

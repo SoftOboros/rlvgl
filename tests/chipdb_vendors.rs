@@ -23,7 +23,13 @@ vendor_check!(
     "ESP32-C3-DevKitM-1",
     "ESP32-C3"
 );
-vendor_check!(nxp, rlvgl_chips_nxp, "nxp", "LPC1768", "LPC1768");
+vendor_check!(
+    nxp,
+    rlvgl_chips_nxp,
+    "nxp",
+    "MIMXRT1060-EVKB",
+    "MIMXRT1062"
+);
 vendor_check!(
     silabs,
     rlvgl_chips_silabs,

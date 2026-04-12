@@ -1,0 +1,39 @@
+//! IOMUX pad routing for {{ ir.board.name }}.
+//!
+//! Configures SW_MUX_CTL_PAD (ALT function select), SW_PAD_CTL_PAD
+//! (drive/pull/slew), and SELECT_INPUT (daisy chain) for each board pin.
+
+/// IOMUXC base address.
+const IOMUXC_BASE: u32 = 0x401F8000;
+
+/// Configure all board pin IOMUX routing.
+pub fn init() {
+    {% for route in pin_routes %}
+    // {{ route.pad }} — {{ route.signal }} (ALT{{ route.alt }})
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT{{ route.alt }}
+        let mux = (IOMUXC_BASE + {{ route.mux_reg }}) as *mut u32;
+        {% if route.direction == "inout" %}
+        core::ptr::write_volatile(mux, {{ route.alt }} | (1 << 4)); // SION=1 for bidirectional
+        {% else %}
+        core::ptr::write_volatile(mux, {{ route.alt }});
+        {% endif %}
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + {{ route.pad_reg }}) as *mut u32;
+        {% if route.pull == "up" %}
+        // PKE=1, PUE=1, PUS=01 (47k pull-up), DSE=110 (R0/6), SPEED=10 (100MHz)
+        core::ptr::write_volatile(pad, (1 << 12) | (1 << 13) | (0b01 << 14) | (0b110 << 3) | (0b10 << 6));
+        {% else %}
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        {% endif %}
+
+        {% if route.daisy is defined %}
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + {{ route.daisy.select_input_reg }}) as *mut u32;
+        core::ptr::write_volatile(sel, {{ route.daisy.daisy_val }});
+        {% endif %}
+    }
+    {% endfor %}
+}
