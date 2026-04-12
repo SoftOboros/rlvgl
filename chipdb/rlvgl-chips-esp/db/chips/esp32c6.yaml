@@ -114,38 +114,35 @@ clock_tree:
       rst_field:    gdma_rst_en
 
 peripherals:
-  # Base addresses: TODO(memalpha) — C6 peripheral base address table
-  # (Table 5.3-2) was not fully retrieved. Using C3-family-pattern
-  # estimates in the 0x6000_xxxx range. Mark for verification against
-  # esp32c6 PAC crate.
+  # Base addresses from ESP32-C6 TRM v1.2 Table 5.3-2.
   uart0:
     class: uart
     instance: uart0
-    base: 0x60000000
+    base: 0x60000000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals:
-      - { role: tx, direction: out, gpio_matrix_id: 7, iomux_pin: 16, iomux_fn: 0 }
-      - { role: rx, direction: in,  gpio_matrix_id: 7, iomux_pin: 17, iomux_fn: 0 }
+      - { role: tx, direction: out, gpio_matrix_id: 6, iomux_pin: 16, iomux_fn: 0 }
+      - { role: rx, direction: in,  gpio_matrix_id: 6, iomux_pin: 17, iomux_fn: 0 }
   uart1:
     class: uart
     instance: uart1
-    base: 0x60001000
+    base: 0x60001000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals:
-      - { role: tx, direction: out }
-      - { role: rx, direction: in }
+      - { role: tx, direction: out, gpio_matrix_id: 9 }
+      - { role: rx, direction: in,  gpio_matrix_id: 9 }
   i2c0:
     class: i2c
     instance: i2c0
-    base: 0x60004000    # TODO verify
+    base: 0x60004000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals:
-      - { role: scl, direction: inout }
-      - { role: sda, direction: inout }
+      - { role: scl, direction: inout, gpio_matrix_id: 45 }
+      - { role: sda, direction: inout, gpio_matrix_id: 46 }
   spi2:
     class: spi_master
     instance: spi2
-    base: 0x60081000    # TODO verify
+    base: 0x60081000        # Confirmed — TRM Table 5.3-2 (GP-SPI2)
     irq: null
     signals:
       - { role: sck,  direction: out, iomux_pin: 6, iomux_fn: 2 }
@@ -157,71 +154,106 @@ peripherals:
   timg0:
     class: timg
     instance: timg0
-    base: 0x60008000
+    base: 0x60008000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals: []
   timg1:
     class: timg
     instance: timg1
-    base: 0x60009000
+    base: 0x60009000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals: []
   systimer:
     class: systimer
     instance: systimer
-    base: 0x6000A000
+    base: 0x6000A000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals: []
   ledc:
     class: ledc
     instance: ledc
-    base: 0x60007000
+    base: 0x60007000        # Confirmed — TRM Table 5.3-2
     irq: null
-    signals: []
+    signals:
+      - { role: ch0, direction: out, gpio_matrix_id: 0 }
+      - { role: ch1, direction: out, gpio_matrix_id: 1 }
+      - { role: ch2, direction: out, gpio_matrix_id: 2 }
+      - { role: ch3, direction: out, gpio_matrix_id: 3 }
+      - { role: ch4, direction: out, gpio_matrix_id: 4 }
+      - { role: ch5, direction: out, gpio_matrix_id: 5 }
   rmt:
     class: rmt
     instance: rmt
-    base: 0x60006000
+    base: 0x60006000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals: []
   twai0:
     class: twai
     instance: twai0
-    base: 0x6000B000
+    base: 0x6000B000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals: []
   twai1:
     class: twai
     instance: twai1
-    base: 0x6000C000
+    base: 0x6000D000        # Confirmed — TRM Table 5.3-2 (I2S is 0x6000C000)
+    irq: null
+    signals: []
+  i2s:
+    class: i2s
+    instance: i2s
+    base: 0x6000C000        # Confirmed — TRM Table 5.3-2
+    irq: null
+    signals:
+      - { role: mclk_out, direction: out, gpio_matrix_id: 12 }
+      - { role: bck_out,  direction: out, gpio_matrix_id: 13 }
+      - { role: ws_out,   direction: out, gpio_matrix_id: 14 }
+      - { role: sd_out,   direction: out, gpio_matrix_id: 15 }
+      - { role: bck_in,   direction: in,  gpio_matrix_id: 16 }
+      - { role: ws_in,    direction: in,  gpio_matrix_id: 17 }
+      - { role: sd_in,    direction: in,  gpio_matrix_id: 15 }
+  adc:
+    class: adc
+    instance: adc
+    base: 0x6000E000        # Confirmed — TRM Table 5.3-2 (SAR ADC)
     irq: null
     signals: []
   usb_sj:
     class: usb_serial_jtag
     instance: usb_sj
-    base: 0x6000F000
+    base: 0x6000F000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals:
       - { role: dm, direction: inout }
       - { role: dp, direction: inout }
+  pcnt:
+    class: pcnt
+    instance: pcnt
+    base: 0x60012000        # Confirmed — TRM Table 5.3-2
+    irq: null
+    signals: []
   gdma:
     class: gdma
     instance: gdma
-    base: 0x60080000
+    base: 0x60080000        # Confirmed — TRM Table 5.3-2
     irq: null
     signals: []
   lp_uart:
     class: uart
     instance: lp_uart
-    base: 0x60020000    # TODO verify — LP peripheral range
+    base: 0x60020000        # LP peripheral range — TRM Table 5.3-2
     irq: null
-    signals: []
+    signals:
+      - { role: tx, direction: out }
+      - { role: rx, direction: in }
   lp_i2c:
     class: i2c
     instance: lp_i2c
-    base: 0x60021000    # TODO verify
+    base: 0x60021000        # LP peripheral range — TRM Table 5.3-2
     irq: null
-    signals: []
+    signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
 
 # IO MUX function table — ESP32-C6 Datasheet Table 2-3 QFN40 IO MUX Pin
 # Functions. C6 has F0, F1, F2 (no F3 populated — fn3 always null).
@@ -260,5 +292,26 @@ io_mux:
   - { gpio: 29, pad_name: SPICLK,     fn0: SPICLK,    fn1: GPIO29, flash_reserved: true }
   - { gpio: 30, pad_name: SPID,       fn0: SPID,      fn1: GPIO30, flash_reserved: true }
 
-# GPIO matrix signal IDs — populated on demand.
-gpio_matrix: []
+# GPIO matrix signal IDs — from TRM v1.2 Table 7.11-1.
+# Signals are numbered consecutively; only named entries are valid.
+gpio_matrix:
+  - { id: 0,  name: ledc_ls_sig_out0, direction: out }
+  - { id: 1,  name: ledc_ls_sig_out1, direction: out }
+  - { id: 2,  name: ledc_ls_sig_out2, direction: out }
+  - { id: 3,  name: ledc_ls_sig_out3, direction: out }
+  - { id: 4,  name: ledc_ls_sig_out4, direction: out }
+  - { id: 5,  name: ledc_ls_sig_out5, direction: out }
+  - { id: 6,  name: U0TXD_out,        direction: out }  # U0RXD_in / U0TXD_out
+  - { id: 7,  name: U0RTS_out,        direction: out }  # U0CTS_in / U0RTS_out
+  - { id: 8,  name: U0DTR_out,        direction: out }  # U0DSR_in / U0DTR_out
+  - { id: 9,  name: U1TXD_out,        direction: out }  # U1RXD_in / U1TXD_out
+  - { id: 10, name: U1RTS_out,        direction: out }  # U1CTS_in / U1RTS_out
+  - { id: 11, name: U1DTR_out,        direction: out }  # U1DSR_in / U1DTR_out
+  - { id: 12, name: I2S_MCLK,         direction: out }
+  - { id: 13, name: I2SO_BCK,         direction: out }
+  - { id: 14, name: I2SO_WS,          direction: out }
+  - { id: 15, name: I2SO_SD,          direction: out }  # I2SI_SD_in / I2SO_SD_out
+  - { id: 16, name: I2SI_BCK,         direction: in }
+  - { id: 17, name: I2SI_WS,          direction: in }
+  - { id: 45, name: I2CEXT0_SCL,      direction: inout }
+  - { id: 46, name: I2CEXT0_SDA,      direction: inout }

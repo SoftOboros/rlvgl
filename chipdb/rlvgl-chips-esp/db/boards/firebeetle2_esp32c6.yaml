@@ -1,0 +1,63 @@
+# DFRobot FireBeetle 2 ESP32-C6 (SKU: DFR1075)
+#
+# Compact IoT board with ESP32-C6-MINI-1 module, USB Type-C with CN3165
+# charger IC, onboard battery management. Exposes SPI, I2C, LP_UART,
+# ADC, and interrupt pins on V-edge headers.
+#
+# Source: DFR1075 schematic v1.1 (memalpha doc 338), DFR1075 wiki.
+# GPIO assignments extracted from schematic net labels.
+
+name: DFR1075 FireBeetle 2 C6
+chip: ESP32-C6
+module: ESP32-C6-MINI-1
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: usb_sj
+  baud: 115200
+
+pins:
+  # I2C bus — exposed on header as SCL/SDA
+  # NOTE: GPIO23 is shared between I2C SCL and SPI SCK on the DFR1075
+  # header. Use one or the other, not both simultaneously.
+  - { gpio: 23, signal: I2C0_SCL,  peripheral: i2c0, direction: inout, label: scl,     pull: up }
+  - { gpio: 20, signal: I2C0_SDA,  peripheral: i2c0, direction: inout, label: sda,     pull: up }
+  # SPI bus — SCK shares GPIO23 with I2C SCL (see note above)
+  - { gpio: 21, signal: SPI2_MOSI, peripheral: spi2, direction: out,   label: mosi }
+  - { gpio: 22, signal: SPI2_MISO, peripheral: spi2, direction: in,    label: miso }
+  - { gpio: 8,  signal: SPI2_CS,   peripheral: spi2, direction: out,   label: cs }
+  # LP UART — low-power UART for always-on wake
+  - { gpio: 5,  signal: LP_UART_TX, peripheral: lp_uart, direction: out, label: lp_tx }
+  - { gpio: 4,  signal: LP_UART_RX, peripheral: lp_uart, direction: in,  label: lp_rx }
+  # ADC analog inputs
+  - { gpio: 2,  signal: ADC1_CH2,  direction: in,    label: a1 }
+  - { gpio: 3,  signal: ADC1_CH3,  direction: in,    label: a2 }
+  # Interrupt / digital I/O
+  - { gpio: 7,  signal: GPIO,      direction: in,    label: int1 }
+  - { gpio: 9,  signal: GPIO,      direction: in,    label: int2 }
+  # Display backlight control
+  - { gpio: 15, signal: GPIO,      direction: out,   label: blk }
+  # Touch chip select (active low for external touch IC)
+  - { gpio: 6,  signal: GPIO,      direction: out,   label: tcs }
+  # USB Serial/JTAG (dedicated pins, used for console + programming)
+  - { gpio: 12, signal: USB_DM,    peripheral: usb_sj, direction: inout, label: usb_dm }
+  - { gpio: 13, signal: USB_DP,    peripheral: usb_sj, direction: inout, label: usb_dp }
+  # UART0 TX/RX on header (directly accessible via IO MUX)
+  - { gpio: 16, signal: UART0_TX,  peripheral: uart0, direction: out,   label: u0_tx }
+  - { gpio: 17, signal: UART0_RX,  peripheral: uart0, direction: in,    label: u0_rx }
+
+i2c_configs:
+  i2c0:
+    scl_hz: 400000  # Standard fast-mode I2C
+
+features:
+  vendor: dfrobot
+  sku: DFR1075
+  charger_ic: cn3165
+  battery: lipo_1s
+  usb: type_c
+  wifi: wifi6
+  bluetooth: ble5
+  ieee802154: zigbee_thread
+  shared_pin_23: i2c_scl_or_spi_sck  # GPIO23 serves either role
