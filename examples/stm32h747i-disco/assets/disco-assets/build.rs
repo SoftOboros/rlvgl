@@ -26,17 +26,16 @@ fn main() -> std::io::Result<()> {
         fn generate_rust_module(out_dir: &Path, assets: &[(&str, &str)]) -> std::io::Result<()> {
             let mut module = String::from("//! Auto-generated asset constants\\n\\n");
             for (name, path) in assets {
-                module.push_str(&format!("pub const {}: &[u8] = include_bytes!(\\\"{}\\\");\\n", name, path));
+                module.push_str(&format!(
+                    "pub const {}: &[u8] = include_bytes!(\\\"{}\\\");\\n",
+                    name, path
+                ));
             }
             std::fs::write(out_dir.join("rlvgl_assets.rs"), module)?;
             Ok(())
         }
 
-        const ASSETS: &[(&str, &str)] = &[
-        
-            ("MEDIA_SPLASH_RAW", "media/splash.raw"),
-        
-        ];
+        const ASSETS: &[(&str, &str)] = &[("MEDIA_SPLASH_RAW", "media/splash.raw")];
 
         let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
         copy_all(&out, ASSETS)?;

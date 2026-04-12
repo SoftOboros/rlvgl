@@ -8,21 +8,38 @@ extern crate std;
 #[cfg(feature = "embed")]
 /// Embedded asset bytes.
 pub mod embed {
-    use phf::{phf_map, Map};
+    use phf::{Map, phf_map};
 
-    
-    
-    pub const MEDIA_SPLASH_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../media/splash.raw"));
-    pub const MEDIA_ALCHEMIST_404_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../media/alchemist-404.raw"));
-    pub const MEDIA_ALCHEMIST_500_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../media/alchemist-500.raw"));
-    pub const MEDIA_OAK_WOOD_GRAIN_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../media/oak-wood-grain.raw"));
-    pub const ICON_FAVICON_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/favicon.raw"));
-    pub const ICON_FILE_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/file.raw"));
-    pub const ICON_GLOBE_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/globe.raw"));
-    pub const ICON_SOFT_O_OUTLINE_YELLOW_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/soft-o-outline-yellow.raw"));
-    pub const ICON_SOFTOBOROS_LETTER_LOGO_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/softoboros-letter-logo.raw"));
-    pub const ICON_WINDOW_RAW: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/window.raw"));
-
+    pub const MEDIA_SPLASH_RAW: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../media/splash.raw"));
+    pub const MEDIA_ALCHEMIST_404_RAW: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../media/alchemist-404.raw"
+    ));
+    pub const MEDIA_ALCHEMIST_500_RAW: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../media/alchemist-500.raw"
+    ));
+    pub const MEDIA_OAK_WOOD_GRAIN_RAW: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../media/oak-wood-grain.raw"
+    ));
+    pub const ICON_FAVICON_RAW: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/favicon.raw"));
+    pub const ICON_FILE_RAW: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/file.raw"));
+    pub const ICON_GLOBE_RAW: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/globe.raw"));
+    pub const ICON_SOFT_O_OUTLINE_YELLOW_RAW: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../icons/soft-o-outline-yellow.raw"
+    ));
+    pub const ICON_SOFTOBOROS_LETTER_LOGO_RAW: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../icons/softoboros-letter-logo.raw"
+    ));
+    pub const ICON_WINDOW_RAW: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icons/window.raw"));
 
     static INDEX: Map<&'static str, &'static [u8]> = phf_map! {
 
@@ -68,13 +85,19 @@ pub mod vendor {
         ("ICON_FAVICON_RAW", "icons/favicon.raw"),
         ("ICON_FILE_RAW", "icons/file.raw"),
         ("ICON_GLOBE_RAW", "icons/globe.raw"),
-        ("ICON_SOFT_O_OUTLINE_YELLOW_RAW", "icons/soft-o-outline-yellow.raw"),
-        ("ICON_SOFTOBOROS_LETTER_LOGO_RAW", "icons/softoboros-letter-logo.raw"),
+        (
+            "ICON_SOFT_O_OUTLINE_YELLOW_RAW",
+            "icons/soft-o-outline-yellow.raw",
+        ),
+        (
+            "ICON_SOFTOBOROS_LETTER_LOGO_RAW",
+            "icons/softoboros-letter-logo.raw",
+        ),
         ("ICON_WINDOW_RAW", "icons/window.raw"),
     ];
 
     mod vendor_api {
-        use std::{fs, path::Path, string::String, format};
+        use std::{format, fs, path::Path, string::String};
 
         pub fn copy_all(out_dir: &Path, assets: &[(&str, &str)]) -> std::io::Result<()> {
             let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../");
@@ -89,10 +112,16 @@ pub mod vendor {
             Ok(())
         }
 
-        pub fn generate_rust_module(out_dir: &Path, assets: &[(&str, &str)]) -> std::io::Result<()> {
+        pub fn generate_rust_module(
+            out_dir: &Path,
+            assets: &[(&str, &str)],
+        ) -> std::io::Result<()> {
             let mut module = String::from("//! Auto-generated asset constants\n\n");
             for (name, path) in assets {
-                module.push_str(&format!("pub const {}: &[u8] = include_bytes!(\"{}\");\n", name, path));
+                module.push_str(&format!(
+                    "pub const {}: &[u8] = include_bytes!(\"{}\");\n",
+                    name, path
+                ));
             }
             fs::write(out_dir.join("rlvgl_assets.rs"), module)?;
             Ok(())
