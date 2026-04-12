@@ -1,0 +1,56 @@
+# DFR1172 FireBeetle 2 ESP32-P4 board IR (P4 primary chip side).
+#
+# DFRobot FireBeetle 2 ESP32-P4 AI Vision Board (SKU DFR1172) — a dual-chip
+# board with ESP32-P4 (main processor, MIPI DSI, I2C touch, PSRAM) and
+# ESP32-C6 (WiFi 6 / BLE / Zigbee / Thread companion coprocessor).
+#
+# This YAML targets the P4 side. The C6 runs its own firmware and is
+# reached via an inter-chip bus (SDIO or SPI — exact GPIO pins TBD from
+# schematic). The MIPI DSI PHY lanes are dedicated chip pins (35-40),
+# NOT part of the GPIO matrix.
+#
+# Source: DFR1172 datasheet v1.0 (memalpha doc 269), DFR1172 wiki (doc 271),
+# examples/beetle-esp32p4/src/main.rs TODO(TRM) list.
+# GPIO assignments tagged TODO(schematic) need verification from the
+# DFR1172 schematic v1.0 (doc 270, a single-page PDF not RAG-extractable).
+
+name: DFR1172 FireBeetle 2 P4
+chip: ESP32-P4
+module: DFR1172
+flash_mb: 16
+psram_mb: 16
+
+console:
+  peripheral: usb_sj
+  baud: 115200
+
+pins:
+  # GPIO assignments from beetle-esp32p4/src/main.rs TODO(TRM) list.
+  # Exact numbers need schematic verification.
+  - { gpio: 3,  signal: LED,       direction: out,   label: led }           # TODO(schematic)
+  - { gpio: 35, signal: BOOT,      direction: in,    label: boot_btn, pull: up } # TODO(schematic) — strap pin, plausible
+  - { gpio: 7,  signal: I2C0_SCL,  peripheral: i2c0, direction: inout, label: touch_scl, pull: up } # TODO(schematic) — ILI2132A @ 0x41
+  - { gpio: 8,  signal: I2C0_SDA,  peripheral: i2c0, direction: inout, label: touch_sda, pull: up } # TODO(schematic)
+
+i2c_configs:
+  i2c0:
+    scl_hz: 400000  # ILI2132A cap-touch supports fast-mode I2C
+
+features:
+  companion_chip: esp32c6
+  dsi_panel: ek79007ad3_1024x600
+  dsi_panel_size_in: "7.0"
+  dsi_clk_n_pin: chip_pin_37
+  dsi_clk_p_pin: chip_pin_38
+  dsi_data0_p_pin: chip_pin_39
+  dsi_data0_n_pin: chip_pin_40
+  dsi_data1_p_pin: chip_pin_35
+  dsi_data1_n_pin: chip_pin_36
+  touch_controller: ili2132a
+  touch_address: "0x41"
+  touch_bus: i2c0
+  led: gpio3
+  boot_button: gpio35
+  console: usb_sj
+  psram_mode: octal
+  flash_mode: qio

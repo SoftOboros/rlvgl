@@ -1,0 +1,34 @@
+# ESP32-C6 companion on DFR1172 FireBeetle 2 P4 board.
+#
+# On the DFR1172, the C6 chip provides WiFi 6 / BLE / Zigbee / Thread
+# wireless connectivity as a coprocessor to the ESP32-P4 main processor.
+# It is connected to the P4 via an inter-chip bus (SDIO slave or SPI —
+# exact GPIOs TBD from schematic).
+#
+# This board YAML exists so we have a C6 chip+board pairing in the chipdb
+# that passes merge validation. The pin assignments are minimal because
+# the C6 on DFR1172 is not the primary init target — its firmware is
+# typically ESP-Hosted or AT commands.
+#
+# For a standalone DFR1117 Beetle ESP32-C6 board, a separate board YAML
+# would be created with the actual DFR1117 pinout (similar to C3 beetle).
+
+name: DFR1172 C6 Companion
+chip: ESP32-C6
+module: ESP32-C6-MINI-1
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # Minimal: only the USB-SJ for firmware flashing + UART0 for AT console
+  - { gpio: 16, signal: UART0_TX, peripheral: uart0, direction: out,   label: u0_tx }
+  - { gpio: 17, signal: UART0_RX, peripheral: uart0, direction: in,    label: u0_rx }
+
+features:
+  role: wifi_coprocessor
+  host_chip: esp32p4
+  host_bus: sdio  # TODO(schematic) — verify SDIO vs SPI

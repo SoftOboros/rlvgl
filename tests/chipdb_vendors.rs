@@ -6,10 +6,10 @@ macro_rules! vendor_check {
         fn $name() {
             assert_eq!($krate::vendor(), $vendor);
             let boards = $krate::boards();
-            assert_eq!(boards.len(), 1);
-            assert_eq!(boards[0].board, $board);
-            assert_eq!(boards[0].chip, $chip);
-            assert!($krate::find($board).is_some());
+            assert!(!boards.is_empty());
+            let found = $krate::find($board).expect(concat!("board not found: ", $board));
+            assert_eq!(found.board, $board);
+            assert_eq!(found.chip, $chip);
         }
     };
 }

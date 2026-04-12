@@ -22,7 +22,7 @@ rust-version = "1.88"
 
 [[bin]]
 name = "rlvgl-beetle-esp32p4"
-path = "src/main.rs"
+path = "src/bsp_pac_main.rs"
 required-features = ["esp32p4"]
 
 [features]
