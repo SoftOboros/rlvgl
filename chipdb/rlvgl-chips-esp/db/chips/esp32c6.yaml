@@ -1,0 +1,264 @@
+# ESP32-C6 chip inventory IR for rlvgl-creator BSP generation.
+#
+# Source: ESP32-C6 Technical Reference Manual v1.2 (memalpha doc 220) and
+# ESP32-C6 Series Datasheet v1.0 (memalpha doc 232).
+#
+# C6 uses PCR (Power, Clock, Reset) for per-peripheral clock gating,
+# similar to H2 but different from C3 (which uses SYSTEM block).
+# The PMU provides higher-level power-domain gating via
+# PMU_HP_x_DIG_ICG_FUNC_EN registers, but per-peripheral init uses
+# the PCR register paths.
+#
+# IO MUX has F0..F2 active (F3 is always empty/unused on C6).
+# 30 GPIOs on QFN40 package, 22 GPIOs on QFN32 (MINI-1 module).
+
+name: ESP32-C6
+arch: rv32imac
+package: QFN40-5x5
+pac_crate: esp32c6
+gpio_count: 30  # QFN40; MINI-1 module exposes 22
+
+memory:
+  # TRM Chapter 5, Table 5.3-1 Memory Address Mapping
+  - { name: rom,       base: 0x40000000, size: 0x00050000, access: rx  } # 320 KB internal ROM
+  - { name: hp_sram,   base: 0x40800000, size: 0x00080000, access: rwx } # 512 KB HP SRAM
+  - { name: lp_sram,   base: 0x50000000, size: 0x00004000, access: rwx } # 16 KB LP SRAM (retained in deep sleep)
+  - { name: flash_cache, base: 0x42000000, size: 0x01000000, access: rx } # 16 MB cache-mapped flash
+
+clock_tree:
+  xtal_hz: 40000000
+  # SPLL = 480 MHz; divided to 240/160/120/80/48/40/20 MHz (TRM §8.2)
+  pll_freqs_hz: [480000000]
+  cpu_freqs_hz: [80000000, 160000000]
+  apb_hz: 40000000  # AHB_CLK max 40 MHz; APB derived from AHB (TRM §8.2)
+  rtc_fast_src: [rc_fast, xtal_d2]
+  rtc_slow_src: [rc_slow, xtal32k, osc_slow]
+  # PCR peripheral clock gates. Register names from TRM Chapter 8 §8.4.
+  # C6 uses PCR_*_CONF_REG for clock/reset bits.
+  system_gates:
+    uart0:
+      clk_en_reg:   pcr.uart0_conf
+      clk_en_field: uart0_clk_en
+      rst_reg:      pcr.uart0_conf
+      rst_field:    uart0_rst_en
+      clk_sel_reg:  pcr.uart0_sclk_conf
+      clk_sel_field: uart0_sclk_sel
+    uart1:
+      clk_en_reg:   pcr.uart1_conf
+      clk_en_field: uart1_clk_en
+      rst_reg:      pcr.uart1_conf
+      rst_field:    uart1_rst_en
+      clk_sel_reg:  pcr.uart1_sclk_conf
+      clk_sel_field: uart1_sclk_sel
+    i2c0:
+      clk_en_reg:   pcr.i2c_conf
+      clk_en_field: i2c_clk_en
+      rst_reg:      pcr.i2c_conf
+      rst_field:    i2c_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf
+      clk_sel_field: i2c_sclk_sel
+    spi2:
+      clk_en_reg:   pcr.spi2_conf
+      clk_en_field: spi2_clk_en
+      rst_reg:      pcr.spi2_conf
+      rst_field:    spi2_rst_en
+    timg0:
+      clk_en_reg:   pcr.timergroup0_conf
+      clk_en_field: tg0_clk_en
+      rst_reg:      pcr.timergroup0_conf
+      rst_field:    tg0_rst_en
+    timg1:
+      clk_en_reg:   pcr.timergroup1_conf
+      clk_en_field: tg1_clk_en
+      rst_reg:      pcr.timergroup1_conf
+      rst_field:    tg1_rst_en
+    systimer:
+      clk_en_reg:   pcr.systimer_conf
+      clk_en_field: systimer_clk_en
+      rst_reg:      pcr.systimer_conf
+      rst_field:    systimer_rst_en
+    ledc:
+      clk_en_reg:   pcr.ledc_conf
+      clk_en_field: ledc_clk_en
+      rst_reg:      pcr.ledc_conf
+      rst_field:    ledc_rst_en
+    i2s:
+      clk_en_reg:   pcr.i2s_conf
+      clk_en_field: i2s_clk_en
+      rst_reg:      pcr.i2s_conf
+      rst_field:    i2s_rst_en
+    rmt:
+      clk_en_reg:   pcr.rmt_conf
+      clk_en_field: rmt_clk_en
+      rst_reg:      pcr.rmt_conf
+      rst_field:    rmt_rst_en
+    twai0:
+      clk_en_reg:   pcr.twai0_conf
+      clk_en_field: twai0_clk_en
+      rst_reg:      pcr.twai0_conf
+      rst_field:    twai0_rst_en
+    twai1:
+      clk_en_reg:   pcr.twai1_conf
+      clk_en_field: twai1_clk_en
+      rst_reg:      pcr.twai1_conf
+      rst_field:    twai1_rst_en
+    usb_sj:
+      clk_en_reg:   pcr.usb_device_conf
+      clk_en_field: usb_device_clk_en
+      rst_reg:      pcr.usb_device_conf
+      rst_field:    usb_device_rst_en
+    gdma:
+      clk_en_reg:   pcr.gdma_conf
+      clk_en_field: gdma_clk_en
+      rst_reg:      pcr.gdma_conf
+      rst_field:    gdma_rst_en
+
+peripherals:
+  # Base addresses: TODO(memalpha) — C6 peripheral base address table
+  # (Table 5.3-2) was not fully retrieved. Using C3-family-pattern
+  # estimates in the 0x6000_xxxx range. Mark for verification against
+  # esp32c6 PAC crate.
+  uart0:
+    class: uart
+    instance: uart0
+    base: 0x60000000
+    irq: null
+    signals:
+      - { role: tx, direction: out, gpio_matrix_id: 7, iomux_pin: 16, iomux_fn: 0 }
+      - { role: rx, direction: in,  gpio_matrix_id: 7, iomux_pin: 17, iomux_fn: 0 }
+  uart1:
+    class: uart
+    instance: uart1
+    base: 0x60001000
+    irq: null
+    signals:
+      - { role: tx, direction: out }
+      - { role: rx, direction: in }
+  i2c0:
+    class: i2c
+    instance: i2c0
+    base: 0x60004000    # TODO verify
+    irq: null
+    signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  spi2:
+    class: spi_master
+    instance: spi2
+    base: 0x60081000    # TODO verify
+    irq: null
+    signals:
+      - { role: sck,  direction: out, iomux_pin: 6, iomux_fn: 2 }
+      - { role: mosi, direction: out, iomux_pin: 7, iomux_fn: 2 }
+      - { role: miso, direction: in,  iomux_pin: 2, iomux_fn: 2 }
+      - { role: cs0,  direction: out, iomux_pin: 16, iomux_fn: 2 }
+      - { role: hd,   direction: out, iomux_pin: 4, iomux_fn: 2 }
+      - { role: wp,   direction: out, iomux_pin: 5, iomux_fn: 2 }
+  timg0:
+    class: timg
+    instance: timg0
+    base: 0x60008000
+    irq: null
+    signals: []
+  timg1:
+    class: timg
+    instance: timg1
+    base: 0x60009000
+    irq: null
+    signals: []
+  systimer:
+    class: systimer
+    instance: systimer
+    base: 0x6000A000
+    irq: null
+    signals: []
+  ledc:
+    class: ledc
+    instance: ledc
+    base: 0x60007000
+    irq: null
+    signals: []
+  rmt:
+    class: rmt
+    instance: rmt
+    base: 0x60006000
+    irq: null
+    signals: []
+  twai0:
+    class: twai
+    instance: twai0
+    base: 0x6000B000
+    irq: null
+    signals: []
+  twai1:
+    class: twai
+    instance: twai1
+    base: 0x6000C000
+    irq: null
+    signals: []
+  usb_sj:
+    class: usb_serial_jtag
+    instance: usb_sj
+    base: 0x6000F000
+    irq: null
+    signals:
+      - { role: dm, direction: inout }
+      - { role: dp, direction: inout }
+  gdma:
+    class: gdma
+    instance: gdma
+    base: 0x60080000
+    irq: null
+    signals: []
+  lp_uart:
+    class: uart
+    instance: lp_uart
+    base: 0x60020000    # TODO verify — LP peripheral range
+    irq: null
+    signals: []
+  lp_i2c:
+    class: i2c
+    instance: lp_i2c
+    base: 0x60021000    # TODO verify
+    irq: null
+    signals: []
+
+# IO MUX function table — ESP32-C6 Datasheet Table 2-3 QFN40 IO MUX Pin
+# Functions. C6 has F0, F1, F2 (no F3 populated — fn3 always null).
+# Very similar structure to C3 with MTMS/MTDI/MTCK/MTDO on GPIO4-7 and
+# FSPI overlay on F2.
+io_mux:
+  - { gpio: 0,  pad_name: XTAL_32K_P, fn0: GPIO0,     fn1: GPIO0,  analog: ADC1_CH0 }
+  - { gpio: 1,  pad_name: XTAL_32K_N, fn0: GPIO1,     fn1: GPIO1,  analog: ADC1_CH1 }
+  - { gpio: 2,  pad_name: GPIO2,      fn0: GPIO2,     fn1: GPIO2,  fn2: FSPIQ }
+  - { gpio: 3,  pad_name: GPIO3,      fn0: GPIO3,     fn1: GPIO3 }
+  - { gpio: 4,  pad_name: MTMS,       fn0: MTMS,      fn1: GPIO4,  fn2: FSPIHD }
+  - { gpio: 5,  pad_name: MTDI,       fn0: MTDI,      fn1: GPIO5,  fn2: FSPIWP }
+  - { gpio: 6,  pad_name: MTCK,       fn0: MTCK,      fn1: GPIO6,  fn2: FSPICLK }
+  - { gpio: 7,  pad_name: MTDO,       fn0: MTDO,      fn1: GPIO7,  fn2: FSPID }
+  - { gpio: 8,  pad_name: GPIO8,      fn0: GPIO8,     fn1: GPIO8,  strap: true }
+  - { gpio: 9,  pad_name: GPIO9,      fn0: GPIO9,     fn1: GPIO9,  strap: true }
+  - { gpio: 10, pad_name: GPIO10,     fn0: GPIO10,    fn1: GPIO10 }
+  - { gpio: 11, pad_name: GPIO11,     fn0: GPIO11,    fn1: GPIO11 }
+  - { gpio: 12, pad_name: GPIO12,     fn0: GPIO12,    fn1: GPIO12 }
+  - { gpio: 13, pad_name: GPIO13,     fn0: GPIO13,    fn1: GPIO13 }
+  - { gpio: 14, pad_name: GPIO14,     fn0: GPIO14,    fn1: GPIO14 } # TODO: verify presence on QFN40
+  - { gpio: 15, pad_name: GPIO15,     fn0: GPIO15,    fn1: GPIO15, strap: true }
+  - { gpio: 16, pad_name: U0TXD,      fn0: U0TXD,     fn1: GPIO16, fn2: FSPICS0 }
+  - { gpio: 17, pad_name: U0RXD,      fn0: U0RXD,     fn1: GPIO17, fn2: FSPICS1 }
+  - { gpio: 18, pad_name: SDIO_CMD,   fn0: SDIO_CMD,  fn1: GPIO18, fn2: FSPICS2 }
+  - { gpio: 19, pad_name: SDIO_CLK,   fn0: SDIO_CLK,  fn1: GPIO19, fn2: FSPICS3 }
+  - { gpio: 20, pad_name: SDIO_DATA0, fn0: SDIO_DATA0, fn1: GPIO20, fn2: FSPICS4 }
+  - { gpio: 21, pad_name: SDIO_DATA1, fn0: SDIO_DATA1, fn1: GPIO21, fn2: FSPICS5 }
+  - { gpio: 22, pad_name: SDIO_DATA2, fn0: SDIO_DATA2, fn1: GPIO22 }
+  - { gpio: 23, pad_name: SDIO_DATA3, fn0: SDIO_DATA3, fn1: GPIO23 }
+  - { gpio: 24, pad_name: SPICS0,     fn0: SPICS0,    fn1: GPIO24, flash_reserved: true }
+  - { gpio: 25, pad_name: SPIQ,       fn0: SPIQ,      fn1: GPIO25, flash_reserved: true }
+  - { gpio: 26, pad_name: SPIWP,      fn0: SPIWP,     fn1: GPIO26, flash_reserved: true }
+  - { gpio: 27, pad_name: GPIO27,     fn0: GPIO27,    fn1: GPIO27 }
+  - { gpio: 28, pad_name: SPIHD,      fn0: SPIHD,     fn1: GPIO28, flash_reserved: true }
+  - { gpio: 29, pad_name: SPICLK,     fn0: SPICLK,    fn1: GPIO29, flash_reserved: true }
+  - { gpio: 30, pad_name: SPID,       fn0: SPID,      fn1: GPIO30, flash_reserved: true }
+
+# GPIO matrix signal IDs — populated on demand.
+gpio_matrix: []

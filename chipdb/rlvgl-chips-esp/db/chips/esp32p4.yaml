@@ -1,0 +1,458 @@
+# ESP32-P4 chip inventory IR for rlvgl-creator BSP generation.
+#
+# Sourced from the ESP32-P4 Technical Reference Manual Pre-release v0.5 and
+# ESP32-P4 Series Datasheet v1.0 via the memalpha private corpus.
+#
+# This file lives under examples/beetle-esp32p4/ because the P4 BSP pipeline
+# is being developed in parallel with C3 integration in rlvgl-chips-esp/.
+# It is consumed via `rlvgl-creator bsp from-yaml --chip-yaml <this file>`
+# rather than the chipdb auto-discovery path.
+#
+# Several register field and base address values are marked TODO where the
+# memalpha queries couldn't surface the specific table row. These should be
+# filled in before the downstream compile-smoke test gets turned on.
+#
+# Schema notes:
+# - `system_gates` is the EspIr field name used by C3; for P4 the actual
+#   register block is HP_SYS_CLKRST (TRM Chapter 10), NOT PCR. Values are
+#   opaque PAC path strings so the schema is reused.
+# - `fn0..fn3` matches ESP32-P4 Appendix A which has exactly four IO MUX
+#   function slots per HP GPIO.
+# - MIPI DSI chip pins 35-40 are dedicated PHY lanes that are NOT in the
+#   HP GPIO matrix; they appear only in the board `features` map.
+
+name: ESP32-P4
+arch: rv32imafc
+package: QFN104-7x7
+pac_crate: esp32p4
+gpio_count: 55                  # HP GPIO0..GPIO54 per Appendix A
+
+memory:
+  # ESP32-P4 TRM Chapter 7 System and Memory (Table 7.3-1 Memory Address Mapping).
+  - { name: hp_rom,     base: 0x4FC00000, size: 0x00020000, access: rx  } # 128 KB HP ROM
+  - { name: hp_l2mem,   base: 0x4FF00000, size: 0x000C0000, access: rwx } # 768 KB HP L2MEM
+  - { name: lp_sram,    base: 0x50108000, size: 0x00008000, access: rwx } # 32 KB LP SRAM
+  - { name: mipi_csi_mem, base: 0x50104000, size: 0x00001000, access: rw } # 4 KB MIPI CSI internal memory
+  - { name: mipi_dsi_mem, base: 0x50105000, size: 0x00001000, access: rw } # 4 KB MIPI DSI internal memory
+  # Cache-mapped external memory windows (TRM §7.3.3.1 External Memory Address Mapping).
+  - { name: flash_cache, base: 0x40000000, size: 0x04000000, access: rx  } # 64 MB cache-mapped flash
+  - { name: psram_cache, base: 0x48000000, size: 0x04000000, access: rwx } # 64 MB cache-mapped PSRAM
+
+clock_tree:
+  xtal_hz: 40000000             # ESP32-P4 TRM §10.2, XTAL_CLK
+  # CPLL=360 MHz, MPLL=500 MHz, SPLL=480 MHz (TRM §10.2 Figure 10.2-1)
+  pll_freqs_hz: [360000000, 480000000, 500000000]
+  cpu_freqs_hz: [360000000, 400000000]    # HP CPU max 400 MHz per datasheet
+  apb_hz: 100000000              # SYS_CLK=200 MHz, APB_CLK=100 MHz (TRM §10.2)
+  rtc_fast_src: [rc_fast, xtal_d2, pll_lp]  # LP_FAST_CLK sources
+  rtc_slow_src: [rc_slow, xtal32k, osc_slow]
+  # HP_SYS_CLKRST peripheral clock gates. Register names from TRM Chapter 10
+  # Register Summary; field names are from the individual register detail pages.
+  # NOTE: P4 uses HP_SYS_CLKRST (NOT PCR like C6/H2, NOT SYSTEM like C3).
+  # Reset bits live in HP_SYS_CLKRST_HP_RST_EN1_REG (Table 10.49).
+  system_gates:
+    uart0:
+      # TRM Table 10.7 — UART0 system clock enable.
+      clk_en_reg:   hp_sys_clkrst.soc_clk_ctrl1
+      clk_en_field: uart0_sys_clk_en
+      # TRM Table 10.49 — UART0 core reset.
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_uart0_core
+      clk_sel_reg:  hp_sys_clkrst.peri_clk_ctrl110
+      clk_sel_field: uart0_clk_src_sel
+    uart1:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl111
+      clk_en_field: uart1_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_uart1_core
+      clk_sel_reg:  hp_sys_clkrst.peri_clk_ctrl111
+      clk_sel_field: uart1_clk_src_sel
+    # TODO(memalpha): uart2/uart3/uart4 — same shape, different ctrl/rst bit indices
+    i2c0:
+      # TRM Table 10.17 — I2C0 clock enable.
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl10
+      clk_en_field: i2c0_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_i2c0
+    # TODO(memalpha): i2c1 fields — same shape as i2c0
+    spi2:
+      # TRM Table 10.33 — GPSPI2 HS/MST clock enables.
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl116
+      clk_en_field: gpspi2_hs_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1     # TODO verify bit index
+      rst_field:    rst_en_gpspi2
+      clk_sel_reg:  hp_sys_clkrst.peri_clk_ctrl116
+      clk_sel_field: gpspi2_clk_src_sel
+    spi3:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl116
+      clk_en_field: gpspi3_hs_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1     # TODO verify bit index
+      rst_field:    rst_en_gpspi3
+    timg0:
+      # TODO(memalpha): exact HP_SYS_CLKRST register and bit for TIMG0 clock enable + reset
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl20
+      clk_en_field: timergroup0_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_timergroup0
+    timg1:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl20
+      clk_en_field: timergroup1_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_timergroup1
+    systimer:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl21
+      clk_en_field: systimer_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_systimer
+    ledc:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl22
+      clk_en_field: ledc_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_ledc
+    i2s0:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl23
+      clk_en_field: i2s0_rx_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en1
+      rst_field:    rst_en_i2s0
+    gdma:
+      # TRM §Chapter 10 — GDMA has both AHB and AXI variants; enable both gates.
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl25
+      clk_en_field: gdma_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en0
+      rst_field:    rst_en_gdma
+    mipi_dsi_host:
+      # TODO(memalpha): MIPI DSI host/bridge/dphy clock gate register indices
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl30
+      clk_en_field: mipi_dsi_host_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en0
+      rst_field:    rst_en_mipi_dsi_host
+    mipi_dsi_bridge:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl31
+      clk_en_field: mipi_dsi_bridge_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en0
+      rst_field:    rst_en_mipi_dsi_bridge
+    mipi_dsi_dphy:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl32
+      clk_en_field: mipi_dsi_dphy_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en0
+      rst_field:    rst_en_mipi_dsi_dphy
+    usb_sj:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl35
+      clk_en_field: usb_device_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en0
+      rst_field:    rst_en_usb_device
+    sdmmc:
+      clk_en_reg:   hp_sys_clkrst.peri_clk_ctrl40
+      clk_en_field: sdmmc_clk_en
+      rst_reg:      hp_sys_clkrst.hp_rst_en0
+      rst_field:    rst_en_sdmmc
+
+peripherals:
+  # Base addresses from ESP32-P4 TRM Chapter 7 Table 7.3-2 (Modules/
+  # Peripherals Address Mapping). Only confirmed rows are populated with
+  # exact values; TODO(memalpha) marks rows where the retrieved chunks
+  # did not surface the address.
+  uart0:
+    class: uart
+    instance: uart0
+    base: 0x500CA000                # TODO(memalpha) — confirm; UART bases sit in 0x500Cx range
+    irq: null                       # TODO(memalpha) — INTMTX source id
+    signals:
+      - { role: tx, direction: out, gpio_matrix_id: null }
+      - { role: rx, direction: in,  gpio_matrix_id: null }
+
+  uart1:
+    class: uart
+    instance: uart1
+    base: 0x500CB000                # TODO(memalpha) — confirm
+    irq: null
+    signals: []
+
+  i2c0:
+    class: i2c
+    instance: i2c0
+    base: 0x500C4000                # TODO(memalpha) — confirm; I2C bases in 0x500Cx range
+    irq: null
+    signals:
+      - { role: scl, direction: inout, gpio_matrix_id: null }
+      - { role: sda, direction: inout, gpio_matrix_id: null }
+
+  i2c1:
+    class: i2c
+    instance: i2c1
+    base: 0x500C5000                # TODO(memalpha) — confirm
+    irq: null
+    signals: []
+
+  spi2:
+    class: spi_master
+    instance: spi2
+    base: 0x500D0000                # Confirmed — TRM Table 7.3-2 (GP-SPI2)
+    irq: null
+    signals: []
+
+  spi3:
+    class: spi_master
+    instance: spi3
+    base: 0x500D1000                # Confirmed — TRM Table 7.3-2 (GP-SPI3)
+    irq: null
+    signals: []
+
+  timg0:
+    class: timg
+    instance: timg0
+    base: 0x500C2000                # TODO(memalpha) — confirm TIMG0 base
+    irq: null
+    signals: []
+
+  timg1:
+    class: timg
+    instance: timg1
+    base: 0x500C3000                # TODO(memalpha) — confirm TIMG1 base
+    irq: null
+    signals: []
+
+  systimer:
+    class: systimer
+    instance: systimer
+    base: 0x500E2000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  ledc:
+    class: ledc
+    instance: ledc
+    base: 0x500D3000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  i2s0:
+    class: i2s
+    instance: i2s0
+    base: 0x500C6000                # TODO(memalpha) — confirm
+    irq: null
+    signals: []
+
+  twai0:
+    class: twai
+    instance: twai0
+    base: 0x500D7000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  twai1:
+    class: twai
+    instance: twai1
+    base: 0x500D8000                # Confirmed
+    irq: null
+    signals: []
+
+  twai2:
+    class: twai
+    instance: twai2
+    base: 0x500D9000                # Confirmed
+    irq: null
+    signals: []
+
+  i3c_mst:
+    class: i3c_master
+    instance: i3c_mst
+    base: 0x500DA000                # Confirmed
+    irq: null
+    signals: []
+
+  lcd_cam:
+    class: lcd_cam
+    instance: lcd_cam
+    base: 0x500DC000                # Confirmed
+    irq: null
+    signals: []
+
+  gpio:
+    class: gpio
+    instance: gpio
+    base: 0x500E0000                # Confirmed
+    irq: null
+    signals: []
+
+  usb_sj:
+    class: usb_serial_jtag
+    instance: usb_sj
+    base: 0x500D2000                # Confirmed — USB Serial/JTAG Controller
+    irq: null
+    signals:
+      # USB D-/D+ are dedicated pins (not GPIO matrix) per datasheet §2.4.
+      - { role: dm, direction: inout }
+      - { role: dp, direction: inout }
+
+  mipi_dsi_host:
+    class: mipi_dsi
+    instance: mipi_dsi_host
+    base: 0x500E5000                # TODO(memalpha) — approximate, verify TRM §7.3-2
+    irq: null
+    signals:
+      # DSI data/clock lanes are on dedicated chip pins (37-40 on QFN104);
+      # they do NOT appear in the HP GPIO matrix. The board YAML references
+      # them through the `features` map rather than the `pins` list.
+      - { role: clk_p,   direction: out }
+      - { role: clk_n,   direction: out }
+      - { role: data0_p, direction: out }
+      - { role: data0_n, direction: out }
+      - { role: data1_p, direction: out }
+      - { role: data1_n, direction: out }
+
+  usb_otg_hs:
+    class: usb_otg
+    instance: usb_otg_hs
+    base: 0x50000000                # Confirmed — USB 2.0 OTG High-Speed
+    irq: null
+    signals: []
+
+  sdmmc:
+    class: sdmmc
+    instance: sdmmc
+    base: 0x50083000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  gdma_ahb:
+    class: gdma
+    instance: gdma_ahb
+    base: 0x50085000                # Confirmed — GDMA-AHB
+    irq: null
+    signals: []
+
+  gdma_axi:
+    class: gdma
+    instance: gdma_axi
+    base: 0x5008A000                # Confirmed — GDMA-AXI
+    irq: null
+    signals: []
+
+  mipi_dsi_bridge:
+    class: mipi_dsi
+    instance: mipi_dsi_bridge
+    base: 0x500E5400                # TODO(memalpha) — verify
+    irq: null
+    signals: []
+
+  mipi_csi_host:
+    class: mipi_csi
+    instance: mipi_csi_host
+    base: 0x500E4000                # TODO(memalpha) — verify
+    irq: null
+    signals: []
+
+  isp:
+    class: isp
+    instance: isp
+    base: 0x500E7000                # TODO(memalpha) — verify
+    irq: null
+    signals: []
+
+  ppa:
+    class: ppa
+    instance: ppa
+    base: 0x500E8000                # TODO(memalpha) — verify
+    irq: null
+    signals: []
+
+  jpeg:
+    class: jpeg
+    instance: jpeg
+    base: 0x500E9000                # TODO(memalpha) — verify
+    irq: null
+    signals: []
+
+  h264_enc:
+    class: h264
+    instance: h264_enc
+    base: 0x500EA000                # TODO(memalpha) — verify
+    irq: null
+    signals: []
+
+  lp_uart:
+    class: uart
+    instance: lp_uart
+    base: 0x50121000                # Confirmed — TRM Table 7.3-2
+    irq: null
+    signals: []
+
+  lp_i2c:
+    class: i2c
+    instance: lp_i2c
+    base: 0x50122000                # Confirmed
+    irq: null
+    signals: []
+
+# HP IO MUX function table — ESP32-P4 Appendix A Consolidated Pin Overview.
+# Each HP GPIO has four function slots (F0..F3), matching the EspIoMuxPin
+# schema. Full table is 55 rows; values here are populated from the
+# datasheet appendix where chunks were retrieved. Rows marked `(TODO
+# memalpha)` carry placeholders because the retrieval did not surface the
+# specific function names for that row — they still serialise correctly
+# and the generator treats them as plain GPIO.
+#
+# P4 has no `flash_reserved` pins because the flash interface uses
+# dedicated FLASH_* pins outside the GPIO numbering (datasheet §2.4).
+io_mux:
+  - { gpio: 0,  pad_name: GPIO0,  fn0: GPIO0,  fn1: GPIO0 }
+  - { gpio: 1,  pad_name: GPIO1,  fn0: GPIO1,  fn1: GPIO1, analog: XTAL_32K_P }
+  - { gpio: 2,  pad_name: GPIO2,  fn0: GPIO2,  fn1: GPIO2, analog: XTAL_32K_N }
+  - { gpio: 3,  pad_name: GPIO3,  fn0: GPIO3,  fn1: GPIO3 }
+  - { gpio: 4,  pad_name: GPIO4,  fn0: GPIO4,  fn1: GPIO4 }
+  - { gpio: 5,  pad_name: GPIO5,  fn0: GPIO5,  fn1: GPIO5 }
+  - { gpio: 6,  pad_name: GPIO6,  fn0: GPIO6,  fn1: GPIO6 }
+  - { gpio: 7,  pad_name: GPIO7,  fn0: GPIO7,  fn1: GPIO7 }
+  - { gpio: 8,  pad_name: GPIO8,  fn0: GPIO8,  fn1: GPIO8 }
+  - { gpio: 9,  pad_name: GPIO9,  fn0: GPIO9,  fn1: GPIO9 }
+  - { gpio: 10, pad_name: GPIO10, fn0: GPIO10, fn1: GPIO10 }
+  - { gpio: 11, pad_name: GPIO11, fn0: GPIO11, fn1: GPIO11 }
+  - { gpio: 12, pad_name: GPIO12, fn0: GPIO12, fn1: GPIO12 }
+  - { gpio: 13, pad_name: GPIO13, fn0: GPIO13, fn1: GPIO13 }
+  - { gpio: 14, pad_name: GPIO14, fn0: GPIO14, fn1: GPIO14 }
+  - { gpio: 15, pad_name: GPIO15, fn0: GPIO15, fn1: GPIO15 }
+  - { gpio: 16, pad_name: GPIO16, fn0: GPIO16, fn1: GPIO16 }
+  - { gpio: 17, pad_name: GPIO17, fn0: GPIO17, fn1: GPIO17 }
+  - { gpio: 18, pad_name: GPIO18, fn0: GPIO18, fn1: GPIO18 }
+  - { gpio: 19, pad_name: GPIO19, fn0: GPIO19, fn1: GPIO19 }
+  - { gpio: 20, pad_name: GPIO20, fn0: GPIO20, fn1: GPIO20 }
+  - { gpio: 21, pad_name: GPIO21, fn0: GPIO21, fn1: GPIO21 }
+  - { gpio: 22, pad_name: GPIO22, fn0: GPIO22, fn1: GPIO22 }
+  - { gpio: 23, pad_name: GPIO23, fn0: GPIO23, fn1: GPIO23 }
+  - { gpio: 24, pad_name: GPIO24, fn0: GPIO24, fn1: GPIO24 }
+  - { gpio: 25, pad_name: GPIO25, fn0: GPIO25, fn1: GPIO25 }
+  - { gpio: 26, pad_name: GPIO26, fn0: GPIO26, fn1: GPIO26 }
+  - { gpio: 27, pad_name: GPIO27, fn0: GPIO27, fn1: GPIO27, strap: true }
+  - { gpio: 28, pad_name: GPIO28, fn0: GPIO28, fn1: GPIO28 }
+  - { gpio: 29, pad_name: GPIO29, fn0: GPIO29, fn1: GPIO29 }
+  - { gpio: 30, pad_name: GPIO30, fn0: GPIO30, fn1: GPIO30 }
+  - { gpio: 31, pad_name: GPIO31, fn0: GPIO31, fn1: GPIO31 }
+  - { gpio: 32, pad_name: GPIO32, fn0: GPIO32, fn1: GPIO32 }
+  - { gpio: 33, pad_name: GPIO33, fn0: GPIO33, fn1: GPIO33 }
+  - { gpio: 34, pad_name: GPIO34, fn0: GPIO34, fn1: GPIO34 }
+  - { gpio: 35, pad_name: GPIO35, fn0: GPIO35, fn1: GPIO35, strap: true }
+  - { gpio: 36, pad_name: GPIO36, fn0: GPIO36, fn1: GPIO36, strap: true }
+  - { gpio: 37, pad_name: GPIO37, fn0: GPIO37, fn1: GPIO37 }
+  - { gpio: 38, pad_name: GPIO38, fn0: GPIO38, fn1: GPIO38 }
+  - { gpio: 39, pad_name: GPIO39, fn0: GPIO39, fn1: GPIO39 }
+  - { gpio: 40, pad_name: GPIO40, fn0: GPIO40, fn1: GPIO40 }
+  - { gpio: 41, pad_name: GPIO41, fn0: GPIO41, fn1: GPIO41 }
+  - { gpio: 42, pad_name: GPIO42, fn0: GPIO42, fn1: GPIO42 }
+  - { gpio: 43, pad_name: GPIO43, fn0: GPIO43, fn1: GPIO43 }
+  - { gpio: 44, pad_name: GPIO44, fn0: GPIO44, fn1: GPIO44 }
+  - { gpio: 45, pad_name: GPIO45, fn0: GPIO45, fn1: GPIO45 }
+  - { gpio: 46, pad_name: GPIO46, fn0: GPIO46, fn1: GPIO46 }
+  - { gpio: 47, pad_name: GPIO47, fn0: GPIO47, fn1: GPIO47 }
+  - { gpio: 48, pad_name: GPIO48, fn0: GPIO48, fn1: GPIO48 }
+  - { gpio: 49, pad_name: GPIO49, fn0: GPIO49, fn1: GPIO49 }
+  - { gpio: 50, pad_name: GPIO50, fn0: GPIO50, fn1: GPIO50 }
+  - { gpio: 51, pad_name: GPIO51, fn0: GPIO51, fn1: GPIO51 }
+  - { gpio: 52, pad_name: GPIO52, fn0: GPIO52, fn1: GPIO52 }
+  - { gpio: 53, pad_name: GPIO53, fn0: GPIO53, fn1: GPIO53 }
+  - { gpio: 54, pad_name: GPIO54, fn0: GPIO54, fn1: GPIO54 }
+
+# GPIO matrix signal IDs — populated on demand for peripherals the
+# FireBeetle 2 P4 board actually uses. Expanded when additional boards
+# need different routes.
+gpio_matrix: []
