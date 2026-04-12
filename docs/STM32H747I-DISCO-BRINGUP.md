@@ -1,8 +1,6 @@
-<!--
-TODO-STM32H747I-DISCO.md - Bring-up checklist and work plan for real hardware.
--->
+<!-- STM32H747I-DISCO-BRINGUP.md - Hardware bring-up checklist. -->
 
-# STM32H747I-DISCO Hardware Bring-up TODOs
+# STM32H747I-DISCO Bring-Up
 
 This document tracks the remaining work required to run the `rlvgl` demo on
 real STM32H747I-DISCO hardware (M7 core). Items are grouped by subsystem and

@@ -1,11 +1,9 @@
-<!--
-TODO-CREATOR-BSP.md - Task list for the BSP generator in rlvgl-creator.
--->
+<!-- CREATOR-BSP-STATUS.md - BSP generator status. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# TODO - Creator BSP
+# Creator BSP Generator Status
 
 This file tracks remaining work for the `rlvgl-creator` board support
 package generator. The generator operates in two stages:

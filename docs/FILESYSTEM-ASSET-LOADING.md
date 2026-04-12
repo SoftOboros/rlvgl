@@ -1,11 +1,9 @@
-<!--
-docs/TODO-FATFS-ASSETS.md - TODO – FATFS-backed Asset Load for rlvgl (optional core feature).
--->
+<!-- FILESYSTEM-ASSET-LOADING.md - Filesystem asset loading design. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# TODO – FATFS-backed Asset Load for rlvgl (optional core feature)
+# Filesystem Asset Loading
 
 > **Epic:** Add optional filesystem-based asset loading to rlvgl using a portable FAT implementation. Core exposes a small, stable `AssetSource` API; platform crates provide block-device drivers (SD card on H747I‑DISCO) or a simulator stub. When disabled, core still supports baked-in assets.
 

@@ -1,12 +1,10 @@
-<!--
-docs/TODO-DECOMP.md - Work plan for rlvgl-decomp (palette + RLE codec)
--->
+<!-- IMAGE-COMPRESSION-FORMAT.md - Image compression format design. -->
 
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# rlvgl-decomp TODOs
+# Image Compression Format
 
 This document tracks the outstanding work for the `rlvgl-decomp` crate: a
 compact palette + RLE image format with short/long repeats and inline pixel

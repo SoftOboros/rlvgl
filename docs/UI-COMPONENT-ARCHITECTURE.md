@@ -1,11 +1,9 @@
-<!--
-docs/TODO-UI.md - rlvgl – UI Workstream TODO.
--->
+<!-- UI-COMPONENT-ARCHITECTURE.md - UI component architecture. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# rlvgl – UI Workstream TODO
+# UI Component Architecture
 
 This file tracks the tasks for building the high-level `rlvgl-ui` crate.
 

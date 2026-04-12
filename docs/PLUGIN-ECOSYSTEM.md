@@ -1,11 +1,9 @@
-<!--
-docs/TODO-PLUGINS.md - rlvgl – Plugins Workstream TODO.
--->
+<!-- PLUGIN-ECOSYSTEM.md - Plugin ecosystem design. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# rlvgl – Plugins Workstream TODO
+# Plugin Ecosystem
 
 > **Purpose**  Track incremental porting of C-based LVGL add-ons to Rust crates for `rlvgl`.  Tasks are ordered to respect technical dependencies so each layer builds on the previous one.
 

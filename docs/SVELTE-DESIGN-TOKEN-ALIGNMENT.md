@@ -1,11 +1,9 @@
-<!--
-docs/TODO-SVELTE-INTEGRATION.md - rlvgl-creator Svelte alignment and token-driven UI pipeline TODO.
--->
+<!-- SVELTE-DESIGN-TOKEN-ALIGNMENT.md - Svelte design token alignment. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# rlvgl-creator — Svelte Integration TODO
+# Svelte Design Token Alignment
 
 _A single markdown that structures the work as one **Epic** with sectioned user‑story tables. Each section begins with a brief description (user story) and a checklist table._
 

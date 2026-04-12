@@ -1,11 +1,9 @@
-<!--
-Tracks tasks for the Chip & Board Support workstream.
--->
+<!-- CHIP-SUPPORT.md - Vendor chip and board support. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# Chip & Board Support Workstream TODO
+# Chip & Board Support
 
 ## Purpose
 Unify chip and board configuration data into self-contained crates per vendor so that `rlvgl-creator` and its UI can dynamically populate drop-downs of vendors, microcontrollers and boards. Today the creator references a single `.ioc` or CSV file directly; this work stream extracts all supported devices into dedicated vendor crates and wires them into the build and publish pipeline.
@@ -345,6 +343,6 @@ Track a new Python-based pipeline (`afdb`) that converts STM32 vendor XML into l
 - The Python extraction script can parse both `.ioc` and `.csv` and produces consistent outputs; tests cover representative samples.
 - `rlvgl-creator` can list vendors, chips and boards via the new crates, and the UI drop-downs populate correctly.
 - CI runs extraction and publishes updated vendor crates; version numbers bump automatically when definitions change.
-- Documentation in `README.md` and this TODO is up to date, and `docs/TEST-TODO.md` includes new test IDs covering chip support (e.g. T-19 for vendor enumeration, T-20 for board loading smoke test).
+- Documentation in `README.md` and this design doc is up to date, and `docs/TEST-STRATEGY.md` includes new test IDs covering chip support (e.g. T-19 for vendor enumeration, T-20 for board loading smoke test).
 - Canonical `mcu` and `boards` IR derived from `STM32_open_pin_data` is consumable through `rlvgl-creator`, which can also convert user-supplied `.ioc` files.
 - Each STM32 data crate embeds a compressed `.bin.zst` artifact per MCU family and stays well under the 10 MB publish limit.

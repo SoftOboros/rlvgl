@@ -1,11 +1,9 @@
-<!--
-docs/TODO.md - Project TODO.
--->
+<!-- PROJECT-ROADMAP.md - High-level project roadmap. -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
-# Project TODO
+# Project Roadmap
 
 This document tracks the high-level work streams and tasks for rlvgl development.
 

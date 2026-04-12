@@ -1,4 +1,6 @@
-# Creator Workspaces & Simulator Integration
+<!-- CREATOR-WORKSPACE-INTEGRATION.md - Workspace scaffolding and simulator integration. -->
+
+# Creator Workspace Integration
 
 This document outlines the roadmap for transitioning `rlvgl-creator` from a component generator (assets, BSPs) to a full project lifecycle manager. The goal is to provide a "zero-friction" workspace where user interface code is shared between a high-performance desktop simulator and the target embedded hardware.
 
