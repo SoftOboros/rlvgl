@@ -103,6 +103,7 @@ Overrides:
 
 | Flag            | Effect                                              |
 |-----------------|-----------------------------------------------------|
+| `--vendor`      | Vendor backend: `esp`, `nrf`, `nxp`, `rp`, `renesas` (aliases: `espressif`, `nordic`, `imxrt`, `rp2040`, `ra`) |
 | `--cpu-hz`      | Override the resolved CPU frequency in hertz        |
 | `--baud`        | Override the console baud rate                      |
 | `--chip`        | Use a different chip spec file stem (default: esp32c3) |
@@ -112,6 +113,100 @@ Overrides:
 Add or edit chips and boards by dropping new YAML files into
 `chipdb/rlvgl-chips-esp/db/chips/` and `chipdb/rlvgl-chips-esp/db/boards/`
 and rebuilding.
+
+### Nordic nRF (YAML chipdb input)
+
+```sh
+cargo run --bin rlgvl-creator --features creator -- bsp from-yaml \
+    --vendor nrf \
+    --board nrf52840_dk \
+    --out gen/ \
+    --emit-pac
+```
+
+Consumes the YAML chip and board specs embedded in `rlvgl-chips-nrf` and
+emits a PAC-style BSP targeting the `nrf52840_pac` PAC crate. Uses
+PSEL-based pin routing for peripheral-to-pin assignment.
+
+The generated BSP consists of six files under `gen/<board_stem>/`:
+
+- `mod.rs` — module index
+- `pac.rs` — `pub fn init()` entry sequencing clocks, GPIO, peripherals
+- `clocks.rs` — clock configuration
+- `gpio.rs` — PSEL-based pin routing for each peripheral
+- `peripherals.rs` — per-instance peripheral init
+- `board.rs` — board constants and labeled pin consts
+
+### NXP i.MX RT (YAML chipdb input)
+
+```sh
+cargo run --bin rlgvl-creator --features creator -- bsp from-yaml \
+    --vendor nxp \
+    --board mimxrt1060_evkb \
+    --out gen/ \
+    --emit-pac
+```
+
+Consumes the YAML chip and board specs embedded in `rlvgl-chips-nxp` and
+emits a BSP targeting the `imxrt_ral` register access layer. Uses IOMUX
+ALT0-7 pad routing with daisy chain SELECT_INPUT muxing and CCM CCGR
+clock gating.
+
+The generated BSP consists of six files under `gen/<board_stem>/`:
+
+- `mod.rs` — module index
+- `pac.rs` — `pub fn init()` entry sequencing clocks, IOMUX, peripherals
+- `clocks.rs` — CCM CCGR clock-gate enables
+- `iomux.rs` — per-pad ALT mux + daisy chain SELECT_INPUT routing
+- `peripherals.rs` — per-instance peripheral init
+- `board.rs` — board constants and labeled pin consts
+
+### RP2040 (YAML chipdb input)
+
+```sh
+cargo run --bin rlgvl-creator --features creator -- bsp from-yaml \
+    --vendor rp \
+    --board pico \
+    --out gen/ \
+    --emit-pac
+```
+
+Consumes the YAML chip and board specs embedded in `rlvgl-chips-rp2040`
+and emits a BSP targeting the `rp2040_pac` PAC crate. Uses FUNCSEL
+per-GPIO pin routing and RESETS register for peripheral reset release (no
+clock gating).
+
+The generated BSP consists of six files under `gen/<board_stem>/`:
+
+- `mod.rs` — module index
+- `pac.rs` — `pub fn init()` entry sequencing clocks, GPIO, peripherals
+- `clocks.rs` — clock and RESETS configuration
+- `gpio.rs` — per-GPIO FUNCSEL routing
+- `peripherals.rs` — per-instance peripheral init
+- `board.rs` — board constants and labeled pin consts
+
+### Renesas RA (YAML chipdb input)
+
+```sh
+cargo run --bin rlgvl-creator --features creator -- bsp from-yaml \
+    --vendor renesas \
+    --board ek_ra6m5 \
+    --out gen/ \
+    --emit-pac
+```
+
+Consumes the YAML chip and board specs embedded in `rlvgl-chips-renesas`
+and emits a BSP using raw register addresses (no PAC crate). Uses PFS
+PSEL + PMR pin routing and MSTP clock gating.
+
+The generated BSP consists of six files under `gen/<board_stem>/`:
+
+- `mod.rs` — module index
+- `pac.rs` — `pub fn init()` entry sequencing clocks, PFS, peripherals
+- `clocks.rs` — MSTP clock-gate enables
+- `pfs.rs` — PFS PSEL + PMR pin function select and routing
+- `peripherals.rs` — per-instance peripheral init
+- `board.rs` — board constants and labeled pin consts
 
 ## Desktop UI and Emulator
 
