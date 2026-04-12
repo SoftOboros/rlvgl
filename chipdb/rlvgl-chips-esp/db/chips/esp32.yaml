@@ -1,0 +1,476 @@
+# ESP32 (classic) chip inventory IR for rlvgl-creator BSP generation.
+#
+# Source: Espressif ESP32 Technical Reference Manual v5.3 and ESP32 Series
+# Datasheet v4.6. Field names and register paths target the `esp32` PAC crate
+# (https://docs.rs/esp32). Register paths use snake_case PAC form, e.g.
+# `dport.perip_clk_en.uart_clk_en`.
+#
+# ESP32 is dual-core Xtensa LX6 with WiFi 4 + BLE 4.2 (classic BT optional).
+# Unlike S2/S3/C3 which use the SYSTEM block, the classic ESP32 uses the DPORT
+# block for peripheral clock gating and reset: dport.perip_clk_en / dport.perip_rst_en.
+# Peripheral base addresses are on the APB bus at 0x3FF4_0000..0x3FF6_FFFF.
+
+name: ESP32
+arch: xtensa-lx6
+package: QFN48-6x6
+pac_crate: esp32
+gpio_count: 40   # GPIO0-39; GPIO34-39 are input-only; GPIO6-11 flash; GPIO16-17 PSRAM on WROVER
+
+memory:
+  # TRM Chapter 1 System and Memory — Table 1-3 Address Mapping.
+  - { name: irom_internal, base: 0x40000000, size: 0x00070000, access: rx  }  # 448 KB Internal ROM 0+1 (I-bus)
+  - { name: drom_internal, base: 0x3FF90000, size: 0x00010000, access: r   }  # 64 KB Internal ROM 1 (D-bus)
+  - { name: iram,          base: 0x40070000, size: 0x00030000, access: rwx }  # Internal SRAM 0 (I-bus, 192 KB)
+  - { name: iram1,         base: 0x400A0000, size: 0x00040000, access: rwx }  # Internal SRAM 1 (I-bus alias, 256 KB)
+  - { name: dram,          base: 0x3FFB0000, size: 0x00050000, access: rw  }  # Internal SRAM 2 (D-bus, 200 KB + 128 KB)
+  # Cache-mapped external memory windows.
+  - { name: drom,          base: 0x3F400000, size: 0x00400000, access: r   }  # External flash data (D-bus, up to 4 MB per mapping)
+  - { name: irom,          base: 0x400C0000, size: 0x00400000, access: rx  }  # External flash instruction (I-bus, up to 4 MB)
+  - { name: psram,         base: 0x3F800000, size: 0x00400000, access: rw  }  # External PSRAM via cache (D-bus, up to 4 MB)
+  # RTC memory.
+  - { name: rtc_fast,      base: 0x3FF80000, size: 0x00002000, access: rwx }  # 8 KB RTC FAST
+  - { name: rtc_slow,      base: 0x50000000, size: 0x00002000, access: rwx }  # 8 KB RTC SLOW
+
+clock_tree:
+  xtal_hz: 40000000
+  pll_freqs_hz: [320000000, 480000000]
+  cpu_freqs_hz: [80000000, 160000000, 240000000]
+  apb_hz: 80000000
+  rtc_fast_src: [xtal_d4, rc_fast]
+  rtc_slow_src: [rc_slow, xtal32k, rc_fast_d256]
+  # DPORT peripheral clock enables / resets. The classic ESP32 uses the DPORT
+  # block (not SYSTEM or PCR). TRM Chapter 3 System Registers, DPORT_PERIP_CLK_EN_REG
+  # and DPORT_PERIP_RST_EN_REG.
+  # Clock enable: set bit to 1 to ungate. Reset: set bit to 1 to assert reset, 0 to release.
+  system_gates:
+    uart0:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: uart_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    uart_rst
+    uart1:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: uart1_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    uart1_rst
+    uart2:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: uart2_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    uart2_rst
+    spi2:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: spi2_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    spi2_rst
+    spi3:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: spi3_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    spi3_rst
+    i2c0:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: i2c_ext0_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    i2c_ext0_rst
+    i2c1:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: i2c_ext1_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    i2c_ext1_rst
+    timg0:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: timergroup_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    timergroup_rst
+    timg1:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: timergroup1_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    timergroup1_rst
+    ledc:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: ledc_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    ledc_rst
+    i2s0:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: i2s0_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    i2s0_rst
+    i2s1:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: i2s1_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    i2s1_rst
+    rmt:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: rmt_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    rmt_rst
+    twai:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: twai_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    twai_rst
+    sdmmc:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: sdio_host_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    sdio_host_rst
+    mcpwm0:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: pwm0_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    pwm0_rst
+    mcpwm1:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: pwm1_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    pwm1_rst
+    pcnt:
+      clk_en_reg:   dport.perip_clk_en
+      clk_en_field: pcnt_clk_en
+      rst_reg:      dport.perip_rst_en
+      rst_field:    pcnt_rst
+
+peripherals:
+  # Base addresses from ESP32 TRM Chapter 1 Table 1-4 (Peripheral Address Mapping).
+  # All on the APB bus at 0x3FF4_xxxx..0x3FF6_xxxx.
+  # IRQ source numbers from TRM Chapter 2 Table 2-1.
+  uart0:
+    class: uart
+    instance: uart0
+    base: 0x3FF40000
+    irq: 34
+    signals:
+      - { role: tx,  direction: out, gpio_matrix_id: 14, iomux_pin: 1,  iomux_fn: 0 }
+      - { role: rx,  direction: in,  gpio_matrix_id: 14, iomux_pin: 3,  iomux_fn: 0 }
+      - { role: rts, direction: out, gpio_matrix_id: 15 }
+      - { role: cts, direction: in,  gpio_matrix_id: 15 }
+
+  uart1:
+    class: uart
+    instance: uart1
+    base: 0x3FF50000
+    irq: 35
+    signals:
+      - { role: tx,  direction: out, gpio_matrix_id: 17, iomux_pin: 10, iomux_fn: 0 }
+      - { role: rx,  direction: in,  gpio_matrix_id: 18, iomux_pin: 9,  iomux_fn: 0 }
+      - { role: rts, direction: out, gpio_matrix_id: 19 }
+      - { role: cts, direction: in,  gpio_matrix_id: 20 }
+
+  uart2:
+    class: uart
+    instance: uart2
+    base: 0x3FF6E000
+    irq: 36
+    signals:
+      - { role: tx,  direction: out, gpio_matrix_id: 198, iomux_pin: 17, iomux_fn: 0 }
+      - { role: rx,  direction: in,  gpio_matrix_id: 198, iomux_pin: 16, iomux_fn: 0 }
+      - { role: rts, direction: out, gpio_matrix_id: 199 }
+      - { role: cts, direction: in,  gpio_matrix_id: 199 }
+
+  spi2:
+    class: spi_master
+    instance: spi2    # HSPI
+    base: 0x3FF64000
+    irq: 30
+    signals:
+      - { role: sck,  direction: out, gpio_matrix_id: 8,  iomux_pin: 14, iomux_fn: 1 }
+      - { role: mosi, direction: out, gpio_matrix_id: 9,  iomux_pin: 13, iomux_fn: 1 }
+      - { role: miso, direction: in,  gpio_matrix_id: 9,  iomux_pin: 12, iomux_fn: 1 }
+      - { role: cs0,  direction: out, gpio_matrix_id: 10, iomux_pin: 15, iomux_fn: 1 }
+
+  spi3:
+    class: spi_master
+    instance: spi3    # VSPI
+    base: 0x3FF65000
+    irq: 31
+    signals:
+      - { role: sck,  direction: out, gpio_matrix_id: 63, iomux_pin: 18, iomux_fn: 1 }
+      - { role: mosi, direction: out, gpio_matrix_id: 64, iomux_pin: 23, iomux_fn: 1 }
+      - { role: miso, direction: in,  gpio_matrix_id: 64, iomux_pin: 19, iomux_fn: 1 }
+      - { role: cs0,  direction: out, gpio_matrix_id: 68, iomux_pin: 5,  iomux_fn: 1 }
+
+  i2c0:
+    class: i2c
+    instance: i2c0
+    base: 0x3FF53000
+    irq: 49
+    signals:
+      - { role: scl, direction: inout, gpio_matrix_id: 29 }
+      - { role: sda, direction: inout, gpio_matrix_id: 30 }
+
+  i2c1:
+    class: i2c
+    instance: i2c1
+    base: 0x3FF67000
+    irq: 50
+    signals:
+      - { role: scl, direction: inout, gpio_matrix_id: 95 }
+      - { role: sda, direction: inout, gpio_matrix_id: 96 }
+
+  timg0:
+    class: timg
+    instance: timg0
+    base: 0x3FF5F000
+    irq: 14
+    signals: []
+
+  timg1:
+    class: timg
+    instance: timg1
+    base: 0x3FF60000
+    irq: 15
+    signals: []
+
+  ledc:
+    class: ledc
+    instance: ledc
+    base: 0x3FF59000
+    irq: 43
+    signals:
+      - { role: hs_ch0, direction: out, gpio_matrix_id: 71 }
+      - { role: hs_ch1, direction: out, gpio_matrix_id: 72 }
+      - { role: hs_ch2, direction: out, gpio_matrix_id: 73 }
+      - { role: hs_ch3, direction: out, gpio_matrix_id: 74 }
+      - { role: hs_ch4, direction: out, gpio_matrix_id: 75 }
+      - { role: hs_ch5, direction: out, gpio_matrix_id: 76 }
+      - { role: hs_ch6, direction: out, gpio_matrix_id: 77 }
+      - { role: hs_ch7, direction: out, gpio_matrix_id: 78 }
+      - { role: ls_ch0, direction: out, gpio_matrix_id: 79 }
+      - { role: ls_ch1, direction: out, gpio_matrix_id: 80 }
+      - { role: ls_ch2, direction: out, gpio_matrix_id: 81 }
+      - { role: ls_ch3, direction: out, gpio_matrix_id: 82 }
+      - { role: ls_ch4, direction: out, gpio_matrix_id: 83 }
+      - { role: ls_ch5, direction: out, gpio_matrix_id: 84 }
+      - { role: ls_ch6, direction: out, gpio_matrix_id: 85 }
+      - { role: ls_ch7, direction: out, gpio_matrix_id: 86 }
+
+  i2s0:
+    class: i2s
+    instance: i2s0
+    base: 0x3FF4F000
+    irq: 37
+    signals:
+      - { role: bck_out,  direction: out, gpio_matrix_id: 1  }
+      - { role: ws_out,   direction: out, gpio_matrix_id: 2  }
+      - { role: sd_out,   direction: out, gpio_matrix_id: 3  }
+      - { role: bck_in,   direction: in,  gpio_matrix_id: 4  }
+      - { role: ws_in,    direction: in,  gpio_matrix_id: 5  }
+      - { role: sd_in,    direction: in,  gpio_matrix_id: 6  }
+
+  i2s1:
+    class: i2s
+    instance: i2s1
+    base: 0x3FF6D000
+    irq: 38
+    signals:
+      - { role: bck_out,  direction: out, gpio_matrix_id: 157 }
+      - { role: ws_out,   direction: out, gpio_matrix_id: 158 }
+      - { role: sd_out,   direction: out, gpio_matrix_id: 159 }
+      - { role: bck_in,   direction: in,  gpio_matrix_id: 160 }
+      - { role: ws_in,    direction: in,  gpio_matrix_id: 161 }
+      - { role: sd_in,    direction: in,  gpio_matrix_id: 162 }
+
+  rmt:
+    class: rmt
+    instance: rmt
+    base: 0x3FF56000
+    irq: 44
+    signals:
+      - { role: ch0, direction: out, gpio_matrix_id: 87  }
+      - { role: ch1, direction: out, gpio_matrix_id: 88  }
+      - { role: ch2, direction: out, gpio_matrix_id: 89  }
+      - { role: ch3, direction: out, gpio_matrix_id: 90  }
+      - { role: ch4, direction: out, gpio_matrix_id: 91  }
+      - { role: ch5, direction: out, gpio_matrix_id: 92  }
+      - { role: ch6, direction: out, gpio_matrix_id: 93  }
+      - { role: ch7, direction: out, gpio_matrix_id: 94  }
+      - { role: ch0_in, direction: in, gpio_matrix_id: 83 }
+      - { role: ch1_in, direction: in, gpio_matrix_id: 84 }
+      - { role: ch2_in, direction: in, gpio_matrix_id: 85 }
+      - { role: ch3_in, direction: in, gpio_matrix_id: 86 }
+      - { role: ch4_in, direction: in, gpio_matrix_id: 87 }
+      - { role: ch5_in, direction: in, gpio_matrix_id: 88 }
+      - { role: ch6_in, direction: in, gpio_matrix_id: 89 }
+      - { role: ch7_in, direction: in, gpio_matrix_id: 90 }
+
+  twai:
+    class: twai
+    instance: twai
+    base: 0x3FF6B000
+    irq: 45
+    signals:
+      - { role: tx, direction: out, gpio_matrix_id: 123 }
+      - { role: rx, direction: in,  gpio_matrix_id: 124 }
+
+  sdmmc:
+    class: sdmmc
+    instance: sdmmc
+    base: 0x3FF68000
+    irq: 33
+    signals:
+      - { role: clk,  direction: out, iomux_pin: 6,  iomux_fn: 3 }  # Note: GPIO6-11 flash; SDMMC typically via slot 1
+      - { role: cmd,  direction: inout, iomux_pin: 11, iomux_fn: 3 }
+      - { role: d0,   direction: inout, iomux_pin: 7,  iomux_fn: 3 }
+      - { role: d1,   direction: inout, iomux_pin: 8,  iomux_fn: 3 }
+      - { role: d2,   direction: inout, iomux_pin: 9,  iomux_fn: 3 }
+      - { role: d3,   direction: inout, iomux_pin: 10, iomux_fn: 3 }
+
+  adc1:
+    class: adc
+    instance: adc1
+    base: 0x3FF48800     # SAR ADC in RTC block (SENS_SAR)
+    irq: null
+    signals: []
+
+  adc2:
+    class: adc
+    instance: adc2
+    base: 0x3FF48800     # shared with ADC1 in RTC block
+    irq: null
+    signals: []
+
+  dac:
+    class: dac
+    instance: dac
+    base: 0x3FF48800     # DAC registers in RTC SENS block
+    irq: null
+    signals:
+      - { role: ch1, direction: out, iomux_pin: 25 }  # DAC1 = GPIO25
+      - { role: ch2, direction: out, iomux_pin: 26 }  # DAC2 = GPIO26
+
+  mcpwm0:
+    class: mcpwm
+    instance: mcpwm0
+    base: 0x3FF5E000
+    irq: 39
+    signals: []
+
+  mcpwm1:
+    class: mcpwm
+    instance: mcpwm1
+    base: 0x3FF6C000
+    irq: 40
+    signals: []
+
+  pcnt:
+    class: pcnt
+    instance: pcnt
+    base: 0x3FF57000
+    irq: 48
+    signals: []
+
+# IO MUX pin summary (TRM Chapter 4 IO_MUX, Table 4-3). ESP32 has six function
+# slots per pin (F0..F5) — more than any other ESP chip. GPIO34-39 are input-only.
+# GPIO6-11 are reserved for SPI flash on all modules. GPIO16-17 are used by PSRAM
+# on WROVER modules.
+#
+# Strapping pins: GPIO0, GPIO2, GPIO5, GPIO12 (MTDI), GPIO15 (MTDO).
+# Touch: GPIO0, GPIO2, GPIO4, GPIO12-15, GPIO27, GPIO32-33.
+# ADC1: GPIO32-39 (ch4-ch7, ch0-ch3). ADC2: GPIO0,2,4,12-15,25-27.
+# DAC: GPIO25 (DAC1), GPIO26 (DAC2).
+io_mux:
+  - { gpio: 0,  pad_name: GPIO0,     fn0: GPIO0,  fn1: CLK_OUT1, fn2: GPIO0,  fn3: null, fn4: null, fn5: EMAC_TX_CLK, strap: true,  rtc_fn: RTC_GPIO11, analog: ADC2_CH1, touch: TOUCH1 }
+  - { gpio: 1,  pad_name: U0TXD,     fn0: U0TXD,  fn1: CLK_OUT3, fn2: GPIO1,  fn3: null, fn4: null, fn5: EMAC_RXD2 }
+  - { gpio: 2,  pad_name: GPIO2,     fn0: GPIO2,  fn1: HSPIWP,   fn2: GPIO2,  fn3: HS2_DATA0, fn4: SD_DATA0, fn5: null, strap: true, rtc_fn: RTC_GPIO12, analog: ADC2_CH2, touch: TOUCH2 }
+  - { gpio: 3,  pad_name: U0RXD,     fn0: U0RXD,  fn1: CLK_OUT2, fn2: GPIO3,  fn3: null, fn4: null, fn5: null }
+  - { gpio: 4,  pad_name: GPIO4,     fn0: GPIO4,  fn1: HSPIHD,   fn2: GPIO4,  fn3: HS2_DATA1, fn4: SD_DATA1, fn5: EMAC_TX_ER, rtc_fn: RTC_GPIO10, analog: ADC2_CH0, touch: TOUCH0 }
+  - { gpio: 5,  pad_name: GPIO5,     fn0: GPIO5,  fn1: VSPICS0,  fn2: GPIO5,  fn3: HS1_DATA6, fn4: null, fn5: EMAC_RX_CLK, strap: true }
+  - { gpio: 6,  pad_name: SD_CLK,    fn0: SD_CLK, fn1: SPICLK,   fn2: GPIO6,  fn3: HS1_CLK,   fn4: U1CTS, fn5: null, flash_reserved: true }
+  - { gpio: 7,  pad_name: SD_DATA0,  fn0: SD_DATA0, fn1: SPIQ,   fn2: GPIO7,  fn3: HS1_DATA0, fn4: U2RTS, fn5: null, flash_reserved: true }
+  - { gpio: 8,  pad_name: SD_DATA1,  fn0: SD_DATA1, fn1: SPID,   fn2: GPIO8,  fn3: HS1_DATA1, fn4: U2CTS, fn5: null, flash_reserved: true }
+  - { gpio: 9,  pad_name: SD_DATA2,  fn0: SD_DATA2, fn1: SPIHD,  fn2: GPIO9,  fn3: HS1_DATA2, fn4: U1RXD, fn5: null, flash_reserved: true }
+  - { gpio: 10, pad_name: SD_DATA3,  fn0: SD_DATA3, fn1: SPIWP,  fn2: GPIO10, fn3: HS1_DATA3, fn4: U1TXD, fn5: null, flash_reserved: true }
+  - { gpio: 11, pad_name: SD_CMD,    fn0: SD_CMD,   fn1: SPICS0, fn2: GPIO11, fn3: HS1_CMD,   fn4: U1RTS, fn5: null, flash_reserved: true }
+  - { gpio: 12, pad_name: MTDI,      fn0: MTDI,   fn1: HSPIQ,    fn2: GPIO12, fn3: HS2_DATA2, fn4: SD_DATA2, fn5: EMAC_TXD3, strap: true, rtc_fn: RTC_GPIO15, analog: ADC2_CH5, touch: TOUCH5 }
+  - { gpio: 13, pad_name: MTCK,      fn0: MTCK,   fn1: HSPID,    fn2: GPIO13, fn3: HS2_DATA3, fn4: SD_DATA3, fn5: EMAC_RX_ER, rtc_fn: RTC_GPIO14, analog: ADC2_CH4, touch: TOUCH4 }
+  - { gpio: 14, pad_name: MTMS,      fn0: MTMS,   fn1: HSPICLK,  fn2: GPIO14, fn3: HS2_CLK,   fn4: SD_CLK,   fn5: EMAC_TXD2, rtc_fn: RTC_GPIO16, analog: ADC2_CH6, touch: TOUCH6 }
+  - { gpio: 15, pad_name: MTDO,      fn0: MTDO,   fn1: HSPICS0,  fn2: GPIO15, fn3: HS2_CMD,   fn4: SD_CMD,   fn5: EMAC_RXD3, strap: true, rtc_fn: RTC_GPIO13, analog: ADC2_CH3, touch: TOUCH3 }
+  - { gpio: 16, pad_name: GPIO16,    fn0: GPIO16, fn1: null,      fn2: GPIO16, fn3: HS1_DATA4, fn4: U2RXD,    fn5: EMAC_CLK_OUT, psram_reserved: true }
+  - { gpio: 17, pad_name: GPIO17,    fn0: GPIO17, fn1: null,      fn2: GPIO17, fn3: HS1_DATA5, fn4: U2TXD,    fn5: EMAC_CLK_180, psram_reserved: true }
+  - { gpio: 18, pad_name: GPIO18,    fn0: GPIO18, fn1: VSPICLK,   fn2: GPIO18, fn3: HS1_DATA7, fn4: null,     fn5: null }
+  - { gpio: 19, pad_name: GPIO19,    fn0: GPIO19, fn1: VSPIQ,     fn2: GPIO19, fn3: U0CTS,     fn4: null,     fn5: EMAC_TXD0 }
+  - { gpio: 20, pad_name: GPIO20,    fn0: GPIO20, fn1: null,      fn2: GPIO20, fn3: null,      fn4: null,     fn5: null }  # Not bonded out on most packages
+  - { gpio: 21, pad_name: GPIO21,    fn0: GPIO21, fn1: VSPIHD,    fn2: GPIO21, fn3: null,      fn4: null,     fn5: EMAC_TX_EN }
+  - { gpio: 22, pad_name: GPIO22,    fn0: GPIO22, fn1: VSPIWP,    fn2: GPIO22, fn3: U0RTS,     fn4: null,     fn5: EMAC_TXD1 }
+  - { gpio: 23, pad_name: GPIO23,    fn0: GPIO23, fn1: VSPID,     fn2: GPIO23, fn3: HS1_STROBE,fn4: null,     fn5: null }
+  - { gpio: 25, pad_name: GPIO25,    fn0: GPIO25, fn1: null,      fn2: GPIO25, fn3: null,      fn4: null,     fn5: EMAC_RXD0, rtc_fn: RTC_GPIO6, analog: ADC2_CH8, dac: DAC1 }
+  - { gpio: 26, pad_name: GPIO26,    fn0: GPIO26, fn1: null,      fn2: GPIO26, fn3: null,      fn4: null,     fn5: EMAC_RXD1, rtc_fn: RTC_GPIO7, analog: ADC2_CH9, dac: DAC2 }
+  - { gpio: 27, pad_name: GPIO27,    fn0: GPIO27, fn1: null,      fn2: GPIO27, fn3: null,      fn4: null,     fn5: EMAC_RX_DV, rtc_fn: RTC_GPIO17, analog: ADC2_CH7, touch: TOUCH7 }
+  - { gpio: 32, pad_name: 32K_XP,    fn0: GPIO32, fn1: null,      fn2: GPIO32, fn3: null,      fn4: null,     fn5: null, rtc_fn: RTC_GPIO9, analog: ADC1_CH4, touch: TOUCH9 }
+  - { gpio: 33, pad_name: 32K_XN,    fn0: GPIO33, fn1: null,      fn2: GPIO33, fn3: null,      fn4: null,     fn5: null, rtc_fn: RTC_GPIO8, analog: ADC1_CH5, touch: TOUCH8 }
+  # GPIO34-39: input-only pins (no output driver, no pull-up/pull-down).
+  - { gpio: 34, pad_name: VDET_1,    fn0: GPIO34, fn1: null,      fn2: GPIO34, fn3: null,      fn4: null,     fn5: null, input_only: true, rtc_fn: RTC_GPIO4, analog: ADC1_CH6 }
+  - { gpio: 35, pad_name: VDET_2,    fn0: GPIO35, fn1: null,      fn2: GPIO35, fn3: null,      fn4: null,     fn5: null, input_only: true, rtc_fn: RTC_GPIO5, analog: ADC1_CH7 }
+  - { gpio: 36, pad_name: SENSOR_VP, fn0: GPIO36, fn1: null,      fn2: GPIO36, fn3: null,      fn4: null,     fn5: null, input_only: true, rtc_fn: RTC_GPIO0, analog: ADC1_CH0 }
+  - { gpio: 37, pad_name: SENSOR_CAPP, fn0: GPIO37, fn1: null,    fn2: GPIO37, fn3: null,      fn4: null,     fn5: null, input_only: true, rtc_fn: RTC_GPIO1, analog: ADC1_CH1 }
+  - { gpio: 38, pad_name: SENSOR_CAPN, fn0: GPIO38, fn1: null,    fn2: GPIO38, fn3: null,      fn4: null,     fn5: null, input_only: true, rtc_fn: RTC_GPIO2, analog: ADC1_CH2 }
+  - { gpio: 39, pad_name: SENSOR_VN, fn0: GPIO39, fn1: null,      fn2: GPIO39, fn3: null,      fn4: null,     fn5: null, input_only: true, rtc_fn: RTC_GPIO3, analog: ADC1_CH3 }
+
+# GPIO matrix signal IDs (TRM Chapter 4, Tables 4-1 and 4-2).
+# Commonly-used subset for UART/SPI/I2C/LEDC/I2S/RMT/TWAI. The classic ESP32
+# has a 256-entry signal matrix. Extend as needed.
+gpio_matrix:
+  - { id: 1,   name: I2S0O_BCK,      direction: out }
+  - { id: 2,   name: I2S0O_WS,       direction: out }
+  - { id: 3,   name: I2S0O_SD,       direction: out }
+  - { id: 4,   name: I2S0I_BCK,      direction: in  }
+  - { id: 5,   name: I2S0I_WS,       direction: in  }
+  - { id: 6,   name: I2S0I_SD,       direction: in  }
+  - { id: 8,   name: HSPICS1,        direction: out }  # HSPI CS1 (GPIO matrix routed)
+  - { id: 9,   name: HSPID,          direction: out }  # HSPI MOSI
+  - { id: 10,  name: HSPICS0,        direction: out }  # HSPI CS0
+  - { id: 14,  name: U0TXD,          direction: out }
+  - { id: 14,  name: U0RXD,          direction: in  }
+  - { id: 15,  name: U0RTS,          direction: out }
+  - { id: 15,  name: U0CTS,          direction: in  }
+  - { id: 17,  name: U1TXD,          direction: out }
+  - { id: 18,  name: U1RXD,          direction: in  }
+  - { id: 19,  name: U1RTS,          direction: out }
+  - { id: 20,  name: U1CTS,          direction: in  }
+  - { id: 29,  name: I2CEXT0_SCL,    direction: inout }
+  - { id: 30,  name: I2CEXT0_SDA,    direction: inout }
+  - { id: 63,  name: VSPICLK,        direction: out }  # VSPI CLK
+  - { id: 64,  name: VSPID,          direction: out }  # VSPI MOSI
+  - { id: 68,  name: VSPICS0,        direction: out }  # VSPI CS0
+  - { id: 71,  name: LEDC_HS_CH0,    direction: out }
+  - { id: 72,  name: LEDC_HS_CH1,    direction: out }
+  - { id: 73,  name: LEDC_HS_CH2,    direction: out }
+  - { id: 74,  name: LEDC_HS_CH3,    direction: out }
+  - { id: 75,  name: LEDC_HS_CH4,    direction: out }
+  - { id: 76,  name: LEDC_HS_CH5,    direction: out }
+  - { id: 77,  name: LEDC_HS_CH6,    direction: out }
+  - { id: 78,  name: LEDC_HS_CH7,    direction: out }
+  - { id: 79,  name: LEDC_LS_CH0,    direction: out }
+  - { id: 80,  name: LEDC_LS_CH1,    direction: out }
+  - { id: 81,  name: LEDC_LS_CH2,    direction: out }
+  - { id: 82,  name: LEDC_LS_CH3,    direction: out }
+  - { id: 83,  name: LEDC_LS_CH4,    direction: out }
+  - { id: 84,  name: LEDC_LS_CH5,    direction: out }
+  - { id: 85,  name: LEDC_LS_CH6,    direction: out }
+  - { id: 86,  name: LEDC_LS_CH7,    direction: out }
+  - { id: 87,  name: RMT_SIG_OUT0,   direction: out }
+  - { id: 88,  name: RMT_SIG_OUT1,   direction: out }
+  - { id: 89,  name: RMT_SIG_OUT2,   direction: out }
+  - { id: 90,  name: RMT_SIG_OUT3,   direction: out }
+  - { id: 91,  name: RMT_SIG_OUT4,   direction: out }
+  - { id: 92,  name: RMT_SIG_OUT5,   direction: out }
+  - { id: 93,  name: RMT_SIG_OUT6,   direction: out }
+  - { id: 94,  name: RMT_SIG_OUT7,   direction: out }
+  - { id: 95,  name: I2CEXT1_SCL,    direction: inout }
+  - { id: 96,  name: I2CEXT1_SDA,    direction: inout }
+  - { id: 123, name: TWAI_TX,        direction: out }
+  - { id: 124, name: TWAI_RX,        direction: in  }
+  - { id: 157, name: I2S1O_BCK,      direction: out }
+  - { id: 158, name: I2S1O_WS,       direction: out }
+  - { id: 159, name: I2S1O_SD,       direction: out }
+  - { id: 160, name: I2S1I_BCK,      direction: in  }
+  - { id: 161, name: I2S1I_WS,       direction: in  }
+  - { id: 162, name: I2S1I_SD,       direction: in  }
+  - { id: 198, name: U2TXD,          direction: out }
+  - { id: 198, name: U2RXD,          direction: in  }
+  - { id: 199, name: U2RTS,          direction: out }
+  - { id: 199, name: U2CTS,          direction: in  }
