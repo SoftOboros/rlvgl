@@ -906,11 +906,26 @@ pub fn run() -> Result<()> {
                         println!("{name}");
                     }
                 }
+                "nrf" | "nordic" => {
+                    for name in rlvgl_chips_nrf::chip_names() {
+                        println!("{name}");
+                    }
+                }
                 other => return Err(anyhow!("unsupported vendor: {other}")),
             },
             BspCommand::ListBoards { vendor, chip } => match vendor.as_str() {
                 "esp" | "espressif" => {
                     for info in rlvgl_chips_esp::boards() {
+                        if let Some(ref filter) = chip {
+                            if !info.chip.eq_ignore_ascii_case(filter) {
+                                continue;
+                            }
+                        }
+                        println!("{:<40} {}", info.board, info.chip);
+                    }
+                }
+                "nrf" | "nordic" => {
+                    for info in rlvgl_chips_nrf::boards() {
                         if let Some(ref filter) = chip {
                             if !info.chip.eq_ignore_ascii_case(filter) {
                                 continue;
@@ -965,9 +980,31 @@ pub fn run() -> Result<()> {
                             println!("generated {} files in {}", written.len(), out.display());
                         }
                     }
+                    "nrf" | "nordic" => {
+                        let board_ir = if let Some(path) = board_yaml.as_ref() {
+                            crate::bsp::nordic::load_board_file(path)?
+                        } else {
+                            crate::bsp::nordic::load_board_db(&board)?
+                        };
+                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
+                            crate::bsp::nordic::load_chip_file(path)?
+                        } else {
+                            let name = match chip.as_deref() {
+                                Some(c) => c.to_string(),
+                                None => board_ir.chip.to_ascii_lowercase().replace('-', ""),
+                            };
+                            crate::bsp::nordic::load_chip_db(&name)?
+                        };
+                        let ir = crate::bsp::nordic::merge(chip_ir, board_ir)?;
+                        let written = crate::bsp::nordic::render_nrf_pac(&ir, &out)?;
+                        if !cli.silent {
+                            println!("generated {} files in {}", written.len(), out.display());
+                        }
+                    }
                     other => {
                         return Err(anyhow!(
-                            "bsp from-yaml does not support vendor '{other}' (supported: esp, espressif)"
+                            "bsp from-yaml does not support vendor '{other}' \
+                             (supported: esp, espressif, nrf, nordic)"
                         ));
                     }
                 }

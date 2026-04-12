@@ -1,0 +1,87 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Enables and configures each peripheral used by the board.
+//! PSEL pin routing is done in `gpio.rs`; this module handles the
+//! peripheral-internal configuration (baud rate, clock frequency, etc.).
+
+use {{ ir.chip.pac_crate }} as pac;
+
+/// Initialize every board peripheral in dependency order.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% set periph = ir.chip.peripherals[name] %}
+{% if periph %}
+{% if periph.class == "uart" and ir.board.console and ir.board.console.peripheral == name %}
+/// Enable {{ name | upper }} as the console at {{ ir.board.console.baud }} baud.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+{% if periph.enable_val %}
+    // Enable UARTE (ENABLE = {{ periph.enable_val }}).
+    p.{{ name | upper }}.enable.write(|w| unsafe { w.bits({{ periph.enable_val }}) });
+{% endif %}
+{% if ir.board.console.baud == 115200 %}
+    // Baud rate: 115200
+    p.{{ name | upper }}.baudrate.write(|w| w.baudrate().baud115200());
+{% elif ir.board.console.baud == 9600 %}
+    p.{{ name | upper }}.baudrate.write(|w| w.baudrate().baud9600());
+{% elif ir.board.console.baud == 1000000 %}
+    p.{{ name | upper }}.baudrate.write(|w| w.baudrate().baud1m());
+{% else %}
+    // Baud rate: {{ ir.board.console.baud }} (using closest enum)
+    p.{{ name | upper }}.baudrate.write(|w| w.baudrate().baud115200());
+{% endif %}
+    // 8N1 is the default configuration; no explicit config register on nRF.
+}
+{% elif periph.class == "spi" %}
+/// Enable {{ name | upper }} as an SPI master.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+{% if periph.enable_val %}
+    p.{{ name | upper }}.enable.write(|w| unsafe { w.bits({{ periph.enable_val }}) });
+{% endif %}
+    // Default: 4 MHz, mode 0 (CPOL=0, CPHA=0).
+    p.{{ name | upper }}.frequency.write(|w| w.frequency().m4());
+    // Config: MSB first, mode 0.
+    p.{{ name | upper }}.config.write(|w| {
+        w.order().msb_first()
+         .cpha().leading()
+         .cpol().active_high()
+    });
+}
+{% elif periph.class == "i2c" %}
+/// Enable {{ name | upper }} as an I2C master.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+{% if periph.enable_val %}
+    p.{{ name | upper }}.enable.write(|w| unsafe { w.bits({{ periph.enable_val }}) });
+{% endif %}
+    // Default: 100 kHz (K100).
+    p.{{ name | upper }}.frequency.write(|w| w.frequency().k100());
+}
+{% elif periph.class == "pwm" %}
+/// Enable {{ name | upper }} (PWM).
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+{% if periph.enable_val %}
+    p.{{ name | upper }}.enable.write(|w| unsafe { w.bits({{ periph.enable_val }}) });
+{% endif %}
+    // PWM is configured per-channel at runtime.
+}
+{% else %}
+/// TODO: initialize {{ name }} (class `{{ periph.class }}`).
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: {{ periph.class }} init for {{ name }}
+}
+{% endif %}
+{% else %}
+/// TODO: unknown peripheral `{{ name }}`.
+pub fn init_{{ name }}() {}
+{% endif %}
+
+{% endfor %}

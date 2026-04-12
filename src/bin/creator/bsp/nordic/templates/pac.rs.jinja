@@ -1,0 +1,13 @@
+//! Top-level PAC initialization for {{ ir.board.name }}.
+//!
+//! Calls sub-modules in dependency order: clocks first (HFCLK/LFCLK),
+//! then GPIO pin configuration and PSEL routing, then peripheral enable.
+
+/// Initialize the {{ ir.board.name }} BSP.
+///
+/// Call this once from `main` before using any peripherals.
+pub fn init() {
+    super::clocks::init();
+    super::gpio::init();
+    super::peripherals::init();
+}

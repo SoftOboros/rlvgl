@@ -1,0 +1,37 @@
+---
+source: tests/bsp_nrf52840_render.rs
+assertion_line: 49
+expression: content
+---
+//! Clock initialization for nRF52840-DK.
+//!
+//! Configures HFCLK (64000000 Hz, source: hfxo)
+//! and LFCLK (32768 Hz, source: lfxo).
+
+use nrf52840_pac as pac;
+
+/// HFCLK frequency in Hz.
+pub const HFCLK_HZ: u32 = 64000000;
+
+/// LFCLK frequency in Hz.
+pub const LFCLK_HZ: u32 = 32768;
+
+/// Start HFCLK and LFCLK with the selected sources.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+
+
+    // Start the high-frequency crystal oscillator (HFXO).
+    p.CLOCK.tasks_hfclkstart.write(|w| unsafe { w.bits(1) });
+    while p.CLOCK.events_hfclkstarted.read().bits() == 0 {}
+    p.CLOCK.events_hfclkstarted.write(|w| unsafe { w.bits(0) });
+
+
+
+    // Select LFXO (external 32.768 kHz crystal) and start LFCLK.
+    p.CLOCK.lfclksrc.write(|w| w.src().xtal());
+
+    p.CLOCK.tasks_lfclkstart.write(|w| unsafe { w.bits(1) });
+    while p.CLOCK.events_lfclkstarted.read().bits() == 0 {}
+    p.CLOCK.events_lfclkstarted.write(|w| unsafe { w.bits(0) });
+}

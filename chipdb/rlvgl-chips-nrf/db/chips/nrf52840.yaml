@@ -1,0 +1,262 @@
+# nRF52840 chip inventory from Nordic Product Specification v1.8.
+name: nRF52840
+arch: cortex-m4f
+package: QFN48-6x6
+pac_crate: nrf52840_pac
+
+gpio_ports:
+  - { port: 0, pin_count: 32 }
+  - { port: 1, pin_count: 16 }
+
+memory:
+  - { name: flash, base: 0x00000000, size: 0x00100000, access: rx }
+  - { name: ram, base: 0x20000000, size: 0x00040000, access: rwx }
+  - { name: ficr, base: 0x10000000, size: 0x00001000, access: r }
+  - { name: uicr, base: 0x10001000, size: 0x00001000, access: rw }
+
+clock_tree:
+  hfclk_hz: 64000000
+  lfclk_hz: 32768
+  hfclk_src: [hfxo, hfint]
+  lfclk_src: [lfxo, lfrc, lfsynth]
+  pclk16m_hz: 16000000
+
+# Shared peripheral instance slots. Only ONE instance per slot can be
+# enabled at a time. The slot's base address and IRQ are shared.
+peripheral_slots:
+  - slot: 0
+    instances: [spim0, spis0, twim0, twis0]
+    base: 0x40003000
+    irq: 3
+  - slot: 1
+    instances: [spim1, spis1, twim1, twis1]
+    base: 0x40004000
+    irq: 4
+  - slot: 2
+    instances: [spim2, spis2]
+    base: 0x40023000
+    irq: 35
+  - slot: 3
+    instances: [spim3]
+    base: 0x4002F000
+    irq: 47
+
+peripherals:
+  uarte0:
+    class: uart
+    instance: uarte0
+    base: 0x40002000
+    irq: 2
+    enable_val: 8
+    psel:
+      - { role: txd, direction: out }
+      - { role: rxd, direction: in }
+      - { role: cts, direction: in }
+      - { role: rts, direction: out }
+  uarte1:
+    class: uart
+    instance: uarte1
+    base: 0x40028000
+    irq: 40
+    enable_val: 8
+    psel:
+      - { role: txd, direction: out }
+      - { role: rxd, direction: in }
+      - { role: cts, direction: in }
+      - { role: rts, direction: out }
+  spim0:
+    class: spi
+    instance: spim0
+    slot: 0
+    enable_val: 7
+    psel:
+      - { role: sck, direction: out }
+      - { role: mosi, direction: out }
+      - { role: miso, direction: in }
+  spis0:
+    class: spi_slave
+    instance: spis0
+    slot: 0
+    enable_val: 2
+    psel:
+      - { role: sck, direction: in }
+      - { role: mosi, direction: in }
+      - { role: miso, direction: out }
+      - { role: csn, direction: in }
+  twim0:
+    class: i2c
+    instance: twim0
+    slot: 0
+    enable_val: 6
+    psel:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  twis0:
+    class: i2c_slave
+    instance: twis0
+    slot: 0
+    enable_val: 9
+    psel:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  spim1:
+    class: spi
+    instance: spim1
+    slot: 1
+    enable_val: 7
+    psel:
+      - { role: sck, direction: out }
+      - { role: mosi, direction: out }
+      - { role: miso, direction: in }
+  twim1:
+    class: i2c
+    instance: twim1
+    slot: 1
+    enable_val: 6
+    psel:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  spim2:
+    class: spi
+    instance: spim2
+    slot: 2
+    enable_val: 7
+    psel:
+      - { role: sck, direction: out }
+      - { role: mosi, direction: out }
+      - { role: miso, direction: in }
+  spim3:
+    class: spi
+    instance: spim3
+    slot: 3
+    enable_val: 7
+    psel:
+      - { role: sck, direction: out }
+      - { role: mosi, direction: out }
+      - { role: miso, direction: in }
+      - { role: csn, direction: out }
+  saadc:
+    class: adc
+    instance: saadc
+    base: 0x40007000
+    irq: 7
+    psel:
+      - { role: ain0, direction: in }
+      - { role: ain1, direction: in }
+      - { role: ain2, direction: in }
+      - { role: ain3, direction: in }
+      - { role: ain4, direction: in }
+      - { role: ain5, direction: in }
+      - { role: ain6, direction: in }
+      - { role: ain7, direction: in }
+  timer0:
+    class: timer
+    instance: timer0
+    base: 0x40008000
+    irq: 8
+    psel: []
+  timer1:
+    class: timer
+    instance: timer1
+    base: 0x40009000
+    irq: 9
+    psel: []
+  timer2:
+    class: timer
+    instance: timer2
+    base: 0x4000A000
+    irq: 10
+    psel: []
+  pwm0:
+    class: pwm
+    instance: pwm0
+    base: 0x4001C000
+    irq: 28
+    enable_val: 1
+    psel:
+      - { role: out0, direction: out }
+      - { role: out1, direction: out }
+      - { role: out2, direction: out }
+      - { role: out3, direction: out }
+  pwm1:
+    class: pwm
+    instance: pwm1
+    base: 0x40021000
+    irq: 33
+    enable_val: 1
+    psel:
+      - { role: out0, direction: out }
+      - { role: out1, direction: out }
+      - { role: out2, direction: out }
+      - { role: out3, direction: out }
+  pwm2:
+    class: pwm
+    instance: pwm2
+    base: 0x40022000
+    irq: 34
+    enable_val: 1
+    psel:
+      - { role: out0, direction: out }
+      - { role: out1, direction: out }
+      - { role: out2, direction: out }
+      - { role: out3, direction: out }
+  pwm3:
+    class: pwm
+    instance: pwm3
+    base: 0x4002D000
+    irq: 45
+    enable_val: 1
+    psel:
+      - { role: out0, direction: out }
+      - { role: out1, direction: out }
+      - { role: out2, direction: out }
+      - { role: out3, direction: out }
+  qdec:
+    class: qdec
+    instance: qdec
+    base: 0x40012000
+    irq: 18
+    enable_val: 1
+    psel:
+      - { role: a, direction: in }
+      - { role: b, direction: in }
+      - { role: led, direction: out }
+  i2s:
+    class: i2s
+    instance: i2s
+    base: 0x40025000
+    irq: 37
+    enable_val: 1
+    psel:
+      - { role: sck, direction: out }
+      - { role: lrck, direction: out }
+      - { role: sdout, direction: out }
+      - { role: sdin, direction: in }
+      - { role: mck, direction: out }
+  pdm:
+    class: pdm
+    instance: pdm
+    base: 0x4001D000
+    irq: 29
+    enable_val: 1
+    psel:
+      - { role: clk, direction: out }
+      - { role: din, direction: in }
+  usbd:
+    class: usb
+    instance: usbd
+    base: 0x40027000
+    irq: 39
+    psel: []
+  qspi:
+    class: qspi
+    instance: qspi
+    base: 0x40029000
+    irq: 41
+    psel:
+      - { role: sck, direction: out }
+      - { role: csn, direction: out }
+      - { role: io0, direction: inout }
+      - { role: io1, direction: inout }
+      - { role: io2, direction: inout }
+      - { role: io3, direction: inout }

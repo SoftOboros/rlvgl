@@ -1,0 +1,133 @@
+---
+source: tests/bsp_nrf52840_render.rs
+assertion_line: 70
+expression: content
+---
+//! Board constants for nRF52840-DK.
+//!
+//! Pin definitions, clock frequencies, and feature flags extracted from
+//! the board YAML spec.
+
+/// Board name.
+pub const BOARD_NAME: &str = "nRF52840-DK";
+
+/// Chip name.
+pub const CHIP_NAME: &str = "nRF52840";
+
+/// HFCLK frequency in Hz.
+pub const HFCLK_HZ: u32 = 64000000;
+
+/// LFCLK frequency in Hz.
+pub const LFCLK_HZ: u32 = 32768;
+
+
+
+/// Pin P0.6 — UARTE0_TXD.
+pub const U0_TX_PORT: u8 = 0;
+pub const U0_TX_PIN: u8 = 6;
+pub const U0_TX_PSEL: u32 = 6;
+
+
+
+/// Pin P0.8 — UARTE0_RXD.
+pub const U0_RX_PORT: u8 = 0;
+pub const U0_RX_PIN: u8 = 8;
+pub const U0_RX_PSEL: u32 = 8;
+
+
+
+/// Pin P0.5 — UARTE0_RTS.
+pub const U0_RTS_PORT: u8 = 0;
+pub const U0_RTS_PIN: u8 = 5;
+pub const U0_RTS_PSEL: u32 = 5;
+
+
+
+/// Pin P0.7 — UARTE0_CTS.
+pub const U0_CTS_PORT: u8 = 0;
+pub const U0_CTS_PIN: u8 = 7;
+pub const U0_CTS_PSEL: u32 = 7;
+
+
+
+/// Pin P0.13 — LED1.
+pub const LED1_PORT: u8 = 0;
+pub const LED1_PIN: u8 = 13;
+pub const LED1_PSEL: u32 = 13;
+
+
+
+/// Pin P0.14 — LED2.
+pub const LED2_PORT: u8 = 0;
+pub const LED2_PIN: u8 = 14;
+pub const LED2_PSEL: u32 = 14;
+
+
+
+/// Pin P0.15 — LED3.
+pub const LED3_PORT: u8 = 0;
+pub const LED3_PIN: u8 = 15;
+pub const LED3_PSEL: u32 = 15;
+
+
+
+/// Pin P0.16 — LED4.
+pub const LED4_PORT: u8 = 0;
+pub const LED4_PIN: u8 = 16;
+pub const LED4_PSEL: u32 = 16;
+
+
+
+/// Pin P0.11 — BUTTON1.
+pub const BTN1_PORT: u8 = 0;
+pub const BTN1_PIN: u8 = 11;
+pub const BTN1_PSEL: u32 = 11;
+
+
+
+/// Pin P0.12 — BUTTON2.
+pub const BTN2_PORT: u8 = 0;
+pub const BTN2_PIN: u8 = 12;
+pub const BTN2_PSEL: u32 = 12;
+
+
+
+/// Pin P0.24 — BUTTON3.
+pub const BTN3_PORT: u8 = 0;
+pub const BTN3_PIN: u8 = 24;
+pub const BTN3_PSEL: u32 = 24;
+
+
+
+/// Pin P0.25 — BUTTON4.
+pub const BTN4_PORT: u8 = 0;
+pub const BTN4_PIN: u8 = 25;
+pub const BTN4_PSEL: u32 = 25;
+
+
+
+/// Pin P0.18 — RESET.
+pub const RESET_PORT: u8 = 0;
+pub const RESET_PIN: u8 = 18;
+pub const RESET_PSEL: u32 = 18;
+
+
+
+
+/// Feature: button_count.
+pub const FEATURE_BUTTON_COUNT: &str = "4";
+
+/// Feature: has_jlink.
+pub const FEATURE_HAS_JLINK: &str = "true";
+
+/// Feature: has_nfc.
+pub const FEATURE_HAS_NFC: &str = "true";
+
+/// Feature: has_qspi_flash.
+pub const FEATURE_HAS_QSPI_FLASH: &str = "true";
+
+/// Feature: has_usb.
+pub const FEATURE_HAS_USB: &str = "true";
+
+/// Feature: led_count.
+pub const FEATURE_LED_COUNT: &str = "4";

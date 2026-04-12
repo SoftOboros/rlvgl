@@ -1,0 +1,30 @@
+//! Board constants for {{ ir.board.name }}.
+//!
+//! Pin definitions, clock frequencies, and feature flags extracted from
+//! the board YAML spec.
+
+/// Board name.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip name.
+pub const CHIP_NAME: &str = "{{ ir.chip.name }}";
+
+/// HFCLK frequency in Hz.
+pub const HFCLK_HZ: u32 = {{ ir.clocks.hfclk_hz }};
+
+/// LFCLK frequency in Hz.
+pub const LFCLK_HZ: u32 = {{ ir.clocks.lfclk_hz }};
+
+{% for route in pin_routes %}
+{% if route.label %}
+/// Pin P{{ route.port }}.{{ route.pin }} — {{ route.signal }}.
+pub const {{ route.label | upper }}_PORT: u8 = {{ route.port }};
+pub const {{ route.label | upper }}_PIN: u8 = {{ route.pin }};
+pub const {{ route.label | upper }}_PSEL: u32 = {{ route.psel_val }};
+{% endif %}
+{% endfor %}
+
+{% for key in ir.board.features | list %}
+/// Feature: {{ key }}.
+pub const FEATURE_{{ key | upper }}: &str = "{{ ir.board.features[key] }}";
+{% endfor %}

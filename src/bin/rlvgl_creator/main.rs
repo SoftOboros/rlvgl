@@ -22,6 +22,8 @@ pub mod espressif;
 pub mod ioc;
 #[path = "../creator/bsp/ir.rs"]
 pub mod ir;
+#[path = "../creator/bsp/nordic/mod.rs"]
+pub mod nordic;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {
@@ -29,6 +31,7 @@ mod bsp {
     pub use super::espressif;
     pub use super::ioc;
     pub use super::ir;
+    pub use super::nordic;
 }
 
 pub use cli::*;

@@ -1,0 +1,65 @@
+//! GPIO pin configuration and PSEL routing for {{ ir.board.name }}.
+//!
+//! Configures PIN_CNF registers for direction, pull, and drive strength,
+//! then writes PSEL registers to route peripheral signals to their
+//! assigned pins.
+
+use {{ ir.chip.pac_crate }} as pac;
+
+/// Configure all board pins and route peripheral signals.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+
+{% for route in pin_routes %}
+{% if route.port == 0 %}
+    // P0.{{ route.pin }} — {{ route.signal }}{% if route.label %} ({{ route.label }}){% endif %}
+
+    p.P0.pin_cnf[{{ route.pin }}].write(|w| {
+{% if route.direction == "out" %}
+        w.dir().output()
+{% elif route.direction == "in" %}
+        w.dir().input()
+         .input().connect()
+{% else %}
+        w.dir().output()
+         .input().connect()
+{% endif %}
+{% if route.pull == "up" %}
+         .pull().pullup()
+{% elif route.pull == "down" %}
+         .pull().pulldown()
+{% else %}
+         .pull().disabled()
+{% endif %}
+    });
+{% elif route.port == 1 %}
+    // P1.{{ route.pin }} — {{ route.signal }}{% if route.label %} ({{ route.label }}){% endif %}
+
+    p.P1.pin_cnf[{{ route.pin }}].write(|w| {
+{% if route.direction == "out" %}
+        w.dir().output()
+{% elif route.direction == "in" %}
+        w.dir().input()
+         .input().connect()
+{% else %}
+        w.dir().output()
+         .input().connect()
+{% endif %}
+{% if route.pull == "up" %}
+         .pull().pullup()
+{% elif route.pull == "down" %}
+         .pull().pulldown()
+{% else %}
+         .pull().disabled()
+{% endif %}
+    });
+{% endif %}
+{% if route.route.kind == "psel" %}
+    // Route {{ route.signal }} → P{{ route.port }}.{{ route.pin }} via PSEL
+    p.{{ route.peripheral | upper }}.{{ route.route.psel_reg }}().write(|w| unsafe {
+        w.bits({{ route.psel_val }})
+    });
+{% endif %}
+
+{% endfor %}
+}

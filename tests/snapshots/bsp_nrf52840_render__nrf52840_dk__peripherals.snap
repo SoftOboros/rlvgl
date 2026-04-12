@@ -1,0 +1,37 @@
+---
+source: tests/bsp_nrf52840_render.rs
+assertion_line: 63
+expression: content
+---
+//! Per-peripheral initialization for nRF52840-DK.
+//!
+//! Enables and configures each peripheral used by the board.
+//! PSEL pin routing is done in `gpio.rs`; this module handles the
+//! peripheral-internal configuration (baud rate, clock frequency, etc.).
+
+use nrf52840_pac as pac;
+
+/// Initialize every board peripheral in dependency order.
+pub fn init() {
+    
+    init_uarte0();
+    
+}
+
+
+
+
+
+/// Enable UARTE0 as the console at 115200 baud.
+pub fn init_uarte0() {
+    let p = unsafe { pac::Peripherals::steal() };
+
+    // Enable UARTE (ENABLE = 8).
+    p.UARTE0.enable.write(|w| unsafe { w.bits(8) });
+
+
+    // Baud rate: 115200
+    p.UARTE0.baudrate.write(|w| w.baudrate().baud115200());
+
+    // 8N1 is the default configuration; no explicit config register on nRF.
+}
