@@ -10,13 +10,32 @@ Tracks tasks for the Chip & Board Support workstream.
 ## Purpose
 Unify chip and board configuration data into self-contained crates per vendor so that `rlvgl-creator` and its UI can dynamically populate drop-downs of vendors, microcontrollers and boards. Today the creator references a single `.ioc` or CSV file directly; this work stream extracts all supported devices into dedicated vendor crates and wires them into the build and publish pipeline.
 
-## Intermediate Representation (IR) Plan
+## Current State (v0.2.0)
+
+The original plan called for a single unified IR. In practice, **vendor-specific
+IRs proved more effective** because each vendor’s pin routing model is
+architecturally distinct:
+
+| Vendor | IR | Pin Model | Status |
+|--------|----|-----------|--------|
+| Espressif | `EspIr` | IO MUX + GPIO matrix | **Complete** — 9 chips, 14 boards |
+| Nordic | `NrfIr` | PSEL registers + peripheral slots | **Complete** — nRF52840 + DK |
+| NXP | `NxpIr` | IOMUX ALT0-7 + daisy chain | **Complete** — MIMXRT1062 + EVKB |
+| RP2040 | `RpIr` | FUNCSEL per GPIO + RESETS | **Complete** — RP2040 + Pico |
+| Renesas | `RenesasIr` | PFS PSEL + PMR + MSTP | **Complete** — R7FA6M5BH + EK-RA6M5 |
+| STM32 | generic `Ir` | AF mux (CubeMX .ioc) | **Complete** — many chips/boards |
+
+Each vendor IR lives in `src/bin/creator/bsp/<vendor>/ir.rs` with its own
+load/merge/render pipeline and 6 MiniJinja templates. Chipdb YAML files live
+in `chipdb/rlvgl-chips-<vendor>/db/{chips,boards}/`.
+
+## Original IR Plan (retained for reference)
 - Standardise on a unified IR shared by vendor crates and `rlvgl-creator`.
 - Canonical device definitions live under `mcu/` and are scraped from vendor XML sources (e.g. the `STM32_open_pin_data` submodule’s `mcu/` and `ip/` trees).
 - Board overlays are stored under `boards/` and are produced by converting `.ioc` examples or user-supplied CubeMX files using the canonical `mcu` data.
 - Both `mcu` and `boards` datasets are bundled with creator, which also exposes a converter for arbitrary `.ioc` files.
 
-## Epic Plan A–H: Unified Config IR and Tooling
+## Epic Plan A–H: Unified Config IR and Tooling (largely superseded)
 
 The following epics define a cross‑vendor plan covering IR definition, ingestion, parsing, validation, packaging, CI, and documentation.
 

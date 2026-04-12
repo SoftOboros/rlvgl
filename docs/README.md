@@ -17,7 +17,8 @@ See crate overviews for:
 - [chip database](../chipdb/README.md)
 
 ## Guides
-- [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) – Product-level release notes for the v0.1.9 publish.
+- [CHANGELOG.md](./CHANGELOG.md) – Version history (current: v0.2.0).
+- [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) – Archived release notes for v0.1.9.
 - [CREATOR-CLI.md](./CREATOR-CLI.md) – Command-line reference and workflows for rlvgl-creator.
 - [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) – MiniJinja template guidelines for BSP generation.
 - [STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) – STM32 BSP generation behavior, flags, and roadmap.
@@ -26,7 +27,7 @@ See crate overviews for:
 - [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) – Details for the STM32H747I-DISCO board.
 - [CROSS-TESTING.md](./CROSS-TESTING.md) – Cross-target test linker requirements.
 - [IOC-IR-ALIGNMENT.md](./IOC-IR-ALIGNMENT.md) – Aligning CubeMX IOC data with the internal IR.
-- [CHANGELOG.md](./CHANGELOG.md) – Version history.
+- [wifi-telemetry.md](./wifi-telemetry.md) – Future WiFi telemetry design and D3 SRAM layout reference.
 
 ## TODO Lists
 - [TODO.md](./TODO.md) – High-level project roadmap.

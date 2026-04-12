@@ -25,15 +25,15 @@ package generator. The generator operates in two stages:
       instance numbers derived from peripheral names.
 - [x] Deny configuration of reserved pins (SWD: `PA13`, `PA14`) unless an
       explicit override is provided.
-- [ ] Provide adapters for additional vendors:
-  - [x] Espressif
-  - [x] Microchip
-  - [x] Nordic
-  - [x] NXP
-  - [x] Renesas
-  - [x] RP2040
-  - [x] Silicon Labs
-  - [x] TI
+- [x] Provide adapters for additional vendors:
+  - [x] Espressif — **full YAML pipeline** (9 chips, 14 boards, IO MUX + GPIO matrix)
+  - [x] Nordic — **full YAML pipeline** (nRF52840, PSEL routing, peripheral slot sharing)
+  - [x] NXP — **full YAML pipeline** (MIMXRT1062, IOMUX ALT + daisy chain, CCM CCGR)
+  - [x] RP2040 — **full YAML pipeline** (RP2040, FUNCSEL, RESETS register)
+  - [x] Renesas — **full YAML pipeline** (R7FA6M5BH, PFS PSEL + PMR, MSTP gates)
+  - [x] Microchip — stub (chipdb crate only, no IR/render)
+  - [x] Silicon Labs — stub (chipdb crate only, no IR/render)
+  - [x] TI — stub (chipdb crate only, no IR/render)
 - [x] Document template helpers and IR schema so users can supply custom
       templates.
 - [x] Add unit tests that snapshot the IR and generated output for sample
