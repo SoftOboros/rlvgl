@@ -1,13 +1,14 @@
 ---
 source: tests/bsp_esp32c3_render.rs
+assertion_line: 83
 expression: text
 ---
 //! Per-peripheral initialization for ESP32-C3-DevKitM-1.
 //!
-//! Only the peripherals actually used by the board are referenced. v1 of the
-//! generator emits real register writes for UART0 (when it is the console)
-//! and leaves stubs for everything else with TODO markers pointing at the
-//! relevant PAC register paths so a human can finish the init sequence.
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits real register writes for UART0 (when it is the console),
+//! I2C (full timing setup), SPI master (clock + mode), and timer groups
+//! (watchdog disable). Other peripherals get TODO stubs.
 
 use esp32c3 as pac;
 

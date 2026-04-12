@@ -266,6 +266,13 @@ pub struct EspBoard {
     /// instance name (e.g. `"i2c0"`). Missing entries default to 100 kHz.
     #[serde(default)]
     pub i2c_configs: IndexMap<String, EspI2cConfig>,
+    /// Optional per-SPI-instance configuration. Keyed by peripheral
+    /// instance name (e.g. `"spi2"`).
+    #[serde(default)]
+    pub spi_configs: IndexMap<String, EspSpiConfig>,
+    /// Optional per-LEDC channel configuration. Keyed by channel label.
+    #[serde(default)]
+    pub ledc_configs: IndexMap<String, EspLedcConfig>,
 }
 
 /// A single board-level pin assignment.
@@ -314,6 +321,58 @@ pub struct EspI2cConfig {
 impl Default for EspI2cConfig {
     fn default() -> Self {
         Self { scl_hz: 100_000 }
+    }
+}
+
+/// Board-level SPI master config.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EspSpiConfig {
+    /// Target SPI clock frequency in Hz.
+    #[serde(default = "default_spi_clk_hz")]
+    pub clk_hz: u32,
+    /// SPI mode (0-3, controls CPOL/CPHA).
+    #[serde(default)]
+    pub mode: u8,
+}
+
+fn default_spi_clk_hz() -> u32 {
+    1_000_000
+}
+
+impl Default for EspSpiConfig {
+    fn default() -> Self {
+        Self {
+            clk_hz: 1_000_000,
+            mode: 0,
+        }
+    }
+}
+
+/// Board-level LEDC (PWM) channel config.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EspLedcConfig {
+    /// PWM frequency in Hz.
+    #[serde(default = "default_ledc_freq_hz")]
+    pub freq_hz: u32,
+    /// Duty resolution in bits (1-14).
+    #[serde(default = "default_ledc_duty_bits")]
+    pub duty_bits: u8,
+}
+
+fn default_ledc_freq_hz() -> u32 {
+    5_000
+}
+
+fn default_ledc_duty_bits() -> u8 {
+    13
+}
+
+impl Default for EspLedcConfig {
+    fn default() -> Self {
+        Self {
+            freq_hz: 5_000,
+            duty_bits: 13,
+        }
     }
 }
 

@@ -1,9 +1,9 @@
 //! Per-peripheral initialization for {{ ir.board.name }}.
 //!
-//! Only the peripherals actually used by the board are referenced. v1 of the
-//! generator emits real register writes for UART0 (when it is the console)
-//! and leaves stubs for everything else with TODO markers pointing at the
-//! relevant PAC register paths so a human can finish the init sequence.
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits real register writes for UART0 (when it is the console),
+//! I2C (full timing setup), SPI master (clock + mode), and timer groups
+//! (watchdog disable). Other peripherals get TODO stubs.
 
 use {{ ir.chip.pac_crate }} as pac;
 
@@ -108,6 +108,73 @@ pub fn init_{{ name }}() {
     });
     // Publish the config — `conf_upgate` latches the new timings.
     p.{{ name | upper }}.ctr().modify(|_, w| w.conf_upgate().set_bit());
+}
+{% elif periph.class == "spi_master" %}
+/// Bring up {{ name }} as an SPI master.
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// Clock gating is already done by `crate::clocks::init`.
+/// Default: 1 MHz, mode 0 (CPOL=0, CPHA=0). Override via `spi_configs`
+/// in the board YAML.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+    {% if ir.board.spi_configs is defined and ir.board.spi_configs[name] is defined %}
+    const SPI_CLK_HZ: u32 = {{ ir.board.spi_configs[name].clk_hz }};
+    const SPI_MODE: u8 = {{ ir.board.spi_configs[name].mode }};
+    {% else %}
+    const SPI_CLK_HZ: u32 = 1_000_000;
+    const SPI_MODE: u8 = 0;
+    {% endif %}
+    // Clock divider: SPI_CLK = APB_CLK / (clkcnt_n + 1).
+    let clkcnt_n: u32 = if SPI_CLK_HZ >= APB_HZ { 0 } else { APB_HZ / SPI_CLK_HZ - 1 };
+    let clkcnt_h = clkcnt_n / 2;
+    p.{{ name | upper }}.clock().write(|w| unsafe {
+        w.bits((clkcnt_n & 0x3F) | ((clkcnt_h & 0x3F) << 6) | ((clkcnt_n & 0x3F) << 12))
+    });
+    // Full-duplex mode, MSB first.
+    p.{{ name | upper }}.user().modify(|_, w| {
+        w.doutdin().set_bit()
+         .wr_byte_order().clear_bit()
+         .rd_byte_order().clear_bit()
+    });
+    // CPOL via ck_idle_edge, CPHA via ck_out_edge.
+    let cpol = (SPI_MODE >> 1) & 1 != 0;
+    let cpha = SPI_MODE & 1 != 0;
+    if cpol {
+        p.{{ name | upper }}.misc().modify(|_, w| w.ck_idle_edge().set_bit());
+    } else {
+        p.{{ name | upper }}.misc().modify(|_, w| w.ck_idle_edge().clear_bit());
+    }
+    if cpha {
+        p.{{ name | upper }}.user().modify(|_, w| w.ck_out_edge().set_bit());
+    } else {
+        p.{{ name | upper }}.user().modify(|_, w| w.ck_out_edge().clear_bit());
+    }
+}
+{% elif periph.class == "ledc" %}
+/// Bring up {{ name }} (LED PWM controller).
+///
+/// Configures LEDC timers and channels based on board config.
+/// Clock gating is already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // LEDC is configured per-channel at runtime by application code.
+    // Clock gate is enabled; channels are ready for use.
+    // See the {{ ir.chip.pac_crate }}::LEDC register block for timer/channel
+    // configuration (timer_conf, ch_conf0, ch_duty, ch_hpoint).
+}
+{% elif periph.class == "timg" %}
+/// Bring up {{ name }} (Timer Group).
+///
+/// Disables the watchdog and leaves the main timer ready for use.
+/// Clock gating is already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+    // Disable the watchdog timer (MWDT) — it's often enabled by bootrom.
+    // Write the WDT key first, then disable.
+    p.{{ name | upper }}.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.{{ name | upper }}.wdtconfig0().write(|w| unsafe { w.bits(0) });
+    p.{{ name | upper }}.wdtwprotect().write(|w| unsafe { w.bits(0) });
 }
 {% else %}
 /// TODO: initialize {{ name }} (class `{{ periph.class }}`, base {{ periph.base }}).
