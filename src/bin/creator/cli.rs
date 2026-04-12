@@ -505,11 +505,25 @@ enum BspCommand {
         #[arg(long)]
         emit_label_consts: bool,
     },
+    /// List available chips for a vendor.
+    ListChips {
+        /// Vendor key (`esp`, `espressif`).
+        #[arg(long)]
+        vendor: String,
+    },
+    /// List available boards for a vendor, optionally filtered by chip.
+    ListBoards {
+        /// Vendor key (`esp`, `espressif`).
+        #[arg(long)]
+        vendor: String,
+        /// Filter boards to those targeting this chip (e.g. `ESP32-C3`).
+        #[arg(long)]
+        chip: Option<String>,
+    },
     /// Render Rust source from a vendor YAML chip/board spec.
     ///
-    /// Currently supports `--vendor esp` which consumes the `rlvgl-chips-esp`
-    /// YAML chipdb (or explicit `--chip-yaml`/`--board-yaml` overrides) to
-    /// produce a PAC-style ESP32-C3 board support crate.
+    /// Supports `--vendor esp` which consumes the `rlvgl-chips-esp`
+    /// YAML chipdb to produce a PAC-style board support crate.
     FromYaml {
         /// Vendor key selecting the YAML adapter (`esp`, `espressif`).
         #[arg(long)]
@@ -886,6 +900,27 @@ pub fn run() -> Result<()> {
                     bsp_gen::emit_board_mod(&out, emit_hal, emit_pac, false, false)?;
                 }
             }
+            BspCommand::ListChips { vendor } => match vendor.as_str() {
+                "esp" | "espressif" => {
+                    for name in rlvgl_chips_esp::chip_names() {
+                        println!("{name}");
+                    }
+                }
+                other => return Err(anyhow!("unsupported vendor: {other}")),
+            },
+            BspCommand::ListBoards { vendor, chip } => match vendor.as_str() {
+                "esp" | "espressif" => {
+                    for info in rlvgl_chips_esp::boards() {
+                        if let Some(ref filter) = chip {
+                            if !info.chip.eq_ignore_ascii_case(filter) {
+                                continue;
+                            }
+                        }
+                        println!("{:<40} {}", info.board, info.chip);
+                    }
+                }
+                other => return Err(anyhow!("unsupported vendor: {other}")),
+            },
             BspCommand::FromYaml {
                 vendor,
                 board,
