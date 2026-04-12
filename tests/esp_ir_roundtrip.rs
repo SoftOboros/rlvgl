@@ -1,8 +1,8 @@
 //! Round-trip and merge checks for the Espressif BSP IR.
 //!
-//! Deserialises the ESP32-C3 chip and DevKitM-1 board YAML from the
+//! Deserialises the ESP32-C3/C6/P4 chip and board YAML from the
 //! `rlvgl-chips-esp` chipdb, runs them through `merge`, and asserts the
-//! load-bearing invariants that the Step 3 render path will depend on.
+//! load-bearing invariants that the render path will depend on.
 #![cfg(feature = "creator")]
 // `#[path]` pulls the espressif module in as if it were part of this test
 // crate, so items that do not happen to be called by a test get flagged as
@@ -224,4 +224,184 @@ fn beetle_esp32c3_i2c0_pins_resolve_to_distinct_matrix_routes() {
 
     // Silence unused warning when the code above still compiles.
     let _ = PinRouteKind::Plain;
+}
+
+// --- ESP32-P4 ---------------------------------------------------------------
+
+#[test]
+fn esp32p4_chip_yaml_parses_with_expected_inventory() {
+    let chip = load_chip_db("esp32p4").expect("esp32p4 chip yaml loads");
+    assert_eq!(chip.name, "ESP32-P4");
+    assert_eq!(chip.arch, "rv32imafc");
+    assert_eq!(chip.pac_crate, "esp32p4");
+    assert_eq!(chip.gpio_count, 55);
+    assert_eq!(chip.io_mux.len(), 55);
+    assert_eq!(chip.clock_tree.xtal_hz, 40_000_000);
+    assert_eq!(chip.clock_tree.apb_hz, 100_000_000);
+    assert!(chip.clock_tree.cpu_freqs_hz.contains(&400_000_000));
+    assert!(chip.clock_tree.pll_freqs_hz.contains(&500_000_000));
+    for name in [
+        "uart0", "uart1", "i2c0", "spi2", "timg0", "timg1", "systimer", "ledc", "usb_sj",
+    ] {
+        assert!(
+            chip.peripherals.contains_key(name),
+            "chip missing peripheral {name}"
+        );
+        assert!(
+            chip.clock_tree.system_gates.contains_key(name),
+            "chip missing system gate for {name}"
+        );
+    }
+}
+
+#[test]
+fn esp32p4_iomux_marks_strap_pins() {
+    let chip = load_chip_db("esp32p4").expect("chip yaml");
+    let pin = |n: u8| {
+        chip.io_mux
+            .iter()
+            .find(|p| p.gpio == n)
+            .unwrap_or_else(|| panic!("missing io_mux entry for GPIO{n}"))
+    };
+    for strap_pin in [27u8, 35, 36] {
+        assert!(pin(strap_pin).strap, "GPIO{strap_pin} should be strap");
+    }
+    assert!(
+        !chip.io_mux.iter().any(|p| p.flash_reserved),
+        "P4 has no flash_reserved pins — flash uses dedicated pads"
+    );
+}
+
+#[test]
+fn beetle_esp32p4_board_yaml_parses_and_merges() {
+    let board = load_board_db("beetle_esp32p4").expect("beetle_esp32p4 board yaml");
+    assert_eq!(board.name, "DFR1172 FireBeetle 2 P4");
+    assert_eq!(board.chip, "ESP32-P4");
+    assert_eq!(board.module.as_deref(), Some("DFR1172"));
+    assert_eq!(board.flash_mb, 16);
+    let console = board.console.as_ref().expect("console config");
+    assert_eq!(console.peripheral, "usb_sj");
+    assert_eq!(console.baud, 115_200);
+
+    let led = board
+        .pins
+        .iter()
+        .find(|p| p.signal == "LED")
+        .expect("LED pin");
+    assert_eq!(led.gpio, 3);
+
+    let scl = board
+        .pins
+        .iter()
+        .find(|p| p.signal == "I2C0_SCL")
+        .expect("SCL pin");
+    assert_eq!(scl.gpio, 7);
+    assert_eq!(scl.peripheral.as_deref(), Some("i2c0"));
+    assert_eq!(scl.direction, EspDir::Inout);
+    assert_eq!(scl.pull.as_deref(), Some("up"));
+
+    let chip = load_chip_db("esp32p4").expect("chip yaml");
+    let ir = merge(chip, board).expect("beetle_esp32p4 merge ok");
+    assert_eq!(ir.pins.len(), 4);
+    assert_eq!(ir.clocks.cpu_hz, 400_000_000);
+    assert_eq!(ir.clocks.apb_hz, 100_000_000);
+    assert!(
+        ir.pins.iter().any(|p| p.signal == "LED" && p.gpio == 3),
+        "merged IR must retain the LED pin"
+    );
+}
+
+// --- ESP32-C6 ---------------------------------------------------------------
+
+#[test]
+fn esp32c6_chip_yaml_parses_with_expected_inventory() {
+    let chip = load_chip_db("esp32c6").expect("esp32c6 chip yaml loads");
+    assert_eq!(chip.name, "ESP32-C6");
+    assert_eq!(chip.arch, "rv32imac");
+    assert_eq!(chip.pac_crate, "esp32c6");
+    assert_eq!(chip.gpio_count, 30);
+    assert_eq!(chip.io_mux.len(), 31);
+    assert_eq!(chip.clock_tree.xtal_hz, 40_000_000);
+    assert_eq!(chip.clock_tree.apb_hz, 40_000_000);
+    assert!(chip.clock_tree.cpu_freqs_hz.contains(&160_000_000));
+    assert!(chip.clock_tree.pll_freqs_hz.contains(&480_000_000));
+    for name in [
+        "uart0", "uart1", "i2c0", "spi2", "timg0", "timg1", "systimer", "ledc", "rmt", "twai0",
+        "usb_sj", "gdma",
+    ] {
+        assert!(
+            chip.peripherals.contains_key(name),
+            "chip missing peripheral {name}"
+        );
+        assert!(
+            chip.clock_tree.system_gates.contains_key(name),
+            "chip missing system gate for {name}"
+        );
+    }
+}
+
+#[test]
+fn esp32c6_uart0_has_direct_iomux_route() {
+    let chip = load_chip_db("esp32c6").expect("chip yaml");
+    let uart0 = &chip.peripherals["uart0"];
+    let tx = uart0
+        .signals
+        .iter()
+        .find(|s| s.role == "tx")
+        .expect("uart0 tx signal");
+    assert_eq!(tx.direction, EspDir::Out);
+    assert_eq!(tx.iomux_pin, Some(16));
+    assert_eq!(tx.iomux_fn, Some(0));
+    let rx = uart0
+        .signals
+        .iter()
+        .find(|s| s.role == "rx")
+        .expect("uart0 rx signal");
+    assert_eq!(rx.direction, EspDir::In);
+    assert_eq!(rx.iomux_pin, Some(17));
+}
+
+#[test]
+fn esp32c6_iomux_marks_flash_and_strap_pins() {
+    let chip = load_chip_db("esp32c6").expect("chip yaml");
+    let pin = |n: u8| {
+        chip.io_mux
+            .iter()
+            .find(|p| p.gpio == n)
+            .unwrap_or_else(|| panic!("missing io_mux entry for GPIO{n}"))
+    };
+    for flash_pin in [24u8, 25, 26, 28, 29, 30] {
+        assert!(
+            pin(flash_pin).flash_reserved,
+            "GPIO{flash_pin} should be flash_reserved"
+        );
+    }
+    for strap_pin in [8u8, 9, 15] {
+        assert!(pin(strap_pin).strap, "GPIO{strap_pin} should be strap");
+    }
+}
+
+#[test]
+fn beetle_esp32c6_board_yaml_parses_and_merges() {
+    let board = load_board_db("beetle_esp32c6").expect("beetle_esp32c6 board yaml");
+    assert_eq!(board.name, "DFR1172 C6 Companion");
+    assert_eq!(board.chip, "ESP32-C6");
+    assert_eq!(board.module.as_deref(), Some("ESP32-C6-MINI-1"));
+    assert_eq!(board.flash_mb, 4);
+    let console = board.console.as_ref().expect("console config");
+    assert_eq!(console.peripheral, "uart0");
+    assert_eq!(console.baud, 115_200);
+
+    let tx = board
+        .pins
+        .iter()
+        .find(|p| p.signal == "UART0_TX")
+        .expect("TX pin");
+    assert_eq!(tx.gpio, 16);
+
+    let chip = load_chip_db("esp32c6").expect("chip yaml");
+    let ir = merge(chip, board).expect("beetle_esp32c6 merge ok");
+    assert_eq!(ir.pins.len(), 2);
+    assert_eq!(ir.clocks.cpu_hz, 160_000_000);
+    assert_eq!(ir.clocks.apb_hz, 40_000_000);
 }

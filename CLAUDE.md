@@ -172,6 +172,12 @@ RUSTFLAGS="" cargo check -p rlvgl-example-beetle-esp32c3 --features bsp_pac --ta
 RUSTFLAGS="" cargo clippy -p rlvgl-example-beetle-esp32c3 --features esp_hal --target riscv32imc-unknown-none-elf -- -D warnings
 RUSTFLAGS="" cargo clippy -p rlvgl-example-beetle-esp32c3 --features bsp_pac --target riscv32imc-unknown-none-elf -- -D warnings
 
+# Phase 4.7: ESP32-P4 + ESP32-C6 BSP generator tests
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32p4_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32p4_cli --features creator
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_cli --features creator
+
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
 
@@ -193,17 +199,20 @@ DRY_RUN=1 scripts/publish_changed.sh HEAD~1
   DMA2D last/max cycles, DMA completion/error counts, and serial queue/drop
   counters.
 
-## ESP32-C3 BSP Generator
+## Espressif BSP Generator
 
 `rlvgl-creator bsp from-yaml --vendor esp` generates raw-PAC bring-up code
-for ESP32-C3 boards from chipdb YAML:
+for Espressif boards (ESP32-C3, ESP32-C6, ESP32-P4) from chipdb YAML:
 
-- **Chip inventory**: `chipdb/rlvgl-chips-esp/db/chips/esp32c3.yaml` —
-  memory map, clock tree, SYSTEM clock-gate table, IO MUX per-pin function
-  table, GPIO matrix signal subset. Derived from the ESP32-C3 TRM.
+- **Chip inventory**: `chipdb/rlvgl-chips-esp/db/chips/{esp32c3,esp32c6,esp32p4}.yaml` —
+  memory map, clock tree, system clock-gate table (SYSTEM for C3, PCR for C6,
+  HP_SYS_CLKRST for P4), IO MUX per-pin function table, GPIO matrix signal
+  subset. Derived from each chip's Technical Reference Manual.
 - **Board specs**: `chipdb/rlvgl-chips-esp/db/boards/*.yaml` — pin
   assignments, console config, optional `i2c_configs:` SCL frequency map.
-  Ships with `esp32c3_devkitm_1.yaml` and `beetle_esp32c3.yaml`.
+  Ships with `esp32c3_devkitm_1.yaml`, `beetle_esp32c3.yaml`,
+  `beetle_esp32p4.yaml` (DFR1172 P4 side), and `beetle_esp32c6.yaml`
+  (DFR1172 C6 companion).
 - **Generated output**: 6 files per board (`mod.rs`, `pac.rs`, `clocks.rs`,
   `io_mux.rs`, `peripherals.rs`, `board.rs`) emitting svd2rust-style writes
   against `esp32c3 = 0.31`. Peripheral instances use uppercase field access
