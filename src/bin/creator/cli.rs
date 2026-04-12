@@ -902,16 +902,19 @@ pub fn run() -> Result<()> {
                 }
                 match vendor.as_str() {
                     "esp" | "espressif" => {
-                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
-                            crate::bsp::espressif::load_chip_file(path)?
-                        } else {
-                            let name = chip.as_deref().unwrap_or("esp32c3");
-                            crate::bsp::espressif::load_chip_db(name)?
-                        };
                         let board_ir = if let Some(path) = board_yaml.as_ref() {
                             crate::bsp::espressif::load_board_file(path)?
                         } else {
                             crate::bsp::espressif::load_board_db(&board)?
+                        };
+                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
+                            crate::bsp::espressif::load_chip_file(path)?
+                        } else {
+                            let name = match chip.as_deref() {
+                                Some(c) => c.to_string(),
+                                None => board_ir.chip.to_ascii_lowercase().replace('-', ""),
+                            };
+                            crate::bsp::espressif::load_chip_db(&name)?
                         };
                         let mut ir = crate::bsp::espressif::merge(chip_ir, board_ir)?;
                         if let Some(hz) = cpu_hz {

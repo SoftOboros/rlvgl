@@ -1,11 +1,12 @@
 ---
 source: tests/bsp_esp32c3_render.rs
+assertion_line: 147
 expression: text
 ---
 //! Clock tree initialization for DFR0868 Beetle ESP32-C3.
 //!
-//! On ESP32-C3 peripheral clock gating and reset live in the `SYSTEM` block
-//! (TRM Chapter 16 SYSREG). To bring up a peripheral this file:
+//! Peripheral clock gating and reset on ESP32-C3 are controlled via
+//! per-peripheral gate registers. To bring up a peripheral this file:
 //!
 //! 1. Asserts reset,
 //! 2. Enables the clock gate,

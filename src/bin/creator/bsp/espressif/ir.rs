@@ -206,6 +206,12 @@ pub struct EspIoMuxPin {
     /// Function 3 selection.
     #[serde(default)]
     pub fn3: Option<String>,
+    /// Function 4 selection (present on S2/S3 with 5+ IO MUX slots).
+    #[serde(default)]
+    pub fn4: Option<String>,
+    /// Function 5 selection (present on classic ESP32 with 6 IO MUX slots).
+    #[serde(default)]
+    pub fn5: Option<String>,
     /// RTC subsystem function name (e.g. `"RTC_GPIO0"`).
     #[serde(default)]
     pub rtc_fn: Option<String>,
