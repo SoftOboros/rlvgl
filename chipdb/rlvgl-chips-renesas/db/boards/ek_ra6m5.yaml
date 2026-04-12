@@ -1,0 +1,37 @@
+# Renesas EK-RA6M5 Evaluation Kit.
+#
+# Source: EK-RA6M5 v1 User's Manual (R20UT4829EJ Rev.1.01).
+
+name: EK-RA6M5
+chip: R7FA6M5BH
+flash_mb: 2
+
+console:
+  peripheral: sci0
+  sci_mode: uart
+  baud: 115200
+
+pins:
+  # SCI0 UART console (via J-Link OB debug USB)
+  - { port: 4, pin: 1, signal: SCI0_TXD, peripheral: sci0, role: txd,
+      direction: out, psel: 4, label: uart_tx }
+  - { port: 4, pin: 2, signal: SCI0_RXD, peripheral: sci0, role: rxd,
+      direction: in, psel: 4, label: uart_rx }
+  # User LEDs (accent green, accent blue, accent red)
+  - { port: 0, pin: 6, signal: LED1, direction: out, label: led1 }
+  - { port: 0, pin: 7, signal: LED2, direction: out, label: led2 }
+  - { port: 0, pin: 8, signal: LED3, direction: out, label: led3 }
+  # User buttons SW1 and SW2 (active low with internal pull-up)
+  - { port: 0, pin: 5, signal: SW1, direction: in, label: sw1, pull: up }
+  - { port: 0, pin: 4, signal: SW2, direction: in, label: sw2, pull: up }
+
+sci_modes:
+  sci0: uart
+
+features:
+  vendor: renesas
+  debugger: jlink_ob
+  led_count: "3"
+  button_count: "2"
+  has_ethernet: "true"
+  has_usb: "true"

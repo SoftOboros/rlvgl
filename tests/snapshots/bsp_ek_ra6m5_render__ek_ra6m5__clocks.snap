@@ -1,0 +1,55 @@
+---
+source: tests/bsp_ek_ra6m5_render.rs
+expression: content
+---
+//! Clock gating (MSTP) for EK-RA6M5.
+//!
+//! Releases peripherals from module-stop by clearing the corresponding
+//! bit in the MSTP control registers.  On Renesas RA MCUs, a peripheral
+//! whose MSTP bit is set has its clock gated and its registers are
+//! inaccessible.
+//!
+//! CPU: 200000000 Hz
+//! PCLKA: 100000000 Hz
+//! PCLKB: 50000000 Hz
+//! PCLKC: 50000000 Hz
+//! PCLKD: 50000000 Hz
+
+/// CPU core clock in Hz.
+pub const CPU_HZ: u32 = 200000000;
+
+/// Peripheral clock A (PCLKA) in Hz.
+pub const PCLKA_HZ: u32 = 100000000;
+
+/// Peripheral clock B (PCLKB) in Hz.
+pub const PCLKB_HZ: u32 = 50000000;
+
+/// Peripheral clock C (PCLKC) in Hz.
+pub const PCLKC_HZ: u32 = 50000000;
+
+/// Peripheral clock D (PCLKD) in Hz.
+pub const PCLKD_HZ: u32 = 50000000;
+
+// MSTP register addresses (RA4/RA6 family).
+const MSTPCRA: u32 = 1074200576;  // 0x4004_7000
+const MSTPCRB: u32 = 1074200580;  // 0x4004_7004
+const MSTPCRC: u32 = 1074200584;  // 0x4004_7008
+const MSTPCRD: u32 = 1074200588;  // 0x4004_700C
+const MSTPCRE: u32 = 1074200592;  // 0x4004_7010
+
+/// Release peripherals from module-stop (ungate clocks).
+///
+/// Each peripheral used by the board has a corresponding MSTP bit that
+/// must be cleared before the peripheral's registers can be accessed.
+pub fn init() {
+    
+    
+    
+    // sci0 — MSTPMSTPCRB bit 31
+    unsafe {
+        let val = core::ptr::read_volatile(reg);
+        core::ptr::write_volatile(reg, val & !(1u32 << 31));
+    }
+    
+    
+}

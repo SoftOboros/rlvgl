@@ -1,0 +1,67 @@
+//! Board-level constants for {{ ir.board.name }}.
+//!
+//! Chip: {{ ir.chip.name }} ({{ ir.chip.arch }}{% if ir.chip.package is defined %}, {{ ir.chip.package }}{% endif %})
+//! PAC crate: {{ ir.chip.pac_crate }}
+
+/// Board name.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip identifier.
+pub const CHIP: &str = "{{ ir.chip.name }}";
+
+/// Target architecture.
+pub const ARCH: &str = "{{ ir.chip.arch }}";
+
+/// PAC crate name.
+pub const PAC_CRATE: &str = "{{ ir.chip.pac_crate }}";
+
+/// CPU clock in Hz.
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+{% if ir.clocks.pclka_hz is defined -%}
+/// Peripheral clock A (PCLKA) in Hz.
+pub const PCLKA_HZ: u32 = {{ ir.clocks.pclka_hz }};
+
+{% endif -%}
+{% if ir.clocks.pclkb_hz is defined -%}
+/// Peripheral clock B (PCLKB) in Hz.
+pub const PCLKB_HZ: u32 = {{ ir.clocks.pclkb_hz }};
+
+{% endif -%}
+{% if ir.clocks.pclkc_hz is defined -%}
+/// Peripheral clock C (PCLKC) in Hz.
+pub const PCLKC_HZ: u32 = {{ ir.clocks.pclkc_hz }};
+
+{% endif -%}
+{% if ir.clocks.pclkd_hz is defined -%}
+/// Peripheral clock D (PCLKD) in Hz.
+pub const PCLKD_HZ: u32 = {{ ir.clocks.pclkd_hz }};
+
+{% endif -%}
+
+{% if ir.board.flash_mb is defined -%}
+/// On-board flash size in MB.
+pub const FLASH_MB: u32 = {{ ir.board.flash_mb }};
+
+{% endif -%}
+{% if ir.board.sram_kb is defined -%}
+/// On-board SRAM size in KB.
+pub const SRAM_KB: u32 = {{ ir.board.sram_kb }};
+
+{% endif -%}
+
+// --- Pin constants ---
+{% for route in pin_routes %}
+{% if route.label is defined %}
+
+/// P{{ route.port }}{{ route.pin }} — {{ route.signal }}
+pub const {{ route.label | upper }}_PORT: u8 = {{ route.port }};
+pub const {{ route.label | upper }}_PIN: u8 = {{ route.pin }};
+{% endif %}
+{% endfor %}
+
+// --- Feature flags ---
+{% for key in ir.board.features | list %}
+/// Feature: {{ key }}
+pub const FEATURE_{{ key | upper }}: &str = "{{ ir.board.features[key] }}";
+{% endfor %}

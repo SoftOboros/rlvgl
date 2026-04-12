@@ -1,0 +1,425 @@
+---
+source: tests/renesas_ir_roundtrip.rs
+expression: "&ir"
+---
+chip:
+  name: R7FA6M5BH
+  arch: cortex-m33
+  core_features:
+    - trustzone
+  package: LQFP176
+  cpu_hz: 200000000
+  pac_crate: ~
+  fsp_version: 5.0.0
+  memory:
+    - name: flash
+      base: 0
+      size: 2097152
+      access: rx
+    - name: sram
+      base: 536870912
+      size: 524288
+      access: rwx
+    - name: data_flash
+      base: 134217728
+      size: 8192
+      access: rw
+  gpio_ports:
+    - port: 0
+      pin_count: 16
+    - port: 1
+      pin_count: 16
+    - port: 2
+      pin_count: 16
+    - port: 3
+      pin_count: 16
+    - port: 4
+      pin_count: 16
+    - port: 5
+      pin_count: 16
+    - port: 6
+      pin_count: 16
+    - port: 7
+      pin_count: 16
+    - port: 8
+      pin_count: 16
+    - port: 9
+      pin_count: 16
+  clock_tree:
+    hoco_hz: 20000000
+    moco_hz: 8000000
+    loco_hz: 32768
+    main_osc_hz: 24000000
+    sub_osc_hz: 32768
+    pll_max_hz: 200000000
+    cpu_max_hz: 200000000
+    pclka_hz: 100000000
+    pclkb_hz: 50000000
+    pclkc_hz: 50000000
+    pclkd_hz: 50000000
+    mstp_gates:
+      sci0:
+        reg: MSTPCRB
+        bit: 31
+      sci1:
+        reg: MSTPCRB
+        bit: 30
+      sci2:
+        reg: MSTPCRB
+        bit: 29
+      sci3:
+        reg: MSTPCRB
+        bit: 28
+      sci4:
+        reg: MSTPCRB
+        bit: 27
+      sci9:
+        reg: MSTPCRB
+        bit: 22
+      spi0:
+        reg: MSTPCRB
+        bit: 19
+      spi1:
+        reg: MSTPCRB
+        bit: 18
+      iic0:
+        reg: MSTPCRE
+        bit: 31
+      iic1:
+        reg: MSTPCRE
+        bit: 30
+      iic2:
+        reg: MSTPCRE
+        bit: 29
+      gpt32:
+        reg: MSTPCRE
+        bit: 1
+      agt0:
+        reg: MSTPCRD
+        bit: 3
+      agt1:
+        reg: MSTPCRD
+        bit: 2
+  peripherals:
+    sci0:
+      class: sci
+      instance: sci0
+      base: 1074200576
+      irq: ~
+      irq_rxi: 0
+      irq_txi: 1
+      modes:
+        - uart
+        - spi
+        - i2c
+      psel_signals:
+        - role: txd
+          direction: out
+          mode: uart
+        - role: rxd
+          direction: in
+          mode: uart
+        - role: sck
+          direction: out
+          mode: spi
+        - role: copi
+          direction: out
+          mode: spi
+        - role: cipo
+          direction: in
+          mode: spi
+        - role: scl
+          direction: inout
+          mode: i2c
+        - role: sda
+          direction: inout
+          mode: i2c
+    sci1:
+      class: sci
+      instance: sci1
+      base: 1074200608
+      irq: ~
+      irq_rxi: 2
+      irq_txi: 3
+      modes:
+        - uart
+        - spi
+        - i2c
+      psel_signals:
+        - role: txd
+          direction: out
+          mode: uart
+        - role: rxd
+          direction: in
+          mode: uart
+    sci9:
+      class: sci
+      instance: sci9
+      base: 1074200864
+      irq: ~
+      irq_rxi: 18
+      irq_txi: 19
+      modes:
+        - uart
+        - spi
+        - i2c
+      psel_signals:
+        - role: txd
+          direction: out
+          mode: uart
+        - role: rxd
+          direction: in
+          mode: uart
+    spi0:
+      class: spi
+      instance: spi0
+      base: 1074208768
+      irq: 44
+      irq_rxi: ~
+      irq_txi: ~
+      modes: ~
+      psel_signals:
+        - role: rspck
+          direction: out
+          mode: ~
+        - role: copi
+          direction: out
+          mode: ~
+        - role: cipo
+          direction: in
+          mode: ~
+        - role: ssl0
+          direction: out
+          mode: ~
+    iic0:
+      class: i2c
+      instance: iic0
+      base: 1074081792
+      irq: 52
+      irq_rxi: ~
+      irq_txi: ~
+      modes: ~
+      psel_signals:
+        - role: scl
+          direction: inout
+          mode: ~
+        - role: sda
+          direction: inout
+          mode: ~
+    iic1:
+      class: i2c
+      instance: iic1
+      base: 1074082048
+      irq: 56
+      irq_rxi: ~
+      irq_txi: ~
+      modes: ~
+      psel_signals:
+        - role: scl
+          direction: inout
+          mode: ~
+        - role: sda
+          direction: inout
+          mode: ~
+  pfs_table:
+    - pin:
+        port: 4
+        pin: 1
+      functions:
+        - psel: 4
+          signal: SCI0_TXD
+          peripheral: sci0
+          role: txd
+    - pin:
+        port: 4
+        pin: 2
+      functions:
+        - psel: 4
+          signal: SCI0_RXD
+          peripheral: sci0
+          role: rxd
+    - pin:
+        port: 1
+        pin: 8
+      functions:
+        - psel: 4
+          signal: SCI9_TXD
+          peripheral: sci9
+          role: txd
+    - pin:
+        port: 1
+        pin: 9
+      functions:
+        - psel: 4
+          signal: SCI9_RXD
+          peripheral: sci9
+          role: rxd
+    - pin:
+        port: 4
+        pin: 0
+      functions:
+        - psel: 7
+          signal: IIC0_SDA
+          peripheral: iic0
+          role: sda
+    - pin:
+        port: 4
+        pin: 3
+      functions:
+        - psel: 7
+          signal: IIC0_SCL
+          peripheral: iic0
+          role: scl
+board:
+  name: EK-RA6M5
+  chip: R7FA6M5BH
+  flash_mb: 2
+  console:
+    peripheral: sci0
+    sci_mode: uart
+    baud: 115200
+  pins:
+    - port: 4
+      pin: 1
+      signal: SCI0_TXD
+      peripheral: sci0
+      role: txd
+      direction: out
+      psel: 4
+      label: uart_tx
+      pull: ~
+    - port: 4
+      pin: 2
+      signal: SCI0_RXD
+      peripheral: sci0
+      role: rxd
+      direction: in
+      psel: 4
+      label: uart_rx
+      pull: ~
+    - port: 0
+      pin: 6
+      signal: LED1
+      peripheral: ~
+      role: ~
+      direction: out
+      psel: ~
+      label: led1
+      pull: ~
+    - port: 0
+      pin: 7
+      signal: LED2
+      peripheral: ~
+      role: ~
+      direction: out
+      psel: ~
+      label: led2
+      pull: ~
+    - port: 0
+      pin: 8
+      signal: LED3
+      peripheral: ~
+      role: ~
+      direction: out
+      psel: ~
+      label: led3
+      pull: ~
+    - port: 0
+      pin: 5
+      signal: SW1
+      peripheral: ~
+      role: ~
+      direction: in
+      psel: ~
+      label: sw1
+      pull: up
+    - port: 0
+      pin: 4
+      signal: SW2
+      peripheral: ~
+      role: ~
+      direction: in
+      psel: ~
+      label: sw2
+      pull: up
+  sci_modes:
+    sci0: uart
+  features:
+    vendor: renesas
+    debugger: jlink_ob
+    led_count: "3"
+    button_count: "2"
+    has_ethernet: "true"
+    has_usb: "true"
+  i2c_configs: {}
+  spi_configs: {}
+clocks:
+  cpu_hz: 200000000
+  pclka_hz: 100000000
+  pclkb_hz: 50000000
+  pclkc_hz: 50000000
+  pclkd_hz: 50000000
+pins:
+  - port: 4
+    pin: 1
+    signal: SCI0_TXD
+    peripheral: sci0
+    role: txd
+    direction: out
+    psel: 4
+    label: uart_tx
+    pull: ~
+  - port: 4
+    pin: 2
+    signal: SCI0_RXD
+    peripheral: sci0
+    role: rxd
+    direction: in
+    psel: 4
+    label: uart_rx
+    pull: ~
+  - port: 0
+    pin: 6
+    signal: LED1
+    peripheral: ~
+    role: ~
+    direction: out
+    psel: ~
+    label: led1
+    pull: ~
+  - port: 0
+    pin: 7
+    signal: LED2
+    peripheral: ~
+    role: ~
+    direction: out
+    psel: ~
+    label: led2
+    pull: ~
+  - port: 0
+    pin: 8
+    signal: LED3
+    peripheral: ~
+    role: ~
+    direction: out
+    psel: ~
+    label: led3
+    pull: ~
+  - port: 0
+    pin: 5
+    signal: SW1
+    peripheral: ~
+    role: ~
+    direction: in
+    psel: ~
+    label: sw1
+    pull: up
+  - port: 0
+    pin: 4
+    signal: SW2
+    peripheral: ~
+    role: ~
+    direction: in
+    psel: ~
+    label: sw2
+    pull: up

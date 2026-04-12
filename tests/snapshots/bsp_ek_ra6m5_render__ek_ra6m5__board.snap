@@ -1,0 +1,110 @@
+---
+source: tests/bsp_ek_ra6m5_render.rs
+expression: content
+---
+//! Board-level constants for EK-RA6M5.
+//!
+//! Chip: R7FA6M5BH (cortex-m33, LQFP176)
+//! PAC crate: none
+
+/// Board name.
+pub const BOARD_NAME: &str = "EK-RA6M5";
+
+/// Chip identifier.
+pub const CHIP: &str = "R7FA6M5BH";
+
+/// Target architecture.
+pub const ARCH: &str = "cortex-m33";
+
+/// PAC crate name.
+pub const PAC_CRATE: &str = "none";
+
+/// CPU clock in Hz.
+pub const CPU_HZ: u32 = 200000000;
+
+/// Peripheral clock A (PCLKA) in Hz.
+pub const PCLKA_HZ: u32 = 100000000;
+
+/// Peripheral clock B (PCLKB) in Hz.
+pub const PCLKB_HZ: u32 = 50000000;
+
+/// Peripheral clock C (PCLKC) in Hz.
+pub const PCLKC_HZ: u32 = 50000000;
+
+/// Peripheral clock D (PCLKD) in Hz.
+pub const PCLKD_HZ: u32 = 50000000;
+
+/// On-board flash size in MB.
+pub const FLASH_MB: u32 = 2;
+
+// --- Pin constants ---
+
+
+
+/// P41 — SCI0_TXD
+pub const UART_TX_PORT: u8 = 4;
+pub const UART_TX_PIN: u8 = 1;
+
+
+
+
+/// P42 — SCI0_RXD
+pub const UART_RX_PORT: u8 = 4;
+pub const UART_RX_PIN: u8 = 2;
+
+
+
+
+/// P06 — LED1
+pub const LED1_PORT: u8 = 0;
+pub const LED1_PIN: u8 = 6;
+
+
+
+
+/// P07 — LED2
+pub const LED2_PORT: u8 = 0;
+pub const LED2_PIN: u8 = 7;
+
+
+
+
+/// P08 — LED3
+pub const LED3_PORT: u8 = 0;
+pub const LED3_PIN: u8 = 8;
+
+
+
+
+/// P05 — SW1
+pub const SW1_PORT: u8 = 0;
+pub const SW1_PIN: u8 = 5;
+
+
+
+
+/// P04 — SW2
+pub const SW2_PORT: u8 = 0;
+pub const SW2_PIN: u8 = 4;
+
+
+
+// --- Feature flags ---
+
+/// Feature: button_count
+pub const FEATURE_BUTTON_COUNT: &str = "2";
+
+/// Feature: debugger
+pub const FEATURE_DEBUGGER: &str = "jlink_ob";
+
+/// Feature: has_ethernet
+pub const FEATURE_HAS_ETHERNET: &str = "true";
+
+/// Feature: has_usb
+pub const FEATURE_HAS_USB: &str = "true";
+
+/// Feature: led_count
+pub const FEATURE_LED_COUNT: &str = "3";
+
+/// Feature: vendor
+pub const FEATURE_VENDOR: &str = "renesas";

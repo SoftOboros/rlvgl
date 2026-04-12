@@ -26,6 +26,8 @@ pub mod ir;
 pub mod nordic;
 #[path = "../creator/bsp/nxp/mod.rs"]
 pub mod nxp;
+#[path = "../creator/bsp/renesas/mod.rs"]
+pub mod renesas;
 #[path = "../creator/bsp/rp/mod.rs"]
 pub mod rp;
 
@@ -37,6 +39,7 @@ mod bsp {
     pub use super::ir;
     pub use super::nordic;
     pub use super::nxp;
+    pub use super::renesas;
     pub use super::rp;
 }
 

@@ -1,0 +1,152 @@
+# Renesas R7FA6M5BH (RA6M5) chip inventory for rlvgl-creator BSP generation.
+#
+# Source: Renesas RA6M5 Group User's Manual: Hardware (R01UH0891EJ Rev.1.20).
+# Register addresses from Section 8 (CGC), Section 19 (I/O Ports).
+# No standard PAC crate — templates emit raw register address writes.
+
+name: R7FA6M5BH
+arch: cortex-m33
+core_features:
+  - trustzone
+package: LQFP176
+cpu_hz: 200000000
+# No community PAC crate on crates.io for RA6M5.
+pac_crate: ~
+fsp_version: "5.0.0"
+
+memory:
+  - { name: flash,      base: 0x00000000, size: 0x00200000, access: rx  }  # 2 MB code flash
+  - { name: sram,       base: 0x20000000, size: 0x00080000, access: rwx }  # 512 KB SRAM
+  - { name: data_flash, base: 0x08000000, size: 0x00002000, access: rw  }  # 8 KB data flash
+
+gpio_ports:
+  - { port: 0, pin_count: 16 }
+  - { port: 1, pin_count: 16 }
+  - { port: 2, pin_count: 16 }
+  - { port: 3, pin_count: 16 }
+  - { port: 4, pin_count: 16 }
+  - { port: 5, pin_count: 16 }
+  - { port: 6, pin_count: 16 }
+  - { port: 7, pin_count: 16 }
+  - { port: 8, pin_count: 16 }
+  - { port: 9, pin_count: 16 }
+
+clock_tree:
+  hoco_hz: 20000000
+  moco_hz: 8000000
+  loco_hz: 32768
+  main_osc_hz: 24000000
+  sub_osc_hz: 32768
+  pll_max_hz: 200000000
+  cpu_max_hz: 200000000
+  pclka_hz: 100000000
+  pclkb_hz: 50000000
+  pclkc_hz: 50000000
+  pclkd_hz: 50000000
+  # Module Stop (MSTP) clock gating registers.
+  # MSTPCRA: 0x40047000, MSTPCRB: 0x40047004, MSTPCRC: 0x40047008,
+  # MSTPCRD: 0x4004700C, MSTPCRE: 0x40047010.
+  # Clear the bit to ungate (release from module stop).
+  mstp_gates:
+    sci0:  { reg: MSTPCRB, bit: 31 }
+    sci1:  { reg: MSTPCRB, bit: 30 }
+    sci2:  { reg: MSTPCRB, bit: 29 }
+    sci3:  { reg: MSTPCRB, bit: 28 }
+    sci4:  { reg: MSTPCRB, bit: 27 }
+    sci9:  { reg: MSTPCRB, bit: 22 }
+    spi0:  { reg: MSTPCRB, bit: 19 }
+    spi1:  { reg: MSTPCRB, bit: 18 }
+    iic0:  { reg: MSTPCRE, bit: 31 }
+    iic1:  { reg: MSTPCRE, bit: 30 }
+    iic2:  { reg: MSTPCRE, bit: 29 }
+    gpt32: { reg: MSTPCRE, bit: 1  }
+    agt0:  { reg: MSTPCRD, bit: 3  }
+    agt1:  { reg: MSTPCRD, bit: 2  }
+
+peripherals:
+  sci0:
+    class: sci
+    instance: sci0
+    base: 0x40070000
+    irq_rxi: 0
+    irq_txi: 1
+    modes: [uart, spi, i2c]
+    psel_signals:
+      - { role: txd, direction: out,   mode: uart }
+      - { role: rxd, direction: in,    mode: uart }
+      - { role: sck, direction: out,   mode: spi  }
+      - { role: copi, direction: out,  mode: spi  }
+      - { role: cipo, direction: in,   mode: spi  }
+      - { role: scl, direction: inout, mode: i2c  }
+      - { role: sda, direction: inout, mode: i2c  }
+  sci1:
+    class: sci
+    instance: sci1
+    base: 0x40070020
+    irq_rxi: 2
+    irq_txi: 3
+    modes: [uart, spi, i2c]
+    psel_signals:
+      - { role: txd, direction: out,   mode: uart }
+      - { role: rxd, direction: in,    mode: uart }
+  sci9:
+    class: sci
+    instance: sci9
+    base: 0x40070120
+    irq_rxi: 18
+    irq_txi: 19
+    modes: [uart, spi, i2c]
+    psel_signals:
+      - { role: txd, direction: out, mode: uart }
+      - { role: rxd, direction: in,  mode: uart }
+  spi0:
+    class: spi
+    instance: spi0
+    base: 0x40072000
+    irq: 44
+    psel_signals:
+      - { role: rspck, direction: out }
+      - { role: copi,  direction: out }
+      - { role: cipo,  direction: in  }
+      - { role: ssl0,  direction: out }
+  iic0:
+    class: i2c
+    instance: iic0
+    base: 0x40053000
+    irq: 52
+    psel_signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  iic1:
+    class: i2c
+    instance: iic1
+    base: 0x40053100
+    irq: 56
+    psel_signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+
+# PFS (Pin Function Select) table — subset for EK-RA6M5 board pins.
+# Full table has hundreds of entries from Section 19.6 of the hardware manual.
+# PFS register address: 0x40040800 + (port * 0x0040) + (pin * 0x0004)
+# PSEL field: bits [28:24] (5-bit peripheral function select).
+# PMR bit: bit 16 (0 = GPIO, 1 = peripheral mode).
+pfs_table:
+  - pin: { port: 4, pin: 1 }
+    functions:
+      - { psel: 4, signal: SCI0_TXD, peripheral: sci0, role: txd }
+  - pin: { port: 4, pin: 2 }
+    functions:
+      - { psel: 4, signal: SCI0_RXD, peripheral: sci0, role: rxd }
+  - pin: { port: 1, pin: 8 }
+    functions:
+      - { psel: 4, signal: SCI9_TXD, peripheral: sci9, role: txd }
+  - pin: { port: 1, pin: 9 }
+    functions:
+      - { psel: 4, signal: SCI9_RXD, peripheral: sci9, role: rxd }
+  - pin: { port: 4, pin: 0 }
+    functions:
+      - { psel: 7, signal: IIC0_SDA, peripheral: iic0, role: sda }
+  - pin: { port: 4, pin: 3 }
+    functions:
+      - { psel: 7, signal: IIC0_SCL, peripheral: iic0, role: scl }

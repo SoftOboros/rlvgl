@@ -1,0 +1,12 @@
+//! Top-level PAC bring-up for {{ ir.board.name }}.
+//!
+//! Calls clock gating, PFS pin routing, and peripheral init in order.
+//! Renesas RA MCUs require module-stop release before any peripheral
+//! register access, so `clocks::init()` must run first.
+
+/// Initialize the board: MSTP release, PFS pin mux, then peripherals.
+pub fn init() {
+    super::clocks::init();
+    super::pfs::init();
+    super::peripherals::init();
+}

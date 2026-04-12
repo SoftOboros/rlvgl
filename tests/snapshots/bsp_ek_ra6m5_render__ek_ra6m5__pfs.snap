@@ -1,0 +1,65 @@
+---
+source: tests/bsp_ek_ra6m5_render.rs
+expression: content
+---
+//! PFS (Pin Function Select) routing for EK-RA6M5.
+//!
+//! On Renesas RA MCUs, each pin's function is controlled by a PFS register
+//! at `PFS_BASE + port * 0x0040 + pin * 0x0004`.  The key fields are:
+//!
+//! * PMR  (bit 16) — 1 = peripheral mode, 0 = GPIO mode
+//! * PSEL (bits 28:24) — peripheral function select (when PMR=1)
+//! * PDR  (bit 2) — 1 = output, 0 = input
+//! * PCR  (bit 4) — 1 = pull-up enabled
+//! * NCODR (bit 6) — 1 = open-drain (N-channel)
+//!
+//! PFS write protection (PWPR register) must be released before writing.
+
+/// PFS register base address.
+const PFS_BASE: u32 = 1073906688;  // 0x4004_0800
+
+/// PWPR (write-protect register) address.
+const PWPR: u32 = 1073907459;  // 0x4004_0B03
+// PWPR bit fields:
+// B0WI  (bit 7) — write-protect for PFSWE; must be 0 to allow PFSWE write
+// PFSWE (bit 6) — PFS write enable; must be 1 to allow PFS writes
+
+/// Release PFS write protection, configure all board pins, then re-lock.
+pub fn init() {
+    unsafe {
+        // Release write protection: clear B0WI, then set PFSWE.
+        let pwpr = PWPR as *mut u8;
+        core::ptr::write_volatile(pwpr, 0x00);  // B0WI=0
+        core::ptr::write_volatile(pwpr, 0x40);  // PFSWE=1
+    }
+
+    
+    // P41 — SCI0_TXD
+    
+    
+    // P42 — SCI0_RXD
+    
+    
+    // P06 — LED1
+    
+    
+    // P07 — LED2
+    
+    
+    // P08 — LED3
+    
+    
+    // P05 — SW1
+    
+    
+    // P04 — SW2
+    
+    
+
+    // Re-enable write protection: clear PFSWE, then set B0WI.
+    unsafe {
+        let pwpr = PWPR as *mut u8;
+        core::ptr::write_volatile(pwpr, 0x00);  // PFSWE=0
+        core::ptr::write_volatile(pwpr, 0x80);  // B0WI=1
+    }
+}
