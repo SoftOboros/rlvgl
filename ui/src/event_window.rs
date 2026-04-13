@@ -262,7 +262,7 @@ impl EventWindowBuilder {
             bg_color: Color(25, 25, 25, 255),
             border_color: Color(80, 80, 80, 255),
             border_width: 2,
-            radius: 8,
+            radius: 18,
             text_color: Color(220, 220, 220, 255),
             font,
             expire_ticks: DEFAULT_EXPIRE_TICKS,

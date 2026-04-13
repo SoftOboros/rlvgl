@@ -11,7 +11,7 @@ use rlvgl_core::event::Event;
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
-use rlvgl_ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl_ui::draw_helpers::{draw_rounded_border, fill_rounded_rect};
 use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 
 // ── Layout constants ──────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 const PANEL_W: i32 = 380;
 const PANEL_H: i32 = 360;
 const PANEL_PADDING: i32 = 16;
-const PANEL_RADIUS: u8 = 10;
+const PANEL_RADIUS: u8 = 18;
 const TITLE_HEIGHT: i32 = 32;
 const CLOSE_SIZE: i32 = 40;
 const ROW_HEIGHT: i32 = 30;
@@ -129,7 +129,7 @@ impl Widget for FileBrowserPanel {
 
         // Panel background + border
         fill_rounded_rect(renderer, self.bounds, BG_COLOR, PANEL_RADIUS);
-        draw_border(renderer, self.bounds, BORDER_COLOR, 2);
+        draw_rounded_border(renderer, self.bounds, BORDER_COLOR, 2, PANEL_RADIUS);
 
         // Title
         self.font.draw_str(

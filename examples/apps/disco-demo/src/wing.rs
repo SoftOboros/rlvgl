@@ -8,7 +8,7 @@ use rlvgl_core::{
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
-use rlvgl_ui::draw_helpers::{draw_border, draw_border_straight, fill_rounded_rect};
+use rlvgl_ui::draw_helpers::{draw_border_straight, draw_rounded_border, fill_rounded_rect};
 
 use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR};
 
@@ -17,7 +17,7 @@ const ICON_SIZE: i32 = 60;
 const GAP: i32 = 10;
 const MARGIN_TOP: i32 = 17;
 const WING_X: i32 = 10;
-const RADIUS: u8 = 8;
+const RADIUS: u8 = 18;
 const CLEAR_FRAMES: u8 = 3;
 const BG_COLOR: Color = Color(30, 30, 30, 240);
 const BORDER_COLOR: Color = Color(80, 80, 80, 255);
@@ -155,7 +155,7 @@ impl Widget for Wing {
             height: self.bounds.height,
         };
         fill_rounded_rect(renderer, bg_rect, BG_COLOR, RADIUS);
-        draw_border(renderer, bg_rect, BORDER_COLOR, BORDER_WIDTH);
+        draw_rounded_border(renderer, bg_rect, BORDER_COLOR, BORDER_WIDTH, RADIUS);
 
         let mut buf: Vec<Color> = Vec::new();
         for index in 0..self.slot_count {
