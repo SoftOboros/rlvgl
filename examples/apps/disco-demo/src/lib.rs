@@ -322,10 +322,11 @@ impl ControllerState {
 
     fn show_home(&mut self) {
         self.active_info = None;
-        self.dashboard.borrow_mut().set_title("Flight Deck");
+        self.dashboard.borrow_mut().show();
+        self.dashboard.borrow_mut().set_title("About");
         self.dashboard
             .borrow_mut()
-            .set_caption("Shared 747-style demo controller");
+            .set_caption("rlvgl demo application");
         self.dashboard
             .borrow_mut()
             .set_accent(Color(0x58, 0xB3, 0xF5, 0xFF));
@@ -364,6 +365,7 @@ impl ControllerState {
     }
 
     fn show_storage(&mut self) {
+        self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title("Storage Browser");
         self.dashboard
             .borrow_mut()
@@ -385,6 +387,7 @@ impl ControllerState {
     }
 
     fn show_info(&mut self, title: &str, caption: &str, accent: Color, lines: Vec<String>) {
+        self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title(title);
         self.dashboard.borrow_mut().set_caption(caption);
         self.dashboard.borrow_mut().set_accent(accent);
@@ -393,6 +396,7 @@ impl ControllerState {
 
     fn close_wings(&mut self) {
         self.active_info = None;
+        self.dashboard.borrow_mut().hide();
         self.settings_wing.borrow_mut().close();
         self.info_wing.borrow_mut().close();
         let focus_index = match self.focus {
@@ -832,8 +836,8 @@ impl DiscoController {
                 width: assets::PANEL_WIDTH.min(width - 120),
                 height: assets::PANEL_HEIGHT.min(height - 120),
             },
-            "Flight Deck",
-            "Shared 747-style demo controller",
+            "About",
+            "rlvgl demo application",
         )));
 
         let event_window = Rc::new(RefCell::new(
@@ -1162,7 +1166,10 @@ impl DiscoController {
         });
 
         let controller = Self { root, state };
+        // Dashboard starts hidden — user navigates to it via settings/info.
+        // Populate the home content so it's ready when shown.
         controller.state.borrow_mut().show_home();
+        controller.state.borrow_mut().dashboard.borrow_mut().hide();
         controller
             .state
             .borrow_mut()

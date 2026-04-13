@@ -26,6 +26,7 @@ pub struct DashboardPanel {
     lines: Vec<String>,
     accent: Color,
     font: &'static BitmapFont,
+    visible: bool,
 }
 
 impl DashboardPanel {
@@ -38,6 +39,7 @@ impl DashboardPanel {
             lines: Vec::new(),
             accent: Color(0x58, 0xB3, 0xF5, 0xFF),
             font: &FONT_6X10,
+            visible: false,
         }
     }
 
@@ -79,14 +81,36 @@ impl DashboardPanel {
     pub fn set_accent(&mut self, color: Color) {
         self.accent = color;
     }
+
+    /// Show the dashboard panel.
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+
+    /// Hide the dashboard panel.
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+
+    /// Returns `true` if the panel is visible.
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 }
 
 impl Widget for DashboardPanel {
     fn bounds(&self) -> Rect {
-        self.bounds
+        if self.visible {
+            self.bounds
+        } else {
+            Rect { x: 0, y: 0, width: 0, height: 0 }
+        }
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        if !self.visible {
+            return;
+        }
         fill_rounded_rect(renderer, self.bounds, PANEL_BG, 18);
         draw_rounded_border(renderer, self.bounds, PANEL_BORDER, 2, 18);
 
