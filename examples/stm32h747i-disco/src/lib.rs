@@ -27,9 +27,11 @@ use embedded_alloc::Heap;
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
+// ── Splash / desktop image ────────────────────────────────────────────────────
+#[cfg(feature = "splash")]
+pub(crate) static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
+
 // ── Shared application modules ────────────────────────────────────────────────
-// These are the same modules used by main.rs. The `#[path]` attributes
-// ensure both targets compile from the same source files.
 
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]

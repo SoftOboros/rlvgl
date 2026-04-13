@@ -188,19 +188,92 @@ pub unsafe extern "C" fn rlvgl_init(
         let ahb3enr = 0x5802_44D4 as *mut u32;
         ahb3enr.write_volatile(ahb3enr.read_volatile() | (1 << 4));
 
-        // ── 4. Test render: bright blue fill to BACK buffer ─────────────
-        // Unmistakable: 0xFF0000FF = solid bright blue.
-        let total_pixels = (fb_w * fb_h) as usize;
-        let buf32 = fb_back as *mut u32;
-        for i in 0..total_pixels {
-            buf32.add(i).write_volatile(0xFF00_00FF); // ARGB blue
+        // ── 3b. Fix DSI color coding ─────────────────────────────────────
+        // Zephyr's HAL_DSI_ConfigVideoMode should set LCOLCR to RGB888
+        // (COLC=5, LPE=1) but the register reads 0 (RGB565). Force it.
+        let lcolcr = 0x5000_0028 as *mut u32;
+        lcolcr.write_volatile((1 << 8) | 5); // LPE=1, COLC=5 (RGB888)
+
+        // ── 4. Decode splash into BOTH framebuffers ─────────────────────
+        //
+        // splash.rle is 480×800 portrait. Zephyr's LTDC FB is 800×480
+        // landscape (800 pixels/line, 480 lines) because the panel MADCTL
+        // handles rotation. We decode portrait into scratch SDRAM, then
+        // copy-rotate 90° CW into landscape FBs.
+        //
+        // 90° CW rotation: portrait(px, py) → landscape(dst_x, dst_y)
+        //   dst_x = py
+        //   dst_y = (portrait_w - 1) - px
+        //
+        // Scratch buffer lives past the two FBs in SDRAM.
+        let fb_front = di.fb_front;
+        let fb_bytes = di.fb_len as usize;
+
+        // Scratch at fb_front + 2 * fb_len (past both FBs)
+        let scratch_base = fb_front.add(2 * fb_bytes);
+        // Portrait dimensions for the splash asset
+        let splash_w: usize = 480;
+        let splash_h: usize = 800;
+        let splash_bytes = splash_w * splash_h * 4;
+
+        #[cfg(feature = "splash")]
+        let splash_ok = (|| -> Option<()> {
+            let blob = crate::SPLASH_RLE;
+            let (w, h, pal_bytes, stream) =
+                rlvgl_decomp::parse_rle_blob(blob).ok()?;
+            if w as usize != splash_w || h as usize != splash_h {
+                return None;
+            }
+            let pal_count = pal_bytes.len() / 2;
+            let mut palette = [0u16; 192];
+            for i in 0..pal_count {
+                palette[i] =
+                    u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+            }
+
+            // Decode portrait into scratch buffer
+            let scratch = core::slice::from_raw_parts_mut(scratch_base, splash_bytes);
+            rlvgl_decomp::decode_argb_into(
+                splash_w, splash_h,
+                &palette[..pal_count], stream, scratch,
+            ).ok()?;
+
+            // Copy-rotate 90° CW from portrait scratch into landscape FBs.
+            // portrait(px, py) → landscape(dst_x=py, dst_y=479-px)
+            let src = scratch_base as *const u32;
+            let dst0 = fb_front as *mut u32;
+            let dst1 = fb_back as *mut u32;
+            let dst_stride = fb_w as usize; // 800 pixels per line
+
+            for py in 0..splash_h {
+                for px in 0..splash_w {
+                    let pixel = src.add(py * splash_w + px).read_volatile();
+                    let dx = py;
+                    let dy = (splash_w - 1) - px;
+                    let dst_idx = dy * dst_stride + dx;
+                    dst0.add(dst_idx).write_volatile(pixel);
+                    dst1.add(dst_idx).write_volatile(pixel);
+                }
+            }
+            Some(())
+        })().is_some();
+
+        #[cfg(not(feature = "splash"))]
+        let splash_ok = false;
+
+        if !splash_ok {
+            // Solid black fallback for both buffers
+            let total = (fb_w * fb_h) as usize;
+            for i in 0..total {
+                (fb_front as *mut u32).add(i).write_volatile(0xFF00_0000);
+                (fb_back as *mut u32).add(i).write_volatile(0xFF00_0000);
+            }
         }
 
-        // Full D-cache clean+invalidate by set/way.
-        // CM7 D-cache: 16KB, 4-way, 32B lines → 128 sets.
         dcache_clean_all();
 
-        // ── 5. Present the rendered frame ─────────────────────────────────
+        // Present back buffer (which now has splash or black).
+        // Both buffers have identical content so either is fine.
         rlvgl_present(fb_back, di.width, di.height);
     }
 }

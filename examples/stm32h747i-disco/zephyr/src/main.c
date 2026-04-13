@@ -117,16 +117,12 @@ int main(void)
 
 	/* Get framebuffer info from Zephyr's LTDC driver.
 	 *
-	 * The LTDC driver allocates 2 contiguous ARGB8888 framebuffers
-	 * in SDRAM (CONFIG_STM32_LTDC_FB_NUM=2). display_get_framebuffer()
-	 * returns the front buffer; the back buffer is at front + fb_len.
-	 *
-	 * The panel is 480x800 portrait natively. Zephyr reports 800x480
-	 * because the shield has rotation=90, but the FB layout in SDRAM
-	 * is portrait (480 pixels per line, 800 lines). */
+	 * In video mode with rotation=90, the LTDC scans landscape:
+	 * 800 pixels per line, 480 lines. The panel MADCTL handles rotation.
+	 * Use the reported (post-rotation) dimensions as the FB layout. */
 	uint8_t *fb_front = (uint8_t *)display_get_framebuffer(g_disp);
-	uint16_t fb_w = 480;   /* portrait pixel width */
-	uint16_t fb_h = 800;   /* portrait pixel height */
+	uint16_t fb_w = caps.x_resolution; /* 800 (landscape) */
+	uint16_t fb_h = caps.y_resolution; /* 480 (landscape) */
 	uint16_t px_sz = 4;    /* ARGB8888 */
 	uint32_t fb_len = fb_w * fb_h * px_sz;
 	uint8_t *fb_back = fb_front + fb_len;
