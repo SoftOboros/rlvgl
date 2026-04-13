@@ -1,5 +1,5 @@
 #![cfg_attr(not(doc), no_std)]
-#![cfg_attr(all(not(doc), not(feature = "zephyr")), no_main)]
+#![cfg_attr(not(doc), no_main)]
 
 //! Entry point for the STM32H747I-DISCO hardware demo.
 //!
@@ -19,15 +19,6 @@ use embedded_alloc::Heap;
 #[cfg(all(not(doc), not(feature = "zephyr")))]
 use panic_halt as _;
 
-// Zephyr builds: minimal panic handler (Zephyr's own abort path handles the rest).
-#[cfg(all(target_os = "none", feature = "zephyr", not(doc)))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {
-        cortex_m::asm::bkpt();
-    }
-}
-
 // The demo app crate provides flush_pending and Application trait for widget
 // tree management. The c_hal path uses a server-mode widget tree driven by
 // CM4 via IPC and does not need it.
@@ -42,16 +33,6 @@ mod audio_scope;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod bare_metal_sync;
-#[cfg(all(
-    feature = "zephyr",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-mod zephyr_sync;
-#[cfg(all(
-    feature = "zephyr",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-mod zephyr_entry;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
@@ -4961,5 +4942,5 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
 }
 
-#[cfg(any(doc, feature = "zephyr"))]
+#[cfg(doc)]
 fn main() {}

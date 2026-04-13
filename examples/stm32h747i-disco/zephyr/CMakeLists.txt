@@ -25,7 +25,7 @@ target_sources(app PRIVATE src/main.c)
 #
 # Adjust the path if your build layout differs.
 set(RLVGL_RUST_LIB
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../target/thumbv7em-none-eabihf/debug/librlvgl_example_disco.a)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../target/thumbv7em-none-eabihf/debug/librlvgl_example_disco.a)
 
 if(EXISTS ${RLVGL_RUST_LIB})
     target_link_libraries(app PUBLIC ${RLVGL_RUST_LIB})

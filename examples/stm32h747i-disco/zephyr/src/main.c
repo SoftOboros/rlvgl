@@ -31,6 +31,20 @@ extern void rlvgl_init(struct k_sem *erif_sem, struct k_sem *dma2d_done_sem);
 extern void rlvgl_dsi_isr(void);
 extern void rlvgl_dma2d_isr(void);
 
+/* ── FFI wrappers for Rust ───────────────────────────────────────────── */
+
+/* Zephyr k_sem_give/k_sem_take may be static-inline or macro-expanded.
+ * Provide real symbols so the Rust static library can link against them. */
+int rlvgl_k_sem_take(struct k_sem *sem, k_timeout_t timeout)
+{
+	return k_sem_take(sem, timeout);
+}
+
+void rlvgl_k_sem_give(struct k_sem *sem)
+{
+	k_sem_give(sem);
+}
+
 /* ── ISR wrappers ────────────────────────────────────────────────────── */
 
 /* DSI IRQ 123 on STM32H747. Priority 1 (high — timing-critical). */

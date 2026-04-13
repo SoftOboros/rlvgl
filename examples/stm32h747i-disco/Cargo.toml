@@ -5,6 +5,12 @@ edition = "2024"
 publish = false
 build = "build.rs"
 
+[lib]
+name = "rlvgl_example_disco"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+required-features = ["zephyr"]
+
 [[bin]]
 name = "rlvgl-stm32h747i-disco"
 path = "src/main.rs"

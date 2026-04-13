@@ -39,12 +39,14 @@ pub const K_NO_WAIT: k_timeout_t = k_timeout_t { ticks: 0 };
 
 unsafe extern "C" {
     /// Take a semaphore (decrement count). Returns 0 on success, -EBUSY
-    /// or -EAGAIN on timeout. Safe from thread context; ISR must use
-    /// `K_NO_WAIT`.
+    /// or -EAGAIN on timeout. Wraps Zephyr's `k_sem_take` via C shim
+    /// (the kernel function may be static-inline).
+    #[link_name = "rlvgl_k_sem_take"]
     pub fn k_sem_take(sem: *mut k_sem, timeout: k_timeout_t) -> i32;
 
     /// Give a semaphore (increment count, wake highest-priority waiter).
-    /// Safe from both thread and ISR context.
+    /// Wraps Zephyr's `k_sem_give` via C shim.
+    #[link_name = "rlvgl_k_sem_give"]
     pub fn k_sem_give(sem: *mut k_sem);
 }
 

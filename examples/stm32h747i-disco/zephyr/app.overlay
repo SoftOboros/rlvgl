@@ -10,13 +10,15 @@
  * SDRAM and the display API surface.
  */
 
-/* Disable Zephyr's video-mode-only DSI driver.
- * Rust performs adapted-command-mode init via raw registers. */
+/* Disable Zephyr's video-mode-only DSI driver and NT35510 panel.
+ * Rust performs adapted-command-mode init via raw registers.
+ * The LTDC driver remains enabled for the display API surface. */
 &mipi_dsi {
 	status = "disabled";
-};
 
-/* Enable DMA2D clock — Rust drives registers directly. */
-&dma2d {
-	status = "okay";
+	/* Disable the NT35510 panel node added by the shield —
+	 * it references the DSI host which we disabled. */
+	nt35510: nt35510@0 {
+		status = "disabled";
+	};
 };
