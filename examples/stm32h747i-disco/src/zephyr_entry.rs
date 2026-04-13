@@ -20,7 +20,92 @@
 //! `IRQ_CONNECT`. They call thin Rust `extern "C"` handlers here.
 
 use crate::zephyr_sync::{self, ZephyrFrameSync};
-use core::sync::atomic::{AtomicPtr, Ordering};
+use core::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
+
+// ── Touch input from Zephyr input subsystem ───────────────────────────────────
+
+/// Matches C `struct rlvgl_touch_event`.
+#[repr(C)]
+struct TouchEventC {
+    x: i16,
+    y: i16,
+    pressed: u8,
+}
+
+/// Packed touch state: x[15:0] | y[31:16] in one atomic, pressed in another.
+static TOUCH_XY: AtomicU32 = AtomicU32::new(0);
+static TOUCH_PRESSED: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+static TOUCH_DIRTY: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+/// Called from C input callback — stores latest touch state atomically.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rlvgl_touch_event(evt: *const TouchEventC) {
+    unsafe {
+        let e = &*evt;
+        let packed = (e.x as u16 as u32) | ((e.y as u16 as u32) << 16);
+        TOUCH_XY.store(packed, Ordering::Relaxed);
+        TOUCH_PRESSED.store(e.pressed != 0, Ordering::Relaxed);
+        TOUCH_DIRTY.store(true, Ordering::Release);
+    }
+}
+
+// ── Key input from Zephyr GPIO keys (joystick) ───────────────────────────────
+
+/// Linux input key codes matching Zephyr's `zephyr,code` DTS values.
+const KEY_ENTER: u16 = 28;
+const KEY_UP: u16 = 103;
+const KEY_DOWN: u16 = 108;
+const KEY_LEFT: u16 = 105;
+const KEY_RIGHT: u16 = 106;
+
+/// Simple key event ring buffer (4 entries, enough for joystick).
+static KEY_BUF: [AtomicU32; 4] = [
+    AtomicU32::new(0), AtomicU32::new(0),
+    AtomicU32::new(0), AtomicU32::new(0),
+];
+static KEY_WRITE: AtomicU32 = AtomicU32::new(0);
+static KEY_READ: AtomicU32 = AtomicU32::new(0);
+
+/// Called from C input callback for joystick key events.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rlvgl_key_event(code: u16, pressed: u8) {
+    // Pack: code in low 16, pressed in bit 16, valid in bit 31
+    let packed = (code as u32) | ((pressed as u32) << 16) | (1 << 31);
+    let idx = KEY_WRITE.fetch_add(1, Ordering::Relaxed) as usize % KEY_BUF.len();
+    KEY_BUF[idx].store(packed, Ordering::Release);
+}
+
+/// Consume the next key event if one is pending.
+fn take_key() -> Option<(u16, bool)> {
+    let r = KEY_READ.load(Ordering::Relaxed);
+    let w = KEY_WRITE.load(Ordering::Acquire);
+    if r == w {
+        return None;
+    }
+    let idx = r as usize % KEY_BUF.len();
+    let packed = KEY_BUF[idx].swap(0, Ordering::Acquire);
+    if packed & (1 << 31) == 0 {
+        return None;
+    }
+    KEY_READ.store(r.wrapping_add(1), Ordering::Relaxed);
+    let code = (packed & 0xFFFF) as u16;
+    let pressed = (packed >> 16) & 1 != 0;
+    Some((code, pressed))
+}
+
+/// Consume the latest touch event if one is pending.
+fn take_touch() -> Option<(i16, i16, bool)> {
+    if !TOUCH_DIRTY.swap(false, Ordering::Acquire) {
+        return None;
+    }
+    let packed = TOUCH_XY.load(Ordering::Relaxed);
+    let x = packed as u16 as i16;
+    let y = (packed >> 16) as u16 as i16;
+    let pressed = TOUCH_PRESSED.load(Ordering::Relaxed);
+    Some((x, y, pressed))
+}
 
 // D-cache clean via Zephyr's SCB_CleanDCache (C wrapper).
 unsafe extern "C" {
@@ -312,6 +397,74 @@ pub unsafe extern "C" fn rlvgl_init(
             let mut render_buf = fb_front; // original front is now the back
 
             loop {
+                // Process joystick key events
+                {
+                    use rlvgl_core::event::{Event, Key};
+                    while let Some((code, pressed)) = take_key() {
+                        let key = match code {
+                            KEY_UP => Some(Key::ArrowUp),
+                            KEY_DOWN => Some(Key::ArrowDown),
+                            KEY_LEFT => Some(Key::ArrowLeft),
+                            KEY_RIGHT => Some(Key::ArrowRight),
+                            KEY_ENTER => Some(Key::Enter),
+                            _ => None,
+                        };
+                        if let Some(k) = key {
+                            if pressed {
+                                controller.dispatch_event(&Event::KeyDown { key: k });
+                            }
+                        }
+                    }
+                }
+
+                // Process touch input.
+                // Zephyr FT5336 reports raw panel coordinates. With
+                // rotation=90, transform to landscape:
+                //   landscape_x = raw_y
+                //   landscape_y = (panel_height - 1) - raw_x
+                if let Some((raw_x, raw_y, pressed)) = take_touch() {
+                    // Zephyr FT5336 driver already reports landscape coords
+                    // but Y is inverted (high=top, low=bottom).
+                    let lx = raw_x as i32;
+                    let ly = 479 - raw_y as i32;
+
+                    // Trace touch to serial
+                    fn u1_putc(c: u8) {
+                        unsafe {
+                            let isr = 0x4001_101C as *const u32;
+                            let tdr = 0x4001_1028 as *mut u32;
+                            while isr.read_volatile() & (1 << 7) == 0 {}
+                            tdr.write_volatile(c as u32);
+                        }
+                    }
+                    fn u1_dec(mut v: i32) {
+                        if v < 0 { u1_putc(b'-'); v = -v; }
+                        let mut buf = [0u8; 10];
+                        let mut i = 0;
+                        if v == 0 { u1_putc(b'0'); return; }
+                        while v > 0 { buf[i] = b'0' + (v % 10) as u8; v /= 10; i += 1; }
+                        while i > 0 { i -= 1; u1_putc(buf[i]); }
+                    }
+                    for &c in b"T:" { u1_putc(c); }
+                    u1_dec(raw_x as i32);
+                    u1_putc(b',');
+                    u1_dec(raw_y as i32);
+                    for &c in b"->" { u1_putc(c); }
+                    u1_dec(lx);
+                    u1_putc(b',');
+                    u1_dec(ly);
+                    u1_putc(if pressed { b'D' } else { b'U' });
+                    for &c in b"\r\n" { u1_putc(c); }
+
+                    if pressed {
+                        use rlvgl_core::event::Event;
+                        controller.dispatch_event(&Event::PressRelease {
+                            x: lx,
+                            y: ly,
+                        });
+                    }
+                }
+
                 controller.tick();
 
                 // Restore pristine desktop into the render buffer

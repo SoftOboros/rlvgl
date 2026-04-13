@@ -10,7 +10,11 @@
  * SDRAM and the display API surface.
  */
 
-/* Phase 5 bringup: let Zephyr's DSI driver init in video mode.
- * This gets pixels on screen via the built-in LTDC+DSI+NT35510
- * driver chain. Adapted command mode (raw register init from Rust)
- * will replace this once video mode is verified working. */
+/* Phase 5 bringup: let Zephyr's DSI driver init in video mode. */
+
+/* Enable joystick buttons for navigation. */
+&joy_center { status = "okay"; };
+&joy_down   { status = "okay"; };
+&joy_up     { status = "okay"; };
+&joy_left   { status = "okay"; };
+&joy_right  { status = "okay"; };

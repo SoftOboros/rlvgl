@@ -12,6 +12,7 @@
 #include <zephyr/irq.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/cache.h>
+#include <zephyr/input/input.h>
 
 /* ── Kernel objects ──────────────────────────────────────────────────── */
 
@@ -77,6 +78,57 @@ int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
 	};
 	return display_write(g_disp, 0, 0, &desc, back_buf);
 }
+
+/* ── Touch input ─────────────────────────────────────────────────────── */
+
+/* Touch event sent to Rust. Coordinates are raw panel space. */
+struct rlvgl_touch_event {
+	int16_t x;
+	int16_t y;
+	uint8_t pressed; /* 1=down/move, 0=up */
+};
+
+/* Rust FFI: queue a touch or key event. */
+extern void rlvgl_touch_event(const struct rlvgl_touch_event *evt);
+extern void rlvgl_key_event(uint16_t code, uint8_t pressed);
+
+static int16_t touch_x, touch_y;
+static bool touch_pressed;
+
+static void input_cb(struct input_event *evt, void *user_data)
+{
+	ARG_UNUSED(user_data);
+
+	switch (evt->code) {
+	case INPUT_ABS_X:
+		touch_x = (int16_t)evt->value;
+		break;
+	case INPUT_ABS_Y:
+		touch_y = (int16_t)evt->value;
+		break;
+	case INPUT_BTN_TOUCH:
+		touch_pressed = evt->value != 0;
+		break;
+	/* Joystick / GPIO keys: forward immediately */
+	case INPUT_KEY_ENTER:
+	case INPUT_KEY_UP:
+	case INPUT_KEY_DOWN:
+	case INPUT_KEY_LEFT:
+	case INPUT_KEY_RIGHT:
+		rlvgl_key_event(evt->code, evt->value ? 1 : 0);
+		return;
+	}
+
+	if (evt->sync) {
+		struct rlvgl_touch_event te = {
+			.x = touch_x,
+			.y = touch_y,
+			.pressed = touch_pressed ? 1 : 0,
+		};
+		rlvgl_touch_event(&te);
+	}
+}
+INPUT_CALLBACK_DEFINE(NULL, input_cb, NULL);
 
 /* ── ISR wrappers ────────────────────────────────────────────────────── */
 
