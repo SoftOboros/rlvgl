@@ -272,9 +272,12 @@ pub unsafe extern "C" fn rlvgl_init(
 
         dcache_clean_all();
 
-        // Present back buffer (which now has splash or black).
-        // Both buffers have identical content so either is fine.
+        // Present splash immediately so it's visible during widget init.
         rlvgl_present(fb_back, di.width, di.height);
+
+        // Splash is now displayed as desktop. Both buffers are identical.
+        // Widget tree and render loop will be wired in once the
+        // orientation architecture is in place.
     }
 }
 

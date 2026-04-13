@@ -55,6 +55,12 @@ void rlvgl_dcache_clean(void)
 	SCB_CleanDCache();
 }
 
+/* Sleep wrapper for Rust render loop frame pacing. */
+void rlvgl_k_sleep_ms(uint32_t ms)
+{
+	k_sleep(K_MSEC(ms));
+}
+
 /* Present: trigger Zephyr LTDC driver's double-buffer swap.
  * Writes the full back buffer as a new frame, which triggers
  * LINE ISR -> CFBAR update -> sem give. Blocks until swap completes. */
