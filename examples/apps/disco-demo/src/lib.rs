@@ -99,7 +99,7 @@ impl DiscoCapabilities {
             audio: false,
             storage: true,
             diagnostics: true,
-            effects: false,
+            effects: true,
             pointer: true,
             platform: "Zephyr RTOS",
         }

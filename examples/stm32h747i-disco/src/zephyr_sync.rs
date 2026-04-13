@@ -123,7 +123,8 @@ impl ZephyrFrameSync {
 impl FrameSync for ZephyrFrameSync {
     #[inline]
     fn take_erif(&self) -> bool {
-        unsafe { k_sem_take(self.erif_sem, K_NO_WAIT) == 0 }
+        // In video mode, no ERIF — always grant.
+        true
     }
 
     #[inline]
@@ -131,12 +132,12 @@ impl FrameSync for ZephyrFrameSync {
         cyccnt().wrapping_sub(self.erif_cyccnt.load(Ordering::Acquire))
     }
 
-    fn dma2d_admits(&self, cost: u32) -> bool {
-        const GUARD: u32 = 400_000; // 1 ms at 400 MHz
-        let budget = self.frame_budget.load(Ordering::Relaxed);
-        let elapsed = self.cycles_since_erif();
-        let remaining = budget.saturating_sub(elapsed);
-        remaining > cost + GUARD
+    fn dma2d_admits(&self, _cost: u32) -> bool {
+        // In video mode, LTDC scans continuously with AXI QoS priority.
+        // DMA2D can run anytime — no ERIF gating needed.
+        // When adapted command mode is enabled, this will use the same
+        // cycle-budget arithmetic as the bare-metal implementation.
+        true
     }
 
     #[inline]
@@ -146,19 +147,10 @@ impl FrameSync for ZephyrFrameSync {
 
     #[inline]
     fn erif_is_set(&self) -> bool {
-        // Non-destructive check: peek at the semaphore count.
-        // Zephyr doesn't expose k_sem_count_get via C ABI trivially,
-        // so we attempt a take and give it back if successful.
-        // This is acceptable because erif_is_set() is only used for the
-        // initial starfield gate (frame_id > 1 && !erif_is_set).
-        unsafe {
-            if k_sem_take(self.erif_sem, K_NO_WAIT) == 0 {
-                k_sem_give(self.erif_sem);
-                true
-            } else {
-                false
-            }
-        }
+        // In video mode, LTDC scans continuously — no ERIF gating.
+        // Always return true so the star crawl doesn't block waiting
+        // for an ERIF that never fires.
+        true
     }
 }
 
@@ -170,20 +162,26 @@ impl Dma2dSync for ZephyrFrameSync {
 
     #[inline]
     fn take_complete(&self) -> bool {
-        unsafe { k_sem_take(self.dma2d_done_sem, K_NO_WAIT) == 0 }
+        // Poll DMA2D_ISR.TCIF (bit 1) directly — avoids ISR/sem race.
+        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
+        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
+        let isr = unsafe { DMA2D_ISR.read_volatile() };
+        if isr & (1 << 1) != 0 {
+            // Clear TC flag
+            unsafe { DMA2D_IFCR.write_volatile(1 << 1) };
+            true
+        } else {
+            false
+        }
     }
 
     fn take_error(&self) -> u32 {
-        // DMA2D error tracking: read ISR register directly.
-        // Under Zephyr the ISR handler clears flags and gives the sem;
-        // errors are checked via the DMA2D ISR register.
-        let regs = 0x5200_1000 as *const u32; // DMA2D_ISR
-        let isr = unsafe { regs.read_volatile() };
+        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
+        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
+        let isr = unsafe { DMA2D_ISR.read_volatile() };
         let errors = isr & ((1 << 5) | (1 << 0)); // CEIF | TEIF
         if errors != 0 {
-            // Clear error flags
-            let ifcr = 0x5200_1004 as *mut u32; // DMA2D_IFCR
-            unsafe { ifcr.write_volatile(errors) };
+            unsafe { DMA2D_IFCR.write_volatile(errors) };
         }
         errors
     }

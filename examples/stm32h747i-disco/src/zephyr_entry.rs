@@ -498,6 +498,44 @@ pub unsafe extern "C" fn rlvgl_init(
                 tag: Some("disco.file_browser"),
             });
 
+            // ── Star crawl setup ─────────────────────────────────────
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            let mut star_crawl = {
+                use crate::star_crawl::StarCrawl;
+                static CRAWL_FONT_DATA: &[u8] =
+                    include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+                static CRAWL_FONT: rlvgl_core::packed_font::PackedFont =
+                    rlvgl_core::packed_font::PackedFont {
+                        height: 24,
+                        ascent: 22,
+                        glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                        data: CRAWL_FONT_DATA,
+                    };
+                static CRAWL_LINES: &[&str] = &[
+                    "rlvgl",
+                    "",
+                    "A Rust UI framework for",
+                    "embedded displays",
+                    "",
+                    "Running on Zephyr RTOS",
+                    "STM32H747I-DISCO",
+                    "",
+                    "DMA2D accelerated",
+                    "star field rendering",
+                ];
+                StarCrawl::new(&CRAWL_FONT, CRAWL_LINES, 60)
+            };
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            let mut crawl_dma2d: Option<rlvgl_platform::dma2d::Dma2dBlitter> = None;
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            let mut crawl_active = false;
+            // Portrait scratch buffer for crawl output (480×720×4 = 1.3MB)
+            // Lives at CRAWL_BASE in SDRAM Bank 2
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            const CRAWL_FB_W: u32 = 480;
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            const CRAWL_FB_H: u32 = 720;
+
             // After first present, LTDC displays back buffer (now front).
             // The "back" for rendering is the original front buffer.
             // Track which buffer to render into.
@@ -587,7 +625,58 @@ pub unsafe extern "C" fn rlvgl_init(
                         DiscoCommand::LoadStorageSummary => {
                             file_browser.borrow_mut().toggle();
                         }
+                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                        DiscoCommand::StartEffect(rlvgl_app_disco_demo::DiscoEffect::StarCrawl) => {
+                            // TODO: DMA2D PAC blitter hangs under Zephyr
+                            // (AMTCR/ISR interaction with video-mode LTDC).
+                            // Star crawl deferred until DMA2D is debugged.
+                            controller.publish_status("Star crawl: DMA2D pending Zephyr debug");
+                        }
                         _ => {}
+                    }
+                }
+
+                // ── Star crawl rendering ──────────────────────────────
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                if crawl_active {
+                    if let Some(ref mut dma2d) = crawl_dma2d {
+                        // Portrait scratch buffer at CRAWL_BASE (0xD100_0000)
+                        let crawl_buf = 0xD100_0000usize as *mut u8;
+                        let sync_ref = get_sync().unwrap_unchecked();
+                        let result = star_crawl.tick(
+                            dma2d, crawl_buf, CRAWL_FB_W, CRAWL_FB_H, sync_ref,
+                        );
+                        match result {
+                            crate::star_crawl::StepResult::FrameReady => {
+                                // Rotate portrait crawl output 90° CW into
+                                // the landscape render buffer.
+                                let src = crawl_buf as *const u32;
+                                let dst = render_buf as *mut u32;
+                                let dst_stride = fb_w as usize;
+                                for py in 0..CRAWL_FB_H as usize {
+                                    for px in 0..CRAWL_FB_W as usize {
+                                        let pixel = src.add(py * CRAWL_FB_W as usize + px).read();
+                                        let dx = py;
+                                        let dy = (CRAWL_FB_W as usize - 1) - px;
+                                        if dx < fb_w as usize && dy < fb_h as usize {
+                                            dst.add(dy * dst_stride + dx).write(pixel);
+                                        }
+                                    }
+                                }
+                                dcache_clean_all();
+                                rlvgl_present(render_buf, di.width, di.height);
+                                render_buf = if render_buf == fb_front { fb_back } else { fb_front };
+                                continue; // skip normal widget render this frame
+                            }
+                            crate::star_crawl::StepResult::Finished => {
+                                crawl_active = false;
+                                crawl_dma2d = None;
+                            }
+                            _ => {
+                                // Pending or Idle — keep ticking
+                                continue; // don't render widgets while crawl runs
+                            }
+                        }
                     }
                 }
 
