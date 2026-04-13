@@ -791,7 +791,11 @@ impl DiscoController {
             width,
             height,
         });
-        root_container.style = StyleBuilder::new().bg_color(Color(13, 19, 30, 255)).build();
+        // Transparent root — desktop/splash background shows through.
+        // Alpha=0 means draw_widget_bg skips the fill entirely.
+        root_container.style = StyleBuilder::new()
+            .bg_color(Color(0, 0, 0, 0))
+            .build();
         let root = Rc::new(RefCell::new(WidgetNode {
             widget: Rc::new(RefCell::new(root_container)),
             children: Vec::new(),

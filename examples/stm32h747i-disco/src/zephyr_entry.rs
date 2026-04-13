@@ -272,13 +272,86 @@ pub unsafe extern "C" fn rlvgl_init(
 
         dcache_clean_all();
 
+        // ── 4b. Save pristine desktop for background restoration ────────
+        // Copy front buffer (rotated splash) to a third SDRAM region
+        // past the scratch area. Each frame we restore from this pristine
+        // copy before drawing widgets.
+        let pristine_base = scratch_base.add(splash_bytes);
+        core::ptr::copy_nonoverlapping(fb_front, pristine_base, fb_bytes);
+
+        dcache_clean_all();
+
         // Present splash immediately so it's visible during widget init.
         rlvgl_present(fb_back, di.width, di.height);
 
-        // Splash is now displayed as desktop. Both buffers are identical.
-        // Widget tree and render loop will be wired in once the
-        // orientation architecture is in place.
+        // ── 5. Initialize heap ───────────────────────────────────────────
+        {
+            const HEAP_SIZE: usize = 64 * 1024;
+            static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+            let start = core::ptr::addr_of_mut!(HEAP_MEM) as usize;
+            crate::ALLOC.init(start, HEAP_SIZE);
+        }
+
+        // ── 6. Build widget tree and run render loop ─────────────────────
+        {
+            use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoController};
+            use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, Surface};
+            use rlvgl_platform::cpu_blitter::CpuBlitter;
+            use rlvgl_platform::screen::Screen;
+
+            let screen = Screen::landscape(fb_w, fb_h);
+            let mut controller = DiscoController::new(
+                screen,
+                DiscoCapabilities::stm32h747i_disco(),
+            );
+            let root = controller.root();
+
+            // After first present, LTDC displays back buffer (now front).
+            // The "back" for rendering is the original front buffer.
+            // Track which buffer to render into.
+            let mut render_buf = fb_front; // original front is now the back
+
+            loop {
+                controller.tick();
+
+                // Restore pristine desktop into the render buffer
+                core::ptr::copy_nonoverlapping(pristine_base, render_buf, fb_bytes);
+
+                // Render widget tree on top (landscape, no rotation)
+                let fb_slice = core::slice::from_raw_parts_mut(render_buf, fb_bytes);
+                let surface = Surface::new(
+                    fb_slice,
+                    (fb_w * bpp) as usize,
+                    PixelFmt::Argb8888,
+                    fb_w,
+                    fb_h,
+                );
+                let mut blitter = CpuBlitter;
+                let mut renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                    BlitterRenderer::new(&mut blitter, surface);
+                root.borrow().draw(&mut renderer);
+
+                dcache_clean_all();
+                rlvgl_present(render_buf, di.width, di.height);
+
+                // After present, the buffer we just rendered becomes
+                // the displayed front. The other buffer becomes our
+                // new render target.
+                render_buf = if render_buf == fb_front {
+                    fb_back
+                } else {
+                    fb_front
+                };
+
+                // Frame pacing — yield to Zephyr scheduler
+                rlvgl_k_sleep_ms(33); // ~30 fps
+            }
+        }
     }
+}
+
+unsafe extern "C" {
+    fn rlvgl_k_sleep_ms(ms: u32);
 }
 
 // ── Frame budget update (called from present thread after each frame) ─────────
