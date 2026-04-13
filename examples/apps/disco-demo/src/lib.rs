@@ -358,11 +358,14 @@ impl ControllerState {
                 if self.capabilities.effects { "yes" } else { "no" },
             ),
             format!(
-                "Pointer: {}  Diagnostics: {}  Backlight: {}%",
+                "Pointer: {}",
                 if self.capabilities.pointer { "yes" } else { "no" },
-                if self.capabilities.diagnostics { "yes" } else { "no" },
-                self.backlight,
             ),
+            format!(
+                "Diagnostics: {}",
+                if self.capabilities.diagnostics { "yes" } else { "no" },
+            ),
+            format!("Backlight: {}%", self.backlight),
         ]);
         self.push_status("About");
     }
@@ -871,7 +874,7 @@ impl DiscoController {
             (assets::ICON_MONITOR_48, true),
             (assets::ICON_GLOBE_48, true),
             (assets::ICON_BUG_48, true),
-            (assets::ICON_CPU_48, true), // About
+            (assets::ICON_INFO, true), // About
         ])));
 
         let info_wing = Rc::new(RefCell::new(Wing::new(&[
