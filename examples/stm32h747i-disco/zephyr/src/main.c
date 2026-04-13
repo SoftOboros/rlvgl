@@ -11,31 +11,34 @@
 #include <zephyr/device.h>
 #include <zephyr/irq.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/cache.h>
 
 /* ── Kernel objects ──────────────────────────────────────────────────── */
 
-/* ERIF semaphore: given by DSI ISR, taken by present thread.
- * Max count 1 — additional gives are silently dropped, matching the
- * bare-metal AtomicBool behavior. */
 K_SEM_DEFINE(erif_sem, 0, 1);
-
-/* DMA2D transfer-complete semaphore: given by DMA2D ISR, taken by
- * render thread. Max count 1. */
 K_SEM_DEFINE(dma2d_done_sem, 0, 1);
+
+/* ── Display info passed to Rust ─────────────────────────────────────── */
+
+struct rlvgl_display_info {
+	uint8_t *fb_front;       /* front framebuffer (currently displayed) */
+	uint8_t *fb_back;        /* back framebuffer (render target) */
+	uint32_t fb_len;         /* bytes per framebuffer */
+	uint16_t width;          /* portrait width (480) */
+	uint16_t height;         /* portrait height (800) */
+	uint16_t pixel_size;     /* bytes per pixel (4 for ARGB8888) */
+};
 
 /* ── Rust FFI declarations ───────────────────────────────────────────── */
 
-/* Initialization entry point — passes kernel object pointers to Rust. */
-extern void rlvgl_init(struct k_sem *erif_sem, struct k_sem *dma2d_done_sem);
-
-/* ISR handlers implemented in Rust (zephyr_entry.rs). */
+extern void rlvgl_init(struct k_sem *erif_sem,
+		       struct k_sem *dma2d_done_sem,
+		       const struct rlvgl_display_info *display_info);
 extern void rlvgl_dsi_isr(void);
 extern void rlvgl_dma2d_isr(void);
 
-/* ── FFI wrappers for Rust ───────────────────────────────────────────── */
+/* ── FFI wrappers for Zephyr kernel API ─────────────────────────────── */
 
-/* Zephyr k_sem_give/k_sem_take may be static-inline or macro-expanded.
- * Provide real symbols so the Rust static library can link against them. */
 int rlvgl_k_sem_take(struct k_sem *sem, k_timeout_t timeout)
 {
 	return k_sem_take(sem, timeout);
@@ -46,16 +49,37 @@ void rlvgl_k_sem_give(struct k_sem *sem)
 	k_sem_give(sem);
 }
 
+/* D-cache clean — flush all dirty lines to SDRAM. */
+void rlvgl_dcache_clean(void)
+{
+	SCB_CleanDCache();
+}
+
+/* Present: trigger Zephyr LTDC driver's double-buffer swap.
+ * Writes the full back buffer as a new frame, which triggers
+ * LINE ISR -> CFBAR update -> sem give. Blocks until swap completes. */
+static const struct device *g_disp;
+
+int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
+{
+	if (!g_disp) return -1;
+	struct display_buffer_descriptor desc = {
+		.buf_size = width * height * 4, /* ARGB8888 */
+		.width = width,
+		.height = height,
+		.pitch = width,
+	};
+	return display_write(g_disp, 0, 0, &desc, back_buf);
+}
+
 /* ── ISR wrappers ────────────────────────────────────────────────────── */
 
-/* DSI IRQ 123 on STM32H747. Priority 1 (high — timing-critical). */
 static void dsi_isr_wrapper(const void *arg)
 {
 	ARG_UNUSED(arg);
 	rlvgl_dsi_isr();
 }
 
-/* DMA2D IRQ. Priority 3 (below DSI, above normal threads). */
 static void dma2d_isr_wrapper(const void *arg)
 {
 	ARG_UNUSED(arg);
@@ -67,67 +91,65 @@ static void dma2d_isr_wrapper(const void *arg)
 int main(void)
 {
 	printk("rlvgl-zephyr: starting\n");
-	/* Register ISRs dynamically (CONFIG_DYNAMIC_INTERRUPTS=y).
-	 *
-	 * IRQ numbers from stm32h747xx.h:
-	 *   DSI_IRQn   = 78  (NVIC IRQ, not exception number)
-	 *   DMA2D_IRQn = 90
-	 *
-	 * Note: Zephyr IRQ numbers are NVIC IRQ numbers (0-based),
-	 * not Cortex-M exception numbers (which are IRQ+16).
-	 */
-	irq_connect_dynamic(78, 1, dsi_isr_wrapper, NULL, 0);
-	irq_enable(78);
 
+	/* Register DMA2D ISR (IRQ 90, pri 3).
+	 * DSI ISR is NOT registered in video mode — the ERIF handler
+	 * clears LTDCEN which kills continuous scanning. Enable it
+	 * only after switching to adapted command mode. */
 	irq_connect_dynamic(90, 3, dma2d_isr_wrapper, NULL, 0);
 	irq_enable(90);
 
-	/* Hand off to Rust. This initializes the display subsystem and
-	 * (in the future) spawns render/present/touch threads. */
 	/* ── Display bringup via Zephyr display API ──────────────── */
-	const struct device *disp = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-	if (!device_is_ready(disp)) {
-		printk("rlvgl-zephyr: display device not ready!\n");
-	} else {
-		struct display_capabilities caps;
-		display_get_capabilities(disp, &caps);
-		printk("rlvgl-zephyr: display %ux%u fmt=%u\n",
-		       caps.x_resolution, caps.y_resolution,
-		       caps.current_pixel_format);
-		display_blanking_off(disp);
-		printk("rlvgl-zephyr: blanking off (backlight on)\n");
-
-		/* Write a red fill using reported resolution. */
-		{
-			uint16_t w = caps.x_resolution;
-			uint16_t h = caps.y_resolution;
-			static uint32_t line_buf[800]; /* max width */
-			for (int i = 0; i < w && i < 800; i++)
-				line_buf[i] = 0xFFFF0000; /* ARGB red */
-			struct display_buffer_descriptor desc = {
-				.buf_size = w * 4,
-				.width = w,
-				.height = 1,
-				.pitch = w,
-			};
-			for (int y = 0; y < h; y++) {
-				int ret = display_write(disp, 0, y, &desc, line_buf);
-				if (ret && y == 0) {
-					printk("rlvgl-zephyr: display_write err=%d\n", ret);
-					break;
-				}
-			}
-			printk("rlvgl-zephyr: red fill %ux%u written\n", w, h);
-		}
+	g_disp = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+	if (!device_is_ready(g_disp)) {
+		printk("rlvgl-zephyr: display not ready!\n");
+		return -1;
 	}
 
+	struct display_capabilities caps;
+	display_get_capabilities(g_disp, &caps);
+	printk("rlvgl-zephyr: display %ux%u fmt=%u\n",
+	       caps.x_resolution, caps.y_resolution,
+	       caps.current_pixel_format);
+
+	display_blanking_off(g_disp);
+	printk("rlvgl-zephyr: blanking off\n");
+
+	/* Get framebuffer info from Zephyr's LTDC driver.
+	 *
+	 * The LTDC driver allocates 2 contiguous ARGB8888 framebuffers
+	 * in SDRAM (CONFIG_STM32_LTDC_FB_NUM=2). display_get_framebuffer()
+	 * returns the front buffer; the back buffer is at front + fb_len.
+	 *
+	 * The panel is 480x800 portrait natively. Zephyr reports 800x480
+	 * because the shield has rotation=90, but the FB layout in SDRAM
+	 * is portrait (480 pixels per line, 800 lines). */
+	uint8_t *fb_front = (uint8_t *)display_get_framebuffer(g_disp);
+	uint16_t fb_w = 480;   /* portrait pixel width */
+	uint16_t fb_h = 800;   /* portrait pixel height */
+	uint16_t px_sz = 4;    /* ARGB8888 */
+	uint32_t fb_len = fb_w * fb_h * px_sz;
+	uint8_t *fb_back = fb_front + fb_len;
+
+	printk("rlvgl-zephyr: fb_front=%p fb_back=%p fb_len=%u\n",
+	       fb_front, fb_back, fb_len);
+
+	struct rlvgl_display_info di = {
+		.fb_front = fb_front,
+		.fb_back = fb_back,
+		.fb_len = fb_len,
+		.width = fb_w,
+		.height = fb_h,
+		.pixel_size = px_sz,
+	};
+
 	printk("rlvgl-zephyr: calling rlvgl_init\n");
-	rlvgl_init(&erif_sem, &dma2d_done_sem);
+	rlvgl_init(&erif_sem, &dma2d_done_sem, &di);
 	printk("rlvgl-zephyr: init complete\n");
 
-	/* Keep main thread alive — Zephyr idle thread handles power mgmt. */
+	/* Keep main thread alive. */
 	while (1) {
-		k_sleep(K_SECONDS(1));
+		k_sleep(K_SECONDS(5));
 		printk("rlvgl-zephyr: heartbeat\n");
 	}
 

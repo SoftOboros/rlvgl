@@ -22,6 +22,16 @@
 use crate::zephyr_sync::{self, ZephyrFrameSync};
 use core::sync::atomic::{AtomicPtr, Ordering};
 
+// D-cache clean via Zephyr's SCB_CleanDCache (C wrapper).
+unsafe extern "C" {
+    fn rlvgl_dcache_clean();
+}
+
+/// Flush all dirty D-cache lines to SDRAM.
+fn dcache_clean_all() {
+    unsafe { rlvgl_dcache_clean() };
+}
+
 // ── Exported ISR handlers ─────────────────────────────────────────────────────
 //
 // Called from C-side ISR wrappers registered via IRQ_CONNECT.
@@ -117,46 +127,82 @@ pub unsafe extern "C" fn rlvgl_dma2d_isr() {
     }
 }
 
+// ── Display info struct (matches C side) ──────────────────────────────────────
+
+#[repr(C)]
+pub struct RlvglDisplayInfo {
+    pub fb_front: *mut u8,
+    pub fb_back: *mut u8,
+    pub fb_len: u32,
+    pub width: u16,
+    pub height: u16,
+    pub pixel_size: u16,
+}
+
+// ── FFI: present via Zephyr display_write ─────────────────────────────────────
+
+unsafe extern "C" {
+    fn rlvgl_present(back_buf: *const u8, width: u16, height: u16) -> i32;
+}
+
 // ── Initialization entry point ────────────────────────────────────────────────
 
 /// Called from Zephyr C `main()` to initialize the rlvgl display system.
 ///
-/// Receives pointers to kernel objects allocated on the C side.
-/// Initializes DSI/LTDC, sets up the sync object, and spawns threads.
+/// Receives kernel object pointers and display info from the C side.
+/// Sets up the sync object, initializes the heap, enables DMA2D,
+/// and renders a test pattern to verify the display pipeline.
 ///
 /// # Safety
 ///
-/// `erif_sem` and `dma2d_done_sem` must be valid, initialized `k_sem`
-/// pointers with `'static` lifetime.
+/// All pointers must be valid with `'static` lifetime.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rlvgl_init(
     erif_sem: *mut zephyr_sync::k_sem,
     dma2d_done_sem: *mut zephyr_sync::k_sem,
+    display_info: *const RlvglDisplayInfo,
 ) {
     unsafe {
-        // Construct the sync object in static storage. rlvgl_init is called
-        // exactly once from Zephyr main (single-threaded at this point).
+        // ── 1. Construct sync object ──────────────────────────────────────
         use core::sync::atomic::AtomicBool;
         static INIT_DONE: AtomicBool = AtomicBool::new(false);
         static mut SYNC_STORAGE: core::mem::MaybeUninit<ZephyrFrameSync> =
             core::mem::MaybeUninit::uninit();
 
         if INIT_DONE.swap(true, Ordering::AcqRel) {
-            return; // double-init guard
+            return;
         }
 
         let ptr = core::ptr::addr_of_mut!(SYNC_STORAGE);
         (*ptr).write(ZephyrFrameSync::new(erif_sem, dma2d_done_sem));
         SYNC.store((*ptr).as_mut_ptr(), Ordering::Release);
-    }
 
-    // TODO (Phase 5): Call the shared DSI/LTDC init from
-    // platform/src/stm32h747i_disco.rs here, then start the
-    // present/render/touch threads.
-    //
-    // For now this is a skeleton that proves the FFI and trait
-    // plumbing compiles. The full display init and thread spawning
-    // will be added when the Zephyr west build environment is wired up.
+        // ── 2. Read display info ──────────────────────────────────────────
+        let di = &*display_info;
+        let fb_back = di.fb_back;
+        let fb_w = di.width as u32;
+        let fb_h = di.height as u32;
+        let bpp = di.pixel_size as u32;
+
+        // ── 3. Enable DMA2D clock (RCC AHB3ENR bit 4) ────────────────────
+        let ahb3enr = 0x5802_44D4 as *mut u32;
+        ahb3enr.write_volatile(ahb3enr.read_volatile() | (1 << 4));
+
+        // ── 4. Test render: bright blue fill to BACK buffer ─────────────
+        // Unmistakable: 0xFF0000FF = solid bright blue.
+        let total_pixels = (fb_w * fb_h) as usize;
+        let buf32 = fb_back as *mut u32;
+        for i in 0..total_pixels {
+            buf32.add(i).write_volatile(0xFF00_00FF); // ARGB blue
+        }
+
+        // Full D-cache clean+invalidate by set/way.
+        // CM7 D-cache: 16KB, 4-way, 32B lines → 128 sets.
+        dcache_clean_all();
+
+        // ── 5. Present the rendered frame ─────────────────────────────────
+        rlvgl_present(fb_back, di.width, di.height);
+    }
 }
 
 // ── Frame budget update (called from present thread after each frame) ─────────
