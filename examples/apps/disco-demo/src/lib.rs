@@ -320,6 +320,33 @@ impl ControllerState {
         self.queue(DiscoCommand::ShowStatus(text));
     }
 
+    fn show_about(&mut self) {
+        self.active_info = None;
+        self.dashboard.borrow_mut().show();
+        self.dashboard.borrow_mut().set_title("About");
+        self.dashboard
+            .borrow_mut()
+            .set_caption("rlvgl demo application");
+        self.dashboard
+            .borrow_mut()
+            .set_accent(Color(0x58, 0xB3, 0xF5, 0xFF));
+        self.dashboard.borrow_mut().set_lines(vec![
+            format!(
+                "Audio: {}  Storage: {}  Effects: {}",
+                if self.capabilities.audio { "yes" } else { "no" },
+                if self.capabilities.storage { "yes" } else { "no" },
+                if self.capabilities.effects { "yes" } else { "no" },
+            ),
+            format!(
+                "Pointer: {}  Diagnostics: {}  Backlight: {}%",
+                if self.capabilities.pointer { "yes" } else { "no" },
+                if self.capabilities.diagnostics { "yes" } else { "no" },
+                self.backlight,
+            ),
+        ]);
+        self.push_status("About");
+    }
+
     fn show_home(&mut self) {
         self.active_info = None;
         self.dashboard.borrow_mut().show();
@@ -548,32 +575,17 @@ impl ControllerState {
                 }
             }
             SettingsSlot::Camera => {
-                self.push_status("Camera pipeline is intentionally stubbed in the shared demo");
-                self.queue(DiscoCommand::NoOp);
+                self.push_status("Camera: not available");
             }
             SettingsSlot::Display => {
-                self.show_info(
-                    "Display Controls",
-                    "Replaceable per-platform display hooks",
-                    Color(0x57, 0xC2, 0xD8, 0xFF),
-                    vec![
-                        "Backends own present, backlight, and pixel format translation.".into(),
-                        "The shared controller only emits abstract display commands.".into(),
-                    ],
-                );
-                self.push_status("Display status panel refreshed");
+                self.push_status("Display: platform-managed");
             }
             SettingsSlot::Locale => {
-                self.show_info(
-                    "Locale + Platform",
-                    "Shared controller status for non-MCU runtimes",
-                    Color(0x7A, 0xD6, 0x8A, 0xFF),
-                    vec![
-                        format!("Pointer enabled: {}", self.capabilities.pointer),
-                        format!("Diagnostics enabled: {}", self.capabilities.diagnostics),
-                    ],
-                );
-                self.push_status("Platform summary updated");
+                self.push_status(format!(
+                    "Pointer: {} | Diag: {}",
+                    if self.capabilities.pointer { "on" } else { "off" },
+                    if self.capabilities.diagnostics { "on" } else { "off" },
+                ));
             }
             SettingsSlot::Backlight => {
                 self.backlight = match self.backlight {
@@ -583,8 +595,7 @@ impl ControllerState {
                     25 => 50,
                     _ => 75,
                 };
-                self.show_home();
-                self.push_status(format!("Queued backlight level {}%", self.backlight));
+                self.push_status(format!("Backlight {}%", self.backlight));
                 self.queue(DiscoCommand::SetBacklight(self.backlight));
             }
         }
