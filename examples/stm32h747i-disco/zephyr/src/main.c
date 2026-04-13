@@ -65,6 +65,7 @@ static void dma2d_isr_wrapper(const void *arg)
 
 int main(void)
 {
+	printk("rlvgl-zephyr: starting\n");
 	/* Register ISRs dynamically (CONFIG_DYNAMIC_INTERRUPTS=y).
 	 *
 	 * IRQ numbers from stm32h747xx.h:
@@ -82,7 +83,15 @@ int main(void)
 
 	/* Hand off to Rust. This initializes the display subsystem and
 	 * (in the future) spawns render/present/touch threads. */
+	printk("rlvgl-zephyr: calling rlvgl_init\n");
 	rlvgl_init(&erif_sem, &dma2d_done_sem);
+	printk("rlvgl-zephyr: init complete\n");
+
+	/* Keep main thread alive — Zephyr idle thread handles power mgmt. */
+	while (1) {
+		k_sleep(K_SECONDS(1));
+		printk("rlvgl-zephyr: heartbeat\n");
+	}
 
 	return 0;
 }
