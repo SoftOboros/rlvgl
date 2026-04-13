@@ -9,7 +9,10 @@ use rlvgl_core::{
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
-use rlvgl_ui::draw_helpers::{draw_rounded_border, fill_rounded_rect};
+use rlvgl_ui::draw_helpers::{
+    draw_panel_header, draw_rounded_border, fill_rounded_rect, panel_close_hit,
+    PANEL_PADDING, PANEL_RADIUS,
+};
 
 const PANEL_BG: Color = Color(22, 29, 41, 255);
 const PANEL_BORDER: Color = Color(75, 94, 122, 255);
@@ -111,38 +114,36 @@ impl Widget for DashboardPanel {
         if !self.visible {
             return;
         }
-        fill_rounded_rect(renderer, self.bounds, PANEL_BG, 18);
-        draw_rounded_border(renderer, self.bounds, PANEL_BORDER, 2, 18);
+        fill_rounded_rect(renderer, self.bounds, PANEL_BG, PANEL_RADIUS);
+        draw_rounded_border(renderer, self.bounds, PANEL_BORDER, 2, PANEL_RADIUS);
 
-        let accent_rect = Rect {
-            x: self.bounds.x + PADDING,
-            y: self.bounds.y + PADDING,
-            width: 72,
-            height: 8,
-        };
-        fill_rounded_rect(renderer, accent_rect, self.accent, 4);
+        let body_y = draw_panel_header(
+            renderer,
+            self.bounds,
+            self.accent,
+            &self.title,
+            self.font,
+            TITLE_COLOR,
+            Color(255, 80, 80, 255),
+            GRID_COLOR,
+        );
 
-        let title_x = self.bounds.x + PADDING;
-        let title_y = self.bounds.y + PADDING + 24;
-        self.font
-            .draw_str(renderer, title_x, title_y, &self.title, TITLE_COLOR);
-
+        // Caption below header
         let caption_line_h = self.font.scaled_height() + 4;
-        let mut caption_y = title_y + 24;
+        let mut caption_y = body_y;
         for line in self.caption.split('\n') {
             self.font
-                .draw_str(renderer, title_x, caption_y, line, BODY_COLOR);
+                .draw_str(renderer, self.bounds.x + PANEL_PADDING, caption_y, line, BODY_COLOR);
             caption_y += caption_line_h;
         }
 
-        // Grid separator sits below the tallest caption block, clamped so it
-        // never overlaps the body area.
+        // Secondary divider below caption
         let grid_top = (caption_y + 8).max(self.bounds.y + 108);
         renderer.fill_rect(
             Rect {
-                x: self.bounds.x + PADDING,
-                y: grid_top - 18,
-                width: self.bounds.width - PADDING * 2,
+                x: self.bounds.x + PANEL_PADDING,
+                y: grid_top,
+                width: self.bounds.width - PANEL_PADDING * 2,
                 height: 1,
             },
             GRID_COLOR,
@@ -157,11 +158,20 @@ impl Widget for DashboardPanel {
             if y + self.font.scaled_height() > body_bottom {
                 break;
             }
-            self.font.draw_str(renderer, title_x, y, line, BODY_COLOR);
+            self.font.draw_str(renderer, self.bounds.x + PANEL_PADDING, y, line, BODY_COLOR);
         }
     }
 
-    fn handle_event(&mut self, _event: &Event) -> bool {
+    fn handle_event(&mut self, event: &Event) -> bool {
+        if !self.visible {
+            return false;
+        }
+        if let Event::PressRelease { x, y } = event {
+            if panel_close_hit(self.bounds, *x, *y) {
+                self.hide();
+                return true;
+            }
+        }
         false
     }
 }

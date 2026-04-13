@@ -179,12 +179,25 @@ impl Widget for EventWindow {
             self.radius,
         );
 
+        // Standard header: accent bar, title, close X, divider
+        use crate::draw_helpers::draw_panel_header;
+        let body_y = draw_panel_header(
+            renderer,
+            self.bounds,
+            Color(0x58, 0xB3, 0xF5, 0xFF), // accent blue
+            "Events",
+            &self.font,
+            self.text_color,
+            Color(255, 80, 80, 255), // close red
+            Color(44, 58, 79, 255),  // divider
+        );
+
         // Text entries stacked vertically
         let line_h = self.font.scaled_height() + 4;
         let max_lines = MAX_LINES.min(self.entries.len());
         let start = self.entries.len().saturating_sub(MAX_LINES);
         let inner_x = self.bounds.x + self.padding;
-        let inner_y = self.bounds.y + self.padding;
+        let inner_y = body_y;
         self.last_draw_lines.set(max_lines as u8);
         self.draw_seq.set(self.draw_seq.get().wrapping_add(1));
 

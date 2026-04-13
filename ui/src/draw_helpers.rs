@@ -21,6 +21,83 @@ pub fn draw_border(renderer: &mut dyn Renderer, rect: Rect, color: Color, width:
     draw_border_straight(renderer, rect, color, width);
 }
 
+/// Standard panel corner radius used by all rlvgl windows.
+pub const PANEL_RADIUS: u8 = 18;
+/// Standard panel padding.
+pub const PANEL_PADDING: i32 = 20;
+/// Standard close button hit area — a square the height of the title area.
+pub const CLOSE_SIZE: i32 = 48;
+
+/// Draw a standard panel header: accent bar, title, close button, divider.
+///
+/// Returns the Y coordinate below the divider — callers render body
+/// content starting there.
+///
+/// - `bounds`: panel outer rectangle
+/// - `accent`: accent bar color
+/// - `title`: header title text
+/// - `font`: bitmap font for the title and close "X"
+/// - `title_color` / `close_color` / `divider_color`: styling
+pub fn draw_panel_header(
+    renderer: &mut dyn Renderer,
+    bounds: Rect,
+    accent: Color,
+    title: &str,
+    font: &rlvgl_core::bitmap_font::BitmapFont,
+    title_color: Color,
+    close_color: Color,
+    divider_color: Color,
+) -> i32 {
+    // Accent bar
+    fill_rounded_rect(
+        renderer,
+        Rect {
+            x: bounds.x + PANEL_PADDING,
+            y: bounds.y + PANEL_PADDING,
+            width: 72,
+            height: 8,
+        },
+        accent,
+        4,
+    );
+
+    // Title
+    let title_y = bounds.y + PANEL_PADDING + 20;
+    font.draw_str(
+        renderer,
+        bounds.x + PANEL_PADDING,
+        title_y,
+        title,
+        title_color,
+    );
+
+    // Close button "X" in upper right
+    let close_x = bounds.x + bounds.width - PANEL_PADDING - CLOSE_SIZE;
+    let close_y = bounds.y + PANEL_PADDING;
+    font.draw_str(renderer, close_x, close_y, "X", close_color);
+
+    // Divider line
+    let div_y = title_y + font.scaled_height() + 12;
+    renderer.fill_rect(
+        Rect {
+            x: bounds.x + PANEL_PADDING,
+            y: div_y,
+            width: bounds.width - PANEL_PADDING * 2,
+            height: 1,
+        },
+        divider_color,
+    );
+
+    div_y + 12 // body content starts here
+}
+
+/// Close button hit test for panels using `draw_panel_header`.
+pub fn panel_close_hit(bounds: Rect, x: i32, y: i32) -> bool {
+    let cx = bounds.x + bounds.width - PANEL_PADDING - CLOSE_SIZE;
+    let cy = bounds.y + PANEL_PADDING;
+    x >= cx && x < cx + CLOSE_SIZE && y >= cy && y < cy + CLOSE_SIZE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

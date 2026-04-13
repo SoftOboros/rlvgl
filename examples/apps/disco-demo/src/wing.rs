@@ -8,7 +8,7 @@ use rlvgl_core::{
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
-use rlvgl_ui::draw_helpers::{draw_border_straight, draw_rounded_border, fill_rounded_rect};
+use rlvgl_ui::draw_helpers::{draw_border_straight, draw_rounded_border, fill_rounded_rect, PANEL_RADIUS};
 
 use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR};
 

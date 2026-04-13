@@ -11,7 +11,10 @@ use rlvgl_core::event::Event;
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
-use rlvgl_ui::draw_helpers::{draw_rounded_border, fill_rounded_rect};
+use rlvgl_ui::draw_helpers::{
+    draw_panel_header, draw_rounded_border, fill_rounded_rect, panel_close_hit,
+    PANEL_PADDING as STD_PADDING, PANEL_RADIUS,
+};
 use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 
 // ── Layout constants ──────────────────────────────────────────────────────
@@ -19,7 +22,7 @@ use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 const PANEL_W: i32 = 380;
 const PANEL_H: i32 = 360;
 const PANEL_PADDING: i32 = 16;
-const PANEL_RADIUS: u8 = 18;
+// PANEL_RADIUS imported from draw_helpers
 const TITLE_HEIGHT: i32 = 32;
 const CLOSE_SIZE: i32 = 40;
 const ROW_HEIGHT: i32 = 30;
@@ -131,21 +134,18 @@ impl Widget for FileBrowserPanel {
         fill_rounded_rect(renderer, self.bounds, BG_COLOR, PANEL_RADIUS);
         draw_rounded_border(renderer, self.bounds, BORDER_COLOR, 2, PANEL_RADIUS);
 
-        // Title
-        self.font.draw_str(
+        // Standard header: accent bar, title, close X, divider
+        use rlvgl_core::bitmap_font::FONT_6X10;
+        let _body_y = draw_panel_header(
             renderer,
-            self.bounds.x + PANEL_PADDING,
-            self.bounds.y + (TITLE_HEIGHT - self.font.height as i32) / 2,
+            self.bounds,
+            TITLE_COLOR, // accent = title blue
             "Files",
+            &FONT_6X10,
             TITLE_COLOR,
+            CLOSE_COLOR,
+            Color(44, 58, 79, 255), // divider
         );
-
-        // Close button
-        let cb = self.close_bounds();
-        let close_x = cb.x + (cb.width - self.font.measure("X")) / 2;
-        let close_y = cb.y + (cb.height - self.font.height as i32) / 2;
-        self.font
-            .draw_str(renderer, close_x, close_y, "X", CLOSE_COLOR);
 
         // Draw entries using PackedFont (renderer.draw_text is a no-op
         // without the fontdue feature).
@@ -203,8 +203,8 @@ impl Widget for FileBrowserPanel {
         }
 
         if let Event::PressRelease { x, y } = event {
-            // Close button
-            if Self::inside(self.close_bounds(), *x, *y) {
+            // Close button (shared header layout)
+            if panel_close_hit(self.bounds, *x, *y) {
                 self.hide();
                 return true;
             }
