@@ -474,7 +474,7 @@ pub unsafe extern "C" fn rlvgl_init(
             let screen = Screen::landscape(fb_w, fb_h);
             let mut controller = DiscoController::new(
                 screen,
-                DiscoCapabilities::stm32h747i_disco(),
+                DiscoCapabilities::zephyr(),
             );
             let root = controller.root();
 

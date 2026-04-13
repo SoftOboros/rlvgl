@@ -46,6 +46,8 @@ pub struct DiscoCapabilities {
     pub effects: bool,
     /// True when pointer or touch input is supported.
     pub pointer: bool,
+    /// Platform description (e.g. "Zephyr v4.1.0", "bare-metal", "simulator").
+    pub platform: &'static str,
 }
 
 impl DiscoCapabilities {
@@ -63,6 +65,7 @@ impl DiscoCapabilities {
             diagnostics: true,
             effects: true,
             pointer: true,
+            platform: "simulator",
         }
     }
 
@@ -74,6 +77,7 @@ impl DiscoCapabilities {
             diagnostics: true,
             effects: true,
             pointer: true,
+            platform: "STM32H747I-DISCO bare-metal",
         }
     }
 
@@ -85,6 +89,19 @@ impl DiscoCapabilities {
             diagnostics: true,
             effects: false,
             pointer: false,
+            platform: "UEFI",
+        }
+    }
+
+    /// Capability preset for the Zephyr RTOS runtime.
+    pub const fn zephyr() -> Self {
+        Self {
+            audio: false,
+            storage: true,
+            diagnostics: true,
+            effects: false,
+            pointer: true,
+            platform: "Zephyr RTOS",
         }
     }
 }
@@ -165,6 +182,7 @@ enum SettingsSlot {
     Display = 2,
     Locale = 3,
     Backlight = 4,
+    About = 5,
 }
 
 impl SettingsSlot {
@@ -174,6 +192,7 @@ impl SettingsSlot {
             2 => Self::Display,
             3 => Self::Locale,
             4 => Self::Backlight,
+            5 => Self::About,
             _ => Self::Audio,
         }
     }
@@ -331,6 +350,7 @@ impl ControllerState {
             .borrow_mut()
             .set_accent(Color(0x58, 0xB3, 0xF5, 0xFF));
         self.dashboard.borrow_mut().set_lines(vec![
+            format!("Platform: {}", self.capabilities.platform),
             format!(
                 "Audio: {}  Storage: {}  Effects: {}",
                 if self.capabilities.audio { "yes" } else { "no" },
@@ -509,7 +529,7 @@ impl ControllerState {
         self.focus = match self.focus {
             FocusState::Wing(WingKind::Settings, index) => FocusState::Wing(
                 WingKind::Settings,
-                (index as i32 + delta).rem_euclid(5) as usize,
+                (index as i32 + delta).rem_euclid(6) as usize,
             ),
             FocusState::Wing(WingKind::Info, index) => FocusState::Wing(
                 WingKind::Info,
@@ -576,6 +596,9 @@ impl ControllerState {
                 };
                 self.push_status(format!("Backlight {}%", self.backlight));
                 self.queue(DiscoCommand::SetBacklight(self.backlight));
+            }
+            SettingsSlot::About => {
+                self.show_about();
             }
         }
     }
@@ -848,6 +871,7 @@ impl DiscoController {
             (assets::ICON_MONITOR_48, true),
             (assets::ICON_GLOBE_48, true),
             (assets::ICON_BUG_48, true),
+            (assets::ICON_CPU_48, true), // About
         ])));
 
         let info_wing = Rc::new(RefCell::new(Wing::new(&[
@@ -928,7 +952,7 @@ impl DiscoController {
             }));
         }
 
-        for index in 0..5 {
+        for index in 0..6 {
             let shared_state = state.clone();
             settings_wing.borrow_mut().slots_mut()[index]
                 .as_mut()
@@ -1528,7 +1552,7 @@ mod tests {
         );
         key_down(&mut c, Key::Enter);
         assert_eq!(focus(&c), FocusState::Wing(WingKind::Settings, 0));
-        for i in 1..5 {
+        for i in 1..6 {
             key_down(&mut c, Key::ArrowDown);
             assert_eq!(focus(&c), FocusState::Wing(WingKind::Settings, i));
         }

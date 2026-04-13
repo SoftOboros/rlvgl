@@ -12,7 +12,7 @@ use rlvgl_ui::draw_helpers::{draw_border, draw_border_straight, fill_rounded_rec
 
 use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR};
 
-const MAX_SLOTS: usize = 5;
+const MAX_SLOTS: usize = 6;
 const ICON_SIZE: i32 = 60;
 const GAP: i32 = 10;
 const MARGIN_TOP: i32 = 17;
