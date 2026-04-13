@@ -26,6 +26,11 @@ use panic_halt as _;
 // library; not all are consumed in every build configuration.
 #[cfg(feature = "audio")]
 mod audio_scope;
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod bare_metal_sync;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
@@ -338,13 +343,15 @@ mod _dma2d_isr {
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static ERIF_FLAG: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+pub(crate) static ERIF_FLAG: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
 /// DWT_CYCCNT snapshot at the instant ERIF fired. T=0 for all scheduling.
 #[cfg(all(
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static ERIF_CYCCNT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+pub(crate) static ERIF_CYCCNT: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(0);
 /// Measured ERIF-to-ERIF interval (cycles). Adapts to actual panel TE rate.
 /// Default 33ms = 13.2M cycles at 400MHz (one full frame at 30fps).
 /// Must be generous initially — too small blocks all DMA2D admission.
@@ -352,7 +359,7 @@ static ERIF_CYCCNT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU3
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
+pub(crate) static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
     core::sync::atomic::AtomicU32::new(13_200_000);
 
 #[cfg(all(
@@ -409,7 +416,7 @@ mod _dsi_isr {
     not(feature = "c_hal"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-fn take_erif() -> bool {
+pub(crate) fn take_erif() -> bool {
     ERIF_FLAG.swap(false, core::sync::atomic::Ordering::AcqRel)
 }
 
@@ -722,7 +729,7 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
     feature = "dma2d",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-mod dma2d_irq {
+pub(crate) mod dma2d_irq {
     use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 
     static START_CYCLES: AtomicU32 = AtomicU32::new(0);
@@ -2915,6 +2922,10 @@ fn main() -> ! {
         let mut dirty_frames: u8 = 4; // force initial render
         // Pipelined render state: decouple render from present.
         // render_active: back buffer is being rendered to (don't present).
+        // Frame synchronization: abstracts ERIF/DMA2D/scope probe access
+        // so star_crawl and event_overlay can use trait methods.
+        let sync = bare_metal_sync::BareMetalFrameSync;
+
         // buffer_ready: render complete, waiting for back porch to present.
         let mut render_active = false;
         let mut buffer_ready = false;
@@ -3929,7 +3940,7 @@ fn main() -> ! {
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            match star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
+                            match star_crawl.tick(&mut blitter, back as *mut u8, w, h, &sync) {
                                 star_crawl::StepResult::Idle => {
                                     render_active = false;
                                 }
@@ -4002,7 +4013,7 @@ fn main() -> ! {
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            match event_overlay.tick(&mut blitter) {
+                            match event_overlay.tick(&mut blitter, &sync) {
                                 event_overlay::StepResult::Pending => {
                                     keep_rendering = true;
                                 }

@@ -10,6 +10,8 @@
 use rlvgl_platform::blit::PixelFmt;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use rlvgl_platform::dma2d::Dma2dBlitter;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+use rlvgl_platform::frame_sync::{Dma2dSync, FrameSync, ScopeProbe};
 
 use rlvgl_core::bitmap_font::BitmapFont;
 use rlvgl_ui::EventWindow;
@@ -125,7 +127,11 @@ impl EventOverlay {
     /// Returns `Pending` while DMA2D transfers are in flight, `FrameReady`
     /// when the overlay has been fully composited onto the back buffer.
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    pub fn tick(&mut self, dma2d: &mut Dma2dBlitter) -> StepResult {
+    pub fn tick(
+        &mut self,
+        dma2d: &mut Dma2dBlitter,
+        sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+    ) -> StepResult {
         // Check for DMA2D errors.
         let dma_error = dma2d.read_error();
         if dma_error != 0 {
@@ -139,7 +145,7 @@ impl EventOverlay {
 
             Stage::FillBorder => {
                 // Border fill: ~100K cycles. Check budget.
-                if !crate::dma2d_admits(100_000) {
+                if !sync.dma2d_admits(100_000) {
                     return StepResult::Pending;
                 }
                 // DMA2D R2M fill: entire event rect with border color.
@@ -147,8 +153,8 @@ impl EventOverlay {
                     self.back_buf
                         .add((EV_FB_Y * self.fb_w * BPP + EV_FB_X * BPP) as usize)
                 };
-                crate::dma2d_irq::note_start();
-                crate::scope_probe::dma2d_active();
+                sync.note_start();
+                sync.dma2d_active();
                 dma2d.start_fill_raw(
                     dst,
                     self.fb_w * BPP,
@@ -165,40 +171,40 @@ impl EventOverlay {
                 if dma2d.is_in_flight() {
                     return StepResult::Pending;
                 }
-                if !crate::dma2d_irq::take_complete() {
+                if !sync.take_complete() {
                     return StepResult::Pending;
                 }
-                crate::scope_probe::dma2d_idle();
+                sync.dma2d_idle();
                 self.stage = Stage::FillInterior;
                 // Fall through to start interior fill immediately.
-                self.tick_fill_interior(dma2d)
+                self.tick_fill_interior(dma2d, sync)
             }
 
-            Stage::FillInterior => self.tick_fill_interior(dma2d),
+            Stage::FillInterior => self.tick_fill_interior(dma2d, sync),
 
             Stage::WaitInterior => {
                 if dma2d.is_in_flight() {
                     return StepResult::Pending;
                 }
-                if !crate::dma2d_irq::take_complete() {
+                if !sync.take_complete() {
                     return StepResult::Pending;
                 }
-                crate::scope_probe::dma2d_idle();
+                sync.dma2d_idle();
                 self.stage = Stage::BlendText;
                 // Fall through to start text blend immediately.
-                self.tick_blend_text(dma2d)
+                self.tick_blend_text(dma2d, sync)
             }
 
-            Stage::BlendText => self.tick_blend_text(dma2d),
+            Stage::BlendText => self.tick_blend_text(dma2d, sync),
 
             Stage::WaitBlend => {
                 if dma2d.is_in_flight() {
                     return StepResult::Pending;
                 }
-                if !crate::dma2d_irq::take_complete() {
+                if !sync.take_complete() {
                     return StepResult::Pending;
                 }
-                crate::scope_probe::dma2d_idle();
+                sync.dma2d_idle();
                 self.stage = Stage::Idle;
                 StepResult::FrameReady
             }
@@ -206,16 +212,20 @@ impl EventOverlay {
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn tick_fill_interior(&mut self, dma2d: &mut Dma2dBlitter) -> StepResult {
-        if !crate::dma2d_admits(100_000) {
+    fn tick_fill_interior(
+        &mut self,
+        dma2d: &mut Dma2dBlitter,
+        sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+    ) -> StepResult {
+        if !sync.dma2d_admits(100_000) {
             return StepResult::Pending;
         }
         let dst = unsafe {
             self.back_buf
                 .add(((EV_FB_Y + BORDER_W) * self.fb_w * BPP + (EV_FB_X + BORDER_W) * BPP) as usize)
         };
-        crate::dma2d_irq::note_start();
-        crate::scope_probe::dma2d_active();
+        sync.note_start();
+        sync.dma2d_active();
         dma2d.start_fill_raw(
             dst,
             self.fb_w * BPP,
@@ -229,16 +239,20 @@ impl EventOverlay {
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    fn tick_blend_text(&mut self, dma2d: &mut Dma2dBlitter) -> StepResult {
-        if !crate::dma2d_admits(400_000) {
+    fn tick_blend_text(
+        &mut self,
+        dma2d: &mut Dma2dBlitter,
+        sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+    ) -> StepResult {
+        if !sync.dma2d_admits(400_000) {
             return StepResult::Pending;
         }
         let dst = unsafe {
             self.back_buf
                 .add((EV_FB_Y * self.fb_w * BPP + EV_FB_X * BPP) as usize)
         };
-        crate::dma2d_irq::note_start();
-        crate::scope_probe::dma2d_active();
+        sync.note_start();
+        sync.dma2d_active();
         dma2d.start_blend_a8_color(
             A8_BUF as *const u8,
             A8_WIDTH,

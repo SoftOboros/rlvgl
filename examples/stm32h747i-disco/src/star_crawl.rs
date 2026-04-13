@@ -10,6 +10,8 @@ use rlvgl_core::packed_font::PackedFont;
 use rlvgl_platform::blit::PixelFmt;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use rlvgl_platform::dma2d::Dma2dBlitter;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+use rlvgl_platform::frame_sync::{Dma2dSync, FrameSync, ScopeProbe};
 
 /// Portrait framebuffer width.
 const FB_W: u32 = 480;
@@ -273,6 +275,7 @@ impl StarCrawl {
         back_buf: *mut u8,
         fb_w: u32,
         _fb_h: u32,
+        sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
     ) -> StepResult {
         if !self.active {
             return StepResult::Idle;
@@ -322,7 +325,7 @@ impl StarCrawl {
                 // mode so ERIF will never fire until we present().
                 if self.bg_row == 0
                     && self.frame_id > 1
-                    && !crate::ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire)
+                    && !sync.erif_is_set()
                 {
                     return StepResult::Pending;
                 }
@@ -331,24 +334,23 @@ impl StarCrawl {
                 // Use the ISR completion latch instead of poll_complete():
                 // the DMA2D ISR clears TCIF before poll_complete() can
                 // see it, causing a race that prevents bg_row from advancing.
-                if !dma2d.is_in_flight() && crate::dma2d_irq::take_complete() {
-                    crate::scope_probe::dma2d_idle();
+                if !dma2d.is_in_flight() && sync.take_complete() {
+                    sync.dma2d_idle();
                     self.bg_row += 1;
                 }
 
                 if self.bg_row < FB_H && !dma2d.is_in_flight() {
                     // Admission: each row blit is ~500 cycles.
                     // Don't start if we'd run into the next scan window.
-                    if !crate::dma2d_admits(500) {
+                    if !sync.dma2d_admits(500) {
                         return StepResult::Pending;
                     }
                     let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
                     let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
                     let dst =
                         unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };
-                    #[cfg(not(feature = "c_hal"))]
-                    crate::dma2d_irq::note_start();
-                    crate::scope_probe::dma2d_active();
+                    sync.note_start();
+                    sync.dma2d_active();
                     dma2d.start_blit_raw(
                         src as *const u8,
                         STAR_STRIDE,
@@ -398,7 +400,7 @@ impl StarCrawl {
             }
             RenderStage::StartTextBlend => {
                 // A8 blend is ~800K cycles. Don't start if budget is tight.
-                if !crate::dma2d_admits(800_000) {
+                if !sync.dma2d_admits(800_000) {
                     return StepResult::Pending;
                 }
 
@@ -410,9 +412,8 @@ impl StarCrawl {
                 // Single DMA2D A8→ARGB blend of the entire text layer.
                 let dst_offset = (A8_Y_BASE * self.fb_w * BPP) as usize;
                 let dst = unsafe { self.back_buf.add(dst_offset) };
-                #[cfg(not(feature = "c_hal"))]
-                crate::dma2d_irq::note_start();
-                crate::scope_probe::dma2d_active();
+                sync.note_start();
+                sync.dma2d_active();
                 dma2d.start_blend_a8_color(
                     A8_BUF as *const u8,
                     A8_WIDTH,
@@ -429,8 +430,8 @@ impl StarCrawl {
                     return StepResult::Pending;
                 }
                 // ISR already cleared TCIF; use latch to confirm done.
-                let _ = crate::dma2d_irq::take_complete();
-                crate::scope_probe::dma2d_idle();
+                let _ = sync.take_complete();
+                sync.dma2d_idle();
                 self.finish_frame();
                 StepResult::FrameReady
             }
