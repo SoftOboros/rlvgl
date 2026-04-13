@@ -10,6 +10,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/irq.h>
+#include <zephyr/drivers/display.h>
 
 /* ── Kernel objects ──────────────────────────────────────────────────── */
 
@@ -83,6 +84,43 @@ int main(void)
 
 	/* Hand off to Rust. This initializes the display subsystem and
 	 * (in the future) spawns render/present/touch threads. */
+	/* ── Display bringup via Zephyr display API ──────────────── */
+	const struct device *disp = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+	if (!device_is_ready(disp)) {
+		printk("rlvgl-zephyr: display device not ready!\n");
+	} else {
+		struct display_capabilities caps;
+		display_get_capabilities(disp, &caps);
+		printk("rlvgl-zephyr: display %ux%u fmt=%u\n",
+		       caps.x_resolution, caps.y_resolution,
+		       caps.current_pixel_format);
+		display_blanking_off(disp);
+		printk("rlvgl-zephyr: blanking off (backlight on)\n");
+
+		/* Write a red fill using reported resolution. */
+		{
+			uint16_t w = caps.x_resolution;
+			uint16_t h = caps.y_resolution;
+			static uint32_t line_buf[800]; /* max width */
+			for (int i = 0; i < w && i < 800; i++)
+				line_buf[i] = 0xFFFF0000; /* ARGB red */
+			struct display_buffer_descriptor desc = {
+				.buf_size = w * 4,
+				.width = w,
+				.height = 1,
+				.pitch = w,
+			};
+			for (int y = 0; y < h; y++) {
+				int ret = display_write(disp, 0, y, &desc, line_buf);
+				if (ret && y == 0) {
+					printk("rlvgl-zephyr: display_write err=%d\n", ret);
+					break;
+				}
+			}
+			printk("rlvgl-zephyr: red fill %ux%u written\n", w, h);
+		}
+	}
+
 	printk("rlvgl-zephyr: calling rlvgl_init\n");
 	rlvgl_init(&erif_sem, &dma2d_done_sem);
 	printk("rlvgl-zephyr: init complete\n");

@@ -10,15 +10,7 @@
  * SDRAM and the display API surface.
  */
 
-/* Disable Zephyr's video-mode-only DSI driver and NT35510 panel.
- * Rust performs adapted-command-mode init via raw registers.
- * The LTDC driver remains enabled for the display API surface. */
-&mipi_dsi {
-	status = "disabled";
-
-	/* Disable the NT35510 panel node added by the shield —
-	 * it references the DSI host which we disabled. */
-	nt35510: nt35510@0 {
-		status = "disabled";
-	};
-};
+/* Phase 5 bringup: let Zephyr's DSI driver init in video mode.
+ * This gets pixels on screen via the built-in LTDC+DSI+NT35510
+ * driver chain. Adapted command mode (raw register init from Rust)
+ * will replace this once video mode is verified working. */
