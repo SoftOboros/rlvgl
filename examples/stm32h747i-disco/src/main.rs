@@ -1,5 +1,5 @@
 #![cfg_attr(not(doc), no_std)]
-#![cfg_attr(not(doc), no_main)]
+#![cfg_attr(all(not(doc), not(feature = "zephyr")), no_main)]
 
 //! Entry point for the STM32H747I-DISCO hardware demo.
 //!
@@ -12,11 +12,21 @@ extern crate alloc;
 #[cfg(not(feature = "c_hal"))]
 use core::arch::asm;
 use core::ptr::addr_of_mut;
+#[cfg(not(feature = "zephyr"))]
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
 #[cfg(target_os = "none")]
-#[cfg(not(doc))]
+#[cfg(all(not(doc), not(feature = "zephyr")))]
 use panic_halt as _;
+
+// Zephyr builds: minimal panic handler (Zephyr's own abort path handles the rest).
+#[cfg(all(target_os = "none", feature = "zephyr", not(doc)))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {
+        cortex_m::asm::bkpt();
+    }
+}
 
 // The demo app crate provides flush_pending and Application trait for widget
 // tree management. The c_hal path uses a server-mode widget tree driven by
@@ -28,6 +38,7 @@ use panic_halt as _;
 mod audio_scope;
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod bare_metal_sync;
@@ -83,6 +94,7 @@ fn _bsp_log(args: core::fmt::Arguments) {
 // frame boundary because has_wrapped() only polls the COUNTFLAG.
 #[cfg(all(
     feature = "cpu_stats",
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 #[cortex_m_rt::exception]
@@ -96,6 +108,7 @@ fn SysTick() {}
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod touch_isr {
@@ -287,6 +300,7 @@ mod touch_isr {
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 use touch_isr::touch_ring_pop;
@@ -294,6 +308,7 @@ use touch_isr::touch_ring_pop;
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _tim6_isr {
@@ -308,6 +323,7 @@ mod _tim6_isr {
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _usart1_isr {
@@ -323,8 +339,9 @@ mod _usart1_isr {
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
+    any(target_arch = "arm", target_arch = "aarch64"),
 ))]
 mod _dma2d_isr {
     use stm32h7::stm32h747cm7::interrupt;
@@ -341,6 +358,7 @@ mod _dma2d_isr {
 /// Replaces polling DSI_WISR.ERIF with zero-latency interrupt detection.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub(crate) static ERIF_FLAG: core::sync::atomic::AtomicBool =
@@ -348,6 +366,7 @@ pub(crate) static ERIF_FLAG: core::sync::atomic::AtomicBool =
 /// DWT_CYCCNT snapshot at the instant ERIF fired. T=0 for all scheduling.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub(crate) static ERIF_CYCCNT: core::sync::atomic::AtomicU32 =
@@ -357,6 +376,7 @@ pub(crate) static ERIF_CYCCNT: core::sync::atomic::AtomicU32 =
 /// Must be generous initially — too small blocks all DMA2D admission.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub(crate) static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
@@ -364,6 +384,7 @@ pub(crate) static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _dsi_isr {
@@ -414,6 +435,7 @@ mod _dsi_isr {
 /// Consume the ERIF flag (set by DSI ISR). Returns true once per scan.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub(crate) fn take_erif() -> bool {
@@ -423,6 +445,7 @@ pub(crate) fn take_erif() -> bool {
 /// Cycles elapsed since last ERIF (T=0 for all scheduling decisions).
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub fn cycles_since_erif() -> u32 {
@@ -434,6 +457,7 @@ pub fn cycles_since_erif() -> u32 {
 /// The guard starts 1ms (400K cycles) before the expected next TE/ERIF.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub fn dma2d_admits(cost: u32) -> bool {
@@ -726,6 +750,7 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     feature = "dma2d",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
@@ -1329,8 +1354,8 @@ const HEAP_SIZE: usize = 64 * 1024;
 /// Static memory region used to service heap allocations.
 static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 
-/// Application entry point.
-#[cfg(not(doc))]
+/// Application entry point (bare-metal only).
+#[cfg(all(not(doc), not(feature = "zephyr")))]
 #[entry]
 fn main() -> ! {
     // Heap must be ready before any Rust allocation (including rlvgl_app_main).
@@ -4926,5 +4951,5 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
 }
 
-#[cfg(doc)]
+#[cfg(any(doc, feature = "zephyr"))]
 fn main() {}

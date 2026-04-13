@@ -41,6 +41,7 @@ hal_sdram = ["dep:stm32-fmc"]
 backlight_pwm = []
 semihosting = ["dep:cortex-m-semihosting"]
 bsp_log = []
+zephyr = []
 
 [dependencies]
 rlvgl-core = { path = "../../core", default-features = false }
