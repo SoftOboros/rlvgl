@@ -13,6 +13,7 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/cache.h>
 #include <zephyr/input/input.h>
+#include <string.h>
 #include <zephyr/fs/fs.h>
 #include <ff.h>
 
@@ -131,6 +132,49 @@ static void input_cb(struct input_event *evt, void *user_data)
 	}
 }
 INPUT_CALLBACK_DEFINE(NULL, input_cb, NULL);
+
+/* ── Filesystem helpers for Rust FFI ──────────────────────────────────── */
+
+/* Directory entry passed to Rust callback. */
+struct rlvgl_dirent {
+	char name[256];
+	uint8_t is_dir; /* 1 = directory, 0 = file */
+	uint32_t size;
+};
+
+/* List directory contents. Calls `cb` for each entry. Returns 0 on
+ * success, negative errno on failure. */
+int rlvgl_readdir(const char *path,
+		  void (*cb)(const struct rlvgl_dirent *entry, void *ctx),
+		  void *ctx)
+{
+	struct fs_dir_t dir;
+	struct fs_dirent ent;
+	int ret;
+
+	fs_dir_t_init(&dir);
+	ret = fs_opendir(&dir, path);
+	if (ret < 0) {
+		return ret;
+	}
+
+	while (1) {
+		ret = fs_readdir(&dir, &ent);
+		if (ret < 0 || ent.name[0] == 0) {
+			break;
+		}
+		struct rlvgl_dirent re;
+		/* Copy name, ensure NUL termination */
+		strncpy(re.name, ent.name, sizeof(re.name) - 1);
+		re.name[sizeof(re.name) - 1] = '\0';
+		re.is_dir = (ent.type == FS_DIR_ENTRY_DIR) ? 1 : 0;
+		re.size = (uint32_t)ent.size;
+		cb(&re, ctx);
+	}
+
+	fs_closedir(&dir);
+	return 0;
+}
 
 /* ── ISR wrappers ────────────────────────────────────────────────────── */
 

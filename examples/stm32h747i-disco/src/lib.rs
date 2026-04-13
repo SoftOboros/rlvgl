@@ -38,6 +38,9 @@ pub(crate) static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle
 mod bsp_pac;
 mod scope_probe;
 
+mod file_browser_panel;
+mod fonts;
+
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod event_overlay;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]

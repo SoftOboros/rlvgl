@@ -224,6 +224,90 @@ pub struct RlvglDisplayInfo {
     pub pixel_size: u16,
 }
 
+// ── Zephyr StorageBrowser implementation ──────────────────────────────────────
+
+/// Directory entry from C `rlvgl_readdir` callback.
+#[repr(C)]
+struct CDirent {
+    name: [u8; 256],
+    is_dir: u8,
+    size: u32,
+}
+
+type ReaddirCb = unsafe extern "C" fn(entry: *const CDirent, ctx: *mut core::ffi::c_void);
+
+unsafe extern "C" {
+    fn rlvgl_readdir(
+        path: *const u8,
+        cb: ReaddirCb,
+        ctx: *mut core::ffi::c_void,
+    ) -> i32;
+}
+
+/// Collects directory entries from the C callback into a Vec.
+unsafe extern "C" fn readdir_collect(entry: *const CDirent, ctx: *mut core::ffi::c_void) {
+    unsafe {
+        let entries = &mut *(ctx as *mut alloc::vec::Vec<rlvgl_ui::file_browser::FileEntry>);
+        let e = &*entry;
+        // Extract name (NUL-terminated C string in the buffer)
+        let name_len = e.name.iter().position(|&b| b == 0).unwrap_or(e.name.len());
+        let name = core::str::from_utf8_unchecked(&e.name[..name_len]);
+        let kind = if e.is_dir != 0 {
+            rlvgl_ui::file_browser::EntryKind::Directory
+        } else if name.ends_with(".wav") || name.ends_with(".WAV") {
+            rlvgl_ui::file_browser::EntryKind::WavFile
+        } else {
+            rlvgl_ui::file_browser::EntryKind::OtherFile
+        };
+        entries.push(rlvgl_ui::file_browser::FileEntry {
+            name: alloc::string::String::from(name),
+            kind,
+        });
+    }
+}
+
+/// StorageBrowser backed by Zephyr's filesystem API.
+pub struct ZephyrStorageBrowser;
+
+impl rlvgl_ui::file_browser::StorageBrowser for ZephyrStorageBrowser {
+    fn list_devices(&mut self) -> alloc::vec::Vec<rlvgl_ui::file_browser::FileEntry> {
+        alloc::vec![rlvgl_ui::file_browser::FileEntry {
+            name: alloc::string::String::from("SD Card"),
+            kind: rlvgl_ui::file_browser::EntryKind::Device,
+        }]
+    }
+
+    fn list_directory(
+        &mut self,
+        _device_index: usize,
+        path: &str,
+    ) -> Result<
+        alloc::vec::Vec<rlvgl_ui::file_browser::FileEntry>,
+        rlvgl_ui::file_browser::StorageBrowserError,
+    > {
+        // Build the full path: "/SD:" + path
+        let mut full_path = alloc::string::String::from("/SD:");
+        if !path.starts_with('/') {
+            full_path.push('/');
+        }
+        full_path.push_str(path);
+        full_path.push('\0'); // NUL terminator for C
+
+        let mut entries = alloc::vec::Vec::new();
+        let ret = unsafe {
+            rlvgl_readdir(
+                full_path.as_ptr(),
+                readdir_collect,
+                &mut entries as *mut _ as *mut core::ffi::c_void,
+            )
+        };
+        if ret < 0 {
+            return Err(rlvgl_ui::file_browser::StorageBrowserError::Unavailable);
+        }
+        Ok(entries)
+    }
+}
+
 // ── FFI: present via Zephyr display_write ─────────────────────────────────────
 
 unsafe extern "C" {
@@ -379,10 +463,13 @@ pub unsafe extern "C" fn rlvgl_init(
 
         // ── 6. Build widget tree and run render loop ─────────────────────
         {
-            use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoController};
+            use alloc::rc::Rc;
+            use core::cell::RefCell;
+            use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
             use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, Surface};
             use rlvgl_platform::cpu_blitter::CpuBlitter;
             use rlvgl_platform::screen::Screen;
+            use rlvgl_core::WidgetNode;
 
             let screen = Screen::landscape(fb_w, fb_h);
             let mut controller = DiscoController::new(
@@ -390,6 +477,26 @@ pub unsafe extern "C" fn rlvgl_init(
                 DiscoCapabilities::stm32h747i_disco(),
             );
             let root = controller.root();
+
+            // File browser panel backed by Zephyr filesystem
+            static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
+            static UI_FONT_FB: rlvgl_core::packed_font::PackedFont =
+                rlvgl_core::packed_font::PackedFont {
+                    height: 24,
+                    ascent: 22,
+                    glyphs: &crate::fonts::DEJAVU_SANS_24_GLYPHS,
+                    data: FONT_DATA,
+                };
+            let storage: Rc<RefCell<dyn rlvgl_ui::file_browser::StorageBrowser>> =
+                Rc::new(RefCell::new(ZephyrStorageBrowser));
+            let file_browser = Rc::new(RefCell::new(
+                crate::file_browser_panel::FileBrowserPanel::new(&UI_FONT_FB, storage),
+            ));
+            root.borrow_mut().children.push(WidgetNode {
+                widget: file_browser.clone(),
+                children: alloc::vec::Vec::new(),
+                tag: Some("disco.file_browser"),
+            });
 
             // After first present, LTDC displays back buffer (now front).
             // The "back" for rendering is the original front buffer.
@@ -458,7 +565,14 @@ pub unsafe extern "C" fn rlvgl_init(
 
                     if pressed {
                         use rlvgl_core::event::Event;
+                        // Send both PressRelease (select) and DoubleTap
+                        // (navigate) — crude until gesture recognizer is
+                        // integrated. FileBrowser uses DoubleTap to enter.
                         controller.dispatch_event(&Event::PressRelease {
+                            x: lx,
+                            y: ly,
+                        });
+                        controller.dispatch_event(&Event::DoubleTap {
                             x: lx,
                             y: ly,
                         });
@@ -466,6 +580,16 @@ pub unsafe extern "C" fn rlvgl_init(
                 }
 
                 controller.tick();
+
+                // Process commands from the controller
+                for cmd in controller.drain_commands() {
+                    match cmd {
+                        DiscoCommand::LoadStorageSummary => {
+                            file_browser.borrow_mut().toggle();
+                        }
+                        _ => {}
+                    }
+                }
 
                 // Restore pristine desktop into the render buffer
                 core::ptr::copy_nonoverlapping(pristine_base, render_buf, fb_bytes);

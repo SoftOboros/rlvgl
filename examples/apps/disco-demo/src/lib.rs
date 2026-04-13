@@ -547,13 +547,11 @@ impl ControllerState {
             MainSlot::Settings => self.open_settings(),
             MainSlot::Files => {
                 self.close_wings();
-                self.show_storage();
                 if self.capabilities.storage {
                     self.queue(DiscoCommand::LoadStorageSummary);
-                    self.push_status("Queued storage summary refresh");
+                    self.push_status("Storage");
                 } else {
-                    self.push_status("Storage browser is unavailable on this platform");
-                    self.queue(DiscoCommand::NoOp);
+                    self.push_status("Storage: not available");
                 }
             }
             MainSlot::Info => self.open_info(),
