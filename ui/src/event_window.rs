@@ -78,8 +78,32 @@ impl EventWindow {
     }
 
     /// Enable or disable event collection. When disabled, `push_event` is a no-op.
+    /// Disabling also hides the window.
     pub fn set_enabled(&mut self, val: bool) {
         self.enabled = val;
+        if !val {
+            self.hide();
+        }
+    }
+
+    /// Toggle visibility. Only works when enabled.
+    pub fn toggle_visible(&mut self) {
+        if !self.enabled {
+            return;
+        }
+        if self.visible {
+            self.hide();
+        } else {
+            self.visible = true;
+        }
+    }
+
+    /// Hide the window (triggers clear countdown for framebuffer cleanup).
+    pub fn hide(&mut self) {
+        if self.visible {
+            self.visible = false;
+            self.clear_countdown = 3;
+        }
     }
 
     /// Packed event-window diagnostic state.
@@ -155,7 +179,7 @@ impl EventWindow {
         if self.entries.len() > MAX_LINES * 2 {
             self.entries.remove(0);
         }
-        self.visible = true;
+        // Don't auto-show — visibility is toggled explicitly by the user.
     }
 }
 
@@ -229,9 +253,16 @@ impl Widget for EventWindow {
                 self.visible = false;
             }
         }
-        // Input events are pushed by the application via push_event()
-        // so it can label the source (joystick vs button vs touch).
-        false // never consume — let other widgets see the event too
+        // Close button
+        if self.visible {
+            if let Event::PressRelease { x, y } = event {
+                if crate::draw_helpers::panel_close_hit(self.bounds, *x, *y) {
+                    self.hide();
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn clear_region(&mut self) -> Option<Rect> {
@@ -338,7 +369,7 @@ impl EventWindowBuilder {
             text_color: self.text_color,
             entries: Vec::new(),
             visible: false,
-            enabled: true,
+            enabled: false,
             clear_countdown: 0,
             padding: 12,
             font: self.font,

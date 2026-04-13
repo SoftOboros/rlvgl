@@ -71,10 +71,11 @@ pub fn draw_panel_header(
         title_color,
     );
 
-    // Close button "X" in upper right
-    let close_x = bounds.x + bounds.width - PANEL_PADDING - CLOSE_SIZE;
-    let close_y = bounds.y + PANEL_PADDING;
-    font.draw_str(renderer, close_x, close_y, "X", close_color);
+    // Close button "X" — text at right edge, hit area is CLOSE_SIZE square
+    // BitmapFont chars are 6px wide at scale 1; approximate position.
+    let close_text_x = bounds.x + bounds.width - PANEL_PADDING - 12;
+    let close_text_y = bounds.y + PANEL_PADDING;
+    font.draw_str(renderer, close_text_x, close_text_y, "X", close_color);
 
     // Divider line
     let div_y = title_y + font.scaled_height() + 12;
@@ -92,10 +93,12 @@ pub fn draw_panel_header(
 }
 
 /// Close button hit test for panels using `draw_panel_header`.
+/// Hit area is a CLOSE_SIZE square anchored at the top-right corner
+/// of the panel (inside padding).
 pub fn panel_close_hit(bounds: Rect, x: i32, y: i32) -> bool {
     let cx = bounds.x + bounds.width - PANEL_PADDING - CLOSE_SIZE;
-    let cy = bounds.y + PANEL_PADDING;
-    x >= cx && x < cx + CLOSE_SIZE && y >= cy && y < cy + CLOSE_SIZE
+    let cy = bounds.y;
+    x >= cx && x < bounds.x + bounds.width && y >= cy && y < cy + CLOSE_SIZE
 }
 
 #[cfg(test)]
