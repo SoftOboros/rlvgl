@@ -1,0 +1,22 @@
+/*
+ * Device tree overlay for rlvgl Zephyr demo on STM32H747I-DISCO.
+ *
+ * Uses the st_b_lcd40_dsi1_mb1166_a09 shield for NT35510 panel/touch
+ * setup. This overlay disables the Zephyr DSI driver (video-mode only)
+ * so that the Rust code can perform raw register adapted-command-mode
+ * init instead.
+ *
+ * LTDC remains enabled — Zephyr's LTDC driver handles framebuffer in
+ * SDRAM and the display API surface.
+ */
+
+/* Disable Zephyr's video-mode-only DSI driver.
+ * Rust performs adapted-command-mode init via raw registers. */
+&mipi_dsi {
+	status = "disabled";
+};
+
+/* Enable DMA2D clock — Rust drives registers directly. */
+&dma2d {
+	status = "okay";
+};

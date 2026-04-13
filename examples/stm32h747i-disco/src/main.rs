@@ -42,6 +42,16 @@ mod audio_scope;
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod bare_metal_sync;
+#[cfg(all(
+    feature = "zephyr",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod zephyr_sync;
+#[cfg(all(
+    feature = "zephyr",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod zephyr_entry;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
