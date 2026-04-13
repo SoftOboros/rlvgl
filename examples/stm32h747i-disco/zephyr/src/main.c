@@ -13,6 +13,8 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/cache.h>
 #include <zephyr/input/input.h>
+#include <zephyr/fs/fs.h>
+#include <ff.h>
 
 /* ── Kernel objects ──────────────────────────────────────────────────── */
 
@@ -196,6 +198,20 @@ int main(void)
 		.height = fb_h,
 		.pixel_size = px_sz,
 	};
+
+	/* ── Filesystem: mount SD card ────────────────────────────── */
+	static FATFS sd_fatfs;
+	static struct fs_mount_t sd_mnt = {
+		.type = FS_FATFS,
+		.fs_data = &sd_fatfs,
+		.mnt_point = "/SD:",
+	};
+	int fs_ret = fs_mount(&sd_mnt);
+	if (fs_ret == 0) {
+		printk("rlvgl-zephyr: SD mounted at /SD:\n");
+	} else {
+		printk("rlvgl-zephyr: SD mount failed (%d)\n", fs_ret);
+	}
 
 	printk("rlvgl-zephyr: calling rlvgl_init\n");
 	rlvgl_init(&erif_sem, &dma2d_done_sem, &di);
