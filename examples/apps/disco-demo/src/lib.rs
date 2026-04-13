@@ -445,16 +445,6 @@ impl ControllerState {
         self.focus = next_focus;
         self.refresh_focus_hint();
         self.sync_focus_highlights();
-        self.show_info(
-            "Settings Wing",
-            "Shared settings actions without board registers",
-            Color(0xE4, 0xA8, 0x40, 0xFF),
-            vec![
-                "Audio scope, locale, and backlight commands are queued here.".into(),
-                "Unsupported entries stay neutral instead of panicking.".into(),
-                format!("Audio supported: {}", self.capabilities.audio),
-            ],
-        );
     }
 
     fn open_info(&mut self) {
@@ -468,15 +458,6 @@ impl ControllerState {
         self.focus = next_focus;
         self.refresh_focus_hint();
         self.sync_focus_highlights();
-        self.show_info(
-            "Info Wing",
-            "Diagnostics and effect hooks shared across runtimes",
-            Color(0xA7, 0x84, 0xF7, 0xFF),
-            vec![
-                "Diagnostics and live stats are platform-capability driven.".into(),
-                "Star crawl and audio scope remain runtime-owned effects.".into(),
-            ],
-        );
     }
 
     fn refresh_focus_hint(&mut self) {
