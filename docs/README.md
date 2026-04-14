@@ -47,6 +47,7 @@ See crate overviews for:
 ## Hardware Targets
 - [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) — Board reference (display, touch, pinout).
 - [STM32H747I-DISCO-BRINGUP.md](./STM32H747I-DISCO-BRINGUP.md) — Hardware bring-up checklist and status.
+- [ZEPHYR.md](./ZEPHYR.md) — Zephyr RTOS integration: SDK install, build, video mode, adapted command mode.
 - [FILESYSTEM-ASSET-LOADING.md](./FILESYSTEM-ASSET-LOADING.md) — FAT32 asset loading on SD card + simulator.
 - [MICROPYTHON-INTEGRATION.md](./MICROPYTHON-INTEGRATION.md) — MicroPython on CM7 + rlvgl on CM4.
 - [wifi-telemetry.md](./wifi-telemetry.md) — Future WiFi telemetry design and D3 SRAM layout.
