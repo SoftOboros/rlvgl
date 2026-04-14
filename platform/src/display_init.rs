@@ -49,7 +49,11 @@ const DSI_VVSACR:  *mut u32   = (DSI + 0x054) as *mut u32;
 const DSI_VVBPCR:  *mut u32   = (DSI + 0x058) as *mut u32;
 const DSI_VVFPCR:  *mut u32   = (DSI + 0x05C) as *mut u32;
 const DSI_VVACR:   *mut u32   = (DSI + 0x060) as *mut u32;
-const DSI_LCCR:    *mut u32   = (DSI + 0x02C) as *mut u32; // alias for Step 9
+// LCCR (LTDC command configuration) lives at 0x64 — NOT 0x2C (which is PCR).
+// Verified against stm32h7-0.15.1 PAC and RM0399 §34.16. The previous 0x2C
+// alias caused configure_adapted_cmd_mode(width) to corrupt PCR and leave
+// CMDSIZE=0, producing snow on the panel.
+const DSI_LCCR:    *mut u32   = (DSI + 0x064) as *mut u32;
 const DSI_CMCR:    *mut u32   = (DSI + 0x068) as *mut u32;
 const DSI_GHCR:    *mut u32   = (DSI + 0x06C) as *mut u32;
 const DSI_GPSR:    *const u32 = (DSI + 0x074) as *const u32;
@@ -545,8 +549,10 @@ pub unsafe fn init_nt35510_panel() -> bool {
 ///
 /// - Peripheral clocks (DMA2D, LTDC, DSI) must be enabled — call
 ///   `enable_display_peripheral_clocks()` first if not done by the OS.
-/// - PLL3 must be running at 32 MHz pixel clock — call
-///   `ensure_pll3_running()` if not done by the OS.
+/// - PLL3R must be running at the pixel clock value used in
+///   `init_dsi_video_timings` (currently 27.5 MHz, matching Zephyr's
+///   `pll3` DTS config: HSE/5 * 132 / 24). Call `ensure_pll3_running()`
+///   if not done by the OS.
 /// - GPIOJ + GPIOG clocks enabled, PG3 reset pin available.
 /// - `fb_addr` must point to a valid ARGB8888 framebuffer of size
 ///   PANEL_W * PANEL_H * 4 bytes in coherent SDRAM.

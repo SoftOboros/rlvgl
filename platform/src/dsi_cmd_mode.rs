@@ -28,7 +28,10 @@ const DSI: u32 = 0x5000_0000;
 const DSI_CR: *mut u32 = (DSI + 0x04) as *mut u32;
 
 /// DSI Host LTDC command configuration register — CMDSIZE field.
-const DSI_LCCR: *mut u32 = (DSI + 0x2C) as *mut u32;
+///
+/// **Offset is 0x64**, not 0x2C. 0x2C is PCR (Protocol Configuration).
+/// Confirmed against `stm32h7-0.15.1` PAC `dsihost::lccr` and RM0399 §34.16.
+const DSI_LCCR: *mut u32 = (DSI + 0x64) as *mut u32;
 
 /// DSI Host mode configuration register — bit 0 = CMDM.
 const DSI_MCR: *mut u32 = (DSI + 0x34) as *mut u32;
