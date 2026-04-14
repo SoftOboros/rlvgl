@@ -1,0 +1,28 @@
+/*
+ * Adapted command mode overlay — disables Zephyr's DSI/LTDC/NT35510
+ * driver init so the Rust code can do full DSI+LTDC init from scratch
+ * in adapted command mode.
+ *
+ * Apply via west: -DEXTRA_DTC_OVERLAY_FILE=adapted_cmd.overlay
+ *
+ * Zephyr keeps providing: SDRAM (memc), clocks (PLL3), GPIO, I2C,
+ *   joystick (gpio_keys), kernel, filesystem, console.
+ */
+
+&zephyr_mipi_dsi {
+	status = "disabled";
+};
+
+&nt35510 {
+	status = "disabled";
+};
+
+&zephyr_lcd_controller {
+	status = "disabled";
+};
+
+/ {
+	chosen {
+		/delete-property/ zephyr,display;
+	};
+};

@@ -354,23 +354,29 @@ pub unsafe extern "C" fn rlvgl_init(
         // exclusive SDRAM access after each scan (ERIF ISR clears LTDCEN).
         //
         // RM0399 §34.16.1: "DSIM must only be changed when DSI_CR.EN = 0"
-        // NOTE: The adapted_cmd mid-flight switch from Zephyr's video mode
-        // does NOT work reliably — see project_zephyr_dma2d_bus.md memory.
-        // Both attempts (2026-04-13 with bare register writes, 2026-04-14
-        // with shared dsi_cmd_mode module + full panel re-init + backlight
-        // toggle) produced blank screen + no backlight.
+        // ── 3c. adapted_cmd: full Rust DSI+LTDC init ────────────────────
+        // Plan B: bypass Zephyr's video-mode display drivers entirely.
+        // Requires the `adapted_cmd.overlay` DTS overlay to disable
+        // &zephyr_mipi_dsi, &nt35510, &zephyr_lcd_controller. Zephyr
+        // still provides clocks (PLL3), SDRAM, GPIO, I2C, and kernel.
         //
-        // The correct path forward is to disable Zephyr's DSI/LTDC/NT35510
-        // DTS nodes and do full Rust DSI init from scratch (matching the
-        // bare-metal sequence in stm32h747i_disco.rs). The shared
-        // `dsi_cmd_mode` module is ready to be used by that path.
-        //
-        // For now, the adapted_cmd feature is a no-op stub. Star crawl
-        // will continue to show the "DMA2D pending" status until plan B
-        // (full Rust DSI init) is implemented.
+        // Build with:
+        //   west build -- -DEXTRA_DTC_OVERLAY_FILE=adapted_cmd.overlay
         #[cfg(feature = "adapted_cmd")]
         {
-            // Intentionally empty — see comment above.
+            use rlvgl_platform::display_init;
+            // Ensure peripheral clocks (DMA2D/LTDC/DSI) are enabled,
+            // and PLL3 is locked. Safe even if Zephyr already did so.
+            display_init::enable_display_peripheral_clocks();
+            display_init::ensure_pll3_running();
+            // Full DSI+LTDC bring-up in adapted command mode.
+            // Uses fb_front (= 0xD0000000) as the initial scan buffer.
+            let ok = display_init::init_full_adapted_cmd(di.fb_front as u32);
+            if !ok {
+                // Init failed — leave a marker in SRAM3 telemetry region
+                // and continue. Display will be blank but app stays alive.
+                (0x3800_0200u32 as *mut u32).write_volatile(0xDEAD_D51A);
+            }
         }
 
         // ── 3d. Determine FB layout ──────────────────────────────────────

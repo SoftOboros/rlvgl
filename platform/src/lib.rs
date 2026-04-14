@@ -39,6 +39,12 @@ pub mod frame_sync;
 ))]
 /// Shared DSI adapted command mode register configuration.
 pub mod dsi_cmd_mode;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_os = "none")
+))]
+/// Full DSI + LTDC init sequence (raw register, no PAC dependency).
+pub mod display_init;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]
 pub mod dma2d;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]

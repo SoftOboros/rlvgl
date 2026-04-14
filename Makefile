@@ -83,6 +83,14 @@ help:
 	@echo "BSP generation:"
 	@echo "  make gen-stm32h747i-disco-bsp # Regenerate H747I-DISCO BSP (SMPS/VOS1)"
 	@echo ""
+	@echo "Zephyr build (STM32H747I-DISCO via shield mb1166-a09):"
+	@echo "  make zephyr-disco-lib         # Build Rust staticlib for Zephyr (video mode)"
+	@echo "  make zephyr-disco-lib-acm     # Build Rust staticlib (adapted_cmd feature)"
+	@echo "  make zephyr-disco             # Build Zephyr image (video mode)"
+	@echo "  make zephyr-disco-acm         # Build Zephyr image (adapted command mode)"
+	@echo "  make zephyr-disco-flash       # Flash zephyr.elf via probe-rs"
+	@echo "  make zephyr-disco-help        # Show env requirements + manual commands"
+	@echo ""
 	@echo "i18n translation:"
 	@echo "  make translate-locale-de       # Translate en.json to German"
 	@echo "  make translate-all-i18n        # Translate en.json to all locales (skip existing)"
@@ -234,3 +242,134 @@ import-icons: extract-icons
 		name=$$(basename "$$raw" .raw); \
 		cargo run --bin rlvgl-creator --features creator -- compress "$$raw" "assets/icons/rle/$${name}.rle"; \
 	done
+
+# ── Zephyr build for STM32H747I-DISCO ────────────────────────────────
+#
+# Requires:
+#   - Zephyr (zephyrproject) checked out at $(ZEPHYR_BASE) (default ~/zephyrproject)
+#   - west, cmake, ninja, python3 in PATH
+#   - arm-none-eabi-gcc toolchain (default: stm32cube bundle)
+#   - A Zephyr SDK (real install) OR the stub at $(ZEPHYR_SDK_DIR)
+#
+# The stub SDK satisfies cmake's `find_package(Zephyr-sdk)` without a full
+# SDK install. It points Zephyr at the gnuarmemb toolchain (the stm32cube
+# bundle's arm-none-eabi-gcc). This is what's used when no real SDK is
+# installed on the build host.
+#
+# Override these variables on the make command line if your layout differs:
+#   make zephyr-disco ZEPHYR_BASE=/path/to/zephyrproject \
+#                     GNUARMEMB_TOOLCHAIN_PATH=/path/to/arm-none-eabi
+ZEPHYR_BASE             ?= $(HOME)/zephyrproject
+ZEPHYR_BUILD            ?= $(ZEPHYR_BASE)/build
+ZEPHYR_APP              := $(CURDIR)/examples/stm32h747i-disco/zephyr
+ZEPHYR_BOARD            := stm32h747i_disco/stm32h747xx/m7
+ZEPHYR_SHIELD           := st_b_lcd40_dsi1_mb1166_a09
+ZEPHYR_OVERLAY_ACM      := $(ZEPHYR_APP)/adapted_cmd.overlay
+ZEPHYR_TOOLCHAIN_VARIANT?= gnuarmemb
+GNUARMEMB_TOOLCHAIN_PATH?= $(HOME)/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/13.3.1+st.9
+ZEPHYR_SDK_STUB         := /tmp/zephyr-sdk-stub/0.16.8
+ZEPHYR_SDK_DIR          ?= $(ZEPHYR_SDK_STUB)/cmake
+
+# Cargo features for the Rust staticlib that Zephyr links in.
+ZEPHYR_DISCO_FEATURES     := cm7,splash,desktop,dma2d,zephyr
+ZEPHYR_DISCO_FEATURES_ACM := $(ZEPHYR_DISCO_FEATURES),adapted_cmd
+
+# Common cargo build invocation for the staticlib.
+ZEPHYR_RUSTFLAGS := -C target-cpu=cortex-m7
+ZEPHYR_CARGO_TARGET := thumbv7em-none-eabihf
+ZEPHYR_LIB := target/$(ZEPHYR_CARGO_TARGET)/debug/librlvgl_example_disco.a
+
+zephyr-disco-help:
+	@echo "Zephyr build for STM32H747I-DISCO via mb1166-a09 shield."
+	@echo ""
+	@echo "Targets:"
+	@echo "  make zephyr-disco-lib       — Rust staticlib (features: $(ZEPHYR_DISCO_FEATURES))"
+	@echo "  make zephyr-disco-lib-acm   — Rust staticlib (adds adapted_cmd)"
+	@echo "  make zephyr-disco           — Zephyr image, video mode"
+	@echo "  make zephyr-disco-acm       — Zephyr image, adapted command mode"
+	@echo "  make zephyr-disco-flash     — probe-rs download zephyr.elf + reset"
+	@echo "  make zephyr-disco-clean     — Remove Zephyr build directory"
+	@echo ""
+	@echo "Variables (override on command line):"
+	@echo "  ZEPHYR_BASE              = $(ZEPHYR_BASE)"
+	@echo "  ZEPHYR_BUILD             = $(ZEPHYR_BUILD)"
+	@echo "  ZEPHYR_BOARD             = $(ZEPHYR_BOARD)"
+	@echo "  ZEPHYR_SHIELD            = $(ZEPHYR_SHIELD)"
+	@echo "  ZEPHYR_TOOLCHAIN_VARIANT = $(ZEPHYR_TOOLCHAIN_VARIANT)"
+	@echo "  GNUARMEMB_TOOLCHAIN_PATH = $(GNUARMEMB_TOOLCHAIN_PATH)"
+	@echo "  ZEPHYR_SDK_DIR           = $(ZEPHYR_SDK_DIR)"
+	@echo ""
+	@echo "Notes:"
+	@echo "  - The Zephyr SDK is stubbed at /tmp/zephyr-sdk-stub. The stub is auto-"
+	@echo "    created if missing — it satisfies cmake's find_package(Zephyr-sdk)"
+	@echo "    without requiring a full SDK install. Real SDK works too: just"
+	@echo "    override ZEPHYR_SDK_DIR=/path/to/cmake."
+	@echo "  - Adapted command mode disables Zephyr's video-mode DSI/LTDC drivers"
+	@echo "    via adapted_cmd.overlay; Rust does the full DSI bring-up using"
+	@echo "    platform/src/display_init.rs. This is needed for DMA2D M2M (star"
+	@echo "    crawl) which deadlocks under Zephyr's continuous-scan video mode."
+	@echo "  - First-time setup: see the Zephyr getting-started guide to install"
+	@echo "    west and clone zephyrproject. https://docs.zephyrproject.org/"
+
+# Auto-create the stub Zephyr SDK if the configured SDK dir doesn't exist.
+$(ZEPHYR_SDK_STUB)/cmake/Zephyr-sdkConfig.cmake:
+	@mkdir -p $(ZEPHYR_SDK_STUB)/cmake/zephyr
+	@printf '%s\n' \
+		'# Stub Zephyr SDK — uses external gnuarmemb toolchain.' \
+		'set(Zephyr-sdk_FOUND TRUE)' \
+		'set(ZEPHYR_SDK_INSTALL_DIR "$(ZEPHYR_SDK_STUB)")' \
+		'set(Zephyr-sdk_VERSION "0.16.8")' \
+		'if(NOT DEFINED ZEPHYR_TOOLCHAIN_VARIANT)' \
+		'  set(ZEPHYR_TOOLCHAIN_VARIANT gnuarmemb)' \
+		'endif()' \
+		> $(ZEPHYR_SDK_STUB)/cmake/Zephyr-sdkConfig.cmake
+	@printf '%s\n' \
+		'set(PACKAGE_VERSION "0.16.8")' \
+		'set(PACKAGE_VERSION_COMPATIBLE TRUE)' \
+		'set(PACKAGE_VERSION_EXACT FALSE)' \
+		> $(ZEPHYR_SDK_STUB)/cmake/Zephyr-sdkConfigVersion.cmake
+	@printf '%s\n' \
+		'# Stub: host tools (gperf, dtc, etc.) are expected to be on PATH.' \
+		> $(ZEPHYR_SDK_STUB)/cmake/zephyr/host-tools.cmake
+
+zephyr-disco-lib:
+	RUSTFLAGS="$(ZEPHYR_RUSTFLAGS)" cargo build \
+		--target $(ZEPHYR_CARGO_TARGET) \
+		-p rlvgl-example-disco --lib \
+		--features $(ZEPHYR_DISCO_FEATURES)
+
+zephyr-disco-lib-acm:
+	RUSTFLAGS="$(ZEPHYR_RUSTFLAGS)" cargo build \
+		--target $(ZEPHYR_CARGO_TARGET) \
+		-p rlvgl-example-disco --lib \
+		--features $(ZEPHYR_DISCO_FEATURES_ACM)
+
+# Video-mode Zephyr build. Stock STM32 DSI driver in continuous video scan.
+zephyr-disco: zephyr-disco-lib $(ZEPHYR_SDK_STUB)/cmake/Zephyr-sdkConfig.cmake
+	cd $(ZEPHYR_BASE) && env \
+		"Zephyr-sdk_DIR=$(ZEPHYR_SDK_DIR)" \
+		ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) \
+		"GNUARMEMB_TOOLCHAIN_PATH=$(GNUARMEMB_TOOLCHAIN_PATH)" \
+		west build -p auto -b $(ZEPHYR_BOARD) $(ZEPHYR_APP) \
+			-- -DSHIELD=$(ZEPHYR_SHIELD)
+
+# Adapted command mode build. Rust does full DSI+LTDC init from scratch
+# (display_init.rs); Zephyr provides clocks, SDRAM, GPIO, I2C, kernel.
+zephyr-disco-acm: zephyr-disco-lib-acm $(ZEPHYR_SDK_STUB)/cmake/Zephyr-sdkConfig.cmake
+	cd $(ZEPHYR_BASE) && env \
+		"Zephyr-sdk_DIR=$(ZEPHYR_SDK_DIR)" \
+		ZEPHYR_TOOLCHAIN_VARIANT=$(ZEPHYR_TOOLCHAIN_VARIANT) \
+		"GNUARMEMB_TOOLCHAIN_PATH=$(GNUARMEMB_TOOLCHAIN_PATH)" \
+		west build -p auto -b $(ZEPHYR_BOARD) $(ZEPHYR_APP) \
+			-- -DSHIELD=$(ZEPHYR_SHIELD) \
+			   -DEXTRA_DTC_OVERLAY_FILE=$(ZEPHYR_OVERLAY_ACM)
+
+zephyr-disco-flash:
+	probe-rs download --chip STM32H747XIHx $(ZEPHYR_BUILD)/zephyr/zephyr.elf
+	probe-rs reset --chip STM32H747XIHx
+
+zephyr-disco-clean:
+	rm -rf $(ZEPHYR_BUILD)
+
+.PHONY: zephyr-disco-lib zephyr-disco-lib-acm zephyr-disco zephyr-disco-acm \
+        zephyr-disco-flash zephyr-disco-clean zephyr-disco-help

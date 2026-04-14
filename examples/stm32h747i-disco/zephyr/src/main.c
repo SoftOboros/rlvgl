@@ -67,7 +67,11 @@ void rlvgl_k_sleep_ms(uint32_t ms)
 
 /* Present: trigger Zephyr LTDC driver's double-buffer swap.
  * Writes the full back buffer as a new frame, which triggers
- * LINE ISR -> CFBAR update -> sem give. Blocks until swap completes. */
+ * LINE ISR -> CFBAR update -> sem give. Blocks until swap completes.
+ *
+ * When Zephyr display is disabled (adapted_cmd path), Rust calls
+ * `dsi_cmd_mode::present()` directly instead of this function. */
+#if DT_HAS_CHOSEN(zephyr_display)
 static const struct device *g_disp;
 
 int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
@@ -81,6 +85,13 @@ int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
 	};
 	return display_write(g_disp, 0, 0, &desc, back_buf);
 }
+#else
+int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
+{
+	(void)back_buf; (void)width; (void)height;
+	return -1; /* Rust uses dsi_cmd_mode::present() directly */
+}
+#endif
 
 /* ── Touch input ─────────────────────────────────────────────────────── */
 
@@ -208,7 +219,15 @@ int main(void)
 	irq_connect_dynamic(123, 2, dsi_isr_wrapper, NULL, 0);
 	irq_enable(123);
 
-	/* ── Display bringup via Zephyr display API ──────────────── */
+	uint8_t *fb_front;
+	uint8_t *fb_back;
+	uint16_t fb_w;
+	uint16_t fb_h;
+	uint16_t px_sz = 4; /* ARGB8888 */
+	uint32_t fb_len;
+
+#if DT_HAS_CHOSEN(zephyr_display)
+	/* ── Display bringup via Zephyr display API (video mode) ────── */
 	g_disp = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 	if (!device_is_ready(g_disp)) {
 		printk("rlvgl-zephyr: display not ready!\n");
@@ -224,17 +243,24 @@ int main(void)
 	display_blanking_off(g_disp);
 	printk("rlvgl-zephyr: blanking off\n");
 
-	/* Get framebuffer info from Zephyr's LTDC driver.
-	 *
-	 * In video mode with rotation=90, the LTDC scans landscape:
-	 * 800 pixels per line, 480 lines. The panel MADCTL handles rotation.
-	 * Use the reported (post-rotation) dimensions as the FB layout. */
-	uint8_t *fb_front = (uint8_t *)display_get_framebuffer(g_disp);
-	uint16_t fb_w = caps.x_resolution; /* 800 (landscape) */
-	uint16_t fb_h = caps.y_resolution; /* 480 (landscape) */
-	uint16_t px_sz = 4;    /* ARGB8888 */
-	uint32_t fb_len = fb_w * fb_h * px_sz;
-	uint8_t *fb_back = fb_front + fb_len;
+	/* In video mode with rotation=90, the LTDC scans landscape:
+	 * 800 pixels per line, 480 lines. */
+	fb_front = (uint8_t *)display_get_framebuffer(g_disp);
+	fb_w = caps.x_resolution; /* 800 */
+	fb_h = caps.y_resolution; /* 480 */
+	fb_len = fb_w * fb_h * px_sz;
+	fb_back = fb_front + fb_len;
+#else
+	/* ── Adapted command mode: hardcoded FB addresses ──────────── */
+	/* SDRAM Bank 0 = 0xD000_0000, Bank 1 = 0xD080_0000 (matches
+	 * bare-metal). NT35510 native portrait 480x800. */
+	fb_front = (uint8_t *)0xD0000000;
+	fb_back  = (uint8_t *)0xD0800000;
+	fb_w = 480;
+	fb_h = 800;
+	fb_len = fb_w * fb_h * px_sz;
+	printk("rlvgl-zephyr: adapted_cmd mode (full Rust DSI init)\n");
+#endif
 
 	printk("rlvgl-zephyr: fb_front=%p fb_back=%p fb_len=%u\n",
 	       fb_front, fb_back, fb_len);
