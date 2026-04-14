@@ -205,7 +205,12 @@ static void dma2d_isr_wrapper(const void *arg)
 
 int main(void)
 {
+	/* SRAM3 breadcrumbs: probe-rs can read these without the board
+	 * being able to print to UART. Lets us tell whether main()
+	 * runs at all when serial is silent. */
+	*(volatile uint32_t *)0x38000200 = 0xB0070001; /* main entered */
 	printk("rlvgl-zephyr: starting\n");
+	*(volatile uint32_t *)0x38000200 = 0xB0070002; /* after first printk */
 
 	/* Register DMA2D ISR (IRQ 90, pri 3). */
 	irq_connect_dynamic(90, 3, dma2d_isr_wrapper, NULL, 0);
@@ -288,8 +293,10 @@ int main(void)
 		printk("rlvgl-zephyr: SD mount failed (%d)\n", fs_ret);
 	}
 
+	*(volatile uint32_t *)0x38000200 = 0xB0070010; /* about to call rlvgl_init */
 	printk("rlvgl-zephyr: calling rlvgl_init\n");
 	rlvgl_init(&erif_sem, &dma2d_done_sem, &di);
+	*(volatile uint32_t *)0x38000200 = 0xB0070011; /* rlvgl_init returned */
 	printk("rlvgl-zephyr: init complete\n");
 
 	/* Keep main thread alive. */

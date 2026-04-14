@@ -319,6 +319,9 @@ pub unsafe extern "C" fn rlvgl_init(
     display_info: *const RlvglDisplayInfo,
 ) {
     unsafe {
+        // SRAM3 breadcrumb: rlvgl_init entered
+        (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0001);
+
         // ── 1. Construct sync object ──────────────────────────────────────
         use core::sync::atomic::AtomicBool;
         static INIT_DONE: AtomicBool = AtomicBool::new(false);
@@ -365,18 +368,17 @@ pub unsafe extern "C" fn rlvgl_init(
         #[cfg(feature = "adapted_cmd")]
         {
             use rlvgl_platform::display_init;
+            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0010);
             // Ensure peripheral clocks (DMA2D/LTDC/DSI) are enabled,
             // and PLL3 is locked. Safe even if Zephyr already did so.
             display_init::enable_display_peripheral_clocks();
+            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0011);
             display_init::ensure_pll3_running();
+            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0012);
             // Full DSI+LTDC bring-up in adapted command mode.
             // Uses fb_front (= 0xD0000000) as the initial scan buffer.
             let ok = display_init::init_full_adapted_cmd(di.fb_front as u32);
-            if !ok {
-                // Init failed — leave a marker in SRAM3 telemetry region
-                // and continue. Display will be blank but app stays alive.
-                (0x3800_0200u32 as *mut u32).write_volatile(0xDEAD_D51A);
-            }
+            (0x3800_0204 as *mut u32).write_volatile(if ok { 0xB1A1_0013 } else { 0xDEAD_D51A });
         }
 
         // ── 3d. Determine FB layout ──────────────────────────────────────
@@ -485,6 +487,20 @@ pub unsafe extern "C" fn rlvgl_init(
         core::ptr::copy_nonoverlapping(fb_front, pristine_base, fb_bytes);
 
         dcache_clean_all();
+
+        // adapted_cmd: re-write ALL LTDC config (timing + layer + GCR).
+        // Some post-display_init code path was clearing these — likely
+        // Zephyr SYS_INIT for the disabled LTDC node still touches the
+        // peripheral. Re-writing them here makes them stick.
+        #[cfg(feature = "adapted_cmd")]
+        {
+            use rlvgl_platform::display_init;
+            display_init::configure_ltdc_timing(480, 800, 2, 34, 34, 120, 150, 150);
+            display_init::setup_ltdc_layer(
+                fb_front as u32, 480, 800, 2, 34, 120, 150,
+            );
+            display_init::enable_ltdc();
+        }
 
         // Present splash immediately so it's visible during widget init.
         do_present(fb_back, di.width, di.height);

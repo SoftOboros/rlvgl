@@ -170,6 +170,10 @@ fn u1_hex(v: u32) {
 /// Drive PG3 (panel reset) low, wait, then high.
 unsafe fn pulse_panel_reset() {
     unsafe {
+        // Configure PG3 as GP output: MODER bits 7:6 = 01
+        const GPIOG_MODER: *mut u32 = GPIOG as *mut u32;
+        let moder = GPIOG_MODER.read_volatile();
+        GPIOG_MODER.write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
         // PG3 low
         GPIOG_BSRR.write_volatile(1u32 << 19);
         delay_cycles(4_000_000); // ~10 ms
@@ -329,8 +333,11 @@ pub unsafe fn init_dsi_ltdc_interface() {
 pub unsafe fn init_dsi_video_timings(width: u16, height: u16,
     hsw: u16, hbp: u16, hfp: u16, vsw: u16, vbp: u16, vfp: u16) {
     unsafe {
-        let lane_byte_clk: u32 = 62500; // kHz
-        let pixel_clk: u32 = 32000;     // kHz
+        let lane_byte_clk: u32 = 62500; // kHz (DSI PLL: HSE/5 * 2 * 100 / 8)
+        // Pixel clock from PLL3_R, set by Zephyr shield overlay to 27.5 MHz
+        // (HSE/5 * 132 / 24). Bare-metal HAL configures 32 MHz; if you change
+        // PLL3 in the DTS, update this constant.
+        let pixel_clk: u32 = 27500;     // kHz
         let total_pixels = (hsw as u32) + (hbp as u32) + (width as u32) + (hfp as u32);
         let hsa_dsi   = (hsw as u32) * lane_byte_clk / pixel_clk;
         let hbp_dsi   = (hbp as u32) * lane_byte_clk / pixel_clk;
@@ -360,7 +367,12 @@ pub unsafe fn init_dsi_video_timings(width: u16, height: u16,
 
 // ── Step "0": Enable DSI peripheral clock + reset ───────────────────────────
 
-/// Enable DMA2D, LTDC, DSI peripheral clocks via RCC.
+/// Enable DMA2D, LTDC, DSI peripheral clocks + GPIOG/GPIOJ clocks via RCC.
+///
+/// GPIOG (panel reset PG3) and GPIOJ (TE PJ2, backlight PJ12) clocks
+/// must be enabled before we touch those pins. Zephyr only enables a
+/// GPIO bank's clock if some driver references it; with our display
+/// nodes disabled, those banks may not be clocked.
 ///
 /// Safe to call even if Zephyr already enabled them.
 pub unsafe fn enable_display_peripheral_clocks() {
@@ -371,6 +383,10 @@ pub unsafe fn enable_display_peripheral_clocks() {
         // APB3ENR.LTDCEN = bit 3, DSIEN = bit 4
         let apb3 = RCC_APB3ENR.read_volatile();
         RCC_APB3ENR.write_volatile(apb3 | (1 << 3) | (1 << 4));
+        // AHB4ENR (0x5802_44E0): GPIOG = bit 6, GPIOJ = bit 9
+        const RCC_AHB4ENR: *mut u32 = (RCC + 0x0E0) as *mut u32;
+        let ahb4 = RCC_AHB4ENR.read_volatile();
+        RCC_AHB4ENR.write_volatile(ahb4 | (1 << 6) | (1 << 9));
         // Brief settle
         cortex_m::asm::dsb();
     }
@@ -500,25 +516,21 @@ unsafe fn dcs_short_write1(cmd: u8, param: u8) -> bool {
     }
 }
 
-/// Send the NT35510 panel init sequence.
+/// Send the full NT35510 panel init sequence (MCS, gamma, voltages, etc.).
 ///
-/// Sends `sleep_out (0x11)` → wait → `set_tear_on (0x35, 0x00)` →
-/// `display_on (0x29)`. Adequate for the MB1166-A09 panel; the full
-/// per-register init is in `nt35510.rs::Nt35510::init` which uses PAC.
+/// Delegates to `nt35510::Nt35510::init()` which uses PAC accessors to
+/// write the ~100 init commands required for proper panel operation.
+/// Steals the PAC DSIHOST peripheral — must not be in use by other code.
+///
+/// # Safety
+///
+/// DSI host clocks must be enabled and DSI must be in adapted command
+/// mode with LP overrides active.
 pub unsafe fn init_nt35510_panel() -> bool {
     unsafe {
-        // Sleep out
-        if !dcs_short_write(0x11) {
-            return false;
-        }
-        delay_cycles(48_000_000); // ~120ms recovery from sleep_out
-        // Tearing effect on, V-blank only
-        let _ = dcs_short_write1(0x35, 0x00);
-        // Display on
-        if !dcs_short_write(0x29) {
-            return false;
-        }
-        true
+        let p = stm32h7::stm32h747cm7::Peripherals::steal();
+        let mut dsi = p.DSIHOST;
+        crate::nt35510::Nt35510::init(&mut dsi)
     }
 }
 

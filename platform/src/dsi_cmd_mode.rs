@@ -150,16 +150,16 @@ pub unsafe fn configure_adapted_cmd_mode(width: u16) {
     // LCCR: command size = display width (pixels per WMS packet)
     DSI_LCCR.write_volatile(width as u32);
 
-    // WCFGR: adapted command mode + RGB888 + external TE + auto refresh
+    // WCFGR: adapted command mode + RGB888 + external TE + MANUAL refresh
     //   bit 0: DSIM = 1 (adapted command mode)
     //   bits 3:1: COLMUX = 5 (RGB888, 24 bpp)
-    //   bit 4: TESRC = 1 (external TE pin, not DSI link BTA)
-    //   bit 6: AR = 1 (automatic refresh on TE event)
+    //   bit 4: TESRC = 1 (external TE pin)
+    //   bit 6: AR = 0 (manual refresh — LTDCEN pulse triggers immediately,
+    //                   no TE wait. Avoids hang if panel TE isn't driving.)
     DSI_WCFGR.write_volatile(
         (1 << 0)       // DSIM = adapted command mode
         | (5 << 1)     // COLMUX = RGB888
-        | (1 << 4)     // TESRC = external TE pin
-        | (1 << 6),    // AR = automatic refresh
+        | (1 << 4),    // TESRC (kept, but AR=0 makes it advisory)
     );
 
     // CMCR: enable TE-acknowledge handshake for adapted command mode.
