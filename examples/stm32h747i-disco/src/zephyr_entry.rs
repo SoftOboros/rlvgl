@@ -146,40 +146,12 @@ fn get_sync() -> Option<&'static ZephyrFrameSync> {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rlvgl_dsi_isr() {
     unsafe {
-        const WISR: *const u32 = 0x5000_040C as *const u32;
-        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
-        const ISR0: *const u32 = 0x5000_00BC as *const u32;
-        const ISR1: *const u32 = 0x5000_00C0 as *const u32;
-        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32;
-        const FIR1: *mut u32 = 0x5000_00DC as *mut u32;
-        const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
-        const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
-        const GPIOJ_BSRR: *mut u32 = (0x5802_2400 + 0x18) as *mut u32;
-
-        let wisr = WISR.read_volatile();
-        WIFCR.write_volatile(wisr & 0x3FFF);
-
-        if wisr & 0x02 != 0 {
-            let cyc = DWT_CYCCNT.read_volatile();
-            // PJ0 LOW — LTDC scan done
-            GPIOJ_BSRR.write_volatile(1u32 << 16);
-            // Clear LTDCEN to prevent auto-refresh
-            DSI_WCR.write_volatile(0x08); // DSIEN only
-
+        // Delegate to shared dsi_cmd_mode module for register handling.
+        if let Some(cyc) = rlvgl_platform::dsi_cmd_mode::handle_erif_isr() {
             if let Some(sync) = get_sync() {
                 sync.isr_record_erif(cyc);
                 zephyr_sync::k_sem_give(sync.erif_sem);
             }
-        }
-
-        // Clear host-level flags
-        let isr0 = ISR0.read_volatile();
-        if isr0 != 0 {
-            FIR0.write_volatile(isr0);
-        }
-        let isr1 = ISR1.read_volatile();
-        if isr1 != 0 {
-            FIR1.write_volatile(isr1);
         }
     }
 }
@@ -314,6 +286,21 @@ unsafe extern "C" {
     fn rlvgl_present(back_buf: *const u8, width: u16, height: u16) -> i32;
 }
 
+/// Present a frame — delegates to either dsi_cmd_mode::present (adapted cmd)
+/// or Zephyr display_write (video mode) depending on the feature.
+#[inline]
+unsafe fn do_present(buf: *mut u8, width: u16, height: u16) {
+    #[cfg(feature = "adapted_cmd")]
+    {
+        let _ = (width, height); // unused in adapted cmd mode
+        rlvgl_platform::dsi_cmd_mode::present(buf as u32);
+    }
+    #[cfg(not(feature = "adapted_cmd"))]
+    {
+        rlvgl_present(buf, width, height);
+    }
+}
+
 // ── Initialization entry point ────────────────────────────────────────────────
 
 /// Called from Zephyr C `main()` to initialize the rlvgl display system.
@@ -349,8 +336,6 @@ pub unsafe extern "C" fn rlvgl_init(
         // ── 2. Read display info ──────────────────────────────────────────
         let di = &*display_info;
         let fb_back = di.fb_back;
-        let fb_w = di.width as u32;
-        let fb_h = di.height as u32;
         let bpp = di.pixel_size as u32;
 
         // ── 3. Enable DMA2D clock (RCC AHB3ENR bit 4) ────────────────────
@@ -363,20 +348,50 @@ pub unsafe extern "C" fn rlvgl_init(
         let lcolcr = 0x5000_0028 as *mut u32;
         lcolcr.write_volatile((1 << 8) | 5); // LPE=1, COLC=5 (RGB888)
 
+        // ── 3c. Adapted command mode switch (optional) ───────────────────
+        // When `adapted_cmd` feature is enabled, reconfigure the DSI from
+        // Zephyr's video mode to adapted command mode. This gives DMA2D
+        // exclusive SDRAM access after each scan (ERIF ISR clears LTDCEN).
+        //
+        // RM0399 §34.16.1: "DSIM must only be changed when DSI_CR.EN = 0"
+        // NOTE: The adapted_cmd mid-flight switch from Zephyr's video mode
+        // does NOT work reliably — see project_zephyr_dma2d_bus.md memory.
+        // Both attempts (2026-04-13 with bare register writes, 2026-04-14
+        // with shared dsi_cmd_mode module + full panel re-init + backlight
+        // toggle) produced blank screen + no backlight.
+        //
+        // The correct path forward is to disable Zephyr's DSI/LTDC/NT35510
+        // DTS nodes and do full Rust DSI init from scratch (matching the
+        // bare-metal sequence in stm32h747i_disco.rs). The shared
+        // `dsi_cmd_mode` module is ready to be used by that path.
+        //
+        // For now, the adapted_cmd feature is a no-op stub. Star crawl
+        // will continue to show the "DMA2D pending" status until plan B
+        // (full Rust DSI init) is implemented.
+        #[cfg(feature = "adapted_cmd")]
+        {
+            // Intentionally empty — see comment above.
+        }
+
+        // ── 3d. Determine FB layout ──────────────────────────────────────
+        // In adapted_cmd mode, LTDC scans portrait (480×800) like bare-metal.
+        // In video mode, LTDC scans landscape (800×480).
+        #[cfg(feature = "adapted_cmd")]
+        let (fb_w, fb_h) = (480u32, 800u32);
+        #[cfg(not(feature = "adapted_cmd"))]
+        let (fb_w, fb_h) = (di.width as u32, di.height as u32);
+
         // ── 4. Decode splash into BOTH framebuffers ─────────────────────
         //
-        // splash.rle is 480×800 portrait. Zephyr's LTDC FB is 800×480
-        // landscape (800 pixels/line, 480 lines) because the panel MADCTL
-        // handles rotation. We decode portrait into scratch SDRAM, then
-        // copy-rotate 90° CW into landscape FBs.
+        // splash.rle is 480×800 portrait ARGB8888.
         //
-        // 90° CW rotation: portrait(px, py) → landscape(dst_x, dst_y)
-        //   dst_x = py
-        //   dst_y = (portrait_w - 1) - px
+        // In adapted_cmd mode, the LTDC scans portrait (480×800) matching
+        // bare-metal — decode directly, no rotation needed.
         //
-        // Scratch buffer lives past the two FBs in SDRAM.
+        // In video mode, the LTDC scans landscape (800×480) — decode into
+        // scratch SDRAM, then copy-rotate 90° CW into landscape FBs.
         let fb_front = di.fb_front;
-        let fb_bytes = di.fb_len as usize;
+        let fb_bytes = (fb_w * fb_h * bpp) as usize;
 
         // Scratch at fb_front + 2 * fb_len (past both FBs)
         let scratch_base = fb_front.add(2 * fb_bytes);
@@ -400,28 +415,43 @@ pub unsafe extern "C" fn rlvgl_init(
                     u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
 
-            // Decode portrait into scratch buffer
-            let scratch = core::slice::from_raw_parts_mut(scratch_base, splash_bytes);
-            rlvgl_decomp::decode_argb_into(
-                splash_w, splash_h,
-                &palette[..pal_count], stream, scratch,
-            ).ok()?;
+            #[cfg(feature = "adapted_cmd")]
+            {
+                // Portrait FB (480×800) — decode directly into both FBs.
+                let fb0 = core::slice::from_raw_parts_mut(fb_front, splash_bytes);
+                rlvgl_decomp::decode_argb_into(
+                    splash_w, splash_h,
+                    &palette[..pal_count], stream, fb0,
+                ).ok()?;
+                // Copy to back buffer
+                core::ptr::copy_nonoverlapping(fb_front, fb_back, splash_bytes);
+            }
 
-            // Copy-rotate 90° CW from portrait scratch into landscape FBs.
-            // portrait(px, py) → landscape(dst_x=py, dst_y=479-px)
-            let src = scratch_base as *const u32;
-            let dst0 = fb_front as *mut u32;
-            let dst1 = fb_back as *mut u32;
-            let dst_stride = fb_w as usize; // 800 pixels per line
+            #[cfg(not(feature = "adapted_cmd"))]
+            {
+                // Landscape FB (800×480) — decode portrait into scratch,
+                // then copy-rotate 90° CW.
+                let scratch = core::slice::from_raw_parts_mut(scratch_base, splash_bytes);
+                rlvgl_decomp::decode_argb_into(
+                    splash_w, splash_h,
+                    &palette[..pal_count], stream, scratch,
+                ).ok()?;
 
-            for py in 0..splash_h {
-                for px in 0..splash_w {
-                    let pixel = src.add(py * splash_w + px).read_volatile();
-                    let dx = py;
-                    let dy = (splash_w - 1) - px;
-                    let dst_idx = dy * dst_stride + dx;
-                    dst0.add(dst_idx).write_volatile(pixel);
-                    dst1.add(dst_idx).write_volatile(pixel);
+                // portrait(px, py) → landscape(dst_x=py, dst_y=479-px)
+                let src = scratch_base as *const u32;
+                let dst0 = fb_front as *mut u32;
+                let dst1 = fb_back as *mut u32;
+                let dst_stride = fb_w as usize; // 800 pixels per line
+
+                for py in 0..splash_h {
+                    for px in 0..splash_w {
+                        let pixel = src.add(py * splash_w + px).read_volatile();
+                        let dx = py;
+                        let dy = (splash_w - 1) - px;
+                        let dst_idx = dy * dst_stride + dx;
+                        dst0.add(dst_idx).write_volatile(pixel);
+                        dst1.add(dst_idx).write_volatile(pixel);
+                    }
                 }
             }
             Some(())
@@ -451,7 +481,7 @@ pub unsafe extern "C" fn rlvgl_init(
         dcache_clean_all();
 
         // Present splash immediately so it's visible during widget init.
-        rlvgl_present(fb_back, di.width, di.height);
+        do_present(fb_back, di.width, di.height);
 
         // ── 5. Initialize heap ───────────────────────────────────────────
         {
@@ -627,10 +657,20 @@ pub unsafe extern "C" fn rlvgl_init(
                         }
                         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                         DiscoCommand::StartEffect(rlvgl_app_disco_demo::DiscoEffect::StarCrawl) => {
-                            // TODO: DMA2D PAC blitter hangs under Zephyr
-                            // (AMTCR/ISR interaction with video-mode LTDC).
-                            // Star crawl deferred until DMA2D is debugged.
-                            controller.publish_status("Star crawl: DMA2D pending Zephyr debug");
+                            #[cfg(feature = "adapted_cmd")]
+                            {
+                                // Adapted command mode: DMA2D M2M works — start the crawl.
+                                if crawl_dma2d.is_none() {
+                                    crawl_dma2d = Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                }
+                                crawl_active = true;
+                                controller.publish_status("Star crawl started");
+                            }
+                            #[cfg(not(feature = "adapted_cmd"))]
+                            {
+                                // Video mode: DMA2D M2M hangs (AXI bus starvation).
+                                controller.publish_status("Star crawl requires adapted_cmd feature");
+                            }
                         }
                         _ => {}
                     }
@@ -664,7 +704,7 @@ pub unsafe extern "C" fn rlvgl_init(
                                     }
                                 }
                                 dcache_clean_all();
-                                rlvgl_present(render_buf, di.width, di.height);
+                                do_present(render_buf, di.width, di.height);
                                 render_buf = if render_buf == fb_front { fb_back } else { fb_front };
                                 continue; // skip normal widget render this frame
                             }
@@ -698,7 +738,7 @@ pub unsafe extern "C" fn rlvgl_init(
                 root.borrow().draw(&mut renderer);
 
                 dcache_clean_all();
-                rlvgl_present(render_buf, di.width, di.height);
+                do_present(render_buf, di.width, di.height);
 
                 // After present, the buffer we just rendered becomes
                 // the displayed front. The other buffer becomes our

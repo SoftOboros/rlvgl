@@ -33,6 +33,12 @@ pub mod cpu_blitter;
 pub mod display;
 /// Frame synchronization traits for ERIF-based scheduling.
 pub mod frame_sync;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_os = "none")
+))]
+/// Shared DSI adapted command mode register configuration.
+pub mod dsi_cmd_mode;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]
 pub mod dma2d;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]

@@ -302,9 +302,22 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
         dbg(" OK\r\n");
 
-        // ── RM0399 §34.14: DSI programming procedure ───────────────────────
+        // ══════════════════════════════════════════════════════════════
+        // DSI + LTDC init — adapted command mode for NT35510 480×800
+        //
+        // Reference: RM0399 Rev 3 §34.14 "Programming procedure"
+        //            RM0432 Rev 9 §30.14 (identical DSI IP on L4R9)
+        //            STM32CubeH7 stm32h747i_discovery_lcd.c
+        //            STM32CubeH7 nt35510.c
+        //
+        // Register addresses: DSI host 0x5000_0000, LTDC 0x5000_1000,
+        //   DSI wrapper 0x5000_0400, PHY regs at CMSIS/PAC offsets
+        //   (confirmed matching RM0399 §34.15/§34.16 via memalpha RAG)
+        //
+        // Step numbering follows RM0399 §34.14.1 procedure overview.
+        // ══════════════════════════════════════════════════════════════
 
-        // Step 1: LTDC timing
+        // Step 1 (RM0399 §34.14.1): LTDC timing — panel porch/sync values
         dbg("  [1] pre-timing\r\n");
         disp.configure_ltdc_timing(width, height, hsw, hbp, hfp, vsw, vbp, vfp);
         dbg("  [2] post-timing\r\n");
@@ -316,8 +329,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         dbg("  [SKIP readback]\r\n");
 
         d3(10, 0xD510_0002); // post LTDC timing
-        // Step 2: DSI regulator enable + wait ready
-        // RM0399 §34.16.4 WISR: RRS=bit12, PLLLS=bit8 (PAC is correct)
+        // Step 2 (RM0399 §34.14.1): DSI regulator enable, wait RRS
+        // RM0399 §34.16.4 WISR: RRS=bit12, PLLLS=bit8 (PAC confirmed correct)
         disp.dsi
             .wrpcr
             .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 24)) }); // REGEN
@@ -333,7 +346,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
 
         d3(10, 0xD510_0003); // post regulator
-        // Step 3: DSI wrapper PLL (matches ST BSP: IDF=5, NDIV=100, ODF=0)
+        // Step 3 (RM0399 §34.14.1): DSI PLL — IDF=5, NDIV=100, ODF=0
+        // → VCO = (25 MHz / 5) * 2 * 100 = 1000 MHz, PHI = 1000 / 2 = 500 Mbps/lane
+        // Lane byte clock = 500 / 8 = 62.5 MHz
         //   HSE = 25 MHz, IDF=5 → ref=5 MHz
         //   NDIV=100 → VCO = 500 MHz → 500 Mbps/lane
         //   Lane byte clock = 500/8 = 62.5 MHz
@@ -371,6 +386,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // ══════════════════════════════════════════════════════════════════
         const DSI: u32 = 0x5000_0000;
 
+        // Step 4 (RM0399 §34.14.2): D-PHY init — EN, CKE, 2 lanes, PSS wait
         // Step 4a: Enable DSI host FIRST (HAL does this before PHY config)
         disp.dsi.cr.write(|w| w.en().set_bit());
 
@@ -429,23 +445,24 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         d3(10, 0xD510_0005); // post PHY init
         dbg("  PHY init done (CLCR=0x03 ACR+DPCC)\r\n");
 
-        // Step 5: Lane timings (while DSI disabled)
+        // Step 5 (RM0399 §34.14.3): Lane timings (while DSI disabled)
         disp.dsi.cltcr.write(|w| unsafe { w.bits((50 << 16) | 50) });
         disp.dsi
             .dltcr
             .write(|w| unsafe { w.bits((15 << 24) | (50 << 16) | 50) });
 
-        // Step 6: Flow control
+        // Step 6 (RM0399 §34.14.4): Flow control — ETTXE + BTAE + ECCRXE
         disp.dsi.pcr.write(|w| unsafe { w.bits(0x15) }); // ETTXE + BTAE + ECCRXE
 
-        // Step 7: DSI Host LTDC interface — VCID=0, RGB888
+        // Step 7 (RM0399 §34.14.5): DSI Host LTDC interface — VCID=0, RGB888
         disp.dsi.lvcidr.write(|w| unsafe { w.vcid().bits(0) });
         // Color coding: RGB888, loosely packed
         disp.dsi.lcolcr.write(|w| unsafe { w.bits((1 << 8) | 5) }); // LPE + COLC=5
         // Polarity: match LTDC GCR defaults
         disp.dsi.lpcr.write(|w| unsafe { w.bits(0x00) });
 
-        // Step 8: Video mode timing (needed even for adapted cmd mode per HAL)
+        // Step 8 (RM0399 §34.14.6): Video mode timing — needed even for
+        // adapted cmd mode per ST HAL (sets DSI packet sizing)
         let lane_byte_clk: u32 = 62500; // kHz
         let pixel_clk: u32 = 32000; // kHz
         let total_pixels = (hsw as u32) + (hbp as u32) + (width as u32) + (hfp as u32);
@@ -478,7 +495,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         });
         disp.dsi.lpmcr.write(|w| unsafe { w.bits((64 << 16) | 64) });
 
-        // Step 9: Adapted command mode config (HAL_DSI_ConfigAdaptedCommandMode)
+        // Step 9 (RM0399 §34.14.7): Adapted command mode config
+        // Provenance: RM0399 Rev 3 pp. 981–988, ST HAL
+        //   HAL_DSI_ConfigAdaptedCommandMode() equivalent.
         // MCR.CMDM=1 (default)
         disp.dsi.lccr.write(|w| unsafe { w.bits(width as u32) });
 
@@ -506,31 +525,25 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Enable TE + End-of-Refresh interrupts
         disp.dsi.wier.write(|w| unsafe { w.bits(0x03) }); // TEIE + ERIE
 
-        // Step 10: HAL_DSI_Start — re-enable DSI host + wrapper
+        // Step 10 (RM0399 §34.14.1 step 12): HAL_DSI_Start —
+        // re-enable DSI host + wrapper after adapted cmd mode config.
         disp.dsi.cr.write(|w| w.en().set_bit());
         disp.dsi.wcr.write(|w| w.dsien().set_bit());
         cortex_m::asm::delay(2_000_000);
         d3(10, 0xD510_0008); // post DSI host+wrapper enable
         dbg("  DSI host+wrapper enabled (HAL sequence)\r\n");
 
-        // Step 13: Reset panel and send NT35510 init commands
-        // Enable LP command transmission in CMCR for DCS writes
-        // Use PAC bit positions: DSW0TX=16, DSW1TX=17, DLWTX=19, MRDPS=24
+        // Step 13 (RM0399 §34.14.1 step 13): Reset panel and send
+        // NT35510 init commands via DCS over LP mode.
+        // Enable LP command transmission in CMCR for DCS writes.
         disp.dsi.cmcr.write(|w| {
-            w.dlwtx()
-                .set_bit() // DCS long write in LP
-                .dsw1tx()
-                .set_bit() // DCS short write 1p in LP
-                .dsw0tx()
-                .set_bit() // DCS short write 0p in LP
-                .glwtx()
-                .set_bit() // Generic long write in LP
-                .gsw2tx()
-                .set_bit() // Generic short write 2p in LP
-                .gsw1tx()
-                .set_bit() // Generic short write 1p in LP
-                .gsw0tx()
-                .set_bit() // Generic short write 0p in LP
+            w.dlwtx().set_bit()      // DCS long write in LP
+                .dsw1tx().set_bit()  // DCS short write 1p in LP
+                .dsw0tx().set_bit()  // DCS short write 0p in LP
+                .glwtx().set_bit()   // Generic long write in LP
+                .gsw2tx().set_bit()  // Generic short write 2p in LP
+                .gsw1tx().set_bit()  // Generic short write 1p in LP
+                .gsw0tx().set_bit()  // Generic short write 0p in LP
         });
         disp.reset_panel();
         cortex_m::asm::delay(4_000_000);
@@ -542,8 +555,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         dbg(" GPSR=");
         dbg_hex(gpsr);
         dbg("\r\n");
-        // Clear LP command overrides — adapted cmd mode takes over
-        // Keep TEARE=1 (bit 0) for TE handshake in adapted command mode
+        // Clear LP command overrides — adapted cmd mode takes over.
+        // Keep TEARE=1 (bit 0) for TE handshake in adapted command mode.
         disp.dsi.cmcr.write(|w| unsafe { w.bits(1) }); // TEARE=1 only
 
         // ── SDRAM framebuffer allocation ────────────────────────────────────

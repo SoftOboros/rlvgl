@@ -123,8 +123,17 @@ impl ZephyrFrameSync {
 impl FrameSync for ZephyrFrameSync {
     #[inline]
     fn take_erif(&self) -> bool {
-        // In video mode, no ERIF — always grant.
-        true
+        #[cfg(feature = "adapted_cmd")]
+        {
+            // Adapted command mode: consume ERIF semaphore (non-blocking).
+            // The DSI ISR gives erif_sem when ERIF fires.
+            unsafe { k_sem_take(self.erif_sem, K_NO_WAIT) == 0 }
+        }
+        #[cfg(not(feature = "adapted_cmd"))]
+        {
+            // Video mode: no ERIF — always grant.
+            true
+        }
     }
 
     #[inline]
@@ -133,11 +142,21 @@ impl FrameSync for ZephyrFrameSync {
     }
 
     fn dma2d_admits(&self, _cost: u32) -> bool {
-        // In video mode, LTDC scans continuously with AXI QoS priority.
-        // DMA2D can run anytime — no ERIF gating needed.
-        // When adapted command mode is enabled, this will use the same
-        // cycle-budget arithmetic as the bare-metal implementation.
-        true
+        #[cfg(feature = "adapted_cmd")]
+        {
+            // Same cycle-budget arithmetic as bare-metal: check if `cost`
+            // cycles of DMA2D work can complete before the 1ms guard window
+            // (400,000 cycles at 400 MHz) before the expected next ERIF.
+            let elapsed = self.cycles_since_erif();
+            let budget = self.frame_budget_cycles();
+            let guard = 400_000u32; // 1 ms at 400 MHz
+            budget.saturating_sub(elapsed) > _cost + guard
+        }
+        #[cfg(not(feature = "adapted_cmd"))]
+        {
+            // Video mode: LTDC scans continuously — DMA2D can run anytime.
+            true
+        }
     }
 
     #[inline]
@@ -147,10 +166,15 @@ impl FrameSync for ZephyrFrameSync {
 
     #[inline]
     fn erif_is_set(&self) -> bool {
-        // In video mode, LTDC scans continuously — no ERIF gating.
-        // Always return true so the star crawl doesn't block waiting
-        // for an ERIF that never fires.
-        true
+        #[cfg(feature = "adapted_cmd")]
+        {
+            rlvgl_platform::dsi_cmd_mode::check_erif()
+        }
+        #[cfg(not(feature = "adapted_cmd"))]
+        {
+            // Video mode: always true so star crawl doesn't block.
+            true
+        }
     }
 }
 

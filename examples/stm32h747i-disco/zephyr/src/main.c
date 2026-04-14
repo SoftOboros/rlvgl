@@ -196,12 +196,17 @@ int main(void)
 {
 	printk("rlvgl-zephyr: starting\n");
 
-	/* Register DMA2D ISR (IRQ 90, pri 3).
-	 * DSI ISR is NOT registered in video mode — the ERIF handler
-	 * clears LTDCEN which kills continuous scanning. Enable it
-	 * only after switching to adapted command mode. */
+	/* Register DMA2D ISR (IRQ 90, pri 3). */
 	irq_connect_dynamic(90, 3, dma2d_isr_wrapper, NULL, 0);
 	irq_enable(90);
+
+	/* Register DSI ISR (IRQ 123, pri 2).
+	 * In video mode this is a no-op (ERIF never fires).
+	 * In adapted command mode (Rust feature "adapted_cmd"), the ERIF
+	 * handler clears LTDCEN after each scan, giving DMA2D exclusive
+	 * SDRAM access for the render window. */
+	irq_connect_dynamic(123, 2, dsi_isr_wrapper, NULL, 0);
+	irq_enable(123);
 
 	/* ── Display bringup via Zephyr display API ──────────────── */
 	g_disp = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));

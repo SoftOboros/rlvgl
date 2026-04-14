@@ -32,6 +32,19 @@ impl Dma2dBlitter {
         Self { regs }
     }
 
+    /// Create a DMA2D blitter by stealing the peripheral singleton.
+    ///
+    /// Uses `Peripherals::steal()` to get the DMA2D register block.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure no other code holds the DMA2D peripheral.
+    /// The DMA2D clock must already be enabled (RCC AHB3ENR bit 4).
+    pub unsafe fn steal() -> Self {
+        let p = stm32h7::stm32h747cm7::Peripherals::steal();
+        Self::new(p.DMA2D)
+    }
+
     /// Consume the blitter and return the raw DMA2D peripheral.
     pub fn into_inner(self) -> DMA2D {
         self.regs
