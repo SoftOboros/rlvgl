@@ -52,6 +52,7 @@ See crate overviews for:
 - [wifi-telemetry.md](./wifi-telemetry.md) — Future WiFi telemetry design and D3 SRAM layout.
 
 ## Build & Test
+- [EMBEDDED-TOOLING.md](./EMBEDDED-TOOLING.md) — Install guide for ARM/STM32, ESP32 (RISC-V + Xtensa), and AVR toolchains, with Intel-macOS workarounds.
 - [MAKE.md](./MAKE.md) — Makefile convenience targets.
 - [CROSS-TESTING.md](./CROSS-TESTING.md) — Cross-target test linker requirements.
 - [CUSTOM-SIMULATOR.md](./CUSTOM-SIMULATOR.md) — Building a custom simulator backend.
