@@ -636,3 +636,103 @@ const _: () = {
     let _ = DSI_WIER;
     let _ = DSI_WIFCR;
 };
+
+// ── Runtime register dump ────────────────────────────────────────────────────
+
+/// Dump the live DSI host, DSI wrapper, LTDC, and PLL3 register values
+/// over USART1 in a single block. Intended for diagnostics — mismatches
+/// between expected and actual register values are usually the cause of
+/// "ACM init reports OK but display is wrong" symptoms.
+///
+/// Each register is one line of the form `NAME=0xVVVVVVVV\r\n`.
+///
+/// # Safety
+///
+/// Reads are non-mutating but require DSI/LTDC peripheral clocks to be
+/// enabled. Call after `enable_display_peripheral_clocks()` and (ideally)
+/// after `init_full_adapted_cmd()` so the values reflect post-init state.
+pub unsafe fn dump_registers() {
+    unsafe fn line(name: &[u8], v: u32) {
+        u1_str(name);
+        u1_putc(b'=');
+        u1_str(b"0x");
+        u1_hex(v);
+        u1_str(b"\r\n");
+    }
+    unsafe {
+        u1_str(b"\r\n--- DSI/LTDC register dump ---\r\n");
+        // RCC PLL3
+        const RCC_PLLCKSELR: *const u32 = (RCC + 0x028) as *const u32;
+        const RCC_PLLCFGR:   *const u32 = (RCC + 0x02C) as *const u32;
+        // Verified against stm32h7-0.15.1 PAC: PLL3DIVR=0x40, PLL3FRACR=0x44
+        // (NOT 0x44/0x48 — _reserved8 padding shifts these earlier than RM0399's
+        // listing initially suggests).
+        const RCC_PLL3DIVR:  *const u32 = (RCC + 0x040) as *const u32;
+        const RCC_PLL3FRACR: *const u32 = (RCC + 0x044) as *const u32;
+        line(b"RCC.CR        ", (RCC_CR as *const u32).read_volatile());
+        line(b"RCC.PLLCKSELR ", RCC_PLLCKSELR.read_volatile());
+        line(b"RCC.PLLCFGR   ", RCC_PLLCFGR.read_volatile());
+        line(b"RCC.PLL3DIVR  ", RCC_PLL3DIVR.read_volatile());
+        line(b"RCC.PLL3FRACR ", RCC_PLL3FRACR.read_volatile());
+        const RCC_AHB3ENR_R: *const u32 = (RCC + 0x0D4) as *const u32;
+        const RCC_APB3ENR_R: *const u32 = (RCC + 0x0E4) as *const u32;
+        const RCC_AHB4ENR_R: *const u32 = (RCC + 0x0E0) as *const u32;
+        const RCC_D1CCIPR:   *const u32 = (RCC + 0x04C) as *const u32;
+        line(b"RCC.AHB3ENR   ", RCC_AHB3ENR_R.read_volatile());
+        line(b"RCC.AHB4ENR   ", RCC_AHB4ENR_R.read_volatile());
+        line(b"RCC.APB3ENR   ", RCC_APB3ENR_R.read_volatile());
+        line(b"RCC.D1CCIPR   ", RCC_D1CCIPR.read_volatile());
+        const RCC_AHB3RSTR_R: *const u32 = (RCC + 0x07C) as *const u32;
+        const RCC_APB3RSTR_R: *const u32 = (RCC + 0x08C) as *const u32;
+        line(b"RCC.AHB3RSTR  ", RCC_AHB3RSTR_R.read_volatile());
+        line(b"RCC.APB3RSTR  ", RCC_APB3RSTR_R.read_volatile());
+        // DSI host
+        line(b"DSI.VR        ", DSI_VR.read_volatile());
+        line(b"DSI.CR        ", (DSI_CR as *const u32).read_volatile());
+        line(b"DSI.CCR       ", (DSI_CCR as *const u32).read_volatile());
+        line(b"DSI.LVCIDR    ", (DSI_LVCIDR as *const u32).read_volatile());
+        line(b"DSI.LCOLCR    ", (DSI_LCOLCR as *const u32).read_volatile());
+        line(b"DSI.LPCR      ", (DSI_LPCR as *const u32).read_volatile());
+        line(b"DSI.LPMCR     ", (DSI_LPMCR as *const u32).read_volatile());
+        line(b"DSI.PCR       ", (DSI_PCR as *const u32).read_volatile());
+        line(b"DSI.MCR       ", (DSI_MCR as *const u32).read_volatile());
+        line(b"DSI.VMCR      ", (DSI_VMCR as *const u32).read_volatile());
+        line(b"DSI.VPCR      ", (DSI_VPCR as *const u32).read_volatile());
+        line(b"DSI.VHSACR    ", (DSI_VHSACR as *const u32).read_volatile());
+        line(b"DSI.VHBPCR    ", (DSI_VHBPCR as *const u32).read_volatile());
+        line(b"DSI.VLCR      ", (DSI_VLCR as *const u32).read_volatile());
+        line(b"DSI.VVSACR    ", (DSI_VVSACR as *const u32).read_volatile());
+        line(b"DSI.VVBPCR    ", (DSI_VVBPCR as *const u32).read_volatile());
+        line(b"DSI.VVFPCR    ", (DSI_VVFPCR as *const u32).read_volatile());
+        line(b"DSI.VVACR     ", (DSI_VVACR as *const u32).read_volatile());
+        line(b"DSI.LCCR      ", (DSI_LCCR as *const u32).read_volatile());
+        line(b"DSI.CMCR      ", (DSI_CMCR as *const u32).read_volatile());
+        line(b"DSI.GPSR      ", DSI_GPSR.read_volatile());
+        line(b"DSI.PSR       ", DSI_PSR.read_volatile());
+        line(b"DSI.PCONFR    ", (DSI_PCONFR as *const u32).read_volatile());
+        // DSI wrapper
+        const DSI_WCFGR: *const u32 = DSI_W as *const u32;
+        line(b"DSI.WCFGR     ", DSI_WCFGR.read_volatile());
+        line(b"DSI.WCR       ", (DSI_WCR as *const u32).read_volatile());
+        line(b"DSI.WIER      ", (DSI_WIER as *const u32).read_volatile());
+        line(b"DSI.WISR      ", DSI_WISR.read_volatile());
+        line(b"DSI.WPCR0     ", (DSI_WPCR0 as *const u32).read_volatile());
+        line(b"DSI.WRPCR     ", (DSI_WRPCR as *const u32).read_volatile());
+        // LTDC
+        line(b"LTDC.SSCR     ", (LTDC_SSCR as *const u32).read_volatile());
+        line(b"LTDC.BPCR     ", (LTDC_BPCR as *const u32).read_volatile());
+        line(b"LTDC.AWCR     ", (LTDC_AWCR as *const u32).read_volatile());
+        line(b"LTDC.TWCR     ", (LTDC_TWCR as *const u32).read_volatile());
+        line(b"LTDC.GCR      ", (LTDC_GCR as *const u32).read_volatile());
+        line(b"LTDC.BCCR     ", (LTDC_BCCR as *const u32).read_volatile());
+        // LTDC layer 1
+        line(b"LTDC.L1CR     ", (LTDC_L1CR as *const u32).read_volatile());
+        line(b"LTDC.L1WHPCR  ", (LTDC_L1WHPCR as *const u32).read_volatile());
+        line(b"LTDC.L1WVPCR  ", (LTDC_L1WVPCR as *const u32).read_volatile());
+        line(b"LTDC.L1PFCR   ", (LTDC_L1PFCR as *const u32).read_volatile());
+        line(b"LTDC.L1CFBAR  ", (LTDC_L1CFBAR as *const u32).read_volatile());
+        line(b"LTDC.L1CFBLR  ", (LTDC_L1CFBLR as *const u32).read_volatile());
+        line(b"LTDC.L1CFBLNR ", (LTDC_L1CFBLNR as *const u32).read_volatile());
+        u1_str(b"--- end dump ---\r\n");
+    }
+}

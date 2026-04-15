@@ -153,16 +153,22 @@ pub unsafe fn configure_adapted_cmd_mode(width: u16) {
     // LCCR: command size = display width (pixels per WMS packet)
     DSI_LCCR.write_volatile(width as u32);
 
-    // WCFGR: adapted command mode + RGB888 + external TE + MANUAL refresh
+    // WCFGR: adapted command mode + RGB888 + external TE + AUTO refresh
     //   bit 0: DSIM = 1 (adapted command mode)
     //   bits 3:1: COLMUX = 5 (RGB888, 24 bpp)
     //   bit 4: TESRC = 1 (external TE pin)
-    //   bit 6: AR = 0 (manual refresh — LTDCEN pulse triggers immediately,
-    //                   no TE wait. Avoids hang if panel TE isn't driving.)
+    //   bit 6: AR = 1 (automatic refresh on TE pulse from panel)
+    //
+    // Matches bare-metal `Stm32h747iDiscoDisplay::new` so the Zephyr ACM
+    // path runs through identical hardware sequencing. Manual-pulse
+    // refresh (AR=0) was used during early bring-up while TE wiring was
+    // unverified; with the panel's `set_tear_on` (DCS 0x35) issued as
+    // part of `Nt35510::init`, AR=1 is the proven mode.
     DSI_WCFGR.write_volatile(
         (1 << 0)       // DSIM = adapted command mode
         | (5 << 1)     // COLMUX = RGB888
-        | (1 << 4),    // TESRC (kept, but AR=0 makes it advisory)
+        | (1 << 4)     // TESRC = external TE pin
+        | (1 << 6),    // AR = automatic refresh on TE
     );
 
     // CMCR: enable TE-acknowledge handshake for adapted command mode.

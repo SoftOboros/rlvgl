@@ -495,11 +495,17 @@ pub unsafe extern "C" fn rlvgl_init(
         #[cfg(feature = "adapted_cmd")]
         {
             use rlvgl_platform::display_init;
+            // Re-enable peripheral clocks in case Zephyr power management
+            // disabled them while the OS was settling.
+            display_init::enable_display_peripheral_clocks();
             display_init::configure_ltdc_timing(480, 800, 2, 34, 34, 120, 150, 150);
             display_init::setup_ltdc_layer(
                 fb_front as u32, 480, 800, 2, 34, 120, 150,
             );
             display_init::enable_ltdc();
+            // Diagnostic dump — confirms LTDC/DSI/PLL3 register state matches
+            // expectations for the adapted_cmd path.
+            display_init::dump_registers();
         }
 
         // Present splash immediately so it's visible during widget init.
@@ -798,8 +804,39 @@ pub unsafe extern "C" fn rlvgl_init(
                     fb_front
                 };
 
-                // Frame pacing — yield to Zephyr scheduler
-                rlvgl_k_sleep_ms(33); // ~30 fps
+                // Frame pacing — wait for the DSI ERIF (end-of-refresh)
+                // semaphore the ISR gives, then run the next render
+                // iteration. This synchronises the render loop with the
+                // panel's TE and avoids the 30 fps / 60 Hz beat that
+                // showed up as icon flicker when we slept a fixed 33 ms.
+                //
+                // Falls back to a fixed sleep if the sem doesn't fire
+                // within ~25 ms (e.g. ERIF stalled): keeps the loop
+                // making progress even if the panel TE goes silent.
+                #[cfg(feature = "adapted_cmd")]
+                {
+                    let mut waited_ms = 0u32;
+                    loop {
+                        if let Some(sync) = get_sync() {
+                            if zephyr_sync::k_sem_take(
+                                sync.erif_sem,
+                                zephyr_sync::K_NO_WAIT,
+                            ) == 0
+                            {
+                                break;
+                            }
+                        }
+                        if waited_ms >= 25 {
+                            break;
+                        }
+                        rlvgl_k_sleep_ms(1);
+                        waited_ms += 1;
+                    }
+                }
+                #[cfg(not(feature = "adapted_cmd"))]
+                {
+                    rlvgl_k_sleep_ms(33); // ~30 fps fallback for video mode
+                }
             }
         }
     }
