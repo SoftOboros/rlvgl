@@ -42,6 +42,7 @@ Package: `rlvgl`
 - [rlvgl-creator](./src/bin/creator/README.md) – Asset and BSP workflows for command-line and UI tooling
 - [examples](./examples/README.md) – Sample applications and board demos
 - [docs](./docs/README.md) – Project documentation and task lists
+- [docs/disco-tutorial](./docs/disco-tutorial/README.md) – Progressive, chapter-by-chapter guide to building the STM32H747I-DISCO demo from scratch
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
 
 ## Building Binary Targets
