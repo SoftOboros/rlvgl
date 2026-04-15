@@ -43,6 +43,7 @@ Package: `rlvgl`
 - [examples](./examples/README.md) – Sample applications and board demos
 - [docs](./docs/README.md) – Project documentation and task lists
 - [docs/disco-tutorial](./docs/disco-tutorial/README.md) – Progressive, chapter-by-chapter guide to building the STM32H747I-DISCO demo from scratch
+- [docs/disco-platform-guide](./docs/disco-platform-guide/README.md) – Volume II: bare-metal STM32H747I-DISCO platform bring-up, SVD/PAC limits, AXI holdoff, and the star crawl in full detail
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
 
 ## Building Binary Targets
