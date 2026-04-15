@@ -523,6 +523,18 @@ pub unsafe extern "C" fn rlvgl_init(
             use rlvgl_platform::screen::Screen;
             use rlvgl_core::WidgetNode;
 
+            // Controller lays out widgets in *landscape* logical coords —
+            // 800w × 480h. The RotatedRenderer below rotates 90° CCW into
+            // the physical portrait FB (480w × 800h) so that on the user's
+            // view (panel mounted with long edge horizontal), an icon at
+            // logical x=730 ends up at user's right edge.
+            //
+            // For the non-ACM (Zephyr video mode) build, the FB is already
+            // landscape and no rotation is needed; the controller still
+            // uses the same logical coords.
+            #[cfg(feature = "adapted_cmd")]
+            let screen = Screen::landscape(800, 480);
+            #[cfg(not(feature = "adapted_cmd"))]
             let screen = Screen::landscape(fb_w, fb_h);
             let mut controller = DiscoController::new(
                 screen,
@@ -755,9 +767,24 @@ pub unsafe extern "C" fn rlvgl_init(
                     fb_h,
                 );
                 let mut blitter = CpuBlitter;
-                let mut renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
                     BlitterRenderer::new(&mut blitter, surface);
-                root.borrow().draw(&mut renderer);
+                // Bare-metal wraps the BlitterRenderer in RotatedRenderer so
+                // the controller (which lays out widgets in landscape coord
+                // space) renders correctly into the portrait FB. The Zephyr
+                // ACM path was drawing directly into the portrait FB, which
+                // produced "top-left across" icon placement instead of
+                // "top-right down". Match bare-metal here.
+                #[cfg(feature = "adapted_cmd")]
+                {
+                    use rlvgl_platform::blit::RotatedRenderer;
+                    let mut renderer = RotatedRenderer::new(&mut blit_renderer, fb_w);
+                    root.borrow().draw(&mut renderer);
+                }
+                #[cfg(not(feature = "adapted_cmd"))]
+                {
+                    root.borrow().draw(&mut blit_renderer);
+                }
 
                 dcache_clean_all();
                 do_present(render_buf, di.width, di.height);
