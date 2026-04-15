@@ -611,6 +611,13 @@ pub unsafe extern "C" fn rlvgl_init(
             // Track which buffer to render into.
             let mut render_buf = fb_front; // original front is now the back
 
+            // Edge-detect touch state so each finger-down generates exactly
+            // one PressRelease + DoubleTap pair, not one per Zephyr input
+            // sample. Without this the file-menu icon was being toggled
+            // open/closed at the input sample rate (~2-4 Hz) which read
+            // as flicker.
+            let mut prev_touch_pressed: bool = false;
+
             loop {
                 // Process joystick key events
                 {
@@ -671,7 +678,13 @@ pub unsafe extern "C" fn rlvgl_init(
                     u1_putc(if pressed { b'D' } else { b'U' });
                     for &c in b"\r\n" { u1_putc(c); }
 
-                    if pressed {
+                    // Only dispatch on the rising edge (finger newly down).
+                    // Held / repeat samples are ignored so the file-menu
+                    // hotspot doesn't toggle every input frame.
+                    let press_edge = pressed && !prev_touch_pressed;
+                    prev_touch_pressed = pressed;
+
+                    if press_edge {
                         use rlvgl_core::event::Event;
                         // Send both PressRelease (select) and DoubleTap
                         // (navigate) — crude until gesture recognizer is
@@ -793,6 +806,17 @@ pub unsafe extern "C" fn rlvgl_init(
                 }
 
                 dcache_clean_all();
+
+                // Frame pacing — fixed sleep matches the bare-metal
+                // SysTick approach, which doesn't flicker. Presenting at
+                // a stable cadence is more important than syncing to
+                // every TE: shadow reload of L1CFBAR happens between
+                // scans because the scan time (~22 ms total) is shorter
+                // than this 33 ms loop period.
+                //
+                // ERIF-based pacing was attempted but interacted poorly
+                // with our render time (~20 ms) and the panel's 60 Hz TE
+                // — see commit history for details.
                 do_present(render_buf, di.width, di.height);
 
                 // After present, the buffer we just rendered becomes
@@ -804,39 +828,7 @@ pub unsafe extern "C" fn rlvgl_init(
                     fb_front
                 };
 
-                // Frame pacing — wait for the DSI ERIF (end-of-refresh)
-                // semaphore the ISR gives, then run the next render
-                // iteration. This synchronises the render loop with the
-                // panel's TE and avoids the 30 fps / 60 Hz beat that
-                // showed up as icon flicker when we slept a fixed 33 ms.
-                //
-                // Falls back to a fixed sleep if the sem doesn't fire
-                // within ~25 ms (e.g. ERIF stalled): keeps the loop
-                // making progress even if the panel TE goes silent.
-                #[cfg(feature = "adapted_cmd")]
-                {
-                    let mut waited_ms = 0u32;
-                    loop {
-                        if let Some(sync) = get_sync() {
-                            if zephyr_sync::k_sem_take(
-                                sync.erif_sem,
-                                zephyr_sync::K_NO_WAIT,
-                            ) == 0
-                            {
-                                break;
-                            }
-                        }
-                        if waited_ms >= 25 {
-                            break;
-                        }
-                        rlvgl_k_sleep_ms(1);
-                        waited_ms += 1;
-                    }
-                }
-                #[cfg(not(feature = "adapted_cmd"))]
-                {
-                    rlvgl_k_sleep_ms(33); // ~30 fps fallback for video mode
-                }
+                rlvgl_k_sleep_ms(33); // ~30 fps
             }
         }
     }
