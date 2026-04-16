@@ -441,6 +441,22 @@ const HB_PLAYIT_POLLS:  *mut u32 = 0x3800_0734 as *mut u32;
 pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
+/// Set by `render_task` while star_crawl is producing frames. Read
+/// by `present_task` — when active, present holds each swapped
+/// frame for exactly two present cycles (≈ 66 ms at the 30 Hz panel
+/// rate) instead of one.
+///
+/// Rationale: a crawl frame takes ~55 ms while present cycles at
+/// 33 ms. At a non-integer 1.67:1 ratio, `buf_ready` polls on
+/// different present cycles produce an irregular swap pattern
+/// `[yes, no, yes, no, yes, yes, no, ...]` — each swap has a
+/// hold-time jitter of one present cycle, visible as crawl flicker.
+/// Pacing the swap rate down to every-other cycle gives a clean 15
+/// fps with constant 66 ms hold per frame, phase-locked to the
+/// panel.
+pub static CRAWL_ACTIVE: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
 #[inline(always)]
 unsafe fn hb_inc(addr: *mut u32) {
     unsafe {
@@ -452,6 +468,12 @@ unsafe fn hb_inc(addr: *mut u32) {
 unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
     use core::sync::atomic::Ordering;
     use rlvgl_platform::frame_sync::FrameSync;
+
+    // Counts cycles since the last successful swap. Used together
+    // with CRAWL_ACTIVE to enforce a minimum 2-cycle hold per
+    // swapped frame when star_crawl is driving render — see the
+    // CRAWL_ACTIVE doc for the rationale.
+    let mut cycles_since_swap: u8 = 0;
 
     // Kick the first scan so ERIF can fire. Without this the display
     // would stay idle because ERIF is a scan-complete signal — we need
@@ -503,17 +525,23 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         }
 
         // If the render task has signalled a fresh back buffer, swap
-        // FRONT and BACK atomically — the new front is what LTDC will
-        // scan on the next re-trigger; the old front becomes the new
-        // back for the next render pass.
+        // FRONT and BACK atomically — unless CRAWL_ACTIVE requires a
+        // 2-cycle hold to smooth the 55 ms crawl / 33 ms present
+        // rate mismatch.
+        let crawl_active = CRAWL_ACTIVE.load(Ordering::Acquire);
+        let hold_more = crawl_active && cycles_since_swap < 1;
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-        if !buf_ready.is_null()
+        if !hold_more
+            && !buf_ready.is_null()
             && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) } == freertos_sync::pdTRUE
         {
             let front = FRONT_FB_ADDR.load(Ordering::Acquire);
             let back = BACK_FB_ADDR.load(Ordering::Acquire);
             FRONT_FB_ADDR.store(back, Ordering::Release);
             BACK_FB_ADDR.store(front, Ordering::Release);
+            cycles_since_swap = 0;
+        } else {
+            cycles_since_swap = cycles_since_swap.saturating_add(1);
         }
 
         let fb = FRONT_FB_ADDR.load(Ordering::Acquire);
@@ -709,6 +737,9 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 cr.set_layer_buf(0xD180_0000usize as *mut u8);
             }
         }
+        // Publish current crawl state for present_task's pacing
+        // decision. See CRAWL_ACTIVE doc for why this matters.
+        CRAWL_ACTIVE.store(cr.is_active(), Ordering::Release);
 
         // ── Crawl mode: non-blocking tick loop ────────────────────
         if cr.is_active() {
