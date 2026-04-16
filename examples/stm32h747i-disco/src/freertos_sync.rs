@@ -12,7 +12,7 @@
 //! Kernel objects live in static storage on the Rust side; FreeRTOS
 //! is configured with `configSUPPORT_STATIC_ALLOCATION = 1`.
 
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use rlvgl_platform::frame_sync::{Dma2dSync, FrameSync, ScopeProbe};
 
 // ── FreeRTOS FFI ──────────────────────────────────────────────────────────────
@@ -80,7 +80,9 @@ const PJ6_RESET: u32 = 1 << 22;
 /// `StaticSemaphore` buffers owned by `freertos_entry`. Atomics are
 /// updated from the DSI/DMA2D ISRs.
 pub struct FreeRtosFrameSync {
-    /// Binary semaphore given by DSI ERIF ISR.
+    /// Binary semaphore given by DSI ERIF ISR (single-consumer — the
+    /// present task blocks on this). Do NOT use for non-destructive
+    /// queries; see `scan_complete` below.
     pub erif_sem: SemaphoreHandle_t,
     /// Binary semaphore given by DMA2D TC ISR.
     pub dma2d_done_sem: SemaphoreHandle_t,
@@ -90,6 +92,20 @@ pub struct FreeRtosFrameSync {
     pub frame_budget: AtomicU32,
     /// DWT_CYCCNT snapshot when last DMA2D transfer started.
     pub dma2d_start_cyc: AtomicU32,
+    /// Non-destructive "previous scan completed" flag.
+    ///
+    /// - Set to `true` by the DSI ERIF ISR when a scan completes.
+    /// - Cleared to `false` by `present_task` immediately before each
+    ///   `ltdc_retrigger` — signalling "a new scan is in flight".
+    ///
+    /// This mirrors the bare-metal `ERIF_FLAG` semantics: `FrameSync::
+    /// erif_is_set` can peek the flag without perturbing the
+    /// semaphore that `present_task` consumes. Without this, a higher-
+    /// priority present task would always drain `erif_sem` before any
+    /// lower-priority renderer (e.g. `star_crawl`) could peek it,
+    /// stalling rendering gates that depend on the previous scan
+    /// having completed.
+    pub scan_complete: AtomicBool,
 }
 
 // Safety: semaphore handles are 'static; ISRs only call give-from-ISR
@@ -110,6 +126,7 @@ impl FreeRtosFrameSync {
             erif_cyccnt: AtomicU32::new(0),
             frame_budget: AtomicU32::new(13_200_000), // 33 ms at 400 MHz
             dma2d_start_cyc: AtomicU32::new(0),
+            scan_complete: AtomicBool::new(false),
         }
     }
 
@@ -161,17 +178,12 @@ impl FrameSync for FreeRtosFrameSync {
 
     #[inline]
     fn erif_is_set(&self) -> bool {
-        // Non-destructive peek: take + give-back if successful.
-        // Matches ZephyrFrameSync's approach — acceptable because
-        // erif_is_set is only used for the initial starfield gate.
-        unsafe {
-            if rlvgl_sem_take(self.erif_sem, 0) == pdTRUE {
-                rlvgl_sem_give(self.erif_sem);
-                true
-            } else {
-                false
-            }
-        }
+        // Non-destructive read of the ISR-set flag. Distinct from
+        // `erif_sem`, which is single-consumer (the present task).
+        // Using a peek-and-give on the sem would race with
+        // present_task's blocking take and starve a lower-priority
+        // render_task here.
+        self.scan_complete.load(Ordering::Acquire)
     }
 }
 

@@ -142,6 +142,10 @@ pub fn dsi_isr_body() {
 
             if let Some(sync) = get_sync() {
                 sync.isr_record_erif(cyc);
+                // Sticky flag for non-destructive queries (star_crawl
+                // gate, etc.). Cleared by present_task just before
+                // each LTDC retrigger.
+                sync.scan_complete.store(true, Ordering::Release);
                 freertos_sync::rlvgl_sem_give_from_isr(sync.erif_sem);
             }
         }
@@ -372,6 +376,10 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
 
         let fb = FRONT_FB_ADDR.load(Ordering::Acquire);
         if fb != 0 {
+            // Mark the previous scan's completion consumed before
+            // starting a new one. Render tasks (star_crawl) poll this
+            // via `sync.erif_is_set` to gate on "prior scan done".
+            sync.scan_complete.store(false, Ordering::Release);
             unsafe { ltdc_retrigger(fb) };
         }
     }
@@ -391,8 +399,16 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
     // Frame pacing when idle (non-crawl compositor demo). Crawl mode
     // yields more aggressively between DMA2D waits (see tick loop).
     const IDLE_PERIOD_MS: u32 = 16; // ~62 Hz
-    const CRAWL_YIELD_MS: u32 = 1; //  short yield between Pending ticks
-    const CRAWL_TIMEOUT_TICKS: u32 = 50; // 50 ms per-frame ceiling
+    const CRAWL_YIELD_MS: u32 = 1; // short yield between Pending ticks
+    // Per-outer-iteration ceiling on Pending iterations. A full crawl
+    // frame needs roughly 500-800 ticks (one tick per state transition
+    // in the star_crawl state machine). Exiting the inner loop early
+    // forces the render task back through lazy-init checks and the
+    // toggle handshake, which costs ~20-30 µs per round-trip; at 1.6
+    // fps with a 50-tick cap, that adds up to substantial overhead.
+    // A generous ceiling keeps us in the inner loop for most of a
+    // frame while still bounding time if crawl stalls.
+    const CRAWL_TIMEOUT_TICKS: u32 = 5000;
 
     // Bold font and README crawl text — mirrors the bare-metal and
     // Zephyr setup so FreeRTOS renders the same content.
@@ -482,7 +498,15 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     StepResult::Idle => break,
                     StepResult::Pending => {
                         deadline_hits += 1;
-                        unsafe { vTaskDelay(CRAWL_YIELD_MS) };
+                        // No voluntary yield on Pending. Star crawl
+                        // returns Pending when DMA2D is still in
+                        // flight; at the lowest task priority (1),
+                        // any higher-priority wake (DSI ISR → present
+                        // sem-give → present preempts us; touch /
+                        // playit likewise) already preempts this
+                        // loop automatically. Voluntary yields only
+                        // add vTaskDelay latency without enabling
+                        // any work that isn't already preemptible.
                     }
                     StepResult::FrameReady => {
                         frame_ready = true;

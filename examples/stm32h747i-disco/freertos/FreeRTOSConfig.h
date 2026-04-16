@@ -16,7 +16,12 @@
 
 /* ── Cortex-M7 core + tick ─────────────────────────────────────────── */
 #define configCPU_CLOCK_HZ                      ( 400000000UL )
-#define configSYSTICK_CLOCK_HZ                  ( 400000000UL )
+/* configSYSTICK_CLOCK_HZ intentionally undefined: port.c only selects
+ * the processor clock (CLK_BIT=1 in SYST_CSR) when this symbol is NOT
+ * defined. Defining it — even to the same value as configCPU_CLOCK_HZ
+ * — flips the port into "use reference clock" mode (HCLK/8 = 50 MHz
+ * on STM32H7), which makes the effective tick rate 125 Hz instead of
+ * 1 kHz and slows every vTaskDelay by 8×. */
 #define configTICK_RATE_HZ                      ( 1000 )
 
 /* ── Scheduler ─────────────────────────────────────────────────────── */
