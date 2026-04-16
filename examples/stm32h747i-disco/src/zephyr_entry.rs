@@ -836,7 +836,7 @@ pub unsafe extern "C" fn rlvgl_init(
                         // fix without depending on InfoSlot::StarCrawl
                         // being reachable from the current UI state.
                         // Remove once the regular play path is wired.
-                        if ly < 60 && lx > (di.width as i32 - 60) {
+                        if ly < 150 && lx > (di.width as i32 - 150) {
                             // Inline the crawl bring-up — bypasses
                             // controller queue (no public `queue_command`).
                             controller.publish_status("Crawl hotspot tapped");
