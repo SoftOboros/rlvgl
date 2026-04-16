@@ -206,25 +206,40 @@ static BUF_READY_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
 // The real present / render / touch bodies will land in follow-up
 // commits once we prove the image boots into the scheduler.
 
-// ── Framebuffer address (written by main.rs at handoff) ──────────────────────
+// ── Framebuffer addresses (written by main.rs at handoff) ────────────────────
 //
 // After bare-metal init finishes, `main.rs` calls
-// `freertos_entry::init_fb_addr(display.front_buffer_addr())` before
-// `start()`. The present task reads this atomic to know which SDRAM
-// region to refresh the panel from.
+// `freertos_entry::init_fbs(front, back, bytes)` before `start()`.
 //
-// We don't double-buffer yet — the render task is stubbed, so there is
-// no fresh back buffer to swap to. Continuously re-presenting the
-// front buffer (which holds the splash after init) keeps the panel
-// alive and proves the DSI ISR → semaphore → task → present pipeline.
+// Double-buffer flow:
+//   - render_task writes into BACK_FB_ADDR.
+//   - render_task gives BUF_READY_SEM when done.
+//   - present_task takes BUF_READY_SEM non-blocking each frame. If a
+//     new frame is ready, it atomically swaps FRONT_FB_ADDR and
+//     BACK_FB_ADDR before re-triggering the LTDC scan.
+//
+// With no render in flight, present_task just re-scans the same
+// FRONT_FB_ADDR every frame, so the splash stays on the panel.
 
 static FRONT_FB_ADDR: core::sync::atomic::AtomicU32 =
     core::sync::atomic::AtomicU32::new(0);
+static BACK_FB_ADDR: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(0);
+static FB_BYTES: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(0);
 
-/// Record the framebuffer base address for the present task.
-/// Called once from `main()` just before `freertos_entry::start()`.
-pub fn init_fb_addr(addr: u32) {
-    FRONT_FB_ADDR.store(addr, core::sync::atomic::Ordering::Release);
+/// Record the framebuffer addresses and byte size for the present /
+/// render tasks. Called once from `main()` just before
+/// `freertos_entry::start()`.
+pub fn init_fbs(front: u32, back: u32, bytes: u32) {
+    FRONT_FB_ADDR.store(front, core::sync::atomic::Ordering::Release);
+    BACK_FB_ADDR.store(back, core::sync::atomic::Ordering::Release);
+    FB_BYTES.store(bytes, core::sync::atomic::Ordering::Release);
+}
+
+/// Backwards-compat shim for the earlier single-buffer entry.
+pub fn init_fb_addr(front: u32) {
+    FRONT_FB_ADDR.store(front, core::sync::atomic::Ordering::Release);
 }
 
 /// Trigger a fresh LTDC scan of the framebuffer at `fb_addr`.
@@ -315,9 +330,20 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         // each frame. Matches bare-metal PRESENT_HOLDOFF = 6M cycles.
         unsafe { vTaskDelay(15) };
 
-        // Re-present the current front buffer. Once the render task
-        // produces fresh content we will swap to a back buffer here;
-        // for now this keeps the panel alive with the splash.
+        // If the render task has signalled a fresh back buffer, swap
+        // FRONT and BACK atomically — the new front is what LTDC will
+        // scan on the next re-trigger; the old front becomes the new
+        // back for the next render pass.
+        let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+        if !buf_ready.is_null()
+            && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) } == freertos_sync::pdTRUE
+        {
+            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+            let back = BACK_FB_ADDR.load(Ordering::Acquire);
+            FRONT_FB_ADDR.store(back, Ordering::Release);
+            BACK_FB_ADDR.store(front, Ordering::Release);
+        }
+
         let fb = FRONT_FB_ADDR.load(Ordering::Acquire);
         if fb != 0 {
             unsafe { ltdc_retrigger(fb) };
@@ -326,13 +352,47 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
 }
 
 unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
+    use core::sync::atomic::Ordering;
+
+    // Simple visible proof-of-life: fill the back buffer with a solid
+    // color that cycles red → green → blue every render pass. When
+    // the present task swaps to this buffer, the whole panel changes
+    // color, proving the render → present pipeline is live.
+    //
+    // Rate-limited to ~2 Hz so the color change is eye-pace rather
+    // than strobe-pace, and so the back-buffer write stays well below
+    // any present-side swap cadence (no tearing risk).
+
+    const RENDER_PERIOD_MS: u32 = 500;
+    let colors: [u32; 3] = [0xFFFF_0000, 0xFF00_FF00, 0xFF00_00FF];
+    let mut frame: u32 = 0;
+
     loop {
         unsafe { hb_inc(HB_RENDER_TICKS) };
-        // TODO: take BUF_READY_SEM with timeout, draw widget tree +
-        // overlay + star crawl into back buffer, give a "done" sem to
-        // the present task. For now tick at 10 Hz so the heartbeat is
-        // visible without burning cycles.
-        unsafe { vTaskDelay(100) };
+
+        let back = BACK_FB_ADDR.load(Ordering::Acquire);
+        let bytes = FB_BYTES.load(Ordering::Acquire);
+        if back != 0 && bytes != 0 {
+            let color = colors[(frame as usize) % colors.len()];
+            let pixels = (bytes / 4) as usize;
+            let ptr = back as *mut u32;
+            // Simple word-stride fill. Not the fastest possible but
+            // fine for ~2 Hz demo cadence.
+            for i in 0..pixels {
+                unsafe { ptr.add(i).write_volatile(color) };
+            }
+            cortex_m::asm::dsb();
+
+            // Signal the present task that the back buffer is ready.
+            let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+            if !buf_ready.is_null() {
+                unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+            }
+
+            frame = frame.wrapping_add(1);
+        }
+
+        unsafe { vTaskDelay(RENDER_PERIOD_MS) };
     }
 }
 

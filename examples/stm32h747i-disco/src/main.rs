@@ -3072,9 +3072,17 @@ fn main() -> ! {
         // by preemptive present / render / touch tasks. Never returns.
         #[cfg(feature = "freertos")]
         unsafe {
-            // Expose the current front-buffer address to the present
-            // task so it can re-trigger LTDC scans each frame.
-            freertos_entry::init_fb_addr(display.front_buffer_addr());
+            // Expose the front + back fb addresses and buffer size to
+            // the FreeRTOS tasks. The present task re-triggers LTDC
+            // scans from the front; the render task fills the back
+            // and signals a swap via buf_ready_sem.
+            let (fw, fh) = display.dimensions();
+            let fb_bytes = fw * fh * 4; // ARGB8888
+            freertos_entry::init_fbs(
+                display.front_buffer_addr(),
+                display.back_buffer_addr(),
+                fb_bytes,
+            );
             freertos_entry::start();
         }
 
