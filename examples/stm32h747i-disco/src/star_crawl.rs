@@ -702,6 +702,16 @@ impl StarCrawl {
                 core::ptr::copy_nonoverlapping(src, dst, row_bytes);
             }
         }
+
+        // Flush D-cache for the entire starfield so DMA2D (which bypasses
+        // L1 D-cache) sees both the per-pixel CPU star writes above and
+        // the row-mirror copies. On bare-metal the larger cache-vs-buffer
+        // ratio usually guaranteed eventual eviction before DMA2D read;
+        // under Zephyr the timing is tighter and stars remained in cache,
+        // leaving the DMA2D row blits to copy "blue only" from SDRAM.
+        let starfield_addr = self.starfield as usize;
+        let starfield_size = (STAR_ROWS * STAR_STRIDE) as usize;
+        dcache_clean_range(starfield_addr, starfield_size);
     }
 }
 
