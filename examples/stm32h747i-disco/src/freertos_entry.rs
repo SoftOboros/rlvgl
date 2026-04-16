@@ -150,6 +150,17 @@ static PRESENT_GATE_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
     AtomicPtr::new(core::ptr::null_mut());
 static mut PRESENT_GATE_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 
+/// Render-start semaphore — given by the DSI ERIF ISR alongside
+/// `erif_sem`. `render_task` blocks on this so render begins on
+/// every ERIF edge, phase-locked to the panel scan. Without this
+/// gate, render runs on its own vTaskDelay cadence (~62 Hz) against
+/// a 30 Hz present rate; the non-integer ratio collapses `buf_ready`
+/// into a binary sem race where alternate renders are lost,
+/// producing beat-frequency jitter on the moving-block demo.
+static RENDER_START_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
+    AtomicPtr::new(core::ptr::null_mut());
+static mut RENDER_START_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
+
 /// One-time TIM7 setup. Enables clock, configures PSC/ARR for 1 MHz
 /// one-pulse operation, enables UIE. Call from `start()` after the
 /// sync object is wired.
@@ -247,6 +258,15 @@ pub fn dsi_isr_body() {
                 // each LTDC retrigger.
                 sync.scan_complete.store(true, Ordering::Release);
                 freertos_sync::rlvgl_sem_give_from_isr(sync.erif_sem);
+            }
+            // Also wake render_task. Two separate binary sems — one
+            // for each single-consumer task — is the clean way to
+            // fan out an ISR edge to multiple tasks without anyone
+            // peeking. Render picks up the next frame in lockstep
+            // with the panel, kill the 62-Hz-vs-30-Hz beat.
+            let rs = RENDER_START_SEM.load(Ordering::Acquire);
+            if !rs.is_null() {
+                freertos_sync::rlvgl_sem_give_from_isr(rs);
             }
         }
 
@@ -591,6 +611,55 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             crawl = Some(c);
         }
 
+        // One-shot double-buffer initial fill. Both front and back
+        // SDRAM regions get cleared to the compositor's background
+        // color via DMA2D (≈ 1 ms each at register-level R2M) so the
+        // splash that bare-metal init decoded into the original front
+        // is wiped BEFORE any render runs. Doing this via CpuBlitter
+        // inside the compositor's `seed_remaining` mechanism is unsafe
+        // under load: if a render iteration is lost (present TIM7
+        // fires before render's CpuBlitter finishes), the seed gets
+        // applied twice to the SAME buffer and the other one keeps
+        // the splash — which then flashes on alternate scans forever.
+        // Hardware fill before entering the loop is deterministic.
+        static mut DOUBLE_FILL_DONE: bool = false;
+        if unsafe { !DOUBLE_FILL_DONE } {
+            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+            let bg = 0xFF08_0820u32;
+            for &addr in &[front, back] {
+                if addr != 0 {
+                    dma2d.as_mut().unwrap().fill_raw(
+                        addr as *mut u8,
+                        w * 4,
+                        w,
+                        h,
+                        bg,
+                        rlvgl_platform::blit::PixelFmt::Argb8888,
+                    );
+                }
+            }
+            // Clean D-cache: bare-metal may have touched SDRAM via
+            // CPU (splash decode) and those lines could still be in
+            // cache. After DMA2D filled SDRAM directly, the cache
+            // still holds stale splash bytes — an LTDC scan would
+            // pick up cache-backed reads through any CPU path, and a
+            // later CPU write would flush those stale lines back over
+            // our DMA2D fill. Invalidate-clean ensures parity.
+            {
+                let mut cp = unsafe { cortex_m::Peripherals::steal() };
+                if front != 0 {
+                    cp.SCB
+                        .clean_invalidate_dcache_by_address(front as usize, (w * h * 4) as usize);
+                }
+                if back != 0 {
+                    cp.SCB
+                        .clean_invalidate_dcache_by_address(back as usize, (w * h * 4) as usize);
+                }
+            }
+            cortex_m::asm::dsb();
+            unsafe { DOUBLE_FILL_DONE = true };
+        }
+
         let dma = dma2d.as_mut().unwrap();
         let cr = crawl.as_mut().unwrap();
 
@@ -693,6 +762,19 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         let mut surf = Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
 
         let stats = c.render_frame(&mut cpu_blitter, &mut surf);
+
+        // Clean the D-cache for the region we just wrote. CpuBlitter
+        // issues normal CPU stores which land in the D-cache (write-
+        // back on this part), and LTDC reads SDRAM directly via AXI
+        // — so without a cache-clean it sees stale pixels and shows
+        // "lines alternating" tearing as the cache drains lazily.
+        // `dsb()` is a memory barrier only; it does NOT flush cache
+        // to SDRAM.
+        {
+            let mut cp = unsafe { cortex_m::Peripherals::steal() };
+            cp.SCB
+                .clean_dcache_by_address(back as usize, bytes as usize);
+        }
         cortex_m::asm::dsb();
 
         unsafe {
@@ -708,7 +790,17 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
         }
 
-        unsafe { vTaskDelay(IDLE_PERIOD_MS) };
+        // Block until the next ERIF. This is the critical ERIF-phase-
+        // lock: render produces exactly one frame per panel scan, so
+        // buf_ready and present are always in 1:1 lockstep with ERIF.
+        // Free-running render (vTaskDelay) beats against the 30 Hz
+        // panel cadence and manifests as moving-block jitter.
+        let rs = RENDER_START_SEM.load(Ordering::Acquire);
+        if !rs.is_null() {
+            unsafe { freertos_sync::rlvgl_sem_take(rs, 100) };
+        } else {
+            unsafe { vTaskDelay(IDLE_PERIOD_MS) };
+        }
     }
 }
 
@@ -903,6 +995,10 @@ pub unsafe fn start() -> ! {
             core::ptr::addr_of_mut!(PRESENT_GATE_SEM_BUF),
         );
         PRESENT_GATE_SEM.store(present_gate_sem, Ordering::Release);
+        let render_start_sem = freertos_sync::rlvgl_sem_create_binary_static(
+            core::ptr::addr_of_mut!(RENDER_START_SEM_BUF),
+        );
+        RENDER_START_SEM.store(render_start_sem, Ordering::Release);
 
         // 1b. Initialize TIM7 for the ERIF-phase-locked present gate.
         tim7_init();
