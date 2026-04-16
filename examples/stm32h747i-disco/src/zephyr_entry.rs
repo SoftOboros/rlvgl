@@ -698,12 +698,18 @@ pub unsafe extern "C" fn rlvgl_init(
                 // Frame rate hint — star_crawl scales pixels-per-frame
                 // from SCROLL_PX_PER_SEC (40) / frame_hz.
                 let mut c = StarCrawl::new(&CRAWL_FONT, crawl_lines, 30);
-                // Zephyr path uses a persistent scratch buffer
-                // (0xD180_0000) across frames, so the crawl can shift
-                // the existing back_buf up by the scroll delta and
-                // only re-fill the newly-exposed bottom rows. See
-                // task #40 / RenderMode::Incremental doc.
-                c.set_render_mode(crate::star_crawl::RenderMode::Incremental);
+                // Zephyr path: default to RenderMode::Full for a
+                // clean look. Incremental mode (committed under the
+                // same API) produces a ~2 Hz yellow-intensity pulse
+                // because the per-frame shift carries over alpha-
+                // blended pixels into the next frame's text region —
+                // partial-alpha edges accumulate rather than being
+                // refreshed from clean starfield BG. Bug today,
+                // optional retro-glow effect tomorrow. Proper
+                // flicker-free Incremental lives in task #41 via a
+                // cross-framebuffer shift that sources "clean BG"
+                // from the opposite FB.
+                c.set_render_mode(crate::star_crawl::RenderMode::Full);
                 c
             };
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
