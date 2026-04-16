@@ -13,6 +13,7 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/uart.h>
 #include <zephyr/cache.h>
 #include <zephyr/input/input.h>
 #include <string.h>
@@ -95,6 +96,31 @@ void rlvgl_dcache_clean(void)
 void rlvgl_k_sleep_ms(uint32_t ms)
 {
 	k_sleep(K_MSEC(ms));
+}
+
+/* ── USART1 RX poll for test automation ──────────────────────────────
+ *
+ * Polls the Zephyr UART device for a single byte using uart_poll_in().
+ * Non-blocking: returns -1 if no byte available, otherwise the byte
+ * value in the low 8 bits. Lets Rust inject debug-trigger characters
+ * (e.g. 'c' to fire the star crawl) from a serial terminal without
+ * needing touch/joystick input.
+ *
+ * Uses the device chosen as zephyr,console (USART1 per stm32h747i_disco
+ * overlay). Both Zephyr console TX (printk) and our raw TX writes
+ * coexist with the poll-based RX since RX is a separate FIFO. */
+int32_t rlvgl_serial_poll_rx(void)
+{
+	const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+	if (!device_is_ready(uart_dev)) {
+		return -1;
+	}
+	unsigned char c;
+	int r = uart_poll_in(uart_dev, &c);
+	if (r == 0) {
+		return (int32_t)c;
+	}
+	return -1;
 }
 
 /* Present: trigger Zephyr LTDC driver's double-buffer swap.

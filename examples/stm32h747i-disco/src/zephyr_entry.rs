@@ -374,17 +374,14 @@ unsafe fn dump_clock_state_oneshot(tag: &[u8]) {
     pair(b"D1CCIPR  ", RCC + 0x04C);
     u1s(b"\r\n");
 
-    // LTDC sanity (read-after-write to GCR)
-    const LTDC: usize = 0x5001_0000;
-    let gcr_p = (LTDC + 0x18) as *mut u32;
-    let gcr_before = gcr_p.read_volatile();
-    u1s(b"LTDC_GCR before=");
-    u1hex(gcr_before);
-    gcr_p.write_volatile(0x0000_2221);
-    cortex_m::asm::dsb();
-    let gcr_after = gcr_p.read_volatile();
-    u1s(b" after=");
-    u1hex(gcr_after);
+    // LTDC sanity — READ-only at the correct H747 base (0x5000_1000).
+    // Earlier version wrote GCR at 0x5001_0018 (off-by-nibble) which
+    // causes a precise data bus fault on H747. Keep this a pure read.
+    const LTDC: usize = 0x5000_1000;
+    let gcr_p = (LTDC + 0x18) as *const u32;
+    let gcr = gcr_p.read_volatile();
+    u1s(b"LTDC_GCR=");
+    u1hex(gcr);
     u1s(b"\r\n");
 
     // DSI host CR / WCR / WCFGR / WISR
@@ -762,6 +759,34 @@ pub unsafe extern "C" fn rlvgl_init(
                 if hb_count == 2 { hb_emit(b'\n'); }
                 if hb_count == 3 { hb_emit(b'\n'); }
                 mark1(b'A'); // entered loop body
+
+                // Drain serial RX for debug triggers. 'c'/'C' fires the
+                // star crawl. Implements a tiny subset of the playit
+                // protocol for remote test automation; full playit
+                // wiring is a follow-up task.
+                #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                loop {
+                    let b = rlvgl_serial_poll_rx();
+                    if b < 0 {
+                        break;
+                    }
+                    match b as u8 {
+                        b'c' | b'C' => {
+                            if crawl_dma2d.is_none() {
+                                crawl_dma2d = Some(
+                                    rlvgl_platform::dma2d::Dma2dBlitter::steal(),
+                                );
+                            }
+                            if let Some(ref mut dma2d) = crawl_dma2d {
+                                star_crawl.activate(dma2d);
+                            }
+                            crawl_active = true;
+                            controller.publish_status("serial 'c' → crawl");
+                            dump_clock_state_oneshot(b"serial-c-crawl");
+                        }
+                        _ => {}
+                    }
+                }
                 // Process joystick key events
                 {
                     use rlvgl_core::event::{Event, Key};
@@ -776,7 +801,34 @@ pub unsafe extern "C" fn rlvgl_init(
                         };
                         if let Some(k) = key {
                             if pressed {
+                                let is_enter = matches!(k, Key::Enter);
                                 controller.dispatch_event(&Event::KeyDown { key: k });
+                                // DEBUG: Enter key fires the star crawl
+                                // trigger inline, bypassing the normal
+                                // UI menu navigation. Lets us validate
+                                // the ACM crawl path without needing to
+                                // reach InfoSlot::StarCrawl via touch.
+                                // Remove once the regular menu hook is
+                                // wired on Zephyr.
+                                if is_enter {
+                                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                                    {
+                                        if crawl_dma2d.is_none() {
+                                            crawl_dma2d = Some(
+                                                rlvgl_platform::dma2d::Dma2dBlitter::steal(),
+                                            );
+                                        }
+                                        if let Some(ref mut dma2d) = crawl_dma2d {
+                                            star_crawl.activate(dma2d);
+                                        }
+                                        crawl_active = true;
+                                        controller.publish_status(
+                                            "Enter → crawl activated",
+                                        );
+                                        #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                                        dump_clock_state_oneshot(b"enter-key-crawl");
+                                    }
+                                }
                             }
                         }
                     }
@@ -1120,6 +1172,9 @@ pub unsafe extern "C" fn rlvgl_init(
 
 unsafe extern "C" {
     fn rlvgl_k_sleep_ms(ms: u32);
+    /// Non-blocking USART1 RX poll. Returns byte value (0..=255) or -1
+    /// if no byte is available. See main.c for impl.
+    fn rlvgl_serial_poll_rx() -> i32;
 }
 
 // ── Frame budget update (called from present thread after each frame) ─────────
