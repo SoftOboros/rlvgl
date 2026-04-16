@@ -728,7 +728,40 @@ pub unsafe extern "C" fn rlvgl_init(
             // as flicker.
             let mut prev_touch_pressed: bool = false;
 
+            // Loop heartbeat: prints '.' every N iterations so we can tell
+            // if the render loop is alive vs locked. Remove once stable.
+            let mut hb_count: u32 = 0;
             loop {
+                // Heartbeat — print on first iteration, then every 30
+                // (~1s at 33ms sleep). Char '!' = first, '.' = periodic,
+                // '0'..'9' = which point in the loop body we last reached.
+                hb_count = hb_count.wrapping_add(1);
+                let want_print = true; // DEBUG: heartbeat every iter
+                let hb_emit = |c: u8| {
+                    let isr = 0x4001_101C as *const u32;
+                    let tdr = 0x4001_1028 as *mut u32;
+                    let mut t = 100_000u32;
+                    while unsafe { isr.read_volatile() } & (1 << 7) == 0 {
+                        t -= 1;
+                        if t == 0 { return; }
+                    }
+                    unsafe { tdr.write_volatile(c as u32) };
+                };
+                if want_print {
+                    // Print iter count modulo 10 so we get '0','1','2',...,'9'
+                    // rolling. Newline every 10 to keep output readable.
+                    let d = b'0' + (hb_count % 10) as u8;
+                    hb_emit(d);
+                    if hb_count % 10 == 0 { hb_emit(b'\n'); }
+                }
+                // First-iters checkpoint helper: prints char on iters 1-3
+                // so we can localize where the lock occurs.
+                let mark1 = |c: u8| {
+                    if hb_count <= 3 { hb_emit(c); }
+                };
+                if hb_count == 2 { hb_emit(b'\n'); }
+                if hb_count == 3 { hb_emit(b'\n'); }
+                mark1(b'A'); // entered loop body
                 // Process joystick key events
                 {
                     use rlvgl_core::event::{Event, Key};
@@ -837,7 +870,9 @@ pub unsafe extern "C" fn rlvgl_init(
                     }
                 }
 
+                mark1(b'B'); // input processed
                 controller.tick();
+                mark1(b'C'); // controller.tick done
 
                 // Process commands from the controller
                 for cmd in controller.drain_commands() {
@@ -1062,7 +1097,9 @@ pub unsafe extern "C" fn rlvgl_init(
                 // ERIF-based pacing was attempted but interacted poorly
                 // with our render time (~20 ms) and the panel's 60 Hz TE
                 // — see commit history for details.
+                mark1(b'D'); // before widget present
                 do_present(render_buf, di.width, di.height);
+                mark1(b'E'); // after widget present
 
                 // After present, the buffer we just rendered becomes
                 // the displayed front. The other buffer becomes our
@@ -1073,7 +1110,9 @@ pub unsafe extern "C" fn rlvgl_init(
                     fb_front
                 };
 
+                mark1(b'F'); // before sleep
                 rlvgl_k_sleep_ms(33); // ~30 fps
+                mark1(b'G'); // after sleep — should never print (only iter 1)
             }
         }
     }
