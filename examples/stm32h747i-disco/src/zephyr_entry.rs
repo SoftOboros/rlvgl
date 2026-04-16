@@ -1111,8 +1111,8 @@ pub unsafe extern "C" fn rlvgl_init(
                 };
 
                 mark1(b'F'); // before sleep
-                rlvgl_k_sleep_ms(33); // ~30 fps
-                mark1(b'G'); // after sleep — should never print (only iter 1)
+                rlvgl_k_sleep_ms(33); // ~30 fps target
+                mark1(b'G'); // after sleep
             }
         }
     }

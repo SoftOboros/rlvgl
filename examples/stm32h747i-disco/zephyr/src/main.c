@@ -95,6 +95,20 @@ int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
 
 /* ── Touch input ─────────────────────────────────────────────────────── */
 
+/* Raw USART1 banner — bypasses Zephyr console driver so we can tell
+ * whether main() is running at all, independent of console routing. */
+static void usart1_raw_str(const char *s)
+{
+	volatile uint32_t *isr = (volatile uint32_t *)0x4001101C;
+	volatile uint32_t *tdr = (volatile uint32_t *)0x40011028;
+	while (*s) {
+		uint32_t t = 100000;
+		while (!(*isr & (1 << 7))) { if (--t == 0) break; }
+		*tdr = (uint32_t)(uint8_t)*s;
+		s++;
+	}
+}
+
 /* Touch event sent to Rust. Coordinates are raw panel space. */
 struct rlvgl_touch_event {
 	int16_t x;
@@ -112,6 +126,11 @@ static bool touch_pressed;
 static void input_cb(struct input_event *evt, void *user_data)
 {
 	ARG_UNUSED(user_data);
+
+	/* Debug: mark every input event with 'I' on USART1 so we can tell
+	 * whether Zephyr's input subsystem delivers events from FT5336 /
+	 * gpio_keys at all. */
+	usart1_raw_str("I");
 
 	switch (evt->code) {
 	case INPUT_ABS_X:
@@ -209,7 +228,9 @@ int main(void)
 	 * being able to print to UART. Lets us tell whether main()
 	 * runs at all when serial is silent. */
 	*(volatile uint32_t *)0x38000200 = 0xB0070001; /* main entered */
+	usart1_raw_str("\r\n[C-MAIN]\r\n");
 	printk("rlvgl-zephyr: starting\n");
+	usart1_raw_str("[C-after-printk]\r\n");
 	*(volatile uint32_t *)0x38000200 = 0xB0070002; /* after first printk */
 
 	/* Register DMA2D ISR (IRQ 90, pri 3). */
