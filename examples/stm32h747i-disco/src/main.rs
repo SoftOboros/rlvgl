@@ -106,7 +106,15 @@ mod _freertos_isr {
     unsafe fn DMA2D() {
         super::freertos_entry::dma2d_isr_body();
     }
+
+    /// TIM7 one-pulse timer — present-gate fire (ERIF + 15 ms).
+    /// See `freertos_entry::tim7_isr_body` for the semantics.
+    #[interrupt]
+    unsafe fn TIM7() {
+        super::freertos_entry::tim7_isr_body();
+    }
 }
+
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]

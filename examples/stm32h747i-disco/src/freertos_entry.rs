@@ -113,6 +113,106 @@ pub fn dma2d_done_sem() -> Option<SemaphoreHandle_t> {
     get_sync().map(|s| s.dma2d_done_sem)
 }
 
+// ── TIM7 present gate ─────────────────────────────────────────────────────────
+//
+// TIM7 is a basic 16-bit APB1 timer with a single update interrupt.
+// We run it in one-pulse mode at 1 MHz (PSC=199 against the 200 MHz
+// APB1 timer clock) so `ARR` is a count of microseconds up to 65535.
+//
+// Phase-lock flow:
+//   1. DSI ERIF ISR records erif_cyc (DWT snapshot) and gives erif_sem.
+//   2. present_task wakes, reads erif_cyc, computes remaining µs until
+//      the PRESENT_HOLDOFF deadline.
+//   3. present_task arms TIM7 with ARR = remaining_us (OPM=1) and
+//      blocks on `present_gate_sem`.
+//   4. TIM7 UIF fires at the deadline; its ISR gives present_gate_sem.
+//   5. present_task wakes, swaps + retriggers LTDC — every present
+//      lands on the exact same DWT offset from ERIF, phase-locked to
+//      the panel's TE signal. No DWT spin, no vTaskDelay jitter.
+
+const TIM7_BASE: usize = 0x4000_1400;
+const TIM7_CR1:  *mut u32 = (TIM7_BASE + 0x00) as *mut u32;
+const TIM7_DIER: *mut u32 = (TIM7_BASE + 0x0C) as *mut u32;
+const TIM7_SR:   *mut u32 = (TIM7_BASE + 0x10) as *mut u32;
+const TIM7_EGR:  *mut u32 = (TIM7_BASE + 0x14) as *mut u32;
+const TIM7_CNT:  *mut u32 = (TIM7_BASE + 0x24) as *mut u32;
+const TIM7_PSC:  *mut u32 = (TIM7_BASE + 0x28) as *mut u32;
+const TIM7_ARR:  *mut u32 = (TIM7_BASE + 0x2C) as *mut u32;
+
+/// RCC APB1LENR on STM32H747 (D2 domain, CM7 view).
+const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32;
+/// TIM7EN is bit 5 of APB1LENR.
+const RCC_APB1LENR_TIM7EN: u32 = 1 << 5;
+
+/// Present gate semaphore — given by TIM7 ISR when the holdoff
+/// deadline fires; taken (with portMAX_DELAY) by present_task.
+static PRESENT_GATE_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
+    AtomicPtr::new(core::ptr::null_mut());
+static mut PRESENT_GATE_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
+
+/// One-time TIM7 setup. Enables clock, configures PSC/ARR for 1 MHz
+/// one-pulse operation, enables UIE. Call from `start()` after the
+/// sync object is wired.
+unsafe fn tim7_init() {
+    unsafe {
+        RCC_APB1LENR
+            .write_volatile(RCC_APB1LENR.read_volatile() | RCC_APB1LENR_TIM7EN);
+        // Barrier: the PAC docs recommend a read-back after clock
+        // enable to ensure the register write has landed before we
+        // touch the peripheral.
+        let _ = RCC_APB1LENR.read_volatile();
+
+        TIM7_CR1.write_volatile(0); // disable + clear all flags
+        TIM7_CNT.write_volatile(0);
+        // APB1 timer clock = 200 MHz on this board (bare-metal TIM6
+        // uses the same divisor — see main.rs line ~2167 for the
+        // same empirical value). PSC=199 → 1 MHz, 1 µs per count.
+        TIM7_PSC.write_volatile(199);
+        TIM7_ARR.write_volatile(0xFFFF);
+        TIM7_EGR.write_volatile(1); // UG: reload PSC shadow
+        TIM7_SR.write_volatile(0); // clear any pending UIF
+        TIM7_DIER.write_volatile(1); // UIE
+        // CR1: OPM (one-pulse) | URS (only overflow asserts UEV — so
+        // our `EGR.UG=1` reload above does NOT spuriously fire UIF).
+        // CEN is off; we set it per-arm.
+        TIM7_CR1.write_volatile((1 << 3) | (1 << 2));
+    }
+}
+
+/// Arm TIM7 for `us` microseconds. Caller must have installed the
+/// sem before calling. Safe to call repeatedly — each arm restarts
+/// the timer from 0.
+unsafe fn tim7_arm(us: u32) {
+    unsafe {
+        // Stop (in case a previous arm is still running)
+        TIM7_CR1.write_volatile((1 << 3) | (1 << 2));
+        TIM7_CNT.write_volatile(0);
+        // Clamp to timer range. For values larger than 65 ms this
+        // would overflow — in practice present holdoff is 15 ms so
+        // we never hit that, but clamp defensively.
+        let arr = us.max(1).min(0xFFFF);
+        TIM7_ARR.write_volatile(arr);
+        TIM7_SR.write_volatile(0); // clear stale UIF
+        // CR1: OPM | URS | CEN
+        TIM7_CR1.write_volatile((1 << 3) | (1 << 2) | (1 << 0));
+    }
+}
+
+/// TIM7 interrupt body — called from the #[interrupt] wrapper in main.rs.
+#[inline]
+pub fn tim7_isr_body() {
+    unsafe {
+        let sr = TIM7_SR.read_volatile();
+        if sr & 1 != 0 {
+            TIM7_SR.write_volatile(0); // clear UIF
+            let gate = PRESENT_GATE_SEM.load(Ordering::Acquire);
+            if !gate.is_null() {
+                freertos_sync::rlvgl_sem_give_from_isr(gate);
+            }
+        }
+    }
+}
+
 // ── ISR handlers (named per STM32H7 NVIC; #[interrupt] in main.rs wraps these)
 
 /// DSI ISR body — same register reads as bare-metal, but gives the
@@ -334,6 +434,7 @@ unsafe fn hb_inc(addr: *mut u32) {
 
 unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
     use core::sync::atomic::Ordering;
+    use rlvgl_platform::frame_sync::FrameSync;
 
     // Kick the first scan so ERIF can fire. Without this the display
     // would stay idle because ERIF is a scan-complete signal — we need
@@ -356,9 +457,33 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             unsafe { hb_inc(HB_ERIF_WAKES) };
         }
 
-        // Holdoff: 15 ms after ERIF ensures we hit the same TE slot
-        // each frame. Matches bare-metal PRESENT_HOLDOFF = 6M cycles.
-        unsafe { vTaskDelay(15) };
+        // Holdoff: present the next frame precisely PRESENT_HOLDOFF
+        // after ERIF, phase-locked to the panel's TE. See the TIM7
+        // block at the top of this module for the rationale — every
+        // frame must land at the same DWT offset or we beat against
+        // TE and get intermittent flicker.
+        //
+        // We arm TIM7 (one-pulse, 1 MHz) for `PRESENT_HOLDOFF -
+        // elapsed_since_erif` µs and block on `present_gate_sem`.
+        // TIM7's UIF ISR gives the sem at the exact deadline. Zero
+        // busy-spin, preemption-friendly, ERIF-phase-locked.
+        const PRESENT_HOLDOFF_CYC: u32 = 6_000_000; // 15 ms @ 400 MHz
+        const CYC_PER_US: u32 = 400; //  400 MHz / 1 MHz
+        let elapsed = sync.cycles_since_erif();
+        if elapsed < PRESENT_HOLDOFF_CYC {
+            let remaining_us = (PRESENT_HOLDOFF_CYC - elapsed) / CYC_PER_US;
+            if remaining_us > 0 {
+                unsafe { tim7_arm(remaining_us) };
+                let gate = PRESENT_GATE_SEM.load(Ordering::Acquire);
+                if !gate.is_null() {
+                    // Take with a 50 ms timeout so a misconfigured
+                    // or stuck TIM7 doesn't wedge the present task
+                    // permanently; 50 ms is > the 15 ms holdoff and
+                    // the longest plausible panel frame period.
+                    unsafe { freertos_sync::rlvgl_sem_take(gate, 50) };
+                }
+            }
+        }
 
         // If the render task has signalled a fresh back buffer, swap
         // FRONT and BACK atomically — the new front is what LTDC will
@@ -774,6 +899,13 @@ pub unsafe fn start() -> ! {
             BUF_READY_SEM_BUF
         ));
         BUF_READY_SEM.store(buf_ready_sem, Ordering::Release);
+        let present_gate_sem = freertos_sync::rlvgl_sem_create_binary_static(
+            core::ptr::addr_of_mut!(PRESENT_GATE_SEM_BUF),
+        );
+        PRESENT_GATE_SEM.store(present_gate_sem, Ordering::Release);
+
+        // 1b. Initialize TIM7 for the ERIF-phase-locked present gate.
+        tim7_init();
 
         // 2. Initialize the sync object in static storage.
         let sync_ptr = core::ptr::addr_of_mut!(SYNC_STORAGE);
@@ -830,8 +962,14 @@ pub unsafe fn start() -> ! {
             .set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 6 << 4);
         cp.NVIC
             .set_priority(stm32h7::stm32h747cm7::Interrupt::DMA2D, 7 << 4);
+        // TIM7 at priority 6 matches DSI — both feed the present task
+        // directly (ERIF sem + gate sem) and must be ISR-safe for
+        // FromISR API (priority > configLIBRARY_MAX_SYSCALL = 5).
+        cp.NVIC
+            .set_priority(stm32h7::stm32h747cm7::Interrupt::TIM7, 6 << 4);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DMA2D);
+        cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::TIM7);
 
         // 5. Start the scheduler — never returns.
         vTaskStartScheduler();
