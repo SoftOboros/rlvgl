@@ -45,6 +45,8 @@ mod fonts;
 mod event_overlay;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod star_crawl;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod readme_crawl;
 
 // ── Zephyr-specific modules ──────────────────────────────────────────────────
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
