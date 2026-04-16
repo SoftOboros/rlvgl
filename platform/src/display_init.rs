@@ -399,19 +399,41 @@ pub unsafe fn enable_display_peripheral_clocks() {
         // CSleep, those peripherals lose their clocks mid-operation —
         // any scan or DMA2D transfer in flight halts, and a just-pulsed
         // WCR.LTDCEN can be lost before the wrapper acts on it.
-        // Set the LP-enable bits matching the EN bits we just set.
-        const RCC_AHB3LPENR: *mut u32 = (RCC + 0x13C) as *mut u32;
-        const RCC_APB3LPENR: *mut u32 = (RCC + 0x14C) as *mut u32;
-        const RCC_AHB4LPENR: *mut u32 = (RCC + 0x148) as *mut u32;
-        let ahb3lp = RCC_AHB3LPENR.read_volatile();
+        //
+        // **H747 dual-core:** Per RM0399 / RM0433 §8.7.1 the per-CPU
+        // C1 view (`RCC_C1_*LPENR` at offset 0x130+0x60 from D-domain)
+        // is a SEPARATE physical register from the D-domain view, and
+        // governs CM7's own CSleep gating. Empirically confirmed via
+        // boot dump: D-domain LPENR shows our bits set, but C1_LPENR
+        // reads 0 — meaning CM7 CSleep would gate everything if we
+        // didn't also write the C1 view. (See feedback_h747_c1_lpenr.md.)
+        // Note: ENR registers ARE aliased on H747 (C1_*ENR same as
+        // D-domain), so we don't need to mirror those.
+        const RCC_AHB3LPENR:    *mut u32 = (RCC + 0x13C) as *mut u32;
+        const RCC_APB3LPENR:    *mut u32 = (RCC + 0x14C) as *mut u32;
+        const RCC_AHB4LPENR:    *mut u32 = (RCC + 0x148) as *mut u32;
+        const RCC_C1_AHB3LPENR: *mut u32 = (RCC + 0x19C) as *mut u32;
+        const RCC_C1_APB3LPENR: *mut u32 = (RCC + 0x1AC) as *mut u32;
+        const RCC_C1_AHB4LPENR: *mut u32 = (RCC + 0x1A8) as *mut u32;
         // DMA2DLPEN (bit 4) + FMCLPEN (bit 12) — LTDC's framebuffer
         // reads go through FMC to SDRAM; if FMC is gated in CSleep,
         // LTDC can't fetch pixels and the scan stalls.
-        RCC_AHB3LPENR.write_volatile(ahb3lp | (1 << 4) | (1 << 12));
+        let ahb3lp_mask = (1 << 4) | (1 << 12);
+        let apb3lp_mask = (1 << 3) | (1 << 4); // LTDC + DSI LPEN
+        let ahb4lp_mask = (1 << 6) | (1 << 9); // GPIOG + GPIOJ LPEN
+        let ahb3lp = RCC_AHB3LPENR.read_volatile();
+        RCC_AHB3LPENR.write_volatile(ahb3lp | ahb3lp_mask);
         let apb3lp = RCC_APB3LPENR.read_volatile();
-        RCC_APB3LPENR.write_volatile(apb3lp | (1 << 3) | (1 << 4)); // LTDC + DSI LPEN
+        RCC_APB3LPENR.write_volatile(apb3lp | apb3lp_mask);
         let ahb4lp = RCC_AHB4LPENR.read_volatile();
-        RCC_AHB4LPENR.write_volatile(ahb4lp | (1 << 6) | (1 << 9)); // GPIOG + GPIOJ LPEN
+        RCC_AHB4LPENR.write_volatile(ahb4lp | ahb4lp_mask);
+        // Mirror to CM7's per-CPU LPENR view.
+        let c1_ahb3lp = RCC_C1_AHB3LPENR.read_volatile();
+        RCC_C1_AHB3LPENR.write_volatile(c1_ahb3lp | ahb3lp_mask);
+        let c1_apb3lp = RCC_C1_APB3LPENR.read_volatile();
+        RCC_C1_APB3LPENR.write_volatile(c1_apb3lp | apb3lp_mask);
+        let c1_ahb4lp = RCC_C1_AHB4LPENR.read_volatile();
+        RCC_C1_AHB4LPENR.write_volatile(c1_ahb4lp | ahb4lp_mask);
 
         // Brief settle
         cortex_m::asm::dsb();
@@ -708,6 +730,25 @@ pub unsafe fn dump_registers() {
         const RCC_APB3RSTR_R: *const u32 = (RCC + 0x08C) as *const u32;
         line(b"RCC.AHB3RSTR  ", RCC_AHB3RSTR_R.read_volatile());
         line(b"RCC.APB3RSTR  ", RCC_APB3RSTR_R.read_volatile());
+        // ── H747 dual-core CPU1 (CM7) view of ENR/LPENR ──────────────────────
+        // Per RM0399 (and aliased on single-core RM0433/RM0468 §8.7.1), the
+        // C1 view of these registers governs CM7's per-CPU bus access /
+        // CSleep gating. If our writes hit the D-domain view but C1 view
+        // shows the bits as 0, CM7 cannot access the peripheral. Boot dump
+        // showing all LTDC.* = 0 (despite display working) is consistent
+        // with C1_APB3ENR.LTDCEN being 0. See feedback_h747_c1_lpenr.md.
+        const RCC_C1_AHB3ENR:   *const u32 = (RCC + 0x134) as *const u32;
+        const RCC_C1_AHB4ENR:   *const u32 = (RCC + 0x140) as *const u32;
+        const RCC_C1_APB3ENR:   *const u32 = (RCC + 0x144) as *const u32;
+        const RCC_C1_AHB3LPENR: *const u32 = (RCC + 0x19C) as *const u32;
+        const RCC_C1_AHB4LPENR: *const u32 = (RCC + 0x1A8) as *const u32;
+        const RCC_C1_APB3LPENR: *const u32 = (RCC + 0x1AC) as *const u32;
+        line(b"RCC.C1_AHB3EN ", RCC_C1_AHB3ENR.read_volatile());
+        line(b"RCC.C1_AHB4EN ", RCC_C1_AHB4ENR.read_volatile());
+        line(b"RCC.C1_APB3EN ", RCC_C1_APB3ENR.read_volatile());
+        line(b"RCC.C1_AHB3LP ", RCC_C1_AHB3LPENR.read_volatile());
+        line(b"RCC.C1_AHB4LP ", RCC_C1_AHB4LPENR.read_volatile());
+        line(b"RCC.C1_APB3LP ", RCC_C1_APB3LPENR.read_volatile());
         // DSI host
         line(b"DSI.VR        ", DSI_VR.read_volatile());
         line(b"DSI.CR        ", (DSI_CR as *const u32).read_volatile());

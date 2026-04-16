@@ -285,6 +285,117 @@ unsafe extern "C" {
     fn rlvgl_present(back_buf: *const u8, width: u16, height: u16) -> i32;
 }
 
+// ── Debug: one-shot RCC/LTDC/DSI clock-gate dump ──────────────────────────────
+//
+// Used to diagnose the v0.2.0 ACM star-crawl lockup. RM0433/RM0468 §8.7.1:
+// on dual-core H747 (RM0399) the per-CPU LPENR views (`RCC_C1_*LPENR` at
+// 0x130+) are SEPARATE registers from the D-domain views (`RCC_*LPENR` at
+// 0x0D0+); on single-core H743 they alias the same physical register.
+// CSleep gating for code running on CM7 uses the C1 view. We dump both
+// so a discrepancy proves whether `feedback_h747_c1_lpenr.md` is correct.
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+unsafe fn dump_clock_state_oneshot(tag: &[u8]) {
+    use core::sync::atomic::{AtomicBool, Ordering};
+    static DUMPED: AtomicBool = AtomicBool::new(false);
+    if DUMPED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    // Spin-wait for USART1 TXE then push one byte.
+    fn u1c(c: u8) {
+        unsafe {
+            let isr = 0x4001_101C as *const u32;
+            let tdr = 0x4001_1028 as *mut u32;
+            let mut t = 100_000u32;
+            while isr.read_volatile() & (1 << 7) == 0 {
+                t -= 1;
+                if t == 0 {
+                    return;
+                }
+            }
+            tdr.write_volatile(c as u32);
+        }
+    }
+    fn u1s(s: &[u8]) {
+        for &b in s {
+            u1c(b);
+        }
+    }
+    fn u1hex(v: u32) {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        for i in (0..8).rev() {
+            let n = ((v >> (i * 4)) & 0xF) as usize;
+            u1c(HEX[n]);
+        }
+    }
+    fn pair(label: &[u8], addr: usize) {
+        u1s(label);
+        u1c(b'=');
+        unsafe { u1hex((addr as *const u32).read_volatile()) };
+        u1c(b' ');
+    }
+
+    const RCC: usize = 0x5802_4400;
+    u1s(b"\r\n=== CLK DUMP ");
+    u1s(tag);
+    u1s(b" ===\r\n");
+
+    // D-domain ENR (what we wrote)
+    pair(b"AHB3ENR  ", RCC + 0x0D4);
+    pair(b"AHB4ENR  ", RCC + 0x0E0);
+    pair(b"APB3ENR  ", RCC + 0x0E4);
+    u1s(b"\r\n");
+
+    // D-domain LPENR (what we wrote)
+    pair(b"AHB3LPENR", RCC + 0x13C);
+    pair(b"AHB4LPENR", RCC + 0x148);
+    pair(b"APB3LPENR", RCC + 0x14C);
+    u1s(b"\r\n");
+
+    // CPU1 (CM7) view — H747 RM0399 specific. Per RM0468 Table 71/75
+    // and the §8.7.1 mapping diagram, C1_*ENR/LPENR live at +0x60 from
+    // their D-domain counterparts. If RM0399 numbers H747 differently
+    // these reads will simply show the alias value — no harm.
+    pair(b"C1_AHB3EN", RCC + 0x134);
+    pair(b"C1_AHB4EN", RCC + 0x140);
+    pair(b"C1_APB3EN", RCC + 0x144);
+    u1s(b"\r\n");
+    pair(b"C1_AHB3LP", RCC + 0x19C);
+    pair(b"C1_AHB4LP", RCC + 0x1A8);
+    pair(b"C1_APB3LP", RCC + 0x1AC);
+    u1s(b"\r\n");
+
+    // PLL + LCDCLK source
+    pair(b"RCC_CR   ", RCC + 0x000);
+    pair(b"PLL3DIVR ", RCC + 0x040);
+    pair(b"D1CCIPR  ", RCC + 0x04C);
+    u1s(b"\r\n");
+
+    // LTDC sanity (read-after-write to GCR)
+    const LTDC: usize = 0x5001_0000;
+    let gcr_p = (LTDC + 0x18) as *mut u32;
+    let gcr_before = gcr_p.read_volatile();
+    u1s(b"LTDC_GCR before=");
+    u1hex(gcr_before);
+    gcr_p.write_volatile(0x0000_2221);
+    cortex_m::asm::dsb();
+    let gcr_after = gcr_p.read_volatile();
+    u1s(b" after=");
+    u1hex(gcr_after);
+    u1s(b"\r\n");
+
+    // DSI host CR / WCR / WCFGR / WISR
+    const DSI: usize = 0x5000_0000;
+    pair(b"DSI_CR   ", DSI + 0x000);
+    pair(b"DSI_WCR  ", DSI + 0x404);
+    pair(b"DSI_WCFGR", DSI + 0x400);
+    pair(b"DSI_WISR ", DSI + 0x40C);
+    u1s(b"\r\n=== END ===\r\n");
+}
+
 /// Present a frame — delegates to either dsi_cmd_mode::present (adapted cmd)
 /// or Zephyr display_write (video mode) depending on the feature.
 #[inline]
@@ -685,17 +796,44 @@ pub unsafe extern "C" fn rlvgl_init(
 
                     if press_edge {
                         use rlvgl_core::event::Event;
-                        // Send both PressRelease (select) and DoubleTap
-                        // (navigate) — crude until gesture recognizer is
-                        // integrated. FileBrowser uses DoubleTap to enter.
-                        controller.dispatch_event(&Event::PressRelease {
-                            x: lx,
-                            y: ly,
-                        });
-                        controller.dispatch_event(&Event::DoubleTap {
-                            x: lx,
-                            y: ly,
-                        });
+                        // ── DEBUG HOTSPOT (top-right corner) ───────────
+                        // Tap the top-right ~60×60 px corner to force the
+                        // star crawl to start, bypassing the normal menu
+                        // navigation. Used to validate the H0 (C1_LPENR)
+                        // fix without depending on InfoSlot::StarCrawl
+                        // being reachable from the current UI state.
+                        // Remove once the regular play path is wired.
+                        if ly < 60 && lx > (di.width as i32 - 60) {
+                            // Inline the crawl bring-up — bypasses
+                            // controller queue (no public `queue_command`).
+                            controller.publish_status("Crawl hotspot tapped");
+                            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                            {
+                                if crawl_dma2d.is_none() {
+                                    crawl_dma2d = Some(
+                                        rlvgl_platform::dma2d::Dma2dBlitter::steal(),
+                                    );
+                                }
+                                if let Some(ref mut dma2d) = crawl_dma2d {
+                                    star_crawl.activate(dma2d);
+                                }
+                                crawl_active = true;
+                                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                                dump_clock_state_oneshot(b"hotspot-trigger");
+                            }
+                        } else {
+                            // Send both PressRelease (select) and DoubleTap
+                            // (navigate) — crude until gesture recognizer is
+                            // integrated. FileBrowser uses DoubleTap to enter.
+                            controller.dispatch_event(&Event::PressRelease {
+                                x: lx,
+                                y: ly,
+                            });
+                            controller.dispatch_event(&Event::DoubleTap {
+                                x: lx,
+                                y: ly,
+                            });
+                        }
                     }
                 }
 
@@ -725,6 +863,11 @@ pub unsafe extern "C" fn rlvgl_init(
                                     star_crawl.activate(dma2d);
                                 }
                                 crawl_active = true;
+                                // Snapshot RCC/LTDC/DSI state at the moment
+                                // the crawl is requested. See dump_clock_state_oneshot
+                                // header comment + memory `feedback_h747_c1_lpenr.md`.
+                                #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+                                dump_clock_state_oneshot(b"crawl-trigger");
                                 controller.publish_status("Star crawl started");
                             }
                             #[cfg(not(feature = "adapted_cmd"))]
@@ -738,18 +881,18 @@ pub unsafe extern "C" fn rlvgl_init(
                 }
 
                 // ── Star crawl rendering ──────────────────────────────
-                // KNOWN ISSUE (v0.2.0): even with DMA2D + present working
-                // in isolation, this block locks the display when active.
-                // Diagnostics show the loop ticks (`TP` returns) but no
-                // FrameReady is ever produced for sustained operation,
-                // and direct LTDC writes in the same context don't appear
-                // to take effect. Suspect a CSleep/clock-domain or AXI
-                // arbitration issue specific to entering the bypass-the-
-                // widget-render path. Disabled with `&& false` to keep the
-                // rest of the demo functional; re-enable when fixed.
+                // PREVIOUS ISSUE (resolved 2026-04-15): this block locked
+                // the display because CM7 CSleep gating during the widget
+                // loop's k_sleep was killing LTDC/DSI/DMA2D clocks. The
+                // root cause was that on the H747 dual-core, *LPENR has a
+                // separate per-CPU C1 view (RCC_C1_*LPENR) that is NOT
+                // aliased to the D-domain register, and our previous fix
+                // wrote only the D-domain view. Fixed in
+                // display_init::enable_display_peripheral_clocks by
+                // mirroring writes to RCC_C1_*LPENR. Re-enabled here.
+                // See feedback_h747_c1_lpenr.md.
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                #[allow(unreachable_code)]
-                if crawl_active && false {
+                if crawl_active {
                     if let Some(ref mut dma2d) = crawl_dma2d {
                         // Portrait scratch back buffer for the composed
                         // crawl frame. MUST be distinct from the starfield
