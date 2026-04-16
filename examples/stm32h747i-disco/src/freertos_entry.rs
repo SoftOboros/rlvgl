@@ -259,15 +259,12 @@ pub fn dsi_isr_body() {
                 sync.scan_complete.store(true, Ordering::Release);
                 freertos_sync::rlvgl_sem_give_from_isr(sync.erif_sem);
             }
-            // Also wake render_task. Two separate binary sems — one
-            // for each single-consumer task — is the clean way to
-            // fan out an ISR edge to multiple tasks without anyone
-            // peeking. Render picks up the next frame in lockstep
-            // with the panel, kill the 62-Hz-vs-30-Hz beat.
-            let rs = RENDER_START_SEM.load(Ordering::Acquire);
-            if !rs.is_null() {
-                freertos_sync::rlvgl_sem_give_from_isr(rs);
-            }
+            // Note: `render_start_sem` is NOT given here. Waking
+            // render on the ERIF edge would start it writing to BACK
+            // while present_task has not yet done the front/back
+            // swap — race. The give lives in `present_task` *after*
+            // `ltdc_retrigger`, so render only wakes once the new
+            // BACK is guaranteed to be off-screen.
         }
 
         let isr0 = ISR0.read_volatile();
@@ -527,6 +524,18 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             sync.scan_complete.store(false, Ordering::Release);
             unsafe { ltdc_retrigger(fb) };
         }
+
+        // Wake render_task. This gate is given *after* the
+        // front/back swap + retrigger, not on the DSI ERIF edge —
+        // so when render_task resumes, the BACK atomic already
+        // points to a buffer that is off-screen (LTDC is scanning
+        // the new FRONT we just retriggered). Waking on ERIF
+        // instead would race the swap: render would start writing
+        // to a buffer that is about to become FRONT.
+        let rs = RENDER_START_SEM.load(Ordering::Acquire);
+        if !rs.is_null() {
+            unsafe { freertos_sync::rlvgl_sem_give(rs) };
+        }
     }
 }
 
@@ -545,15 +554,21 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
     // yields more aggressively between DMA2D waits (see tick loop).
     const IDLE_PERIOD_MS: u32 = 16; // ~62 Hz
     const CRAWL_YIELD_MS: u32 = 1; // short yield between Pending ticks
-    // Per-outer-iteration ceiling on Pending iterations. A full crawl
-    // frame needs roughly 500-800 ticks (one tick per state transition
-    // in the star_crawl state machine). Exiting the inner loop early
-    // forces the render task back through lazy-init checks and the
-    // toggle handshake, which costs ~20-30 µs per round-trip; at 1.6
-    // fps with a 50-tick cap, that adds up to substantial overhead.
-    // A generous ceiling keeps us in the inner loop for most of a
-    // frame while still bounding time if crawl stalls.
-    const CRAWL_TIMEOUT_TICKS: u32 = 5000;
+    // Per-outer-iteration ceiling on Pending iterations. With the
+    // render_start_sem gate (given by present_task AFTER retrigger),
+    // render wakes while the panel scan is just starting — not yet
+    // complete. star_crawl's internal `erif_is_set()` gate blocks on
+    // the sticky `scan_complete` flag, which DSI ISR won't set until
+    // ~14 ms later when the scan finishes. The tick loop must stay
+    // in Pending long enough for ERIF to fire, or the frame never
+    // completes.
+    //
+    // 200_000 iterations is a bounded ceiling (still exits cleanly
+    // if DMA2D truly stalls) but large enough that the ~14 ms wait
+    // for ERIF is well within budget — even if every inner iteration
+    // took a microsecond, 200_000 is 200 ms. In practice the loop
+    // exits on FrameReady well before this.
+    const CRAWL_TIMEOUT_TICKS: u32 = 200_000;
 
     // Bold font and README crawl text — mirrors the bare-metal and
     // Zephyr setup so FreeRTOS renders the same content.
@@ -573,6 +588,27 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
     loop {
         unsafe { hb_inc(HB_RENDER_TICKS) };
+
+        // ── ERIF/swap gate ────────────────────────────────────────
+        // Block until present_task has completed its swap + retrigger
+        // for the current frame. present gives `render_start_sem` at
+        // the END of its loop body (after ltdc_retrigger), so when
+        // we resume here the BACK atomic points at a buffer that is
+        // off-screen and safe to write. This gate applies to BOTH
+        // the crawl path and the idle compositor path — without it,
+        // both can race the front/back swap and produce tearing.
+        //
+        // The 100-ms timeout is defensive — if present stalls, we
+        // still loop to re-check lazy-init paths rather than
+        // deadlocking.
+        {
+            let rs = RENDER_START_SEM.load(Ordering::Acquire);
+            if !rs.is_null() {
+                unsafe { freertos_sync::rlvgl_sem_take(rs, 100) };
+            } else {
+                unsafe { vTaskDelay(IDLE_PERIOD_MS) };
+            }
+        }
 
         let back = BACK_FB_ADDR.load(Ordering::Acquire);
         let w = FB_W.load(Ordering::Acquire);
@@ -692,15 +728,16 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     StepResult::Idle => break,
                     StepResult::Pending => {
                         deadline_hits += 1;
-                        // No voluntary yield on Pending. Star crawl
-                        // returns Pending when DMA2D is still in
-                        // flight; at the lowest task priority (1),
-                        // any higher-priority wake (DSI ISR → present
-                        // sem-give → present preempts us; touch /
-                        // playit likewise) already preempts this
-                        // loop automatically. Voluntary yields only
-                        // add vTaskDelay latency without enabling
-                        // any work that isn't already preemptible.
+                        // Yield once every ~4096 Pending ticks so the
+                        // FreeRTOS idle hook gets a crack at stack-
+                        // watermark checks and stats while we're
+                        // spinning on DMA2D / ERIF. Priority-6 ISRs
+                        // (DSI / DMA2D / TIM7) already preempt us
+                        // automatically; this yield is just for the
+                        // idle task. Every ~4 ms at 1 µs/tick.
+                        if deadline_hits & 0xFFF == 0 {
+                            unsafe { vTaskDelay(1) };
+                        }
                     }
                     StepResult::FrameReady => {
                         frame_ready = true;
@@ -788,18 +825,6 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
         if !buf_ready.is_null() {
             unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
-        }
-
-        // Block until the next ERIF. This is the critical ERIF-phase-
-        // lock: render produces exactly one frame per panel scan, so
-        // buf_ready and present are always in 1:1 lockstep with ERIF.
-        // Free-running render (vTaskDelay) beats against the 30 Hz
-        // panel cadence and manifests as moving-block jitter.
-        let rs = RENDER_START_SEM.load(Ordering::Acquire);
-        if !rs.is_null() {
-            unsafe { freertos_sync::rlvgl_sem_take(rs, 100) };
-        } else {
-            unsafe { vTaskDelay(IDLE_PERIOD_MS) };
         }
     }
 }
