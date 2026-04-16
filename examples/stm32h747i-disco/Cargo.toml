@@ -49,6 +49,7 @@ semihosting = ["dep:cortex-m-semihosting"]
 bsp_log = []
 zephyr = []
 adapted_cmd = []  # DSI adapted command mode (enables DMA2D M2M for star crawl)
+freertos = []  # FreeRTOS kernel linked in-tree; preemptive present/render/touch tasks
 
 [dependencies]
 rlvgl-core = { path = "../../core", default-features = false }
@@ -75,3 +76,6 @@ embedded-hal = { version = "1", optional = true }
 embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", optional = true, features = ["unproven"] }
 embedded-sdmmc = { version = "0.9", default-features = false, optional = true }
 stm32-fmc = { version = "0.3.2", optional = true }
+
+[build-dependencies]
+cc = "1"

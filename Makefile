@@ -123,6 +123,15 @@ build-disco-cm4:
 
 build-disco-all: build-disco build-disco-cm4
 
+# FreeRTOS build: preemptive present / render / touch tasks.
+FEATURES_CM7_FREERTOS := cm7,freertos,adapted_cmd,dma2d,splash,desktop
+
+build-disco-freertos:
+	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	cargo build --target $(TARGET) \
+	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7_FREERTOS)
+	$(MAKE) objcopy-disco
+
 # ── Host simulators and tools ─────────────────────────────────────
 build-sim:
 	RUSTFLAGS="" cargo build -p $(SIM_PACKAGE) --bin $(SIM_BIN) --features $(SIM_FEATURES)
@@ -171,6 +180,13 @@ objcopy-disco-release:
 
 # ── Flash (probe-rs) ─────────────────────────────────────────────
 flash-disco: build-disco
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset \
+	  --probe $(PROBE_ID) $(ELF_CM7)
+	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+flash-disco-freertos: build-disco-freertos
 	probe-rs download --chip $(CHIP) \
 	  --protocol swd --speed $(PROBE_SPEED) \
 	  --non-interactive --connect-under-reset \

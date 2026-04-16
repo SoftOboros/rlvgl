@@ -64,6 +64,35 @@ cargo install probe-rs --locked --features cli
 [MAKE.md](./MAKE.md) for the `make flash-disco` / `make probe-rs-gdb`
 workflows that this toolchain unlocks.
 
+### FreeRTOS build (optional)
+
+`make build-disco-freertos` compiles the vendored FreeRTOS kernel in
+`examples/stm32h747i-disco/freertos/Source/` through `cc-rs`, which
+invokes `arm-none-eabi-gcc` on the host. The kernel sources include
+`<stdlib.h>` and `<stdint.h>`, so a cross C compiler is required:
+
+```bash
+brew install arm-none-eabi-gcc   # macOS
+# Debian / Ubuntu:
+sudo apt install gcc-arm-none-eabi
+```
+
+The homebrew bottle of `arm-none-eabi-gcc` is shipped without newlib,
+so the workspace provides minimal freestanding header stubs under
+`examples/stm32h747i-disco/freertos/stubs/` (`stdint.h`, `stdlib.h`,
+`string.h`). `build.rs` prepends those to the include path whenever the
+`freertos` feature is active — no extra libc install is needed. If you
+use a full arm-gnu-toolchain install (e.g. the Arm-distributed MSI/PKG
+bundle) the stubs are harmless because the toolchain's own headers are
+still shadowed only for those three names.
+
+Build / flash:
+
+```bash
+make build-disco-freertos
+make flash-disco-freertos
+```
+
 ## ESP32
 
 There are two parallel Rust paths for Espressif parts:

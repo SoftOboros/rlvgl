@@ -57,6 +57,32 @@ mod star_crawl;
 #[allow(dead_code)]
 mod sys_info;
 mod wing;
+
+#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+mod freertos_sync;
+#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+mod freertos_entry;
+#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+mod touch_i2c;
+
+/// ISR wrappers routing the DSI / DMA2D IRQs to `freertos_entry` bodies.
+/// These replace the bare-metal `_dsi_isr` / `_dma2d_isr` modules below
+/// when the `freertos` feature is active — a single binary may only
+/// define one `#[interrupt] fn DSI()` (likewise DMA2D).
+#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+mod _freertos_isr {
+    use stm32h7::stm32h747cm7::interrupt;
+
+    #[interrupt]
+    unsafe fn DSI() {
+        super::freertos_entry::dsi_isr_body();
+    }
+
+    #[interrupt]
+    unsafe fn DMA2D() {
+        super::freertos_entry::dma2d_isr_body();
+    }
+}
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
@@ -83,9 +109,13 @@ fn _bsp_log(args: core::fmt::Arguments) {
 // SysTick exception handler — empty body; sole purpose is to wake WFI.
 // Without an enabled SysTick interrupt the core would sleep past the
 // frame boundary because has_wrapped() only polls the COUNTFLAG.
+// FreeRTOS provides its own SysTick handler via the vector alias in
+// `freertos_entry::SysTick`. The `cpu_stats` empty-body variant below
+// must not collide with it, hence the extra `not(feature = "freertos")`.
 #[cfg(all(
     feature = "cpu_stats",
     not(feature = "zephyr"),
+    not(feature = "freertos"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 #[cortex_m_rt::exception]
@@ -331,6 +361,7 @@ mod _usart1_isr {
 #[cfg(all(
     not(feature = "c_hal"),
     not(feature = "zephyr"),
+    not(feature = "freertos"),
     feature = "dma2d",
     any(target_arch = "arm", target_arch = "aarch64"),
 ))]
@@ -376,6 +407,7 @@ pub(crate) static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
 #[cfg(all(
     not(feature = "c_hal"),
     not(feature = "zephyr"),
+    not(feature = "freertos"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _dsi_isr {
@@ -3033,6 +3065,20 @@ fn main() -> ! {
             nvic.set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 1);
         }
 
+        // ── FreeRTOS handoff ──────────────────────────────────────────
+        // Hardware is fully initialized — clocks, SDRAM, DSI, LTDC,
+        // DMA2D, touch I2C, framebuffers. Hand control to the FreeRTOS
+        // scheduler; the bare-metal cooperative loop below is replaced
+        // by preemptive present / render / touch tasks. Never returns.
+        #[cfg(feature = "freertos")]
+        unsafe {
+            // Expose the current front-buffer address to the present
+            // task so it can re-trigger LTDC scans each frame.
+            freertos_entry::init_fb_addr(display.front_buffer_addr());
+            freertos_entry::start();
+        }
+
+        #[allow(unreachable_code)]
         loop {
             loop_count = loop_count.wrapping_add(1);
             // PJ0 is now driven by ISR (ERIF→LOW) and present() (→HIGH).
