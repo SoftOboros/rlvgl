@@ -82,6 +82,13 @@ enum RenderStage {
     RenderFrame = 1,
     StartTextBlend = 2,
     WaitTextBlend = 3,
+    /// Starfield has been rendered into the persistent `layer_buf`; issue
+    /// a single full-frame M2M blit from layer into `back_buf` so text
+    /// can blend on top of a clean stars-only background.
+    ComposeLayer = 4,
+    /// Wait for the ComposeLayer M2M blit to finish before starting the
+    /// text A8 blend into `back_buf`.
+    WaitCompose = 5,
 }
 
 /// Result of advancing the crawl task by one step.
@@ -134,6 +141,17 @@ pub struct StarCrawl {
     frame_scroll_px: i32,
     frame_star_row: u32,
     back_buf: *mut u8,
+    /// Persistent starfield layer buffer. When non-null, starfield rows
+    /// render into this buffer instead of directly into `back_buf`, and
+    /// an internal compose stage (`ComposeLayer` / `WaitCompose`) blits
+    /// layer → back_buf before text blends on top. This decouples
+    /// the starfield (opaque, scrolls at 1/3 rate, safe to incremental-
+    /// shift) from the text A8 blend (alpha, scrolls at full rate —
+    /// shifting a blended buffer causes alpha accumulation / flicker).
+    ///
+    /// When null, legacy behavior: stars and text both render into
+    /// `back_buf` (matches bare-metal `RenderMode::Full` today).
+    layer_buf: *mut u8,
     fb_w: u32,
 
     stage: RenderStage,
@@ -187,6 +205,7 @@ impl StarCrawl {
             frame_scroll_px: 0,
             frame_star_row: 0,
             back_buf: core::ptr::null_mut(),
+            layer_buf: core::ptr::null_mut(),
             fb_w: FB_W,
             stage: RenderStage::Idle,
             bg_row: 0,
@@ -225,6 +244,24 @@ impl StarCrawl {
         self.last_frame_star_row = u32::MAX;
     }
 
+    /// Configure a persistent starfield layer buffer, distinct from the
+    /// per-frame `back_buf`. When set, starfield rows render into `layer`
+    /// and an internal compose stage blits layer → back_buf before the
+    /// text A8 blend. This is the recommended configuration when the
+    /// host alternates `back_buf` between `fb_front` and `fb_back`
+    /// (e.g. Zephyr ACM), because it preserves `RenderMode::Incremental`'s
+    /// "same buffer every frame" contract without contaminating the
+    /// persistent buffer with alpha-blended text.
+    ///
+    /// Passing `core::ptr::null_mut()` restores legacy behaviour (stars
+    /// and text both render into `back_buf`).
+    pub fn set_layer_buf(&mut self, layer: *mut u8) {
+        self.layer_buf = layer;
+        // Buffer identity change invalidates any prior frame's shift
+        // anchor; force the next frame to take the Full path.
+        self.last_frame_star_row = u32::MAX;
+    }
+
     pub fn deactivate(&mut self) {
         self.active = false;
         self.drop_frame();
@@ -248,7 +285,10 @@ impl StarCrawl {
 
     /// Returns `true` when the crawl is parked on a DMA completion.
     pub fn waiting_for_dma(&self) -> bool {
-        self.stage == RenderStage::WaitTextBlend
+        matches!(
+            self.stage,
+            RenderStage::WaitTextBlend | RenderStage::WaitCompose
+        )
     }
 
     /// Packed crawl diagnostics for D3 SRAM / serial telemetry.
@@ -378,9 +418,17 @@ impl StarCrawl {
             //   - Full mode (bare-metal)
             self.incr_shift_done = false;
             let mut start_row: u32 = 0;
-            if self.render_mode == RenderMode::Incremental
-                && self.last_frame_star_row != u32::MAX
-            {
+            // Starfield DMA destination: layer buffer when set (Zephyr
+            // ACM / any host that alternates back_buf), else back_buf.
+            // Incremental shift must target the SAME buffer every frame,
+            // which is why the layer path is preferred with alternating
+            // framebuffers.
+            let stars_target = if self.layer_buf.is_null() {
+                back_buf
+            } else {
+                self.layer_buf
+            };
+            if self.render_mode == RenderMode::Incremental && self.last_frame_star_row != u32::MAX {
                 // Delta is signed in modular STAR_ROWS space. We only
                 // scroll forward, so expect a small positive delta.
                 // Negative or huge deltas (e.g. STAR_ROWS wrap) → full.
@@ -393,19 +441,17 @@ impl StarCrawl {
                     FB_H // marker: fall back to full re-blit
                 };
                 if delta_rows > 0 && delta_rows < FB_H {
-                    // Issue DMA2D M2M shift: copy back_buf rows
+                    // Issue DMA2D M2M shift: copy stars_target rows
                     // [delta..FB_H] → rows [0..FB_H-delta]. Source is
                     // strictly above destination so linear-in-memory
                     // DMA2D has no aliasing.
                     let row_bytes = (FB_W * BPP) as u32;
                     let keep_rows = FB_H - delta_rows;
-                    let src_rows = unsafe {
-                        back_buf.add((delta_rows * row_bytes) as usize)
-                    };
+                    let src_rows = unsafe { stars_target.add((delta_rows * row_bytes) as usize) };
                     dma2d.start_blit_raw(
                         src_rows as *const u8,
                         row_bytes,
-                        back_buf,
+                        stars_target,
                         row_bytes,
                         FB_W,
                         keep_rows,
@@ -433,10 +479,7 @@ impl StarCrawl {
                 // Skip the gate on the very first frame after activation
                 // (frame_id == 1) — no scan is pending in adapted command
                 // mode so ERIF will never fire until we present().
-                if self.bg_row == 0
-                    && self.frame_id > 1
-                    && !sync.erif_is_set()
-                {
+                if self.bg_row == 0 && self.frame_id > 1 && !sync.erif_is_set() {
                     return StepResult::Pending;
                 }
 
@@ -466,8 +509,14 @@ impl StarCrawl {
                     }
                     let star_row = (self.frame_star_row + self.bg_row) % STAR_ROWS;
                     let src = unsafe { self.starfield.add((star_row * STAR_STRIDE) as usize) };
-                    let dst =
-                        unsafe { self.back_buf.add((self.bg_row * self.fb_w * BPP) as usize) };
+                    // Stars render into the persistent layer buffer when
+                    // one is configured, else into back_buf (bare-metal).
+                    let stars_dst = if self.layer_buf.is_null() {
+                        self.back_buf
+                    } else {
+                        self.layer_buf
+                    };
+                    let dst = unsafe { stars_dst.add((self.bg_row * self.fb_w * BPP) as usize) };
                     sync.note_start();
                     sync.dma2d_active();
                     dma2d.start_blit_raw(
@@ -513,8 +562,51 @@ impl StarCrawl {
                 let text_done = self.text_row >= CRAWL_H;
                 let dma_done = !dma2d.is_in_flight();
                 if star_done && text_done && dma_done {
-                    self.stage = RenderStage::StartTextBlend;
+                    // If a persistent starfield layer is configured, the
+                    // stars just landed in `layer_buf` — compose it into
+                    // `back_buf` before blending text on top. Otherwise
+                    // (legacy bare-metal) go straight to text blend.
+                    self.stage = if self.layer_buf.is_null() {
+                        RenderStage::StartTextBlend
+                    } else {
+                        RenderStage::ComposeLayer
+                    };
                 }
+                StepResult::Pending
+            }
+            RenderStage::ComposeLayer => {
+                if dma2d.is_in_flight() {
+                    return StepResult::Pending;
+                }
+                // One full-frame M2M blit layer → back_buf. Budget
+                // ~400K cycles at 400 MHz (1.5 MB / ~4 bytes per cycle).
+                if !sync.dma2d_admits(500_000) {
+                    return StepResult::Pending;
+                }
+                let row_bytes = self.fb_w * BPP;
+                sync.note_start();
+                sync.dma2d_active();
+                dma2d.start_blit_raw(
+                    self.layer_buf as *const u8,
+                    row_bytes,
+                    self.back_buf,
+                    row_bytes,
+                    self.fb_w,
+                    FB_H,
+                    PixelFmt::Argb8888,
+                );
+                self.stage = RenderStage::WaitCompose;
+                StepResult::Pending
+            }
+            RenderStage::WaitCompose => {
+                if dma2d.is_in_flight() {
+                    return StepResult::Pending;
+                }
+                // Consume the completion latch and drive PJ6 low before
+                // the next DMA2D burst.
+                let _ = sync.take_complete();
+                sync.dma2d_idle();
+                self.stage = RenderStage::StartTextBlend;
                 StepResult::Pending
             }
             RenderStage::StartTextBlend => {
@@ -863,4 +955,50 @@ fn dcache_clean_range(addr: usize, size: usize) {
         a += LINE_SIZE;
     }
     cortex_m::asm::dsb();
+}
+
+// ── Effect trait impl ───────────────────────────────────────────────────────
+//
+// Lightweight adapter so `StarCrawl` satisfies the crate-local `Effect`
+// trait (see `effect.rs`). `tick` delegates straight through; state-only
+// methods are thin wrappers. Keeps the public crawl API stable while
+// letting future multi-effect code treat the crawl as one instance among
+// many.
+
+impl crate::effect::Effect for StarCrawl {
+    fn is_active(&self) -> bool {
+        StarCrawl::is_active(self)
+    }
+
+    fn advance(&mut self) {
+        self.advance_scroll();
+    }
+
+    fn dirty_bounds(&self) -> Option<crate::effect::Rect> {
+        if !self.active {
+            return None;
+        }
+        Some(crate::effect::Rect {
+            x: 0,
+            y: 0,
+            w: FB_W as u16,
+            h: FB_H as u16,
+        })
+    }
+
+    fn reset(&mut self) {
+        self.deactivate();
+    }
+
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    fn tick(
+        &mut self,
+        dma2d: &mut Dma2dBlitter,
+        target: *mut u8,
+        target_w: u32,
+        target_h: u32,
+        sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+    ) -> StepResult {
+        StarCrawl::tick(self, dma2d, target, target_w, target_h, sync)
+    }
 }

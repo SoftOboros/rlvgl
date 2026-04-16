@@ -34,10 +34,8 @@ struct TouchEventC {
 
 /// Packed touch state: x[15:0] | y[31:16] in one atomic, pressed in another.
 static TOUCH_XY: AtomicU32 = AtomicU32::new(0);
-static TOUCH_PRESSED: core::sync::atomic::AtomicBool =
-    core::sync::atomic::AtomicBool::new(false);
-static TOUCH_DIRTY: core::sync::atomic::AtomicBool =
-    core::sync::atomic::AtomicBool::new(false);
+static TOUCH_PRESSED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+static TOUCH_DIRTY: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 /// Called from C input callback — stores latest touch state atomically.
 #[unsafe(no_mangle)]
@@ -62,8 +60,10 @@ const KEY_RIGHT: u16 = 106;
 
 /// Simple key event ring buffer (4 entries, enough for joystick).
 static KEY_BUF: [AtomicU32; 4] = [
-    AtomicU32::new(0), AtomicU32::new(0),
-    AtomicU32::new(0), AtomicU32::new(0),
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+    AtomicU32::new(0),
 ];
 static KEY_WRITE: AtomicU32 = AtomicU32::new(0);
 static KEY_READ: AtomicU32 = AtomicU32::new(0);
@@ -129,7 +129,11 @@ static SYNC: AtomicPtr<ZephyrFrameSync> = AtomicPtr::new(core::ptr::null_mut());
 #[inline]
 fn get_sync() -> Option<&'static ZephyrFrameSync> {
     let ptr = SYNC.load(Ordering::Acquire);
-    if ptr.is_null() { None } else { Some(unsafe { &*ptr }) }
+    if ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { &*ptr })
+    }
 }
 
 /// DSI ISR handler — called from C when DSI IRQ 123 fires.
@@ -208,11 +212,7 @@ struct CDirent {
 type ReaddirCb = unsafe extern "C" fn(entry: *const CDirent, ctx: *mut core::ffi::c_void);
 
 unsafe extern "C" {
-    fn rlvgl_readdir(
-        path: *const u8,
-        cb: ReaddirCb,
-        ctx: *mut core::ffi::c_void,
-    ) -> i32;
+    fn rlvgl_readdir(path: *const u8, cb: ReaddirCb, ctx: *mut core::ffi::c_void) -> i32;
 }
 
 /// Collects directory entries from the C callback into a Vec.
@@ -518,16 +518,14 @@ pub unsafe extern "C" fn rlvgl_init(
         #[cfg(feature = "splash")]
         let splash_ok = (|| -> Option<()> {
             let blob = crate::SPLASH_RLE;
-            let (w, h, pal_bytes, stream) =
-                rlvgl_decomp::parse_rle_blob(blob).ok()?;
+            let (w, h, pal_bytes, stream) = rlvgl_decomp::parse_rle_blob(blob).ok()?;
             if w as usize != splash_w || h as usize != splash_h {
                 return None;
             }
             let pal_count = pal_bytes.len() / 2;
             let mut palette = [0u16; 192];
             for i in 0..pal_count {
-                palette[i] =
-                    u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
+                palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
 
             #[cfg(feature = "adapted_cmd")]
@@ -535,9 +533,13 @@ pub unsafe extern "C" fn rlvgl_init(
                 // Portrait FB (480×800) — decode directly into both FBs.
                 let fb0 = core::slice::from_raw_parts_mut(fb_front, splash_bytes);
                 rlvgl_decomp::decode_argb_into(
-                    splash_w, splash_h,
-                    &palette[..pal_count], stream, fb0,
-                ).ok()?;
+                    splash_w,
+                    splash_h,
+                    &palette[..pal_count],
+                    stream,
+                    fb0,
+                )
+                .ok()?;
                 // Copy to back buffer
                 core::ptr::copy_nonoverlapping(fb_front, fb_back, splash_bytes);
             }
@@ -548,9 +550,13 @@ pub unsafe extern "C" fn rlvgl_init(
                 // then copy-rotate 90° CW.
                 let scratch = core::slice::from_raw_parts_mut(scratch_base, splash_bytes);
                 rlvgl_decomp::decode_argb_into(
-                    splash_w, splash_h,
-                    &palette[..pal_count], stream, scratch,
-                ).ok()?;
+                    splash_w,
+                    splash_h,
+                    &palette[..pal_count],
+                    stream,
+                    scratch,
+                )
+                .ok()?;
 
                 // portrait(px, py) → landscape(dst_x=py, dst_y=479-px)
                 let src = scratch_base as *const u32;
@@ -570,7 +576,8 @@ pub unsafe extern "C" fn rlvgl_init(
                 }
             }
             Some(())
-        })().is_some();
+        })()
+        .is_some();
 
         #[cfg(not(feature = "splash"))]
         let splash_ok = false;
@@ -609,9 +616,7 @@ pub unsafe extern "C" fn rlvgl_init(
             // disabled them while the OS was settling.
             display_init::enable_display_peripheral_clocks();
             display_init::configure_ltdc_timing(480, 800, 2, 34, 34, 120, 150, 150);
-            display_init::setup_ltdc_layer(
-                fb_front as u32, 480, 800, 2, 34, 120, 150,
-            );
+            display_init::setup_ltdc_layer(fb_front as u32, 480, 800, 2, 34, 120, 150);
             display_init::enable_ltdc();
             // Diagnostic dump — confirms LTDC/DSI/PLL3 register state matches
             // expectations for the adapted_cmd path.
@@ -634,10 +639,10 @@ pub unsafe extern "C" fn rlvgl_init(
             use alloc::rc::Rc;
             use core::cell::RefCell;
             use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
+            use rlvgl_core::WidgetNode;
             use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, Surface};
             use rlvgl_platform::cpu_blitter::CpuBlitter;
             use rlvgl_platform::screen::Screen;
-            use rlvgl_core::WidgetNode;
 
             // Controller lays out widgets in *landscape* logical coords —
             // 800w × 480h. The RotatedRenderer below rotates 90° CCW into
@@ -652,10 +657,7 @@ pub unsafe extern "C" fn rlvgl_init(
             let screen = Screen::landscape(800, 480);
             #[cfg(not(feature = "adapted_cmd"))]
             let screen = Screen::landscape(fb_w, fb_h);
-            let mut controller = DiscoController::new(
-                screen,
-                DiscoCapabilities::zephyr(),
-            );
+            let mut controller = DiscoController::new(screen, DiscoCapabilities::zephyr());
             let root = controller.root();
 
             // File browser panel backed by Zephyr filesystem
@@ -698,18 +700,16 @@ pub unsafe extern "C" fn rlvgl_init(
                 // Frame rate hint — star_crawl scales pixels-per-frame
                 // from SCROLL_PX_PER_SEC (40) / frame_hz.
                 let mut c = StarCrawl::new(&CRAWL_FONT, crawl_lines, 30);
-                // Zephyr path: default to RenderMode::Full for a
-                // clean look. Incremental mode (committed under the
-                // same API) produces a ~2 Hz yellow-intensity pulse
-                // because the per-frame shift carries over alpha-
-                // blended pixels into the next frame's text region —
-                // partial-alpha edges accumulate rather than being
-                // refreshed from clean starfield BG. Bug today,
-                // optional retro-glow effect tomorrow. Proper
-                // flicker-free Incremental lives in task #41 via a
-                // cross-framebuffer shift that sources "clean BG"
-                // from the opposite FB.
-                c.set_render_mode(crate::star_crawl::RenderMode::Full);
+                // Zephyr path: Incremental starfield in a persistent
+                // layer buffer (see `set_layer_buf` below at activate
+                // time). The 2 Hz yellow flicker that plagued the old
+                // Incremental path came from alpha-accumulation when
+                // text was blended into the same persistent buffer as
+                // the stars. Task #41 split them: stars live in the
+                // layer (safe to shift, opaque only), text blends
+                // directly into the active FB after the layer is
+                // composed. No more accumulation.
+                c.set_render_mode(crate::star_crawl::RenderMode::Incremental);
                 c
             };
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -763,7 +763,9 @@ pub unsafe extern "C" fn rlvgl_init(
                     let mut t = 100_000u32;
                     while unsafe { isr.read_volatile() } & (1 << 7) == 0 {
                         t -= 1;
-                        if t == 0 { return; }
+                        if t == 0 {
+                            return;
+                        }
                     }
                     unsafe { tdr.write_volatile(c as u32) };
                 };
@@ -772,15 +774,23 @@ pub unsafe extern "C" fn rlvgl_init(
                     // rolling. Newline every 10 to keep output readable.
                     let d = b'0' + (hb_count % 10) as u8;
                     hb_emit(d);
-                    if hb_count % 10 == 0 { hb_emit(b'\n'); }
+                    if hb_count % 10 == 0 {
+                        hb_emit(b'\n');
+                    }
                 }
                 // First-iters checkpoint helper: prints char on iters 1-3
                 // so we can localize where the lock occurs.
                 let mark1 = |c: u8| {
-                    if hb_count <= 3 { hb_emit(c); }
+                    if hb_count <= 3 {
+                        hb_emit(c);
+                    }
                 };
-                if hb_count == 2 { hb_emit(b'\n'); }
-                if hb_count == 3 { hb_emit(b'\n'); }
+                if hb_count == 2 {
+                    hb_emit(b'\n');
+                }
+                if hb_count == 3 {
+                    hb_emit(b'\n');
+                }
                 mark1(b'A'); // entered loop body
 
                 // Drain serial RX for debug triggers. 'c'/'C' fires the
@@ -796,12 +806,16 @@ pub unsafe extern "C" fn rlvgl_init(
                     match b as u8 {
                         b'c' | b'C' => {
                             if crawl_dma2d.is_none() {
-                                crawl_dma2d = Some(
-                                    rlvgl_platform::dma2d::Dma2dBlitter::steal(),
-                                );
+                                crawl_dma2d = Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
                             }
                             if let Some(ref mut dma2d) = crawl_dma2d {
                                 star_crawl.activate(dma2d);
+                                // Persistent starfield layer at
+                                // 0xD180_0000 (was the compose scratch).
+                                // Stars render into the layer with
+                                // Incremental shift; text blends onto
+                                // the active FB after layer compose.
+                                star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
                             }
                             crawl_active = true;
                             controller.publish_status("serial 'c' → crawl");
@@ -834,20 +848,21 @@ pub unsafe extern "C" fn rlvgl_init(
                                 // Remove once the regular menu hook is
                                 // wired on Zephyr.
                                 if is_enter {
-                                    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                                    #[cfg(all(
+                                        feature = "dma2d",
+                                        any(target_arch = "arm", target_arch = "aarch64")
+                                    ))]
                                     {
                                         if crawl_dma2d.is_none() {
-                                            crawl_dma2d = Some(
-                                                rlvgl_platform::dma2d::Dma2dBlitter::steal(),
-                                            );
+                                            crawl_dma2d =
+                                                Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
                                         }
                                         if let Some(ref mut dma2d) = crawl_dma2d {
                                             star_crawl.activate(dma2d);
+                                            star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
                                         }
                                         crawl_active = true;
-                                        controller.publish_status(
-                                            "Enter → crawl activated",
-                                        );
+                                        controller.publish_status("Enter → crawl activated");
                                         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
                                         dump_clock_state_oneshot(b"enter-key-crawl");
                                     }
@@ -878,23 +893,42 @@ pub unsafe extern "C" fn rlvgl_init(
                         }
                     }
                     fn u1_dec(mut v: i32) {
-                        if v < 0 { u1_putc(b'-'); v = -v; }
+                        if v < 0 {
+                            u1_putc(b'-');
+                            v = -v;
+                        }
                         let mut buf = [0u8; 10];
                         let mut i = 0;
-                        if v == 0 { u1_putc(b'0'); return; }
-                        while v > 0 { buf[i] = b'0' + (v % 10) as u8; v /= 10; i += 1; }
-                        while i > 0 { i -= 1; u1_putc(buf[i]); }
+                        if v == 0 {
+                            u1_putc(b'0');
+                            return;
+                        }
+                        while v > 0 {
+                            buf[i] = b'0' + (v % 10) as u8;
+                            v /= 10;
+                            i += 1;
+                        }
+                        while i > 0 {
+                            i -= 1;
+                            u1_putc(buf[i]);
+                        }
                     }
-                    for &c in b"T:" { u1_putc(c); }
+                    for &c in b"T:" {
+                        u1_putc(c);
+                    }
                     u1_dec(raw_x as i32);
                     u1_putc(b',');
                     u1_dec(raw_y as i32);
-                    for &c in b"->" { u1_putc(c); }
+                    for &c in b"->" {
+                        u1_putc(c);
+                    }
                     u1_dec(lx);
                     u1_putc(b',');
                     u1_dec(ly);
                     u1_putc(if pressed { b'D' } else { b'U' });
-                    for &c in b"\r\n" { u1_putc(c); }
+                    for &c in b"\r\n" {
+                        u1_putc(c);
+                    }
 
                     // Only dispatch on the rising edge (finger newly down).
                     // Held / repeat samples are ignored so the file-menu
@@ -915,15 +949,18 @@ pub unsafe extern "C" fn rlvgl_init(
                             // Inline the crawl bring-up — bypasses
                             // controller queue (no public `queue_command`).
                             controller.publish_status("Crawl hotspot tapped");
-                            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                            #[cfg(all(
+                                feature = "dma2d",
+                                any(target_arch = "arm", target_arch = "aarch64")
+                            ))]
                             {
                                 if crawl_dma2d.is_none() {
-                                    crawl_dma2d = Some(
-                                        rlvgl_platform::dma2d::Dma2dBlitter::steal(),
-                                    );
+                                    crawl_dma2d =
+                                        Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
                                 }
                                 if let Some(ref mut dma2d) = crawl_dma2d {
                                     star_crawl.activate(dma2d);
+                                    star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
                                 }
                                 crawl_active = true;
                                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
@@ -933,14 +970,8 @@ pub unsafe extern "C" fn rlvgl_init(
                             // Send both PressRelease (select) and DoubleTap
                             // (navigate) — crude until gesture recognizer is
                             // integrated. FileBrowser uses DoubleTap to enter.
-                            controller.dispatch_event(&Event::PressRelease {
-                                x: lx,
-                                y: ly,
-                            });
-                            controller.dispatch_event(&Event::DoubleTap {
-                                x: lx,
-                                y: ly,
-                            });
+                            controller.dispatch_event(&Event::PressRelease { x: lx, y: ly });
+                            controller.dispatch_event(&Event::DoubleTap { x: lx, y: ly });
                         }
                     }
                 }
@@ -961,7 +992,10 @@ pub unsafe extern "C" fn rlvgl_init(
                         DiscoCommand::LoadStorageSummary => {
                             file_browser.borrow_mut().toggle();
                         }
-                        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+                        #[cfg(all(
+                            feature = "dma2d",
+                            any(target_arch = "arm", target_arch = "aarch64")
+                        ))]
                         DiscoCommand::StartEffect(rlvgl_app_disco_demo::DiscoEffect::StarCrawl) => {
                             #[cfg(feature = "adapted_cmd")]
                             {
@@ -973,10 +1007,12 @@ pub unsafe extern "C" fn rlvgl_init(
                                 // block below); enabling this triggers a
                                 // present-pipeline lock under crawl_active.
                                 if crawl_dma2d.is_none() {
-                                    crawl_dma2d = Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                    crawl_dma2d =
+                                        Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
                                 }
                                 if let Some(ref mut dma2d) = crawl_dma2d {
                                     star_crawl.activate(dma2d);
+                                    star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
                                 }
                                 crawl_active = true;
                                 // Snapshot RCC/LTDC/DSI state at the moment
@@ -989,7 +1025,8 @@ pub unsafe extern "C" fn rlvgl_init(
                             #[cfg(not(feature = "adapted_cmd"))]
                             {
                                 // Video mode: DMA2D M2M hangs (AXI bus starvation).
-                                controller.publish_status("Star crawl requires adapted_cmd feature");
+                                controller
+                                    .publish_status("Star crawl requires adapted_cmd feature");
                             }
                         }
                         _ => {}
@@ -1010,14 +1047,12 @@ pub unsafe extern "C" fn rlvgl_init(
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 if crawl_active {
                     if let Some(ref mut dma2d) = crawl_dma2d {
-                        // Reverted: render to a scratch buffer, compose
-                        // via DMA2D blit to render_buf. Rendering
-                        // directly into render_buf tripled tick count
-                        // per frame (11k → 32k) despite double-
-                        // buffering — likely SDRAM bank / AXI port
-                        // contention between DMA2D row blits and the
-                        // current/prior LTDC scan target. TBD.
-                        let crawl_buf = 0xD180_0000usize as *mut u8;
+                        // Task #41 (layered): stars live in a persistent
+                        // layer buffer at 0xD180_0000 (set via
+                        // `star_crawl.set_layer_buf(...)` at activate),
+                        // and the crawl's internal ComposeLayer stage
+                        // blits the layer into `render_buf` right before
+                        // text A8 blend. No per-frame compose blit here.
                         let sync_ref = get_sync().unwrap_unchecked();
                         // Per-iteration trace so we can see where tick stalls.
                         // 'T' = entering tick; result tag follows.
@@ -1028,12 +1063,18 @@ pub unsafe extern "C" fn rlvgl_init(
                                 let mut t = 100_000u32;
                                 while isr.read_volatile() & (1 << 7) == 0 {
                                     t -= 1;
-                                    if t == 0 { return; }
+                                    if t == 0 {
+                                        return;
+                                    }
                                 }
                                 tdr.write_volatile(c as u32);
                             }
                         }
-                        fn u1s(s: &[u8]) { for &b in s { u1c(b); } }
+                        fn u1s(s: &[u8]) {
+                            for &b in s {
+                                u1c(b);
+                            }
+                        }
                         fn u1hex(v: u32) {
                             const HEX: &[u8; 16] = b"0123456789abcdef";
                             for i in (0..8).rev() {
@@ -1087,11 +1128,17 @@ pub unsafe extern "C" fn rlvgl_init(
                         static mut BATCH_CYC_ACCUM: u32 = 0;
                         static mut LAST_FRAME_CYC: u32 = 0;
                         let batch_start = DWT_CYC.read_volatile();
+                        // Task #41: tick targets `render_buf` (active
+                        // FB) directly. Stars render into the persistent
+                        // layer configured via `set_layer_buf(crawl_buf)`;
+                        // the crawl's internal ComposeLayer stage blits
+                        // layer → render_buf before the text A8 blend.
+                        // This removes the separate compose blit that
+                        // used to live below on FrameReady.
                         let mut result = crate::star_crawl::StepResult::Pending;
                         for _ in 0..1024 {
-                            result = star_crawl.tick(
-                                dma2d, crawl_buf, CRAWL_FB_W, CRAWL_FB_H, sync_ref,
-                            );
+                            result = star_crawl
+                                .tick(dma2d, render_buf, CRAWL_FB_W, CRAWL_FB_H, sync_ref);
                             TICKS_THIS_FRAME += 1;
                             if star_crawl.waiting_for_dma() {
                                 DMA_WAIT_TICKS += 1;
@@ -1144,46 +1191,15 @@ pub unsafe extern "C" fn rlvgl_init(
                         }
                         match result {
                             crate::star_crawl::StepResult::FrameReady => {
-                                // Direct blit from crawl scratch (480×800) to
-                                // the portrait FB (480×800). Both buffers are
-                                // the same shape and orientation since
-                                // star_crawl now renders at the full portrait
-                                // height (FB_H=800); no rotation needed.
-                                //
-                                // Architecture per design note: the crawl is
-                                // logically independent of display dimensions
-                                // — it renders to its own SRAM scratch at its
-                                // chosen aspect, and a COMPOSITION step here
-                                // blits it onto the final display surface.
-                                // Today that composition is a 1:1 memcpy; in
-                                // future it can scale / offset / clip as
-                                // needed.
-                                // DMA2D M2M blit of the full 480×800 crawl
-                                // scratch to the display FB. Much faster
-                                // than a CPU memcpy of the 1.5 MB buffer
-                                // and bypasses D-cache entirely (DMA2D
-                                // reads/writes SDRAM directly, so the
-                                // later dcache_clean_all is only needed
-                                // to flush any stale cache lines that
-                                // would otherwise clobber our just-written
-                                // pixels via eviction).
-                                let t0 = DWT_CYC.read_volatile();
-                                let stride_bytes = (fb_w * bpp) as u32;
-                                dma2d.blit_raw(
-                                    crawl_buf as *const u8,
-                                    stride_bytes,
-                                    render_buf,
-                                    stride_bytes,
-                                    fb_w as u32,
-                                    fb_h as u32,
-                                    rlvgl_platform::PixelFmt::Argb8888,
-                                );
+                                // Task #41: the crawl now composes the
+                                // starfield layer → render_buf and
+                                // blends text onto render_buf entirely
+                                // inside `tick`. No explicit compose
+                                // blit here; we just present.
                                 let t1 = DWT_CYC.read_volatile();
                                 do_present(render_buf, di.width, di.height);
                                 let t2 = DWT_CYC.read_volatile();
-                                u1s(b" bl=");
-                                u1hex(t1.wrapping_sub(t0) / 400);
-                                u1s(b"us pr=");
+                                u1s(b" pr=");
                                 u1hex(t2.wrapping_sub(t1) / 400);
                                 u1s(b"us");
                                 // Advance scroll so the next frame uses a
@@ -1193,7 +1209,11 @@ pub unsafe extern "C" fn rlvgl_init(
                                 // text motion). Bare-metal calls this after
                                 // its present; mirroring here.
                                 star_crawl.advance_scroll();
-                                render_buf = if render_buf == fb_front { fb_back } else { fb_front };
+                                render_buf = if render_buf == fb_front {
+                                    fb_back
+                                } else {
+                                    fb_front
+                                };
                                 continue; // skip normal widget render this frame
                             }
                             crate::star_crawl::StepResult::Finished => {

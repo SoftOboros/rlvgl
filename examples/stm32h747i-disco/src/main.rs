@@ -42,6 +42,8 @@ mod config_menu;
 mod cpu_stats;
 mod device_storage;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod effect;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod event_overlay;
 mod file_browser_panel;
 mod fonts;
