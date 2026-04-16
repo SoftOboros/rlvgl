@@ -90,9 +90,17 @@ pub struct Compositor {
     layers: Vec<Box<dyn Layer>>,
     dirty: Vec<Rect>,
     prev_dirty: Vec<Rect>,
-    /// When `Some`, the next frame forces a full-surface redraw (used
-    /// to prime both buffers after startup / resize).
+    /// Full-surface seed rect, applied for `seed_remaining` consecutive
+    /// frames. We prime **both** buffers on startup — not just one —
+    /// because the present task swaps front/back and the buffer that
+    /// wasn't primed would still carry whatever boot-time content was
+    /// in SDRAM (splash image, garbage, etc). Dirty-region replay only
+    /// touches the small rects each layer moved, so areas outside any
+    /// dirty rect would forever show the un-primed content on the
+    /// buffer that never got the full fill — visible as "lines
+    /// alternating" when LTDC switches between buffers.
     seed: Option<Rect>,
+    seed_remaining: u8,
 }
 
 impl Compositor {
@@ -102,6 +110,7 @@ impl Compositor {
             dirty: Vec::new(),
             prev_dirty: Vec::new(),
             seed: None,
+            seed_remaining: 0,
         }
     }
 
@@ -115,9 +124,13 @@ impl Compositor {
         self.layers.get_mut(idx).map(|b| b.as_mut())
     }
 
-    /// Force the next frame to repaint the entire surface.
+    /// Force the next **two** frames to repaint the entire surface.
+    /// Two frames is the minimum needed to seed both sides of a
+    /// front/back double buffer when the present task swaps on every
+    /// buf_ready signal.
     pub fn prime_full(&mut self, surface: Rect) {
         self.seed = Some(surface);
+        self.seed_remaining = 2;
     }
 
     /// Tick all layers, collect their dirty rects, render from bottom
@@ -135,9 +148,17 @@ impl Compositor {
         //    (which has two-frame-old content) converges.
         self.dirty.extend_from_slice(&self.prev_dirty);
 
-        // 2. Seed — one-shot full-surface repaint on startup.
-        if let Some(r) = self.seed.take() {
-            self.dirty.push(r);
+        // 2. Seed — full-surface repaint for `seed_remaining` frames.
+        //    Primes both buffers of a double-buffered present pipeline
+        //    (see `prime_full` docs for the rationale).
+        if self.seed_remaining > 0 {
+            if let Some(r) = self.seed {
+                self.dirty.push(r);
+            }
+            self.seed_remaining -= 1;
+            if self.seed_remaining == 0 {
+                self.seed = None;
+            }
         }
 
         // 3. Tick each layer, collect its dirty rects.
