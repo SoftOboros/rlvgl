@@ -97,6 +97,27 @@ pub enum StepResult {
     Finished,
 }
 
+/// How the per-frame background (starfield) is rendered into back_buf.
+///
+/// See the per-platform setter call in the host's `rlvgl_init` /
+/// bare-metal main for how each build selects a mode.
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum RenderMode {
+    /// Full re-blit: every frame writes all FB_H rows of starfield
+    /// via per-row DMA2D ops. Interleaves with CPU FIR text work for
+    /// parallelism. Works regardless of whether back_buf is the same
+    /// pointer across frames (bare-metal alternates front/back FBs).
+    Full,
+    /// Incremental: DMA2D M2M-shifts existing back_buf up by the
+    /// frame-to-frame scroll delta, then re-blits only the newly
+    /// exposed bottom rows. Requires back_buf to be a persistent
+    /// buffer across frames (same pointer every frame) — typically a
+    /// dedicated scratch like 0xD180_0000. Falls back to Full
+    /// automatically on the first frame after activation or when the
+    /// delta exceeds FB_H (full re-render cheaper than partial shift).
+    Incremental,
+}
+
 /// Star crawl renderer with non-blocking internal state.
 pub struct StarCrawl {
     active: bool,
@@ -118,6 +139,20 @@ pub struct StarCrawl {
     stage: RenderStage,
     bg_row: u32,
     text_row: u32,
+
+    /// Host-configured rendering strategy for the starfield per frame.
+    /// See [`RenderMode`]. Defaults to [`RenderMode::Full`] for
+    /// bare-metal compatibility.
+    render_mode: RenderMode,
+    /// Previous frame's `frame_star_row`. Used by Incremental mode to
+    /// compute the scroll delta (how many rows to shift + re-fill).
+    /// `u32::MAX` sentinel = no prior frame (first frame after
+    /// activate; Incremental falls back to Full).
+    last_frame_star_row: u32,
+    /// In Incremental mode, set to true after the shift DMA2D is
+    /// issued at new-frame-start so we don't issue it again during
+    /// the same frame.
+    incr_shift_done: bool,
 
     scanline_buf: [u8; CRAWL_W as usize],
 
@@ -156,6 +191,9 @@ impl StarCrawl {
             stage: RenderStage::Idle,
             bg_row: 0,
             text_row: 0,
+            render_mode: RenderMode::Full,
+            last_frame_star_row: u32::MAX,
+            incr_shift_done: false,
             scanline_buf: [0u8; CRAWL_W as usize],
             lines,
             font,
@@ -172,6 +210,19 @@ impl StarCrawl {
 
     pub fn is_active(&self) -> bool {
         self.active
+    }
+
+    /// Select between [`RenderMode::Full`] (default) and
+    /// [`RenderMode::Incremental`]. Safe to call any time; takes
+    /// effect at the next frame start. Incremental mode requires the
+    /// host to pass the SAME `back_buf` pointer on every call to
+    /// [`Self::tick`]; otherwise the shift-from-previous-frame
+    /// assumption is violated.
+    pub fn set_render_mode(&mut self, mode: RenderMode) {
+        self.render_mode = mode;
+        // Reset the delta-tracking sentinel so the next frame-start
+        // picks the Full path (no prior frame to shift from).
+        self.last_frame_star_row = u32::MAX;
     }
 
     pub fn deactivate(&mut self) {
@@ -226,6 +277,9 @@ impl StarCrawl {
 
     fn finish_frame(&mut self) {
         self.diag_completed_frames = self.diag_completed_frames.saturating_add(1);
+        // Remember this frame's starfield scroll position so the NEXT
+        // frame can compute the delta for Incremental mode.
+        self.last_frame_star_row = self.frame_star_row;
         self.reset_frame_state();
     }
 
@@ -234,6 +288,12 @@ impl StarCrawl {
         if self.frame_active {
             self.diag_dropped_frames = self.diag_dropped_frames.saturating_add(1);
         }
+        // Invalidate the Incremental-mode delta anchor: back_buf may
+        // have been partially written or the host may switch to a
+        // different buffer next frame, so we must fall back to Full
+        // for the next frame.
+        self.last_frame_star_row = u32::MAX;
+        self.incr_shift_done = false;
         self.reset_frame_state();
     }
 
@@ -298,7 +358,6 @@ impl StarCrawl {
             self.frame_star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
             self.back_buf = back_buf;
             self.fb_w = fb_w;
-            self.bg_row = 0;
             self.text_row = 0;
             self.diag_rows_with_text = 0;
             self.diag_rows_blended = 0;
@@ -310,6 +369,53 @@ impl StarCrawl {
             unsafe {
                 core::ptr::write_bytes(A8_BUF as *mut u8, 0, A8_SIZE);
             }
+            // Incremental mode: if we have a valid prior frame, shift
+            // the existing back_buf up by the scroll delta and only
+            // re-fill the bottom N rows this frame. Skip shift and fall
+            // back to Full re-blit on:
+            //   - first frame after activate (no prior)
+            //   - delta >= FB_H (no overlap worth preserving)
+            //   - Full mode (bare-metal)
+            self.incr_shift_done = false;
+            let mut start_row: u32 = 0;
+            if self.render_mode == RenderMode::Incremental
+                && self.last_frame_star_row != u32::MAX
+            {
+                // Delta is signed in modular STAR_ROWS space. We only
+                // scroll forward, so expect a small positive delta.
+                // Negative or huge deltas (e.g. STAR_ROWS wrap) → full.
+                let last = self.last_frame_star_row as i32;
+                let cur = self.frame_star_row as i32;
+                let raw = cur - last;
+                let delta_rows = if raw >= 0 && (raw as u32) < FB_H {
+                    raw as u32
+                } else {
+                    FB_H // marker: fall back to full re-blit
+                };
+                if delta_rows > 0 && delta_rows < FB_H {
+                    // Issue DMA2D M2M shift: copy back_buf rows
+                    // [delta..FB_H] → rows [0..FB_H-delta]. Source is
+                    // strictly above destination so linear-in-memory
+                    // DMA2D has no aliasing.
+                    let row_bytes = (FB_W * BPP) as u32;
+                    let keep_rows = FB_H - delta_rows;
+                    let src_rows = unsafe {
+                        back_buf.add((delta_rows * row_bytes) as usize)
+                    };
+                    dma2d.start_blit_raw(
+                        src_rows as *const u8,
+                        row_bytes,
+                        back_buf,
+                        row_bytes,
+                        FB_W,
+                        keep_rows,
+                        PixelFmt::Argb8888,
+                    );
+                    self.incr_shift_done = true;
+                    start_row = keep_rows;
+                }
+            }
+            self.bg_row = start_row;
             self.stage = RenderStage::RenderFrame;
         }
 
@@ -340,7 +446,16 @@ impl StarCrawl {
                 // see it, causing a race that prevents bg_row from advancing.
                 if !dma2d.is_in_flight() && sync.take_complete() {
                     sync.dma2d_idle();
-                    self.bg_row += 1;
+                    if self.incr_shift_done {
+                        // That completion was the Incremental-mode shift,
+                        // not a per-row blit. Consume the flag without
+                        // advancing bg_row — the bottom `delta` rows
+                        // still need filling, starting from the current
+                        // bg_row value set at new-frame-start.
+                        self.incr_shift_done = false;
+                    } else {
+                        self.bg_row += 1;
+                    }
                 }
 
                 if self.bg_row < FB_H && !dma2d.is_in_flight() {

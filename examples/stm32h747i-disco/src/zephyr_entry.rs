@@ -697,7 +697,14 @@ pub unsafe extern "C" fn rlvgl_init(
                 let crawl_lines = crate::readme_crawl::README_CRAWL;
                 // Frame rate hint — star_crawl scales pixels-per-frame
                 // from SCROLL_PX_PER_SEC (40) / frame_hz.
-                StarCrawl::new(&CRAWL_FONT, crawl_lines, 30)
+                let mut c = StarCrawl::new(&CRAWL_FONT, crawl_lines, 30);
+                // Zephyr path uses a persistent scratch buffer
+                // (0xD180_0000) across frames, so the crawl can shift
+                // the existing back_buf up by the scroll delta and
+                // only re-fill the newly-exposed bottom rows. See
+                // task #40 / RenderMode::Incremental doc.
+                c.set_render_mode(crate::star_crawl::RenderMode::Incremental);
+                c
             };
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             let mut crawl_dma2d: Option<rlvgl_platform::dma2d::Dma2dBlitter> = None;
