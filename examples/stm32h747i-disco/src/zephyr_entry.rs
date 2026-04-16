@@ -1013,12 +1013,13 @@ pub unsafe extern "C" fn rlvgl_init(
                                 u1c(HEX[n]);
                             }
                         }
-                        // Dump star_crawl diag_words every ~256 ticks.
-                        // Cheap counter via static-mut.
+                        // Dump star_crawl diag_words every ~16 ticks so we
+                        // see progress promptly. Iter rate is slow (~2 iter/s)
+                        // when crawl is active so 256 would take > 2 minutes.
                         static mut TICK_COUNT: u32 = 0;
                         unsafe {
                             TICK_COUNT = TICK_COUNT.wrapping_add(1);
-                            if TICK_COUNT % 256 == 0 {
+                            if TICK_COUNT % 16 == 0 {
                                 let (w0, w1, w2, w3) = star_crawl.diag_words();
                                 u1s(b"\r\nDIAG ");
                                 u1hex(w0);
@@ -1070,6 +1071,22 @@ pub unsafe extern "C" fn rlvgl_init(
                                 // The bottom 240 rows are clipped — a known
                                 // limitation while we keep star_crawl's
                                 // internal FB_H=720 unchanged.
+                                //
+                                // Before writing the rotated crawl, clear
+                                // the ENTIRE portrait FB to BG_COLOR. The
+                                // rotation only covers portrait rows 0-479
+                                // (→ landscape cols 0-479). Without this
+                                // wipe, portrait rows 480-799 still hold
+                                // the previous widget render, which on
+                                // the rotated panel shows up as the right
+                                // ~40% of the landscape view being stale
+                                // desktop icons next to the starfield.
+                                const BG_COLOR: u32 = 0xFF0A_0A20;
+                                let fb_pixels = (fb_w * fb_h) as usize;
+                                let dst_u32 = render_buf as *mut u32;
+                                for i in 0..fb_pixels {
+                                    dst_u32.add(i).write(BG_COLOR);
+                                }
                                 let src = crawl_buf as *const u32;
                                 let dst = render_buf as *mut u32;
                                 let dst_stride = fb_w as usize;
