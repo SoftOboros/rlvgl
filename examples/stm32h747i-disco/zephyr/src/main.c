@@ -11,6 +11,8 @@
 #include <zephyr/device.h>
 #include <zephyr/irq.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/cache.h>
 #include <zephyr/input/input.h>
 #include <string.h>
@@ -236,7 +238,15 @@ int main(void)
 	/* Probe FT5336 device readiness — helps tell whether the i2c touch
 	 * controller actually bound in this build (adapted_cmd overlay
 	 * disables zephyr display nodes, which may have collaterally removed
-	 * parents the FT5336 node depended on). */
+	 * parents the FT5336 node depended on).
+	 *
+	 * Also: pulse PG3 (the shared DSI/touch reset line) from here so the
+	 * FT5336 IC gets a clean reset BEFORE the Rust panel init runs —
+	 * matches what Zephyr's normal NT35510 driver would have done at
+	 * POST_KERNEL 87, and unblocks the FT5336 polling which was
+	 * starting in an indeterminate state on the ACM build. Then probe
+	 * the chip ID over I2C to verify it responds with real data (not
+	 * just 0s) after reset. */
 #if DT_NODE_EXISTS(DT_NODELABEL(ft5336))
 	{
 		const struct device *ft5336_dev =
@@ -248,6 +258,62 @@ int main(void)
 		} else {
 			printk("rlvgl-zephyr: ft5336 OK, name=%s\n",
 			       ft5336_dev->name);
+
+			/* Pulse PG3 reset: low 10ms, high 10ms. */
+			static const struct gpio_dt_spec pg3_reset =
+				GPIO_DT_SPEC_GET_OR(DT_NODELABEL(gpiog),
+						    reset_gpios, {0});
+			/* Fallback: drive PG3 via raw gpio_pin_configure. */
+			const struct device *gpiog_dev =
+				DEVICE_DT_GET(DT_NODELABEL(gpiog));
+			if (device_is_ready(gpiog_dev)) {
+				gpio_pin_configure(gpiog_dev, 3,
+						   GPIO_OUTPUT_INACTIVE);
+				gpio_pin_set(gpiog_dev, 3, 0); /* low = assert reset */
+				k_sleep(K_MSEC(10));
+				gpio_pin_set(gpiog_dev, 3, 1); /* high = deassert */
+				k_sleep(K_MSEC(200)); /* FT5336 needs ~300ms to come up */
+				/* Verify PG3 is actually HIGH after deassert by
+				 * reading GPIOG_IDR bit 3. Raw register read. */
+				volatile uint32_t *gpiog_idr =
+					(volatile uint32_t *)0x58021810;
+				uint32_t idr = *gpiog_idr;
+				printk("rlvgl-zephyr: PG3 pulsed, GPIOG_IDR=0x%08x (bit3=%d)\n",
+				       idr, (idr >> 3) & 1);
+
+				/* Read FT5336 chip ID (register 0xA3) + firmware
+				 * version (0xA6) via Zephyr I2C to verify the
+				 * chip is in normal operating state. */
+				const struct device *i2c_dev =
+					DEVICE_DT_GET(DT_BUS(DT_NODELABEL(ft5336)));
+				if (device_is_ready(i2c_dev)) {
+					uint8_t chip_id = 0xFF, fw_ver = 0xFF, td_status = 0xFF;
+					int r1 = i2c_reg_read_byte(i2c_dev, 0x38, 0xA3, &chip_id);
+					int r2 = i2c_reg_read_byte(i2c_dev, 0x38, 0xA6, &fw_ver);
+					int r3 = i2c_reg_read_byte(i2c_dev, 0x38, 0x02, &td_status);
+					printk("rlvgl-zephyr: ft5336 chip_id(0xA3)=0x%02x rc=%d, "
+					       "fw(0xA6)=0x%02x rc=%d, td(0x02)=0x%02x rc=%d\n",
+					       chip_id, r1, fw_ver, r2, td_status, r3);
+					/* Write 0x55 to DEVICE_MODE and read back to
+					 * detect stuck-bus vs real chip. */
+					int r4 = i2c_reg_write_byte(i2c_dev, 0x38, 0x00, 0x55);
+					uint8_t dm_rb = 0;
+					int r5 = i2c_reg_read_byte(i2c_dev, 0x38, 0x00, &dm_rb);
+					printk("rlvgl-zephyr: ft5336 WR 0x55 to 0x00 rc=%d; "
+					       "RB=0x%02x rc=%d\n", r4, dm_rb, r5);
+					/* Also try a bogus address (0x77 — no known device) */
+					uint8_t bogus = 0;
+					int r6 = i2c_reg_read_byte(i2c_dev, 0x77, 0xA3, &bogus);
+					printk("rlvgl-zephyr: i2c 0x77 (bogus) read rc=%d data=0x%02x\n",
+					       r6, bogus);
+					/* Finally, force DEVICE_MODE = 0x00 (normal) */
+					i2c_reg_write_byte(i2c_dev, 0x38, 0x00, 0x00);
+				} else {
+					printk("rlvgl-zephyr: i2c bus NOT READY\n");
+				}
+			} else {
+				printk("rlvgl-zephyr: gpiog NOT READY\n");
+			}
 		}
 	}
 #else
