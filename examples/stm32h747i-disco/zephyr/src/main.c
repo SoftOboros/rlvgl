@@ -233,6 +233,27 @@ int main(void)
 	usart1_raw_str("[C-after-printk]\r\n");
 	*(volatile uint32_t *)0x38000200 = 0xB0070002; /* after first printk */
 
+	/* Probe FT5336 device readiness — helps tell whether the i2c touch
+	 * controller actually bound in this build (adapted_cmd overlay
+	 * disables zephyr display nodes, which may have collaterally removed
+	 * parents the FT5336 node depended on). */
+#if DT_NODE_EXISTS(DT_NODELABEL(ft5336))
+	{
+		const struct device *ft5336_dev =
+			DEVICE_DT_GET(DT_NODELABEL(ft5336));
+		if (ft5336_dev == NULL) {
+			printk("rlvgl-zephyr: ft5336 DEVICE_DT_GET returned NULL\n");
+		} else if (!device_is_ready(ft5336_dev)) {
+			printk("rlvgl-zephyr: ft5336 NOT READY\n");
+		} else {
+			printk("rlvgl-zephyr: ft5336 OK, name=%s\n",
+			       ft5336_dev->name);
+		}
+	}
+#else
+	printk("rlvgl-zephyr: ft5336 DT node MISSING\n");
+#endif
+
 	/* Register DMA2D ISR (IRQ 90, pri 3). */
 	irq_connect_dynamic(90, 3, dma2d_isr_wrapper, NULL, 0);
 	irq_enable(90);
