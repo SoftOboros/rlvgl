@@ -1075,7 +1075,7 @@ pub unsafe extern "C" fn rlvgl_init(
                         static mut LAST_FRAME_CYC: u32 = 0;
                         let batch_start = DWT_CYC.read_volatile();
                         let mut result = crate::star_crawl::StepResult::Pending;
-                        for _ in 0..64 {
+                        for _ in 0..1024 {
                             result = star_crawl.tick(
                                 dma2d, crawl_buf, CRAWL_FB_W, CRAWL_FB_H, sync_ref,
                             );
