@@ -166,20 +166,19 @@ pub unsafe extern "C" fn rlvgl_dsi_isr() {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rlvgl_dma2d_isr() {
     unsafe {
+        // The Dma2dBlitter doesn't enable any DMA2D interrupt sources
+        // (CR.TCIE/TEIE/CEIE all stay 0), so this handler currently
+        // never fires in practice. Kept registered as a safety net in
+        // case future code enables IRQs — clear non-TC error flags so
+        // the IRQ won't storm if/when that happens. TCIF is owned by
+        // the polling `take_complete()` path in zephyr_sync.rs.
         const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
         const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
-
         let isr = DMA2D_ISR.read_volatile();
-        let clear = isr & 0x3F;
+        // Clear errors (CEIF=0, TEIF=5, TWIF=2, AEIF=4) but NOT TCIF (1).
+        let clear = isr & 0b00111101;
         if clear != 0 {
             DMA2D_IFCR.write_volatile(clear);
-        }
-
-        // TC (bit 1) = transfer complete
-        if isr & (1 << 1) != 0 {
-            if let Some(sync) = get_sync() {
-                zephyr_sync::k_sem_give(sync.dma2d_done_sem);
-            }
         }
     }
 }
@@ -712,9 +711,18 @@ pub unsafe extern "C" fn rlvgl_init(
                         DiscoCommand::StartEffect(rlvgl_app_disco_demo::DiscoEffect::StarCrawl) => {
                             #[cfg(feature = "adapted_cmd")]
                             {
-                                // Adapted command mode: DMA2D M2M works — start the crawl.
+                                // Adapted command mode: DMA2D M2M works.
+                                // Bring up the crawl renderer state and
+                                // mark it active. Note: as of v0.2.0 the
+                                // tick path itself still has open issues
+                                // (see comments around the `crawl_active`
+                                // block below); enabling this triggers a
+                                // present-pipeline lock under crawl_active.
                                 if crawl_dma2d.is_none() {
                                     crawl_dma2d = Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                }
+                                if let Some(ref mut dma2d) = crawl_dma2d {
+                                    star_crawl.activate(dma2d);
                                 }
                                 crawl_active = true;
                                 controller.publish_status("Star crawl started");
@@ -730,28 +738,122 @@ pub unsafe extern "C" fn rlvgl_init(
                 }
 
                 // ── Star crawl rendering ──────────────────────────────
+                // KNOWN ISSUE (v0.2.0): even with DMA2D + present working
+                // in isolation, this block locks the display when active.
+                // Diagnostics show the loop ticks (`TP` returns) but no
+                // FrameReady is ever produced for sustained operation,
+                // and direct LTDC writes in the same context don't appear
+                // to take effect. Suspect a CSleep/clock-domain or AXI
+                // arbitration issue specific to entering the bypass-the-
+                // widget-render path. Disabled with `&& false` to keep the
+                // rest of the demo functional; re-enable when fixed.
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-                if crawl_active {
+                #[allow(unreachable_code)]
+                if crawl_active && false {
                     if let Some(ref mut dma2d) = crawl_dma2d {
-                        // Portrait scratch buffer at CRAWL_BASE (0xD100_0000)
-                        let crawl_buf = 0xD100_0000usize as *mut u8;
+                        // Portrait scratch back buffer for the composed
+                        // crawl frame. MUST be distinct from the starfield
+                        // buffer (which star_crawl puts at CRAWL_BASE =
+                        // 0xD100_0000); otherwise the DMA2D row-blits read
+                        // from and write to the same region (overlapping
+                        // src/dst → undefined behavior, lockup after one
+                        // frame). 0xD180_0000 sits 8 MB into SDRAM, well
+                        // past starfield (~2.7 MB) + text_src (~1 MB).
+                        let crawl_buf = 0xD180_0000usize as *mut u8;
                         let sync_ref = get_sync().unwrap_unchecked();
+                        // Per-iteration trace so we can see where tick stalls.
+                        // 'T' = entering tick; result tag follows.
+                        fn u1c(c: u8) {
+                            unsafe {
+                                let isr = 0x4001_101C as *const u32;
+                                let tdr = 0x4001_1028 as *mut u32;
+                                let mut t = 100_000u32;
+                                while isr.read_volatile() & (1 << 7) == 0 {
+                                    t -= 1;
+                                    if t == 0 { return; }
+                                }
+                                tdr.write_volatile(c as u32);
+                            }
+                        }
+                        fn u1s(s: &[u8]) { for &b in s { u1c(b); } }
+                        fn u1hex(v: u32) {
+                            const HEX: &[u8; 16] = b"0123456789abcdef";
+                            for i in (0..8).rev() {
+                                let n = ((v >> (i * 4)) & 0xF) as usize;
+                                u1c(HEX[n]);
+                            }
+                        }
+                        // Dump star_crawl diag_words every ~256 ticks.
+                        // Cheap counter via static-mut.
+                        static mut TICK_COUNT: u32 = 0;
+                        unsafe {
+                            TICK_COUNT = TICK_COUNT.wrapping_add(1);
+                            if TICK_COUNT % 256 == 0 {
+                                let (w0, w1, w2, w3) = star_crawl.diag_words();
+                                u1s(b"\r\nDIAG ");
+                                u1hex(w0);
+                                u1c(b' ');
+                                u1hex(w1);
+                                u1c(b' ');
+                                u1hex(w2);
+                                u1c(b' ');
+                                u1hex(w3);
+                                u1s(b"\r\n");
+                                // Also DMA2D ISR + CR
+                                let dma2d_isr = (0x5200_1004 as *const u32).read_volatile();
+                                let dma2d_cr = (0x5200_1000 as *const u32).read_volatile();
+                                u1s(b"DMA2D ISR=");
+                                u1hex(dma2d_isr);
+                                u1s(b" CR=");
+                                u1hex(dma2d_cr);
+                                u1s(b"\r\n");
+                            }
+                        }
+                        u1c(b'T');
                         let result = star_crawl.tick(
                             dma2d, crawl_buf, CRAWL_FB_W, CRAWL_FB_H, sync_ref,
                         );
+                        // result tag char so we can tell what tick returned.
+                        let tag = match result {
+                            crate::star_crawl::StepResult::FrameReady => b'F',
+                            crate::star_crawl::StepResult::Pending => b'P',
+                            crate::star_crawl::StepResult::Idle => b'I',
+                            crate::star_crawl::StepResult::Finished => b'X',
+                        };
+                        u1c(tag);
+                        u1c(b'\r');
+                        u1c(b'\n');
                         match result {
                             crate::star_crawl::StepResult::FrameReady => {
-                                // Rotate portrait crawl output 90° CW into
-                                // the landscape render buffer.
+                                // Rotate the crawl scratch (480w × 720h) into
+                                // the portrait FB (480w × 800h) using the
+                                // SAME 90° rotation that `RotatedRenderer`
+                                // applies to widgets — so the crawl text
+                                // ends up upright and scrolls upward in the
+                                // user's landscape view.
+                                //
+                                // Mapping (matches blit::RotatedRenderer):
+                                //   crawl(px, py) → fb(fb_w - 1 - py, px)
+                                //
+                                // Only the top 480 rows of the 720-row
+                                // scratch fit (fb_x range is 0..fb_w=480).
+                                // The bottom 240 rows are clipped — a known
+                                // limitation while we keep star_crawl's
+                                // internal FB_H=720 unchanged.
                                 let src = crawl_buf as *const u32;
                                 let dst = render_buf as *mut u32;
                                 let dst_stride = fb_w as usize;
                                 for py in 0..CRAWL_FB_H as usize {
+                                    // dx = fb_w - 1 - py: any py >= fb_w
+                                    // would underflow, so bail early.
+                                    if py >= fb_w as usize {
+                                        break;
+                                    }
+                                    let dx = fb_w as usize - 1 - py;
                                     for px in 0..CRAWL_FB_W as usize {
                                         let pixel = src.add(py * CRAWL_FB_W as usize + px).read();
-                                        let dx = py;
-                                        let dy = (CRAWL_FB_W as usize - 1) - px;
-                                        if dx < fb_w as usize && dy < fb_h as usize {
+                                        let dy = px;
+                                        if dy < fb_h as usize {
                                             dst.add(dy * dst_stride + dx).write(pixel);
                                         }
                                     }

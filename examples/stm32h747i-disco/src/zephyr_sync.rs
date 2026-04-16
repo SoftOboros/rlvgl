@@ -123,17 +123,13 @@ impl ZephyrFrameSync {
 impl FrameSync for ZephyrFrameSync {
     #[inline]
     fn take_erif(&self) -> bool {
-        #[cfg(feature = "adapted_cmd")]
-        {
-            // Adapted command mode: consume ERIF semaphore (non-blocking).
-            // The DSI ISR gives erif_sem when ERIF fires.
-            unsafe { k_sem_take(self.erif_sem, K_NO_WAIT) == 0 }
-        }
-        #[cfg(not(feature = "adapted_cmd"))]
-        {
-            // Video mode: no ERIF — always grant.
-            true
-        }
+        // The Zephyr ACM path uses WCFGR.AR=0 (manual LTDCEN pulse — see
+        // `feedback_acm_ar_zephyr.md`). No LTDC scan happens unless we
+        // explicitly call `present()`, so there is no in-flight scan to
+        // wait for between DMA2D bursts. Always grant — the render loop
+        // sequences DMA2D and present manually.
+        let _ = unsafe { k_sem_take(self.erif_sem, K_NO_WAIT) }; // drain
+        true
     }
 
     #[inline]
@@ -142,21 +138,10 @@ impl FrameSync for ZephyrFrameSync {
     }
 
     fn dma2d_admits(&self, _cost: u32) -> bool {
-        #[cfg(feature = "adapted_cmd")]
-        {
-            // Same cycle-budget arithmetic as bare-metal: check if `cost`
-            // cycles of DMA2D work can complete before the 1ms guard window
-            // (400,000 cycles at 400 MHz) before the expected next ERIF.
-            let elapsed = self.cycles_since_erif();
-            let budget = self.frame_budget_cycles();
-            let guard = 400_000u32; // 1 ms at 400 MHz
-            budget.saturating_sub(elapsed) > _cost + guard
-        }
-        #[cfg(not(feature = "adapted_cmd"))]
-        {
-            // Video mode: LTDC scans continuously — DMA2D can run anytime.
-            true
-        }
+        // ACM with AR=0: no concurrent LTDC scan to budget against.
+        // The render loop only calls `present()` after the crawl
+        // returns FrameReady, so DMA2D has the bus all to itself.
+        true
     }
 
     #[inline]
@@ -166,15 +151,10 @@ impl FrameSync for ZephyrFrameSync {
 
     #[inline]
     fn erif_is_set(&self) -> bool {
-        #[cfg(feature = "adapted_cmd")]
-        {
-            rlvgl_platform::dsi_cmd_mode::check_erif()
-        }
-        #[cfg(not(feature = "adapted_cmd"))]
-        {
-            // Video mode: always true so star crawl doesn't block.
-            true
-        }
+        // ACM with AR=0: no scan in flight unless we explicitly pulsed.
+        // Always return true so the star_crawl gate doesn't block on a
+        // condition that will never be met.
+        true
     }
 }
 
@@ -186,12 +166,15 @@ impl Dma2dSync for ZephyrFrameSync {
 
     #[inline]
     fn take_complete(&self) -> bool {
-        // Poll DMA2D_ISR.TCIF (bit 1) directly — avoids ISR/sem race.
+        // The Dma2dBlitter never enables CR.TCIE, so TCIF sets on each
+        // completed transfer but no IRQ fires (verified via diag dump:
+        // CR=0x00010000, TCIE bit 8 clear). Poll DMA2D_ISR.TCIF directly
+        // and clear it ourselves. The ISR-based path was tried but
+        // useless without TCIE — the sem was never given.
         const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
         const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
         let isr = unsafe { DMA2D_ISR.read_volatile() };
         if isr & (1 << 1) != 0 {
-            // Clear TC flag
             unsafe { DMA2D_IFCR.write_volatile(1 << 1) };
             true
         } else {

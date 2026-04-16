@@ -391,6 +391,28 @@ pub unsafe fn enable_display_peripheral_clocks() {
         const RCC_AHB4ENR: *mut u32 = (RCC + 0x0E0) as *mut u32;
         let ahb4 = RCC_AHB4ENR.read_volatile();
         RCC_AHB4ENR.write_volatile(ahb4 | (1 << 6) | (1 << 9));
+
+        // ── KEEP CLOCKED IN CSLEEP ────────────────────────────────────
+        // Per RM0399 §8.7.x, *xxxLPENR registers gate peripheral clocks
+        // *while the CPU is in CSleep* (entered via WFI / Zephyr k_sleep).
+        // If LTDC/DSI/DMA2D LPEN bits are 0 and Zephyr's idle drops into
+        // CSleep, those peripherals lose their clocks mid-operation —
+        // any scan or DMA2D transfer in flight halts, and a just-pulsed
+        // WCR.LTDCEN can be lost before the wrapper acts on it.
+        // Set the LP-enable bits matching the EN bits we just set.
+        const RCC_AHB3LPENR: *mut u32 = (RCC + 0x13C) as *mut u32;
+        const RCC_APB3LPENR: *mut u32 = (RCC + 0x14C) as *mut u32;
+        const RCC_AHB4LPENR: *mut u32 = (RCC + 0x148) as *mut u32;
+        let ahb3lp = RCC_AHB3LPENR.read_volatile();
+        // DMA2DLPEN (bit 4) + FMCLPEN (bit 12) — LTDC's framebuffer
+        // reads go through FMC to SDRAM; if FMC is gated in CSleep,
+        // LTDC can't fetch pixels and the scan stalls.
+        RCC_AHB3LPENR.write_volatile(ahb3lp | (1 << 4) | (1 << 12));
+        let apb3lp = RCC_APB3LPENR.read_volatile();
+        RCC_APB3LPENR.write_volatile(apb3lp | (1 << 3) | (1 << 4)); // LTDC + DSI LPEN
+        let ahb4lp = RCC_AHB4LPENR.read_volatile();
+        RCC_AHB4LPENR.write_volatile(ahb4lp | (1 << 6) | (1 << 9)); // GPIOG + GPIOJ LPEN
+
         // Brief settle
         cortex_m::asm::dsb();
     }
