@@ -259,12 +259,10 @@ pub fn dsi_isr_body() {
                 sync.scan_complete.store(true, Ordering::Release);
                 freertos_sync::rlvgl_sem_give_from_isr(sync.erif_sem);
             }
-            // Note: `render_start_sem` is NOT given here. Waking
-            // render on the ERIF edge would start it writing to BACK
-            // while present_task has not yet done the front/back
-            // swap — race. The give lives in `present_task` *after*
-            // `ltdc_retrigger`, so render only wakes once the new
-            // BACK is guaranteed to be off-screen.
+            // render_start_sem is NOT given on the ERIF edge.
+            // It's given by present_task after retrigger — so render
+            // starts its DMA2D work into BACK while LTDC scans FRONT.
+            // Two different buffers, separated by the swap.
         }
 
         let isr0 = ISR0.read_volatile();
@@ -544,6 +542,30 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             cycles_since_swap = cycles_since_swap.saturating_add(1);
         }
 
+        // Before retrigger, ensure DMA2D is fully idle. star_crawl
+        // has some DMA2D start paths that aren't gated through
+        // `sync.dma2d_admits`, so a static admission guard can't
+        // guarantee DMA2D finishes before the scan. Wait here
+        // (yielding to render / idle at priority 1) until the
+        // hardware CR.START bit clears. Hard guarantee of no scan/
+        // DMA2D contention — frame period extends if DMA2D needs
+        // more than the 15 ms holdoff, which is the "graceful
+        // slowdown" behaviour (prefer frame-repeat over flicker).
+        {
+            const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32;
+            const CR_START: u32 = 1 << 0;
+            let mut wait_ticks: u32 = 0;
+            while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
+                wait_ticks += 1;
+                if wait_ticks > 30 {
+                    // 30 ms ceiling — DMA2D looks wedged; retrigger
+                    // anyway so we don't deadlock.
+                    break;
+                }
+                unsafe { vTaskDelay(1) };
+            }
+        }
+
         let fb = FRONT_FB_ADDR.load(Ordering::Acquire);
         if fb != 0 {
             // Mark the previous scan's completion consumed before
@@ -551,19 +573,17 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             // via `sync.erif_is_set` to gate on "prior scan done".
             sync.scan_complete.store(false, Ordering::Release);
             unsafe { ltdc_retrigger(fb) };
+            // PJ0 / Arduino D7 HIGH — LTDC scan is now active. DSI
+            // ISR takes it LOW when ERIF fires (scan complete).
+            // Together they scope the scan window on D7, and D9 (PJ6)
+            // scopes DMA2D in flight — so one can see whether DMA2D
+            // is cleanly sitting in the back-porch window (D9 inside
+            // D7-LOW) or spilling into the scan (D9 overlapping
+            // D7-HIGH = AXI contention).
+            rlvgl_platform::frame_sync::ScopeProbe::ltdc_active(sync);
         }
-
-        // Wake render_task. This gate is given *after* the
-        // front/back swap + retrigger, not on the DSI ERIF edge —
-        // so when render_task resumes, the BACK atomic already
-        // points to a buffer that is off-screen (LTDC is scanning
-        // the new FRONT we just retriggered). Waking on ERIF
-        // instead would race the swap: render would start writing
-        // to a buffer that is about to become FRONT.
-        let rs = RENDER_START_SEM.load(Ordering::Acquire);
-        if !rs.is_null() {
-            unsafe { freertos_sync::rlvgl_sem_give(rs) };
-        }
+        // Render is woken on the ERIF edge by the DSI ISR, not
+        // here — see the DSI ISR body for the rationale.
     }
 }
 
@@ -755,6 +775,27 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             // idle can run.
             while deadline_hits < CRAWL_TIMEOUT_TICKS {
                 unsafe { hb_inc(HB_CRAWL_TICKS) };
+
+                // Scan-phase gate: if LTDC is currently scanning
+                // (scan_complete == false), DO NOT issue new DMA2D
+                // ops. star_crawl has internal admission at frame
+                // start but not at every tick, so a long frame's
+                // mid-op sequence can spill DMA2D into the scan and
+                // contend with LTDC on the AXI/SDRAM bus.
+                //
+                // Yielding here (vTaskDelay(1)) gives higher-priority
+                // tasks and the idle hook CPU; DSI ERIF ISR will set
+                // scan_complete=true when the scan finishes, letting
+                // this task resume and pack more DMA2D into the next
+                // back porch. Over multiple back porches the frame
+                // completes cleanly — the graceful slowdown the user
+                // asked for.
+                use rlvgl_platform::frame_sync::FrameSync;
+                if !sync.erif_is_set() {
+                    unsafe { vTaskDelay(1) };
+                    continue;
+                }
+
                 match cr.tick(dma, back as *mut u8, w, h, sync) {
                     StepResult::Idle => break,
                     StepResult::Pending => {

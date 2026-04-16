@@ -92,6 +92,11 @@ pub struct FreeRtosFrameSync {
     pub frame_budget: AtomicU32,
     /// DWT_CYCCNT snapshot when last DMA2D transfer started.
     pub dma2d_start_cyc: AtomicU32,
+    /// DMA2D ops admitted this back-porch window. Reset to 0 by the
+    /// DSI ERIF ISR; incremented by `dma2d_admits`. Caps at 2 ops
+    /// per porch so each porch's DMA2D footprint is tiny and
+    /// guaranteed to finish before retrigger.
+    pub porch_admits: AtomicU32,
     /// Non-destructive "previous scan completed" flag.
     ///
     /// - Set to `true` by the DSI ERIF ISR when a scan completes.
@@ -126,6 +131,7 @@ impl FreeRtosFrameSync {
             erif_cyccnt: AtomicU32::new(0),
             frame_budget: AtomicU32::new(13_200_000), // 33 ms at 400 MHz
             dma2d_start_cyc: AtomicU32::new(0),
+            porch_admits: AtomicU32::new(0),
             scan_complete: AtomicBool::new(false),
         }
     }
@@ -164,11 +170,37 @@ impl FrameSync for FreeRtosFrameSync {
     }
 
     fn dma2d_admits(&self, cost: u32) -> bool {
-        const GUARD: u32 = 400_000; // 1 ms at 400 MHz
-        let budget = self.frame_budget.load(Ordering::Relaxed);
+        // DMA2D admission has two windows carved out of the 15 ms
+        // back porch (ERIF → retrigger):
+        //
+        // [   back porch   | front porch |    scan phase    ]
+        // |<-- admit -->|<-- refuse --->|<---- refuse ---->|
+        // 0              Y             15 ms           ~29 ms
+        //
+        // "Front porch" (named per the user's convention) is a
+        // safety margin before retrigger. star_crawl's op cost
+        // estimates (500 for row, 500_000 for compose, 800_000 for
+        // M2M shift) underestimate real DMA2D time because of AXI
+        // arbitration + SDRAM refresh stalls, so a generous guard
+        // is required to ensure the op truly finishes before the
+        // retrigger kicks LTDC. Without this, DMA2D pulses on D9
+        // overlap the scan window (D7 HIGH) and produce the
+        // "rolling" flicker pattern.
+        //
+        // FRONT_PORCH = 4 ms = 1_600_000 cycles @ 400 MHz —
+        // conservative enough to absorb the cost-underestimate on
+        // the biggest M2M op observed in star_crawl.
+        //
+        // Scan phase rejection is unconditional: `elapsed >=
+        // BACK_PORCH_CYCLES` means LTDC is actively scanning; never
+        // start a DMA2D op there regardless of reported cost.
+        const FRONT_PORCH: u32 = 1_600_000; // 4 ms @ 400 MHz
+        const BACK_PORCH_CYCLES: u32 = 6_000_000; // 15 ms @ 400 MHz
         let elapsed = self.cycles_since_erif();
-        let remaining = budget.saturating_sub(elapsed);
-        remaining > cost + GUARD
+        if elapsed >= BACK_PORCH_CYCLES {
+            return false;
+        }
+        elapsed + cost + FRONT_PORCH < BACK_PORCH_CYCLES
     }
 
     #[inline]
