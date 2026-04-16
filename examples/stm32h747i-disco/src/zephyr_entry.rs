@@ -587,10 +587,13 @@ pub unsafe extern "C" fn rlvgl_init(
         dcache_clean_all();
 
         // ── 4b. Save pristine desktop for background restoration ────────
-        // Copy front buffer (rotated splash) to a third SDRAM region
-        // past the scratch area. Each frame we restore from this pristine
-        // copy before drawing widgets.
-        let pristine_base = scratch_base.add(splash_bytes);
+        // Copy front buffer (rotated splash) to a third SDRAM region.
+        // Fixed at 0xD030_0000 to match bare-metal's `PRISTINE` constant
+        // in `star_crawl::blit_splash_crop_a8` so the splash-graphic
+        // A8 pre-render reads valid pixels on both build flavors. SDRAM
+        // gap between fb_back end (0xD097_6E00) and crawl starfield at
+        // 0xD100_0000 has 6.5 MB free; 0xD030_0000..0xD047_6E00 fits.
+        let pristine_base = 0xD030_0000usize as *mut u8;
         core::ptr::copy_nonoverlapping(fb_front, pristine_base, fb_bytes);
 
         dcache_clean_all();
@@ -700,7 +703,15 @@ pub unsafe extern "C" fn rlvgl_init(
                     "DMA2D accelerated",
                     "star field rendering",
                 ];
-                StarCrawl::new(&CRAWL_FONT, CRAWL_LINES, 60)
+                // Frame rate hint — star_crawl scales pixels-per-frame
+                // from SCROLL_PX_PER_SEC / frame_hz. Bare-metal runs at
+                // ~60 Hz; Zephyr's ACM path completes a full crawl frame
+                // at ~1.5 fps due to the 1.5 MB DMA2D compose blit and
+                // full-page starfield/text render. Pass 2 so the per-
+                // frame scroll shift is roughly 20 px, yielding a
+                // visible ~30 px/s scroll matching the 40 px/s design
+                // target.
+                StarCrawl::new(&CRAWL_FONT, CRAWL_LINES, 2)
             };
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             let mut crawl_dma2d: Option<rlvgl_platform::dma2d::Dma2dBlitter> = None;
@@ -711,7 +722,7 @@ pub unsafe extern "C" fn rlvgl_init(
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             const CRAWL_FB_W: u32 = 480;
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-            const CRAWL_FB_H: u32 = 720;
+            const CRAWL_FB_H: u32 = 800;
 
             // After first present, LTDC displays back buffer (now front).
             // The "back" for rendering is the original front buffer.
@@ -1056,57 +1067,48 @@ pub unsafe extern "C" fn rlvgl_init(
                         u1c(b'\n');
                         match result {
                             crate::star_crawl::StepResult::FrameReady => {
-                                // Rotate the crawl scratch (480w × 720h) into
-                                // the portrait FB (480w × 800h) using the
-                                // SAME 90° rotation that `RotatedRenderer`
-                                // applies to widgets — so the crawl text
-                                // ends up upright and scrolls upward in the
-                                // user's landscape view.
+                                // Direct blit from crawl scratch (480×800) to
+                                // the portrait FB (480×800). Both buffers are
+                                // the same shape and orientation since
+                                // star_crawl now renders at the full portrait
+                                // height (FB_H=800); no rotation needed.
                                 //
-                                // Mapping (matches blit::RotatedRenderer):
-                                //   crawl(px, py) → fb(fb_w - 1 - py, px)
-                                //
-                                // Only the top 480 rows of the 720-row
-                                // scratch fit (fb_x range is 0..fb_w=480).
-                                // The bottom 240 rows are clipped — a known
-                                // limitation while we keep star_crawl's
-                                // internal FB_H=720 unchanged.
-                                //
-                                // Before writing the rotated crawl, clear
-                                // the ENTIRE portrait FB to BG_COLOR. The
-                                // rotation only covers portrait rows 0-479
-                                // (→ landscape cols 0-479). Without this
-                                // wipe, portrait rows 480-799 still hold
-                                // the previous widget render, which on
-                                // the rotated panel shows up as the right
-                                // ~40% of the landscape view being stale
-                                // desktop icons next to the starfield.
-                                const BG_COLOR: u32 = 0xFF0A_0A20;
-                                let fb_pixels = (fb_w * fb_h) as usize;
-                                let dst_u32 = render_buf as *mut u32;
-                                for i in 0..fb_pixels {
-                                    dst_u32.add(i).write(BG_COLOR);
-                                }
-                                let src = crawl_buf as *const u32;
-                                let dst = render_buf as *mut u32;
-                                let dst_stride = fb_w as usize;
-                                for py in 0..CRAWL_FB_H as usize {
-                                    // dx = fb_w - 1 - py: any py >= fb_w
-                                    // would underflow, so bail early.
-                                    if py >= fb_w as usize {
-                                        break;
-                                    }
-                                    let dx = fb_w as usize - 1 - py;
-                                    for px in 0..CRAWL_FB_W as usize {
-                                        let pixel = src.add(py * CRAWL_FB_W as usize + px).read();
-                                        let dy = px;
-                                        if dy < fb_h as usize {
-                                            dst.add(dy * dst_stride + dx).write(pixel);
-                                        }
-                                    }
-                                }
+                                // Architecture per design note: the crawl is
+                                // logically independent of display dimensions
+                                // — it renders to its own SRAM scratch at its
+                                // chosen aspect, and a COMPOSITION step here
+                                // blits it onto the final display surface.
+                                // Today that composition is a 1:1 memcpy; in
+                                // future it can scale / offset / clip as
+                                // needed.
+                                // DMA2D M2M blit of the full 480×800 crawl
+                                // scratch to the display FB. Much faster
+                                // than a CPU memcpy of the 1.5 MB buffer
+                                // and bypasses D-cache entirely (DMA2D
+                                // reads/writes SDRAM directly, so the
+                                // later dcache_clean_all is only needed
+                                // to flush any stale cache lines that
+                                // would otherwise clobber our just-written
+                                // pixels via eviction).
+                                let stride_bytes = (fb_w * bpp) as u32;
+                                dma2d.blit_raw(
+                                    crawl_buf as *const u8,
+                                    stride_bytes,
+                                    render_buf,
+                                    stride_bytes,
+                                    fb_w as u32,
+                                    fb_h as u32,
+                                    rlvgl_platform::PixelFmt::Argb8888,
+                                );
                                 dcache_clean_all();
                                 do_present(render_buf, di.width, di.height);
+                                // Advance scroll so the next frame uses a
+                                // new star_scroll_q8 + text scroll_q8. Without
+                                // this call the crawl re-renders the identical
+                                // frame forever (stationary starfield, no
+                                // text motion). Bare-metal calls this after
+                                // its present; mirroring here.
+                                star_crawl.advance_scroll();
                                 render_buf = if render_buf == fb_front { fb_back } else { fb_front };
                                 continue; // skip normal widget render this frame
                             }

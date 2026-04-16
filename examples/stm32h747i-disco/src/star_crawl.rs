@@ -15,8 +15,12 @@ use rlvgl_platform::frame_sync::{Dma2dSync, FrameSync, ScopeProbe};
 
 /// Portrait framebuffer width.
 const FB_W: u32 = 480;
-/// Portrait rows used by the crawl.
-const FB_H: u32 = 720;
+/// Portrait rows used by the crawl. Sized to match the full portrait
+/// FB height (480×800 on STM32H747I-DISCO NT35510), so direct blits
+/// from the crawl scratch cover the entire display with no rotation
+/// step. Previously 720, leaving 80 rows of BG at the bottom of
+/// portrait (= 80 landscape cols of BG at one edge).
+const FB_H: u32 = 800;
 /// Landscape crawl width.
 const CRAWL_W: u32 = FB_H;
 /// Landscape crawl height.
