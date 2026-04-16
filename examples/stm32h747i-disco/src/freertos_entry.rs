@@ -28,9 +28,7 @@
 
 use core::sync::atomic::{AtomicPtr, Ordering};
 
-use crate::freertos_sync::{
-    self, FreeRtosFrameSync, SemaphoreHandle_t, StaticSemaphore,
-};
+use crate::freertos_sync::{self, FreeRtosFrameSync, SemaphoreHandle_t, StaticSemaphore};
 
 // ── FreeRTOS task + kernel FFI ────────────────────────────────────────────────
 
@@ -108,6 +106,13 @@ fn get_sync() -> Option<&'static FreeRtosFrameSync> {
     }
 }
 
+/// Expose the DMA2D completion semaphore to other FreeRTOS-side
+/// modules (e.g. `freertos_dma2d::FreeRtosDma2dBlitter`) that need to
+/// block on DMA2D transfer completion from a task context.
+pub fn dma2d_done_sem() -> Option<SemaphoreHandle_t> {
+    get_sync().map(|s| s.dma2d_done_sem)
+}
+
 // ── ISR handlers (named per STM32H7 NVIC; #[interrupt] in main.rs wraps these)
 
 /// DSI ISR body — same register reads as bare-metal, but gives the
@@ -178,6 +183,7 @@ pub fn dma2d_isr_body() {
 const PRESENT_STACK_WORDS: usize = 512; // 2 KB
 const RENDER_STACK_WORDS: usize = 2048; // 8 KB
 const TOUCH_STACK_WORDS: usize = 256; // 1 KB
+const PLAYIT_STACK_WORDS: usize = 512; // 2 KB — small cmd parsing + serial
 
 static mut ERIF_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 static mut DMA2D_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
@@ -186,10 +192,12 @@ static mut BUF_READY_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 static mut PRESENT_TCB: StaticTask = StaticTask::new();
 static mut RENDER_TCB: StaticTask = StaticTask::new();
 static mut TOUCH_TCB: StaticTask = StaticTask::new();
+static mut PLAYIT_TCB: StaticTask = StaticTask::new();
 
 static mut PRESENT_STACK: [StackType_t; PRESENT_STACK_WORDS] = [0; PRESENT_STACK_WORDS];
 static mut RENDER_STACK: [StackType_t; RENDER_STACK_WORDS] = [0; RENDER_STACK_WORDS];
 static mut TOUCH_STACK: [StackType_t; TOUCH_STACK_WORDS] = [0; TOUCH_STACK_WORDS];
+static mut PLAYIT_STACK: [StackType_t; PLAYIT_STACK_WORDS] = [0; PLAYIT_STACK_WORDS];
 
 static mut SYNC_STORAGE: core::mem::MaybeUninit<FreeRtosFrameSync> =
     core::mem::MaybeUninit::uninit();
@@ -221,19 +229,20 @@ static BUF_READY_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
 // With no render in flight, present_task just re-scans the same
 // FRONT_FB_ADDR every frame, so the splash stays on the panel.
 
-static FRONT_FB_ADDR: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
-static BACK_FB_ADDR: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
-static FB_BYTES: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
+static FRONT_FB_ADDR: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+static BACK_FB_ADDR: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+static FB_BYTES: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+static FB_W: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+static FB_H: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
-/// Record the framebuffer addresses and byte size for the present /
-/// render tasks. Called once from `main()` just before
-/// `freertos_entry::start()`.
-pub fn init_fbs(front: u32, back: u32, bytes: u32) {
+/// Record the framebuffer geometry for the present / render tasks.
+/// Called once from `main()` just before `freertos_entry::start()`.
+pub fn init_fbs(front: u32, back: u32, width: u32, height: u32) {
+    let bytes = width * height * 4; // ARGB8888
     FRONT_FB_ADDR.store(front, core::sync::atomic::Ordering::Release);
     BACK_FB_ADDR.store(back, core::sync::atomic::Ordering::Release);
+    FB_W.store(width, core::sync::atomic::Ordering::Release);
+    FB_H.store(height, core::sync::atomic::Ordering::Release);
     FB_BYTES.store(bytes, core::sync::atomic::Ordering::Release);
 }
 
@@ -286,13 +295,30 @@ unsafe fn ltdc_retrigger(fb_addr: u32) {
 //   0x3800_070C — present_task ERIF wake count (sem-take successes)
 //   0x3800_0710 — touch_task non-empty sample count (FT5336 touches seen)
 //   0x3800_0714 — touch_task last reported count+event_flag+x+y packed
+//   0x3800_0718 — last render frame pixels-touched count
+//   0x3800_071C — last render frame rect count
+//   0x3800_0720 — last render frame cycle count (CpuBlitter cost)
+//   0x3800_0724 — cumulative pixels-touched  (for fps * pixels calc)
 
 const HB_PRESENT_TICKS: *mut u32 = 0x3800_0700 as *mut u32;
-const HB_RENDER_TICKS:  *mut u32 = 0x3800_0704 as *mut u32;
-const HB_TOUCH_TICKS:   *mut u32 = 0x3800_0708 as *mut u32;
-const HB_ERIF_WAKES:    *mut u32 = 0x3800_070C as *mut u32;
-const HB_TOUCH_HITS:    *mut u32 = 0x3800_0710 as *mut u32;
-const HB_TOUCH_LAST:    *mut u32 = 0x3800_0714 as *mut u32;
+const HB_RENDER_TICKS: *mut u32 = 0x3800_0704 as *mut u32;
+const HB_TOUCH_TICKS: *mut u32 = 0x3800_0708 as *mut u32;
+const HB_ERIF_WAKES: *mut u32 = 0x3800_070C as *mut u32;
+const HB_TOUCH_HITS: *mut u32 = 0x3800_0710 as *mut u32;
+const HB_TOUCH_LAST: *mut u32 = 0x3800_0714 as *mut u32;
+const HB_RENDER_PIXELS: *mut u32 = 0x3800_0718 as *mut u32;
+const HB_RENDER_RECTS: *mut u32 = 0x3800_071C as *mut u32;
+const HB_RENDER_CYC: *mut u32 = 0x3800_0720 as *mut u32;
+const HB_RENDER_PX_TOT: *mut u32 = 0x3800_0724 as *mut u32;
+const HB_CRAWL_FRAMEID: *mut u32 = 0x3800_0728 as *mut u32;
+const HB_CRAWL_TICKS:   *mut u32 = 0x3800_072C as *mut u32;
+const HB_CRAWL_READY:   *mut u32 = 0x3800_0730 as *mut u32;
+const HB_PLAYIT_POLLS:  *mut u32 = 0x3800_0734 as *mut u32;
+
+/// Shared flag — playit `C` command sets this; render task reads to
+/// toggle the star crawl on/off.
+pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
 
 #[inline(always)]
 unsafe fn hb_inc(addr: *mut u32) {
@@ -352,47 +378,188 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
 }
 
 unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
+    use alloc::boxed::Box;
     use core::sync::atomic::Ordering;
+    use rlvgl_core::packed_font::PackedFont;
+    use rlvgl_platform::blit::{PixelFmt, Rect, Surface};
+    use rlvgl_platform::cpu_blitter::CpuBlitter;
+    use rlvgl_platform::dma2d::Dma2dBlitter;
 
-    // Simple visible proof-of-life: fill the back buffer with a solid
-    // color that cycles red → green → blue every render pass. When
-    // the present task swaps to this buffer, the whole panel changes
-    // color, proving the render → present pipeline is live.
-    //
-    // Rate-limited to ~2 Hz so the color change is eye-pace rather
-    // than strobe-pace, and so the back-buffer write stays well below
-    // any present-side swap cadence (no tearing risk).
+    use crate::freertos_layers::{Compositor, MotionBlockLayer, SolidBackgroundLayer};
+    use crate::star_crawl::{self, RenderMode, StarCrawl, StepResult};
 
-    const RENDER_PERIOD_MS: u32 = 500;
-    let colors: [u32; 3] = [0xFFFF_0000, 0xFF00_FF00, 0xFF00_00FF];
-    let mut frame: u32 = 0;
+    // Frame pacing when idle (non-crawl compositor demo). Crawl mode
+    // yields more aggressively between DMA2D waits (see tick loop).
+    const IDLE_PERIOD_MS: u32 = 16; // ~62 Hz
+    const CRAWL_YIELD_MS: u32 = 1; //  short yield between Pending ticks
+    const CRAWL_TIMEOUT_TICKS: u32 = 50; // 50 ms per-frame ceiling
+
+    // Bold font and README crawl text — mirrors the bare-metal and
+    // Zephyr setup so FreeRTOS renders the same content.
+    static BOLD_FONT_DATA: &[u8] =
+        include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
+    static BOLD_FONT: PackedFont = PackedFont {
+        height: 32,
+        ascent: 30,
+        glyphs: &crate::fonts::DEJAVU_SANS_BOLD_32_GLYPHS,
+        data: BOLD_FONT_DATA,
+    };
+
+    let mut compositor: Option<Compositor> = None;
+    let mut cpu_blitter = CpuBlitter;
+    let mut dma2d: Option<Dma2dBlitter> = None;
+    let mut crawl: Option<StarCrawl> = None;
 
     loop {
         unsafe { hb_inc(HB_RENDER_TICKS) };
 
         let back = BACK_FB_ADDR.load(Ordering::Acquire);
+        let w = FB_W.load(Ordering::Acquire);
+        let h = FB_H.load(Ordering::Acquire);
         let bytes = FB_BYTES.load(Ordering::Acquire);
-        if back != 0 && bytes != 0 {
-            let color = colors[(frame as usize) % colors.len()];
-            let pixels = (bytes / 4) as usize;
-            let ptr = back as *mut u32;
-            // Simple word-stride fill. Not the fastest possible but
-            // fine for ~2 Hz demo cadence.
-            for i in 0..pixels {
-                unsafe { ptr.add(i).write_volatile(color) };
-            }
-            cortex_m::asm::dsb();
 
-            // Signal the present task that the back buffer is ready.
-            let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-            if !buf_ready.is_null() {
-                unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
-            }
-
-            frame = frame.wrapping_add(1);
+        if back == 0 || w == 0 || h == 0 || bytes == 0 {
+            unsafe { vTaskDelay(IDLE_PERIOD_MS) };
+            continue;
         }
 
-        unsafe { vTaskDelay(RENDER_PERIOD_MS) };
+        // Wait for the sync object (gives us dma2d_done_sem for TCIE
+        // ack) before claiming the DMA2D peripheral.
+        if get_sync().is_none() {
+            unsafe { vTaskDelay(IDLE_PERIOD_MS) };
+            continue;
+        }
+
+        // Lazy-init DMA2D blitter — owned directly so `star_crawl.tick`
+        // can borrow &mut. We enable the TC interrupt so the FreeRTOS
+        // DMA2D ISR gives `dma2d_done_sem`, which the sync trait
+        // (`take_complete`) drains between tick calls.
+        if dma2d.is_none() {
+            let mut b = unsafe { Dma2dBlitter::steal() };
+            b.enable_tc_interrupt();
+            dma2d = Some(b);
+        }
+
+        // Lazy-init StarCrawl — uses the same bold font + README text
+        // as bare-metal / Zephyr. Incremental mode is the efficient
+        // path (per-frame M2M shift + narrow fill-in) and requires a
+        // persistent layer buffer — 0xD180_0000 matches Zephyr.
+        if crawl.is_none() {
+            let mut c = StarCrawl::new(&BOLD_FONT, crate::readme_crawl::README_CRAWL, 30);
+            c.set_render_mode(RenderMode::Incremental);
+            crawl = Some(c);
+        }
+
+        let dma = dma2d.as_mut().unwrap();
+        let cr = crawl.as_mut().unwrap();
+
+        // ── Toggle handshake with playit_task ─────────────────────
+        let req = CRAWL_REQ.swap(false, Ordering::AcqRel);
+        if req {
+            if cr.is_active() {
+                cr.deactivate();
+            } else {
+                cr.activate(dma);
+                cr.set_layer_buf(0xD180_0000usize as *mut u8);
+            }
+        }
+
+        // ── Crawl mode: non-blocking tick loop ────────────────────
+        if cr.is_active() {
+            let sync = get_sync().unwrap();
+            let mut deadline_hits = 0u32;
+            let mut frame_ready = false;
+            let mut finished = false;
+
+            // Run tick() until the frame is ready, the crawl finishes,
+            // or we hit a per-frame ceiling (prevents the render task
+            // from monopolizing the CPU if DMA2D stalls). Between
+            // `Pending` returns yield briefly so touch / present /
+            // idle can run.
+            while deadline_hits < CRAWL_TIMEOUT_TICKS {
+                unsafe { hb_inc(HB_CRAWL_TICKS) };
+                match cr.tick(dma, back as *mut u8, w, h, sync) {
+                    StepResult::Idle => break,
+                    StepResult::Pending => {
+                        deadline_hits += 1;
+                        unsafe { vTaskDelay(CRAWL_YIELD_MS) };
+                    }
+                    StepResult::FrameReady => {
+                        frame_ready = true;
+                        break;
+                    }
+                    StepResult::Finished => {
+                        finished = true;
+                        break;
+                    }
+                }
+            }
+
+            if frame_ready {
+                cortex_m::asm::dsb();
+                unsafe {
+                    HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
+                    hb_inc(HB_CRAWL_READY);
+                }
+                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+                if !buf_ready.is_null() {
+                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+                }
+                cr.advance_scroll();
+            }
+
+            if finished {
+                cr.deactivate();
+            }
+
+            // Stay in crawl mode — loop back to tick the next frame.
+            continue;
+        }
+
+        // ── Idle mode: simple compositor demo, CpuBlitter-backed ──
+        let c = compositor.get_or_insert_with(|| {
+            let mut c = Compositor::new();
+            c.push(Box::new(SolidBackgroundLayer { color: 0xFF08_0820 }));
+            let block_h = 80u32;
+            let block_w = 80u32;
+            let block = MotionBlockLayer::new(
+                Rect {
+                    x: 0,
+                    y: ((h - block_h) / 2) as i32,
+                    w: block_w,
+                    h: block_h,
+                },
+                0xFFE5_3E3E,
+                4,
+                (w, h),
+            );
+            c.push(Box::new(block));
+            c.prime_full(Rect { x: 0, y: 0, w, h });
+            c
+        });
+
+        let buf =
+            unsafe { core::slice::from_raw_parts_mut(back as *mut u8, bytes as usize) };
+        let stride = (w as usize) * 4;
+        let mut surf = Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
+
+        let stats = c.render_frame(&mut cpu_blitter, &mut surf);
+        cortex_m::asm::dsb();
+
+        unsafe {
+            HB_RENDER_PIXELS.write_volatile(stats.pixels_touched);
+            HB_RENDER_RECTS.write_volatile(stats.rect_count);
+            HB_RENDER_CYC.write_volatile(stats.cycles);
+            let prev = HB_RENDER_PX_TOT.read_volatile();
+            HB_RENDER_PX_TOT.write_volatile(prev.wrapping_add(stats.pixels_touched));
+        }
+
+        let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+        if !buf_ready.is_null() {
+            unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+        }
+
+        unsafe { vTaskDelay(IDLE_PERIOD_MS) };
     }
 }
 
@@ -415,8 +582,10 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
                 unsafe { hb_inc(HB_TOUCH_HITS) };
                 // Pack the first point for debug visibility.
                 let (_id, ef, x, y) = s.points[0];
-                let packed =
-                    ((s.count as u32) << 28) | ((ef as u32) << 24) | ((x as u32) << 12) | (y as u32 & 0xFFF);
+                let packed = ((s.count as u32) << 28)
+                    | ((ef as u32) << 24)
+                    | ((x as u32) << 12)
+                    | (y as u32 & 0xFFF);
                 unsafe { HB_TOUCH_LAST.write_volatile(packed) };
             }
             unsafe {
@@ -427,6 +596,136 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
         // ~120 Hz poll rate. FreeRTOS tick is 1 kHz so 8 ticks ≈ 8 ms.
         unsafe { vTaskDelay(8) };
     }
+}
+
+// ── Playit command task ──────────────────────────────────────────────────────
+//
+// Minimal command-line processor on USART1 so a probe-rs / host tool
+// can toggle the star crawl (`C`) and query perf counters (`?`). Uses
+// the bare-metal `runtime_serial` ring (its USART1 ISR still fires in
+// FreeRTOS builds) and dispatches on newline-terminated commands.
+//
+// A full playit `PlayitExecutor` wants a widget tree we don't have
+// yet under FreeRTOS; this handler covers the two commands that
+// matter for instrumentation until the widget tree lands.
+
+unsafe extern "C" fn playit_task(_arg: *mut core::ffi::c_void) {
+    // Line accumulator. 64 bytes is comfortably larger than any of
+    // our supported commands.
+    const LINE_CAP: usize = 64;
+    let mut line = [0u8; LINE_CAP];
+    let mut line_len: usize = 0;
+
+    loop {
+        unsafe { hb_inc(HB_PLAYIT_POLLS) };
+
+        // Drain all bytes currently in the RX ring.
+        while let Some(b) = crate::runtime_serial::pop_rx() {
+            match b {
+                b'\r' => { /* swallow */ }
+                b'\n' => {
+                    if line_len > 0 {
+                        handle_command(&line[..line_len]);
+                    }
+                    line_len = 0;
+                }
+                _ => {
+                    if line_len < LINE_CAP {
+                        line[line_len] = b;
+                        line_len += 1;
+                    } else {
+                        // overflow — reset and drop until next newline
+                        line_len = 0;
+                    }
+                }
+            }
+        }
+
+        // 20 ms poll — responsive enough for interactive commands,
+        // low enough to stay out of the render task's way.
+        unsafe { vTaskDelay(20) };
+    }
+}
+
+/// Dispatch a single command line. Responds on USART1 via
+/// `runtime_serial::write_bytes` + `kick_tx`.
+fn handle_command(line: &[u8]) {
+    let first = line.first().copied().unwrap_or(0);
+    match first {
+        b'C' | b'c' => {
+            CRAWL_REQ.store(true, Ordering::Release);
+            crate::runtime_serial::write_bytes(b"CRAWL:toggled\r\n");
+            crate::runtime_serial::kick_tx();
+        }
+        b'?' => {
+            // Snapshot the breadcrumbs and emit a one-line status.
+            // Format: ?:tick=<present_ticks>,erif=<erif_wakes>,crawl_fr=<framed>,crawl_rdy=<ready>,touches=<hits>
+            let present_ticks = unsafe { HB_PRESENT_TICKS.read_volatile() };
+            let erif_wakes = unsafe { HB_ERIF_WAKES.read_volatile() };
+            let crawl_fr = unsafe { HB_CRAWL_FRAMEID.read_volatile() };
+            let crawl_rdy = unsafe { HB_CRAWL_READY.read_volatile() };
+            let touches = unsafe { HB_TOUCH_HITS.read_volatile() };
+
+            let mut out = [0u8; 96];
+            let mut p = 0usize;
+            let prefix = b"?:tick=";
+            p = write_slice(&mut out, p, prefix);
+            p = write_u32(&mut out, p, present_ticks);
+            p = write_slice(&mut out, p, b",erif=");
+            p = write_u32(&mut out, p, erif_wakes);
+            p = write_slice(&mut out, p, b",crawl_fr=");
+            p = write_u32(&mut out, p, crawl_fr);
+            p = write_slice(&mut out, p, b",crawl_rdy=");
+            p = write_u32(&mut out, p, crawl_rdy);
+            p = write_slice(&mut out, p, b",touches=");
+            p = write_u32(&mut out, p, touches);
+            p = write_slice(&mut out, p, b"\r\n");
+
+            crate::runtime_serial::write_bytes(&out[..p]);
+            crate::runtime_serial::kick_tx();
+        }
+        _ => {
+            crate::runtime_serial::write_bytes(b"?\r\n");
+            crate::runtime_serial::kick_tx();
+        }
+    }
+}
+
+fn write_slice(dst: &mut [u8], mut p: usize, s: &[u8]) -> usize {
+    for &b in s {
+        if p >= dst.len() {
+            return p;
+        }
+        dst[p] = b;
+        p += 1;
+    }
+    p
+}
+
+fn write_u32(dst: &mut [u8], mut p: usize, mut v: u32) -> usize {
+    let mut tmp = [0u8; 10];
+    let mut n = 0;
+    if v == 0 {
+        if p < dst.len() {
+            dst[p] = b'0';
+            p += 1;
+        }
+        return p;
+    }
+    while v > 0 {
+        tmp[n] = b'0' + (v % 10) as u8;
+        v /= 10;
+        n += 1;
+    }
+    while n > 0 {
+        n -= 1;
+        if p >= dst.len() {
+            return p;
+        }
+        dst[p] = tmp[n];
+        p += 1;
+    }
+    p
 }
 
 // ── Entry point called from main.rs ───────────────────────────────────────────
@@ -443,15 +742,13 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
 pub unsafe fn start() -> ! {
     unsafe {
         // 1. Create binary semaphores in static storage.
-        let erif_sem = freertos_sync::rlvgl_sem_create_binary_static(
-            core::ptr::addr_of_mut!(ERIF_SEM_BUF),
-        );
-        let dma2d_sem = freertos_sync::rlvgl_sem_create_binary_static(
-            core::ptr::addr_of_mut!(DMA2D_SEM_BUF),
-        );
-        let buf_ready_sem = freertos_sync::rlvgl_sem_create_binary_static(
-            core::ptr::addr_of_mut!(BUF_READY_SEM_BUF),
-        );
+        let erif_sem =
+            freertos_sync::rlvgl_sem_create_binary_static(core::ptr::addr_of_mut!(ERIF_SEM_BUF));
+        let dma2d_sem =
+            freertos_sync::rlvgl_sem_create_binary_static(core::ptr::addr_of_mut!(DMA2D_SEM_BUF));
+        let buf_ready_sem = freertos_sync::rlvgl_sem_create_binary_static(core::ptr::addr_of_mut!(
+            BUF_READY_SEM_BUF
+        ));
         BUF_READY_SEM.store(buf_ready_sem, Ordering::Release);
 
         // 2. Initialize the sync object in static storage.
@@ -490,13 +787,25 @@ pub unsafe fn start() -> ! {
             core::ptr::addr_of_mut!(TOUCH_TCB),
         );
 
+        xTaskCreateStatic(
+            playit_task,
+            b"playit\0".as_ptr(),
+            PLAYIT_STACK_WORDS as u32,
+            core::ptr::null_mut(),
+            2,
+            core::ptr::addr_of_mut!(PLAYIT_STACK) as *mut StackType_t,
+            core::ptr::addr_of_mut!(PLAYIT_TCB),
+        );
+
         // 4. Enable DSI + DMA2D IRQs at priorities above the syscall
         //    ceiling so xSemaphoreGiveFromISR remains safe. Tick runs
         //    at the lowest NVIC priority (15); FreeRTOS clamps to
         //    configKERNEL_INTERRUPT_PRIORITY at scheduler start.
         let mut cp = cortex_m::Peripherals::steal();
-        cp.NVIC.set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 6 << 4);
-        cp.NVIC.set_priority(stm32h7::stm32h747cm7::Interrupt::DMA2D, 7 << 4);
+        cp.NVIC
+            .set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 6 << 4);
+        cp.NVIC
+            .set_priority(stm32h7::stm32h747cm7::Interrupt::DMA2D, 7 << 4);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DMA2D);
 

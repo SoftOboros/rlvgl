@@ -99,9 +99,7 @@ pub unsafe fn read_sample() -> RawTouchSample {
         }
 
         // ── Read phase: 31 bytes ──
-        I2C4_CR2.write_volatile(
-            FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25),
-        );
+        I2C4_CR2.write_volatile(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
         let mut buf = [0u8; 31];
         for b in buf.iter_mut() {
             if !i2c4_wait(2) {

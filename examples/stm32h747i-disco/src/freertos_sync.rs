@@ -103,10 +103,7 @@ impl FreeRtosFrameSync {
     /// # Safety
     ///
     /// Handles must be valid and have `'static` lifetime.
-    pub unsafe fn new(
-        erif_sem: SemaphoreHandle_t,
-        dma2d_done_sem: SemaphoreHandle_t,
-    ) -> Self {
+    pub unsafe fn new(erif_sem: SemaphoreHandle_t, dma2d_done_sem: SemaphoreHandle_t) -> Self {
         Self {
             erif_sem,
             dma2d_done_sem,

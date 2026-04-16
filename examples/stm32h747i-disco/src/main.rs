@@ -60,18 +60,40 @@ mod star_crawl;
 mod sys_info;
 mod wing;
 
-#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
-mod freertos_sync;
-#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_dma2d;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 mod freertos_entry;
-#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_layers;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_sync;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 mod touch_i2c;
 
 /// ISR wrappers routing the DSI / DMA2D IRQs to `freertos_entry` bodies.
 /// These replace the bare-metal `_dsi_isr` / `_dma2d_isr` modules below
 /// when the `freertos` feature is active — a single binary may only
 /// define one `#[interrupt] fn DSI()` (likewise DMA2D).
-#[cfg(all(feature = "freertos", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
 mod _freertos_isr {
     use stm32h7::stm32h747cm7::interrupt;
 
@@ -3074,16 +3096,16 @@ fn main() -> ! {
         // by preemptive present / render / touch tasks. Never returns.
         #[cfg(feature = "freertos")]
         unsafe {
-            // Expose the front + back fb addresses and buffer size to
-            // the FreeRTOS tasks. The present task re-triggers LTDC
-            // scans from the front; the render task fills the back
+            // Expose the front + back fb addresses and geometry to the
+            // FreeRTOS tasks. Present task re-triggers LTDC scans from
+            // the front; render task fills the back through CpuBlitter
             // and signals a swap via buf_ready_sem.
             let (fw, fh) = display.dimensions();
-            let fb_bytes = fw * fh * 4; // ARGB8888
             freertos_entry::init_fbs(
                 display.front_buffer_addr(),
                 display.back_buffer_addr(),
-                fb_bytes,
+                fw,
+                fh,
             );
             freertos_entry::start();
         }
