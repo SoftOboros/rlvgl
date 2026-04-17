@@ -526,47 +526,48 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             }
         }
 
-        // If the render task has signalled a fresh back buffer, swap
-        // FRONT and BACK atomically — unless CRAWL_ACTIVE requires a
-        // 2-cycle hold to smooth the 55 ms crawl / 33 ms present
-        // rate mismatch.
         let crawl_active = CRAWL_ACTIVE.load(Ordering::Acquire);
-        let hold_more = crawl_active && cycles_since_swap < 1;
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-        if !hold_more
-            && !buf_ready.is_null()
-            && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) } == freertos_sync::pdTRUE
-        {
-            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
-            let back = BACK_FB_ADDR.load(Ordering::Acquire);
-            FRONT_FB_ADDR.store(back, Ordering::Release);
-            BACK_FB_ADDR.store(front, Ordering::Release);
-            cycles_since_swap = 0;
+        if crawl_active && !buf_ready.is_null() {
+            // Single-buffer crawl: block on buf_ready with NO
+            // fallthrough. buf_ready is the SOLE retrigger gate —
+            // the DMA2D safety gate can't work with chunked ops
+            // because CR.START is 0 between chunks. portMAX_DELAY
+            // so we never retrigger mid-compose.
+            let got = unsafe {
+                freertos_sync::rlvgl_sem_take(
+                    buf_ready,
+                    freertos_sync::portMAX_DELAY,
+                )
+            } == freertos_sync::pdTRUE;
+            if !got {
+                continue; // shouldn't happen with MAX_DELAY
+            }
+            // buf_ready means compose finished + D-cache cleaned.
+            // Skip DMA2D safety gate — go straight to retrigger.
         } else {
-            cycles_since_swap = cycles_since_swap.saturating_add(1);
-        }
-
-        // Before retrigger, ensure DMA2D is fully idle. star_crawl
-        // has some DMA2D start paths that aren't gated through
-        // `sync.dma2d_admits`, so a static admission guard can't
-        // guarantee DMA2D finishes before the scan. Wait here
-        // (yielding to render / idle at priority 1) until the
-        // hardware CR.START bit clears. Hard guarantee of no scan/
-        // DMA2D contention — frame period extends if DMA2D needs
-        // more than the 15 ms holdoff, which is the "graceful
-        // slowdown" behaviour (prefer frame-repeat over flicker).
-        {
-            const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32;
-            const CR_START: u32 = 1 << 0;
-            let mut wait_ticks: u32 = 0;
-            while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
-                wait_ticks += 1;
-                if wait_ticks > 30 {
-                    // 30 ms ceiling — DMA2D looks wedged; retrigger
-                    // anyway so we don't deadlock.
-                    break;
+            // Idle compositor: non-blocking buf_ready + DMA2D gate
+            if !buf_ready.is_null()
+                && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) }
+                    == freertos_sync::pdTRUE
+            {
+                let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+                let back = BACK_FB_ADDR.load(Ordering::Acquire);
+                FRONT_FB_ADDR.store(back, Ordering::Release);
+                BACK_FB_ADDR.store(front, Ordering::Release);
+            }
+            // DMA2D safety gate for non-crawl path
+            {
+                const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32;
+                const CR_START: u32 = 1 << 0;
+                let mut wait_ticks: u32 = 0;
+                while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
+                    wait_ticks += 1;
+                    if wait_ticks > 30 {
+                        break;
+                    }
+                    unsafe { vTaskDelay(1) };
                 }
-                unsafe { vTaskDelay(1) };
             }
         }
 
@@ -740,10 +741,13 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 cr.deactivate();
             } else {
                 cr.activate(dma);
-                // No pre-fill — the first compose in Phase A will
-                // write the starfield directly from the source buffer.
-                // One frame of stale content is preferred over DMA2D
-                // contention from a blocking pre-fill during scan.
+                // Drain stale buf_ready from the idle compositor so
+                // present's blocking take waits for THIS frame's
+                // compose, not a leftover give.
+                let br = BUF_READY_SEM.load(Ordering::Acquire);
+                if !br.is_null() {
+                    unsafe { freertos_sync::rlvgl_sem_take(br, 0) };
+                }
             }
         }
         CRAWL_ACTIVE.store(cr.is_active(), Ordering::Release);
@@ -784,8 +788,14 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
                     hb_inc(HB_CRAWL_READY);
                 }
-                // No buf_ready — present retriggers FRONT without
-                // swapping. The display buffer is updated in-place.
+                // Signal buf_ready so present waits for ALL chunks
+                // to finish before retrigger. Without this, present's
+                // DMA2D safety gate sees CR.START=0 between chunks
+                // and retriggers mid-compose — half-written frame.
+                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+                if !buf_ready.is_null() {
+                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+                }
             }
 
             // Phase B: prep next frame's text (CPU FIR).
