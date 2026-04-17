@@ -2085,11 +2085,13 @@ fn main() -> ! {
         unsafe {
             (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32);
         } // post-I2C4-pins
-        let i2c4 =
+        let mut i2c4 =
             stm32h7xx_hal::i2c::I2c::i2c4(I2C4, 400.kHz(), ccdr.peripheral.I2C4, &ccdr.clocks);
         unsafe {
             (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32);
         } // post-I2C4-init
+        // FT5336 CTRL init deferred — HAL I2C writes hang the bus.
+        // Touch needs PG3 reset re-sequencing (separate task).
         // Wrap for embedded-hal 1.0 (stm32h7xx-hal I2c implements eh 0.2 I2C)
         #[cfg(feature = "audio")]
         struct HalI2c<I>(I);
