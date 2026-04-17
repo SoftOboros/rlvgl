@@ -259,10 +259,14 @@ pub fn dsi_isr_body() {
                 sync.scan_complete.store(true, Ordering::Release);
                 freertos_sync::rlvgl_sem_give_from_isr(sync.erif_sem);
             }
-            // render_start_sem is NOT given on the ERIF edge.
-            // It's given by present_task after retrigger — so render
-            // starts its DMA2D work into BACK while LTDC scans FRONT.
-            // Two different buffers, separated by the swap.
+            // Wake render_task at ERIF so its compose+blend DMA2D
+            // runs during the back porch (ERIF → retrigger) while
+            // present_task is blocked on TIM7. Zero AXI contention
+            // because LTDC scan hasn't started yet.
+            let rs = RENDER_START_SEM.load(Ordering::Acquire);
+            if !rs.is_null() {
+                freertos_sync::rlvgl_sem_give_from_isr(rs);
+            }
         }
 
         let isr0 = ISR0.read_volatile();
@@ -582,8 +586,8 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             // D7-HIGH = AXI contention).
             rlvgl_platform::frame_sync::ScopeProbe::ltdc_active(sync);
         }
-        // Render is woken on the ERIF edge by the DSI ISR, not
-        // here — see the DSI ISR body for the rationale.
+        // render_start_sem is given by the DSI ISR on ERIF so
+        // render wakes during the back porch, not after retrigger.
     }
 }
 
@@ -598,25 +602,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
     use crate::freertos_layers::{Compositor, MotionBlockLayer, SolidBackgroundLayer};
     use crate::star_crawl::{self, RenderMode, StarCrawl, StepResult};
 
-    // Frame pacing when idle (non-crawl compositor demo). Crawl mode
-    // yields more aggressively between DMA2D waits (see tick loop).
-    const IDLE_PERIOD_MS: u32 = 16; // ~62 Hz
-    const CRAWL_YIELD_MS: u32 = 1; // short yield between Pending ticks
-    // Per-outer-iteration ceiling on Pending iterations. With the
-    // render_start_sem gate (given by present_task AFTER retrigger),
-    // render wakes while the panel scan is just starting — not yet
-    // complete. star_crawl's internal `erif_is_set()` gate blocks on
-    // the sticky `scan_complete` flag, which DSI ISR won't set until
-    // ~14 ms later when the scan finishes. The tick loop must stay
-    // in Pending long enough for ERIF to fire, or the frame never
-    // completes.
-    //
-    // 200_000 iterations is a bounded ceiling (still exits cleanly
-    // if DMA2D truly stalls) but large enough that the ~14 ms wait
-    // for ERIF is well within budget — even if every inner iteration
-    // took a microsecond, 200_000 is 200 ms. In practice the loop
-    // exits on FrameReady well before this.
-    const CRAWL_TIMEOUT_TICKS: u32 = 200_000;
+    const IDLE_PERIOD_MS: u32 = 16; // ~62 Hz idle compositor demo
 
     // Bold font and README crawl text — mirrors the bare-metal and
     // Zephyr setup so FreeRTOS renders the same content.
@@ -754,76 +740,41 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 cr.deactivate();
             } else {
                 cr.activate(dma);
-                cr.set_layer_buf(0xD180_0000usize as *mut u8);
+                // No pre-fill — the first compose in Phase A will
+                // write the starfield directly from the source buffer.
+                // One frame of stale content is preferred over DMA2D
+                // contention from a blocking pre-fill during scan.
             }
         }
-        // Publish current crawl state for present_task's pacing
-        // decision. See CRAWL_ACTIVE doc for why this matters.
         CRAWL_ACTIVE.store(cr.is_active(), Ordering::Release);
 
-        // ── Crawl mode: non-blocking tick loop ────────────────────
+        // ── Crawl mode: two-phase pipeline ───────────────────────
+        //
+        // Phase A runs FIRST on every ERIF — compose starfield +
+        // text into BACK. 1-2 DMA2D blits (~2ms total), fully in
+        // the back porch since render_start_sem fires on ERIF and
+        // present is blocked on TIM7.
+        //
+        // Phase B runs in remaining time — CPU FIR text prep for
+        // the NEXT frame. If Phase B can't finish before the next
+        // ERIF, it yields; Phase A still runs on the next ERIF
+        // (composing whatever text is ready so far). This prevents
+        // Phase B from starving Phase A and pushing DMA2D into the
+        // scan window.
         if cr.is_active() {
             let sync = get_sync().unwrap();
-            let mut deadline_hits = 0u32;
-            let mut frame_ready = false;
-            let mut finished = false;
 
-            // Run tick() until the frame is ready, the crawl finishes,
-            // or we hit a per-frame ceiling (prevents the render task
-            // from monopolizing the CPU if DMA2D stalls). Between
-            // `Pending` returns yield briefly so touch / present /
-            // idle can run.
-            while deadline_hits < CRAWL_TIMEOUT_TICKS {
-                unsafe { hb_inc(HB_CRAWL_TICKS) };
-
-                // Scan-phase gate: if LTDC is currently scanning
-                // (scan_complete == false), DO NOT issue new DMA2D
-                // ops. star_crawl has internal admission at frame
-                // start but not at every tick, so a long frame's
-                // mid-op sequence can spill DMA2D into the scan and
-                // contend with LTDC on the AXI/SDRAM bus.
-                //
-                // Yielding here (vTaskDelay(1)) gives higher-priority
-                // tasks and the idle hook CPU; DSI ERIF ISR will set
-                // scan_complete=true when the scan finishes, letting
-                // this task resume and pack more DMA2D into the next
-                // back porch. Over multiple back porches the frame
-                // completes cleanly — the graceful slowdown the user
-                // asked for.
-                use rlvgl_platform::frame_sync::FrameSync;
-                if !sync.erif_is_set() {
-                    unsafe { vTaskDelay(1) };
-                    continue;
-                }
-
-                match cr.tick(dma, back as *mut u8, w, h, sync) {
-                    StepResult::Idle => break,
-                    StepResult::Pending => {
-                        deadline_hits += 1;
-                        // Yield once every ~4096 Pending ticks so the
-                        // FreeRTOS idle hook gets a crack at stack-
-                        // watermark checks and stats while we're
-                        // spinning on DMA2D / ERIF. Priority-6 ISRs
-                        // (DSI / DMA2D / TIM7) already preempt us
-                        // automatically; this yield is just for the
-                        // idle task. Every ~4 ms at 1 µs/tick.
-                        if deadline_hits & 0xFFF == 0 {
-                            unsafe { vTaskDelay(1) };
-                        }
-                    }
-                    StepResult::FrameReady => {
-                        frame_ready = true;
-                        break;
-                    }
-                    StepResult::Finished => {
-                        finished = true;
-                        break;
-                    }
-                }
+            // Phase A: compose into BACK (guaranteed in back porch)
+            while dma.is_in_flight() {
+                cortex_m::asm::nop();
             }
-
-            if frame_ready {
+            if cr.compose_and_blend(dma, back as *mut u8, w, sync) {
                 cortex_m::asm::dsb();
+                {
+                    let mut cp = unsafe { cortex_m::Peripherals::steal() };
+                    cp.SCB
+                        .clean_dcache_by_address(back as usize, bytes as usize);
+                }
                 unsafe {
                     HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
                     hb_inc(HB_CRAWL_READY);
@@ -832,14 +783,26 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 if !buf_ready.is_null() {
                     unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
                 }
-                cr.advance_scroll();
             }
 
-            if finished {
-                cr.deactivate();
+            // Phase B: prep next frame's text (CPU FIR).
+            // Run a bounded batch of FIR rows, then yield back to
+            // the main loop. The next ERIF triggers Phase A first,
+            // and Phase B continues from where it left off.
+            const PREP_BATCH: u32 = 64;
+            for _ in 0..PREP_BATCH {
+                unsafe { hb_inc(HB_CRAWL_TICKS) };
+                match cr.prep_next_frame(dma, sync) {
+                    StepResult::FrameReady => break,
+                    StepResult::Pending => {}
+                    StepResult::Finished => {
+                        cr.deactivate();
+                        break;
+                    }
+                    StepResult::Idle => break,
+                }
             }
 
-            // Stay in crawl mode — loop back to tick the next frame.
             continue;
         }
 
