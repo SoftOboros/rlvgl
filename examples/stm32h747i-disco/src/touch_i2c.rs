@@ -45,6 +45,49 @@ impl RawTouchSample {
     };
 }
 
+/// Write FT5336 CTRL register (0x86) = 0 to enable polling/interrupt
+/// mode. Without this write after a panel reset, the INT line may
+/// stay de-asserted and no touches are detected.
+///
+/// # Safety
+/// I2C4 must be clocked and PE=1.
+/// Write a single FT5336 register via I2C4.
+unsafe fn write_reg(reg: u8, val: u8) {
+    unsafe {
+        I2C4_ICR.write_volatile(
+            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
+        );
+        // Write 2 bytes: register address + value, AUTOEND
+        I2C4_CR2.write_volatile(
+            FT5336_SADD | (2 << 16) | (1 << 13) | (1 << 25),
+        );
+        if !i2c4_wait(1) { return; }
+        I2C4_TXDR.write_volatile(reg as u32);
+        if !i2c4_wait(1) { return; }
+        I2C4_TXDR.write_volatile(val as u32);
+        if i2c4_wait(5) {
+            I2C4_ICR.write_volatile(1 << 5);
+        }
+    }
+}
+
+/// Initialize FT5336: set operating mode + interrupt control.
+///
+/// # Safety
+/// I2C4 must be clocked and PE=1.
+pub unsafe fn init_ctrl() {
+    unsafe {
+        // DEVICE_MODE (0x00) = 0 → Normal Operating Mode
+        write_reg(0x00, 0x00);
+        // Brief delay for mode switch
+        for _ in 0..100_000u32 {
+            cortex_m::asm::nop();
+        }
+        // CTRL (0x86) = 0 → polling mode (INT asserted while touched)
+        write_reg(0x86, 0x00);
+    }
+}
+
 /// Non-blocking check: is PK7 (FT5336 INT) currently asserted low?
 #[inline]
 pub fn int_asserted() -> bool {
