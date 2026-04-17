@@ -764,31 +764,31 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         if cr.is_active() {
             let sync = get_sync().unwrap();
 
-            // Phase A: compose into BACK (guaranteed in back porch)
+            // Single-buffer crawl: compose directly into FRONT.
+            // Present retriggers FRONT every cycle without swapping.
+            // DMA2D writes complete in the back porch before retrigger,
+            // so no tearing. Chunked ops (~50 rows each) release the
+            // AXI bus between batches for DSI/SDRAM refresh.
+            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
             while dma.is_in_flight() {
                 cortex_m::asm::nop();
             }
-            if cr.compose_and_blend(dma, back as *mut u8, w, sync) {
+            if cr.compose_and_blend(dma, front as *mut u8, w, sync) {
                 cortex_m::asm::dsb();
                 {
                     let mut cp = unsafe { cortex_m::Peripherals::steal() };
                     cp.SCB
-                        .clean_dcache_by_address(back as usize, bytes as usize);
+                        .clean_dcache_by_address(front as usize, bytes as usize);
                 }
                 unsafe {
                     HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
                     hb_inc(HB_CRAWL_READY);
                 }
-                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-                if !buf_ready.is_null() {
-                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
-                }
+                // No buf_ready — present retriggers FRONT without
+                // swapping. The display buffer is updated in-place.
             }
 
             // Phase B: prep next frame's text (CPU FIR).
-            // Run a bounded batch of FIR rows, then yield back to
-            // the main loop. The next ERIF triggers Phase A first,
-            // and Phase B continues from where it left off.
             const PREP_BATCH: u32 = 64;
             for _ in 0..PREP_BATCH {
                 unsafe { hb_inc(HB_CRAWL_TICKS) };

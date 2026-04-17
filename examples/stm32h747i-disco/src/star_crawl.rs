@@ -667,18 +667,19 @@ impl StarCrawl {
 
     // ── Two-phase API (FreeRTOS display driver) ─────────────────────────────
 
-    /// Display output: compose starfield → `back_buf` then A8 text
-    /// blend. Runs in the back porch (no LTDC scan) so large DMA2D
-    /// ops are safe. 1-2 M2M blits for starfield (contiguous or
-    /// wrapped) + 1 A8 blend ≈ 2ms total. present_task's DMA2D
-    /// safety gate ensures these finish before LTDC retrigger.
+    /// Compose starfield → `fb` in chunked batches + A8 text blend.
+    ///
+    /// Starfield is blitted in CHUNK_ROWS-row batches (each ~96 KB).
+    /// Between batches, DMA2D releases the AXI bus so DSI and SDRAM
+    /// refresh don't stall. Total time ~12ms but bus is shared
+    /// cooperatively. A8 text blended in stripes the same way.
     ///
     /// Returns `true` when all ops complete, `false` if crawl inactive.
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn compose_and_blend(
         &mut self,
         dma2d: &mut Dma2dBlitter,
-        back_buf: *mut u8,
+        fb: *mut u8,
         fb_w: u32,
         sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
     ) -> bool {
@@ -688,88 +689,110 @@ impl StarCrawl {
         let row_bytes = fb_w * BPP;
         let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
 
-        // 1. Starfield → back_buf: 1 blit if contiguous, 2 if wrapped
+        // 1. Starfield → fb in chunks. Each chunk is small enough
+        //    that SDRAM refresh and DSI TE can proceed between ops.
+        const CHUNK_ROWS: u32 = 50;
         sync.note_start();
-        sync.dma2d_active();
-        if star_row + FB_H <= STAR_ROWS {
-            // Contiguous — single M2M blit
-            let src = unsafe {
-                self.starfield.add((star_row * STAR_STRIDE) as usize)
-            };
-            dma2d.start_blit_raw(
-                src as *const u8,
-                STAR_STRIDE,
-                back_buf,
-                row_bytes,
-                fb_w,
-                FB_H,
-                PixelFmt::Argb8888,
-            );
-            while dma2d.is_in_flight() {
-                cortex_m::asm::nop();
+        let mut row = 0u32;
+        while row < FB_H {
+            let batch = CHUNK_ROWS.min(FB_H - row);
+            let src_start = (star_row + row) % STAR_ROWS;
+
+            // Check for wrap within this batch
+            if src_start + batch <= STAR_ROWS {
+                // Contiguous chunk
+                let src = unsafe {
+                    self.starfield
+                        .add((src_start * STAR_STRIDE) as usize)
+                };
+                let dst = unsafe { fb.add((row * row_bytes) as usize) };
+                sync.dma2d_active();
+                dma2d.start_blit_raw(
+                    src as *const u8,
+                    STAR_STRIDE,
+                    dst,
+                    row_bytes,
+                    fb_w,
+                    batch,
+                    PixelFmt::Argb8888,
+                );
+                while dma2d.is_in_flight() {
+                    cortex_m::asm::nop();
+                }
+                sync.dma2d_idle();
+            } else {
+                // Batch straddles starfield wrap — split into two
+                let top = STAR_ROWS - src_start;
+                let bot = batch - top;
+                let src_top = unsafe {
+                    self.starfield
+                        .add((src_start * STAR_STRIDE) as usize)
+                };
+                let dst_top = unsafe { fb.add((row * row_bytes) as usize) };
+                sync.dma2d_active();
+                dma2d.start_blit_raw(
+                    src_top as *const u8,
+                    STAR_STRIDE,
+                    dst_top,
+                    row_bytes,
+                    fb_w,
+                    top,
+                    PixelFmt::Argb8888,
+                );
+                while dma2d.is_in_flight() {
+                    cortex_m::asm::nop();
+                }
+                sync.dma2d_idle();
+                let dst_bot = unsafe {
+                    fb.add(((row + top) * row_bytes) as usize)
+                };
+                sync.dma2d_active();
+                dma2d.start_blit_raw(
+                    self.starfield as *const u8,
+                    STAR_STRIDE,
+                    dst_bot,
+                    row_bytes,
+                    fb_w,
+                    bot,
+                    PixelFmt::Argb8888,
+                );
+                while dma2d.is_in_flight() {
+                    cortex_m::asm::nop();
+                }
+                sync.dma2d_idle();
             }
             cortex_m::asm::dsb();
-        } else {
-            // Wrap — two blits
-            let top_rows = STAR_ROWS - star_row;
-            let bot_rows = FB_H - top_rows;
-            let src_top = unsafe {
-                self.starfield.add((star_row * STAR_STRIDE) as usize)
-            };
-            dma2d.start_blit_raw(
-                src_top as *const u8,
-                STAR_STRIDE,
-                back_buf,
-                row_bytes,
-                fb_w,
-                top_rows,
-                PixelFmt::Argb8888,
-            );
-            while dma2d.is_in_flight() {
-                cortex_m::asm::nop();
-            }
-            cortex_m::asm::dsb();
-            let dst_bot = unsafe {
-                back_buf.add((top_rows * row_bytes) as usize)
-            };
-            dma2d.start_blit_raw(
-                self.starfield as *const u8,
-                STAR_STRIDE,
-                dst_bot,
-                row_bytes,
-                fb_w,
-                bot_rows,
-                PixelFmt::Argb8888,
-            );
-            while dma2d.is_in_flight() {
-                cortex_m::asm::nop();
-            }
-            cortex_m::asm::dsb();
+            row += batch;
         }
-        // Clear D9 immediately — before take_complete — so present
-        // can't preempt us and retrigger while D9 is still HIGH.
-        sync.dma2d_idle();
         let _ = sync.take_complete();
 
-        // 2. A8 blend: single DMA2D blend op
+        // 2. A8 text blend in stripes
         dcache_clean_range(A8_BUF, A8_SIZE);
-        let dst_offset = (A8_Y_BASE * fb_w * BPP) as usize;
-        let dst = unsafe { back_buf.add(dst_offset) };
-        sync.note_start();
-        sync.dma2d_active();
-        dma2d.start_blend_a8_color(
-            A8_BUF as *const u8,
-            A8_WIDTH,
-            A8_HEIGHT,
-            YELLOW,
-            dst,
-            fb_w * BPP,
-        );
-        while dma2d.is_in_flight() {
-            cortex_m::asm::nop();
+        const BLEND_ROWS: u32 = 50;
+        let mut y = 0u32;
+        let a8_h = A8_HEIGHT;
+        while y < a8_h {
+            let h = BLEND_ROWS.min(a8_h - y);
+            let src_off = (y * A8_WIDTH) as usize;
+            let src = (A8_BUF + src_off) as *const u8;
+            let dst_off = ((A8_Y_BASE + y) * fb_w * BPP) as usize;
+            let dst = unsafe { fb.add(dst_off) };
+            sync.dma2d_active();
+            dma2d.start_blend_a8_color(
+                src,
+                A8_WIDTH,
+                h,
+                YELLOW,
+                dst,
+                fb_w * BPP,
+            );
+            while dma2d.is_in_flight() {
+                cortex_m::asm::nop();
+            }
+            sync.dma2d_idle();
+            cortex_m::asm::dsb();
+            y += h;
         }
-        cortex_m::asm::dsb();
-        sync.dma2d_idle();
         let _ = sync.take_complete();
 
         self.diag_completed_frames = self.diag_completed_frames.saturating_add(1);
