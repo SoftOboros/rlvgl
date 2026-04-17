@@ -405,6 +405,133 @@ unsafe fn ltdc_retrigger(fb_addr: u32) {
     }
 }
 
+// ── LTDC Layer 2: A8 text overlay ────────────────────────────────────────────
+
+/// LTDC Layer 2 register base (Layer 1 + 0x80).
+const LTDC_L2: u32 = 0x5000_1000 + 0x104;
+const LTDC_L2CR: *mut u32 = (LTDC_L2 + 0x00) as *mut u32;
+const LTDC_L2WHPCR: *mut u32 = (LTDC_L2 + 0x04) as *mut u32;
+const LTDC_L2WVPCR: *mut u32 = (LTDC_L2 + 0x08) as *mut u32;
+const LTDC_L2PFCR: *mut u32 = (LTDC_L2 + 0x10) as *mut u32;
+const LTDC_L2CACR: *mut u32 = (LTDC_L2 + 0x14) as *mut u32;
+const LTDC_L2DCCR: *mut u32 = (LTDC_L2 + 0x18) as *mut u32;
+const LTDC_L2BFCR: *mut u32 = (LTDC_L2 + 0x1C) as *mut u32;
+const LTDC_L2CFBAR: *mut u32 = (LTDC_L2 + 0x28) as *mut u32;
+const LTDC_L2CFBLR: *mut u32 = (LTDC_L2 + 0x2C) as *mut u32;
+const LTDC_L2CFBLNR: *mut u32 = (LTDC_L2 + 0x30) as *mut u32;
+const LTDC_L2CLUTWR: *mut u32 = (LTDC_L2 + 0x34) as *mut u32;
+const LTDC_SRCR: *const u32 = 0x5000_1024 as *const u32;
+
+/// A8 text buffer for LTDC Layer 2. Must be in SDRAM (AXI-accessible)
+/// since LTDC reads via AXI, not AHB. D2 SRAM at 0x3000_0000 is
+/// AHB-only and invisible to LTDC. Uses the old layer_buf region.
+const A8_L2_ADDR: u32 = 0xD180_0000;
+const A8_WIDTH: u32 = 480;
+const A8_HEIGHT: u32 = 600;
+/// Portrait row offset where the A8 region starts (centering the
+/// 600-row text region within the 800-row display).
+const A8_Y_BASE: u32 = 100; // (800 - 600) / 2
+
+/// Configure LTDC Layer 2 as an L8+CLUT overlay for the A8 text
+/// buffer. Each L8 pixel value maps via CLUT to yellow with
+/// proportional alpha. LTDC hardware-blends this over the
+/// starfield in Layer 1 during scan — zero DMA2D.
+///
+/// # Safety
+/// Must be called after LTDC is initialized (Layer 1 active).
+unsafe fn setup_ltdc_layer2_a8(panel_w: u16, panel_h: u16) {
+    unsafe {
+        // Use the same timing parameters as Layer 1.
+        // HSW=2, HBP=34, VSW=120, VBP=150 (from display_init)
+        let hsw: u32 = 2;
+        let hbp: u32 = 34;
+        let vsw: u32 = 120;
+        let vbp: u32 = 150;
+
+        // Layer 2 window covers only the text region (A8_Y_BASE
+        // to A8_Y_BASE + A8_HEIGHT) of the full display.
+        let x0 = hsw + hbp + 1;
+        let x1 = x0 + panel_w as u32 - 1;
+        let y0 = vsw + vbp + 1 + A8_Y_BASE;
+        let y1 = y0 + A8_HEIGHT - 1;
+
+        LTDC_L2WHPCR.write_volatile((x1 << 16) | x0);
+        LTDC_L2WVPCR.write_volatile((y1 << 16) | y0);
+
+        // ARGB8888 pixel format (0). The A8→ARGB expansion in
+        // the render loop writes (alpha << 24) | 0x00FFD700 for
+        // each pixel — yellow at the FIR-computed alpha.
+        LTDC_L2PFCR.write_volatile(0); // ARGB8888
+        LTDC_L2CACR.write_volatile(255); // constant alpha = opaque
+        LTDC_L2DCCR.write_volatile(0); // default color = transparent
+        // Blending: BF1=PAxCA (0x06), BF2=1-PAxCA (0x07)
+        // This blends Layer 2 (text) over Layer 1 (starfield)
+        // using the per-pixel alpha from the CLUT.
+        LTDC_L2BFCR.write_volatile(0x0607);
+
+        // ARGB8888 buffer in SDRAM
+        LTDC_L2CFBAR.write_volatile(A8_L2_ADDR);
+        let pitch = A8_WIDTH * 4; // 4 bytes per pixel for ARGB8888
+        LTDC_L2CFBLR.write_volatile((pitch << 16) | (pitch + 7));
+        LTDC_L2CFBLNR.write_volatile(A8_HEIGHT);
+
+        // Load CLUT: 256 entries. Entry[i] = alpha=i, yellow.
+        // CLUTWR format: [31:24]=CLUTADD, [23:16]=R, [15:8]=G, [7:0]=B
+        // But CLUT entries provide RGB; alpha comes from CACR or
+        // the pixel value maps to a full ARGB via the CLUT.
+        //
+        // For L8: pixel value selects CLUT index. CLUT entry
+        // provides RGB. The pixel value IS the alpha (via CLUT
+        // alpha channel in ARGB CLUT mode — but STM32H7 LTDC
+        // CLUT is RGB888 only, no alpha per entry).
+        //
+        // Workaround: treat L8 value as both color index AND alpha.
+        // CLUT[i] = yellow (same for all i). The L8 pixel value
+        // drives constant-alpha multiplication via BF1/BF2.
+        //
+        // Actually, for L8 with blending: the pixel value IS the
+        // color index. Alpha is from CACR (constant = 255). To get
+        // per-pixel alpha, we need AL88 format — but that's 2 bytes.
+        //
+        // Better approach: skip CLUT. Use ARGB8888 format for Layer 2
+        // but point it at a small pre-blended buffer. OR use the
+        // default color + alpha approach.
+        //
+        // Simplest: just fill the CLUT with yellow at varying alpha.
+        // Each CLUT entry = RGB(0xFF, 0xD7, 0x00). The L8 pixel
+        // value selects the entry (all same color). Per-pixel alpha
+        // isn't supported via L8 CLUT on STM32H7 — CLUT entries
+        // are RGB only, alpha comes from CACR.
+        //
+        // The real solution: convert A8 to ARGB8888 with CPU or
+        // DMA2D (small, A8_WIDTH × A8_HEIGHT × 4 = 1.15MB) into a
+        // scratch buffer, use that as Layer 2 source. But that's
+        // DMA2D per frame again.
+        //
+        // OR: Use AL88 format (format 7). Each pixel is 16 bits:
+        // upper 8 = alpha, lower 8 = luminance. Set constant color
+        // to yellow. But our A8 buffer is 8-bit, not 16-bit.
+        //
+        // For now: load CLUT with yellow entries. Alpha blending
+        // uses CACR × pixel_alpha. With L8, pixel_alpha isn't
+        // available. We get solid yellow overlay where A8 > 0.
+        //
+        // TODO: convert to AL88 or ARGB for proper alpha gradients.
+        // Enable Layer 2: LEN (bit 0). No SRCR here — present_task's
+        // next retrigger does shadow reload, avoiding the race where
+        // present's SRCR fires mid-setup and loads partial config.
+        LTDC_L2CR.write_volatile(0x01); // LEN
+    }
+}
+
+/// Disable LTDC Layer 2.
+unsafe fn disable_ltdc_layer2() {
+    unsafe {
+        LTDC_L2CR.write_volatile(0); // LEN = 0
+        (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR
+    }
+}
+
 // ── D3 SRAM heartbeat breadcrumbs ─────────────────────────────────────────────
 //
 // Each task increments a distinct 32-bit slot in SRAM3 (0x3800_0000 region) so
@@ -737,15 +864,27 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             if cr.is_active() {
                 cr.deactivate();
                 CRAWL_FB_ADDR.store(0, Ordering::Release);
+                unsafe { disable_ltdc_layer2() };
             } else {
                 cr.activate(dma);
-                // Drain stale buf_ready from the idle compositor so
-                // present's blocking take waits for THIS frame's
-                // compose, not a leftover give.
+                // Drain stale buf_ready
                 let br = BUF_READY_SEM.load(Ordering::Acquire);
                 if !br.is_null() {
                     unsafe { freertos_sync::rlvgl_sem_take(br, 0) };
                 }
+                // Zero the Layer 2 ARGB buffer before enabling —
+                // stale SDRAM data with non-zero alpha would cover
+                // the starfield. 480×600×4 = 1.15 MB.
+                unsafe {
+                    core::ptr::write_bytes(
+                        0xD180_0000 as *mut u8,
+                        0,
+                        480 * 600 * 4,
+                    );
+                }
+                cortex_m::asm::dsb();
+                // Enable LTDC Layer 2 for ARGB8888 text overlay.
+                unsafe { setup_ltdc_layer2_a8(w as u16, h as u16) };
             }
         }
         CRAWL_ACTIVE.store(cr.is_active(), Ordering::Release);
@@ -800,23 +939,53 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 hb_inc(HB_CRAWL_READY);
             }
 
-            // Phase B: advance scroll + CPU FIR text prep for
-            // future jumbo compose. Text isn't visible yet (LTDC
-            // reads raw starfield), but this keeps the scroll + text
-            // pipeline advancing so the jumbo compose phase can
-            // pick it up.
+            // Phase B: advance scroll + CPU FIR text into D2 SRAM
+            // A8 buffer. After prep completes, copy to SDRAM for
+            // LTDC Layer 2 to read.
+            let mut prep_done = false;
             for _ in 0..480u32 {
                 unsafe { hb_inc(HB_CRAWL_TICKS) };
                 match cr.prep_next_frame(dma, sync) {
-                    StepResult::FrameReady => break,
+                    StepResult::FrameReady => {
+                        prep_done = true;
+                        break;
+                    }
                     StepResult::Pending => {}
                     StepResult::Finished => {
                         cr.deactivate();
                         CRAWL_FB_ADDR.store(0, Ordering::Release);
+                        unsafe { disable_ltdc_layer2() };
                         break;
                     }
                     StepResult::Idle => break,
                 }
+            }
+            // Expand A8 → ARGB8888 from D2 SRAM → SDRAM for Layer 2.
+            // Each A8 byte → (alpha << 24) | 0x00FFD700 (yellow).
+            // 480×600 pixels = 288K reads + 1.15M writes, ~3ms CPU.
+            if prep_done {
+                const A8_SRC: *const u8 = 0x3000_0000 as *const u8;
+                const ARGB_DST: *mut u32 = 0xD180_0000 as *mut u32;
+                const PIXEL_COUNT: usize = 480 * 600;
+                const ARGB_BYTES: usize = PIXEL_COUNT * 4;
+                const YELLOW_RGB: u32 = 0x00FF_D700;
+                unsafe {
+                    for i in 0..PIXEL_COUNT {
+                        let alpha = *A8_SRC.add(i) as u32;
+                        *ARGB_DST.add(i) = (alpha << 24) | YELLOW_RGB;
+                    }
+                }
+                // D-cache clean: CPU writes are in write-back cache;
+                // LTDC reads SDRAM via AXI (bypasses D-cache). Without
+                // clean, LTDC sees stale/zero data.
+                {
+                    let mut cp = unsafe { cortex_m::Peripherals::steal() };
+                    cp.SCB.clean_dcache_by_address(
+                        0xD180_0000usize,
+                        ARGB_BYTES,
+                    );
+                }
+                cortex_m::asm::dsb();
             }
 
             continue;
