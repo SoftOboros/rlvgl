@@ -192,6 +192,12 @@ pub struct StarCrawl {
     prep_shift_done: bool,
     prep_frame_scroll_px: i32,
     prep_frame_star_row: u32,
+
+    // Resumable compose state — survives across back porches
+    compose_row: u32,         // starfield row progress
+    compose_blend_y: u32,     // A8 blend stripe progress
+    compose_star_row: u32,    // starfield scroll offset for this compose
+    compose_active: bool,     // compose in progress (not yet buf_ready)
 }
 
 impl StarCrawl {
@@ -238,6 +244,10 @@ impl StarCrawl {
             prep_shift_done: false,
             prep_frame_scroll_px: 0,
             prep_frame_star_row: 0,
+            compose_row: 0,
+            compose_blend_y: 0,
+            compose_star_row: 0,
+            compose_active: false,
         }
     }
 
@@ -667,45 +677,60 @@ impl StarCrawl {
 
     // ── Two-phase API (FreeRTOS display driver) ─────────────────────────────
 
-    /// Compose starfield → `fb` in chunked batches + A8 text blend.
+    /// Timer-gated resumable compose. Call once per back porch.
     ///
-    /// Starfield is blitted in CHUNK_ROWS-row batches (each ~96 KB).
-    /// Between batches, DMA2D releases the AXI bus so DSI and SDRAM
-    /// refresh don't stall. Total time ~12ms but bus is shared
-    /// cooperatively. A8 text blended in stripes the same way.
+    /// Runs starfield chunks + A8 blend stripes until `porch_cyc`
+    /// cycles have elapsed since the porch started, then returns
+    /// `false` (more work next porch). Returns `true` when the
+    /// entire compose + blend is done — caller should give buf_ready.
     ///
-    /// Returns `true` when all ops complete, `false` if crawl inactive.
+    /// `porch_start` = DWT_CYCCNT snapshot at ERIF (porch start).
+    /// `porch_cyc`   = budget in cycles (e.g. 4_800_000 = 12 ms).
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-    pub fn compose_and_blend(
+    pub fn compose_tick(
         &mut self,
         dma2d: &mut Dma2dBlitter,
         fb: *mut u8,
         fb_w: u32,
         sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+        porch_start: u32,
+        porch_cyc: u32,
     ) -> bool {
         if !self.active || self.starfield.is_null() {
             return false;
         }
+
+        // First call for a new frame: latch scroll position
+        if !self.compose_active {
+            self.compose_row = 0;
+            self.compose_blend_y = 0;
+            self.compose_star_row =
+                ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+            self.compose_active = true;
+            dcache_clean_range(A8_BUF, A8_SIZE);
+        }
+
         let row_bytes = fb_w * BPP;
-        let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
-
-        // 1. Starfield → fb in chunks. Each chunk is small enough
-        //    that SDRAM refresh and DSI TE can proceed between ops.
         const CHUNK_ROWS: u32 = 50;
-        sync.note_start();
-        let mut row = 0u32;
-        while row < FB_H {
-            let batch = CHUNK_ROWS.min(FB_H - row);
-            let src_start = (star_row + row) % STAR_ROWS;
 
-            // Check for wrap within this batch
+        // ── Starfield chunks ────────────────────────────────────
+        while self.compose_row < FB_H {
+            let elapsed = cyccnt().wrapping_sub(porch_start);
+            if elapsed >= porch_cyc {
+                return false; // porch budget expired
+            }
+            let batch = CHUNK_ROWS.min(FB_H - self.compose_row);
+            let src_start =
+                (self.compose_star_row + self.compose_row) % STAR_ROWS;
+
             if src_start + batch <= STAR_ROWS {
-                // Contiguous chunk
                 let src = unsafe {
                     self.starfield
                         .add((src_start * STAR_STRIDE) as usize)
                 };
-                let dst = unsafe { fb.add((row * row_bytes) as usize) };
+                let dst = unsafe {
+                    fb.add((self.compose_row * row_bytes) as usize)
+                };
                 sync.dma2d_active();
                 dma2d.start_blit_raw(
                     src as *const u8,
@@ -721,14 +746,15 @@ impl StarCrawl {
                 }
                 sync.dma2d_idle();
             } else {
-                // Batch straddles starfield wrap — split into two
                 let top = STAR_ROWS - src_start;
                 let bot = batch - top;
                 let src_top = unsafe {
                     self.starfield
                         .add((src_start * STAR_STRIDE) as usize)
                 };
-                let dst_top = unsafe { fb.add((row * row_bytes) as usize) };
+                let dst_top = unsafe {
+                    fb.add((self.compose_row * row_bytes) as usize)
+                };
                 sync.dma2d_active();
                 dma2d.start_blit_raw(
                     src_top as *const u8,
@@ -744,7 +770,9 @@ impl StarCrawl {
                 }
                 sync.dma2d_idle();
                 let dst_bot = unsafe {
-                    fb.add(((row + top) * row_bytes) as usize)
+                    fb.add(
+                        ((self.compose_row + top) * row_bytes) as usize,
+                    )
                 };
                 sync.dma2d_active();
                 dma2d.start_blit_raw(
@@ -762,20 +790,22 @@ impl StarCrawl {
                 sync.dma2d_idle();
             }
             cortex_m::asm::dsb();
-            row += batch;
+            self.compose_row += batch;
         }
-        let _ = sync.take_complete();
 
-        // 2. A8 text blend in stripes
-        dcache_clean_range(A8_BUF, A8_SIZE);
-        const BLEND_ROWS: u32 = 50;
-        let mut y = 0u32;
+        // ── A8 text blend stripes ───────────────────────────────
         let a8_h = A8_HEIGHT;
-        while y < a8_h {
-            let h = BLEND_ROWS.min(a8_h - y);
-            let src_off = (y * A8_WIDTH) as usize;
+        const BLEND_ROWS: u32 = 50;
+        while self.compose_blend_y < a8_h {
+            let elapsed = cyccnt().wrapping_sub(porch_start);
+            if elapsed >= porch_cyc {
+                return false; // porch expired
+            }
+            let h = BLEND_ROWS.min(a8_h - self.compose_blend_y);
+            let src_off = (self.compose_blend_y * A8_WIDTH) as usize;
             let src = (A8_BUF + src_off) as *const u8;
-            let dst_off = ((A8_Y_BASE + y) * fb_w * BPP) as usize;
+            let dst_off = ((A8_Y_BASE + self.compose_blend_y) * fb_w * BPP)
+                as usize;
             let dst = unsafe { fb.add(dst_off) };
             sync.dma2d_active();
             dma2d.start_blend_a8_color(
@@ -791,11 +821,14 @@ impl StarCrawl {
             }
             sync.dma2d_idle();
             cortex_m::asm::dsb();
-            y += h;
+            self.compose_blend_y += h;
         }
-        let _ = sync.take_complete();
 
-        self.diag_completed_frames = self.diag_completed_frames.saturating_add(1);
+        // All done — reset for next frame
+        let _ = sync.take_complete();
+        self.compose_active = false;
+        self.diag_completed_frames =
+            self.diag_completed_frames.saturating_add(1);
         true
     }
 
@@ -1248,6 +1281,15 @@ impl StarCrawl {
     pub fn tick(&mut self, _back_buf: *mut u8, _fb_w: u32, _fb_h: u32) -> StepResult {
         StepResult::Idle
     }
+}
+
+// ── DWT cycle counter ───────────────────────────────────────────────────────
+
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+#[inline(always)]
+fn cyccnt() -> u32 {
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+    unsafe { DWT_CYCCNT.read_volatile() }
 }
 
 // ── D-cache maintenance ─────────────────────────────────────────────────────

@@ -460,6 +460,12 @@ pub static CRAWL_ACTIVE: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
 #[inline(always)]
+fn cyccnt() -> u32 {
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+    unsafe { DWT_CYCCNT.read_volatile() }
+}
+
+#[inline(always)]
 unsafe fn hb_inc(addr: *mut u32) {
     unsafe {
         let v = addr.read_volatile().wrapping_add(1);
@@ -526,48 +532,34 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             }
         }
 
-        let crawl_active = CRAWL_ACTIVE.load(Ordering::Acquire);
+        // Non-blocking buf_ready for ALL modes. If a new frame is
+        // ready, swap FRONT/BACK. If not, retrigger the same FRONT
+        // (frame repeat). This keeps the ERIF cycle alive at 30 Hz
+        // so render_start_sem fires every porch — essential when
+        // compose spans multiple porches via compose_tick.
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-        if crawl_active && !buf_ready.is_null() {
-            // Single-buffer crawl: block on buf_ready with NO
-            // fallthrough. buf_ready is the SOLE retrigger gate —
-            // the DMA2D safety gate can't work with chunked ops
-            // because CR.START is 0 between chunks. portMAX_DELAY
-            // so we never retrigger mid-compose.
-            let got = unsafe {
-                freertos_sync::rlvgl_sem_take(
-                    buf_ready,
-                    freertos_sync::portMAX_DELAY,
-                )
-            } == freertos_sync::pdTRUE;
-            if !got {
-                continue; // shouldn't happen with MAX_DELAY
-            }
-            // buf_ready means compose finished + D-cache cleaned.
-            // Skip DMA2D safety gate — go straight to retrigger.
+        if !buf_ready.is_null()
+            && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) }
+                == freertos_sync::pdTRUE
+        {
+            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+            let back = BACK_FB_ADDR.load(Ordering::Acquire);
+            FRONT_FB_ADDR.store(back, Ordering::Release);
+            BACK_FB_ADDR.store(front, Ordering::Release);
+            cycles_since_swap = 0;
         } else {
-            // Idle compositor: non-blocking buf_ready + DMA2D gate
-            if !buf_ready.is_null()
-                && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) }
-                    == freertos_sync::pdTRUE
-            {
-                let front = FRONT_FB_ADDR.load(Ordering::Acquire);
-                let back = BACK_FB_ADDR.load(Ordering::Acquire);
-                FRONT_FB_ADDR.store(back, Ordering::Release);
-                BACK_FB_ADDR.store(front, Ordering::Release);
-            }
-            // DMA2D safety gate for non-crawl path
-            {
-                const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32;
-                const CR_START: u32 = 1 << 0;
-                let mut wait_ticks: u32 = 0;
-                while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
-                    wait_ticks += 1;
-                    if wait_ticks > 30 {
-                        break;
-                    }
-                    unsafe { vTaskDelay(1) };
-                }
+            cycles_since_swap = cycles_since_swap.saturating_add(1);
+        }
+        // DMA2D safety gate — compose_tick is timer-gated so DMA2D
+        // should be idle by retrigger time. This is a safety net.
+        {
+            const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32;
+            const CR_START: u32 = 1 << 0;
+            let mut wait_ticks: u32 = 0;
+            while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
+                wait_ticks += 1;
+                if wait_ticks > 30 { break; }
+                unsafe { vTaskDelay(1) };
             }
         }
 
@@ -768,39 +760,55 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         if cr.is_active() {
             let sync = get_sync().unwrap();
 
-            // Single-buffer crawl: compose directly into FRONT.
-            // Present retriggers FRONT every cycle without swapping.
-            // DMA2D writes complete in the back porch before retrigger,
-            // so no tearing. Chunked ops (~50 rows each) release the
-            // AXI bus between batches for DSI/SDRAM refresh.
-            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+            // Timer-gated compose into BACK. FRONT stays stable for
+            // LTDC scans. compose_tick is resumable — picks up where
+            // it left off on the next ERIF. When fully done, give
+            // buf_ready → present swaps BACK→FRONT on next ERIF.
+            //
+            // Porch budget: 12ms (4_800_000 cyc @ 400 MHz). Leaves
+            // 3ms before TIM7 fires at 15ms.
+            const PORCH_BUDGET: u32 = 4_800_000;
+            let porch_start = sync.erif_cyccnt.load(
+                core::sync::atomic::Ordering::Acquire,
+            );
+
             while dma.is_in_flight() {
                 cortex_m::asm::nop();
             }
-            if cr.compose_and_blend(dma, front as *mut u8, w, sync) {
+            let done = cr.compose_tick(
+                dma,
+                back as *mut u8,
+                w,
+                sync,
+                porch_start,
+                PORCH_BUDGET,
+            );
+            if done {
                 cortex_m::asm::dsb();
                 {
                     let mut cp = unsafe { cortex_m::Peripherals::steal() };
                     cp.SCB
-                        .clean_dcache_by_address(front as usize, bytes as usize);
+                        .clean_dcache_by_address(back as usize, bytes as usize);
                 }
                 unsafe {
                     HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
                     hb_inc(HB_CRAWL_READY);
                 }
-                // Signal buf_ready so present waits for ALL chunks
-                // to finish before retrigger. Without this, present's
-                // DMA2D safety gate sees CR.START=0 between chunks
-                // and retriggers mid-compose — half-written frame.
                 let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
                 if !buf_ready.is_null() {
                     unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
                 }
             }
+            // If !done: compose continues on next ERIF. Present
+            // doesn't get buf_ready, retriggers old content (frame
+            // repeat — preferred over flicker).
 
-            // Phase B: prep next frame's text (CPU FIR).
-            const PREP_BATCH: u32 = 64;
-            for _ in 0..PREP_BATCH {
+            // Phase B: CPU FIR text prep. NOT timer-gated — pure CPU
+            // work, no DMA2D, no AXI contention with LTDC. Runs from
+            // compose completion (~T+10ms) through the scan phase
+            // until the next ERIF (~T+33ms) = ~23ms of FIR time,
+            // enough for all 480 rows.
+            for _ in 0..480u32 {
                 unsafe { hb_inc(HB_CRAWL_TICKS) };
                 match cr.prep_next_frame(dma, sync) {
                     StepResult::FrameReady => break,
