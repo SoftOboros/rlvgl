@@ -359,10 +359,11 @@ mod touch_isr {
 use touch_isr::touch_ring_pop;
 
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
+/// In FreeRTOS builds, this runs from TIM6 enable until start()
+/// disables it; touch_task takes over I2C reads after that.
 #[cfg(all(
     not(feature = "c_hal"),
     not(feature = "zephyr"),
-    not(feature = "freertos"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _tim6_isr {
@@ -2216,6 +2217,10 @@ fn main() -> ! {
         let _pk7 = gpiok.pk7.into_floating_input();
 
         // ── TIM6 at 120 Hz for interrupt-driven touch sampling ──
+        // Bare-metal: ISR does full I2C reads.
+        // FreeRTOS: ISR just clears UIF; touch_task handles I2C reads.
+        // TIM6 must fire in both builds — disabling it prevents FT5336
+        // sensor calibration from completing.
         unsafe {
             // Enable TIM6 clock (RCC APB1LENR bit 4)
             let apb1lenr = 0x5802_44E8u32 as *mut u32;
@@ -3107,10 +3112,6 @@ fn main() -> ! {
         // by preemptive present / render / touch tasks. Never returns.
         #[cfg(feature = "freertos")]
         unsafe {
-            // Expose the front + back fb addresses and geometry to the
-            // FreeRTOS tasks. Present task re-triggers LTDC scans from
-            // the front; render task fills the back through CpuBlitter
-            // and signals a swap via buf_ready_sem.
             let (fw, fh) = display.dimensions();
             freertos_entry::init_fbs(
                 display.front_buffer_addr(),

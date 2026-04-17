@@ -642,12 +642,12 @@ pub unsafe fn init_full_adapted_cmd(fb_addr: u32) -> bool {
         u1_str(b"DSI[10 start]\r\n");
         dsi_cmd_mode::start_dsi();
         // Step 13: panel DCS init via LP. Reset is NOT pulsed here on
-        // Zephyr ACM builds — the C side's `ft5336_early_reset` SYS_INIT
-        // hook already pulsed PG3 at POST_KERNEL 45 (see
-        // memory/project_zephyr_ft5336_no_touches.md). Pulsing PG3 a
-        // second time puts the FT5336 touch IC into an "ACK-with-zeros"
-        // state that no further wake sequence recovers. On bare-metal
-        // builds, the C-side hook doesn't exist so we pulse here.
+        // Zephyr or FreeRTOS builds — the early PG3 pulse in main.rs
+        // (or Zephyr's SYS_INIT hook) already reset both the LCD panel
+        // and FT5336. A second pulse corrupts the FT5336 touch sensor
+        // (registers respond but TD_STATUS stays zero — sensor disabled).
+        // On bare-metal builds, the early pulse provides sufficient reset
+        // but we keep the second pulse for historical compatibility.
         u1_str(b"DSI[13 panel ");
         dsi_cmd_mode::enable_lp_cmd_overrides();
         #[cfg(not(feature = "zephyr"))]

@@ -64,12 +64,16 @@ unsafe fn write_reg(reg: u8, val: u8) {
     }
 }
 
-/// Initialize FT5336: normal mode + keep-active scanning.
+/// Initialize FT5336: keep-active scanning mode.
+///
+/// Only writes CTRL register — matches the Zephyr fix (commit 022384c).
+/// DEVICE_MODE and G_MODE are left at their power-on defaults.
+/// Also lowers the touch threshold to improve sensitivity.
 pub unsafe fn init_ctrl() {
     unsafe {
-        write_reg(0x00, 0x00); // DEVICE_MODE = normal
+        write_reg(0x86, 0x00); // CTRL = keep active (not monitor)
         for _ in 0..100_000u32 { cortex_m::asm::nop(); }
-        write_reg(0x86, 0x00); // CTRL = keep active
+        write_reg(0x80, 0x04); // TH_GROUP = 4 (very sensitive, default 0x1C)
     }
 }
 
@@ -95,6 +99,43 @@ unsafe fn i2c4_wait(bit: u32) -> bool {
             }
         }
         false
+    }
+}
+
+/// Soft-reset I2C4 by toggling PE (Peripheral Enable) in CR1.
+/// Clears any stuck bus state from a failed transaction.
+pub unsafe fn i2c4_bus_recover() {
+    unsafe {
+        const I2C4_CR1: *mut u32 = 0x5800_1C00 as *mut u32;
+        let cr1 = I2C4_CR1.read_volatile();
+        I2C4_CR1.write_volatile(cr1 & !1u32); // PE=0
+        for _ in 0..10_000u32 { cortex_m::asm::nop(); }
+        I2C4_CR1.write_volatile(cr1 | 1u32); // PE=1
+        for _ in 0..10_000u32 { cortex_m::asm::nop(); }
+    }
+}
+
+/// Read one register from the FT5336 via I2C4.
+/// Returns `None` on timeout or NACK.
+pub unsafe fn read_reg(reg: u8) -> Option<u8> {
+    unsafe {
+        I2C4_ICR.write_volatile(
+            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
+        );
+        // Write phase: register address (1 byte, no AUTOEND → TC)
+        I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
+        if !i2c4_wait(1) { return None; }
+        I2C4_TXDR.write_volatile(reg as u32);
+        if !i2c4_wait(6) { return None; } // TC
+
+        // Read phase: 1 byte, AUTOEND
+        I2C4_CR2.write_volatile(
+            FT5336_SADD | (1 << 10) | (1 << 16) | (1 << 13) | (1 << 25),
+        );
+        if !i2c4_wait(2) { return None; } // RXNE
+        let val = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
+        if i2c4_wait(5) { I2C4_ICR.write_volatile(1 << 5); }
+        Some(val)
     }
 }
 

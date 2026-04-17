@@ -570,6 +570,11 @@ const HB_PLAYIT_POLLS:  *mut u32 = 0x3800_0734 as *mut u32;
 pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
+/// When true, touch_task yields instead of polling I2C4 — lets the F
+/// command get clean bus access.
+static TOUCH_PAUSE: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
 /// Set by `render_task` while star_crawl is producing frames. Read
 /// by `present_task` — when active, present holds each swapped
 /// frame for exactly two present cycles (≈ 66 ms at the 30 Hz panel
@@ -1003,12 +1008,17 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
     use crate::touch_i2c;
 
-    // FT5336 init_ctrl hangs I2C4 — skip for now.
-    // Touch detection needs PG3 reset re-sequencing (same root
-    // cause as Zephyr port, see project_zephyr_ft5336_no_touches).
+    // FT5336 CTRL init done in start() — chip should be in
+    // keep-active scan mode (CTRL=0x00).
 
     loop {
         unsafe { hb_inc(HB_TOUCH_TICKS) };
+
+        // Pause when the F command needs clean I2C4 access.
+        if TOUCH_PAUSE.load(Ordering::Relaxed) {
+            unsafe { vTaskDelay(50) };
+            continue;
+        }
 
         // Poll unconditionally — INT line may not assert without
         // CTRL register init. TIM6 ISR disabled, so we have exclusive
@@ -1096,6 +1106,51 @@ fn handle_command(line: &[u8]) {
             crate::runtime_serial::write_bytes(b"CRAWL:toggled\r\n");
             crate::runtime_serial::kick_tx();
         }
+        b'F' | b'f' => {
+            // Pause touch_task, then do clean I2C4 reads
+            use crate::touch_i2c;
+            TOUCH_PAUSE.store(true, Ordering::Release);
+            unsafe { vTaskDelay(20) }; // let touch_task yield
+
+            let int_pin = touch_i2c::int_asserted();
+            // Raw 31-byte read (same as read_sample) — dump hex
+            let sample = unsafe { touch_i2c::read_sample() };
+            // Also read key config registers individually
+            let id = unsafe { touch_i2c::read_reg(0xA3) };
+            let ctrl = unsafe { touch_i2c::read_reg(0x86) };
+            let gm = unsafe { touch_i2c::read_reg(0xA4) };
+            let th = unsafe { touch_i2c::read_reg(0x80) };
+
+            TOUCH_PAUSE.store(false, Ordering::Release);
+
+            let mut out = [0u8; 128];
+            let mut p = 0;
+            p = write_slice(&mut out, p, b"FT: cnt=");
+            p = write_hex_u8(&mut out, p, sample.count);
+            if sample.count > 0 {
+                let (tid, ef, x, y) = sample.points[0];
+                p = write_slice(&mut out, p, b" p0=");
+                p = write_hex_u8(&mut out, p, tid);
+                p = write_slice(&mut out, p, b":");
+                p = write_hex_u8(&mut out, p, ef);
+                p = write_slice(&mut out, p, b":");
+                p = write_u32(&mut out, p, x as u32);
+                p = write_slice(&mut out, p, b",");
+                p = write_u32(&mut out, p, y as u32);
+            }
+            p = write_slice(&mut out, p, b" id=");
+            p = write_hex_u8(&mut out, p, id.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, b" ct=");
+            p = write_hex_u8(&mut out, p, ctrl.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, b" gm=");
+            p = write_hex_u8(&mut out, p, gm.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, b" th=");
+            p = write_hex_u8(&mut out, p, th.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, if int_pin { b" I=L" } else { b" I=H" });
+            p = write_slice(&mut out, p, b"\r\n");
+            crate::runtime_serial::write_bytes(&out[..p]);
+            crate::runtime_serial::kick_tx();
+        }
         b'?' => {
             // Snapshot the breadcrumbs and emit a one-line status.
             // Format: ?:tick=<present_ticks>,erif=<erif_wakes>,crawl_fr=<framed>,crawl_rdy=<ready>,touches=<hits>
@@ -1104,8 +1159,14 @@ fn handle_command(line: &[u8]) {
             let crawl_fr = unsafe { HB_CRAWL_FRAMEID.read_volatile() };
             let crawl_rdy = unsafe { HB_CRAWL_READY.read_volatile() };
             let touches = unsafe { HB_TOUCH_HITS.read_volatile() };
+            let touch_last = unsafe { HB_TOUCH_LAST.read_volatile() };
+            // Unpack: [31:28]=count, [27:24]=event_flag, [23:12]=x, [11:0]=y
+            let tc = (touch_last >> 28) & 0xF;
+            let ef = (touch_last >> 24) & 0xF;
+            let tx = (touch_last >> 12) & 0xFFF;
+            let ty = touch_last & 0xFFF;
 
-            let mut out = [0u8; 96];
+            let mut out = [0u8; 128];
             let mut p = 0usize;
             let prefix = b"?:tick=";
             p = write_slice(&mut out, p, prefix);
@@ -1118,6 +1179,14 @@ fn handle_command(line: &[u8]) {
             p = write_u32(&mut out, p, crawl_rdy);
             p = write_slice(&mut out, p, b",touches=");
             p = write_u32(&mut out, p, touches);
+            p = write_slice(&mut out, p, b",t=");
+            p = write_u32(&mut out, p, tc);
+            p = write_slice(&mut out, p, b":");
+            p = write_u32(&mut out, p, ef);
+            p = write_slice(&mut out, p, b":");
+            p = write_u32(&mut out, p, tx);
+            p = write_slice(&mut out, p, b",");
+            p = write_u32(&mut out, p, ty);
             p = write_slice(&mut out, p, b"\r\n");
 
             crate::runtime_serial::write_bytes(&out[..p]);
@@ -1167,6 +1236,16 @@ fn write_u32(dst: &mut [u8], mut p: usize, mut v: u32) -> usize {
     p
 }
 
+fn write_hex_u8(dst: &mut [u8], mut p: usize, v: u8) -> usize {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    if p + 1 < dst.len() {
+        dst[p] = HEX[(v >> 4) as usize];
+        dst[p + 1] = HEX[(v & 0xF) as usize];
+        p += 2;
+    }
+    p
+}
+
 // ── Entry point called from main.rs ───────────────────────────────────────────
 
 /// Start the FreeRTOS scheduler. Never returns.
@@ -1183,6 +1262,24 @@ pub unsafe fn start() -> ! {
         // 0. Stop TIM6 — bare-metal uses it for the touch ISR.
         //    FreeRTOS uses touch_task. Concurrent I2C4 access = bus hang.
         (0x4000_1000u32 as *mut u32).write_volatile(0); // TIM6_CR1 CEN=0
+
+        // 0b. FT5336: probe chip state but do NOT write any registers.
+        //     The bare-metal path gets touches without init_ctrl(); writing
+        //     CTRL or G_MODE may be corrupting the sensor.
+        {
+            use crate::touch_i2c;
+            let chip_id = touch_i2c::read_reg(0xA3);
+            let ctrl = touch_i2c::read_reg(0x86);
+            let mut out = [0u8; 40];
+            let mut p = 0;
+            p = write_slice(&mut out, p, b"FT5336: id=0x");
+            p = write_hex_u8(&mut out, p, chip_id.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, b" ctrl=0x");
+            p = write_hex_u8(&mut out, p, ctrl.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, b"\r\n");
+            crate::runtime_serial::write_bytes(&out[..p]);
+            crate::runtime_serial::kick_tx();
+        }
 
         // 1. Create binary semaphores in static storage.
         let erif_sem =
