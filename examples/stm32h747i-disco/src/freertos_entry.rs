@@ -459,6 +459,13 @@ pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
 pub static CRAWL_ACTIVE: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
+/// When non-zero, present_task retriggers with this address instead
+/// of FRONT_FB_ADDR. Set by render_task to point LTDC directly at
+/// the jumbo/starfield buffer at the current scroll offset. Zero
+/// DMA2D per frame — just a CFBAR register write.
+static CRAWL_FB_ADDR: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(0);
+
 #[inline(always)]
 fn cyccnt() -> u32 {
     const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
@@ -563,20 +570,18 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             }
         }
 
-        let fb = FRONT_FB_ADDR.load(Ordering::Acquire);
+        // Choose retrigger address: CRAWL_FB_ADDR when crawl is
+        // driving (points LTDC directly at the jumbo/starfield
+        // buffer — zero DMA2D per frame), else FRONT_FB_ADDR.
+        let crawl_fb = CRAWL_FB_ADDR.load(Ordering::Acquire);
+        let fb = if crawl_fb != 0 {
+            crawl_fb
+        } else {
+            FRONT_FB_ADDR.load(Ordering::Acquire)
+        };
         if fb != 0 {
-            // Mark the previous scan's completion consumed before
-            // starting a new one. Render tasks (star_crawl) poll this
-            // via `sync.erif_is_set` to gate on "prior scan done".
             sync.scan_complete.store(false, Ordering::Release);
             unsafe { ltdc_retrigger(fb) };
-            // PJ0 / Arduino D7 HIGH — LTDC scan is now active. DSI
-            // ISR takes it LOW when ERIF fires (scan complete).
-            // Together they scope the scan window on D7, and D9 (PJ6)
-            // scopes DMA2D in flight — so one can see whether DMA2D
-            // is cleanly sitting in the back-porch window (D9 inside
-            // D7-LOW) or spilling into the scan (D9 overlapping
-            // D7-HIGH = AXI contention).
             rlvgl_platform::frame_sync::ScopeProbe::ltdc_active(sync);
         }
         // render_start_sem is given by the DSI ISR on ERIF so
@@ -731,6 +736,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         if req {
             if cr.is_active() {
                 cr.deactivate();
+                CRAWL_FB_ADDR.store(0, Ordering::Release);
             } else {
                 cr.activate(dma);
                 // Drain stale buf_ready from the idle compositor so
@@ -760,54 +766,45 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         if cr.is_active() {
             let sync = get_sync().unwrap();
 
-            // Timer-gated compose into BACK. FRONT stays stable for
-            // LTDC scans. compose_tick is resumable — picks up where
-            // it left off on the next ERIF. When fully done, give
-            // buf_ready → present swaps BACK→FRONT on next ERIF.
+            // ── Jumbo/CFBAR model: zero DMA2D per frame ──────────
             //
-            // Porch budget: 12ms (4_800_000 cyc @ 400 MHz). Leaves
-            // 3ms before TIM7 fires at 15ms.
-            const PORCH_BUDGET: u32 = 4_800_000;
-            let porch_start = sync.erif_cyccnt.load(
-                core::sync::atomic::Ordering::Acquire,
-            );
+            // Point LTDC directly at the starfield source buffer at
+            // the current scroll offset. Present reads CRAWL_FB_ADDR
+            // and retriggers with it — just a register write, no
+            // DMA2D blit to the display buffer at all. LTDC reads
+            // 800 contiguous rows from the starfield.
+            //
+            // The starfield is 1600 rows (double-height, mirrored).
+            // As long as star_row + 800 <= 1600, the source is
+            // contiguous and LTDC reads correctly.
+            const CRAWL_BASE: usize = 0xD100_0000;
+            const STAR_STRIDE: u32 = 480 * 4; // FB_W * BPP
+            const STAR_ROWS: u32 = 1600;
+            const FB_H_CONST: u32 = 800;
 
-            while dma.is_in_flight() {
-                cortex_m::asm::nop();
-            }
-            let done = cr.compose_tick(
-                dma,
-                back as *mut u8,
-                w,
-                sync,
-                porch_start,
-                PORCH_BUDGET,
-            );
-            if done {
-                cortex_m::asm::dsb();
-                {
-                    let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                    cp.SCB
-                        .clean_dcache_by_address(back as usize, bytes as usize);
-                }
-                unsafe {
-                    HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
-                    hb_inc(HB_CRAWL_READY);
-                }
-                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-                if !buf_ready.is_null() {
-                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
-                }
-            }
-            // If !done: compose continues on next ERIF. Present
-            // doesn't get buf_ready, retriggers old content (frame
-            // repeat — preferred over flicker).
+            let star_row =
+                ((cr.star_scroll_q8() >> 8) as u32) % STAR_ROWS;
 
-            // Phase B: CPU FIR text prep. NOT timer-gated — pure CPU
-            // work, no DMA2D, no AXI contention with LTDC. Runs from
-            // compose completion (~T+10ms) through the scan phase
-            // until the next ERIF (~T+33ms) = ~23ms of FIR time,
-            // enough for all 480 rows.
+            // Clamp: if viewport would wrap, pin to last safe row
+            let safe_row = if star_row + FB_H_CONST <= STAR_ROWS {
+                star_row
+            } else {
+                STAR_ROWS - FB_H_CONST
+            };
+
+            let cfbar = CRAWL_BASE as u32 + safe_row * STAR_STRIDE;
+            CRAWL_FB_ADDR.store(cfbar, Ordering::Release);
+
+            unsafe {
+                HB_CRAWL_FRAMEID.write_volatile(cr.frame_id());
+                hb_inc(HB_CRAWL_READY);
+            }
+
+            // Phase B: advance scroll + CPU FIR text prep for
+            // future jumbo compose. Text isn't visible yet (LTDC
+            // reads raw starfield), but this keeps the scroll + text
+            // pipeline advancing so the jumbo compose phase can
+            // pick it up.
             for _ in 0..480u32 {
                 unsafe { hb_inc(HB_CRAWL_TICKS) };
                 match cr.prep_next_frame(dma, sync) {
@@ -815,6 +812,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     StepResult::Pending => {}
                     StepResult::Finished => {
                         cr.deactivate();
+                        CRAWL_FB_ADDR.store(0, Ordering::Release);
                         break;
                     }
                     StepResult::Idle => break,

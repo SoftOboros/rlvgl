@@ -255,6 +255,11 @@ impl StarCrawl {
         self.active
     }
 
+    /// Current starfield scroll in Q8 fixed-point.
+    pub fn star_scroll_q8(&self) -> i32 {
+        self.star_scroll_q8
+    }
+
     /// Select between [`RenderMode::Full`] (default) and
     /// [`RenderMode::Incremental`]. Safe to call any time; takes
     /// effect at the next frame start. Incremental mode requires the
