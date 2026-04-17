@@ -586,57 +586,6 @@ pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
 pub static CRAWL_ACTIVE: core::sync::atomic::AtomicBool =
     core::sync::atomic::AtomicBool::new(false);
 
-// ── Touch event ring (touch_task → render_task) ─────────────────────────────
-//
-// Single-producer (touch_task) / single-consumer (render_task) ring
-// buffer using atomics. Each entry is a packed u32:
-//   [31:30] = event type (0=down, 1=up, 2=move)
-//   [29:16] = x (portrait raw, 0-479)
-//   [15:2]  = y (portrait raw, 0-799)
-//   [1:0]   = reserved
-
-const TOUCH_RING_SIZE: usize = 16;
-static TOUCH_RING: [core::sync::atomic::AtomicU32; TOUCH_RING_SIZE] = {
-    const INIT: core::sync::atomic::AtomicU32 =
-        core::sync::atomic::AtomicU32::new(0);
-    [INIT; TOUCH_RING_SIZE]
-};
-static TOUCH_RING_WR: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
-static TOUCH_RING_RD: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
-
-fn touch_ring_push(evt_type: u32, px: u16, py: u16) {
-    let wr = TOUCH_RING_WR.load(core::sync::atomic::Ordering::Relaxed);
-    let rd = TOUCH_RING_RD.load(core::sync::atomic::Ordering::Acquire);
-    let next = (wr + 1) % TOUCH_RING_SIZE as u32;
-    if next == rd {
-        return; // full — drop
-    }
-    let packed = (evt_type << 30)
-        | ((px as u32 & 0x3FFF) << 16)
-        | ((py as u32 & 0x3FFF) << 2);
-    TOUCH_RING[wr as usize].store(packed, core::sync::atomic::Ordering::Relaxed);
-    TOUCH_RING_WR.store(next, core::sync::atomic::Ordering::Release);
-}
-
-fn touch_ring_pop() -> Option<(u32, u16, u16)> {
-    let rd = TOUCH_RING_RD.load(core::sync::atomic::Ordering::Relaxed);
-    let wr = TOUCH_RING_WR.load(core::sync::atomic::Ordering::Acquire);
-    if rd == wr {
-        return None;
-    }
-    let packed = TOUCH_RING[rd as usize].load(core::sync::atomic::Ordering::Relaxed);
-    TOUCH_RING_RD.store(
-        (rd + 1) % TOUCH_RING_SIZE as u32,
-        core::sync::atomic::Ordering::Release,
-    );
-    let evt_type = packed >> 30;
-    let px = ((packed >> 16) & 0x3FFF) as u16;
-    let py = ((packed >> 2) & 0x3FFF) as u16;
-    Some((evt_type, px, py))
-}
-
 /// When non-zero, present_task retriggers with this address instead
 /// of FRONT_FB_ADDR. Set by render_task to point LTDC directly at
 /// the jumbo/starfield buffer at the current scroll offset. Zero
@@ -768,21 +717,20 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
 }
 
 unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
-    use alloc::rc::Rc;
-    use core::cell::RefCell;
+    use alloc::boxed::Box;
     use core::sync::atomic::Ordering;
-    use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
     use rlvgl_core::packed_font::PackedFont;
-    use rlvgl_core::WidgetNode;
-    use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
+    use rlvgl_platform::blit::{PixelFmt, Rect, Surface};
     use rlvgl_platform::cpu_blitter::CpuBlitter;
     use rlvgl_platform::dma2d::Dma2dBlitter;
-    use rlvgl_platform::screen::Screen;
 
-    use crate::star_crawl::{RenderMode, StarCrawl, StepResult};
+    use crate::freertos_layers::{Compositor, MotionBlockLayer, SolidBackgroundLayer};
+    use crate::star_crawl::{self, RenderMode, StarCrawl, StepResult};
 
-    const IDLE_PERIOD_MS: u32 = 16;
+    const IDLE_PERIOD_MS: u32 = 16; // ~62 Hz idle compositor demo
 
+    // Bold font and README crawl text — mirrors the bare-metal and
+    // Zephyr setup so FreeRTOS renders the same content.
     static BOLD_FONT_DATA: &[u8] =
         include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
     static BOLD_FONT: PackedFont = PackedFont {
@@ -792,12 +740,10 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         data: BOLD_FONT_DATA,
     };
 
+    let mut compositor: Option<Compositor> = None;
     let mut cpu_blitter = CpuBlitter;
     let mut dma2d: Option<Dma2dBlitter> = None;
     let mut crawl: Option<StarCrawl> = None;
-    let mut controller: Option<DiscoController> = None;
-    let mut root: Option<Rc<RefCell<WidgetNode>>> = None;
-    let mut dirty_frames: u32 = 4; // force initial render
 
     loop {
         unsafe { hb_inc(HB_RENDER_TICKS) };
@@ -860,18 +806,53 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             crawl = Some(c);
         }
 
-        // Lazy-init widget tree (mirrors Zephyr's rlvgl_init pattern)
-        if controller.is_none() {
-            let screen = Screen::landscape(800, 480);
-            let caps = DiscoCapabilities {
-                platform: "FreeRTOS",
-                ..DiscoCapabilities::stm32h747i_disco()
-            };
-            let mut ctrl = DiscoController::new(screen, caps);
-            let r = ctrl.root();
-            root = Some(r);
-            controller = Some(ctrl);
-            dirty_frames = 4;
+        // One-shot double-buffer initial fill. Both front and back
+        // SDRAM regions get cleared to the compositor's background
+        // color via DMA2D (≈ 1 ms each at register-level R2M) so the
+        // splash that bare-metal init decoded into the original front
+        // is wiped BEFORE any render runs. Doing this via CpuBlitter
+        // inside the compositor's `seed_remaining` mechanism is unsafe
+        // under load: if a render iteration is lost (present TIM7
+        // fires before render's CpuBlitter finishes), the seed gets
+        // applied twice to the SAME buffer and the other one keeps
+        // the splash — which then flashes on alternate scans forever.
+        // Hardware fill before entering the loop is deterministic.
+        static mut DOUBLE_FILL_DONE: bool = false;
+        if unsafe { !DOUBLE_FILL_DONE } {
+            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+            let bg = 0xFF08_0820u32;
+            for &addr in &[front, back] {
+                if addr != 0 {
+                    dma2d.as_mut().unwrap().fill_raw(
+                        addr as *mut u8,
+                        w * 4,
+                        w,
+                        h,
+                        bg,
+                        rlvgl_platform::blit::PixelFmt::Argb8888,
+                    );
+                }
+            }
+            // Clean D-cache: bare-metal may have touched SDRAM via
+            // CPU (splash decode) and those lines could still be in
+            // cache. After DMA2D filled SDRAM directly, the cache
+            // still holds stale splash bytes — an LTDC scan would
+            // pick up cache-backed reads through any CPU path, and a
+            // later CPU write would flush those stale lines back over
+            // our DMA2D fill. Invalidate-clean ensures parity.
+            {
+                let mut cp = unsafe { cortex_m::Peripherals::steal() };
+                if front != 0 {
+                    cp.SCB
+                        .clean_invalidate_dcache_by_address(front as usize, (w * h * 4) as usize);
+                }
+                if back != 0 {
+                    cp.SCB
+                        .clean_invalidate_dcache_by_address(back as usize, (w * h * 4) as usize);
+                }
+            }
+            cortex_m::asm::dsb();
+            unsafe { DOUBLE_FILL_DONE = true };
         }
 
         let dma = dma2d.as_mut().unwrap();
@@ -1010,65 +991,55 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             continue;
         }
 
-        // ── Desktop mode: render widget tree into BACK ────────────
-        if let (Some(ctrl), Some(r)) = (controller.as_mut(), root.as_ref()) {
-            // Drain touch events and dispatch to widget tree.
-            // Portrait raw → landscape: (px, py) → (py, 799 - px)
-            // dw = 800 (landscape width)
-            while let Some((evt_type, px, py)) = touch_ring_pop() {
-                let lx = py as i32;
-                let ly = 799 - px as i32;
-                let evt = match evt_type {
-                    0 => rlvgl_core::event::Event::PointerDown { x: lx, y: ly },
-                    1 => rlvgl_core::event::Event::PointerUp { x: lx, y: ly },
-                    2 => rlvgl_core::event::Event::PointerMove { x: lx, y: ly },
-                    _ => continue,
-                };
-                r.borrow_mut().dispatch_event(&evt);
-                dirty_frames = 4;
-            }
-            ctrl.tick();
+        // ── Idle mode: simple compositor demo, CpuBlitter-backed ──
+        let c = compositor.get_or_insert_with(|| {
+            let mut c = Compositor::new();
+            c.push(Box::new(SolidBackgroundLayer { color: 0xFF08_0820 }));
+            let block_h = 80u32;
+            let block_w = 80u32;
+            let block = MotionBlockLayer::new(
+                Rect {
+                    x: 0,
+                    y: ((h - block_h) / 2) as i32,
+                    w: block_w,
+                    h: block_h,
+                },
+                0xFFE5_3E3E,
+                4,
+                (w, h),
+            );
+            c.push(Box::new(block));
+            c.prime_full(Rect { x: 0, y: 0, w, h });
+            c
+        });
 
-            // Process commands from controller (crawl toggle, etc.)
-            for cmd in ctrl.drain_commands() {
-                match cmd {
-                    DiscoCommand::StartEffect(
-                        rlvgl_app_disco_demo::DiscoEffect::StarCrawl,
-                    ) => {
-                        CRAWL_REQ.store(true, Ordering::Release);
-                    }
-                    _ => {}
-                }
-            }
+        let buf =
+            unsafe { core::slice::from_raw_parts_mut(back as *mut u8, bytes as usize) };
+        let stride = (w as usize) * 4;
+        let mut surf = Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
 
-            if dirty_frames > 0 {
-                let buf = unsafe {
-                    core::slice::from_raw_parts_mut(
-                        back as *mut u8,
-                        bytes as usize,
-                    )
-                };
-                let stride = (w as usize) * 4;
-                let surface =
-                    Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
-                let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
-                    BlitterRenderer::new(&mut cpu_blitter, surface);
-                let mut renderer =
-                    RotatedRenderer::new(&mut blit_renderer, w);
-                r.borrow().draw(&mut renderer);
+        let stats = c.render_frame(&mut cpu_blitter, &mut surf);
 
-                // D-cache clean so LTDC sees the writes
-                {
-                    let mut cp =
-                        unsafe { cortex_m::Peripherals::steal() };
-                    cp.SCB.clean_dcache_by_address(
-                        back as usize,
-                        bytes as usize,
-                    );
-                }
-                cortex_m::asm::dsb();
-                dirty_frames -= 1;
-            }
+        // Clean the D-cache for the region we just wrote. CpuBlitter
+        // issues normal CPU stores which land in the D-cache (write-
+        // back on this part), and LTDC reads SDRAM directly via AXI
+        // — so without a cache-clean it sees stale pixels and shows
+        // "lines alternating" tearing as the cache drains lazily.
+        // `dsb()` is a memory barrier only; it does NOT flush cache
+        // to SDRAM.
+        {
+            let mut cp = unsafe { cortex_m::Peripherals::steal() };
+            cp.SCB
+                .clean_dcache_by_address(back as usize, bytes as usize);
+        }
+        cortex_m::asm::dsb();
+
+        unsafe {
+            HB_RENDER_PIXELS.write_volatile(stats.pixels_touched);
+            HB_RENDER_RECTS.write_volatile(stats.rect_count);
+            HB_RENDER_CYC.write_volatile(stats.cycles);
+            let prev = HB_RENDER_PX_TOT.read_volatile();
+            HB_RENDER_PX_TOT.write_volatile(prev.wrapping_add(stats.pixels_touched));
         }
 
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
@@ -1081,41 +1052,27 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
     use crate::touch_i2c;
 
-    // Write FT5336 CTRL=0 to enable interrupt/polling mode.
-    unsafe { touch_i2c::init_ctrl() };
-
     loop {
         unsafe { hb_inc(HB_TOUCH_TICKS) };
 
-        // Poll FT5336 unconditionally — the INT line (PK7) may not
-        // assert if the CTRL register isn't in the right mode after
-        // panel reset. Polling at 120 Hz is cheap on I2C4.
+        // Only poll the chip when its INT line is asserted or we just
+        // saw a touch (to catch the release event). This keeps the
+        // I2C bus quiet in the common no-touch case.
         static mut PREV_TOUCH: bool = false;
+        let int_low = touch_i2c::int_asserted();
         let prev = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(PREV_TOUCH)) };
 
-        {
+        if int_low || prev {
             let s = unsafe { touch_i2c::read_sample() };
             if s.count > 0 {
                 unsafe { hb_inc(HB_TOUCH_HITS) };
-                let (_id, _ef, x, y) = s.points[0];
-                // Pack for breadcrumb
+                // Pack the first point for debug visibility.
+                let (_id, ef, x, y) = s.points[0];
                 let packed = ((s.count as u32) << 28)
-                    | ((_ef as u32) << 24)
+                    | ((ef as u32) << 24)
                     | ((x as u32) << 12)
                     | (y as u32 & 0xFFF);
                 unsafe { HB_TOUCH_LAST.write_volatile(packed) };
-                // Push to event ring for render_task
-                if !prev {
-                    touch_ring_push(0, x, y); // PointerDown
-                } else {
-                    touch_ring_push(2, x, y); // PointerMove
-                }
-            } else if prev {
-                // Release — use last known position (already in breadcrumb)
-                let last = unsafe { HB_TOUCH_LAST.read_volatile() };
-                let lx = ((last >> 12) & 0xFFF) as u16;
-                let ly = (last & 0xFFF) as u16;
-                touch_ring_push(1, lx, ly); // PointerUp
             }
             unsafe {
                 core::ptr::write_volatile(core::ptr::addr_of_mut!(PREV_TOUCH), s.count > 0);
@@ -1270,12 +1227,6 @@ fn write_u32(dst: &mut [u8], mut p: usize, mut v: u32) -> usize {
 /// already initialized and interrupts still globally disabled.
 pub unsafe fn start() -> ! {
     unsafe {
-        // 0. Disable TIM6 — bare-metal uses it for touch ISR polling.
-        //    FreeRTOS uses touch_task instead. Concurrent I2C4 access
-        //    from ISR + task corrupts the bus.
-        const TIM6_CR1: *mut u32 = 0x4000_1000 as *mut u32;
-        TIM6_CR1.write_volatile(0); // CEN=0
-
         // 1. Create binary semaphores in static storage.
         let erif_sem =
             freertos_sync::rlvgl_sem_create_binary_static(core::ptr::addr_of_mut!(ERIF_SEM_BUF));

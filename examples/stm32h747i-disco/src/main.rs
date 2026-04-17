@@ -359,11 +359,9 @@ mod touch_isr {
 use touch_isr::touch_ring_pop;
 
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
-/// Disabled under FreeRTOS (touch_task polls I2C4 directly).
 #[cfg(all(
     not(feature = "c_hal"),
     not(feature = "zephyr"),
-    not(feature = "freertos"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _tim6_isr {
