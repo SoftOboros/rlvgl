@@ -806,54 +806,8 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             crawl = Some(c);
         }
 
-        // One-shot double-buffer initial fill. Both front and back
-        // SDRAM regions get cleared to the compositor's background
-        // color via DMA2D (≈ 1 ms each at register-level R2M) so the
-        // splash that bare-metal init decoded into the original front
-        // is wiped BEFORE any render runs. Doing this via CpuBlitter
-        // inside the compositor's `seed_remaining` mechanism is unsafe
-        // under load: if a render iteration is lost (present TIM7
-        // fires before render's CpuBlitter finishes), the seed gets
-        // applied twice to the SAME buffer and the other one keeps
-        // the splash — which then flashes on alternate scans forever.
-        // Hardware fill before entering the loop is deterministic.
-        static mut DOUBLE_FILL_DONE: bool = false;
-        if unsafe { !DOUBLE_FILL_DONE } {
-            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
-            let bg = 0xFF08_0820u32;
-            for &addr in &[front, back] {
-                if addr != 0 {
-                    dma2d.as_mut().unwrap().fill_raw(
-                        addr as *mut u8,
-                        w * 4,
-                        w,
-                        h,
-                        bg,
-                        rlvgl_platform::blit::PixelFmt::Argb8888,
-                    );
-                }
-            }
-            // Clean D-cache: bare-metal may have touched SDRAM via
-            // CPU (splash decode) and those lines could still be in
-            // cache. After DMA2D filled SDRAM directly, the cache
-            // still holds stale splash bytes — an LTDC scan would
-            // pick up cache-backed reads through any CPU path, and a
-            // later CPU write would flush those stale lines back over
-            // our DMA2D fill. Invalidate-clean ensures parity.
-            {
-                let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                if front != 0 {
-                    cp.SCB
-                        .clean_invalidate_dcache_by_address(front as usize, (w * h * 4) as usize);
-                }
-                if back != 0 {
-                    cp.SCB
-                        .clean_invalidate_dcache_by_address(back as usize, (w * h * 4) as usize);
-                }
-            }
-            cortex_m::asm::dsb();
-            unsafe { DOUBLE_FILL_DONE = true };
-        }
+        // No initial fill — bare-metal init decoded the splash into
+        // FRONT. The widget tree renders into BACK on every idle frame.
 
         let dma = dma2d.as_mut().unwrap();
         let cr = crawl.as_mut().unwrap();
@@ -991,55 +945,52 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             continue;
         }
 
-        // ── Idle mode: simple compositor demo, CpuBlitter-backed ──
-        let c = compositor.get_or_insert_with(|| {
-            let mut c = Compositor::new();
-            c.push(Box::new(SolidBackgroundLayer { color: 0xFF08_0820 }));
-            let block_h = 80u32;
-            let block_w = 80u32;
-            let block = MotionBlockLayer::new(
-                Rect {
-                    x: 0,
-                    y: ((h - block_h) / 2) as i32,
-                    w: block_w,
-                    h: block_h,
-                },
-                0xFFE5_3E3E,
-                4,
-                (w, h),
-            );
-            c.push(Box::new(block));
-            c.prime_full(Rect { x: 0, y: 0, w, h });
-            c
-        });
-
-        let buf =
-            unsafe { core::slice::from_raw_parts_mut(back as *mut u8, bytes as usize) };
-        let stride = (w as usize) * 4;
-        let mut surf = Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
-
-        let stats = c.render_frame(&mut cpu_blitter, &mut surf);
-
-        // Clean the D-cache for the region we just wrote. CpuBlitter
-        // issues normal CPU stores which land in the D-cache (write-
-        // back on this part), and LTDC reads SDRAM directly via AXI
-        // — so without a cache-clean it sees stale pixels and shows
-        // "lines alternating" tearing as the cache drains lazily.
-        // `dsb()` is a memory barrier only; it does NOT flush cache
-        // to SDRAM.
+        // ── Desktop mode: widget tree render ─────────────────────
         {
-            let mut cp = unsafe { cortex_m::Peripherals::steal() };
-            cp.SCB
-                .clean_dcache_by_address(back as usize, bytes as usize);
-        }
-        cortex_m::asm::dsb();
+            use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoController};
+            use rlvgl_platform::blit::{BlitterRenderer, RotatedRenderer};
+            use rlvgl_platform::screen::Screen;
 
-        unsafe {
-            HB_RENDER_PIXELS.write_volatile(stats.pixels_touched);
-            HB_RENDER_RECTS.write_volatile(stats.rect_count);
-            HB_RENDER_CYC.write_volatile(stats.cycles);
-            let prev = HB_RENDER_PX_TOT.read_volatile();
-            HB_RENDER_PX_TOT.write_volatile(prev.wrapping_add(stats.pixels_touched));
+            static mut DESKTOP_CTRL: Option<DiscoController> = None;
+            if unsafe { (*core::ptr::addr_of!(DESKTOP_CTRL)).is_none() } {
+                let screen = Screen::landscape(800, 480);
+                let ctrl = DiscoController::new(
+                    screen,
+                    DiscoCapabilities::stm32h747i_disco(),
+                );
+                unsafe { *core::ptr::addr_of_mut!(DESKTOP_CTRL) = Some(ctrl) };
+            }
+
+            let ctrl = unsafe { &mut *core::ptr::addr_of_mut!(DESKTOP_CTRL) }
+                .as_mut()
+                .unwrap();
+            ctrl.tick();
+
+            {
+                let buf = unsafe {
+                    core::slice::from_raw_parts_mut(
+                        back as *mut u8,
+                        bytes as usize,
+                    )
+                };
+                let stride = (w as usize) * 4;
+                let surface =
+                    Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
+                let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                    BlitterRenderer::new(&mut cpu_blitter, surface);
+                let mut renderer =
+                    RotatedRenderer::new(&mut blit_renderer, w);
+                ctrl.root().borrow().draw(&mut renderer);
+
+                {
+                    let mut cp = unsafe { cortex_m::Peripherals::steal() };
+                    cp.SCB.clean_dcache_by_address(
+                        back as usize,
+                        bytes as usize,
+                    );
+                }
+                cortex_m::asm::dsb();
+            }
         }
 
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
@@ -1052,17 +1003,19 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
     use crate::touch_i2c;
 
+    // FT5336 init_ctrl hangs I2C4 — skip for now.
+    // Touch detection needs PG3 reset re-sequencing (same root
+    // cause as Zephyr port, see project_zephyr_ft5336_no_touches).
+
     loop {
         unsafe { hb_inc(HB_TOUCH_TICKS) };
 
-        // Only poll the chip when its INT line is asserted or we just
-        // saw a touch (to catch the release event). This keeps the
-        // I2C bus quiet in the common no-touch case.
+        // Poll unconditionally — INT line may not assert without
+        // CTRL register init. TIM6 ISR disabled, so we have exclusive
+        // I2C4 access.
         static mut PREV_TOUCH: bool = false;
-        let int_low = touch_i2c::int_asserted();
         let prev = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(PREV_TOUCH)) };
-
-        if int_low || prev {
+        {
             let s = unsafe { touch_i2c::read_sample() };
             if s.count > 0 {
                 unsafe { hb_inc(HB_TOUCH_HITS) };
@@ -1227,6 +1180,10 @@ fn write_u32(dst: &mut [u8], mut p: usize, mut v: u32) -> usize {
 /// already initialized and interrupts still globally disabled.
 pub unsafe fn start() -> ! {
     unsafe {
+        // 0. Stop TIM6 — bare-metal uses it for the touch ISR.
+        //    FreeRTOS uses touch_task. Concurrent I2C4 access = bus hang.
+        (0x4000_1000u32 as *mut u32).write_volatile(0); // TIM6_CR1 CEN=0
+
         // 1. Create binary semaphores in static storage.
         let erif_sem =
             freertos_sync::rlvgl_sem_create_binary_static(core::ptr::addr_of_mut!(ERIF_SEM_BUF));

@@ -45,6 +45,34 @@ impl RawTouchSample {
     };
 }
 
+/// Write a single FT5336 register via I2C4.
+unsafe fn write_reg(reg: u8, val: u8) {
+    unsafe {
+        I2C4_ICR.write_volatile(
+            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
+        );
+        I2C4_CR2.write_volatile(
+            FT5336_SADD | (2 << 16) | (1 << 13) | (1 << 25),
+        );
+        if !i2c4_wait(1) { return; }
+        I2C4_TXDR.write_volatile(reg as u32);
+        if !i2c4_wait(1) { return; }
+        I2C4_TXDR.write_volatile(val as u32);
+        if i2c4_wait(5) {
+            I2C4_ICR.write_volatile(1 << 5);
+        }
+    }
+}
+
+/// Initialize FT5336: normal mode + keep-active scanning.
+pub unsafe fn init_ctrl() {
+    unsafe {
+        write_reg(0x00, 0x00); // DEVICE_MODE = normal
+        for _ in 0..100_000u32 { cortex_m::asm::nop(); }
+        write_reg(0x86, 0x00); // CTRL = keep active
+    }
+}
+
 /// Non-blocking check: is PK7 (FT5336 INT) currently asserted low?
 #[inline]
 pub fn int_asserted() -> bool {
