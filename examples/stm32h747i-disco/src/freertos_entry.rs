@@ -87,9 +87,18 @@ unsafe extern "C" {
     fn xPortSysTickHandler();
 }
 
+/// Set true in start() right before vTaskStartScheduler(). Until then,
+/// the SysTick handler is a no-op — prevents xPortSysTickHandler from
+/// running on uninitialized FreeRTOS scheduler data when the HAL's
+/// clock setup enables SysTick before the scheduler starts.
+static SYSTICK_READY: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
 #[cortex_m_rt::exception]
 fn SysTick() {
-    unsafe { xPortSysTickHandler() }
+    if SYSTICK_READY.load(Ordering::Relaxed) {
+        unsafe { xPortSysTickHandler() }
+    }
 }
 
 // ── Global sync pointer ───────────────────────────────────────────────────────
@@ -1263,19 +1272,27 @@ pub unsafe fn start() -> ! {
         //    FreeRTOS uses touch_task. Concurrent I2C4 access = bus hang.
         (0x4000_1000u32 as *mut u32).write_volatile(0); // TIM6_CR1 CEN=0
 
-        // 0b. FT5336: probe chip state but do NOT write any registers.
-        //     The bare-metal path gets touches without init_ctrl(); writing
-        //     CTRL or G_MODE may be corrupting the sensor.
+        // 0b. FT5336 init: write CTRL=0x00 (keep-active scan mode).
+        //     300+ ms have elapsed since the last PG3 reset; chip is booted.
         {
             use crate::touch_i2c;
-            let chip_id = touch_i2c::read_reg(0xA3);
-            let ctrl = touch_i2c::read_reg(0x86);
-            let mut out = [0u8; 40];
+            let mut chip_id = touch_i2c::read_reg(0xA3);
+            if chip_id.is_none() {
+                touch_i2c::i2c4_bus_recover();
+                chip_id = touch_i2c::read_reg(0xA3);
+            }
+            let ctrl_pre = touch_i2c::read_reg(0x86);
+            touch_i2c::init_ctrl();
+            let ctrl_post = touch_i2c::read_reg(0x86);
+
+            let mut out = [0u8; 48];
             let mut p = 0;
             p = write_slice(&mut out, p, b"FT5336: id=0x");
             p = write_hex_u8(&mut out, p, chip_id.unwrap_or(0xFF));
             p = write_slice(&mut out, p, b" ctrl=0x");
-            p = write_hex_u8(&mut out, p, ctrl.unwrap_or(0xFF));
+            p = write_hex_u8(&mut out, p, ctrl_pre.unwrap_or(0xFF));
+            p = write_slice(&mut out, p, b"->0x");
+            p = write_hex_u8(&mut out, p, ctrl_post.unwrap_or(0xFF));
             p = write_slice(&mut out, p, b"\r\n");
             crate::runtime_serial::write_bytes(&out[..p]);
             crate::runtime_serial::kick_tx();
@@ -1367,6 +1384,8 @@ pub unsafe fn start() -> ! {
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::TIM7);
 
         // 5. Start the scheduler — never returns.
+        //    Enable SysTick routing to FreeRTOS just before launch.
+        SYSTICK_READY.store(true, Ordering::Release);
         vTaskStartScheduler();
     }
 }

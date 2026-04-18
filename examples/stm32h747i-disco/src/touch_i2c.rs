@@ -68,12 +68,9 @@ unsafe fn write_reg(reg: u8, val: u8) {
 ///
 /// Only writes CTRL register — matches the Zephyr fix (commit 022384c).
 /// DEVICE_MODE and G_MODE are left at their power-on defaults.
-/// Also lowers the touch threshold to improve sensitivity.
 pub unsafe fn init_ctrl() {
     unsafe {
         write_reg(0x86, 0x00); // CTRL = keep active (not monitor)
-        for _ in 0..100_000u32 { cortex_m::asm::nop(); }
-        write_reg(0x80, 0x04); // TH_GROUP = 4 (very sensitive, default 0x1C)
     }
 }
 

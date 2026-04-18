@@ -1405,7 +1405,12 @@ unsafe fn adc3_temp_init() {
 
 /// Cached junction temperature in tenths of °C.
 static mut CACHED_TEMP_X10: i32 = 0;
-/// Heap size in bytes.
+/// Heap size in bytes. FreeRTOS adds ~33KB to .bss (heap_4 + task stacks +
+/// TCBs) in the 128K DTCM, leaving less room for the main stack. Reduce
+/// the Rust heap when FreeRTOS is linked to avoid stack overflow.
+#[cfg(feature = "freertos")]
+const HEAP_SIZE: usize = 32 * 1024;
+#[cfg(not(feature = "freertos"))]
 const HEAP_SIZE: usize = 64 * 1024;
 
 /// Static memory region used to service heap allocations.
@@ -1655,6 +1660,12 @@ fn main() -> ! {
         use stm32h7xx_hal::rcc::{PllConfigStrategy, ResetEnable};
         let rcc = RCC.constrain();
         let mut syscfg = SYSCFG;
+        // FreeRTOS: disable SysTick BEFORE HAL freeze() to prevent the
+        // FreeRTOS SysTick handler from running on uninitialized data.
+        // The HAL's freeze() enables SysTick for delay functions; even
+        // one tick through xPortSysTickHandler corrupts scheduler state.
+        #[cfg(feature = "freertos")]
+        unsafe { (0xE000_E010u32 as *mut u32).write_volatile(0); }
         // HAL RCC: derive SYSCLK and LTDC pixel clock (via PLL3R)
         // Assumes HSE=25 MHz on H747I-DISCO. Adjust if using HSI or a different crystal.
         let ccdr = rcc
@@ -1670,6 +1681,15 @@ fn main() -> ! {
             // Target ~33 MHz pixel clock for 800x480 panel bring-up
             .pll3_r_ck(32.MHz())
             .freeze(vos, &mut syscfg);
+        // HAL freeze() enables SysTick for its delay functions. In
+        // FreeRTOS builds, the SysTick vector points to xPortSysTickHandler
+        // which operates on uninitialized scheduler data — disable SysTick
+        // immediately. The FreeRTOS port re-enables it in vTaskStartScheduler.
+        #[cfg(feature = "freertos")]
+        unsafe {
+            const SYST_CSR: *mut u32 = 0xE000_E010 as *mut u32;
+            SYST_CSR.write_volatile(0); // disable SysTick
+        }
         // Enable display-related peripherals in D1 domain
         let _ = ccdr.peripheral.LTDC.enable();
         let _ = ccdr.peripheral.DMA2D.enable();
