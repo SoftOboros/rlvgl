@@ -1004,13 +1004,23 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             use rlvgl_platform::screen::Screen;
 
             static mut DESKTOP_CTRL: Option<DiscoController> = None;
+            static mut DESKTOP_DIAG: bool = false;
+            // Dirty-frame counter: >0 = render + swap, 0 = idle (present
+            // repeats FRONT). Start at 4 for initial convergence.
+            // Touch events set this to 20 (~660ms at 30Hz) to cover
+            // wing slide + double-buffer convergence.
+            static mut DIRTY_FRAMES: u8 = 4;
             if unsafe { (*core::ptr::addr_of!(DESKTOP_CTRL)).is_none() } {
+                crate::runtime_serial::write_bytes(b"RND:ctrl_new\r\n");
+                crate::runtime_serial::kick_tx();
                 let screen = Screen::landscape(800, 480);
                 let ctrl = DiscoController::new(
                     screen,
                     DiscoCapabilities::stm32h747i_disco(),
                 );
                 unsafe { *core::ptr::addr_of_mut!(DESKTOP_CTRL) = Some(ctrl) };
+                crate::runtime_serial::write_bytes(b"RND:ctrl_ok\r\n");
+                crate::runtime_serial::kick_tx();
             }
 
             let ctrl = unsafe { &mut *core::ptr::addr_of_mut!(DESKTOP_CTRL) }
@@ -1106,48 +1116,130 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     };
 
                     if let Some(evt) = evt {
+                        // Touch dirties for 20 frames (~660ms) to cover
+                        // wing slide animations + double-buffer convergence.
+                        unsafe {
+                            core::ptr::write_volatile(
+                                core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                                20,
+                            );
+                        }
+                        // Feed through gesture pipeline only —
+                        // PressDown/PressRelease/DoubleTap are what
+                        // the widget tree expects.
                         if let Some(gesture) = tap.process(&evt) {
                             let (a, b) = dtap.process(&gesture);
-                            for dtap_evt in a.into_iter().chain(b) {
-                                ctrl.root().borrow_mut().dispatch_event(&dtap_evt);
+                            for g in a.into_iter().chain(b) {
+                                ctrl.dispatch_event(&g);
                             }
                         }
                     }
+                }
+
+                // Advance gesture timers every frame. TapRecognizer fires
+                // PressRelease after settle; DoubleTapRecognizer forwards
+                // buffered PressRelease after the double-tap window expires.
+                if let Some(gesture) = tap.tick() {
+                    unsafe {
+                        core::ptr::write_volatile(
+                            core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                            20,
+                        );
+                    }
+                    let (a, b) = dtap.process(&gesture);
+                    for g in a.into_iter().chain(b) {
+                        ctrl.dispatch_event(&g);
+                    }
+                }
+                if let Some(gesture) = dtap.tick() {
+                    unsafe {
+                        core::ptr::write_volatile(
+                            core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                            20,
+                        );
+                    }
+                    // Diagnostic: log PressRelease coordinates
+                    if let rlvgl_core::event::Event::PressRelease { x, y } = &gesture {
+                        let mut out = [0u8; 32];
+                        let mut p = 0;
+                        p = write_slice(&mut out, p, b"PR:");
+                        p = write_u32(&mut out, p, *x as u32);
+                        p = write_slice(&mut out, p, b",");
+                        p = write_u32(&mut out, p, *y as u32);
+                        p = write_slice(&mut out, p, b"\r\n");
+                        crate::runtime_serial::write_bytes(&out[..p]);
+                        crate::runtime_serial::kick_tx();
+                    }
+                    ctrl.dispatch_event(&gesture);
                 }
             }
 
             ctrl.tick();
 
-            {
-                let buf = unsafe {
-                    core::slice::from_raw_parts_mut(
-                        back as *mut u8,
-                        bytes as usize,
-                    )
-                };
-                let stride = (w as usize) * 4;
-                let surface =
-                    Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
-                let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
-                    BlitterRenderer::new(&mut cpu_blitter, surface);
-                let mut renderer =
-                    RotatedRenderer::new(&mut blit_renderer, w);
-                ctrl.root().borrow().draw(&mut renderer);
+            let df = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DIRTY_FRAMES)) };
+            if df > 0 {
+                unsafe {
+                    core::ptr::write_volatile(
+                        core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                        df - 1,
+                    );
+                }
 
-                {
-                    let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                    cp.SCB.clean_dcache_by_address(
-                        back as usize,
+                // Restore pristine splash into back buffer, draw
+                // widget tree, then signal present to swap.
+                const DESKTOP_PRISTINE: u32 = 0xD030_0000;
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        DESKTOP_PRISTINE as *const u8,
+                        back as *mut u8,
                         bytes as usize,
                     );
                 }
-                cortex_m::asm::dsb();
-            }
-        }
 
-        let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-        if !buf_ready.is_null() {
-            unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+                // One-shot diagnostic: confirm draw path executes
+                if !unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DESKTOP_DIAG)) } {
+                    crate::runtime_serial::write_bytes(b"RND:draw\r\n");
+                    crate::runtime_serial::kick_tx();
+                }
+
+                {
+                    let buf = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            back as *mut u8,
+                            bytes as usize,
+                        )
+                    };
+                    let stride = (w as usize) * 4;
+                    let surface =
+                        Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
+                    let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                        BlitterRenderer::new(&mut cpu_blitter, surface);
+                    let mut renderer =
+                        RotatedRenderer::new(&mut blit_renderer, w);
+                    ctrl.root().borrow().draw(&mut renderer);
+
+                    {
+                        let mut cp = unsafe { cortex_m::Peripherals::steal() };
+                        cp.SCB.clean_dcache_by_address(
+                            back as usize,
+                            bytes as usize,
+                        );
+                    }
+                    cortex_m::asm::dsb();
+                }
+
+                // One-shot diagnostic: confirm draw completed
+                if !unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DESKTOP_DIAG)) } {
+                    unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(DESKTOP_DIAG), true) };
+                    crate::runtime_serial::write_bytes(b"RND:drawn\r\n");
+                    crate::runtime_serial::kick_tx();
+                }
+
+                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+                if !buf_ready.is_null() {
+                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+                }
+            }
         }
     }
 }
@@ -1155,11 +1247,22 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
     use crate::touch_i2c;
 
-    // FT5336 CTRL init done in start() — chip should be in
-    // keep-active scan mode (CTRL=0x00).
+    // FT5336 CTRL init done in start(). Periodically re-check
+    // CTRL and G_MODE — the chip can auto-revert to monitor mode.
+    let mut ctrl_check_counter: u32 = 0;
 
     loop {
         unsafe { hb_inc(HB_TOUCH_TICKS) };
+
+        // Every ~2s (250 iterations × 8ms), verify CTRL is still 0x00
+        ctrl_check_counter += 1;
+        if ctrl_check_counter >= 250 {
+            ctrl_check_counter = 0;
+            let ctrl = unsafe { touch_i2c::read_reg(0x86) };
+            if ctrl != Some(0x00) {
+                unsafe { touch_i2c::init_ctrl() };
+            }
+        }
 
         // Pause when the F command needs clean I2C4 access.
         if TOUCH_PAUSE.load(Ordering::Relaxed) {

@@ -64,12 +64,14 @@ unsafe fn write_reg(reg: u8, val: u8) {
     }
 }
 
-/// Initialize FT5336: keep-active scanning mode.
+/// Initialize FT5336: keep-active continuous scanning mode.
 ///
-/// Only writes CTRL register — matches the Zephyr fix (commit 022384c).
-/// DEVICE_MODE and G_MODE are left at their power-on defaults.
+/// Writes both G_MODE and CTRL — G_MODE=0x00 (polling) prevents
+/// the chip from auto-reverting CTRL to monitor mode when no
+/// INT-pin activity is detected.
 pub unsafe fn init_ctrl() {
     unsafe {
+        write_reg(0xA4, 0x00); // G_MODE = polling (not trigger)
         write_reg(0x86, 0x00); // CTRL = keep active (not monitor)
     }
 }
