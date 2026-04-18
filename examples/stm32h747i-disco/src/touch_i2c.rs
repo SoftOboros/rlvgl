@@ -191,3 +191,195 @@ pub unsafe fn read_sample() -> RawTouchSample {
         RawTouchSample { count, points }
     }
 }
+
+// ── Interrupt-driven I2C4 read (FreeRTOS) ────────────────────────────────────
+//
+// Single-wait state machine: task starts the transaction, enables I2C4_EV
+// interrupt, then blocks on a semaphore. The ISR advances through
+// write-addr → restart-read → collect-bytes → STOP, then gives the sem.
+
+const I2C4_CR1: *mut u32 = 0x5800_1C00 as *mut u32;
+
+/// ISR state for the interrupt-driven read.
+#[derive(Copy, Clone, PartialEq)]
+#[repr(u8)]
+enum I2c4Phase {
+    Idle = 0,
+    WaitTxis = 1,   // START sent, waiting for TXIS to write register address
+    WaitTC = 2,     // Reg addr written, waiting for TC (transfer complete)
+    Reading = 3,    // Repeated START with read, collecting RXNE bytes
+}
+
+/// Shared state between task (start) and ISR (advance).
+static mut ISR_PHASE: I2c4Phase = I2c4Phase::Idle;
+static mut ISR_BUF: [u8; 32] = [0; 32];
+static mut ISR_IDX: usize = 0;
+static mut ISR_LEN: usize = 0;
+static mut ISR_REG: u8 = 0;
+static mut ISR_OK: bool = false;
+
+/// Semaphore handle — set by freertos_entry::start().
+static I2C4_DONE_SEM: core::sync::atomic::AtomicPtr<core::ffi::c_void> =
+    core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
+
+/// Store the semaphore handle (called from start()).
+pub fn set_i2c4_sem(sem: *mut core::ffi::c_void) {
+    I2C4_DONE_SEM.store(sem, core::sync::atomic::Ordering::Release);
+}
+
+/// Start an interrupt-driven read of `len` bytes from FT5336 register
+/// `reg`. Returns immediately; call `i2c4_irq_wait()` to block until
+/// the ISR completes.
+///
+/// # Safety
+/// Must not be called while a previous transaction is in flight.
+pub unsafe fn i2c4_irq_start(reg: u8, len: usize) {
+    unsafe {
+        let n = len.min(31);
+        ISR_REG = reg;
+        ISR_LEN = n;
+        ISR_IDX = 0;
+        ISR_OK = false;
+
+        // Clear stale flags
+        I2C4_ICR.write_volatile(
+            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
+        );
+
+        // Enable I2C4 event interrupts: TXIE, TCIE, RXIE, STOPIE, NACKIE
+        let cr1 = I2C4_CR1.read_volatile();
+        I2C4_CR1.write_volatile(
+            cr1 | (1 << 1)   // TXIE
+                | (1 << 2)   // RXIE
+                | (1 << 4)   // NACKIE
+                | (1 << 5)   // STOPIE
+                | (1 << 6),  // TCIE
+        );
+
+        // Write phase: register address (1 byte, no AUTOEND → TC)
+        ISR_PHASE = I2c4Phase::WaitTxis;
+        I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
+    }
+}
+
+/// Block until the ISR completes the transaction. Returns the buffer
+/// slice on success, or None on NACK/error.
+///
+/// # Safety
+/// Must be called from a FreeRTOS task context after `i2c4_irq_start`.
+pub unsafe fn i2c4_irq_wait() -> Option<&'static [u8]> {
+    unsafe {
+        let sem = I2C4_DONE_SEM.load(core::sync::atomic::Ordering::Acquire);
+        if sem.is_null() {
+            return None;
+        }
+        // Block until ISR gives the semaphore (100ms timeout)
+        unsafe extern "C" { fn rlvgl_sem_take(sem: *mut core::ffi::c_void, ticks: u32) -> i32; }
+        let got = rlvgl_sem_take(sem, 100);
+        if got != 1 || !ISR_OK {
+            // Disable I2C4 event interrupts on failure
+            let cr1 = I2C4_CR1.read_volatile();
+            I2C4_CR1.write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+            ISR_PHASE = I2c4Phase::Idle;
+            return None;
+        }
+        Some(&ISR_BUF[..ISR_LEN])
+    }
+}
+
+/// Interrupt-driven read of 31 bytes from register 0x02, parsed as
+/// a multi-touch sample. Drop-in replacement for `read_sample()`.
+pub unsafe fn read_sample_irq() -> RawTouchSample {
+    unsafe {
+        i2c4_irq_start(0x02, 31);
+        let Some(buf) = i2c4_irq_wait() else {
+            return RawTouchSample::EMPTY;
+        };
+        // Parse — same logic as read_sample()
+        let count = (buf[0] & 0x0F).min(5);
+        let mut points = [(0u8, 0u8, 0u16, 0u16); 5];
+        for i in 0..count as usize {
+            let base = 1 + i * 6;
+            let event_flag = buf[base] >> 6;
+            let x = (((buf[base] & 0x0F) as u16) << 8) | buf[base + 1] as u16;
+            let id = buf[base + 2] >> 4;
+            let y = (((buf[base + 2] & 0x0F) as u16) << 8) | buf[base + 3] as u16;
+            points[i] = (id, event_flag, x, y);
+        }
+        RawTouchSample { count, points }
+    }
+}
+
+/// I2C4 event ISR body. Called from the I2C4_EV interrupt handler.
+///
+/// # Safety
+/// Must be called from ISR context only.
+pub unsafe fn i2c4_ev_handler() {
+    unsafe {
+        let isr = I2C4_ISR.read_volatile();
+
+        // NACK — abort
+        if isr & (1 << 4) != 0 {
+            I2C4_ICR.write_volatile(1 << 4); // clear NACKF
+            // Disable event interrupts
+            let cr1 = I2C4_CR1.read_volatile();
+            I2C4_CR1.write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+            ISR_OK = false;
+            ISR_PHASE = I2c4Phase::Idle;
+            give_i2c4_sem();
+            return;
+        }
+
+        match ISR_PHASE {
+            I2c4Phase::WaitTxis => {
+                if isr & (1 << 1) != 0 { // TXIS
+                    I2C4_TXDR.write_volatile(ISR_REG as u32);
+                    ISR_PHASE = I2c4Phase::WaitTC;
+                }
+            }
+            I2c4Phase::WaitTC => {
+                if isr & (1 << 6) != 0 { // TC
+                    // Start read phase: repeated START, RD_WRN=1, AUTOEND
+                    let nbytes = ISR_LEN as u32;
+                    I2C4_CR2.write_volatile(
+                        FT5336_SADD | (1 << 10) | (nbytes << 16) | (1 << 13) | (1 << 25),
+                    );
+                    ISR_PHASE = I2c4Phase::Reading;
+                }
+            }
+            I2c4Phase::Reading => {
+                if isr & (1 << 2) != 0 { // RXNE
+                    let b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
+                    if ISR_IDX < ISR_LEN {
+                        ISR_BUF[ISR_IDX] = b;
+                        ISR_IDX += 1;
+                    }
+                }
+                if isr & (1 << 5) != 0 { // STOPF
+                    I2C4_ICR.write_volatile(1 << 5); // clear STOPF
+                    // Disable event interrupts
+                    let cr1 = I2C4_CR1.read_volatile();
+                    I2C4_CR1.write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+                    ISR_OK = ISR_IDX == ISR_LEN;
+                    ISR_PHASE = I2c4Phase::Idle;
+                    give_i2c4_sem();
+                }
+            }
+            I2c4Phase::Idle => {
+                // Spurious — disable interrupts
+                let cr1 = I2C4_CR1.read_volatile();
+                I2C4_CR1.write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+            }
+        }
+    }
+}
+
+unsafe fn give_i2c4_sem() {
+    unsafe {
+        let sem = I2C4_DONE_SEM.load(core::sync::atomic::Ordering::Relaxed);
+        if !sem.is_null() {
+            unsafe extern "C" { fn rlvgl_sem_give_from_isr(sem: *mut core::ffi::c_void); }
+            rlvgl_sem_give_from_isr(sem);
+        }
+    }
+}

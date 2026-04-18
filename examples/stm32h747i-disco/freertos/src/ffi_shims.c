@@ -26,14 +26,30 @@
  * trampolines instead. An unconditional `b` does not touch SP/LR, so
  * the hardware-stacked frame reaches the real handler untouched.
  */
+/* D3 SRAM breadcrumbs to detect pre-scheduler invocations.
+ * 0x3800_0600 = SVCall hit count, 0x3800_0604 = PendSV hit count.
+ * r0/r1 are hardware-saved on the exception stack — safe to clobber
+ * before branching to the real handler. No push/pop needed. */
 __attribute__( ( naked ) ) void SVCall( void )
 {
-    __asm__ volatile ( "b vPortSVCHandler" );
+    __asm__ volatile (
+        "ldr  r0, =0x38000600   \n"
+        "ldr  r1, [r0]          \n"
+        "adds r1, #1            \n"
+        "str  r1, [r0]          \n"
+        "b    vPortSVCHandler   \n"
+    );
 }
 
 __attribute__( ( naked ) ) void PendSV( void )
 {
-    __asm__ volatile ( "b xPortPendSVHandler" );
+    __asm__ volatile (
+        "ldr  r0, =0x38000604   \n"
+        "ldr  r1, [r0]          \n"
+        "adds r1, #1            \n"
+        "str  r1, [r0]          \n"
+        "b    xPortPendSVHandler\n"
+    );
 }
 
 void rlvgl_sem_give_from_isr( SemaphoreHandle_t sem )

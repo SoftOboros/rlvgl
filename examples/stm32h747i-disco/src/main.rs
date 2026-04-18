@@ -113,6 +113,12 @@ mod _freertos_isr {
     unsafe fn TIM7() {
         super::freertos_entry::tim7_isr_body();
     }
+
+    /// I2C4 event — interrupt-driven touch read state machine.
+    #[interrupt]
+    unsafe fn I2C4_EV() {
+        super::touch_i2c::i2c4_ev_handler();
+    }
 }
 
 // HAL BSP module is not required for this bring-up path

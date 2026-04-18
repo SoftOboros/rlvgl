@@ -98,6 +98,12 @@ static SYSTICK_READY: core::sync::atomic::AtomicBool =
 fn SysTick() {
     if SYSTICK_READY.load(Ordering::Relaxed) {
         unsafe { xPortSysTickHandler() }
+    } else {
+        // Count pre-scheduler SysTick hits at D3 SRAM 0x3800_0608
+        unsafe {
+            let p = 0x3800_0608u32 as *mut u32;
+            p.write_volatile(p.read_volatile().wrapping_add(1));
+        }
     }
 }
 
@@ -320,6 +326,7 @@ const PLAYIT_STACK_WORDS: usize = 512; // 2 KB — small cmd parsing + serial
 static mut ERIF_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 static mut DMA2D_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 static mut BUF_READY_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
+static mut I2C4_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 
 static mut PRESENT_TCB: StaticTask = StaticTask::new();
 static mut RENDER_TCB: StaticTask = StaticTask::new();
@@ -1035,7 +1042,7 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
         static mut PREV_TOUCH: bool = false;
         let prev = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(PREV_TOUCH)) };
         {
-            let s = unsafe { touch_i2c::read_sample() };
+            let s = unsafe { touch_i2c::read_sample_irq() };
             if s.count > 0 {
                 unsafe { hb_inc(HB_TOUCH_HITS) };
                 // Pack the first point for debug visibility.
@@ -1316,6 +1323,12 @@ pub unsafe fn start() -> ! {
         );
         RENDER_START_SEM.store(render_start_sem, Ordering::Release);
 
+        // 1c. I2C4 interrupt-driven touch: semaphore
+        let i2c4_sem = freertos_sync::rlvgl_sem_create_binary_static(
+            core::ptr::addr_of_mut!(I2C4_SEM_BUF),
+        );
+        crate::touch_i2c::set_i2c4_sem(i2c4_sem as *mut core::ffi::c_void);
+
         // 1b. Initialize TIM7 for the ERIF-phase-locked present gate.
         tim7_init();
 
@@ -1379,9 +1392,13 @@ pub unsafe fn start() -> ! {
         // FromISR API (priority > configLIBRARY_MAX_SYSCALL = 5).
         cp.NVIC
             .set_priority(stm32h7::stm32h747cm7::Interrupt::TIM7, 6 << 4);
+        // I2C4_EV at priority 7 — ISR-safe for FromISR semaphore give
+        cp.NVIC
+            .set_priority(stm32h7::stm32h747cm7::Interrupt::I2C4_EV, 7 << 4);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DMA2D);
         cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::TIM7);
+        cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::I2C4_EV);
 
         // 5. Start the scheduler — never returns.
         //    Enable SysTick routing to FreeRTOS just before launch.
