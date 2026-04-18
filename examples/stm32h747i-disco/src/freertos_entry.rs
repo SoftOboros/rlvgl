@@ -581,6 +581,37 @@ const HB_CRAWL_TICKS:   *mut u32 = 0x3800_072C as *mut u32;
 const HB_CRAWL_READY:   *mut u32 = 0x3800_0730 as *mut u32;
 const HB_PLAYIT_POLLS:  *mut u32 = 0x3800_0734 as *mut u32;
 
+// ── Cross-task touch ring (touch_task → render_task) ──────────────────────────
+//
+// Lock-free SPSC: touch_task is the sole producer, render_task the sole
+// consumer. Atomic head/tail with Acquire/Release ordering.
+
+use crate::touch_i2c::RawTouchSample;
+
+const TOUCH_EVT_CAP: usize = 16;
+static TOUCH_EVT_HEAD: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+static TOUCH_EVT_TAIL: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+static mut TOUCH_EVT_SLOTS: [RawTouchSample; TOUCH_EVT_CAP] =
+    [RawTouchSample::EMPTY; TOUCH_EVT_CAP];
+
+fn touch_evt_push(s: RawTouchSample) {
+    let head = TOUCH_EVT_HEAD.load(Ordering::Relaxed);
+    let tail = TOUCH_EVT_TAIL.load(Ordering::Acquire);
+    let next = (head + 1) % TOUCH_EVT_CAP as u32;
+    if next == tail { return; } // full — drop
+    unsafe { TOUCH_EVT_SLOTS[head as usize] = s; }
+    TOUCH_EVT_HEAD.store(next, Ordering::Release);
+}
+
+fn touch_evt_pop() -> Option<RawTouchSample> {
+    let tail = TOUCH_EVT_TAIL.load(Ordering::Relaxed);
+    let head = TOUCH_EVT_HEAD.load(Ordering::Acquire);
+    if tail == head { return None; }
+    let s = unsafe { TOUCH_EVT_SLOTS[tail as usize] };
+    TOUCH_EVT_TAIL.store((tail + 1) % TOUCH_EVT_CAP as u32, Ordering::Release);
+    Some(s)
+}
+
 /// Shared flag — playit `C` command sets this; render task reads to
 /// toggle the star crawl on/off.
 pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
@@ -985,6 +1016,106 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             let ctrl = unsafe { &mut *core::ptr::addr_of_mut!(DESKTOP_CTRL) }
                 .as_mut()
                 .unwrap();
+
+            // ── Drain touch events and dispatch to widget tree ──
+            {
+                use rlvgl_core::event::Event;
+                use rlvgl_platform::gesture::{DoubleTapRecognizer, TapRecognizer};
+
+                static mut TAP: Option<TapRecognizer> = None;
+                static mut DTAP: Option<DoubleTapRecognizer> = None;
+                static mut LAST_TOUCH: Option<(u16, u16)> = None;
+                static mut LAST_COUNT: u8 = 0;
+
+                let tap = unsafe {
+                    let p = core::ptr::addr_of_mut!(TAP);
+                    if (*p).is_none() { *p = Some(TapRecognizer::new(30)); }
+                    (*p).as_mut().unwrap()
+                };
+                let dtap = unsafe {
+                    let p = core::ptr::addr_of_mut!(DTAP);
+                    if (*p).is_none() { *p = Some(DoubleTapRecognizer::new(30)); }
+                    (*p).as_mut().unwrap()
+                };
+
+                const DW: i32 = 800; // landscape width (= portrait height)
+
+                while let Some(sample) = touch_evt_pop() {
+                    let count = sample.count;
+                    let raw = &sample.points;
+
+                    // Portrait→landscape transform + state machine
+                    let evt = if count >= 2 {
+                        use rlvgl_core::event::{
+                            MAX_TOUCH_POINTS, TouchPoint,
+                            TouchState as EvtTouchState,
+                        };
+                        let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
+                        for i in 0..count as usize {
+                            let (id, flag, x, y) = raw[i];
+                            points[i] = TouchPoint {
+                                id,
+                                x: y as i32,
+                                y: DW - 1 - x as i32,
+                                state: match flag {
+                                    0 => EvtTouchState::Down,
+                                    1 => EvtTouchState::Up,
+                                    _ => EvtTouchState::Contact,
+                                },
+                            };
+                        }
+                        let (_, _, x0, y0) = raw[0];
+                        unsafe { LAST_TOUCH = Some((x0, y0)); LAST_COUNT = count; }
+                        Some(Event::Touch { count, points })
+                    } else {
+                        let touch = if count == 1 {
+                            let (_, _, x, y) = raw[0];
+                            Some((x, y))
+                        } else {
+                            None
+                        };
+                        let was_multi = unsafe { LAST_COUNT } >= 2;
+                        let last = unsafe { LAST_TOUCH };
+                        unsafe { LAST_COUNT = count; }
+                        let to_l = |px: u16, py: u16| (py as i32, DW - 1 - px as i32);
+                        match (touch, last) {
+                            (Some((x, y)), Some((lx, ly))) => {
+                                unsafe { LAST_TOUCH = Some((x, y)); }
+                                if was_multi {
+                                    let (lx, ly) = to_l(x, y);
+                                    Some(Event::PointerDown { x: lx, y: ly })
+                                } else if (x, y) != (lx, ly) {
+                                    let (lx, ly) = to_l(x, y);
+                                    Some(Event::PointerMove { x: lx, y: ly })
+                                } else {
+                                    None
+                                }
+                            }
+                            (Some((x, y)), None) => {
+                                unsafe { LAST_TOUCH = Some((x, y)); }
+                                let (lx, ly) = to_l(x, y);
+                                Some(Event::PointerDown { x: lx, y: ly })
+                            }
+                            (None, Some((lx, ly))) => {
+                                unsafe { LAST_TOUCH = None; }
+                                let (lx, ly) = to_l(lx, ly);
+                                Some(Event::PointerUp { x: lx, y: ly })
+                            }
+                            (None, None) => None,
+                        }
+                    };
+
+                    if let Some(evt) = evt {
+                        if let Some(gesture) = tap.process(&evt) {
+                            let (a, b) = dtap.process(&gesture);
+                            for dtap_evt in a.into_iter().chain(b) {
+                                ctrl.root().borrow_mut().dispatch_event(&dtap_evt);
+                            }
+                        }
+                    }
+                }
+            }
+
             ctrl.tick();
 
             {
@@ -1036,22 +1167,23 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
             continue;
         }
 
-        // Poll unconditionally — INT line may not assert without
-        // CTRL register init. TIM6 ISR disabled, so we have exclusive
-        // I2C4 access.
+        // Read touch sample via interrupt-driven I2C4.
         static mut PREV_TOUCH: bool = false;
         let prev = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(PREV_TOUCH)) };
         {
             let s = unsafe { touch_i2c::read_sample_irq() };
             if s.count > 0 {
                 unsafe { hb_inc(HB_TOUCH_HITS) };
-                // Pack the first point for debug visibility.
                 let (_id, ef, x, y) = s.points[0];
                 let packed = ((s.count as u32) << 28)
                     | ((ef as u32) << 24)
                     | ((x as u32) << 12)
                     | (y as u32 & 0xFFF);
                 unsafe { HB_TOUCH_LAST.write_volatile(packed) };
+                touch_evt_push(s);
+            } else if prev {
+                // Push a count=0 sample so render_task sees the release
+                touch_evt_push(RawTouchSample::EMPTY);
             }
             unsafe {
                 core::ptr::write_volatile(core::ptr::addr_of_mut!(PREV_TOUCH), s.count > 0);
