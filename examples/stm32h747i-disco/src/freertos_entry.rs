@@ -997,33 +997,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             continue;
         }
 
-        // Staging flag: set by Phase B (compose), read by Phase A (blit).
-        static mut STAGING_READY: bool = false;
-
-        // ── Phase A: DMA2D staging blit BACK→FRONT ──────────────
-        if unsafe { core::ptr::read_volatile(core::ptr::addr_of!(STAGING_READY)) } {
-            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
-            if front != 0 && back != 0 && front != back {
-                dma.start_blit_raw(
-                    back as *const u8,
-                    w * 4,
-                    front as *mut u8,
-                    w * 4,
-                    w,
-                    h,
-                    PixelFmt::Argb8888,
-                );
-                if let Some(sync) = get_sync() {
-                    sync.wait_dma2d(50);
-                }
-            }
-            unsafe {
-                core::ptr::write_volatile(
-                    core::ptr::addr_of_mut!(STAGING_READY),
-                    false,
-                );
-            }
-        }
+        // DMA2D staging blit deferred — using buf_ready swap for now.
 
         // ── Desktop mode: widget tree render ─────────────────────
         {
@@ -1319,11 +1293,9 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     }
                 }
 
-                unsafe {
-                    core::ptr::write_volatile(
-                        core::ptr::addr_of_mut!(STAGING_READY),
-                        true,
-                    );
+                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
+                if !buf_ready.is_null() {
+                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
                 }
             }
         }
