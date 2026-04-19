@@ -1353,10 +1353,20 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 for cmd in cmds {
                     use rlvgl_app_disco_demo::{DiscoCommand, DiscoEffect};
                     match cmd {
+                        DiscoCommand::LoadStorageSummary => {
+                            ctrl.publish_status("FreeRTOS runtime: storage refresh");
+                        }
                         DiscoCommand::StartEffect(DiscoEffect::StarCrawl) => {
                             CRAWL_REQ.store(true, Ordering::Release);
                         }
-                        _ => {}
+                        DiscoCommand::StartEffect(DiscoEffect::AudioScope) => {
+                            ctrl.publish_status("FreeRTOS runtime: audio scope");
+                        }
+                        DiscoCommand::StopEffect(_) => {}
+                        DiscoCommand::SetBacklight(_level) => {
+                            // TODO: PWM backlight control
+                        }
+                        DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}
                     }
                 }
             }
