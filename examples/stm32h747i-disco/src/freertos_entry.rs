@@ -700,7 +700,7 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         // elapsed_since_erif` µs and block on `present_gate_sem`.
         // TIM7's UIF ISR gives the sem at the exact deadline. Zero
         // busy-spin, preemption-friendly, ERIF-phase-locked.
-        const PRESENT_HOLDOFF_CYC: u32 = 6_000_000; // 15 ms @ 400 MHz
+        const PRESENT_HOLDOFF_CYC: u32 = 8_800_000; // 22 ms @ 400 MHz — gives render time to finish FRONT writes before retrigger
         const CYC_PER_US: u32 = 400; //  400 MHz / 1 MHz
         let elapsed = sync.cycles_since_erif();
         if elapsed < PRESENT_HOLDOFF_CYC {
@@ -1237,24 +1237,18 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 // Restore pristine splash into back buffer, draw
                 // widget tree, then signal present to swap.
                 const DESKTOP_PRISTINE: u32 = 0xD030_0000;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        DESKTOP_PRISTINE as *const u8,
-                        back as *mut u8,
-                        bytes as usize,
-                    );
-                }
-
-                // One-shot diagnostic: confirm draw path executes
-                if !unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DESKTOP_DIAG)) } {
-                    crate::runtime_serial::write_bytes(b"RND:draw\r\n");
-                    crate::runtime_serial::kick_tx();
-                }
+                // Render directly into FRONT — single-buffer, no swap.
+                // LTDC is disabled during the 22ms holdoff; render
+                // completes before present retriggers.
+                // Skip pristine restore — draw on existing content.
+                // First frame has splash from boot; subsequent frames
+                // overwrite widget areas only.
+                let front = FRONT_FB_ADDR.load(Ordering::Acquire);
 
                 {
                     let buf = unsafe {
                         core::slice::from_raw_parts_mut(
-                            back as *mut u8,
+                            front as *mut u8,
                             bytes as usize,
                         )
                     };
@@ -1270,33 +1264,14 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     {
                         let mut cp = unsafe { cortex_m::Peripherals::steal() };
                         cp.SCB.clean_dcache_by_address(
-                            back as usize,
+                            front as usize,
                             bytes as usize,
                         );
                     }
                     cortex_m::asm::dsb();
                 }
-
-                // Diagnostic: confirm each dirty frame completes
-                static mut DRAW_COUNT: u32 = 0;
-                unsafe {
-                    let dc = core::ptr::read_volatile(core::ptr::addr_of!(DRAW_COUNT));
-                    core::ptr::write_volatile(core::ptr::addr_of_mut!(DRAW_COUNT), dc + 1);
-                    if dc < 10 {
-                        let mut out = [0u8; 16];
-                        let mut p = 0;
-                        p = write_slice(&mut out, p, b"DR:");
-                        p = write_u32(&mut out, p, dc);
-                        p = write_slice(&mut out, p, b"\r\n");
-                        crate::runtime_serial::write_bytes(&out[..p]);
-                        crate::runtime_serial::kick_tx();
-                    }
-                }
-
-                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-                if !buf_ready.is_null() {
-                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
-                }
+                // No buf_ready — present retriggers the same FRONT.
+                // Single-buffer = zero flicker.
             }
         }
     }
