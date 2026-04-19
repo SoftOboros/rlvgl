@@ -1073,7 +1073,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     (*p).as_mut().unwrap()
                 };
 
-                const DW: i32 = 800; // landscape width (= portrait height)
+                const DW: i32 = 480; // portrait width (RotatedRenderer Y axis)
 
                 static mut TOUCH_DRAIN_DIAG: u32 = 0;
                 while let Some(sample) = touch_evt_pop() {
