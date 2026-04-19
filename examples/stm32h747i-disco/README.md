@@ -45,7 +45,7 @@ Build targets:
 | Bare-metal | `make build-disco` | `make flash-disco` |
 | FreeRTOS | `make build-disco-freertos` | `make flash-disco-freertos` |
 | Zephyr (video) | `make zephyr-disco` | `make zephyr-disco-flash` |
-| Zephyr (ACM) | `make zephyr-disco-acm` | `make zephyr-disco-acm-flash` |
+| Zephyr (ACM) | `make zephyr-disco-acm` | `make zephyr-disco-flash` |
 
 ## Requirements
 - Rust target `thumbv7em-none-eabihf`

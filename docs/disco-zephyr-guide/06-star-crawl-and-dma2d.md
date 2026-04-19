@@ -83,7 +83,7 @@ other task is waiting on DMA2D completion.
 
 ```bash
 make zephyr-disco-acm       # adapted command mode
-make zephyr-disco-acm-flash
+make zephyr-disco-flash
 ```
 
 Navigate to info wing -> star crawl -> Enter. The crawl should

@@ -54,6 +54,8 @@ help:
 	@echo "  make build-disco-release      # Build CM7 release + generate .hex/.bin"
 	@echo "  make build-disco-cm4          # Build CM4 debug"
 	@echo "  make build-disco-all          # Build both cores"
+	@echo "  make build-disco-freertos     # Build FreeRTOS preemptive task variant"
+	@echo "  make flash-disco-freertos     # Build + flash FreeRTOS variant"
 	@echo ""
 	@echo "Host simulators and tools:"
 	@echo "  make build-sim                # Build rlvgl-sim (generic simulator)"

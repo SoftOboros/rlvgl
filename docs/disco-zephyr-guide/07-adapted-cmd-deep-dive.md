@@ -109,7 +109,7 @@ eliminates the race.
 ## Verify
 
 ```bash
-make zephyr-disco-acm-flash
+make zephyr-disco-flash
 ```
 
 - Splash visible without corruption.
