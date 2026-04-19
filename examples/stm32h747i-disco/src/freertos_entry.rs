@@ -700,7 +700,7 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         // elapsed_since_erif` µs and block on `present_gate_sem`.
         // TIM7's UIF ISR gives the sem at the exact deadline. Zero
         // busy-spin, preemption-friendly, ERIF-phase-locked.
-        const PRESENT_HOLDOFF_CYC: u32 = 8_800_000; // 22 ms @ 400 MHz — gives render time to finish FRONT writes before retrigger
+        const PRESENT_HOLDOFF_CYC: u32 = 11_200_000; // 28 ms @ 400 MHz — gives render time to finish FRONT writes before retrigger
         const CYC_PER_US: u32 = 400; //  400 MHz / 1 MHz
         let elapsed = sync.cycles_since_erif();
         if elapsed < PRESENT_HOLDOFF_CYC {
@@ -909,6 +909,19 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
         // Phase B from starving Phase A and pushing DMA2D into the
         // scan window.
         if cr.is_active() {
+            // Touch-to-dismiss: any touch while crawl is active
+            // deactivates it (matches bare-metal behavior).
+            if touch_evt_pop().is_some() {
+                // Drain remaining events
+                while touch_evt_pop().is_some() {}
+                cr.deactivate();
+                CRAWL_FB_ADDR.store(0, Ordering::Release);
+                unsafe { disable_ltdc_layer2() };
+                CRAWL_ACTIVE.store(false, Ordering::Release);
+                // Force desktop re-render
+                continue;
+            }
+
             let sync = get_sync().unwrap();
 
             // ── Jumbo/CFBAR model: zero DMA2D per frame ──────────
@@ -1028,6 +1041,71 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             let ctrl = unsafe { &mut *core::ptr::addr_of_mut!(DESKTOP_CTRL) }
                 .as_mut()
                 .unwrap();
+
+            // Track whether a gesture changed widget state — only
+            // then do we pristine-restore before draw.
+            static mut NEEDS_PRISTINE: bool = false;
+
+            use rlvgl_core::event::Event;
+
+            // ── Poll button (PC13, active-high) ──
+            {
+                const GPIOC_IDR: *const u32 = 0x5802_0810 as *const u32;
+                static mut BTN_LAST: bool = false;
+                let pressed = unsafe { GPIOC_IDR.read_volatile() } & (1 << 13) != 0;
+                let last = unsafe { BTN_LAST };
+                if pressed != last {
+                    unsafe { BTN_LAST = pressed; }
+                    let evt = if pressed {
+                        Event::KeyDown { key: rlvgl_core::event::Key::Enter }
+                    } else {
+                        Event::KeyUp { key: rlvgl_core::event::Key::Enter }
+                    };
+                    unsafe {
+                        core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                        core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
+                    }
+                    ctrl.root().borrow_mut().dispatch_event(&evt);
+                }
+            }
+
+            // ── Poll joystick (PK2-PK6, active-low, pull-up) ──
+            {
+                const GPIOK_IDR: *const u32 = 0x5802_2810 as *const u32;
+                static mut JOY_LAST: [bool; 5] = [false; 5];
+                let idr = unsafe { GPIOK_IDR.read_volatile() };
+                let pins = [
+                    idr & (1 << 2) == 0, // PK2 = SEL/Enter
+                    idr & (1 << 3) == 0, // PK3 = Down
+                    idr & (1 << 4) == 0, // PK4 = Left
+                    idr & (1 << 5) == 0, // PK5 = Right
+                    idr & (1 << 6) == 0, // PK6 = Up
+                ];
+                use rlvgl_core::event::Key;
+                const KEYS: [Key; 5] = [
+                    Key::Enter,
+                    Key::ArrowDown,
+                    Key::ArrowLeft,
+                    Key::ArrowRight,
+                    Key::ArrowUp,
+                ];
+                for i in 0..5 {
+                    let last = unsafe { JOY_LAST[i] };
+                    if pins[i] != last {
+                        unsafe { JOY_LAST[i] = pins[i]; }
+                        let evt = if pins[i] {
+                            Event::KeyDown { key: KEYS[i].clone() }
+                        } else {
+                            Event::KeyUp { key: KEYS[i].clone() }
+                        };
+                        unsafe {
+                            core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                            core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
+                        }
+                        ctrl.root().borrow_mut().dispatch_event(&evt);
+                    }
+                }
+            }
 
             // ── Drain touch events and dispatch to widget tree ──
             {
@@ -1155,75 +1233,125 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     };
 
                     if let Some(ref evt) = evt {
-                        // Touch dirties for 20 frames (~660ms) to cover
-                        // wing slide animations + double-buffer convergence.
-                        unsafe {
-                            core::ptr::write_volatile(
-                                core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                                20,
-                            );
-                        }
-                        // Direct PressRelease on PointerUp — bypasses
-                        // gesture pipeline latency for debugging.
-                        if let Event::PointerUp { x, y } = evt {
-                            let pr = Event::PressRelease { x: *x, y: *y };
-                            let mut out = [0u8; 32];
-                            let mut p = 0;
-                            p = write_slice(&mut out, p, b"UP:");
-                            p = write_u32(&mut out, p, *x as u32);
-                            p = write_slice(&mut out, p, b",");
-                            p = write_u32(&mut out, p, *y as u32);
-                            p = write_slice(&mut out, p, b"\r\n");
-                            crate::runtime_serial::write_bytes(&out[..p]);
-                            crate::runtime_serial::kick_tx();
-                            ctrl.dispatch_event(&pr);
-                        }
-                        if let Event::PointerDown { x, y } = evt {
-                            let pd = Event::PressDown { x: *x, y: *y };
-                            ctrl.dispatch_event(&pd);
+                        // Gesture pipeline — only dispatch action
+                        // events (PressRelease/DoubleTap) to root,
+                        // and only when in an interactive zone.
+                        // ActionHotspot doesn't check bounds, so
+                        // stray touches fire the first hotspot.
+                        if let Some(gesture) = tap.process(evt) {
+                            let (a, b) = dtap.process(&gesture);
+                            for g in a.into_iter().chain(b) {
+                                let in_zone = match &g {
+                                    Event::PressRelease { x, .. }
+                                    | Event::DoubleTap { x, .. } => {
+                                        // Icon strip: right edge (x≥700)
+                                        // Wing area: left edge (x<80)
+                                        *x >= 700 || *x < 80
+                                    }
+                                    _ => false,
+                                };
+                                if in_zone {
+                                    unsafe {
+                                        core::ptr::write_volatile(
+                                            core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                                            1,
+                                        );
+                                    }
+                                    unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true); }
+                                    ctrl.root().borrow_mut().dispatch_event(&g);
+                                }
+                            }
                         }
                     }
                 }
 
-                // Advance gesture timers every frame. TapRecognizer fires
-                // PressRelease after settle; DoubleTapRecognizer forwards
-                // buffered PressRelease after the double-tap window expires.
+                // Advance gesture timers — zone-gated dispatch.
                 if let Some(gesture) = tap.tick() {
-                    unsafe {
-                        core::ptr::write_volatile(
-                            core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                            20,
-                        );
-                    }
                     let (a, b) = dtap.process(&gesture);
                     for g in a.into_iter().chain(b) {
-                        ctrl.dispatch_event(&g);
+                        let in_zone = match &g {
+                            Event::PressRelease { x, .. }
+                            | Event::DoubleTap { x, .. } => *x >= 700 || *x < 80,
+                            _ => false,
+                        };
+                        if in_zone {
+                            unsafe {
+                                core::ptr::write_volatile(
+                                    core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                                    1,
+                                );
+                            }
+                            ctrl.root().borrow_mut().dispatch_event(&g);
+                        }
                     }
                 }
                 if let Some(gesture) = dtap.tick() {
-                    unsafe {
-                        core::ptr::write_volatile(
-                            core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                            20,
-                        );
+                    let in_zone = match &gesture {
+                        Event::PressRelease { x, .. }
+                        | Event::DoubleTap { x, .. } => *x >= 700 || *x < 80,
+                        _ => false,
+                    };
+                    if in_zone {
+                        unsafe {
+                            core::ptr::write_volatile(
+                                core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                                1,
+                            );
+                        }
+                        unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true); }
+                        ctrl.root().borrow_mut().dispatch_event(&gesture);
                     }
-                    // Diagnostic: log PressRelease coordinates
-                    if let rlvgl_core::event::Event::PressRelease { x, y } = &gesture {
-                        let mut out = [0u8; 32];
-                        let mut p = 0;
-                        p = write_slice(&mut out, p, b"PR:");
-                        p = write_u32(&mut out, p, *x as u32);
-                        p = write_slice(&mut out, p, b",");
-                        p = write_u32(&mut out, p, *y as u32);
-                        p = write_slice(&mut out, p, b"\r\n");
-                        crate::runtime_serial::write_bytes(&out[..p]);
-                        crate::runtime_serial::kick_tx();
-                    }
-                    ctrl.dispatch_event(&gesture);
                 }
             }
 
+            // Tick controller: advances tick_count (live stats),
+            // re-renders active info page, syncs focus highlights.
             ctrl.tick();
+
+            // Periodic refresh (~1Hz) for live stats updates.
+            // Don't render every frame — pristine+draw every
+            // frame causes visible flicker on the splash icons.
+            static mut REFRESH_COUNTER: u8 = 0;
+            unsafe {
+                let rc = core::ptr::read_volatile(core::ptr::addr_of!(REFRESH_COUNTER));
+                core::ptr::write_volatile(
+                    core::ptr::addr_of_mut!(REFRESH_COUNTER),
+                    rc.wrapping_add(1),
+                );
+                if rc % 25 == 0 {
+                    core::ptr::write_volatile(
+                        core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                        core::ptr::read_volatile(
+                            core::ptr::addr_of!(DIRTY_FRAMES),
+                        ).max(1),
+                    );
+                }
+            }
+
+            // Drain platform commands from the controller.
+            // Any command means UI state changed — need re-render.
+            {
+                let cmds = ctrl.drain_commands();
+                if !cmds.is_empty() {
+                    unsafe {
+                        core::ptr::write_volatile(
+                            core::ptr::addr_of_mut!(DIRTY_FRAMES),
+                            core::ptr::read_volatile(
+                                core::ptr::addr_of!(DIRTY_FRAMES),
+                            ).max(1),
+                        );
+                    }
+                }
+                for cmd in cmds {
+                    use rlvgl_app_disco_demo::{DiscoCommand, DiscoEffect};
+                    match cmd {
+                        DiscoCommand::StartEffect(DiscoEffect::StarCrawl) => {
+                            CRAWL_REQ.store(true, Ordering::Release);
+                        }
+                        _ => {}
+                    }
+                }
+            }
 
             let df = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DIRTY_FRAMES)) };
             if df > 0 {
@@ -1234,16 +1362,24 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     );
                 }
 
-                // Restore pristine splash into back buffer, draw
-                // widget tree, then signal present to swap.
-                const DESKTOP_PRISTINE: u32 = 0xD030_0000;
                 // Render directly into FRONT — single-buffer, no swap.
-                // LTDC is disabled during the 22ms holdoff; render
-                // completes before present retriggers.
-                // Skip pristine restore — draw on existing content.
-                // First frame has splash from boot; subsequent frames
-                // overwrite widget areas only.
+                const DESKTOP_PRISTINE: u32 = 0xD030_0000;
                 let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+
+                // Pristine restore only when gesture changed widget
+                // state. Periodic refreshes draw on existing content
+                // to avoid flash on splash icons.
+                let np = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(NEEDS_PRISTINE)) };
+                if np {
+                    unsafe {
+                        core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), false);
+                        core::ptr::copy_nonoverlapping(
+                            DESKTOP_PRISTINE as *const u8,
+                            front as *mut u8,
+                            bytes as usize,
+                        );
+                    }
+                }
 
                 {
                     let buf = unsafe {
