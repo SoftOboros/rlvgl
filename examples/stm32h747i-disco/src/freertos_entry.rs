@@ -1062,10 +1062,14 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         Event::KeyUp { key: rlvgl_core::event::Key::Enter }
                     };
                     unsafe {
-                        core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                        // Enter changes panels — needs pristine.
+                        // Arrows just move focus — draw-only suffices.
+                        if matches!(evt, Event::KeyDown { key: rlvgl_core::event::Key::Enter }) {
+                            core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                        }
                         core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
                     }
-                    ctrl.root().borrow_mut().dispatch_event(&evt);
+                    ctrl.dispatch_event(&evt);
                 }
             }
 
@@ -1093,16 +1097,18 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     let last = unsafe { JOY_LAST[i] };
                     if pins[i] != last {
                         unsafe { JOY_LAST[i] = pins[i]; }
-                        let evt = if pins[i] {
-                            Event::KeyDown { key: KEYS[i].clone() }
-                        } else {
-                            Event::KeyUp { key: KEYS[i].clone() }
-                        };
-                        unsafe {
-                            core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
-                            core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
+                        // Only dispatch KeyDown (press edge).
+                        // KeyUp doesn't change visual state.
+                        if pins[i] {
+                            let evt = Event::KeyDown { key: KEYS[i].clone() };
+                            unsafe {
+                                if matches!(KEYS[i], Key::Enter) {
+                                    core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                                }
+                                core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
+                            }
+                            ctrl.dispatch_event(&evt);
                         }
-                        ctrl.root().borrow_mut().dispatch_event(&evt);
                     }
                 }
             }
@@ -1257,8 +1263,9 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                                             1,
                                         );
                                     }
-                                    unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true); }
-                                    ctrl.root().borrow_mut().dispatch_event(&g);
+                                    // Touch PressRelease dispatch disabled —
+                                    // ActionHotspot bounds bug. Use joystick.
+                                    let _ = &g;
                                 }
                             }
                         }
@@ -1298,8 +1305,9 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                                 1,
                             );
                         }
-                        unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true); }
-                        ctrl.root().borrow_mut().dispatch_event(&gesture);
+                        // Touch PressRelease dispatch disabled —
+                        // ActionHotspot bounds bug. Use joystick.
+                        let _ = &gesture;
                     }
                 }
             }

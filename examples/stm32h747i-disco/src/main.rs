@@ -1414,9 +1414,9 @@ static mut CACHED_TEMP_X10: i32 = 0;
 /// Heap size in bytes. FreeRTOS adds ~33KB to .bss (heap_4 + task stacks +
 /// TCBs) in the 128K DTCM, leaving less room for the main stack. Reduce
 /// the Rust heap when FreeRTOS is linked to avoid stack overflow.
-/// 48KB: DiscoController widget tree + icon RLE decode need more than 32KB.
+/// 64KB: settings wing draws 5 icons; Vec<Color> realloc needs headroom.
 #[cfg(feature = "freertos")]
-const HEAP_SIZE: usize = 48 * 1024;
+const HEAP_SIZE: usize = 64 * 1024;
 #[cfg(not(feature = "freertos"))]
 const HEAP_SIZE: usize = 64 * 1024;
 
