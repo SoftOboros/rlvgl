@@ -64,14 +64,13 @@ unsafe fn write_reg(reg: u8, val: u8) {
     }
 }
 
-/// Initialize FT5336: keep-active continuous scanning mode.
+/// Initialize FT5336: keep-active scanning mode.
 ///
-/// Writes both G_MODE and CTRL — G_MODE=0x00 (polling) prevents
-/// the chip from auto-reverting CTRL to monitor mode when no
-/// INT-pin activity is detected.
+/// Only writes CTRL register. G_MODE is left at default (trigger).
+/// Note: CTRL may auto-revert to monitor mode; touch_task periodic
+/// re-check handles this.
 pub unsafe fn init_ctrl() {
     unsafe {
-        write_reg(0xA4, 0x00); // G_MODE = polling (not trigger)
         write_reg(0x86, 0x00); // CTRL = keep active (not monitor)
     }
 }
@@ -221,7 +220,7 @@ static mut ISR_REG: u8 = 0;
 static mut ISR_OK: bool = false;
 
 /// Semaphore handle — set by freertos_entry::start().
-static I2C4_DONE_SEM: core::sync::atomic::AtomicPtr<core::ffi::c_void> =
+pub static I2C4_DONE_SEM: core::sync::atomic::AtomicPtr<core::ffi::c_void> =
     core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
 
 /// Store the semaphore handle (called from start()).

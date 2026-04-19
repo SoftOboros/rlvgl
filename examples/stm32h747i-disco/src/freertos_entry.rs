@@ -997,6 +997,34 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             continue;
         }
 
+        // Staging flag: set by Phase B (compose), read by Phase A (blit).
+        static mut STAGING_READY: bool = false;
+
+        // ── Phase A: DMA2D staging blit BACK→FRONT ──────────────
+        if unsafe { core::ptr::read_volatile(core::ptr::addr_of!(STAGING_READY)) } {
+            let front = FRONT_FB_ADDR.load(Ordering::Acquire);
+            if front != 0 && back != 0 && front != back {
+                dma.start_blit_raw(
+                    back as *const u8,
+                    w * 4,
+                    front as *mut u8,
+                    w * 4,
+                    w,
+                    h,
+                    PixelFmt::Argb8888,
+                );
+                if let Some(sync) = get_sync() {
+                    sync.wait_dma2d(50);
+                }
+            }
+            unsafe {
+                core::ptr::write_volatile(
+                    core::ptr::addr_of_mut!(STAGING_READY),
+                    false,
+                );
+            }
+        }
+
         // ── Desktop mode: widget tree render ─────────────────────
         {
             use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoController};
@@ -1029,6 +1057,29 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
             // ── Drain touch events and dispatch to widget tree ──
             {
+                // Print ring h/t every 150 iterations (~5s at 30Hz)
+                // to catch state changes after user taps.
+                static mut DESKTOP_LOOP_DIAG: u32 = 0;
+                unsafe {
+                    let c = core::ptr::read_volatile(core::ptr::addr_of!(DESKTOP_LOOP_DIAG));
+                    core::ptr::write_volatile(core::ptr::addr_of_mut!(DESKTOP_LOOP_DIAG), c + 1);
+                    if c % 150 == 0 && c <= 600 {
+                        let h = TOUCH_EVT_HEAD.load(Ordering::Relaxed);
+                        let t = TOUCH_EVT_TAIL.load(Ordering::Relaxed);
+                        let mut out = [0u8; 40];
+                        let mut p = 0;
+                        p = write_slice(&mut out, p, b"DL:");
+                        p = write_u32(&mut out, p, c);
+                        p = write_slice(&mut out, p, b" h=");
+                        p = write_u32(&mut out, p, h);
+                        p = write_slice(&mut out, p, b",t=");
+                        p = write_u32(&mut out, p, t);
+                        p = write_slice(&mut out, p, b"\r\n");
+                        crate::runtime_serial::write_bytes(&out[..p]);
+                        crate::runtime_serial::kick_tx();
+                    }
+                }
+
                 use rlvgl_core::event::Event;
                 use rlvgl_platform::gesture::{DoubleTapRecognizer, TapRecognizer};
 
@@ -1050,7 +1101,21 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
                 const DW: i32 = 800; // landscape width (= portrait height)
 
+                static mut TOUCH_DRAIN_DIAG: u32 = 0;
                 while let Some(sample) = touch_evt_pop() {
+                    unsafe {
+                        let c = core::ptr::read_volatile(core::ptr::addr_of!(TOUCH_DRAIN_DIAG));
+                        if c < 3 {
+                            core::ptr::write_volatile(core::ptr::addr_of_mut!(TOUCH_DRAIN_DIAG), c + 1);
+                            let mut out = [0u8; 24];
+                            let mut p = 0;
+                            p = write_slice(&mut out, p, b"TD:");
+                            p = write_u32(&mut out, p, sample.count as u32);
+                            p = write_slice(&mut out, p, b"\r\n");
+                            crate::runtime_serial::write_bytes(&out[..p]);
+                            crate::runtime_serial::kick_tx();
+                        }
+                    }
                     let count = sample.count;
                     let raw = &sample.points;
 
@@ -1115,7 +1180,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         }
                     };
 
-                    if let Some(evt) = evt {
+                    if let Some(ref evt) = evt {
                         // Touch dirties for 20 frames (~660ms) to cover
                         // wing slide animations + double-buffer convergence.
                         unsafe {
@@ -1124,14 +1189,24 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                                 20,
                             );
                         }
-                        // Feed through gesture pipeline only —
-                        // PressDown/PressRelease/DoubleTap are what
-                        // the widget tree expects.
-                        if let Some(gesture) = tap.process(&evt) {
-                            let (a, b) = dtap.process(&gesture);
-                            for g in a.into_iter().chain(b) {
-                                ctrl.dispatch_event(&g);
-                            }
+                        // Direct PressRelease on PointerUp — bypasses
+                        // gesture pipeline latency for debugging.
+                        if let Event::PointerUp { x, y } = evt {
+                            let pr = Event::PressRelease { x: *x, y: *y };
+                            let mut out = [0u8; 32];
+                            let mut p = 0;
+                            p = write_slice(&mut out, p, b"UP:");
+                            p = write_u32(&mut out, p, *x as u32);
+                            p = write_slice(&mut out, p, b",");
+                            p = write_u32(&mut out, p, *y as u32);
+                            p = write_slice(&mut out, p, b"\r\n");
+                            crate::runtime_serial::write_bytes(&out[..p]);
+                            crate::runtime_serial::kick_tx();
+                            ctrl.dispatch_event(&pr);
+                        }
+                        if let Event::PointerDown { x, y } = evt {
+                            let pd = Event::PressDown { x: *x, y: *y };
+                            ctrl.dispatch_event(&pd);
                         }
                     }
                 }
@@ -1228,16 +1303,27 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     cortex_m::asm::dsb();
                 }
 
-                // One-shot diagnostic: confirm draw completed
-                if !unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DESKTOP_DIAG)) } {
-                    unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!(DESKTOP_DIAG), true) };
-                    crate::runtime_serial::write_bytes(b"RND:drawn\r\n");
-                    crate::runtime_serial::kick_tx();
+                // Diagnostic: confirm each dirty frame completes
+                static mut DRAW_COUNT: u32 = 0;
+                unsafe {
+                    let dc = core::ptr::read_volatile(core::ptr::addr_of!(DRAW_COUNT));
+                    core::ptr::write_volatile(core::ptr::addr_of_mut!(DRAW_COUNT), dc + 1);
+                    if dc < 10 {
+                        let mut out = [0u8; 16];
+                        let mut p = 0;
+                        p = write_slice(&mut out, p, b"DR:");
+                        p = write_u32(&mut out, p, dc);
+                        p = write_slice(&mut out, p, b"\r\n");
+                        crate::runtime_serial::write_bytes(&out[..p]);
+                        crate::runtime_serial::kick_tx();
+                    }
                 }
 
-                let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
-                if !buf_ready.is_null() {
-                    unsafe { freertos_sync::rlvgl_sem_give(buf_ready) };
+                unsafe {
+                    core::ptr::write_volatile(
+                        core::ptr::addr_of_mut!(STAGING_READY),
+                        true,
+                    );
                 }
             }
         }
@@ -1254,15 +1340,9 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
     loop {
         unsafe { hb_inc(HB_TOUCH_TICKS) };
 
-        // Every ~2s (250 iterations × 8ms), verify CTRL is still 0x00
-        ctrl_check_counter += 1;
-        if ctrl_check_counter >= 250 {
-            ctrl_check_counter = 0;
-            let ctrl = unsafe { touch_i2c::read_reg(0x86) };
-            if ctrl != Some(0x00) {
-                unsafe { touch_i2c::init_ctrl() };
-            }
-        }
+        // CTRL re-check removed — blocking I2C4 kills interrupt path.
+        // CTRL=0x00 written at boot; second PG3 pulse provides reset.
+        let _ = ctrl_check_counter;
 
         // Pause when the F command needs clean I2C4 access.
         if TOUCH_PAUSE.load(Ordering::Relaxed) {
@@ -1272,9 +1352,23 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
 
         // Read touch sample via interrupt-driven I2C4.
         static mut PREV_TOUCH: bool = false;
+        static mut TOUCH_DIAG_CNT: u32 = 0;
         let prev = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(PREV_TOUCH)) };
         {
             let s = unsafe { touch_i2c::read_sample_irq() };
+            // One-shot diagnostic: first touch or first 100 idle reads
+            unsafe {
+                let c = core::ptr::read_volatile(core::ptr::addr_of!(TOUCH_DIAG_CNT));
+                core::ptr::write_volatile(core::ptr::addr_of_mut!(TOUCH_DIAG_CNT), c + 1);
+                if c == 100 && s.count == 0 {
+                    crate::runtime_serial::write_bytes(b"TT:100idle\r\n");
+                    crate::runtime_serial::kick_tx();
+                }
+                if s.count > 0 && c < 1000 {
+                    crate::runtime_serial::write_bytes(b"TT:hit\r\n");
+                    crate::runtime_serial::kick_tx();
+                }
+            }
             if s.count > 0 {
                 unsafe { hb_inc(HB_TOUCH_HITS) };
                 let (_id, ef, x, y) = s.points[0];
