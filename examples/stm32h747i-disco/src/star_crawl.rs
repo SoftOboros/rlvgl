@@ -194,10 +194,10 @@ pub struct StarCrawl {
     prep_frame_star_row: u32,
 
     // Resumable compose state — survives across back porches
-    compose_row: u32,         // starfield row progress
-    compose_blend_y: u32,     // A8 blend stripe progress
-    compose_star_row: u32,    // starfield scroll offset for this compose
-    compose_active: bool,     // compose in progress (not yet buf_ready)
+    compose_row: u32,      // starfield row progress
+    compose_blend_y: u32,  // A8 blend stripe progress
+    compose_star_row: u32, // starfield scroll offset for this compose
+    compose_active: bool,  // compose in progress (not yet buf_ready)
 }
 
 impl StarCrawl {
@@ -709,8 +709,7 @@ impl StarCrawl {
         if !self.compose_active {
             self.compose_row = 0;
             self.compose_blend_y = 0;
-            self.compose_star_row =
-                ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+            self.compose_star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
             self.compose_active = true;
             dcache_clean_range(A8_BUF, A8_SIZE);
         }
@@ -725,17 +724,11 @@ impl StarCrawl {
                 return false; // porch budget expired
             }
             let batch = CHUNK_ROWS.min(FB_H - self.compose_row);
-            let src_start =
-                (self.compose_star_row + self.compose_row) % STAR_ROWS;
+            let src_start = (self.compose_star_row + self.compose_row) % STAR_ROWS;
 
             if src_start + batch <= STAR_ROWS {
-                let src = unsafe {
-                    self.starfield
-                        .add((src_start * STAR_STRIDE) as usize)
-                };
-                let dst = unsafe {
-                    fb.add((self.compose_row * row_bytes) as usize)
-                };
+                let src = unsafe { self.starfield.add((src_start * STAR_STRIDE) as usize) };
+                let dst = unsafe { fb.add((self.compose_row * row_bytes) as usize) };
                 sync.dma2d_active();
                 dma2d.start_blit_raw(
                     src as *const u8,
@@ -753,13 +746,8 @@ impl StarCrawl {
             } else {
                 let top = STAR_ROWS - src_start;
                 let bot = batch - top;
-                let src_top = unsafe {
-                    self.starfield
-                        .add((src_start * STAR_STRIDE) as usize)
-                };
-                let dst_top = unsafe {
-                    fb.add((self.compose_row * row_bytes) as usize)
-                };
+                let src_top = unsafe { self.starfield.add((src_start * STAR_STRIDE) as usize) };
+                let dst_top = unsafe { fb.add((self.compose_row * row_bytes) as usize) };
                 sync.dma2d_active();
                 dma2d.start_blit_raw(
                     src_top as *const u8,
@@ -774,11 +762,7 @@ impl StarCrawl {
                     cortex_m::asm::nop();
                 }
                 sync.dma2d_idle();
-                let dst_bot = unsafe {
-                    fb.add(
-                        ((self.compose_row + top) * row_bytes) as usize,
-                    )
-                };
+                let dst_bot = unsafe { fb.add(((self.compose_row + top) * row_bytes) as usize) };
                 sync.dma2d_active();
                 dma2d.start_blit_raw(
                     self.starfield as *const u8,
@@ -809,18 +793,10 @@ impl StarCrawl {
             let h = BLEND_ROWS.min(a8_h - self.compose_blend_y);
             let src_off = (self.compose_blend_y * A8_WIDTH) as usize;
             let src = (A8_BUF + src_off) as *const u8;
-            let dst_off = ((A8_Y_BASE + self.compose_blend_y) * fb_w * BPP)
-                as usize;
+            let dst_off = ((A8_Y_BASE + self.compose_blend_y) * fb_w * BPP) as usize;
             let dst = unsafe { fb.add(dst_off) };
             sync.dma2d_active();
-            dma2d.start_blend_a8_color(
-                src,
-                A8_WIDTH,
-                h,
-                YELLOW,
-                dst,
-                fb_w * BPP,
-            );
+            dma2d.start_blend_a8_color(src, A8_WIDTH, h, YELLOW, dst, fb_w * BPP);
             while dma2d.is_in_flight() {
                 cortex_m::asm::nop();
             }
@@ -832,8 +808,7 @@ impl StarCrawl {
         // All done — reset for next frame
         let _ = sync.take_complete();
         self.compose_active = false;
-        self.diag_completed_frames =
-            self.diag_completed_frames.saturating_add(1);
+        self.diag_completed_frames = self.diag_completed_frames.saturating_add(1);
         true
     }
 
@@ -853,10 +828,7 @@ impl StarCrawl {
         let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
         for row in 0..FB_H {
             let src_row = (star_row + row) % STAR_ROWS;
-            let src = unsafe {
-                self.starfield.add((src_row * STAR_STRIDE) as usize)
-                    as *const u8
-            };
+            let src = unsafe { self.starfield.add((src_row * STAR_STRIDE) as usize) as *const u8 };
             let dst = unsafe { back_buf.add((row * row_bytes) as usize) };
             dma2d.start_blit_raw(
                 src,
@@ -881,14 +853,7 @@ impl StarCrawl {
             let src = (A8_BUF + src_off) as *const u8;
             let dst_off = ((A8_Y_BASE + y) * fb_w * BPP) as usize;
             let dst = unsafe { back_buf.add(dst_off) };
-            dma2d.start_blend_a8_color(
-                src,
-                A8_WIDTH,
-                h,
-                YELLOW,
-                dst,
-                fb_w * BPP,
-            );
+            dma2d.start_blend_a8_color(src, A8_WIDTH, h, YELLOW, dst, fb_w * BPP);
             while dma2d.is_in_flight() {
                 cortex_m::asm::nop();
             }
@@ -932,22 +897,18 @@ impl StarCrawl {
 
         // CPU FIR text — one row per call
         if self.prep_text_row < CRAWL_H {
-            let text_row_i =
-                self.prep_frame_scroll_px + self.prep_text_row as i32;
+            let text_row_i = self.prep_frame_scroll_px + self.prep_text_row as i32;
             if text_row_i >= 0 && (text_row_i as u32) < self.text_h {
                 let src_row = text_row_i as u32;
-                let target_w = TOP_W
-                    + (BOT_W - TOP_W) * self.prep_text_row / (CRAWL_H - 1);
+                let target_w = TOP_W + (BOT_W - TOP_W) * self.prep_text_row / (CRAWL_H - 1);
                 let dst_x_off = (CRAWL_W - target_w) / 2;
                 if self.fir_resample_text_row(src_row, target_w) {
                     let x_col = (FB_W - 1 - self.prep_text_row) as usize;
                     let y_off = (dst_x_off - A8_Y_BASE) as usize;
                     for i in 0..target_w as usize {
                         unsafe {
-                            let a8_ptr = (A8_BUF
-                                + (y_off + i) * A8_WIDTH as usize
-                                + x_col)
-                                as *mut u8;
+                            let a8_ptr =
+                                (A8_BUF + (y_off + i) * A8_WIDTH as usize + x_col) as *mut u8;
                             a8_ptr.write_volatile(self.scanline_buf[i]);
                         }
                     }
@@ -979,12 +940,8 @@ impl StarCrawl {
         // Row-by-row blit from starfield → layer_buf (wrapping)
         for r in 0..FB_H {
             let src_row = (star_row + r) % STAR_ROWS;
-            let src = unsafe {
-                self.starfield.add((src_row * STAR_STRIDE) as usize)
-            };
-            let dst = unsafe {
-                self.layer_buf.add((r * row_bytes) as usize)
-            };
+            let src = unsafe { self.starfield.add((src_row * STAR_STRIDE) as usize) };
+            let dst = unsafe { self.layer_buf.add((r * row_bytes) as usize) };
             dma2d.start_blit_raw(
                 src as *const u8,
                 row_bytes,

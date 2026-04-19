@@ -48,15 +48,15 @@ impl RawTouchSample {
 /// Write a single FT5336 register via I2C4.
 unsafe fn write_reg(reg: u8, val: u8) {
     unsafe {
-        I2C4_ICR.write_volatile(
-            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
-        );
-        I2C4_CR2.write_volatile(
-            FT5336_SADD | (2 << 16) | (1 << 13) | (1 << 25),
-        );
-        if !i2c4_wait(1) { return; }
+        I2C4_ICR.write_volatile((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+        I2C4_CR2.write_volatile(FT5336_SADD | (2 << 16) | (1 << 13) | (1 << 25));
+        if !i2c4_wait(1) {
+            return;
+        }
         I2C4_TXDR.write_volatile(reg as u32);
-        if !i2c4_wait(1) { return; }
+        if !i2c4_wait(1) {
+            return;
+        }
         I2C4_TXDR.write_volatile(val as u32);
         if i2c4_wait(5) {
             I2C4_ICR.write_volatile(1 << 5);
@@ -107,9 +107,13 @@ pub unsafe fn i2c4_bus_recover() {
         const I2C4_CR1: *mut u32 = 0x5800_1C00 as *mut u32;
         let cr1 = I2C4_CR1.read_volatile();
         I2C4_CR1.write_volatile(cr1 & !1u32); // PE=0
-        for _ in 0..10_000u32 { cortex_m::asm::nop(); }
+        for _ in 0..10_000u32 {
+            cortex_m::asm::nop();
+        }
         I2C4_CR1.write_volatile(cr1 | 1u32); // PE=1
-        for _ in 0..10_000u32 { cortex_m::asm::nop(); }
+        for _ in 0..10_000u32 {
+            cortex_m::asm::nop();
+        }
     }
 }
 
@@ -117,22 +121,26 @@ pub unsafe fn i2c4_bus_recover() {
 /// Returns `None` on timeout or NACK.
 pub unsafe fn read_reg(reg: u8) -> Option<u8> {
     unsafe {
-        I2C4_ICR.write_volatile(
-            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
-        );
+        I2C4_ICR.write_volatile((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
         // Write phase: register address (1 byte, no AUTOEND → TC)
         I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
-        if !i2c4_wait(1) { return None; }
+        if !i2c4_wait(1) {
+            return None;
+        }
         I2C4_TXDR.write_volatile(reg as u32);
-        if !i2c4_wait(6) { return None; } // TC
+        if !i2c4_wait(6) {
+            return None;
+        } // TC
 
         // Read phase: 1 byte, AUTOEND
-        I2C4_CR2.write_volatile(
-            FT5336_SADD | (1 << 10) | (1 << 16) | (1 << 13) | (1 << 25),
-        );
-        if !i2c4_wait(2) { return None; } // RXNE
+        I2C4_CR2.write_volatile(FT5336_SADD | (1 << 10) | (1 << 16) | (1 << 13) | (1 << 25));
+        if !i2c4_wait(2) {
+            return None;
+        } // RXNE
         let val = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
-        if i2c4_wait(5) { I2C4_ICR.write_volatile(1 << 5); }
+        if i2c4_wait(5) {
+            I2C4_ICR.write_volatile(1 << 5);
+        }
         Some(val)
     }
 }
@@ -206,9 +214,9 @@ const I2C4_CR1: *mut u32 = 0x5800_1C00 as *mut u32;
 #[repr(u8)]
 enum I2c4Phase {
     Idle = 0,
-    WaitTxis = 1,   // START sent, waiting for TXIS to write register address
-    WaitTC = 2,     // Reg addr written, waiting for TC (transfer complete)
-    Reading = 3,    // Repeated START with read, collecting RXNE bytes
+    WaitTxis = 1, // START sent, waiting for TXIS to write register address
+    WaitTC = 2,   // Reg addr written, waiting for TC (transfer complete)
+    Reading = 3,  // Repeated START with read, collecting RXNE bytes
 }
 
 /// Shared state between task (start) and ISR (advance).
@@ -243,9 +251,7 @@ pub unsafe fn i2c4_irq_start(reg: u8, len: usize) {
         ISR_OK = false;
 
         // Clear stale flags
-        I2C4_ICR.write_volatile(
-            (1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10),
-        );
+        I2C4_ICR.write_volatile((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
 
         // Enable I2C4 event interrupts: TXIE, TCIE, RXIE, STOPIE, NACKIE
         let cr1 = I2C4_CR1.read_volatile();
@@ -254,7 +260,7 @@ pub unsafe fn i2c4_irq_start(reg: u8, len: usize) {
                 | (1 << 2)   // RXIE
                 | (1 << 4)   // NACKIE
                 | (1 << 5)   // STOPIE
-                | (1 << 6),  // TCIE
+                | (1 << 6), // TCIE
         );
 
         // Write phase: register address (1 byte, no AUTOEND → TC)
@@ -275,7 +281,9 @@ pub unsafe fn i2c4_irq_wait() -> Option<&'static [u8]> {
             return None;
         }
         // Block until ISR gives the semaphore (100ms timeout)
-        unsafe extern "C" { fn rlvgl_sem_take(sem: *mut core::ffi::c_void, ticks: u32) -> i32; }
+        unsafe extern "C" {
+            fn rlvgl_sem_take(sem: *mut core::ffi::c_void, ticks: u32) -> i32;
+        }
         let got = rlvgl_sem_take(sem, 100);
         if got != 1 || !ISR_OK {
             // Disable I2C4 event interrupts on failure
@@ -333,13 +341,15 @@ pub unsafe fn i2c4_ev_handler() {
 
         match ISR_PHASE {
             I2c4Phase::WaitTxis => {
-                if isr & (1 << 1) != 0 { // TXIS
+                if isr & (1 << 1) != 0 {
+                    // TXIS
                     I2C4_TXDR.write_volatile(ISR_REG as u32);
                     ISR_PHASE = I2c4Phase::WaitTC;
                 }
             }
             I2c4Phase::WaitTC => {
-                if isr & (1 << 6) != 0 { // TC
+                if isr & (1 << 6) != 0 {
+                    // TC
                     // Start read phase: repeated START, RD_WRN=1, AUTOEND
                     let nbytes = ISR_LEN as u32;
                     I2C4_CR2.write_volatile(
@@ -349,18 +359,22 @@ pub unsafe fn i2c4_ev_handler() {
                 }
             }
             I2c4Phase::Reading => {
-                if isr & (1 << 2) != 0 { // RXNE
+                if isr & (1 << 2) != 0 {
+                    // RXNE
                     let b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
                     if ISR_IDX < ISR_LEN {
                         ISR_BUF[ISR_IDX] = b;
                         ISR_IDX += 1;
                     }
                 }
-                if isr & (1 << 5) != 0 { // STOPF
+                if isr & (1 << 5) != 0 {
+                    // STOPF
                     I2C4_ICR.write_volatile(1 << 5); // clear STOPF
                     // Disable event interrupts
                     let cr1 = I2C4_CR1.read_volatile();
-                    I2C4_CR1.write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+                    I2C4_CR1.write_volatile(
+                        cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)),
+                    );
                     ISR_OK = ISR_IDX == ISR_LEN;
                     ISR_PHASE = I2c4Phase::Idle;
                     give_i2c4_sem();
@@ -369,7 +383,8 @@ pub unsafe fn i2c4_ev_handler() {
             I2c4Phase::Idle => {
                 // Spurious — disable interrupts
                 let cr1 = I2C4_CR1.read_volatile();
-                I2C4_CR1.write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+                I2C4_CR1
+                    .write_volatile(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
             }
         }
     }
@@ -379,7 +394,9 @@ unsafe fn give_i2c4_sem() {
     unsafe {
         let sem = I2C4_DONE_SEM.load(core::sync::atomic::Ordering::Relaxed);
         if !sem.is_null() {
-            unsafe extern "C" { fn rlvgl_sem_give_from_isr(sem: *mut core::ffi::c_void); }
+            unsafe extern "C" {
+                fn rlvgl_sem_give_from_isr(sem: *mut core::ffi::c_void);
+            }
             rlvgl_sem_give_from_isr(sem);
         }
     }

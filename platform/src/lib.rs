@@ -31,14 +31,6 @@ pub mod compositor;
 pub mod cpu_blitter;
 /// Display driver traits and implementations.
 pub mod display;
-/// Frame synchronization traits for ERIF-based scheduling.
-pub mod frame_sync;
-#[cfg(all(
-    feature = "stm32h747i_disco",
-    any(target_arch = "arm", target_os = "none")
-))]
-/// Shared DSI adapted command mode register configuration.
-pub mod dsi_cmd_mode;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
@@ -57,6 +49,14 @@ pub mod dma2d_draw;
 ))]
 /// DMA1 driver for SAI1 sub-block A transmit streaming.
 pub mod dma_sai;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_os = "none")
+))]
+/// Shared DSI adapted command mode register configuration.
+pub mod dsi_cmd_mode;
+/// Frame synchronization traits for ERIF-based scheduling.
+pub mod frame_sync;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")

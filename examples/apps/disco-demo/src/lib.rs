@@ -354,16 +354,32 @@ impl ControllerState {
             format!(
                 "Audio: {}  Storage: {}  Effects: {}",
                 if self.capabilities.audio { "yes" } else { "no" },
-                if self.capabilities.storage { "yes" } else { "no" },
-                if self.capabilities.effects { "yes" } else { "no" },
+                if self.capabilities.storage {
+                    "yes"
+                } else {
+                    "no"
+                },
+                if self.capabilities.effects {
+                    "yes"
+                } else {
+                    "no"
+                },
             ),
             format!(
                 "Pointer: {}",
-                if self.capabilities.pointer { "yes" } else { "no" },
+                if self.capabilities.pointer {
+                    "yes"
+                } else {
+                    "no"
+                },
             ),
             format!(
                 "Diagnostics: {}",
-                if self.capabilities.diagnostics { "yes" } else { "no" },
+                if self.capabilities.diagnostics {
+                    "yes"
+                } else {
+                    "no"
+                },
             ),
             format!("Backlight: {}%", self.backlight),
         ]);
@@ -585,8 +601,16 @@ impl ControllerState {
             SettingsSlot::Locale => {
                 self.push_status(format!(
                     "Pointer: {} | Diag: {}",
-                    if self.capabilities.pointer { "on" } else { "off" },
-                    if self.capabilities.diagnostics { "on" } else { "off" },
+                    if self.capabilities.pointer {
+                        "on"
+                    } else {
+                        "off"
+                    },
+                    if self.capabilities.diagnostics {
+                        "on"
+                    } else {
+                        "off"
+                    },
                 ));
             }
             SettingsSlot::Backlight => {
@@ -809,9 +833,7 @@ impl DiscoController {
         });
         // Transparent root — desktop/splash background shows through.
         // Alpha=0 means draw_widget_bg skips the fill entirely.
-        root_container.style = StyleBuilder::new()
-            .bg_color(Color(0, 0, 0, 0))
-            .build();
+        root_container.style = StyleBuilder::new().bg_color(Color(0, 0, 0, 0)).build();
         let root = Rc::new(RefCell::new(WidgetNode {
             widget: Rc::new(RefCell::new(root_container)),
             children: Vec::new(),

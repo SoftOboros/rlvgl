@@ -1672,7 +1672,9 @@ fn main() -> ! {
         // The HAL's freeze() enables SysTick for delay functions; even
         // one tick through xPortSysTickHandler corrupts scheduler state.
         #[cfg(feature = "freertos")]
-        unsafe { (0xE000_E010u32 as *mut u32).write_volatile(0); }
+        unsafe {
+            (0xE000_E010u32 as *mut u32).write_volatile(0);
+        }
         // HAL RCC: derive SYSCLK and LTDC pixel clock (via PLL3R)
         // Assumes HSE=25 MHz on H747I-DISCO. Adjust if using HSI or a different crystal.
         let ccdr = rcc

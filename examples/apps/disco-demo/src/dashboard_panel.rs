@@ -10,8 +10,8 @@ use rlvgl_core::{
     widget::{Color, Rect, Widget},
 };
 use rlvgl_ui::draw_helpers::{
-    draw_panel_header, draw_rounded_border, fill_rounded_rect, panel_close_hit,
-    PANEL_PADDING, PANEL_RADIUS,
+    PANEL_PADDING, PANEL_RADIUS, draw_panel_header, draw_rounded_border, fill_rounded_rect,
+    panel_close_hit,
 };
 
 const PANEL_BG: Color = Color(22, 29, 41, 255);
@@ -106,7 +106,12 @@ impl Widget for DashboardPanel {
         if self.visible {
             self.bounds
         } else {
-            Rect { x: 0, y: 0, width: 0, height: 0 }
+            Rect {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            }
         }
     }
 
@@ -132,8 +137,13 @@ impl Widget for DashboardPanel {
         let caption_line_h = self.font.scaled_height() + 4;
         let mut caption_y = body_y;
         for line in self.caption.split('\n') {
-            self.font
-                .draw_str(renderer, self.bounds.x + PANEL_PADDING, caption_y, line, BODY_COLOR);
+            self.font.draw_str(
+                renderer,
+                self.bounds.x + PANEL_PADDING,
+                caption_y,
+                line,
+                BODY_COLOR,
+            );
             caption_y += caption_line_h;
         }
 
@@ -158,7 +168,8 @@ impl Widget for DashboardPanel {
             if y + self.font.scaled_height() > body_bottom {
                 break;
             }
-            self.font.draw_str(renderer, self.bounds.x + PANEL_PADDING, y, line, BODY_COLOR);
+            self.font
+                .draw_str(renderer, self.bounds.x + PANEL_PADDING, y, line, BODY_COLOR);
         }
     }
 

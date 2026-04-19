@@ -166,7 +166,7 @@ pub unsafe fn configure_adapted_cmd_mode(width: u16) {
     DSI_WCFGR.write_volatile(
         (1 << 0)       // DSIM = adapted command mode
         | (5 << 1)     // COLMUX = RGB888
-        | (1 << 4),    // TESRC (kept, but AR=0 makes it advisory)
+        | (1 << 4), // TESRC (kept, but AR=0 makes it advisory)
     );
 
     // CMCR: enable TE-acknowledge handshake for adapted command mode.
@@ -253,7 +253,7 @@ pub unsafe fn enable_lp_cmd_overrides() {
         | (1 << 14)  // GLWTX — generic long write in LP
         | (1 << 10)  // GSW2TX — generic short write 2p in LP
         | (1 << 9)   // GSW1TX — generic short write 1p in LP
-        | (1 << 8)   // GSW0TX — generic short write 0p in LP
+        | (1 << 8), // GSW0TX — generic short write 0p in LP
     );
 }
 

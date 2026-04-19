@@ -29,7 +29,7 @@ fn main() {
     }
 }
 
-fn build_freertos(manifest_dir: &PathBuf) {
+fn build_freertos(manifest_dir: &std::path::Path) {
     let root = manifest_dir.join("freertos");
     let src = root.join("Source");
     let port_dir = src.join("portable/GCC/ARM_CM7/r0p1");

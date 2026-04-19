@@ -537,13 +537,20 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // NT35510 init commands via DCS over LP mode.
         // Enable LP command transmission in CMCR for DCS writes.
         disp.dsi.cmcr.write(|w| {
-            w.dlwtx().set_bit()      // DCS long write in LP
-                .dsw1tx().set_bit()  // DCS short write 1p in LP
-                .dsw0tx().set_bit()  // DCS short write 0p in LP
-                .glwtx().set_bit()   // Generic long write in LP
-                .gsw2tx().set_bit()  // Generic short write 2p in LP
-                .gsw1tx().set_bit()  // Generic short write 1p in LP
-                .gsw0tx().set_bit()  // Generic short write 0p in LP
+            w.dlwtx()
+                .set_bit() // DCS long write in LP
+                .dsw1tx()
+                .set_bit() // DCS short write 1p in LP
+                .dsw0tx()
+                .set_bit() // DCS short write 0p in LP
+                .glwtx()
+                .set_bit() // Generic long write in LP
+                .gsw2tx()
+                .set_bit() // Generic short write 2p in LP
+                .gsw1tx()
+                .set_bit() // Generic short write 1p in LP
+                .gsw0tx()
+                .set_bit() // Generic short write 0p in LP
         });
         disp.reset_panel();
         cortex_m::asm::delay(4_000_000);

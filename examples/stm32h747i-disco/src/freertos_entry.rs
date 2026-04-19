@@ -91,8 +91,7 @@ unsafe extern "C" {
 /// the SysTick handler is a no-op — prevents xPortSysTickHandler from
 /// running on uninitialized FreeRTOS scheduler data when the HAL's
 /// clock setup enables SysTick before the scheduler starts.
-static SYSTICK_READY: core::sync::atomic::AtomicBool =
-    core::sync::atomic::AtomicBool::new(false);
+static SYSTICK_READY: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 #[cortex_m_rt::exception]
 fn SysTick() {
@@ -146,13 +145,13 @@ pub fn dma2d_done_sem() -> Option<SemaphoreHandle_t> {
 //      the panel's TE signal. No DWT spin, no vTaskDelay jitter.
 
 const TIM7_BASE: usize = 0x4000_1400;
-const TIM7_CR1:  *mut u32 = (TIM7_BASE + 0x00) as *mut u32;
+const TIM7_CR1: *mut u32 = (TIM7_BASE + 0x00) as *mut u32;
 const TIM7_DIER: *mut u32 = (TIM7_BASE + 0x0C) as *mut u32;
-const TIM7_SR:   *mut u32 = (TIM7_BASE + 0x10) as *mut u32;
-const TIM7_EGR:  *mut u32 = (TIM7_BASE + 0x14) as *mut u32;
-const TIM7_CNT:  *mut u32 = (TIM7_BASE + 0x24) as *mut u32;
-const TIM7_PSC:  *mut u32 = (TIM7_BASE + 0x28) as *mut u32;
-const TIM7_ARR:  *mut u32 = (TIM7_BASE + 0x2C) as *mut u32;
+const TIM7_SR: *mut u32 = (TIM7_BASE + 0x10) as *mut u32;
+const TIM7_EGR: *mut u32 = (TIM7_BASE + 0x14) as *mut u32;
+const TIM7_CNT: *mut u32 = (TIM7_BASE + 0x24) as *mut u32;
+const TIM7_PSC: *mut u32 = (TIM7_BASE + 0x28) as *mut u32;
+const TIM7_ARR: *mut u32 = (TIM7_BASE + 0x2C) as *mut u32;
 
 /// RCC APB1LENR on STM32H747 (D2 domain, CM7 view).
 const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32;
@@ -181,8 +180,7 @@ static mut RENDER_START_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 /// sync object is wired.
 unsafe fn tim7_init() {
     unsafe {
-        RCC_APB1LENR
-            .write_volatile(RCC_APB1LENR.read_volatile() | RCC_APB1LENR_TIM7EN);
+        RCC_APB1LENR.write_volatile(RCC_APB1LENR.read_volatile() | RCC_APB1LENR_TIM7EN);
         // Barrier: the PAC docs recommend a read-back after clock
         // enable to ensure the register write has landed before we
         // touch the peripheral.
@@ -577,9 +575,9 @@ const HB_RENDER_RECTS: *mut u32 = 0x3800_071C as *mut u32;
 const HB_RENDER_CYC: *mut u32 = 0x3800_0720 as *mut u32;
 const HB_RENDER_PX_TOT: *mut u32 = 0x3800_0724 as *mut u32;
 const HB_CRAWL_FRAMEID: *mut u32 = 0x3800_0728 as *mut u32;
-const HB_CRAWL_TICKS:   *mut u32 = 0x3800_072C as *mut u32;
-const HB_CRAWL_READY:   *mut u32 = 0x3800_0730 as *mut u32;
-const HB_PLAYIT_POLLS:  *mut u32 = 0x3800_0734 as *mut u32;
+const HB_CRAWL_TICKS: *mut u32 = 0x3800_072C as *mut u32;
+const HB_CRAWL_READY: *mut u32 = 0x3800_0730 as *mut u32;
+const HB_PLAYIT_POLLS: *mut u32 = 0x3800_0734 as *mut u32;
 
 // ── Cross-task touch ring (touch_task → render_task) ──────────────────────────
 //
@@ -598,15 +596,21 @@ fn touch_evt_push(s: RawTouchSample) {
     let head = TOUCH_EVT_HEAD.load(Ordering::Relaxed);
     let tail = TOUCH_EVT_TAIL.load(Ordering::Acquire);
     let next = (head + 1) % TOUCH_EVT_CAP as u32;
-    if next == tail { return; } // full — drop
-    unsafe { TOUCH_EVT_SLOTS[head as usize] = s; }
+    if next == tail {
+        return;
+    } // full — drop
+    unsafe {
+        TOUCH_EVT_SLOTS[head as usize] = s;
+    }
     TOUCH_EVT_HEAD.store(next, Ordering::Release);
 }
 
 fn touch_evt_pop() -> Option<RawTouchSample> {
     let tail = TOUCH_EVT_TAIL.load(Ordering::Relaxed);
     let head = TOUCH_EVT_HEAD.load(Ordering::Acquire);
-    if tail == head { return None; }
+    if tail == head {
+        return None;
+    }
     let s = unsafe { TOUCH_EVT_SLOTS[tail as usize] };
     TOUCH_EVT_TAIL.store((tail + 1) % TOUCH_EVT_CAP as u32, Ordering::Release);
     Some(s)
@@ -614,13 +618,11 @@ fn touch_evt_pop() -> Option<RawTouchSample> {
 
 /// Shared flag — playit `C` command sets this; render task reads to
 /// toggle the star crawl on/off.
-pub static CRAWL_REQ: core::sync::atomic::AtomicBool =
-    core::sync::atomic::AtomicBool::new(false);
+pub static CRAWL_REQ: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 /// When true, touch_task yields instead of polling I2C4 — lets the F
 /// command get clean bus access.
-static TOUCH_PAUSE: core::sync::atomic::AtomicBool =
-    core::sync::atomic::AtomicBool::new(false);
+static TOUCH_PAUSE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 /// Set by `render_task` while star_crawl is producing frames. Read
 /// by `present_task` — when active, present holds each swapped
@@ -642,8 +644,7 @@ pub static CRAWL_ACTIVE: core::sync::atomic::AtomicBool =
 /// of FRONT_FB_ADDR. Set by render_task to point LTDC directly at
 /// the jumbo/starfield buffer at the current scroll offset. Zero
 /// DMA2D per frame — just a CFBAR register write.
-static CRAWL_FB_ADDR: core::sync::atomic::AtomicU32 =
-    core::sync::atomic::AtomicU32::new(0);
+static CRAWL_FB_ADDR: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 #[inline(always)]
 fn cyccnt() -> u32 {
@@ -725,8 +726,7 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         // compose spans multiple porches via compose_tick.
         let buf_ready = BUF_READY_SEM.load(Ordering::Acquire);
         if !buf_ready.is_null()
-            && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) }
-                == freertos_sync::pdTRUE
+            && unsafe { freertos_sync::rlvgl_sem_take(buf_ready, 0) } == freertos_sync::pdTRUE
         {
             let front = FRONT_FB_ADDR.load(Ordering::Acquire);
             let back = BACK_FB_ADDR.load(Ordering::Acquire);
@@ -744,7 +744,9 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
             let mut wait_ticks: u32 = 0;
             while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
                 wait_ticks += 1;
-                if wait_ticks > 30 { break; }
+                if wait_ticks > 30 {
+                    break;
+                }
                 unsafe { vTaskDelay(1) };
             }
         }
@@ -783,8 +785,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
     // Bold font and README crawl text — mirrors the bare-metal and
     // Zephyr setup so FreeRTOS renders the same content.
-    static BOLD_FONT_DATA: &[u8] =
-        include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
+    static BOLD_FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
     static BOLD_FONT: PackedFont = PackedFont {
         height: 32,
         ascent: 30,
@@ -882,11 +883,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 // stale SDRAM data with non-zero alpha would cover
                 // the starfield. 480×600×4 = 1.15 MB.
                 unsafe {
-                    core::ptr::write_bytes(
-                        0xD180_0000 as *mut u8,
-                        0,
-                        480 * 600 * 4,
-                    );
+                    core::ptr::write_bytes(0xD180_0000 as *mut u8, 0, 480 * 600 * 4);
                 }
                 cortex_m::asm::dsb();
                 // Enable LTDC Layer 2 for ARGB8888 text overlay.
@@ -940,8 +937,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             const STAR_ROWS: u32 = 1600;
             const FB_H_CONST: u32 = 800;
 
-            let star_row =
-                ((cr.star_scroll_q8() >> 8) as u32) % STAR_ROWS;
+            let star_row = ((cr.star_scroll_q8() >> 8) as u32) % STAR_ROWS;
 
             // Clamp: if viewport would wrap, pin to last safe row
             let safe_row = if star_row + FB_H_CONST <= STAR_ROWS {
@@ -999,10 +995,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 // clean, LTDC sees stale/zero data.
                 {
                     let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                    cp.SCB.clean_dcache_by_address(
-                        0xD180_0000usize,
-                        ARGB_BYTES,
-                    );
+                    cp.SCB.clean_dcache_by_address(0xD180_0000usize, ARGB_BYTES);
                 }
                 cortex_m::asm::dsb();
             }
@@ -1029,10 +1022,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 crate::runtime_serial::write_bytes(b"RND:ctrl_new\r\n");
                 crate::runtime_serial::kick_tx();
                 let screen = Screen::landscape(800, 480);
-                let ctrl = DiscoController::new(
-                    screen,
-                    DiscoCapabilities::stm32h747i_disco(),
-                );
+                let ctrl = DiscoController::new(screen, DiscoCapabilities::stm32h747i_disco());
                 unsafe { *core::ptr::addr_of_mut!(DESKTOP_CTRL) = Some(ctrl) };
                 crate::runtime_serial::write_bytes(b"RND:ctrl_ok\r\n");
                 crate::runtime_serial::kick_tx();
@@ -1055,17 +1045,31 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 let pressed = unsafe { GPIOC_IDR.read_volatile() } & (1 << 13) != 0;
                 let last = unsafe { BTN_LAST };
                 if pressed != last {
-                    unsafe { BTN_LAST = pressed; }
+                    unsafe {
+                        BTN_LAST = pressed;
+                    }
                     let evt = if pressed {
-                        Event::KeyDown { key: rlvgl_core::event::Key::Enter }
+                        Event::KeyDown {
+                            key: rlvgl_core::event::Key::Enter,
+                        }
                     } else {
-                        Event::KeyUp { key: rlvgl_core::event::Key::Enter }
+                        Event::KeyUp {
+                            key: rlvgl_core::event::Key::Enter,
+                        }
                     };
                     unsafe {
                         // Enter changes panels — needs pristine.
                         // Arrows just move focus — draw-only suffices.
-                        if matches!(evt, Event::KeyDown { key: rlvgl_core::event::Key::Enter }) {
-                            core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                        if matches!(
+                            evt,
+                            Event::KeyDown {
+                                key: rlvgl_core::event::Key::Enter
+                            }
+                        ) {
+                            core::ptr::write_volatile(
+                                core::ptr::addr_of_mut!(NEEDS_PRISTINE),
+                                true,
+                            );
                         }
                         core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
                     }
@@ -1096,14 +1100,21 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 for i in 0..5 {
                     let last = unsafe { JOY_LAST[i] };
                     if pins[i] != last {
-                        unsafe { JOY_LAST[i] = pins[i]; }
+                        unsafe {
+                            JOY_LAST[i] = pins[i];
+                        }
                         // Only dispatch KeyDown (press edge).
                         // KeyUp doesn't change visual state.
                         if pins[i] {
-                            let evt = Event::KeyDown { key: KEYS[i].clone() };
+                            let evt = Event::KeyDown {
+                                key: KEYS[i].clone(),
+                            };
                             unsafe {
                                 if matches!(KEYS[i], Key::Enter) {
-                                    core::ptr::write_volatile(core::ptr::addr_of_mut!(NEEDS_PRISTINE), true);
+                                    core::ptr::write_volatile(
+                                        core::ptr::addr_of_mut!(NEEDS_PRISTINE),
+                                        true,
+                                    );
                                 }
                                 core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
                             }
@@ -1148,12 +1159,16 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
                 let tap = unsafe {
                     let p = core::ptr::addr_of_mut!(TAP);
-                    if (*p).is_none() { *p = Some(TapRecognizer::new(30)); }
+                    if (*p).is_none() {
+                        *p = Some(TapRecognizer::new(30));
+                    }
                     (*p).as_mut().unwrap()
                 };
                 let dtap = unsafe {
                     let p = core::ptr::addr_of_mut!(DTAP);
-                    if (*p).is_none() { *p = Some(DoubleTapRecognizer::new(30)); }
+                    if (*p).is_none() {
+                        *p = Some(DoubleTapRecognizer::new(30));
+                    }
                     (*p).as_mut().unwrap()
                 };
 
@@ -1164,7 +1179,10 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     unsafe {
                         let c = core::ptr::read_volatile(core::ptr::addr_of!(TOUCH_DRAIN_DIAG));
                         if c < 3 {
-                            core::ptr::write_volatile(core::ptr::addr_of_mut!(TOUCH_DRAIN_DIAG), c + 1);
+                            core::ptr::write_volatile(
+                                core::ptr::addr_of_mut!(TOUCH_DRAIN_DIAG),
+                                c + 1,
+                            );
                             let mut out = [0u8; 24];
                             let mut p = 0;
                             p = write_slice(&mut out, p, b"TD:");
@@ -1180,8 +1198,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     // Portrait→landscape transform + state machine
                     let evt = if count >= 2 {
                         use rlvgl_core::event::{
-                            MAX_TOUCH_POINTS, TouchPoint,
-                            TouchState as EvtTouchState,
+                            MAX_TOUCH_POINTS, TouchPoint, TouchState as EvtTouchState,
                         };
                         let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
                         for i in 0..count as usize {
@@ -1198,7 +1215,10 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                             };
                         }
                         let (_, _, x0, y0) = raw[0];
-                        unsafe { LAST_TOUCH = Some((x0, y0)); LAST_COUNT = count; }
+                        unsafe {
+                            LAST_TOUCH = Some((x0, y0));
+                            LAST_COUNT = count;
+                        }
                         Some(Event::Touch { count, points })
                     } else {
                         let touch = if count == 1 {
@@ -1209,11 +1229,15 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         };
                         let was_multi = unsafe { LAST_COUNT } >= 2;
                         let last = unsafe { LAST_TOUCH };
-                        unsafe { LAST_COUNT = count; }
+                        unsafe {
+                            LAST_COUNT = count;
+                        }
                         let to_l = |px: u16, py: u16| (py as i32, DW - 1 - px as i32);
                         match (touch, last) {
                             (Some((x, y)), Some((lx, ly))) => {
-                                unsafe { LAST_TOUCH = Some((x, y)); }
+                                unsafe {
+                                    LAST_TOUCH = Some((x, y));
+                                }
                                 if was_multi {
                                     let (lx, ly) = to_l(x, y);
                                     Some(Event::PointerDown { x: lx, y: ly })
@@ -1225,12 +1249,16 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                                 }
                             }
                             (Some((x, y)), None) => {
-                                unsafe { LAST_TOUCH = Some((x, y)); }
+                                unsafe {
+                                    LAST_TOUCH = Some((x, y));
+                                }
                                 let (lx, ly) = to_l(x, y);
                                 Some(Event::PointerDown { x: lx, y: ly })
                             }
                             (None, Some((lx, ly))) => {
-                                unsafe { LAST_TOUCH = None; }
+                                unsafe {
+                                    LAST_TOUCH = None;
+                                }
                                 let (lx, ly) = to_l(lx, ly);
                                 Some(Event::PointerUp { x: lx, y: ly })
                             }
@@ -1248,8 +1276,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                             let (a, b) = dtap.process(&gesture);
                             for g in a.into_iter().chain(b) {
                                 let in_zone = match &g {
-                                    Event::PressRelease { x, .. }
-                                    | Event::DoubleTap { x, .. } => {
+                                    Event::PressRelease { x, .. } | Event::DoubleTap { x, .. } => {
                                         // Icon strip: right edge (x≥700)
                                         // Wing area: left edge (x<80)
                                         *x >= 700 || *x < 80
@@ -1277,16 +1304,14 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     let (a, b) = dtap.process(&gesture);
                     for g in a.into_iter().chain(b) {
                         let in_zone = match &g {
-                            Event::PressRelease { x, .. }
-                            | Event::DoubleTap { x, .. } => *x >= 700 || *x < 80,
+                            Event::PressRelease { x, .. } | Event::DoubleTap { x, .. } => {
+                                *x >= 700 || *x < 80
+                            }
                             _ => false,
                         };
                         if in_zone {
                             unsafe {
-                                core::ptr::write_volatile(
-                                    core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                                    1,
-                                );
+                                core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
                             }
                             ctrl.root().borrow_mut().dispatch_event(&g);
                         }
@@ -1294,16 +1319,14 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 }
                 if let Some(gesture) = dtap.tick() {
                     let in_zone = match &gesture {
-                        Event::PressRelease { x, .. }
-                        | Event::DoubleTap { x, .. } => *x >= 700 || *x < 80,
+                        Event::PressRelease { x, .. } | Event::DoubleTap { x, .. } => {
+                            *x >= 700 || *x < 80
+                        }
                         _ => false,
                     };
                     if in_zone {
                         unsafe {
-                            core::ptr::write_volatile(
-                                core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                                1,
-                            );
+                            core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
                         }
                         // Touch PressRelease dispatch disabled —
                         // ActionHotspot bounds bug. Use joystick.
@@ -1326,12 +1349,11 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     core::ptr::addr_of_mut!(REFRESH_COUNTER),
                     rc.wrapping_add(1),
                 );
-                if rc == 0 { // wraps every 256 ticks ≈ 14s at 18Hz
+                if rc == 0 {
+                    // wraps every 256 ticks ≈ 14s at 18Hz
                     core::ptr::write_volatile(
                         core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                        core::ptr::read_volatile(
-                            core::ptr::addr_of!(DIRTY_FRAMES),
-                        ).max(1),
+                        core::ptr::read_volatile(core::ptr::addr_of!(DIRTY_FRAMES)).max(1),
                     );
                 }
             }
@@ -1344,9 +1366,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     unsafe {
                         core::ptr::write_volatile(
                             core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                            core::ptr::read_volatile(
-                                core::ptr::addr_of!(DIRTY_FRAMES),
-                            ).max(1),
+                            core::ptr::read_volatile(core::ptr::addr_of!(DIRTY_FRAMES)).max(1),
                         );
                     }
                 }
@@ -1374,10 +1394,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             let df = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(DIRTY_FRAMES)) };
             if df > 0 {
                 unsafe {
-                    core::ptr::write_volatile(
-                        core::ptr::addr_of_mut!(DIRTY_FRAMES),
-                        df - 1,
-                    );
+                    core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), df - 1);
                 }
 
                 // Render directly into FRONT — single-buffer, no swap.
@@ -1401,26 +1418,19 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
                 {
                     let buf = unsafe {
-                        core::slice::from_raw_parts_mut(
-                            front as *mut u8,
-                            bytes as usize,
-                        )
+                        core::slice::from_raw_parts_mut(front as *mut u8, bytes as usize)
                     };
                     let stride = (w as usize) * 4;
-                    let surface =
-                        Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
+                    let surface = Surface::new(buf, stride, PixelFmt::Argb8888, w, h);
                     let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
                         BlitterRenderer::new(&mut cpu_blitter, surface);
-                    let mut renderer =
-                        RotatedRenderer::new(&mut blit_renderer, w);
+                    let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
                     ctrl.root().borrow().draw(&mut renderer);
 
                     {
                         let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                        cp.SCB.clean_dcache_by_address(
-                            front as usize,
-                            bytes as usize,
-                        );
+                        cp.SCB
+                            .clean_dcache_by_address(front as usize, bytes as usize);
                     }
                     cortex_m::asm::dsb();
                 }
@@ -1754,9 +1764,8 @@ pub unsafe fn start() -> ! {
         RENDER_START_SEM.store(render_start_sem, Ordering::Release);
 
         // 1c. I2C4 interrupt-driven touch: semaphore
-        let i2c4_sem = freertos_sync::rlvgl_sem_create_binary_static(
-            core::ptr::addr_of_mut!(I2C4_SEM_BUF),
-        );
+        let i2c4_sem =
+            freertos_sync::rlvgl_sem_create_binary_static(core::ptr::addr_of_mut!(I2C4_SEM_BUF));
         crate::touch_i2c::set_i2c4_sem(i2c4_sem as *mut core::ffi::c_void);
 
         // 1b. Initialize TIM7 for the ERIF-phase-locked present gate.
