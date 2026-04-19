@@ -1,0 +1,142 @@
+<!--
+RELEASE-v0.2.0.md - Product-level release notes for rlvgl v0.2.0.
+-->
+<p align="center">
+  <img src="../rlvgl-logo.png" alt="rlvgl" />
+</p>
+
+# rlvgl v0.2.0 Release Notes
+
+`rlvgl` v0.2.0 is the release where the STM32H747I-DISCO demo runs on
+three platforms from the same widget tree. The shared `DiscoController`
+and `rlvgl-app-disco-demo` crate now drive the full desktop, touch,
+keyboard, and star crawl experience on bare-metal, FreeRTOS, and Zephyr
+RTOS without any app-level changes between them.
+
+## Short Release Summary
+
+`v0.2.0` adds multi-vendor BSP generation (5 vendors, 9 chips, 14
+boards), a UEFI display backend, serial test automation via
+`rlvgl-playit`, and FreeRTOS/Zephyr RTOS support for the
+STM32H747I-DISCO demo. Platform guides (Volumes IV and V) document the
+FreeRTOS and Zephyr integration in tutorial form.
+
+## Highlights
+
+### Three-platform STM32H747I-DISCO demo
+
+The same `DiscoController` widget tree — desktop icons, settings/info
+wings, live stats, star crawl — runs on:
+
+| Platform | Task model | Display | Build |
+|----------|-----------|---------|-------|
+| Bare-metal | Cooperative loop | Compositor double-buffer | `make build-disco` |
+| FreeRTOS | Preemptive tasks | Single-buffer 32 ms holdoff | `make build-disco-freertos` |
+| Zephyr | Zephyr threads | Video mode or adapted cmd | `make zephyr-disco` |
+
+Pre-built firmware for bare-metal and FreeRTOS is attached as release
+artifacts (`.elf`, `.hex`, `.bin`).
+
+### FreeRTOS platform (new)
+
+- Four FreeRTOS tasks: present (ERIF-gated LTDC retrigger), render
+  (widget tree + pristine restore), touch (interrupt-driven I2C4), and
+  playit (serial command processor).
+- TIM7 one-pulse holdoff for phase-locked present timing.
+- Interrupt-driven I2C4 state machine replaces busy-wait polling that
+  fails under preemption.
+- Joystick (PK2-PK6) and button (PC13) keyboard navigation through
+  the full DiscoController widget tree.
+- Star crawl launched from the info wing with touch-to-dismiss.
+- Single-buffer rendering into FRONT during the back porch eliminates
+  double-buffer flicker.
+
+### Zephyr platform (documented)
+
+- Video mode (Zephyr DSI driver, continuous scan) and adapted command
+  mode (Rust raw DSI init, pulsed scan, DMA2D-capable).
+- C+Rust hybrid: thin C shell for Zephyr SYS_INIT hooks, input
+  callbacks, ISR registration, and filesystem FFI.
+- SYS_INIT early PG3 reset for FT5336 under adapted command mode.
+- C1_LPENR fix for dual-core H747 CSleep display clock gating.
+
+### Multi-vendor BSP generation
+
+- 5 vendors with full YAML-to-IR-to-render pipelines: Espressif (9
+  chips, 14 boards), Nordic nRF, NXP i.MX RT, RP2040, Renesas RA.
+- 6 MiniJinja templates per vendor generating real PAC register writes.
+- `rlvgl-creator bsp from-yaml --vendor <v>` CLI for all vendors.
+
+### UEFI backend
+
+- GOP framebuffer display, SimpleTextInput keyboard, Serial I/O playit
+  transport for QEMU-based test automation.
+
+### Test automation (rlvgl-playit)
+
+- Serial test driver: touch injection, pointer/key events, multi-touch
+  frames, widget queries, framebuffer pixel dumps, event recording.
+- Node.js harness for end-to-end simulator and UEFI automation.
+
+### Platform guides
+
+- **Volume IV** (7 chapters): FreeRTOS scaffolding, present/render/touch
+  tasks, input dispatch, star crawl, flicker analysis.
+- **Volume V** (7 chapters): Zephyr build/link, C shell FFI, display
+  modes, touch pipeline, render loop, DMA2D, adapted command mode.
+
+### Rendering and UI
+
+- Anti-aliased rounded corners.
+- Compositor save-under and dirty-region restoration.
+- Focus highlights and keyboard navigation.
+- Star crawl: mirrored starfield + 7-tap FIR text overlay + DMA2D
+  compose pipeline.
+
+## Build artifacts
+
+| File | Platform | Format |
+|------|----------|--------|
+| `rlvgl-stm32h747i-disco-bare-metal.elf` | Bare-metal | ELF (debug symbols) |
+| `rlvgl-stm32h747i-disco-bare-metal.hex` | Bare-metal | Intel HEX |
+| `rlvgl-stm32h747i-disco-bare-metal.bin` | Bare-metal | Raw binary (base 0x08000000) |
+| `rlvgl-stm32h747i-disco-freertos.elf` | FreeRTOS | ELF (debug symbols) |
+| `rlvgl-stm32h747i-disco-freertos.hex` | FreeRTOS | Intel HEX |
+| `rlvgl-stm32h747i-disco-freertos.bin` | FreeRTOS | Raw binary (base 0x08000000) |
+
+Flash with probe-rs:
+```bash
+probe-rs download --chip STM32H747XIHx rlvgl-stm32h747i-disco-bare-metal.elf
+probe-rs reset --chip STM32H747XIHx
+```
+
+Or with STM32CubeProgrammer:
+```bash
+STM32_Programmer_CLI -c port=SWD -d rlvgl-stm32h747i-disco-bare-metal.hex -hardRst
+```
+
+## Infrastructure
+
+- 31 workspace crates at version 0.2.0.
+- `make release-artifacts` stages platform-suffixed binaries for upload.
+- `scripts/publish_changed.sh` for dependency-ordered crates.io publish.
+- Pre-publish validation: 7 phases (fmt, clippy, tests, playit, creator,
+  embedded build, docs).
+
+## Known issues
+
+- FreeRTOS touch PressRelease dispatch disabled due to `ActionHotspot`
+  missing coordinate bounds check. Joystick is the primary interaction
+  path. Touch detection works (star crawl dismiss).
+- FreeRTOS CTRL=0x00 may auto-revert to monitor mode after extended
+  idle. Interrupt-driven periodic re-write planned.
+- Zephyr adapted command mode star crawl has display corruption under
+  investigation (DMA2D/LTDC timing).
+
+## Documentation
+
+- [Volume I: Disco Demo Tutorial](docs/disco-tutorial/README.md) (7 chapters)
+- [Volume II: Platform Guide](docs/disco-platform-guide/README.md) (11 chapters)
+- [Volume III: Test & Debug](docs/disco-test-and-debug/README.md) (4 chapters)
+- [Volume IV: FreeRTOS Guide](docs/disco-freertos-guide/README.md) (7 chapters)
+- [Volume V: Zephyr Guide](docs/disco-zephyr-guide/README.md) (7 chapters)
