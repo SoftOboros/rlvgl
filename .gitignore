@@ -24,4 +24,4 @@ cookies.txt
 .playwright*
 tmp/
 **/.cache/
-i18n/translations.bin
+i18n/translations.binrelease/

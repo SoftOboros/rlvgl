@@ -37,6 +37,7 @@ ELF_CM4       := target/$(TARGET)/debug/$(BIN_CM4)
 DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 
 .PHONY: help build-disco build-disco-release build-disco-cm4 build-disco-all \
+	build-disco-freertos flash-disco-freertos release-artifacts \
 	objcopy-disco objcopy-disco-release \
 	flash-disco flash-disco-hex flash-disco-bin \
 	probe-rs-gdb \
@@ -56,6 +57,7 @@ help:
 	@echo "  make build-disco-all          # Build both cores"
 	@echo "  make build-disco-freertos     # Build FreeRTOS preemptive task variant"
 	@echo "  make flash-disco-freertos     # Build + flash FreeRTOS variant"
+	@echo "  make release-artifacts        # Build all platforms (release) into release/"
 	@echo ""
 	@echo "Host simulators and tools:"
 	@echo "  make build-sim                # Build rlvgl-sim (generic simulator)"
@@ -179,6 +181,41 @@ objcopy-disco-release:
 	$(OBJCOPY) -O binary -R .noinit $(ELF_CM7_REL) $(ELF_CM7_REL).bin
 	@echo "── artifacts ──"
 	@ls -lh $(ELF_CM7_REL) $(ELF_CM7_REL).hex $(ELF_CM7_REL).bin
+
+# ── Release artifacts ────────────────────────────────────────────
+#
+# Build all platform variants in release mode, rename with platform
+# suffix, and stage in release/. Suitable for attaching to a GitHub
+# release via `gh release upload`.
+#
+# Usage:
+#   make release-artifacts
+#   gh release create v0.2.0 release/*
+#
+RELEASE_DIR       := release
+FEATURES_REL_BM   := cm7,dma2d,splash,desktop,audio
+FEATURES_REL_RTOS := cm7,freertos,adapted_cmd,dma2d,splash,desktop
+
+release-artifacts:
+	@rm -rf $(RELEASE_DIR) && mkdir -p $(RELEASE_DIR)
+	@echo "── bare-metal release ──"
+	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	cargo build --target $(TARGET) --release \
+	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_REL_BM)
+	$(OBJCOPY) -O ihex $(ELF_CM7_REL) $(RELEASE_DIR)/$(BIN_CM7)-bare-metal.hex
+	$(OBJCOPY) -O binary -R .noinit $(ELF_CM7_REL) $(RELEASE_DIR)/$(BIN_CM7)-bare-metal.bin
+	cp $(ELF_CM7_REL) $(RELEASE_DIR)/$(BIN_CM7)-bare-metal.elf
+	@echo "── FreeRTOS release ──"
+	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	cargo build --target $(TARGET) --release \
+	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_REL_RTOS)
+	$(OBJCOPY) -O ihex $(ELF_CM7_REL) $(RELEASE_DIR)/$(BIN_CM7)-freertos.hex
+	$(OBJCOPY) -O binary -R .noinit $(ELF_CM7_REL) $(RELEASE_DIR)/$(BIN_CM7)-freertos.bin
+	cp $(ELF_CM7_REL) $(RELEASE_DIR)/$(BIN_CM7)-freertos.elf
+	@echo "── manifest ──"
+	@ls -lh $(RELEASE_DIR)/
+	@echo ""
+	@echo "Upload: gh release create <tag> $(RELEASE_DIR)/*"
 
 # ── Flash (probe-rs) ─────────────────────────────────────────────
 flash-disco: build-disco
