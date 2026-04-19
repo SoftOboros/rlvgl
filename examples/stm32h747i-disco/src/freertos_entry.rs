@@ -700,7 +700,7 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         // elapsed_since_erif` µs and block on `present_gate_sem`.
         // TIM7's UIF ISR gives the sem at the exact deadline. Zero
         // busy-spin, preemption-friendly, ERIF-phase-locked.
-        const PRESENT_HOLDOFF_CYC: u32 = 11_200_000; // 28 ms @ 400 MHz — gives render time to finish FRONT writes before retrigger
+        const PRESENT_HOLDOFF_CYC: u32 = 12_800_000; // 32 ms @ 400 MHz — settings wing (5 icons) needs more render time
         const CYC_PER_US: u32 = 400; //  400 MHz / 1 MHz
         let elapsed = sync.cycles_since_erif();
         if elapsed < PRESENT_HOLDOFF_CYC {
@@ -1316,9 +1316,9 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             // re-renders active info page, syncs focus highlights.
             ctrl.tick();
 
-            // Periodic refresh (~1Hz) for live stats updates.
-            // Don't render every frame — pristine+draw every
-            // frame causes visible flicker on the splash icons.
+            // Slow periodic refresh (~3s) for live stats updates.
+            // Faster rates cause visible flicker on settings wing
+            // (5 icon RLE decode is expensive).
             static mut REFRESH_COUNTER: u8 = 0;
             unsafe {
                 let rc = core::ptr::read_volatile(core::ptr::addr_of!(REFRESH_COUNTER));
@@ -1326,7 +1326,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     core::ptr::addr_of_mut!(REFRESH_COUNTER),
                     rc.wrapping_add(1),
                 );
-                if rc % 25 == 0 {
+                if rc == 0 { // wraps every 256 ticks ≈ 14s at 18Hz
                     core::ptr::write_volatile(
                         core::ptr::addr_of_mut!(DIRTY_FRAMES),
                         core::ptr::read_volatile(
