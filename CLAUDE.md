@@ -31,6 +31,26 @@ cargo build \
 - `audio` enables WM8994 codec init over I2C4 + SAI1 I2S TX + SAI4 PDM mic.
 - `sd_storage` enables SDMMC block device; file browser listing is still a stub.
 
+### FreeRTOS build
+
+```bash
+RUSTFLAGS="-C target-cpu=cortex-m7" \
+cargo build \
+  --target thumbv7em-none-eabihf \
+  -p rlvgl-example-disco \
+  --bin rlvgl-stm32h747i-disco \
+  --features cm7,freertos,adapted_cmd,dma2d,splash,desktop
+```
+
+- This is the FreeRTOS preemptive task build (present/render/touch/playit).
+- `freertos` links libfreertos.a and enables the FreeRTOS entry path.
+- `adapted_cmd` selects DSI adapted command mode (portrait, pulsed scan).
+- Uses single-buffer FRONT rendering with 32 ms holdoff.
+- Joystick (PK2-PK6) + button (PC13) for navigation.
+- Touch detection works; touch dispatch to widget tree disabled pending
+  ActionHotspot bounds fix.
+- 64 KB Rust heap required (settings wing draws 5 RLE icons).
+
 ### Compile-safety check for the leaner profiling feature set
 
 ```bash

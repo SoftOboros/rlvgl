@@ -27,9 +27,30 @@ let dp = pac::Peripherals::take().unwrap();
 hal::init_board_hal(&dp);
 ```
 
+## Platform Variants
+
+The same `rlvgl-app-disco-demo` crate and `DiscoController` widget tree
+run on three platforms, each with its own task model and display driver:
+
+| Platform | Entry point | Task model | Display | Guide |
+|----------|-------------|------------|---------|-------|
+| **Bare-metal** | `main.rs` cooperative loop | Single-threaded, SysTick-driven | Compositor + double-buffer | [Vol II](../../docs/disco-platform-guide/README.md) |
+| **FreeRTOS** | `freertos_entry.rs` + `ffi_shims.c` | Preemptive tasks (present/render/touch/playit) | Single-buffer FRONT, 32 ms holdoff | [Vol IV](../../docs/disco-freertos-guide/README.md) |
+| **Zephyr** | `zephyr_entry.rs` + `zephyr/src/main.c` | Zephyr threads, C+Rust FFI | Video mode or adapted command mode | [Vol V](../../docs/disco-zephyr-guide/README.md) |
+
+Build targets:
+
+| Platform | Build | Flash |
+|----------|-------|-------|
+| Bare-metal | `make build-disco` | `make flash-disco` |
+| FreeRTOS | `make build-disco-freertos` | `make flash-disco-freertos` |
+| Zephyr (video) | `make zephyr-disco` | `make zephyr-disco-flash` |
+| Zephyr (ACM) | `make zephyr-disco-acm` | `make zephyr-disco-acm-flash` |
+
 ## Requirements
 - Rust target `thumbv7em-none-eabihf`
 - `arm-none-eabi` cross toolchain
+- For Zephyr: Zephyr SDK 0.16.x + west (see [docs/ZEPHYR.md](../../docs/ZEPHYR.md))
 
 ## Building
 

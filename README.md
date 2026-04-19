@@ -45,6 +45,8 @@ Package: `rlvgl`
 - [docs/disco-tutorial](./docs/disco-tutorial/README.md) – Progressive, chapter-by-chapter guide to building the STM32H747I-DISCO demo from scratch
 - [docs/disco-platform-guide](./docs/disco-platform-guide/README.md) – Volume II: bare-metal STM32H747I-DISCO platform bring-up, SVD/PAC limits, AXI holdoff, and the star crawl in full detail
 - [docs/disco-test-and-debug](./docs/disco-test-and-debug/README.md) – Volume III: how to test and debug across the host simulator, UEFI/QEMU, and hardware, including playit automation and VS Code + probe-rs + GDB
+- [docs/disco-freertos-guide](./docs/disco-freertos-guide/README.md) – Volume IV: FreeRTOS preemptive tasks, interrupt-driven I2C4 touch, single-buffer rendering, joystick navigation
+- [docs/disco-zephyr-guide](./docs/disco-zephyr-guide/README.md) – Volume V: Zephyr C+Rust hybrid, video mode vs adapted command mode, DMA2D pipeline, CSleep/LPENR fix
 - [lvgl](./lvgl/README.md) – C submodule (reference only)
 
 ## Building Binary Targets
