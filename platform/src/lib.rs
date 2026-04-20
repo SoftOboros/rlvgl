@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-#[cfg(any(feature = "simulator", feature = "fatfs"))]
+#[cfg(any(feature = "simulator", feature = "fatfs", feature = "linux_fbdev"))]
 extern crate std;
 
 #[cfg(feature = "simulator")]
@@ -66,6 +66,10 @@ pub mod ft5336;
 pub mod gesture;
 /// Input device abstractions.
 pub mod input;
+#[cfg(feature = "linux_fbdev")]
+pub mod linux_evdev;
+#[cfg(feature = "linux_fbdev")]
+pub mod linux_fbdev;
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",
@@ -185,6 +189,10 @@ pub use dma2d::Dma2dBlitter;
 ))]
 pub use ft5336::Ft5336;
 pub use input::{InputDevice, InputEvent};
+#[cfg(feature = "linux_fbdev")]
+pub use linux_evdev::LinuxEvdevInput;
+#[cfg(feature = "linux_fbdev")]
+pub use linux_fbdev::LinuxFbdevDisplay;
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
 #[cfg(all(

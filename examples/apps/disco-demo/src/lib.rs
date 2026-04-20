@@ -104,6 +104,22 @@ impl DiscoCapabilities {
             platform: "Zephyr RTOS",
         }
     }
+
+    /// Capability preset for the BeagleBone Black with NHD-7.0CTP-CAPE-P.
+    ///
+    /// No on-board audio codec (HDMI audio disabled when LCD cape is active).
+    /// Storage available via eMMC and microSD. Cap touch via FT5x06 on I2C.
+    /// Effects run CPU-only (no DMA2D on AM3358).
+    pub const fn beaglebone_black() -> Self {
+        Self {
+            audio: false,
+            storage: true,
+            diagnostics: true,
+            effects: true,
+            pointer: true,
+            platform: "BeagleBone Black",
+        }
+    }
 }
 
 impl Default for DiscoCapabilities {

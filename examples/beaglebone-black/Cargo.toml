@@ -1,0 +1,18 @@
+[package]
+name = "rlvgl-example-bbb"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "rlvgl-bbb"
+path = "src/main.rs"
+
+[features]
+default = ["linux"]
+linux = ["rlvgl-platform/linux_fbdev"]
+
+[dependencies]
+rlvgl-core = { path = "../../core" }
+rlvgl-platform = { path = "../../platform", default-features = false }
+rlvgl-app-disco-demo = { path = "../apps/disco-demo" }

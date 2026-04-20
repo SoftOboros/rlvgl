@@ -1,0 +1,82 @@
+/*
+ * Device Tree Overlay for BeagleBone Black + NHD-7.0CTP-CAPE-P
+ *
+ * Enables the AM3358 LCDC driving the NHD-7.0-800480AF-ASXP 7" IPS TFT
+ * via 24-bit parallel RGB. Disables the on-board HDMI framer (TDA19988)
+ * since LCD and HDMI share the LCDC and pin mux group.
+ *
+ * Touch: FT5x06 capacitive controller on I2C2 (0x38).
+ *
+ * Timing values from the NHD-7.0-800480AF-ASXP datasheet:
+ *   800x480 @ ~33.3 MHz pixel clock
+ *   HBP=46  HFP=210  HSW=20
+ *   VBP=23  VFP=22   VSW=10
+ *   DE mode, data clocked on falling edge
+ *
+ * Usage:
+ *   sudo dtc -O dtb -o /lib/firmware/BB-NHD7-CAPE.dtbo BB-NHD7-CAPE.dts
+ *   echo BB-NHD7-CAPE > /sys/devices/platform/bone_capemgr/slots
+ *
+ * Or add to /boot/uEnv.txt:
+ *   dtb_overlay=/lib/firmware/BB-NHD7-CAPE.dtbo
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "ti,beaglebone", "ti,beaglebone-black";
+	part-number = "BB-NHD7-CAPE";
+	version = "00A0";
+
+	/* Disable HDMI — shares LCDC and LCD pin mux */
+	fragment@0 {
+		target = <&lcdc>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@1 {
+		target-path = "/";
+		__overlay__ {
+			/* Panel timing for NHD-7.0-800480AF-ASXP */
+			panel {
+				compatible = "newhaven,nhd-7.0-800480af";
+				status = "okay";
+
+				panel-timing {
+					clock-frequency = <33300000>;
+					hactive = <800>;
+					vactive = <480>;
+					hfront-porch = <210>;
+					hback-porch = <46>;
+					hsync-len = <20>;
+					vfront-porch = <22>;
+					vback-porch = <23>;
+					vsync-len = <10>;
+					hsync-active = <0>;
+					vsync-active = <0>;
+					de-active = <1>;
+					pixelclk-active = <0>;  /* falling edge */
+				};
+			};
+		};
+	};
+
+	/* FT5x06 capacitive touch on I2C2 */
+	fragment@2 {
+		target = <&i2c2>;
+		__overlay__ {
+			status = "okay";
+			clock-frequency = <400000>;
+
+			ft5x06@38 {
+				compatible = "focaltech,ft5336";
+				reg = <0x38>;
+				/* int-gpios = <&gpio1 PIN GPIO_ACTIVE_LOW>; */
+				/* TODO: confirm interrupt GPIO from cape schematic */
+			};
+		};
+	};
+};

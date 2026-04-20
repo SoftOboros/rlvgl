@@ -389,6 +389,7 @@ members = [
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
     "examples/beetle-esp32p4",
+    "examples/beaglebone-black",
     "examples/stm32h747i-disco/assets/disco-assets",
     "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp",
     "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip",

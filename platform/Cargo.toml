@@ -33,6 +33,7 @@ libloading = { version = "0.8", optional = true }
 uefi = { version = "0.36.1", optional = true }
 rlvgl-playit = { path = "../playit", version = "0.2.0", default-features = false, optional = true }
 ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+libc = { version = "0.2", optional = true }
 
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
@@ -69,6 +70,7 @@ apng = ["rlvgl-core/apng", "dep:image"]
 lottie = ["rlvgl-core/lottie"]
 canvas = ["rlvgl-core/canvas", "embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin"]
+linux_fbdev = ["dep:libc"]
 fatfs = ["rlvgl-core/fatfs"]
 nes = ["rlvgl-core/nes"]
 
