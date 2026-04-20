@@ -17,8 +17,12 @@ required-features = ["bare_metal"]
 default = ["linux"]
 linux = ["rlvgl-platform/linux_fbdev"]
 bare_metal = []
+freertos = ["bare_metal"]
 
 [dependencies]
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", default-features = false }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+
+[build-dependencies]
+cc = "1"

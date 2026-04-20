@@ -12,6 +12,11 @@
 
 mod bsp;
 
+#[cfg(feature = "freertos")]
+mod freertos_entry;
+#[cfg(feature = "freertos")]
+mod freertos_sync;
+
 use bsp::lcdc;
 
 // ---------------------------------------------------------------------------
@@ -49,14 +54,14 @@ pub extern "C" fn _start() -> ! {
         bsp::pinmux::configure_i2c2_pins();
     }
 
-    // Phase 3: Allocate framebuffer in DDR
-    // Place it at a fixed address well above our code
-    let fb_addr: u32 = 0x8020_0000;
+    // Phase 3: Allocate framebuffers in DDR
+    let fb0_addr: u32 = 0x8020_0000;
     let fb_size: u32 = lcdc::HACTIVE * lcdc::VACTIVE * 4; // ARGB8888
+    let fb1_addr: u32 = fb0_addr + fb_size; // Second buffer for double-buffering
 
-    // Fill framebuffer with a solid color (blue) as smoke test
+    // Fill first framebuffer with a solid color (blue) as smoke test
     unsafe {
-        let fb = core::slice::from_raw_parts_mut(fb_addr as *mut u32, (fb_size / 4) as usize);
+        let fb = core::slice::from_raw_parts_mut(fb0_addr as *mut u32, (fb_size / 4) as usize);
         for pixel in fb.iter_mut() {
             *pixel = 0xFF_00_40_80; // ARGB: opaque dark blue
         }
@@ -64,20 +69,27 @@ pub extern "C" fn _start() -> ! {
 
     // Phase 4: Initialize LCDC raster controller
     unsafe {
-        lcdc::init_raster(fb_addr, fb_size);
+        lcdc::init_raster(fb0_addr, fb_size);
     }
 
-    // Phase 5: Main loop
-    // For now, just wait for EOF interrupts and do nothing.
-    // The full DiscoController integration requires a heap allocator
-    // (embedded-alloc) which will be added in the next phase.
-    loop {
-        unsafe {
-            if lcdc::is_eof_pending() {
-                lcdc::clear_eof_irq();
-                // Frame complete — future: render next frame here
+    // Phase 5: Branch to FreeRTOS or cooperative loop
+    #[cfg(feature = "freertos")]
+    unsafe {
+        freertos_entry::start(fb0_addr, fb1_addr);
+        // Never returns
+    }
+
+    #[cfg(not(feature = "freertos"))]
+    {
+        // Cooperative loop: wait for EOF interrupts
+        loop {
+            unsafe {
+                if lcdc::is_eof_pending() {
+                    lcdc::clear_eof_irq();
+                    // Frame complete — future: render next frame here
+                }
             }
+            core::hint::spin_loop();
         }
-        core::hint::spin_loop();
     }
 }
