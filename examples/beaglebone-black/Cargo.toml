@@ -8,9 +8,15 @@ publish = false
 name = "rlvgl-bbb"
 path = "src/main.rs"
 
+[[bin]]
+name = "rlvgl-bbb-bare"
+path = "src/bare_metal.rs"
+required-features = ["bare_metal"]
+
 [features]
 default = ["linux"]
 linux = ["rlvgl-platform/linux_fbdev"]
+bare_metal = []
 
 [dependencies]
 rlvgl-core = { path = "../../core" }
