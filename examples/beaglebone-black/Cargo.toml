@@ -18,6 +18,7 @@ default = ["linux"]
 linux = ["rlvgl-platform/linux_fbdev"]
 bare_metal = []
 freertos = ["bare_metal"]
+zephyr = ["bare_metal"]
 
 [dependencies]
 rlvgl-core = { path = "../../core" }

@@ -17,6 +17,11 @@ mod freertos_entry;
 #[cfg(feature = "freertos")]
 mod freertos_sync;
 
+#[cfg(feature = "zephyr")]
+mod zephyr_entry;
+#[cfg(feature = "zephyr")]
+mod zephyr_sync;
+
 use bsp::lcdc;
 
 // ---------------------------------------------------------------------------
