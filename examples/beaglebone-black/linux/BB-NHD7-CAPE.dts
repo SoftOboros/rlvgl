@@ -1,82 +1,114 @@
 /*
  * Device Tree Overlay for BeagleBone Black + NHD-7.0CTP-CAPE-P
  *
- * Enables the AM3358 LCDC driving the NHD-7.0-800480AF-ASXP 7" IPS TFT
- * via 24-bit parallel RGB. Disables the on-board HDMI framer (TDA19988)
- * since LCD and HDMI share the LCDC and pin mux group.
+ * Kernel: 6.12+ (bone25) with built-in tilcdc DRM driver.
  *
- * Touch: FT5x06 capacitive controller on I2C2 (0x38).
+ * DT symbols verified on live hardware:
+ *   &lcdc          = /ocp/.../lcdc@0
+ *   &am33xx_pinmux = /ocp/.../pinmux@800
+ *   &i2c2          = /ocp/.../i2c@0
+ *   &vmmcsd_fixed  = /fixedregulator0
+ *   (no label for HDMI bridge — disabled via target-path)
  *
- * Timing values from the NHD-7.0-800480AF-ASXP datasheet:
- *   800x480 @ ~33.3 MHz pixel clock
- *   HBP=46  HFP=210  HSW=20
- *   VBP=23  VFP=22   VSW=10
- *   DE mode, data clocked on falling edge
- *
- * Usage:
- *   sudo dtc -O dtb -o /lib/firmware/BB-NHD7-CAPE.dtbo BB-NHD7-CAPE.dts
- *   echo BB-NHD7-CAPE > /sys/devices/platform/bone_capemgr/slots
- *
- * Or add to /boot/uEnv.txt:
- *   dtb_overlay=/lib/firmware/BB-NHD7-CAPE.dtbo
+ * Deploy:
+ *   dtc -O dtb -o BB-NHD7-CAPE.dtbo -b 0 -@ BB-NHD7-CAPE.dts
+ *   sudo cp BB-NHD7-CAPE.dtbo /boot/dtbs/$(uname -r)/overlays/
+ *   Add to /boot/uEnv.txt:
+ *     enable_uboot_overlays=1
+ *     uboot_overlay_addr4=/boot/dtbs/<kernel>/overlays/BB-NHD7-CAPE.dtbo
+ *     disable_uboot_overlay_video=1
  */
 
 /dts-v1/;
 /plugin/;
 
-/ {
-	compatible = "ti,beaglebone", "ti,beaglebone-black";
-	part-number = "BB-NHD7-CAPE";
-	version = "00A0";
+/* Pin mux for LCD data + control signals */
+&am33xx_pinmux {
+	bb_lcd_pins: bb-lcd-pins {
+		pinctrl-single,pins = <
+			0x0a0 0x08  /* lcd_data0  MODE0 OUTPUT */
+			0x0a4 0x08  /* lcd_data1  */
+			0x0a8 0x08  /* lcd_data2  */
+			0x0ac 0x08  /* lcd_data3  */
+			0x0b0 0x08  /* lcd_data4  */
+			0x0b4 0x08  /* lcd_data5  */
+			0x0b8 0x08  /* lcd_data6  */
+			0x0bc 0x08  /* lcd_data7  */
+			0x0c0 0x08  /* lcd_data8  */
+			0x0c4 0x08  /* lcd_data9  */
+			0x0c8 0x08  /* lcd_data10 */
+			0x0cc 0x08  /* lcd_data11 */
+			0x0d0 0x08  /* lcd_data12 */
+			0x0d4 0x08  /* lcd_data13 */
+			0x0d8 0x08  /* lcd_data14 */
+			0x0dc 0x08  /* lcd_data15 */
+			0x0e0 0x08  /* lcd_data16 */
+			0x0e4 0x08  /* lcd_data17 */
+			0x0e8 0x08  /* lcd_data18 */
+			0x0ec 0x08  /* lcd_data19 */
+			0x0f0 0x08  /* lcd_data20 */
+			0x0f4 0x08  /* lcd_data21 */
+			0x0f8 0x08  /* lcd_data22 */
+			0x0fc 0x08  /* lcd_data23 */
+			0x100 0x08  /* lcd_vsync  */
+			0x104 0x08  /* lcd_hsync  */
+			0x108 0x08  /* lcd_pclk   */
+			0x10c 0x08  /* lcd_ac_bias_en */
+		>;
+	};
+};
 
-	/* Disable HDMI — shares LCDC and LCD pin mux */
-	fragment@0 {
-		target = <&lcdc>;
-		__overlay__ {
-			status = "okay";
+/* Configure LCDC: override pinctrl and add panel port */
+&lcdc {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&bb_lcd_pins>;
+
+	/* Replace the HDMI endpoint with our panel endpoint */
+	port {
+		lcdc_out: endpoint {
+			remote-endpoint = <&panel_in>;
 		};
 	};
+};
 
-	fragment@1 {
-		target-path = "/";
-		__overlay__ {
-			/* Panel timing for NHD-7.0-800480AF-ASXP */
-			panel {
-				compatible = "newhaven,nhd-7.0-800480af";
-				status = "okay";
+/* Panel node at root with timing for NHD-7.0-800480AF-ASXP */
+&{/} {
+	panel {
+		compatible = "panel-dpi";
+		power-supply = <&vmmcsd_fixed>;
 
-				panel-timing {
-					clock-frequency = <33300000>;
-					hactive = <800>;
-					vactive = <480>;
-					hfront-porch = <210>;
-					hback-porch = <46>;
-					hsync-len = <20>;
-					vfront-porch = <22>;
-					vback-porch = <23>;
-					vsync-len = <10>;
-					hsync-active = <0>;
-					vsync-active = <0>;
-					de-active = <1>;
-					pixelclk-active = <0>;  /* falling edge */
-				};
+		panel-timing {
+			clock-frequency = <33300000>;
+			hactive = <800>;
+			vactive = <480>;
+			hfront-porch = <210>;
+			hback-porch = <46>;
+			hsync-len = <20>;
+			vfront-porch = <22>;
+			vback-porch = <23>;
+			vsync-len = <10>;
+			hsync-active = <0>;
+			vsync-active = <0>;
+			de-active = <1>;
+			pixelclk-active = <0>;
+		};
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&lcdc_out>;
 			};
 		};
 	};
+};
 
-	/* FT5x06 capacitive touch on I2C2 */
-	fragment@2 {
-		target = <&i2c2>;
-		__overlay__ {
-			status = "okay";
-			clock-frequency = <400000>;
+/* FT5x06 capacitive touch on I2C2 */
+&i2c2 {
+	status = "okay";
+	clock-frequency = <400000>;
 
-			ft5x06@38 {
-				compatible = "focaltech,ft5336";
-				reg = <0x38>;
-				/* int-gpios = <&gpio1 PIN GPIO_ACTIVE_LOW>; */
-				/* TODO: confirm interrupt GPIO from cape schematic */
-			};
-		};
+	ft5x06@38 {
+		compatible = "focaltech,ft5336";
+		reg = <0x38>;
 	};
 };
