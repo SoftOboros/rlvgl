@@ -1,570 +1,446 @@
-# BeagleBone Black + NHD-7.0CTP-CAPE-P: Plan of Plans
+# BeagleBone Black + NHD-7.0CTP-CAPE-P
 
-## Context
+Comprehensive guide for running rlvgl on the BeagleBone Black (AM3358) with
+the Newhaven NHD-7.0CTP-CAPE-P 7" IPS capacitive touch display cape.
 
-rlvgl is expanding from MCU-class targets (STM32H747I-DISCO, Beetle ESP32-C3/P4) to its first
-**Cortex-A application processor** — the BeagleBone Black (AM3358, Cortex-A8 @ 1 GHz) paired
-with the Newhaven NHD-7.0CTP-CAPE-P 7" IPS capacitive touch cape.
-
-The BBB+cape matches the DISCO's 800x480 resolution but over parallel RGB (LCDC) instead of
-MIPI DSI, on a fundamentally different processor class. Four delivery paths — Linux,
-bare-metal, FreeRTOS, and Zephyr — mirror and extend the DISCO's multi-platform model,
-proving rlvgl portability across bus architectures, CPU families, and runtime environments.
-
-Each prong is a multi-phase effort with its own detailed planning cycle. This document is the
-**unifying roadmap** that identifies shared vs. individual work, sequencing dependencies, and
-the common app/platform contracts that keep all four prongs compatible with each other and
-with existing targets.
+This document covers hardware setup, SD card preparation, display bring-up,
+and the four-prong software architecture (Linux, bare-metal, FreeRTOS, Zephyr).
+It will be split into tutorial chapters as each section matures.
 
 ---
 
-## Hardware Profile
+## Hardware
 
-| Item | Spec |
-|------|------|
-| **Board** | BeagleBone Black (AM3358BZCZ100) |
-| **CPU** | Cortex-A8 @ 1 GHz, ARMv7-A |
-| **Memory** | 512 MB DDR3L, 4 GB eMMC, 128 KB SRAM |
-| **Display cape** | NHD-7.0CTP-CAPE-P |
-| **Panel** | NHD-7.0-800480AF-ASXP, 800x480, IPS |
-| **Panel interface** | 24-bit parallel RGB, ST7277 driver IC, DE/SYNC modes |
-| **Panel connector** | 40-pin 0.5mm FFC |
-| **Touch** | Capacitive, FT5x06 family over I2C (same register set as FT5336 on DISCO) |
-| **Display controller** | AM3358 LCDC — raster mode, built-in DMA, 512-word FIFO, up to 126 MHz pclk |
-| **Backlight** | 180 mA @ 9.3V, driven by cape circuit |
-| **HDMI** | Disabled when LCD cape active (shared LCDC + pin mux) |
+### Bill of Materials
 
----
+| Item | Part Number | Notes |
+|------|-------------|-------|
+| BeagleBone Black | Rev D (AM3358BZCZ100) | Cortex-A8 @ 1 GHz, 512 MB DDR3L |
+| Display cape | NHD-7.0CTP-CAPE-P | 7" IPS, 800x480, cap touch, BBB cape form factor |
+| Power supply | 5V 2A, 5.5x2.1mm barrel | **Required** — USB 500 mA is not enough for cape+backlight |
+| USB cable | Mini-B to A | Data + serial console to host Mac/PC |
+| microSD card | 4 GB+ (any speed class) | Primary boot device when cape is attached |
 
-## The Four Prongs
+### Power Budget
 
-### Prong 1: Linux fbdev/DRM (stepping stone)
-### Prong 2: Bare-metal (full control, LCDC driver foundation)
-### Prong 3: FreeRTOS (preemptive tasks on bare-metal BSP)
-### Prong 4: Zephyr RTOS (full RTOS ecosystem)
+The cape draws ~450 mA from the 5V rail (backlight: 180 mA @ 9.3V boosted
+from 5V, panel logic: 55 mA, touch: 15 mA). The BBB itself draws ~300 mA.
+**Total: ~750 mA — well over USB's 500 mA limit.**
 
----
+When powered via USB only, the BBB's `VDD_5V` expansion header rail is not
+supplied (TPS65217C PMIC limitation). The cape's backlight boost converter
+needs this rail. **Always use the barrel jack when the cape is attached.**
 
-## Shared Work (All Four Prongs)
+Both barrel jack and USB can be connected simultaneously. The PMIC
+automatically prefers DC power while USB provides data (serial console +
+Ethernet gadget).
 
-These pieces are built once and consumed by all four BBB entry points, and in most cases
-by existing targets too. **Do this work first.**
+### Critical Hardware Constraint: LCD vs eMMC Pin Conflict
 
-### S1. DiscoController capability preset for BBB
+**LCD_DATA[0:7] share physical pins with eMMC (MMC1) data lines on the
+BBB P8 expansion header.** Setting these pins to LCD Mode 0 kills eMMC
+access, which kills the rootfs if booting from eMMC.
 
-**File:** `examples/apps/disco-demo/src/lib.rs`
+**When the NHD cape is attached and LCD pins are active, the BBB must
+boot from the microSD card.** This is a known BBB hardware limitation
+shared by all 4.3"/7" LCD capes. The bare-metal and FreeRTOS prongs
+don't use eMMC rootfs so they can set LCD pin mux freely.
 
-Add `DiscoCapabilities::beaglebone_black()` preset:
-```rust
-pub fn beaglebone_black() -> Self {
-    Self {
-        audio: false,       // no on-board codec (HDMI audio disabled with cape)
-        storage: true,      // eMMC + microSD
-        diagnostics: true,
-        effects: true,      // star crawl (CPU-rendered, no DMA2D)
-        pointer: true,      // cap touch via FT5x06
-        platform: "beaglebone-black",
-    }
-}
-```
+### Cape Identification
 
-No widget tree changes needed — same 800x480 as DISCO. The controller is already
-resolution-aware from `Screen`.
+The NHD-7.0CTP-CAPE-P has an I2C EEPROM that identifies it to U-Boot as
+`BB-BONE-NH7C-01`. U-Boot passes this as a kernel command line parameter:
+`uboot_detected_capes=BB-BONE-NH7C-01`. No built-in U-Boot overlay exists
+for this cape — display configuration is our responsibility.
 
-### S2. FT5x06 touch driver reuse
+### Panel Specifications (NHD-7.0-800480AF-ASXP)
 
-**Existing:** `platform/src/ft5336.rs` (84 lines)
+| Parameter | Value |
+|-----------|-------|
+| Resolution | 800 x 480 |
+| Interface | 24-bit parallel RGB |
+| Driver IC | Sitronix ST7277 (DE mode recommended) |
+| Pixel clock | 33.3 MHz typical |
+| HBP / HFP / HSW | 46 / 210 / 20 DCLK cycles |
+| VBP / VFP / VSW | 23 / 22 / 10 lines |
+| Data clock edge | Falling (DCLK) |
+| Backlight | 180 mA @ 9.3V (boost from 5V on cape) |
+| Touch | FT5x06 capacitive, I2C @ 0x38 |
 
-The FT5336 on the DISCO and the FT5x06 on the NHD cape share the same register map
-(I2C address 0x38, same TD_STATUS/Pn_XH/Pn_XL/Pn_YH/Pn_YL layout). The existing
-`Ft5336` driver should work as-is for single-touch. Verify register compatibility
-during bring-up; if minor differences exist, parameterize via a generic or feature flag
-rather than forking.
+### AM3358 LCDC Register Summary
 
-### S3. Screen configuration
+Base address: `0x4830_E000` (TRM section 13.5.1)
 
-All three prongs use the same Screen:
-```rust
-Screen::new(800, 480, Rotation::Deg0, ColorFormat::Argb8888, 60)
-```
+| Register | Offset | Key Fields |
+|----------|--------|------------|
+| LCD_CTRL | 0x04 | MODESEL (raster=1), CLKDIV [15:8] |
+| RASTER_CTRL | 0x28 | LCDEN, LCDTFT, TFT24, TFT24_UNPACKED, PALMODE |
+| RASTER_TIMING_0 | 0x2C | HBP [31:24], HFP [23:16], HSW [15:10], PPL [9:0] |
+| RASTER_TIMING_1 | 0x30 | VBP [31:24], VFP [23:16], VSW [15:10], LPP [9:0] |
+| RASTER_TIMING_2 | 0x34 | IPC (bit 11), IHS (12), IVS (13), LPP_B10 (26) |
+| LCDDMA_CTRL | 0x40 | BURST_SIZE, FIFO_TH, FRAME_MODE |
+| LCDDMA_FB0_BASE | 0x44 | Framebuffer physical start address |
+| LCDDMA_FB0_CEILING | 0x48 | Framebuffer physical end address |
+| IRQENABLE_SET | 0x60 | EOF0 (bit 8) for frame-complete interrupt |
+| CLKC_ENABLE | 0x6C | DMA_CLK (bit 2), CORE_CLK (bit 0) |
 
-The LCDC panel is landscape-native (no rotation needed, unlike the DISCO's portrait DSI
-panel rotated to landscape). This simplifies the coordinate pipeline.
+PRCM clock enable: `CM_PER_LCDC_CLKCTRL` at `0x44E0_0018`, MODULEMODE=0x2.
 
-### S4. CpuBlitter for rendering
-
-No hardware 2D accelerator on AM3358 (no DMA2D equivalent). All three prongs use
-`CpuBlitter` exclusively. The `BlitterRenderer<CpuBlitter, N>` path is already
-battle-tested on the simulator and UEFI backends.
-
-Star crawl effect needs a CPU-only path (currently gated on `feature = "dma2d"`).
-Factor the composition logic to work with CpuBlitter — this benefits all non-DMA2D
-targets.
-
-### S5. Example crate scaffold
-
-**New:** `examples/beaglebone-black/`
-
-```
-examples/beaglebone-black/
-├── Cargo.toml            # workspace member, feature-gated entry points
-├── src/
-│   ├── main.rs           # Linux entry (feature = "linux")
-│   ├── bare_metal.rs     # Bare-metal entry (feature = "bare_metal")
-│   ├── freertos_entry.rs # FreeRTOS preemptive task entry (feature = "freertos")
-│   ├── zephyr_entry.rs   # Zephyr staticlib entry (feature = "zephyr")
-│   ├── lib.rs            # Shared re-exports, panic handler, allocator
-│   ├── bsp/              # Board-specific code (shared across non-Linux prongs)
-│   │   ├── mod.rs
-│   │   ├── lcdc.rs       # LCDC timing constants + register driver
-│   │   └── pins.rs       # Pin assignments (cape header → AM3358 pad)
-│   └── bsp_generated/    # BSP generator output (bare-metal/FreeRTOS)
-├── freertos/             # FreeRTOS C glue (port layer, heap, ISR trampolines)
-├── zephyr/               # Zephyr app shell (C main, DTS overlay, prj.conf)
-├── assets/               # Shared splash/icons (symlink or copy from disco)
-└── README.md
-```
-
-**Cargo.toml features:**
-```toml
-[features]
-linux = ["std"]                    # Linux userspace (armv7-unknown-linux-gnueabihf)
-bare_metal = ["rlvgl-chips-ti"]    # no_std bare-metal (armv7a-none-eabi)
-freertos = ["bare_metal"]          # FreeRTOS tasks on bare-metal BSP
-zephyr = []                        # Zephyr staticlib (crate-type = ["staticlib"])
-splash = []
-```
-
-### S6. LCDC timing constants (shared BSP)
-
-Panel timing from NHD-7.0-800480AF-ASXP datasheet, consumed by all three prongs
-(Linux DTS overlay, Zephyr DTS, bare-metal LCDC register setup):
-
-```
-Resolution:  800 x 480
-Pixel clock: ~33.3 MHz (typ)
-HBP: 46,  HFP: 210, HSW: 20  (horizontal back porch, front porch, sync width)
-VBP: 23,  VFP: 22,  VSW: 10  (vertical)
-DE mode recommended (ST7277)
-Data clocked on DCLK falling edge
-```
-
-These values go in `bsp/lcdc.rs` as constants and are also used to generate the
-device tree snippets for Linux and Zephyr.
-
-### S7. Chipdb YAML for AM3358
-
-**New:** `chipdb/rlvgl-chips-ti/db/chips/am3358.yaml`
-
-Minimum viable content for display bring-up:
-- Memory map: L4_WKUP, L4_PER, OCMC, DDR (0x80000000)
-- PRCM clock gates: LCDC, I2C1/I2C2, GPIO0-3, UART0
-- CTRLMOD pad mux: LCD_DATA[0:23], LCD_VSYNC, LCD_HSYNC, LCD_PCLK, LCD_AC_BIAS_EN
-- LCDC peripheral: base 0x4830E000, IRQ 36
-- I2C instances: I2C0 (0x44E0B000), I2C1 (0x4802A000), I2C2 (0x4819C000)
-
-**New:** `chipdb/rlvgl-chips-ti/db/boards/beaglebone_black_nhd7.yaml`
-
-Pin assignments mapping cape header signals to AM3358 pads:
-- LCD_DATA[0:23] on expansion header P8 (pins 45-27, specific pad mapping)
-- LCD_VSYNC, LCD_HSYNC, LCD_PCLK, LCD_AC_BIAS_EN
-- I2C2_SDA/SCL for touch controller (P9.19/P9.20)
-- Backlight enable GPIO
-- Console: UART0 (P9.21/P9.22)
-
-This YAML is consumed by bare-metal BSP generation and serves as documentation
-for the Linux/Zephyr device tree overlays.
+Pin mux: CTRLMOD `conf_lcd_data0` at `0x44E1_08A0` through
+`conf_lcd_ac_bias_en` at `0x44E1_090C`. Mode 0 = LCD function.
 
 ---
 
-## Prong 1: Linux fbdev/DRM
+## SD Card Preparation
 
-**Target:** `armv7-unknown-linux-gnueabihf` (std, runs on Debian/Ubuntu on BBB)
+### Step 1: Download the Bookworm Image
 
-**Value:** Fastest path to pixels on panel. Validates display + touch hardware.
-Proves rlvgl as a lightweight embedded Linux GUI alternative.
-
-### L1. New platform backend: `LinuxFbdevDisplay`
-
-**File:** `platform/src/linux_fbdev.rs` (new, feature-gated on `linux_fbdev`)
-
-Implements `DisplayDriver`:
-- Open `/dev/fb0`, query `FBIOGET_VSCREENINFO` / `FBIOGET_FSCREENINFO`
-- mmap framebuffer
-- `screen()` → Screen from queried resolution
-- `flush(area, colors)` → write ARGB8888 pixels to mmap'd buffer
-  (with format conversion if panel is RGB565)
-- Optional: `FBIOPAN_DISPLAY` for double-buffering
-
-### L2. New input backend: `LinuxEvdevInput`
-
-**File:** `platform/src/linux_evdev.rs` (new, feature-gated on `linux_fbdev`)
-
-Implements `InputDevice`:
-- Open `/dev/input/eventN` (auto-detect touch device via `EVIOCGBIT`)
-- Parse `input_event` structs (EV_ABS for touch, EV_KEY for buttons)
-- Map ABS_MT_POSITION_X/Y → `Event::PointerDown/Up/Move`
-- Multi-touch: ABS_MT_SLOT + ABS_MT_TRACKING_ID → `Event::Touch`
-
-### L3. Linux entry point
-
-**File:** `examples/beaglebone-black/src/main.rs`
-
-Standard `fn main()`:
-1. Open fbdev display
-2. Open evdev input
-3. Create `DiscoController::new(screen, DiscoCapabilities::beaglebone_black())`
-4. Main loop: poll input → dispatch events → tick → render → flush
-5. Signal handling for clean shutdown
-
-### L4. Device tree overlay
-
-**File:** `examples/beaglebone-black/linux/BB-NHD7-CAPE.dts`
-
-- Enable LCDC with NHD panel timing
-- Disable HDMI (nxp,tda998x)
-- Configure I2C2 for FT5x06 touch
-- Pin mux for LCD_DATA[0:23] + sync signals
-- Backlight GPIO
-
-### L5. Build + run instructions
-
-Cross-compile on macOS/Linux host:
-```bash
-cross build --target armv7-unknown-linux-gnueabihf \
-  -p rlvgl-example-bbb --features linux --release
-```
-scp to BBB, load DT overlay, run.
-
----
-
-## Prong 2: Bare-Metal
-
-**Target:** `armv7a-none-eabi` (no_std, no OS)
-
-**Value:** Full register-level control. Extends BSP generator to TI/Sitara vendor.
-Exercises the LCDC from Rust with zero abstraction overhead. The LCDC driver and
-BSP code written here is reused directly by the FreeRTOS prong.
-
-### B1. TI BSP generator pipeline
-
-**New files in `src/bin/creator/bsp/ti/`:**
-```
-ti/
-├── mod.rs          # module index
-├── ir.rs           # TiChip, TiBoard, TiIr structs
-├── load.rs         # YAML → IR parsing, chip+board merge
-├── render.rs       # IR → Jinja template rendering
-└── templates/
-    ├── mod.rs.jinja
-    ├── pac.rs.jinja         # init() entry: clocks → pinmux → peripherals
-    ├── clocks.rs.jinja      # PRCM CM_PER/CM_WKUP MODULEMODE enables
-    ├── pinmux.rs.jinja      # CTRLMOD conf_* pad configuration
-    ├── peripherals.rs.jinja # LCDC, I2C, UART init sequences
-    └── board.rs.jinja       # Pin constants, clock frequencies
-```
-
-Wire `"ti" | "sitara"` into CLI vendor matching in `src/bin/creator/cli.rs`.
-
-### B2. AM3358 LCDC driver (bare-metal Rust)
-
-**File:** `examples/beaglebone-black/src/bsp/lcdc.rs` (hand-written, not generated)
-
-The LCDC is the critical peripheral. Bare-metal init sequence:
-1. PRCM: Enable LCDC module clock (CM_PER_LCDC_CLKSTCTRL)
-2. CTRLMOD: Mux LCD_DATA[0:23] + sync pins to Mode 0
-3. LCDC: Configure raster controller
-   - Set RASTER_CTRL for active matrix, 24-bit TFT
-   - Program timing registers (RASTER_TIMING_0/1/2) from S6 constants
-   - Set framebuffer base address in DMA (LCDDMA_FB0_BASE/CEILING)
-   - Enable raster, enable DMA
-4. Backlight GPIO enable
-
-### B3. DDR3L and boot
-
-This is the hardest part. Options:
-- **U-Boot handoff:** Use U-Boot SPL to init DDR3L + clocks, then chainload
-  bare-metal Rust ELF. U-Boot already does this for Linux. Pragmatic.
-- **Full bare-metal boot:** Write DDR3L EMIF controller init in Rust. Very hard,
-  fragile, rarely done outside TI's own ROM/SPL code.
-
-**Recommendation:** U-Boot SPL handoff for initial bring-up. Full boot is a
-stretch goal — the LCDC/touch/rendering work is the same either way.
-
-### B4. Bare-metal entry point
-
-**File:** `examples/beaglebone-black/src/bare_metal.rs`
-
-- `#[no_mangle] pub extern "C" fn main() -> !` (called from U-Boot or reset vector)
-- Set up MMU + caches (Cortex-A8 specific)
-- Init heap in DDR
-- Init LCDC, I2C, GPIO via generated BSP + hand-written LCDC driver
-- Create DiscoController
-- Main loop: poll touch → dispatch → tick → render → flush to LCDC framebuffer
-
-### B5. Linker script + flash/load
-
-- `memory.x` for AM3358 memory layout (DDR at 0x80000000, SRAM at 0x402F0400)
-- `Makefile` targets: `build-bbb`, `flash-bbb` (via JTAG or TFTP from U-Boot)
-
----
-
-## Prong 3: FreeRTOS
-
-**Target:** `armv7a-none-eabi` (no_std, FreeRTOS scheduler)
-
-**Value:** Preemptive task scheduling on the bare-metal BSP. Proven pattern from
-DISCO FreeRTOS (present/render/touch as separate tasks with semaphore-gated frame
-sync). Lighter than Zephyr — just adds a scheduler on top of the same LCDC driver
-and I2C touch code from Prong 2. Particularly valuable on the BBB since CPU-only
-rendering (no DMA2D) benefits from isolating the render pipeline in a lower-priority
-task that can be preempted by touch and present.
-
-### F1. FreeRTOS port layer for Cortex-A8
-
-**Dir:** `examples/beaglebone-black/freertos/`
-
-FreeRTOS has an official Cortex-A port (`portable/GCC/ARM_CA8_AM335x/`
-in the FreeRTOS-Kernel repo) that uses:
-- SVC/IRQ mode switching for context save/restore
-- Timer interrupt (DMTIMER) for tick
-- GIC (or direct INTC on AM335x) for interrupt routing
-
-Integrate as C sources linked into the Rust staticlib, same pattern as
-`examples/stm32h747i-disco/freertos/`.
-
-### F2. FreeRTOS task model
-
-Same architecture as DISCO FreeRTOS (`freertos_entry.rs`):
-
-| Task | Priority | Stack | Blocks on |
-|------|----------|-------|-----------|
-| present | 3 | 2 KB | LCDC end-of-frame IRQ sem |
-| render | 1 | 8 KB | render-request sem |
-| touch | 2 | 1 KB | periodic timer (120 Hz) |
-
-The LCDC end-of-frame interrupt replaces the DISCO's DSI ERIF as the
-present-gate signal. Touch reads FT5x06 via I2C2 (same `Ft5336` driver).
-
-### F3. FreeRTOS entry point
-
-**File:** `examples/beaglebone-black/src/freertos_entry.rs`
-
-Same pattern as DISCO:
-- Init BSP (LCDC, I2C, GPIO) using bare-metal code from Prong 2
-- Create FreeRTOS tasks with `xTaskCreate`
-- Create semaphores for frame sync (`erif_sem`, `render_sem`, `dma_done_sem`)
-- Call `vTaskStartScheduler()`
-- DiscoController owned by render task, commands drained each frame
-
-### F4. ISR routing
-
-- LCDC end-of-frame → `xSemaphoreGiveFromISR(erif_sem)`
-- Touch timer → `xSemaphoreGiveFromISR(touch_sem)`
-- NVIC/INTC priorities set so ISRs don't call FreeRTOS API above
-  `configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY`
-
-### F5. Build instructions
+The BBB needs Debian 12 (Bookworm) with kernel 6.12.x — this kernel has
+`tilcdc` and `panel-simple` built-in (`=y`, not modules).
 
 ```bash
-RUSTFLAGS="-C target-cpu=cortex-a8" \
-cargo build \
-  --target armv7a-none-eabi \
-  -p rlvgl-example-bbb \
-  --features freertos
+curl -L -o /tmp/bbb-bookworm.img.xz \
+  "https://files.beagle.cc/file/beagleboard-public-2021/images/am335x-debian-12.13-base-v6.12-armhf-2026-03-17-4gb.img.xz"
 ```
 
----
+### Step 2: Flash to microSD
 
-## Prong 4: Zephyr RTOS
-
-**Target:** Zephyr application for `am335x_bone_black` board
-
-**Value:** Full RTOS ecosystem with device tree, driver model, and input subsystem.
-Proven staticlib integration pattern from DISCO. Tests rlvgl Zephyr on Cortex-A
-(vs Cortex-M on DISCO). Most unknowns of any prong due to Zephyr's Cortex-A8
-maturity (MMU, cache management, LCDC driver availability).
-
-### Z1. Zephyr project scaffold
-
-**Dir:** `examples/beaglebone-black/zephyr/`
-
-```
-zephyr/
-├── CMakeLists.txt      # staticlib linkage
-├── prj.conf            # CONFIG_DISPLAY, CONFIG_INPUT, CONFIG_FT5336
-├── boards/
-│   └── am335x_bone_black.overlay   # LCDC + cape DTS overlay
-├── src/
-│   └── main.c          # k_thread_create → rlvgl_init()
-└── Kconfig             # optional board-specific configs
+```bash
+diskutil unmountDisk /dev/diskN          # Replace N with your SD card
+xzcat /tmp/bbb-bookworm.img.xz | sudo dd of=/dev/rdiskN bs=4m
+sync
 ```
 
-### Z2. LCDC display driver (Zephyr)
+### Step 3: Configure Credentials
 
-Zephyr's AM335x support may not include an LCDC display driver. If missing:
-- Write `drivers/display/display_am335x_lcdc.c` (or contribute upstream)
-- Implements Zephyr `display_driver_api` (write, read, get_capabilities, blanking)
-- Configure LCDC raster mode with panel timing from DTS
-- Framebuffer in DDR
+After flashing, the SD card's boot partition mounts as `BOOT` on macOS.
+Edit `sysconf.txt` to set the username, password, and SSH key:
 
-If exists but incomplete, extend for 24-bit RGB + DE mode.
+```
+user_name=debian
+user_password=YourPasswordHere
+user_authorized_key=ssh-rsa AAAA... you@host
+```
 
-### Z3. Zephyr staticlib entry
+This avoids the broken SSH forced-password-change flow on Bookworm.
 
-**File:** `examples/beaglebone-black/src/zephyr_entry.rs`
+### Step 4: Disable eMMC Boot (One-Time)
 
-Same pattern as DISCO Zephyr:
-- `extern "C" fn rlvgl_init(display_info: *const DisplayInfo)`
-- Create DiscoController with BBB capabilities
-- Spawn render/present threads via Zephyr `k_thread` wrappers
-- Touch input via Zephyr input subsystem callback
+Boot the BBB **without** the cape from the SD card (hold S2 during power-on).
+Once booted, SSH in and zero the eMMC SPL so the ROM bootloader falls
+through to SD automatically:
 
-### Z4. Touch via Zephyr input subsystem
+```bash
+# The SPL lives at raw sector 256 (offset 0x20000) on the eMMC
+echo "$PASSWORD" | sudo -S dd if=/dev/zero of=/dev/mmcblk1 bs=512 seek=256 count=64
+```
 
-Zephyr has FT5336 driver (`drivers/input/input_ft5336.c`). The FT5x06 on the cape
-is register-compatible. Configure via DTS:
+After this, the BBB boots from SD without holding S2. To restore eMMC
+boot, reflash the eMMC with the BB imager tool.
+
+### Step 5: Patch the DTB for LCD Output
+
+The stock DTB wires the LCDC to the HDMI bridge (TDA19988). We need to:
+1. Disable the TDA19988
+2. Add a panel node with our timing
+3. Add LCD pin mux
+4. Wire the LCDC endpoint to the panel
+
+**Important:** The correct DTB filename on Bookworm is
+`am335x-boneblack-uboot.dtb` (not `am335x-boneblack.dtb`, which doesn't
+exist in this image).
+
+**Important:** The `bbbio-set-sysconf` service runs on first boot and
+reinstalls DTBs from the kernel package. Patch the DTB **after** first
+boot completes (the service shows `inactive dead`).
+
+Use `fdtoverlay` to apply a compiled overlay to the binary DTB — this
+avoids the broken phandle references that `dtc` decompile/recompile
+introduces:
+
+```bash
+# On the BBB:
+KVER=$(uname -r)
+DTB=/boot/dtbs/$KVER/am335x-boneblack-uboot.dtb
+cp $DTB ${DTB}.orig
+
+# Disable HDMI bridge
+fdtput -t s $DTB \
+  /ocp/interconnect@44c00000/segment@200000/target-module@b000/i2c@0/tda19988@70 \
+  status "disabled"
+
+# Compile and apply the LCD overlay
+dtc -I dts -O dtb -o /tmp/lcd.dtbo -@ /path/to/lcd-overlay.dts
+fdtoverlay -i $DTB -o ${DTB}.new /tmp/lcd.dtbo
+mv ${DTB}.new $DTB
+
+# Add missing properties that panel-simple requires
+fdtput -t i $DTB /panel connector-type 14    # DRM_MODE_CONNECTOR_DPI
+fdtput -t i $DTB /panel bus-format 0x1013    # MEDIA_BUS_FMT_RGB888_1X24
+```
+
+The overlay DTS (`tools/patch-dtb-lcd.sh` automates this):
+
 ```dts
-&i2c2 {
-    ft5x06@38 {
-        compatible = "focaltech,ft5336";
-        reg = <0x38>;
-        int-gpios = <&gpio1 PIN GPIO_ACTIVE_LOW>;
+/dts-v1/;
+/plugin/;
+
+&{/} {
+    panel {
+        compatible = "innolux,at070tn92";  /* 800x480, timing-compatible */
+        status = "okay";
+        port {
+            panel_in: endpoint {
+                remote-endpoint = <&lcdc_0>;
+            };
+        };
+    };
+};
+
+&lcdc {
+    pinctrl-names = "default";
+    pinctrl-0 = <&bb_lcd_pins>;
+    port {
+        lcdc_0: endpoint@0 {
+            remote-endpoint = <&panel_in>;
+        };
+    };
+};
+
+&am33xx_pinmux {
+    bb_lcd_pins: bb-lcd-pins {
+        pinctrl-single,pins = <
+            0x0a0 0x08 0x0a4 0x08 0x0a8 0x08 0x0ac 0x08  /* lcd_data0-3 */
+            0x0b0 0x08 0x0b4 0x08 0x0b8 0x08 0x0bc 0x08  /* lcd_data4-7 */
+            0x0c0 0x08 0x0c4 0x08 0x0c8 0x08 0x0cc 0x08  /* lcd_data8-11 */
+            0x0d0 0x08 0x0d4 0x08 0x0d8 0x08 0x0dc 0x08  /* lcd_data12-15 */
+            0x0e0 0x08 0x0e4 0x08 0x0e8 0x08 0x0ec 0x08  /* lcd_data16-19 */
+            0x0f0 0x08 0x0f4 0x08 0x0f8 0x08 0x0fc 0x08  /* lcd_data20-23 */
+            0x100 0x08 0x104 0x08 0x108 0x08 0x10c 0x08  /* vsync,hsync,pclk,ac_bias */
+        >;
     };
 };
 ```
 
-### Z5. Build instructions
+### Step 6: Verify Display Bring-Up
+
+After rebooting with the patched DTB and cape attached:
 
 ```bash
-west build -b am335x_bone_black examples/beaglebone-black/zephyr
-west flash
+ls /dev/fb0                           # Framebuffer device should exist
+cat /sys/class/drm/card0-DPI-1/status # Should say "connected"
+cat /sys/class/drm/card0-DPI-1/modes  # Should say "800x480"
+dmesg | grep tilcdc                   # Should show fb0 initialization
+```
+
+If the kernel DRM path doesn't cooperate (tilcdc endpoint wiring issues),
+the fallback is direct LCDC register programming via `/dev/mem` — see
+the "Direct LCDC via /dev/mem" section below.
+
+### Step 7: Test Pixels
+
+```bash
+dd if=/dev/urandom of=/dev/fb0 bs=768000 count=1  # Random noise (RGB565)
+```
+
+You should see colorful static on the display.
+
+---
+
+## Direct LCDC via /dev/mem (Fallback / All-Prong Foundation)
+
+If the kernel DRM driver doesn't produce `/dev/fb0`, or for the bare-metal
+and FreeRTOS prongs, we program the LCDC registers directly. This is the
+**same register sequence** used by all four prongs — validating it on Linux
+via `/dev/mem` first gives us confidence for bare-metal.
+
+The init sequence (from `bsp/lcdc.rs` and `bsp/am335x.rs`):
+
+```
+1. PRCM:  CM_PER_LCDC_CLKSTCTRL = 0x2 (SW_WKUP)
+          CM_PER_LCDC_CLKCTRL = 0x2 (MODULEMODE_ENABLE)
+          Poll IDLEST until 0x0
+
+2. PINMUX: conf_lcd_data[0:23] = 0x08 (Mode 0, pull disabled, output)
+           conf_lcd_vsync/hsync/pclk/ac_bias = 0x08
+
+3. LCDC:  CLKC_ENABLE = 0x07 (DMA + Core)
+          LCD_CTRL = 0x0201 (raster mode, clkdiv=2 → ~33 MHz)
+          RASTER_CTRL = TFT | TFT24 | UNPACKED | PALMODE_DATA_ONLY
+          RASTER_TIMING_0 = encode(HBP=46, HFP=210, HSW=20, PPL=800)
+          RASTER_TIMING_1 = encode(VBP=23, VFP=22, VSW=10, LPP=480)
+          RASTER_TIMING_2 = IPC (falling edge)
+          LCDDMA_CTRL = burst 16, single FB
+          LCDDMA_FB0_BASE = framebuffer physical address
+          LCDDMA_FB0_CEILING = base + (800*480*4) - 4
+          IRQENABLE_SET = EOF0 (bit 8)
+          RASTER_CTRL |= LCDEN (bit 0) — START (must be last)
+```
+
+A Python script using `/dev/mem` and `mmap` can execute this sequence
+from Linux userspace to prove pixels before the Rust binary is ready.
+See `tools/lcdc-test.py` (to be written).
+
+---
+
+## Software Architecture
+
+### The Four Prongs
+
+| Prong | Feature | Target | Display Driver | Status |
+|-------|---------|--------|---------------|--------|
+| Linux | `linux` | armv7-unknown-linux-gnueabihf | `/dev/mem` LCDC or `/dev/fb0` | SD card boots, SSH works |
+| Bare-metal | `bare_metal` | armv7a-none-eabihf | Direct LCDC registers | Scaffold compiles |
+| FreeRTOS | `freertos` | armv7a-none-eabihf | Same + preemptive tasks | Scaffold compiles |
+| Zephyr | `zephyr` | Zephyr west build | Zephyr display API | Scaffold compiles |
+
+All four share the same LCDC register definitions (`bsp/am335x.rs`),
+timing constants (`bsp/lcdc.rs`), and the same `DiscoController` widget
+tree from `rlvgl-app-disco-demo`.
+
+### Crate Structure
+
+```
+examples/beaglebone-black/
+├── Cargo.toml             # features: linux, bare_metal, freertos, zephyr
+├── build.rs               # linker script + FreeRTOS C compilation
+├── memory.x               # DDR @ 0x80000000 (bare-metal)
+├── src/
+│   ├── main.rs            # Linux entry (DiscoController + fbdev/devmem)
+│   ├── bare_metal.rs      # no_std entry (PRCM → pinmux → LCDC → loop)
+│   ├── freertos_entry.rs  # present/render/touch tasks
+│   ├── freertos_sync.rs   # Semaphore FFI wrappers
+│   ├── zephyr_entry.rs    # rlvgl_init() + input callbacks
+│   ├── zephyr_sync.rs     # k_sem FFI
+│   └── bsp/
+│       ├── am335x.rs      # Hand-written PAC (PRCM, CTRLMOD, LCDC, I2C, GPIO)
+│       ├── lcdc.rs        # Panel timing + raster init
+│       ├── prcm.rs        # Clock enable helpers
+│       └── pinmux.rs      # LCD + I2C2 pin configuration
+├── freertos/              # FreeRTOS C glue (config, shims, stubs)
+├── zephyr/                # Zephyr app shell (CMake, prj.conf, main.c, DTS)
+├── linux/                 # Device tree overlay source
+└── tools/
+    ├── setup-bbb.sh       # First-time eMMC password + SSH key setup
+    ├── prepare-sd.sh      # Flash Bookworm image + configure sysconf.txt
+    └── patch-dtb-lcd.sh   # Patch DTB with panel + pinmux + HDMI disable
 ```
 
 ---
 
-## Dependency Graph
+## Lessons Learned (Hardware Bring-Up Log)
 
-```
-                    ┌─────────────────────────────────┐
-                    │  S1-S7: Shared Work              │
-                    │  (capabilities, screen, touch,   │
-                    │   blitter, scaffold, chipdb)     │
-                    └──────────┬──────────────────────┘
-                               │
-         ┌─────────────────────┼─────────────────────┐
-         ▼                     ▼                     ▼
-┌─────────────────┐   ┌──────────────────┐   ┌──────────────┐
-│ Prong 1: Linux  │   │ Prong 2:         │   │ Prong 4:     │
-│ L1-L5           │   │ Bare-metal       │   │ Zephyr       │
-│                 │   │ B1-B5            │   │ Z1-Z5        │
-│ Fastest to      │   │                  │   │              │
-│ screen; no BSP  │   │ LCDC driver +    │   │ Needs LCDC   │
-│ gen needed      │   │ chipdb + BSP gen │   │ Zephyr driver│
-└────────┬────────┘   └────────┬─────────┘   └──────────────┘
-         │                     │
-         │              ┌──────┴──────┐
-         │              ▼             │
-         │     ┌──────────────────┐   │
-         │     │ Prong 3:         │   │
-         │     │ FreeRTOS         │   │
-         │     │ F1-F5            │   │
-         │     │                  │   │
-         │     │ Adds preemptive  │   │
-         │     │ tasks on top of  │   │
-         │     │ bare-metal BSP   │   │
-         │     └──────────────────┘   │
-         │                            │
-         ▼                            ▼
-    ┌──────────────────────────────────────────────┐
-    │  Same DiscoController + widget tree           │
-    │  Same CpuBlitter + BlitterRenderer            │
-    │  Same FT5x06 touch (reuse ft5336.rs)          │
-    │  Same 800x480 Screen, same app as DISCO/sim   │
-    └──────────────────────────────────────────────┘
-```
+### What Worked
 
-## Sequencing
+- **Cape detection:** U-Boot reads the cape EEPROM and identifies
+  `BB-BONE-NH7C-01` automatically.
+- **Panel-simple driver:** Probes successfully with `innolux,at070tn92`
+  compatible string when the panel DT node is present.
+- **fdtoverlay:** Reliable way to add nodes to binary DTB without
+  breaking phandle cross-references (unlike dtc decompile/recompile).
+- **fdtput:** Adds/modifies individual properties in binary DTB.
+- **Backlight:** Cape's backlight circuit works immediately with 5V barrel
+  jack power — no GPIO enable needed.
+- **Pin mux via /dev/mem:** Python script can read and write CTRLMOD pad
+  registers directly. Mode 0 confirmed to set LCD function.
 
-| Phase | Work | Depends On | Unlocks |
-|-------|------|-----------|---------|
-| **Phase 0** | S1-S4: Capabilities, Screen, touch reuse audit, CpuBlitter star crawl | Nothing | All prongs |
-| **Phase 1** | S5-S6: Crate scaffold + LCDC timing constants | Phase 0 | All prongs |
-| **Phase 2a** | L1-L5: Linux fbdev backend + entry point | Phase 1 | Hardware validation |
-| **Phase 2b** | S7: AM3358 chipdb YAML | Phase 1 | Prongs 2-4 |
-| **Phase 3** | B1-B5: BSP generator + bare-metal LCDC + U-Boot boot | Phase 2a (validates HW), Phase 2b | Bare-metal demo, unlocks FreeRTOS |
-| **Phase 4** | F1-F5: FreeRTOS port + preemptive task model | Phase 3 (reuses BSP) | FreeRTOS demo |
-| **Phase 5** | Z1-Z5: Zephyr project + LCDC driver | Phase 2a, Phase 2b | Zephyr demo |
+### What Didn't Work
 
-Linux goes first because it validates the hardware with minimal software investment.
-Bare-metal follows because the LCDC register driver and BSP code it produces are
-reused directly by FreeRTOS. FreeRTOS adds preemptive task scheduling on top of the
-same BSP — a lighter step than Zephyr. Zephyr is last because its Cortex-A8 support
-has the most unknowns (MMU gaps, uncertain LCDC driver availability).
+- **U-Boot DT overlays:** Overlays with `port`/`endpoint` nodes crash
+  U-Boot on this Bookworm image. The board hangs during overlay
+  application with no serial output. Symptom: 4 solid blue LEDs, no
+  heartbeat, no USB enumeration.
 
----
+- **dtc round-trip:** Decompiling a DTB to DTS, editing, and recompiling
+  breaks phandle references. The resulting DTB has missing or incorrect
+  cross-references. Symptom: LCDC shows `status = "disabled"` in the
+  live DT even though the file looks correct.
 
-## What Stays Compatible With Other Targets
+- **eMMC boot with LCD pin mux:** Setting LCD_DATA[0:7] to Mode 0
+  kills eMMC access because these pins are shared with MMC1 data bus.
+  The board appears to brick (no USB, no serial, no network). Recovery
+  requires booting from microSD.
 
-| Component | BBB (all 4) | DISCO | ESP32 | Simulator |
-|-----------|-------------|-------|-------|-----------|
-| DiscoController | beaglebone_black() | stm32h747i_disco() | N/A (too small) | simulator() |
-| Widget tree | Same | Same | Different (128x64) | Same |
-| Blitter | CpuBlitter | Dma2dBlitter | CpuBlitter | WgpuBlitter |
-| Touch driver | FT5x06 (= FT5336) | FT5336 | N/A | Mouse |
-| Screen | 800x480 Deg0 | 800x480 Deg0* | 128x64 | 800x480 |
-| App crate | disco-demo | disco-demo | N/A | demo or disco-demo |
-| FreeRTOS | Cortex-A8 port | Cortex-M7 port | N/A | N/A |
+- **Panel-simple connector_type:** Kernel 6.12.76-bone50 requires
+  `connector-type = <14>` (DRM_MODE_CONNECTOR_DPI) in the panel DT node.
+  Without it, panel-simple logs "Specify missing connector_type" and
+  tilcdc fails to create a DRM card.
 
-*DISCO is physically portrait, rotated to landscape in software.
+- **Wrong DTB filename:** The Bookworm image uses
+  `am335x-boneblack-uboot.dtb`, not `am335x-boneblack.dtb` (which
+  doesn't exist). Patching the wrong file wastes a reboot cycle.
 
-### Cross-platform parity (DISCO vs BBB)
+- **bbbio-set-sysconf overwrites DTBs:** On first boot, this service
+  processes `sysconf.txt` and reinstalls DTBs from the kernel package.
+  Any DTB patches applied before first boot are lost.
 
-The DISCO supports bare-metal, FreeRTOS, and Zephyr. The BBB adds Linux and
-targets all four. The same `DiscoController` + command queue pattern is used
-everywhere. Platform differences are isolated to:
+- **Debian 13 (Trixie) kernel:** The Trixie SD image (6.19-bone) has
+  `panel-simple` as a module with an empty device table. The
+  `innolux,at070tn92` compatible string is not in the module's
+  `MODULE_DEVICE_TABLE`, so the panel never auto-matches. Stick with
+  Bookworm (6.12) where panel-simple is built-in with the full table.
 
-- **Display driver:** LTDC+DSI (DISCO) vs LCDC parallel RGB (BBB) vs fbdev (Linux)
-- **Touch transport:** I2C4 (DISCO) vs I2C2 (BBB) vs evdev (Linux)
-- **Frame sync:** DSI ERIF (DISCO) vs LCDC EOF IRQ (BBB bare-metal/FreeRTOS)
-- **Scheduler:** cortex-m-rt (DISCO bare-metal) vs Cortex-A8 reset (BBB bare-metal)
-- **Task model:** SVC/PendSV (DISCO FreeRTOS) vs SVC/IRQ mode (BBB FreeRTOS)
+### Recovery Procedure
+
+When the BBB is bricked (no USB, no network, solid LEDs):
+
+1. Power off (unplug everything)
+2. Insert the rescue microSD (Bookworm or Trixie image)
+3. Hold S2 (boot button near SD slot) while applying power
+4. Boot from SD — SSH at 192.168.6.2 (Bookworm) or 192.168.7.2 (Trixie)
+5. Mount eMMC: `sudo mount /dev/mmcblk1p3 /mnt`
+6. Fix uEnv.txt: comment out broken overlay/DTB lines
+7. Unmount and reboot without SD
 
 ---
 
-## Documentation
+## Roadmap
 
-This plan of plans is maintained as a durable reference in the repo:
+### Phase 0: Shared Work ✅
 
-**File:** `docs/BEAGLEBONE-BLACK.md`
+- [x] DiscoCapabilities::beaglebone_black() preset
+- [x] FT5x06 touch driver compatibility confirmed
+- [x] Screen configuration (800x480, Deg0, landscape-native)
+- [x] CpuBlitter rendering path
 
-This mirrors how the DISCO has `docs/STM32H747I-DISCO.md` plus per-platform guide
-directories (`docs/disco-freertos-guide/`, `docs/disco-zephyr-guide/`, etc.). As each
-prong matures, it will get its own guide directory:
+### Phase 1: Scaffold ✅
 
-- `docs/bbb-linux-guide/` — Linux fbdev bring-up, DT overlay, cross-compile
-- `docs/bbb-bare-metal-guide/` — BSP generation, U-Boot handoff, JTAG debug
-- `docs/bbb-freertos-guide/` — FreeRTOS Cortex-A8 port, task model, frame sync
-- `docs/bbb-zephyr-guide/` — Zephyr west build, LCDC driver, touch config
+- [x] Example crate with Linux, bare-metal, FreeRTOS, Zephyr features
+- [x] LCDC timing constants
+- [x] AM3358 register map (hand-written PAC)
+- [x] PRCM, pin mux, LCDC driver modules
+- [x] Linker script, build.rs, FreeRTOS config
+- [x] Zephyr CMakeLists, prj.conf, main.c, DTS overlay
 
-The initial commit of this plan creates `docs/BEAGLEBONE-BLACK.md` as a copy of
-the plan of plans. It evolves as work progresses.
+### Phase 2: Hardware Bring-Up (In Progress)
 
----
+- [x] SD card preparation (Bookworm 6.12 image)
+- [x] First boot, SSH access, password configuration
+- [x] eMMC boot disabled (SD is default)
+- [x] Cape detected (BB-BONE-NH7C-01 EEPROM)
+- [x] DTB patched (panel node, HDMI disabled, pin mux)
+- [x] Panel-simple driver probes panel node
+- [x] Backlight confirmed (visible glow)
+- [ ] **Pixels on screen** ← next: /dev/mem LCDC driver
+- [ ] Touch input via I2C2
 
-## Verification Strategy
+### Phase 3: Linux Prong
 
-Each prong has its own verification, but the **cross-prong check** is:
+- [ ] /dev/mem LCDC init from userspace (Python proof, then Rust)
+- [ ] Framebuffer mmap + pixel writes
+- [ ] Cross-compile rlvgl-bbb and deploy
+- [ ] DiscoController rendering on hardware
+- [ ] Touch input (evdev or direct I2C)
 
-1. **Visual parity:** Same widget tree renders identically on BBB Linux, BBB bare-metal,
-   BBB FreeRTOS, BBB Zephyr, DISCO, and desktop simulator. Use `playit` framebuffer
-   dump (`D` command) or screenshot comparison.
+### Phase 4: Bare-Metal + FreeRTOS
 
-2. **Touch parity:** Tap on settings icon → wing opens on all platforms. Touch
-   coordinates map correctly (no rotation confusion since BBB is landscape-native).
+- [ ] U-Boot chainload bare-metal ELF
+- [ ] LCDC register init (same sequence, no Linux)
+- [ ] FreeRTOS task model (present/render/touch)
+- [ ] DiscoController integration
 
-3. **App compatibility:** `DiscoController` compiles and links for all targets without
-   `#[cfg]` divergence. Capability differences are runtime, not compile-time.
+### Phase 5: Zephyr
 
-4. **Regression:** Existing targets (DISCO bare-metal, FreeRTOS, Zephyr, simulator)
-   continue to pass pre-publish validation after shared code changes (S1-S4).
+- [ ] Zephyr board support for AM335x LCDC
+- [ ] Staticlib integration
+- [ ] Touch via Zephyr input subsystem
