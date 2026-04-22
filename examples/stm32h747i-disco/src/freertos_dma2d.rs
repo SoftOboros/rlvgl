@@ -33,6 +33,8 @@
 
 use rlvgl_platform::blit::{BlitCaps, Blitter, Rect, Surface};
 use rlvgl_platform::dma2d::Dma2dBlitter;
+use rlvgl_platform::hwcore::addr::PhysAddr;
+use rlvgl_platform::hwcore::surface::{BackBuffer, FrameBuffer};
 
 use crate::freertos_sync::{self, SemaphoreHandle_t, pdTRUE};
 
@@ -121,13 +123,45 @@ impl Blitter for FreeRtosDma2dBlitter {
         }
         let w = (ex - sx) as u32;
         let h = (ey - sy) as u32;
+        let _ = bpp; // pixel size is rederived inside `start_fill_typed`.
 
-        let offset = sy * dst.stride + sx * bpp;
-        let dst_ptr = unsafe { dst.buf.as_mut_ptr().add(offset) };
-
-        self.inner
-            .start_fill_raw(dst_ptr, dst.stride as u32, w, h, color, dst.format);
+        // SAFETY: `dst.buf` is a `&mut [u8]` reborrowed by the caller for
+        // the duration of `fill`. We synthesize a transient
+        // `FrameBuffer` over its base pointer so `start_fill_typed` can
+        // apply the typed borrow contract; the `BackBuffer<'_>` lives
+        // only across the typed call and `into_borrow` returns the
+        // reborrow before this method exits, restoring `dst.buf` for
+        // the caller.
+        let mut fb = unsafe {
+            FrameBuffer::from_phys(
+                PhysAddr::new(dst.buf.as_mut_ptr() as u32),
+                dst.width,
+                dst.height,
+                dst.stride as u32,
+                dst.format,
+            )
+        };
+        let mut back = BackBuffer::wrap(&mut fb);
+        let inflight = self.inner.start_fill_typed(
+            back.dma_dst(),
+            Rect {
+                x: sx as i32,
+                y: sy as i32,
+                w,
+                h,
+            },
+            color,
+        );
+        let _ = inflight.into_borrow();
         self.wait_for_tc();
+        // Drain the M7 write queue before returning so the compositor's
+        // next read sees the DMA2D fill — without this the migrated
+        // typed-API path showed residual crawl content over the desktop
+        // when star_crawl deactivated. The original raw `start_fill_raw`
+        // was structurally similar but went through fewer stack frames;
+        // the explicit barrier makes the post-fill memory state
+        // observable regardless of how the borrow chain unwinds.
+        cortex_m::asm::dsb();
     }
 
     fn blit(&mut self, src: &Surface, src_area: Rect, dst: &mut Surface, dst_pos: (i32, i32)) {

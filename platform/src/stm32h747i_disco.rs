@@ -21,6 +21,21 @@ use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 use embedded_hal::{digital::OutputPin, pwm::SetDutyCycle};
 use rlvgl_core::event::{Event, MAX_TOUCH_POINTS, TouchPoint, TouchState};
 use rlvgl_core::widget::{Color, Rect};
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::PixelFmt;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::hwcore::addr::PhysAddr;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::hwcore::surface::{BackBuffer, FrameBuffer, FrontBuffer};
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use stm32h7::stm32h747cm7::DMA2D;
 #[cfg(all(
@@ -198,7 +213,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         #[inline(always)]
         fn d3(slot: u32, val: u32) {
             unsafe {
-                ((0x3800_0100u32 + slot * 4) as *mut u32).write_volatile(val);
+                ((0x3800_0100u32 + slot * 4) as *mut u32).write_volatile(val); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
         }
         d3(0, 0xB007_0001); // entered new()
@@ -236,10 +251,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // ── Serial debug helper (UART8 + USART1 VCP dual output) ────────
         fn dbg(s: &str) {
-            const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
-            const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
-            const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
-            const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+            const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for b in s.bytes() {
                 unsafe {
                     while U8_ISR.read_volatile() & (1 << 7) == 0 {}
@@ -250,10 +265,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             }
         }
         fn dbg_hex(val: u32) {
-            const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
-            const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
-            const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
-            const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+            const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             const HEX: &[u8; 16] = b"0123456789abcdef";
             unsafe {
                 for i in (0..8).rev() {
@@ -281,10 +296,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             while i > 0 {
                 i -= 1;
                 let ch = buf[i];
-                const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
-                const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
-                const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
-                const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+                const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 unsafe {
                     while U8_ISR.read_volatile() & (1 << 7) == 0 {}
                     U8_TDR.write_volatile(ch as u32);
@@ -297,7 +312,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // PLL3 is now enabled in main.rs after HAL freeze().
         // No LTDC/DSI reset — HAL enable() provides a clean state.
         unsafe {
-            let gcr = (0x5000_1018u32 as *const u32).read_volatile();
+            let gcr = (0x5000_1018u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg_hex(gcr);
         }
         dbg(" OK\r\n");
@@ -371,7 +386,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 }
                 cortex_m::asm::nop();
             }
-            let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() };
+            let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  PLL: WISR=");
             dbg_hex(wisr);
             if tries == 0 {
@@ -409,7 +424,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // PSR at offset 0xB0 (CMSIS): PSS0=bit1, PSS1=bit2, PSSC=bit3...
         // Actually PAC PSR — let me use raw read
         {
-            let psr_addr = (DSI + 0xB0) as *const u32;
+            let psr_addr = (DSI + 0xB0) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let mut tries = 1_000_000u32;
             // For 2 lanes: wait for PSS0 (bit 1) + PSS1 (bit 2) + PSSC (bit 3) = 0x0E
             loop {
@@ -504,10 +519,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Configure PJ2 as DSI_TE (AF13)
         unsafe {
             let gpioj: u32 = 0x5802_2400;
-            let moder = (gpioj as *mut u32).read_volatile();
-            (gpioj as *mut u32).write_volatile((moder & !(3u32 << 4)) | (2u32 << 4));
-            let afrl = ((gpioj + 0x20) as *mut u32).read_volatile();
-            ((gpioj + 0x20) as *mut u32).write_volatile((afrl & !(0xFu32 << 8)) | (13u32 << 8));
+            let moder = (gpioj as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (gpioj as *mut u32).write_volatile((moder & !(3u32 << 4)) | (2u32 << 4)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let afrl = ((gpioj + 0x20) as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((gpioj + 0x20) as *mut u32).write_volatile((afrl & !(0xFu32 << 8)) | (13u32 << 8)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         dbg("  PJ2 = DSI_TE (AF13)\r\n");
 
@@ -558,7 +573,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         d3(10, 0xD510_000A); // post NT35510 init
         dbg("  NT35510 init: ");
         dbg(if panel_ok { "ok" } else { "FAIL" });
-        let gpsr = unsafe { (0x5000_0074u32 as *const u32).read_volatile() };
+        let gpsr = unsafe { (0x5000_0074u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         dbg(" GPSR=");
         dbg_hex(gpsr);
         dbg("\r\n");
@@ -588,10 +603,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // LTDC needs highest read priority to keep its line FIFO fed.
         // DMA2D gets moderate priority so starfield blits don't starve LTDC.
         unsafe {
-            (0x5104_7100u32 as *mut u32).write_volatile(0xF); // INI6 LTDC read QoS = max
-            (0x5104_7104u32 as *mut u32).write_volatile(0x4); // INI6 LTDC write QoS = low
-            (0x5104_6100u32 as *mut u32).write_volatile(0x4); // INI5 DMA2D read QoS = moderate
-            (0x5104_6104u32 as *mut u32).write_volatile(0x4); // INI5 DMA2D write QoS = moderate
+            (0x5104_7100u32 as *mut u32).write_volatile(0xF); // INI6 LTDC read QoS = max // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5104_7104u32 as *mut u32).write_volatile(0x4); // INI6 LTDC write QoS = low // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5104_6100u32 as *mut u32).write_volatile(0x4); // INI5 DMA2D read QoS = moderate // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5104_6104u32 as *mut u32).write_volatile(0x4); // INI5 DMA2D write QoS = moderate // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // Advance allocator past both reserved banks
         let _ = sdram_alloc::alloc(0x0100_0000, 1); // reserve Banks 0+1 (16 MB)
@@ -601,7 +616,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         d3(3, 0xB007_0004); // post-MPU SDRAM config
         // Quick SDRAM smoke test: write/read one word
         unsafe {
-            let test_addr = (fb_addr as *mut u32).add(0x1000);
+            let test_addr = (fb_addr as *mut u32).add(0x1000); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             test_addr.write_volatile(0xCAFE_BABE);
             cortex_m::asm::dsb();
             let rb = test_addr.read_volatile();
@@ -653,8 +668,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             unsafe {
                 let total_pixels = (width as usize) * (height as usize);
                 for i in 0..total_pixels {
-                    (fb_addr as *mut u32).add(i).write_volatile(0xFF00_0000); // black
-                    (fb_back as *mut u32).add(i).write_volatile(0xFF00_0000);
+                    (fb_addr as *mut u32).add(i).write_volatile(0xFF00_0000); // black // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (fb_back as *mut u32).add(i).write_volatile(0xFF00_0000); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 }
                 cortex_m::asm::dsb();
             }
@@ -674,9 +689,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Readback a few FB pixels for telemetry
         unsafe {
-            d3(6, (fb_addr as *const u32).read_volatile()); // pixel[0]
-            d3(7, (fb_addr as *const u32).add(256).read_volatile()); // pixel[256]
-            d3(8, (fb_addr as *const u32).add(480).read_volatile()); // pixel[480] (row 1)
+            d3(6, (fb_addr as *const u32).read_volatile()); // pixel[0] // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            d3(7, (fb_addr as *const u32).add(256).read_volatile()); // pixel[256] // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            d3(8, (fb_addr as *const u32).add(480).read_volatile()); // pixel[480] (row 1) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         // Step 14: Setup LTDC layer with SDRAM framebuffer
@@ -684,11 +699,11 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Readback layer regs BEFORE GCR enable (no aliasing yet)
         unsafe {
-            let l1cr = (0x5000_1084u32 as *const u32).read_volatile();
-            let cfbar = (0x5000_10ACu32 as *const u32).read_volatile();
-            let cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
-            let cfblnr = (0x5000_10B4u32 as *const u32).read_volatile();
-            let pfcr = (0x5000_1094u32 as *const u32).read_volatile();
+            let l1cr = (0x5000_1084u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cfbar = (0x5000_10ACu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cfblr = (0x5000_10B0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cfblnr = (0x5000_10B4u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let pfcr = (0x5000_1094u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  L1 pre-en: CR=");
             dbg_hex(l1cr);
             dbg(" CFBAR=");
@@ -701,12 +716,12 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             dbg_hex(pfcr);
             dbg("\r\n");
             // Store at 0x24070120
-            (0x2407_0120u32 as *mut u32).write_volatile(0xBEEF_0002);
-            (0x2407_0124u32 as *mut u32).write_volatile(l1cr);
-            (0x2407_0128u32 as *mut u32).write_volatile(cfbar);
-            (0x2407_012Cu32 as *mut u32).write_volatile(cfblr);
-            (0x2407_0130u32 as *mut u32).write_volatile(cfblnr);
-            (0x2407_0134u32 as *mut u32).write_volatile(pfcr);
+            (0x2407_0120u32 as *mut u32).write_volatile(0xBEEF_0002); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x2407_0124u32 as *mut u32).write_volatile(l1cr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x2407_0128u32 as *mut u32).write_volatile(cfbar); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x2407_012Cu32 as *mut u32).write_volatile(cfblr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x2407_0130u32 as *mut u32).write_volatile(cfblnr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x2407_0134u32 as *mut u32).write_volatile(pfcr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         #[cfg(feature = "sdram_ramtest")]
@@ -717,20 +732,20 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Verify all layer registers before LTDCEN (no aliasing yet)
         unsafe {
-            let l1_cr = (0x5000_1084u32 as *const u32).read_volatile();
-            let l1_whpcr = (0x5000_1088u32 as *const u32).read_volatile();
-            let l1_wvpcr = (0x5000_108Cu32 as *const u32).read_volatile();
-            let l1_pfcr = (0x5000_1094u32 as *const u32).read_volatile();
-            let l1_cacr = (0x5000_1098u32 as *const u32).read_volatile();
-            let l1_bfcr = (0x5000_10A0u32 as *const u32).read_volatile();
-            let l1_cfbar = (0x5000_10ACu32 as *const u32).read_volatile();
-            let l1_cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
-            let l1_cfblnr = (0x5000_10B4u32 as *const u32).read_volatile();
-            let sscr = (0x5000_1008u32 as *const u32).read_volatile();
-            let bpcr = (0x5000_100Cu32 as *const u32).read_volatile();
-            let awcr = (0x5000_1010u32 as *const u32).read_volatile();
-            let twcr = (0x5000_1014u32 as *const u32).read_volatile();
-            let gcr = (0x5000_1018u32 as *const u32).read_volatile();
+            let l1_cr = (0x5000_1084u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_whpcr = (0x5000_1088u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_wvpcr = (0x5000_108Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_pfcr = (0x5000_1094u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_cacr = (0x5000_1098u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_bfcr = (0x5000_10A0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_cfbar = (0x5000_10ACu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_cfblr = (0x5000_10B0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let l1_cfblnr = (0x5000_10B4u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let sscr = (0x5000_1008u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let bpcr = (0x5000_100Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let awcr = (0x5000_1010u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let twcr = (0x5000_1014u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let gcr = (0x5000_1018u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Store comprehensive pre-LTDCEN dump at 0x24070140
             let base_dump: u32 = 0x2407_0140;
             let dump_vals: [u32; 16] = [
@@ -752,7 +767,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 0xBEEF_EEEE, // end
             ];
             for (i, &v) in dump_vals.iter().enumerate() {
-                ((base_dump + i as u32 * 4) as *mut u32).write_volatile(v);
+                ((base_dump + i as u32 * 4) as *mut u32).write_volatile(v); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             dbg("  pre-LTDCEN: L1CR=");
             dbg_hex(l1_cr);
@@ -769,16 +784,16 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Use write (not modify) to ensure GCR polarity bits are all 0
         // (HSPOL=0, VSPOL=0, DEPOL=0, PCPOL=0) matching LPCR=0x00.
         // Raw write — PAC gcr.write() starts from 0 and may not set LTDCEN correctly
-        unsafe { (0x5000_1018 as *mut u32).write_volatile(0x0000_2221) }; // GCR reset val + LTDCEN
-        unsafe { (0x5000_1024 as *mut u32).write_volatile(1) }; // SRCR.IMR
+        unsafe { (0x5000_1018 as *mut u32).write_volatile(0x0000_2221) }; // GCR reset val + LTDCEN // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        unsafe { (0x5000_1024 as *mut u32).write_volatile(1) }; // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         cortex_m::asm::dsb();
         // RM0399 §34.5: DSI host waits for the first VSYNC active
         // transition to start video mode.  Let LTDC run for at least
         // one full frame (~14ms at 32 MHz pixel clock, 840×512 total)
         // so it is generating periodic VSYNC before we bridge.
-        let gcr = unsafe { (0x5000_1018u32 as *const u32).read_volatile() };
-        let l1cr = unsafe { (0x5000_1084u32 as *const u32).read_volatile() };
-        let cfbar = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() };
+        let gcr = unsafe { (0x5000_1018u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let l1cr = unsafe { (0x5000_1084u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let cfbar = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         dbg("  LTDC: GCR=");
         dbg_hex(gcr);
         dbg(" L1CR=");
@@ -791,12 +806,12 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // Extended layer register readback
         unsafe {
-            let whpcr = (0x5000_1088u32 as *const u32).read_volatile();
-            let wvpcr = (0x5000_108Cu32 as *const u32).read_volatile();
-            let pfcr = (0x5000_1094u32 as *const u32).read_volatile();
-            let cacr = (0x5000_1098u32 as *const u32).read_volatile();
-            let cfblr = (0x5000_10B0u32 as *const u32).read_volatile();
-            let cfblnr = (0x5000_10B4u32 as *const u32).read_volatile();
+            let whpcr = (0x5000_1088u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let wvpcr = (0x5000_108Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let pfcr = (0x5000_1094u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cacr = (0x5000_1098u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cfblr = (0x5000_10B0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cfblnr = (0x5000_10B4u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  L1: WHPCR=");
             dbg_hex(whpcr);
             dbg(" WVPCR=");
@@ -815,17 +830,17 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // Framebuffer content: first 4 pixels (ARGB8888)
             dbg("  FB[0..3]: ");
             for i in 0..4u32 {
-                let px = ((fb_addr + i * 4) as *const u32).read_volatile();
+                let px = ((fb_addr + i * 4) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 dbg_hex(px);
                 dbg(" ");
             }
             dbg("\r\n");
 
             // DSI state
-            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile(); // wrapper WCFGR
-            let wcr = (0x5000_0404u32 as *const u32).read_volatile(); // wrapper WCR
-            let cmcr = (0x5000_0068u32 as *const u32).read_volatile(); // host CMCR
-            let mcr = (0x5000_0004u32 as *const u32).read_volatile(); // host CR (EN)
+            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile(); // wrapper WCFGR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let wcr = (0x5000_0404u32 as *const u32).read_volatile(); // wrapper WCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cmcr = (0x5000_0068u32 as *const u32).read_volatile(); // host CMCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let mcr = (0x5000_0004u32 as *const u32).read_volatile(); // host CR (EN) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  DSI: WCFGR=");
             dbg_hex(wcfgr);
             dbg(" WCR=");
@@ -837,10 +852,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             dbg("\r\n");
 
             // LTDC timing readback
-            let sscr = (0x5000_1008u32 as *const u32).read_volatile();
-            let bpcr = (0x5000_100Cu32 as *const u32).read_volatile();
-            let awcr = (0x5000_1010u32 as *const u32).read_volatile();
-            let twcr = (0x5000_1014u32 as *const u32).read_volatile();
+            let sscr = (0x5000_1008u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let bpcr = (0x5000_100Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let awcr = (0x5000_1010u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let twcr = (0x5000_1014u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  TIM: SSCR=");
             dbg_hex(sscr);
             dbg(" BPCR=");
@@ -880,17 +895,17 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                 bpcr,
                 awcr,
                 twcr,
-                ((fb_addr) as *const u32).read_volatile(),
-                ((fb_addr + 4) as *const u32).read_volatile(),
-                ((fb_addr + 8) as *const u32).read_volatile(),
-                ((fb_addr + 12) as *const u32).read_volatile(),
+                ((fb_addr) as *const u32).read_volatile(), // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((fb_addr + 4) as *const u32).read_volatile(), // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((fb_addr + 8) as *const u32).read_volatile(), // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((fb_addr + 12) as *const u32).read_volatile(), // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 0,
                 0,
                 0,           // placeholders for post-LTDCEN WISR/VMCCR/PHYSTS
                 0xD1A6_FFFF, // end sentinel
             ];
             for (i, &v) in vals.iter().enumerate() {
-                ((base + i as u32 * 4) as *mut u32).write_volatile(v);
+                ((base + i as u32 * 4) as *mut u32).write_volatile(v); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
         }
         cortex_m::asm::delay(8_000_000); // ~20ms at 400 MHz
@@ -907,22 +922,22 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         unsafe {
             // Ensure DWT CYCCNT is running (may not be enabled yet).
             // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
-            let demcr = (0xE000_EDFCu32 as *const u32).read_volatile();
-            (0xE000_EDFCu32 as *mut u32).write_volatile(demcr | (1 << 24));
-            (0xE000_1FB0u32 as *mut u32).write_volatile(0xC5AC_CE55); // LAR unlock
-            let ctrl = (0xE000_1000u32 as *const u32).read_volatile();
-            (0xE000_1000u32 as *mut u32).write_volatile(ctrl | 1); // CYCCNTENA
-            (0xE000_1004u32 as *mut u32).write_volatile(0); // reset CYCCNT
+            let demcr = (0xE000_EDFCu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0xE000_EDFCu32 as *mut u32).write_volatile(demcr | (1 << 24)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0xE000_1FB0u32 as *mut u32).write_volatile(0xC5AC_CE55); // LAR unlock // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let ctrl = (0xE000_1000u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0xE000_1000u32 as *mut u32).write_volatile(ctrl | 1); // CYCCNTENA // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0xE000_1004u32 as *mut u32).write_volatile(0); // reset CYCCNT // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
 
             // Clear stale flags
-            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // CERIF + CTEIF
+            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // CERIF + CTEIF // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
 
             // Verify DWT is counting
-            let cyc_a = (0xE000_1004u32 as *const u32).read_volatile();
+            let cyc_a = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::delay(1000);
-            let cyc_b = (0xE000_1004u32 as *const u32).read_volatile();
+            let cyc_b = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  DWT check: ");
             dbg_dec(cyc_b.wrapping_sub(cyc_a));
             dbg(" cyc\r\n");
@@ -933,33 +948,33 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // 2. Wait for any in-flight transfer to finish.
             // 3. Clear ERIF, pulse LTDCEN, measure time to ERIF.
             // 4. Re-enable AR.
-            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile();
-            (0x5000_0400u32 as *mut u32).write_volatile(wcfgr & !(1 << 6)); // AR=0
+            let wcfgr = (0x5000_0400u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_0400u32 as *mut u32).write_volatile(wcfgr & !(1 << 6)); // AR=0 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
             cortex_m::asm::delay(16_000_000); // 40ms — let any in-flight frame finish
-            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // clear ERIF+TEIF
+            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // clear ERIF+TEIF // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
 
-            let wisr_pre = (0x5000_040Cu32 as *const u32).read_volatile();
+            let wisr_pre = (0x5000_040Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  pre-pulse WISR: ");
             dbg_hex(wisr_pre);
             dbg("\r\n");
 
             // Single manual LTDCEN pulse
-            (0x5000_0404u32 as *mut u32).write_volatile(0x0C); // DSIEN+LTDCEN
+            (0x5000_0404u32 as *mut u32).write_volatile(0x0C); // DSIEN+LTDCEN // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
 
-            let t0 = (0xE000_1004u32 as *const u32).read_volatile();
+            let t0 = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let mut timeout = 20_000_000u32;
             while timeout > 0 {
-                if (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 {
+                if (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     break;
                 }
                 timeout -= 1;
             }
-            let t1 = (0xE000_1004u32 as *const u32).read_volatile();
+            let t1 = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let elapsed = t1.wrapping_sub(t0);
-            let wisr_post = (0x5000_040Cu32 as *const u32).read_volatile();
+            let wisr_post = (0x5000_040Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             dbg("  EoR: ");
             if timeout == 0 {
                 dbg("TIMEOUT ");
@@ -973,18 +988,18 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             dbg("\r\n");
 
             // Restore AR and clear flags
-            (0x5000_0400u32 as *mut u32).write_volatile(wcfgr); // restore AR=1
-            (0x5000_0410u32 as *mut u32).write_volatile(0x03);
+            (0x5000_0400u32 as *mut u32).write_volatile(wcfgr); // restore AR=1 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_0410u32 as *mut u32).write_volatile(0x03); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
         }
         // Read WISR from wrapper (safe — wrapper regs don't hang debug port)
-        let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() };
+        let wisr = unsafe { (0x5000_040Cu32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         dbg("  post-LTDCEN: WISR=");
         dbg_hex(wisr);
         dbg("\r\n");
         unsafe {
-            (0x2407_0060u32 as *mut u32).write_volatile(wisr);
-            (0x2407_0064u32 as *mut u32).write_volatile(0xAA55_AA55); // done marker
+            (0x2407_0060u32 as *mut u32).write_volatile(wisr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x2407_0064u32 as *mut u32).write_volatile(0xAA55_AA55); // done marker // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         // Backlight on
@@ -1033,11 +1048,11 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Raw writes — PAC LTDC struct has wrong offsets (missing initial padding)
         const LTDC: u32 = 0x5000_1000;
         unsafe {
-            ((LTDC + 0x08) as *mut u32).write_volatile((hswm1 << 16) | vshm1); // SSCR
-            ((LTDC + 0x0C) as *mut u32).write_volatile((ahbp << 16) | avbp); // BPCR
-            ((LTDC + 0x10) as *mut u32).write_volatile((aaw << 16) | aah); // AWCR
-            ((LTDC + 0x14) as *mut u32).write_volatile((totalw << 16) | totalh); // TWCR
-            ((LTDC + 0x2C) as *mut u32).write_volatile(0); // BCCR
+            ((LTDC + 0x08) as *mut u32).write_volatile((hswm1 << 16) | vshm1); // SSCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((LTDC + 0x0C) as *mut u32).write_volatile((ahbp << 16) | avbp); // BPCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((LTDC + 0x10) as *mut u32).write_volatile((aaw << 16) | aah); // AWCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((LTDC + 0x14) as *mut u32).write_volatile((totalw << 16) | totalh); // TWCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((LTDC + 0x2C) as *mut u32).write_volatile(0); // BCCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
     #[cfg(feature = "stm32h747i_disco")]
@@ -1086,20 +1101,20 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Layer 1 base = LTDC(0x50001000) + 0x84
         const L1: u32 = 0x5000_1084;
         unsafe {
-            ((L1 + 0x04) as *mut u32).write_volatile((x1 << 16) | x0); // WHPCR
-            ((L1 + 0x08) as *mut u32).write_volatile((y1 << 16) | y0); // WVPCR
-            ((L1 + 0x10) as *mut u32).write_volatile(0); // PFCR = ARGB8888
-            ((L1 + 0x14) as *mut u32).write_volatile(255); // CACR
-            ((L1 + 0x1C) as *mut u32).write_volatile(0x0405); // BFCR
-            ((L1 + 0x28) as *mut u32).write_volatile(fb); // CFBAR
+            ((L1 + 0x04) as *mut u32).write_volatile((x1 << 16) | x0); // WHPCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1 + 0x08) as *mut u32).write_volatile((y1 << 16) | y0); // WVPCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1 + 0x10) as *mut u32).write_volatile(0); // PFCR = ARGB8888 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1 + 0x14) as *mut u32).write_volatile(255); // CACR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1 + 0x1C) as *mut u32).write_volatile(0x0405); // BFCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1 + 0x28) as *mut u32).write_volatile(fb); // CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // CFBLR: bits[28:16]=CFBP (pitch), bits[12:0]=CFBLL (line_len + 7)
-            ((L1 + 0x2C) as *mut u32).write_volatile((pitch << 16) | (pitch + 7)); // CFBLR
-            ((L1 + 0x30) as *mut u32).write_volatile(height as u32); // CFBLNR
+            ((L1 + 0x2C) as *mut u32).write_volatile((pitch << 16) | (pitch + 7)); // CFBLR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1 + 0x30) as *mut u32).write_volatile(height as u32); // CFBLNR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Enable layer (CR bit 0 = LEN)
-            let cr = ((L1) as *const u32).read_volatile();
-            ((L1) as *mut u32).write_volatile(cr | 1); // CR.LEN
+            let cr = ((L1) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((L1) as *mut u32).write_volatile(cr | 1); // CR.LEN // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
-        unsafe { (0x5000_1024 as *mut u32).write_volatile(1) } // SRCR.IMR;
+        unsafe { (0x5000_1024 as *mut u32).write_volatile(1) } // SRCR.IMR; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     #[cfg(all(
@@ -1358,24 +1373,24 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // Without D-cache, C=1 is ignored and writes go directly to AXI
             // (strongly-ordered behavior), monopolizing the bus.
             // SCB CCR register at 0xE000_ED14, D-cache enable = bit 16
-            let ccr = (0xE000_ED14 as *const u32).read_volatile();
+            let ccr = (0xE000_ED14 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             if ccr & (1 << 16) == 0 {
                 // Invalidate D-cache before enabling (ARM requirement)
                 // DCISW approach: invalidate by set/way all cache sets
                 // For simplicity, use CSSELR=0 (L1 D-cache) then loop sets×ways
-                (0xE000_ED84 as *mut u32).write_volatile(0); // CSSELR = L1 data
+                (0xE000_ED84 as *mut u32).write_volatile(0); // CSSELR = L1 data // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 cortex_m::asm::dsb();
                 // CM7 L1 D-cache: 32 KB, 8-way, 128 sets, 32-byte lines
                 for set in 0..128u32 {
                     for way in 0..8u32 {
                         let val = (way << 30) | (set << 5);
-                        (0xE000_EF60 as *mut u32).write_volatile(val); // DCISW
+                        (0xE000_EF60 as *mut u32).write_volatile(val); // DCISW // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     }
                 }
                 cortex_m::asm::dsb();
                 cortex_m::asm::isb();
                 // Enable D-cache (set bit 16 of CCR)
-                (0xE000_ED14 as *mut u32).write_volatile(ccr | (1 << 16));
+                (0xE000_ED14 as *mut u32).write_volatile(ccr | (1 << 16)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 cortex_m::asm::dsb();
                 cortex_m::asm::isb();
             }
@@ -1383,18 +1398,164 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     }
 
     /// Return the address of the current back (off-screen) buffer.
+    ///
+    /// Deprecated u32 shim — prefer [`Self::back_phys`] for a typed
+    /// [`PhysAddr`], or [`Self::with_back`] for a typed
+    /// [`BackBuffer`] borrow scoped to a closure.
+    #[deprecated(
+        note = "use back_phys() for a typed PhysAddr or with_back() for a typed BackBuffer; this u32 shim is removed in Step 9 of the Register-Mashing Discipline migration"
+    )]
     pub fn back_buffer_addr(&self) -> u32 {
         self.fb_addr_back
     }
 
     /// Return the address of the current front (displayed) buffer.
+    ///
+    /// Deprecated u32 shim — prefer [`Self::front_phys`] for a typed
+    /// [`PhysAddr`], or [`Self::with_front`] for a typed
+    /// [`FrontBuffer`] borrow scoped to a closure.
+    #[deprecated(
+        note = "use front_phys() for a typed PhysAddr or with_front() for a typed FrontBuffer; this u32 shim is removed in Step 9 of the Register-Mashing Discipline migration"
+    )]
     pub fn front_buffer_addr(&self) -> u32 {
         self.fb_addr
     }
 
     /// Override the back-buffer address (for fixing double-buffer allocation).
+    ///
+    /// Deprecated u32 shim — prefer [`Self::set_back_phys`].
+    #[deprecated(
+        note = "use set_back_phys() for a typed PhysAddr; this u32 shim is removed in Step 9 of the Register-Mashing Discipline migration"
+    )]
     pub fn set_back_buffer(&mut self, addr: u32) {
         self.fb_addr_back = addr;
+    }
+
+    // ── Typed framebuffer accessors (Step 5 of register-mashing migration) ──
+
+    /// Typed physical address of the current front (displayed) buffer.
+    ///
+    /// Use this in preference to [`Self::front_buffer_addr`]; the
+    /// [`PhysAddr`] newtype prevents accidentally mixing this address
+    /// with a DMA bus address or an MMIO base.
+    #[inline]
+    pub fn front_phys(&self) -> PhysAddr {
+        PhysAddr::new(self.fb_addr)
+    }
+
+    /// Typed physical address of the current back (off-screen) buffer.
+    ///
+    /// Use this in preference to [`Self::back_buffer_addr`]; the
+    /// [`PhysAddr`] newtype prevents accidentally mixing this address
+    /// with a DMA bus address or an MMIO base.
+    #[inline]
+    pub fn back_phys(&self) -> PhysAddr {
+        PhysAddr::new(self.fb_addr_back)
+    }
+
+    /// Override the back-buffer address with a typed [`PhysAddr`].
+    #[inline]
+    pub fn set_back_phys(&mut self, addr: PhysAddr) {
+        self.fb_addr_back = addr.raw();
+    }
+
+    /// Build a transient [`FrameBuffer`] over the current back buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the SDRAM region `[fb_addr_back,
+    /// fb_addr_back + stride * height)` is mapped, writable, and not
+    /// concurrently accessed by LTDC scan-out (i.e. the back buffer is
+    /// off-screen at call time). The returned [`FrameBuffer`] is owned
+    /// by the caller for the duration of its scope; dropping it does not
+    /// release the SDRAM region.
+    ///
+    /// Prefer [`Self::with_back`] which scopes the borrow to a closure.
+    #[inline]
+    pub unsafe fn build_back_framebuffer(&self) -> FrameBuffer {
+        let stride = self.width as u32 * 4; // ARGB8888
+        // SAFETY: caller contract.
+        unsafe {
+            FrameBuffer::from_phys(
+                self.back_phys(),
+                self.width as u32,
+                self.height as u32,
+                stride,
+                PixelFmt::Argb8888,
+            )
+        }
+    }
+
+    /// Build a transient [`FrameBuffer`] over the current front buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the SDRAM region is mapped and not
+    /// concurrently written. CPU writes through this handle would tear
+    /// against LTDC scan-out — the typed [`FrontBuffer`] returned by
+    /// [`Self::with_front`] enforces this by exposing only `&` access.
+    #[inline]
+    pub unsafe fn build_front_framebuffer(&self) -> FrameBuffer {
+        let stride = self.width as u32 * 4;
+        // SAFETY: caller contract.
+        unsafe {
+            FrameBuffer::from_phys(
+                self.front_phys(),
+                self.width as u32,
+                self.height as u32,
+                stride,
+                PixelFmt::Argb8888,
+            )
+        }
+    }
+
+    /// Invoke `f` with a typed [`BackBuffer`] borrow over the current
+    /// back buffer.
+    ///
+    /// The borrow is scoped to the closure call so it cannot escape and
+    /// alias outside the `with_back` lifetime. While the closure runs,
+    /// callers may pass the borrow to typed DMA2D submission methods
+    /// ([`crate::dma2d::Dma2dBlitter::start_fill_typed`]) and to typed
+    /// overlay methods
+    /// ([`crate::dma2d_draw::Dma2dOverlayCtx::fill_rect_rotated_typed`])
+    /// — the borrow checker enforces that an outstanding `InFlight<_,
+    /// BackBuffer<_>>` cannot coexist with CPU access.
+    ///
+    /// # Safety
+    ///
+    /// Construction of the underlying [`FrameBuffer`] is `unsafe`
+    /// because it asserts the SDRAM region is mapped and unaliased; this
+    /// method delegates that contract to the caller. Convenience-wise,
+    /// `with_back` is the typed equivalent of taking the back-buffer
+    /// address and using it directly — it does not add validation, only
+    /// borrow discipline.
+    #[inline]
+    pub unsafe fn with_back<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut BackBuffer<'_>) -> R,
+    {
+        // SAFETY: delegated to caller via the `unsafe fn` declaration.
+        let mut fb = unsafe { self.build_back_framebuffer() };
+        let mut bb = BackBuffer::wrap(&mut fb);
+        f(&mut bb)
+    }
+
+    /// Invoke `f` with a typed [`FrontBuffer`] borrow over the current
+    /// front buffer. The closure receives `&` access only — see
+    /// [`FrontBuffer`] for the rationale.
+    ///
+    /// # Safety
+    ///
+    /// See [`Self::with_back`].
+    #[inline]
+    pub unsafe fn with_front<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&FrontBuffer<'_>) -> R,
+    {
+        // SAFETY: delegated to caller via the `unsafe fn` declaration.
+        let fb = unsafe { self.build_front_framebuffer() };
+        let fbuf = FrontBuffer::wrap(&fb);
+        f(&fbuf)
     }
 
     /// Return the display dimensions as (width, height) in pixels.
@@ -1426,20 +1587,20 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         unsafe {
             // 1. Clear stale ERIF so the DSI ISR doesn't fire on the
             //    previous scan's flag before we finish the swap.
-            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
 
             // 2. Swap layer address and trigger shadow reload.
-            (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR
-            (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR
+            (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
         unsafe {
             // 3. Enable LTDCEN — next TE edge triggers LTDC to scan.
-            (0x5000_0404 as *mut u32).write_volatile(0x0C); // DSI_WCR: DSIEN+LTDCEN
+            (0x5000_0404 as *mut u32).write_volatile(0x0C); // DSI_WCR: DSIEN+LTDCEN // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // 4. Clear any spurious ERIF from the LTDCEN re-enable.
             cortex_m::asm::dsb();
-            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // The real ERIF fires ~14ms later when the scan completes.
     }
@@ -1454,9 +1615,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// Returns DWT cycles waited. 0 means scan was already done.
     /// `u32::MAX` means timeout (LTDC stuck).
     pub fn wait_frame_done(&self) -> u32 {
-        const WISR: *const u32 = 0x5000_040C as *const u32;
-        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
-        const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+        const WISR: *const u32 = 0x5000_040C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
             let t0 = DWT_CYCCNT.read_volatile();
             // Poll until ERIF fires (cleared by present()).
@@ -1477,8 +1638,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// Check if LTDC FIFO underrun has occurred (diagnostic).
     /// Returns `true` if underrun flag is set, and clears it.
     pub fn check_fifo_underrun(&self) -> bool {
-        const LTDC_ISR: *const u32 = 0x5000_1038 as *const u32;
-        const LTDC_ICR: *mut u32 = 0x5000_103C as *mut u32;
+        const LTDC_ISR: *const u32 = 0x5000_1038 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const LTDC_ICR: *mut u32 = 0x5000_103C as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
             let isr = LTDC_ISR.read_volatile();
             if isr & 0x02 != 0 {
@@ -1495,7 +1656,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// Does NOT clear the flag — present() handles that.
     #[inline]
     pub fn check_erif(&self) -> bool {
-        unsafe { (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 }
+        unsafe { (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Returns true when LTDC is NOT actively reading from SDRAM.
@@ -1505,7 +1666,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// the SDRAM bus is free for DMA2D / CPU.
     #[inline]
     pub fn ltdc_bus_idle(&self) -> bool {
-        unsafe { (0x5000_1048u32 as *const u32).read_volatile() & 0x01 == 0 }
+        unsafe { (0x5000_1048u32 as *const u32).read_volatile() & 0x01 == 0 } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Read DSI/LTDC diagnostic registers.
@@ -1516,10 +1677,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// - cdsr: LTDC_CDSR — VSYNC/HSYNC/data-enable phase state
     pub fn diagnose_dsi_state(&self) -> (u32, u32, u32, u32) {
         unsafe {
-            let wisr = (0x5000_040Cu32 as *const u32).read_volatile();
-            let ltdc_isr = (0x5000_1038u32 as *const u32).read_volatile();
-            let cpsr = (0x5000_1044u32 as *const u32).read_volatile();
-            let cdsr = (0x5000_1048u32 as *const u32).read_volatile();
+            let wisr = (0x5000_040Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let ltdc_isr = (0x5000_1038u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cpsr = (0x5000_1044u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let cdsr = (0x5000_1048u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             (wisr, ltdc_isr, cpsr, cdsr)
         }
     }
@@ -1547,7 +1708,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         //   GPIOI: 0,1,2,3,4,5,6,7,9,10
         unsafe {
             // Enable GPIO D-I clocks (AHB4ENR bits 3-8)
-            let ahb4enr = 0x5802_44E0u32 as *mut u32;
+            let ahb4enr = 0x5802_44E0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ahb4enr.write_volatile(
                 ahb4enr.read_volatile()
                     | (1 << 3)
@@ -1557,24 +1718,24 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
                     | (1 << 7)
                     | (1 << 8),
             );
-            let _ = (ahb4enr as *const u32).read_volatile();
+            let _ = (ahb4enr as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Enable FMC clock (AHB3ENR bit 12)
-            let ahb3enr = (0x5802_4400 + 0xD4) as *mut u32;
+            let ahb3enr = (0x5802_4400 + 0xD4) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ahb3enr.write_volatile(ahb3enr.read_volatile() | (1 << 12));
-            let _ = (ahb3enr as *const u32).read_volatile();
+            let _ = (ahb3enr as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         // Configure pin as AF12, very-high speed, push-pull
         #[inline(always)]
         fn fmc_pin(gpio_base: u32, pin: u32) {
             unsafe {
-                let moder = gpio_base as *mut u32;
-                let ospeedr = (gpio_base + 0x08) as *mut u32;
+                let moder = gpio_base as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                let ospeedr = (gpio_base + 0x08) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let afr = if pin < 8 {
-                    (gpio_base + 0x20) as *mut u32 // AFRL
+                    (gpio_base + 0x20) as *mut u32 // AFRL // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 } else {
-                    (gpio_base + 0x24) as *mut u32 // AFRH
+                    (gpio_base + 0x24) as *mut u32 // AFRH // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 };
                 let bit = if pin < 8 { pin } else { pin - 8 };
                 // MODER: AF mode (0b10)
@@ -1616,12 +1777,12 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
 
         // GPIO telemetry: verify clocks and pin config
-        const D3_GPIO: *mut u32 = 0x3800_0500u32 as *mut u32;
+        const D3_GPIO: *mut u32 = 0x3800_0500u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
-            let ahb4enr = (0x5802_44E0u32 as *const u32).read_volatile();
-            let gpiod_moder = (GPIOD as *const u32).read_volatile();
-            let gpiod_afrh = ((GPIOD + 0x24) as *const u32).read_volatile();
-            let gpiof_moder = (GPIOF as *const u32).read_volatile();
+            let ahb4enr = (0x5802_44E0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let gpiod_moder = (GPIOD as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let gpiod_afrh = ((GPIOD + 0x24) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let gpiof_moder = (GPIOF as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             D3_GPIO.write_volatile(0x6F10_0001); // sentinel
             D3_GPIO.add(1).write_volatile(ahb4enr);
             D3_GPIO.add(2).write_volatile(gpiod_moder);
@@ -1631,14 +1792,14 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
 
         // ── FMC SDRAM controller init ───────────────────────────────────
         // STM32H747I-DISCO: SDRAM on FMC Bank 2 (SDNE1=PH6, SDCKE1=PH7)
-        const FMC_BCR1: *mut u32 = 0x5200_4000u32 as *mut u32;
-        const FMC_SDCR1: *mut u32 = 0x5200_4140u32 as *mut u32;
-        const FMC_SDCR2: *mut u32 = 0x5200_4144u32 as *mut u32;
-        const FMC_SDTR1: *mut u32 = 0x5200_4148u32 as *mut u32;
-        const FMC_SDTR2: *mut u32 = 0x5200_414Cu32 as *mut u32;
-        const FMC_SDCMR: *mut u32 = 0x5200_4150u32 as *mut u32;
-        const FMC_SDRTR: *mut u32 = 0x5200_4154u32 as *mut u32;
-        const FMC_SDSR: *const u32 = 0x5200_4158u32 as *const u32;
+        const FMC_BCR1: *mut u32 = 0x5200_4000u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDCR1: *mut u32 = 0x5200_4140u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDCR2: *mut u32 = 0x5200_4144u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDTR1: *mut u32 = 0x5200_4148u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDTR2: *mut u32 = 0x5200_414Cu32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDCMR: *mut u32 = 0x5200_4150u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDRTR: *mut u32 = 0x5200_4154u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FMC_SDSR: *const u32 = 0x5200_4158u32 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         #[inline(always)]
         fn sdram_busy_wait() {
@@ -1660,7 +1821,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         }
 
         // D3 SRAM telemetry base for SDRAM reinit
-        const D3: *mut u32 = 0x3800_0400u32 as *mut u32;
+        const D3: *mut u32 = 0x3800_0400u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
             D3.write_volatile(0x5D_000001); // entered reinit
 
@@ -1675,7 +1836,7 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             D3.add(4).write_volatile(old_sdsr); // old SDSR
 
             // Step 1: FMC peripheral reset via RCC_AHB3RSTR bit 12
-            const RCC_AHB3RSTR: *mut u32 = (0x5802_4400 + 0x7C) as *mut u32;
+            const RCC_AHB3RSTR: *mut u32 = (0x5802_4400 + 0x7C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let rstr = RCC_AHB3RSTR.read_volatile();
             RCC_AHB3RSTR.write_volatile(rstr | (1 << 12)); // assert
             cortex_m::asm::dsb();
@@ -1685,9 +1846,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             cortex_m::asm::delay(10_000);
 
             // Re-enable FMC clock + FMCEN after reset
-            const RCC_AHB3ENR: *mut u32 = (0x5802_4400 + 0xD4) as *mut u32;
+            const RCC_AHB3ENR: *mut u32 = (0x5802_4400 + 0xD4) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             RCC_AHB3ENR.write_volatile(RCC_AHB3ENR.read_volatile() | (1 << 12));
-            let _ = (RCC_AHB3ENR as *const u32).read_volatile();
+            let _ = (RCC_AHB3ENR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             FMC_BCR1.write_volatile(FMC_BCR1.read_volatile() | (1u32 << 31));
             cortex_m::asm::dsb();
             cortex_m::asm::delay(10_000);
@@ -1780,10 +1941,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             D3.add(5).write_volatile(new_sdsr); // new SDSR
 
             // Write 4 distinct values to 4 widely-spaced addresses
-            let p0 = 0xD000_0000u32 as *mut u32;
-            let p1 = 0xD000_1000u32 as *mut u32; // +4 KiB
-            let p2 = 0xD010_0000u32 as *mut u32; // +1 MiB
-            let p3 = 0xD100_0000u32 as *mut u32; // +16 MiB
+            let p0 = 0xD000_0000u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let p1 = 0xD000_1000u32 as *mut u32; // +4 KiB // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let p2 = 0xD010_0000u32 as *mut u32; // +1 MiB // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let p3 = 0xD100_0000u32 as *mut u32; // +16 MiB // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             p0.write_volatile(0xCAFE_0000);
             p1.write_volatile(0xCAFE_1111);
             p2.write_volatile(0xCAFE_2222);

@@ -171,22 +171,26 @@ fn SysTick() {}
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod touch_isr {
-    use core::ptr::{addr_of, addr_of_mut};
-    use core::sync::atomic::Ordering;
-    use core::sync::atomic::compiler_fence;
+    use core::sync::atomic::{AtomicBool, Ordering};
 
-    // I2C4 register addresses (base 0x5800_1C00, RM0399 §50.7)
-    const I2C4_CR2: *mut u32 = 0x5800_1C04 as *mut u32;
-    const I2C4_ISR: *const u32 = 0x5800_1C18 as *const u32;
-    const I2C4_ICR: *mut u32 = 0x5800_1C1C as *mut u32;
-    const I2C4_RXDR: *const u32 = 0x5800_1C24 as *const u32;
-    const I2C4_TXDR: *mut u32 = 0x5800_1C28 as *mut u32;
+    use rlvgl_platform::hwcore::isr::IsrChannel;
+    use rlvgl_platform::hwcore::regs::gpio::Gpio;
+    use rlvgl_platform::hwcore::regs::i2c::I2c;
+    use rlvgl_platform::hwcore::regs::tim::TimBasic;
 
-    // GPIOK IDR for PK7 touch INT pin (active-low)
-    const GPIOK_IDR: *const u32 = 0x5802_2810 as *const u32;
-
-    // TIM6 SR (status register, clear UIF on entry)
-    const TIM6_SR: *mut u32 = 0x4000_1010 as *mut u32;
+    // I2C4 / GPIOK / TIM6 access flows through typed handles from
+    // `rlvgl_platform::hwcore::regs::*`. Each `static` instance pins
+    // the handle for `'static` so call sites read/write via
+    // `I2C4.regs().cr2.write(...)` etc. — every field offset is
+    // const-eval-asserted against RM0399.
+    //
+    // SAFETY: this `touch_isr` module is the bare-metal owner of these
+    // peripherals. The FreeRTOS path uses `touch_i2c.rs` for I2C4 and
+    // its own TIM7 path for the present-gate timer; the two paths are
+    // mutually exclusive at build time via the `freertos` feature.
+    static I2C4: I2c = unsafe { I2c::i2c4() };
+    static GPIOK: Gpio = unsafe { Gpio::gpiok() };
+    static TIM6: TimBasic = unsafe { TimBasic::tim6() };
 
     // FT5336 7-bit address, shifted left into SADD[7:1]
     const FT5336_SADD: u32 = 0x38 << 1; // 0x70
@@ -208,54 +212,40 @@ mod touch_isr {
         };
     }
 
-    pub const TOUCH_RING_CAP: usize = 16;
+    /// Touch ring capacity. The typed `IsrChannel<T, N>` reserves one
+    /// slot for empty/full disambiguation, so usable capacity is N-1.
+    pub const TOUCH_RING_CAP: usize = 17;
 
-    pub struct TouchRing {
-        pub head: u32,
-        pub tail: u32,
-        pub slots: [RawTouchSample; TOUCH_RING_CAP],
-    }
+    /// SPSC ring buffer for touch samples. ISR is the sole writer
+    /// (`touch_ring_push`); main loop is the sole reader
+    /// (`touch_ring_pop`). Encapsulates volatile + Acquire/Release
+    /// ordering — replaces the prior `static mut TouchRing` + manual
+    /// `compiler_fence` pattern.
+    pub static TOUCH_RING: IsrChannel<RawTouchSample, TOUCH_RING_CAP> = IsrChannel::new();
 
-    pub static mut TOUCH_RING: TouchRing = TouchRing {
-        head: 0,
-        tail: 0,
-        slots: [RawTouchSample::EMPTY; TOUCH_RING_CAP],
-    };
-
-    static mut PREV_INT_LOW: bool = false;
+    /// Debounce: previous read of PK7 (FT5336 INT line). ISR-only.
+    static PREV_INT_LOW: AtomicBool = AtomicBool::new(false);
 
     /// Push a sample into the ring (ISR side, single writer).
+    ///
+    /// # Safety
+    ///
+    /// Must be called from the touch ISR only (single-writer contract).
     #[inline]
     pub unsafe fn touch_ring_push(sample: RawTouchSample) {
-        unsafe {
-            let ring = addr_of_mut!(TOUCH_RING);
-            let head = core::ptr::read_volatile(addr_of!((*ring).head));
-            let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
-            if head.wrapping_sub(tail) >= TOUCH_RING_CAP as u32 {
-                return; // full — drop newest
-            }
-            (*ring).slots[(head % TOUCH_RING_CAP as u32) as usize] = sample;
-            compiler_fence(Ordering::Release);
-            core::ptr::write_volatile(addr_of_mut!((*ring).head), head.wrapping_add(1));
-        }
+        // SAFETY: caller asserts single-writer; IsrChannel docs.
+        let _ = unsafe { TOUCH_RING.try_push(sample) }; // drop on full
     }
 
     /// Pop a sample from the ring (main-loop side, single reader).
+    ///
+    /// # Safety
+    ///
+    /// Must be called from the main loop only (single-reader contract).
     #[inline]
     pub unsafe fn touch_ring_pop() -> Option<RawTouchSample> {
-        unsafe {
-            let ring = addr_of_mut!(TOUCH_RING);
-            let head = core::ptr::read_volatile(addr_of!((*ring).head));
-            let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
-            if head == tail {
-                return None;
-            }
-            compiler_fence(Ordering::Acquire);
-            let sample = (*ring).slots[(tail % TOUCH_RING_CAP as u32) as usize];
-            compiler_fence(Ordering::Release);
-            core::ptr::write_volatile(addr_of_mut!((*ring).tail), tail.wrapping_add(1));
-            Some(sample)
-        }
+        // SAFETY: caller asserts single-reader; IsrChannel docs.
+        unsafe { TOUCH_RING.try_pop() }
     }
 
     /// Wait for a bit in I2C4_ISR with timeout.  Returns false on timeout.
@@ -263,10 +253,10 @@ mod touch_isr {
     unsafe fn i2c4_wait(bit: u32) -> bool {
         unsafe {
             for _ in 0..I2C_TIMEOUT {
-                let isr = I2C4_ISR.read_volatile();
+                let isr = I2C4.regs().isr.read();
                 if isr & (1 << 4) != 0 {
                     // NACKF — device didn't acknowledge
-                    I2C4_ICR.write_volatile(1 << 4); // clear NACKCF
+                    I2C4.regs().icr.write(1 << 4); // clear NACKCF
                     return false;
                 }
                 if isr & (1 << bit) != 0 {
@@ -287,16 +277,16 @@ mod touch_isr {
             // STOPCF=5, NACKCF=4, BERRCF=8, ARLOCF=9, OVRCF=10.
             // Without this, a prior timeout leaves STOPF set and new
             // transactions can hang or return stale data.
-            I2C4_ICR.write_volatile((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+            I2C4.regs().icr.write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
 
             // ── Write phase: send register address 0x02 ──
             // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
-            I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
+            I2C4.regs().cr2.write(FT5336_SADD | (1 << 16) | (1 << 13));
             // Wait TXIS (bit 1)
             if !i2c4_wait(1) {
                 return RawTouchSample::EMPTY;
             }
-            I2C4_TXDR.write_volatile(0x02);
+            I2C4.regs().txdr.write(0x02);
             // Wait TC (bit 6) — transfer complete (AUTOEND=0, RELOAD=0)
             if !i2c4_wait(6) {
                 return RawTouchSample::EMPTY;
@@ -304,18 +294,18 @@ mod touch_isr {
 
             // ── Read phase: read 31 bytes ──
             // CR2: SADD, NBYTES=31, RD_WRN=1, START=1, AUTOEND=1
-            I2C4_CR2.write_volatile(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
+            I2C4.regs().cr2.write(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
             let mut buf = [0u8; 31];
             for b in buf.iter_mut() {
                 // Wait RXNE (bit 2)
                 if !i2c4_wait(2) {
                     return RawTouchSample::EMPTY;
                 }
-                *b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
+                *b = (I2C4.regs().rxdr.read() & 0xFF) as u8;
             }
             // AUTOEND generates STOP; wait STOPF (bit 5) then clear it
             if i2c4_wait(5) {
-                I2C4_ICR.write_volatile(1 << 5); // STOPCF
+                I2C4.regs().icr.write(1 << 5); // STOPCF
             }
 
             // ── Parse (identical to ft5336.rs:48-79) ──
@@ -338,13 +328,13 @@ mod touch_isr {
     pub unsafe fn tim6_dac_handler() {
         unsafe {
             // Clear UIF (bit 0)
-            TIM6_SR.write_volatile(TIM6_SR.read_volatile() & !1);
+            TIM6.regs().sr.write(TIM6.regs().sr.read() & !1);
 
             // Read PK7: low = touch data available
-            let int_low = GPIOK_IDR.read_volatile() & (1 << 7) == 0;
+            let int_low = GPIOK.regs().idr.read() & (1 << 7) == 0;
 
             // Read when INT active OR on the LOW→HIGH edge (catches release)
-            let prev = core::ptr::read_volatile(addr_of!(PREV_INT_LOW));
+            let prev = PREV_INT_LOW.load(Ordering::Acquire);
             let should_read = int_low || prev;
 
             if should_read {
@@ -352,7 +342,7 @@ mod touch_isr {
                 touch_ring_push(sample);
             }
 
-            core::ptr::write_volatile(addr_of_mut!(PREV_INT_LOW), int_low);
+            PREV_INT_LOW.store(int_low, Ordering::Release);
         }
     }
 }
@@ -458,25 +448,25 @@ mod _dsi_isr {
     /// Clear ALL flags to prevent non-ERIF events from re-triggering.
     #[interrupt]
     unsafe fn DSI() {
-        const WISR: *const u32 = 0x5000_040C as *const u32;
-        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
+        const WISR: *const u32 = 0x5000_040C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // DSI Host flag clear registers (prevent re-trigger from host events)
-        const ISR0: *const u32 = 0x5000_00BC as *const u32;
-        const ISR1: *const u32 = 0x5000_00C0 as *const u32;
-        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32;
-        const FIR1: *mut u32 = 0x5000_00DC as *mut u32;
+        const ISR0: *const u32 = 0x5000_00BC as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const ISR1: *const u32 = 0x5000_00C0 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FIR1: *mut u32 = 0x5000_00DC as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
             let wisr = WISR.read_volatile();
             // Clear ALL wrapper flags (bits 13..0)
             WIFCR.write_volatile(wisr & 0x3FFF);
             if wisr & 0x02 != 0 {
                 // Snapshot DWT_CYCCNT first — T=0 for all scheduling.
-                let cyc = (0xE000_1004u32 as *const u32).read_volatile();
+                let cyc = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 // PJ0 LOW — LTDC scan done (exact ISR timing, no poll jitter)
-                (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16);
+                (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 // Clear LTDCEN to prevent auto-refresh from re-scanning
                 // before present() swaps the buffer.
-                const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
+                const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 DSI_WCR.write_volatile(0x08); // DSIEN only, clear LTDCEN
                 // Timestamp BEFORE flag so consumers see consistent pair.
                 super::ERIF_CYCCNT.store(cyc, core::sync::atomic::Ordering::Release);
@@ -512,7 +502,7 @@ pub(crate) fn take_erif() -> bool {
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub fn cycles_since_erif() -> u32 {
-    let now = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
+    let now = unsafe { (0xE000_1004u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     now.wrapping_sub(ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire))
 }
 
@@ -538,11 +528,13 @@ pub fn dma2d_admits(cost: u32) -> bool {
 mod runtime_serial {
     use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 
-    const USART1_CR1: *mut u32 = 0x4001_1000 as *mut u32;
-    const USART1_ISR: *const u32 = 0x4001_101C as *const u32;
-    const USART1_ICR: *mut u32 = 0x4001_1020 as *mut u32;
-    const USART1_RDR: *const u32 = 0x4001_1024 as *const u32;
-    const USART1_TDR: *mut u32 = 0x4001_1028 as *mut u32;
+    use rlvgl_platform::hwcore::regs::usart::Usart;
+
+    // USART1 access (0x4001_1000) flows through the typed `Usart` handle.
+    // SAFETY: this `runtime_serial` module is the sole owner of USART1 in
+    // the bare-metal disco binary; the FreeRTOS path uses its own serial
+    // wiring (currently routed through the C HAL).
+    static USART1: Usart = unsafe { Usart::usart1() };
 
     const CR1_RXNEIE_RXFNEIE: u32 = 1 << 5;
     const CR1_TXEIE_TXFNFIE: u32 = 1 << 7;
@@ -570,14 +562,14 @@ mod runtime_serial {
     static RX_DROPPED: AtomicU32 = AtomicU32::new(0);
     static TX_DROPPED: AtomicU32 = AtomicU32::new(0);
 
-    static mut RX_BUF: [u8; RX_CAP] = [0; RX_CAP];
-    static mut TX_BUF: [u8; TX_CAP] = [0; TX_CAP];
+    static mut RX_BUF: [u8; RX_CAP] = [0; RX_CAP]; // rlvgl-discipline: allow(static_mut)
+    static mut TX_BUF: [u8; TX_CAP] = [0; TX_CAP]; // rlvgl-discipline: allow(static_mut)
 
     #[inline]
     fn blocking_write_byte(byte: u8) {
         unsafe {
-            while USART1_ISR.read_volatile() & ISR_TXE_TXFNF == 0 {}
-            USART1_TDR.write_volatile(byte as u32);
+            while USART1.regs().isr.read() & ISR_TXE_TXFNF == 0 {}
+            USART1.regs().tdr.write(byte as u32);
         }
     }
 
@@ -643,9 +635,9 @@ mod runtime_serial {
         TX_DROPPED.store(0, Ordering::Relaxed);
 
         unsafe {
-            USART1_ICR.write_volatile(ERROR_CLEAR);
-            let cr1 = USART1_CR1.read_volatile();
-            USART1_CR1.write_volatile((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
+            USART1.regs().icr.write(ERROR_CLEAR);
+            let cr1 = USART1.regs().cr1.read();
+            USART1.regs().cr1.write((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
 
             use stm32h7::stm32h747cm7::Interrupt;
             cortex_m::peripheral::NVIC::unmask(Interrupt::USART1);
@@ -663,8 +655,8 @@ mod runtime_serial {
             return;
         }
         unsafe {
-            let cr1 = USART1_CR1.read_volatile();
-            USART1_CR1.write_volatile(cr1 | CR1_TXEIE_TXFNFIE);
+            let cr1 = USART1.regs().cr1.read();
+            USART1.regs().cr1.write(cr1 | CR1_TXEIE_TXFNFIE);
         }
     }
 
@@ -709,29 +701,29 @@ mod runtime_serial {
     }
 
     pub unsafe fn irq_handler() {
-        let isr = unsafe { USART1_ISR.read_volatile() };
+        let isr = unsafe { USART1.regs().isr.read() };
         if isr & ERROR_FLAGS != 0 {
             unsafe {
-                USART1_ICR.write_volatile(ERROR_CLEAR);
+                USART1.regs().icr.write(ERROR_CLEAR);
             }
         }
 
-        while unsafe { USART1_ISR.read_volatile() } & ISR_RXNE_RXFNE != 0 {
-            let byte = unsafe { (USART1_RDR.read_volatile() & 0xFF) as u8 };
+        while unsafe { USART1.regs().isr.read() } & ISR_RXNE_RXFNE != 0 {
+            let byte = unsafe { (USART1.regs().rdr.read() & 0xFF) as u8 };
             if !push_rx(byte) {
                 RX_DROPPED.fetch_add(1, Ordering::Relaxed);
             }
         }
 
-        while unsafe { USART1_ISR.read_volatile() } & ISR_TXE_TXFNF != 0 {
+        while unsafe { USART1.regs().isr.read() } & ISR_TXE_TXFNF != 0 {
             if let Some(byte) = pop_tx() {
                 unsafe {
-                    USART1_TDR.write_volatile(byte as u32);
+                    USART1.regs().tdr.write(byte as u32);
                 }
             } else {
                 unsafe {
-                    let cr1 = USART1_CR1.read_volatile();
-                    USART1_CR1.write_volatile(cr1 & !CR1_TXEIE_TXFNFIE);
+                    let cr1 = USART1.regs().cr1.read();
+                    USART1.regs().cr1.write(cr1 & !CR1_TXEIE_TXFNFIE);
                 }
                 break;
             }
@@ -785,7 +777,7 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
             return 0;
         }
         let offset = ((uy * self.width + ux) * 4) as usize;
-        let ptr = (self.fb_addr as usize + offset) as *const u32;
+        let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe { ptr.read_volatile() }
     }
 
@@ -800,7 +792,7 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
             .min(out.len());
         for i in 0..available {
             let offset = ((uy * self.width + ux + i as u32) * 4) as usize;
-            let ptr = (self.fb_addr as usize + offset) as *const u32;
+            let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             out[i] = unsafe { ptr.read_volatile() };
         }
         available
@@ -828,7 +820,7 @@ pub(crate) mod dma2d_irq {
     static COMPLETE_LATCH: AtomicBool = AtomicBool::new(false);
     static ERROR_LATCH: AtomicU32 = AtomicU32::new(0);
 
-    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
     pub fn init(nvic: &mut cortex_m::peripheral::NVIC) {
         use stm32h7::stm32h747cm7::Interrupt;
@@ -1076,13 +1068,13 @@ fn configure_mpu_regions(cp: &mut cortex_m::Peripherals) {
 #[allow(unknown_lints, unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
-static mut MPU_TRACE: u32 = 0;
+static mut MPU_TRACE: u32 = 0; // rlvgl-discipline: allow(static_mut)
 
 #[cfg(not(feature = "c_hal"))]
 #[allow(unknown_lints, unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
-static mut MPU_DUMP: [u32; 12] = [0; 12];
+static mut MPU_DUMP: [u32; 12] = [0; 12]; // rlvgl-discipline: allow(static_mut)
 
 #[cfg(not(feature = "c_hal"))]
 #[inline(always)]
@@ -1194,7 +1186,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
         // SDTR1: shared timing (TRP, TRC must be in SDTR1)
         // PAC sdbank1().sdtr offset = 0x144 = SDCR2 (known PAC bug).
         // Use raw write to SDTR1 at 0x148.
-        let sdtr1 = 0x5200_4148u32 as *mut u32;
+        let sdtr1 = 0x5200_4148u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         sdtr1.write_volatile(
             (1 << 20) // TRP = 2 cycles
             | (6 << 12), // TRC = 7 cycles
@@ -1202,7 +1194,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
         // SDTR2: bank-specific timing
         // PAC sdbank2().sdtr offset = 0x148 = SDTR1 (same PAC bug pattern).
         // Use raw write to SDTR2 at 0x14C.
-        let sdtr2 = 0x5200_414Cu32 as *mut u32;
+        let sdtr2 = 0x5200_414Cu32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         sdtr2.write_volatile(
             (1 << 24)   // TRCD = 2 cycles
             | (1 << 16) // TWR = 2 cycles
@@ -1323,18 +1315,18 @@ fn early_fmc_setup() {
     let fmc = unsafe { &*stm32h7::stm32h747cm7::FMC::ptr() };
     // D3 SRAM telemetry for early FMC init
     unsafe {
-        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32);
+        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
     configure_fmc_sdram(fmc);
     // Capture SDCR1, SDTR1, SDSR after init
     unsafe {
-        let sdcr1 = (0x5200_4140u32 as *const u32).read_volatile();
-        let sdtr1 = (0x5200_4148u32 as *const u32).read_volatile();
-        let sdsr = (0x5200_4158u32 as *const u32).read_volatile();
-        (0x3800_0204u32 as *mut u32).write_volatile(sdcr1);
-        (0x3800_0208u32 as *mut u32).write_volatile(sdtr1);
-        (0x3800_020Cu32 as *mut u32).write_volatile(sdsr);
-        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0002u32);
+        let sdcr1 = (0x5200_4140u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let sdtr1 = (0x5200_4148u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let sdsr = (0x5200_4158u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_0204u32 as *mut u32).write_volatile(sdcr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_0208u32 as *mut u32).write_volatile(sdtr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_020Cu32 as *mut u32).write_volatile(sdsr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0002u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }
 
@@ -1346,20 +1338,20 @@ fn early_fmc_setup() {
 // TS_CAL2   = 0x1FF1_E840  (factory cal at 110 °C, 16-bit, VDDA=3.3 V)
 
 const ADC3_BASE: u32 = 0x5802_6000;
-const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32; // +0x00
-const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32; // +0x08
-const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32; // +0x18
-const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32; // +0x1C
-const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32; // +0x30
-const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08
+const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32; // +0x00 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32; // +0x08 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32; // +0x18 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32; // +0x1C // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32; // +0x30 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 /// Initialise ADC3 for single-shot temperature sensor reads on channel 18.
 unsafe fn adc3_temp_init() {
     unsafe {
         // 1. Enable ADC3 clock (RCC_AHB4ENR bit 24)
-        let ahb4enr = 0x5802_44E0u32 as *mut u32;
+        let ahb4enr = 0x5802_44E0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         ahb4enr.write_volatile(ahb4enr.read_volatile() | (1 << 24));
-        let _ = (ahb4enr as *const u32).read_volatile(); // readback fence
+        let _ = (ahb4enr as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         // 2. Exit deep power-down
         let cr = ADC3_CR.read_volatile();
@@ -1410,7 +1402,7 @@ unsafe fn adc3_temp_init() {
 }
 
 /// Cached junction temperature in tenths of °C.
-static mut CACHED_TEMP_X10: i32 = 0;
+static mut CACHED_TEMP_X10: i32 = 0; // rlvgl-discipline: allow(static_mut)
 /// Heap size in bytes. FreeRTOS adds ~33KB to .bss (heap_4 + task stacks +
 /// TCBs) in the 128K DTCM, leaving less room for the main stack. Reduce
 /// the Rust heap when FreeRTOS is linked to avoid stack overflow.
@@ -1421,7 +1413,7 @@ const HEAP_SIZE: usize = 64 * 1024;
 const HEAP_SIZE: usize = 64 * 1024;
 
 /// Static memory region used to service heap allocations.
-static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE]; // rlvgl-discipline: allow(static_mut)
 
 /// Application entry point (bare-metal only).
 #[cfg(all(not(doc), not(feature = "zephyr")))]
@@ -1459,7 +1451,7 @@ fn main() -> ! {
     {
         // D3 breadcrumb: very first thing in Rust HAL path
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // Early spin delay to give debuggers time to attach before
         // peripheral clocks and pin configuration. This is a coarse, cycle-based
@@ -1471,12 +1463,12 @@ fn main() -> ! {
         }
 
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-delay
         let mut cp = cortex_m::Peripherals::take().unwrap();
         configure_mpu_regions(&mut cp);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-MPU
 
         use core::convert::Infallible;
@@ -1673,7 +1665,7 @@ fn main() -> ! {
         // one tick through xPortSysTickHandler corrupts scheduler state.
         #[cfg(feature = "freertos")]
         unsafe {
-            (0xE000_E010u32 as *mut u32).write_volatile(0);
+            (0xE000_E010u32 as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // HAL RCC: derive SYSCLK and LTDC pixel clock (via PLL3R)
         // Assumes HSE=25 MHz on H747I-DISCO. Adjust if using HSI or a different crystal.
@@ -1696,7 +1688,7 @@ fn main() -> ! {
         // immediately. The FreeRTOS port re-enables it in vTaskStartScheduler.
         #[cfg(feature = "freertos")]
         unsafe {
-            const SYST_CSR: *mut u32 = 0xE000_E010 as *mut u32;
+            const SYST_CSR: *mut u32 = 0xE000_E010 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             SYST_CSR.write_volatile(0); // disable SysTick
         }
         // Enable display-related peripherals in D1 domain
@@ -1708,7 +1700,7 @@ fn main() -> ! {
         // Without PLL3R running, LTDC register reads hang (no pixel clock domain).
         // Force PLL3ON and wait for PLL3RDY.
         unsafe {
-            const RCC_CR: *mut u32 = 0x5802_4400u32 as *mut u32;
+            const RCC_CR: *mut u32 = 0x5802_4400u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             RCC_CR.write_volatile(RCC_CR.read_volatile() | (1 << 28)); // PLL3ON
             while RCC_CR.read_volatile() & (1 << 29) == 0 {} // wait PLL3RDY
         }
@@ -1719,7 +1711,7 @@ fn main() -> ! {
             let _ = bsp_pac::signal_clocks_ready();
         }
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // pre-gpio-split
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
         let gpiog = GPIOG.split(ccdr.peripheral.GPIOG);
@@ -1733,7 +1725,7 @@ fn main() -> ! {
         #[cfg(feature = "qspi_flash")]
         let gpiob = GPIOB.split(ccdr.peripheral.GPIOB);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-gpio-split
 
         // ── ADC3 temperature sensor ──────────────────────────────────────
@@ -1823,7 +1815,7 @@ fn main() -> ! {
         af12_high!(gpioi.pi9);
         af12_high!(gpioi.pi10);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-FMC-pins
 
         // ── QSPI flash init (MT25TL01G Bank 1) ──────────────────────────
@@ -1835,7 +1827,7 @@ fn main() -> ! {
             // Errata 2.8.5: Select PLL2R (150 MHz) as QSPI kernel clock
             // D1CCIPR QSPISEL bits [5:4]: 00=HCLK, 01=PLL1Q, 10=PLL2R, 11=PER
             unsafe {
-                let d1ccipr = 0x5802_4C18u32 as *mut u32;
+                let d1ccipr = 0x5802_4C18u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let val = d1ccipr.read_volatile();
                 d1ccipr.write_volatile((val & !(0b11 << 4)) | (0b10 << 4));
             }
@@ -1862,14 +1854,14 @@ fn main() -> ! {
                 Ok(id) => {
                     unsafe {
                         // Breadcrumb: write JEDEC ID to D3 SRAM for debug
-                        let bc = 0x3800_0320u32 as *mut u32;
+                        let bc = 0x3800_0320u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         bc.write_volatile(
                             0x0F00_0000 | (id[0] as u32) << 16 | (id[1] as u32) << 8 | id[2] as u32,
                         );
                     }
                 }
                 Err(_) => unsafe {
-                    (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD);
+                    (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 },
             }
             flash
@@ -1942,32 +1934,32 @@ fn main() -> ! {
         // Addresses from C HAL path (RCC C1 domain registers at 0x5802_44xx)
         unsafe {
             // Enable GPIOA clock (AHB4ENR at RCC+0xE0)
-            let ahb4 = 0x5802_44E0u32 as *mut u32; // global AHB4ENR
+            let ahb4 = 0x5802_44E0u32 as *mut u32; // global AHB4ENR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ahb4.write_volatile(ahb4.read_volatile() | (1 << 0));
-            let _ = (ahb4 as *const u32).read_volatile();
+            let _ = (ahb4 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits [7:4]=7 (PA9), [11:8]=7 (PA10)
             let gpioa = 0x5802_0000u32;
-            let afrh = (gpioa + 0x24) as *mut u32;
+            let afrh = (gpioa + 0x24) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             afrh.write_volatile(
                 (afrh.read_volatile() & !(0xFFu32 << 4)) | (7u32 << 4) | (7u32 << 8),
             );
             // MODER: PA9 = AF (10), PA10 = AF (10)
-            let moder = gpioa as *mut u32;
+            let moder = gpioa as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             moder.write_volatile((moder.read_volatile() & !(0xF << 18)) | (0b1010 << 18));
             // Enable USART1 clock (C1_APB2ENR bit 4)
-            let apb2 = 0x5802_44F0u32 as *mut u32;
+            let apb2 = 0x5802_44F0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             apb2.write_volatile(apb2.read_volatile() | (1 << 4));
-            let _ = (apb2 as *const u32).read_volatile();
+            let _ = (apb2 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE+FIFOEN
             let usart1 = 0x4001_1000u32;
-            ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR
-            ((usart1 + 0x00) as *mut u32).write_volatile(
+            ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((usart1 + 0x00) as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 (1 << 29) | (1 << 3) | (1 << 2) | (1 << 0), // FIFOEN + TE + RE + UE
             );
         }
 
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // pre-display::new
         let mut display = Stm32h747iDiscoDisplay::new(
             blitter,
@@ -1981,12 +1973,12 @@ fn main() -> ! {
             Some(SPLASH_RLE),
         );
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-display::new
         // Early serial breadcrumb (serial_puts not yet defined)
         {
-            const ISR: *const u32 = 0x4001_101C as *const u32;
-            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            const ISR: *const u32 = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for &b in b"POST-DISP\r\n" {
                 unsafe {
                     while ISR.read_volatile() & (1 << 7) == 0 {}
@@ -2024,11 +2016,11 @@ fn main() -> ! {
 
                     // Pattern 1: solid zeros
                     for i in 0..STRIDE {
-                        let p = (mb_base as *mut u32).add(i * 8);
+                        let p = (mb_base as *mut u32).add(i * 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p.write_volatile(0x0000_0000);
                     }
                     for i in 0..STRIDE {
-                        let p = (mb_base as *const u32).add(i * 8);
+                        let p = (mb_base as *const u32).add(i * 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p.read_volatile() != 0x0000_0000 {
                             errs += 1;
                         }
@@ -2036,11 +2028,11 @@ fn main() -> ! {
 
                     // Pattern 2: solid ones
                     for i in 0..STRIDE {
-                        let p = (mb_base as *mut u32).add(i * 8 + 1);
+                        let p = (mb_base as *mut u32).add(i * 8 + 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p.write_volatile(0xFFFF_FFFF);
                     }
                     for i in 0..STRIDE {
-                        let p = (mb_base as *const u32).add(i * 8 + 1);
+                        let p = (mb_base as *const u32).add(i * 8 + 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p.read_volatile() != 0xFFFF_FFFF {
                             errs += 1;
                         }
@@ -2048,12 +2040,12 @@ fn main() -> ! {
 
                     // Pattern 3: address-based
                     for i in 0..STRIDE {
-                        let p = (mb_base as *mut u32).add(i * 8 + 2);
+                        let p = (mb_base as *mut u32).add(i * 8 + 2); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         let v = (mb_base as u32).wrapping_add((i as u32) << 4);
                         p.write_volatile(v);
                     }
                     for i in 0..STRIDE {
-                        let p = (mb_base as *const u32).add(i * 8 + 2);
+                        let p = (mb_base as *const u32).add(i * 8 + 2); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         let v = (mb_base as u32).wrapping_add((i as u32) << 4);
                         if p.read_volatile() != v {
                             errs += 1;
@@ -2062,14 +2054,14 @@ fn main() -> ! {
 
                     // Pattern 4: checkerboard
                     for i in 0..STRIDE {
-                        let p0 = (mb_base as *mut u32).add(i * 8 + 3);
-                        let p1 = (mb_base as *mut u32).add(i * 8 + 4);
+                        let p0 = (mb_base as *mut u32).add(i * 8 + 3); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        let p1 = (mb_base as *mut u32).add(i * 8 + 4); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p0.write_volatile(0xAAAA_AAAA);
                         p1.write_volatile(0x5555_5555);
                     }
                     for i in 0..STRIDE {
-                        let p0 = (mb_base as *const u32).add(i * 8 + 3);
-                        let p1 = (mb_base as *const u32).add(i * 8 + 4);
+                        let p0 = (mb_base as *const u32).add(i * 8 + 3); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        let p1 = (mb_base as *const u32).add(i * 8 + 4); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p0.read_volatile() != 0xAAAA_AAAA {
                             errs += 1;
                         }
@@ -2085,7 +2077,7 @@ fn main() -> ! {
                         seed ^= seed << 13;
                         seed ^= seed >> 17;
                         seed ^= seed << 5;
-                        let p = (mb_base as *mut u32).add(i * 8 + 5);
+                        let p = (mb_base as *mut u32).add(i * 8 + 5); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p.write_volatile(seed);
                     }
                     let mut seed2: u32 = 0xC0FF_EE11 ^ (mb as u32 * 0x9E37_79B9);
@@ -2093,7 +2085,7 @@ fn main() -> ! {
                         seed2 ^= seed2 << 13;
                         seed2 ^= seed2 >> 17;
                         seed2 ^= seed2 << 5;
-                        let p = (mb_base as *const u32).add(i * 8 + 5);
+                        let p = (mb_base as *const u32).add(i * 8 + 5); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p.read_volatile() != seed2 {
                             errs += 1;
                         }
@@ -2108,17 +2100,17 @@ fn main() -> ! {
 
         // ── I2C4 for FT5336 touch controller (PD12=SCL, PD13=SDA, AF4 OD) ──
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // pre-I2C4
         let _scl = gpiod.pd12.into_alternate_open_drain::<4>();
         let _sda = gpiod.pd13.into_alternate_open_drain::<4>();
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-I2C4-pins
         let mut i2c4 =
             stm32h7xx_hal::i2c::I2c::i2c4(I2C4, 400.kHz(), ccdr.peripheral.I2C4, &ccdr.clocks);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-I2C4-init
         // FT5336 CTRL init deferred — HAL I2C writes hang the bus.
         // Touch needs PG3 reset re-sequencing (separate task).
@@ -2165,8 +2157,8 @@ fn main() -> ! {
             }
         }
         {
-            const ISR: *const u32 = 0x4001_101C as *const u32;
-            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            const ISR: *const u32 = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for &b in b"PRE-AUDIO\r\n" {
                 unsafe {
                     while ISR.read_volatile() & (1 << 7) == 0 {}
@@ -2228,8 +2220,8 @@ fn main() -> ! {
         let i2c4 = i2c4;
 
         {
-            const ISR: *const u32 = 0x4001_101C as *const u32;
-            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            const ISR: *const u32 = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for &b in b"POST-AUDIO\r\n" {
                 unsafe {
                     while ISR.read_volatile() & (1 << 7) == 0 {}
@@ -2252,16 +2244,16 @@ fn main() -> ! {
         // sensor calibration from completing.
         unsafe {
             // Enable TIM6 clock (RCC APB1LENR bit 4)
-            let apb1lenr = 0x5802_44E8u32 as *mut u32;
+            let apb1lenr = 0x5802_44E8u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             apb1lenr.write_volatile(apb1lenr.read_volatile() | (1 << 4));
-            let _ = (apb1lenr as *const u32).read_volatile(); // readback fence
+            let _ = (apb1lenr as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             let tim6 = 0x4000_1000u32;
-            let tim6_cr1 = tim6 as *mut u32; // +0x00
-            let tim6_dier = (tim6 + 0x0C) as *mut u32; // +0x0C
-            let tim6_egr = (tim6 + 0x14) as *mut u32; // +0x14
-            let tim6_psc = (tim6 + 0x28) as *mut u32; // +0x28
-            let tim6_arr = (tim6 + 0x2C) as *mut u32; // +0x2C
+            let tim6_cr1 = tim6 as *mut u32; // +0x00 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_dier = (tim6 + 0x0C) as *mut u32; // +0x0C // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_egr = (tim6 + 0x14) as *mut u32; // +0x14 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_psc = (tim6 + 0x28) as *mut u32; // +0x28 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_arr = (tim6 + 0x2C) as *mut u32; // +0x2C // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Timer clock = 2 × APB1 = 200 MHz (APB1 prescaler > 1)
             // 200 MHz / (199+1) = 1 MHz tick, / (8332+1) = 120.0 Hz
@@ -2270,7 +2262,7 @@ fn main() -> ! {
             tim6_dier.write_volatile(1); // UIE — update interrupt enable
             tim6_egr.write_volatile(1); // UG  — force load PSC/ARR shadow
             // Clear any pending UIF before enabling
-            let tim6_sr = (tim6 + 0x10) as *mut u32;
+            let tim6_sr = (tim6 + 0x10) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             tim6_sr.write_volatile(0);
             tim6_cr1.write_volatile(1); // CEN — start counter
 
@@ -2582,7 +2574,7 @@ fn main() -> ! {
         let (w_fb, h_fb) = display.dimensions();
 
         unsafe {
-            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001);
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // ── Icon strip (right edge, 3 slots) + wings ────────────────────
         // Shared crawl toggle flag — set by info wing favicon callback.
@@ -2803,7 +2795,7 @@ fn main() -> ! {
                     iw.borrow_mut().close();
                     let vis = sw.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis {
+                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                             0x5E77_0001
                         } else {
                             0x5E77_0000
@@ -2826,7 +2818,7 @@ fn main() -> ! {
                     sw2.borrow_mut().close();
                     let vis = iw2.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis {
+                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                             0x1AF0_0001
                         } else {
                             0x1AF0_0000
@@ -2879,13 +2871,13 @@ fn main() -> ! {
 
         serial_puts("PRE-FB2\r\n");
         unsafe {
-            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003);
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const SDRAM_BANK_STRIDE: u32 = 0x0080_0000;
         const FB2_ADDR: u32 = 0xD080_0000; // SDRAM internal bank 1
-        let front_addr = display.front_buffer_addr();
-        let back_addr = display.back_buffer_addr();
+        let front_addr = display.front_phys().raw();
+        let back_addr = display.back_phys().raw();
         let same_buffer = back_addr == front_addr;
         let same_bank = ((back_addr - 0xD000_0000) / SDRAM_BANK_STRIDE)
             == ((front_addr - 0xD000_0000) / SDRAM_BANK_STRIDE);
@@ -2899,7 +2891,7 @@ fn main() -> ! {
                 );
                 cortex_m::asm::dsb();
             }
-            display.set_back_buffer(FB2_ADDR);
+            display.set_back_phys(rlvgl_platform::PhysAddr::new(FB2_ADDR));
         }
 
         // ── Desktop background ────────────────────────────────────────────
@@ -2917,7 +2909,7 @@ fn main() -> ! {
                 palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
             let fb0 = unsafe {
-                core::slice::from_raw_parts_mut(display.front_buffer_addr() as *mut u8, fb_bytes)
+                core::slice::from_raw_parts_mut(display.front_phys().raw() as *mut u8, fb_bytes)
             };
             let _ = rlvgl_decomp::decode_argb_into(
                 dw as usize,
@@ -2927,7 +2919,7 @@ fn main() -> ! {
                 fb0,
             );
             let fb1 = unsafe {
-                core::slice::from_raw_parts_mut(display.back_buffer_addr() as *mut u8, fb_bytes)
+                core::slice::from_raw_parts_mut(display.back_phys().raw() as *mut u8, fb_bytes)
             };
             let _ = rlvgl_decomp::decode_argb_into(
                 dw as usize,
@@ -2942,8 +2934,8 @@ fn main() -> ! {
 
         // Telemetry: write both fb addresses
         unsafe {
-            (0x3800_0620u32 as *mut u32).write_volatile(display.front_buffer_addr());
-            (0x3800_0624u32 as *mut u32).write_volatile(display.back_buffer_addr());
+            (0x3800_0620u32 as *mut u32).write_volatile(display.front_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x3800_0624u32 as *mut u32).write_volatile(display.back_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         // Save a pristine copy of the desktop framebuffer so we can restore
@@ -2953,7 +2945,7 @@ fn main() -> ! {
         const DESKTOP_PRISTINE: u32 = 0xD030_0000;
         // When desktop feature is off, the pristine copy is still taken so
         // that the solid-black background can be restored correctly.
-        let pristine_ref = display.back_buffer_addr();
+        let pristine_ref = display.back_phys().raw();
         unsafe {
             core::ptr::copy_nonoverlapping(
                 pristine_ref as *const u8,
@@ -2975,10 +2967,10 @@ fn main() -> ! {
 
         // D3 breadcrumb: entering main loop
         unsafe {
-            (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001);
+            (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         unsafe {
-            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004);
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         serial_puts("rlvgl: input proof loop started\r\n");
 
@@ -3003,20 +2995,20 @@ fn main() -> ! {
         const TELEM_DUMP_TICK: u32 = 0x3800_06F4;
 
         unsafe {
-            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
-            (TELEM_DUMP_TICK as *mut u32).write_volatile(0);
+            (TELEM_IDX_ADDR as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (TELEM_DUMP_TICK as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         fn telem_log(tick: u32, code: u32, x: i32, y: i32) {
             unsafe {
-                let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                let idx = (TELEM_IDX_ADDR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let slot = idx % TELEM_ENTRIES;
                 let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
-                (base as *mut u32).write_volatile(tick);
-                ((base + 4) as *mut u32).write_volatile(code);
-                ((base + 8) as *mut u32).write_volatile(x as u32);
-                ((base + 12) as *mut u32).write_volatile(y as u32);
-                (TELEM_IDX_ADDR as *mut u32).write_volatile(idx + 1);
+                (base as *mut u32).write_volatile(tick); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((base + 4) as *mut u32).write_volatile(code); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((base + 8) as *mut u32).write_volatile(x as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((base + 12) as *mut u32).write_volatile(y as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (TELEM_IDX_ADDR as *mut u32).write_volatile(idx + 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
         }
 
@@ -3029,7 +3021,7 @@ fn main() -> ! {
             rlvgl_playit::PlayitExecutor<UsartTransport, 32>,
         > = alloc::boxed::Box::new(rlvgl_playit::PlayitExecutor::new(UsartTransport));
         let mut fb_reader = SdramFbReader {
-            fb_addr: display.front_buffer_addr(),
+            fb_addr: display.front_phys().raw(),
             width: display.dimensions().0,
             height: display.dimensions().1,
             present_count: 0,
@@ -3113,19 +3105,19 @@ fn main() -> ! {
         // into an incompletely-initialized system.
         unsafe {
             // Disable ALL DSI host interrupts — only wrapper ERIE matters.
-            (0x5000_00C4u32 as *mut u32).write_volatile(0); // IER0 = 0
-            (0x5000_00C8u32 as *mut u32).write_volatile(0); // IER1 = 0
+            (0x5000_00C4u32 as *mut u32).write_volatile(0); // IER0 = 0 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_00C8u32 as *mut u32).write_volatile(0); // IER1 = 0 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Set WIER to ONLY ERIE (bit 1), clearing all others.
-            (0x5000_0408u32 as *mut u32).write_volatile(1 << 1);
+            (0x5000_0408u32 as *mut u32).write_volatile(1 << 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Clear all pending wrapper + host flags
-            (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // WIFCR: all wrapper flags
-            let isr0 = (0x5000_00BCu32 as *const u32).read_volatile();
+            (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // WIFCR: all wrapper flags // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let isr0 = (0x5000_00BCu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             if isr0 != 0 {
-                (0x5000_00D8u32 as *mut u32).write_volatile(isr0);
+                (0x5000_00D8u32 as *mut u32).write_volatile(isr0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
-            let isr1 = (0x5000_00C0u32 as *const u32).read_volatile();
+            let isr1 = (0x5000_00C0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             if isr1 != 0 {
-                (0x5000_00DCu32 as *mut u32).write_volatile(isr1);
+                (0x5000_00DCu32 as *mut u32).write_volatile(isr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             // Clear NVIC pending bit, then unmask
             cortex_m::peripheral::NVIC::unpend(stm32h7::stm32h747cm7::Interrupt::DSI);
@@ -3143,8 +3135,8 @@ fn main() -> ! {
         unsafe {
             let (fw, fh) = display.dimensions();
             freertos_entry::init_fbs(
-                display.front_buffer_addr(),
-                display.back_buffer_addr(),
+                display.front_phys().raw(),
+                display.back_phys().raw(),
                 fw,
                 fh,
             );
@@ -3158,8 +3150,8 @@ fn main() -> ! {
             // No polling — shows exact scan window without main-loop jitter.
             // Loop heartbeat
             unsafe {
-                let prev = (0x3800_0660u32 as *const u32).read_volatile();
-                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1));
+                let prev = (0x3800_0660u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             // Handle CM4 commands
             if let Some(cmd) = ipc::cmd_pop() {
@@ -3418,7 +3410,7 @@ fn main() -> ! {
             #[cfg(feature = "cpu_stats")]
             let serial_start = cpu_stats.cyccnt();
             {
-                fb_reader.fb_addr = display.front_buffer_addr();
+                fb_reader.fb_addr = display.front_phys().raw();
                 // Use tick_count for the dump gate so dumps complete even
                 // when the render loop is idle (display.present() is gated
                 // by dirty_frames). Reporting present_count separately in
@@ -3458,7 +3450,7 @@ fn main() -> ! {
                         Event::KeyUp { .. } => 0x4200_8000,
                         _ => 0x4200_FFFF,
                     };
-                    (0x3800_0630u32 as *mut u32).write_volatile(code);
+                    (0x3800_0630u32 as *mut u32).write_volatile(code); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 }
                 if matches!(evt, Event::KeyDown { .. }) {
                     serial_puts("BTN: PRESS\r\n");
@@ -3491,7 +3483,7 @@ fn main() -> ! {
                         Event::KeyUp { .. } => 0x4A00_8000,
                         _ => 0x4A00_FFFF,
                     };
-                    (0x3800_0634u32 as *mut u32).write_volatile(code);
+                    (0x3800_0634u32 as *mut u32).write_volatile(code); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 }
                 if let Event::KeyDown { ref key } = evt {
                     let label = match key {
@@ -3599,7 +3591,7 @@ fn main() -> ! {
                 }
                 // Track wing visibility for dirty frames + compositor restore
                 let sw_vis = settings_wing.borrow().is_visible();
-                static mut SW_WAS_VISIBLE: bool = false;
+                static mut SW_WAS_VISIBLE: bool = false; // rlvgl-discipline: allow(static_mut)
                 if sw_vis != unsafe { SW_WAS_VISIBLE } {
                     dirty_frames = 4;
                     if !sw_vis {
@@ -3610,7 +3602,7 @@ fn main() -> ! {
                     }
                 }
                 let iw_vis = info_wing.borrow().is_visible();
-                static mut IW_WAS_VISIBLE: bool = false;
+                static mut IW_WAS_VISIBLE: bool = false; // rlvgl-discipline: allow(static_mut)
                 if iw_vis != unsafe { IW_WAS_VISIBLE } {
                     dirty_frames = 4;
                     if !iw_vis {
@@ -3637,7 +3629,7 @@ fn main() -> ! {
                 // Track chip info panel visibility
                 {
                     let vis = chip_info_panel.borrow().is_visible();
-                    static mut CIP_WAS_VIS: bool = false;
+                    static mut CIP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if vis != unsafe { CIP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
@@ -3651,7 +3643,7 @@ fn main() -> ! {
                 // Track live stats panel visibility
                 {
                     let vis = live_stats_panel.borrow().is_visible();
-                    static mut LSP_WAS_VIS: bool = false;
+                    static mut LSP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if vis != unsafe { LSP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
@@ -3665,7 +3657,7 @@ fn main() -> ! {
                 // Track file browser panel visibility
                 {
                     let vis = file_browser_panel.borrow().is_visible();
-                    static mut FBP_WAS_VIS: bool = false;
+                    static mut FBP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if vis != unsafe { FBP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
@@ -3682,7 +3674,7 @@ fn main() -> ! {
                 // Live stats refresh (~2 Hz) — skip first frame after becoming visible
                 {
                     let lsp_now = live_stats_panel.borrow().is_visible();
-                    static mut LSP_PREV_VIS: bool = false;
+                    static mut LSP_PREV_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     let was = unsafe { LSP_PREV_VIS };
                     unsafe {
                         LSP_PREV_VIS = lsp_now;
@@ -3719,7 +3711,7 @@ fn main() -> ! {
                 // Track config menu visibility
                 {
                     let cm_vis = config_menu.borrow().is_visible();
-                    static mut CM_WAS: bool = false;
+                    static mut CM_WAS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if cm_vis != unsafe { CM_WAS } {
                         dirty_frames = 4;
                         if !cm_vis {
@@ -3742,7 +3734,7 @@ fn main() -> ! {
                 // entry count change, new event push).
 
                 // Detect entry count change (expiry or new push)
-                static mut LAST_ENTRY_COUNT: usize = 0;
+                static mut LAST_ENTRY_COUNT: usize = 0; // rlvgl-discipline: allow(static_mut)
                 let ec = entry_count;
                 if ec != unsafe { LAST_ENTRY_COUNT } {
                     unsafe {
@@ -3866,36 +3858,36 @@ fn main() -> ! {
                 tick_count += 1;
                 // Telemetry at 0x3800_0604..0x3800_0640
                 unsafe {
-                    (0x3800_0604u32 as *mut u32).write_volatile(evt_count);
-                    (0x3800_0608u32 as *mut u32).write_volatile(tick_count);
-                    (0x3800_060Cu32 as *mut u32).write_volatile(render_count);
-                    (0x3800_0610u32 as *mut u32).write_volatile(
+                    (0x3800_0604u32 as *mut u32).write_volatile(evt_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0608u32 as *mut u32).write_volatile(tick_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_060Cu32 as *mut u32).write_volatile(render_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0610u32 as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         ((dirty_frames as u32) << 16)
                             | ((was_visible as u32) << 8)
                             | (event_win.borrow().is_visible() as u32),
                     );
-                    (0x3800_0614u32 as *mut u32).write_volatile(display.back_buffer_addr());
-                    (0x3800_0618u32 as *mut u32)
-                        .write_volatile((0x5000_10ACu32 as *const u32).read_volatile());
+                    (0x3800_0614u32 as *mut u32).write_volatile(display.back_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0618u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        .write_volatile((0x5000_10ACu32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // Cortex-M fault registers
-                    (0x3800_0638u32 as *mut u32).write_volatile(
-                        (0xE000_ED28u32 as *const u32).read_volatile(), // CFSR
+                    (0x3800_0638u32 as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        (0xE000_ED28u32 as *const u32).read_volatile(), // CFSR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     );
-                    (0x3800_063Cu32 as *mut u32).write_volatile(
-                        (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR
+                    (0x3800_063Cu32 as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     );
                     // LTDC ISR — FUIF (bit 1) / LIF (bit 0)
-                    (0x3800_0640u32 as *mut u32)
-                        .write_volatile((0x5000_1038u32 as *const u32).read_volatile());
+                    (0x3800_0640u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        .write_volatile((0x5000_1038u32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // EventWindow entry count for debugging
-                    (0x3800_0644u32 as *mut u32)
+                    (0x3800_0644u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         .write_volatile(event_win.borrow().entry_count() as u32);
 
                     // Dump event telemetry ring over serial every ~1s (6 ticks)
-                    let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile();
+                    let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     if tick_count - last_dump >= 180 {
                         // ~30s at 6Hz
-                        let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                        let idx = (TELEM_IDX_ADDR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if idx > 0 {
                             let dump_count = idx.min(TELEM_ENTRIES);
                             let start = if idx > TELEM_ENTRIES {
@@ -3907,10 +3899,10 @@ fn main() -> ! {
                             for i in start..start + dump_count {
                                 let slot = i % TELEM_ENTRIES;
                                 let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
-                                let t = (base as *const u32).read_volatile();
-                                let code = ((base + 4) as *const u32).read_volatile();
-                                let x = ((base + 8) as *const u32).read_volatile();
-                                let y = ((base + 12) as *const u32).read_volatile();
+                                let t = (base as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let code = ((base + 4) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let x = ((base + 8) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let y = ((base + 12) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                                 // Format: " T:code:x:y"
                                 use core::fmt::Write;
                                 let mut buf = alloc::string::String::new();
@@ -3920,9 +3912,9 @@ fn main() -> ! {
                             }
                             serial_puts("\r\n");
                             // Reset ring
-                            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
+                            (TELEM_IDX_ADDR as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         }
-                        (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count);
+                        (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     }
                 }
 
@@ -3990,12 +3982,12 @@ fn main() -> ! {
                         | ((crawl_waiting_dma as u32) << 19)
                         | ((display.check_erif() as u32) << 18)
                         | (present_count & 0xFFFF);
-                    let active_fb = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() };
+                    let active_fb = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     let ltdc_status = (((cdsr & 0xFF) as u16) << 8) | (ltdc_isr as u16 & 0xFF);
                     cpu_stats.record_display_diag(
                         display_flags,
-                        display.front_buffer_addr(),
-                        display.back_buffer_addr(),
+                        display.front_phys().raw(),
+                        display.back_phys().raw(),
                         active_fb,
                         wisr as u16,
                         ltdc_status,
@@ -4031,7 +4023,7 @@ fn main() -> ! {
             // LTDC reads front buffer undisturbed during this time.
             // Three modes: star crawl, audio scope, or normal tree+overlay.
             if render_active && !buffer_ready {
-                const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+                const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let t_frame_start = unsafe { DWT_CYCCNT.read_volatile() };
 
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -4047,7 +4039,7 @@ fn main() -> ! {
                 #[cfg(not(feature = "audio"))]
                 let is_scope = false;
 
-                let back = display.back_buffer_addr();
+                let back = display.back_phys().raw();
                 let (w, h) = display.dimensions();
                 let mut frame_ready = false;
                 #[cfg(any(
@@ -4426,11 +4418,11 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
     impl OutputPin for GpioOut {
         fn set_high(&mut self) -> Result<(), Infallible> {
-            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << self.pin) }
+            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << self.pin) } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             Ok(())
         }
         fn set_low(&mut self) -> Result<(), Infallible> {
-            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << (self.pin + 16)) }
+            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << (self.pin + 16)) } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             Ok(())
         }
     }
@@ -4463,7 +4455,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
     impl InputPin for GpioIn {
         fn is_high(&mut self) -> Result<bool, Infallible> {
-            let idr = unsafe { ((self.base + 0x10) as *const u32).read_volatile() };
+            let idr = unsafe { ((self.base + 0x10) as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             Ok((idr >> self.pin) & 1 != 0)
         }
         fn is_low(&mut self) -> Result<bool, Infallible> {
@@ -4551,9 +4543,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // PG3: panel reset — ensure it's in GPIO output mode (C BSP may
     // have left it in AF mode, which prevents BSRR from toggling the pin).
     unsafe {
-        let moder = (GPIOG as *mut u32).read_volatile();
+        let moder = (GPIOG as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Clear bits 7:6 (pin 3 MODER) and set to 01 (GP output)
-        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
+        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
     let panel_reset = GpioOut {
         base: GPIOG,
@@ -4563,8 +4555,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // PJ12: LCD backlight control (DSI_BL_CTRL per UM2411 CN15 pin 53)
     // Configure PJ12 as GP output (clear bits 25:24, set to 01)
     unsafe {
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
+        let moder = (GPIOJ as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
     let backlight = GpioBacklight(GpioOut {
         base: GPIOJ,
@@ -4579,17 +4571,17 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     const RCC_APB1LENR: u32 = 0x5802_44E8;
     unsafe {
         // Enable UART8 clock (RCC_APB1LENR bit 31)
-        let apb1 = (RCC_APB1LENR as *mut u32).read_volatile();
-        (RCC_APB1LENR as *mut u32).write_volatile(apb1 | (1 << 31));
-        (RCC_APB1LENR as *const u32).read_volatile(); // readback fence
+        let apb1 = (RCC_APB1LENR as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (RCC_APB1LENR as *mut u32).write_volatile(apb1 | (1 << 31)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (RCC_APB1LENR as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // PJ8 = AF8: MODER bits 17:16 = 10 (AF), AFRH bits 3:0 = 0x8
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 16)) | (2u32 << 16));
-        let afrh = ((GPIOJ + 0x24) as *mut u32).read_volatile();
-        ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8);
+        let moder = (GPIOJ as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 16)) | (2u32 << 16)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let afrh = ((GPIOJ + 0x24) as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // UART8: BRR = APB1_clk / baud = 100_000_000 / 115200 ≈ 868
-        ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR
-        ((UART8 + 0x00) as *mut u32).write_volatile(
+        ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((UART8 + 0x00) as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             (1 << 3)  // TE (transmitter enable)
             | (1 << 0), // UE (USART enable)
         );
@@ -4600,30 +4592,30 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     const GPIOA: u32 = 0x5802_0000;
     unsafe {
         // Enable GPIOA clock (AHB4ENR bit 0)
-        let ahb4 = (0x5802_44E0u32 as *mut u32).read_volatile();
-        (0x5802_44E0u32 as *mut u32).write_volatile(ahb4 | (1 << 0));
-        (0x5802_44E0u32 as *const u32).read_volatile();
+        let ahb4 = (0x5802_44E0u32 as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44E0u32 as *mut u32).write_volatile(ahb4 | (1 << 0)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44E0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits 7:4 and 11:8 = 7
-        let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile();
-        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFFu32 << 4)) | (0x77u32 << 4));
+        let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFFu32 << 4)) | (0x77u32 << 4)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // MODER: PA9 = AF (10), PA10 = AF (10)
-        let moder = (GPIOA as *mut u32).read_volatile();
-        (GPIOA as *mut u32).write_volatile((moder & !(0xF << 18)) | (0b1010 << 18));
+        let moder = (GPIOA as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOA as *mut u32).write_volatile((moder & !(0xF << 18)) | (0b1010 << 18)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Enable USART1 clock (APB2ENR bit 4)
-        let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile();
-        (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4));
-        (0x5802_44F0u32 as *const u32).read_volatile();
+        let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44F0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // BRR = APB2_clk / baud = 100_000_000 / 115200 ≈ 868
-        ((USART1 + 0x0C) as *mut u32).write_volatile(868);
-        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE
+        ((USART1 + 0x0C) as *mut u32).write_volatile(868); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Send a string over UART8 + USART1 VCP (blocking, dual output).
     fn dbg_print(s: &str) {
-        const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
-        const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
-        const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
-        const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+        const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         for b in s.bytes() {
             unsafe {
                 while U8_ISR.read_volatile() & (1 << 7) == 0 {}
@@ -4636,7 +4628,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     /// Short debug pulse on PJ6 (CN5 D9) to mark major runtime milestones.
     fn dbg_pulse() {
-        const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32;
+        const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
             GPIOJ_BSRR.write_volatile(1u32 << 6);
             cortex_m::asm::delay(4_000_000);
@@ -4690,14 +4682,14 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // constructor or PAC peripheral take() may reset GPIO MODER.
     unsafe {
         // PJ12 backlight: MODER bits 25:24 = 01
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
+        let moder = (GPIOJ as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Drive PJ12 high (backlight on)
-        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // PG3 panel reset: MODER bits 7:6 = 01, drive high
-        let moder = (GPIOG as *mut u32).read_volatile();
-        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
-        ((GPIOG + 0x18) as *mut u32).write_volatile(1u32 << 3);
+        let moder = (GPIOG as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((GPIOG + 0x18) as *mut u32).write_volatile(1u32 << 3); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     // ── IPC + input ──────────────────────────────────────────────────────────
@@ -4764,7 +4756,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             let _ = writeln!(out, "\n── {} @ 0x{:08X} ({} words) ──", label, addr, words);
             for i in 0..words {
                 let a = addr + (i as u32) * 4;
-                let val = unsafe { (a as *const u32).read_volatile() };
+                let val = unsafe { (a as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 if i % 4 == 0 {
                     let _ = write!(out, "  {:08X}:", a);
                 }
@@ -4797,7 +4789,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     fn sh_reg(label: &str, addr: u32) {
         use core::fmt::Write;
         if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
-            let val = unsafe { (addr as *const u32).read_volatile() };
+            let val = unsafe { (addr as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let _ = writeln!(out, "  {} (0x{:08X}) = 0x{:08X}", label, addr, val);
         }
     }
@@ -4864,7 +4856,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
         // Framebuffer content: read from pre-stored CFBAR (0x24070128)
         // (Live LTDC reads are aliased to GCR after LTDCEN)
-        let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };
+        let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         if cfbar >= 0x2400_0000 && cfbar < 0x2408_0000 {
             sh_hexdump("Framebuffer (AXI SRAM)", cfbar, 64);
         } else if cfbar >= 0xC000_0000 {
@@ -4880,11 +4872,11 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         sh_println("\n── SDRAM read/write test ──");
         let test_addr: u32 = 0xC000_0000;
         unsafe {
-            let before = (test_addr as *const u32).read_volatile();
-            (test_addr as *mut u32).write_volatile(0xDEAD_BEEF);
+            let before = (test_addr as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (test_addr as *mut u32).write_volatile(0xDEAD_BEEF); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
-            let after = (test_addr as *const u32).read_volatile();
-            (test_addr as *mut u32).write_volatile(before); // restore
+            let after = (test_addr as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (test_addr as *mut u32).write_volatile(before); // restore // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             use core::fmt::Write;
             if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
                 let _ = writeln!(
@@ -4907,16 +4899,16 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     for _ in 0..3 {
         unsafe {
             // PJ12 HIGH
-            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::delay(80_000_000); // ~200ms at 400 MHz
             // PJ12 LOW
-            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << (12 + 16));
+            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << (12 + 16)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::delay(80_000_000);
         }
     }
     // Leave backlight ON
     unsafe {
-        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     // ── Display server main loop ─────────────────────────────────────────────
@@ -5011,7 +5003,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             controller.tick();
             apply_disco_commands(&mut controller, &mut display);
 
-            let back = display.back_buffer_addr();
+            let back = display.back_phys().raw();
             let fb_bytes = (w_fb * h_fb * 4) as usize;
             let stride = (w_fb * 4) as usize;
             let fb_slice = unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };
@@ -5024,7 +5016,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
             // Heartbeat toggle on PJ6 (CN5 D9)
             unsafe {
-                const GPIOJ_ODR: *mut u32 = (0x58022400 + 0x14) as *mut u32;
+                const GPIOJ_ODR: *mut u32 = (0x58022400 + 0x14) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let odr = GPIOJ_ODR.read_volatile();
                 GPIOJ_ODR.write_volatile(odr ^ (1 << 6));
             }
@@ -5040,7 +5032,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             if frame_counter % (FRAME_HZ * 30) == FRAME_HZ {
                 sh_println("\n── Periodic SDRAM check ──");
                 // CFBAR is at LTDC+0xAC (aliased after LTDCEN — use pre-stored value)
-                let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };
+                let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 sh_hexdump("FB snapshot", cfbar, 16);
                 sh_reg("WISR  ", 0x5000_040C);
                 sh_reg("WCR   ", 0x5000_0404);

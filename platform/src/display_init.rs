@@ -28,90 +28,90 @@ use crate::dsi_cmd_mode;
 // ── DSI host register addresses (base = 0x5000_0000) ─────────────────────────
 
 const DSI: u32 = 0x5000_0000;
-const DSI_VR: *const u32 = (DSI + 0x000) as *const u32;
-const DSI_CR: *mut u32 = (DSI + 0x004) as *mut u32;
-const DSI_CCR: *mut u32 = (DSI + 0x008) as *mut u32;
-const DSI_LVCIDR: *mut u32 = (DSI + 0x00C) as *mut u32;
-const DSI_LCOLCR: *mut u32 = (DSI + 0x010) as *mut u32;
-const DSI_LPCR: *mut u32 = (DSI + 0x014) as *mut u32;
-const DSI_LPMCR: *mut u32 = (DSI + 0x018) as *mut u32;
-const DSI_PCR: *mut u32 = (DSI + 0x02C) as *mut u32;
-const DSI_GVCIDR: *mut u32 = (DSI + 0x030) as *mut u32;
-const DSI_MCR: *mut u32 = (DSI + 0x034) as *mut u32;
-const DSI_VMCR: *mut u32 = (DSI + 0x038) as *mut u32;
-const DSI_VPCR: *mut u32 = (DSI + 0x03C) as *mut u32;
-const DSI_VCCR: *mut u32 = (DSI + 0x040) as *mut u32;
-const DSI_VNPCR: *mut u32 = (DSI + 0x044) as *mut u32;
-const DSI_VHSACR: *mut u32 = (DSI + 0x048) as *mut u32;
-const DSI_VHBPCR: *mut u32 = (DSI + 0x04C) as *mut u32;
-const DSI_VLCR: *mut u32 = (DSI + 0x050) as *mut u32;
-const DSI_VVSACR: *mut u32 = (DSI + 0x054) as *mut u32;
-const DSI_VVBPCR: *mut u32 = (DSI + 0x058) as *mut u32;
-const DSI_VVFPCR: *mut u32 = (DSI + 0x05C) as *mut u32;
-const DSI_VVACR: *mut u32 = (DSI + 0x060) as *mut u32;
+const DSI_VR: *const u32 = (DSI + 0x000) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_CR: *mut u32 = (DSI + 0x004) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_CCR: *mut u32 = (DSI + 0x008) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_LVCIDR: *mut u32 = (DSI + 0x00C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_LCOLCR: *mut u32 = (DSI + 0x010) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_LPCR: *mut u32 = (DSI + 0x014) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_LPMCR: *mut u32 = (DSI + 0x018) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_PCR: *mut u32 = (DSI + 0x02C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_GVCIDR: *mut u32 = (DSI + 0x030) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_MCR: *mut u32 = (DSI + 0x034) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VMCR: *mut u32 = (DSI + 0x038) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VPCR: *mut u32 = (DSI + 0x03C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VCCR: *mut u32 = (DSI + 0x040) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VNPCR: *mut u32 = (DSI + 0x044) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VHSACR: *mut u32 = (DSI + 0x048) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VHBPCR: *mut u32 = (DSI + 0x04C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VLCR: *mut u32 = (DSI + 0x050) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VVSACR: *mut u32 = (DSI + 0x054) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VVBPCR: *mut u32 = (DSI + 0x058) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VVFPCR: *mut u32 = (DSI + 0x05C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_VVACR: *mut u32 = (DSI + 0x060) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 // LCCR (LTDC command configuration) lives at 0x64 — NOT 0x2C (which is PCR).
 // Verified against stm32h7-0.15.1 PAC and RM0399 §34.16. The previous 0x2C
 // alias caused configure_adapted_cmd_mode(width) to corrupt PCR and leave
 // CMDSIZE=0, producing snow on the panel.
-const DSI_LCCR: *mut u32 = (DSI + 0x064) as *mut u32;
-const DSI_CMCR: *mut u32 = (DSI + 0x068) as *mut u32;
-const DSI_GHCR: *mut u32 = (DSI + 0x06C) as *mut u32;
-const DSI_GPSR: *const u32 = (DSI + 0x074) as *const u32;
-const DSI_TCCR0: *mut u32 = (DSI + 0x078) as *mut u32;
-const DSI_CLCR: *mut u32 = (DSI + 0x094) as *mut u32;
-const DSI_CLTCR: *mut u32 = (DSI + 0x098) as *mut u32;
-const DSI_DLTCR: *mut u32 = (DSI + 0x09C) as *mut u32;
-const DSI_PCTLR: *mut u32 = (DSI + 0x0A0) as *mut u32;
-const DSI_PCONFR: *mut u32 = (DSI + 0x0A4) as *mut u32;
-const DSI_PSR: *const u32 = (DSI + 0x0B0) as *const u32;
+const DSI_LCCR: *mut u32 = (DSI + 0x064) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_CMCR: *mut u32 = (DSI + 0x068) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_GHCR: *mut u32 = (DSI + 0x06C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_GPSR: *const u32 = (DSI + 0x074) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_TCCR0: *mut u32 = (DSI + 0x078) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_CLCR: *mut u32 = (DSI + 0x094) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_CLTCR: *mut u32 = (DSI + 0x098) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_DLTCR: *mut u32 = (DSI + 0x09C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_PCTLR: *mut u32 = (DSI + 0x0A0) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_PCONFR: *mut u32 = (DSI + 0x0A4) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_PSR: *const u32 = (DSI + 0x0B0) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // DSI wrapper registers (base = DSI + 0x400)
 const DSI_W: u32 = DSI + 0x400;
-const DSI_WCR: *mut u32 = (DSI_W + 0x04) as *mut u32;
-const DSI_WIER: *mut u32 = (DSI_W + 0x08) as *mut u32;
-const DSI_WISR: *const u32 = (DSI_W + 0x0C) as *const u32;
-const DSI_WIFCR: *mut u32 = (DSI_W + 0x10) as *mut u32;
-const DSI_WPCR0: *mut u32 = (DSI_W + 0x18) as *mut u32;
-const DSI_WRPCR: *mut u32 = (DSI_W + 0x30) as *mut u32;
+const DSI_WCR: *mut u32 = (DSI_W + 0x04) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_WIER: *mut u32 = (DSI_W + 0x08) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_WISR: *const u32 = (DSI_W + 0x0C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_WIFCR: *mut u32 = (DSI_W + 0x10) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_WPCR0: *mut u32 = (DSI_W + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const DSI_WRPCR: *mut u32 = (DSI_W + 0x30) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // ── LTDC register addresses (base = 0x5000_1000) ─────────────────────────────
 
 const LTDC: u32 = 0x5000_1000;
-const LTDC_SSCR: *mut u32 = (LTDC + 0x008) as *mut u32;
-const LTDC_BPCR: *mut u32 = (LTDC + 0x00C) as *mut u32;
-const LTDC_AWCR: *mut u32 = (LTDC + 0x010) as *mut u32;
-const LTDC_TWCR: *mut u32 = (LTDC + 0x014) as *mut u32;
-const LTDC_GCR: *mut u32 = (LTDC + 0x018) as *mut u32;
-const LTDC_SRCR: *mut u32 = (LTDC + 0x024) as *mut u32;
-const LTDC_BCCR: *mut u32 = (LTDC + 0x02C) as *mut u32;
+const LTDC_SSCR: *mut u32 = (LTDC + 0x008) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_BPCR: *mut u32 = (LTDC + 0x00C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_AWCR: *mut u32 = (LTDC + 0x010) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_TWCR: *mut u32 = (LTDC + 0x014) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_GCR: *mut u32 = (LTDC + 0x018) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_SRCR: *mut u32 = (LTDC + 0x024) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_BCCR: *mut u32 = (LTDC + 0x02C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // LTDC Layer 1 (base = LTDC + 0x84)
 const LTDC_L1: u32 = LTDC + 0x084;
-const LTDC_L1CR: *mut u32 = (LTDC_L1 + 0x00) as *mut u32;
-const LTDC_L1WHPCR: *mut u32 = (LTDC_L1 + 0x04) as *mut u32;
-const LTDC_L1WVPCR: *mut u32 = (LTDC_L1 + 0x08) as *mut u32;
-const LTDC_L1PFCR: *mut u32 = (LTDC_L1 + 0x10) as *mut u32;
-const LTDC_L1CACR: *mut u32 = (LTDC_L1 + 0x14) as *mut u32;
-const LTDC_L1BFCR: *mut u32 = (LTDC_L1 + 0x1C) as *mut u32;
-const LTDC_L1CFBAR: *mut u32 = (LTDC_L1 + 0x28) as *mut u32;
-const LTDC_L1CFBLR: *mut u32 = (LTDC_L1 + 0x2C) as *mut u32;
-const LTDC_L1CFBLNR: *mut u32 = (LTDC_L1 + 0x30) as *mut u32;
+const LTDC_L1CR: *mut u32 = (LTDC_L1 + 0x00) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1WHPCR: *mut u32 = (LTDC_L1 + 0x04) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1WVPCR: *mut u32 = (LTDC_L1 + 0x08) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1PFCR: *mut u32 = (LTDC_L1 + 0x10) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1CACR: *mut u32 = (LTDC_L1 + 0x14) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1BFCR: *mut u32 = (LTDC_L1 + 0x1C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1CFBAR: *mut u32 = (LTDC_L1 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1CFBLR: *mut u32 = (LTDC_L1 + 0x2C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L1CFBLNR: *mut u32 = (LTDC_L1 + 0x30) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // ── RCC ──────────────────────────────────────────────────────────────────────
 
 const RCC: u32 = 0x5802_4400;
-const RCC_CR: *mut u32 = (RCC + 0x000) as *mut u32;
-const RCC_AHB3ENR: *mut u32 = (RCC + 0x0D4) as *mut u32;
-const RCC_APB3ENR: *mut u32 = (RCC + 0x0E4) as *mut u32;
+const RCC_CR: *mut u32 = (RCC + 0x000) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const RCC_AHB3ENR: *mut u32 = (RCC + 0x0D4) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const RCC_APB3ENR: *mut u32 = (RCC + 0x0E4) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // ── GPIO ─────────────────────────────────────────────────────────────────────
 
 const GPIOG: u32 = 0x5802_1800;
-const GPIOG_BSRR: *mut u32 = (GPIOG + 0x18) as *mut u32;
+const GPIOG_BSRR: *mut u32 = (GPIOG + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 const GPIOJ: u32 = 0x5802_2400;
-const GPIOJ_MODER: *mut u32 = (GPIOJ + 0x00) as *mut u32;
-const GPIOJ_BSRR: *mut u32 = (GPIOJ + 0x18) as *mut u32;
+const GPIOJ_MODER: *mut u32 = (GPIOJ + 0x00) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const GPIOJ_BSRR: *mut u32 = (GPIOJ + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // ── Panel timing constants (NT35510 480×800 portrait, MB1166-A09) ────────────
 
@@ -142,8 +142,8 @@ fn delay_cycles(cycles: u32) {
 /// Direct USART1 TX byte. Bypasses Zephyr's console subsystem so it
 /// works even when called from contexts where printk isn't available.
 fn u1_putc(c: u8) {
-    const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
-    const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+    const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     unsafe {
         // Wait for TXE (bit 7) — bounded poll
         let mut tries = 100_000u32;
@@ -175,7 +175,7 @@ fn u1_hex(v: u32) {
 unsafe fn pulse_panel_reset() {
     unsafe {
         // Configure PG3 as GP output: MODER bits 7:6 = 01
-        const GPIOG_MODER: *mut u32 = GPIOG as *mut u32;
+        const GPIOG_MODER: *mut u32 = GPIOG as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let moder = GPIOG_MODER.read_volatile();
         GPIOG_MODER.write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
         // PG3 low
@@ -401,7 +401,7 @@ pub unsafe fn enable_display_peripheral_clocks() {
         let apb3 = RCC_APB3ENR.read_volatile();
         RCC_APB3ENR.write_volatile(apb3 | (1 << 3) | (1 << 4));
         // AHB4ENR (0x5802_44E0): GPIOG = bit 6, GPIOJ = bit 9
-        const RCC_AHB4ENR: *mut u32 = (RCC + 0x0E0) as *mut u32;
+        const RCC_AHB4ENR: *mut u32 = (RCC + 0x0E0) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let ahb4 = RCC_AHB4ENR.read_volatile();
         RCC_AHB4ENR.write_volatile(ahb4 | (1 << 6) | (1 << 9));
 
@@ -422,12 +422,12 @@ pub unsafe fn enable_display_peripheral_clocks() {
         // didn't also write the C1 view. (See feedback_h747_c1_lpenr.md.)
         // Note: ENR registers ARE aliased on H747 (C1_*ENR same as
         // D-domain), so we don't need to mirror those.
-        const RCC_AHB3LPENR: *mut u32 = (RCC + 0x13C) as *mut u32;
-        const RCC_APB3LPENR: *mut u32 = (RCC + 0x14C) as *mut u32;
-        const RCC_AHB4LPENR: *mut u32 = (RCC + 0x148) as *mut u32;
-        const RCC_C1_AHB3LPENR: *mut u32 = (RCC + 0x19C) as *mut u32;
-        const RCC_C1_APB3LPENR: *mut u32 = (RCC + 0x1AC) as *mut u32;
-        const RCC_C1_AHB4LPENR: *mut u32 = (RCC + 0x1A8) as *mut u32;
+        const RCC_AHB3LPENR: *mut u32 = (RCC + 0x13C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_APB3LPENR: *mut u32 = (RCC + 0x14C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_AHB4LPENR: *mut u32 = (RCC + 0x148) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_AHB3LPENR: *mut u32 = (RCC + 0x19C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_APB3LPENR: *mut u32 = (RCC + 0x1AC) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_AHB4LPENR: *mut u32 = (RCC + 0x1A8) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // DMA2DLPEN (bit 4) + FMCLPEN (bit 12) — LTDC's framebuffer
         // reads go through FMC to SDRAM; if FMC is gated in CSleep,
         // LTDC can't fetch pixels and the scan stalls.
@@ -741,28 +741,28 @@ pub unsafe fn dump_registers() {
     unsafe {
         u1_str(b"\r\n--- DSI/LTDC register dump ---\r\n");
         // RCC PLL3
-        const RCC_PLLCKSELR: *const u32 = (RCC + 0x028) as *const u32;
-        const RCC_PLLCFGR: *const u32 = (RCC + 0x02C) as *const u32;
+        const RCC_PLLCKSELR: *const u32 = (RCC + 0x028) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_PLLCFGR: *const u32 = (RCC + 0x02C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Verified against stm32h7-0.15.1 PAC: PLL3DIVR=0x40, PLL3FRACR=0x44
         // (NOT 0x44/0x48 — _reserved8 padding shifts these earlier than RM0399's
         // listing initially suggests).
-        const RCC_PLL3DIVR: *const u32 = (RCC + 0x040) as *const u32;
-        const RCC_PLL3FRACR: *const u32 = (RCC + 0x044) as *const u32;
-        line(b"RCC.CR        ", (RCC_CR as *const u32).read_volatile());
+        const RCC_PLL3DIVR: *const u32 = (RCC + 0x040) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_PLL3FRACR: *const u32 = (RCC + 0x044) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        line(b"RCC.CR        ", RCC_CR.cast_const().read_volatile());
         line(b"RCC.PLLCKSELR ", RCC_PLLCKSELR.read_volatile());
         line(b"RCC.PLLCFGR   ", RCC_PLLCFGR.read_volatile());
         line(b"RCC.PLL3DIVR  ", RCC_PLL3DIVR.read_volatile());
         line(b"RCC.PLL3FRACR ", RCC_PLL3FRACR.read_volatile());
-        const RCC_AHB3ENR_R: *const u32 = (RCC + 0x0D4) as *const u32;
-        const RCC_APB3ENR_R: *const u32 = (RCC + 0x0E4) as *const u32;
-        const RCC_AHB4ENR_R: *const u32 = (RCC + 0x0E0) as *const u32;
-        const RCC_D1CCIPR: *const u32 = (RCC + 0x04C) as *const u32;
+        const RCC_AHB3ENR_R: *const u32 = (RCC + 0x0D4) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_APB3ENR_R: *const u32 = (RCC + 0x0E4) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_AHB4ENR_R: *const u32 = (RCC + 0x0E0) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_D1CCIPR: *const u32 = (RCC + 0x04C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         line(b"RCC.AHB3ENR   ", RCC_AHB3ENR_R.read_volatile());
         line(b"RCC.AHB4ENR   ", RCC_AHB4ENR_R.read_volatile());
         line(b"RCC.APB3ENR   ", RCC_APB3ENR_R.read_volatile());
         line(b"RCC.D1CCIPR   ", RCC_D1CCIPR.read_volatile());
-        const RCC_AHB3RSTR_R: *const u32 = (RCC + 0x07C) as *const u32;
-        const RCC_APB3RSTR_R: *const u32 = (RCC + 0x08C) as *const u32;
+        const RCC_AHB3RSTR_R: *const u32 = (RCC + 0x07C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_APB3RSTR_R: *const u32 = (RCC + 0x08C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         line(b"RCC.AHB3RSTR  ", RCC_AHB3RSTR_R.read_volatile());
         line(b"RCC.APB3RSTR  ", RCC_APB3RSTR_R.read_volatile());
         // ── H747 dual-core CPU1 (CM7) view of ENR/LPENR ──────────────────────
@@ -772,12 +772,12 @@ pub unsafe fn dump_registers() {
         // shows the bits as 0, CM7 cannot access the peripheral. Boot dump
         // showing all LTDC.* = 0 (despite display working) is consistent
         // with C1_APB3ENR.LTDCEN being 0. See feedback_h747_c1_lpenr.md.
-        const RCC_C1_AHB3ENR: *const u32 = (RCC + 0x134) as *const u32;
-        const RCC_C1_AHB4ENR: *const u32 = (RCC + 0x140) as *const u32;
-        const RCC_C1_APB3ENR: *const u32 = (RCC + 0x144) as *const u32;
-        const RCC_C1_AHB3LPENR: *const u32 = (RCC + 0x19C) as *const u32;
-        const RCC_C1_AHB4LPENR: *const u32 = (RCC + 0x1A8) as *const u32;
-        const RCC_C1_APB3LPENR: *const u32 = (RCC + 0x1AC) as *const u32;
+        const RCC_C1_AHB3ENR: *const u32 = (RCC + 0x134) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_AHB4ENR: *const u32 = (RCC + 0x140) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_APB3ENR: *const u32 = (RCC + 0x144) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_AHB3LPENR: *const u32 = (RCC + 0x19C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_AHB4LPENR: *const u32 = (RCC + 0x1A8) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const RCC_C1_APB3LPENR: *const u32 = (RCC + 0x1AC) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         line(b"RCC.C1_AHB3EN ", RCC_C1_AHB3ENR.read_volatile());
         line(b"RCC.C1_AHB4EN ", RCC_C1_AHB4ENR.read_volatile());
         line(b"RCC.C1_APB3EN ", RCC_C1_APB3ENR.read_volatile());
@@ -786,92 +786,92 @@ pub unsafe fn dump_registers() {
         line(b"RCC.C1_APB3LP ", RCC_C1_APB3LPENR.read_volatile());
         // DSI host
         line(b"DSI.VR        ", DSI_VR.read_volatile());
-        line(b"DSI.CR        ", (DSI_CR as *const u32).read_volatile());
-        line(b"DSI.CCR       ", (DSI_CCR as *const u32).read_volatile());
+        line(b"DSI.CR        ", DSI_CR.cast_const().read_volatile());
+        line(b"DSI.CCR       ", DSI_CCR.cast_const().read_volatile());
         line(
             b"DSI.LVCIDR    ",
-            (DSI_LVCIDR as *const u32).read_volatile(),
+            DSI_LVCIDR.cast_const().read_volatile(),
         );
         line(
             b"DSI.LCOLCR    ",
-            (DSI_LCOLCR as *const u32).read_volatile(),
+            DSI_LCOLCR.cast_const().read_volatile(),
         );
-        line(b"DSI.LPCR      ", (DSI_LPCR as *const u32).read_volatile());
-        line(b"DSI.LPMCR     ", (DSI_LPMCR as *const u32).read_volatile());
-        line(b"DSI.PCR       ", (DSI_PCR as *const u32).read_volatile());
-        line(b"DSI.MCR       ", (DSI_MCR as *const u32).read_volatile());
-        line(b"DSI.VMCR      ", (DSI_VMCR as *const u32).read_volatile());
-        line(b"DSI.VPCR      ", (DSI_VPCR as *const u32).read_volatile());
+        line(b"DSI.LPCR      ", DSI_LPCR.cast_const().read_volatile());
+        line(b"DSI.LPMCR     ", DSI_LPMCR.cast_const().read_volatile());
+        line(b"DSI.PCR       ", DSI_PCR.cast_const().read_volatile());
+        line(b"DSI.MCR       ", DSI_MCR.cast_const().read_volatile());
+        line(b"DSI.VMCR      ", DSI_VMCR.cast_const().read_volatile());
+        line(b"DSI.VPCR      ", DSI_VPCR.cast_const().read_volatile());
         line(
             b"DSI.VHSACR    ",
-            (DSI_VHSACR as *const u32).read_volatile(),
+            DSI_VHSACR.cast_const().read_volatile(),
         );
         line(
             b"DSI.VHBPCR    ",
-            (DSI_VHBPCR as *const u32).read_volatile(),
+            DSI_VHBPCR.cast_const().read_volatile(),
         );
-        line(b"DSI.VLCR      ", (DSI_VLCR as *const u32).read_volatile());
+        line(b"DSI.VLCR      ", DSI_VLCR.cast_const().read_volatile());
         line(
             b"DSI.VVSACR    ",
-            (DSI_VVSACR as *const u32).read_volatile(),
+            DSI_VVSACR.cast_const().read_volatile(),
         );
         line(
             b"DSI.VVBPCR    ",
-            (DSI_VVBPCR as *const u32).read_volatile(),
+            DSI_VVBPCR.cast_const().read_volatile(),
         );
         line(
             b"DSI.VVFPCR    ",
-            (DSI_VVFPCR as *const u32).read_volatile(),
+            DSI_VVFPCR.cast_const().read_volatile(),
         );
-        line(b"DSI.VVACR     ", (DSI_VVACR as *const u32).read_volatile());
-        line(b"DSI.LCCR      ", (DSI_LCCR as *const u32).read_volatile());
-        line(b"DSI.CMCR      ", (DSI_CMCR as *const u32).read_volatile());
+        line(b"DSI.VVACR     ", DSI_VVACR.cast_const().read_volatile());
+        line(b"DSI.LCCR      ", DSI_LCCR.cast_const().read_volatile());
+        line(b"DSI.CMCR      ", DSI_CMCR.cast_const().read_volatile());
         line(b"DSI.GPSR      ", DSI_GPSR.read_volatile());
         line(b"DSI.PSR       ", DSI_PSR.read_volatile());
         line(
             b"DSI.PCONFR    ",
-            (DSI_PCONFR as *const u32).read_volatile(),
+            DSI_PCONFR.cast_const().read_volatile(),
         );
         // DSI wrapper
-        const DSI_WCFGR: *const u32 = DSI_W as *const u32;
+        const DSI_WCFGR: *const u32 = DSI_W as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         line(b"DSI.WCFGR     ", DSI_WCFGR.read_volatile());
-        line(b"DSI.WCR       ", (DSI_WCR as *const u32).read_volatile());
-        line(b"DSI.WIER      ", (DSI_WIER as *const u32).read_volatile());
+        line(b"DSI.WCR       ", DSI_WCR.cast_const().read_volatile());
+        line(b"DSI.WIER      ", DSI_WIER.cast_const().read_volatile());
         line(b"DSI.WISR      ", DSI_WISR.read_volatile());
-        line(b"DSI.WPCR0     ", (DSI_WPCR0 as *const u32).read_volatile());
-        line(b"DSI.WRPCR     ", (DSI_WRPCR as *const u32).read_volatile());
+        line(b"DSI.WPCR0     ", DSI_WPCR0.cast_const().read_volatile());
+        line(b"DSI.WRPCR     ", DSI_WRPCR.cast_const().read_volatile());
         // LTDC
-        line(b"LTDC.SSCR     ", (LTDC_SSCR as *const u32).read_volatile());
-        line(b"LTDC.BPCR     ", (LTDC_BPCR as *const u32).read_volatile());
-        line(b"LTDC.AWCR     ", (LTDC_AWCR as *const u32).read_volatile());
-        line(b"LTDC.TWCR     ", (LTDC_TWCR as *const u32).read_volatile());
-        line(b"LTDC.GCR      ", (LTDC_GCR as *const u32).read_volatile());
-        line(b"LTDC.BCCR     ", (LTDC_BCCR as *const u32).read_volatile());
+        line(b"LTDC.SSCR     ", LTDC_SSCR.cast_const().read_volatile());
+        line(b"LTDC.BPCR     ", LTDC_BPCR.cast_const().read_volatile());
+        line(b"LTDC.AWCR     ", LTDC_AWCR.cast_const().read_volatile());
+        line(b"LTDC.TWCR     ", LTDC_TWCR.cast_const().read_volatile());
+        line(b"LTDC.GCR      ", LTDC_GCR.cast_const().read_volatile());
+        line(b"LTDC.BCCR     ", LTDC_BCCR.cast_const().read_volatile());
         // LTDC layer 1
-        line(b"LTDC.L1CR     ", (LTDC_L1CR as *const u32).read_volatile());
+        line(b"LTDC.L1CR     ", LTDC_L1CR.cast_const().read_volatile());
         line(
             b"LTDC.L1WHPCR  ",
-            (LTDC_L1WHPCR as *const u32).read_volatile(),
+            LTDC_L1WHPCR.cast_const().read_volatile(),
         );
         line(
             b"LTDC.L1WVPCR  ",
-            (LTDC_L1WVPCR as *const u32).read_volatile(),
+            LTDC_L1WVPCR.cast_const().read_volatile(),
         );
         line(
             b"LTDC.L1PFCR   ",
-            (LTDC_L1PFCR as *const u32).read_volatile(),
+            LTDC_L1PFCR.cast_const().read_volatile(),
         );
         line(
             b"LTDC.L1CFBAR  ",
-            (LTDC_L1CFBAR as *const u32).read_volatile(),
+            LTDC_L1CFBAR.cast_const().read_volatile(),
         );
         line(
             b"LTDC.L1CFBLR  ",
-            (LTDC_L1CFBLR as *const u32).read_volatile(),
+            LTDC_L1CFBLR.cast_const().read_volatile(),
         );
         line(
             b"LTDC.L1CFBLNR ",
-            (LTDC_L1CFBLNR as *const u32).read_volatile(),
+            LTDC_L1CFBLNR.cast_const().read_volatile(),
         );
         u1_str(b"--- end dump ---\r\n");
     }

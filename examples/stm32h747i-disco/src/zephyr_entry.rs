@@ -176,8 +176,8 @@ pub unsafe extern "C" fn rlvgl_dma2d_isr() {
         // case future code enables IRQs — clear non-TC error flags so
         // the IRQ won't storm if/when that happens. TCIF is owned by
         // the polling `take_complete()` path in zephyr_sync.rs.
-        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
-        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
+        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let isr = DMA2D_ISR.read_volatile();
         // Clear errors (CEIF=0, TEIF=5, TWIF=2, AEIF=4) but NOT TCIF (1).
         let clear = isr & 0b00111101;
@@ -307,8 +307,8 @@ unsafe fn dump_clock_state_oneshot(tag: &[u8]) {
     // Spin-wait for USART1 TXE then push one byte.
     fn u1c(c: u8) {
         unsafe {
-            let isr = 0x4001_101C as *const u32;
-            let tdr = 0x4001_1028 as *mut u32;
+            let isr = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tdr = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let mut t = 100_000u32;
             while isr.read_volatile() & (1 << 7) == 0 {
                 t -= 1;
@@ -334,7 +334,7 @@ unsafe fn dump_clock_state_oneshot(tag: &[u8]) {
     fn pair(label: &[u8], addr: usize) {
         u1s(label);
         u1c(b'=');
-        unsafe { u1hex((addr as *const u32).read_volatile()) };
+        unsafe { u1hex((addr as *const u32).read_volatile()) }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         u1c(b' ');
     }
 
@@ -378,7 +378,7 @@ unsafe fn dump_clock_state_oneshot(tag: &[u8]) {
     // Earlier version wrote GCR at 0x5001_0018 (off-by-nibble) which
     // causes a precise data bus fault on H747. Keep this a pure read.
     const LTDC: usize = 0x5000_1000;
-    let gcr_p = (LTDC + 0x18) as *const u32;
+    let gcr_p = (LTDC + 0x18) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     let gcr = gcr_p.read_volatile();
     u1s(b"LTDC_GCR=");
     u1hex(gcr);
@@ -427,12 +427,12 @@ pub unsafe extern "C" fn rlvgl_init(
 ) {
     unsafe {
         // SRAM3 breadcrumb: rlvgl_init entered
-        (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0001);
+        (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         // ── 1. Construct sync object ──────────────────────────────────────
         use core::sync::atomic::AtomicBool;
         static INIT_DONE: AtomicBool = AtomicBool::new(false);
-        static mut SYNC_STORAGE: core::mem::MaybeUninit<ZephyrFrameSync> =
+        static mut SYNC_STORAGE: core::mem::MaybeUninit<ZephyrFrameSync> = // rlvgl-discipline: allow(static_mut)
             core::mem::MaybeUninit::uninit();
 
         if INIT_DONE.swap(true, Ordering::AcqRel) {
@@ -449,13 +449,13 @@ pub unsafe extern "C" fn rlvgl_init(
         let bpp = di.pixel_size as u32;
 
         // ── 3. Enable DMA2D clock (RCC AHB3ENR bit 4) ────────────────────
-        let ahb3enr = 0x5802_44D4 as *mut u32;
+        let ahb3enr = 0x5802_44D4 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         ahb3enr.write_volatile(ahb3enr.read_volatile() | (1 << 4));
 
         // ── 3b. Fix DSI color coding ─────────────────────────────────────
         // Zephyr's HAL_DSI_ConfigVideoMode should set LCOLCR to RGB888
         // (COLC=5, LPE=1) but the register reads 0 (RGB565). Force it.
-        let lcolcr = 0x5000_0028 as *mut u32;
+        let lcolcr = 0x5000_0028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         lcolcr.write_volatile((1 << 8) | 5); // LPE=1, COLC=5 (RGB888)
 
         // ── 3c. Adapted command mode switch (optional) ───────────────────
@@ -475,17 +475,17 @@ pub unsafe extern "C" fn rlvgl_init(
         #[cfg(feature = "adapted_cmd")]
         {
             use rlvgl_platform::display_init;
-            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0010);
+            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0010); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Ensure peripheral clocks (DMA2D/LTDC/DSI) are enabled,
             // and PLL3 is locked. Safe even if Zephyr already did so.
             display_init::enable_display_peripheral_clocks();
-            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0011);
+            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0011); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             display_init::ensure_pll3_running();
-            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0012);
+            (0x3800_0204 as *mut u32).write_volatile(0xB1A1_0012); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Full DSI+LTDC bring-up in adapted command mode.
             // Uses fb_front (= 0xD0000000) as the initial scan buffer.
             let ok = display_init::init_full_adapted_cmd(di.fb_front as u32);
-            (0x3800_0204 as *mut u32).write_volatile(if ok { 0xB1A1_0013 } else { 0xDEAD_D51A });
+            (0x3800_0204 as *mut u32).write_volatile(if ok { 0xB1A1_0013 } else { 0xDEAD_D51A }); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         // ── 3d. Determine FB layout ──────────────────────────────────────
@@ -559,9 +559,9 @@ pub unsafe extern "C" fn rlvgl_init(
                 .ok()?;
 
                 // portrait(px, py) → landscape(dst_x=py, dst_y=479-px)
-                let src = scratch_base as *const u32;
-                let dst0 = fb_front as *mut u32;
-                let dst1 = fb_back as *mut u32;
+                let src = scratch_base as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                let dst0 = fb_front as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                let dst1 = fb_back as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let dst_stride = fb_w as usize; // 800 pixels per line
 
                 for py in 0..splash_h {
@@ -586,8 +586,8 @@ pub unsafe extern "C" fn rlvgl_init(
             // Solid black fallback for both buffers
             let total = (fb_w * fb_h) as usize;
             for i in 0..total {
-                (fb_front as *mut u32).add(i).write_volatile(0xFF00_0000);
-                (fb_back as *mut u32).add(i).write_volatile(0xFF00_0000);
+                (fb_front as *mut u32).add(i).write_volatile(0xFF00_0000); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (fb_back as *mut u32).add(i).write_volatile(0xFF00_0000); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
         }
 
@@ -629,7 +629,7 @@ pub unsafe extern "C" fn rlvgl_init(
         // ── 5. Initialize heap ───────────────────────────────────────────
         {
             const HEAP_SIZE: usize = 64 * 1024;
-            static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+            static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE]; // rlvgl-discipline: allow(static_mut)
             let start = core::ptr::addr_of_mut!(HEAP_MEM) as usize;
             crate::ALLOC.init(start, HEAP_SIZE);
         }
@@ -731,8 +731,8 @@ pub unsafe extern "C" fn rlvgl_init(
             // Enable DWT cycle counter for frame-timing instrumentation.
             // CoreDebug->DEMCR |= TRCENA, DWT->CTRL |= CYCCNTENA.
             unsafe {
-                const DEMCR: *mut u32 = 0xE000_EDFC as *mut u32;
-                const DWT_CTRL: *mut u32 = 0xE000_1000 as *mut u32;
+                const DEMCR: *mut u32 = 0xE000_EDFC as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                const DWT_CTRL: *mut u32 = 0xE000_1000 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 DEMCR.write_volatile(DEMCR.read_volatile() | (1 << 24));
                 DWT_CTRL.write_volatile(DWT_CTRL.read_volatile() | 1);
             }
@@ -758,8 +758,8 @@ pub unsafe extern "C" fn rlvgl_init(
                 // serial chars. F-line summary carries the info we need.
                 let want_print = !crawl_active;
                 let hb_emit = |c: u8| {
-                    let isr = 0x4001_101C as *const u32;
-                    let tdr = 0x4001_1028 as *mut u32;
+                    let isr = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    let tdr = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     let mut t = 100_000u32;
                     while unsafe { isr.read_volatile() } & (1 << 7) == 0 {
                         t -= 1;
@@ -886,8 +886,8 @@ pub unsafe extern "C" fn rlvgl_init(
                     // Trace touch to serial
                     fn u1_putc(c: u8) {
                         unsafe {
-                            let isr = 0x4001_101C as *const u32;
-                            let tdr = 0x4001_1028 as *mut u32;
+                            let isr = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                            let tdr = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                             while isr.read_volatile() & (1 << 7) == 0 {}
                             tdr.write_volatile(c as u32);
                         }
@@ -1058,8 +1058,8 @@ pub unsafe extern "C" fn rlvgl_init(
                         // 'T' = entering tick; result tag follows.
                         fn u1c(c: u8) {
                             unsafe {
-                                let isr = 0x4001_101C as *const u32;
-                                let tdr = 0x4001_1028 as *mut u32;
+                                let isr = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let tdr = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                                 let mut t = 100_000u32;
                                 while isr.read_volatile() & (1 << 7) == 0 {
                                     t -= 1;
@@ -1085,7 +1085,7 @@ pub unsafe extern "C" fn rlvgl_init(
                         // Dump star_crawl diag_words every ~16 ticks so we
                         // see progress promptly. Iter rate is slow (~2 iter/s)
                         // when crawl is active so 256 would take > 2 minutes.
-                        static mut TICK_COUNT: u32 = 0;
+                        static mut TICK_COUNT: u32 = 0; // rlvgl-discipline: allow(static_mut)
                         unsafe {
                             TICK_COUNT = TICK_COUNT.wrapping_add(1);
                             if TICK_COUNT % 16 == 0 {
@@ -1100,8 +1100,8 @@ pub unsafe extern "C" fn rlvgl_init(
                                 u1hex(w3);
                                 u1s(b"\r\n");
                                 // Also DMA2D ISR + CR
-                                let dma2d_isr = (0x5200_1004 as *const u32).read_volatile();
-                                let dma2d_cr = (0x5200_1000 as *const u32).read_volatile();
+                                let dma2d_isr = (0x5200_1004 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let dma2d_cr = (0x5200_1000 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                                 u1s(b"DMA2D ISR=");
                                 u1hex(dma2d_isr);
                                 u1s(b" CR=");
@@ -1122,11 +1122,11 @@ pub unsafe extern "C" fn rlvgl_init(
                         // because DMA2D was still in-flight (detected
                         // via star_crawl.waiting_for_dma()). Also time
                         // the batch via DWT cycles for per-frame cost.
-                        const DWT_CYC: *const u32 = 0xE000_1004 as *const u32;
-                        static mut TICKS_THIS_FRAME: u32 = 0;
-                        static mut DMA_WAIT_TICKS: u32 = 0;
-                        static mut BATCH_CYC_ACCUM: u32 = 0;
-                        static mut LAST_FRAME_CYC: u32 = 0;
+                        const DWT_CYC: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        static mut TICKS_THIS_FRAME: u32 = 0; // rlvgl-discipline: allow(static_mut)
+                        static mut DMA_WAIT_TICKS: u32 = 0; // rlvgl-discipline: allow(static_mut)
+                        static mut BATCH_CYC_ACCUM: u32 = 0; // rlvgl-discipline: allow(static_mut)
+                        static mut LAST_FRAME_CYC: u32 = 0; // rlvgl-discipline: allow(static_mut)
                         let batch_start = DWT_CYC.read_volatile();
                         // Task #41: tick targets `render_buf` (active
                         // FB) directly. Stars render into the persistent

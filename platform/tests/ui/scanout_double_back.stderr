@@ -1,0 +1,9 @@
+error[E0499]: cannot borrow `sc` as mutable more than once at a time
+  --> tests/ui/scanout_double_back.rs:34:13
+   |
+33 |     let a = sc.back_mut();
+   |             -- first mutable borrow occurs here
+34 |     let b = sc.back_mut();
+   |             ^^ second mutable borrow occurs here
+35 |     let _ = (a, b);
+   |              - first borrow later used here

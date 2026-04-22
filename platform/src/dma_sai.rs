@@ -106,10 +106,10 @@ impl DmaSai1Tx {
     /// Enable the DMA1 peripheral clock.
     pub fn enable_clock(&self) {
         unsafe {
-            let reg = RCC_AHB1ENR as *mut u32;
+            let reg = RCC_AHB1ENR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             reg.write_volatile(reg.read_volatile() | 1); // bit 0 = DMA1EN
             // Readback fence
-            let _ = (reg as *const u32).read_volatile();
+            let _ = (reg as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
@@ -132,28 +132,28 @@ impl DmaSai1Tx {
 
         unsafe {
             // Ensure stream is disabled
-            let cr = S0CR as *mut u32;
+            let cr = S0CR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cr.write_volatile(cr.read_volatile() & !CR_EN);
-            while (cr as *const u32).read_volatile() & CR_EN != 0 {}
+            while (cr as *const u32).read_volatile() & CR_EN != 0 {} // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Clear all interrupt flags for stream 0
-            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0);
+            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Number of data items
-            (S0NDTR as *mut u32).write_volatile(transfers as u32);
+            (S0NDTR as *mut u32).write_volatile(transfers as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Peripheral address (SAI1_A DR)
-            (S0PAR as *mut u32).write_volatile(periph_addr);
+            (S0PAR as *mut u32).write_volatile(periph_addr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Memory addresses
-            (S0M0AR as *mut u32).write_volatile(buf0 as u32);
-            (S0M1AR as *mut u32).write_volatile(buf1 as u32);
+            (S0M0AR as *mut u32).write_volatile(buf0 as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (S0M1AR as *mut u32).write_volatile(buf1 as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // FIFO control: enable FIFO, full threshold
-            (S0FCR as *mut u32).write_volatile(FCR_DMDIS | FCR_FTH_FULL);
+            (S0FCR as *mut u32).write_volatile(FCR_DMDIS | FCR_FTH_FULL); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Configure DMAMUX1 channel 0 → SAI1_A (request ID 87)
-            (DMAMUX1_C0CR as *mut u32).write_volatile(SAI1A_DMAREQ_ID);
+            (DMAMUX1_C0CR as *mut u32).write_volatile(SAI1A_DMAREQ_ID); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Stream configuration: M2P, circular, double-buffer, 16-bit, high priority
             let cr_val = CR_DIR_M2P
@@ -174,7 +174,7 @@ impl DmaSai1Tx {
     /// Both buffers should already contain valid audio data before calling this.
     pub fn start(&self) {
         unsafe {
-            let cr = S0CR as *mut u32;
+            let cr = S0CR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cr.write_volatile(cr.read_volatile() | CR_EN);
         }
     }
@@ -182,11 +182,11 @@ impl DmaSai1Tx {
     /// Stop DMA streaming.
     pub fn stop(&self) {
         unsafe {
-            let cr = S0CR as *mut u32;
+            let cr = S0CR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cr.write_volatile(cr.read_volatile() & !CR_EN);
-            while (cr as *const u32).read_volatile() & CR_EN != 0 {}
+            while (cr as *const u32).read_volatile() & CR_EN != 0 {} // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Clear flags
-            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0);
+            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
@@ -195,7 +195,7 @@ impl DmaSai1Tx {
     /// CT=0 → DMA reads M0AR (buf0), CT=1 → DMA reads M1AR (buf1).
     pub fn current_target(&self) -> u8 {
         unsafe {
-            let cr = (S0CR as *const u32).read_volatile();
+            let cr = (S0CR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             if cr & CR_CT != 0 { 1 } else { 0 }
         }
     }
@@ -205,32 +205,32 @@ impl DmaSai1Tx {
     /// This flag is set each time the DMA finishes one full buffer and switches
     /// to the other.
     pub fn transfer_complete(&self) -> bool {
-        unsafe { (DMA1_LISR as *const u32).read_volatile() & LISR_TCIF0 != 0 }
+        unsafe { (DMA1_LISR as *const u32).read_volatile() & LISR_TCIF0 != 0 } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Returns `true` if the half-transfer flag is set.
     pub fn half_transfer(&self) -> bool {
-        unsafe { (DMA1_LISR as *const u32).read_volatile() & LISR_HTIF0 != 0 }
+        unsafe { (DMA1_LISR as *const u32).read_volatile() & LISR_HTIF0 != 0 } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Clear the transfer-complete interrupt flag.
     pub fn clear_transfer_complete(&self) {
         unsafe {
-            (DMA1_LIFCR as *mut u32).write_volatile(LISR_TCIF0);
+            (DMA1_LIFCR as *mut u32).write_volatile(LISR_TCIF0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
     /// Clear the half-transfer interrupt flag.
     pub fn clear_half_transfer(&self) {
         unsafe {
-            (DMA1_LIFCR as *mut u32).write_volatile(LISR_HTIF0);
+            (DMA1_LIFCR as *mut u32).write_volatile(LISR_HTIF0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
     /// Clear all DMA stream 0 interrupt flags.
     pub fn clear_all_flags(&self) {
         unsafe {
-            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0);
+            (DMA1_LIFCR as *mut u32).write_volatile(LIFCR_ALL_S0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 

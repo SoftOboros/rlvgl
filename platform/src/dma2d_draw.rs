@@ -8,6 +8,7 @@
 
 use crate::blit::PixelFmt;
 use crate::dma2d::Dma2dBlitter;
+use crate::hwcore::surface::BackBuffer;
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::widget::{Color, Rect};
 
@@ -85,6 +86,12 @@ impl Dma2dOverlayCtx {
 
     /// Fill a landscape-coordinate rectangle with solid color.
     /// Uses DMA2D R2M fill for large areas, CPU writes for small ones.
+    ///
+    /// Hidden from rustdoc during the typed-API migration. Prefer
+    /// [`Self::fill_rect_rotated_typed`]; this raw entry point reads
+    /// `self.fb` directly and is removed in Step 9 of the
+    /// Register-Mashing Discipline migration.
+    #[doc(hidden)]
     pub fn fill_rect_rotated(&mut self, wx: i32, wy: i32, ww: i32, wh: i32, color: Color) {
         if let Some((fx, fy, fw, fh)) = self.rotate_clip(wx, wy, ww, wh) {
             let argb = color.to_argb8888();
@@ -109,7 +116,7 @@ impl Dma2dOverlayCtx {
 
             // CPU fallback for small fills or when DMA2D unavailable
             for row in 0..fh {
-                let ptr = self.fb_ptr(fx, fy + row) as *mut u32;
+                let ptr = self.fb_ptr(fx, fy + row).cast::<u32>();
                 for col in 0..fw {
                     unsafe { ptr.add(col as usize).write_volatile(argb) };
                 }
@@ -134,7 +141,7 @@ impl Dma2dOverlayCtx {
         unsafe {
             if alpha == 255 {
                 let argb = color.to_argb8888();
-                (ptr as *mut u32).write_volatile(argb);
+                ptr.cast::<u32>().write_volatile(argb);
             } else {
                 let inv = 255 - alpha;
                 let bg_b = *ptr.add(0) as u16;
@@ -158,6 +165,9 @@ impl Dma2dOverlayCtx {
     // ── Rounded rectangles ─────────────────────────────────────────────
 
     /// Fill a rounded rectangle via CPU fills + AA fringe blends.
+    ///
+    /// Hidden during typed-API migration; use [`Self::fill_rounded_rect_hw_typed`].
+    #[doc(hidden)]
     pub fn fill_rounded_rect_hw(&mut self, rect: Rect, color: Color, radius: u8) {
         let r = (radius as i32).min(rect.width / 2).min(rect.height / 2);
         if r <= 0 {
@@ -219,6 +229,9 @@ impl Dma2dOverlayCtx {
     // ── Borders ────────────────────────────────────────────────────────
 
     /// Draw a straight (non-rounded) border via 4 DMA2D fills.
+    ///
+    /// Hidden during typed-API migration; use [`Self::draw_border_hw_typed`].
+    #[doc(hidden)]
     pub fn draw_border_hw(&mut self, rect: Rect, color: Color, width: u8) {
         let w = width as i32;
         if w == 0 {
@@ -241,6 +254,9 @@ impl Dma2dOverlayCtx {
     }
 
     /// Draw a rounded border via CPU fills + AA fringe.
+    ///
+    /// Hidden during typed-API migration; use [`Self::draw_rounded_border_hw_typed`].
+    #[doc(hidden)]
     pub fn draw_rounded_border_hw(
         &mut self,
         rect: Rect,
@@ -364,6 +380,9 @@ impl Dma2dOverlayCtx {
     /// `glyph_data` is the raw A8 alpha bitmap (row-major, `gw × gh`).
     /// `scratch` is a caller-provided buffer in DMA2D-accessible memory
     /// (SDRAM) for the rotated A8 data. Must be ≥ `gw * gh` bytes.
+    ///
+    /// Hidden during typed-API migration; use [`Self::draw_glyph_rotated_typed`].
+    #[doc(hidden)]
     pub fn draw_glyph_rotated(
         &mut self,
         gx: i32,
@@ -451,7 +470,7 @@ impl Dma2dOverlayCtx {
                 unsafe {
                     if alpha >= 255 {
                         let argb = fg_color.to_argb8888();
-                        (ptr as *mut u32).write_volatile(argb);
+                        ptr.cast::<u32>().write_volatile(argb);
                     } else {
                         let inv = 255 - alpha;
                         let bg_b = *ptr.add(0) as u16;
@@ -470,6 +489,9 @@ impl Dma2dOverlayCtx {
     /// Render a string at landscape (x, y) using DMA2D glyph blending.
     ///
     /// `scratch` must be in DMA2D-accessible memory (SDRAM), ≥ 512 bytes.
+    ///
+    /// Hidden during typed-API migration; use [`Self::draw_str_rotated_typed`].
+    #[doc(hidden)]
     pub fn draw_str_rotated(
         &mut self,
         font: &PackedFont,
@@ -532,4 +554,146 @@ fn arc_dx(r: i32, dy: i32) -> (i32, u8) {
     let dx_int = (dx4 / 4) as i32;
     let frac = (dx4 % 4) as u8 * 64;
     (dx_int, frac)
+}
+
+// ── Typed entry points ─────────────────────────────────────────────────
+//
+// Step 4 of the Register-Mashing Discipline migration. Each `*_typed`
+// method takes a `&mut BackBuffer<'_>` borrow and delegates to the raw
+// `self.fb`-using implementation above. The borrow argument carries no
+// runtime weight (a debug-only geometry assertion confirms the caller
+// targeted the same framebuffer the context was built around) but
+// enforces the borrow contract at the call site:
+//
+//   * the caller must hold the back buffer's `&mut` for the duration of
+//     the call, so an `InFlight<_, BackBuffer<_>>` cannot be alive
+//     simultaneously,
+//   * any concurrent overlay draw on the same buffer is rejected with
+//     E0499 (cannot borrow `back` as mutable more than once).
+//
+// The raw entry points remain available (now `#[doc(hidden)]`); call
+// sites migrate file-by-file in Steps 4b / 4c. The struct shape is
+// unchanged this step — the lifetime-parametric `Dma2dOverlayCtx<'a>`
+// rewrite that holds the typed handle internally lands once all callers
+// use the typed entry points.
+
+#[inline]
+fn assert_back_matches(ctx: &Dma2dOverlayCtx, back: &BackBuffer<'_>) {
+    debug_assert_eq!(
+        ctx.fb as u32,
+        back.dma_addr().raw(),
+        "BackBuffer must reference the same framebuffer as the Dma2dOverlayCtx"
+    );
+    debug_assert_eq!(
+        ctx.fb_w,
+        back.width(),
+        "BackBuffer width disagrees with Dma2dOverlayCtx::fb_w"
+    );
+    debug_assert_eq!(
+        ctx.fb_h,
+        back.height(),
+        "BackBuffer height disagrees with Dma2dOverlayCtx::fb_h"
+    );
+    debug_assert_eq!(
+        ctx.fb_stride,
+        back.stride_bytes(),
+        "BackBuffer stride disagrees with Dma2dOverlayCtx::fb_stride"
+    );
+}
+
+impl Dma2dOverlayCtx {
+    /// Typed counterpart of [`Self::fill_rect_rotated`].
+    ///
+    /// The `back` borrow asserts at the call site that the caller holds
+    /// the destination back buffer mutably for the duration of this
+    /// overlay draw — preventing concurrent DMA submissions or CPU
+    /// access on the same buffer (rustc rejects either with E0499).
+    #[inline]
+    pub fn fill_rect_rotated_typed(
+        &mut self,
+        back: &mut BackBuffer<'_>,
+        wx: i32,
+        wy: i32,
+        ww: i32,
+        wh: i32,
+        color: Color,
+    ) {
+        assert_back_matches(self, back);
+        self.fill_rect_rotated(wx, wy, ww, wh, color);
+    }
+
+    /// Typed counterpart of [`Self::fill_rounded_rect_hw`].
+    #[inline]
+    pub fn fill_rounded_rect_hw_typed(
+        &mut self,
+        back: &mut BackBuffer<'_>,
+        rect: Rect,
+        color: Color,
+        radius: u8,
+    ) {
+        assert_back_matches(self, back);
+        self.fill_rounded_rect_hw(rect, color, radius);
+    }
+
+    /// Typed counterpart of [`Self::draw_border_hw`].
+    #[inline]
+    pub fn draw_border_hw_typed(
+        &mut self,
+        back: &mut BackBuffer<'_>,
+        rect: Rect,
+        color: Color,
+        width: u8,
+    ) {
+        assert_back_matches(self, back);
+        self.draw_border_hw(rect, color, width);
+    }
+
+    /// Typed counterpart of [`Self::draw_rounded_border_hw`].
+    #[inline]
+    pub fn draw_rounded_border_hw_typed(
+        &mut self,
+        back: &mut BackBuffer<'_>,
+        rect: Rect,
+        color: Color,
+        border_width: u8,
+        radius: u8,
+    ) {
+        assert_back_matches(self, back);
+        self.draw_rounded_border_hw(rect, color, border_width, radius);
+    }
+
+    /// Typed counterpart of [`Self::draw_glyph_rotated`].
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_glyph_rotated_typed(
+        &mut self,
+        back: &mut BackBuffer<'_>,
+        gx: i32,
+        gy: i32,
+        glyph_data: &[u8],
+        gw: u32,
+        gh: u32,
+        fg_color: Color,
+        scratch: &mut [u8],
+    ) {
+        assert_back_matches(self, back);
+        self.draw_glyph_rotated(gx, gy, glyph_data, gw, gh, fg_color, scratch);
+    }
+
+    /// Typed counterpart of [`Self::draw_str_rotated`].
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_str_rotated_typed(
+        &mut self,
+        back: &mut BackBuffer<'_>,
+        font: &PackedFont,
+        x: i32,
+        y: i32,
+        text: &str,
+        color: Color,
+        scratch: &mut [u8],
+    ) {
+        assert_back_matches(self, back);
+        self.draw_str_rotated(font, x, y, text, color, scratch);
+    }
 }

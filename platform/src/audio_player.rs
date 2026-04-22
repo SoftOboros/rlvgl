@@ -243,11 +243,16 @@ impl AudioPlayer {
 
 /// Clean D-Cache lines covering the given memory range.
 ///
-/// Uses raw SCCR register writes (matching the project's raw-register style)
-/// to avoid a dependency on `cortex-m` in this module.
+/// Writes successive cache-line addresses to SCB DCCMVAC at `0xE000_EF68`.
+/// The raw register write is intentionally kept here — the `cortex_m`
+/// crate's `SCB::clean_dcache_by_address` requires plumbing a `&mut SCB`
+/// instance through the audio player constructor, which is more
+/// invasive than the discipline opt-out for a single cache-control
+/// register. The opt-out marker on the const declaration documents
+/// the deferral.
 fn clean_dcache(ptr: *const u8, len: usize) {
     // SCB DCCMVAC (Clean D-Cache by MVA to PoC): 0xE000_EF68
-    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32;
+    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     const CACHE_LINE: usize = 32;
     let start = (ptr as usize) & !(CACHE_LINE - 1);
     let end = ((ptr as usize) + len + CACHE_LINE - 1) & !(CACHE_LINE - 1);

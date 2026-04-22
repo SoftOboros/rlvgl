@@ -61,6 +61,11 @@ audio = ["stm32h7", "embedded-hal"]
 dma2d = ["stm32h7"]
 freertos = []
 splash = ["dep:rlvgl-decomp"]
+## Host-only mock implementation of the typed DMA2D submission API.
+## Used by `examples/disco-sim/tests/typed_dma2d_host.rs` and any future
+## host-side test that wants to exercise `BackBuffer::dma_dst()` /
+## `InFlight<T>` lifecycle without hardware.
+mock_blitter = []
 fontdue = ["rlvgl-core/fontdue"]
 png = ["rlvgl-core/png"]
 jpeg = ["rlvgl-core/jpeg"]
@@ -78,3 +83,4 @@ nes = ["rlvgl-core/nes"]
 base64 = "0.21"
 fatfs = "0.3"
 fscommon = "0.1"
+trybuild = "1.0"

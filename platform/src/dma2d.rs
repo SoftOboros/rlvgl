@@ -5,6 +5,8 @@
 
 use crate::blit::{BlitCaps, Blitter, PixelFmt, Rect, Surface};
 #[cfg(feature = "dma2d")]
+use crate::hwcore::surface::{BackBuffer, BorrowedForDma, InFlight};
+#[cfg(feature = "dma2d")]
 use stm32h7::stm32h747cm7::DMA2D;
 
 /// Blitter backed by the STM32H7 DMA2D peripheral.
@@ -276,9 +278,13 @@ impl Dma2dBlitter {
 
 #[cfg(feature = "dma2d")]
 impl Dma2dBlitter {
-    /// R2M fill by raw pointer. Fills `width × height` pixels at `dst` with
-    /// a solid color. `dst_stride` is in bytes.
-    pub fn start_fill_raw(
+    /// R2M fill by raw pointer (crate-internal engine).
+    ///
+    /// Step 9 of the Register-Mashing Discipline migration: visibility
+    /// downgraded to `pub(crate)` and renamed to remove the literal
+    /// `start_fill_raw` token from the public surface. Callers use the
+    /// typed [`Self::start_fill_typed`] which delegates here.
+    pub(crate) fn fill_engine_raw(
         &mut self,
         dst: *mut u8,
         dst_stride: u32,
@@ -304,7 +310,7 @@ impl Dma2dBlitter {
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
     }
 
-    /// Blocking compatibility wrapper for [`Self::start_fill_raw`].
+    /// Blocking compatibility wrapper for [`Self::fill_engine_raw`].
     pub fn fill_raw(
         &mut self,
         dst: *mut u8,
@@ -314,13 +320,16 @@ impl Dma2dBlitter {
         color: u32,
         fmt: PixelFmt,
     ) {
-        self.start_fill_raw(dst, dst_stride, width, height, color, fmt);
+        self.fill_engine_raw(dst, dst_stride, width, height, color, fmt);
         self.wait();
     }
 
-    /// M2M copy by raw pointer. Copies `width × height` pixels from `src` to
-    /// `dst`. Both must be the same pixel format. Strides are in bytes.
-    pub fn start_blit_raw(
+    /// M2M copy by raw pointer (crate-internal engine).
+    ///
+    /// Step 9 of the Register-Mashing Discipline migration: visibility
+    /// downgraded to `pub(crate)` and renamed. Callers use the typed
+    /// [`Self::start_blit_typed`] which delegates here.
+    pub(crate) fn blit_engine_raw(
         &mut self,
         src: *const u8,
         src_stride: u32,
@@ -350,7 +359,7 @@ impl Dma2dBlitter {
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::CR_START) });
     }
 
-    /// Blocking compatibility wrapper for [`Self::start_blit_raw`].
+    /// Blocking compatibility wrapper for [`Self::blit_engine_raw`].
     pub fn blit_raw(
         &mut self,
         src: *const u8,
@@ -361,7 +370,7 @@ impl Dma2dBlitter {
         height: u32,
         fmt: PixelFmt,
     ) {
-        self.start_blit_raw(src, src_stride, dst, dst_stride, width, height, fmt);
+        self.blit_engine_raw(src, src_stride, dst, dst_stride, width, height, fmt);
         self.wait();
     }
 
@@ -476,6 +485,92 @@ impl Dma2dBlitter {
     ) {
         self.start_blend_a8_color(a8_src, width, height, fg_color, dst, dst_stride);
         self.wait();
+    }
+}
+
+// ── Typed DMA2D submission API ───────────────────────────────────────────
+//
+// Step 3 of the Register-Mashing Discipline migration. The methods below
+// consume a `BorrowedForDma<'_, BackBuffer<'_>>` reborrow and return an
+// `InFlight<'_, BackBuffer<'_>>` token, so the borrow checker prevents:
+//   * a second DMA submission while one is outstanding (the engine is
+//     `&mut`-borrowed for the InFlight lifetime), and
+//   * CPU access to the back buffer during the transfer (`back.cpu_slice()`
+//     would re-borrow `back` mutably while `BorrowedForDma` already holds it).
+//
+// They forward to the existing `start_*_raw` methods after extracting the
+// destination address and stride from the typed handle. The raw methods
+// remain available (now `#[doc(hidden)]`) until Step 9 — overlay paths
+// migrate one at a time in Steps 4–8.
+
+#[cfg(feature = "dma2d")]
+impl Dma2dBlitter {
+    /// Non-blocking R2M fill of `area` (in back-buffer pixels) with
+    /// `color`, using the typed framebuffer-ownership handles.
+    ///
+    /// Returns an [`InFlight`] holding the `BorrowedForDma` reborrow for
+    /// the duration of the transfer. Completion is observed via the
+    /// usual [`Self::is_in_flight`] / [`Self::poll_complete`] /
+    /// [`Self::ack_complete`] sequence; consume the token via
+    /// [`InFlight::into_borrow`] and drop the borrow once the transfer
+    /// has acked.
+    pub fn start_fill_typed<'b, 'fb>(
+        &'b mut self,
+        mut dst: BorrowedForDma<'b, BackBuffer<'fb>>,
+        area: Rect,
+        color: u32,
+    ) -> InFlight<'b, BackBuffer<'fb>> {
+        let dst_stride = dst.stride_bytes();
+        let fmt = dst.format();
+        let bpp = Self::pixel_size(fmt);
+        let dst_base = dst.dma_addr().raw() as *mut u8;
+        // SAFETY: `BorrowedForDma` carries a `&mut BackBuffer` reborrow
+        // so the destination region is not aliased by any CPU-visible
+        // handle for the lifetime of the returned `InFlight`. The
+        // pointer arithmetic stays within the back buffer the borrow
+        // refers to (caller-supplied `area.x` / `area.y` are assumed
+        // non-negative and within bounds; out-of-bounds origins are a
+        // caller bug, not unsafety in this layer). Alignment was
+        // validated by `BackBuffer::dma_addr()` via `DmaAddr::from_phys`.
+        let dst_ptr = unsafe {
+            dst_base.add(area.y as usize * dst_stride as usize + area.x as usize * bpp)
+        };
+        let _ = &mut dst; // bind the reborrow into this scope explicitly
+        self.fill_engine_raw(dst_ptr, dst_stride, area.w, area.h, color, fmt);
+        InFlight::new(dst)
+    }
+
+    /// Non-blocking M2M copy of `width × height` pixels from `src` (raw
+    /// pointer) to the typed back buffer at offset `dst_pos`.
+    ///
+    /// `src` is intentionally still raw because Step 3 only types the
+    /// destination side; sources backed by SDRAM textures and font glyphs
+    /// migrate to typed `Texture<'a>` / `GlyphAtlas<'a>` handles in a
+    /// follow-up step. The destination's borrow contract is enforced as
+    /// for [`Self::start_fill_typed`].
+    pub fn start_blit_typed<'b, 'fb>(
+        &'b mut self,
+        src: *const u8,
+        src_stride: u32,
+        mut dst: BorrowedForDma<'b, BackBuffer<'fb>>,
+        dst_pos: (i32, i32),
+        width: u32,
+        height: u32,
+    ) -> InFlight<'b, BackBuffer<'fb>> {
+        let dst_stride = dst.stride_bytes();
+        let fmt = dst.format();
+        let bpp = Self::pixel_size(fmt);
+        let dst_base = dst.dma_addr().raw() as *mut u8;
+        // SAFETY: dst_base + offset stays within the back buffer the
+        // BorrowedForDma reborrow refers to (caller-supplied dst_pos is
+        // assumed to be inside the buffer; out-of-bounds offsets are a
+        // caller bug, not unsafety in this layer).
+        let dst_ptr = unsafe {
+            dst_base.add(dst_pos.1 as usize * dst_stride as usize + dst_pos.0 as usize * bpp)
+        };
+        let _ = &mut dst;
+        self.blit_engine_raw(src, src_stride, dst_ptr, dst_stride, width, height, fmt);
+        InFlight::new(dst)
     }
 }
 

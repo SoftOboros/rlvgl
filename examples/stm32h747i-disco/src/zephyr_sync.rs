@@ -53,18 +53,22 @@ unsafe extern "C" {
 // ── DWT cycle counter ─────────────────────────────────────────────────────────
 //
 // On Cortex-M7, DWT_CYCCNT at 0xE000_1004 is the same register that
-// bare-metal reads. Zephyr doesn't remap it — we can read it directly.
-
-const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+// bare-metal reads. Zephyr doesn't remap it — we can read it directly
+// via the cortex_m crate's typed accessor.
 
 #[inline(always)]
 fn cyccnt() -> u32 {
-    unsafe { DWT_CYCCNT.read_volatile() }
+    cortex_m::peripheral::DWT::cycle_count()
 }
 
-// ── Scope probe GPIO (same raw BSRR writes as bare-metal) ─────────────────────
+// ── Scope probe GPIO ──────────────────────────────────────────────────────────
+//
+// SAFETY: Zephyr does not own GPIOJ MODER setup; bare-metal `scope_probe`
+// configures the pins as outputs at boot. This Zephyr handle just pulses
+// BSRR, which is a write-only atomic set/reset.
+static GPIOJ: rlvgl_platform::hwcore::regs::gpio::Gpio =
+    unsafe { rlvgl_platform::hwcore::regs::gpio::Gpio::gpioj() };
 
-const GPIOJ_BSRR: *mut u32 = (0x5802_2400 + 0x18) as *mut u32;
 const PJ0_SET: u32 = 1 << 0;
 const PJ6_SET: u32 = 1 << 6;
 const PJ6_RESET: u32 = 1 << 22;
@@ -171,8 +175,11 @@ impl Dma2dSync for ZephyrFrameSync {
         // CR=0x00010000, TCIE bit 8 clear). Poll DMA2D_ISR.TCIF directly
         // and clear it ourselves. The ISR-based path was tried but
         // useless without TCIE — the sem was never given.
-        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
-        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
+        // DMA2D status read — same deferral as freertos_sync.rs:
+        // typed `Dma2dBlitter` is owned by the render path; a
+        // read-only typed accessor for ISR/IFCR is a TODO.
+        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let isr = unsafe { DMA2D_ISR.read_volatile() };
         if isr & (1 << 1) != 0 {
             unsafe { DMA2D_IFCR.write_volatile(1 << 1) };
@@ -183,8 +190,11 @@ impl Dma2dSync for ZephyrFrameSync {
     }
 
     fn take_error(&self) -> u32 {
-        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
-        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
+        // DMA2D status read — same deferral as freertos_sync.rs:
+        // typed `Dma2dBlitter` is owned by the render path; a
+        // read-only typed accessor for ISR/IFCR is a TODO.
+        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let isr = unsafe { DMA2D_ISR.read_volatile() };
         let errors = isr & ((1 << 5) | (1 << 0)); // CEIF | TEIF
         if errors != 0 {
@@ -197,16 +207,16 @@ impl Dma2dSync for ZephyrFrameSync {
 impl ScopeProbe for ZephyrFrameSync {
     #[inline(always)]
     fn dma2d_active(&self) {
-        unsafe { GPIOJ_BSRR.write_volatile(PJ6_SET) }
+        GPIOJ.regs().bsrr.write(PJ6_SET);
     }
 
     #[inline(always)]
     fn dma2d_idle(&self) {
-        unsafe { GPIOJ_BSRR.write_volatile(PJ6_RESET) }
+        GPIOJ.regs().bsrr.write(PJ6_RESET);
     }
 
     #[inline(always)]
     fn ltdc_active(&self) {
-        unsafe { GPIOJ_BSRR.write_volatile(PJ0_SET) }
+        GPIOJ.regs().bsrr.write(PJ0_SET);
     }
 }

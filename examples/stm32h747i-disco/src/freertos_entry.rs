@@ -28,6 +28,9 @@
 
 use core::sync::atomic::{AtomicPtr, Ordering};
 
+use rlvgl_platform::hwcore::regs::gpio::Gpio;
+use rlvgl_platform::hwcore::regs::tim::TimBasic;
+
 use crate::freertos_sync::{self, FreeRtosFrameSync, SemaphoreHandle_t, StaticSemaphore};
 
 // ── FreeRTOS task + kernel FFI ────────────────────────────────────────────────
@@ -100,7 +103,7 @@ fn SysTick() {
     } else {
         // Count pre-scheduler SysTick hits at D3 SRAM 0x3800_0608
         unsafe {
-            let p = 0x3800_0608u32 as *mut u32;
+            let p = 0x3800_0608u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             p.write_volatile(p.read_volatile().wrapping_add(1));
         }
     }
@@ -144,17 +147,13 @@ pub fn dma2d_done_sem() -> Option<SemaphoreHandle_t> {
 //      lands on the exact same DWT offset from ERIF, phase-locked to
 //      the panel's TE signal. No DWT spin, no vTaskDelay jitter.
 
-const TIM7_BASE: usize = 0x4000_1400;
-const TIM7_CR1: *mut u32 = (TIM7_BASE + 0x00) as *mut u32;
-const TIM7_DIER: *mut u32 = (TIM7_BASE + 0x0C) as *mut u32;
-const TIM7_SR: *mut u32 = (TIM7_BASE + 0x10) as *mut u32;
-const TIM7_EGR: *mut u32 = (TIM7_BASE + 0x14) as *mut u32;
-const TIM7_CNT: *mut u32 = (TIM7_BASE + 0x24) as *mut u32;
-const TIM7_PSC: *mut u32 = (TIM7_BASE + 0x28) as *mut u32;
-const TIM7_ARR: *mut u32 = (TIM7_BASE + 0x2C) as *mut u32;
+// TIM7 access flows through `rlvgl_platform::hwcore::regs::tim::TimBasic`
+// — a typed handle wrapping `MmioAddr<TimBasicRegs>` with const-eval
+// offset assertions for every field. Replaces the 7 raw `*mut u32`
+// constants this file used pre-Step-8b.
 
 /// RCC APB1LENR on STM32H747 (D2 domain, CM7 view).
-const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32;
+const RCC_APB1LENR: *mut u32 = 0x5802_44E8 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 /// TIM7EN is bit 5 of APB1LENR.
 const RCC_APB1LENR_TIM7EN: u32 = 1 << 5;
 
@@ -162,7 +161,7 @@ const RCC_APB1LENR_TIM7EN: u32 = 1 << 5;
 /// deadline fires; taken (with portMAX_DELAY) by present_task.
 static PRESENT_GATE_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
     AtomicPtr::new(core::ptr::null_mut());
-static mut PRESENT_GATE_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
+static mut PRESENT_GATE_SEM_BUF: StaticSemaphore = StaticSemaphore::new(); // rlvgl-discipline: allow(static_mut)
 
 /// Render-start semaphore — given by the DSI ERIF ISR alongside
 /// `erif_sem`. `render_task` blocks on this so render begins on
@@ -173,7 +172,7 @@ static mut PRESENT_GATE_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
 /// producing beat-frequency jitter on the moving-block demo.
 static RENDER_START_SEM: AtomicPtr<freertos_sync::QueueDefinition> =
     AtomicPtr::new(core::ptr::null_mut());
-static mut RENDER_START_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
+static mut RENDER_START_SEM_BUF: StaticSemaphore = StaticSemaphore::new(); // rlvgl-discipline: allow(static_mut)
 
 /// One-time TIM7 setup. Enables clock, configures PSC/ARR for 1 MHz
 /// one-pulse operation, enables UIE. Call from `start()` after the
@@ -186,20 +185,25 @@ unsafe fn tim7_init() {
         // touch the peripheral.
         let _ = RCC_APB1LENR.read_volatile();
 
-        TIM7_CR1.write_volatile(0); // disable + clear all flags
-        TIM7_CNT.write_volatile(0);
+        // SAFETY: this is the sole TimBasic handle for TIM7 in the
+        // FreeRTOS path; bare-metal TIM6 uses a separate handle.
+        // The timer clock was just enabled above.
+        let tim7 = TimBasic::tim7();
+        let r = tim7.regs();
+        r.cr1.write(0); // disable + clear all flags
+        r.cnt.write(0);
         // APB1 timer clock = 200 MHz on this board (bare-metal TIM6
         // uses the same divisor — see main.rs line ~2167 for the
         // same empirical value). PSC=199 → 1 MHz, 1 µs per count.
-        TIM7_PSC.write_volatile(199);
-        TIM7_ARR.write_volatile(0xFFFF);
-        TIM7_EGR.write_volatile(1); // UG: reload PSC shadow
-        TIM7_SR.write_volatile(0); // clear any pending UIF
-        TIM7_DIER.write_volatile(1); // UIE
+        r.psc.write(199);
+        r.arr.write(0xFFFF);
+        r.egr.write(1); // UG: reload PSC shadow
+        r.sr.write(0); // clear any pending UIF
+        r.dier.write(1); // UIE
         // CR1: OPM (one-pulse) | URS (only overflow asserts UEV — so
         // our `EGR.UG=1` reload above does NOT spuriously fire UIF).
         // CEN is off; we set it per-arm.
-        TIM7_CR1.write_volatile((1 << 3) | (1 << 2));
+        r.cr1.write((1 << 3) | (1 << 2));
     }
 }
 
@@ -207,30 +211,35 @@ unsafe fn tim7_init() {
 /// sem before calling. Safe to call repeatedly — each arm restarts
 /// the timer from 0.
 unsafe fn tim7_arm(us: u32) {
-    unsafe {
-        // Stop (in case a previous arm is still running)
-        TIM7_CR1.write_volatile((1 << 3) | (1 << 2));
-        TIM7_CNT.write_volatile(0);
-        // Clamp to timer range. For values larger than 65 ms this
-        // would overflow — in practice present holdoff is 15 ms so
-        // we never hit that, but clamp defensively.
-        let arr = us.max(1).min(0xFFFF);
-        TIM7_ARR.write_volatile(arr);
-        TIM7_SR.write_volatile(0); // clear stale UIF
-        // CR1: OPM | URS | CEN
-        TIM7_CR1.write_volatile((1 << 3) | (1 << 2) | (1 << 0));
-    }
+    // SAFETY: see `tim7_init` — same single-handle contract.
+    let tim7 = unsafe { TimBasic::tim7() };
+    let r = tim7.regs();
+    // Stop (in case a previous arm is still running)
+    r.cr1.write((1 << 3) | (1 << 2));
+    r.cnt.write(0);
+    // Clamp to timer range. For values larger than 65 ms this
+    // would overflow — in practice present holdoff is 15 ms so
+    // we never hit that, but clamp defensively.
+    let arr = us.max(1).min(0xFFFF);
+    r.arr.write(arr);
+    r.sr.write(0); // clear stale UIF
+    // CR1: OPM | URS | CEN
+    r.cr1.write((1 << 3) | (1 << 2) | (1 << 0));
 }
 
 /// TIM7 interrupt body — called from the #[interrupt] wrapper in main.rs.
 #[inline]
 pub fn tim7_isr_body() {
-    unsafe {
-        let sr = TIM7_SR.read_volatile();
-        if sr & 1 != 0 {
-            TIM7_SR.write_volatile(0); // clear UIF
-            let gate = PRESENT_GATE_SEM.load(Ordering::Acquire);
-            if !gate.is_null() {
+    // SAFETY: ISR context; the typed handle is reconstructed each call
+    // (zero overhead — `MmioAddr<T>` is a `NonNull<T>` newtype).
+    let tim7 = unsafe { TimBasic::tim7() };
+    let r = tim7.regs();
+    let sr = r.sr.read();
+    if sr & 1 != 0 {
+        r.sr.write(0); // clear UIF
+        let gate = PRESENT_GATE_SEM.load(Ordering::Acquire);
+        if !gate.is_null() {
+            unsafe {
                 freertos_sync::rlvgl_sem_give_from_isr(gate);
             }
         }
@@ -244,15 +253,15 @@ pub fn tim7_isr_body() {
 #[inline]
 pub fn dsi_isr_body() {
     unsafe {
-        const WISR: *const u32 = 0x5000_040C as *const u32;
-        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
-        const ISR0: *const u32 = 0x5000_00BC as *const u32;
-        const ISR1: *const u32 = 0x5000_00C0 as *const u32;
-        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32;
-        const FIR1: *mut u32 = 0x5000_00DC as *mut u32;
-        const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
-        const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
-        const GPIOJ_BSRR: *mut u32 = (0x5802_2400 + 0x18) as *mut u32;
+        const WISR: *const u32 = 0x5000_040C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const ISR0: *const u32 = 0x5000_00BC as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const ISR1: *const u32 = 0x5000_00C0 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FIR1: *mut u32 = 0x5000_00DC as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const GPIOJ_BSRR: *mut u32 = (0x5802_2400 + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         let wisr = WISR.read_volatile();
         WIFCR.write_volatile(wisr & 0x3FFF);
@@ -297,8 +306,8 @@ pub fn dsi_isr_body() {
 #[inline]
 pub fn dma2d_isr_body() {
     unsafe {
-        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32;
-        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32;
+        const DMA2D_ISR: *const u32 = 0x5200_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DMA2D_IFCR: *mut u32 = 0x5200_1008 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         let isr = DMA2D_ISR.read_volatile();
         let clear = isr & 0x3F;
@@ -321,22 +330,22 @@ const RENDER_STACK_WORDS: usize = 2048; // 8 KB
 const TOUCH_STACK_WORDS: usize = 256; // 1 KB
 const PLAYIT_STACK_WORDS: usize = 512; // 2 KB — small cmd parsing + serial
 
-static mut ERIF_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
-static mut DMA2D_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
-static mut BUF_READY_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
-static mut I2C4_SEM_BUF: StaticSemaphore = StaticSemaphore::new();
+static mut ERIF_SEM_BUF: StaticSemaphore = StaticSemaphore::new(); // rlvgl-discipline: allow(static_mut)
+static mut DMA2D_SEM_BUF: StaticSemaphore = StaticSemaphore::new(); // rlvgl-discipline: allow(static_mut)
+static mut BUF_READY_SEM_BUF: StaticSemaphore = StaticSemaphore::new(); // rlvgl-discipline: allow(static_mut)
+static mut I2C4_SEM_BUF: StaticSemaphore = StaticSemaphore::new(); // rlvgl-discipline: allow(static_mut)
 
-static mut PRESENT_TCB: StaticTask = StaticTask::new();
-static mut RENDER_TCB: StaticTask = StaticTask::new();
-static mut TOUCH_TCB: StaticTask = StaticTask::new();
-static mut PLAYIT_TCB: StaticTask = StaticTask::new();
+static mut PRESENT_TCB: StaticTask = StaticTask::new(); // rlvgl-discipline: allow(static_mut)
+static mut RENDER_TCB: StaticTask = StaticTask::new(); // rlvgl-discipline: allow(static_mut)
+static mut TOUCH_TCB: StaticTask = StaticTask::new(); // rlvgl-discipline: allow(static_mut)
+static mut PLAYIT_TCB: StaticTask = StaticTask::new(); // rlvgl-discipline: allow(static_mut)
 
-static mut PRESENT_STACK: [StackType_t; PRESENT_STACK_WORDS] = [0; PRESENT_STACK_WORDS];
-static mut RENDER_STACK: [StackType_t; RENDER_STACK_WORDS] = [0; RENDER_STACK_WORDS];
-static mut TOUCH_STACK: [StackType_t; TOUCH_STACK_WORDS] = [0; TOUCH_STACK_WORDS];
-static mut PLAYIT_STACK: [StackType_t; PLAYIT_STACK_WORDS] = [0; PLAYIT_STACK_WORDS];
+static mut PRESENT_STACK: [StackType_t; PRESENT_STACK_WORDS] = [0; PRESENT_STACK_WORDS]; // rlvgl-discipline: allow(static_mut)
+static mut RENDER_STACK: [StackType_t; RENDER_STACK_WORDS] = [0; RENDER_STACK_WORDS]; // rlvgl-discipline: allow(static_mut)
+static mut TOUCH_STACK: [StackType_t; TOUCH_STACK_WORDS] = [0; TOUCH_STACK_WORDS]; // rlvgl-discipline: allow(static_mut)
+static mut PLAYIT_STACK: [StackType_t; PLAYIT_STACK_WORDS] = [0; PLAYIT_STACK_WORDS]; // rlvgl-discipline: allow(static_mut)
 
-static mut SYNC_STORAGE: core::mem::MaybeUninit<FreeRtosFrameSync> =
+static mut SYNC_STORAGE: core::mem::MaybeUninit<FreeRtosFrameSync> = // rlvgl-discipline: allow(static_mut)
     core::mem::MaybeUninit::uninit();
 
 /// Binary semaphore: render task signals when back buffer is ready to
@@ -401,10 +410,10 @@ pub fn init_fb_addr(front: u32) {
 #[inline]
 unsafe fn ltdc_retrigger(fb_addr: u32) {
     unsafe {
-        const DSI_WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
-        const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
-        const LTDC_L1CFBAR: *mut u32 = 0x5000_10AC as *mut u32;
-        const LTDC_SRCR: *mut u32 = 0x5000_1024 as *mut u32;
+        const DSI_WIFCR: *mut u32 = 0x5000_0410 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const LTDC_L1CFBAR: *mut u32 = 0x5000_10AC as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const LTDC_SRCR: *mut u32 = 0x5000_1024 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         cortex_m::asm::dsb();
         DSI_WIFCR.write_volatile(0x02); // clear ERIF
@@ -423,18 +432,18 @@ unsafe fn ltdc_retrigger(fb_addr: u32) {
 
 /// LTDC Layer 2 register base (Layer 1 + 0x80).
 const LTDC_L2: u32 = 0x5000_1000 + 0x104;
-const LTDC_L2CR: *mut u32 = (LTDC_L2 + 0x00) as *mut u32;
-const LTDC_L2WHPCR: *mut u32 = (LTDC_L2 + 0x04) as *mut u32;
-const LTDC_L2WVPCR: *mut u32 = (LTDC_L2 + 0x08) as *mut u32;
-const LTDC_L2PFCR: *mut u32 = (LTDC_L2 + 0x10) as *mut u32;
-const LTDC_L2CACR: *mut u32 = (LTDC_L2 + 0x14) as *mut u32;
-const LTDC_L2DCCR: *mut u32 = (LTDC_L2 + 0x18) as *mut u32;
-const LTDC_L2BFCR: *mut u32 = (LTDC_L2 + 0x1C) as *mut u32;
-const LTDC_L2CFBAR: *mut u32 = (LTDC_L2 + 0x28) as *mut u32;
-const LTDC_L2CFBLR: *mut u32 = (LTDC_L2 + 0x2C) as *mut u32;
-const LTDC_L2CFBLNR: *mut u32 = (LTDC_L2 + 0x30) as *mut u32;
-const LTDC_L2CLUTWR: *mut u32 = (LTDC_L2 + 0x34) as *mut u32;
-const LTDC_SRCR: *const u32 = 0x5000_1024 as *const u32;
+const LTDC_L2CR: *mut u32 = (LTDC_L2 + 0x00) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2WHPCR: *mut u32 = (LTDC_L2 + 0x04) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2WVPCR: *mut u32 = (LTDC_L2 + 0x08) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2PFCR: *mut u32 = (LTDC_L2 + 0x10) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2CACR: *mut u32 = (LTDC_L2 + 0x14) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2DCCR: *mut u32 = (LTDC_L2 + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2BFCR: *mut u32 = (LTDC_L2 + 0x1C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2CFBAR: *mut u32 = (LTDC_L2 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2CFBLR: *mut u32 = (LTDC_L2 + 0x2C) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2CFBLNR: *mut u32 = (LTDC_L2 + 0x30) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_L2CLUTWR: *mut u32 = (LTDC_L2 + 0x34) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const LTDC_SRCR: *const u32 = 0x5000_1024 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 /// A8 text buffer for LTDC Layer 2. Must be in SDRAM (AXI-accessible)
 /// since LTDC reads via AXI, not AHB. D2 SRAM at 0x3000_0000 is
@@ -542,7 +551,7 @@ unsafe fn setup_ltdc_layer2_a8(panel_w: u16, panel_h: u16) {
 unsafe fn disable_ltdc_layer2() {
     unsafe {
         LTDC_L2CR.write_volatile(0); // LEN = 0
-        (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR
+        (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }
 
@@ -564,20 +573,20 @@ unsafe fn disable_ltdc_layer2() {
 //   0x3800_0720 — last render frame cycle count (CpuBlitter cost)
 //   0x3800_0724 — cumulative pixels-touched  (for fps * pixels calc)
 
-const HB_PRESENT_TICKS: *mut u32 = 0x3800_0700 as *mut u32;
-const HB_RENDER_TICKS: *mut u32 = 0x3800_0704 as *mut u32;
-const HB_TOUCH_TICKS: *mut u32 = 0x3800_0708 as *mut u32;
-const HB_ERIF_WAKES: *mut u32 = 0x3800_070C as *mut u32;
-const HB_TOUCH_HITS: *mut u32 = 0x3800_0710 as *mut u32;
-const HB_TOUCH_LAST: *mut u32 = 0x3800_0714 as *mut u32;
-const HB_RENDER_PIXELS: *mut u32 = 0x3800_0718 as *mut u32;
-const HB_RENDER_RECTS: *mut u32 = 0x3800_071C as *mut u32;
-const HB_RENDER_CYC: *mut u32 = 0x3800_0720 as *mut u32;
-const HB_RENDER_PX_TOT: *mut u32 = 0x3800_0724 as *mut u32;
-const HB_CRAWL_FRAMEID: *mut u32 = 0x3800_0728 as *mut u32;
-const HB_CRAWL_TICKS: *mut u32 = 0x3800_072C as *mut u32;
-const HB_CRAWL_READY: *mut u32 = 0x3800_0730 as *mut u32;
-const HB_PLAYIT_POLLS: *mut u32 = 0x3800_0734 as *mut u32;
+const HB_PRESENT_TICKS: *mut u32 = 0x3800_0700 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_RENDER_TICKS: *mut u32 = 0x3800_0704 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_TOUCH_TICKS: *mut u32 = 0x3800_0708 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_ERIF_WAKES: *mut u32 = 0x3800_070C as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_TOUCH_HITS: *mut u32 = 0x3800_0710 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_TOUCH_LAST: *mut u32 = 0x3800_0714 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_RENDER_PIXELS: *mut u32 = 0x3800_0718 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_RENDER_RECTS: *mut u32 = 0x3800_071C as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_RENDER_CYC: *mut u32 = 0x3800_0720 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_RENDER_PX_TOT: *mut u32 = 0x3800_0724 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_CRAWL_FRAMEID: *mut u32 = 0x3800_0728 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_CRAWL_TICKS: *mut u32 = 0x3800_072C as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_CRAWL_READY: *mut u32 = 0x3800_0730 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const HB_PLAYIT_POLLS: *mut u32 = 0x3800_0734 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 // ── Cross-task touch ring (touch_task → render_task) ──────────────────────────
 //
@@ -589,7 +598,7 @@ use crate::touch_i2c::RawTouchSample;
 const TOUCH_EVT_CAP: usize = 16;
 static TOUCH_EVT_HEAD: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 static TOUCH_EVT_TAIL: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-static mut TOUCH_EVT_SLOTS: [RawTouchSample; TOUCH_EVT_CAP] =
+static mut TOUCH_EVT_SLOTS: [RawTouchSample; TOUCH_EVT_CAP] = // rlvgl-discipline: allow(static_mut)
     [RawTouchSample::EMPTY; TOUCH_EVT_CAP];
 
 fn touch_evt_push(s: RawTouchSample) {
@@ -648,7 +657,7 @@ static CRAWL_FB_ADDR: core::sync::atomic::AtomicU32 = core::sync::atomic::Atomic
 
 #[inline(always)]
 fn cyccnt() -> u32 {
-    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     unsafe { DWT_CYCCNT.read_volatile() }
 }
 
@@ -739,7 +748,7 @@ unsafe extern "C" fn present_task(_arg: *mut core::ffi::c_void) {
         // DMA2D safety gate — compose_tick is timer-gated so DMA2D
         // should be idle by retrigger time. This is a safety net.
         {
-            const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32;
+            const DMA2D_CR: *const u32 = 0x5200_1000 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             const CR_START: u32 = 1 << 0;
             let mut wait_ticks: u32 = 0;
             while unsafe { DMA2D_CR.read_volatile() } & CR_START != 0 {
@@ -883,7 +892,9 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 // stale SDRAM data with non-zero alpha would cover
                 // the starfield. 480×600×4 = 1.15 MB.
                 unsafe {
-                    core::ptr::write_bytes(0xD180_0000 as *mut u8, 0, 480 * 600 * 4);
+                    // SDRAM scratch region for jumbo-buffer scratch — fixed-offset
+                    // allocation by convention.
+                    core::ptr::write_bytes(0xD180_0000 as *mut u8, 0, 480 * 600 * 4); // rlvgl-discipline: allow(raw_addr_cast)
                 }
                 cortex_m::asm::dsb();
                 // Enable LTDC Layer 2 for ARGB8888 text overlay.
@@ -980,7 +991,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             // 480×600 pixels = 288K reads + 1.15M writes, ~3ms CPU.
             if prep_done {
                 const A8_SRC: *const u8 = 0x3000_0000 as *const u8;
-                const ARGB_DST: *mut u32 = 0xD180_0000 as *mut u32;
+                const ARGB_DST: *mut u32 = 0xD180_0000 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 const PIXEL_COUNT: usize = 480 * 600;
                 const ARGB_BYTES: usize = PIXEL_COUNT * 4;
                 const YELLOW_RGB: u32 = 0x00FF_D700;
@@ -1011,13 +1022,13 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             use rlvgl_platform::blit::{BlitterRenderer, RotatedRenderer};
             use rlvgl_platform::screen::Screen;
 
-            static mut DESKTOP_CTRL: Option<DiscoController> = None;
-            static mut DESKTOP_DIAG: bool = false;
+            static mut DESKTOP_CTRL: Option<DiscoController> = None; // rlvgl-discipline: allow(static_mut)
+            static mut DESKTOP_DIAG: bool = false; // rlvgl-discipline: allow(static_mut)
             // Dirty-frame counter: >0 = render + swap, 0 = idle (present
             // repeats FRONT). Start at 4 for initial convergence.
             // Touch events set this to 20 (~660ms at 30Hz) to cover
             // wing slide + double-buffer convergence.
-            static mut DIRTY_FRAMES: u8 = 4;
+            static mut DIRTY_FRAMES: u8 = 4; // rlvgl-discipline: allow(static_mut)
             if unsafe { (*core::ptr::addr_of!(DESKTOP_CTRL)).is_none() } {
                 crate::runtime_serial::write_bytes(b"RND:ctrl_new\r\n");
                 crate::runtime_serial::kick_tx();
@@ -1034,15 +1045,18 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
             // Track whether a gesture changed widget state — only
             // then do we pristine-restore before draw.
-            static mut NEEDS_PRISTINE: bool = false;
+            static mut NEEDS_PRISTINE: bool = false; // rlvgl-discipline: allow(static_mut)
 
             use rlvgl_core::event::Event;
 
             // ── Poll button (PC13, active-high) ──
             {
-                const GPIOC_IDR: *const u32 = 0x5802_0810 as *const u32;
-                static mut BTN_LAST: bool = false;
-                let pressed = unsafe { GPIOC_IDR.read_volatile() } & (1 << 13) != 0;
+                // SAFETY: GPIOC clock was enabled at boot (see C BSP);
+                // this is a single-cycle read of IDR which is harmless
+                // even if the bank were misconfigured.
+                let gpioc = unsafe { Gpio::gpioc() };
+                static mut BTN_LAST: bool = false; // rlvgl-discipline: allow(static_mut)
+                let pressed = gpioc.regs().idr.read() & (1 << 13) != 0;
                 let last = unsafe { BTN_LAST };
                 if pressed != last {
                     unsafe {
@@ -1079,9 +1093,11 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
             // ── Poll joystick (PK2-PK6, active-low, pull-up) ──
             {
-                const GPIOK_IDR: *const u32 = 0x5802_2810 as *const u32;
-                static mut JOY_LAST: [bool; 5] = [false; 5];
-                let idr = unsafe { GPIOK_IDR.read_volatile() };
+                // SAFETY: GPIOK clock was enabled at boot (FT5336 INT
+                // and joystick share the bank); IDR read is benign.
+                let gpiok = unsafe { Gpio::gpiok() };
+                static mut JOY_LAST: [bool; 5] = [false; 5]; // rlvgl-discipline: allow(static_mut)
+                let idr = gpiok.regs().idr.read();
                 let pins = [
                     idr & (1 << 2) == 0, // PK2 = SEL/Enter
                     idr & (1 << 3) == 0, // PK3 = Down
@@ -1128,7 +1144,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             {
                 // Print ring h/t every 150 iterations (~5s at 30Hz)
                 // to catch state changes after user taps.
-                static mut DESKTOP_LOOP_DIAG: u32 = 0;
+                static mut DESKTOP_LOOP_DIAG: u32 = 0; // rlvgl-discipline: allow(static_mut)
                 unsafe {
                     let c = core::ptr::read_volatile(core::ptr::addr_of!(DESKTOP_LOOP_DIAG));
                     core::ptr::write_volatile(core::ptr::addr_of_mut!(DESKTOP_LOOP_DIAG), c + 1);
@@ -1152,10 +1168,10 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                 use rlvgl_core::event::Event;
                 use rlvgl_platform::gesture::{DoubleTapRecognizer, TapRecognizer};
 
-                static mut TAP: Option<TapRecognizer> = None;
-                static mut DTAP: Option<DoubleTapRecognizer> = None;
-                static mut LAST_TOUCH: Option<(u16, u16)> = None;
-                static mut LAST_COUNT: u8 = 0;
+                static mut TAP: Option<TapRecognizer> = None; // rlvgl-discipline: allow(static_mut)
+                static mut DTAP: Option<DoubleTapRecognizer> = None; // rlvgl-discipline: allow(static_mut)
+                static mut LAST_TOUCH: Option<(u16, u16)> = None; // rlvgl-discipline: allow(static_mut)
+                static mut LAST_COUNT: u8 = 0; // rlvgl-discipline: allow(static_mut)
 
                 let tap = unsafe {
                     let p = core::ptr::addr_of_mut!(TAP);
@@ -1174,7 +1190,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
 
                 const DW: i32 = 480; // portrait width (RotatedRenderer Y axis)
 
-                static mut TOUCH_DRAIN_DIAG: u32 = 0;
+                static mut TOUCH_DRAIN_DIAG: u32 = 0; // rlvgl-discipline: allow(static_mut)
                 while let Some(sample) = touch_evt_pop() {
                     unsafe {
                         let c = core::ptr::read_volatile(core::ptr::addr_of!(TOUCH_DRAIN_DIAG));
@@ -1342,7 +1358,7 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
             // Slow periodic refresh (~3s) for live stats updates.
             // Faster rates cause visible flicker on settings wing
             // (5 icon RLE decode is expensive).
-            static mut REFRESH_COUNTER: u8 = 0;
+            static mut REFRESH_COUNTER: u8 = 0; // rlvgl-discipline: allow(static_mut)
             unsafe {
                 let rc = core::ptr::read_volatile(core::ptr::addr_of!(REFRESH_COUNTER));
                 core::ptr::write_volatile(
@@ -1462,8 +1478,8 @@ unsafe extern "C" fn touch_task(_arg: *mut core::ffi::c_void) {
         }
 
         // Read touch sample via interrupt-driven I2C4.
-        static mut PREV_TOUCH: bool = false;
-        static mut TOUCH_DIAG_CNT: u32 = 0;
+        static mut PREV_TOUCH: bool = false; // rlvgl-discipline: allow(static_mut)
+        static mut TOUCH_DIAG_CNT: u32 = 0; // rlvgl-discipline: allow(static_mut)
         let prev = unsafe { core::ptr::read_volatile(core::ptr::addr_of!(PREV_TOUCH)) };
         {
             let s = unsafe { touch_i2c::read_sample_irq() };
@@ -1717,7 +1733,7 @@ pub unsafe fn start() -> ! {
     unsafe {
         // 0. Stop TIM6 — bare-metal uses it for the touch ISR.
         //    FreeRTOS uses touch_task. Concurrent I2C4 access = bus hang.
-        (0x4000_1000u32 as *mut u32).write_volatile(0); // TIM6_CR1 CEN=0
+        (0x4000_1000u32 as *mut u32).write_volatile(0); // TIM6_CR1 CEN=0 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         // 0b. FT5336 init: write CTRL=0x00 (keep-active scan mode).
         //     300+ ms have elapsed since the last PG3 reset; chip is booted.
@@ -1858,11 +1874,11 @@ pub unsafe fn start() -> ! {
 // With configSUPPORT_STATIC_ALLOCATION = 1 and configUSE_TIMERS = 1,
 // FreeRTOS calls these to obtain storage for its internal tasks.
 
-static mut IDLE_TCB: StaticTask = StaticTask::new();
-static mut IDLE_STACK: [StackType_t; 128] = [0; 128];
+static mut IDLE_TCB: StaticTask = StaticTask::new(); // rlvgl-discipline: allow(static_mut)
+static mut IDLE_STACK: [StackType_t; 128] = [0; 128]; // rlvgl-discipline: allow(static_mut)
 
-static mut TIMER_TCB: StaticTask = StaticTask::new();
-static mut TIMER_STACK: [StackType_t; 256] = [0; 256];
+static mut TIMER_TCB: StaticTask = StaticTask::new(); // rlvgl-discipline: allow(static_mut)
+static mut TIMER_STACK: [StackType_t; 256] = [0; 256]; // rlvgl-discipline: allow(static_mut)
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn vApplicationGetIdleTaskMemory(

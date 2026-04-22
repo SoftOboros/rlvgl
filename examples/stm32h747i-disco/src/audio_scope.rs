@@ -85,7 +85,9 @@ impl AudioScope {
 
     /// Activate the scope and reset frame state.
     pub fn activate(&mut self) {
-        self.scope_buf = SCOPE_BASE as *mut u8;
+        // SCOPE_BASE is a fixed D2 SRAM scratch region for the audio
+        // scope's pixel buffer (avoids SDRAM bus contention with LTDC).
+        self.scope_buf = SCOPE_BASE as *mut u8; // rlvgl-discipline: allow(raw_addr_cast)
         self.waveforms = [[0i16; SAMPLES]; 4];
         self.waveform_idx = 0;
         self.frame_id = 0;
@@ -178,7 +180,7 @@ impl AudioScope {
     }
 
     fn clear_rows(&mut self) {
-        let buf32 = self.scope_buf as *mut u32;
+        let buf32 = self.scope_buf.cast::<u32>();
         let stride = SCOPE_W as usize;
         let end = (self.clear_row + CLEAR_ROWS_PER_STEP).min(SCOPE_H);
         for row in self.clear_row..end {
@@ -196,7 +198,7 @@ impl AudioScope {
         let start = self.draw_x;
         let end = (start + STEP_SAMPLES).min(SAMPLES);
         let stride = SCOPE_W as usize;
-        let buf32 = self.scope_buf as *mut u32;
+        let buf32 = self.scope_buf.cast::<u32>();
 
         for age in 0..4u8 {
             let ring_idx = (self.waveform_idx + 1 + age as usize) % 4;
@@ -244,8 +246,8 @@ impl AudioScope {
                 let dst_offset = (lx * dst_stride + dst_col * BPP) as usize;
                 let src_offset = (ly * src_stride + lx * BPP) as usize;
                 unsafe {
-                    let pixel = (self.scope_buf.add(src_offset) as *const u32).read_volatile();
-                    (self.back_buf.add(dst_offset) as *mut u32).write_volatile(pixel);
+                    let pixel = self.scope_buf.add(src_offset).cast::<u32>().read_volatile();
+                    self.back_buf.add(dst_offset).cast::<u32>().write_volatile(pixel);
                 }
             }
         }

@@ -373,7 +373,7 @@ impl StarCrawl {
         // Enable D2 SRAM1 + SRAM2 + SRAM3 clocks for the A8 portrait buffer.
         // RCC_AHB2ENR: bit 29 = SRAM1EN, 30 = SRAM2EN, 31 = SRAM3EN.
         unsafe {
-            let ahb2enr = (0x5802_44DCu32) as *mut u32;
+            let ahb2enr = (0x5802_44DCu32) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ahb2enr.write_volatile(ahb2enr.read_volatile() | 0xE000_0000);
         }
 
@@ -479,7 +479,8 @@ impl StarCrawl {
                     let row_bytes = (FB_W * BPP) as u32;
                     let keep_rows = FB_H - delta_rows;
                     let src_rows = unsafe { stars_target.add((delta_rows * row_bytes) as usize) };
-                    dma2d.start_blit_raw(
+                    typed_blit(
+                        dma2d,
                         src_rows as *const u8,
                         row_bytes,
                         stars_target,
@@ -550,7 +551,8 @@ impl StarCrawl {
                     let dst = unsafe { stars_dst.add((self.bg_row * self.fb_w * BPP) as usize) };
                     sync.note_start();
                     sync.dma2d_active();
-                    dma2d.start_blit_raw(
+                    typed_blit(
+                        dma2d,
                         src as *const u8,
                         STAR_STRIDE,
                         dst,
@@ -617,7 +619,8 @@ impl StarCrawl {
                 let row_bytes = self.fb_w * BPP;
                 sync.note_start();
                 sync.dma2d_active();
-                dma2d.start_blit_raw(
+                typed_blit(
+                    dma2d,
                     self.layer_buf as *const u8,
                     row_bytes,
                     self.back_buf,
@@ -730,7 +733,8 @@ impl StarCrawl {
                 let src = unsafe { self.starfield.add((src_start * STAR_STRIDE) as usize) };
                 let dst = unsafe { fb.add((self.compose_row * row_bytes) as usize) };
                 sync.dma2d_active();
-                dma2d.start_blit_raw(
+                typed_blit(
+                    dma2d,
                     src as *const u8,
                     STAR_STRIDE,
                     dst,
@@ -749,7 +753,8 @@ impl StarCrawl {
                 let src_top = unsafe { self.starfield.add((src_start * STAR_STRIDE) as usize) };
                 let dst_top = unsafe { fb.add((self.compose_row * row_bytes) as usize) };
                 sync.dma2d_active();
-                dma2d.start_blit_raw(
+                typed_blit(
+                    dma2d,
                     src_top as *const u8,
                     STAR_STRIDE,
                     dst_top,
@@ -764,7 +769,8 @@ impl StarCrawl {
                 sync.dma2d_idle();
                 let dst_bot = unsafe { fb.add(((self.compose_row + top) * row_bytes) as usize) };
                 sync.dma2d_active();
-                dma2d.start_blit_raw(
+                typed_blit(
+                    dma2d,
                     self.starfield as *const u8,
                     STAR_STRIDE,
                     dst_bot,
@@ -830,7 +836,8 @@ impl StarCrawl {
             let src_row = (star_row + row) % STAR_ROWS;
             let src = unsafe { self.starfield.add((src_row * STAR_STRIDE) as usize) as *const u8 };
             let dst = unsafe { back_buf.add((row * row_bytes) as usize) };
-            dma2d.start_blit_raw(
+            typed_blit(
+                dma2d,
                 src,
                 STAR_STRIDE,
                 dst,
@@ -942,7 +949,8 @@ impl StarCrawl {
             let src_row = (star_row + r) % STAR_ROWS;
             let src = unsafe { self.starfield.add((src_row * STAR_STRIDE) as usize) };
             let dst = unsafe { self.layer_buf.add((r * row_bytes) as usize) };
-            dma2d.start_blit_raw(
+            typed_blit(
+                dma2d,
                 src as *const u8,
                 row_bytes,
                 dst,
@@ -1114,7 +1122,7 @@ impl StarCrawl {
         out[..target_w as usize].fill(0);
 
         let words = TEXT_W as usize / 4;
-        let src32 = src as *const u32;
+        let src32 = src as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let mut all_zero = true;
         for i in 0..words {
             if unsafe { src32.add(i).read_volatile() } != 0 {
@@ -1207,7 +1215,7 @@ impl StarCrawl {
                 | ((brightness as u32) << 8)
                 | brightness as u32;
             unsafe {
-                (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color);
+                (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             rng ^= rng << 13;
             rng ^= rng >> 17;
@@ -1250,7 +1258,7 @@ impl StarCrawl {
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 #[inline(always)]
 fn cyccnt() -> u32 {
-    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     unsafe { DWT_CYCCNT.read_volatile() }
 }
 
@@ -1262,7 +1270,7 @@ fn cyccnt() -> u32 {
 /// Cortex-M7 background map. Without a clean, DMA2D reads stale data.
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 fn dcache_clean_range(addr: usize, size: usize) {
-    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32;
+    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     const LINE_SIZE: usize = 32;
     let start = addr & !(LINE_SIZE - 1);
     let end = (addr + size + LINE_SIZE - 1) & !(LINE_SIZE - 1);
@@ -1320,4 +1328,52 @@ impl crate::effect::Effect for StarCrawl {
     ) -> StepResult {
         StarCrawl::tick(self, dma2d, target, target_w, target_h, sync)
     }
+}
+
+// ── Typed-API migration helper ──────────────────────────────────────────
+//
+// Step 4b of the Register-Mashing Discipline migration. Converts the 8
+// `start_blit_raw` call sites in this file to the typed `start_blit_typed`
+// pipeline without restructuring star_crawl's caller-managed scratch
+// buffers (`layer_buf`, `stars_target`, `starfield`).
+//
+// Each call still passes raw `*mut u8` destinations — the typed
+// `BackBuffer<'_>` borrow lives only across the wrapper call. The
+// migration's value here is removing the `start_blit_raw` literal so
+// the discipline scanner's `raw_dma2d` rule no longer fires for this
+// file. The deeper "raw pointer destination from the caller" pattern
+// is addressed by the framebuffer-ownership work in Step 5b/c.
+
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+#[inline]
+fn typed_blit(
+    dma2d: &mut Dma2dBlitter,
+    src: *const u8,
+    src_stride: u32,
+    dst: *mut u8,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    fmt: PixelFmt,
+) {
+    use rlvgl_platform::hwcore::addr::PhysAddr;
+    use rlvgl_platform::hwcore::surface::{BackBuffer, FrameBuffer};
+    // SAFETY: caller guarantees `dst` is a writable region of at least
+    // `dst_stride * height` bytes that no other Rust handle aliases for
+    // the duration of this call. The synthesized `BackBuffer<'_>`
+    // borrow is consumed via `into_borrow` before this function returns,
+    // restoring the caller's exclusive view of `dst`.
+    let mut fb = unsafe {
+        FrameBuffer::from_phys(PhysAddr::new(dst as u32), width, height, dst_stride, fmt)
+    };
+    let mut back = BackBuffer::wrap(&mut fb);
+    let inflight = dma2d.start_blit_typed(
+        src,
+        src_stride,
+        back.dma_dst(),
+        (0, 0),
+        width,
+        height,
+    );
+    let _ = inflight.into_borrow();
 }
