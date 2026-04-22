@@ -9,6 +9,14 @@ fn main() {
     println!("cargo:rustc-link-search={}", out_dir.display());
     println!("cargo:rerun-if-changed=memory.x");
 
+    // Use memory.x as the linker script when building bare-metal. The
+    // Linux userspace build uses the host-toolchain default script and
+    // must NOT see this flag — `-T` would override cross-toolchain's
+    // glibc-aware layout and break the resulting binary.
+    if std::env::var("CARGO_FEATURE_BARE_METAL").is_ok() {
+        println!("cargo:rustc-link-arg=-Tmemory.x");
+    }
+
     // Compile FreeRTOS C sources when freertos feature is enabled
     if std::env::var("CARGO_FEATURE_FREERTOS").is_ok() {
         build_freertos(&manifest_dir);

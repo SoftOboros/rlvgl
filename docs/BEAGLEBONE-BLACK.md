@@ -247,14 +247,59 @@ You should see colorful static on the display.
 
 ---
 
-## Direct LCDC via /dev/mem (Fallback / All-Prong Foundation)
+## Direct LCDC via /dev/mem — the All-Prong Foundation
 
-If the kernel DRM driver doesn't produce `/dev/fb0`, or for the bare-metal
-and FreeRTOS prongs, we program the LCDC registers directly. This is the
-**same register sequence** used by all four prongs — validating it on Linux
-via `/dev/mem` first gives us confidence for bare-metal.
+The Linux prong programs the LCDC registers directly through `/dev/mem`,
+using the **same register sequence** that bare-metal, FreeRTOS, and
+Zephyr will reuse. This is the primary Linux path (not a fallback). It
+decouples pixels-on-panel from the kernel `tilcdc` driver so we can
+validate the register recipe in a debuggable userspace harness before
+running it on bare-metal where a bad write freezes the AXI bus.
 
-The init sequence (from `bsp/lcdc.rs` and `bsp/am335x.rs`):
+### Prerequisites (one-time, on the BBB)
+
+1. **Reserve the framebuffer region.** The AM3358 has 512 MB of DDR3L
+   at `[0x8000_0000, 0xA000_0000)`; we ship `mem=510M` on the kernel
+   command line to keep the top 2 MB out of Linux's RAM pool so we can
+   mmap it through `/dev/mem`:
+
+   ```bash
+   sudo bash examples/beaglebone-black/tools/reserve-fb.sh
+   sudo reboot
+   ```
+
+   Verify after reboot:
+
+   ```bash
+   cat /proc/cmdline | tr ' ' '\n' | grep '^mem='
+   ```
+
+2. **Install the armv7 target on the host** (optional — you can also
+   compile on the BBB directly):
+
+   ```bash
+   rustup target add armv7-unknown-linux-gnueabihf
+   ```
+
+### Run
+
+```bash
+# Build
+cargo build --target armv7-unknown-linux-gnueabihf \
+    -p rlvgl-example-bbb --features linux --release
+scp target/armv7-unknown-linux-gnueabihf/release/rlvgl-bbb \
+    debian@192.168.6.2:~
+
+# On the BBB
+sudo bash examples/beaglebone-black/tools/unbind-tilcdc.sh   # releases LCDC
+sudo ./rlvgl-bbb                                             # writes pixels
+```
+
+### Register sequence (all four prongs)
+
+Implemented in `examples/beaglebone-black/src/bsp/lcdc.rs` and shared
+across Linux (`/dev/mem`), bare-metal, FreeRTOS, and Zephyr by way of
+the `bsp::am335x` register map.
 
 ```
 1. PRCM:  CM_PER_LCDC_CLKSTCTRL = 0x2 (SW_WKUP)
@@ -264,22 +309,154 @@ The init sequence (from `bsp/lcdc.rs` and `bsp/am335x.rs`):
 2. PINMUX: conf_lcd_data[0:23] = 0x08 (Mode 0, pull disabled, output)
            conf_lcd_vsync/hsync/pclk/ac_bias = 0x08
 
-3. LCDC:  CLKC_ENABLE = 0x07 (DMA + Core)
-          LCD_CTRL = 0x0201 (raster mode, clkdiv=2 → ~33 MHz)
+3. LCDC:  CLKC_ENABLE = 0x05 (DMA + Core)
+          LCD_CTRL = 0x0501 (raster mode, clkdiv=5 → ~33 MHz)
           RASTER_CTRL = TFT | TFT24 | UNPACKED | PALMODE_DATA_ONLY
           RASTER_TIMING_0 = encode(HBP=46, HFP=210, HSW=20, PPL=800)
           RASTER_TIMING_1 = encode(VBP=23, VFP=22, VSW=10, LPP=480)
-          RASTER_TIMING_2 = IPC (falling edge)
-          LCDDMA_CTRL = burst 16, single FB
-          LCDDMA_FB0_BASE = framebuffer physical address
+          RASTER_TIMING_2 = IPC|IHS|IVS (bits 22/21/20 — falling DCLK,
+                            active-low HSYNC, active-low VSYNC)
+          LCDDMA_CTRL = burst 16, FIFO threshold 8, single FB
+          LCDDMA_FB0_BASE = 0x9FE0_0000  (reserved region)
           LCDDMA_FB0_CEILING = base + (800*480*4) - 4
           IRQENABLE_SET = EOF0 (bit 8)
           RASTER_CTRL |= LCDEN (bit 0) — START (must be last)
 ```
 
+**Register-bit caveat:** RASTER_TIMING_2 bits 11/12/13 are **not**
+IPC/IHS/IVS — those live at bits 22/21/20 per TRM Table 13-26. Earlier
+versions of this code had the wrong positions; confirmed against the
+AM335x TRM (SPRUH73Q) before shipping.
+
+Expected live-register values after init (verify with `sudo devmem2
+0x4830E028` etc.):
+
+| Register | Offset | Expected |
+|----------|--------|----------|
+| LCD_CTRL | 0x04 | `0x0000_0501` |
+| RASTER_CTRL (post-LCDEN) | 0x28 | `0x0620_0081` |
+| RASTER_TIMING_0 | 0x2C | `0x2d0d_2c50` |
+| RASTER_TIMING_1 | 0x30 | `0x1716_25df` |
+| RASTER_TIMING_2 | 0x34 | `0x0070_0000` |
+| LCDDMA_CTRL | 0x40 | `0x0000_0040` |
+| LCDDMA_FB0_BASE | 0x44 | `0x9FE0_0000` |
+| LCDDMA_FB0_CEILING | 0x48 | `0x9FF7_6FFC` |
+| CLKC_ENABLE | 0x6C | `0x0000_0005` |
+
 A Python script using `/dev/mem` and `mmap` can execute this sequence
 from Linux userspace to prove pixels before the Rust binary is ready.
 See `tools/lcdc-test.py` (to be written).
+
+---
+
+## Phase 4: Bare-Metal Chainload
+
+The bare-metal prong runs the **exact same register sequence** from a
+`no_std` ELF that U-Boot chainloads — no Linux, no `tilcdc`, no DTB
+surgery. This is the fastest smoke-test path: if pixels light here, the
+`bsp::lcdc::init_raster` sequence is correct by construction, and any
+remaining Linux-prong blockers are kernel-side (pinctrl, framebuffer
+coherency, LCDC bound by tilcdc).
+
+### Framebuffer & layout
+
+The bare-metal build lives at `0x82000000` (standard AM335x
+`loadaddr`). DDR layout after `go 0x82000000`:
+
+| Region                   | Purpose                              |
+|--------------------------|--------------------------------------|
+| `0x80000000..0x82000000` | U-Boot SPL + scratch (32 MB)         |
+| `0x82000000..0x83000000` | `.text/.rodata/.data/.bss` (16 MB)   |
+| `0x83000000..0x84000000` | Stack, grows down from `__stack_top` |
+| `0x84000000..0x84200000` | Framebuffer (800×480×4 = 1.5 MB)     |
+| `0x84200000..0x9F800000` | Free                                 |
+| `0x9F800000..0xA0000000` | U-Boot relocated image + heap        |
+
+See `examples/beaglebone-black/memory.x` for the linker script.
+
+### Build + flat .bin
+
+```bash
+# One-time setup on the host
+rustup target add armv7a-none-eabihf
+# and any `arm-none-eabi-*` GNU toolchain (e.g. brew install gcc-arm-embedded)
+
+# Build ELF + emit flat .bin
+bash examples/beaglebone-black/tools/build-bare.sh
+```
+
+The script emits:
+
+```
+target/armv7a-none-eabihf/release/rlvgl-bbb-bare        # ELF
+target/armv7a-none-eabihf/release/rlvgl-bbb-bare.bin    # raw binary (~1.2 KB)
+```
+
+Release `.bin` is tiny because the bare-metal path has no std, no
+allocator, no `DiscoController`, and no lvgl widget tree — it's just
+"fill FB with dark blue, program LCDC, wait on EOF". This is deliberate
+for v1: we want to prove the register sequence end-to-end with the
+smallest possible code.
+
+### U-Boot chainload procedure
+
+Attach USB-serial to the BBB J1 header (3.3 V FTDI cable):
+
+| J1 pin | Signal | Wire to |
+|--------|--------|---------|
+| 1      | GND    | FTDI GND |
+| 4      | RX     | FTDI TX  |
+| 5      | TX     | FTDI RX  |
+
+Open serial at 115200 8N1 (`screen /dev/cu.usbserial-* 115200` on
+macOS, or `tools/serial.sh` equivalent). Power-cycle the BBB with the
+`rlvgl-bbb-bare.bin` on the SD FAT partition (alongside the Bookworm
+`boot` files — Bookworm leaves FAT partition 1 readable via `fatload
+mmc 0:1`).
+
+At the U-Boot prompt (press any key during the 1-second boot delay):
+
+```
+U-Boot# fatload mmc 0:1 0x82000000 rlvgl-bbb-bare.bin
+  reading rlvgl-bbb-bare.bin
+  1229 bytes read in 5 ms (240 KiB/s)
+U-Boot# go 0x82000000
+  ## Starting application at 0x82000000 ...
+```
+
+Expected serial output (from the `bsp::uart0` breadcrumb driver):
+
+```
+=== rlvgl-bbb-bare ===
+stage 1: enable peripheral clocks
+stage 2: configure LCD pin mux
+stage 3: fill framebuffer at 0x84000000 (0x00177000 bytes)
+stage 4: init LCDC raster
+stage 5: LCDEN set; entering main loop
+eof 0x00000040
+eof 0x00000080
+...
+```
+
+Expected visual: solid dark-blue screen (`0xFF_00_40_80` = ARGB opaque
+dark blue). If byte order comes out wrong (e.g. dark red instead of
+dark blue), that's a TFT24_UNPACKED byte-lane confirmation — fix by
+adjusting the pixel constant rather than the LCDC init, since the init
+must match the Linux prong for reuse.
+
+### What succeeds here proves, transitively
+
+- `bsp::prcm::enable_lcdc/enable_i2c2/enable_gpio1` is correct.
+- `bsp::pinmux::configure_lcd_pins` drives the pads to Mode 0
+  (writes to `CONF_LCD_*` succeed because bare-metal is ring 0 —
+  the write-lock observed from Linux `/dev/mem` is a CP15/MMU or
+  Linux-side quirk, not a hardware block).
+- `bsp::lcdc::init_raster` programs RASTER_CTRL/TIMING_0/1/2,
+  LCDDMA_CTRL, LCDDMA_FB0_BASE/CEILING, CLKC_ENABLE, and LCDEN in
+  the correct order with the correct bit fields.
+- LCDC DMAs from `0x84000000` (bare-metal) are equivalent to DMAs
+  from `0x9FE0_0000` (Linux `/dev/mem` reserved region) — only the
+  framebuffer address changes between prongs.
 
 ---
 
@@ -323,7 +500,9 @@ examples/beaglebone-black/
 └── tools/
     ├── setup-bbb.sh       # First-time eMMC password + SSH key setup
     ├── prepare-sd.sh      # Flash Bookworm image + configure sysconf.txt
-    └── patch-dtb-lcd.sh   # Patch DTB with panel + pinmux + HDMI disable
+    ├── patch-dtb-lcd.sh   # Patch DTB with panel + pinmux + HDMI disable
+    ├── reserve-fb.sh      # Append mem=510M to uEnv.txt for fb reservation
+    └── unbind-tilcdc.sh   # Release LCDC from kernel driver before rlvgl-bbb
 ```
 
 ---
@@ -426,18 +605,27 @@ When the BBB is bricked (no USB, no network, solid LEDs):
 
 ### Phase 3: Linux Prong
 
-- [ ] /dev/mem LCDC init from userspace (Python proof, then Rust)
-- [ ] Framebuffer mmap + pixel writes
-- [ ] Cross-compile rlvgl-bbb and deploy
-- [ ] DiscoController rendering on hardware
-- [ ] Touch input (evdev or direct I2C)
+- [x] /dev/mem LCDC init from userspace (Rust; shared bsp code with
+      bare-metal / FreeRTOS / Zephyr)
+- [x] Framebuffer mmap + pixel writes (reserved 2 MB at 0x9FE0_0000)
+- [x] Reserve-fb + unbind-tilcdc helper scripts
+- [x] AM335x register layout verified against TRM SPRUH73Q
+      (RASTER_TIMING_2 bits fixed: IPC/IHS/IVS at 22/21/20)
+- [ ] Cross-compile rlvgl-bbb and deploy to hardware
+- [ ] DiscoController rendering on hardware (visual confirmation)
+- [ ] Touch via kernel edt-ft5x06 → evdev (DTB patch already in place)
+- [ ] Direct I2C2 register-based touch (follow-up, unifies with bare-metal)
+- [ ] DT split: 24-bit-from-SD vs 16-bit-from-eMMC variant (deferred)
 
 ### Phase 4: Bare-Metal + FreeRTOS
 
-- [ ] U-Boot chainload bare-metal ELF
-- [ ] LCDC register init (same sequence, no Linux)
+- [x] `_start` preamble: SVC mode, MMU/caches off, SP set, `.bss` zeroed
+- [x] Polled UART0 breadcrumb driver (`bsp::uart0`, 0x44E0_9000)
+- [x] `memory.x` relocated to `loadaddr` 0x82000000; framebuffer past stack
+- [x] `tools/build-bare.sh` builds ELF + flat `.bin` (~1.2 KB release)
+- [ ] U-Boot chainload + pixels on panel (first hardware smoke test)
 - [ ] FreeRTOS task model (present/render/touch)
-- [ ] DiscoController integration
+- [ ] DiscoController integration (needs heap; deferred until smoke passes)
 
 ### Phase 5: Zephyr
 

@@ -15,6 +15,7 @@ required-features = ["bare_metal"]
 
 [features]
 default = ["linux"]
+# Linux userspace: /dev/mem-backed LCDC driver + kernel evdev touch.
 linux = ["rlvgl-platform/linux_fbdev"]
 bare_metal = []
 freertos = ["bare_metal"]
@@ -24,6 +25,7 @@ zephyr = ["bare_metal"]
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", default-features = false }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+libc = "0.2"
 
 [build-dependencies]
 cc = "1"

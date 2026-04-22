@@ -1,11 +1,13 @@
-//! Linux framebuffer entry point for the BeagleBone Black + NHD-7.0CTP-CAPE-P.
+//! Linux entry point for the BeagleBone Black + NHD-7.0CTP-CAPE-P.
 //!
-//! Renders the shared 747-style disco demo to `/dev/fb0` with touch input
-//! from `/dev/input/eventN`. This is the fastest path to pixels on panel
-//! and validates display + touch hardware before the Zephyr and bare-metal
-//! prongs are brought up.
-
-mod bsp;
+//! Renders through the kernel `tilcdc` DRM driver via `/dev/fb0`. The DTB
+//! must have the `lcdc@4830e000` node enabled with a `bb-lcd-pins` pinctrl
+//! state and a `/panel` node (`compatible = "panel-dpi"`). See
+//! `docs/BEAGLEBONE-BLACK.md` for the fdtput-based DT setup (fdtoverlay
+//! wedges u-boot on this Bookworm image; use direct fdtput mutations).
+//!
+//! Touch comes through the kernel `edt-ft5x06` driver on
+//! `/dev/input/eventN`.
 
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
 use rlvgl_platform::{
@@ -20,21 +22,11 @@ use std::{
 fn apply_commands(controller: &mut DiscoController) {
     for command in controller.drain_commands() {
         match command {
-            DiscoCommand::SetBacklight(level) => {
-                eprintln!("bbb: backlight {level}%");
-            }
-            DiscoCommand::LoadStorageSummary => {
-                eprintln!("bbb: storage summary requested");
-            }
-            DiscoCommand::StartEffect(effect) => {
-                eprintln!("bbb: start effect {effect:?}");
-            }
-            DiscoCommand::StopEffect(effect) => {
-                eprintln!("bbb: stop effect {effect:?}");
-            }
-            DiscoCommand::ShowStatus(status) => {
-                eprintln!("bbb: {status}");
-            }
+            DiscoCommand::SetBacklight(level) => eprintln!("bbb: backlight {level}%"),
+            DiscoCommand::LoadStorageSummary => eprintln!("bbb: storage summary requested"),
+            DiscoCommand::StartEffect(effect) => eprintln!("bbb: start effect {effect:?}"),
+            DiscoCommand::StopEffect(effect) => eprintln!("bbb: stop effect {effect:?}"),
+            DiscoCommand::ShowStatus(status) => eprintln!("bbb: {status}"),
             DiscoCommand::NoOp => {}
         }
     }
@@ -53,7 +45,8 @@ fn main() {
     let (w, h) = screen.logical_size();
     let width = w as usize;
     let height = h as usize;
-    let frame_hz = bsp::lcdc::FRAME_HZ.max(1);
+    // fbdev doesn't report refresh rate; BBB panel is 33.3 MHz / (1076*535) ≈ 57 Hz.
+    let frame_hz = 57u32;
 
     eprintln!("rlvgl-bbb: screen {width}x{height} @ {frame_hz}Hz");
 
@@ -70,7 +63,6 @@ fn main() {
     loop {
         let started = Instant::now();
 
-        // Poll input
         while let Some(event) = input.poll() {
             if let Some(gesture) = tap.process(&event) {
                 root.borrow_mut().dispatch_event(&gesture);
@@ -82,11 +74,9 @@ fn main() {
             controller.handle_event(&gesture);
         }
 
-        // Tick
         controller.tick();
         apply_commands(&mut controller);
 
-        // Render
         {
             let mut blitter = CpuBlitter;
             let surface = Surface::new(&mut framebuf, width * 4, PixelFmt::Argb8888, w, h);
@@ -96,7 +86,6 @@ fn main() {
             renderer.planner().add(BlitRect { x: 0, y: 0, w, h });
         }
 
-        // Flush full frame to fbdev
         use rlvgl_core::widget::{Color, Rect};
         let colors: &[Color] = unsafe {
             core::slice::from_raw_parts(framebuf.as_ptr() as *const Color, width * height)
@@ -111,7 +100,6 @@ fn main() {
             colors,
         );
 
-        // Frame pacing
         let elapsed = started.elapsed();
         if elapsed < frame_time {
             thread::sleep(frame_time - elapsed);

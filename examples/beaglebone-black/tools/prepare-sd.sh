@@ -33,7 +33,18 @@ set -euo pipefail
 DISK="${1:?Usage: $0 /dev/diskN}"
 IMAGE="${BB_IMAGE:-/tmp/bbb-bookworm.img.xz}"
 PASSWORD="${BB_PASSWORD:?Set BB_PASSWORD to the desired user password}"
-SSH_KEY="${BB_SSH_KEY:-${HOME}/.ssh/id_ed25519.pub}"
+# Prefer BB_SSH_KEY if set; else probe common key names in order.
+if [ -n "${BB_SSH_KEY:-}" ]; then
+    SSH_KEY="$BB_SSH_KEY"
+else
+    for cand in id_ed25519.pub id_rsa.pub id_ecdsa.pub; do
+        if [ -f "${HOME}/.ssh/$cand" ]; then
+            SSH_KEY="${HOME}/.ssh/$cand"
+            break
+        fi
+    done
+    SSH_KEY="${SSH_KEY:-${HOME}/.ssh/id_ed25519.pub}"
+fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
@@ -120,7 +131,7 @@ echo "  1. Insert SD into BBB (slot under the board)"
 echo "  2. Attach NHD-7.0CTP-CAPE-P cape"
 echo "  3. Connect 5V 2A barrel jack + USB-mini"
 echo "  4. Hold S2 during power-on (until eMMC boot is disabled)"
-echo "  5. SSH to debian@192.168.6.2 (password: ${PASSWORD})"
+echo "  5. SSH to debian@192.168.6.2 (use your configured password)"
 echo "  6. Disable eMMC boot (one-time):"
 echo "       sudo dd if=/dev/zero of=/dev/mmcblk1 bs=512 seek=256 count=64"
 echo "  7. Patch DTB for LCD output:"

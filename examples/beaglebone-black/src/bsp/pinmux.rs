@@ -10,9 +10,9 @@ use super::am335x::*;
 /// LCD_DATA[0:23] are output-only (no rxactive), fast slew, no pull.
 /// LCD_VSYNC, LCD_HSYNC, LCD_PCLK, LCD_AC_BIAS_EN are also Mode 0 output.
 pub unsafe fn configure_lcd_pins() {
-    let lcd_out: u32 = PIN_MODE_0 | (1 << 3); // mode 0, pull disabled
+    let lcd_out: u32 = PIN_MODE_0 | (1 << 3);
 
-    let lcd_data_pins: [*mut u32; 24] = [
+    let lcd_data_pins: [u32; 24] = [
         CONF_LCD_DATA0,
         CONF_LCD_DATA1,
         CONF_LCD_DATA2,
@@ -54,7 +54,7 @@ pub unsafe fn configure_lcd_pins() {
 pub unsafe fn configure_i2c2_pins() {
     let i2c_cfg: u32 = PIN_MODE_3 | PIN_PULL_UP_EN | PIN_RX_ACTIVE | PIN_SLOW_SLEW;
     unsafe {
-        reg_write(CONF_UART1_CTSN, i2c_cfg); // I2C2_SDA
-        reg_write(CONF_UART1_RTSN, i2c_cfg); // I2C2_SCL
+        reg_write(CONF_UART1_CTSN, i2c_cfg);
+        reg_write(CONF_UART1_RTSN, i2c_cfg);
     }
 }
