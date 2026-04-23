@@ -40,7 +40,11 @@ pub fn put_hex32(mut v: u32) {
     puts("0x");
     for shift in (0..32).step_by(4).rev() {
         let nib = ((v >> shift) & 0xF) as u8;
-        let c = if nib < 10 { b'0' + nib } else { b'a' + (nib - 10) };
+        let c = if nib < 10 {
+            b'0' + nib
+        } else {
+            b'a' + (nib - 10)
+        };
         putc(c);
         let _ = &mut v;
     }

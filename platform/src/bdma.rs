@@ -175,7 +175,8 @@ impl BdmaSai4Rx {
     /// Returns which buffer the BDMA is currently writing to (0 or 1).
     pub fn current_target(&self) -> u8 {
         unsafe {
-            if (CH1_CCR as *const u32).read_volatile() & CCR_CT != 0 { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            if (CH1_CCR as *const u32).read_volatile() & CCR_CT != 0 {
+                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 1
             } else {
                 0

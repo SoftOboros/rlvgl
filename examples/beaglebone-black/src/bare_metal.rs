@@ -245,8 +245,7 @@ pub extern "C" fn rust_main() -> ! {
     }
 
     unsafe {
-        let fb =
-            core::slice::from_raw_parts_mut(FB_BASE as *mut u32, (FB_BYTES / 4) as usize);
+        let fb = core::slice::from_raw_parts_mut(FB_BASE as *mut u32, (FB_BYTES / 4) as usize);
         // Vertical color-bar test pattern. For TFT24_UNPACKED the low
         // 24 bits of each 32-bit word go out to LCD_DATA[23:0] with
         // byte layout {R[23:16], G[15:8], B[7:0]}. Seeing six distinct

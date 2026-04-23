@@ -174,7 +174,10 @@ pub unsafe fn send_set_tear_on() {
     // DCS short write with 1 parameter (data type 0x15):
     //   GHCR = DT[5:0]=0x15 | VCID[7:6]=0 | WCLSB[15:8]=0x35 | WCMSB[23:16]=0x00
     // 0x35 = set_tear_on, param 0x00 = V-blank only
-    DSI_HOST.regs().ghcr.write(0x15 | (0x35 << 8) | (0x00 << 16));
+    DSI_HOST
+        .regs()
+        .ghcr
+        .write(0x15 | (0x35 << 8) | (0x00 << 16));
     // Wait for command to be sent
     wait_cmd_fifo_empty();
 }

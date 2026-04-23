@@ -532,9 +532,8 @@ impl Dma2dBlitter {
         // non-negative and within bounds; out-of-bounds origins are a
         // caller bug, not unsafety in this layer). Alignment was
         // validated by `BackBuffer::dma_addr()` via `DmaAddr::from_phys`.
-        let dst_ptr = unsafe {
-            dst_base.add(area.y as usize * dst_stride as usize + area.x as usize * bpp)
-        };
+        let dst_ptr =
+            unsafe { dst_base.add(area.y as usize * dst_stride as usize + area.x as usize * bpp) };
         let _ = &mut dst; // bind the reborrow into this scope explicitly
         self.fill_engine_raw(dst_ptr, dst_stride, area.w, area.h, color, fmt);
         InFlight::new(dst)

@@ -19,7 +19,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use crate::blit::{PixelFmt, Rect};
-use crate::hwcore::surface::{pixel_size, BackBuffer, BorrowedForDma, InFlight};
+use crate::hwcore::surface::{BackBuffer, BorrowedForDma, InFlight, pixel_size};
 
 /// One recorded operation submitted to a [`MockBlitter`].
 #[derive(Debug, Clone, PartialEq, Eq)]

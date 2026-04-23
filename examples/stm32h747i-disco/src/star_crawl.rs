@@ -1367,13 +1367,6 @@ fn typed_blit(
         FrameBuffer::from_phys(PhysAddr::new(dst as u32), width, height, dst_stride, fmt)
     };
     let mut back = BackBuffer::wrap(&mut fb);
-    let inflight = dma2d.start_blit_typed(
-        src,
-        src_stride,
-        back.dma_dst(),
-        (0, 0),
-        width,
-        height,
-    );
+    let inflight = dma2d.start_blit_typed(src, src_stride, back.dma_dst(), (0, 0), width, height);
     let _ = inflight.into_borrow();
 }

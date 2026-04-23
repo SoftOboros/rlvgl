@@ -7,8 +7,23 @@
 //! controller. Backlight PWM and panel reset control are wired through
 //! `embedded-hal` traits.
 
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::PixelFmt;
 #[cfg(feature = "stm32h747i_disco")]
 use crate::ft5336::Ft5336;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::hwcore::addr::PhysAddr;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+use crate::hwcore::surface::{BackBuffer, FrameBuffer, FrontBuffer};
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_arch = "aarch64")
@@ -21,21 +36,6 @@ use embedded_hal::{digital::InputPin, i2c::I2c, i2c::SevenBitAddress};
 use embedded_hal::{digital::OutputPin, pwm::SetDutyCycle};
 use rlvgl_core::event::{Event, MAX_TOUCH_POINTS, TouchPoint, TouchState};
 use rlvgl_core::widget::{Color, Rect};
-#[cfg(all(
-    feature = "stm32h747i_disco",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-use crate::PixelFmt;
-#[cfg(all(
-    feature = "stm32h747i_disco",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-use crate::hwcore::addr::PhysAddr;
-#[cfg(all(
-    feature = "stm32h747i_disco",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-use crate::hwcore::surface::{BackBuffer, FrameBuffer, FrontBuffer};
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use stm32h7::stm32h747cm7::DMA2D;
 #[cfg(all(
@@ -967,7 +967,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let t0 = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let mut timeout = 20_000_000u32;
             while timeout > 0 {
-                if (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                if (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 {
+                    // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     break;
                 }
                 timeout -= 1;

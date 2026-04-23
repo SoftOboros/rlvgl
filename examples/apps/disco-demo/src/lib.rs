@@ -10,11 +10,11 @@
 
 extern crate alloc;
 
-mod assets;
+pub mod assets;
 mod dashboard_panel;
 mod hotspot;
-mod icon_strip;
-mod wing;
+pub mod icon_strip;
+pub mod wing;
 
 use alloc::{format, rc::Rc, string::String, vec, vec::Vec};
 use core::cell::RefCell;

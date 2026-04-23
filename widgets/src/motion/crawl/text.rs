@@ -11,13 +11,17 @@
 //! V1 scope:
 //! - Background is **static**; the jumbo buffer is used as a regular
 //!   surface with `scale = 1`. The jumbo infrastructure still
-//!   underpins it for the future parallax follow-up.
+//!   underpins parallax scrolling.
 //! - Text is pre-rendered **once** at [`Crawl::activate`] time into a
-//!   caller-supplied A8 [`Surface`].
-//! - No perspective trapezoid — text is drawn at constant width.
+//!   caller-supplied A8 [`Surface`], or supplied pre-built by the host.
+//! - Optional perspective narrowing is applied per output row using a
+//!   small FIR resampler, matching the STM32 disco crawl's 2.5D look.
 //! - Direction [`Direction::Up`] is fully implemented and exercised by
 //!   the [`StarCrawl`](super::StarCrawl) preset; the other three
 //!   directions are plumbed through the API but lightly tested.
+//! - The background scroll axis comes from the supplied
+//!   [`JumboBuffer`], so a vertical text crawl can still drift a
+//!   horizontal starfield underneath it.
 
 use core::marker::PhantomData;
 
@@ -27,7 +31,7 @@ use rlvgl_platform::blit::{Blitter, PixelFmt, Rect as BlitRect, Surface};
 use super::{Crawl, CrawlState};
 use crate::motion::background::BackgroundPattern;
 use crate::motion::direction::Direction;
-use crate::motion::jumbo::JumboBuffer;
+use crate::motion::jumbo::{JumboBuffer, JumboOrientation};
 use crate::motion::rate::MotionRate;
 
 /// Packed ARGB8888 colour with per-channel helpers.
@@ -80,6 +84,17 @@ pub struct TextCrawl<'buf, R: MotionRate, B: BackgroundPattern> {
     /// Inter-line spacing in pixels. Defaults to `font.height` when
     /// constructed via [`TextCrawl::new`].
     pub line_spacing: u16,
+    /// Divider applied to the text scroll accumulator when sampling the
+    /// background. `1` locks the background to the text; higher values
+    /// slow the background for a parallax effect.
+    pub background_scroll_divisor: u16,
+    /// Width of the projected text at the top edge of the visible
+    /// crawl window. Keeping this narrower than the source text width
+    /// produces the classic perspective taper.
+    pub perspective_top_width: u16,
+    /// Width of the projected text at the bottom edge of the visible
+    /// crawl window.
+    pub perspective_bottom_width: u16,
 
     jumbo_bg: JumboBuffer<'buf>,
     text_src: Surface<'buf>,
@@ -87,6 +102,7 @@ pub struct TextCrawl<'buf, R: MotionRate, B: BackgroundPattern> {
 
     state: CrawlState,
     text_height_px: u32,
+    pre_rendered_text: bool,
     /// Enforces the lifetime parameter doesn't get optimised away.
     _buf: PhantomData<&'buf mut ()>,
 }
@@ -96,8 +112,8 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> TextCrawl<'buf, R, B> {
     ///
     /// `jumbo_bg` must use [`PixelFmt::Argb8888`], `text_src` must use
     /// [`PixelFmt::A8`]. `scanline` is a scratch buffer at least
-    /// `max(visible_w, visible_h) * 4` bytes long — used to stage
-    /// composite scanlines before they are handed to the blitter.
+    /// `max(visible_w, visible_h)` bytes long; wider scratch is fine
+    /// and lets hosts keep a single reusable buffer shape.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         direction: Direction,
@@ -119,11 +135,15 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> TextCrawl<'buf, R, B> {
             text_color: TextColor(text_color),
             lines,
             line_spacing,
+            background_scroll_divisor: 1,
+            perspective_top_width: text_src.width.min(u16::MAX as u32) as u16,
+            perspective_bottom_width: text_src.width.min(u16::MAX as u32) as u16,
             jumbo_bg,
             text_src,
             scanline,
             state: CrawlState::default(),
             text_height_px: 0,
+            pre_rendered_text: false,
             _buf: PhantomData,
         }
     }
@@ -132,6 +152,16 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> TextCrawl<'buf, R, B> {
     /// until [`Crawl::activate`] has been called.
     pub fn text_height_px(&self) -> u32 {
         self.text_height_px
+    }
+
+    /// Treat the current contents of `text_src` as the finished crawl
+    /// strip instead of re-rasterising `lines` on activate.
+    ///
+    /// Hosts use this when they want to splice extra A8 assets such as
+    /// a logo or splash crop into the same source buffer as the text.
+    pub fn use_pre_rendered_text(&mut self, text_height_px: u32) {
+        self.text_height_px = text_height_px.min(self.text_src.height);
+        self.pre_rendered_text = true;
     }
 
     /// Total scroll extent in pixels (how far the scroll needs to
@@ -152,6 +182,82 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> TextCrawl<'buf, R, B> {
 
     fn visible_h(&self) -> u32 {
         self.jumbo_bg.visible_h
+    }
+
+    fn background_scroll_px(&self) -> u32 {
+        let scroll_q8 = self.state.scroll_q8.max(0) as u32;
+        let divisor = u32::from(self.background_scroll_divisor.max(1));
+        (scroll_q8 / divisor) >> 8
+    }
+
+    fn projected_row_width(&self, screen_y: i32, paint_h: i32, max_w: i32) -> i32 {
+        if paint_h <= 0 || max_w <= 0 {
+            return 0;
+        }
+        let top = i32::from(self.perspective_top_width.max(1)).min(max_w);
+        let bottom = i32::from(self.perspective_bottom_width.max(1))
+            .min(max_w)
+            .max(top);
+        if paint_h == 1 || top == bottom {
+            return bottom;
+        }
+        top + (bottom - top) * screen_y / (paint_h - 1)
+    }
+
+    fn resample_text_row_into_scanline(&mut self, text_row: u32, target_w: usize) -> usize {
+        if target_w == 0 || text_row >= self.text_height_px {
+            return 0;
+        }
+        let src_w = self.text_src.width as usize;
+        let text_stride = self.text_src.stride;
+        let src_row_start = text_row as usize * text_stride;
+        if src_row_start >= self.text_src.buf.len() {
+            return 0;
+        }
+        let src_row_end = (src_row_start + src_w).min(self.text_src.buf.len());
+        let src = &self.text_src.buf[src_row_start..src_row_end];
+        if src.iter().all(|&alpha| alpha == 0) {
+            return 0;
+        }
+
+        let out_len = target_w.min(self.scanline.len());
+        let out = &mut self.scanline[..out_len];
+        out.fill(0);
+
+        if out_len == src_w && src.len() >= out_len {
+            out.copy_from_slice(&src[..out_len]);
+            return out_len;
+        }
+
+        let step_q16 = ((src_w as u32) << 16) / out_len.max(1) as u32;
+        const TAPS: [(i32, u32); 7] = [
+            (-3, 8),
+            (-2, 24),
+            (-1, 48),
+            (0, 64),
+            (1, 48),
+            (2, 24),
+            (3, 8),
+        ];
+
+        for (ox, slot) in out.iter_mut().enumerate() {
+            let cx_q16 = ox as u32 * step_q16 + (step_q16 >> 1);
+            let cx = (cx_q16 >> 16) as i32;
+            let mut acc: u32 = 0;
+            let mut wsum: u32 = 0;
+            for &(tap, weight) in &TAPS {
+                let sx = cx + tap;
+                if sx >= 0 && (sx as usize) < src.len() {
+                    acc += src[sx as usize] as u32 * weight;
+                    wsum += weight;
+                }
+            }
+            if wsum > 0 {
+                *slot = (acc / wsum).min(255) as u8;
+            }
+        }
+
+        out_len
     }
 }
 
@@ -241,6 +347,37 @@ pub fn pre_render_text(
     cur_y.clamp(0, h) as u32
 }
 
+fn blend_a8_row(
+    dst: &mut Surface<'_>,
+    dst_row_start: usize,
+    dst_x: usize,
+    alphas: &[u8],
+    color: TextColor,
+) {
+    let color_r = color.r() as u32;
+    let color_g = color.g() as u32;
+    let color_b = color.b() as u32;
+    for (x, &alpha_byte) in alphas.iter().enumerate() {
+        let alpha = alpha_byte as u32;
+        if alpha == 0 {
+            continue;
+        }
+        let dst_off = dst_row_start + (dst_x + x) * 4;
+        if dst_off + 4 > dst.buf.len() {
+            break;
+        }
+        // Destination is BGRA little-endian.
+        let bg_b = dst.buf[dst_off] as u32;
+        let bg_g = dst.buf[dst_off + 1] as u32;
+        let bg_r = dst.buf[dst_off + 2] as u32;
+        let inv = 255 - alpha;
+        dst.buf[dst_off] = ((color_b * alpha + bg_b * inv) / 255) as u8;
+        dst.buf[dst_off + 1] = ((color_g * alpha + bg_g * inv) / 255) as u8;
+        dst.buf[dst_off + 2] = ((color_r * alpha + bg_r * inv) / 255) as u8;
+        dst.buf[dst_off + 3] = 0xFF;
+    }
+}
+
 impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> {
     fn state(&self) -> CrawlState {
         self.state
@@ -265,9 +402,10 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
         }
         self.jumbo_bg.mirror_tail();
 
-        // Pre-render text into the A8 text source.
-        self.text_height_px =
-            pre_render_text(self.font, self.lines, self.line_spacing, &mut self.text_src);
+        if !self.pre_rendered_text {
+            self.text_height_px =
+                pre_render_text(self.font, self.lines, self.line_spacing, &mut self.text_src);
+        }
 
         // Start the scroll at 0 (content offscreen on the entry side).
         self.state = CrawlState {
@@ -295,47 +433,64 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
 
     fn paint<BL: Blitter>(&mut self, blitter: &mut BL, dst: &mut Surface<'_>) {
         // 1. Blit the jumbo background into `dst`, wrapping around the
-        //    jumbo's long axis so the scroll cursor can slide through
-        //    a pre-painted pattern without visible seams. For
-        //    `scale = 1` jumbos this collapses to a single blit of
-        //    the whole head half; for `scale >= 2` jumbos with a
-        //    `mirror_tail()` it's a two-slab blit that wraps the
-        //    visible window around the buffer boundary.
+        //    jumbo's configured long axis so the scroll cursor can slide
+        //    through a pre-painted pattern without visible seams.
         let bg_w = self.visible_w();
         let bg_h = self.visible_h();
         let copy_w = bg_w.min(dst.width);
         let copy_h = bg_h.min(dst.height);
-        let scroll_px = (self.state.scroll_q8 >> 8).max(0) as u32;
         let long_axis = self.jumbo_bg.long_axis_pixels().max(1);
-        let bg_scroll = scroll_px % long_axis;
-        let (slab_a, slab_b) = self.jumbo_bg.window_range(bg_scroll, copy_h);
+        let bg_scroll = self.background_scroll_px() % long_axis;
+        let orientation = self.jumbo_bg.orientation;
+        let (slab_a, slab_b) = match orientation {
+            JumboOrientation::Vertical => self.jumbo_bg.window_range(bg_scroll, copy_h),
+            JumboOrientation::Horizontal => self.jumbo_bg.window_range(bg_scroll, copy_w),
+        };
         {
             let bg_surface = self.jumbo_bg.as_surface();
-            // First slab — always present.
-            let src_rect_a = BlitRect {
-                x: 0,
-                y: slab_a.0 as i32,
-                w: copy_w,
-                h: slab_a.1,
-            };
-            blitter.blit(&bg_surface, src_rect_a, dst, (0, 0));
-            // Second slab — non-zero only when the window wraps.
-            if slab_b.1 > 0 {
-                let src_rect_b = BlitRect {
-                    x: 0,
-                    y: slab_b.0 as i32,
-                    w: copy_w,
-                    h: slab_b.1,
-                };
-                blitter.blit(&bg_surface, src_rect_b, dst, (0, slab_a.1 as i32));
+            match orientation {
+                JumboOrientation::Vertical => {
+                    let src_rect_a = BlitRect {
+                        x: 0,
+                        y: slab_a.0 as i32,
+                        w: copy_w,
+                        h: slab_a.1,
+                    };
+                    blitter.blit(&bg_surface, src_rect_a, dst, (0, 0));
+                    if slab_b.1 > 0 {
+                        let src_rect_b = BlitRect {
+                            x: 0,
+                            y: slab_b.0 as i32,
+                            w: copy_w,
+                            h: slab_b.1,
+                        };
+                        blitter.blit(&bg_surface, src_rect_b, dst, (0, slab_a.1 as i32));
+                    }
+                }
+                JumboOrientation::Horizontal => {
+                    let src_rect_a = BlitRect {
+                        x: slab_a.0 as i32,
+                        y: 0,
+                        w: slab_a.1,
+                        h: copy_h,
+                    };
+                    blitter.blit(&bg_surface, src_rect_a, dst, (0, 0));
+                    if slab_b.1 > 0 {
+                        let src_rect_b = BlitRect {
+                            x: slab_b.0 as i32,
+                            y: 0,
+                            w: slab_b.1,
+                            h: copy_h,
+                        };
+                        blitter.blit(&bg_surface, src_rect_b, dst, (slab_a.1 as i32, 0));
+                    }
+                }
             }
         }
 
-        // 2. Overlay the text column with A8 alpha blending. V1 is
-        //    CPU-only, row by row. `scanline` is unused here because
-        //    we blend directly into `dst` — reserved for the future
-        //    perspective warp pipeline.
-        let _ = &mut self.scanline;
+        // 2. Overlay the text column with A8 alpha blending, applying
+        //    a per-row perspective resample when the top and bottom
+        //    widths differ.
         if self.text_height_px == 0 {
             return;
         }
@@ -351,51 +506,48 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
         let visible_w = bg_w as i32;
         let text_h = self.text_height_px as i32;
         let text_w = self.text_src.width as i32;
-        let text_stride = self.text_src.stride;
         let dst_stride = dst.stride;
         let dst_w = dst.width as i32;
         let dst_h = dst.height as i32;
         let color = self.text_color;
-        let color_r = color.r() as u32;
-        let color_g = color.g() as u32;
-        let color_b = color.b() as u32;
 
         match self.direction {
             Direction::Up => {
                 // text_y_in_src = screen_y - visible_h + scroll_px
-                for screen_y in 0..visible_h.min(dst_h) {
+                let paint_h = visible_h.min(dst_h).max(0);
+                let paint_w = visible_w.min(dst_w).max(0);
+                for screen_y in 0..paint_h {
                     let text_y = screen_y - visible_h + scroll_px;
                     if text_y < 0 || text_y >= text_h {
                         continue;
                     }
-                    let src_row_start = (text_y as usize) * text_stride;
                     let dst_row_start = (screen_y as usize) * dst_stride;
-                    let row_w = text_w.min(visible_w).min(dst_w);
-                    // Text is horizontally centered in text_src already;
-                    // copy text_src directly to dst pixel-by-pixel.
-                    for x in 0..row_w as usize {
-                        let src_idx = src_row_start + x;
-                        if src_idx >= self.text_src.buf.len() {
-                            break;
-                        }
-                        let alpha = self.text_src.buf[src_idx] as u32;
-                        if alpha == 0 {
+                    let row_w = self.projected_row_width(screen_y, paint_h, paint_w.min(text_w));
+                    if row_w <= 0 {
+                        continue;
+                    }
+                    let text_x = ((paint_w - row_w) / 2).max(0) as usize;
+                    if row_w == text_w {
+                        let src_row_start = text_y as usize * self.text_src.stride;
+                        let src_row_end = src_row_start + row_w as usize;
+                        if src_row_end > self.text_src.buf.len() {
                             continue;
                         }
-                        let dst_off = dst_row_start + x * 4;
-                        if dst_off + 4 > dst.buf.len() {
-                            break;
-                        }
-                        // Destination is BGRA little-endian.
-                        let bg_b = dst.buf[dst_off] as u32;
-                        let bg_g = dst.buf[dst_off + 1] as u32;
-                        let bg_r = dst.buf[dst_off + 2] as u32;
-                        let inv = 255 - alpha;
-                        dst.buf[dst_off] = ((color_b * alpha + bg_b * inv) / 255) as u8;
-                        dst.buf[dst_off + 1] = ((color_g * alpha + bg_g * inv) / 255) as u8;
-                        dst.buf[dst_off + 2] = ((color_r * alpha + bg_r * inv) / 255) as u8;
-                        dst.buf[dst_off + 3] = 0xFF;
+                        blend_a8_row(
+                            dst,
+                            dst_row_start,
+                            text_x,
+                            &self.text_src.buf[src_row_start..src_row_end],
+                            color,
+                        );
+                        continue;
                     }
+
+                    let count = self.resample_text_row_into_scanline(text_y as u32, row_w as usize);
+                    if count == 0 {
+                        continue;
+                    }
+                    blend_a8_row(dst, dst_row_start, text_x, &self.scanline[..count], color);
                 }
             }
             _ => {
@@ -411,12 +563,12 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::motion::background::StarField;
+    use crate::motion::background::{BackgroundPattern, StarField};
     use crate::motion::jumbo::JumboOrientation;
     use crate::motion::rate::FrameRoundedRate;
     use alloc::vec;
     use rlvgl_platform::CpuBlitter;
-    use rlvgl_platform::blit::PixelFmt;
+    use rlvgl_platform::blit::{PixelFmt, Surface};
 
     // A tiny stand-in font with exactly one 1×1 glyph for the character
     // `#`. Enough to verify that pre_render_text lays out something and
@@ -438,6 +590,27 @@ mod tests {
         glyphs: &TEST_GLYPHS,
         data: &TEST_DATA,
     };
+
+    #[derive(Copy, Clone)]
+    struct ColumnPattern;
+
+    impl BackgroundPattern for ColumnPattern {
+        fn paint(&self, surface: &mut Surface<'_>) {
+            if surface.format != PixelFmt::Argb8888 {
+                return;
+            }
+            for y in 0..surface.height as usize {
+                let row_start = y * surface.stride;
+                for x in 0..surface.width as usize {
+                    let off = row_start + x * 4;
+                    surface.buf[off] = x as u8;
+                    surface.buf[off + 1] = 0;
+                    surface.buf[off + 2] = 0;
+                    surface.buf[off + 3] = 0xFF;
+                }
+            }
+        }
+    }
 
     fn make_crawl<'b>(
         jumbo: &'b mut alloc::vec::Vec<u8>,
@@ -554,5 +727,163 @@ mod tests {
         let mut blitter = CpuBlitter;
         crawl.paint(&mut blitter, &mut dst);
         assert!(dst_buf.iter().any(|&b| b != 0));
+    }
+
+    #[test]
+    fn horizontal_jumbo_scrolls_background_left() {
+        let mut jumbo = vec![0u8; 8 * 4 * 4];
+        let mut text = vec![0u8; 4 * 4];
+        let mut scanline = vec![0u8; 16];
+        let jumbo_view = JumboBuffer::new(
+            jumbo.as_mut_slice(),
+            8 * 4,
+            4,
+            4,
+            2,
+            JumboOrientation::Horizontal,
+            PixelFmt::Argb8888,
+        );
+        let text_view = Surface::new(text.as_mut_slice(), 4, PixelFmt::A8, 4, 4);
+        let mut crawl = TextCrawl::new(
+            Direction::Up,
+            FrameRoundedRate::new(30, 30),
+            ColumnPattern,
+            &TEST_FONT,
+            0x00FF_D700,
+            &[],
+            jumbo_view,
+            text_view,
+            scanline.as_mut_slice(),
+        );
+        crawl.activate();
+
+        let mut before = vec![0u8; 4 * 4 * 4];
+        let mut before_surface = Surface::new(&mut before, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        let mut blitter = CpuBlitter;
+        crawl.paint(&mut blitter, &mut before_surface);
+        assert_eq!(before[0], 0, "initial top-left pixel should use column 0");
+
+        crawl.state.scroll_q8 = 1 << 8;
+        let mut after = vec![0u8; 4 * 4 * 4];
+        let mut after_surface = Surface::new(&mut after, 4 * 4, PixelFmt::Argb8888, 4, 4);
+        crawl.paint(&mut blitter, &mut after_surface);
+        assert_eq!(
+            after[0], 1,
+            "after one pixel of scroll, the leftmost visible column should advance"
+        );
+    }
+
+    #[test]
+    fn text_is_centered_inside_visible_window() {
+        let mut jumbo = vec![0u8; 8 * 8 * 4];
+        let mut text = vec![0u8; 4 * 4];
+        let mut scanline = vec![0u8; 32];
+        let jumbo_view = JumboBuffer::new(
+            jumbo.as_mut_slice(),
+            8 * 4,
+            8,
+            4,
+            2,
+            JumboOrientation::Vertical,
+            PixelFmt::Argb8888,
+        );
+        let text_view = Surface::new(text.as_mut_slice(), 4, PixelFmt::A8, 4, 4);
+        let mut crawl = TextCrawl::new(
+            Direction::Up,
+            FrameRoundedRate::new(30, 30),
+            StarField {
+                star_count: 0,
+                bg_color: 0,
+                ..Default::default()
+            },
+            &TEST_FONT,
+            0x00FF_D700,
+            &["#"],
+            jumbo_view,
+            text_view,
+            scanline.as_mut_slice(),
+        );
+        crawl.activate();
+        crawl.state.scroll_q8 = 4 << 8;
+
+        let mut dst_buf = vec![0u8; 8 * 4 * 4];
+        let mut dst = Surface::new(&mut dst_buf, 8 * 4, PixelFmt::Argb8888, 8, 4);
+        let mut blitter = CpuBlitter;
+        crawl.paint(&mut blitter, &mut dst);
+
+        let lit_columns: alloc::vec::Vec<usize> = dst_buf
+            .chunks_exact(4)
+            .take(8)
+            .enumerate()
+            .filter_map(|(x, px)| (px[0] != 0 || px[1] != 0 || px[2] != 0).then_some(x))
+            .collect();
+        assert_eq!(lit_columns, vec![3]);
+    }
+
+    #[test]
+    fn pre_rendered_text_survives_activate() {
+        let mut jumbo = vec![0u8; 8 * 8 * 4];
+        let mut text = vec![0u8; 8 * 8];
+        let mut scanline = vec![0u8; 32];
+        text[0] = 0xAA;
+        let mut crawl = make_crawl(&mut jumbo, &mut text, &mut scanline);
+        crawl.use_pre_rendered_text(1);
+
+        crawl.activate();
+
+        assert_eq!(crawl.text_height_px(), 1);
+        assert_eq!(crawl.text_src.buf[0], 0xAA);
+    }
+
+    #[test]
+    fn perspective_rows_narrow_toward_top() {
+        let mut jumbo = vec![0u8; 8 * 8 * 4];
+        let mut text = vec![0u8; 4 * 4];
+        let mut scanline = vec![0u8; 32];
+        for byte in &mut text {
+            *byte = 0xFF;
+        }
+        let jumbo_view = JumboBuffer::new(
+            jumbo.as_mut_slice(),
+            8 * 4,
+            8,
+            4,
+            2,
+            JumboOrientation::Vertical,
+            PixelFmt::Argb8888,
+        );
+        let text_view = Surface::new(text.as_mut_slice(), 4, PixelFmt::A8, 4, 4);
+        let mut crawl = TextCrawl::new(
+            Direction::Up,
+            FrameRoundedRate::new(30, 30),
+            StarField {
+                star_count: 0,
+                bg_color: 0,
+                ..Default::default()
+            },
+            &TEST_FONT,
+            0x00FF_D700,
+            &[],
+            jumbo_view,
+            text_view,
+            scanline.as_mut_slice(),
+        );
+        crawl.use_pre_rendered_text(4);
+        crawl.perspective_top_width = 2;
+        crawl.perspective_bottom_width = 4;
+        crawl.activate();
+        crawl.state.scroll_q8 = 4 << 8;
+
+        let mut dst_buf = vec![0u8; 8 * 4 * 4];
+        let mut dst = Surface::new(&mut dst_buf, 8 * 4, PixelFmt::Argb8888, 8, 4);
+        let mut blitter = CpuBlitter;
+        crawl.paint(&mut blitter, &mut dst);
+
+        let top_row = &dst_buf[..8 * 4];
+        let bottom_row = &dst_buf[3 * 8 * 4..4 * 8 * 4];
+        let top_lit = top_row.chunks_exact(4).filter(|px| px[3] != 0).count();
+        let bottom_lit = bottom_row.chunks_exact(4).filter(|px| px[3] != 0).count();
+        assert_eq!(top_lit, 2);
+        assert_eq!(bottom_lit, 4);
     }
 }

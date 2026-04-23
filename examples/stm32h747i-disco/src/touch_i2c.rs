@@ -58,8 +58,12 @@ impl RawTouchSample {
 /// Write a single FT5336 register via I2C4.
 unsafe fn write_reg(reg: u8, val: u8) {
     unsafe {
-        I2C4.regs().icr.write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
-        I2C4.regs().cr2.write(FT5336_SADD | (2 << 16) | (1 << 13) | (1 << 25));
+        I2C4.regs()
+            .icr
+            .write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+        I2C4.regs()
+            .cr2
+            .write(FT5336_SADD | (2 << 16) | (1 << 13) | (1 << 25));
         if !i2c4_wait(1) {
             return;
         }
@@ -130,7 +134,9 @@ pub unsafe fn i2c4_bus_recover() {
 /// Returns `None` on timeout or NACK.
 pub unsafe fn read_reg(reg: u8) -> Option<u8> {
     unsafe {
-        I2C4.regs().icr.write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+        I2C4.regs()
+            .icr
+            .write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
         // Write phase: register address (1 byte, no AUTOEND → TC)
         I2C4.regs().cr2.write(FT5336_SADD | (1 << 16) | (1 << 13));
         if !i2c4_wait(1) {
@@ -142,7 +148,9 @@ pub unsafe fn read_reg(reg: u8) -> Option<u8> {
         } // TC
 
         // Read phase: 1 byte, AUTOEND
-        I2C4.regs().cr2.write(FT5336_SADD | (1 << 10) | (1 << 16) | (1 << 13) | (1 << 25));
+        I2C4.regs()
+            .cr2
+            .write(FT5336_SADD | (1 << 10) | (1 << 16) | (1 << 13) | (1 << 25));
         if !i2c4_wait(2) {
             return None;
         } // RXNE
@@ -170,7 +178,9 @@ pub unsafe fn read_sample() -> RawTouchSample {
     unsafe {
         // Clear stale status flags from any prior aborted transaction.
         // STOPCF=5, NACKCF=4, BERRCF=8, ARLOCF=9, OVRCF=10.
-        I2C4.regs().icr.write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+        I2C4.regs()
+            .icr
+            .write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
 
         // ── Write phase: register address 0x02 ──
         I2C4.regs().cr2.write(FT5336_SADD | (1 << 16) | (1 << 13));
@@ -183,7 +193,9 @@ pub unsafe fn read_sample() -> RawTouchSample {
         }
 
         // ── Read phase: 31 bytes ──
-        I2C4.regs().cr2.write(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
+        I2C4.regs()
+            .cr2
+            .write(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
         let mut buf = [0u8; 31];
         for b in buf.iter_mut() {
             if !i2c4_wait(2) {
@@ -260,7 +272,9 @@ pub unsafe fn i2c4_irq_start(reg: u8, len: usize) {
         ISR_OK = false;
 
         // Clear stale flags
-        I2C4.regs().icr.write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+        I2C4.regs()
+            .icr
+            .write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
 
         // Enable I2C4 event interrupts: TXIE, TCIE, RXIE, STOPIE, NACKIE
         let cr1 = I2C4.regs().cr1.read();
@@ -297,7 +311,9 @@ pub unsafe fn i2c4_irq_wait() -> Option<&'static [u8]> {
         if got != 1 || !ISR_OK {
             // Disable I2C4 event interrupts on failure
             let cr1 = I2C4.regs().cr1.read();
-            I2C4.regs().cr1.write(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+            I2C4.regs()
+                .cr1
+                .write(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
             ISR_PHASE = I2c4Phase::Idle;
             return None;
         }
@@ -341,7 +357,9 @@ pub unsafe fn i2c4_ev_handler() {
             I2C4.regs().icr.write(1 << 4); // clear NACKF
             // Disable event interrupts
             let cr1 = I2C4.regs().cr1.read();
-            I2C4.regs().cr1.write(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
+            I2C4.regs()
+                .cr1
+                .write(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
             ISR_OK = false;
             ISR_PHASE = I2c4Phase::Idle;
             give_i2c4_sem();
@@ -361,9 +379,9 @@ pub unsafe fn i2c4_ev_handler() {
                     // TC
                     // Start read phase: repeated START, RD_WRN=1, AUTOEND
                     let nbytes = ISR_LEN as u32;
-                    I2C4.regs().cr2.write(
-                        FT5336_SADD | (1 << 10) | (nbytes << 16) | (1 << 13) | (1 << 25),
-                    );
+                    I2C4.regs()
+                        .cr2
+                        .write(FT5336_SADD | (1 << 10) | (nbytes << 16) | (1 << 13) | (1 << 25));
                     ISR_PHASE = I2c4Phase::Reading;
                 }
             }
@@ -381,9 +399,9 @@ pub unsafe fn i2c4_ev_handler() {
                     I2C4.regs().icr.write(1 << 5); // clear STOPF
                     // Disable event interrupts
                     let cr1 = I2C4.regs().cr1.read();
-                    I2C4.regs().cr1.write(
-                        cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)),
-                    );
+                    I2C4.regs()
+                        .cr1
+                        .write(cr1 & !((1 << 1) | (1 << 2) | (1 << 4) | (1 << 5) | (1 << 6)));
                     ISR_OK = ISR_IDX == ISR_LEN;
                     ISR_PHASE = I2c4Phase::Idle;
                     give_i2c4_sem();

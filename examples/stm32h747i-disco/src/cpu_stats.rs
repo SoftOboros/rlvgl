@@ -177,7 +177,9 @@ impl CpuStats {
         if !self.enabled {
             return;
         }
-        let now = unsafe { d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */ };
+        let now = unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        };
 
         // Previous frame duration (wrapping arithmetic handles CYCCNT wrap).
         let total = now.wrapping_sub(self.frame_start);
@@ -214,7 +216,9 @@ impl CpuStats {
         if !self.enabled {
             return;
         }
-        self.idle_start = unsafe { d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */ };
+        self.idle_start = unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        };
     }
 
     /// Accumulate idle duration after WFI returns (idle end).
@@ -223,7 +227,9 @@ impl CpuStats {
         if !self.enabled {
             return;
         }
-        let now = unsafe { d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */ };
+        let now = unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        };
         self.idle_accum = self
             .idle_accum
             .wrapping_add(now.wrapping_sub(self.idle_start));
@@ -244,7 +250,9 @@ impl CpuStats {
     /// Read the raw CYCCNT value (for driver-level bracket timing).
     #[inline]
     pub fn cyccnt(&self) -> u32 {
-        unsafe { d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */ }
+        unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        }
     }
 
     // ── Driver metric stubs ────────────────────────────────────────────
@@ -311,7 +319,10 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_serial_depths(&self, rx_depth: u16, tx_depth: u16) {
         unsafe {
-            d3_write(D3_SERIAL_DEPTHS, ((rx_depth as u32) << 16) | tx_depth as u32);
+            d3_write(
+                D3_SERIAL_DEPTHS,
+                ((rx_depth as u32) << 16) | tx_depth as u32,
+            );
         }
     }
 
@@ -329,7 +340,8 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_pipeline_stage(&self, stage: u8, current_frame: u16, queued_frame: u8) {
         unsafe {
-            d3_write(D3_PIPELINE_STAGE, 
+            d3_write(
+                D3_PIPELINE_STAGE,
                 ((stage as u32) << 24) | ((queued_frame as u32) << 16) | current_frame as u32,
             );
         }
@@ -340,7 +352,10 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_spin_counts(&self, serial_spins: u16, dma_spins: u16) {
         unsafe {
-            d3_write(D3_SPIN_COUNTS, ((serial_spins as u32) << 16) | dma_spins as u32);
+            d3_write(
+                D3_SPIN_COUNTS,
+                ((serial_spins as u32) << 16) | dma_spins as u32,
+            );
         }
     }
 

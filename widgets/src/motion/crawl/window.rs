@@ -34,7 +34,7 @@
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
-use rlvgl_platform::blit::{Blitter, Surface};
+use rlvgl_platform::blit::{Blitter, PixelFmt, Surface};
 
 use super::Crawl;
 use crate::motion::direction::Direction;
@@ -124,7 +124,36 @@ impl<C: Crawl> CrawlWindow<C> {
         if !self.active {
             return false;
         }
-        self.crawl.paint(blitter, dst);
+        let left = self.bounds.x.max(0).min(dst.width as i32);
+        let top = self.bounds.y.max(0).min(dst.height as i32);
+        let right = (self.bounds.x + self.bounds.width)
+            .max(left)
+            .min(dst.width as i32);
+        let bottom = (self.bounds.y + self.bounds.height)
+            .max(top)
+            .min(dst.height as i32);
+        if left >= right || top >= bottom {
+            return false;
+        }
+
+        let bytes_per_pixel = match dst.format {
+            PixelFmt::Argb8888 => 4,
+            PixelFmt::Rgb565 => 2,
+            PixelFmt::L8 | PixelFmt::A8 | PixelFmt::A4 => 1,
+        };
+        let offset = top as usize * dst.stride + left as usize * bytes_per_pixel;
+        if offset >= dst.buf.len() {
+            return false;
+        }
+
+        let mut view = Surface::new(
+            &mut dst.buf[offset..],
+            dst.stride,
+            dst.format,
+            (right - left) as u32,
+            (bottom - top) as u32,
+        );
+        self.crawl.paint(blitter, &mut view);
         true
     }
 
@@ -223,15 +252,29 @@ mod tests {
         }
         fn paint<B: Blitter>(&mut self, _blitter: &mut B, _dst: &mut Surface<'_>) {
             self.paints += 1;
+            let bytes_per_pixel = match _dst.format {
+                PixelFmt::Argb8888 => 4,
+                PixelFmt::Rgb565 => 2,
+                PixelFmt::L8 | PixelFmt::A8 | PixelFmt::A4 => 1,
+            };
+            for y in 0.._dst.height as usize {
+                let row_start = y * _dst.stride;
+                for x in 0.._dst.width as usize {
+                    let off = row_start + x * bytes_per_pixel;
+                    for byte in &mut _dst.buf[off..off + bytes_per_pixel] {
+                        *byte = 0xCC;
+                    }
+                }
+            }
         }
     }
 
     fn bounds() -> Rect {
         Rect {
-            x: 10,
-            y: 20,
-            width: 64,
-            height: 48,
+            x: 2,
+            y: 1,
+            width: 4,
+            height: 2,
         }
     }
 
@@ -305,6 +348,29 @@ mod tests {
         let mut blitter = CpuBlitter;
         assert!(!w.paint_frame(&mut blitter, &mut dst));
         assert_eq!(w.crawl().paints, 0);
+    }
+
+    #[test]
+    fn paint_frame_is_clipped_to_bounds() {
+        use alloc::vec;
+        use rlvgl_platform::CpuBlitter;
+        use rlvgl_platform::blit::{PixelFmt, Surface};
+
+        let mut w = CrawlWindow::new(bounds(), MockCrawl::new(10));
+        w.activate();
+        let mut dst_buf = vec![0u8; 8 * 4 * 4];
+        let mut dst = Surface::new(&mut dst_buf, 8 * 4, PixelFmt::Argb8888, 8, 4);
+        let mut blitter = CpuBlitter;
+        assert!(w.paint_frame(&mut blitter, &mut dst));
+
+        for y in 0..4usize {
+            for x in 0..8usize {
+                let off = (y * 8 + x) * 4;
+                let painted = dst_buf[off] == 0xCC;
+                let inside = (2..6).contains(&x) && (1..3).contains(&y);
+                assert_eq!(painted, inside, "unexpected paint state at ({x}, {y})");
+            }
+        }
     }
 
     #[test]

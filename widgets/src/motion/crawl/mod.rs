@@ -63,9 +63,10 @@ pub trait Crawl {
     /// Prepare the engine for a fresh scroll cycle.
     ///
     /// This is the moment at which the background pattern is painted
-    /// into the supplied jumbo buffer and the text source is
-    /// pre-rendered. Subsequent [`Crawl::tick`] calls scroll through
-    /// the pre-painted content without touching the buffers again.
+    /// into the supplied jumbo buffer and the text source is rendered
+    /// or latched as ready. Subsequent [`Crawl::tick`] calls scroll
+    /// through the pre-painted content without touching the buffers
+    /// again.
     fn activate(&mut self);
 
     /// Stop animating and park the crawl.

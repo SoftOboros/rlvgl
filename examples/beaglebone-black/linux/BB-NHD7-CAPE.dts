@@ -3,59 +3,112 @@
  *
  * Kernel: 6.12+ (bone25) with built-in tilcdc DRM driver.
  *
+ * Binds panel-dpi (generic DPI panel, timings from DT) to the tilcdc
+ * DRM output via a port/endpoint graph edge. Avoids panel-simple's
+ * compatible-string lookup table, so this doesn't depend on
+ * innolux,at070tn92 being present in the kernel's MODULE_DEVICE_TABLE.
+ *
+ * Touch: edt-ft5x06 bound as edt,edt-ft5406 on I2C2 @ 0x38 with an
+ * interrupt on P9_27 (gpio3_19). That compatible is what the kernel
+ * 6.12 edt-ft5x06 driver actually matches for FT5x06-family parts.
+ *
  * DT symbols verified on live hardware:
  *   &lcdc          = /ocp/.../lcdc@0
  *   &am33xx_pinmux = /ocp/.../pinmux@800
  *   &i2c2          = /ocp/.../i2c@0
  *   &vmmcsd_fixed  = /fixedregulator0
- *   (no label for HDMI bridge — disabled via target-path)
+ *   (no label for HDMI bridge — disabled via disable_uboot_overlay_video=1)
  *
- * Deploy:
- *   dtc -O dtb -o BB-NHD7-CAPE.dtbo -b 0 -@ BB-NHD7-CAPE.dts
- *   sudo cp BB-NHD7-CAPE.dtbo /boot/dtbs/$(uname -r)/overlays/
- *   Add to /boot/uEnv.txt:
- *     enable_uboot_overlays=1
- *     uboot_overlay_addr4=/boot/dtbs/<kernel>/overlays/BB-NHD7-CAPE.dtbo
- *     disable_uboot_overlay_video=1
+ * Build + deploy: see tools/build-overlay.sh and
+ * tools/deploy-overlay-sd-ext4.sh (they pin down the kernel version
+ * and write /boot/uEnv.txt via debugfs on the SD).
  */
 
 /dts-v1/;
 /plugin/;
 
-/* Pin mux for LCD data + control signals */
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/* MEDIA_BUS_FMT_RGB888_1X24 — from <linux/media-bus-format.h>. Not
+ * exported via dt-bindings, so we inline the value so panel-simple's
+ * "Specify missing bus_format" warning goes away and the DRM pipeline
+ * picks up the 24-bit 1-lane RGB configuration. */
+#define BB_BUS_FMT_RGB888_1X24  0x100a
+
+/* Pin mux for LCD data + control signals.
+ *
+ * AM335x offsets are from pinmux@800 base (CTRLMOD+0x800..0xA34).
+ *
+ *   LCD_DATA0..15     → dedicated LCD pads at 0x0a0..0x0dc, MODE 0
+ *   LCD_DATA16..23    → GPMC_AD15..8 at 0x03c..0x020, MODE 1 (P8_15/16/11/12/17/14/13/19)
+ *   LCD_VSYNC         → 0x0e0, MODE 0
+ *   LCD_HSYNC         → 0x0e4, MODE 0
+ *   LCD_PCLK          → 0x0e8, MODE 0
+ *   LCD_AC_BIAS_EN    → 0x0ec, MODE 0
+ *
+ * BBB 6.12 kernel parses pinctrl-single,pins as TRIPLETS
+ * (offset, config_flags, mux_mode) — same format every other group in
+ * the base DTB uses (emmc-pins, cpsw-*, etc.). Using pair format here
+ * causes mis-alignment: the 2nd "triplet" gets offset 0x08 (PIN2, i.e.
+ * eMMC MMC1_DAT2) from our pair data, which collides with the eMMC
+ * overlay and makes tilcdc fail to bind.
+ *
+ * Config-flag encoding (upper bits of the AM335x CONF register):
+ *   bit 3 = PULLDIS  (1 = pull disabled)
+ *   bit 4 = PULLUP   (1 = pull up, meaningful when PULLDIS=0)
+ *   bit 5 = RXACTIVE (1 = input enable)
+ *   bit 6 = SLEW     (1 = slow slew)
+ * For LCD outputs: PULLDIS=1, RX=0 → config = 0x08.
+ * For the FT5x06 IRQ input: pull-down + input → config = 0x20.
+ */
 &am33xx_pinmux {
 	bb_lcd_pins: bb-lcd-pins {
 		pinctrl-single,pins = <
-			0x0a0 0x08  /* lcd_data0  MODE0 OUTPUT */
-			0x0a4 0x08  /* lcd_data1  */
-			0x0a8 0x08  /* lcd_data2  */
-			0x0ac 0x08  /* lcd_data3  */
-			0x0b0 0x08  /* lcd_data4  */
-			0x0b4 0x08  /* lcd_data5  */
-			0x0b8 0x08  /* lcd_data6  */
-			0x0bc 0x08  /* lcd_data7  */
-			0x0c0 0x08  /* lcd_data8  */
-			0x0c4 0x08  /* lcd_data9  */
-			0x0c8 0x08  /* lcd_data10 */
-			0x0cc 0x08  /* lcd_data11 */
-			0x0d0 0x08  /* lcd_data12 */
-			0x0d4 0x08  /* lcd_data13 */
-			0x0d8 0x08  /* lcd_data14 */
-			0x0dc 0x08  /* lcd_data15 */
-			0x0e0 0x08  /* lcd_data16 */
-			0x0e4 0x08  /* lcd_data17 */
-			0x0e8 0x08  /* lcd_data18 */
-			0x0ec 0x08  /* lcd_data19 */
-			0x0f0 0x08  /* lcd_data20 */
-			0x0f4 0x08  /* lcd_data21 */
-			0x0f8 0x08  /* lcd_data22 */
-			0x0fc 0x08  /* lcd_data23 */
-			0x100 0x08  /* lcd_vsync  */
-			0x104 0x08  /* lcd_hsync  */
-			0x108 0x08  /* lcd_pclk   */
-			0x10c 0x08  /* lcd_ac_bias_en */
+			/* LCD_DATA0..15 on dedicated LCD pads, MODE 0 */
+			0x0a0 0x08 0x00  /* conf_lcd_data0  */
+			0x0a4 0x08 0x00  /* conf_lcd_data1  */
+			0x0a8 0x08 0x00  /* conf_lcd_data2  */
+			0x0ac 0x08 0x00  /* conf_lcd_data3  */
+			0x0b0 0x08 0x00  /* conf_lcd_data4  */
+			0x0b4 0x08 0x00  /* conf_lcd_data5  */
+			0x0b8 0x08 0x00  /* conf_lcd_data6  */
+			0x0bc 0x08 0x00  /* conf_lcd_data7  */
+			0x0c0 0x08 0x00  /* conf_lcd_data8  */
+			0x0c4 0x08 0x00  /* conf_lcd_data9  */
+			0x0c8 0x08 0x00  /* conf_lcd_data10 */
+			0x0cc 0x08 0x00  /* conf_lcd_data11 */
+			0x0d0 0x08 0x00  /* conf_lcd_data12 */
+			0x0d4 0x08 0x00  /* conf_lcd_data13 */
+			0x0d8 0x08 0x00  /* conf_lcd_data14 */
+			0x0dc 0x08 0x00  /* conf_lcd_data15 */
+
+			/* LCD_DATA16..23 on GPMC_AD15..8, MODE 1
+			 * (mapping follows BBB P8 header silkscreen) */
+			0x03c 0x08 0x01  /* conf_gpmc_ad15 → lcd_data16 (P8_15) */
+			0x038 0x08 0x01  /* conf_gpmc_ad14 → lcd_data17 (P8_16) */
+			0x034 0x08 0x01  /* conf_gpmc_ad13 → lcd_data18 (P8_11) */
+			0x030 0x08 0x01  /* conf_gpmc_ad12 → lcd_data19 (P8_12) */
+			0x02c 0x08 0x01  /* conf_gpmc_ad11 → lcd_data20 (P8_17) */
+			0x028 0x08 0x01  /* conf_gpmc_ad10 → lcd_data21 (P8_14) */
+			0x024 0x08 0x01  /* conf_gpmc_ad9  → lcd_data22 (P8_13) */
+			0x020 0x08 0x01  /* conf_gpmc_ad8  → lcd_data23 (P8_19) */
+
+			/* Sync / pclk / AC bias (MODE 0) */
+			0x0e0 0x08 0x00  /* conf_lcd_vsync */
+			0x0e4 0x08 0x00  /* conf_lcd_hsync */
+			0x0e8 0x08 0x00  /* conf_lcd_pclk */
+			0x0ec 0x08 0x00  /* conf_lcd_ac_bias_en */
 		>;
 	};
+
+	/* mcasp0_fsr → gpio3_19, MODE 7, input w/ pulldown.
+	 * This is the FT5x06 INT line (P9_27 on the cape header). */
+	bb_ft5x06_irq_pins: bb-ft5x06-irq-pins {
+		pinctrl-single,pins = <
+			0x1a8 0x20 0x07  /* mcasp0_fsr.gpio3_19: RX | pull-down, MODE 7 */
+		>;
+	};
+
 };
 
 /* Configure LCDC: override pinctrl and add panel port */
@@ -72,11 +125,27 @@
 	};
 };
 
-/* Panel node at root with timing for NHD-7.0-800480AF-ASXP */
+/* Panel node at root with timing for NHD-7.0-800480AF-ASXP.
+ *
+ * The Bookworm 6.12 base DTB already has a /panel stub with
+ * `data-mapping = "rgb565"` and `connector-type = 14`. Our overlay
+ * merges into that stub. panel-simple reads `data-mapping` before
+ * `bus-format`, so the inherited "rgb565" string makes it think the
+ * panel is 16-bit even when we set bus-format to RGB888_1X24. We
+ * override with "rgb24" to force the 24-bit mapping. */
 &{/} {
 	panel {
 		compatible = "panel-dpi";
 		power-supply = <&vmmcsd_fixed>;
+
+		/* Override the base's "rgb565" string so panel-simple picks
+		 * the 24-bit parallel-RGB path. */
+		data-mapping = "rgb24";
+
+		/* panel-simple wants these explicitly set when compatible is
+		 * "panel-dpi". Without them it warns and may fail to bind. */
+		bus-format = <BB_BUS_FMT_RGB888_1X24>;
+		bpc = <8>;
 
 		panel-timing {
 			clock-frequency = <33300000>;
@@ -102,13 +171,24 @@
 	};
 };
 
-/* FT5x06 capacitive touch on I2C2 */
+/* FT5x06 capacitive touch on I2C2.
+ * edt,edt-ft5406 is the compatible the kernel 6.12 edt-ft5x06 driver
+ * actually binds for this part family. */
 &i2c2 {
 	status = "okay";
 	clock-frequency = <400000>;
 
-	ft5x06@38 {
-		compatible = "focaltech,ft5336";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	edt-ft5x06@38 {
+		compatible = "edt,edt-ft5406";
 		reg = <0x38>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bb_ft5x06_irq_pins>;
+		interrupt-parent = <&gpio3>;
+		interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+		touchscreen-size-x = <800>;
+		touchscreen-size-y = <480>;
 	};
 };

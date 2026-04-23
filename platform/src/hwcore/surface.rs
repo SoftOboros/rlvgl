@@ -470,7 +470,7 @@ impl Scanout {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hwcore::addr::{SDRAM_BANK2_BASE, SDRAM_BANK_STRIDE};
+    use crate::hwcore::addr::{SDRAM_BANK_STRIDE, SDRAM_BANK2_BASE};
 
     const W: u32 = 480;
     const H: u32 = 272;

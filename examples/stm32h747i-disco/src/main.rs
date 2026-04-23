@@ -47,7 +47,6 @@ mod effect;
 mod event_overlay;
 mod file_browser_panel;
 mod fonts;
-mod icon_strip;
 mod ipc;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod readme_crawl;
@@ -58,7 +57,23 @@ mod settings_dialog;
 mod star_crawl;
 #[allow(dead_code)]
 mod sys_info;
-mod wing;
+
+/// Joystick focus state machine for the bare-metal main loop.
+///
+/// Mirrors the navigation behavior of `disco-demo`'s `ControllerState`
+/// without instantiating a full `DiscoController` (the bare-metal main
+/// composes its own widget tree alongside the disco-demo widgets).
+///
+/// - `Main(i)`: focus is on icon-strip slot `i` (0..ICON_STRIP_SLOT_COUNT).
+/// - `SettingsWing(i)`: focus is inside the settings wing on slot `i`.
+/// - `InfoWing(i)`: focus is inside the info wing on slot `i`.
+#[cfg(not(feature = "c_hal"))]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum AppFocus {
+    Main(usize),
+    SettingsWing(usize),
+    InfoWing(usize),
+}
 
 #[cfg(all(
     feature = "freertos",
@@ -277,7 +292,9 @@ mod touch_isr {
             // STOPCF=5, NACKCF=4, BERRCF=8, ARLOCF=9, OVRCF=10.
             // Without this, a prior timeout leaves STOPF set and new
             // transactions can hang or return stale data.
-            I2C4.regs().icr.write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+            I2C4.regs()
+                .icr
+                .write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
 
             // ── Write phase: send register address 0x02 ──
             // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
@@ -294,7 +311,9 @@ mod touch_isr {
 
             // ── Read phase: read 31 bytes ──
             // CR2: SADD, NBYTES=31, RD_WRN=1, START=1, AUTOEND=1
-            I2C4.regs().cr2.write(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
+            I2C4.regs()
+                .cr2
+                .write(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
             let mut buf = [0u8; 31];
             for b in buf.iter_mut() {
                 // Wait RXNE (bit 2)
@@ -637,7 +656,10 @@ mod runtime_serial {
         unsafe {
             USART1.regs().icr.write(ERROR_CLEAR);
             let cr1 = USART1.regs().cr1.read();
-            USART1.regs().cr1.write((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
+            USART1
+                .regs()
+                .cr1
+                .write((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
 
             use stm32h7::stm32h747cm7::Interrupt;
             cortex_m::peripheral::NVIC::unmask(Interrupt::USART1);
@@ -1953,7 +1975,8 @@ fn main() -> ! {
             // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE+FIFOEN
             let usart1 = 0x4001_1000u32;
             ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            ((usart1 + 0x00) as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((usart1 + 0x00) as *mut u32).write_volatile(
+                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 (1 << 29) | (1 << 3) | (1 << 2) | (1 << 0), // FIFOEN + TE + RE + UE
             );
         }
@@ -2590,7 +2613,7 @@ fn main() -> ! {
 
         // Wings are created first so icon strip callbacks can reference them.
         let settings_wing = {
-            use crate::wing::Wing;
+            use rlvgl_app_disco_demo::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
                 (include_bytes!("../assets/icons/48/audio48.rle"), true),
                 (include_bytes!("../assets/icons/48/camera48.rle"), false),
@@ -2601,7 +2624,7 @@ fn main() -> ! {
         };
 
         let info_wing = {
-            use crate::wing::Wing;
+            use rlvgl_app_disco_demo::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
                 (include_bytes!("../assets/icons/48/cpu48.rle"), true), // Chip info
                 (include_bytes!("../assets/icons/48/monitor48.rle"), true), // Live stats
@@ -2760,14 +2783,46 @@ fn main() -> ! {
             }));
         }
 
+        // Outer-scope handle for the icon strip; populated inside the
+        // block below so the joystick handler (further down the main
+        // body) can update the focus index without restructuring the
+        // existing widget composition flow.
+        let mut _icon_strip_handle: Option<
+            Rc<RefCell<rlvgl_app_disco_demo::icon_strip::IconStrip>>,
+        > = None;
+        // Joystick focus state. Hidden until the operator engages the
+        // joystick (matches disco-demo's "no focus on cold boot" UX).
+        let mut app_focus = AppFocus::Main(0);
+        let mut app_focus_visible: bool = false;
+
+        // Icon strip layout constants — also used by the joystick handler
+        // below to compute the focused slot's center for synthesizing
+        // a `PressRelease` event on Enter. Disco-demo's `IconStrip` does
+        // not expose `slot_center` publicly; the math is duplicated here.
+        const ICON_STRIP_X: i32 = 730;
+        const ICON_STRIP_ICON_SIZE: i32 = 60;
+        const ICON_STRIP_MARGIN_TOP: i32 = 17;
+        const ICON_STRIP_GAP: i32 = 10;
+        const ICON_STRIP_SLOT_COUNT: usize = rlvgl_app_disco_demo::icon_strip::SLOT_COUNT;
+        // Wing layout constants — mirror the private constants in
+        // disco-demo's `wing.rs` (WING_X / ICON_SIZE / MARGIN_TOP / GAP).
+        // Used by the joystick handler to synthesize a `PressRelease`
+        // at a wing slot's center on Enter.
+        const WING_X: i32 = 10;
+        const WING_ICON_SIZE: i32 = 60;
+        const WING_MARGIN_TOP: i32 = 17;
+        const WING_GAP: i32 = 10;
+        const SETTINGS_WING_SLOTS: usize = 5; // see settings_wing icons array
+        const INFO_WING_SLOTS: usize = 4; // see info_wing icons array
+
         {
-            use crate::icon_strip::{IconSlot, IconStrip};
+            use rlvgl_app_disco_demo::icon_strip::{IconSlot, IconStrip};
 
             let mut strip = IconStrip::new(
-                730, // x position
-                60,  // icon size
-                17,  // margin top
-                10,  // gap between icons
+                ICON_STRIP_X,
+                ICON_STRIP_ICON_SIZE,
+                ICON_STRIP_MARGIN_TOP,
+                ICON_STRIP_GAP,
             );
 
             let icons: [(&[u8], bool); 3] = [
@@ -2795,7 +2850,8 @@ fn main() -> ! {
                     iw.borrow_mut().close();
                     let vis = sw.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis {
+                            // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                             0x5E77_0001
                         } else {
                             0x5E77_0000
@@ -2818,7 +2874,8 @@ fn main() -> ! {
                     sw2.borrow_mut().close();
                     let vis = iw2.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis { // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis {
+                            // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                             0x1AF0_0001
                         } else {
                             0x1AF0_0000
@@ -2862,8 +2919,15 @@ fn main() -> ! {
                 tag: None,
             });
             // Icon strip last — only gets events when no overlays are active.
+            // Wrap the strip in an Rc so the joystick handler (declared
+            // outside this scope) can update its focus index. The Rc
+            // is moved out via the outer-scope `_icon_strip_handle` slot
+            // below.
+            let icon_strip_rc: Rc<RefCell<rlvgl_app_disco_demo::icon_strip::IconStrip>> =
+                Rc::new(RefCell::new(strip));
+            _icon_strip_handle = Some(icon_strip_rc.clone());
             root.borrow_mut().children.push(rlvgl_core::WidgetNode {
-                widget: Rc::new(RefCell::new(strip)),
+                widget: icon_strip_rc,
                 children: alloc::vec![],
                 tag: None,
             });
@@ -3503,6 +3567,119 @@ fn main() -> ! {
                     }
                     dirty_frames = 2;
                     evt_count += 1;
+
+                    // ── Joystick focus navigation ─────────────────────────
+                    // Mirrors disco-demo's `ControllerState::handle_key`:
+                    //   Up/Down  : cycle within current focus surface
+                    //   Left/Right (in Main)  : cycle main slots (wraps)
+                    //   Left/Right (in Wing)  : close the wing → Main
+                    //   Enter    : synthesize PressRelease at focused
+                    //              slot's center; existing on_tap then
+                    //              opens/toggles the wing or panel
+                    //
+                    // First joystick press reveals the focus outline
+                    // (matches "no focus before operator engages" UX).
+                    if !app_focus_visible {
+                        app_focus_visible = true;
+                        // Don't consume the first press — fall through
+                        // so the user sees focus appear AND the action
+                        // execute on the same Enter press.
+                    }
+
+                    // Compute the next focus state.
+                    let prev_focus = app_focus;
+                    match (app_focus, key) {
+                        (AppFocus::Main(i), Key::ArrowUp) => {
+                            app_focus = AppFocus::Main(i.saturating_sub(1));
+                        }
+                        (AppFocus::Main(i), Key::ArrowDown) => {
+                            app_focus = AppFocus::Main((i + 1).min(ICON_STRIP_SLOT_COUNT - 1));
+                        }
+                        (AppFocus::Main(i), Key::ArrowLeft) => {
+                            app_focus = AppFocus::Main(i.saturating_sub(1));
+                        }
+                        (AppFocus::Main(i), Key::ArrowRight) => {
+                            app_focus = AppFocus::Main((i + 1).min(ICON_STRIP_SLOT_COUNT - 1));
+                        }
+                        (AppFocus::SettingsWing(i), Key::ArrowUp) => {
+                            app_focus = AppFocus::SettingsWing(i.saturating_sub(1));
+                        }
+                        (AppFocus::SettingsWing(i), Key::ArrowDown) => {
+                            app_focus =
+                                AppFocus::SettingsWing((i + 1).min(SETTINGS_WING_SLOTS - 1));
+                        }
+                        (AppFocus::SettingsWing(_), Key::ArrowLeft | Key::ArrowRight) => {
+                            settings_wing.borrow_mut().close();
+                            app_focus = AppFocus::Main(0);
+                        }
+                        (AppFocus::InfoWing(i), Key::ArrowUp) => {
+                            app_focus = AppFocus::InfoWing(i.saturating_sub(1));
+                        }
+                        (AppFocus::InfoWing(i), Key::ArrowDown) => {
+                            app_focus = AppFocus::InfoWing((i + 1).min(INFO_WING_SLOTS - 1));
+                        }
+                        (AppFocus::InfoWing(_), Key::ArrowLeft | Key::ArrowRight) => {
+                            info_wing.borrow_mut().close();
+                            app_focus = AppFocus::Main(2);
+                        }
+                        (AppFocus::Main(idx), Key::Enter) => {
+                            // Synthesize PressRelease at icon strip slot's center.
+                            let cx = ICON_STRIP_X + ICON_STRIP_ICON_SIZE / 2;
+                            let cy = ICON_STRIP_MARGIN_TOP
+                                + idx as i32 * (ICON_STRIP_ICON_SIZE + ICON_STRIP_GAP)
+                                + ICON_STRIP_ICON_SIZE / 2;
+                            let press = Event::PressRelease { x: cx, y: cy };
+                            root.borrow_mut().dispatch_event(&press);
+                            // Wing may have opened — transition focus.
+                            if settings_wing.borrow().is_visible() {
+                                app_focus = AppFocus::SettingsWing(0);
+                            } else if info_wing.borrow().is_visible() {
+                                app_focus = AppFocus::InfoWing(0);
+                            }
+                        }
+                        (AppFocus::SettingsWing(idx), Key::Enter) => {
+                            let cx = WING_X + WING_ICON_SIZE / 2;
+                            let cy = WING_MARGIN_TOP
+                                + idx as i32 * (WING_ICON_SIZE + WING_GAP)
+                                + WING_ICON_SIZE / 2;
+                            let press = Event::PressRelease { x: cx, y: cy };
+                            root.borrow_mut().dispatch_event(&press);
+                            // Wing may have closed (slot action toggled
+                            // it, or opened a modal that closed wings).
+                            if !settings_wing.borrow().is_visible() {
+                                app_focus = AppFocus::Main(0);
+                            }
+                        }
+                        (AppFocus::InfoWing(idx), Key::Enter) => {
+                            let cx = WING_X + WING_ICON_SIZE / 2;
+                            let cy = WING_MARGIN_TOP
+                                + idx as i32 * (WING_ICON_SIZE + WING_GAP)
+                                + WING_ICON_SIZE / 2;
+                            let press = Event::PressRelease { x: cx, y: cy };
+                            root.borrow_mut().dispatch_event(&press);
+                            if !info_wing.borrow().is_visible() {
+                                app_focus = AppFocus::Main(2);
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    // Push the current focus down to whichever widget
+                    // owns it; clear the others so only one outline
+                    // is visible at a time.
+                    if app_focus_visible {
+                        let (strip_focus, settings_focus, info_focus) = match app_focus {
+                            AppFocus::Main(i) => (Some(i), None, None),
+                            AppFocus::SettingsWing(i) => (None, Some(i), None),
+                            AppFocus::InfoWing(i) => (None, None, Some(i)),
+                        };
+                        if let Some(ref strip_rc) = _icon_strip_handle {
+                            strip_rc.borrow_mut().set_focused_slot(strip_focus);
+                        }
+                        settings_wing.borrow_mut().set_focused_slot(settings_focus);
+                        info_wing.borrow_mut().set_focused_slot(info_focus);
+                    }
+                    let _ = prev_focus; // suppress unused if logging is added later
                 }
                 root.borrow_mut().dispatch_event(&evt);
             }
@@ -3861,7 +4038,8 @@ fn main() -> ! {
                     (0x3800_0604u32 as *mut u32).write_volatile(evt_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     (0x3800_0608u32 as *mut u32).write_volatile(tick_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     (0x3800_060Cu32 as *mut u32).write_volatile(render_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                    (0x3800_0610u32 as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0610u32 as *mut u32).write_volatile(
+                        // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         ((dirty_frames as u32) << 16)
                             | ((was_visible as u32) << 8)
                             | (event_win.borrow().is_visible() as u32),
@@ -3870,10 +4048,12 @@ fn main() -> ! {
                     (0x3800_0618u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         .write_volatile((0x5000_10ACu32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // Cortex-M fault registers
-                    (0x3800_0638u32 as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0638u32 as *mut u32).write_volatile(
+                        // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         (0xE000_ED28u32 as *const u32).read_volatile(), // CFSR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     );
-                    (0x3800_063Cu32 as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_063Cu32 as *mut u32).write_volatile(
+                        // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     );
                     // LTDC ISR — FUIF (bit 1) / LIF (bit 0)
@@ -4581,7 +4761,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // UART8: BRR = APB1_clk / baud = 100_000_000 / 115200 ≈ 868
         ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-        ((UART8 + 0x00) as *mut u32).write_volatile( // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((UART8 + 0x00) as *mut u32).write_volatile(
+            // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             (1 << 3)  // TE (transmitter enable)
             | (1 << 0), // UE (USART enable)
         );

@@ -788,50 +788,26 @@ pub unsafe fn dump_registers() {
         line(b"DSI.VR        ", DSI_VR.read_volatile());
         line(b"DSI.CR        ", DSI_CR.cast_const().read_volatile());
         line(b"DSI.CCR       ", DSI_CCR.cast_const().read_volatile());
-        line(
-            b"DSI.LVCIDR    ",
-            DSI_LVCIDR.cast_const().read_volatile(),
-        );
-        line(
-            b"DSI.LCOLCR    ",
-            DSI_LCOLCR.cast_const().read_volatile(),
-        );
+        line(b"DSI.LVCIDR    ", DSI_LVCIDR.cast_const().read_volatile());
+        line(b"DSI.LCOLCR    ", DSI_LCOLCR.cast_const().read_volatile());
         line(b"DSI.LPCR      ", DSI_LPCR.cast_const().read_volatile());
         line(b"DSI.LPMCR     ", DSI_LPMCR.cast_const().read_volatile());
         line(b"DSI.PCR       ", DSI_PCR.cast_const().read_volatile());
         line(b"DSI.MCR       ", DSI_MCR.cast_const().read_volatile());
         line(b"DSI.VMCR      ", DSI_VMCR.cast_const().read_volatile());
         line(b"DSI.VPCR      ", DSI_VPCR.cast_const().read_volatile());
-        line(
-            b"DSI.VHSACR    ",
-            DSI_VHSACR.cast_const().read_volatile(),
-        );
-        line(
-            b"DSI.VHBPCR    ",
-            DSI_VHBPCR.cast_const().read_volatile(),
-        );
+        line(b"DSI.VHSACR    ", DSI_VHSACR.cast_const().read_volatile());
+        line(b"DSI.VHBPCR    ", DSI_VHBPCR.cast_const().read_volatile());
         line(b"DSI.VLCR      ", DSI_VLCR.cast_const().read_volatile());
-        line(
-            b"DSI.VVSACR    ",
-            DSI_VVSACR.cast_const().read_volatile(),
-        );
-        line(
-            b"DSI.VVBPCR    ",
-            DSI_VVBPCR.cast_const().read_volatile(),
-        );
-        line(
-            b"DSI.VVFPCR    ",
-            DSI_VVFPCR.cast_const().read_volatile(),
-        );
+        line(b"DSI.VVSACR    ", DSI_VVSACR.cast_const().read_volatile());
+        line(b"DSI.VVBPCR    ", DSI_VVBPCR.cast_const().read_volatile());
+        line(b"DSI.VVFPCR    ", DSI_VVFPCR.cast_const().read_volatile());
         line(b"DSI.VVACR     ", DSI_VVACR.cast_const().read_volatile());
         line(b"DSI.LCCR      ", DSI_LCCR.cast_const().read_volatile());
         line(b"DSI.CMCR      ", DSI_CMCR.cast_const().read_volatile());
         line(b"DSI.GPSR      ", DSI_GPSR.read_volatile());
         line(b"DSI.PSR       ", DSI_PSR.read_volatile());
-        line(
-            b"DSI.PCONFR    ",
-            DSI_PCONFR.cast_const().read_volatile(),
-        );
+        line(b"DSI.PCONFR    ", DSI_PCONFR.cast_const().read_volatile());
         // DSI wrapper
         const DSI_WCFGR: *const u32 = DSI_W as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         line(b"DSI.WCFGR     ", DSI_WCFGR.read_volatile());
@@ -849,26 +825,11 @@ pub unsafe fn dump_registers() {
         line(b"LTDC.BCCR     ", LTDC_BCCR.cast_const().read_volatile());
         // LTDC layer 1
         line(b"LTDC.L1CR     ", LTDC_L1CR.cast_const().read_volatile());
-        line(
-            b"LTDC.L1WHPCR  ",
-            LTDC_L1WHPCR.cast_const().read_volatile(),
-        );
-        line(
-            b"LTDC.L1WVPCR  ",
-            LTDC_L1WVPCR.cast_const().read_volatile(),
-        );
-        line(
-            b"LTDC.L1PFCR   ",
-            LTDC_L1PFCR.cast_const().read_volatile(),
-        );
-        line(
-            b"LTDC.L1CFBAR  ",
-            LTDC_L1CFBAR.cast_const().read_volatile(),
-        );
-        line(
-            b"LTDC.L1CFBLR  ",
-            LTDC_L1CFBLR.cast_const().read_volatile(),
-        );
+        line(b"LTDC.L1WHPCR  ", LTDC_L1WHPCR.cast_const().read_volatile());
+        line(b"LTDC.L1WVPCR  ", LTDC_L1WVPCR.cast_const().read_volatile());
+        line(b"LTDC.L1PFCR   ", LTDC_L1PFCR.cast_const().read_volatile());
+        line(b"LTDC.L1CFBAR  ", LTDC_L1CFBAR.cast_const().read_volatile());
+        line(b"LTDC.L1CFBLR  ", LTDC_L1CFBLR.cast_const().read_volatile());
         line(
             b"LTDC.L1CFBLNR ",
             LTDC_L1CFBLNR.cast_const().read_volatile(),

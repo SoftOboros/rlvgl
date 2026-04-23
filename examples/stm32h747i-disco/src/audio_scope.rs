@@ -247,7 +247,10 @@ impl AudioScope {
                 let src_offset = (ly * src_stride + lx * BPP) as usize;
                 unsafe {
                     let pixel = self.scope_buf.add(src_offset).cast::<u32>().read_volatile();
-                    self.back_buf.add(dst_offset).cast::<u32>().write_volatile(pixel);
+                    self.back_buf
+                        .add(dst_offset)
+                        .cast::<u32>()
+                        .write_volatile(pixel);
                 }
             }
         }

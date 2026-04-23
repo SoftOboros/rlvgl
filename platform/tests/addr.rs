@@ -4,8 +4,8 @@
 //! perspective and verify the SDRAM bank-collision math that previously
 //! lived inline at `examples/stm32h747i-disco/src/main.rs:2890-2891`.
 
+use rlvgl_platform::hwcore::addr::{SDRAM_BANK_COUNT, SDRAM_BANK_STRIDE, SDRAM_BANK2_BASE};
 use rlvgl_platform::{AddrError, DmaAddr, PhysAddr};
-use rlvgl_platform::hwcore::addr::{SDRAM_BANK2_BASE, SDRAM_BANK_COUNT, SDRAM_BANK_STRIDE};
 
 #[test]
 fn sdram_bank_partitions_match_example_constants() {
@@ -17,7 +17,10 @@ fn sdram_bank_partitions_match_example_constants() {
     let back = PhysAddr::new(SDRAM_BANK2_BASE + SDRAM_BANK_STRIDE);
     let fb = front.sdram_bank().expect("front in-range");
     let bb = back.sdram_bank().expect("back in-range");
-    assert_ne!(fb, bb, "front/back framebuffers must live in distinct banks");
+    assert_ne!(
+        fb, bb,
+        "front/back framebuffers must live in distinct banks"
+    );
     assert_eq!(fb, 0);
     assert_eq!(bb, 1);
 }
@@ -25,8 +28,7 @@ fn sdram_bank_partitions_match_example_constants() {
 #[test]
 fn sdram_bank_rejects_out_of_range_addresses() {
     assert_eq!(PhysAddr::new(0x2000_0000).sdram_bank(), None);
-    let too_high =
-        SDRAM_BANK2_BASE + SDRAM_BANK_STRIDE * u32::from(SDRAM_BANK_COUNT);
+    let too_high = SDRAM_BANK2_BASE + SDRAM_BANK_STRIDE * u32::from(SDRAM_BANK_COUNT);
     assert_eq!(PhysAddr::new(too_high).sdram_bank(), None);
 }
 

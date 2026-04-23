@@ -11,11 +11,11 @@
 //! of the pre-publish gate). Activates the `mock_blitter` feature on
 //! `rlvgl-platform` via the dev-dependency declared in `Cargo.toml`.
 
+use rlvgl_platform::BlitRect;
 use rlvgl_platform::PixelFmt;
-use rlvgl_platform::hwcore::addr::{PhysAddr, SDRAM_BANK2_BASE, SDRAM_BANK_STRIDE};
+use rlvgl_platform::hwcore::addr::{PhysAddr, SDRAM_BANK_STRIDE, SDRAM_BANK2_BASE};
 use rlvgl_platform::hwcore::mock::{MockBlitter, MockOp};
 use rlvgl_platform::hwcore::surface::{BackBuffer, FrameBuffer, Scanout};
-use rlvgl_platform::BlitRect;
 
 const W: u32 = 480;
 const H: u32 = 272;

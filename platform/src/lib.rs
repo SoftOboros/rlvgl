@@ -57,10 +57,6 @@ pub mod dma_sai;
 pub mod dsi_cmd_mode;
 /// Frame synchronization traits for ERIF-based scheduling.
 pub mod frame_sync;
-/// Hardware-abstraction substrate (address newtypes, framebuffer ownership,
-/// ISR channels, typed register blocks). See the "Register-Mashing
-/// Discipline" section of `CLAUDE.md`.
-pub mod hwcore;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
@@ -68,6 +64,10 @@ pub mod hwcore;
 pub mod ft5336;
 /// Gesture recognition (debounced tap, press-down/release).
 pub mod gesture;
+/// Hardware-abstraction substrate (address newtypes, framebuffer ownership,
+/// ISR channels, typed register blocks). See the "Register-Mashing
+/// Discipline" section of `CLAUDE.md`.
+pub mod hwcore;
 /// Input device abstractions.
 pub mod input;
 #[cfg(feature = "linux_fbdev")]
@@ -183,13 +183,6 @@ pub use audio_player::AudioPlayer;
 pub use blit::{
     BlitCaps, BlitPlanner, Blitter, BlitterRenderer, PixelFmt, Rect as BlitRect, Surface,
 };
-pub use hwcore::addr::{AddrError, DmaAddr, MmioAddr, PhysAddr};
-pub use hwcore::isr::{IsrChannel, IsrCounter, IsrFlag};
-pub use hwcore::surface::{
-    BackBuffer, BankCollision, BorrowedForDma, FrameBuffer, FrontBuffer, InFlight, Scanout,
-};
-#[cfg(any(test, feature = "mock_blitter"))]
-pub use hwcore::mock::{MockBlitter, MockOp};
 pub use cpu_blitter::CpuBlitter;
 pub use display::DisplayDriver;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]
@@ -199,6 +192,13 @@ pub use dma2d::Dma2dBlitter;
     any(target_arch = "arm", target_os = "none")
 ))]
 pub use ft5336::Ft5336;
+pub use hwcore::addr::{AddrError, DmaAddr, MmioAddr, PhysAddr};
+pub use hwcore::isr::{IsrChannel, IsrCounter, IsrFlag};
+#[cfg(any(test, feature = "mock_blitter"))]
+pub use hwcore::mock::{MockBlitter, MockOp};
+pub use hwcore::surface::{
+    BackBuffer, BankCollision, BorrowedForDma, FrameBuffer, FrontBuffer, InFlight, Scanout,
+};
 pub use input::{InputDevice, InputEvent};
 #[cfg(feature = "linux_fbdev")]
 pub use linux_evdev::LinuxEvdevInput;

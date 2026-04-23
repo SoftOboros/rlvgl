@@ -80,9 +80,7 @@ const RULES: &[Rule] = &[
     Rule {
         id: "fb_addr_shim",
         description: "deleted u32 framebuffer-address shim resurrected",
-        matcher: |line| {
-            line.contains(".front_buffer_addr(") || line.contains(".back_buffer_addr(")
-        },
+        matcher: |line| line.contains(".front_buffer_addr(") || line.contains(".back_buffer_addr("),
         whitelist: &[],
     },
     Rule {
@@ -229,7 +227,9 @@ fn discipline() {
         if !is_in_scope(&rel) {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = std::fs::read_to_string(path) else {
+            continue;
+        };
         let stripped = strip_comments(&text);
         for (lineno, raw_line, code_line) in text
             .lines()
@@ -304,11 +304,7 @@ fn discipline() {
 
     let stale: Vec<_> = baseline
         .iter()
-        .filter(|(rule, file)| {
-            !found
-                .iter()
-                .any(|(r, f, _, _)| r == rule && f == file)
-        })
+        .filter(|(rule, file)| !found.iter().any(|(r, f, _, _)| r == rule && f == file))
         .collect();
     if !stale.is_empty() && !strict {
         // Stale entries indicate a successful migration step — surface them
@@ -447,9 +443,7 @@ fn contains_hex_as_mut(line: &str) -> bool {
     while i + 2 < bytes.len() {
         if bytes[i] == b'0' && (bytes[i + 1] == b'x' || bytes[i + 1] == b'X') {
             let mut j = i + 2;
-            while j < bytes.len()
-                && (bytes[j].is_ascii_hexdigit() || bytes[j] == b'_')
-            {
+            while j < bytes.len() && (bytes[j].is_ascii_hexdigit() || bytes[j] == b'_') {
                 j += 1;
             }
             if j > i + 2 {
@@ -457,7 +451,8 @@ fn contains_hex_as_mut(line: &str) -> bool {
                 while k < bytes.len() && (bytes[k] == b' ' || bytes[k] == b'\t') {
                     k += 1;
                 }
-                if k + 6 < bytes.len() && &bytes[k..k + 2] == b"as"
+                if k + 6 < bytes.len()
+                    && &bytes[k..k + 2] == b"as"
                     && (bytes[k + 2] == b' ' || bytes[k + 2] == b'\t')
                 {
                     let mut m = k + 3;
