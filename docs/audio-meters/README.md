@@ -36,7 +36,8 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-01 — Core math (Rust) | Ratified 2026-04-26 | _(combined with AM-02; see commit `2aa15ac`)_ |
 | AM-02 — TS port of L0 | Ratified 2026-04-26 | _(combined with AM-01; see commit `2aa15ac`)_ |
 | AM-03 — Scale descriptors | Ratified 2026-04-26 | [03-scales.md](03-scales.md) |
-| AM-04 — Asset package | Planned | _(pending)_ |
+| AM-04a — Skin descriptors | Ratified 2026-04-26 | [04-skins.md](04-skins.md) |
+| AM-04b — Visual primitives + creator rasterisation | Deferred | _(deferred until widget-side demand)_ |
 | AM-05 — `LedBargraph` (rlvgl) | Planned | _(pending)_ |
 | AM-06 — `LedBargraph` (TS) | Planned | _(pending)_ |
 | AM-07 — `NeedleVu` (both) | Planned | _(pending)_ |

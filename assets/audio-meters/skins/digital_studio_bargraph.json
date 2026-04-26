@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "digital_studio_bargraph",
+  "title": "Digital Studio — Peak Bargraph",
+  "scale_id": "digital_peak",
+  "default_ballistic": "DigitalPeak",
+  "meter_type": "bargraph",
+  "palette": {
+    "Safe":    "#2e7dd1",
+    "Nominal": "#3ed27a",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#080a0c",
+    "frame":      "#1d2126",
+    "scale_text": "#dde2e6",
+    "minor_tick": "#4d555c",
+    "major_tick": "#8e98a0",
+    "led_off":    "#11141a",
+    "peak_hold":  "#ffe35a"
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspect_ratio": 0.16,
+    "led_count": 48,
+    "peak_hold_ms": 1500
+  }
+}

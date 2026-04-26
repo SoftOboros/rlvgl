@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "broadcast_classic_needle",
+  "title": "Broadcast Classic — Analog Needle",
+  "scale_id": "vu_broadcast",
+  "default_ballistic": "Vu",
+  "meter_type": "needle",
+  "palette": {
+    "Safe":    "#1f1f1f",
+    "Nominal": "#1f1f1f",
+    "Caution": "#a07b1c",
+    "Hot":     "#a72b1f",
+    "Over":    "#d11a1a"
+  },
+  "secondary_colors": {
+    "background":   "#f1e7c4",
+    "frame":        "#3a2a18",
+    "scale_text":   "#1a1a1a",
+    "minor_tick":   "#3a2a18",
+    "major_tick":   "#1a1a1a",
+    "needle":       "#1a1a1a",
+    "needle_pivot": "#3a2a18",
+    "peak_hold":    "#d11a1a"
+  },
+  "layout": {
+    "orientation": "horizontal",
+    "aspect_ratio": 1.6,
+    "peak_hold_ms": 0
+  }
+}
