@@ -1,0 +1,26 @@
+{
+  "$schema": "../schema/scale.schema.json",
+  "id": "ppm_iia_bbc",
+  "label_units": "BBC",
+  "range_db": { "min": 1.0, "max": 7.0 },
+  "pivot": { "label": "4", "input_dbfs": -18.0 },
+  "ticks": {
+    "majors": [1, 2, 3, 4, 5, 6, 7],
+    "minors_per_major_division": 0,
+    "labels": {
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7"
+    }
+  },
+  "zones": [
+    { "from_db": 1.0, "to_db": 4.0, "color": "Safe" },
+    { "from_db": 4.0, "to_db": 6.0, "color": "Nominal" },
+    { "from_db": 6.0, "to_db": 7.0, "color": "Hot" }
+  ],
+  "compatible_ballistics": ["PpmTypeIIa", "PpmTypeIIb"]
+}

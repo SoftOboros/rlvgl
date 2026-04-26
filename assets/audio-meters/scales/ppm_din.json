@@ -1,0 +1,28 @@
+{
+  "$schema": "../schema/scale.schema.json",
+  "id": "ppm_din",
+  "label_units": "dB",
+  "range_db": { "min": -50.0, "max": 5.0 },
+  "pivot": { "label": "0", "input_dbfs": -9.0 },
+  "ticks": {
+    "majors": [-50, -40, -30, -20, -10, -5, 0, 5],
+    "minors_per_major_division": 4,
+    "labels": {
+      "-50": "−50",
+      "-40": "−40",
+      "-30": "−30",
+      "-20": "−20",
+      "-10": "−10",
+      "-5": "−5",
+      "0": "0",
+      "5": "+5"
+    }
+  },
+  "zones": [
+    { "from_db": -50.0, "to_db": -10.0, "color": "Safe" },
+    { "from_db": -10.0, "to_db": 0.0, "color": "Nominal" },
+    { "from_db": 0.0, "to_db": 3.0, "color": "Caution" },
+    { "from_db": 3.0, "to_db": 5.0, "color": "Hot" }
+  ],
+  "compatible_ballistics": ["PpmTypeI", "DigitalPeak"]
+}
