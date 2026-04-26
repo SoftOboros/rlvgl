@@ -1,0 +1,24 @@
+[package]
+name = "rlvgl-audio-meters-core"
+version = "0.2.0"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "L0 ballistic state machines and dB calibration helpers for rlvgl audio meters. Cross-runtime; matches TypeScript port at @rlvgl/audio-meters."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-audio-meters-core"
+keywords = ["embedded", "audio", "metering", "vu", "no_std"]
+categories = ["embedded", "no-std", "multimedia::audio"]
+publish = true
+
+[dependencies]
+libm = "0.2"
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+default = []

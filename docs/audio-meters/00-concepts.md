@@ -157,10 +157,10 @@ from any behaviour change.
 
 | Variant | Time constants | Authority |
 |---|---|---|
-| `Vu` | RMS-style integration, **300 ms** rise time to within 1 dB of a steady-state -20 dBFS / 0 VU step input. Symmetric attack / decay. | IEC 60268-17 |
-| `PpmTypeI` (DIN 45406) | Attack: **5 ms** to reach -1 dB of a steady tone. Decay: **20 dB / 1.5 s**. | IEC 60268-10 |
-| `PpmTypeIIa` (BBC) | Attack: **10 ms** to reach -1 dB. Decay: **24 dB / 2.8 s**. | IEC 60268-10 |
-| `PpmTypeIIb` (EBU) | Attack: **10 ms** to reach -1 dB. Decay: **20 dB / 1.7 s**. | IEC 60268-10 |
+| `Vu` | First-order envelope follower on linear amplitude. Rise to **99 %** of a steady-state step in **300 ms ± 10 %**. Symmetric attack / decay. Equivalent first-order τ ≈ 65 ms in linear-amplitude domain. | IEC 60268-17 |
+| `PpmTypeI` (DIN 45406) | Linear-amplitude attack: reaches **1 dB below** steady tone in **5 ms** (τ ≈ 2.26 ms). Decay: **20 dB / 1.5 s**, linear in dB. | IEC 60268-10 |
+| `PpmTypeIIa` (BBC) | Linear-amplitude attack: reaches 1 dB below in **10 ms** (τ ≈ 4.52 ms). Decay: **24 dB / 2.8 s**, linear in dB. | IEC 60268-10 |
+| `PpmTypeIIb` (EBU) | Linear-amplitude attack: 10 ms (τ ≈ 4.52 ms). Decay: **20 dB / 1.7 s**, linear in dB. | IEC 60268-10 |
 | `DigitalPeak` | Attack: instantaneous (one sample). Decay: **20 dB / 1.5 s** (matches DIN PPM decay so two meters agree on transients). | AES17 §6.2 |
 | `Rms` | Sliding-window RMS, **400 ms** window. No attack/decay asymmetry. | Convention; documented in this doc. |
 | `LufsM` | ITU-R BS.1770-4 momentary loudness, **400 ms** sliding window, K-weighted. **Note:** K-weighting is the caller's job; the meter sees post-weighted dBFS. | ITU-R BS.1770-4 |
@@ -359,3 +359,13 @@ AM-05 onward depend transitively on the above.
   display-time additive offset, not part of the ballistic. Rationale: keeps
   the upstream audio path pluggable (mic, file, AudioWorklet, synthesised
   test signal).
+- **2026-04-26-004** — Refinement: §5 ballistic time constants restated in
+  linear-amplitude domain. Original wording said "300 ms to within 1 dB"
+  for VU and "5 / 10 ms to within 1 dB" for PPM, which is ambiguous between
+  dB-domain and linear-amplitude exponential models — and yields wildly
+  different τ values. The IEC test signals are physical step responses on
+  analog meter movements, which are linear-amplitude envelope followers.
+  VU is now "99 % rise in 300 ms" (the actual IEC 60268-17 criterion);
+  PPM is "1 dB below steady tone" interpreted in linear amplitude (the
+  IEC 60268-10 criterion). Decay rates unchanged — those were already
+  unambiguous (linear in dB).
