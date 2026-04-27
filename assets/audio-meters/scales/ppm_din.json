@@ -3,7 +3,7 @@
   "id": "ppm_din",
   "label_units": "dB",
   "range_db": { "min": -50.0, "max": 5.0 },
-  "pivot": { "label": "0", "input_dbfs": -9.0 },
+  "pivot": { "value": 0, "label": "0", "input_dbfs": -9.0 },
   "ticks": {
     "majors": [-50, -40, -30, -20, -10, -5, 0, 5],
     "minors_per_major_division": 4,

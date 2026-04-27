@@ -3,7 +3,7 @@
   "id": "ppm_iia_bbc",
   "label_units": "BBC",
   "range_db": { "min": 1.0, "max": 7.0 },
-  "pivot": { "label": "4", "input_dbfs": -18.0 },
+  "pivot": { "value": 4, "label": "4", "input_dbfs": -18.0 },
   "ticks": {
     "majors": [1, 2, 3, 4, 5, 6, 7],
     "minors_per_major_division": 0,

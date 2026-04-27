@@ -369,3 +369,18 @@ AM-05 onward depend transitively on the above.
   PPM is "1 dB below steady tone" interpreted in linear amplitude (the
   IEC 60268-10 criterion). Decay rates unchanged — those were already
   unambiguous (linear in dB).
+- **2026-04-26-005** — Schema fix in `scale.schema.json`: `pivot` gains a
+  required numeric `value` field (alongside the existing `label` string
+  and `input_dbfs` number). Reason: implementing AM-07 NeedleVu surfaced
+  that widgets were conflating two different conversions. The widget
+  needs **dBFS → scale-units** for positioning (zone lookup, needle
+  angle, bargraph fraction), and the optional `calibration_default`
+  field is **scale-units → alt-units** (dBu / dBV / dBSPL) for label
+  rendering. Without an explicit numeric pivot value, deriving the
+  positioning offset required parsing the pivot label string, which is
+  fragile (unicode minus, BBC mark labels, etc.). New rule: widgets
+  compute `scale_units = dbfs + (pivot.value - pivot.input_dbfs)` for
+  all positioning; `calibration_default.offset_db` is reserved for
+  alt-units label rendering and does **not** enter positioning math.
+  All six canonical scale JSON files updated; both runtime validators
+  require the new field.

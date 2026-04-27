@@ -21,6 +21,7 @@ struct RangeDb {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Pivot {
+    value: f32,
     label: String,
     input_dbfs: f32,
 }
@@ -108,9 +109,27 @@ fn validate(scale: &Scale, file_stem: &str) {
         "{}: pivot.input_dbfs must be finite",
         scale.id
     );
+    assert!(
+        scale.pivot.value.is_finite(),
+        "{}: pivot.value must be finite",
+        scale.id
+    );
+    assert!(
+        scale.pivot.value >= scale.range_db.min - 1e-3
+            && scale.pivot.value <= scale.range_db.max + 1e-3,
+        "{}: pivot.value ({}) must lie within range_db [{}, {}]",
+        scale.id,
+        scale.pivot.value,
+        scale.range_db.min,
+        scale.range_db.max,
+    );
 
     // Majors sorted ascending, all within range_db.
-    assert!(scale.ticks.majors.len() >= 2, "{}: need ≥ 2 majors", scale.id);
+    assert!(
+        scale.ticks.majors.len() >= 2,
+        "{}: need ≥ 2 majors",
+        scale.id
+    );
     for w in scale.ticks.majors.windows(2) {
         assert!(
             w[0] < w[1],
@@ -223,8 +242,8 @@ fn canonical_scales_load_and_validate() {
 
     for path in entries {
         let text = fs::read_to_string(&path).unwrap();
-        let scale: Scale = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        let scale: Scale =
+            serde_json::from_str(&text).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
         let stem = path.file_stem().unwrap().to_string_lossy().to_string();
         validate(&scale, &stem);
         found += 1;

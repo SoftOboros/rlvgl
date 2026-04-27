@@ -40,7 +40,7 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-04b — Visual primitives + creator rasterisation | Deferred | _(deferred until widget-side demand)_ |
 | AM-05 — `LedBargraph` (rlvgl) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) |
 | AM-06 — `LedBargraph` (TS) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) (combined) |
-| AM-07 — `NeedleVu` (both) | Planned | _(pending)_ |
+| AM-07 — `NeedleVu` (both) | Ratified 2026-04-26 | [06-needle-vu.md](06-needle-vu.md) |
 | AM-08 — Aux meters + skins | Planned | _(pending)_ |
 | AM-09 — Integration | Planned | _(pending)_ |
 

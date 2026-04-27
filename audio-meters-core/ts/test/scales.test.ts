@@ -17,6 +17,7 @@ interface RangeDb {
 }
 
 interface Pivot {
+  value: number;
   label: string;
   input_dbfs: number;
 }
@@ -99,6 +100,15 @@ function validate(scale: Scale, fileStem: string): void {
   assert.ok(
     Number.isFinite(scale.pivot.input_dbfs),
     `${scale.id}: pivot.input_dbfs must be finite`,
+  );
+  assert.ok(
+    Number.isFinite(scale.pivot.value),
+    `${scale.id}: pivot.value must be finite`,
+  );
+  assert.ok(
+    scale.pivot.value >= scale.range_db.min - 1e-3 &&
+      scale.pivot.value <= scale.range_db.max + 1e-3,
+    `${scale.id}: pivot.value (${scale.pivot.value}) must lie within range_db [${scale.range_db.min}, ${scale.range_db.max}]`,
   );
 
   // Majors strictly ascending, endpoints match range_db.

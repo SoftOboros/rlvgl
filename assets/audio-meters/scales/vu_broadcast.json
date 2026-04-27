@@ -3,7 +3,7 @@
   "id": "vu_broadcast",
   "label_units": "dBVU",
   "range_db": { "min": -20.0, "max": 3.0 },
-  "pivot": { "label": "0", "input_dbfs": -20.0 },
+  "pivot": { "value": 0, "label": "0", "input_dbfs": -20.0 },
   "calibration_default": { "to": "dBu", "offset_db": 24.0 },
   "ticks": {
     "majors": [-20, -10, -7, -5, -3, -1, 0, 1, 2, 3],

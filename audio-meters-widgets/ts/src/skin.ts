@@ -54,7 +54,7 @@ export interface Scale {
   id: string;
   label_units: string;
   range_db: { min: number; max: number };
-  pivot: { label: string; input_dbfs: number };
+  pivot: { value: number; label: string; input_dbfs: number };
   calibration_default?: { to: string; offset_db: number };
   ticks: {
     majors: number[];
@@ -63,6 +63,15 @@ export interface Scale {
   };
   zones: Zone[];
   compatible_ballistics: string[];
+}
+
+/**
+ * Project a dBFS-domain reading into the scale's units (the domain of
+ * `range_db`, `zones`, and `ticks`). Mirror of
+ * `widgets::meters::skin::Scale::dbfs_to_scale_units` on the Rust side.
+ */
+export function dbfsToScaleUnits(scale: Scale, dbfs: number): number {
+  return dbfs + (scale.pivot.value - scale.pivot.input_dbfs);
 }
 
 export interface Skin {

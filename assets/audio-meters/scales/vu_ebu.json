@@ -3,7 +3,7 @@
   "id": "vu_ebu",
   "label_units": "dBVU",
   "range_db": { "min": -18.0, "max": 3.0 },
-  "pivot": { "label": "0", "input_dbfs": -18.0 },
+  "pivot": { "value": 0, "label": "0", "input_dbfs": -18.0 },
   "calibration_default": { "to": "dBu", "offset_db": 18.0 },
   "ticks": {
     "majors": [-18, -10, -7, -5, -3, -1, 0, 1, 2, 3],

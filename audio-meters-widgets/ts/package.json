@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "node --test --experimental-strip-types --no-warnings test/led-bargraph.test.ts test/presets.test.ts"
+    "test": "node --test --experimental-strip-types --no-warnings test/led-bargraph.test.ts test/presets.test.ts test/needle-vu.test.ts"
   },
   "engines": {
     "node": ">=22.6"

@@ -8,7 +8,7 @@ import {
   BallisticState,
   type Ballistic,
 } from "../../../audio-meters-core/ts/src/index.ts";
-import { type Scale, type Skin, zoneColorFor } from "./skin.ts";
+import { dbfsToScaleUnits, type Scale, type Skin, zoneColorFor } from "./skin.ts";
 
 const DEFAULT_LED_OFF = "#141418";
 const DEFAULT_BACKGROUND = "#08080a";
@@ -114,16 +114,19 @@ export class LedBargraphCore {
 
     sink.fillRect(x, y, w, h, bg);
 
-    const cal = scale.calibration_default?.offset_db ?? 0;
-    const readingDisp = this.readingDb + cal;
-    const peakDisp = this.peakDb + cal;
+    // Project dBFS-domain reading and peak into scale-units (the
+    // domain of range_db, zones, and ticks). Mirror of the Rust
+    // widget; calibration_default is for label rendering only and
+    // does not enter positioning.
+    const readingSu = dbfsToScaleUnits(scale, this.readingDb);
+    const peakSu = dbfsToScaleUnits(scale, this.peakDb);
     const lo = scale.range_db.min;
     const hi = scale.range_db.max;
     const span = Math.max(hi - lo, Number.EPSILON);
 
-    const litFrac = clamp01((readingDisp - lo) / span);
+    const litFrac = clamp01((readingSu - lo) / span);
     const litSegments = Math.round(litFrac * n);
-    const peakFrac = clamp01((peakDisp - lo) / span);
+    const peakFrac = clamp01((peakSu - lo) / span);
     const peakSegment = clampInt(Math.round(peakFrac * n) - 1, 0, n - 1);
 
     const horizontal = skin.layout.orientation === "horizontal";
@@ -132,8 +135,8 @@ export class LedBargraphCore {
     for (let i = 0; i < n; i++) {
       const cell = segmentRect(x, y, w, h, n, i, horizontal);
       const centreFrac = (i + 0.5) / n;
-      const centreDb = lo + centreFrac * span;
-      const colorId = zoneColorFor(scale, centreDb);
+      const centreSu = lo + centreFrac * span;
+      const colorId = zoneColorFor(scale, centreSu);
       const zoneCol = palette[colorId];
 
       const lit = i < litSegments;
@@ -142,7 +145,7 @@ export class LedBargraphCore {
       if (
         i === peakSegment &&
         (skin.layout.peak_hold_ms ?? 0) > 0 &&
-        peakDisp > lo &&
+        peakSu > lo &&
         litSegments < n
       ) {
         sink.fillRect(cell.x, cell.y, cell.w, cell.h, peakColor);

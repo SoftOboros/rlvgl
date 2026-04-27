@@ -11,6 +11,16 @@ export {
   defineRlvglLedBargraph,
 } from "./led-bargraph-element.ts";
 export {
+  NeedleVuCore,
+  NEEDLE_HALF_ARC_RAD,
+  type NeedleSink,
+  type NeedleVuConfig,
+} from "./needle-vu-core.ts";
+export {
+  RlvglNeedleVuElement,
+  defineRlvglNeedleVu,
+} from "./needle-vu-element.ts";
+export {
   type Layout,
   type MeterColorId,
   type MeterType,
@@ -20,5 +30,6 @@ export {
   type SecondaryColors,
   type Skin,
   type Zone,
+  dbfsToScaleUnits,
   zoneColorFor,
 } from "./skin.ts";

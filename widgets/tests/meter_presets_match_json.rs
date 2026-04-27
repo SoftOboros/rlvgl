@@ -24,6 +24,7 @@ struct JsonRange {
 
 #[derive(Deserialize)]
 struct JsonPivot {
+    value: f32,
     label: String,
     input_dbfs: f32,
 }
@@ -142,6 +143,7 @@ fn assert_scale_match(runtime: &Scale, json_path: &PathBuf) {
     assert_eq!(runtime.range_max_db, j.range_db.max);
     assert_eq!(runtime.pivot_label, j.pivot.label);
     assert_eq!(runtime.pivot_input_dbfs, j.pivot.input_dbfs);
+    assert_eq!(runtime.pivot_value, j.pivot.value, "{}: pivot_value", j.id);
     assert_eq!(
         runtime.calibration_offset_db,
         j.calibration_default.as_ref().map(|c| c.offset_db),

@@ -38,13 +38,17 @@
     },
     "pivot": {
       "type": "object",
-      "description": "Reference point (alignment level). Maps a labelled scale position to its dBFS equivalent so the meter can be driven by the dBFS-domain ballistic state.",
+      "description": "Reference point (alignment level). Maps a labelled scale position to its dBFS equivalent so the meter can be driven by the dBFS-domain ballistic state. The numeric `value` is the scale-units coordinate of the pivot (e.g. 0 for vu_broadcast, 4 for ppm_iia_bbc, -23 for lufs_ebu_r128); the `label` is its display text. Widgets derive the dBFS → scale-units offset as `value - input_dbfs`.",
       "additionalProperties": false,
-      "required": ["label", "input_dbfs"],
+      "required": ["value", "label", "input_dbfs"],
       "properties": {
+        "value": {
+          "type": "number",
+          "description": "Numeric scale-units coordinate of the pivot. MUST lie within [range_db.min, range_db.max]."
+        },
         "label": {
           "type": "string",
-          "description": "Display text at the pivot tick (e.g. \"0\", \"4\")."
+          "description": "Display text at the pivot tick (e.g. \"0\", \"4\", \"−23\"). MAY include unicode minus / superscripts; widgets render verbatim."
         },
         "input_dbfs": {
           "type": "number",

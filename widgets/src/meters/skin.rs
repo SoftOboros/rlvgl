@@ -146,17 +146,26 @@ pub struct Scale {
     pub id: &'static str,
     /// Display unit string for tick labels (e.g. `"dBVU"`, `"dBFS"`).
     pub label_units: &'static str,
-    /// Lowest value on the visible scale (display dB).
+    /// Lowest value on the visible scale (in scale units).
     pub range_min_db: f32,
-    /// Highest value on the visible scale (display dB).
+    /// Highest value on the visible scale (in scale units).
     pub range_max_db: f32,
-    /// Display label at the pivot tick (e.g. `"0"`).
+    /// Numeric scale-units coordinate of the pivot. Lies within
+    /// `[range_min_db, range_max_db]`.
+    pub pivot_value: f32,
+    /// Display text at the pivot tick (e.g. `"0"`, `"4"`, `"−23"`).
     pub pivot_label: &'static str,
     /// dBFS sample value that should produce a reading at the pivot.
+    /// Together with `pivot_value` this defines the dBFS → scale-units
+    /// offset: `scale_units = dbfs + (pivot_value - pivot_input_dbfs)`.
     pub pivot_input_dbfs: f32,
-    /// Optional default calibration offset; `dB_displayed = dbfs + offset`.
+    /// Optional alternate-units calibration. When the user wants
+    /// labels in dBu / dBV / dBSPL instead of `label_units`, the
+    /// alt-units value is `scale_units + offset_db`. Does **not**
+    /// affect zone lookup or needle / bargraph positioning — those
+    /// always work in scale-units domain.
     pub calibration_offset_db: Option<f32>,
-    /// Major-tick positions in display dB (strictly ascending).
+    /// Major-tick positions, in scale-units (strictly ascending).
     pub majors: &'static [f32],
     /// Minor ticks between each pair of consecutive majors. `0` = none.
     pub minors_per_major_division: u32,
@@ -187,18 +196,31 @@ pub struct Skin {
 }
 
 impl Scale {
-    /// Look up the §7 colour identifier whose zone covers `db_value`.
-    /// If `db_value` is below `range_min_db`, returns the first zone's
-    /// colour; if above `range_max_db`, returns the last zone's colour.
-    pub fn zone_color_for(&self, db_value: f32) -> MeterColorId {
+    /// Project a dBFS-domain reading into scale-units. Widgets use this
+    /// for zone lookup and for needle / bargraph positioning. See
+    /// concepts §3 (Scale glossary entry) and §9 (widget update
+    /// contract): ballistic state stays in dBFS-domain; *only* the
+    /// rendered value lives in scale-units.
+    #[inline]
+    pub fn dbfs_to_scale_units(&self, dbfs: f32) -> f32 {
+        dbfs + (self.pivot_value - self.pivot_input_dbfs)
+    }
+
+    /// Look up the §7 colour identifier whose zone covers `scale_value`
+    /// (a value in scale-units, **not** dBFS — call
+    /// [`Self::dbfs_to_scale_units`] first if you have a dBFS reading).
+    /// If `scale_value` is below `range_min_db`, returns the first
+    /// zone's colour; if at or above `range_max_db`, returns the last
+    /// zone's colour.
+    pub fn zone_color_for(&self, scale_value: f32) -> MeterColorId {
         // Zones are partition-ordered (validated at AM-03 by both
-        // runtimes); first zone whose `to_db` exceeds `db_value` wins.
+        // runtimes); first zone whose `to_db` exceeds `scale_value` wins.
         for z in self.zones {
-            if db_value < z.to_db {
+            if scale_value < z.to_db {
                 return z.color;
             }
         }
-        // db_value >= range_max_db: clamp to last zone.
+        // scale_value >= range_max_db: clamp to last zone.
         self.zones
             .last()
             .map(|z| z.color)

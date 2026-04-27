@@ -26,6 +26,7 @@ pub static SCALE_VU_BROADCAST: Scale = Scale {
     label_units: "dBVU",
     range_min_db: -20.0,
     range_max_db: 3.0,
+    pivot_value: 0.0,
     pivot_label: "0",
     pivot_input_dbfs: -20.0,
     calibration_offset_db: Some(24.0),
@@ -61,6 +62,7 @@ pub static SCALE_VU_EBU: Scale = Scale {
     label_units: "dBVU",
     range_min_db: -18.0,
     range_max_db: 3.0,
+    pivot_value: 0.0,
     pivot_label: "0",
     pivot_input_dbfs: -18.0,
     calibration_offset_db: Some(18.0),
@@ -96,6 +98,7 @@ pub static SCALE_DIGITAL_PEAK: Scale = Scale {
     label_units: "dBFS",
     range_min_db: -60.0,
     range_max_db: 0.0,
+    pivot_value: 0.0,
     pivot_label: "0",
     pivot_input_dbfs: 0.0,
     calibration_offset_db: None,
@@ -190,6 +193,39 @@ pub static EBU_CLASSIC_BARGRAPH: Skin = Skin {
         aspect_ratio: 0.18,
         led_count: 32,
         peak_hold_ms: 1500.0,
+    },
+};
+
+/// `broadcast_classic_needle` — Cream-faced analog VU look over `vu_broadcast`.
+pub static BROADCAST_CLASSIC_NEEDLE: Skin = Skin {
+    id: "broadcast_classic_needle",
+    title: "Broadcast Classic — Analog Needle",
+    scale: &SCALE_VU_BROADCAST,
+    default_ballistic: Ballistic::Vu,
+    meter_type: MeterType::Needle,
+    palette: Palette {
+        safe: rgb(0x1f, 0x1f, 0x1f),
+        nominal: rgb(0x1f, 0x1f, 0x1f),
+        caution: rgb(0xa0, 0x7b, 0x1c),
+        hot: rgb(0xa7, 0x2b, 0x1f),
+        over: rgb(0xd1, 0x1a, 0x1a),
+    },
+    secondary: SecondaryColors {
+        background: Some(rgb(0xf1, 0xe7, 0xc4)),
+        frame: Some(rgb(0x3a, 0x2a, 0x18)),
+        scale_text: Some(rgb(0x1a, 0x1a, 0x1a)),
+        minor_tick: Some(rgb(0x3a, 0x2a, 0x18)),
+        major_tick: Some(rgb(0x1a, 0x1a, 0x1a)),
+        needle: Some(rgb(0x1a, 0x1a, 0x1a)),
+        needle_pivot: Some(rgb(0x3a, 0x2a, 0x18)),
+        led_off: None,
+        peak_hold: Some(rgb(0xd1, 0x1a, 0x1a)),
+    },
+    layout: Layout {
+        orientation: Orientation::Horizontal,
+        aspect_ratio: 1.6,
+        led_count: 0,
+        peak_hold_ms: 0.0,
     },
 };
 

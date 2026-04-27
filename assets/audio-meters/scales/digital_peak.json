@@ -3,7 +3,7 @@
   "id": "digital_peak",
   "label_units": "dBFS",
   "range_db": { "min": -60.0, "max": 0.0 },
-  "pivot": { "label": "0", "input_dbfs": 0.0 },
+  "pivot": { "value": 0, "label": "0", "input_dbfs": 0.0 },
   "ticks": {
     "majors": [-60, -50, -40, -30, -20, -12, -6, -3, 0],
     "minors_per_major_division": 5,

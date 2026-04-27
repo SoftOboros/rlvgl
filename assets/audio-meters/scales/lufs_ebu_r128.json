@@ -3,7 +3,7 @@
   "id": "lufs_ebu_r128",
   "label_units": "LUFS",
   "range_db": { "min": -36.0, "max": 0.0 },
-  "pivot": { "label": "−23", "input_dbfs": -23.0 },
+  "pivot": { "value": -23, "label": "−23", "input_dbfs": -23.0 },
   "ticks": {
     "majors": [-36, -30, -27, -25, -23, -21, -19, -17, -15, -10, -5, 0],
     "minors_per_major_division": 1,

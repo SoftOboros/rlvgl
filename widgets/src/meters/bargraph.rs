@@ -138,24 +138,24 @@ impl Widget for LedBargraph {
 
         renderer.fill_rect(self.bounds, bg);
 
-        // Map dBFS-domain reading and peak into the scale's *display*
-        // domain (apply calibration offset if present). Zone lookups
-        // and tick math live in display dB so they line up with the
-        // labels printed in AM-08.
+        // Project dBFS-domain reading and peak into scale-units (the
+        // domain of `range_db`, `zones`, and `majors`). Concepts §3:
+        // ballistic state stays in dBFS; rendering happens in scale
+        // units. The optional `calibration_offset_db` is for *label*
+        // rendering only and does not enter positioning.
         let scale = self.skin.scale;
-        let cal = scale.calibration_offset_db.unwrap_or(0.0);
-        let reading_disp = self.reading_db + cal;
-        let peak_disp = self.peak_db + cal;
+        let reading_su = scale.dbfs_to_scale_units(self.reading_db);
+        let peak_su = scale.dbfs_to_scale_units(self.peak_db);
         let lo = scale.range_min_db;
         let hi = scale.range_max_db;
         let span = (hi - lo).max(f32::EPSILON);
 
         // Fraction of the bargraph that should be lit, in [0, 1].
-        let lit_frac = ((reading_disp - lo) / span).clamp(0.0, 1.0);
+        let lit_frac = ((reading_su - lo) / span).clamp(0.0, 1.0);
         // `+ 0.5` is integer round-to-nearest; lit_frac is non-negative.
         let lit_segments = (lit_frac * n as f32 + 0.5) as i32;
         // Index of the segment that holds the peak pip.
-        let peak_frac = ((peak_disp - lo) / span).clamp(0.0, 1.0);
+        let peak_frac = ((peak_su - lo) / span).clamp(0.0, 1.0);
         let peak_segment = ((peak_frac * n as f32 + 0.5) as i32 - 1).clamp(0, n - 1);
 
         let horizontal = matches!(self.skin.layout.orientation, Orientation::Horizontal);
@@ -165,10 +165,10 @@ impl Widget for LedBargraph {
             // horizontal meters paint left-to-right.
             let cell = segment_rect(self.bounds, n, i, horizontal);
 
-            // Centre of this segment in display dB.
+            // Centre of this segment in scale-units.
             let centre_frac = (i as f32 + 0.5) / n as f32;
-            let centre_db = lo + centre_frac * span;
-            let zone_col = self.skin.palette.color(scale.zone_color_for(centre_db));
+            let centre_su = lo + centre_frac * span;
+            let zone_col = self.skin.palette.color(scale.zone_color_for(centre_su));
 
             let lit = i < lit_segments;
             let cell_fill = if lit { zone_col } else { off };
@@ -176,7 +176,7 @@ impl Widget for LedBargraph {
 
             if i == peak_segment
                 && self.skin.layout.peak_hold_ms > 0.0
-                && peak_disp > lo
+                && peak_su > lo
                 && lit_segments < n
             {
                 renderer.fill_rect(cell, peak_color);
@@ -285,28 +285,34 @@ mod tests {
         };
         let mut bar = LedBargraph::new(bounds, skin);
 
-        // Drive a steady -10 dBVU equivalent (-30 dBFS for vu_broadcast)
-        // long enough for VU to settle.
+        // Drive a steady -30 dBFS (= -10 dBVU on vu_broadcast: 0 VU
+        // = -20 dBFS, so dbfs_to_scale_units = dbfs + 20). Run long
+        // enough for VU to settle.
         for _ in 0..120 {
-            bar.update(
-                -30.0 + skin.scale.calibration_offset_db.unwrap_or(0.0) - 24.0,
-                1.0 / 60.0,
-            );
+            bar.update(-30.0, 1.0 / 60.0);
         }
-        // After some seconds of -30 dBFS into VU, reading should be in
-        // the Safe / Nominal portion of the scale, i.e. roughly half
-        // the LEDs lit-or-fewer.
         let n = skin.layout.led_count as i32;
-        let lit = bar.reading_db() + skin.scale.calibration_offset_db.unwrap_or(0.0);
-        let frac = ((lit - skin.scale.range_min_db)
+        let scale_value = skin.scale.dbfs_to_scale_units(bar.reading_db());
+        let frac = ((scale_value - skin.scale.range_min_db)
             / (skin.scale.range_max_db - skin.scale.range_min_db))
             .clamp(0.0, 1.0);
         let lit_segments = (frac * n as f32 + 0.5) as i32;
+        // -10 dBVU is below the pivot (0 VU), so meter should be lit
+        // less than fully and clearly less than the pivot fraction.
         assert!(
             lit_segments < n,
             "should not be fully lit on -30 dBFS sustained, got {}/{}",
             lit_segments,
-            n
+            n,
+        );
+        let pivot_frac = (skin.scale.pivot_value - skin.scale.range_min_db)
+            / (skin.scale.range_max_db - skin.scale.range_min_db);
+        let pivot_segments = (pivot_frac * n as f32 + 0.5) as i32;
+        assert!(
+            lit_segments < pivot_segments,
+            "expected lit ({}) < pivot ({}) for -10 dBVU sustained input",
+            lit_segments,
+            pivot_segments,
         );
     }
 
