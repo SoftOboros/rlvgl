@@ -297,6 +297,10 @@ fn scales_match_json() {
         &presets::SCALE_LUFS_EBU_R128,
         &dir.join("lufs_ebu_r128.json"),
     );
+    assert_scale_match(
+        &presets::SCALE_LUFS_STREAMING_M14,
+        &dir.join("lufs_streaming_m14.json"),
+    );
 }
 
 #[test]
@@ -325,6 +329,10 @@ fn skins_match_json() {
     assert_skin_match(
         &presets::LUFS_EBU_R128_GAUGE,
         &dir.join("lufs_ebu_r128_gauge.json"),
+    );
+    assert_skin_match(
+        &presets::STREAMING_LUFS_GAUGE,
+        &dir.join("streaming_lufs_gauge.json"),
     );
 }
 

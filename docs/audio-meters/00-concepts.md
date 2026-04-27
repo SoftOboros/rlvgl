@@ -189,6 +189,7 @@ Initial scale set:
 | `ppm_iia_bbc` | 1 … 7 (BBC marks) | "4" = −18 dBFS test level | BBC convention; non-dB labels. |
 | `digital_peak` | −60 … 0 dBFS | 0 dBFS = full scale | AES17 digital. |
 | `lufs_ebu_r128` | −36 … 0 LUFS | −23 LUFS target | EBU R 128. |
+| `lufs_streaming_m14` | −36 … 0 LUFS | −14 LUFS target | Spotify / YouTube / Apple Music streaming convention. |
 
 Adding a scale: drop a JSON file under `assets/audio-meters/scales/`,
 add a row to a per-chapter walkthrough (likely AM-03), no §15 churn.

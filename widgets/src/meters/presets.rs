@@ -216,6 +216,61 @@ pub static SCALE_LUFS_EBU_R128: Scale = Scale {
     ],
 };
 
+/// `lufs_streaming_m14` — Streaming target (-14 LUFS): Spotify, YouTube,
+/// Apple Music style. Same range as EBU R 128 (-36..0) but a different
+/// target loudness; production tooling commonly toggles between EBU
+/// (-23) and streaming (-14) targets.
+pub static SCALE_LUFS_STREAMING_M14: Scale = Scale {
+    id: "lufs_streaming_m14",
+    label_units: "LUFS",
+    range_min_db: -36.0,
+    range_max_db: 0.0,
+    pivot_value: -14.0,
+    pivot_label: "−14",
+    pivot_input_dbfs: -14.0,
+    calibration_offset_db: None,
+    majors: &[
+        -36.0, -30.0, -24.0, -20.0, -16.0, -14.0, -12.0, -10.0, -8.0, -5.0, -3.0, 0.0,
+    ],
+    minors_per_major_division: 1,
+    tick_labels: &[
+        TickLabel { value: -36.0, label: "−36" },
+        TickLabel { value: -30.0, label: "−30" },
+        TickLabel { value: -24.0, label: "−24" },
+        TickLabel { value: -20.0, label: "−20" },
+        TickLabel { value: -16.0, label: "−16" },
+        TickLabel { value: -14.0, label: "−14" },
+        TickLabel { value: -12.0, label: "−12" },
+        TickLabel { value: -10.0, label: "−10" },
+        TickLabel { value:  -8.0, label: "−8"  },
+        TickLabel { value:  -5.0, label: "−5"  },
+        TickLabel { value:  -3.0, label: "−3"  },
+        TickLabel { value:   0.0, label: "0"   },
+    ],
+    zones: &[
+        Zone {
+            from_db: -36.0,
+            to_db: -16.0,
+            color: MeterColorId::Safe,
+        },
+        Zone {
+            from_db: -16.0,
+            to_db: -12.0,
+            color: MeterColorId::Nominal,
+        },
+        Zone {
+            from_db: -12.0,
+            to_db: -8.0,
+            color: MeterColorId::Caution,
+        },
+        Zone {
+            from_db: -8.0,
+            to_db: 0.0,
+            color: MeterColorId::Hot,
+        },
+    ],
+};
+
 // ---- Skins ----------------------------------------------------------
 
 /// `broadcast_classic_bargraph` — US LED bargraph; classic green/amber/red.
@@ -370,6 +425,43 @@ pub static LUFS_EBU_R128_GAUGE: Skin = Skin {
     },
     secondary: SecondaryColors {
         background: Some(rgb(0x08, 0x08, 0x0a)),
+        frame: Some(rgb(0x1d, 0x21, 0x26)),
+        scale_text: Some(rgb(0xdd, 0xe2, 0xe6)),
+        minor_tick: None,
+        major_tick: None,
+        needle: None,
+        needle_pivot: None,
+        led_off: None,
+        peak_hold: None,
+    },
+    layout: Layout {
+        orientation: Orientation::Horizontal,
+        aspect_ratio: 2.0,
+        led_count: 0,
+        peak_hold_ms: 0.0,
+    },
+    assets: SkinAssets::EMPTY,
+};
+
+/// `streaming_lufs_gauge` — LUFS loudness gauge calibrated for
+/// streaming targets (-14 LUFS, Spotify / YouTube / Apple Music
+/// convention). Same compound widget shape as
+/// [`LUFS_EBU_R128_GAUGE`]; different scale target.
+pub static STREAMING_LUFS_GAUGE: Skin = Skin {
+    id: "streaming_lufs_gauge",
+    title: "Streaming — LUFS Loudness Gauge (−14 target)",
+    scale: &SCALE_LUFS_STREAMING_M14,
+    default_ballistic: Ballistic::LufsI,
+    meter_type: MeterType::LufsGauge,
+    palette: Palette {
+        safe: rgb(0x3e, 0xd2, 0x7a),
+        nominal: rgb(0x3e, 0xd2, 0x7a),
+        caution: rgb(0xe6, 0xb2, 0x2c),
+        hot: rgb(0xd2, 0x4b, 0x2e),
+        over: rgb(0xff, 0x2a, 0x1f),
+    },
+    secondary: SecondaryColors {
+        background: Some(rgb(0x0a, 0x0c, 0x10)),
         frame: Some(rgb(0x1d, 0x21, 0x26)),
         scale_text: Some(rgb(0xdd, 0xe2, 0xe6)),
         minor_tick: None,
