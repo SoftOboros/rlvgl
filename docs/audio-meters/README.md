@@ -204,6 +204,7 @@ independently conformant once its checklist passes.
 | AM-08e — LufsI absolute gating | Ratified 2026-04-26 | [12-lufs-gating.md](12-lufs-gating.md) |
 | AM-08h — BS.1770 relative gating | Ratified 2026-04-26 | [14-bs1770-relative-gating.md](14-bs1770-relative-gating.md) |
 | AM-08i — LufsGaugeStrict widget | Ratified 2026-04-26 | _(commit `4ab8930` follow-up)_ |
+| AM-10 — Multi-channel composite (5.1, EQ, …) | Ratified 2026-04-26 | [15-multi-channel.md](15-multi-channel.md) |
 | AM-08f — Streaming LUFS scale | Ratified 2026-04-26 | _(commit `9d873d1`)_ |
 | AM-08g — PPM skin coverage | Ratified 2026-04-26 | _(commit `7ad4724`)_ |
 | AM-09 — Integration | Ratified 2026-04-26 | [10-integration.md](10-integration.md) |

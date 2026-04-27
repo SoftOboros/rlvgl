@@ -63,3 +63,8 @@ export {
   type MeterCoreLike,
   type Rect,
 } from "./stereo.ts";
+export {
+  MultiChannel,
+  splitHorizontalN,
+  splitVerticalN,
+} from "./multi-channel.ts";

@@ -7,6 +7,7 @@
 pub mod bargraph;
 pub mod lufs_gauge;
 pub mod lufs_gauge_strict;
+pub mod multi_channel;
 pub mod needle;
 pub mod numeric;
 /// Hand-authored runtime [`skin::Scale`] / [`skin::Skin`] constants
@@ -25,4 +26,5 @@ pub use skin::{
     Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin,
     SkinAssets, TickLabel, Zone, rgb, rgba,
 };
+pub use multi_channel::{MultiChannel, split_horizontal_n, split_vertical_n};
 pub use stereo::{MeterWidget, StereoPair, split_horizontal};
