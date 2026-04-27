@@ -45,6 +45,7 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-08b — Ticks + labels | Ratified 2026-04-26 | [08-ticks-labels.md](08-ticks-labels.md) |
 | AM-08c — Stereo composition | Ratified 2026-04-26 | [09-stereo.md](09-stereo.md) |
 | AM-08d — LUFS gauge | Ratified 2026-04-26 | [11-lufs-gauge.md](11-lufs-gauge.md) |
+| AM-08e — LufsI absolute gating | Ratified 2026-04-26 | [12-lufs-gating.md](12-lufs-gating.md) |
 | AM-09 — Integration | Ratified 2026-04-26 | [10-integration.md](10-integration.md) |
 
 ## Reference

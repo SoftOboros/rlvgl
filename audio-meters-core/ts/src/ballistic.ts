@@ -38,6 +38,14 @@ const PPM_IIB_DECAY_DB_PER_S = fr(20.0 / 1.7);
 
 const DIGITAL_PEAK_DECAY_DB_PER_S = fr(20.0 / 1.5);
 
+/**
+ * Absolute-gate threshold for `LufsI`. Per ITU-R BS.1770-4, blocks
+ * below -70 LUFS are excluded from the integrated mean. We apply
+ * per-sample (streaming) since L0 is not block-based; relative
+ * gating (programme-mean − 10 LU) is deferred. See concepts §15-006.
+ */
+const LUFS_ABSOLUTE_GATE_DB = -70.0;
+
 // ---- Windowed (RMS / LUFS) -------------------------------------------
 
 const RMS_LUFS_M_TAU_S = fr(0.100);
@@ -195,17 +203,19 @@ export class BallisticState {
         this.s.readingDb = powerToDb(this.s.linState);
         break;
       case "LufsI": {
-        // §5: ungated running mean of linear power.
-        const p = dbToPower(dbfsClean);
-        // Saturating add of u32 max for parity with Rust.
-        if (this.s.integratedCount < 0xffffffff) {
-          this.s.integratedCount += 1;
+        // §5: BS.1770 absolute-gated running mean. Skip samples below
+        // LUFS_ABSOLUTE_GATE_DB; hold previous reading during silence.
+        if (dbfsClean >= LUFS_ABSOLUTE_GATE_DB) {
+          const p = dbToPower(dbfsClean);
+          if (this.s.integratedCount < 0xffffffff) {
+            this.s.integratedCount += 1;
+          }
+          const n = fr(this.s.integratedCount);
+          this.s.integratedMean = fr(
+            this.s.integratedMean + (p - this.s.integratedMean) / n,
+          );
+          this.s.readingDb = powerToDb(this.s.integratedMean);
         }
-        const n = fr(this.s.integratedCount);
-        this.s.integratedMean = fr(
-          this.s.integratedMean + (p - this.s.integratedMean) / n,
-        );
-        this.s.readingDb = powerToDb(this.s.integratedMean);
         break;
       }
     }

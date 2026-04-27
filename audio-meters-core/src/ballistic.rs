@@ -69,6 +69,15 @@ const PPM_IIB_DECAY_DB_PER_S: f32 = 20.0 / 1.7;
 /// (concepts §5; AES17 §6.2).
 const DIGITAL_PEAK_DECAY_DB_PER_S: f32 = 20.0 / 1.5;
 
+/// Absolute-gate threshold for [`Ballistic::LufsI`]. Per ITU-R
+/// BS.1770-4, blocks below `-70 LUFS` are excluded from the
+/// integrated mean. We apply the gate per-sample (not per-block) since
+/// the L0 ungated implementation is a streaming running mean rather
+/// than a block-based one. AM-08e change-log entry §15-006 documents
+/// the deviation: relative gating (programme-mean − 10 LU) is
+/// deferred to a future phase that adds a fixed-size block ring.
+const LUFS_ABSOLUTE_GATE_DB: f32 = -70.0;
+
 // ---- Windowed (RMS / LUFS) -------------------------------------------
 
 /// Leaky-integrator τ for `Rms` / `LufsM` (400 ms ENBW).
@@ -95,8 +104,9 @@ pub enum Ballistic {
     LufsM,
     /// ITU-R BS.1770-4 short-term, 3000 ms ENBW. Caller K-weights upstream.
     LufsS,
-    /// ITU-R BS.1770-4 integrated. Currently ungated (full-programme mean).
-    /// Gating deferred to AM-08.
+    /// ITU-R BS.1770-4 integrated. Absolute-gated running mean
+    /// (samples below `-70 LUFS` are excluded). Relative gating
+    /// (programme-mean − 10 LU) is deferred — see concepts §15-006.
     LufsI,
     /// Zero ballistic — reading equals input. Test fixture / debug overlay.
     Instant,
@@ -226,13 +236,20 @@ impl BallisticState {
                 self.reading_db = power_to_db(self.lin_state);
             }
             Ballistic::LufsI => {
-                // §5: ungated running mean of linear power. AM-08 will add
-                // BS.1770 -70 LUFS absolute and -10 LU relative gates.
-                let p = db_to_power(dbfs);
-                self.integrated_count = self.integrated_count.saturating_add(1);
-                let n = self.integrated_count as f32;
-                self.integrated_mean += (p - self.integrated_mean) / n;
-                self.reading_db = power_to_db(self.integrated_mean);
+                // §5: BS.1770 absolute-gated running mean. Samples below
+                // LUFS_ABSOLUTE_GATE_DB (-70) are skipped — they don't
+                // advance the count and don't contribute to the mean.
+                // Once the count is non-zero, the reading retains the
+                // last computed value during silence. Relative gating
+                // (programme-mean − 10 LU) is deferred — see §15-006.
+                if dbfs >= LUFS_ABSOLUTE_GATE_DB {
+                    let p = db_to_power(dbfs);
+                    self.integrated_count = self.integrated_count.saturating_add(1);
+                    let n = self.integrated_count as f32;
+                    self.integrated_mean += (p - self.integrated_mean) / n;
+                    self.reading_db = power_to_db(self.integrated_mean);
+                }
+                // else: hold previous reading (or floor if never above gate).
             }
         }
 

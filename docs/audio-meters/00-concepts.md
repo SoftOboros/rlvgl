@@ -165,7 +165,7 @@ from any behaviour change.
 | `Rms` | Sliding-window RMS, **400 ms** window. No attack/decay asymmetry. | Convention; documented in this doc. |
 | `LufsM` | ITU-R BS.1770-4 momentary loudness, **400 ms** sliding window, K-weighted. **Note:** K-weighting is the caller's job; the meter sees post-weighted dBFS. | ITU-R BS.1770-4 |
 | `LufsS` | Short-term loudness, **3 s** sliding window. Caller K-weights. | ITU-R BS.1770-4 |
-| `LufsI` | Integrated loudness, gated, full programme. Caller K-weights. | ITU-R BS.1770-4 |
+| `LufsI` | Integrated loudness, **absolute-gated** at `-70 LUFS` (per-sample). Caller K-weights. Relative gating deferred — see §15-006. | ITU-R BS.1770-4 |
 | `Instant` | Zero ballistic; reading == input. For test fixtures and debug overlays. | n/a |
 
 Each variant in `audio-meters-core` MUST cite the corresponding §5 row in a
@@ -384,3 +384,26 @@ AM-05 onward depend transitively on the above.
   alt-units label rendering and does **not** enter positioning math.
   All six canonical scale JSON files updated; both runtime validators
   require the new field.
+- **2026-04-26-006** — `Ballistic::LufsI` semantic upgrade: now applies
+  the ITU-R BS.1770-4 absolute gate (samples below `-70 LUFS` are
+  excluded from the running mean and hold the previous reading).
+  Previously LufsI was a fully ungated streaming mean — silence would
+  drag the integrated value down. The fix is per-sample (streaming),
+  not per-block, since the L0 implementation is not block-based;
+  full BS.1770 gating uses 400 ms blocks with 75 % overlap.
+  Approximation rationale: per-sample gating at -70 LUFS catches the
+  same class of "silence below noise floor" cases that the block gate
+  was designed to exclude, with O(1) state.
+
+  **Relative gating** (programme-mean − 10 LU, BS.1770 §5.1) requires a
+  block ring buffer; deferred to a future phase that adds `alloc` to
+  L0 (or a const-generic ring with a configurable max programme
+  length). Until then, `LufsI` reads slightly higher than a fully
+  conformant reference implementation when the programme contains
+  long quiet sections that would have been relative-gated. Documented
+  divergence; bracketed by the parity fixtures so any further drift
+  is caught.
+
+  Both runtimes updated in lockstep; parity fixtures regenerated.
+  Widget consumers (`LufsGauge`) pick up the new semantics
+  transparently — they consume `BallisticState` by value.
