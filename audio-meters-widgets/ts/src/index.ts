@@ -21,6 +21,15 @@ export {
   defineRlvglNeedleVu,
 } from "./needle-vu-element.ts";
 export {
+  NumericPeakCore,
+  type NumericSink,
+  type NumericPeakConfig,
+} from "./numeric-peak-core.ts";
+export {
+  RlvglNumericPeakElement,
+  defineRlvglNumericPeak,
+} from "./numeric-peak-element.ts";
+export {
   type Layout,
   type MeterColorId,
   type MeterType,

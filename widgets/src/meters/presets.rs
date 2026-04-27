@@ -229,6 +229,39 @@ pub static BROADCAST_CLASSIC_NEEDLE: Skin = Skin {
     },
 };
 
+/// `digital_studio_numeric` — Two-line numeric dBFS readout.
+pub static DIGITAL_STUDIO_NUMERIC: Skin = Skin {
+    id: "digital_studio_numeric",
+    title: "Digital Studio — Numeric Readout",
+    scale: &SCALE_DIGITAL_PEAK,
+    default_ballistic: Ballistic::DigitalPeak,
+    meter_type: MeterType::Numeric,
+    palette: Palette {
+        safe: rgb(0x3e, 0xd2, 0x7a),
+        nominal: rgb(0x3e, 0xd2, 0x7a),
+        caution: rgb(0xe6, 0xb2, 0x2c),
+        hot: rgb(0xd2, 0x4b, 0x2e),
+        over: rgb(0xff, 0x2a, 0x1f),
+    },
+    secondary: SecondaryColors {
+        background: Some(rgb(0x08, 0x08, 0x0a)),
+        frame: Some(rgb(0x1d, 0x21, 0x26)),
+        scale_text: Some(rgb(0xdd, 0xe2, 0xe6)),
+        minor_tick: None,
+        major_tick: None,
+        needle: None,
+        needle_pivot: None,
+        led_off: None,
+        peak_hold: Some(rgb(0xff, 0xe3, 0x5a)),
+    },
+    layout: Layout {
+        orientation: Orientation::Horizontal,
+        aspect_ratio: 2.5,
+        led_count: 0,
+        peak_hold_ms: 1500.0,
+    },
+};
+
 /// `digital_studio_bargraph` — High-resolution dBFS peak meter.
 pub static DIGITAL_STUDIO_BARGRAPH: Skin = Skin {
     id: "digital_studio_bargraph",

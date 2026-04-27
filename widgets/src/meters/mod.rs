@@ -6,6 +6,7 @@
 
 pub mod bargraph;
 pub mod needle;
+pub mod numeric;
 /// Hand-authored runtime [`skin::Scale`] / [`skin::Skin`] constants
 /// matching the JSON descriptors under `assets/audio-meters/`. Replaced
 /// by `rlvgl-creator` codegen output in AM-04b.
@@ -14,6 +15,7 @@ pub mod skin;
 
 pub use bargraph::LedBargraph;
 pub use needle::NeedleVu;
+pub use numeric::NumericPeak;
 pub use skin::{
     Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, Zone, rgb,
     rgba,

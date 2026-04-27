@@ -278,6 +278,14 @@ fn skins_match_json() {
         &presets::DIGITAL_STUDIO_BARGRAPH,
         &dir.join("digital_studio_bargraph.json"),
     );
+    assert_skin_match(
+        &presets::DIGITAL_STUDIO_NUMERIC,
+        &dir.join("digital_studio_numeric.json"),
+    );
+    assert_skin_match(
+        &presets::BROADCAST_CLASSIC_NEEDLE,
+        &dir.join("broadcast_classic_needle.json"),
+    );
 }
 
 /// `Zone` is required to be exported so this integration test sees it.
