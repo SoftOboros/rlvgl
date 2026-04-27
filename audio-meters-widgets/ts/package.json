@@ -1,0 +1,21 @@
+{
+  "name": "@rlvgl/audio-meters-widgets",
+  "version": "0.2.0",
+  "description": "Vanilla-canvas custom-element widgets for rlvgl audio meters. Browser-only; depends on @rlvgl/audio-meters-core for ballistic state. Mirror of widgets/src/meters/ on the rlvgl Rust side.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types --no-warnings test/led-bargraph.test.ts test/presets.test.ts"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "files": [
+    "src/**/*.ts",
+    "README.md"
+  ]
+}

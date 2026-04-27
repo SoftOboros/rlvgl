@@ -38,8 +38,8 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-03 — Scale descriptors | Ratified 2026-04-26 | [03-scales.md](03-scales.md) |
 | AM-04a — Skin descriptors | Ratified 2026-04-26 | [04-skins.md](04-skins.md) |
 | AM-04b — Visual primitives + creator rasterisation | Deferred | _(deferred until widget-side demand)_ |
-| AM-05 — `LedBargraph` (rlvgl) | Planned | _(pending)_ |
-| AM-06 — `LedBargraph` (TS) | Planned | _(pending)_ |
+| AM-05 — `LedBargraph` (rlvgl) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) |
+| AM-06 — `LedBargraph` (TS) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) (combined) |
 | AM-07 — `NeedleVu` (both) | Planned | _(pending)_ |
 | AM-08 — Aux meters + skins | Planned | _(pending)_ |
 | AM-09 — Integration | Planned | _(pending)_ |

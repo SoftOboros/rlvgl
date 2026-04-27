@@ -3,9 +3,9 @@
 // docs/audio-meters/00-concepts.md.
 
 export {
-  Ballistic,
   BallisticState,
   ALL_BALLISTICS,
   NEG_INFINITY_FLOOR_DB,
 } from "./ballistic.ts";
+export type { Ballistic } from "./ballistic.ts";
 export { applyCalibration } from "./dbfs.ts";
