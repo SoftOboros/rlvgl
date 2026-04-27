@@ -47,3 +47,19 @@ npm test
 
 Headless: `LedBargraphCore` is decoupled from canvas via `DrawSink` so
 tests run under Node `--experimental-strip-types`.
+
+## CLI demo
+
+```sh
+npm run demo
+```
+
+Runs `examples/cli-demo.ts` — drives all four widget cores
+(bargraph, needle, numeric, LUFS gauge) with a synthetic 12-second
+dBFS sequence (silence → ramp → plateau → pulse train → silence) and
+prints per-frame readings plus an ASCII bargraph to stdout. Useful as
+a reference integration and a smoke check that everything composes.
+
+The demo is also a working example of how to consume the library
+without a browser; replace the `synthetic()` function with your audio
+source's dBFS detector to drive a real signal.
