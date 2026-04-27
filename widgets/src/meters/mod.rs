@@ -6,6 +6,7 @@
 
 pub mod bargraph;
 pub mod lufs_gauge;
+pub mod lufs_gauge_strict;
 pub mod needle;
 pub mod numeric;
 /// Hand-authored runtime [`skin::Scale`] / [`skin::Skin`] constants
@@ -17,6 +18,7 @@ pub mod stereo;
 
 pub use bargraph::LedBargraph;
 pub use lufs_gauge::LufsGauge;
+pub use lufs_gauge_strict::LufsGaugeStrict;
 pub use needle::NeedleVu;
 pub use numeric::NumericPeak;
 pub use skin::{

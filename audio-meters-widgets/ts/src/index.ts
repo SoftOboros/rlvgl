@@ -35,6 +35,11 @@ export {
   type LufsSink,
 } from "./lufs-gauge-core.ts";
 export {
+  LufsGaugeStrictCore,
+  type LufsGaugeStrictConfig,
+  type LufsStrictSink,
+} from "./lufs-gauge-strict-core.ts";
+export {
   RlvglLufsGaugeElement,
   defineRlvglLufsGauge,
 } from "./lufs-gauge-element.ts";

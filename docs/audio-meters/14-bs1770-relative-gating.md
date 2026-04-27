@@ -142,9 +142,10 @@ gating".
   arithmetic than the leaky integrators; bit-precision parity is
   harder to enforce. Unit-level cross-runtime parity (same scenario,
   same expected behaviour) is enough for this helper.
-- LufsGauge integration. The widget keeps the streaming
-  `BallisticState::LufsI` for the I line. A future `LufsGaugeStrict`
-  or similar can take the helper as a generic parameter.
+- ~~LufsGauge integration.~~ **Done in AM-08i** — see
+  `widgets::meters::LufsGaugeStrict<const N: usize>` and the
+  TS-side `LufsGaugeStrictCore`. Same draw model as `LufsGauge`;
+  only the integrated-line source differs.
 
 ## Files cited
 

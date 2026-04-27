@@ -90,6 +90,18 @@ case demands it.
       assertion at and above target.
 - [x] Cortex-M7 cross-compile clean.
 
+## Strict-gated companion: `LufsGaugeStrict<const N>`
+
+For full BS.1770-4 §5.1 two-pass gating (absolute + relative), see
+[`LufsGaugeStrict`](14-bs1770-relative-gating.md) — same draw model,
+different integrated-line source. Pick whichever fits the
+application:
+
+| Widget | Integrated source | Memory overhead | Conformance |
+|---|---|---|---|
+| `LufsGauge` | `BallisticState::LufsI` | O(1) | absolute-gated only |
+| `LufsGaugeStrict<N>` | `RelativelyGatedLufsI<N>` | `4 × N` bytes | full §5.1 two-pass |
+
 ## Non-goals
 
 - True ITU-R BS.1770-4 absolute (-70 LUFS) and relative (-10 LU)

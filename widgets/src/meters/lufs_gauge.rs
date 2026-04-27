@@ -34,7 +34,9 @@ const NOMINAL_LU_HALF_WIDTH: f32 = 0.5;
 const CAUTION_LU_HALF_WIDTH: f32 = 1.5;
 
 /// LUFS loudness gauge with momentary / short-term / integrated
-/// readouts.
+/// readouts. Streaming-LufsI integrated line by default
+/// (concepts §15-006: absolute-gated only). For strict BS.1770 §5.1
+/// two-pass gating, see [`super::lufs_gauge_strict::LufsGaugeStrict`].
 pub struct LufsGauge {
     bounds: Rect,
     skin: &'static Skin,
