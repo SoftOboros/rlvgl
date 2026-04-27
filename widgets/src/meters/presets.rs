@@ -164,6 +164,94 @@ pub static SCALE_DIGITAL_PEAK: Scale = Scale {
     ],
 };
 
+/// `ppm_din` — DIN 45406 PPM (Nordic broadcast convention).
+/// Range −50 … +5 dB; pivot label "0" maps to −9 dBFS.
+pub static SCALE_PPM_DIN: Scale = Scale {
+    id: "ppm_din",
+    label_units: "dB",
+    range_min_db: -50.0,
+    range_max_db: 5.0,
+    pivot_value: 0.0,
+    pivot_label: "0",
+    pivot_input_dbfs: -9.0,
+    calibration_offset_db: None,
+    majors: &[-50.0, -40.0, -30.0, -20.0, -10.0, -5.0, 0.0, 5.0],
+    minors_per_major_division: 4,
+    tick_labels: &[
+        TickLabel { value: -50.0, label: "−50" },
+        TickLabel { value: -40.0, label: "−40" },
+        TickLabel { value: -30.0, label: "−30" },
+        TickLabel { value: -20.0, label: "−20" },
+        TickLabel { value: -10.0, label: "−10" },
+        TickLabel { value:  -5.0, label: "−5"  },
+        TickLabel { value:   0.0, label: "0"   },
+        TickLabel { value:   5.0, label: "+5"  },
+    ],
+    zones: &[
+        Zone {
+            from_db: -50.0,
+            to_db: -10.0,
+            color: MeterColorId::Safe,
+        },
+        Zone {
+            from_db: -10.0,
+            to_db: 0.0,
+            color: MeterColorId::Nominal,
+        },
+        Zone {
+            from_db: 0.0,
+            to_db: 3.0,
+            color: MeterColorId::Caution,
+        },
+        Zone {
+            from_db: 3.0,
+            to_db: 5.0,
+            color: MeterColorId::Hot,
+        },
+    ],
+};
+
+/// `ppm_iia_bbc` — BBC PPM (IEC 60268-10 Type IIa). Range 1 … 7 in
+/// "BBC marks"; alignment level "4" maps to −18 dBFS.
+pub static SCALE_PPM_IIA_BBC: Scale = Scale {
+    id: "ppm_iia_bbc",
+    label_units: "BBC",
+    range_min_db: 1.0,
+    range_max_db: 7.0,
+    pivot_value: 4.0,
+    pivot_label: "4",
+    pivot_input_dbfs: -18.0,
+    calibration_offset_db: None,
+    majors: &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+    minors_per_major_division: 0,
+    tick_labels: &[
+        TickLabel { value: 1.0, label: "1" },
+        TickLabel { value: 2.0, label: "2" },
+        TickLabel { value: 3.0, label: "3" },
+        TickLabel { value: 4.0, label: "4" },
+        TickLabel { value: 5.0, label: "5" },
+        TickLabel { value: 6.0, label: "6" },
+        TickLabel { value: 7.0, label: "7" },
+    ],
+    zones: &[
+        Zone {
+            from_db: 1.0,
+            to_db: 4.0,
+            color: MeterColorId::Safe,
+        },
+        Zone {
+            from_db: 4.0,
+            to_db: 6.0,
+            color: MeterColorId::Nominal,
+        },
+        Zone {
+            from_db: 6.0,
+            to_db: 7.0,
+            color: MeterColorId::Hot,
+        },
+    ],
+};
+
 /// `lufs_ebu_r128` — EBU R 128 LUFS scale; target -23.
 pub static SCALE_LUFS_EBU_R128: Scale = Scale {
     id: "lufs_ebu_r128",
@@ -474,6 +562,78 @@ pub static STREAMING_LUFS_GAUGE: Skin = Skin {
     layout: Layout {
         orientation: Orientation::Horizontal,
         aspect_ratio: 2.0,
+        led_count: 0,
+        peak_hold_ms: 0.0,
+    },
+    assets: SkinAssets::EMPTY,
+};
+
+/// `nordic_ppm_bargraph` — DIN 45406 Type I PPM, vertical bargraph.
+/// Pairs the `ppm_din` scale with the fast-attack `PpmTypeI`
+/// ballistic; conventional green-to-red banding.
+pub static NORDIC_PPM_BARGRAPH: Skin = Skin {
+    id: "nordic_ppm_bargraph",
+    title: "Nordic PPM — DIN 45406 Bargraph",
+    scale: &SCALE_PPM_DIN,
+    default_ballistic: Ballistic::PpmTypeI,
+    meter_type: MeterType::Bargraph,
+    palette: Palette {
+        safe: rgb(0x2c, 0x8a, 0x3f),
+        nominal: rgb(0x4c, 0xc4, 0x6a),
+        caution: rgb(0xe6, 0xb2, 0x2c),
+        hot: rgb(0xd2, 0x4b, 0x2e),
+        over: rgb(0xff, 0x2a, 0x1f),
+    },
+    secondary: SecondaryColors {
+        background: Some(rgb(0x0a, 0x0d, 0x0a)),
+        frame: Some(rgb(0x1f, 0x26, 0x20)),
+        scale_text: Some(rgb(0xcf, 0xd5, 0xcf)),
+        minor_tick: Some(rgb(0x46, 0x50, 0x49)),
+        major_tick: Some(rgb(0x8a, 0x94, 0x8c)),
+        needle: None,
+        needle_pivot: None,
+        led_off: Some(rgb(0x16, 0x1a, 0x17)),
+        peak_hold: Some(rgb(0xff, 0xff, 0xff)),
+    },
+    layout: Layout {
+        orientation: Orientation::Vertical,
+        aspect_ratio: 0.16,
+        led_count: 40,
+        peak_hold_ms: 1500.0,
+    },
+    assets: SkinAssets::EMPTY,
+};
+
+/// `bbc_ppm_needle` — BBC PPM (IEC 60268-10 Type IIa) analog needle.
+/// 1..7 BBC marks across the arc; alignment level "4" maps to
+/// −18 dBFS via `pivot_input_dbfs`.
+pub static BBC_PPM_NEEDLE: Skin = Skin {
+    id: "bbc_ppm_needle",
+    title: "BBC PPM — IEC Type IIa Needle",
+    scale: &SCALE_PPM_IIA_BBC,
+    default_ballistic: Ballistic::PpmTypeIIa,
+    meter_type: MeterType::Needle,
+    palette: Palette {
+        safe: rgb(0x1f, 0x1f, 0x1f),
+        nominal: rgb(0x1f, 0x1f, 0x1f),
+        caution: rgb(0x1f, 0x1f, 0x1f),
+        hot: rgb(0xa7, 0x2b, 0x1f),
+        over: rgb(0xd1, 0x1a, 0x1a),
+    },
+    secondary: SecondaryColors {
+        background: Some(rgb(0x0a, 0x0a, 0x0c)),
+        frame: Some(rgb(0x27, 0x27, 0x2a)),
+        scale_text: Some(rgb(0xdc, 0xdc, 0xe0)),
+        minor_tick: Some(rgb(0x66, 0x66, 0x69)),
+        major_tick: Some(rgb(0xdc, 0xdc, 0xe0)),
+        needle: Some(rgb(0xdc, 0xdc, 0xe0)),
+        needle_pivot: Some(rgb(0x7a, 0x7a, 0x7e)),
+        led_off: None,
+        peak_hold: None,
+    },
+    layout: Layout {
+        orientation: Orientation::Horizontal,
+        aspect_ratio: 1.6,
         led_count: 0,
         peak_hold_ms: 0.0,
     },

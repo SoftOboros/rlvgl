@@ -301,6 +301,8 @@ fn scales_match_json() {
         &presets::SCALE_LUFS_STREAMING_M14,
         &dir.join("lufs_streaming_m14.json"),
     );
+    assert_scale_match(&presets::SCALE_PPM_DIN, &dir.join("ppm_din.json"));
+    assert_scale_match(&presets::SCALE_PPM_IIA_BBC, &dir.join("ppm_iia_bbc.json"));
 }
 
 #[test]
@@ -333,6 +335,14 @@ fn skins_match_json() {
     assert_skin_match(
         &presets::STREAMING_LUFS_GAUGE,
         &dir.join("streaming_lufs_gauge.json"),
+    );
+    assert_skin_match(
+        &presets::NORDIC_PPM_BARGRAPH,
+        &dir.join("nordic_ppm_bargraph.json"),
+    );
+    assert_skin_match(
+        &presets::BBC_PPM_NEEDLE,
+        &dir.join("bbc_ppm_needle.json"),
     );
 }
 

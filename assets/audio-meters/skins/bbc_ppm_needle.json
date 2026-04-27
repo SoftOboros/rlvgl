@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "bbc_ppm_needle",
+  "title": "BBC PPM — IEC Type IIa Needle",
+  "scale_id": "ppm_iia_bbc",
+  "default_ballistic": "PpmTypeIIa",
+  "meter_type": "needle",
+  "palette": {
+    "Safe":    "#1f1f1f",
+    "Nominal": "#1f1f1f",
+    "Caution": "#1f1f1f",
+    "Hot":     "#a72b1f",
+    "Over":    "#d11a1a"
+  },
+  "secondary_colors": {
+    "background":   "#0a0a0c",
+    "frame":        "#27272a",
+    "scale_text":   "#dcdce0",
+    "minor_tick":   "#666669",
+    "major_tick":   "#dcdce0",
+    "needle":       "#dcdce0",
+    "needle_pivot": "#7a7a7e"
+  },
+  "layout": {
+    "orientation": "horizontal",
+    "aspect_ratio": 1.6,
+    "peak_hold_ms": 0
+  }
+}
