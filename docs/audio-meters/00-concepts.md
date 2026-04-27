@@ -385,6 +385,28 @@ AM-05 onward depend transitively on the above.
   alt-units label rendering and does **not** enter positioning math.
   All six canonical scale JSON files updated; both runtime validators
   require the new field.
+- **2026-04-26-007** — Add `RelativelyGatedLufsI<const N: usize>`
+  helper to L0 (Rust + TS). Two-pass gating per ITU-R BS.1770-4 §5.1:
+  pass 1 = absolute gate at `-70 LUFS`, pass 2 = relative gate at
+  `(absolute-mean − 10 LU)` floored at the absolute gate. Sliding
+  window of size `N` keeps the type bounded — caller picks `N`
+  based on use case (256 ≈ 4 s recent loudness; 8192 ≈ 2 min
+  programme). Memory: `4 × N` bytes per meter.
+
+  Standalone helper, **not** a `Ballistic` enum variant — adding a
+  variant would be Standards Action and would require const-generic
+  enums (which Rust doesn't have). The widget tier (LufsGauge) keeps
+  using `BallisticState::LufsI` (absolute-only) by default; users
+  who need full BS.1770 conformance compose
+  `RelativelyGatedLufsI<N>` into a custom widget. Documented in
+  AM-08h chapter (`14-bs1770-relative-gating.md`).
+
+  Approximation acknowledged: BS.1770 specifies 400 ms blocks with
+  75 % overlap; this helper treats every per-frame `update` as one
+  gating sample. Strict programme-loudness reference values should
+  come from a desktop conformance implementation; this helper
+  targets the "good-enough live readout" use case.
+
 - **2026-04-26-006** — `Ballistic::LufsI` semantic upgrade: now applies
   the ITU-R BS.1770-4 absolute gate (samples below `-70 LUFS` are
   excluded from the running mean and hold the previous reading).

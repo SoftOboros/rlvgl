@@ -9,3 +9,8 @@ export {
 } from "./ballistic.ts";
 export type { Ballistic } from "./ballistic.ts";
 export { applyCalibration } from "./dbfs.ts";
+export {
+  RelativelyGatedLufsI,
+  ABSOLUTE_GATE_DB,
+  RELATIVE_GATE_OFFSET_LU,
+} from "./integrated.ts";

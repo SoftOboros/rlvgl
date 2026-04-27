@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "node --test --experimental-strip-types --no-warnings test/parity.test.ts test/scales.test.ts test/skins.test.ts"
+    "test": "node --test --experimental-strip-types --no-warnings test/parity.test.ts test/scales.test.ts test/skins.test.ts test/integrated.test.ts"
   },
   "engines": {
     "node": ">=22.6"

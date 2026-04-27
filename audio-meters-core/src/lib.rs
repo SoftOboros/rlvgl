@@ -32,6 +32,8 @@
 
 mod ballistic;
 mod dbfs;
+pub mod integrated;
 
 pub use ballistic::{Ballistic, BallisticState, NEG_INFINITY_FLOOR_DB};
 pub use dbfs::{Dbfs, apply_calibration};
+pub use integrated::RelativelyGatedLufsI;
