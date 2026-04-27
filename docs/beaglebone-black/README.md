@@ -954,9 +954,24 @@ without any software change once a responsive cape is installed.
       second pass so u-boot falls through to the kernel, Linux comes
       back. **No buttons, no SD removal, no fw\_setenv — single SSH
       command round-trips.**
+- [x] **Playit-lite over UART0** — bare-metal accepts the playit
+      subset over the J1 6-pin header (3.3 V FTDI, 115200 8N1,
+      GND/RX/TX on pins 1/4/5). Commands honored:
+      `? → STAT:<frame>,<step>`, `R → force PRM_RSTCTRL warm reset
+      to Linux` (skips the 10 s auto-timer), `D<x>,<y>,<w>,<h>`
+      → ARGB pixel dump from the FB_BASE framebuffer. No allocator
+      needed; the dispatcher is ~150 lines of `no_std` Rust in
+      `src/bare_metal.rs::playit_lite`. The `?` and `R` paths give
+      an interactive pulse-check + immediate-return-to-Linux without
+      waiting for the auto-reset timer; the dump path produces
+      8-hex-digit ARGB rows for visual debug.
 - [ ] FreeRTOS task model (present/render/touch). Bare-metal binary
       is the stand-in payload until the FreeRTOS prong is buildable;
       the swap mechanism is identical regardless.
+- [ ] Full `PlayitExecutor` on bare-metal — needs a global allocator
+      (`linked_list_allocator` or similar) plus a minimal
+      `WidgetNode` root since the executor uses `Rc<RefCell<dyn Widget>>`.
+      Deferred; playit-lite covers the everyday smoke-test surface.
 - [ ] DiscoController integration (needs heap; deferred until smoke passes)
 
 #### Beagleboard u-boot uEnv.txt gotcha

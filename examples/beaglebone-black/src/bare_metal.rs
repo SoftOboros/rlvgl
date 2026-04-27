@@ -297,28 +297,50 @@ pub extern "C" fn rust_main() -> ! {
 
     #[cfg(not(feature = "freertos"))]
     {
-        // Knight-Rider chase — panel shows color bars; LEDs sweep
-        // USR0..USR3..USR0 so it's visually obvious the board is
-        // alive and EOF interrupts are firing (we clear EOF0 each
-        // time a frame completes).
+        // Knight-Rider chase + playit-lite over UART0.
+        //
+        // Panel shows color bars; LEDs sweep USR0..USR3..USR0 so the
+        // board is visibly alive. UART0 (J1 pins 1/4/5, 3.3V FTDI,
+        // 115200 8N1) accepts the playit subset:
+        //
+        //   ?            -> "STAT:<frame>,<step>\r\n"
+        //   R            -> trigger PRM_RSTCTRL warm reset (force
+        //                   immediate return to Linux without
+        //                   waiting for the AUTO_RESET_FRAMES
+        //                   timer)
+        //   D<x>,<y>,<w>,<h>  -> ARGB hex pixel dump
         //
         // After AUTO_RESET_FRAMES of LCDC EOF events (~57 Hz panel
-        // → ~10 s wall clock), trigger a global software warm reset
-        // via PRM_RSTCTRL. The chip re-enters ROM, ROM loads u-boot
-        // SPL from SD, u-boot reads /boot/uEnv.txt — the freertos-
-        // next marker was already cleared in u-boot before jumping
-        // here, so the next boot is normal Linux. This is the
-        // "swap the other way" return trip that lets the toggle
-        // work without a physical S3 press.
+        // → ~10 s wall clock), automatically trigger PRM_RSTCTRL —
+        // global software warm reset back to ROM. ROM re-runs SPL,
+        // u-boot reads /uEnv.txt, marker is absent (u-boot fatrm-
+        // cleared it before jumping here), so distro_bootcmd boots
+        // Linux. This is the "swap the other way" return trip that
+        // makes the toggle work without a physical S3 press.
         //
-        // PRM_RSTCTRL on AM335x lives at 0x44E0_0F00. Writing
-        // 0x1 (bit 0) triggers a global software warm reset; per
-        // TRM SPRUH73Q section 8.1.7.5, the ROM does not preserve
-        // DRAM on warm reset on this part, so we re-boot like a
-        // cold boot — exactly what we want here.
+        // PRM_RSTCTRL on AM335x lives at 0x44E0_0F00. Writing 0x1
+        // (bit 0) triggers a global software warm reset; per TRM
+        // SPRUH73Q section 8.1.7.5, the ROM does not preserve DRAM
+        // on warm reset on this part, so we re-boot like a cold
+        // boot — exactly what we want.
         const PRM_RSTCTRL: u32 = 0x44E0_0F00;
         const PRM_RSTCTRL_RESET: u32 = 1 << 0;
         const AUTO_RESET_FRAMES: u32 = 57 * 10;
+
+        // Line buffer for playit-lite command parsing. 64 bytes is
+        // more than enough for the longest command we honor today
+        // (D<x>,<y>,<w>,<h> with all four 4-digit decimals plus
+        // commas).
+        const CMD_BUF_LEN: usize = 64;
+        let mut cmd_buf = [0u8; CMD_BUF_LEN];
+        let mut cmd_len: usize = 0;
+
+        // Splash banner so the operator knows the playit channel is
+        // open and what subset is honored.
+        bsp::uart0::puts(
+            "\n=== rlvgl-bbb-bare playit-lite ===\n\
+             commands: ? | R | D<x>,<y>,<w>,<h>\n",
+        );
 
         let mut step: u32 = 0;
         let mut frame_count: u32 = 0;
@@ -334,19 +356,157 @@ pub extern "C" fn rust_main() -> ! {
                     lcdc::clear_eof_irq();
                     frame_count = frame_count.wrapping_add(1);
                     if frame_count >= AUTO_RESET_FRAMES {
+                        bsp::uart0::puts("rlvgl: auto-reset to Linux\n");
                         core::ptr::write_volatile(
                             PRM_RSTCTRL as *mut u32,
                             PRM_RSTCTRL_RESET,
                         );
-                        // Should not reach here — chip resets within
-                        // a few cycles. Spin defensively.
                         loop {
                             core::hint::spin_loop();
                         }
                     }
                 }
             }
+
+            // Drain any pending UART0 RX bytes. Process complete
+            // lines (\n or \r terminated). Quietly drop overflow.
+            while let Some(b) = bsp::uart0::getc_nonblock() {
+                if b == b'\n' || b == b'\r' {
+                    if cmd_len > 0 {
+                        playit_lite::dispatch(
+                            &cmd_buf[..cmd_len],
+                            frame_count,
+                            step,
+                            FB_BASE,
+                        );
+                        cmd_len = 0;
+                    }
+                } else if cmd_len < CMD_BUF_LEN {
+                    cmd_buf[cmd_len] = b;
+                    cmd_len += 1;
+                } else {
+                    // Overflow: drop until next newline.
+                    cmd_len = 0;
+                }
+            }
+
             step = step.wrapping_add(1);
         }
+    }
+}
+
+/// Playit-lite command dispatcher (no allocator, no widget tree).
+///
+/// Handles the most useful subset of the playit wire protocol so the
+/// bare-metal alt payload can be exercised over UART0 without bringing
+/// up the full executor (which needs alloc + WidgetNode). The transport
+/// layer (`getc_nonblock` / `puts` / `putc_raw`) is reusable when the
+/// full executor lands.
+#[cfg(not(feature = "freertos"))]
+mod playit_lite {
+    use super::bsp;
+    use super::lcdc;
+
+    const PRM_RSTCTRL: u32 = 0x44E0_0F00;
+    const PRM_RSTCTRL_RESET: u32 = 1 << 0;
+
+    /// Dispatch one complete command line.
+    pub fn dispatch(line: &[u8], frame_count: u32, step: u32, fb_base: u32) {
+        if line.is_empty() {
+            return;
+        }
+        match line[0] {
+            b'?' => status(frame_count, step),
+            b'R' | b'r' => reset(),
+            b'D' | b'd' => dump(&line[1..], fb_base),
+            _ => bsp::uart0::puts("ERR:unknown\n"),
+        }
+    }
+
+    fn status(frame_count: u32, step: u32) {
+        bsp::uart0::puts("STAT:");
+        bsp::uart0::put_u32(frame_count);
+        bsp::uart0::puts(",");
+        bsp::uart0::put_u32(step);
+        bsp::uart0::puts("\n");
+    }
+
+    fn reset() -> ! {
+        bsp::uart0::puts("OK:reset\n");
+        unsafe {
+            core::ptr::write_volatile(PRM_RSTCTRL as *mut u32, PRM_RSTCTRL_RESET);
+        }
+        loop {
+            core::hint::spin_loop();
+        }
+    }
+
+    /// Parse `<x>,<y>,<w>,<h>` and dump that ARGB rect from the
+    /// framebuffer in 8-hex-digit-per-pixel space-separated form.
+    fn dump(args: &[u8], fb_base: u32) {
+        let mut nums = [0i32; 4];
+        let mut idx = 0;
+        let mut acc: i32 = 0;
+        let mut neg = false;
+        let mut have = false;
+        for &b in args {
+            match b {
+                b'0'..=b'9' => {
+                    acc = acc.saturating_mul(10).saturating_add((b - b'0') as i32);
+                    have = true;
+                }
+                b'-' if !have => {
+                    neg = true;
+                }
+                b',' => {
+                    if idx < 4 {
+                        nums[idx] = if neg { -acc } else { acc };
+                        idx += 1;
+                    }
+                    acc = 0;
+                    neg = false;
+                    have = false;
+                }
+                b' ' | b'\t' => {}
+                _ => {
+                    bsp::uart0::puts("ERR:dump-parse\n");
+                    return;
+                }
+            }
+        }
+        if have && idx < 4 {
+            nums[idx] = if neg { -acc } else { acc };
+            idx += 1;
+        }
+        if idx != 4 {
+            bsp::uart0::puts("ERR:dump-args\n");
+            return;
+        }
+        let (x, y, w, h) = (nums[0], nums[1], nums[2], nums[3]);
+        if w <= 0 || h <= 0 {
+            bsp::uart0::puts("ERR:dump-dims\n");
+            return;
+        }
+        let stride_px = lcdc::HACTIVE as i32;
+        let height_px = lcdc::VACTIVE as i32;
+        let x1 = (x + w).min(stride_px);
+        let y1 = (y + h).min(height_px);
+        let x0 = x.max(0);
+        let y0 = y.max(0);
+        bsp::uart0::puts("DUMP:\n");
+        for row in y0..y1 {
+            for col in x0..x1 {
+                let off = (row * stride_px + col) as u32 * 4;
+                let pixel = unsafe {
+                    core::ptr::read_volatile((fb_base + off) as *const u32)
+                };
+                bsp::uart0::put_hex32(pixel);
+                if col + 1 < x1 {
+                    bsp::uart0::putc_raw(b' ');
+                }
+            }
+            bsp::uart0::putc_raw(b'\n');
+        }
+        bsp::uart0::puts("END\n");
     }
 }
