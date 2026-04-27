@@ -29,6 +29,12 @@ const DEFAULT_PEAK_HOLD: Color = Color(0xff, 0xff, 0xff, 0xff);
 /// signal.
 const PEAK_DECAY_DB_PER_S: f32 = 12.0;
 
+/// Width of the right-hand strip reserved for tick marks and labels
+/// when [`LedBargraph::show_ticks`] is `true`. Application code is
+/// responsible for sizing the widget bounds wide enough that the
+/// remaining LED column is still visually meaningful.
+pub const BARGRAPH_TICK_STRIP_PX: i32 = 36;
+
 /// Mono LED bargraph driven by a [`BallisticState`].
 pub struct LedBargraph {
     bounds: Rect,
@@ -42,6 +48,10 @@ pub struct LedBargraph {
     /// Time since `peak_db` was last refreshed, in seconds. After
     /// `skin.layout.peak_hold_ms / 1000`, the pip decays.
     peak_age_s: f32,
+    /// When `true`, paint major-tick marks and labels in a
+    /// `BARGRAPH_TICK_STRIP_PX`-wide strip on the right side of the
+    /// widget. Default `false` so callers opt in.
+    pub show_ticks: bool,
 }
 
 impl LedBargraph {
@@ -61,7 +71,15 @@ impl LedBargraph {
             reading_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_age_s: 0.0,
+            show_ticks: false,
         }
+    }
+
+    /// Builder-style helper: enable tick + label rendering in the
+    /// right-hand strip and return self.
+    pub fn with_ticks(mut self) -> Self {
+        self.show_ticks = true;
+        self
     }
 
     /// Replace the ballistic kind. Resets ballistic state, the cached
@@ -138,6 +156,24 @@ impl Widget for LedBargraph {
 
         renderer.fill_rect(self.bounds, bg);
 
+        // When tick rendering is enabled, the LED column shrinks to
+        // leave room for ticks + labels on the right side. Vertical
+        // bargraphs only — the AM-08b chapter notes that horizontal
+        // tick rendering is deferred (it requires bottom-strip layout
+        // and rotated label glyphs that the Renderer trait doesn't
+        // currently support).
+        let horizontal = matches!(self.skin.layout.orientation, Orientation::Horizontal);
+        let led_bounds = if self.show_ticks && !horizontal {
+            Rect {
+                x: self.bounds.x,
+                y: self.bounds.y,
+                width: (self.bounds.width - BARGRAPH_TICK_STRIP_PX).max(1),
+                height: self.bounds.height,
+            }
+        } else {
+            self.bounds
+        };
+
         // Project dBFS-domain reading and peak into scale-units (the
         // domain of `range_db`, `zones`, and `majors`). Concepts §3:
         // ballistic state stays in dBFS; rendering happens in scale
@@ -158,12 +194,11 @@ impl Widget for LedBargraph {
         let peak_frac = ((peak_su - lo) / span).clamp(0.0, 1.0);
         let peak_segment = ((peak_frac * n as f32 + 0.5) as i32 - 1).clamp(0, n - 1);
 
-        let horizontal = matches!(self.skin.layout.orientation, Orientation::Horizontal);
         for i in 0..n {
             // Segment index counted from the "bottom" of the meter
             // (zero = lowest value end). Vertical meters paint top-down,
             // horizontal meters paint left-to-right.
-            let cell = segment_rect(self.bounds, n, i, horizontal);
+            let cell = segment_rect(led_bounds, n, i, horizontal);
 
             // Centre of this segment in scale-units.
             let centre_frac = (i as f32 + 0.5) / n as f32;
@@ -182,10 +217,70 @@ impl Widget for LedBargraph {
                 renderer.fill_rect(cell, peak_color);
             }
         }
+
+        if self.show_ticks && !horizontal {
+            self.draw_ticks(renderer, led_bounds, lo, span);
+        }
     }
 
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
+    }
+}
+
+/// Default colours when the bound skin omits major / minor / text.
+const DEFAULT_MAJOR_TICK: Color = Color(0xa0, 0xa0, 0xa8, 0xff);
+const DEFAULT_SCALE_TEXT: Color = Color(0xcf, 0xcf, 0xd2, 0xff);
+
+impl LedBargraph {
+    /// Paint major-tick marks and labels in the right-hand strip
+    /// reserved by [`BARGRAPH_TICK_STRIP_PX`]. Called from `draw()`
+    /// when `show_ticks` is set on a vertical bargraph.
+    fn draw_ticks(&self, renderer: &mut dyn Renderer, led_bounds: Rect, lo: f32, span: f32) {
+        use alloc::format;
+        let scale = self.skin.scale;
+        let major_col = self
+            .skin
+            .secondary
+            .major_tick
+            .unwrap_or(DEFAULT_MAJOR_TICK);
+        let text_col = self
+            .skin
+            .secondary
+            .scale_text
+            .unwrap_or(DEFAULT_SCALE_TEXT);
+
+        let strip_x = led_bounds.x + led_bounds.width;
+        let tick_w = 8;
+        let tick_h = 2;
+        for &m in scale.majors {
+            let frac = ((m - lo) / span).clamp(0.0, 1.0);
+            // Vertical bargraph: y=0 is top, low values at bottom.
+            let y =
+                led_bounds.y + led_bounds.height - 1 - (frac * (led_bounds.height as f32)) as i32;
+            renderer.fill_rect(
+                Rect {
+                    x: strip_x,
+                    y: y - tick_h / 2,
+                    width: tick_w,
+                    height: tick_h,
+                },
+                major_col,
+            );
+
+            // Label: skin-supplied, else formatted number.
+            let lbl_x = strip_x + tick_w + 2;
+            // Lift the baseline slightly so a typical 12-px font sits
+            // beside the tick mark.
+            let lbl_y = y + 4;
+            match scale.label_for_major(m) {
+                Some(s) => renderer.draw_text((lbl_x, lbl_y), s, text_col),
+                None => {
+                    let formatted = format!("{m:.0}");
+                    renderer.draw_text((lbl_x, lbl_y), &formatted, text_col);
+                }
+            }
+        }
     }
 }
 
@@ -314,6 +409,70 @@ mod tests {
             lit_segments,
             pivot_segments,
         );
+    }
+
+    #[test]
+    fn show_ticks_emits_label_per_major() {
+        let skin = &BROADCAST_CLASSIC_BARGRAPH;
+        let bar = LedBargraph::new(
+            Rect {
+                x: 0,
+                y: 0,
+                width: 64,
+                height: 320,
+            },
+            skin,
+        )
+        .with_ticks();
+        struct Counter {
+            text_count: usize,
+            label_set: alloc::vec::Vec<alloc::string::String>,
+        }
+        impl Renderer for Counter {
+            fn fill_rect(&mut self, _r: Rect, _c: Color) {}
+            fn draw_text(&mut self, _p: (i32, i32), text: &str, _c: Color) {
+                self.text_count += 1;
+                self.label_set.push(text.into());
+            }
+        }
+        let mut c = Counter {
+            text_count: 0,
+            label_set: alloc::vec::Vec::new(),
+        };
+        bar.draw(&mut c);
+        let majors = skin.scale.majors.len();
+        assert_eq!(c.text_count, majors, "expected one label per major");
+        assert!(
+            c.label_set.iter().any(|s| s == "0"),
+            "expected canonical '0' label, got {:?}",
+            c.label_set
+        );
+    }
+
+    #[test]
+    fn no_ticks_means_no_text_calls() {
+        let skin = &BROADCAST_CLASSIC_BARGRAPH;
+        let bar = LedBargraph::new(
+            Rect {
+                x: 0,
+                y: 0,
+                width: 32,
+                height: 256,
+            },
+            skin,
+        );
+        struct Counter {
+            text_count: usize,
+        }
+        impl Renderer for Counter {
+            fn fill_rect(&mut self, _r: Rect, _c: Color) {}
+            fn draw_text(&mut self, _p: (i32, i32), _t: &str, _c: Color) {
+                self.text_count += 1;
+            }
+        }
+        let mut c = Counter { text_count: 0 };
+        bar.draw(&mut c);
+        assert_eq!(c.text_count, 0, "ticks default off; no text expected");
     }
 
     #[test]

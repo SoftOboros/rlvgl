@@ -12,6 +12,7 @@
 //!
 //! See `docs/audio-meters/06-needle-vu.md`.
 
+extern crate alloc;
 use libm::{cosf, sinf};
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
 use rlvgl_core::event::Event;
@@ -38,6 +39,9 @@ const NEEDLE_THICKNESS_PX: i32 = 2;
 /// Pivot-dot radius in pixels.
 const PIVOT_RADIUS_PX: i32 = 4;
 
+/// Tick mark length in pixels (radial, into the face from the arc).
+const TICK_LEN_PX: i32 = 6;
+
 /// Mono analog needle driven by a [`BallisticState`].
 pub struct NeedleVu {
     bounds: Rect,
@@ -45,6 +49,9 @@ pub struct NeedleVu {
     ballistic: BallisticState,
     /// Latest reading from the ballistic, dBFS-domain.
     reading_db: f32,
+    /// When `true`, paint major-tick marks and labels along the arc.
+    /// Default `false` so callers opt in.
+    pub show_ticks: bool,
 }
 
 impl NeedleVu {
@@ -62,7 +69,14 @@ impl NeedleVu {
             skin,
             ballistic: BallisticState::new(skin.default_ballistic),
             reading_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
+            show_ticks: false,
         }
+    }
+
+    /// Builder-style helper: enable tick + label rendering and return self.
+    pub fn with_ticks(mut self) -> Self {
+        self.show_ticks = true;
+        self
     }
 
     /// Replace the ballistic kind. New ballistic starts at floor.
@@ -128,12 +142,78 @@ impl Widget for NeedleVu {
         let length = (self.bounds.height as f32 * 0.95) as i32;
         let angle = self.needle_angle_rad();
 
+        if self.show_ticks {
+            self.draw_ticks(renderer, pivot_x, pivot_y, length);
+        }
+
         draw_needle_line(renderer, pivot_x, pivot_y, length, angle, needle_col);
         draw_pivot_dot(renderer, pivot_x, pivot_y, pivot_col);
     }
 
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
+    }
+}
+
+const DEFAULT_MAJOR_TICK: Color = Color(0x1a, 0x1a, 0x1a, 0xff);
+const DEFAULT_SCALE_TEXT: Color = Color(0x1a, 0x1a, 0x1a, 0xff);
+
+impl NeedleVu {
+    /// Paint major-tick marks and labels along the arc traced by the
+    /// needle tip. Each major sits just inside the arc; its label
+    /// renders just outside, anchored at the tick endpoint.
+    fn draw_ticks(&self, renderer: &mut dyn Renderer, pivot_x: i32, pivot_y: i32, length: i32) {
+        use libm::{cosf, sinf};
+        let scale = self.skin.scale;
+        let major_col = self.skin.secondary.major_tick.unwrap_or(DEFAULT_MAJOR_TICK);
+        let text_col = self.skin.secondary.scale_text.unwrap_or(DEFAULT_SCALE_TEXT);
+
+        let lo = scale.range_min_db;
+        let hi = scale.range_max_db;
+        let span = (hi - lo).max(f32::EPSILON);
+        let r_outer = length as f32;
+        let r_inner = (length - TICK_LEN_PX) as f32;
+
+        for &m in scale.majors {
+            let frac = ((m - lo) / span).clamp(0.0, 1.0);
+            let angle = -NEEDLE_HALF_ARC_RAD + frac * 2.0 * NEEDLE_HALF_ARC_RAD;
+            let dx = sinf(angle);
+            let dy = -cosf(angle);
+
+            let outer_x = (pivot_x as f32 + r_outer * dx) as i32;
+            let outer_y = (pivot_y as f32 + r_outer * dy) as i32;
+            let inner_x = (pivot_x as f32 + r_inner * dx) as i32;
+            let inner_y = (pivot_y as f32 + r_inner * dy) as i32;
+
+            // Walk the radial line in unit steps, painting 2x2.
+            let dx_step = (outer_x - inner_x) as f32 / TICK_LEN_PX as f32;
+            let dy_step = (outer_y - inner_y) as f32 / TICK_LEN_PX as f32;
+            for s in 0..=TICK_LEN_PX {
+                let t = s as f32;
+                let x = inner_x as f32 + t * dx_step;
+                let y = inner_y as f32 + t * dy_step;
+                renderer.fill_rect(
+                    Rect {
+                        x: x as i32 - 1,
+                        y: y as i32 - 1,
+                        width: 2,
+                        height: 2,
+                    },
+                    major_col,
+                );
+            }
+
+            // Label just outside the arc.
+            let label_x = (pivot_x as f32 + (r_outer + 4.0) * dx) as i32 - 8;
+            let label_y = (pivot_y as f32 + (r_outer + 4.0) * dy) as i32 + 4;
+            match scale.label_for_major(m) {
+                Some(s) => renderer.draw_text((label_x, label_y), s, text_col),
+                None => {
+                    let formatted = alloc::format!("{m:.0}");
+                    renderer.draw_text((label_x, label_y), &formatted, text_col);
+                }
+            }
+        }
     }
 }
 
@@ -197,6 +277,77 @@ mod tests {
             height: 200,
         };
         let _ = NeedleVu::new(bounds, bargraph);
+    }
+
+    extern crate alloc;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    struct TextRecorder {
+        rect_count: usize,
+        text_count: usize,
+        last_text: Vec<String>,
+    }
+    impl Renderer for TextRecorder {
+        fn fill_rect(&mut self, _rect: Rect, _color: Color) {
+            self.rect_count += 1;
+        }
+        fn draw_text(&mut self, _pos: (i32, i32), text: &str, _color: Color) {
+            self.text_count += 1;
+            self.last_text.push(text.into());
+        }
+    }
+
+    #[test]
+    fn show_ticks_paints_label_per_major() {
+        let bar = NeedleVu::new(
+            Rect {
+                x: 0,
+                y: 0,
+                width: 320,
+                height: 200,
+            },
+            &BROADCAST_CLASSIC_NEEDLE,
+        )
+        .with_ticks();
+        let mut r = TextRecorder {
+            rect_count: 0,
+            text_count: 0,
+            last_text: Vec::new(),
+        };
+        bar.draw(&mut r);
+        let majors = BROADCAST_CLASSIC_NEEDLE.scale.majors.len();
+        assert_eq!(
+            r.text_count, majors,
+            "expected one label per major, got {}",
+            r.text_count
+        );
+        // Sanity: the canonical broadcast scale labels include "0".
+        assert!(
+            r.last_text.iter().any(|s| s == "0"),
+            "expected '0' label among ticks, got {:?}",
+            r.last_text
+        );
+    }
+
+    #[test]
+    fn no_ticks_means_no_text_calls() {
+        let bar = NeedleVu::new(
+            Rect {
+                x: 0,
+                y: 0,
+                width: 320,
+                height: 200,
+            },
+            &BROADCAST_CLASSIC_NEEDLE,
+        );
+        let mut r = TextRecorder {
+            rect_count: 0,
+            text_count: 0,
+            last_text: Vec::new(),
+        };
+        bar.draw(&mut r);
+        assert_eq!(r.text_count, 0, "ticks default off; no text expected");
     }
 
     #[test]

@@ -109,3 +109,25 @@ test("setBallistic resets ballistic + peak state", () => {
     `after setBallistic, reading should drop back to floor`,
   );
 });
+
+test("showTicks paints one label per major", () => {
+  const core = new LedBargraphCore({ scale: SCALE, skin: SKIN, showTicks: true });
+  const labels: string[] = [];
+  core.draw(
+    {
+      fillRect() {},
+      drawText(_x, _y, text) {
+        labels.push(text);
+      },
+    },
+    0,
+    0,
+    96,
+    320,
+  );
+  assert.equal(labels.length, SCALE.ticks.majors.length);
+  assert.ok(
+    labels.includes("0"),
+    `expected '0' label among ticks, got ${JSON.stringify(labels)}`,
+  );
+});

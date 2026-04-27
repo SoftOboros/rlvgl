@@ -23,17 +23,27 @@ const PIVOT_RADIUS_PX = 4;
  */
 export interface NeedleSink {
   fillRect(x: number, y: number, w: number, h: number, color: string): void;
+  /** Optional text rendering. Required when `showTicks` is enabled. */
+  drawText?(x: number, y: number, text: string, color: string): void;
 }
+
+const DEFAULT_MAJOR_TICK = "#1a1a1a";
+const DEFAULT_SCALE_TEXT = "#1a1a1a";
+/** Tick mark length in pixels (radial, into the face from the arc). */
+const TICK_LEN_PX = 6;
 
 export interface NeedleVuConfig {
   scale: Scale;
   skin: Skin;
   ballistic?: Ballistic;
+  showTicks?: boolean;
 }
 
 export class NeedleVuCore {
   readonly scale: Scale;
   readonly skin: Skin;
+  /** Public so callers can toggle ticks at runtime. */
+  showTicks: boolean;
   private state: BallisticState;
   private readingDb: number;
   private readonly NEG_FLOOR = -120.0;
@@ -50,6 +60,7 @@ export class NeedleVuCore {
       (cfg.ballistic ?? cfg.skin.default_ballistic) as Ballistic,
     );
     this.readingDb = this.NEG_FLOOR;
+    this.showTicks = cfg.showTicks ?? false;
   }
 
   setBallistic(kind: Ballistic): void {
@@ -99,8 +110,53 @@ export class NeedleVuCore {
     const length = Math.floor(h * 0.95);
     const angle = this.needleAngleRad();
 
+    if (this.showTicks) {
+      this.drawTicks(sink, pivotX, pivotY, length);
+    }
+
     drawNeedleLine(sink, pivotX, pivotY, length, angle, needleColor);
     drawPivotDot(sink, pivotX, pivotY, pivotColor);
+  }
+
+  private drawTicks(
+    sink: NeedleSink,
+    pivotX: number,
+    pivotY: number,
+    length: number,
+  ): void {
+    const sec = this.skin.secondary_colors ?? {};
+    const majorCol = sec.major_tick ?? DEFAULT_MAJOR_TICK;
+    const textCol = sec.scale_text ?? DEFAULT_SCALE_TEXT;
+    const lo = this.scale.range_db.min;
+    const hi = this.scale.range_db.max;
+    const span = Math.max(hi - lo, Number.EPSILON);
+    const rOuter = length;
+    const rInner = length - TICK_LEN_PX;
+    const labels = this.scale.ticks.labels ?? {};
+
+    for (const m of this.scale.ticks.majors) {
+      const frac = clamp01((m - lo) / span);
+      const ang = -NEEDLE_HALF_ARC_RAD + frac * 2 * NEEDLE_HALF_ARC_RAD;
+      const dx = Math.sin(ang);
+      const dy = -Math.cos(ang);
+      const innerX = pivotX + rInner * dx;
+      const innerY = pivotY + rInner * dy;
+      const outerX = pivotX + rOuter * dx;
+      const outerY = pivotY + rOuter * dy;
+
+      const stepX = (outerX - innerX) / TICK_LEN_PX;
+      const stepY = (outerY - innerY) / TICK_LEN_PX;
+      for (let s = 0; s <= TICK_LEN_PX; s++) {
+        const px = Math.floor(innerX + s * stepX);
+        const py = Math.floor(innerY + s * stepY);
+        sink.fillRect(px - 1, py - 1, 2, 2, majorCol);
+      }
+
+      const labelText = labels[String(m)] ?? `${m.toFixed(0)}`;
+      const labelX = Math.floor(pivotX + (rOuter + 4) * dx) - 8;
+      const labelY = Math.floor(pivotY + (rOuter + 4) * dy) + 4;
+      sink.drawText?.(labelX, labelY, labelText, textCol);
+    }
   }
 }
 

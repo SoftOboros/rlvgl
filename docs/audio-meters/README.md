@@ -42,7 +42,7 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-06 — `LedBargraph` (TS) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) (combined) |
 | AM-07 — `NeedleVu` (both) | Ratified 2026-04-26 | [06-needle-vu.md](06-needle-vu.md) |
 | AM-08a — `NumericPeak` (both) | Ratified 2026-04-26 | [07-numeric-peak.md](07-numeric-peak.md) |
-| AM-08b — Ticks + labels | Planned | _(pending)_ |
+| AM-08b — Ticks + labels | Ratified 2026-04-26 | [08-ticks-labels.md](08-ticks-labels.md) |
 | AM-08c — LUFS gauge | Planned | _(pending)_ |
 | AM-09 — Integration | Planned | _(pending)_ |
 

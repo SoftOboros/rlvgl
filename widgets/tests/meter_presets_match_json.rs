@@ -14,6 +14,7 @@ use rlvgl_widgets::meters::{
     Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, Zone,
     presets,
 };
+use rlvgl_widgets::meters::skin::TickLabel;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -40,6 +41,8 @@ struct JsonCalibration {
 struct JsonTicks {
     majors: Vec<f32>,
     minors_per_major_division: u32,
+    #[serde(default)]
+    labels: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -161,6 +164,7 @@ fn assert_scale_match(runtime: &Scale, json_path: &PathBuf) {
         "{}: minors_per_major_division",
         j.id
     );
+    assert_tick_labels_match(&j.id, runtime.tick_labels, &j.ticks.labels);
     assert_eq!(runtime.zones.len(), j.zones.len(), "{}: zone count", j.id);
     for (i, (rz, jz)) in runtime.zones.iter().zip(j.zones.iter()).enumerate() {
         assert_eq!(rz.from_db, jz.from_db, "{} zone[{}].from_db", j.id, i);
@@ -174,6 +178,34 @@ fn assert_scale_match(runtime: &Scale, json_path: &PathBuf) {
             other => panic!("unknown color in JSON: {other}"),
         };
         assert_eq!(rz.color, expected, "{} zone[{}].color", j.id, i);
+    }
+}
+
+fn assert_tick_labels_match(
+    scale_id: &str,
+    runtime: &[TickLabel],
+    json: &BTreeMap<String, String>,
+) {
+    assert_eq!(
+        runtime.len(),
+        json.len(),
+        "{}: tick_labels count differs (runtime {} vs json {})",
+        scale_id,
+        runtime.len(),
+        json.len()
+    );
+    for tl in runtime {
+        // JSON keys are stringified numeric majors; parse with normal
+        // ASCII minus, JSON does not use unicode minus in keys.
+        let key = format!("{:.0}", tl.value);
+        let expected = json
+            .get(&key)
+            .unwrap_or_else(|| panic!("{}: tick label key `{}` missing in JSON", scale_id, key));
+        assert_eq!(
+            tl.label, *expected,
+            "{}: tick label for {} differs",
+            scale_id, key
+        );
     }
 }
 

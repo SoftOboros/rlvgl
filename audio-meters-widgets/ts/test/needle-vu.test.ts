@@ -71,13 +71,17 @@ test("angle at pivot input matches pivot value mapping", () => {
   );
 });
 
-test("draw paints background + needle line + pivot", () => {
+test("draw paints background + needle line + pivot (no ticks)", () => {
   const core = new NeedleVuCore({ scale: SCALE, skin: SKIN });
   let opCount = 0;
+  let textCount = 0;
   core.draw(
     {
       fillRect() {
         opCount++;
+      },
+      drawText() {
+        textCount++;
       },
     },
     0,
@@ -88,4 +92,27 @@ test("draw paints background + needle line + pivot", () => {
   // 1 background + (length+1) needle steps + 1 pivot dot.
   // length = floor(200 * 0.95) = 190, so 191 needle ops.
   assert.equal(opCount, 1 + 191 + 1);
+  assert.equal(textCount, 0, "ticks default off");
+});
+
+test("showTicks paints one label per major", () => {
+  const core = new NeedleVuCore({ scale: SCALE, skin: SKIN, showTicks: true });
+  const labels: string[] = [];
+  core.draw(
+    {
+      fillRect() {},
+      drawText(_x, _y, text) {
+        labels.push(text);
+      },
+    },
+    0,
+    0,
+    320,
+    200,
+  );
+  assert.equal(labels.length, SCALE.ticks.majors.length);
+  assert.ok(
+    labels.includes("0"),
+    `expected '0' label among ticks, got ${JSON.stringify(labels)}`,
+  );
 });

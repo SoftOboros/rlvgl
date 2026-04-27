@@ -17,6 +17,6 @@ pub use bargraph::LedBargraph;
 pub use needle::NeedleVu;
 pub use numeric::NumericPeak;
 pub use skin::{
-    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, Zone, rgb,
-    rgba,
+    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, TickLabel,
+    Zone, rgb, rgba,
 };

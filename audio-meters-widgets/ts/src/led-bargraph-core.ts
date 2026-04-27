@@ -20,18 +20,29 @@ const PEAK_DECAY_DB_PER_S = 12.0;
 /** A "draw rectangle" call. The element binds this to canvas 2D context. */
 export interface DrawSink {
   fillRect(x: number, y: number, w: number, h: number, color: string): void;
+  /** Optional text rendering. Required when `showTicks` is enabled. */
+  drawText?(x: number, y: number, text: string, color: string): void;
 }
+
+/** Width of the right-hand strip reserved for ticks + labels. */
+export const BARGRAPH_TICK_STRIP_PX = 36;
+const DEFAULT_MAJOR_TICK = "#a0a0a8";
+const DEFAULT_SCALE_TEXT = "#cfcfd2";
 
 export interface LedBargraphConfig {
   scale: Scale;
   skin: Skin;
   /** Override the skin's default ballistic. */
   ballistic?: Ballistic;
+  /** Enable major-tick + label rendering on the right-hand strip. */
+  showTicks?: boolean;
 }
 
 export class LedBargraphCore {
   readonly scale: Scale;
   readonly skin: Skin;
+  /** Public so callers can toggle ticks at runtime. */
+  showTicks: boolean;
   private state: BallisticState;
   private readingDb: number;
   private peakDb: number;
@@ -51,6 +62,7 @@ export class LedBargraphCore {
     this.readingDb = this.NEG_FLOOR;
     this.peakDb = this.NEG_FLOOR;
     this.peakAgeS = 0;
+    this.showTicks = cfg.showTicks ?? false;
   }
 
   setBallistic(kind: Ballistic): void {
@@ -132,8 +144,17 @@ export class LedBargraphCore {
     const horizontal = skin.layout.orientation === "horizontal";
     const palette = skin.palette;
 
+    // Shrink the LED column when ticks are visible (vertical only).
+    const ledX = x;
+    const ledY = y;
+    const ledW =
+      this.showTicks && !horizontal
+        ? Math.max(1, w - BARGRAPH_TICK_STRIP_PX)
+        : w;
+    const ledH = h;
+
     for (let i = 0; i < n; i++) {
-      const cell = segmentRect(x, y, w, h, n, i, horizontal);
+      const cell = segmentRect(ledX, ledY, ledW, ledH, n, i, horizontal);
       const centreFrac = (i + 0.5) / n;
       const centreSu = lo + centreFrac * span;
       const colorId = zoneColorFor(scale, centreSu);
@@ -150,6 +171,39 @@ export class LedBargraphCore {
       ) {
         sink.fillRect(cell.x, cell.y, cell.w, cell.h, peakColor);
       }
+    }
+
+    if (this.showTicks && !horizontal) {
+      this.drawTicks(sink, ledX, ledY, ledW, ledH, lo, span);
+    }
+  }
+
+  private drawTicks(
+    sink: DrawSink,
+    ledX: number,
+    ledY: number,
+    ledW: number,
+    ledH: number,
+    lo: number,
+    span: number,
+  ): void {
+    const sec = this.skin.secondary_colors ?? {};
+    const majorCol = sec.major_tick ?? DEFAULT_MAJOR_TICK;
+    const textCol = sec.scale_text ?? DEFAULT_SCALE_TEXT;
+    const stripX = ledX + ledW;
+    const tickW = 8;
+    const tickH = 2;
+    const labels = this.scale.ticks.labels ?? {};
+
+    for (const m of this.scale.ticks.majors) {
+      const frac = clamp01((m - lo) / span);
+      // Vertical bargraph: low values at bottom.
+      const yPx = Math.floor(ledY + ledH - 1 - frac * ledH);
+      sink.fillRect(stripX, yPx - (tickH >> 1), tickW, tickH, majorCol);
+
+      // Label: skin-supplied via JSON map, else formatted number.
+      const labelText = labels[String(m)] ?? `${m.toFixed(0)}`;
+      sink.drawText?.(stripX + tickW + 2, yPx + 4, labelText, textCol);
     }
   }
 }
