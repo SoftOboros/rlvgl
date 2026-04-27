@@ -297,31 +297,31 @@ pub extern "C" fn rust_main() -> ! {
 
     #[cfg(not(feature = "freertos"))]
     {
-        // LED register-state display: cycle through 4 one-second
-        // frames of LCDC/pinmux readbacks. USR0..USR3 show the low
-        // nibble of each sampled value. Each frame is framed by a
-        // brief all-off pulse for visual separation.
-        //
-        // Expected patterns if everything is configured correctly:
-        //
-        //   Frame A — RASTER_CTRL[3:0]    : USR0 lit       (LCDEN=1)
-        //   Frame B — CONF_LCD_DATA0[3:0] : USR3 lit       (0x08 = Mode 0 + slew fast)
-        //   Frame C — LCD_CTRL[3:0]       : USR0 lit       (MODESEL_RASTER=1)
-        //   Frame D — CLKC_ENABLE[3:0]    : USR0 + USR2    (DMA|CORE = 0x5)
-        //
-        // Anything different localises which register didn't take:
-        //   - Frame A blank → LCDEN didn't stick (LCDC dead)
-        //   - Frame B shows 0 → pinmux writes ignored (CTRLMOD lock)
-        //   - Frame A+B+C as expected but Frame D wrong → enable seq issue
-        //
-        // Report: "I see lit pattern X in each frame" and we narrow
-        // down the next fix.
-
         // Knight-Rider chase — panel shows color bars; LEDs sweep
         // USR0..USR3..USR0 so it's visually obvious the board is
         // alive and EOF interrupts are firing (we clear EOF0 each
         // time a frame completes).
+        //
+        // After AUTO_RESET_FRAMES of LCDC EOF events (~57 Hz panel
+        // → ~10 s wall clock), trigger a global software warm reset
+        // via PRM_RSTCTRL. The chip re-enters ROM, ROM loads u-boot
+        // SPL from SD, u-boot reads /boot/uEnv.txt — the freertos-
+        // next marker was already cleared in u-boot before jumping
+        // here, so the next boot is normal Linux. This is the
+        // "swap the other way" return trip that lets the toggle
+        // work without a physical S3 press.
+        //
+        // PRM_RSTCTRL on AM335x lives at 0x44E0_0F00. Writing
+        // 0x1 (bit 0) triggers a global software warm reset; per
+        // TRM SPRUH73Q section 8.1.7.5, the ROM does not preserve
+        // DRAM on warm reset on this part, so we re-boot like a
+        // cold boot — exactly what we want here.
+        const PRM_RSTCTRL: u32 = 0x44E0_0F00;
+        const PRM_RSTCTRL_RESET: u32 = 1 << 0;
+        const AUTO_RESET_FRAMES: u32 = 57 * 10;
+
         let mut step: u32 = 0;
+        let mut frame_count: u32 = 0;
         loop {
             for _ in 0..2_000_000u32 {
                 core::hint::spin_loop();
@@ -332,6 +332,18 @@ pub extern "C" fn rust_main() -> ! {
                 bsp::leds::set_one(led);
                 if lcdc::is_eof_pending() {
                     lcdc::clear_eof_irq();
+                    frame_count = frame_count.wrapping_add(1);
+                    if frame_count >= AUTO_RESET_FRAMES {
+                        core::ptr::write_volatile(
+                            PRM_RSTCTRL as *mut u32,
+                            PRM_RSTCTRL_RESET,
+                        );
+                        // Should not reach here — chip resets within
+                        // a few cycles. Spin defensively.
+                        loop {
+                            core::hint::spin_loop();
+                        }
+                    }
                 }
             }
             step = step.wrapping_add(1);

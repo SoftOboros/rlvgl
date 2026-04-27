@@ -938,10 +938,50 @@ without any software change once a responsive cape is installed.
 - [x] `_start` preamble: SVC mode, MMU/caches off, SP set, `.bss` zeroed
 - [x] Polled UART0 breadcrumb driver (`bsp::uart0`, 0x44E0_9000)
 - [x] `memory.x` relocated to `loadaddr` 0x82000000; framebuffer past stack
-- [x] `tools/build-bare.sh` builds ELF + flat `.bin` (~1.2 KB release)
-- [ ] U-Boot chainload + pixels on panel (first hardware smoke test)
-- [ ] FreeRTOS task model (present/render/touch)
+- [x] `tools/build-bare.sh` builds ELF + flat `.bin` (~1.8 KB release)
+- [x] U-Boot chainload + pixels on panel — colour bars + LED chase
+      verified on hardware 2026-04-27 via the alt-boot toggle below
+- [x] **Linux↔FreeRTOS swap toggle** (cape stays on, no SD shuttle, no
+      `fw_setenv`). From running Linux: `sudo swap-to-freertos` (or
+      `echo F > /boot/firmware/freertos-next && reboot`). u-boot reads
+      the FAT-side `/uEnv.txt` (NOT `/boot/uEnv.txt` — see below),
+      detects the marker, chainloads `rlvgl-bbb-bare.bin` from the FAT
+      partition, `fatrm`-clears the marker, and `go`s into the alt
+      payload. The alt payload runs ~10 s (panel shows 6 colour bars
+      + Knight-Rider LED chase) then writes `0x1` to `PRM_RSTCTRL`
+      (`0x44E0_0F00`) — global software warm reset. The chip
+      re-enters ROM, ROM loads SPL → u-boot, marker is absent on the
+      second pass so u-boot falls through to the kernel, Linux comes
+      back. **No buttons, no SD removal, no fw\_setenv — single SSH
+      command round-trips.**
+- [ ] FreeRTOS task model (present/render/touch). Bare-metal binary
+      is the stand-in payload until the FreeRTOS prong is buildable;
+      the swap mechanism is identical regardless.
 - [ ] DiscoController integration (needs heap; deferred until smoke passes)
+
+#### Beagleboard u-boot uEnv.txt gotcha
+
+There are two uEnv.txt locations and they are **NOT equivalent**:
+
+| Path | Where u-boot reads it | What it honors |
+|------|------------------------|----------------|
+| `/uEnv.txt`                 | mmc 0:1 root (FAT)        | `uenvcmd` is dispatched |
+| `/boot/uEnv.txt`            | mmc 0:3 root (ext4)       | `uname_r` triggers `uname_boot`; **uenvcmd is silently ignored** |
+
+The Beagleboard `boot` env script imports the FAT-side `/uEnv.txt`
+via `loadbootenv` + `importbootenv` and then explicitly does
+`if test -n ${uenvcmd}; then run uenvcmd; fi`. The same script's
+ext4 fallback path imports `/boot/uEnv.txt` but only checks
+`uname_r`. Putting the toggle's `uenvcmd=` in `/boot/uEnv.txt`
+silently no-ops; it has to live in the FAT-side file.
+
+The repo's canonical FAT-side toggle file is
+[`examples/beaglebone-black/linux/uEnv.txt.fat-toggle`](../../examples/beaglebone-black/linux/uEnv.txt.fat-toggle);
+[`examples/beaglebone-black/tools/install-freertos-toggle.sh`](../../examples/beaglebone-black/tools/install-freertos-toggle.sh)
+deploys it (plus the bare-metal `.bin` and the
+`/usr/local/bin/swap-to-freertos` Linux-side helper) over SSH from
+a host machine without disturbing `/boot/uEnv.txt` or pulling the
+SD card.
 
 ### Phase 5: Zephyr
 
