@@ -634,8 +634,19 @@ When the BBB is bricked (no USB, no network, solid LEDs):
 - [ ] 32bpp XRGB8888 fbdev mode via DRM client-side mode set (deferred;
       needs to not conflict with eMMC pin sharing)
 - [ ] R/B swap in `LinuxFbdevDisplay::flush` 16bpp path (cosmetic)
-- [ ] Dirty-rect redraw to lighten CPU (full-frame blit at 57 Hz is fine
-      on AM3358 for now)
+- [x] Dirty-rect redraw — present path consumes the `BlitterRenderer`
+      planner rects + the crawl viewport instead of repacking the full
+      ARGB→BGR565 frame each tick. `BlitPlanner::overflowed()` flips the
+      frame to a full repaint when the rect set spills past
+      `DIRTY_RECTS_MAX = 128`; first-frame splash and crawl on/off
+      transitions also force one. See `examples/beaglebone-black/src/main.rs`
+      (`present_bbb_fbdev_16bpp_rect`, `clip_rect_to_screen`) and the
+      rect-pack unit tests in the same file. **Measured on hardware
+      2026-04-27**: idle desktop dropped from ~95 % → ~13 % CPU (≈ 7×).
+      Crawl-active stays near 99 % CPU because the 720×480 viewport
+      dirties every frame; wing-open also stays high during the slide
+      animation. Frame rate steady at the 57 Hz panel cadence in both
+      cases.
 
 #### Overlay-driven bring-up (current Linux path)
 

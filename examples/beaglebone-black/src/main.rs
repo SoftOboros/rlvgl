@@ -22,6 +22,7 @@
 //! with `nc 127.0.0.1 <port>`. Stand-in for the RMA'd touch panel (see
 //! `RMA-newhaven-2026-04-22.md` alongside this file).
 
+use heapless::Vec as HVec;
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_core::event::Event;
 #[cfg(feature = "star_crawl")]
@@ -55,6 +56,17 @@ use bsp::{devmem, edma::BbbEdmaBlitter};
 /// to match the `splash` + `desktop` pairing on the DISCO Zephyr build.
 #[cfg(feature = "splash")]
 static SPLASH_RLE: &[u8] = include_bytes!("../../stm32h747i-disco/assets/media/splash.rle");
+
+/// Maximum dirty rects tracked per frame.
+///
+/// Sized for the worst observed widget-tree fanout on this target —
+/// the open-wing frame pushes ~50 rects through `BlitterRenderer`'s
+/// `fill_rect` / `draw_text` calls (per-glyph for fontdue text, per
+/// label, per icon, plus the per-frame status panel). 128 leaves
+/// generous headroom; if it ever overflows, the planner reports
+/// `overflowed()` and the loop falls back to a full-frame repaint
+/// for that frame so visually nothing tears.
+const DIRTY_RECTS_MAX: usize = 128;
 
 /// Per-frame resolution of the effect-related `DiscoCommand`s emitted
 /// by the controller. Kept separate from the imperative logging so the
@@ -161,24 +173,55 @@ fn pack_bbb_scanout_bgr565(src: &[u8], src_off: usize) -> u16 {
     ((b >> 3) << 11) | ((g >> 2) << 5) | (r >> 3)
 }
 
-/// Present a full ARGB8888 render buffer into the BBB's 16bpp fbdev mmap.
-fn present_bbb_fbdev_16bpp(
+/// Pack a single rect of the ARGB8888 render buffer into the BBB's 16bpp
+/// fbdev mmap. `rect` MUST already be clipped to the source extents.
+///
+/// Drives the dirty-rect present path: only scanlines/columns named by
+/// `rect` are repacked, leaving the rest of the fbdev mmap untouched
+/// from the previous frame. That keeps a static desktop frame down to
+/// the union of widget-tree dirty rects (≪ 800×480) instead of a full
+/// 384k-pixel ARGB→BGR565 sweep every frame.
+fn present_bbb_fbdev_16bpp_rect(
     src: &[u8],
-    width: usize,
-    height: usize,
+    src_width: usize,
+    rect: BlitRect,
     dst: &mut [u8],
     dst_stride: usize,
 ) {
-    for y in 0..height {
-        let src_row = &src[y * width * 4..(y + 1) * width * 4];
-        let dst_row = &mut dst[y * dst_stride..y * dst_stride + width * 2];
-        for x in 0..width {
-            let pixel = pack_bbb_scanout_bgr565(src_row, x * 4);
-            let dst_off = x * 2;
-            dst_row[dst_off] = pixel as u8;
-            dst_row[dst_off + 1] = (pixel >> 8) as u8;
+    let x0 = rect.x as usize;
+    let y0 = rect.y as usize;
+    let w = rect.w as usize;
+    let h = rect.h as usize;
+    for row in 0..h {
+        let src_y = y0 + row;
+        let src_row_start = src_y * src_width * 4;
+        let dst_row_start = src_y * dst_stride;
+        for col in 0..w {
+            let src_x = x0 + col;
+            let pixel = pack_bbb_scanout_bgr565(src, src_row_start + src_x * 4);
+            let dst_off = dst_row_start + src_x * 2;
+            dst[dst_off] = pixel as u8;
+            dst[dst_off + 1] = (pixel >> 8) as u8;
         }
     }
+}
+
+/// Clip a dirty rect to the screen extents. Returns `None` if the rect
+/// is fully outside the screen or has zero extent after clipping.
+fn clip_rect_to_screen(rect: BlitRect, screen_w: i32, screen_h: i32) -> Option<BlitRect> {
+    let x0 = rect.x.max(0);
+    let y0 = rect.y.max(0);
+    let x1 = (rect.x + rect.w as i32).min(screen_w);
+    let y1 = (rect.y + rect.h as i32).min(screen_h);
+    if x0 >= x1 || y0 >= y1 {
+        return None;
+    }
+    Some(BlitRect {
+        x: x0,
+        y: y0,
+        w: (x1 - x0) as u32,
+        h: (y1 - y0) as u32,
+    })
 }
 
 fn main() {
@@ -228,6 +271,14 @@ fn main() {
     let mut tick_accum = frame_time;
     let mut tick_count: u32 = 0;
     let mut present_count: u32 = 0;
+    // Dirty-rect present state. The renderer planner gives us widget-tree
+    // rects; the crawl viewport contributes one rect when active; the
+    // first frame and any crawl on/off transition force a full repaint.
+    let full_frame_rect = BlitRect { x: 0, y: 0, w, h };
+    let mut dirty: HVec<BlitRect, DIRTY_RECTS_MAX> = HVec::new();
+    let mut first_frame = true;
+    #[cfg(feature = "star_crawl")]
+    let mut crawl_was_active = false;
 
     // Star-crawl overlay state. When the controller emits
     // `DiscoCommand::StartEffect(StarCrawl)` (e.g. from a playit tap on
@@ -439,7 +490,13 @@ fn main() {
             }
         }
 
-        {
+        // Reset the dirty-rect set for this frame. Widget-tree draw
+        // populates it via the BlitterRenderer planner; the crawl path
+        // appends its viewport when active; transitions and overflow
+        // collapse it back to a single full-frame rect.
+        dirty.clear();
+
+        let mut planner_overflow = {
             let surface = Surface::new(
                 &mut framebuf[..width * height * 4],
                 width * 4,
@@ -447,16 +504,28 @@ fn main() {
                 w,
                 h,
             );
-            let mut renderer: BlitterRenderer<'_, BbbEdmaBlitter, 16> =
+            let mut renderer: BlitterRenderer<'_, BbbEdmaBlitter, DIRTY_RECTS_MAX> =
                 BlitterRenderer::new(&mut blitter, surface);
             root.borrow().draw(&mut renderer);
-            renderer.planner().add(BlitRect { x: 0, y: 0, w, h });
-        }
+            let planner = renderer.planner();
+            let mut overflow = planner.overflowed();
+            for &r in planner.rects() {
+                if dirty.push(r).is_err() {
+                    overflow = true;
+                    break;
+                }
+            }
+            overflow
+        };
 
         // Compose the crawl over the just-rendered widget tree. Paint
         // order matches disco-sim: widgets first, crawl over the top,
         // so the desktop/settings widgets stay visible underneath when
         // the crawl is partially transparent / ramping in.
+        #[cfg(feature = "star_crawl")]
+        let crawl_active_now = active_crawl.is_some();
+        #[cfg(not(feature = "star_crawl"))]
+        let crawl_active_now = false;
         #[cfg(feature = "star_crawl")]
         if let Some(crawl) = active_crawl.as_mut() {
             let mut surface = Surface::new(
@@ -467,58 +536,120 @@ fn main() {
                 h,
             );
             crawl.paint_frame(&mut blitter, &mut surface);
+            let bounds = crawl.bounds();
+            let crawl_rect = BlitRect {
+                x: bounds.x,
+                y: bounds.y,
+                w: bounds.width.max(0) as u32,
+                h: bounds.height.max(0) as u32,
+            };
+            if dirty.push(crawl_rect).is_err() {
+                planner_overflow = true;
+            }
+        }
+
+        // Decide whether this frame can be presented from the dirty set
+        // or needs a full-frame repaint. Full-frame triggers:
+        //   - First frame after boot (splash + initial widget tree need
+        //     to land on the fbdev mmap in full).
+        //   - Crawl activation/deactivation transition (the area outside
+        //     the crawl viewport needs its widget background restored).
+        //   - Planner overflow this frame (we may have dropped rects so
+        //     we can't trust the partial set).
+        #[cfg(feature = "star_crawl")]
+        let crawl_transition = crawl_active_now != crawl_was_active;
+        #[cfg(not(feature = "star_crawl"))]
+        let crawl_transition = false;
+        if first_frame || crawl_transition || planner_overflow {
+            dirty.clear();
+            let _ = dirty.push(full_frame_rect);
         }
 
         let display_stride = display.stride_bytes();
         let display_bpp = display.bits_per_pixel();
         match display_bpp {
             32 => {
-                let src_surface = Surface::new(
-                    &mut framebuf[..width * height * 4],
-                    width * 4,
-                    PixelFmt::Argb8888,
-                    w,
-                    h,
-                );
-                let mut dst_surface = Surface::new(
-                    display.buffer_mut(),
-                    display_stride,
-                    PixelFmt::Argb8888,
-                    w,
-                    h,
-                );
-                blitter.blit(
-                    &src_surface,
-                    BlitRect { x: 0, y: 0, w, h },
-                    &mut dst_surface,
-                    (0, 0),
-                );
+                for &r in dirty.iter() {
+                    let Some(c) = clip_rect_to_screen(r, w as i32, h as i32) else {
+                        continue;
+                    };
+                    let src_surface = Surface::new(
+                        &mut framebuf[..width * height * 4],
+                        width * 4,
+                        PixelFmt::Argb8888,
+                        w,
+                        h,
+                    );
+                    let mut dst_surface = Surface::new(
+                        display.buffer_mut(),
+                        display_stride,
+                        PixelFmt::Argb8888,
+                        w,
+                        h,
+                    );
+                    blitter.blit(&src_surface, c, &mut dst_surface, (c.x, c.y));
+                }
             }
             16 => {
-                present_bbb_fbdev_16bpp(
-                    &framebuf[..width * height * 4],
-                    width,
-                    height,
-                    display.buffer_mut(),
-                    display_stride,
-                );
+                let dst = display.buffer_mut();
+                for &r in dirty.iter() {
+                    let Some(c) = clip_rect_to_screen(r, w as i32, h as i32) else {
+                        continue;
+                    };
+                    present_bbb_fbdev_16bpp_rect(
+                        &framebuf[..width * height * 4],
+                        width,
+                        c,
+                        dst,
+                        display_stride,
+                    );
+                }
             }
             _ => {
+                // Generic fbdev fallback (24bpp / unusual depths). The
+                // platform `flush` path can take a sub-rect, so route
+                // the dirty list through it row by row.
                 use rlvgl_core::widget::{Color, Rect};
-                let colors: &[Color] = unsafe {
-                    core::slice::from_raw_parts(framebuf.as_ptr() as *const Color, width * height)
-                };
-                display.flush(
-                    Rect {
-                        x: 0,
-                        y: 0,
-                        width: width as i32,
-                        height: height as i32,
-                    },
-                    colors,
-                );
+                for &r in dirty.iter() {
+                    let Some(c) = clip_rect_to_screen(r, w as i32, h as i32) else {
+                        continue;
+                    };
+                    // SAFETY: the render buffer is ARGB8888 (4 bytes per
+                    // pixel) and `Color` is a 4-byte tuple of bytes
+                    // matching that layout, so the cast preserves the
+                    // pixel array.
+                    let colors_full: &[Color] = unsafe {
+                        core::slice::from_raw_parts(
+                            framebuf.as_ptr() as *const Color,
+                            width * height,
+                        )
+                    };
+                    let mut row_buf: Vec<Color> = Vec::with_capacity(c.w as usize);
+                    for row in 0..c.h as usize {
+                        let src_y = c.y as usize + row;
+                        row_buf.clear();
+                        let row_start = src_y * width + c.x as usize;
+                        row_buf
+                            .extend_from_slice(&colors_full[row_start..row_start + c.w as usize]);
+                        display.flush(
+                            Rect {
+                                x: c.x,
+                                y: c.y + row as i32,
+                                width: c.w as i32,
+                                height: 1,
+                            },
+                            &row_buf,
+                        );
+                    }
+                }
             }
         }
+        first_frame = false;
+        #[cfg(feature = "star_crawl")]
+        {
+            crawl_was_active = crawl_active_now;
+        }
+        let _ = crawl_active_now;
         present_count = present_count.wrapping_add(1);
 
         let elapsed = started.elapsed();
@@ -530,7 +661,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{pack_bbb_scanout_bgr565, present_bbb_fbdev_16bpp};
+    use super::{
+        BlitRect, clip_rect_to_screen, pack_bbb_scanout_bgr565, present_bbb_fbdev_16bpp_rect,
+    };
 
     #[test]
     fn packs_argb_bytes_as_bgr565_for_bbb_scanout() {
@@ -539,14 +672,115 @@ mod tests {
     }
 
     #[test]
-    fn presents_full_frame_into_fbdev_rows() {
+    fn full_frame_rect_packs_every_pixel() {
         let src = [
             0x00, 0x00, 0xFF, 0xFF, // red in render space
             0xFF, 0x00, 0x00, 0xFF, // blue in render space
         ];
         let mut dst = [0u8; 4];
-        present_bbb_fbdev_16bpp(&src, 2, 1, &mut dst, 4);
+        present_bbb_fbdev_16bpp_rect(
+            &src,
+            2,
+            BlitRect {
+                x: 0,
+                y: 0,
+                w: 2,
+                h: 1,
+            },
+            &mut dst,
+            4,
+        );
         assert_eq!(u16::from_le_bytes([dst[0], dst[1]]), 0x001F);
         assert_eq!(u16::from_le_bytes([dst[2], dst[3]]), 0xF800);
+    }
+
+    #[test]
+    fn rect_pack_leaves_other_rows_untouched() {
+        // 2-wide, 3-tall ARGB source. Row 0: opaque red. Row 1: opaque
+        // blue. Row 2: opaque green. Pack only row 1; rows 0 and 2
+        // must keep their previous contents.
+        let src = [
+            0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, // row 0 red
+            0xFF, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, // row 1 blue
+            0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, // row 2 green
+        ];
+        let mut dst = [0xAAu8; 12]; // stride = 4, 3 rows; sentinel pattern
+        present_bbb_fbdev_16bpp_rect(
+            &src,
+            2,
+            BlitRect {
+                x: 0,
+                y: 1,
+                w: 2,
+                h: 1,
+            },
+            &mut dst,
+            4,
+        );
+        // Row 0 untouched.
+        assert_eq!(&dst[0..4], &[0xAA, 0xAA, 0xAA, 0xAA]);
+        // Row 1 packed as blue (RGB565 = 0xF800 with the BBB R/B swap).
+        assert_eq!(u16::from_le_bytes([dst[4], dst[5]]), 0xF800);
+        assert_eq!(u16::from_le_bytes([dst[6], dst[7]]), 0xF800);
+        // Row 2 untouched.
+        assert_eq!(&dst[8..12], &[0xAA, 0xAA, 0xAA, 0xAA]);
+    }
+
+    #[test]
+    fn rect_pack_leaves_other_columns_untouched_within_row() {
+        // Single row, 4 wide. Pack only columns 1..=2.
+        let src = [
+            0x00, 0x00, 0xFF, 0xFF, // col 0 red
+            0xFF, 0x00, 0x00, 0xFF, // col 1 blue
+            0x00, 0xFF, 0x00, 0xFF, // col 2 green
+            0xFF, 0xFF, 0xFF, 0xFF, // col 3 white
+        ];
+        let mut dst = [0xAAu8; 8]; // 4 px × 2 bytes
+        present_bbb_fbdev_16bpp_rect(
+            &src,
+            4,
+            BlitRect {
+                x: 1,
+                y: 0,
+                w: 2,
+                h: 1,
+            },
+            &mut dst,
+            8,
+        );
+        // Col 0 untouched.
+        assert_eq!(&dst[0..2], &[0xAA, 0xAA]);
+        // Col 1 packed blue.
+        assert_eq!(u16::from_le_bytes([dst[2], dst[3]]), 0xF800);
+        // Col 2 packed green.
+        assert_eq!(u16::from_le_bytes([dst[4], dst[5]]), 0x07E0);
+        // Col 3 untouched.
+        assert_eq!(&dst[6..8], &[0xAA, 0xAA]);
+    }
+
+    #[test]
+    fn clip_drops_fully_offscreen_rect() {
+        let off_left = BlitRect {
+            x: -100,
+            y: 0,
+            w: 50,
+            h: 10,
+        };
+        assert!(clip_rect_to_screen(off_left, 800, 480).is_none());
+    }
+
+    #[test]
+    fn clip_trims_partially_offscreen_rect() {
+        let crossing = BlitRect {
+            x: -10,
+            y: -5,
+            w: 100,
+            h: 50,
+        };
+        let clipped = clip_rect_to_screen(crossing, 800, 480).expect("non-empty");
+        assert_eq!(clipped.x, 0);
+        assert_eq!(clipped.y, 0);
+        assert_eq!(clipped.w, 90);
+        assert_eq!(clipped.h, 45);
     }
 }

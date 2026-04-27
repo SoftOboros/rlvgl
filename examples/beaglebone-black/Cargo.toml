@@ -44,6 +44,7 @@ rlvgl-decomp = { path = "../../rlvgl-decomp", optional = true }
 rlvgl-playit = { path = "../../playit", default-features = false, features = ["std"], optional = true }
 rlvgl-widgets = { path = "../../widgets", default-features = false, optional = true }
 libc = "0.2"
+heapless = { version = "0.8", default-features = false }
 
 [build-dependencies]
 cc = "1"
