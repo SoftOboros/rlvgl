@@ -42,3 +42,9 @@ export {
   dbfsToScaleUnits,
   zoneColorFor,
 } from "./skin.ts";
+export {
+  StereoPair,
+  splitHorizontal,
+  type MeterCoreLike,
+  type Rect,
+} from "./stereo.ts";

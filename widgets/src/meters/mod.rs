@@ -12,6 +12,7 @@ pub mod numeric;
 /// by `rlvgl-creator` codegen output in AM-04b.
 pub mod presets;
 pub mod skin;
+pub mod stereo;
 
 pub use bargraph::LedBargraph;
 pub use needle::NeedleVu;
@@ -20,3 +21,4 @@ pub use skin::{
     Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, TickLabel,
     Zone, rgb, rgba,
 };
+pub use stereo::{MeterWidget, StereoPair, split_horizontal};

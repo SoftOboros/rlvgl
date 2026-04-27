@@ -43,7 +43,8 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-07 — `NeedleVu` (both) | Ratified 2026-04-26 | [06-needle-vu.md](06-needle-vu.md) |
 | AM-08a — `NumericPeak` (both) | Ratified 2026-04-26 | [07-numeric-peak.md](07-numeric-peak.md) |
 | AM-08b — Ticks + labels | Ratified 2026-04-26 | [08-ticks-labels.md](08-ticks-labels.md) |
-| AM-08c — LUFS gauge | Planned | _(pending)_ |
+| AM-08c — Stereo composition | Ratified 2026-04-26 | [09-stereo.md](09-stereo.md) |
+| AM-08d — LUFS gauge | Planned | _(pending)_ |
 | AM-09 — Integration | Planned | _(pending)_ |
 
 ## Reference
