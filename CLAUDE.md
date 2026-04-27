@@ -408,9 +408,9 @@ Multi-phase initiatives in this repo — the STM32H747I-DISCO bring-up
 (`docs/disco-platform-guide/`, `docs/disco-tutorial/`,
 `docs/disco-freertos-guide/`, `docs/disco-zephyr-guide/`,
 `docs/disco-test-and-debug/`), the BeagleBone Black + NHD cape four-prong
-port (`docs/BEAGLEBONE-BLACK.md`, growing toward `docs/beaglebone-black/`),
-the `rlvgl-creator` + chipdb family (`docs/CREATOR-*.md`,
-`chipdb/rlvgl-chips-*`), and any future multi-chapter guide — follow a
+port (`docs/beaglebone-black/`), the `rlvgl-creator` + chipdb family
+(`docs/creator/`, `docs/bsp/`, `chipdb/rlvgl-chips-*`), and any future
+multi-chapter guide — follow a
 standards-body-style planning cycle: every behaviour change is preceded by
 a ratified *terms* doc. Vocabulary drift and invariant erosion are the
 dominant failure modes once a plan crosses ~3 phases, especially across
@@ -429,10 +429,10 @@ narrative without capitalised keywords is advisory, not binding.
 ### Normative vs. informative sections
 
 In a per-chapter doc (e.g. `docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md`,
-`docs/BEAGLEBONE-BLACK.md` sections):
+`docs/beaglebone-black/README.md` sections):
 
 - Sections referenced by the chapter's **Acceptance** checklist (or by
-  `docs/PROJECT-ROADMAP.md` checkboxes that cite the chapter) are
+  `docs/releases/roadmap-pre-v0.2.md` checkboxes that cite the chapter) are
   **normative** — binding on implementers.
 - All other sections (problem statement, narrative, lessons-learned,
   non-goals, change log) are **informative**.
@@ -450,7 +450,7 @@ reviewers can reason about partial deployments without re-arguing scope.
 Worked example for the BBB port:
 
 - "A conforming BBB deployment MUST satisfy the Phase 3 Linux-prong
-  acceptance gates in `docs/BEAGLEBONE-BLACK.md`."
+  acceptance gates in `docs/beaglebone-black/README.md`."
 - "A conforming BBB deployment MAY additionally satisfy Phase 4
   (bare-metal), FreeRTOS, or Zephyr; each is independently conformant."
 
@@ -518,7 +518,7 @@ Chapters beyond the §0 concepts gate MAY omit sections that do not apply;
 
 See
 [`docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md`](docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md)
-and [`docs/BEAGLEBONE-BLACK.md`](docs/BEAGLEBONE-BLACK.md) as the current
+and [`docs/beaglebone-black/README.md`](docs/beaglebone-black/README.md) as the current
 reference shapes. Neither yet uses the full §0–§15 structure; they MUST
 adopt it when their initiatives cross the ~3-phase threshold or gain a
 sibling port.
@@ -555,9 +555,8 @@ This discipline applies to:
 - `docs/disco-freertos-guide/` (DISCO FreeRTOS port, 7 chapters)
 - `docs/disco-zephyr-guide/` (DISCO Zephyr port, 7 chapters)
 - `docs/disco-test-and-debug/` (DISCO test & debug, 4 chapters)
-- `docs/BEAGLEBONE-BLACK.md` (BBB four-prong; promote to
-  `docs/beaglebone-black/` once it grows past single-file scope)
-- `docs/CREATOR-*.md` and `chipdb/rlvgl-chips-*` (rlvgl-creator + chipdb
+- `docs/beaglebone-black/` (BBB four-prong)
+- `docs/creator/`, `docs/bsp/`, and `chipdb/rlvgl-chips-*` (rlvgl-creator + chipdb
   family)
 - Any future multi-chapter initiative with ≥3 phases.
 

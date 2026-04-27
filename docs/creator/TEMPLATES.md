@@ -1,8 +1,8 @@
 <!--
-docs/CREATOR-TEMPLATES.md - rlvgl-creator Templates and Hooks.
+docs/creator/TEMPLATES.md - rlvgl-creator Templates and Hooks.
 -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # rlvgl-creator Templates and Hooks

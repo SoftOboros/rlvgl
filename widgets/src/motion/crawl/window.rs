@@ -35,6 +35,7 @@ use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
 use rlvgl_platform::blit::{Blitter, PixelFmt, Surface};
+use rlvgl_platform::effect::{BlitterSink, EffectSink, SubSink};
 
 use super::Crawl;
 use crate::motion::direction::Direction;
@@ -113,13 +114,15 @@ impl<C: Crawl> CrawlWindow<C> {
 
     /// Paint the current crawl frame into `dst` using `blitter`.
     ///
-    /// The destination surface and blitter are supplied by the host
-    /// each frame — the widget owns neither. Hosts typically call
-    /// this from their render loop between the regular widget tree
-    /// draw and the screen present.
+    /// Bridges the legacy Blitter-based paint API (what the BBB Linux
+    /// host and tests call) to the new sink-based [`Crawl::draw`]
+    /// entry point. The widget's `bounds` rect is applied as a
+    /// sub-surface view so the crawl paints into its window region
+    /// only, matching the pre-sink behaviour exactly.
     ///
     /// Returns `true` if paint actually ran (the widget was active),
-    /// `false` if it was skipped because the crawl was inactive.
+    /// `false` if it was skipped because the crawl was inactive or
+    /// the bounds intersection with `dst` was empty.
     pub fn paint_frame<B: Blitter>(&mut self, blitter: &mut B, dst: &mut Surface<'_>) -> bool {
         if !self.active {
             return false;
@@ -153,7 +156,8 @@ impl<C: Crawl> CrawlWindow<C> {
             (right - left) as u32,
             (bottom - top) as u32,
         );
-        self.crawl.paint(blitter, &mut view);
+        let mut sink = BlitterSink::new(blitter, &mut view);
+        self.crawl.draw(&mut sink);
         true
     }
 
@@ -162,6 +166,41 @@ impl<C: Crawl> CrawlWindow<C> {
     #[inline]
     pub fn direction(&self) -> Direction {
         self.crawl.direction()
+    }
+}
+
+impl<C: Crawl> rlvgl_platform::effect::Effect for CrawlWindow<C> {
+    fn is_active(&self) -> bool {
+        CrawlWindow::is_active(self)
+    }
+    fn activate(&mut self) {
+        CrawlWindow::activate(self)
+    }
+    fn deactivate(&mut self) {
+        CrawlWindow::deactivate(self)
+    }
+    fn tick(&mut self) {
+        if self.active {
+            self.crawl.tick();
+            if self.crawl.state().finished {
+                self.active = false;
+            }
+        }
+    }
+    fn draw(&mut self, sink: &mut dyn EffectSink) {
+        if !self.active {
+            return;
+        }
+        // Report the bounds as the target size so the inner crawl
+        // self-clips, then offset every op by `(bounds.x, bounds.y)`
+        // in the wrapper before forwarding to the host's sink.
+        let width = self.bounds.width.max(0) as u32;
+        let height = self.bounds.height.max(0) as u32;
+        if width == 0 || height == 0 {
+            return;
+        }
+        let mut sub = SubSink::new(sink, (self.bounds.x, self.bounds.y), width, height);
+        self.crawl.draw(&mut sub);
     }
 }
 
@@ -250,22 +289,11 @@ mod tests {
                 self.state.active = false;
             }
         }
-        fn paint<B: Blitter>(&mut self, _blitter: &mut B, _dst: &mut Surface<'_>) {
+        fn draw(&mut self, sink: &mut dyn EffectSink) {
             self.paints += 1;
-            let bytes_per_pixel = match _dst.format {
-                PixelFmt::Argb8888 => 4,
-                PixelFmt::Rgb565 => 2,
-                PixelFmt::L8 | PixelFmt::A8 | PixelFmt::A4 => 1,
-            };
-            for y in 0.._dst.height as usize {
-                let row_start = y * _dst.stride;
-                for x in 0.._dst.width as usize {
-                    let off = row_start + x * bytes_per_pixel;
-                    for byte in &mut _dst.buf[off..off + bytes_per_pixel] {
-                        *byte = 0xCC;
-                    }
-                }
-            }
+            let w = sink.target_width();
+            let h = sink.target_height();
+            sink.fill(rlvgl_platform::blit::Rect { x: 0, y: 0, w, h }, 0xFFCC_CCCC);
         }
     }
 

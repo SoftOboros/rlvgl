@@ -446,7 +446,7 @@ cargo install cargo-generate --locked
 
 - [MAKE.md](./MAKE.md) — STM32 convenience targets (build, flash, GDB).
 - [CROSS-TESTING.md](./CROSS-TESTING.md) — Host-side cross-target tests.
-- [CHIP-SUPPORT.md](./CHIP-SUPPORT.md) — Which chips the chipdb/BSP
+- [bsp/CHIP-SUPPORT.md](./bsp/CHIP-SUPPORT.md) — Which chips the chipdb/BSP
   generator supports.
 - `CLAUDE.md` at the repo root — agent runbook with the exact build,
   flash, and `/pre-publish` invocations for this workspace.

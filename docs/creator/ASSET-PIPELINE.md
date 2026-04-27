@@ -1,6 +1,6 @@
 <!-- CREATOR-ASSET-PIPELINE.md - Creator asset pipeline design. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Creator Asset Pipeline

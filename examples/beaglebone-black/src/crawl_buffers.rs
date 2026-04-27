@@ -22,7 +22,8 @@
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_decomp::{decode_argb_into, parse_rle_blob};
 use rlvgl_platform::blit::{PixelFmt, Surface};
-use rlvgl_widgets::motion::crawl::{pre_render_text, star_crawl::disco_demo_preset};
+use rlvgl_platform::effect::CrawlParams;
+use rlvgl_widgets::motion::crawl::{build_star_crawl, pre_render_text};
 use rlvgl_widgets::motion::{CrawlWindow, JumboBuffer, JumboOrientation, StarCrawl};
 
 #[path = "../../stm32h747i-disco/src/fonts.rs"]
@@ -65,8 +66,6 @@ const TEXT_HEIGHT_PX: u32 = 6400;
 const CRAWL_VIEW_W: u32 = 720;
 /// Crawl viewport height. Matches the full BBB panel height.
 const CRAWL_VIEW_H: u32 = 480;
-/// Hardware-matching line spacing: 1.5× a 24 px font = 36 px.
-const CRAWL_LINE_SPACING_PX: u16 = 36;
 /// Top margin above the splash crop, matching the STM32 crawl script.
 const TOP_MARGIN_PX: u32 = 120;
 /// Portrait splash crop source X offset.
@@ -190,7 +189,7 @@ fn blit_splash_crop_a8(dst: &mut Surface<'_>, dst_y: u32) -> u32 {
     GRAPHIC_SIZE
 }
 
-fn render_crawl_strip(text_src: &mut Surface<'_>) -> u32 {
+fn render_crawl_strip(text_src: &mut Surface<'_>, line_spacing_px: u16) -> u32 {
     let mut cur_y = TOP_MARGIN_PX;
     let graphic_h = blit_splash_crop_a8(text_src, cur_y);
     if graphic_h > 0 {
@@ -206,7 +205,7 @@ fn render_crawl_strip(text_src: &mut Surface<'_>) -> u32 {
             text_src.width,
             text_src.height.saturating_sub(body_y),
         );
-        pre_render_text(&CRAWL_FONT, CRAWL_LINES, CRAWL_LINE_SPACING_PX, &mut body)
+        pre_render_text(&CRAWL_FONT, CRAWL_LINES, line_spacing_px, &mut body)
     };
     cur_y += text_h + LOGO_GAP_PX;
     cur_y += blit_logo_a8(text_src, cur_y);
@@ -216,9 +215,14 @@ fn render_crawl_strip(text_src: &mut Surface<'_>) -> u32 {
 /// Build a [`CrawlWindow`] wrapping a freshly-allocated [`StarCrawl`]
 /// engine sized like the STM32 demo's crawl viewport.
 ///
-/// `frame_hz` must match the host's render loop cadence so the
-/// sub-pixel rate model advances the scroll accumulator at the right
-/// wall-clock speed (the disco preset targets 40 px/s).
+/// The tuning knobs (scroll speed, line spacing, perspective taper,
+/// text colour, background scroll divisor) come from
+/// [`CrawlParams::star_crawl_disco`] — the platform crate owns those
+/// defaults now, so this function only carries the BBB-specific buffer
+/// sizing and the splash-crop + logo text-strip composition. `frame_hz`
+/// must match the host's render loop cadence so the sub-pixel rate
+/// model advances the scroll accumulator at the right wall-clock
+/// speed.
 pub fn build_star_crawl_window(
     visible_w: u32,
     visible_h: u32,
@@ -226,6 +230,8 @@ pub fn build_star_crawl_window(
 ) -> CrawlWindow<StarCrawl<'static>> {
     let visible_w = visible_w.max(1).min(CRAWL_VIEW_W);
     let visible_h = visible_h.max(1).min(CRAWL_VIEW_H);
+
+    let params = CrawlParams::star_crawl_disco(visible_w, visible_h, frame_hz.max(1));
 
     // Horizontal jumbo background so the starfield drifts right-to-left
     // while the text itself continues to crawl upward.
@@ -255,17 +261,17 @@ pub fn build_star_crawl_window(
         TEXT_WIDTH_PX,
         TEXT_HEIGHT_PX,
     );
-    let text_height = render_crawl_strip(&mut text_src);
+    let text_height = render_crawl_strip(&mut text_src, params.line_spacing_px);
 
     // Scanline scratch: wide enough for the long axis × 4 bytes.
     let scanline_len = visible_w.max(visible_h) as usize * ARGB_BPP;
     let scanline_vec: Vec<u8> = vec![0u8; scanline_len];
     let scanline_slice: &'static mut [u8] = Vec::leak(scanline_vec);
 
-    let mut crawl = disco_demo_preset(
+    let mut crawl = build_star_crawl(
+        &params,
         &CRAWL_FONT,
         CRAWL_LINES,
-        frame_hz,
         jumbo,
         text_src,
         scanline_slice,

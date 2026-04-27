@@ -22,7 +22,7 @@
 #
 # Prerequisites:
 #   - macOS with diskutil
-#   - Bookworm image at /tmp/bbb-bookworm.img.xz (see docs/BEAGLEBONE-BLACK.md)
+#   - Bookworm image at /tmp/bbb-bookworm.img.xz (see docs/beaglebone-black/)
 #
 # Download the image:
 #   curl -L -o /tmp/bbb-bookworm.img.xz \
@@ -125,7 +125,7 @@ diskutil eject "$DISK" 2>/dev/null || true
 echo ""
 echo "=== SD Card Ready ==="
 echo ""
-echo "Next steps (see docs/BEAGLEBONE-BLACK.md for details):"
+echo "Next steps (see docs/beaglebone-black/ for details):"
 echo ""
 echo "  1. Insert SD into BBB (slot under the board)"
 echo "  2. Attach NHD-7.0CTP-CAPE-P cape"

@@ -1,6 +1,6 @@
 <!-- CHIP-SUPPORT.md - Vendor chip and board support. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Chip & Board Support
@@ -187,7 +187,7 @@ Summary of what exists in this repository today versus the plan above.
 - Add a simple canonicalizer script/binary to sort fields and normalize AF strings; wire basic tests (Epic A2).
 - Land STM32 pipeline as the first “vendor” in the unified IR: adapt existing AFDB output to emit the Config IR alongside current canonical overlays (Epics A/C/E intersection).
 - Draft `manifests/vendors.yaml` and a minimal `tools/fetch_examples.py` that only supports STM32 Cube projects to seed the ingestion flow (Epic B1).
-- Add `docs/IOC-IR-ALIGNMENT.md` references into this plan and link from `README-CREATOR.md`; extend docs with a Quickstart once B1/B2 exist (Epic H3).
+- Add `docs/bsp/IOC-IR-ALIGNMENT.md` references into this plan and link from `README-CREATOR.md`; extend docs with a Quickstart once B1/B2 exist (Epic H3).
 - C‑AST: expand pattern coverage to infer signal roles (TX/RX/SCK/…); recognize I2C/SPI/TIM/SDMMC/ULPI blocks; capture pull/speed/otype.
 - C‑AST: add a preprocessing harness (`tools/materialize_tu.py`) to record TU flags and includes for future tree‑sitter/libclang parsing.
 - Creator docs: document `ast from-c` and `bsp from-c` usage in `README-CREATOR.md` with examples.

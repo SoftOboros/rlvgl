@@ -1,6 +1,6 @@
 <!-- CREATOR-BSP-STATUS.md - BSP generator status. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Creator BSP Generator Status

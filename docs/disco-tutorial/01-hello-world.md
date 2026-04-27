@@ -206,7 +206,7 @@ What you should see on the DISCO: a black screen with the white text
 **`Hello, rlvgl`** centered on the 800×480 panel.
 
 If the screen stays white or flickers, walk the
-[`STM32H747I-DISCO-BRINGUP.md`](../STM32H747I-DISCO-BRINGUP.md)
+[`BRINGUP.md`](../../examples/stm32h747i-disco/BRINGUP.md)
 checklist before continuing — every subsequent chapter assumes a
 stable framebuffer.
 
@@ -214,10 +214,10 @@ stable framebuffer.
 
 - [`rlvgl-platform` README](../../platform/README.md) — what
   `stm32h747i_disco` pulls in and what it exposes.
-- [`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+- [`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
   — how display flush is structured.
-- [`docs/STM32H747I-DISCO.md`](../STM32H747I-DISCO.md) — one-page
-  overview of what the finished demo does, for context.
+- [`examples/stm32h747i-disco/HARDWARE.md`](../../examples/stm32h747i-disco/HARDWARE.md)
+  — one-page overview of what the finished demo does, for context.
 
 ---
 

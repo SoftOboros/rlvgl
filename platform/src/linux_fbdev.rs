@@ -8,6 +8,7 @@
 use std::eprintln;
 
 use crate::display::DisplayDriver;
+use crate::hwcore::addr::PhysAddr;
 use crate::screen::Screen;
 use rlvgl_core::widget::{Color, Rect};
 use std::fs::{File, OpenOptions};
@@ -96,6 +97,7 @@ pub struct LinuxFbdevDisplay {
     _file: File,
     mmap_ptr: *mut u8,
     mmap_len: usize,
+    phys_addr: Option<PhysAddr>,
     width: u32,
     height: u32,
     stride: u32,
@@ -159,6 +161,7 @@ impl LinuxFbdevDisplay {
             _file: file,
             mmap_ptr: mmap_ptr as *mut u8,
             mmap_len,
+            phys_addr: u32::try_from(finfo.smem_start).ok().map(PhysAddr::new),
             width: vinfo.xres,
             height: vinfo.yres,
             stride: finfo.line_length,
@@ -169,6 +172,27 @@ impl LinuxFbdevDisplay {
     /// Open the default `/dev/fb0` device.
     pub fn open_default() -> Self {
         Self::open("/dev/fb0")
+    }
+
+    /// Borrow the raw mmap-backed framebuffer bytes.
+    pub fn buffer_mut(&mut self) -> &mut [u8] {
+        unsafe { core::slice::from_raw_parts_mut(self.mmap_ptr, self.mmap_len) }
+    }
+
+    /// Physical base address reported by `fb_fix_screeninfo.smem_start`,
+    /// if it fits in the platform's 32-bit [`PhysAddr`] type.
+    pub fn framebuffer_phys(&self) -> Option<PhysAddr> {
+        self.phys_addr
+    }
+
+    /// Number of bytes between consecutive scanlines.
+    pub fn stride_bytes(&self) -> usize {
+        self.stride as usize
+    }
+
+    /// Native fbdev pixel depth.
+    pub fn bits_per_pixel(&self) -> u32 {
+        self.bpp
     }
 }
 
@@ -186,22 +210,26 @@ impl DisplayDriver for LinuxFbdevDisplay {
     }
 
     fn flush(&mut self, area: Rect, colors: &[Color]) {
-        let fb = unsafe { core::slice::from_raw_parts_mut(self.mmap_ptr, self.mmap_len) };
+        let width = self.width as usize;
+        let height = self.height as usize;
+        let stride = self.stride as usize;
+        let bpp = self.bpp;
+        let fb = self.buffer_mut();
 
         for row in 0..area.height as usize {
             let py = area.y as usize + row;
-            if py >= self.height as usize {
+            if py >= height {
                 break;
             }
             for col in 0..area.width as usize {
                 let px = area.x as usize + col;
-                if px >= self.width as usize {
+                if px >= width {
                     break;
                 }
                 let color = colors[row * area.width as usize + col];
-                let offset = py * self.stride as usize + px * (self.bpp / 8) as usize;
+                let offset = py * stride + px * (bpp / 8) as usize;
 
-                match self.bpp {
+                match bpp {
                     32 => {
                         // BGRA8888 (typical Linux fbdev byte order)
                         if offset + 3 < fb.len() {

@@ -33,6 +33,10 @@ pub mod wdt;
 #[cfg(feature = "linux")]
 pub mod devmem;
 
+/// EDMA-backed copy offload for Linux userspace rendering.
+#[cfg(feature = "linux")]
+pub mod edma;
+
 /// `DisplayDriver` backed by a register-driven LCDC over `/dev/mem`.
 #[cfg(feature = "linux")]
 pub mod devmem_display;

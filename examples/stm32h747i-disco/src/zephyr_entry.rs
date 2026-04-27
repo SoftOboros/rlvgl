@@ -682,47 +682,29 @@ pub unsafe extern "C" fn rlvgl_init(
             });
 
             // ── Star crawl setup ─────────────────────────────────────
+            //
+            // Zephyr now shares the bare-metal engine: widgets' generic
+            // `TextCrawl` driven through `rlvgl_platform::BlitterSink<
+            // Dma2dBlitter>`. The crawl owns three buffers at fixed
+            // SDRAM addresses — see `crate::crawl_buffers` for the
+            // layout. `(fb_w, fb_h)` is passed directly so video-mode
+            // (800×480 landscape) and adapted-cmd (480×800 portrait)
+            // both render natively without the retired hardware
+            // engine's DMA2D rotation step.
+            //
+            // The `LegacyCrawlApi` trait shim keeps the render loop's
+            // telemetry + error-recovery call sites unchanged —
+            // `advance_scroll`, `diag_words`, etc. are thin wrappers
+            // over the widgets' window.
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-            let mut star_crawl = {
-                use crate::star_crawl::StarCrawl;
-                // Use the same bold 32 pt font and README crawl text
-                // as the bare-metal path so the two platforms render
-                // the same content.
-                static BOLD_FONT_DATA: &[u8] =
-                    include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
-                static CRAWL_FONT: rlvgl_core::packed_font::PackedFont =
-                    rlvgl_core::packed_font::PackedFont {
-                        height: 32,
-                        ascent: 30,
-                        glyphs: &crate::fonts::DEJAVU_SANS_BOLD_32_GLYPHS,
-                        data: BOLD_FONT_DATA,
-                    };
-                let crawl_lines = crate::readme_crawl::README_CRAWL;
-                // Frame rate hint — star_crawl scales pixels-per-frame
-                // from SCROLL_PX_PER_SEC (40) / frame_hz.
-                let mut c = StarCrawl::new(&CRAWL_FONT, crawl_lines, 30);
-                // Zephyr path: Incremental starfield in a persistent
-                // layer buffer (see `set_layer_buf` below at activate
-                // time). The 2 Hz yellow flicker that plagued the old
-                // Incremental path came from alpha-accumulation when
-                // text was blended into the same persistent buffer as
-                // the stars. Task #41 split them: stars live in the
-                // layer (safe to shift, opaque only), text blends
-                // directly into the active FB after the layer is
-                // composed. No more accumulation.
-                c.set_render_mode(crate::star_crawl::RenderMode::Incremental);
-                c
-            };
+            #[allow(unused_imports)]
+            use crate::crawl_buffers::LegacyCrawlApi;
+            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+            let mut star_crawl = crate::crawl_buffers::build_star_crawl_window(fb_w, fb_h, 30);
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             let mut crawl_dma2d: Option<rlvgl_platform::dma2d::Dma2dBlitter> = None;
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             let mut crawl_active = false;
-            // Portrait scratch buffer for crawl output (480×720×4 = 1.3MB)
-            // Lives at CRAWL_BASE in SDRAM Bank 2
-            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-            const CRAWL_FB_W: u32 = 480;
-            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-            const CRAWL_FB_H: u32 = 800;
 
             // After first present, LTDC displays back buffer (now front).
             // The "back" for rendering is the original front buffer.
@@ -806,18 +788,18 @@ pub unsafe extern "C" fn rlvgl_init(
                     }
                     match b as u8 {
                         b'c' | b'C' => {
+                            // Claim DMA2D for the crawl's lifetime —
+                            // the render dispatch below borrows it each
+                            // frame and hands it to `paint_frame`.
                             if crawl_dma2d.is_none() {
-                                crawl_dma2d = Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                let mut b = rlvgl_platform::dma2d::Dma2dBlitter::steal();
+                                b.enable_tc_interrupt();
+                                crawl_dma2d = Some(b);
                             }
-                            if let Some(ref mut dma2d) = crawl_dma2d {
-                                star_crawl.activate(dma2d);
-                                // Persistent starfield layer at
-                                // 0xD180_0000 (was the compose scratch).
-                                // Stars render into the layer with
-                                // Incremental shift; text blends onto
-                                // the active FB after layer compose.
-                                star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
-                            }
+                            // Widgets' activate is CPU-only (paints
+                            // starfield + pre-renders A8 text). DMA2D
+                            // is used by the per-frame paint below.
+                            star_crawl.activate();
                             crawl_active = true;
                             controller.publish_status("serial 'c' → crawl");
                             dump_clock_state_oneshot(b"serial-c-crawl");
@@ -855,13 +837,12 @@ pub unsafe extern "C" fn rlvgl_init(
                                     ))]
                                     {
                                         if crawl_dma2d.is_none() {
-                                            crawl_dma2d =
-                                                Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                            let mut b =
+                                                rlvgl_platform::dma2d::Dma2dBlitter::steal();
+                                            b.enable_tc_interrupt();
+                                            crawl_dma2d = Some(b);
                                         }
-                                        if let Some(ref mut dma2d) = crawl_dma2d {
-                                            star_crawl.activate(dma2d);
-                                            star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
-                                        }
+                                        star_crawl.activate();
                                         crawl_active = true;
                                         controller.publish_status("Enter → crawl activated");
                                         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
@@ -956,13 +937,11 @@ pub unsafe extern "C" fn rlvgl_init(
                             ))]
                             {
                                 if crawl_dma2d.is_none() {
-                                    crawl_dma2d =
-                                        Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                    let mut b = rlvgl_platform::dma2d::Dma2dBlitter::steal();
+                                    b.enable_tc_interrupt();
+                                    crawl_dma2d = Some(b);
                                 }
-                                if let Some(ref mut dma2d) = crawl_dma2d {
-                                    star_crawl.activate(dma2d);
-                                    star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
-                                }
+                                star_crawl.activate();
                                 crawl_active = true;
                                 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
                                 dump_clock_state_oneshot(b"hotspot-trigger");
@@ -1008,13 +987,11 @@ pub unsafe extern "C" fn rlvgl_init(
                                 // block below); enabling this triggers a
                                 // present-pipeline lock under crawl_active.
                                 if crawl_dma2d.is_none() {
-                                    crawl_dma2d =
-                                        Some(rlvgl_platform::dma2d::Dma2dBlitter::steal());
+                                    let mut b = rlvgl_platform::dma2d::Dma2dBlitter::steal();
+                                    b.enable_tc_interrupt();
+                                    crawl_dma2d = Some(b);
                                 }
-                                if let Some(ref mut dma2d) = crawl_dma2d {
-                                    star_crawl.activate(dma2d);
-                                    star_crawl.set_layer_buf(0xD180_0000usize as *mut u8);
-                                }
+                                star_crawl.activate();
                                 crawl_active = true;
                                 // Snapshot RCC/LTDC/DSI state at the moment
                                 // the crawl is requested. See dump_clock_state_oneshot
@@ -1048,184 +1025,42 @@ pub unsafe extern "C" fn rlvgl_init(
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 if crawl_active {
                     if let Some(ref mut dma2d) = crawl_dma2d {
-                        // Task #41 (layered): stars live in a persistent
-                        // layer buffer at 0xD180_0000 (set via
-                        // `star_crawl.set_layer_buf(...)` at activate),
-                        // and the crawl's internal ComposeLayer stage
-                        // blits the layer into `render_buf` right before
-                        // text A8 blend. No per-frame compose blit here.
-                        let sync_ref = get_sync().unwrap_unchecked();
-                        // Per-iteration trace so we can see where tick stalls.
-                        // 'T' = entering tick; result tag follows.
-                        fn u1c(c: u8) {
-                            unsafe {
-                                let isr = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                                let tdr = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                                let mut t = 100_000u32;
-                                while isr.read_volatile() & (1 << 7) == 0 {
-                                    t -= 1;
-                                    if t == 0 {
-                                        return;
-                                    }
-                                }
-                                tdr.write_volatile(c as u32);
-                            }
-                        }
-                        fn u1s(s: &[u8]) {
-                            for &b in s {
-                                u1c(b);
-                            }
-                        }
-                        fn u1hex(v: u32) {
-                            const HEX: &[u8; 16] = b"0123456789abcdef";
-                            for i in (0..8).rev() {
-                                let n = ((v >> (i * 4)) & 0xF) as usize;
-                                u1c(HEX[n]);
-                            }
-                        }
-                        // Dump star_crawl diag_words every ~16 ticks so we
-                        // see progress promptly. Iter rate is slow (~2 iter/s)
-                        // when crawl is active so 256 would take > 2 minutes.
-                        static mut TICK_COUNT: u32 = 0; // rlvgl-discipline: allow(static_mut)
-                        unsafe {
-                            TICK_COUNT = TICK_COUNT.wrapping_add(1);
-                            if TICK_COUNT % 16 == 0 {
-                                let (w0, w1, w2, w3) = star_crawl.diag_words();
-                                u1s(b"\r\nDIAG ");
-                                u1hex(w0);
-                                u1c(b' ');
-                                u1hex(w1);
-                                u1c(b' ');
-                                u1hex(w2);
-                                u1c(b' ');
-                                u1hex(w3);
-                                u1s(b"\r\n");
-                                // Also DMA2D ISR + CR
-                                let dma2d_isr = (0x5200_1004 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                                let dma2d_cr = (0x5200_1000 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                                u1s(b"DMA2D ISR=");
-                                u1hex(dma2d_isr);
-                                u1s(b" CR=");
-                                u1hex(dma2d_cr);
-                                u1s(b"\r\n");
-                            }
-                        }
-                        // Batch many ticks per loop iteration. Each tick
-                        // is ~1 starfield row blit + 1 FIR text row — the
-                        // whole frame needs ~800 ticks. Without batching,
-                        // each outer-loop iter prints ~4 serial chars
-                        // (~350us at 115200 baud) which dominates
-                        // per-tick cost. Batching 64 lets us amortize
-                        // that and lets the DMA2D chain back-to-back.
+                        // Widgets' `CrawlWindow::paint_frame` wraps the
+                        // DMA2D blitter in a `BlitterSink` and runs one
+                        // full frame of ops through it: jumbo-background
+                        // blit + one `blend_a8_row` per text row. Each
+                        // DMA2D op is synchronous start+wait, so this
+                        // call blocks for the frame's DMA2D work inline.
                         //
-                        // Instrumentation: count ticks spent in this
-                        // batch + how many of them returned Pending
-                        // because DMA2D was still in-flight (detected
-                        // via star_crawl.waiting_for_dma()). Also time
-                        // the batch via DWT cycles for per-frame cost.
-                        const DWT_CYC: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                        static mut TICKS_THIS_FRAME: u32 = 0; // rlvgl-discipline: allow(static_mut)
-                        static mut DMA_WAIT_TICKS: u32 = 0; // rlvgl-discipline: allow(static_mut)
-                        static mut BATCH_CYC_ACCUM: u32 = 0; // rlvgl-discipline: allow(static_mut)
-                        static mut LAST_FRAME_CYC: u32 = 0; // rlvgl-discipline: allow(static_mut)
-                        let batch_start = DWT_CYC.read_volatile();
-                        // Task #41: tick targets `render_buf` (active
-                        // FB) directly. Stars render into the persistent
-                        // layer configured via `set_layer_buf(crawl_buf)`;
-                        // the crawl's internal ComposeLayer stage blits
-                        // layer → render_buf before the text A8 blend.
-                        // This removes the separate compose blit that
-                        // used to live below on FrameReady.
-                        let mut result = crate::star_crawl::StepResult::Pending;
-                        for _ in 0..1024 {
-                            result = star_crawl
-                                .tick(dma2d, render_buf, CRAWL_FB_W, CRAWL_FB_H, sync_ref);
-                            TICKS_THIS_FRAME += 1;
-                            if star_crawl.waiting_for_dma() {
-                                DMA_WAIT_TICKS += 1;
-                            }
-                            if !matches!(result, crate::star_crawl::StepResult::Pending) {
-                                break;
-                            }
+                        // The 1024-iter cooperative batch loop the
+                        // retired hardware engine used is gone; when
+                        // responsiveness during the crawl window
+                        // matters, swap the sink for a future
+                        // `Dma2dBatchSink` that yields across ERIF
+                        // back porches.
+                        let fb_slice = core::slice::from_raw_parts_mut(render_buf, fb_bytes);
+                        let mut dst = Surface::new(
+                            fb_slice,
+                            (fb_w * bpp) as usize,
+                            PixelFmt::Argb8888,
+                            fb_w,
+                            fb_h,
+                        );
+                        let painted = star_crawl.paint_frame(dma2d, &mut dst);
+                        if painted {
+                            do_present(render_buf, di.width, di.height);
+                            star_crawl.advance_scroll();
+                            render_buf = if render_buf == fb_front {
+                                fb_back
+                            } else {
+                                fb_front
+                            };
                         }
-                        let batch_end = DWT_CYC.read_volatile();
-                        BATCH_CYC_ACCUM =
-                            BATCH_CYC_ACCUM.wrapping_add(batch_end.wrapping_sub(batch_start));
-                        // Print one tag char on meaningful transitions
-                        // only (FrameReady / Finished / Idle). Skip the
-                        // noisy per-Pending-batch to keep UART free.
-                        let tag = match result {
-                            crate::star_crawl::StepResult::FrameReady => Some(b'F'),
-                            crate::star_crawl::StepResult::Idle => Some(b'I'),
-                            crate::star_crawl::StepResult::Finished => Some(b'X'),
-                            crate::star_crawl::StepResult::Pending => None,
-                        };
-                        if let Some(t) = tag {
-                            u1c(t);
-                            // On FrameReady, print a compact timing line:
-                            //   F <ticks> <dma_wait_ticks> <frame_ms> <last_ms>
-                            // where:
-                            //   ticks        = total star_crawl.tick calls in frame
-                            //   dma_wait     = ticks where waiting_for_dma() was true
-                            //   frame_ms     = wall-clock ms in the tick loops for this frame
-                            //   last_ms      = ms since previous FrameReady (includes blit+present)
-                            if t == b'F' {
-                                let now_cyc = DWT_CYC.read_volatile();
-                                let since_last = now_cyc.wrapping_sub(LAST_FRAME_CYC);
-                                LAST_FRAME_CYC = now_cyc;
-                                let frame_ms = BATCH_CYC_ACCUM / 400_000;
-                                let last_ms = since_last / 400_000;
-                                u1c(b' ');
-                                u1hex(TICKS_THIS_FRAME);
-                                u1c(b' ');
-                                u1hex(DMA_WAIT_TICKS);
-                                u1c(b' ');
-                                u1hex(frame_ms);
-                                u1c(b' ');
-                                u1hex(last_ms);
-                                TICKS_THIS_FRAME = 0;
-                                DMA_WAIT_TICKS = 0;
-                                BATCH_CYC_ACCUM = 0;
-                            }
-                            u1c(b'\r');
-                            u1c(b'\n');
+                        if !star_crawl.is_active() {
+                            crawl_active = false;
+                            crawl_dma2d = None;
                         }
-                        match result {
-                            crate::star_crawl::StepResult::FrameReady => {
-                                // Task #41: the crawl now composes the
-                                // starfield layer → render_buf and
-                                // blends text onto render_buf entirely
-                                // inside `tick`. No explicit compose
-                                // blit here; we just present.
-                                let t1 = DWT_CYC.read_volatile();
-                                do_present(render_buf, di.width, di.height);
-                                let t2 = DWT_CYC.read_volatile();
-                                u1s(b" pr=");
-                                u1hex(t2.wrapping_sub(t1) / 400);
-                                u1s(b"us");
-                                // Advance scroll so the next frame uses a
-                                // new star_scroll_q8 + text scroll_q8. Without
-                                // this call the crawl re-renders the identical
-                                // frame forever (stationary starfield, no
-                                // text motion). Bare-metal calls this after
-                                // its present; mirroring here.
-                                star_crawl.advance_scroll();
-                                render_buf = if render_buf == fb_front {
-                                    fb_back
-                                } else {
-                                    fb_front
-                                };
-                                continue; // skip normal widget render this frame
-                            }
-                            crate::star_crawl::StepResult::Finished => {
-                                crawl_active = false;
-                                crawl_dma2d = None;
-                            }
-                            _ => {
-                                // Pending or Idle — keep ticking
-                                continue; // don't render widgets while crawl runs
-                            }
-                        }
+                        continue; // skip normal widget render this frame
                     }
                 }
 

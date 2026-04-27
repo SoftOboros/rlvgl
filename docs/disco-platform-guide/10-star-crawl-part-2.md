@@ -359,7 +359,7 @@ Fault modes:
   at
   [`platform/src/dma2d.rs`](../../platform/src/dma2d.rs) —
   the actual register sequence.
-- [`docs/RENDERING-ALPHA-BLENDING.md`](../RENDERING-ALPHA-BLENDING.md)
+- [`docs/rendering/ALPHA-BLENDING.md`](../rendering/ALPHA-BLENDING.md)
   — the blend math DMA2D implements.
 - [`examples/stm32h747i-disco/src/star_crawl.rs`](../../examples/stm32h747i-disco/src/star_crawl.rs)
   — the full 736-line source this chapter walked through.

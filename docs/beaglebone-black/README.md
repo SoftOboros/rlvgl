@@ -604,7 +604,7 @@ When the BBB is bricked (no USB, no network, solid LEDs):
 - [ ] Touch input via I2C2 — **hardware-blocked**, cape RMA in flight.
       FT5426G responds on I2C with correct IDs but its scan engine
       reports zero touches under sustained firm press. Full diagnostic
-      and RMA packet in [`docs/NewhavenRMA.md`](NewhavenRMA.md).
+      and RMA packet in [`examples/beaglebone-black/RMA-newhaven-2026-04-22.md`](../../examples/beaglebone-black/RMA-newhaven-2026-04-22.md).
 
 ### Phase 3: Linux Prong
 
@@ -746,9 +746,7 @@ ms intervals and diff per-row — a healthy board shows zero row churn
 between consecutive static-UI frames. When fbcon is bound, you'll see
 exactly 16 contiguous rows at the cursor's Y position light up every
 ~500 ms, 8 pixels wide. This was the probe used to diagnose it on
-2026-04-22; full details in
-[`feedback_bbb_fbcon_cursor.md`](../.claude/projects/-Users-iraabbott-rlvgl/memory/feedback_bbb_fbcon_cursor.md)
-(kept outside the public tree).
+2026-04-22.
 
 **Deprecated path:** `tools/patch-dtb-lcd.sh` used `fdtoverlay` against
 `am335x-boneblack-uboot.dtb` to bake the patch into the base DTB. It
@@ -773,7 +771,7 @@ Cargo features (all default-on):
 | Feature      | What it enables |
 |--------------|-----------------|
 | `linux`      | `LinuxFbdevDisplay` + evdev input path |
-| `splash`     | RLE splash decoded once into the framebuffer at boot, via `rlvgl_decomp::decode_argb_into_rotated(Rot90Ccw)` (portrait asset → landscape FB). Per-board orientation is the decompress-step option discussed in [`project_splash_orientation_model.md`](../.claude/projects/-Users-iraabbott-rlvgl/memory/project_splash_orientation_model.md). |
+| `splash`     | RLE splash decoded once into the framebuffer at boot, via `rlvgl_decomp::decode_argb_into_rotated(Rot90Ccw)` (portrait asset → landscape FB). Per-board orientation is the decompress-step option in `rlvgl_decomp::Orientation`. |
 | `desktop`    | DiscoController desktop widget tree layered over the splash (root is transparent; widgets paint on top). |
 | `playit`     | Optional `rlvgl-playit` TCP listener (see below). Requires `RLVGL_PLAYIT_PORT` env var at runtime to bind. |
 | `star_crawl` | Star-Wars-style scrolling crawl overlay (see below). |
@@ -916,7 +914,7 @@ I²C probes with correct IDs (`CIPHER=0x54`, `FW_VER=0x14`,
 reads bit-for-bit identical between untouched and held states — the
 chip is running but seeing no capacitance change on its sense lines.
 
-Full diagnostic + submittable RMA packet: [`docs/NewhavenRMA.md`](NewhavenRMA.md).
+Full diagnostic + submittable RMA packet: [`examples/beaglebone-black/RMA-newhaven-2026-04-22.md`](../../examples/beaglebone-black/RMA-newhaven-2026-04-22.md).
 
 Until a replacement arrives, all input is driven via the playit
 path described above. The overlay's `edt-ft5x06` binding + IRQ-on-

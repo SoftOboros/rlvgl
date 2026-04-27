@@ -1,7 +1,7 @@
 <!-- IMAGE-COMPRESSION-FORMAT.md - Image compression format design. -->
 
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Image Compression Format

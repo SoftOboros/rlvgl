@@ -1,6 +1,6 @@
 <!-- CREATOR-UI-DESIGN.md - Desktop UI design. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Creator Desktop UI Design

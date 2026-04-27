@@ -88,7 +88,7 @@ CHANGELOG.md - Notes on chip & board database releases.
   embedded build, docs).
 
 ## v0.1.9
-- See [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) for detailed notes.
+- See [releases/v0.1.9.md](./releases/v0.1.9.md) for detailed notes.
 - STM32 BSP generation from CubeMX `.ioc` files.
 - Initial vendor chipdb crate stubs (9 vendors).
 - STM32H747I-DISCO board bring-up: display, touch, SD, backlight.

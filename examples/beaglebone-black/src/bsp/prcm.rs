@@ -37,6 +37,21 @@ pub unsafe fn enable_lcdc() {
     }
 }
 
+/// Enable the EDMA3 channel controller and transfer controller 0.
+///
+/// Queue 0 is the reset-default service queue and feeds transfer
+/// controller 0, so a userspace blit path that only uses queue 0 needs
+/// those two clocks enabled. TPTC1/TPTC2 stay gated until a caller
+/// deliberately remaps channels to queues 1 or 2.
+pub unsafe fn enable_edma() {
+    unsafe {
+        reg_write(CM_PER_TPCC_CLKCTRL, MODULEMODE_ENABLE);
+        wait_idlest_bounded(CM_PER_TPCC_CLKCTRL);
+        reg_write(CM_PER_TPTC0_CLKCTRL, MODULEMODE_ENABLE);
+        wait_idlest_bounded(CM_PER_TPTC0_CLKCTRL);
+    }
+}
+
 /// Enable I2C2 peripheral clock (for FT5x06 touch controller).
 pub unsafe fn enable_i2c2() {
     unsafe {

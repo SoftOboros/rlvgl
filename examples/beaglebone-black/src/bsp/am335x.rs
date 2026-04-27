@@ -100,11 +100,15 @@ pub unsafe fn reg_clear_bits(pa: u32, bits: u32) {
 pub const CM_PER: u32 = 0x44E0_0000;
 
 pub const CM_PER_LCDC_CLKCTRL: u32 = CM_PER + 0x018;
+pub const CM_PER_TPTC0_CLKCTRL: u32 = CM_PER + 0x024;
 pub const CM_PER_I2C2_CLKCTRL: u32 = CM_PER + 0x044;
 pub const CM_PER_I2C1_CLKCTRL: u32 = CM_PER + 0x048;
 pub const CM_PER_GPIO1_CLKCTRL: u32 = CM_PER + 0x0AC;
 pub const CM_PER_GPIO2_CLKCTRL: u32 = CM_PER + 0x0B0;
 pub const CM_PER_GPIO3_CLKCTRL: u32 = CM_PER + 0x0B4;
+pub const CM_PER_TPCC_CLKCTRL: u32 = CM_PER + 0x0BC;
+pub const CM_PER_TPTC1_CLKCTRL: u32 = CM_PER + 0x0FC;
+pub const CM_PER_TPTC2_CLKCTRL: u32 = CM_PER + 0x100;
 pub const CM_PER_LCDC_CLKSTCTRL: u32 = CM_PER + 0x148;
 
 /// CM_DPLL base — holds the LCDC pixel-clock source selector.
@@ -228,6 +232,52 @@ pub const TIMING2_IEO: u32 = 1 << 23;
 pub const TIMING2_IPC: u32 = 1 << 22;
 pub const TIMING2_IHS: u32 = 1 << 21;
 pub const TIMING2_IVS: u32 = 1 << 20;
+
+// ---------------------------------------------------------------------------
+// EDMA3 CC / TC
+// TRM Section 11
+// ---------------------------------------------------------------------------
+
+/// EDMA3 channel controller base address.
+pub const EDMA3CC_BASE: u32 = 0x4900_0000;
+/// Transfer controller 0 base address.
+pub const EDMA3TC0_BASE: u32 = 0x4980_0000;
+/// Transfer controller 1 base address.
+pub const EDMA3TC1_BASE: u32 = 0x4990_0000;
+/// Transfer controller 2 base address.
+pub const EDMA3TC2_BASE: u32 = 0x49A0_0000;
+
+pub const EDMA3CC_DCHMAP_0: u32 = EDMA3CC_BASE + 0x100;
+pub const EDMA3CC_DMAQNUM_0: u32 = EDMA3CC_BASE + 0x240;
+pub const EDMA3CC_QUEPRI: u32 = EDMA3CC_BASE + 0x284;
+pub const EDMA3CC_EMCR: u32 = EDMA3CC_BASE + 0x308;
+pub const EDMA3CC_CCERRCLR: u32 = EDMA3CC_BASE + 0x31C;
+pub const EDMA3CC_DRAE0: u32 = EDMA3CC_BASE + 0x340;
+pub const EDMA3CC_DRAEH0: u32 = EDMA3CC_BASE + 0x344;
+pub const EDMA3CC_ER: u32 = EDMA3CC_BASE + 0x1000;
+pub const EDMA3CC_ERH: u32 = EDMA3CC_BASE + 0x1004;
+pub const EDMA3CC_ECR: u32 = EDMA3CC_BASE + 0x1008;
+pub const EDMA3CC_ECRH: u32 = EDMA3CC_BASE + 0x100C;
+pub const EDMA3CC_ESR: u32 = EDMA3CC_BASE + 0x1010;
+pub const EDMA3CC_ESRH: u32 = EDMA3CC_BASE + 0x1014;
+pub const EDMA3CC_EER: u32 = EDMA3CC_BASE + 0x1020;
+pub const EDMA3CC_EERH: u32 = EDMA3CC_BASE + 0x1024;
+pub const EDMA3CC_EECR: u32 = EDMA3CC_BASE + 0x1028;
+pub const EDMA3CC_EECRH: u32 = EDMA3CC_BASE + 0x102C;
+pub const EDMA3CC_EESR: u32 = EDMA3CC_BASE + 0x1030;
+pub const EDMA3CC_EESRH: u32 = EDMA3CC_BASE + 0x1034;
+pub const EDMA3CC_IESR: u32 = EDMA3CC_BASE + 0x1060;
+pub const EDMA3CC_IESRH: u32 = EDMA3CC_BASE + 0x1064;
+pub const EDMA3CC_IPR: u32 = EDMA3CC_BASE + 0x1068;
+pub const EDMA3CC_IPRH: u32 = EDMA3CC_BASE + 0x106C;
+pub const EDMA3CC_ICR: u32 = EDMA3CC_BASE + 0x1070;
+pub const EDMA3CC_ICRH: u32 = EDMA3CC_BASE + 0x1074;
+pub const EDMA3CC_SECR: u32 = EDMA3CC_BASE + 0x1078;
+pub const EDMA3CC_SECRH: u32 = EDMA3CC_BASE + 0x107C;
+pub const EDMA3CC_PARAM_BASE: u32 = EDMA3CC_BASE + 0x4000;
+
+/// PaRAM set size in bytes.
+pub const EDMA3CC_PARAM_STRIDE: u32 = 0x20;
 
 // ---------------------------------------------------------------------------
 // I2C2 — I2C Controller

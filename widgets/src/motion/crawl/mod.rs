@@ -17,11 +17,11 @@ pub mod star_crawl;
 pub mod text;
 pub mod window;
 
-pub use star_crawl::StarCrawl;
+pub use star_crawl::{StarCrawl, build_star_crawl};
 pub use text::{TextCrawl, pre_render_text};
 pub use window::CrawlWindow;
 
-use rlvgl_platform::blit::{Blitter, Surface};
+use rlvgl_platform::effect::EffectSink;
 
 use crate::motion::Direction;
 
@@ -49,9 +49,14 @@ pub struct CrawlState {
 /// (`Vec<u8>` on the sim, fixed SDRAM addresses on the STM32H747I-DISCO
 /// target, and so on).
 ///
-/// Paint is generic over [`Blitter`] so the engine can be driven by a
-/// CPU blitter on the sim and (in a future follow-up) the DMA2D
-/// blitter on hardware without dyn-trait lifetime acrobatics.
+/// Per-frame rendering goes through [`rlvgl_platform::effect::EffectSink`]
+/// so the same engine drives a synchronous CPU blitter, a
+/// future-batched DMA2D sink, or an instrumentation sink that records
+/// the op stream without touching pixels. This matches the sink/
+/// backend split used by the platform-level [`rlvgl_platform::effect::Effect`]
+/// trait; any [`Crawl`] impl is automatically a CPU-paintable
+/// [`rlvgl_platform::effect::Effect`] via the blanket impl in
+/// [`crate::motion::crawl::text`].
 pub trait Crawl {
     /// Current scroll state.
     fn state(&self) -> CrawlState;
@@ -78,10 +83,13 @@ pub trait Crawl {
     /// Advance the scroll accumulator by one frame's worth of motion.
     fn tick(&mut self);
 
-    /// Paint the current frame into `dst` using `blitter` for any
-    /// bulk pixel transfers. For software blitters this is a series
-    /// of CPU scanline operations; on hardware it becomes DMA2D blits.
-    fn paint<B: Blitter>(&mut self, blitter: &mut B, dst: &mut Surface<'_>);
+    /// Emit the current frame's render ops into `sink`.
+    ///
+    /// For a synchronous CPU blitter the sink will execute each op
+    /// immediately; a batched DMA2D sink may coalesce adjacent fills
+    /// or defer work to an ERIF-aligned dispatch slot. The engine
+    /// must not assume either.
+    fn draw(&mut self, sink: &mut dyn EffectSink);
 }
 
 #[cfg(test)]

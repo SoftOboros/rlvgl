@@ -1,6 +1,6 @@
 <!-- PROJECT-ROADMAP.md - High-level project roadmap. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Project Roadmap

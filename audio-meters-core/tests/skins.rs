@@ -250,7 +250,11 @@ fn validate(skin: &Skin, file_stem: &str, scales: &BTreeMap<String, ScaleStub>) 
             .layout
             .led_count
             .unwrap_or_else(|| panic!("{}: bargraph must declare led_count", skin.id));
-        assert!((4..=256).contains(&n), "{}: led_count {n} out of range", skin.id);
+        assert!(
+            (4..=256).contains(&n),
+            "{}: led_count {n} out of range",
+            skin.id
+        );
     }
 
     if let Some(hold) = skin.layout.peak_hold_ms {
@@ -276,8 +280,8 @@ fn canonical_skins_load_and_validate() {
     let mut count = 0;
     for path in entries {
         let text = fs::read_to_string(&path).unwrap();
-        let skin: Skin = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        let skin: Skin =
+            serde_json::from_str(&text).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
         let stem = path.file_stem().unwrap().to_string_lossy().to_string();
         validate(&skin, &stem, &scales);
         count += 1;

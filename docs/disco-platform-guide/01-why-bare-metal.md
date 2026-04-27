@@ -197,7 +197,7 @@ first LTDC read. Then put it back.
 
 ## Going deeper
 
-- [`docs/STM32H747I-DISCO-BRINGUP.md`](../STM32H747I-DISCO-BRINGUP.md)
+- [`examples/stm32h747i-disco/BRINGUP.md`](../../examples/stm32h747i-disco/BRINGUP.md)
   — the hand-maintained bring-up checklist. Each item on that
   list is a potential entry in a future gap gallery.
 - RM0399 §8 (RCC), §22 (FMC), §50 (I2C), §B3 Cortex-M7 system

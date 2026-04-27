@@ -156,7 +156,7 @@ _User story: As a maintainer, I can trust the generated outputs and understand t
 | [ ] | Add golden snapshots for token outputs (CSS/Tailwind/Rust). | insta | Deterministic formatting. |
 | [ ] | Add sample `.svelte` fixtures for compile tests. | tests | Keep minimal subset. |
 | [ ] | Document the Svelte subset and mapping table. | docs | Constraints + examples. |
-| [ ] | Add creator CLI reference entries for `svelte` subcommands. | docs | Update `docs/CREATOR-CLI.md`. |
+| [ ] | Add creator CLI reference entries for `svelte` subcommands. | docs | Update `docs/creator/CLI.md`. |
 
 ---
 

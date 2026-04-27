@@ -55,6 +55,9 @@ pub mod dma_sai;
 ))]
 /// Shared DSI adapted command mode register configuration.
 pub mod dsi_cmd_mode;
+/// Platform-level visual effect primitives ([`Effect`] trait,
+/// [`CrawlParams`] struct).
+pub mod effect;
 /// Frame synchronization traits for ERIF-based scheduling.
 pub mod frame_sync;
 #[cfg(all(
@@ -187,6 +190,7 @@ pub use cpu_blitter::CpuBlitter;
 pub use display::DisplayDriver;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]
 pub use dma2d::Dma2dBlitter;
+pub use effect::{BlitterSink, CrawlParams, Effect, EffectExt, EffectSink, SubSink};
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")

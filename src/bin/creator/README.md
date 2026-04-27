@@ -225,4 +225,4 @@ cargo run --bin rlgvl-creator --features creator,creator_ui -- sim --screen=800x
 ## Developer Notes
 
 For details on customizing scaffold templates and extending the conversion pipeline, see
-[`docs/CREATOR-TEMPLATES.md`](../../../docs/CREATOR-TEMPLATES.md).
+[`docs/creator/TEMPLATES.md`](../../../docs/creator/TEMPLATES.md).

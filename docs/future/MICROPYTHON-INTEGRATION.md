@@ -1,9 +1,14 @@
 <!-- MICROPYTHON-INTEGRATION.md - MicroPython integration design. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # MicroPython Integration
+
+> **Status: design sketch — not shipped.** This document lives in `docs/future/`
+> because it describes a planned epic, not current behaviour. The design
+> below is preserved for later pickup; nothing here is wired into any
+> shipping build.
 
 > **Epic:** Run MicroPython on CM7, keep rlvgl rendering/input on CM4, and expose a unified, *Python‑first* top‑level API that works on MicroPython (device) and Rust (host/tests). The on‑device Python binding uses MicroPython’s C‑module API via a small Rust FFI shim (not PyO3). For desktop CPython parity and CI, we’ll also ship a PyO3 shim that mirrors the same API surface.
 

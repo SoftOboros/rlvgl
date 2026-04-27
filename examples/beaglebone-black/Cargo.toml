@@ -15,7 +15,7 @@ required-features = ["bare_metal"]
 
 [features]
 default = ["linux", "splash", "desktop", "playit", "star_crawl"]
-# Linux userspace: kernel tilcdc fbdev + evdev touch (see docs/BEAGLEBONE-BLACK.md).
+# Linux userspace: kernel tilcdc fbdev + evdev touch (see docs/beaglebone-black/).
 linux = ["rlvgl-platform/linux_fbdev"]
 # Splash image painted into framebuffer before the render loop. Pulls
 # rlvgl-decomp in through the platform's splash feature.
@@ -26,7 +26,7 @@ desktop = []
 # Drive input + introspection over an SSH-forwarded loopback TCP socket
 # when the `RLVGL_PLAYIT_PORT` env var is set at runtime. Standing in for
 # the broken FT5426 touch sensor while the cape is RMA'd (see
-# docs/NewhavenRMA.md).
+# examples/beaglebone-black/RMA-newhaven-2026-04-22.md).
 playit = ["dep:rlvgl-playit"]
 # Star-crawl overlay effect (mirrors disco-sim wiring). Activated when
 # DiscoController emits DiscoCommand::StartEffect(StarCrawl) — a playit

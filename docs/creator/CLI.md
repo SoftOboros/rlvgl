@@ -2,7 +2,7 @@
 CREATOR-CLI.md - Command-line reference and workflows for rlvgl-creator.
 -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # rlvgl-creator CLI
@@ -213,7 +213,7 @@ rlvgl-creator bsp from-ioc <ioc> [--emit-hal] [--emit-pac] [--template <template
   L5, G0, G4, U5, WB, and WL variants.
 
 See also: STM32 BSP generation behavior, flags, and roadmap in
-[STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) — includes dual-core split,
+[../bsp/STM32.md](../bsp/STM32.md) — includes dual-core split,
 power (SCUEN/VOS), and clock (PLL1/prescalers) details.
 
 #### Advanced configuration examples

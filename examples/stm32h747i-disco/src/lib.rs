@@ -42,6 +42,8 @@ mod file_browser_panel;
 mod fonts;
 
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod crawl_buffers;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod effect;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod event_overlay;

@@ -26,7 +26,8 @@
 use core::marker::PhantomData;
 
 use rlvgl_core::packed_font::PackedFont;
-use rlvgl_platform::blit::{Blitter, PixelFmt, Rect as BlitRect, Surface};
+use rlvgl_platform::blit::{PixelFmt, Rect as BlitRect, Surface};
+use rlvgl_platform::effect::EffectSink;
 
 use super::{Crawl, CrawlState};
 use crate::motion::background::BackgroundPattern;
@@ -41,21 +42,6 @@ use crate::motion::rate::MotionRate;
 /// inner helpers crack the channels for CPU scanline blending.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TextColor(pub u32);
-
-impl TextColor {
-    #[inline]
-    pub(crate) const fn r(self) -> u8 {
-        ((self.0 >> 16) & 0xFF) as u8
-    }
-    #[inline]
-    pub(crate) const fn g(self) -> u8 {
-        ((self.0 >> 8) & 0xFF) as u8
-    }
-    #[inline]
-    pub(crate) const fn b(self) -> u8 {
-        (self.0 & 0xFF) as u8
-    }
-}
 
 /// Generic text crawl engine.
 ///
@@ -347,34 +333,23 @@ pub fn pre_render_text(
     cur_y.clamp(0, h) as u32
 }
 
-fn blend_a8_row(
-    dst: &mut Surface<'_>,
-    dst_row_start: usize,
-    dst_x: usize,
-    alphas: &[u8],
-    color: TextColor,
-) {
-    let color_r = color.r() as u32;
-    let color_g = color.g() as u32;
-    let color_b = color.b() as u32;
-    for (x, &alpha_byte) in alphas.iter().enumerate() {
-        let alpha = alpha_byte as u32;
-        if alpha == 0 {
-            continue;
-        }
-        let dst_off = dst_row_start + (dst_x + x) * 4;
-        if dst_off + 4 > dst.buf.len() {
-            break;
-        }
-        // Destination is BGRA little-endian.
-        let bg_b = dst.buf[dst_off] as u32;
-        let bg_g = dst.buf[dst_off + 1] as u32;
-        let bg_r = dst.buf[dst_off + 2] as u32;
-        let inv = 255 - alpha;
-        dst.buf[dst_off] = ((color_b * alpha + bg_b * inv) / 255) as u8;
-        dst.buf[dst_off + 1] = ((color_g * alpha + bg_g * inv) / 255) as u8;
-        dst.buf[dst_off + 2] = ((color_r * alpha + bg_r * inv) / 255) as u8;
-        dst.buf[dst_off + 3] = 0xFF;
+impl<'buf, R: MotionRate, B: BackgroundPattern> rlvgl_platform::effect::Effect
+    for TextCrawl<'buf, R, B>
+{
+    fn is_active(&self) -> bool {
+        <Self as Crawl>::state(self).active
+    }
+    fn activate(&mut self) {
+        <Self as Crawl>::activate(self)
+    }
+    fn deactivate(&mut self) {
+        <Self as Crawl>::deactivate(self)
+    }
+    fn tick(&mut self) {
+        <Self as Crawl>::tick(self)
+    }
+    fn draw(&mut self, sink: &mut dyn EffectSink) {
+        <Self as Crawl>::draw(self, sink)
     }
 }
 
@@ -431,14 +406,17 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
         }
     }
 
-    fn paint<BL: Blitter>(&mut self, blitter: &mut BL, dst: &mut Surface<'_>) {
-        // 1. Blit the jumbo background into `dst`, wrapping around the
-        //    jumbo's configured long axis so the scroll cursor can slide
-        //    through a pre-painted pattern without visible seams.
+    fn draw(&mut self, sink: &mut dyn EffectSink) {
+        // 1. Blit the jumbo background into the sink, wrapping around
+        //    the jumbo's configured long axis so the scroll cursor can
+        //    slide through a pre-painted pattern without visible seams.
         let bg_w = self.visible_w();
         let bg_h = self.visible_h();
-        let copy_w = bg_w.min(dst.width);
-        let copy_h = bg_h.min(dst.height);
+        let dst_w = sink.target_width();
+        let dst_h = sink.target_height();
+        let dst_format = sink.target_format();
+        let copy_w = bg_w.min(dst_w);
+        let copy_h = bg_h.min(dst_h);
         let long_axis = self.jumbo_bg.long_axis_pixels().max(1);
         let bg_scroll = self.background_scroll_px() % long_axis;
         let orientation = self.jumbo_bg.orientation;
@@ -456,7 +434,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
                         w: copy_w,
                         h: slab_a.1,
                     };
-                    blitter.blit(&bg_surface, src_rect_a, dst, (0, 0));
+                    sink.blit(&bg_surface, src_rect_a, (0, 0));
                     if slab_b.1 > 0 {
                         let src_rect_b = BlitRect {
                             x: 0,
@@ -464,7 +442,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
                             w: copy_w,
                             h: slab_b.1,
                         };
-                        blitter.blit(&bg_surface, src_rect_b, dst, (0, slab_a.1 as i32));
+                        sink.blit(&bg_surface, src_rect_b, (0, slab_a.1 as i32));
                     }
                 }
                 JumboOrientation::Horizontal => {
@@ -474,7 +452,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
                         w: slab_a.1,
                         h: copy_h,
                     };
-                    blitter.blit(&bg_surface, src_rect_a, dst, (0, 0));
+                    sink.blit(&bg_surface, src_rect_a, (0, 0));
                     if slab_b.1 > 0 {
                         let src_rect_b = BlitRect {
                             x: slab_b.0 as i32,
@@ -482,7 +460,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
                             w: slab_b.1,
                             h: copy_h,
                         };
-                        blitter.blit(&bg_surface, src_rect_b, dst, (slab_a.1 as i32, 0));
+                        sink.blit(&bg_surface, src_rect_b, (slab_a.1 as i32, 0));
                     }
                 }
             }
@@ -490,11 +468,13 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
 
         // 2. Overlay the text column with A8 alpha blending, applying
         //    a per-row perspective resample when the top and bottom
-        //    widths differ.
+        //    widths differ. Rows are emitted as individual
+        //    `blend_a8_row` ops so a batched DMA2D sink can group them
+        //    into a single stripe-blend transaction downstream.
         if self.text_height_px == 0 {
             return;
         }
-        if dst.format != PixelFmt::Argb8888 {
+        if dst_format != PixelFmt::Argb8888 {
             return;
         }
         if self.text_src.format != PixelFmt::A8 {
@@ -506,39 +486,35 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
         let visible_w = bg_w as i32;
         let text_h = self.text_height_px as i32;
         let text_w = self.text_src.width as i32;
-        let dst_stride = dst.stride;
-        let dst_w = dst.width as i32;
-        let dst_h = dst.height as i32;
-        let color = self.text_color;
+        let dst_w_i = dst_w as i32;
+        let dst_h_i = dst_h as i32;
+        let color_u32 = self.text_color.0;
 
         match self.direction {
             Direction::Up => {
                 // text_y_in_src = screen_y - visible_h + scroll_px
-                let paint_h = visible_h.min(dst_h).max(0);
-                let paint_w = visible_w.min(dst_w).max(0);
+                let paint_h = visible_h.min(dst_h_i).max(0);
+                let paint_w = visible_w.min(dst_w_i).max(0);
                 for screen_y in 0..paint_h {
                     let text_y = screen_y - visible_h + scroll_px;
                     if text_y < 0 || text_y >= text_h {
                         continue;
                     }
-                    let dst_row_start = (screen_y as usize) * dst_stride;
                     let row_w = self.projected_row_width(screen_y, paint_h, paint_w.min(text_w));
                     if row_w <= 0 {
                         continue;
                     }
-                    let text_x = ((paint_w - row_w) / 2).max(0) as usize;
+                    let text_x = ((paint_w - row_w) / 2).max(0);
                     if row_w == text_w {
                         let src_row_start = text_y as usize * self.text_src.stride;
                         let src_row_end = src_row_start + row_w as usize;
                         if src_row_end > self.text_src.buf.len() {
                             continue;
                         }
-                        blend_a8_row(
-                            dst,
-                            dst_row_start,
-                            text_x,
+                        sink.blend_a8_row(
                             &self.text_src.buf[src_row_start..src_row_end],
-                            color,
+                            (text_x, screen_y),
+                            color_u32,
                         );
                         continue;
                     }
@@ -547,7 +523,7 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> Crawl for TextCrawl<'buf, R, B> 
                     if count == 0 {
                         continue;
                     }
-                    blend_a8_row(dst, dst_row_start, text_x, &self.scanline[..count], color);
+                    sink.blend_a8_row(&self.scanline[..count], (text_x, screen_y), color_u32);
                 }
             }
             _ => {
@@ -568,6 +544,7 @@ mod tests {
     use crate::motion::rate::FrameRoundedRate;
     use alloc::vec;
     use rlvgl_platform::CpuBlitter;
+    use rlvgl_platform::EffectExt;
     use rlvgl_platform::blit::{PixelFmt, Surface};
 
     // A tiny stand-in font with exactly one 1×1 glyph for the character

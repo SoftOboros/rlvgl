@@ -3,9 +3,14 @@
 
 //! Entry point for the STM32H747I-DISCO hardware demo.
 //!
-//! Initializes placeholder display and touch drivers for the board and
-//! constructs the shared widget demonstration. Real MIPI-DSI and touch
-//! handling will be added in future iterations.
+//! Drives the OTM8009A MIPI-DSI panel (video mode by default, adapted
+//! command mode under `adapted_cmd`) and the FT5336 I²C touch controller
+//! through the shared `DiscoController` widget tree. Same entry point is
+//! used by the bare-metal build; `freertos_entry.rs` and `zephyr_entry.rs`
+//! wrap the same controller for their respective task models.
+//!
+//! See: README.md, BRINGUP.md, HARDWARE.md alongside this crate;
+//! docs/disco-platform-guide/ for the full bring-up walkthrough.
 
 extern crate alloc;
 
@@ -40,6 +45,8 @@ mod bsp_pac;
 mod config_menu;
 #[cfg(feature = "cpu_stats")]
 mod cpu_stats;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod crawl_buffers;
 mod device_storage;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod effect;
@@ -3120,20 +3127,22 @@ fn main() -> ! {
         let mut evt_count: u32 = 0;
 
         // ── Star Wars opening crawl ─────────────────────────────────────
+        //
+        // Bare-metal now drives the widgets' generic `TextCrawl` via
+        // `rlvgl_platform::BlitterSink<Dma2dBlitter>` — same sink
+        // pattern BBB Linux uses. The retired `crate::star_crawl`
+        // hardware engine still lives in this crate because the
+        // FreeRTOS entry path depends on it; see the follow-up notes
+        // in `crate::crawl_buffers` for orientation + perspective
+        // deltas introduced by the port.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        let mut star_crawl = {
-            use rlvgl_core::packed_font::PackedFont;
-
-            static BOLD_FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
-            static BOLD_FONT: PackedFont = PackedFont {
-                height: 32,
-                ascent: 30,
-                glyphs: &crate::fonts::DEJAVU_SANS_BOLD_32_GLYPHS,
-                data: BOLD_FONT_DATA,
-            };
-
-            star_crawl::StarCrawl::new(&BOLD_FONT, crate::readme_crawl::README_CRAWL, FRAME_HZ)
-        };
+        #[allow(unused_imports)]
+        use crate::crawl_buffers::LegacyCrawlApi;
+        // Bare-metal runs the NT35510 in adapted-command portrait mode,
+        // so the framebuffer is 480 × 800. Zephyr's video-mode path
+        // passes (800, 480) to the same builder.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let mut star_crawl = crawl_buffers::build_star_crawl_window(480, 800, FRAME_HZ);
 
         // Audio read cursor: tracks position in SDRAM PCM buffer.
         // Pre-fill consumed the first 2 * buf_size bytes.
@@ -3940,18 +3949,17 @@ fn main() -> ! {
                             audio_scope.deactivate();
                             mic_capture.stop();
                         }
-                        if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
-                            blitter.enable_tc_interrupt();
-                            serial_puts("CRAWL:activate()\r\n");
-                            star_crawl.activate(&mut blitter);
-                            serial_puts("CRAWL:active!\r\n");
-                            display.return_dma2d_raw(blitter.into_inner());
-                            render_active = true;
-                            crawl_touch_guard = 20; // ~330ms at 60Hz
-                        } else {
-                            serial_puts("CRAWL:no dma2d!\r\n");
-                        }
+                        // Widgets' `CrawlWindow::activate` paints the
+                        // starfield into the jumbo buffer and pre-renders
+                        // the A8 text column synchronously on the CPU — no
+                        // DMA2D needed at activation time. DMA2D gets
+                        // re-acquired per-frame in the render branch
+                        // below.
+                        serial_puts("CRAWL:activate()\r\n");
+                        star_crawl.activate();
+                        serial_puts("CRAWL:active!\r\n");
+                        render_active = true;
+                        crawl_touch_guard = 20; // ~330ms at 60Hz
                     }
                 }
 
@@ -4235,10 +4243,23 @@ fn main() -> ! {
 
                 if is_crawl {
                     // ── Star crawl render ──
-                    // No per-tick bus gating. QoS gives LTDC read priority
-                    // (INI6=0xF). D-cache invalidated after DMA2D blit.
-                    // Render-start is ERIF-gated (below) so we don't begin
-                    // a new frame mid-scan, but once started, run freely.
+                    //
+                    // Widgets' `CrawlWindow::paint_frame` wraps the
+                    // provided `Dma2dBlitter` in a
+                    // `rlvgl_platform::BlitterSink` and runs one full
+                    // frame of ops through it: jumbo-background blit
+                    // (1–2 DMA2D transactions depending on wrap) then
+                    // one `blend_a8_row` per text row. Each DMA2D op is
+                    // start+wait (see `Dma2dBlitter: Blitter`), so the
+                    // call blocks for the frame's DMA2D work inline.
+                    //
+                    // Render-start is ERIF-gated by the outer loop so
+                    // we don't begin a new frame mid-scan. Inside the
+                    // paint the compositor/touch/serial services stall
+                    // until it returns — acceptable at 30 Hz today;
+                    // when that ceases to be true, swap the sink for
+                    // a future `Dma2dBatchSink` with ERIF-aware
+                    // budget-bounded flush.
                     {
                         #[cfg(all(
                             feature = "dma2d",
@@ -4247,31 +4268,41 @@ fn main() -> ! {
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            match star_crawl.tick(&mut blitter, back as *mut u8, w, h, &sync) {
-                                star_crawl::StepResult::Idle => {
-                                    render_active = false;
-                                }
-                                star_crawl::StepResult::Pending => {
-                                    keep_rendering = true;
-                                }
-                                star_crawl::StepResult::FrameReady => {
-                                    frame_ready = true;
-                                }
-                                star_crawl::StepResult::Finished => {
-                                    render_active = false;
-                                    serial_puts("CRAWL:done\r\n");
-                                    let (w, h) = display.dimensions();
-                                    compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
-                                        x: 0,
-                                        y: 0,
-                                        width: h as i32,
-                                        height: w as i32,
-                                    });
-                                    dirty_frames = 4;
-                                }
-                            }
+                            let back_bytes = unsafe {
+                                core::slice::from_raw_parts_mut(
+                                    back as *mut u8,
+                                    (w as usize) * (h as usize) * 4,
+                                )
+                            };
+                            let mut dst = rlvgl_platform::Surface::new(
+                                back_bytes,
+                                w as usize * 4,
+                                rlvgl_platform::PixelFmt::Argb8888,
+                                w,
+                                h,
+                            );
+                            let painted = star_crawl.paint_frame(&mut blitter, &mut dst);
                             display.return_dma2d_raw(blitter.into_inner());
+                            let _ = sync; // retained for future cooperative path
+                            if painted {
+                                frame_ready = true;
+                            } else {
+                                render_active = false;
+                            }
+                            if !star_crawl.is_active() {
+                                render_active = false;
+                                serial_puts("CRAWL:done\r\n");
+                                let (w, h) = display.dimensions();
+                                compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                    x: 0,
+                                    y: 0,
+                                    width: w as i32,
+                                    height: h as i32,
+                                });
+                                dirty_frames = 4;
+                            }
                         }
+                        let _ = keep_rendering; // single-blocking paint: no cooperative yield
                     }
                 } else if is_scope {
                     // ── Audio scope render ──

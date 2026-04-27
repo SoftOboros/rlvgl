@@ -1,6 +1,6 @@
 <!-- RENDERING-BACKEND-ARCHITECTURE.md - Pluggable rendering backend architecture. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Rendering Backend Architecture

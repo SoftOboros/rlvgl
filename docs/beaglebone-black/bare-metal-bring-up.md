@@ -8,7 +8,7 @@ initialisation recipe looks like, how the three non-obvious fixes were
 found, and the SD-swap deploy flow we use on a Mac that has no USB
 serial adapter and a flaky USB-gadget network.
 
-This is a companion to [`docs/BEAGLEBONE-BLACK.md`](../BEAGLEBONE-BLACK.md).
+This is a companion to [`docs/beaglebone-black/README.md`](./README.md).
 That file still holds the project-level roadmap, cape EEPROM notes, and
 the Linux-prong history (including five failed DT surgeries). This one
 is exclusively the bare-metal story.

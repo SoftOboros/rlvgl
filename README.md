@@ -183,7 +183,7 @@ RLVGL_CHIP_SRC=chipdb/rlvgl-chips-stm/generated cargo build -p rlvgl-chips-stm
 ```
 
 For a full asset workflow overview see the [rlvgl-creator 🆕 README](./README-CREATOR.md).
-Command details live in [docs/CREATOR-CLI.md](./docs/CREATOR-CLI.md).
+Command details live in [docs/creator/CLI.md](./docs/creator/CLI.md).
 
 ### IR schema
 

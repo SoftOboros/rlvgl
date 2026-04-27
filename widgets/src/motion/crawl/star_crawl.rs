@@ -17,6 +17,7 @@
 
 use rlvgl_core::packed_font::PackedFont;
 use rlvgl_platform::blit::Surface;
+use rlvgl_platform::effect::CrawlParams;
 
 use super::text::TextCrawl;
 use crate::motion::background::StarField;
@@ -81,5 +82,42 @@ pub fn disco_demo_preset<'buf>(
     crawl.background_scroll_divisor = 3;
     crawl.perspective_top_width = DISCO_PRESET_TOP_WIDTH;
     crawl.perspective_bottom_width = DISCO_PRESET_BOTTOM_WIDTH;
+    crawl
+}
+
+/// Build a [`StarCrawl`] from a platform-level [`CrawlParams`] plus the
+/// caller-supplied font, text, and buffer triplet.
+///
+/// This is the generic factory the BSPs drive. Direction is fixed to
+/// [`Direction::Up`] because "star crawl" implies the Star Wars look;
+/// flavours that want other directions should compose [`TextCrawl`]
+/// directly. Every other tuning knob — scroll speed, line spacing,
+/// perspective taper, text colour, background scroll divisor — flows
+/// in through `params`, so a single shared allocation path can drive
+/// the sim, BBB, and future boards without touching this function.
+#[allow(clippy::too_many_arguments)]
+pub fn build_star_crawl<'buf>(
+    params: &CrawlParams,
+    font: &'static PackedFont,
+    lines: &'static [&'static str],
+    jumbo_bg: JumboBuffer<'buf>,
+    text_src: Surface<'buf>,
+    scanline: &'buf mut [u8],
+) -> StarCrawl<'buf> {
+    let mut crawl = TextCrawl::new(
+        Direction::Up,
+        SubPixelRate::new(params.pixels_per_sec, params.frame_hz.max(1)),
+        StarField::default(),
+        font,
+        params.text_color_argb,
+        lines,
+        jumbo_bg,
+        text_src,
+        scanline,
+    );
+    crawl.line_spacing = params.line_spacing_px.max(1);
+    crawl.background_scroll_divisor = params.background_scroll_divisor.max(1);
+    crawl.perspective_top_width = params.perspective_top_width;
+    crawl.perspective_bottom_width = params.perspective_bottom_width;
     crawl
 }

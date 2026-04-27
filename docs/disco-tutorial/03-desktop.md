@@ -115,7 +115,7 @@ while the CPU keeps servicing the event loop.
 
 No new code in `main.rs` is required for this — the feature flag
 is enough. See
-[`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+[`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
 for how the platform crate picks the DMA2D backend when the flag
 is on.
 
@@ -170,9 +170,9 @@ framebuffers — double-check step 3.
 
 ## Going deeper
 
-- [`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+- [`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
   — how `rlvgl-platform` picks a blit backend based on features.
-- [`docs/RENDERING-ALPHA-BLENDING.md`](../RENDERING-ALPHA-BLENDING.md)
+- [`docs/rendering/ALPHA-BLENDING.md`](../rendering/ALPHA-BLENDING.md)
   — the alpha math DMA2D accelerates.
 - [STM32H747XIHx RM0399 §DMA2D] — the register reference for the
   2D engine itself. You will not need to touch it directly; the

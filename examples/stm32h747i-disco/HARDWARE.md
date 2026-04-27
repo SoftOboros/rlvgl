@@ -1,8 +1,8 @@
 <!--
-docs/STM32H747I-DISCO.md - STM32H747I-DISCO Hardware Notes.
+examples/stm32h747i-disco/HARDWARE.md - STM32H747I-DISCO Hardware Notes.
 -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # STM32H747I-DISCO Hardware Notes

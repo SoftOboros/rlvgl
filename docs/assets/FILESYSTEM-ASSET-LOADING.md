@@ -1,6 +1,6 @@
 <!-- FILESYSTEM-ASSET-LOADING.md - Filesystem asset loading design. -->
 <p align="center">
-  <img src="../rlvgl-logo.png" alt="rlvgl" />
+  <img src="../../rlvgl-logo.png" alt="rlvgl" />
 </p>
 
 # Filesystem Asset Loading

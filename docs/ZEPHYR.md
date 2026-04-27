@@ -513,9 +513,9 @@ See [Common environment issues](#common-environment-issues).
 
 ## Related documentation
 
-- `docs/STM32H747I-DISCO.md` — board-specific hardware notes (pinmap,
+- `examples/stm32h747i-disco/HARDWARE.md` — board-specific hardware notes (pinmap,
   shield wiring, peripheral selection)
-- `docs/STM32H747I-DISCO-BRINGUP.md` — bare-metal bring-up history and
+- `examples/stm32h747i-disco/BRINGUP.md` — bare-metal bring-up history and
   DSI / LTDC sequencing notes
 - `docs/MAKE.md` — full Makefile target reference
 - `examples/stm32h747i-disco/zephyr/CMakeLists.txt` — Zephyr application

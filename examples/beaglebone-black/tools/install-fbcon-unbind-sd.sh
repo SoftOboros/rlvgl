@@ -4,7 +4,7 @@
 # fresh SD deploy automatically unbinds fbcon at boot and prevents the
 # "flashing cursor underline" on the panel.
 #
-# Root cause is captured in docs/BEAGLEBONE-BLACK.md and the memory note
+# Root cause is captured in docs/beaglebone-black/ and the memory note
 # feedback_bbb_fbcon_cursor.md: the Linux framebuffer console (fbcon)
 # stays bound to /dev/fb0 alongside rlvgl's userspace writes and paints
 # its blinking 8x16 character cell on top of the rendered widget tree.

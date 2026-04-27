@@ -1,9 +1,11 @@
 //! Linux entry point for the BeagleBone Black + NHD-7.0CTP-CAPE-P.
 //!
-//! Renders through the kernel `tilcdc` DRM driver via `/dev/fb0`. The DTB
+//! Presents through the kernel `tilcdc` fbdev node (`/dev/fb0`) but renders
+//! into a separate reserved `/dev/mem` ARGB8888 buffer first so EDMA can
+//! offload the final same-format copy into the scanout framebuffer. The DTB
 //! must have the `lcdc@4830e000` node enabled with a `bb-lcd-pins` pinctrl
 //! state and a `/panel` node (`compatible = "panel-dpi"`). See
-//! `docs/BEAGLEBONE-BLACK.md` for the overlay-driven DT setup.
+//! `docs/beaglebone-black/` for the overlay-driven DT setup.
 //!
 //! Touch comes through the kernel `edt-ft5x06` driver on
 //! `/dev/input/eventN`.
@@ -18,14 +20,14 @@
 //! protocol (`T<x>,<y>`, `?`, `D<x>,<y>,<w>,<h>`, …). Forward it from
 //! a dev host via `ssh -L <port>:127.0.0.1:<port> debian@<bbb>` and drive
 //! with `nc 127.0.0.1 <port>`. Stand-in for the RMA'd touch panel (see
-//! `docs/NewhavenRMA.md`).
+//! `RMA-newhaven-2026-04-22.md` alongside this file).
 
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_core::event::Event;
 #[cfg(feature = "star_crawl")]
 use rlvgl_core::widget::Widget;
 use rlvgl_platform::{
-    BlitRect, BlitterRenderer, CpuBlitter, DisplayDriver, InputDevice, LinuxEvdevInput,
+    BlitRect, Blitter, BlitterRenderer, DisplayDriver, InputDevice, LinuxEvdevInput,
     LinuxFbdevDisplay, PixelFmt, Screen, Surface, gesture::TapRecognizer,
 };
 use std::{
@@ -42,6 +44,10 @@ use rlvgl_playit::{
 mod crawl_buffers;
 #[cfg(feature = "star_crawl")]
 use rlvgl_widgets::motion::{CrawlWindow, StarCrawl};
+
+mod bsp;
+
+use bsp::{devmem, edma::BbbEdmaBlitter};
 
 /// Splash asset shared with the STM32 DISCO demo (480×800 portrait, ARGB8888).
 ///
@@ -85,12 +91,13 @@ fn apply_commands(controller: &mut DiscoController) -> CommandOutcome {
     outcome
 }
 
-/// `FramebufferReader` over our local ARGB8888 `framebuf: Vec<u8>`.
+/// `FramebufferReader` over our local ARGB8888 render buffer.
 ///
 /// The surface we render into is landscape-ordered, stride = `width * 4`
-/// bytes, each pixel `[B, G, R, A]` (as produced by `Color::to_argb8888()
-/// .to_le_bytes()`). The playit `D` (dump) command wants ARGB u32 values
-/// in that same native-endian layout, so a straight 4-byte read works.
+/// bytes, each pixel `[B, G, R, A]` (as produced by
+/// `Color::to_argb8888().to_le_bytes()`). The playit `D` (dump) command
+/// wants ARGB u32 values in that same native-endian layout, so a straight
+/// 4-byte read works.
 ///
 /// `present_count` is supplied by the main loop through the `poll` status
 /// parameter, so this reader doesn't need to track it.
@@ -139,6 +146,41 @@ impl<'a> FramebufferReader for FramebufView<'a> {
     }
 }
 
+/// Pack one render-buffer pixel into the BBB's 16bpp scanout ordering.
+///
+/// The off-screen surface stores native-endian ARGB8888, which means
+/// little-endian bytes land in memory as `[B, G, R, A]`. The NHD-7 cape's
+/// current tilcdc path wants the red/blue lanes swapped in 16bpp mode, so
+/// we intentionally emit BGR565 here. That matches the long-standing
+/// CPU-only BBB path instead of relying on the old accidental byte-cast.
+#[inline]
+fn pack_bbb_scanout_bgr565(src: &[u8], src_off: usize) -> u16 {
+    let b = src[src_off] as u16;
+    let g = src[src_off + 1] as u16;
+    let r = src[src_off + 2] as u16;
+    ((b >> 3) << 11) | ((g >> 2) << 5) | (r >> 3)
+}
+
+/// Present a full ARGB8888 render buffer into the BBB's 16bpp fbdev mmap.
+fn present_bbb_fbdev_16bpp(
+    src: &[u8],
+    width: usize,
+    height: usize,
+    dst: &mut [u8],
+    dst_stride: usize,
+) {
+    for y in 0..height {
+        let src_row = &src[y * width * 4..(y + 1) * width * 4];
+        let dst_row = &mut dst[y * dst_stride..y * dst_stride + width * 2];
+        for x in 0..width {
+            let pixel = pack_bbb_scanout_bgr565(src_row, x * 4);
+            let dst_off = x * 2;
+            dst_row[dst_off] = pixel as u8;
+            dst_row[dst_off + 1] = (pixel >> 8) as u8;
+        }
+    }
+}
+
 fn main() {
     let fb_path = env::var("RLVGL_FB").unwrap_or_else(|_| "/dev/fb0".into());
     let input_path = env::var("RLVGL_INPUT").unwrap_or_else(|_| "/dev/input/event0".into());
@@ -164,7 +206,23 @@ fn main() {
     let root = controller.root();
 
     let mut tap = TapRecognizer::new(frame_hz);
-    let mut framebuf = vec![0u8; width * height * 4];
+    devmem::DevMem::init();
+    assert!(
+        width * height * 4 <= devmem::FB_SIZE,
+        "bbb: off-screen render buffer {} bytes exceeds reserved /dev/mem framebuffer {} bytes",
+        width * height * 4,
+        devmem::FB_SIZE
+    );
+    let (render_va, render_pa) = devmem::map_framebuffer();
+    let framebuf = unsafe { core::slice::from_raw_parts_mut(render_va, devmem::FB_SIZE) };
+    unsafe {
+        core::ptr::write_bytes(render_va, 0, devmem::FB_SIZE);
+    }
+    let mut blitter = BbbEdmaBlitter::init();
+    blitter.register_phys_span(&mut framebuf[..], rlvgl_platform::PhysAddr::new(render_pa));
+    if let Some(fb_phys) = display.framebuffer_phys() {
+        blitter.register_phys_span(display.buffer_mut(), fb_phys);
+    }
     let frame_time = Duration::from_secs_f64(1.0 / frame_hz as f64);
     let mut last_tick = Instant::now();
     let mut tick_accum = frame_time;
@@ -218,7 +276,7 @@ fn main() {
     // land bytes in the same read pattern the widget tree uses — this
     // was the fix for the earlier "splash upside-down relative to icons"
     // report on this board. Each BSP picks its own orientation; see
-    // docs/BEAGLEBONE-BLACK.md for the per-board table.
+    // docs/beaglebone-black/ for the per-board table.
     #[cfg(feature = "splash")]
     {
         const SW: usize = 480;
@@ -237,7 +295,7 @@ fn main() {
                         SH,
                         &palette[..pal_count],
                         stream,
-                        &mut framebuf,
+                        &mut framebuf[..width * height * 4],
                         width,
                         height,
                         ORIENT,
@@ -275,6 +333,14 @@ fn main() {
         // we replay each dispatched event back into the DiscoController
         // so its side-effect commands (e.g. LoadStorageSummary on tap)
         // fire exactly as they would for real hardware touches.
+        //
+        // Extension payloads — playit routes single letters that don't
+        // match a built-in command (e.g. `C\n`) to the extension
+        // callback. We use `C` / `c` as the star-crawl toggle so a
+        // playit-driven board can start/stop the effect without having
+        // to tap the Settings wing slot by pixel coordinates.
+        #[cfg(all(feature = "playit", feature = "star_crawl"))]
+        let mut ext_toggle_crawl = false;
         #[cfg(feature = "playit")]
         if let Some(executor) = playit.as_mut() {
             let status = StatusData {
@@ -282,7 +348,7 @@ fn main() {
                 present_count,
             };
             let fb_view = FramebufView {
-                buf: &framebuf,
+                buf: &framebuf[..width * height * 4],
                 width,
                 height,
                 present_count,
@@ -293,7 +359,14 @@ fn main() {
                 &status,
                 Some(&fb_view),
                 &mut NullPipeline,
-                |_ext| {},
+                #[cfg(feature = "star_crawl")]
+                |ext: &[u8]| {
+                    if matches!(ext, b"C" | b"c") {
+                        ext_toggle_crawl = true;
+                    }
+                },
+                #[cfg(not(feature = "star_crawl"))]
+                |_ext: &[u8]| {},
                 |event| controller.handle_event(event),
             );
         }
@@ -312,7 +385,20 @@ fn main() {
             tick_accum -= frame_time;
         }
 
-        let outcome = apply_commands(&mut controller);
+        let mut outcome = apply_commands(&mut controller);
+
+        // Fold the playit `C` extension into this frame's outcome as
+        // either a start or a stop depending on current state. This
+        // lets a single `C\n` over the loopback TCP socket act like
+        // the hardware toggle button the DISCO target exposes.
+        #[cfg(all(feature = "playit", feature = "star_crawl"))]
+        if ext_toggle_crawl {
+            if active_crawl.is_some() {
+                outcome.stop_star_crawl = true;
+            } else {
+                outcome.start_star_crawl = true;
+            }
+        }
 
         // Honour effect start/stop requests from this frame's commands.
         // Drop any previous crawl first so its leaked buffers don't
@@ -323,6 +409,7 @@ fn main() {
                 if let Some(mut crawl) = active_crawl.take() {
                     crawl.deactivate();
                 }
+                eprintln!("bbb: star crawl deactivated");
             }
             if outcome.start_star_crawl {
                 if let Some(mut crawl) = active_crawl.take() {
@@ -353,9 +440,14 @@ fn main() {
         }
 
         {
-            let mut blitter = CpuBlitter;
-            let surface = Surface::new(&mut framebuf, width * 4, PixelFmt::Argb8888, w, h);
-            let mut renderer: BlitterRenderer<'_, CpuBlitter, 16> =
+            let surface = Surface::new(
+                &mut framebuf[..width * height * 4],
+                width * 4,
+                PixelFmt::Argb8888,
+                w,
+                h,
+            );
+            let mut renderer: BlitterRenderer<'_, BbbEdmaBlitter, 16> =
                 BlitterRenderer::new(&mut blitter, surface);
             root.borrow().draw(&mut renderer);
             renderer.planner().add(BlitRect { x: 0, y: 0, w, h });
@@ -367,29 +459,94 @@ fn main() {
         // the crawl is partially transparent / ramping in.
         #[cfg(feature = "star_crawl")]
         if let Some(crawl) = active_crawl.as_mut() {
-            let mut blitter = CpuBlitter;
-            let mut surface = Surface::new(&mut framebuf, width * 4, PixelFmt::Argb8888, w, h);
+            let mut surface = Surface::new(
+                &mut framebuf[..width * height * 4],
+                width * 4,
+                PixelFmt::Argb8888,
+                w,
+                h,
+            );
             crawl.paint_frame(&mut blitter, &mut surface);
         }
 
-        use rlvgl_core::widget::{Color, Rect};
-        let colors: &[Color] = unsafe {
-            core::slice::from_raw_parts(framebuf.as_ptr() as *const Color, width * height)
-        };
-        display.flush(
-            Rect {
-                x: 0,
-                y: 0,
-                width: width as i32,
-                height: height as i32,
-            },
-            colors,
-        );
+        let display_stride = display.stride_bytes();
+        let display_bpp = display.bits_per_pixel();
+        match display_bpp {
+            32 => {
+                let src_surface = Surface::new(
+                    &mut framebuf[..width * height * 4],
+                    width * 4,
+                    PixelFmt::Argb8888,
+                    w,
+                    h,
+                );
+                let mut dst_surface = Surface::new(
+                    display.buffer_mut(),
+                    display_stride,
+                    PixelFmt::Argb8888,
+                    w,
+                    h,
+                );
+                blitter.blit(
+                    &src_surface,
+                    BlitRect { x: 0, y: 0, w, h },
+                    &mut dst_surface,
+                    (0, 0),
+                );
+            }
+            16 => {
+                present_bbb_fbdev_16bpp(
+                    &framebuf[..width * height * 4],
+                    width,
+                    height,
+                    display.buffer_mut(),
+                    display_stride,
+                );
+            }
+            _ => {
+                use rlvgl_core::widget::{Color, Rect};
+                let colors: &[Color] = unsafe {
+                    core::slice::from_raw_parts(framebuf.as_ptr() as *const Color, width * height)
+                };
+                display.flush(
+                    Rect {
+                        x: 0,
+                        y: 0,
+                        width: width as i32,
+                        height: height as i32,
+                    },
+                    colors,
+                );
+            }
+        }
         present_count = present_count.wrapping_add(1);
 
         let elapsed = started.elapsed();
         if elapsed < frame_time {
             thread::sleep(frame_time - elapsed);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pack_bbb_scanout_bgr565, present_bbb_fbdev_16bpp};
+
+    #[test]
+    fn packs_argb_bytes_as_bgr565_for_bbb_scanout() {
+        let src = [0x21, 0x10, 0x08, 0xFF];
+        assert_eq!(pack_bbb_scanout_bgr565(&src, 0), 0x2081);
+    }
+
+    #[test]
+    fn presents_full_frame_into_fbdev_rows() {
+        let src = [
+            0x00, 0x00, 0xFF, 0xFF, // red in render space
+            0xFF, 0x00, 0x00, 0xFF, // blue in render space
+        ];
+        let mut dst = [0u8; 4];
+        present_bbb_fbdev_16bpp(&src, 2, 1, &mut dst, 4);
+        assert_eq!(u16::from_le_bytes([dst[0], dst[1]]), 0x001F);
+        assert_eq!(u16::from_le_bytes([dst[2], dst[3]]), 0xF800);
     }
 }
