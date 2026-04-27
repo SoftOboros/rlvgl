@@ -188,6 +188,58 @@ pub struct Scale {
     pub zones: &'static [Zone],
 }
 
+/// Optional graphical primitives bound to a [`Skin`]. Every field is
+/// optional; widgets fall back to procedural rendering from
+/// `palette` + `layout` when a slot is `None`.
+///
+/// Forward-compatibility scaffolding. AM-04b-stub (this commit) adds
+/// the type but no widget consumes it yet — the aesthetics pass
+/// (full AM-04b) will populate slots and add asset-aware rendering
+/// paths to existing widgets without changing the schema or widget
+/// API. SVG content is **pre-rasterised** by `rlvgl-creator` at
+/// build time; the byte slice here is target-format pixels (RLE
+/// blob, RGB565 strip, or a PNG that the renderer decodes itself).
+/// PNG content is the raw file bytes; the rendering path decodes
+/// using the platform's PNG support.
+#[derive(Debug, Clone, Copy)]
+pub struct SkinAssets {
+    /// LED segment art for lit cells (typically per-zone-coloured).
+    pub led_segment_on_png: Option<&'static [u8]>,
+    /// LED segment art for unlit cells.
+    pub led_segment_off_png: Option<&'static [u8]>,
+    /// Needle vector — rasterised at build time, byte slice is the
+    /// chosen runtime format.
+    pub needle_svg: Option<&'static [u8]>,
+    /// Bezel / frame art around the meter.
+    pub bezel_svg: Option<&'static [u8]>,
+    /// Pre-rendered faceplate (e.g. cream paper texture for the
+    /// classic VU look).
+    pub faceplate_png: Option<&'static [u8]>,
+}
+
+impl SkinAssets {
+    /// All slots `None`. Use this for skins that render purely from
+    /// palette + layout. All AM-04a / AM-08* skins use this.
+    pub const EMPTY: Self = Self {
+        led_segment_on_png: None,
+        led_segment_off_png: None,
+        needle_svg: None,
+        bezel_svg: None,
+        faceplate_png: None,
+    };
+
+    /// `true` when at least one slot is populated. Widget rendering
+    /// paths use this as a fast-path check before deciding between
+    /// procedural and asset-driven rendering.
+    pub const fn any_present(&self) -> bool {
+        self.led_segment_on_png.is_some()
+            || self.led_segment_off_png.is_some()
+            || self.needle_svg.is_some()
+            || self.bezel_svg.is_some()
+            || self.faceplate_png.is_some()
+    }
+}
+
 /// Runtime `Skin` — mirror of
 /// `assets/audio-meters/schema/skin.schema.json`.
 #[derive(Debug, Clone, Copy)]
@@ -208,6 +260,9 @@ pub struct Skin {
     pub secondary: SecondaryColors,
     /// Geometry hints.
     pub layout: Layout,
+    /// Optional graphical primitives. AM-04a / AM-08* skins set this
+    /// to [`SkinAssets::EMPTY`]; the aesthetics pass populates it.
+    pub assets: SkinAssets,
 }
 
 impl Scale {

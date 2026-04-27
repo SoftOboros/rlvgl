@@ -37,7 +37,8 @@ Each phase is independently conformant once its acceptance checklist passes.
 | AM-02 — TS port of L0 | Ratified 2026-04-26 | _(combined with AM-01; see commit `2aa15ac`)_ |
 | AM-03 — Scale descriptors | Ratified 2026-04-26 | [03-scales.md](03-scales.md) |
 | AM-04a — Skin descriptors | Ratified 2026-04-26 | [04-skins.md](04-skins.md) |
-| AM-04b — Visual primitives + creator rasterisation | Deferred | _(deferred until widget-side demand)_ |
+| AM-04b-stub — Asset hooks | Ratified 2026-04-26 | [13-asset-hooks.md](13-asset-hooks.md) |
+| AM-04b — Visual primitives + creator rasterisation | Deferred | _(aesthetics pass)_ |
 | AM-05 — `LedBargraph` (rlvgl) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) |
 | AM-06 — `LedBargraph` (TS) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) (combined) |
 | AM-07 — `NeedleVu` (both) | Ratified 2026-04-26 | [06-needle-vu.md](06-needle-vu.md) |

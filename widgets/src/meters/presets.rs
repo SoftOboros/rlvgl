@@ -15,8 +15,8 @@
 use rlvgl_audio_meters_core::Ballistic;
 
 use super::skin::{
-    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, TickLabel,
-    Zone, rgb,
+    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, SkinAssets,
+    TickLabel, Zone, rgb,
 };
 
 // ---- Scales ---------------------------------------------------------
@@ -249,6 +249,7 @@ pub static BROADCAST_CLASSIC_BARGRAPH: Skin = Skin {
         led_count: 32,
         peak_hold_ms: 1200.0,
     },
+    assets: SkinAssets::EMPTY,
 };
 
 /// `ebu_classic_bargraph` — EBU LED bargraph; teal-tinted Safe band.
@@ -282,6 +283,7 @@ pub static EBU_CLASSIC_BARGRAPH: Skin = Skin {
         led_count: 32,
         peak_hold_ms: 1500.0,
     },
+    assets: SkinAssets::EMPTY,
 };
 
 /// `broadcast_classic_needle` — Cream-faced analog VU look over `vu_broadcast`.
@@ -315,6 +317,7 @@ pub static BROADCAST_CLASSIC_NEEDLE: Skin = Skin {
         led_count: 0,
         peak_hold_ms: 0.0,
     },
+    assets: SkinAssets::EMPTY,
 };
 
 /// `digital_studio_numeric` — Two-line numeric dBFS readout.
@@ -348,6 +351,7 @@ pub static DIGITAL_STUDIO_NUMERIC: Skin = Skin {
         led_count: 0,
         peak_hold_ms: 1500.0,
     },
+    assets: SkinAssets::EMPTY,
 };
 
 /// `lufs_ebu_r128_gauge` — EBU R 128 LUFS loudness gauge.
@@ -381,6 +385,7 @@ pub static LUFS_EBU_R128_GAUGE: Skin = Skin {
         led_count: 0,
         peak_hold_ms: 0.0,
     },
+    assets: SkinAssets::EMPTY,
 };
 
 /// `digital_studio_bargraph` — High-resolution dBFS peak meter.
@@ -414,4 +419,5 @@ pub static DIGITAL_STUDIO_BARGRAPH: Skin = Skin {
         led_count: 48,
         peak_hold_ms: 1500.0,
     },
+    assets: SkinAssets::EMPTY,
 };

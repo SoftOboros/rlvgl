@@ -74,6 +74,27 @@ export function dbfsToScaleUnits(scale: Scale, dbfs: number): number {
   return dbfs + (scale.pivot.value - scale.pivot.input_dbfs);
 }
 
+/**
+ * Optional graphical primitives bound to a Skin. Mirrors the
+ * `assets` block in `assets/audio-meters/schema/skin.schema.json`.
+ *
+ * Forward-compatibility scaffolding — AM-04b-stub adds the type
+ * but no widget consumes it yet. Aesthetics pass populates and adds
+ * asset-aware rendering.
+ *
+ * Field values are filenames in JSON (resolved relative to
+ * `assets/audio-meters/{svg,png}/`). Loaders map those filenames to
+ * runtime byte slices / URLs when the time comes.
+ */
+export interface SkinAssets {
+  led_segment_on_png?: string;
+  led_segment_off_png?: string;
+  needle_svg?: string;
+  bezel_svg?: string;
+  faceplate_png?: string;
+  faceplate_svg?: string;
+}
+
 export interface Skin {
   id: string;
   title: string;
@@ -84,6 +105,8 @@ export interface Skin {
   palette: Palette;
   secondary_colors?: SecondaryColors;
   layout: Layout;
+  /** Optional graphical primitives. Populated by aesthetics pass. */
+  assets?: SkinAssets;
 }
 
 /** Look up the §7 colour identifier whose zone covers `dbValue`. */

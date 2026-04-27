@@ -20,7 +20,7 @@ pub use lufs_gauge::LufsGauge;
 pub use needle::NeedleVu;
 pub use numeric::NumericPeak;
 pub use skin::{
-    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, TickLabel,
-    Zone, rgb, rgba,
+    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin,
+    SkinAssets, TickLabel, Zone, rgb, rgba,
 };
 pub use stereo::{MeterWidget, StereoPair, split_horizontal};

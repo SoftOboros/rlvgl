@@ -47,6 +47,7 @@ export {
   type Scale,
   type SecondaryColors,
   type Skin,
+  type SkinAssets,
   type Zone,
   dbfsToScaleUnits,
   zoneColorFor,

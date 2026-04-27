@@ -54,7 +54,12 @@ Optional fields:
 - `calibration_override` — overrides the scale's `calibration_default`.
 - `secondary_colors` — non-zone colours (background, frame, ticks,
   needle, led_off, peak_hold).
-- `assets` — placeholder for AM-04b file references.
+- `assets` — optional pointers to graphical primitives (filenames
+  under `assets/audio-meters/{svg,png}/`). AM-04a skins leave this
+  empty; AM-04b-stub (commit `<TBD>`) added the runtime
+  `SkinAssets` type and `skin.assets` field on the runtime `Skin`
+  struct so the aesthetics pass can populate it without changing
+  the schema. See `docs/audio-meters/13-asset-hooks.md`.
 
 ## Validator contract
 
