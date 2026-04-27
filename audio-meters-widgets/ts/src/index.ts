@@ -30,6 +30,15 @@ export {
   defineRlvglNumericPeak,
 } from "./numeric-peak-element.ts";
 export {
+  LufsGaugeCore,
+  type LufsGaugeConfig,
+  type LufsSink,
+} from "./lufs-gauge-core.ts";
+export {
+  RlvglLufsGaugeElement,
+  defineRlvglLufsGauge,
+} from "./lufs-gauge-element.ts";
+export {
   type Layout,
   type MeterColorId,
   type MeterType,

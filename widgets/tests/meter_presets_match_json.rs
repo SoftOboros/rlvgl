@@ -293,6 +293,10 @@ fn scales_match_json() {
     assert_scale_match(&presets::SCALE_VU_BROADCAST, &dir.join("vu_broadcast.json"));
     assert_scale_match(&presets::SCALE_VU_EBU, &dir.join("vu_ebu.json"));
     assert_scale_match(&presets::SCALE_DIGITAL_PEAK, &dir.join("digital_peak.json"));
+    assert_scale_match(
+        &presets::SCALE_LUFS_EBU_R128,
+        &dir.join("lufs_ebu_r128.json"),
+    );
 }
 
 #[test]
@@ -317,6 +321,10 @@ fn skins_match_json() {
     assert_skin_match(
         &presets::BROADCAST_CLASSIC_NEEDLE,
         &dir.join("broadcast_classic_needle.json"),
+    );
+    assert_skin_match(
+        &presets::LUFS_EBU_R128_GAUGE,
+        &dir.join("lufs_ebu_r128_gauge.json"),
     );
 }
 

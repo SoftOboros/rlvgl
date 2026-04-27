@@ -164,6 +164,58 @@ pub static SCALE_DIGITAL_PEAK: Scale = Scale {
     ],
 };
 
+/// `lufs_ebu_r128` — EBU R 128 LUFS scale; target -23.
+pub static SCALE_LUFS_EBU_R128: Scale = Scale {
+    id: "lufs_ebu_r128",
+    label_units: "LUFS",
+    range_min_db: -36.0,
+    range_max_db: 0.0,
+    pivot_value: -23.0,
+    pivot_label: "−23",
+    pivot_input_dbfs: -23.0,
+    calibration_offset_db: None,
+    majors: &[
+        -36.0, -30.0, -27.0, -25.0, -23.0, -21.0, -19.0, -17.0, -15.0, -10.0, -5.0, 0.0,
+    ],
+    minors_per_major_division: 1,
+    tick_labels: &[
+        TickLabel { value: -36.0, label: "−36" },
+        TickLabel { value: -30.0, label: "−30" },
+        TickLabel { value: -27.0, label: "−27" },
+        TickLabel { value: -25.0, label: "−25" },
+        TickLabel { value: -23.0, label: "−23" },
+        TickLabel { value: -21.0, label: "−21" },
+        TickLabel { value: -19.0, label: "−19" },
+        TickLabel { value: -17.0, label: "−17" },
+        TickLabel { value: -15.0, label: "−15" },
+        TickLabel { value: -10.0, label: "−10" },
+        TickLabel { value:  -5.0, label: "−5"  },
+        TickLabel { value:   0.0, label: "0"   },
+    ],
+    zones: &[
+        Zone {
+            from_db: -36.0,
+            to_db: -25.0,
+            color: MeterColorId::Safe,
+        },
+        Zone {
+            from_db: -25.0,
+            to_db: -21.0,
+            color: MeterColorId::Nominal,
+        },
+        Zone {
+            from_db: -21.0,
+            to_db: -15.0,
+            color: MeterColorId::Caution,
+        },
+        Zone {
+            from_db: -15.0,
+            to_db: 0.0,
+            color: MeterColorId::Hot,
+        },
+    ],
+};
+
 // ---- Skins ----------------------------------------------------------
 
 /// `broadcast_classic_bargraph` — US LED bargraph; classic green/amber/red.
@@ -295,6 +347,39 @@ pub static DIGITAL_STUDIO_NUMERIC: Skin = Skin {
         aspect_ratio: 2.5,
         led_count: 0,
         peak_hold_ms: 1500.0,
+    },
+};
+
+/// `lufs_ebu_r128_gauge` — EBU R 128 LUFS loudness gauge.
+pub static LUFS_EBU_R128_GAUGE: Skin = Skin {
+    id: "lufs_ebu_r128_gauge",
+    title: "EBU R 128 — LUFS Loudness Gauge",
+    scale: &SCALE_LUFS_EBU_R128,
+    default_ballistic: Ballistic::LufsI,
+    meter_type: MeterType::LufsGauge,
+    palette: Palette {
+        safe: rgb(0x3e, 0xd2, 0x7a),
+        nominal: rgb(0x3e, 0xd2, 0x7a),
+        caution: rgb(0xe6, 0xb2, 0x2c),
+        hot: rgb(0xd2, 0x4b, 0x2e),
+        over: rgb(0xff, 0x2a, 0x1f),
+    },
+    secondary: SecondaryColors {
+        background: Some(rgb(0x08, 0x08, 0x0a)),
+        frame: Some(rgb(0x1d, 0x21, 0x26)),
+        scale_text: Some(rgb(0xdd, 0xe2, 0xe6)),
+        minor_tick: None,
+        major_tick: None,
+        needle: None,
+        needle_pivot: None,
+        led_off: None,
+        peak_hold: None,
+    },
+    layout: Layout {
+        orientation: Orientation::Horizontal,
+        aspect_ratio: 2.0,
+        led_count: 0,
+        peak_hold_ms: 0.0,
     },
 };
 
