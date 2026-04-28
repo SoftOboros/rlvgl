@@ -135,25 +135,12 @@ impl Sai4Pdm {
     ///
     /// `mckdiv` is the master clock divider used to derive the bit clock.
     /// The PDM bitstream clock frequency is:
-    ///   `F_PDM_CK = F_SAI4_KER_CK / (2 * MCKDIV)` when NODIV=0
+    ///   `F_PDM_CK = F_SAI4_KER_CK / (2 * MCKDIV)` when NODIV=1
     ///
     /// For a 1 mic pair with 16-bit slots:
     ///   - FRL = 15 (16 bit-clocks per frame)
     ///   - NBSLOT = 0 (1 slot of 16 bits)
     ///   - F_SCK_A = F_PDM_CK * 2 * 1 (MICNBR+1)
-    ///
-    /// Bench-flash 2026-04-28 (disco-analyzer subrepo gate-4.x): the
-    /// previous CR1 bitmask included CR1_NODIV, which per RM0399
-    /// bypasses MCKDIV and feeds SAI_KER_CK (200 MHz on the rlvgl
-    /// example clock tree) straight through as the PDM bit clock —
-    /// far above the MEMS mic spec (~4 MHz max). The mic responded
-    /// in a degraded slow-mode producing samples at 16x below the
-    /// intended ~42 kHz PCM rate, causing audible-band signals to
-    /// alias when displayed in a spectrum analyzer. Fix: drop
-    /// CR1_NODIV from the bitmask. With NODIV=0, MCKDIV=37, and
-    /// SAI_KER_CK=200 MHz, F_PDM_CK = 2.7 MHz → PCM at 42 kHz after
-    /// CIC decimation 64. Verified on STM32H747I-DISCO via probe-rs
-    /// reads of SAI4 registers showing pre-fix bit 19 (NODIV) = 1.
     pub fn configure(&self, mckdiv: u8) {
         unsafe {
             // Disable sub-block A
@@ -165,11 +152,11 @@ impl Sai4Pdm {
             let acr2 = self.reg(ACR2);
             acr2.write_volatile(CR2_FTH_QUARTER | CR2_FFLUSH);
 
-            // CR1: master RX, 16-bit data, async, NODIV=0 (use MCKDIV
-            // to derive the PDM bit clock from SAI_KER_CK).
+            // CR1: master RX, 16-bit data, async, NODIV=1
             let cr1 = CR1_MODE_MASTER_RX
                 | CR1_DS_16BIT
                 | CR1_SYNCEN_ASYNC
+                | CR1_NODIV
                 | ((mckdiv as u32) << CR1_MCKDIV_SHIFT);
             acr1.write_volatile(cr1);
 
