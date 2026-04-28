@@ -35,6 +35,9 @@ fn apply_runtime_commands(controller: &mut DiscoController) {
                 DiscoEffect::StarCrawl => {
                     controller.publish_status("UEFI runtime does not provide the star crawl yet");
                 }
+                DiscoEffect::Spectrum => {
+                    controller.publish_status("UEFI runtime does not provide the spectrum yet");
+                }
             },
             DiscoCommand::StopEffect(effect) => match effect {
                 DiscoEffect::AudioScope => {
@@ -42,6 +45,9 @@ fn apply_runtime_commands(controller: &mut DiscoController) {
                 }
                 DiscoEffect::StarCrawl => {
                     controller.publish_status("UEFI runtime stopped star crawl");
+                }
+                DiscoEffect::Spectrum => {
+                    controller.publish_status("UEFI runtime stopped spectrum");
                 }
             },
             DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}

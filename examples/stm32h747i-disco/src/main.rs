@@ -4953,6 +4953,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                     DiscoEffect::StarCrawl => {
                         controller.publish_status("STM32 runtime acknowledged star crawl");
                     }
+                    DiscoEffect::Spectrum => {
+                        controller.publish_status("STM32 runtime acknowledged spectrum");
+                    }
                 },
                 DiscoCommand::StopEffect(effect) => match effect {
                     DiscoEffect::AudioScope => {
@@ -4960,6 +4963,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                     }
                     DiscoEffect::StarCrawl => {
                         controller.publish_status("STM32 runtime stopped star crawl");
+                    }
+                    DiscoEffect::Spectrum => {
+                        controller.publish_status("STM32 runtime stopped spectrum");
                     }
                 },
                 DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}
