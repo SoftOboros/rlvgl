@@ -62,7 +62,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
 
         // SDCR1: shared bits only (SDCLK, RBURST, RPIPE)
         fmc.sdbank1().sdcr.write(|w| w
-            .sdclk().bits(0b01)   // Reserved per RM0399, but required on this silicon
+            .sdclk().bits(0b10)   // fmc_ker_ck/2 per RM0399 §23.9.5.1
             .rburst().set_bit()
             .rpipe().bits(0));
 
@@ -78,9 +78,21 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
             .wp().clear_bit());
 ```
 
-The SDCLK field value `0b01` is flagged "Reserved" in RM0399
-but is what this silicon actually requires — confirmed against
-the CubeMX output for the board.
+The SDCLK field encodes the FMC kernel-clock divider, per
+RM0399 Rev 4 §23.9.5.1 (and RM0433 Rev 8 §22.9.5.1 for the
+H743 sibling):
+
+| `SDCLK[1:0]` | Meaning |
+|---|---|
+| `0b00` | SDCLK clock disabled |
+| `0b01` | Reserved |
+| `0b10` | `fmc_ker_ck / 2` (the documented /2 divider) |
+| `0b11` | `fmc_ker_ck / 3` |
+
+This chapter previously instructed `0b01` based on CubeMX
+output; that value is *Reserved* per the RM, not silicon-
+required. See the change log at the foot of this chapter
+for the audit trail and the on-hardware reproduction.
 
 ### 3. Program SDTR1 / SDTR2 — raw addresses
 
@@ -206,6 +218,26 @@ Fault modes:
   trusting the framebuffer to it. Turn it on if the surface
   symptoms in the "Fault modes" list above match what you
   see.
+
+---
+
+## Change log
+
+- **2026-04-28 — DISCO-03: SDCLK 0b01 → 0b10 (column-aliasing fix).**
+  `configure_fmc_sdram` (and the prose in §2) had been instructing
+  `SDCR1.SDCLK[1:0] = 0b01` with the comment "Reserved per RM0399,
+  but required on this silicon." Per RM0399 Rev 4 §23.9.5.1 the
+  field encoding is `00`=disabled / `01`=Reserved / `10`=
+  `fmc_ker_ck/2` / `11`=`fmc_ker_ck/3`. The `0b01` value was
+  inherited from a CubeMX export and is *Reserved*, not silicon-
+  required. At PLL2_R 150 MHz it produced a clock-like waveform
+  but failed to decode column-address line A0 (byte-address bit 2),
+  so adjacent 32-bit cells swapped on writeback. Reproduced
+  independently on disco-analyzer (SDCR1 `0x16D0` → `0x1AD0` after
+  the fix; `0xDEADBEEF`/`0xCAFEBABE` no longer swap at
+  `0xD000_0000`/`0xD000_0004`) and on lvglpp's H747I-DISCO memtest.
+  Memalpha 2026-04-28 verified the RM encoding table against
+  RM0399 Rev 4 §23.9.5.1 and RM0433 Rev 8 §22.9.5.1.
 
 ---
 

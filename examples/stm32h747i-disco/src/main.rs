@@ -1187,10 +1187,20 @@ fn issue_sdram_command(
 fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
     unsafe {
         fmc.bcr1.modify(|_, w| w.fmcen().set_bit());
-        // SDCR1: shared bits only (SDCLK, RBURST, RPIPE)
+        // SDCR1: shared bits only (SDCLK, RBURST, RPIPE).
+        // SDCLK = 0b10 = fmc_ker_ck/2 per RM0399 Rev 4 §23.9.5.1
+        // (and RM0433 Rev 8 §22.9.5.1 for the H743 sibling). The previous
+        // `0b01` value was inherited from a CubeMX export; per the RM
+        // it is *Reserved*, not silicon-required. At PLL2_R 150 MHz the
+        // Reserved encoding produced a clock-like waveform but failed
+        // to decode column-address line A0 (byte-address bit 2), so
+        // adjacent 32-bit cells swapped on writeback. Reproduced on
+        // disco-analyzer + lvglpp; memalpha 2026-04-28 verified the
+        // RM encoding table. See docs/disco-platform-guide/03-sdram-and-fmc.md
+        // §"Change log" for the audit trail.
         fmc.sdbank1().sdcr.write(|w| {
             w.sdclk()
-                .bits(0b01) // Reserved per RM0399, but required on this silicon
+                .bits(0b10) // fmc_ker_ck/2 per RM0399 §23.9.5.1
                 .rburst()
                 .set_bit()
                 .rpipe()
