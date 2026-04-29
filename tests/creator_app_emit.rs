@@ -70,12 +70,33 @@ fn emits_bbb_linux_with_cross_tree_splash() {
     assert!(idx.contains("include_bytes!(\"../assets/splash.rle\")"), "got: {idx}");
     assert!(idx.contains("SPLASH_CLASS: &str = \"image_rle_a8\""), "got: {idx}");
 
-    // Scaffold placeholders carry the stub flag.
-    let cargo = entry_for(&inv, "Cargo.toml");
-    assert!(cargo.stub);
-    assert_eq!(cargo.stage, "scaffold");
-    let readme = entry_for(&inv, "README.md");
-    assert!(readme.stub);
+    // APP-02c: Cargo.toml + README.md are no longer stubs.
+    let cargo_e = entry_for(&inv, "Cargo.toml");
+    assert!(!cargo_e.stub, "Cargo.toml stops being a stub at APP-02c");
+    assert_eq!(cargo_e.stage, "scaffold");
+    let readme_e = entry_for(&inv, "README.md");
+    assert!(!readme_e.stub);
+
+    // Cargo.toml content: name, controller dependency, features.
+    let cargo = fs::read_to_string(out.join("Cargo.toml")).unwrap();
+    assert!(cargo.contains("name = \"rlvgl-bbb-linux\""), "got:\n{cargo}");
+    assert!(cargo.contains("rlvgl-app-disco-demo = { path = \"../apps/disco-demo\" }"), "got:\n{cargo}");
+    assert!(cargo.contains("default = [\"linux\""), "got:\n{cargo}");
+
+    // app.rs wires the controller with the manifest's capabilities preset.
+    assert_file_exists(out, "src/app.rs");
+    let app_rs = fs::read_to_string(out.join("src/app.rs")).unwrap();
+    assert!(app_rs.contains("use rlvgl_app_disco_demo::"), "got:\n{app_rs}");
+    assert!(
+        app_rs.contains("DiscoCapabilities::beaglebone_black_nhd_cape()"),
+        "got:\n{app_rs}"
+    );
+
+    // main.rs is the linux prong template.
+    assert_file_exists(out, "src/main.rs");
+    let main_rs = fs::read_to_string(out.join("src/main.rs")).unwrap();
+    assert!(main_rs.contains("fn main() -> std::io::Result<()>"), "got:\n{main_rs}");
+    assert!(main_rs.contains("std::thread::sleep"), "got:\n{main_rs}");
 
     // hand_written generator → no bsp_generated/.
     assert!(
@@ -123,33 +144,70 @@ fn emits_beetle_esp_hal_without_bsp_generated() {
         "hosted generator must not emit bsp_generated/"
     );
     assert_file_exists(out, "src/screens/main_screen.rs");
+    assert_file_exists(out, "src/main.rs");
+    let main_rs = fs::read_to_string(out.join("src/main.rs")).unwrap();
+    // beetle esp_hal is a bare_metal prong app (no std), so the
+    // emitted main.rs is the §8.2 cortex/riscv-rt template stub.
+    assert!(main_rs.contains("#![no_std]"), "got:\n{main_rs}");
 }
 
 // ─── H747 FreeRTOS + Zephyr ─────────────────────────────────────────
 
 #[test]
 fn emits_h747_freertos() {
-    let (tmp, inv) = emit_to_tempdir("examples/stm32h747i-disco/app.yaml");
+    let (tmp, _inv) = emit_to_tempdir("examples/stm32h747i-disco/app.yaml");
     let out = tmp.path();
     assert_file_exists(out, "src/screens/home.rs");
     assert_file_exists(out, "assets/splash.rle");
+    assert_file_exists(out, "src/main.rs");
     let cargo = fs::read_to_string(out.join("Cargo.toml")).unwrap();
-    assert!(cargo.contains("rlvgl-stm32h747i-disco-freertos"), "got: {cargo}");
+    assert!(cargo.contains("rlvgl-stm32h747i-disco-freertos"), "got:\n{cargo}");
     let readme = fs::read_to_string(out.join("README.md")).unwrap();
-    assert!(readme.contains("freertos"), "got: {readme}");
-    let _ = inv;
+    assert!(readme.contains("freertos"), "got:\n{readme}");
+
+    // FreeRTOS prong template per chapter 02 §8.3 includes the task
+    // shape comments + a render_task body sketch.
+    let main_rs = fs::read_to_string(out.join("src/main.rs")).unwrap();
+    assert!(main_rs.contains("present_task"), "got:\n{main_rs}");
+    assert!(main_rs.contains("render_task"), "got:\n{main_rs}");
+    assert!(main_rs.contains("#![no_std]"), "got:\n{main_rs}");
 }
 
 #[test]
-fn emits_h747_zephyr() {
-    let (tmp, _inv) = emit_to_tempdir("examples/stm32h747i-disco/app-zephyr.yaml");
+fn emits_h747_zephyr_nested_west_project() {
+    let (tmp, inv) = emit_to_tempdir("examples/stm32h747i-disco/app-zephyr.yaml");
     let out = tmp.path();
     assert_file_exists(out, "src/screens/home.rs");
+
+    // APP-02c: zephyr prong emits a staticlib (src/lib.rs, not main.rs)
+    // plus a nested west project at zephyr/ per chapter 02 §5.4.1.
+    assert_file_exists(out, "src/lib.rs");
+    assert!(!out.join("src/main.rs").exists(), "zephyr prong must not emit main.rs");
+    let lib_rs = fs::read_to_string(out.join("src/lib.rs")).unwrap();
+    assert!(lib_rs.contains("pub extern \"C\" fn rlvgl_init()"), "got:\n{lib_rs}");
+
+    // Cargo.toml flips to staticlib for zephyr.
     let cargo = fs::read_to_string(out.join("Cargo.toml")).unwrap();
-    assert!(cargo.contains("rlvgl-stm32h747i-disco-zephyr"), "got: {cargo}");
-    // Note: chapter 02 §5.4.1 nested `zephyr/` west project emission
-    // is deferred to APP-02c. APP-02b only emits the Cargo crate
-    // skeleton; that's intentional and reflected here.
+    assert!(cargo.contains("crate-type = [\"staticlib\"]"), "got:\n{cargo}");
+    assert!(!cargo.contains("[[bin]]"), "got:\n{cargo}");
+
+    // Nested west project files.
+    assert_file_exists(out, "zephyr/CMakeLists.txt");
+    assert_file_exists(out, "zephyr/prj.conf");
+    assert_file_exists(out, "zephyr/app.overlay");
+    assert_file_exists(out, "zephyr/src/main.c");
+    let cmake = fs::read_to_string(out.join("zephyr/CMakeLists.txt")).unwrap();
+    assert!(cmake.contains("find_package(Zephyr"), "got:\n{cmake}");
+    assert!(cmake.contains("rlvgl_stm32h747i_disco_zephyr"), "got:\n{cmake}");
+    let main_c = fs::read_to_string(out.join("zephyr/src/main.c")).unwrap();
+    assert!(main_c.contains("extern int rlvgl_init(void)"), "got:\n{main_c}");
+
+    // Inventory should record each zephyr/* file at scaffold stage.
+    for rel in ["zephyr/CMakeLists.txt", "zephyr/prj.conf", "zephyr/app.overlay", "zephyr/src/main.c"] {
+        let e = entry_for(&inv, rel);
+        assert_eq!(e.stage, "scaffold");
+        assert!(!e.stub, "{rel} should not be a stub");
+    }
 }
 
 // ─── Inventory invariants ────────────────────────────────────────────
