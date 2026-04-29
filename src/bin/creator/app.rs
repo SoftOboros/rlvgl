@@ -1071,7 +1071,7 @@ impl Orchestrator {
 
         // Stage 3d: i18n — stubbed pending APP-02c emission.
         if self.manifest.i18n.is_some() {
-            self.emit_i18n_stub(&mut inv)?;
+            self.emit_i18n(&mut inv)?;
         }
 
         // Stage 3e: theme — stubbed pending APP-02c emission.
@@ -1444,19 +1444,120 @@ impl Orchestrator {
         Ok(())
     }
 
-    fn emit_i18n_stub(&self, inv: &mut Inventory) -> Result<()> {
-        let body = "// SPDX-License-Identifier: MIT\n\
-             //\n\
-             // src/i18n_generated.rs (orchestrator stub, APP-02b).\n\
-             //\n\
-             // TODO(APP-02c): scan i18n.bundle_dir/*.json and emit a match\n\
-             // table per docs/app-schema/02-generator-pipeline.md §7.5.\n\
-             \n\
-             pub fn t(key: &str, _locale: &str) -> &'static str {\n\
-             \x20   // TODO(APP-02c): real translation table.\n\
-             \x20   key\n\
-             }\n";
-        self.emit("src/i18n_generated.rs", body.as_bytes(), inv, "i18n", true)
+    /// APP-02f: real i18n generator per chapter 02 §7.5. Walks
+    /// `i18n.bundle_dir`, parses each `<locale>.json` as a flat
+    /// `{ "key": "value" }` map (the rlvgl_i18n_v1 format ratified
+    /// in chapter 01 §5.8), and emits `src/i18n_generated.rs` with a
+    /// `t(key, locale) -> &'static str` function whose body
+    /// match-arms over (locale, key). Missing keys (a key present
+    /// in some locales but not others) surface as eprintln warnings
+    /// at v0 per §7.5; v1 may promote to a hard error.
+    fn emit_i18n(&self, inv: &mut Inventory) -> Result<()> {
+        let i18n = self
+            .manifest
+            .i18n
+            .as_ref()
+            .expect("emit_i18n called without i18n:");
+        let bundle_dir = lexical_normalise(&self.manifest_dir.join(&i18n.bundle_dir));
+        if !bundle_dir.is_dir() {
+            bail!(
+                "i18n.bundle_dir does not resolve to a directory: {} (chapter 02 §7.5)",
+                bundle_dir.display()
+            );
+        }
+
+        // Read every <locale>.json under bundle_dir. Sort entries so
+        // emission is byte-deterministic.
+        let mut bundles: Vec<(String, Vec<(String, String)>)> = Vec::new();
+        let mut dir_entries: Vec<std::path::PathBuf> = std::fs::read_dir(&bundle_dir)
+            .map_err(|e| anyhow!("read i18n.bundle_dir {}: {e}", bundle_dir.display()))?
+            .filter_map(|r| r.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("json"))
+            .collect();
+        dir_entries.sort();
+
+        for path in dir_entries {
+            let locale = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| anyhow!("i18n bundle has unreadable file stem: {}", path.display()))?
+                .to_string();
+            let text = std::fs::read_to_string(&path)
+                .map_err(|e| anyhow!("read i18n bundle {}: {e}", path.display()))?;
+            let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&text)
+                .map_err(|e| anyhow!("parse i18n bundle {}: {e}", path.display()))?;
+            let mut pairs: Vec<(String, String)> = map
+                .into_iter()
+                .map(|(k, v)| {
+                    let s = v
+                        .as_str()
+                        .ok_or_else(|| {
+                            anyhow!("i18n bundle {} key '{}' is not a string", path.display(), k)
+                        })?
+                        .to_string();
+                    Ok::<_, anyhow::Error>((k, s))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            pairs.sort_by(|a, b| a.0.cmp(&b.0));
+            bundles.push((locale, pairs));
+        }
+
+        if bundles.is_empty() {
+            bail!(
+                "i18n.bundle_dir {} contains no <locale>.json files (chapter 02 §7.5)",
+                bundle_dir.display()
+            );
+        }
+
+        // Missing-key warnings — keys present in some locales but
+        // not others. Soft warning at v0 per §7.5.
+        let key_union: std::collections::BTreeSet<&str> = bundles
+            .iter()
+            .flat_map(|(_, kv)| kv.iter().map(|(k, _)| k.as_str()))
+            .collect();
+        for (locale, kv) in &bundles {
+            let have: std::collections::BTreeSet<&str> =
+                kv.iter().map(|(k, _)| k.as_str()).collect();
+            for missing in key_union.difference(&have) {
+                eprintln!(
+                    "i18n: warning: locale '{locale}' is missing key '{missing}' (will fall through to the key as the literal string)"
+                );
+            }
+        }
+
+        // Build src/i18n_generated.rs.
+        let mut body = String::new();
+        body.push_str("// SPDX-License-Identifier: MIT\n");
+        body.push_str("//\n");
+        body.push_str("// src/i18n_generated.rs (i18n generator emission, APP-02f).\n");
+        body.push_str("// Per chapter 02 §7.5: one match arm per (locale, key) pair drawn\n");
+        let bundle_list = bundles
+            .iter()
+            .map(|(l, _)| format!("{l}.json"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        body.push_str(&format!(
+            "// from `{bundle_list}` files in `{}`.\n",
+            i18n.bundle_dir.display()
+        ));
+        body.push('\n');
+        body.push_str(&format!(
+            "pub const DEFAULT_LOCALE: &str = {:?};\n\n",
+            i18n.default_locale
+        ));
+        body.push_str("pub fn t(key: &str, locale: &str) -> &'static str {\n");
+        body.push_str("    match (locale, key) {\n");
+        for (locale, kv) in &bundles {
+            for (k, v) in kv {
+                body.push_str(&format!("        ({:?}, {:?}) => {:?},\n", locale, k, v));
+            }
+        }
+        body.push_str("        _ => key,\n");
+        body.push_str("    }\n");
+        body.push_str("}\n");
+
+        self.emit("src/i18n_generated.rs", body.as_bytes(), inv, "i18n", false)
     }
 
     fn emit_theme_stub(&self, inv: &mut Inventory) -> Result<()> {
