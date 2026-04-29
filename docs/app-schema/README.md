@@ -1,23 +1,32 @@
 <!--
 README.md - rlvgl Application Schema, initiative index.
-Status: DRAFT — chapters not yet ratified.
+Status: All five chapters RATIFIED 2026-04-27 / 2026-04-29.
 -->
 
 # rlvgl Application Schema
 
 > **Status:** All five chapters RATIFIED (owner: Ira Abbott; 00 and
 > 01 on 2026-04-27, 03 and 02 and 04 on 2026-04-29). `APP-NN[a-z]`
-> execution PRs MAY cite any chapter as a frozen authority. v0.5
-> work areas (real BSP-gen integration — APP-02e — already
-> shipped; orchestrator CV + vendored-crate consumption per
-> chapter 04 — APP-04c, lands next; first SM-bearing round-trip
-> target — APP-04b — gated on external `mcp-statechart`
-> reachability; real i18n/theme generators; figma/uml layout
-> formats; parallel stage 3 dispatch; Cargo `[features]` graph
-> expansion) live in follow-up PR sequences (APP-02f+, APP-04b+,
-> APP-04c+, APP-05+) and don't reopen ratified chapters. See
-> [`CLAUDE.md`](../../CLAUDE.md) §"Spec-Before-Code Planning
-> Discipline" for what ratification means.
+> execution PRs MAY cite any chapter as a frozen authority.
+>
+> **Implementation status as of 2026-04-29:** chapter 02 §7 sub-
+> generators are ALL real except SM-gen-via-external-tool — APP-02e
+> (BSP-gen), APP-02f (i18n), APP-02g (theme), APP-02h (parallel
+> stage 3 dispatch), APP-04c (vendored-crate SM consumption +
+> CV-1 cross-validate) all shipped. 53/53 creator app-schema
+> integration tests pass across seven suites (validator, emit,
+> bsp-gen, sm-vendored, i18n, theme, parallel).
+>
+> **v0.5 work still open:** APP-04b (first SM-bearing round-trip
+> target — gated on external `mcp-statechart` tool reachability;
+> the orchestrator's vendored-crate consumption path is in place
+> and tested, but no committed round-trip target carries
+> `state_machine:` yet); APP-05+ (Cargo `[features]` graph
+> expansion — chapter 02 §8 preamble; v1 deferred); figma/uml
+> layout formats (chapter 01 §5.5 v1 work). These don't reopen
+> ratified chapters. See [`CLAUDE.md`](../../CLAUDE.md)
+> §"Spec-Before-Code Planning Discipline" for what ratification
+> means.
 
 This initiative defines a **stable underschema** — a single
 declarative manifest (`app.yaml`) describing an rlvgl application —
@@ -51,9 +60,11 @@ A conforming rlvgl application MUST be expressible as:
 4. an optional layout source export, plus
 5. an optional i18n bundle conforming to `format: rlvgl_i18n_v1`.
 
-Given those inputs, `rlvgl-creator app from-yaml` (TBD, chapter 02)
-SHALL emit a buildable Cargo crate equivalent to one of the
-existing examples in `examples/`.
+Given those inputs, `rlvgl-creator app from-yaml` (implemented per
+chapter 02; APP-02a–h shipped 2026-04-29) SHALL emit a buildable
+Cargo crate equivalent to one of the existing examples in
+`examples/`. The orchestrator supports `--validate-only`,
+`--check`, `--force`, and `--jobs N` parallel dispatch.
 
 ## Initiative prefix
 
