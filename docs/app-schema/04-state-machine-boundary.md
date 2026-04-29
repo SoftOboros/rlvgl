@@ -512,14 +512,15 @@ This chapter is ratified (§15 entry dated) when:
       `src/bin/creator/app.rs` Orchestrator step 4 OR explicitly
       noted as gated on a SM-bearing round-trip target landing
       first (in which case §15 records the deferral).
-      **Satisfied (partial)** — CV-1 implemented in APP-04c
+      **Satisfied** — CV-1 implemented in APP-04c
       `cross_validate_sm`; CV-3 satisfied by construction (the
       orchestrator reads only the self-manifest, never the
-      SCXML directly); CV-2 enforcement deferred to a chapter 01
-      §6 rule 6 amendment that explicitly forbids
-      `screens[].state` when `state_machine:` is absent (current
-      rule 6 only enforces the default-screen invariant). The
-      partial-deferral note here records that scope split.
+      SCXML directly); CV-2 enforced by the chapter 01 §6 rule 6
+      amendment dated 2026-04-29 (rule retitled
+      "State-machine invariant" — when `state_machine:` is
+      absent, `screens[].state` MUST also be absent, in addition
+      to the default-screen invariant). Counter-example test:
+      `tests/creator_app_validate.rs::rule_6_rejects_screen_state_without_state_machine`.
 - [ ] §7 vector test-family naming pattern documented in the
       external `mcp-statechart` README (cross-repo cite) OR a
       shim in this chapter accepts the existing tool's actual

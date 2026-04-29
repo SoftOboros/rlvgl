@@ -560,14 +560,27 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
         }
     }
 
-    // Rule 6: default-screen invariant.
+    // Rule 6: state-machine invariant (amended 2026-04-29).
+    // - state_machine: absent  → exactly one screens[].default: true
+    //                              AND every screens[].state MUST be absent
+    // - state_machine: present → screens[].state values validated
+    //                              post-generation by chapter 04 §6 CV-1.
     if manifest.state_machine.is_none() {
         let default_count = manifest.screens.iter().filter(|s| s.default).count();
         if default_count != 1 {
             bail!(
-                "rule 6 (default-screen invariant): when state_machine: is absent, exactly one screen must have default: true (found {})",
+                "rule 6 (state-machine invariant): when state_machine: is absent, exactly one screen must have default: true (found {})",
                 default_count
             );
+        }
+        for s in &manifest.screens {
+            if let Some(state) = &s.state {
+                bail!(
+                    "rule 6 (state-machine invariant): screen '{}' sets state: '{}' but state_machine: is absent — there is no SM to resolve the state name against (chapter 04 §6 CV-2)",
+                    s.id,
+                    state
+                );
+            }
         }
     }
     // When state_machine is present, screens[].state validation is

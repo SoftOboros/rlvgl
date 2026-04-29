@@ -456,8 +456,15 @@ A conforming v0 validator MUST enforce, in this order:
    - `controller`, if present, has `crate` set and at most one of
      `path` / `version`. `path`, if present, resolves under the
      manifest's parent.
-6. **Default-screen invariant** — exactly one default screen iff
-   no `state_machine`.
+6. **State-machine invariant** —
+   - When `state_machine:` is absent: every `screens[].state`
+     field MUST also be absent (a state name has no SM to
+     resolve against), AND exactly one screen MUST have
+     `default: true`.
+   - When `state_machine:` is present: `screens[].state` MAY be
+     set; values are validated post-generation against the SM's
+     emitted state set per [chapter 04 §6](04-state-machine-boundary.md#6-cross-validate-normative)
+     CV-1. `default: true` is permitted but not required.
 7. **Unknown top-level keys** — reject.
 
 Fields validated post-generation (NOT by the manifest validator):
@@ -565,7 +572,8 @@ rule fires.
 | `assets: [{ id: a, class: image_rgb565, source: ../x }]`   | 4 (path escape)             |
 | `target: { vendor: esp, board: nonexistent, prong: linux }`| 5 (board not in chipdb)     |
 | `target: { vendor: esp, board: beetle_esp32c3, prong: vxworks }` | 5 (prong not in set)   |
-| Two screens with `default: true`, no `state_machine`       | 6 (default-screen invariant)|
+| Two screens with `default: true`, no `state_machine`       | 6 (state-machine invariant) |
+| `screens[].state: idle`, no `state_machine`                | 6 (state-machine invariant) |
 | Top-level key `runtime: { ... }`                           | 7 (unknown top-level key)   |
 
 ## §10 Reconciliation with adjacent schemas
@@ -713,3 +721,4 @@ Ratifying this chapter unblocks:
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §3 (Manifest path) and §6 rule 4 (Path safety) re-scoped: traversal scope changed from "manifest's parent directory" to "cargo workspace root." `..` traversals into sibling crates / shared assets within the same workspace are now permitted; absolute paths and traversals beyond the workspace root remain rejected. §5.10 `controller.path` validation updated to acknowledge workspace-sibling path-deps. Forced by APP-03b (BBB Linux round-trip) discovery that monorepo-shared assets (`../stm32h747i-disco/assets/media/splash.rle`) and workspace path-deps (`../apps/disco-demo`) are legitimate Cargo patterns the original wording incorrectly forbade. See [03 §6.11](03-round-trip.md#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent). No frozen invariants or enums changed. |
 | 2026-04-29 | IMPLEMENTATION | APP-02a: validator landed in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. All seven §6 validation rules implemented; 17/17 integration tests pass (5 committed-manifest happy-path + 8 §9 counter-examples + 4 targeted feature). All five round-trip manifests now have validator-acceptance proof. §12 acceptance bullets §6 / §7 flipped checked. No spec change; this entry records the implementation milestone that satisfies §12 acceptance gates. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.3 grammar extended with required `vendored_crate: <manifest-path>` field. Forced by [04 §5.3](04-state-machine-boundary.md#53-vendored-crate-offline-model--frozen) freezing the vendored-crate offline model: the orchestrator does NOT invoke `mcp-statechart` during `app from-yaml`, so the manifest needs an explicit pointer to the pre-generated SM crate's directory (where `.mcp-statechart-manifest.json` lives). The field is required *only when* `state_machine:` is present — manifests without `state_machine:` are unaffected. Path-safety rule 4 applies (workspace-root scoped). All five committed round-trip manifests are unaffected because none currently carry `state_machine:`; the field activates with APP-04b (first SM-bearing round-trip target). No frozen invariants or enums changed. |
+| 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §6 rule 6 retitled "State-machine invariant" and extended to also forbid `screens[].state` when `state_machine:` is absent. Forced by [04 §6](04-state-machine-boundary.md#6-cross-validate-normative) CV-2's claim that "a non-empty `screens[].state` without an SM is rejected by 01 §6 rule 6" — that claim was aspirational since the prior wording only covered the default-screen invariant. This amendment makes the chapter 04 cross-reference accurate. New §9 counter-example row added: `screens[].state: idle` without `state_machine:` → rule 6. None of the five committed round-trip manifests carry `screens[].state` (verified by grep), so none are impacted. No frozen invariants or enums changed. |

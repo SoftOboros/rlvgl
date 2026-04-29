@@ -172,6 +172,20 @@ fn rule_6_rejects_zero_default_screens_without_sm() {
 }
 
 #[test]
+fn rule_6_rejects_screen_state_without_state_machine() {
+    // CV-2 enforcement (amended 2026-04-29): when state_machine: is
+    // absent, screens[].state MUST also be absent — there's no SM
+    // to resolve the state name against.
+    let body = VALID_BASE.replace("    default: true", "    default: true\n    state: idle");
+    let err = validate_snippet(&body);
+    assert!(err.contains("rule 6"), "got: {err}");
+    assert!(
+        err.contains("CV-2") || err.contains("state_machine"),
+        "got: {err}"
+    );
+}
+
+#[test]
 fn rule_7_rejects_unknown_top_level_key() {
     let body = format!("{VALID_BASE}\nruntime: {{ tick_hz: 60 }}\n");
     let err = validate_snippet(&body);
