@@ -266,6 +266,38 @@ State machines vendor a pre-generated SM crate under
 the orchestrator never invokes the external `mcp-statechart` tool
 during emission.
 
+### Authoring lifecycle
+
+Three sibling subcommands round out the manifest workflow:
+
+```sh
+# Scaffold a starter manifest + minimal layout (cargo-new style).
+# Refuses to overwrite an existing path.
+cargo run --bin rlvgl-creator --features creator -- app new my-app
+
+# Human-readable summary: target, controller, state machine,
+# asset histogram, screens, theme, i18n, eligible stage-3 stages.
+# Validates the manifest first.
+cargo run --bin rlvgl-creator --features creator -- app inspect my-app/app.yaml
+
+# Emit a JSON Schema for the rlvgl-app/v0 manifest grammar.
+# Useful for editor validation (VS Code YAML extension, etc.) and
+# CI lint hooks. Captures chapter 01 §5 grammar; runtime cross-
+# reference rules (chipdb lookup, path safety) still need the
+# full validator.
+cargo run --bin rlvgl-creator --features creator -- app schema --out app.schema.json
+```
+
+Together these form the authoring loop:
+
+```
+app new <NAME>                           # scaffold
+app inspect <NAME>/app.yaml              # check the summary
+app from-yaml --validate-only ...        # rule check
+app from-yaml ... --out <DIR>            # emit
+app from-yaml --check ... --out <DIR>    # CI determinism gate
+```
+
 ## Desktop UI and Emulator
 
 Launch the desktop UI explicitly:
