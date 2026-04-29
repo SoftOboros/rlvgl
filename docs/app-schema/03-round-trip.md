@@ -610,6 +610,39 @@ yet, so most layout source is hand-rolled Rust.
 pipeline (e.g. `figma_export_v1` or `uml_widget_v1`) shipping
 first. Don't remove the backdoor before there's a real front door."
 
+### 6.12 🟡 OPEN — Zephyr `prj.conf` has hand-tuned values the template cannot reproduce
+
+**Surfaced 2026-04-29 by APP-03d** (H747 Zephyr round-trip). The
+existing `examples/stm32h747i-disco/zephyr/prj.conf` contains
+hand-tuned values that derive neither from chipdb nor from
+`target.features`:
+
+- `CONFIG_MAIN_STACK_SIZE=16384` — tuned because the default 4 KB
+  overflowed during star-crawl render (per the in-tree comment).
+- `CONFIG_HEAP_MEM_POOL_SIZE=65536` — same family of memory tuning.
+- `CONFIG_INPUT_FT5336_INTERRUPT=n`, `CONFIG_INPUT_FT5336_PERIOD=10`,
+  `CONFIG_INPUT_MODE_SYNCHRONOUS=y` — touch-driver behavioural
+  tunables resolved during bring-up (per the existing `feedback_acm_ar_zephyr`
+  / `project_zephyr_ft5336_no_touches` memory entries).
+- `CONFIG_LOG_MODE_IMMEDIATE=y`, `CONFIG_INPUT_LOG_LEVEL_DBG=y` —
+  diagnostic-level overrides.
+
+Chapter 02 §8.4 says the Zephyr template emits a baseline `prj.conf`
+the manifest's `target.features` extends. There is no mechanism to
+override individual Kconfig values from the manifest.
+
+**Disposition: DEFER.** v0 ships without per-Kconfig override.
+Pipeline behaviour (APP-02d): emit the template-baselined `prj.conf`,
+then if the destination directory already contains a `prj.conf` with
+hand-edits, `--check` mode flags the divergence (per chapter 02 §9.4
+inventory tracking) and CI surfaces it as an explicit choice. The
+*intent* of the existing tuning gets carried by the in-tree comments
+in `prj.conf`, not by the manifest.
+
+A v1 amendment MAY add a `target.zephyr_kconfig:` map for explicit
+overrides, but only if APP-03d implementation evidence shows the
+deferred approach causes recurring CI noise. Premature now.
+
 ### 6.11 🟡 CLOSED — Path safety scoped to workspace root, not manifest parent
 
 **Surfaced 2026-04-29 by APP-03b** (BBB Linux round-trip). The
@@ -747,3 +780,4 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-29 | DRAFT  | APP-04a landed: ti and stm vendor crates each gained one `BoardInfo` const entry (`beaglebone_black_nhd_cape` → AM335x, `stm32h747i_disco` → STM32H747XIH6). Investigation showed both vendors drive `find()` from a hardcoded `BOARDS` const, so the simpler-than-expected mechanism made the addition trivial. BBB and H747 round-trip manifests are now unblocked at the `target.board` validation level. |
 | 2026-04-29 | DRAFT  | APP-03b landed: `examples/beaglebone-black/app.yaml` + `layouts/home.rs` checked in as the second round-trip artifact. Cites `target.generator: hand_written` (BBB Linux on §5.6 allow-list), the new `controller:` field at `../apps/disco-demo`, and a cross-tree splash asset at `../stm32h747i-disco/assets/media/splash.rle`. Discovery of the cross-tree paths surfaced [§6.11](#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent) — path-safety rule was over-tight; landed alongside as a 01 §15 ratified amendment scoping path safety to the workspace root rather than the manifest's parent. |
 | 2026-04-29 | DRAFT  | APP-03c landed: `examples/stm32h747i-disco/app.yaml` + `layouts/home.rs` checked in as the third round-trip artifact (FreeRTOS intent, build profile `cm7,freertos,adapted_cmd,dma2d,splash,desktop` per CLAUDE.md). No new spec gaps — the path-safety amendment from APP-03b carried it. Cites the new `controller:` field at `../apps/disco-demo`, capabilities preset `stm32h747i_disco`. Splash asset is local (`assets/media/splash.rle`); same blob is what the BBB manifest cross-references. Three of four round-trip targets now landed (beetle esp_hal, BBB linux, H747 freertos); H747 zephyr (APP-03d) remains. |
+| 2026-04-29 | DRAFT  | APP-03d landed: `examples/stm32h747i-disco/app-zephyr.yaml` checked in as the fourth and final round-trip artifact (Zephyr intent, build profile `cm7,zephyr,splash,desktop,dma2d`). Reuses `layouts/home.rs` with the FreeRTOS manifest — the controller-driven render call is prong-agnostic; cross-prong layout reuse is exactly the schema's value proposition. Filename is `app-zephyr.yaml` (not `app.yaml`) since the same Cargo crate hosts the FreeRTOS intent at the canonical name. Surfaced finding [§6.12](#612--open--zephyr-prjconf-has-hand-tuned-values-the-template-cannot-reproduce) — existing `zephyr/prj.conf` has hand-tuned values (`CONFIG_MAIN_STACK_SIZE=16384`, FT5336 touch tunables, log levels) that neither chipdb nor `target.features` express; **disposition DEFER** with `--check`-flag surfacing in APP-02d, no v0 grammar change. **All four round-trip targets now landed**; remaining §12 acceptance work for chapter 03 is the validator-acceptance proof under APP-02a. |
