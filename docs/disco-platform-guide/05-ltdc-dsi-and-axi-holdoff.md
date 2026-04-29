@@ -223,7 +223,7 @@ Fault modes:
 - [`platform/README.md`](../../platform/README.md) — the
   `Stm32h747iDiscoDisplay` type and the `Blitter` trait the
   display delegates to.
-- [`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+- [`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
   — how the platform crate composes LTDC + DMA2D + the
   display driver.
 

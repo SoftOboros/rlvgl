@@ -18,6 +18,8 @@ pub mod image;
 pub mod label;
 /// Scrollable list widget.
 pub mod list;
+/// Audio-meter widgets (LED bargraph; needle and others to follow).
+pub mod meters;
 /// UI motion components (crawls, scrollers, tickers).
 pub mod motion;
 /// Progress bar widget.

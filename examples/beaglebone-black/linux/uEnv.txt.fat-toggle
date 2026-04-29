@@ -1,0 +1,22 @@
+# /uEnv.txt — toggle script for the BBB Linux↔FreeRTOS swap.
+#
+# Lives at the root of the SD's FAT partition (mmc 0:1), NOT under
+# /boot/. Beagleboard u-boot's `boot` script imports this file early
+# and runs uenvcmd if defined; the kernel-boot config still lives at
+# /boot/uEnv.txt on the ext4 rootfs (mmc 0:3) where uname_r drives
+# uname_boot. Splitting the two is required because the ext4-side
+# importbootenv path does NOT dispatch uenvcmd — only uname_r is
+# honored.
+#
+# Marker file: /freertos-next on FAT (also visible from running
+# Linux as /boot/firmware/freertos-next). Existence triggers
+# alt-boot to /boot/firmware/rlvgl-bbb-bare.bin (FreeRTOS prong /
+# bare-metal stand-in). u-boot fatrm-clears the marker before the
+# `go`, so the warm reset issued by the alt payload returns to
+# Linux on the next boot — no S2/S3 button, no SD shuttle, no
+# fw_setenv.
+#
+# Linux-side helper: /usr/local/bin/swap-to-freertos writes 'F\n'
+# to /boot/firmware/freertos-next and reboots.
+
+uenvcmd=if fatsize mmc 0:1 freertos-next; then if fatload mmc 0:1 0x82000000 rlvgl-bbb-bare.bin; then fatrm mmc 0:1 freertos-next; echo "rlvgl: alt-boot via freertos-next"; go 0x82000000; fi; echo "rlvgl: alt-boot prep failed, clearing marker"; fatrm mmc 0:1 freertos-next; fi

@@ -1,0 +1,26 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "digital_studio_numeric",
+  "title": "Digital Studio — Numeric Readout",
+  "scale_id": "digital_peak",
+  "default_ballistic": "DigitalPeak",
+  "meter_type": "numeric",
+  "palette": {
+    "Safe":    "#3ed27a",
+    "Nominal": "#3ed27a",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#08080a",
+    "frame":      "#1d2126",
+    "scale_text": "#dde2e6",
+    "peak_hold":  "#ffe35a"
+  },
+  "layout": {
+    "orientation": "horizontal",
+    "aspect_ratio": 2.5,
+    "peak_hold_ms": 1500
+  }
+}

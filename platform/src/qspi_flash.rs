@@ -91,7 +91,9 @@ impl Mt25tlFlash {
     /// Must be executed upon reset and upon switching from memory-mapped to
     /// any other mode.
     fn errata_2_8_3_reset(&mut self) {
-        const BC: *mut u32 = 0x3800_0314 as *mut u32;
+        // D3 SRAM telemetry breadcrumb at fixed offset — debug visibility
+        // for probe-rs while the QSPI errata reset sequence is in flight.
+        const BC: *mut u32 = 0x3800_0314 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let rb = self.qspi.inner_mut();
         unsafe {
             // Save the HAL-configured CR value so we can restore it after
@@ -466,7 +468,9 @@ pub struct QspiMemoryMapped {
 impl QspiMemoryMapped {
     /// Get a raw pointer to the memory-mapped flash base.
     pub fn base_ptr(&self) -> *const u8 {
-        MEMORY_MAPPED_BASE as *const u8
+        // Memory-mapped QSPI flash region — intentional MMIO-like access
+        // to a hardware-defined address window.
+        MEMORY_MAPPED_BASE as *const u8 // rlvgl-discipline: allow(raw_addr_cast)
     }
 
     /// Read a slice from memory-mapped flash.
@@ -476,7 +480,8 @@ impl QspiMemoryMapped {
     /// The caller must ensure `offset + len` does not exceed [`FLASH_SIZE`]
     /// and that the MPU is configured to allow access to the QSPI region.
     pub unsafe fn read_slice(&self, offset: usize, len: usize) -> &[u8] {
-        let ptr = (MEMORY_MAPPED_BASE as usize + offset) as *const u8;
+        // Memory-mapped QSPI flash region — see `base_ptr`.
+        let ptr = (MEMORY_MAPPED_BASE as usize + offset) as *const u8; // rlvgl-discipline: allow(raw_addr_cast)
         unsafe { core::slice::from_raw_parts(ptr, len) }
     }
 

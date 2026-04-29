@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: MIT
+#
+# rlvgl-app/v0 manifest for the DFR0868 Beetle ESP32-C3 esp_hal intent.
+#
+# Status: APP-03a candidate. Conforms to docs/app-schema/01-manifest-schema.md
+# (RATIFIED 2026-04-27). Validator-`--check` verification pending APP-02a
+# implementation; see docs/app-schema/02-generator-pipeline.md §5.2.
+#
+# Round-trip authority: docs/app-schema/03-round-trip.md §5.1 (the
+# `esp_hal` intent of examples/beetle-esp32c3/Cargo.toml). The sibling
+# `bsp_pac` intent — also hosted by the same Cargo.toml but selecting
+# the `bsp_pac` feature — gets its own manifest at a future date per
+# the "one app.yaml per intent" rule (01 §11).
+#
+# Resolves at validate-time:
+#   target.vendor=esp -> chipdb/rlvgl-chips-esp/
+#   target.board=beetle_esp32c3 -> chipdb/rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml
+#   target.generator=hosted -> upstream esp-hal crate (selected by features)
+
+schema: rlvgl-app/v0
+name: rlvgl-beetle-esp32c3-eh
+
+metadata:
+  version: 0.2.0
+  description: "rlvgl SSD1306 demo on DFR0868 Beetle ESP32-C3 (esp_hal hosted path)."
+  license: MIT
+
+target:
+  vendor: esp
+  board: beetle_esp32c3
+  prong: bare_metal
+  generator: hosted
+  features:
+    - esp_hal
+
+screens:
+  - id: main-screen
+    layout: layouts/main_screen.rs
+    layout_format: rust_inline_v1
+    default: true

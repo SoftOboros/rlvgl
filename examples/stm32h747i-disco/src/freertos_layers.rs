@@ -193,8 +193,12 @@ impl Compositor {
 
 #[inline(always)]
 fn cyccnt() -> u32 {
-    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
-    unsafe { DWT_CYCCNT.read_volatile() }
+    // Typed access to the Cortex-M DWT cycle counter at 0xE000_1004.
+    // The cortex-m crate's `DWT::cycle_count()` is a safe wrapper around
+    // the same volatile read, with `#[doc(hidden)]` PAC handling for
+    // the underlying MMIO base — replaces the prior raw cast that the
+    // discipline scanner caught under `raw_mmio_cast` / `raw_addr_cast`.
+    cortex_m::peripheral::DWT::cycle_count()
 }
 
 /// Intersect two rects. Returns `None` if they don't overlap.

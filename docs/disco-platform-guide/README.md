@@ -48,7 +48,7 @@ can always diff your understanding against what actually ships.
     numbers; buy/download once and keep it open.
   - [STM32H747xI Errata ES0392](https://www.st.com/resource/en/errata_sheet/es0392-stm32h747xibixg-device-errata-stmicroelectronics.pdf)
     — silicon bugs you will hit. Ch 8 covers the QSPI one.
-  - [`docs/STM32H747I-DISCO-BRINGUP.md`](../STM32H747I-DISCO-BRINGUP.md)
+  - [`examples/stm32h747i-disco/BRINGUP.md`](../../examples/stm32h747i-disco/BRINGUP.md)
     — hardware bring-up checklist / recovery notes.
   - [`examples/stm32h747i-disco/MEMORY.md`](../../examples/stm32h747i-disco/MEMORY.md)
     — the dual-core memory map. Ch 9 and Ch 10 reference it
@@ -75,7 +75,7 @@ can always diff your understanding against what actually ships.
 | [8](08-secondary-peripherals.md) | Secondary Peripherals | Various | QSPI (errata 2.8.5, raw `D1CCIPR` write at L1711–1770); USART1 raw register init (L1823–1849); SAI1 I2S TX + SAI4 PDM mic + WM8994 over I2C4 (L2057–2120); backlight PWM on TIM8_CH2 / PJ6 (L1777–1810). |
 | [9](09-star-crawl-part-1.md) | Star Crawl Part I — Pre-render, Perspective & FIR | `star_crawl.rs` L59–72, L130–267, L363–388, L585–662 | Text pre-render into wide A8 SDRAM buffer; linear perspective interpolation `TOP_W → BOT_W`; 7-tap FIR row resampler with Q.16 phase; starfield double-height mirror layout; the SDRAM / D2 SRAM split. |
 | [10](10-star-crawl-part-2.md) | Star Crawl Part II — DMA2D Pipeline, Cache & State Machine | `star_crawl.rs` L73–92, L235–438, L723–736 | The `RenderStage` ↔ `StepResult` state machine; DMA2D row blits under admission gating; D-cache clean-by-MVAC before the A8→ARGB blend; Q.8 scroll physics with 1/3-speed star parallax; teardown + pristine restore. The capstone. |
-| [11](11-generated-bsps.md) | Generated BSPs (Epilogue) | `docs/STM_BSP_GENERATION.md`, `chips/stm/bsps/`, `rlvgl-creator` BSP subcommand | How `rlvgl-creator platform import` + `platform gen` produce equivalent bring-up code from a CubeMX `.ioc`. What the generator automates; what it cannot automate (the Ch 1 gotcha catalogue). |
+| [11](11-generated-bsps.md) | Generated BSPs (Epilogue) | `docs/bsp/STM32.md`, `chips/stm/bsps/`, `rlvgl-creator` BSP subcommand | How `rlvgl-creator platform import` + `platform gen` produce equivalent bring-up code from a CubeMX `.ioc`. What the generator automates; what it cannot automate (the Ch 1 gotcha catalogue). |
 
 ## Conventions
 

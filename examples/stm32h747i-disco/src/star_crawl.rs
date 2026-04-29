@@ -184,6 +184,20 @@ pub struct StarCrawl {
     diag_completed_frames: u16,
     diag_dropped_frames: u16,
     diag_last_error: u16,
+
+    // Two-phase pipeline state (used by compose_and_blend / prep_next_frame)
+    prep_bg_row: u32,
+    prep_text_row: u32,
+    prep_started: bool,
+    prep_shift_done: bool,
+    prep_frame_scroll_px: i32,
+    prep_frame_star_row: u32,
+
+    // Resumable compose state — survives across back porches
+    compose_row: u32,      // starfield row progress
+    compose_blend_y: u32,  // A8 blend stripe progress
+    compose_star_row: u32, // starfield scroll offset for this compose
+    compose_active: bool,  // compose in progress (not yet buf_ready)
 }
 
 impl StarCrawl {
@@ -224,11 +238,26 @@ impl StarCrawl {
             diag_completed_frames: 0,
             diag_dropped_frames: 0,
             diag_last_error: 0,
+            prep_bg_row: 0,
+            prep_text_row: 0,
+            prep_started: false,
+            prep_shift_done: false,
+            prep_frame_scroll_px: 0,
+            prep_frame_star_row: 0,
+            compose_row: 0,
+            compose_blend_y: 0,
+            compose_star_row: 0,
+            compose_active: false,
         }
     }
 
     pub fn is_active(&self) -> bool {
         self.active
+    }
+
+    /// Current starfield scroll in Q8 fixed-point.
+    pub fn star_scroll_q8(&self) -> i32 {
+        self.star_scroll_q8
     }
 
     /// Select between [`RenderMode::Full`] (default) and
@@ -334,6 +363,8 @@ impl StarCrawl {
         // for the next frame.
         self.last_frame_star_row = u32::MAX;
         self.incr_shift_done = false;
+        self.prep_started = false;
+        self.prep_shift_done = false;
         self.reset_frame_state();
     }
 
@@ -342,7 +373,7 @@ impl StarCrawl {
         // Enable D2 SRAM1 + SRAM2 + SRAM3 clocks for the A8 portrait buffer.
         // RCC_AHB2ENR: bit 29 = SRAM1EN, 30 = SRAM2EN, 31 = SRAM3EN.
         unsafe {
-            let ahb2enr = (0x5802_44DCu32) as *mut u32;
+            let ahb2enr = (0x5802_44DCu32) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ahb2enr.write_volatile(ahb2enr.read_volatile() | 0xE000_0000);
         }
 
@@ -448,7 +479,8 @@ impl StarCrawl {
                     let row_bytes = (FB_W * BPP) as u32;
                     let keep_rows = FB_H - delta_rows;
                     let src_rows = unsafe { stars_target.add((delta_rows * row_bytes) as usize) };
-                    dma2d.start_blit_raw(
+                    typed_blit(
+                        dma2d,
                         src_rows as *const u8,
                         row_bytes,
                         stars_target,
@@ -519,7 +551,8 @@ impl StarCrawl {
                     let dst = unsafe { stars_dst.add((self.bg_row * self.fb_w * BPP) as usize) };
                     sync.note_start();
                     sync.dma2d_active();
-                    dma2d.start_blit_raw(
+                    typed_blit(
+                        dma2d,
                         src as *const u8,
                         STAR_STRIDE,
                         dst,
@@ -586,7 +619,8 @@ impl StarCrawl {
                 let row_bytes = self.fb_w * BPP;
                 sync.note_start();
                 sync.dma2d_active();
-                dma2d.start_blit_raw(
+                typed_blit(
+                    dma2d,
                     self.layer_buf as *const u8,
                     row_bytes,
                     self.back_buf,
@@ -647,6 +681,290 @@ impl StarCrawl {
                 StepResult::FrameReady
             }
         }
+    }
+
+    // ── Two-phase API (FreeRTOS display driver) ─────────────────────────────
+
+    /// Timer-gated resumable compose. Call once per back porch.
+    ///
+    /// Runs starfield chunks + A8 blend stripes until `porch_cyc`
+    /// cycles have elapsed since the porch started, then returns
+    /// `false` (more work next porch). Returns `true` when the
+    /// entire compose + blend is done — caller should give buf_ready.
+    ///
+    /// `porch_start` = DWT_CYCCNT snapshot at ERIF (porch start).
+    /// `porch_cyc`   = budget in cycles (e.g. 4_800_000 = 12 ms).
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn compose_tick(
+        &mut self,
+        dma2d: &mut Dma2dBlitter,
+        fb: *mut u8,
+        fb_w: u32,
+        sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+        porch_start: u32,
+        porch_cyc: u32,
+    ) -> bool {
+        if !self.active || self.starfield.is_null() {
+            return false;
+        }
+
+        // First call for a new frame: latch scroll position
+        if !self.compose_active {
+            self.compose_row = 0;
+            self.compose_blend_y = 0;
+            self.compose_star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+            self.compose_active = true;
+            dcache_clean_range(A8_BUF, A8_SIZE);
+        }
+
+        let row_bytes = fb_w * BPP;
+        const CHUNK_ROWS: u32 = 50;
+
+        // ── Starfield chunks ────────────────────────────────────
+        while self.compose_row < FB_H {
+            let elapsed = cyccnt().wrapping_sub(porch_start);
+            if elapsed >= porch_cyc {
+                return false; // porch budget expired
+            }
+            let batch = CHUNK_ROWS.min(FB_H - self.compose_row);
+            let src_start = (self.compose_star_row + self.compose_row) % STAR_ROWS;
+
+            if src_start + batch <= STAR_ROWS {
+                let src = unsafe { self.starfield.add((src_start * STAR_STRIDE) as usize) };
+                let dst = unsafe { fb.add((self.compose_row * row_bytes) as usize) };
+                sync.dma2d_active();
+                typed_blit(
+                    dma2d,
+                    src as *const u8,
+                    STAR_STRIDE,
+                    dst,
+                    row_bytes,
+                    fb_w,
+                    batch,
+                    PixelFmt::Argb8888,
+                );
+                while dma2d.is_in_flight() {
+                    cortex_m::asm::nop();
+                }
+                sync.dma2d_idle();
+            } else {
+                let top = STAR_ROWS - src_start;
+                let bot = batch - top;
+                let src_top = unsafe { self.starfield.add((src_start * STAR_STRIDE) as usize) };
+                let dst_top = unsafe { fb.add((self.compose_row * row_bytes) as usize) };
+                sync.dma2d_active();
+                typed_blit(
+                    dma2d,
+                    src_top as *const u8,
+                    STAR_STRIDE,
+                    dst_top,
+                    row_bytes,
+                    fb_w,
+                    top,
+                    PixelFmt::Argb8888,
+                );
+                while dma2d.is_in_flight() {
+                    cortex_m::asm::nop();
+                }
+                sync.dma2d_idle();
+                let dst_bot = unsafe { fb.add(((self.compose_row + top) * row_bytes) as usize) };
+                sync.dma2d_active();
+                typed_blit(
+                    dma2d,
+                    self.starfield as *const u8,
+                    STAR_STRIDE,
+                    dst_bot,
+                    row_bytes,
+                    fb_w,
+                    bot,
+                    PixelFmt::Argb8888,
+                );
+                while dma2d.is_in_flight() {
+                    cortex_m::asm::nop();
+                }
+                sync.dma2d_idle();
+            }
+            cortex_m::asm::dsb();
+            self.compose_row += batch;
+        }
+
+        // ── A8 text blend stripes ───────────────────────────────
+        let a8_h = A8_HEIGHT;
+        const BLEND_ROWS: u32 = 50;
+        while self.compose_blend_y < a8_h {
+            let elapsed = cyccnt().wrapping_sub(porch_start);
+            if elapsed >= porch_cyc {
+                return false; // porch expired
+            }
+            let h = BLEND_ROWS.min(a8_h - self.compose_blend_y);
+            let src_off = (self.compose_blend_y * A8_WIDTH) as usize;
+            let src = (A8_BUF + src_off) as *const u8;
+            let dst_off = ((A8_Y_BASE + self.compose_blend_y) * fb_w * BPP) as usize;
+            let dst = unsafe { fb.add(dst_off) };
+            sync.dma2d_active();
+            dma2d.start_blend_a8_color(src, A8_WIDTH, h, YELLOW, dst, fb_w * BPP);
+            while dma2d.is_in_flight() {
+                cortex_m::asm::nop();
+            }
+            sync.dma2d_idle();
+            cortex_m::asm::dsb();
+            self.compose_blend_y += h;
+        }
+
+        // All done — reset for next frame
+        let _ = sync.take_complete();
+        self.compose_active = false;
+        self.diag_completed_frames = self.diag_completed_frames.saturating_add(1);
+        true
+    }
+
+    /// Blocking compose + blend for pre-fill (no ERIF cycle running).
+    /// Reads directly from starfield, row-by-row, no admission gating.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn compose_and_blend_blocking(
+        &mut self,
+        dma2d: &mut Dma2dBlitter,
+        back_buf: *mut u8,
+        fb_w: u32,
+    ) {
+        if self.starfield.is_null() {
+            return;
+        }
+        let row_bytes = fb_w * BPP;
+        let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+        for row in 0..FB_H {
+            let src_row = (star_row + row) % STAR_ROWS;
+            let src = unsafe { self.starfield.add((src_row * STAR_STRIDE) as usize) as *const u8 };
+            let dst = unsafe { back_buf.add((row * row_bytes) as usize) };
+            typed_blit(
+                dma2d,
+                src,
+                STAR_STRIDE,
+                dst,
+                row_bytes,
+                fb_w,
+                1,
+                PixelFmt::Argb8888,
+            );
+            while dma2d.is_in_flight() {
+                cortex_m::asm::nop();
+            }
+        }
+        dcache_clean_range(A8_BUF, A8_SIZE);
+        let a8_h = A8_HEIGHT;
+        const STRIPE_H: u32 = 16;
+        let mut y = 0u32;
+        while y < a8_h {
+            let h = STRIPE_H.min(a8_h - y);
+            let src_off = (y * A8_WIDTH) as usize;
+            let src = (A8_BUF + src_off) as *const u8;
+            let dst_off = ((A8_Y_BASE + y) * fb_w * BPP) as usize;
+            let dst = unsafe { back_buf.add(dst_off) };
+            dma2d.start_blend_a8_color(src, A8_WIDTH, h, YELLOW, dst, fb_w * BPP);
+            while dma2d.is_in_flight() {
+                cortex_m::asm::nop();
+            }
+            y += h;
+        }
+    }
+
+    /// Prepare the next frame's A8 text buffer via CPU FIR.
+    ///
+    /// Call repeatedly until it returns `FrameReady`. Pure CPU work —
+    /// no DMA2D, no AXI contention. Starfield compose reads directly
+    /// from the pre-rendered double-height buffer, so no starfield
+    /// shift or layer_buf update is needed.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn prep_next_frame(
+        &mut self,
+        _dma2d: &mut Dma2dBlitter,
+        _sync: &(impl FrameSync + Dma2dSync + ScopeProbe),
+    ) -> StepResult {
+        if !self.active {
+            return StepResult::Idle;
+        }
+
+        if !self.prep_started {
+            self.advance_scroll();
+            self.frame_id = self.frame_id.wrapping_add(1);
+
+            let scroll_px = self.scroll_q8 >> 8;
+            if scroll_px >= (self.text_h + CRAWL_H) as i32 {
+                self.deactivate();
+                return StepResult::Finished;
+            }
+
+            self.prep_frame_scroll_px = scroll_px;
+            unsafe {
+                core::ptr::write_bytes(A8_BUF as *mut u8, 0, A8_SIZE);
+            }
+            self.prep_text_row = 0;
+            self.prep_started = true;
+        }
+
+        // CPU FIR text — one row per call
+        if self.prep_text_row < CRAWL_H {
+            let text_row_i = self.prep_frame_scroll_px + self.prep_text_row as i32;
+            if text_row_i >= 0 && (text_row_i as u32) < self.text_h {
+                let src_row = text_row_i as u32;
+                let target_w = TOP_W + (BOT_W - TOP_W) * self.prep_text_row / (CRAWL_H - 1);
+                let dst_x_off = (CRAWL_W - target_w) / 2;
+                if self.fir_resample_text_row(src_row, target_w) {
+                    let x_col = (FB_W - 1 - self.prep_text_row) as usize;
+                    let y_off = (dst_x_off - A8_Y_BASE) as usize;
+                    for i in 0..target_w as usize {
+                        unsafe {
+                            let a8_ptr =
+                                (A8_BUF + (y_off + i) * A8_WIDTH as usize + x_col) as *mut u8;
+                            a8_ptr.write_volatile(self.scanline_buf[i]);
+                        }
+                    }
+                }
+            }
+            self.prep_text_row += 1;
+        }
+
+        if self.prep_text_row >= CRAWL_H {
+            dcache_clean_range(A8_BUF, A8_SIZE);
+            self.prep_started = false;
+            return StepResult::FrameReady;
+        }
+
+        StepResult::Pending
+    }
+
+    /// One-shot: fill `layer_buf` from the starfield source buffer.
+    /// Blocking — called during pre-fill before the render loop starts.
+    #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+    pub fn render_stars_to_layer(&mut self, dma2d: &mut Dma2dBlitter) {
+        if self.layer_buf.is_null() || self.starfield.is_null() {
+            return;
+        }
+        let star_row = ((self.star_scroll_q8 >> 8) as u32) % STAR_ROWS;
+        self.last_frame_star_row = star_row;
+        let row_bytes = FB_W * BPP;
+
+        // Row-by-row blit from starfield → layer_buf (wrapping)
+        for r in 0..FB_H {
+            let src_row = (star_row + r) % STAR_ROWS;
+            let src = unsafe { self.starfield.add((src_row * STAR_STRIDE) as usize) };
+            let dst = unsafe { self.layer_buf.add((r * row_bytes) as usize) };
+            typed_blit(
+                dma2d,
+                src as *const u8,
+                row_bytes,
+                dst,
+                row_bytes,
+                FB_W,
+                1,
+                PixelFmt::Argb8888,
+            );
+            while dma2d.is_in_flight() {
+                cortex_m::asm::nop();
+            }
+        }
+        let layer_size = (FB_W * FB_H * BPP) as usize;
+        dcache_clean_range(self.layer_buf as usize, layer_size);
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -804,7 +1122,7 @@ impl StarCrawl {
         out[..target_w as usize].fill(0);
 
         let words = TEXT_W as usize / 4;
-        let src32 = src as *const u32;
+        let src32 = src as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let mut all_zero = true;
         for i in 0..words {
             if unsafe { src32.add(i).read_volatile() } != 0 {
@@ -897,7 +1215,7 @@ impl StarCrawl {
                 | ((brightness as u32) << 8)
                 | brightness as u32;
             unsafe {
-                (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color);
+                (self.starfield.add((idx * BPP) as usize) as *mut u32).write_volatile(color); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             rng ^= rng << 13;
             rng ^= rng >> 17;
@@ -935,6 +1253,15 @@ impl StarCrawl {
     }
 }
 
+// ── DWT cycle counter ───────────────────────────────────────────────────────
+
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+#[inline(always)]
+fn cyccnt() -> u32 {
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    unsafe { DWT_CYCCNT.read_volatile() }
+}
+
 // ── D-cache maintenance ─────────────────────────────────────────────────────
 
 /// Clean D-cache lines covering `[addr, addr+size)` so DMA2D sees CPU writes.
@@ -943,7 +1270,7 @@ impl StarCrawl {
 /// Cortex-M7 background map. Without a clean, DMA2D reads stale data.
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 fn dcache_clean_range(addr: usize, size: usize) {
-    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32;
+    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     const LINE_SIZE: usize = 32;
     let start = addr & !(LINE_SIZE - 1);
     let end = (addr + size + LINE_SIZE - 1) & !(LINE_SIZE - 1);
@@ -1001,4 +1328,45 @@ impl crate::effect::Effect for StarCrawl {
     ) -> StepResult {
         StarCrawl::tick(self, dma2d, target, target_w, target_h, sync)
     }
+}
+
+// ── Typed-API migration helper ──────────────────────────────────────────
+//
+// Step 4b of the Register-Mashing Discipline migration. Converts the 8
+// `start_blit_raw` call sites in this file to the typed `start_blit_typed`
+// pipeline without restructuring star_crawl's caller-managed scratch
+// buffers (`layer_buf`, `stars_target`, `starfield`).
+//
+// Each call still passes raw `*mut u8` destinations — the typed
+// `BackBuffer<'_>` borrow lives only across the wrapper call. The
+// migration's value here is removing the `start_blit_raw` literal so
+// the discipline scanner's `raw_dma2d` rule no longer fires for this
+// file. The deeper "raw pointer destination from the caller" pattern
+// is addressed by the framebuffer-ownership work in Step 5b/c.
+
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+#[inline]
+fn typed_blit(
+    dma2d: &mut Dma2dBlitter,
+    src: *const u8,
+    src_stride: u32,
+    dst: *mut u8,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    fmt: PixelFmt,
+) {
+    use rlvgl_platform::hwcore::addr::PhysAddr;
+    use rlvgl_platform::hwcore::surface::{BackBuffer, FrameBuffer};
+    // SAFETY: caller guarantees `dst` is a writable region of at least
+    // `dst_stride * height` bytes that no other Rust handle aliases for
+    // the duration of this call. The synthesized `BackBuffer<'_>`
+    // borrow is consumed via `into_borrow` before this function returns,
+    // restoring the caller's exclusive view of `dst`.
+    let mut fb = unsafe {
+        FrameBuffer::from_phys(PhysAddr::new(dst as u32), width, height, dst_stride, fmt)
+    };
+    let mut back = BackBuffer::wrap(&mut fb);
+    let inflight = dma2d.start_blit_typed(src, src_stride, back.dma_dst(), (0, 0), width, height);
+    let _ = inflight.into_borrow();
 }

@@ -36,9 +36,15 @@ binary targets from one crate:
 | `backlight_pwm` | Enables PWM-based backlight control. | Board-specific option. | Negligible CPU cost; small peripheral-setup increase. |
 | `semihosting` | Enables semihosting debug output. | Debug builds only. | Helpful for bring-up, but repeated output can slow the system. |
 | `bsp_log` | Routes BSP log messages through the selected logging path. | Most useful together with `semihosting`. | Mostly diagnostic overhead. |
+| `freertos` | Links the FreeRTOS C archive and enables preemptive task model. Replaces the bare-metal cooperative loop with present/render/touch/playit tasks. Forwards to `rlvgl-platform/freertos`. | CM7 only. Requires the FreeRTOS source tree at `freertos/`. | Adds ~33 KB to `.bss` (ucHeap + task stacks + TCBs). Requires 64 KB Rust heap. |
+| `adapted_cmd` | Selects DSI adapted command mode (portrait, pulsed LTDC scan). Enables DMA2D M2M transfers. Without this, bare-metal uses its own DSI init; with Zephyr, it disables the Zephyr DSI driver. | CM7 only. Affects display orientation and DMA2D availability. | Enables DMA2D acceleration but limits frame rate to pulsed scan cadence. |
+| `zephyr` | Enables the Zephyr RTOS platform path. Rust compiles as a staticlib linked by Zephyr's west build. Forwards to `rlvgl-platform/zephyr`. | CM7 only. Requires Zephyr SDK 0.16.x + west. | No additional Rust `.bss`; Zephyr kernel manages memory. |
 
 ## Recommended starting points
 
 - Minimal CM7 firmware: `--features cm7`
 - Current richer CM7 profile from `make build-disco`: `--features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio`
+- FreeRTOS desktop from `make build-disco-freertos`: `--features cm7,freertos,adapted_cmd,dma2d,splash,desktop`
+- Zephyr video mode from `make zephyr-disco`: `--features cm7,zephyr,dma2d,splash,desktop`
+- Zephyr adapted cmd from `make zephyr-disco-acm`: `--features cm7,zephyr,adapted_cmd,dma2d,splash,desktop`
 - Minimal CM4 helper build: `--features cm4`

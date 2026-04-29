@@ -1,0 +1,25 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "streaming_lufs_gauge",
+  "title": "Streaming — LUFS Loudness Gauge (−14 target)",
+  "scale_id": "lufs_streaming_m14",
+  "default_ballistic": "LufsI",
+  "meter_type": "lufs_gauge",
+  "palette": {
+    "Safe":    "#3ed27a",
+    "Nominal": "#3ed27a",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#0a0c10",
+    "frame":      "#1d2126",
+    "scale_text": "#dde2e6"
+  },
+  "layout": {
+    "orientation": "horizontal",
+    "aspect_ratio": 2.0,
+    "peak_hold_ms": 0
+  }
+}

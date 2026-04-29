@@ -58,16 +58,20 @@ unsafe extern "C" {
 
 // ── DWT cycle counter ─────────────────────────────────────────────────────────
 
-const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
-
 #[inline(always)]
 fn cyccnt() -> u32 {
-    unsafe { DWT_CYCCNT.read_volatile() }
+    // Typed access via cortex_m crate (replaces raw 0xE000_1004 cast).
+    cortex_m::peripheral::DWT::cycle_count()
 }
 
-// ── Scope probe GPIO (same raw BSRR writes as bare-metal) ─────────────────────
+// ── Scope probe GPIO ──────────────────────────────────────────────────────────
+//
+// SAFETY: the bare-metal `scope_probe` module owns GPIOJ MODER setup;
+// this FreeRTOS handle just pulses BSRR which is a write-only atomic
+// set/reset — no RMW race with other GPIOJ writers.
+static GPIOJ: rlvgl_platform::hwcore::regs::gpio::Gpio =
+    unsafe { rlvgl_platform::hwcore::regs::gpio::Gpio::gpioj() };
 
-const GPIOJ_BSRR: *mut u32 = (0x5802_2400 + 0x18) as *mut u32;
 const PJ0_SET: u32 = 1 << 0;
 const PJ6_SET: u32 = 1 << 6;
 const PJ6_RESET: u32 = 1 << 22;
@@ -231,11 +235,16 @@ impl Dma2dSync for FreeRtosFrameSync {
     }
 
     fn take_error(&self) -> u32 {
-        let regs = 0x5200_1000 as *const u32; // DMA2D_ISR
+        // DMA2D status read — the typed `Dma2dBlitter` is owned by the
+        // render path; routing this read-only ISR check through it
+        // would require a `&mut Dma2dBlitter` (owned elsewhere) or a
+        // dedicated read-only typed accessor (not yet built). Opt-out
+        // markers track the deferral.
+        let regs = 0x5200_1000 as *const u32; // DMA2D_ISR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let isr = unsafe { regs.read_volatile() };
         let errors = isr & ((1 << 5) | (1 << 0)); // CEIF | TEIF
         if errors != 0 {
-            let ifcr = 0x5200_1004 as *mut u32; // DMA2D_IFCR
+            let ifcr = 0x5200_1004 as *mut u32; // DMA2D_IFCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             unsafe { ifcr.write_volatile(errors) };
         }
         errors
@@ -245,16 +254,16 @@ impl Dma2dSync for FreeRtosFrameSync {
 impl ScopeProbe for FreeRtosFrameSync {
     #[inline(always)]
     fn dma2d_active(&self) {
-        unsafe { GPIOJ_BSRR.write_volatile(PJ6_SET) }
+        GPIOJ.regs().bsrr.write(PJ6_SET);
     }
 
     #[inline(always)]
     fn dma2d_idle(&self) {
-        unsafe { GPIOJ_BSRR.write_volatile(PJ6_RESET) }
+        GPIOJ.regs().bsrr.write(PJ6_RESET);
     }
 
     #[inline(always)]
     fn ltdc_active(&self) {
-        unsafe { GPIOJ_BSRR.write_volatile(PJ0_SET) }
+        GPIOJ.regs().bsrr.write(PJ0_SET);
     }
 }

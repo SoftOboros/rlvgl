@@ -1,0 +1,22 @@
+#!/bin/bash
+# swap-to-freertos — Linux-side trigger for the BBB Linux↔FreeRTOS toggle.
+#
+# Writes 'F\n' to /boot/firmware/freertos-next and reboots. u-boot reads
+# the marker via /uEnv.txt at the FAT root, chainloads
+# /boot/firmware/rlvgl-bbb-bare.bin (FreeRTOS prong / bare-metal
+# stand-in), and fatrm-clears the marker before the `go`. The alt
+# payload triggers a warm reset on its way out, so a single invocation
+# round-trips Linux → alt → Linux automatically — no buttons, no
+# SD shuttle, no fw_setenv.
+#
+# Install on the BBB:
+#   sudo cp swap-to-freertos /usr/local/bin/
+#   sudo chmod 755 /usr/local/bin/swap-to-freertos
+#
+# Use:
+#   sudo swap-to-freertos
+set -euo pipefail
+echo F > /boot/firmware/freertos-next
+sync
+echo "rlvgl: marker set, rebooting..."
+exec /sbin/reboot

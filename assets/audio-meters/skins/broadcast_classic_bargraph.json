@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "broadcast_classic_bargraph",
+  "title": "Broadcast Classic — LED Bargraph",
+  "scale_id": "vu_broadcast",
+  "default_ballistic": "Vu",
+  "meter_type": "bargraph",
+  "palette": {
+    "Safe":    "#1f9d4f",
+    "Nominal": "#3ed27a",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#0c0c0e",
+    "frame":      "#2a2a2e",
+    "scale_text": "#cfcfd2",
+    "minor_tick": "#5b5b62",
+    "major_tick": "#a0a0a8",
+    "led_off":    "#1c1c1f",
+    "peak_hold":  "#ffffff"
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspect_ratio": 0.18,
+    "led_count": 32,
+    "peak_hold_ms": 1200
+  }
+}

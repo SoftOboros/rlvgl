@@ -94,7 +94,7 @@ pub fn build_star_crawl_window(
     let jumbo_stride = visible_w as usize * ARGB_BPP;
     let jumbo_len = jumbo_stride * (visible_h as usize * JUMBO_SCALE as usize);
     let jumbo_vec: Vec<u8> = vec![0u8; jumbo_len];
-    let jumbo_slice: &'static mut [u8] = Vec::leak(jumbo_vec);
+    let jumbo_slice: &'static mut [u8] = Vec::leak(jumbo_vec); // rlvgl-discipline: allow(static_mut)
     let jumbo = JumboBuffer::new(
         jumbo_slice,
         jumbo_stride,
@@ -109,7 +109,7 @@ pub fn build_star_crawl_window(
     let text_stride = TEXT_WIDTH_PX as usize;
     let text_len = text_stride * TEXT_HEIGHT_PX as usize;
     let text_vec: Vec<u8> = vec![0u8; text_len];
-    let text_slice: &'static mut [u8] = Vec::leak(text_vec);
+    let text_slice: &'static mut [u8] = Vec::leak(text_vec); // rlvgl-discipline: allow(static_mut)
     let text_src = Surface::new(
         text_slice,
         text_stride,
@@ -122,7 +122,7 @@ pub fn build_star_crawl_window(
     // region × 4 bytes (ARGB composite staging).
     let scanline_len = visible_w.max(visible_h) as usize * ARGB_BPP;
     let scanline_vec: Vec<u8> = vec![0u8; scanline_len];
-    let scanline_slice: &'static mut [u8] = Vec::leak(scanline_vec);
+    let scanline_slice: &'static mut [u8] = Vec::leak(scanline_vec); // rlvgl-discipline: allow(static_mut)
 
     let crawl = disco_demo_preset(
         &CRAWL_FONT,

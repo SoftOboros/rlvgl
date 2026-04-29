@@ -31,6 +31,26 @@ cargo build \
 - `audio` enables WM8994 codec init over I2C4 + SAI1 I2S TX + SAI4 PDM mic.
 - `sd_storage` enables SDMMC block device; file browser listing is still a stub.
 
+### FreeRTOS build
+
+```bash
+RUSTFLAGS="-C target-cpu=cortex-m7" \
+cargo build \
+  --target thumbv7em-none-eabihf \
+  -p rlvgl-example-disco \
+  --bin rlvgl-stm32h747i-disco \
+  --features cm7,freertos,adapted_cmd,dma2d,splash,desktop
+```
+
+- This is the FreeRTOS preemptive task build (present/render/touch/playit).
+- `freertos` links libfreertos.a and enables the FreeRTOS entry path.
+- `adapted_cmd` selects DSI adapted command mode (portrait, pulsed scan).
+- Uses single-buffer FRONT rendering with 32 ms holdoff.
+- Joystick (PK2-PK6) + button (PC13) for navigation.
+- Touch detection works; touch dispatch to widget tree disabled pending
+  ActionHotspot bounds fix.
+- 64 KB Rust heap required (settings wing draws 5 RLE icons).
+
 ### Compile-safety check for the leaner profiling feature set
 
 ```bash
@@ -142,6 +162,19 @@ RUSTFLAGS="" cargo clippy --workspace -- -D warnings
 # Phase 2: tests (all workspace crates including doc tests)
 RUSTFLAGS="" cargo test --workspace
 
+# Phase 2.5: hardware-abstraction discipline (STM32H747I-DISCO)
+# Locks in: typed framebuffer ownership, DMA2D InFlight tokens, typed
+# DSI/LTDC/I2C/USART/GPIO/TIM register blocks, IsrChannel<T,N> + IsrFlag
+# + IsrCounter ISR primitives, address-domain newtypes (MmioAddr<T>,
+# PhysAddr, DmaAddr). Strict mode asserts BASELINE is empty — any new
+# raw cast / static mut / compiler_fence outside the documented exempts
+# fails CI. See the "Register-Mashing Discipline" section above.
+RLVGL_LINT_STRICT=1 RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline
+RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline_compile
+# The disco-sim host integration test for the typed types runs in
+# Phase 4.5 via `cargo test -p rlvgl-example-disco-sim` — do not
+# duplicate here.
+
 # Phase 3: playit crate (standalone — no_std cross-compile + package)
 RUSTFLAGS="" cargo test -p rlvgl-playit
 RUSTFLAGS="-C target-cpu=cortex-m7" cargo check --target thumbv7em-none-eabihf -p rlvgl-playit
@@ -198,6 +231,105 @@ DRY_RUN=1 scripts/publish_changed.sh HEAD~1
 - Relevant telemetry now includes idle cycles, loop count, pipeline stage/frame,
   DMA2D last/max cycles, DMA completion/error counts, and serial queue/drop
   counters.
+
+## Register-Mashing Discipline (STM32H747I-DISCO)
+
+Raw MMIO and pointer-heavy code in the 747I tree must follow an
+ownership/provenance discipline — the goal is not to eliminate `unsafe`, but to
+give `unsafe` blocks a narrow legal envelope and to make aliasing, provenance,
+and address-domain mistakes compile errors rather than silent runtime bugs.
+
+This discipline is being staged into `platform/` via the plan at
+`/Users/iraabbott/.claude/plans/let-s-plan-to-mitigate-parallel-anchor.md` and
+locked in by `platform/tests/discipline.rs` (grep scanner) plus
+`platform/tests/discipline_compile.rs` (trybuild compile-fail fixtures). Until
+Step 9 lands, the scanner runs in baseline mode with a shrinking exemption list.
+
+### Normative rules
+
+1. **Contain raw MMIO at the perimeter.** `*mut u32 = ADDR as *mut u32` style
+   constants MUST live in `platform/src/hwcore/regs/` (typed register-block
+   modules) or in vendored PAC code. They MUST NOT appear inline in example
+   binaries, app-level code, or other `platform/` modules.
+2. **Typed framebuffer ownership.** Framebuffer addresses MUST flow as
+   `FrameBuffer` / `FrontBuffer<'a>` / `BackBuffer<'a>` handles, not as bare
+   `u32` or `*mut u8`. Shims returning `u32` (e.g. `front_buffer_addr()`) are
+   `#[deprecated]` during migration and REMOVED at Step 9.
+3. **DMA as ownership transfer.** DMA2D submission MUST return an
+   `InFlight<'dma, T>` token that borrows the destination buffer; CPU access
+   during a transfer is prevented at compile time. Raw pointer DMA2D entry
+   points (`start_fill_raw`, `start_blit_raw`) are `#[doc(hidden)]` during
+   migration and REMOVED at Step 9.
+4. **Three address domains, three types.** MMIO register addresses, CPU RAM
+   pointers, and DMA bus addresses MUST NOT collapse into a single `u32`.
+   Use `MmioAddr<T>`, `PhysAddr`, `DmaAddr` from `platform::hwcore::addr`.
+   Conversions between them go through explicit methods that assert alignment
+   / provenance preconditions.
+5. **Typed register blocks for DSI / LTDC / DMA2D.** Register layouts MUST be
+   expressed as `#[repr(C)]` structs with `const_assert_eq!(offset_of!(...),
+   0x…)` assertions. Hand-offset pointer arithmetic (the class of bug that
+   caused the LCCR-at-0x2C panel-snow incident) MUST NOT recur — the wrong
+   offset becomes a compile-time failure.
+6. **ISR shared state through `IsrChannel<T,N>`.** `static mut` declarations
+   MUST live in `platform/src/hwcore/isr.rs`. Application ISRs use
+   `IsrChannel<T,N>`, `IsrFlag`, `IsrCounter` — the volatile + `compiler_fence`
+   plumbing is encapsulated. Direct `compiler_fence(` calls outside `hwcore/`
+   are a discipline violation.
+7. **Unsafe block hygiene.** Every `unsafe { ... }` block or `unsafe fn` in
+   `platform/` and `examples/stm32h747i-disco/` MUST carry a `// SAFETY:`
+   comment naming (a) what memory is accessed, (b) who owns it, (c) why
+   aliasing is acceptable, (d) what synchronization is required. Large
+   `unsafe` functions SHOULD be decomposed so the `unsafe` envelope is as
+   small as practical.
+8. **Volatile is not provenance.** Volatile access semantics (`read_volatile`,
+   `write_volatile`, PAC `.write()` / `.modify()`) govern reordering and
+   elision. They do NOT repair aliasing, lifetime, or provenance errors in
+   surrounding RAM logic. Treat them as orthogonal concerns.
+
+### Applicability
+
+- **IN SCOPE**: `platform/` (all modules), `examples/stm32h747i-disco/`
+  (bare-metal + FreeRTOS builds), `display_init.rs`, `dma2d.rs`,
+  `dma2d_draw.rs`, ISR paths in `main.rs`.
+- **OUT OF SCOPE**: `examples/beaglebone-black/src/bsp/` (DevMem abstraction
+  already clean), `examples/beetle-esp32c3/src/bsp_generated/` (PAC-typed by
+  generator), `esp_hal`-based code, vendored PAC crates, audio/QSPI/SDMMC
+  paths (already PAC/HAL-typed).
+- **Zephyr port**: consumes `display_init.rs` and therefore inherits the
+  typed register-block rule (#5) once Step 6 lands. Zephyr-specific glue in
+  `zephyr_entry.rs` follows #7 but is otherwise scoped separately.
+
+### Enforcement
+
+During staged migration (Steps 1–8):
+
+```bash
+# Shows violations against BASELINE exemptions; fails only on *new* violations.
+RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline
+# trybuild fixtures enforce the InFlight / Scanout / MmioAddr contracts.
+RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline_compile
+```
+
+At Step 9 (full strict mode, enforced by Phase 2.5 of pre-publish):
+
+```bash
+# Phase 2.5: hardware-abstraction discipline (STM32H747I-DISCO)
+RLVGL_LINT_STRICT=1 RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline
+RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline_compile
+# The disco-sim host integration test for the typed types runs in Phase 4.5
+# via `cargo test -p rlvgl-example-disco-sim` — do not duplicate here.
+```
+
+`RLVGL_LINT_STRICT=1` asserts the `BASELINE` array in `discipline.rs` is empty.
+Reviewers MAY grant a temporary `RLVGL_LINT_STRICT=0` waiver for an emergency
+hotfix, but the same PR MUST file a follow-up issue to restore strict mode.
+
+### Opt-out marker for legitimate exceptions
+
+Lines containing `// rlvgl-discipline: allow(<rule_id>)` are exempt from the
+scanner. Use sparingly, with justification in the surrounding comment. Rule
+IDs: `raw_mmio_cast`, `raw_addr_cast`, `static_mut`, `raw_dma2d`,
+`fb_addr_shim`, `compiler_fence`.
 
 ## Espressif BSP Generator
 
@@ -269,3 +401,168 @@ mutually exclusive features:
   include SSD1306 or rlvgl — SSD1306 over raw PAC needs command-list
   chunking (ESP32-C3 TX FIFO is 32 bytes, SSD1306 framebuffer writes are
   ~1 KB) and is deferred to a follow-up milestone.
+
+## Spec-Before-Code Planning Discipline
+
+Multi-phase initiatives in this repo — the STM32H747I-DISCO bring-up
+(`docs/disco-platform-guide/`, `docs/disco-tutorial/`,
+`docs/disco-freertos-guide/`, `docs/disco-zephyr-guide/`,
+`docs/disco-test-and-debug/`), the BeagleBone Black + NHD cape four-prong
+port (`docs/beaglebone-black/`), the `rlvgl-creator` + chipdb family
+(`docs/creator/`, `docs/bsp/`, `chipdb/rlvgl-chips-*`), and any future
+multi-chapter guide — follow a
+standards-body-style planning cycle: every behaviour change is preceded by
+a ratified *terms* doc. Vocabulary drift and invariant erosion are the
+dominant failure modes once a plan crosses ~3 phases, especially across
+parallel ports (Linux / bare-metal / FreeRTOS / Zephyr) where the same
+concept name can quietly pick up different semantics in each tree. The
+cycle exists to prevent silent forks, not as ceremony.
+
+### Normative keywords (RFC 2119 / 8174)
+
+The key words **MUST**, **MUST NOT**, **SHALL**, **SHOULD**, **SHOULD
+NOT**, **MAY**, and **RECOMMENDED** in initiative-family guide docs and
+per-chapter concepts docs are interpreted per RFC 2119 and RFC 8174. Use
+capitals when invoking the keyword; lowercase for ordinary English. Plain
+narrative without capitalised keywords is advisory, not binding.
+
+### Normative vs. informative sections
+
+In a per-chapter doc (e.g. `docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md`,
+`docs/beaglebone-black/README.md` sections):
+
+- Sections referenced by the chapter's **Acceptance** checklist (or by
+  `docs/releases/roadmap-pre-v0.2.md` checkboxes that cite the chapter) are
+  **normative** — binding on implementers.
+- All other sections (problem statement, narrative, lessons-learned,
+  non-goals, change log) are **informative**.
+- The initiative README (e.g. `docs/disco-platform-guide/README.md`) is
+  **informative**; per-chapter docs are the normative artifacts.
+
+Do not re-derive normative rules in README narrative — cite the
+per-chapter doc and section heading.
+
+### Conformance targets
+
+Each initiative README MUST name the conforming artifact and its
+acceptance gates. Optional phases yield a second conformance level so
+reviewers can reason about partial deployments without re-arguing scope.
+Worked example for the BBB port:
+
+- "A conforming BBB deployment MUST satisfy the Phase 3 Linux-prong
+  acceptance gates in `docs/beaglebone-black/README.md`."
+- "A conforming BBB deployment MAY additionally satisfy Phase 4
+  (bare-metal), FreeRTOS, or Zephyr; each is independently conformant."
+
+Same pattern for the DISCO guide (Volume I tutorial MUST, Volume II
+platform guide SHOULD, FreeRTOS/Zephyr MAY) and for `rlvgl-creator`
+(chipdb render tests MUST pass; `compile-verify` SHOULD pass;
+hardware bring-up on the generated BSP MAY pass at initiative close).
+
+### Definitions — reference vs. restatement
+
+For every term that also exists in code, the glossary entry MUST cite the
+authoritative source and mark the relationship:
+
+- **"As defined in [path/to/file.rs:line]; used without modification."**
+  — repo is canonical; spec references it. Example: `DiscoCommand` in
+  `examples/apps/disco-demo/src/lib.rs`.
+- **"As defined in [path/to/file.rs:line]; adapted: [delta]."** — repo
+  is canonical; spec extends/narrows it with a named delta. Example: BBB
+  `Screen::landscape(800, 480)` uses the same type as DISCO but with a
+  different `frame_hz` derivation (`PIXEL_CLOCK_HZ / (HTOTAL * VTOTAL)`).
+- **"Owned by <CHAPTER>; does not exist in repo yet."** — spec is
+  canonical; repo will mirror once the chapter lands. Example:
+  `DevMem::translate_mut` before the bsp refactor shipped.
+
+Silent restatement of an existing repo definition is how forks form
+between the four BBB prongs and the four DISCO build profiles. Don't do
+it.
+
+### Frozen enumerations — registration policy
+
+Every frozen enum (`PixelFmt`, `Rotation`, `ColorFormat`, `DiscoCommand`,
+`Effect`, chipdb vendor set `{esp, stm, ti, nxp, nrf, renesas, silabs,
+rp2040, microchip}`, BBB prong set `{linux, bare_metal, freertos,
+zephyr}`, etc.) declares its registration policy in the concepts doc:
+
+- **Standards Action** — adding a value requires a change-log amendment to
+  the initiative's canonical concepts doc and an explicit go-ahead from
+  the owner. Use for enums encoding cross-phase contracts (prong set,
+  chipdb vendor set, `PixelFmt`).
+- **Specification Required** — adding a value requires a per-chapter
+  walkthrough update, no concepts-doc amendment. Use for enums local to
+  one chapter's surface (e.g. `DiscoCommand` variants for a new demo
+  feature).
+- **Expert Review** — chapter owner MAY add with a PR-level note. Use
+  for internal enums with no cross-phase coupling (private state
+  machines inside one crate).
+
+Default to Standards Action when in doubt; demote later if churn
+justifies.
+
+### Phase document shape
+
+A per-chapter concepts doc follows this section layout: §0 authority
+policy (which external doc owns which vocabulary — RM0399 for H747,
+SPRUH73Q for AM335x, TRM-by-vendor for chipdb crates), §1 purpose, §2
+problem statement (evidence pinned to code paths, e.g.
+`platform/src/dsi_cmd_mode.rs:NN`), §3 canonical glossary, §4
+source-of-truth map (one owner per concept across the four prongs), §5–§9
+frozen decisions (enums, register-bit positions, timing invariants), §10
+reconciliation decisions vs. adjacent repo primitives (e.g. how a new
+`rlvgl-creator` BSP maps onto the hand-written H747 BSP), §11 non-goals,
+§12 acceptance checklist, §13 files cited, §14 unblocks, §15 change log.
+Chapters beyond the §0 concepts gate MAY omit sections that do not apply;
+§0, §3/§4, §10, §12, §15 are load-bearing.
+
+See
+[`docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md`](docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md)
+and [`docs/beaglebone-black/README.md`](docs/beaglebone-black/README.md) as the current
+reference shapes. Neither yet uses the full §0–§15 structure; they MUST
+adopt it when their initiatives cross the ~3-phase threshold or gain a
+sibling port.
+
+### Execution discipline
+
+Once a concepts doc is ratified (dated change-log entry), execution PRs:
+
+- Cite the initiative-and-phase code in the commit subject. Suggested
+  prefixes: `DISCO-NN[a-z]:` for disco-platform-guide chapters,
+  `BBB-NN[a-z]:` for BeagleBone Black phases,
+  `CREATOR-NN[a-z]:` for rlvgl-creator phases,
+  `CHIPS-<VENDOR>-NN[a-z]:` for per-vendor chipdb crates
+  (e.g. `CHIPS-ESP-02b:`, `CHIPS-STM-04a:`).
+- Name in the PR description which invariants (from the concepts doc's
+  frozen-decisions sections) the change touches, and how each is
+  preserved.
+- Touching a frozen enum value or an invariant (register-bit position,
+  pixel format, prong-set membership) requires a change-log amendment
+  **first**, in a separate PR. No behaviour PR rides on an unamended
+  invariant.
+
+Conventional-commit style (`feat:`, `fix:`, `docs:`, `tools:`) remains
+the default for non-initiative work; the initiative prefix replaces the
+conventional type when the change is scoped to a ratified phase.
+
+### Applicability
+
+This discipline applies to:
+
+- `docs/disco-platform-guide/` (DISCO Volume II platform guide, 11
+  chapters)
+- `docs/disco-tutorial/` (DISCO Volume I tutorial, 7 chapters)
+- `docs/disco-freertos-guide/` (DISCO FreeRTOS port, 7 chapters)
+- `docs/disco-zephyr-guide/` (DISCO Zephyr port, 7 chapters)
+- `docs/disco-test-and-debug/` (DISCO test & debug, 4 chapters)
+- `docs/beaglebone-black/` (BBB four-prong)
+- `docs/creator/`, `docs/bsp/`, and `chipdb/rlvgl-chips-*` (rlvgl-creator + chipdb
+  family)
+- Any future multi-chapter initiative with ≥3 phases.
+
+Single-doc TODOs, phase-1 prototypes, and one-off explorations MAY use
+informal form. The moment a family produces a second chapter citing the
+first, the full discipline applies to that family.
+
+The point is convergence over time: form is cheaper to align than
+vocabulary.

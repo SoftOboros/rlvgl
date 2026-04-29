@@ -148,19 +148,29 @@ pub trait Blitter {
 /// [`Self::add`] to register a region that changed during rendering and
 /// [`Self::rects`] to obtain the batched list for flushing. After presenting
 /// the frame, call [`Self::clear`] to reuse the planner for the next frame.
+///
+/// Adds beyond `N` are silently dropped, but [`Self::overflowed`] flips to
+/// `true` so callers driving a dirty-rect present path know the rect set is
+/// incomplete and can fall back to a full-frame repaint for that frame.
 pub struct BlitPlanner<const N: usize> {
     rects: HVec<Rect, N>,
+    overflowed: bool,
 }
 
 impl<const N: usize> BlitPlanner<N> {
     /// Create an empty planner.
     pub fn new() -> Self {
-        Self { rects: HVec::new() }
+        Self {
+            rects: HVec::new(),
+            overflowed: false,
+        }
     }
 
     /// Record a dirty rectangle.
     pub fn add(&mut self, rect: Rect) {
-        let _ = self.rects.push(rect);
+        if self.rects.push(rect).is_err() {
+            self.overflowed = true;
+        }
     }
 
     /// Return all accumulated rectangles.
@@ -168,9 +178,15 @@ impl<const N: usize> BlitPlanner<N> {
         &self.rects
     }
 
+    /// Whether [`Self::add`] dropped a rect because the planner was full.
+    pub fn overflowed(&self) -> bool {
+        self.overflowed
+    }
+
     /// Remove all stored rectangles.
     pub fn clear(&mut self) {
         self.rects.clear();
+        self.overflowed = false;
     }
 }
 

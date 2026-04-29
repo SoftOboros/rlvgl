@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "ebu_classic_bargraph",
+  "title": "EBU Classic — LED Bargraph",
+  "scale_id": "vu_ebu",
+  "default_ballistic": "Vu",
+  "meter_type": "bargraph",
+  "palette": {
+    "Safe":    "#1f7d8c",
+    "Nominal": "#3eb1c4",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#0a0c0d",
+    "frame":      "#23282b",
+    "scale_text": "#d6dcde",
+    "minor_tick": "#56636a",
+    "major_tick": "#9aa6ad",
+    "led_off":    "#161a1c",
+    "peak_hold":  "#ffffff"
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspect_ratio": 0.18,
+    "led_count": 32,
+    "peak_hold_ms": 1500
+  }
+}

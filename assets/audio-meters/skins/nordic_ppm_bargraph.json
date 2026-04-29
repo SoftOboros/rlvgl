@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "nordic_ppm_bargraph",
+  "title": "Nordic PPM — DIN 45406 Bargraph",
+  "scale_id": "ppm_din",
+  "default_ballistic": "PpmTypeI",
+  "meter_type": "bargraph",
+  "palette": {
+    "Safe":    "#2c8a3f",
+    "Nominal": "#4cc46a",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#0a0d0a",
+    "frame":      "#1f2620",
+    "scale_text": "#cfd5cf",
+    "minor_tick": "#465049",
+    "major_tick": "#8a948c",
+    "led_off":    "#161a17",
+    "peak_hold":  "#ffffff"
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspect_ratio": 0.16,
+    "led_count": 40,
+    "peak_hold_ms": 1500
+  }
+}

@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-#[cfg(any(feature = "simulator", feature = "fatfs"))]
+#[cfg(any(feature = "simulator", feature = "fatfs", feature = "linux_fbdev"))]
 extern crate std;
 
 #[cfg(feature = "simulator")]
@@ -31,14 +31,6 @@ pub mod compositor;
 pub mod cpu_blitter;
 /// Display driver traits and implementations.
 pub mod display;
-/// Frame synchronization traits for ERIF-based scheduling.
-pub mod frame_sync;
-#[cfg(all(
-    feature = "stm32h747i_disco",
-    any(target_arch = "arm", target_os = "none")
-))]
-/// Shared DSI adapted command mode register configuration.
-pub mod dsi_cmd_mode;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
@@ -61,11 +53,30 @@ pub mod dma_sai;
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
 ))]
+/// Shared DSI adapted command mode register configuration.
+pub mod dsi_cmd_mode;
+/// Platform-level visual effect primitives ([`Effect`] trait,
+/// [`CrawlParams`] struct).
+pub mod effect;
+/// Frame synchronization traits for ERIF-based scheduling.
+pub mod frame_sync;
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_os = "none")
+))]
 pub mod ft5336;
 /// Gesture recognition (debounced tap, press-down/release).
 pub mod gesture;
+/// Hardware-abstraction substrate (address newtypes, framebuffer ownership,
+/// ISR channels, typed register blocks). See the "Register-Mashing
+/// Discipline" section of `CLAUDE.md`.
+pub mod hwcore;
 /// Input device abstractions.
 pub mod input;
+#[cfg(feature = "linux_fbdev")]
+pub mod linux_evdev;
+#[cfg(feature = "linux_fbdev")]
+pub mod linux_fbdev;
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",
@@ -179,12 +190,24 @@ pub use cpu_blitter::CpuBlitter;
 pub use display::DisplayDriver;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_os = "none")))]
 pub use dma2d::Dma2dBlitter;
+pub use effect::{BlitterSink, CrawlParams, Effect, EffectExt, EffectSink, SubSink};
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
 ))]
 pub use ft5336::Ft5336;
+pub use hwcore::addr::{AddrError, DmaAddr, MmioAddr, PhysAddr};
+pub use hwcore::isr::{IsrChannel, IsrCounter, IsrFlag};
+#[cfg(any(test, feature = "mock_blitter"))]
+pub use hwcore::mock::{MockBlitter, MockOp};
+pub use hwcore::surface::{
+    BackBuffer, BankCollision, BorrowedForDma, FrameBuffer, FrontBuffer, InFlight, Scanout,
+};
 pub use input::{InputDevice, InputEvent};
+#[cfg(feature = "linux_fbdev")]
+pub use linux_evdev::LinuxEvdevInput;
+#[cfg(feature = "linux_fbdev")]
+pub use linux_fbdev::LinuxFbdevDisplay;
 #[cfg(feature = "simulator")]
 pub use pixels_renderer::PixelsRenderer;
 #[cfg(all(

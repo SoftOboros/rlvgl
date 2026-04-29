@@ -46,13 +46,13 @@ and refer back as needed:
 
 - [`src/bin/creator/README.md`](../../src/bin/creator/README.md) —
   one-page overview and command index.
-- [`docs/CREATOR-CLI.md`](../CREATOR-CLI.md) — full CLI reference,
+- [`docs/creator/CLI.md`](../creator/CLI.md) — full CLI reference,
   including every subcommand flag and edge-case.
-- [`docs/CREATOR-ASSET-PIPELINE.md`](../CREATOR-ASSET-PIPELINE.md) —
+- [`docs/creator/ASSET-PIPELINE.md`](../creator/ASSET-PIPELINE.md) —
   epic-level design (manifest format, hashing, determinism).
-- [`docs/CREATOR-UI-DESIGN.md`](../CREATOR-UI-DESIGN.md) — desktop
+- [`docs/creator/UI-DESIGN.md`](../creator/UI-DESIGN.md) — desktop
   UI interaction model.
-- [`docs/IMAGE-COMPRESSION-FORMAT.md`](../IMAGE-COMPRESSION-FORMAT.md)
+- [`docs/assets/IMAGE-COMPRESSION-FORMAT.md`](../assets/IMAGE-COMPRESSION-FORMAT.md)
   — the actual on-device RLE format.
 
 ## Steps
@@ -79,7 +79,7 @@ moment; the output is interchangeable.
 
 #### Path A — CLI
 
-Mirror the workflow in [`CREATOR-CLI.md`](../CREATOR-CLI.md) §Quick
+Mirror the workflow in [`CLI.md`](../creator/CLI.md) §Quick
 start workflow. Put the source image under an `assets/media/`
 directory in your crate, then:
 
@@ -95,11 +95,11 @@ cargo run --bin rlvgl-creator --features creator -- convert
 ```
 
 `convert` emits `splash.rle` (and an uncompressed `splash.raw`)
-next to the source. See [`CREATOR-CLI.md §convert`](../CREATOR-CLI.md#convert)
+next to the source. See [`CLI.md §convert`](../creator/CLI.md#convert)
 for options like target dimensions, colour depth, and dithering.
 
 For an SVG source use the `svg` subcommand instead — see
-[`CREATOR-CLI.md §svg`](../CREATOR-CLI.md#svg).
+[`CLI.md §svg`](../creator/CLI.md#svg).
 
 #### Path B — Desktop UI
 
@@ -110,7 +110,7 @@ cargo run --bin rlvgl-creator --features creator,creator_ui -- ui
 ```
 
 Then, following the interaction model in
-[`CREATOR-UI-DESIGN.md`](../CREATOR-UI-DESIGN.md):
+[`UI-DESIGN.md`](../creator/UI-DESIGN.md):
 
 1. **File → Open Project** and point at the asset folder in your
    tutorial crate (the one with `manifest.yml`).
@@ -218,12 +218,12 @@ re-exporting.
 
 ## Going deeper
 
-- [`docs/IMAGE-COMPRESSION-FORMAT.md`](../IMAGE-COMPRESSION-FORMAT.md)
+- [`docs/assets/IMAGE-COMPRESSION-FORMAT.md`](../assets/IMAGE-COMPRESSION-FORMAT.md)
   — the exact bit layout of the RLE blob you just generated.
-- [`docs/FILESYSTEM-ASSET-LOADING.md`](../FILESYSTEM-ASSET-LOADING.md)
+- [`docs/assets/FILESYSTEM-ASSET-LOADING.md`](../assets/FILESYSTEM-ASSET-LOADING.md)
   — how the finished demo loads assets from SD/QSPI instead of
   `include_bytes!` when those features are on.
-- [`docs/CREATOR-TEMPLATES.md`](../CREATOR-TEMPLATES.md) — scaffolding
+- [`docs/creator/TEMPLATES.md`](../creator/TEMPLATES.md) — scaffolding
   a proper assets crate so multiple targets can share art.
 
 ---

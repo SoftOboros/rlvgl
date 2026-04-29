@@ -44,6 +44,34 @@ CHANGELOG.md - Notes on chip & board database releases.
 - Star crawl motion system (mirrored starfield + FIR text overlay).
 - CPU stats via DWT/D3 SRAM telemetry.
 
+### FreeRTOS platform (new)
+- Preemptive task model: present (P3), render (P1), touch (P2), playit (P2).
+- Interrupt-driven I2C4 touch via ISR state machine + FreeRTOS semaphore.
+- TIM7 one-pulse ERIF-phase-locked present with configurable holdoff.
+- Single-buffer FRONT rendering (32 ms holdoff, ~18 Hz, flicker-free).
+- Joystick (PK2-PK6) and button (PC13) input with keyboard navigation.
+- Star crawl integration with jumbo/CFBAR model + touch-to-dismiss.
+- DiscoCommand drain: star crawl, storage refresh, backlight, effects.
+- SVCall/PendSV naked trampolines via `ffi_shims.c` for FreeRTOS exception routing.
+- SysTick pre-scheduler gate to prevent xPortSysTickHandler on uninitialized data.
+- FT5336 CTRL=0x00 keep-active init; G_MODE left at default (0x00 kills touch).
+- `make build-disco-freertos` / `make flash-disco-freertos` build targets.
+
+### Zephyr platform (existing, documented)
+- C+Rust hybrid: 440-line C shell (main.c) + 1,300-line Rust entry (zephyr_entry.rs).
+- Video mode (Zephyr DSI driver, landscape, DMA2D deadlocks) and adapted command
+  mode (Rust raw DSI init, portrait, DMA2D works).
+- SYS_INIT PG3 early reset hook for FT5336 under adapted command mode.
+- INPUT_MODE_SYNCHRONOUS for dropped-event-free touch/joystick input.
+- C1_LPENR CSleep fix for dual-core H747 display peripheral clock gating.
+- Star crawl pipeline functional under adapted command mode.
+
+### Platform guides (new)
+- Volume IV: FreeRTOS Platform Guide (7 chapters) — scaffolding, present task,
+  touch ISR, render task, input dispatch, star crawl, flicker/rendering strategy.
+- Volume V: Zephyr Platform Guide (7 chapters) — build/link, C shell/FFI,
+  display modes, touch/input, render loop, DMA2D, adapted command mode deep dive.
+
 ### Rendering and UI
 - Anti-aliased rounded corners in core draw.
 - Compositor save-under and dirty-region restoration.
@@ -60,7 +88,7 @@ CHANGELOG.md - Notes on chip & board database releases.
   embedded build, docs).
 
 ## v0.1.9
-- See [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) for detailed notes.
+- See [releases/v0.1.9.md](./releases/v0.1.9.md) for detailed notes.
 - STM32 BSP generation from CubeMX `.ioc` files.
 - Initial vendor chipdb crate stubs (9 vendors).
 - STM32H747I-DISCO board bring-up: display, touch, SD, backlight.

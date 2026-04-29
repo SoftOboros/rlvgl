@@ -50,7 +50,7 @@ rather than duplicating their contents:
 
 - [`docs/EMBEDDED-TOOLING.md`](../EMBEDDED-TOOLING.md) — full toolchain
   install, cross-compile notes, and debugger setup.
-- [`docs/STM32H747I-DISCO-BRINGUP.md`](../STM32H747I-DISCO-BRINGUP.md) —
+- [`examples/stm32h747i-disco/BRINGUP.md`](../../examples/stm32h747i-disco/BRINGUP.md) —
   hardware bringup checklist if the board behaves oddly (SD/MMC, DSI
   reset, BOOT0 jumper, etc.).
 - [`docs/MAKE.md`](../MAKE.md) — the make target catalogue.

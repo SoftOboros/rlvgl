@@ -33,6 +33,7 @@ libloading = { version = "0.8", optional = true }
 uefi = { version = "0.36.1", optional = true }
 rlvgl-playit = { path = "../playit", version = "0.2.0", default-features = false, optional = true }
 ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+libc = { version = "0.2", optional = true }
 
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
@@ -58,7 +59,13 @@ fatfs_nostd = ["dep:fatfs"]
 sd_storage = ["dep:embedded-sdmmc"]
 audio = ["stm32h7", "embedded-hal"]
 dma2d = ["stm32h7"]
+freertos = []
 splash = ["dep:rlvgl-decomp"]
+## Host-only mock implementation of the typed DMA2D submission API.
+## Used by `examples/disco-sim/tests/typed_dma2d_host.rs` and any future
+## host-side test that wants to exercise `BackBuffer::dma_dst()` /
+## `InFlight<T>` lifecycle without hardware.
+mock_blitter = []
 fontdue = ["rlvgl-core/fontdue"]
 png = ["rlvgl-core/png"]
 jpeg = ["rlvgl-core/jpeg"]
@@ -68,6 +75,7 @@ apng = ["rlvgl-core/apng", "dep:image"]
 lottie = ["rlvgl-core/lottie"]
 canvas = ["rlvgl-core/canvas", "embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin"]
+linux_fbdev = ["dep:libc"]
 fatfs = ["rlvgl-core/fatfs"]
 nes = ["rlvgl-core/nes"]
 
@@ -75,3 +83,4 @@ nes = ["rlvgl-core/nes"]
 base64 = "0.21"
 fatfs = "0.3"
 fscommon = "0.1"
+trybuild = "1.0"

@@ -5,7 +5,7 @@
 
 # Test Strategy
 
-This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ordered roughly in the sequence it should be tackled, lists its upstream **dependencies** ­– either by reference to `docs/PROJECT-ROADMAP.md` sections (roadmap section references) or to earlier tests – and indicates whether it can be **fully automated** (via Codex‑driven `cargo test`, headless simulator, CI image‑diff, etc.) or requires **human verification** (e.g. visual acceptance on real hardware).
+This file enumerates the **testing work‑stream** for rlvgl.  Each entry is ordered roughly in the sequence it should be tackled, lists its upstream **dependencies** ­– either by reference to `docs/releases/roadmap-pre-v0.2.md` (historical roadmap sections) or to earlier tests – and indicates whether it can be **fully automated** (via Codex‑driven `cargo test`, headless simulator, CI image‑diff, etc.) or requires **human verification** (e.g. visual acceptance on real hardware).
 
 | ✔ | Order | Test ID | Description | Depends on | Automation |
 |---|-------|---------|-------------|-----------|------------|

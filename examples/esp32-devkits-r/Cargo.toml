@@ -1,0 +1,46 @@
+[package]
+name = "rlvgl-example-esp32-devkits-r"
+version = "0.2.0"
+edition = "2024"
+publish = false
+rust-version = "1.88"
+
+# ESP32-DevKitS-R (ESP32-WROOM-32) + CANADUINO 0.96" SSD1306 128x64 I2C OLED.
+#
+# This crate is EXCLUDED from the workspace because the original ESP32 uses
+# the Xtensa architecture, which requires the Espressif Rust toolchain
+# (`espup`) rather than standard Rust.
+#
+# Prerequisites:
+#   cargo install espup espflash
+#   espup install
+#
+# Build & flash (from this directory):
+#   cargo build
+#   cargo run          # flash + serial monitor via espflash
+#
+# Build from workspace root:
+#   cargo +esp build --manifest-path examples/esp32-devkits-r/Cargo.toml
+#
+# Wiring (SSD1306 I2C OLED):
+#   ESP32 GPIO21  ->  SDA
+#   ESP32 GPIO22  ->  SCL
+#   ESP32 3V3     ->  VCC
+#   ESP32 GND     ->  GND
+
+[[bin]]
+name = "rlvgl-esp32-devkits-r"
+path = "src/main.rs"
+
+[dependencies]
+esp-hal = { version = "1.0", features = ["esp32", "unstable"] }
+esp-bootloader-esp-idf = { version = "0.4", features = ["esp32"] }
+esp-backtrace = { version = "0.18", features = ["esp32", "panic-handler", "println"] }
+esp-println = { version = "0.16", features = ["esp32", "log-04"] }
+esp-alloc = { version = "0.7" }
+
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"] }
+
+rlvgl-core = { path = "../../core", default-features = false }
+rlvgl-platform = { path = "../../platform", default-features = false, features = ["ssd1306"] }
+rlvgl-widgets = { path = "../../widgets", default-features = false }

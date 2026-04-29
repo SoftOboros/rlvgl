@@ -46,9 +46,9 @@ silicon property.
 ### 1. Two stages — import and generate
 
 Per
-[`docs/CREATOR-CLI.md §bsp from-ioc`](../CREATOR-CLI.md#bsp-from-ioc)
+[`docs/creator/CLI.md §bsp from-ioc`](../creator/CLI.md#bsp-from-ioc)
 and
-[`docs/STM_BSP_GENERATION.md`](../STM_BSP_GENERATION.md):
+[`docs/bsp/STM32.md`](../bsp/STM32.md):
 
 ```bash
 rlvgl-creator platform import \
@@ -185,11 +185,11 @@ None — this chapter is about tooling, not silicon.
 
 ## Going deeper
 
-- [`docs/STM_BSP_GENERATION.md`](../STM_BSP_GENERATION.md)
+- [`docs/bsp/STM32.md`](../bsp/STM32.md)
   — end-to-end walkthrough of the import → gen pipeline.
-- [`docs/CREATOR-CLI.md`](../CREATOR-CLI.md) — full
+- [`docs/creator/CLI.md`](../creator/CLI.md) — full
   `rlvgl-creator` reference, including every `bsp` flag.
-- [`docs/CREATOR-TEMPLATES.md`](../CREATOR-TEMPLATES.md) —
+- [`docs/creator/TEMPLATES.md`](../creator/TEMPLATES.md) —
   how to write your own template pack when the ones shipped
   don't cover your peripheral.
 - [`chips/stm/bsps/README.md`](../../chips/stm/bsps/README.md)
