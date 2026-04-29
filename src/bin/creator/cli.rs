@@ -364,6 +364,21 @@ enum AppCommand {
         #[arg(value_name = "MANIFEST")]
         manifest: PathBuf,
     },
+    /// Scaffold a starter `app.yaml` + minimal layout file at
+    /// `<DIR>/<NAME>/`. Defaults `--dir` to the current working
+    /// directory (cargo-new style). Refuses to overwrite an
+    /// existing path. Generated manifest validates against
+    /// chapter 01 §6.
+    New {
+        /// Project name. Must be a valid kebab-case ref-id
+        /// (chapter 01 §3 — `^[a-z][a-z0-9-]*$`, max 63 chars).
+        #[arg(value_name = "NAME")]
+        name: String,
+        /// Parent directory under which `<NAME>/` is created.
+        /// Defaults to the current working directory.
+        #[arg(long, value_name = "DIR")]
+        dir: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1311,6 +1326,16 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                 }
             }
             AppCommand::Inspect { manifest } => app::inspect(&manifest)?,
+            AppCommand::New { name, dir } => {
+                let parent = dir.unwrap_or_else(|| PathBuf::from("."));
+                let manifest = app::new_scaffold(&parent, &name)?;
+                if !cli.silent {
+                    eprintln!(
+                        "scaffolded {} (run `rlvgl-creator app inspect {0}` to verify)",
+                        manifest.display()
+                    );
+                }
+            }
         },
     }
 

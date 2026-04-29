@@ -324,6 +324,83 @@ pub fn app_schema_json() -> Result<String> {
     Ok(serde_json::to_string_pretty(&schema)?)
 }
 
+/// Scaffold a starter `app.yaml` + minimal layout file at
+/// `<dir>/<name>/`. Refuses to overwrite an existing directory
+/// (analogous to `cargo new`'s default refusal). The emitted
+/// manifest is the minimal-viable rlvgl-app/v0 shape — esp/
+/// beetle_esp32c3/bare_metal/hosted target, one default screen,
+/// no controller, no SM, no theme, no i18n, no assets — and
+/// MUST validate against the chapter 01 §6 rules.
+pub fn new_scaffold(dir: &Path, name: &str) -> Result<PathBuf> {
+    if !is_ref_id(name) {
+        bail!(
+            "app name '{name}' is not a valid kebab-case ref-id (chapter 01 §3) — must match ^[a-z][a-z0-9-]*$, max 63 chars"
+        );
+    }
+    let target = dir.join(name);
+    if target.exists() {
+        bail!(
+            "refusing to scaffold into existing path: {} (move or delete it first)",
+            target.display()
+        );
+    }
+    std::fs::create_dir_all(target.join("layouts"))
+        .map_err(|e| anyhow!("create_dir_all {}: {e}", target.display()))?;
+
+    let manifest_body = format!(
+        r#"# {name}/app.yaml — rlvgl-app/v0 starter manifest.
+#
+# Validate:  rlvgl-creator app from-yaml --validate-only {name}/app.yaml
+# Inspect:   rlvgl-creator app inspect {name}/app.yaml
+# Emit:      rlvgl-creator app from-yaml {name}/app.yaml --out target/{name}-emit
+#
+# Adjust target.vendor / target.board to match your hardware.
+# Run `rlvgl-creator app schema` for the JSON Schema describing
+# every field — see docs/app-schema/01-manifest-schema.md for the
+# normative grammar.
+
+schema: rlvgl-app/v0
+name: {name}
+
+target:
+  vendor: esp
+  board: beetle_esp32c3
+  prong: bare_metal
+  generator: hosted
+
+screens:
+  - id: main-screen
+    layout: layouts/main_screen.rs
+    layout_format: rust_inline_v1
+    default: true
+"#
+    );
+    let manifest_path = target.join("app.yaml");
+    std::fs::write(&manifest_path, &manifest_body)
+        .map_err(|e| anyhow!("write {}: {e}", manifest_path.display()))?;
+
+    let layout_body = "// layouts/main_screen.rs — starter layout.\n\
+         //\n\
+         // The orchestrator copies this file verbatim into\n\
+         // src/screens/main_screen.rs at emit time per chapter 02 §7.7\n\
+         // (rust_inline_v1). Replace this placeholder with real widget\n\
+         // construction once the surrounding scaffold is fleshed out.\n\
+         \n\
+         pub fn build() {}\n";
+    std::fs::write(target.join("layouts/main_screen.rs"), layout_body)
+        .map_err(|e| anyhow!("write layouts/main_screen.rs: {e}"))?;
+
+    // Sanity check: scaffolded manifest MUST validate.
+    validate(&manifest_path).map_err(|e| {
+        anyhow!(
+            "scaffolded manifest at {} failed validation: {e}",
+            manifest_path.display()
+        )
+    })?;
+
+    Ok(manifest_path)
+}
+
 /// Run the validator and emit a human-readable manifest summary
 /// to stdout. Reports the target tuple, controller wiring, state
 /// machine attachment, asset class histogram, screens shape,
