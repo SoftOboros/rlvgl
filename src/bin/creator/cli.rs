@@ -13,6 +13,7 @@ use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 pub mod add_target;
+pub mod app;
 pub mod apng;
 pub mod bsp_gen;
 pub mod chakra;
@@ -26,6 +27,7 @@ pub mod lottie;
 pub mod manifest;
 pub mod new;
 pub mod preview;
+pub mod qt;
 pub mod raw;
 pub mod run;
 pub mod scaffold;
@@ -295,6 +297,94 @@ enum Command {
         #[command(subcommand)]
         cmd: AstCommand,
     },
+    /// Qt / QML ingestion commands
+    Qt {
+        #[command(subcommand)]
+        cmd: QtCommand,
+    },
+    /// rlvgl Application Schema (`app.yaml`) commands per
+    /// `docs/app-schema/`.
+    App {
+        #[command(subcommand)]
+        cmd: AppCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AppCommand {
+    /// Parse an `app.yaml` and run the chapter 01 §6 validator.
+    /// Use `--validate-only` for spec compliance check (orchestrator
+    /// emission is APP-02b/c/d follow-up).
+    FromYaml {
+        /// Path to `app.yaml` (rlvgl-app/v0 manifest).
+        #[arg(value_name = "MANIFEST")]
+        manifest: PathBuf,
+        /// Output directory for orchestrator emission (unused at v0;
+        /// orchestrator emission lands in APP-02b/c/d).
+        #[arg(long, value_name = "DIR")]
+        out: Option<PathBuf>,
+        /// Parse and validate; do not emit. Required at v0 since
+        /// emission is not yet implemented.
+        #[arg(long)]
+        validate_only: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum QtCommand {
+    /// Parse a `.qml` file (or every `*.qml` under a directory, per
+    /// QT-08) and emit IR to the output directory
+    Ingest {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Output directory. File-mode writes `qt-ir.json`;
+        /// directory-mode writes `<basename>.qt-ir.json` per file.
+        out: PathBuf,
+    },
+    /// Parse a `.qml` file and exit non-zero on any error (no IR emitted)
+    Check {
+        /// Input `.qml` file
+        input: PathBuf,
+    },
+    /// Emit JSON Schema for `qt-ir.json` (UiModule)
+    Schema {
+        /// Optional output file (defaults to stdout)
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Lower a `.qml` to a Rust module. `--target rlvgl` (default)
+    /// produces a `<basename>.rlvgl.rs` with a runnable
+    /// `build_screen` function; `--target data` produces a
+    /// `<basename>.rs` static-data module per phase QT-03. Accepts
+    /// a directory `<input>` per QT-08 and emits one output per
+    /// `*.qml` child.
+    Emit {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Output directory
+        out: PathBuf,
+        /// Emit target shape
+        #[arg(long, value_enum, default_value_t = QtEmitTarget::Rlvgl)]
+        target: QtEmitTarget,
+    },
+}
+
+/// `qt emit --target` value selector. Mirrors `qt::EmitTarget`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum QtEmitTarget {
+    /// QT-03 data-only `pub static SCREEN: Node = …;` shape.
+    Data,
+    /// QT-03b runnable `build_screen(bounds) -> WidgetNode` shape.
+    Rlvgl,
+}
+
+impl From<QtEmitTarget> for qt::EmitTarget {
+    fn from(t: QtEmitTarget) -> Self {
+        match t {
+            QtEmitTarget::Data => qt::EmitTarget::Data,
+            QtEmitTarget::Rlvgl => qt::EmitTarget::Rlvgl,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -1149,6 +1239,19 @@ pub fn run() -> Result<()> {
                     println!("{}", json);
                 }
             }
+        },
+        Command::Qt { cmd } => match cmd {
+            QtCommand::Ingest { input, out } => qt::ingest(&input, &out)?,
+            QtCommand::Check { input } => qt::check(&input)?,
+            QtCommand::Schema { out } => qt::schema(out.as_deref())?,
+            QtCommand::Emit { input, out, target } => qt::emit(&input, &out, target.into())?,
+        },
+        Command::App { cmd } => match cmd {
+            AppCommand::FromYaml {
+                manifest,
+                out,
+                validate_only,
+            } => app::run_from_yaml(&manifest, out.as_deref(), validate_only)?,
         },
     }
 

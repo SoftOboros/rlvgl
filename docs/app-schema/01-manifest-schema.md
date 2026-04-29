@@ -652,12 +652,15 @@ This chapter is ratified (§15 entry dated) when:
 - [x] §5.6 `hand_written` allow-list reviewed; H747 board + BBB
       Linux entry at v0 ratification (BBB added during the
       convergence pass).
-- [ ] §6 validation rule set has a corresponding test fixture in
-      a future `creator/` validator implementation (not blocking
-      ratification — APP-02a tracking).
-- [ ] §7 minimal example accepted by the validator (proof: round-trip
-      target `examples/beetle-esp32c3/` per [00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property))
-      — manifest landed via APP-03a; validator acceptance pending APP-02a.
+- [x] §6 validation rule set has a corresponding test fixture —
+      `tests/creator_app_validate.rs` covers all eight chapter 01 §9
+      counter-examples plus targeted feature tests (APP-02a, 2026-04-29).
+- [x] §7 minimal example accepted by the validator — all five
+      committed round-trip manifests
+      (`examples/beetle-esp32c3/{app,app-bsp-pac}.yaml`,
+      `examples/beaglebone-black/app.yaml`,
+      `examples/stm32h747i-disco/{app,app-zephyr}.yaml`) pass
+      `rlvgl-creator app from-yaml --validate-only` (APP-02a, 2026-04-29).
 - [x] §15 has a dated ratification entry signed off by the
       initiative owner.
 
@@ -698,3 +701,4 @@ Ratifying this chapter unblocks:
 | 2026-04-27 | RATIFIED | Owner: Ira Abbott. v0 manifest grammar (`rlvgl-app/v0`) frozen. §6 validator-test-fixture and §7 minimal-example items remain unchecked but are explicitly non-blocking per §12 (tracked under APP-02a / APP-03a). `APP-NN` execution PRs may now cite this chapter as a frozen authority for grammar, validation rules, and field semantics. Future grammar amendments require a new dated entry and matching review depth. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.2 board-lookup rule clarified: replaced "MUST be a file basename in `chipdb/rlvgl-chips-<vendor>/db/boards/`" with "MUST resolve via the vendor crate's `find()` API." §6 validation rule 5 updated to match. **Substance unchanged** — board id MUST still resolve to a real chipdb-registered board with a non-empty `chip` field; only the lookup *mechanism* is now vendor-architecture-aware (esp uses YAML files; stm uses a build-time `chipdb.bin.zst` archive; ti uses a hardcoded `BOARDS` constant). Forced by [03 §6.4 follow-up](03-round-trip.md#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards) discovery that 01 §5.2's original wording was esp-shape-specific. No frozen invariants or enums changed. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §3 (Manifest path) and §6 rule 4 (Path safety) re-scoped: traversal scope changed from "manifest's parent directory" to "cargo workspace root." `..` traversals into sibling crates / shared assets within the same workspace are now permitted; absolute paths and traversals beyond the workspace root remain rejected. §5.10 `controller.path` validation updated to acknowledge workspace-sibling path-deps. Forced by APP-03b (BBB Linux round-trip) discovery that monorepo-shared assets (`../stm32h747i-disco/assets/media/splash.rle`) and workspace path-deps (`../apps/disco-demo`) are legitimate Cargo patterns the original wording incorrectly forbade. See [03 §6.11](03-round-trip.md#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent). No frozen invariants or enums changed. |
+| 2026-04-29 | IMPLEMENTATION | APP-02a: validator landed in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. All seven §6 validation rules implemented; 17/17 integration tests pass (5 committed-manifest happy-path + 8 §9 counter-examples + 4 targeted feature). All five round-trip manifests now have validator-acceptance proof. §12 acceptance bullets §6 / §7 flipped checked. No spec change; this entry records the implementation milestone that satisfies §12 acceptance gates. |

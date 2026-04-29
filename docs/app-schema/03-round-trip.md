@@ -610,6 +610,39 @@ yet, so most layout source is hand-rolled Rust.
 pipeline (e.g. `figma_export_v1` or `uml_widget_v1`) shipping
 first. Don't remove the backdoor before there's a real front door."
 
+### 6.14 🟡 CLOSED — chipdb `find()` cross-vendor lookup key was inconsistent
+
+**Surfaced 2026-04-29 by APP-02a** (validator implementation).
+Chapter 01 §3 (`Board id`) defines the canonical board id as the
+**file stem** (snake_case, matches chipdb file naming). Most vendor
+chipdb crates (`stm`, `ti`, `nrf`, `nxp`, `renesas`, `silabs`,
+`microchip`, `rp2040`) drive `find()` from a hardcoded `BOARDS`
+const where the `board:` field uses the same form a manifest
+cites.
+
+The `esp` crate, however, is build-script-generated: its
+`BOARD_INFOS` const is built by extracting the YAML's `name:` field
+(human-friendly, e.g. `"DFR0868 Beetle ESP32-C3"`), while file
+stems are kept in a parallel `BOARD_NAMES` array. Esp's `find()`
+matched only on `BoardInfo.board` (human name), so the validator's
+canonical lookup `find("beetle_esp32c3")` returned `None` — a
+chipdb implementation defect against the chapter 01 §3 contract.
+
+**Disposition: ACCEPT** as a chipdb-side fix, not a spec change.
+Esp's `find()` extended (one block) to fall back to the file stem
+via the parallel `BOARD_NAMES` array when the human-name match
+fails. Both forms now resolve, preserving the existing
+`find("ESP32-C3-DevKitM-1")` test path and aligning the
+cross-vendor API with chapter 01 §3's contract. Other vendor
+crates whose hardcoded const happens to use a non-stem
+`board:` value (e.g. `"STM32F4DISCOVERY"`, `"MSP432P401R"`)
+remain reachable by their existing form, but those entries are
+not cited by any landed manifest at v0.
+
+A future chipdb-side cleanup MAY normalize all hardcoded `BOARDS`
+const entries to file-stem form for true uniformity. Out of
+v0 scope.
+
 ### 6.13 🟡 OPEN — `bsp_pac` stretches the screen abstraction
 
 **Surfaced 2026-04-29 by APP-03e** (beetle bsp_pac sibling
@@ -821,3 +854,4 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-29 | DRAFT  | APP-03c landed: `examples/stm32h747i-disco/app.yaml` + `layouts/home.rs` checked in as the third round-trip artifact (FreeRTOS intent, build profile `cm7,freertos,adapted_cmd,dma2d,splash,desktop` per CLAUDE.md). No new spec gaps — the path-safety amendment from APP-03b carried it. Cites the new `controller:` field at `../apps/disco-demo`, capabilities preset `stm32h747i_disco`. Splash asset is local (`assets/media/splash.rle`); same blob is what the BBB manifest cross-references. Three of four round-trip targets now landed (beetle esp_hal, BBB linux, H747 freertos); H747 zephyr (APP-03d) remains. |
 | 2026-04-29 | DRAFT  | APP-03d landed: `examples/stm32h747i-disco/app-zephyr.yaml` checked in as the fourth and final round-trip artifact (Zephyr intent, build profile `cm7,zephyr,splash,desktop,dma2d`). Reuses `layouts/home.rs` with the FreeRTOS manifest — the controller-driven render call is prong-agnostic; cross-prong layout reuse is exactly the schema's value proposition. Filename is `app-zephyr.yaml` (not `app.yaml`) since the same Cargo crate hosts the FreeRTOS intent at the canonical name. Surfaced finding [§6.12](#612--open--zephyr-prjconf-has-hand-tuned-values-the-template-cannot-reproduce) — existing `zephyr/prj.conf` has hand-tuned values (`CONFIG_MAIN_STACK_SIZE=16384`, FT5336 touch tunables, log levels) that neither chipdb nor `target.features` express; **disposition DEFER** with `--check`-flag surfacing in APP-02d, no v0 grammar change. **All four round-trip targets now landed**; remaining §12 acceptance work for chapter 03 is the validator-acceptance proof under APP-02a. |
 | 2026-04-29 | DRAFT  | APP-03e landed: `examples/beetle-esp32c3/app-bsp-pac.yaml` + `layouts/led_blink.rs` checked in as a fifth round-trip artifact, the bsp_pac sibling of APP-03a. Closes the schema-coverage gap on `target.generator: creator-bsp-pac` (only landed manifest that exercises it). Surfaced finding [§6.13](#613--open--bsp_pac-stretches-the-screen-abstraction) — bsp_pac has no display and no rlvgl runtime; the v0 `screens[]` requirement (exactly one default screen when `state_machine:` is absent) doesn't naturally fit headless apps. Manifest uses the stretched "screens[] = what runs each tick" interpretation explicitly. **Disposition DEFER** — v0 grammar unchanged; orchestrator emission of headless intents is out of v0 scope; v1 may add a `target.kind: headless` field with its own template family. |
+| 2026-04-29 | DRAFT  | APP-02a landed: validator + orchestrator-skeleton subcommand `rlvgl-creator app from-yaml --validate-only` in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. Implements all seven chapter 01 §6 validation rules; integration tests cover (a) all five committed round-trip manifests passing, (b) eight chapter 01 §9 counter-examples each rejected with the rule-tagged error, (c) four targeted feature-coverage tests (`controller:` workspace path-dep, state-machine extension, hand_written allow-list). Surfaced finding [§6.14](#614--closed--chipdb-find-cross-vendor-lookup-key-was-inconsistent) — esp's `find()` matched on human-friendly name only; chapter 01 §3 says board id = file stem; landed a chipdb-side fix making esp's `find()` accept either form. Orchestrator emission (chapter 02 §6 stages 3–7) remains DEFER for APP-02b/c/d. **All five committed manifests now pass `--validate-only`**, which is the chapter 01 §12 acceptance proof for "minimal example accepted by validator." |
