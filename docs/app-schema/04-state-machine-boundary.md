@@ -497,33 +497,51 @@ unamended invariant.
 
 This chapter is ratified (§15 entry dated) when:
 
-- [ ] §5.3 vendored-crate offline model is consistent with the
+- [x] §5.3 vendored-crate offline model is consistent with the
       committed orchestrator behaviour (no SM-gen subprocess
-      invocation in `app from-yaml`).
+      invocation in `app from-yaml`). **Satisfied** — APP-04c's
+      `emit_sm_vendored` reads files from
+      `state_machine.vendored_crate` and never reaches network;
+      `tests/creator_app_sm_vendored.rs` covers the contract.
 - [ ] §5.5 self-manifest format is documented in a citable form
       (this chapter, plus an example committed under
       `chipdb/` or a future `docs/state-machines/` directory).
-- [ ] §6 cross-validate rule (CV-1, CV-2, CV-3) implemented in
+      **Partial** — chapter 04 §5.5 documents the format; a
+      committed real example lands with APP-04b.
+- [x] §6 cross-validate rule (CV-1, CV-2, CV-3) implemented in
       `src/bin/creator/app.rs` Orchestrator step 4 OR explicitly
       noted as gated on a SM-bearing round-trip target landing
       first (in which case §15 records the deferral).
+      **Satisfied (partial)** — CV-1 implemented in APP-04c
+      `cross_validate_sm`; CV-3 satisfied by construction (the
+      orchestrator reads only the self-manifest, never the
+      SCXML directly); CV-2 enforcement deferred to a chapter 01
+      §6 rule 6 amendment that explicitly forbids
+      `screens[].state` when `state_machine:` is absent (current
+      rule 6 only enforces the default-screen invariant). The
+      partial-deferral note here records that scope split.
 - [ ] §7 vector test-family naming pattern documented in the
       external `mcp-statechart` README (cross-repo cite) OR a
       shim in this chapter accepts the existing tool's actual
-      naming and §7.2 amends to that convention.
-- [ ] §10 promotion criteria reviewed by the initiative owner
+      naming and §7.2 amends to that convention. **Gated on
+      APP-04b** — needs real `mcp-statechart` output to compare
+      against the proposed `vector_<scxml_id_snake_case>` shape.
+- [x] §10 promotion criteria reviewed by the initiative owner
       (Ira Abbott) — non-binding feedback OK; the criteria are
-      meant to be argued.
-- [ ] §15 has a dated ratification entry signed off by the
-      initiative owner.
+      meant to be argued. **Satisfied** — see the 2026-04-29
+      RATIFIED §15 entry: "§10 promotion criteria reviewed and
+      accepted (the four criteria stand as written)."
+- [x] §15 has a dated ratification entry signed off by the
+      initiative owner. **Satisfied** — 2026-04-29 RATIFIED entry.
 
 The implementation work for items 1–4 lives in PR sequence
-**APP-04a+**: `APP-04a` — chapter 04 ratified; `APP-04b` — first
-SM-bearing round-trip target lands (likely the FreeRTOS H747
-demo, since `rlvgl-app-disco-demo` already has internal-state
-shape); `APP-04c` — orchestrator CV-1 cross-validate
-implemented; `APP-04d` — first SCXML + vendored SM crate
-committed to the repo.
+**APP-04a+**: `APP-04a` — chapter 04 DRAFT (shipped); `APP-04`
+ratify + chapter 01 §5.3 amendment for `vendored_crate` (shipped);
+`APP-04c` — orchestrator vendored-crate consumption + CV-1
+(shipped); **`APP-04b`** — first SM-bearing round-trip target,
+gates items 2 + 4 above; **`APP-04d`** (rolled into APP-04b
+since both ride the same first SCXML landing) — first SCXML +
+vendored SM crate committed to the repo.
 
 ## §13 Files cited
 
