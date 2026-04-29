@@ -1,15 +1,21 @@
 <!--
 04-state-machine-boundary.md - rlvgl Application Schema, Chapter 4: State-Machine Boundary.
-Status: DRAFT — full Option A treatment.
+Status: RATIFIED 2026-04-29 — full Option A treatment.
 -->
 
 **[← Prev](03-round-trip.md) · [Index](README.md) · Next → (TBD)**
 
 # Chapter 4 — State-Machine Boundary
 
-> **Status:** DRAFT 2026-04-29 (see §15). Depends on
+> **Status:** RATIFIED 2026-04-29 (see §15). Depends on
 > [Chapter 0](00-concepts.md), [Chapter 1](01-manifest-schema.md),
 > [Chapter 2](02-generator-pipeline.md), [Chapter 3](03-round-trip.md).
+> `APP-NN` execution PRs MAY cite this chapter as a frozen authority
+> for the vendored-crate offline model (§5.3), the SM-gen
+> self-manifest format (§5.5), the screen↔state cross-validate
+> rules (§6 CV-1/CV-2/CV-3), the verification-vector test-family
+> naming pattern (§7), and the v1 promotion criteria for Option B
+> (§10).
 > This chapter consolidates the Option A decision from
 > [00 §10.2](00-concepts.md#102-state-machine-boundary-the-biggest-open-question)
 > and expands the SM-gen sub-generator contract from
@@ -178,10 +184,13 @@ not a current capability.
 
 ### 5.4 Vendored SM-crate layout — frozen
 
-When `state_machine:` is present, the SM crate MUST conform to:
+When `state_machine:` is present, the manifest's
+[01 §5.3](01-manifest-schema.md#53-state_machine-optional)
+`state_machine.vendored_crate` field MUST point at a directory
+that conforms to:
 
 ```
-<sm-out>/
+<vendored_crate>/
 ├── Cargo.toml                  # (only if SM is a sibling crate;
 │                               #  inline-module form omits it)
 ├── .mcp-statechart-manifest.json # SM-gen self-manifest per [02 §7.1]
@@ -198,20 +207,21 @@ When `state_machine:` is present, the SM crate MUST conform to:
 
 Two acceptable wrapper shapes:
 
-- **Sibling crate.** SM lives at a sibling path
-  (e.g. `examples/disco-demo-states/`); the manifest's
-  `state_machine.source` is the SCXML/UML; the round-trip target
+- **Sibling crate.** `vendored_crate` resolves to a sibling crate
+  path (e.g. `../disco-demo-states/`); the round-trip target
   declares the SM crate as a path dependency in its `Cargo.toml`.
   This matches the controller-crate pattern in
   [02 §7.8](02-generator-pipeline.md#78-controller-wiring-contract).
-- **Inline module.** SM lives inside the round-trip target's
+- **Inline module.** `vendored_crate` resolves to a directory that
+  the orchestrator copies into the round-trip target's
   `src/state_machine/`; the orchestrator emits a child-module
   `mod.rs` index per [02 §5.4](02-generator-pipeline.md#54-emitted-crate-layout).
   This matches the BSP pattern in [02 §7.2](02-generator-pipeline.md#72-bsp-gen-contract).
 
-The choice is a per-target authoring decision; the manifest does
-NOT carry a discriminator at v0. The orchestrator detects which
-form is in use by looking at where the vendored output lives.
+The choice is a per-target authoring decision encoded in where
+`vendored_crate` points. The manifest does NOT carry a separate
+shape discriminator; presence/absence of `Cargo.toml` in the
+vendored directory is the de-facto signal.
 
 ### 5.5 SM-gen self-manifest — required
 
@@ -249,10 +259,12 @@ step 4 is "post-SM cross-validate." This chapter spells out the
 rule:
 
 > **CV-1.** If `state_machine:` is present, the orchestrator MUST
-> read the SM-gen self-manifest's `state_set` array. For every
-> `screens[].state` in the manifest, the value MUST appear in
-> `state_set`. The first mismatch fails the run with the screen
-> id, the unknown state name, and the resolved `state_set`.
+> read the SM-gen self-manifest at
+> `<state_machine.vendored_crate>/.mcp-statechart-manifest.json`
+> and parse its `state_set` array. For every `screens[].state` in
+> the manifest, the value MUST appear in `state_set`. The first
+> mismatch fails the run with the screen id, the unknown state
+> name, and the resolved `state_set`.
 
 > **CV-2.** If `state_machine:` is absent, every `screens[].state`
 > field MUST be absent. A non-empty `screens[].state` without an
@@ -552,3 +564,5 @@ Ratifying this chapter unblocks:
 | Date       | Status | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 2026-04-29 | DRAFT  | Initial Option A treatment. Recaps [00 §10.2](00-concepts.md#102-state-machine-boundary-the-biggest-open-question) and [02 §7.4](02-generator-pipeline.md#74-sm-gen-contract-external-mcp); adds §5.3 vendored-crate offline model, §5.5 self-manifest is required (no §7.2.1 waiver for SM-gen), §6 CV-1/CV-2/CV-3 screen↔state cross-validate rules, §7 verification-vector test-family shape (`vector_<scxml_id_snake_case>` naming pattern), §10 four-criterion promotion gate for Option B (any two trigger a chapter 00 amendment), §11 non-goals. §12 acceptance items 1–4 are implementation gates; the chapter ratifies on its own substance (items 5–6) and the implementation rides on `APP-04a+`. Chapter remains DRAFT pending owner review of §10 criteria and §7 naming pattern. |
+| 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.4 (vendored crate layout) and §6 CV-1 updated to cite a new chapter 01 §5.3 manifest field, `state_machine.vendored_crate: <manifest-path>`, that points at the directory containing `.mcp-statechart-manifest.json`. The convention-based "orchestrator detects shape by looking at where vendored output lives" wording from the original §5.4 was operationally underspecified — the orchestrator had no defined way to *find* the vendored output. Adding an explicit field replaces the implicit convention. The two wrapper shapes (sibling crate vs. inline module) remain; the discriminator is now the presence/absence of `Cargo.toml` in the vendored directory rather than a manifest field. Chapter 01 §15 carries the matching grammar amendment. No frozen invariants or enums changed in this chapter; CV-1's substance is unchanged (still: every screen.state in state_set), only its anchoring is now explicit. |
+| 2026-04-29 | RATIFIED | Owner: Ira Abbott. §10 promotion criteria reviewed and accepted (the four criteria stand as written); §7.2 `vector_<scxml_id_snake_case>` naming pattern accepted as the v0 convention (the external `mcp-statechart` README will be updated to match in a separate cross-repo cite, per §12 item 4). All §12 acceptance bullets satisfied for the chapter's own substance. `APP-NN` execution PRs may now cite this chapter as a frozen authority for the vendored-crate offline model, SM-gen self-manifest format, screen↔state cross-validate rules, verification-vector test-family naming, and the v1 promotion criteria for Option B. Implementation work (§12 items 1–3) rides on `APP-04c+` (orchestrator CV implementation, lands next) and `APP-04b+` (first SM-bearing round-trip target, lands when the external `mcp-statechart` tool is reachable from the rlvgl tree). |

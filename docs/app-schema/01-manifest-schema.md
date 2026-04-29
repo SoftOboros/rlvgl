@@ -182,6 +182,7 @@ target:
 state_machine:
   source:               <manifest-path>  # required if state_machine: present
   generator:            <string>         # required, "mcp-statechart" only in v0
+  vendored_crate:       <manifest-path>  # required if state_machine: present (v0)
   verification_vectors: <bool>           # optional, default true
 ```
 
@@ -191,6 +192,15 @@ state_machine:
   `.uml` (case-insensitive).
 - `generator` MUST be `"mcp-statechart"` in v0. Adding generators is
   a Standards Action ([00 §5](00-concepts.md#§5-frozen-decisions--enums--registration-policy)).
+- `vendored_crate` MUST resolve to a directory under the workspace
+  root (rule 4 path-safety scoping applies) containing
+  `.mcp-statechart-manifest.json` per
+  [04 §5.5](04-state-machine-boundary.md#55-sm-gen-self-manifest--required).
+  v0 is offline-only — the orchestrator does NOT invoke the SM-gen
+  during `app from-yaml`; the field tells the orchestrator where the
+  pre-generated SM crate lives. Per
+  [04 §5.3](04-state-machine-boundary.md#53-vendored-crate-offline-model--frozen),
+  this is the same path-dep pattern used by chipdb-rendered BSPs.
 - The manifest does NOT define states inline. This is the resolved
   decision from
   [00 §10.2](00-concepts.md#102-state-machine-boundary-the-biggest-open-question)
@@ -702,3 +712,4 @@ Ratifying this chapter unblocks:
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.2 board-lookup rule clarified: replaced "MUST be a file basename in `chipdb/rlvgl-chips-<vendor>/db/boards/`" with "MUST resolve via the vendor crate's `find()` API." §6 validation rule 5 updated to match. **Substance unchanged** — board id MUST still resolve to a real chipdb-registered board with a non-empty `chip` field; only the lookup *mechanism* is now vendor-architecture-aware (esp uses YAML files; stm uses a build-time `chipdb.bin.zst` archive; ti uses a hardcoded `BOARDS` constant). Forced by [03 §6.4 follow-up](03-round-trip.md#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards) discovery that 01 §5.2's original wording was esp-shape-specific. No frozen invariants or enums changed. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §3 (Manifest path) and §6 rule 4 (Path safety) re-scoped: traversal scope changed from "manifest's parent directory" to "cargo workspace root." `..` traversals into sibling crates / shared assets within the same workspace are now permitted; absolute paths and traversals beyond the workspace root remain rejected. §5.10 `controller.path` validation updated to acknowledge workspace-sibling path-deps. Forced by APP-03b (BBB Linux round-trip) discovery that monorepo-shared assets (`../stm32h747i-disco/assets/media/splash.rle`) and workspace path-deps (`../apps/disco-demo`) are legitimate Cargo patterns the original wording incorrectly forbade. See [03 §6.11](03-round-trip.md#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent). No frozen invariants or enums changed. |
 | 2026-04-29 | IMPLEMENTATION | APP-02a: validator landed in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. All seven §6 validation rules implemented; 17/17 integration tests pass (5 committed-manifest happy-path + 8 §9 counter-examples + 4 targeted feature). All five round-trip manifests now have validator-acceptance proof. §12 acceptance bullets §6 / §7 flipped checked. No spec change; this entry records the implementation milestone that satisfies §12 acceptance gates. |
+| 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.3 grammar extended with required `vendored_crate: <manifest-path>` field. Forced by [04 §5.3](04-state-machine-boundary.md#53-vendored-crate-offline-model--frozen) freezing the vendored-crate offline model: the orchestrator does NOT invoke `mcp-statechart` during `app from-yaml`, so the manifest needs an explicit pointer to the pre-generated SM crate's directory (where `.mcp-statechart-manifest.json` lives). The field is required *only when* `state_machine:` is present — manifests without `state_machine:` are unaffected. Path-safety rule 4 applies (workspace-root scoped). All five committed round-trip manifests are unaffected because none currently carry `state_machine:`; the field activates with APP-04b (first SM-bearing round-trip target). No frozen invariants or enums changed. |
