@@ -569,9 +569,456 @@ pub fn run_from_yaml(manifest: &Path, out: Option<&Path>, validate_only: bool) -
     if validate_only {
         return Ok(());
     }
-    let _ = out; // orchestrator emission is deferred to APP-02b/c/d
-    bail!(
-        "orchestrator emission is not yet implemented (APP-02b/c/d). \
-         Use --validate-only to run the chapter 01 §6 validator."
+    let out = out.ok_or_else(|| {
+        anyhow!(
+            "--out <DIR> is required when emitting (omit it and pass --validate-only \
+             to run the chapter 01 §6 validator only)"
+        )
+    })?;
+    let manifest_dir = manifest
+        .parent()
+        .ok_or_else(|| anyhow!("manifest has no parent: {}", manifest.display()))?;
+    let ws_root = find_workspace_root(manifest_dir);
+    let mut orch = Orchestrator::new(m, manifest_dir.to_path_buf(), ws_root, out.to_path_buf());
+    let inv = orch.run()?;
+    eprintln!(
+        "emit: {} files in {} ({} stage(s) ran, {} stub(s) deferred to APP-02c)",
+        inv.entries.len(),
+        out.display(),
+        inv.entries
+            .iter()
+            .map(|e| e.stage.as_str())
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+        inv.entries.iter().filter(|e| e.stub).count(),
     );
+    Ok(())
+}
+
+// ─── APP-02b: orchestrator emission ──────────────────────────────────
+//
+// Implements chapter 02 §6 stages 3 (parallel sub-generators), 5
+// (layout-translator), and the §9.4 inventory tracking. Stage 6
+// (crate scaffold — Cargo.toml, main.rs, app.rs) and stage 7
+// (post-emit fmt + cargo check) are deferred to APP-02c. Sub-gens
+// for SM, theme, i18n, and creator-bsp-pac BSP-gen emit clearly-marked
+// stub files until APP-02c wires real generators in.
+
+/// Inventory entry per chapter 02 §9.4. `path` is relative to the
+/// orchestrator's output directory.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct InventoryEntry {
+    pub path: String,
+    pub stage: String,
+    pub hash: String,
+    /// True when the stage emitted a placeholder pending APP-02c.
+    /// Recorded so `--check` mode (APP-02d) can distinguish stubs
+    /// from real output.
+    #[serde(default)]
+    pub stub: bool,
+}
+
+/// Inventory file written to `<out>/.rlvgl-app-manifest.json` per
+/// chapter 02 §9.4.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Inventory {
+    pub manifest: String,
+    pub schema: String,
+    pub orchestrator: String,
+    pub generated_at: String,
+    pub entries: Vec<InventoryEntry>,
+}
+
+impl Inventory {
+    fn new(manifest_path: &Path, schema: &str) -> Self {
+        Self {
+            manifest: manifest_path.display().to_string(),
+            schema: schema.to_string(),
+            orchestrator: format!("rlvgl-creator app from-yaml (APP-02b)"),
+            generated_at: chrono_iso8601_today(),
+            entries: Vec::new(),
+        }
+    }
+}
+
+/// Today's date in ISO-8601 form. Avoids a chrono dependency by
+/// asking the runtime for SystemTime and extracting the YYYY-MM-DD.
+fn chrono_iso8601_today() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Civil date from Unix epoch seconds — Howard Hinnant's algorithm.
+    let days = (secs / 86_400) as i64;
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{:04}-{:02}-{:02}", y, m, d)
+}
+
+/// Orchestrator that walks the chapter 02 §6 stage graph against a
+/// validated manifest and emits the chapter 02 §5.4 output tree.
+pub struct Orchestrator {
+    manifest: Manifest,
+    manifest_dir: PathBuf,
+    workspace_root: PathBuf,
+    out: PathBuf,
+}
+
+impl Orchestrator {
+    pub fn new(
+        manifest: Manifest,
+        manifest_dir: PathBuf,
+        workspace_root: PathBuf,
+        out: PathBuf,
+    ) -> Self {
+        Self {
+            manifest,
+            manifest_dir,
+            workspace_root,
+            out,
+        }
+    }
+
+    /// Run the stage graph end to end. Returns the inventory of all
+    /// emitted files.
+    pub fn run(&mut self) -> Result<Inventory> {
+        std::fs::create_dir_all(&self.out)
+            .map_err(|e| anyhow!("create out {}: {e}", self.out.display()))?;
+        std::fs::create_dir_all(self.out.join("src"))?;
+
+        let manifest_path_str = self.manifest_dir.join("app.yaml").display().to_string();
+        let mut inv = Inventory::new(Path::new(&manifest_path_str), &self.manifest.schema);
+
+        // Stage 3a: BSP-gen — only for creator-bsp-pac.
+        let generator = self
+            .manifest
+            .target
+            .generator
+            .as_deref()
+            .unwrap_or("creator-bsp-pac");
+        if generator == "creator-bsp-pac" {
+            self.emit_bsp_gen_stub(&mut inv)?;
+        }
+
+        // Stage 3b: asset pipeline — file-copy plus include_bytes! index.
+        if !self.manifest.assets.is_empty() {
+            self.emit_asset_pipeline(&mut inv)?;
+        }
+
+        // Stage 3c: SM-gen — stubbed pending external MCP integration.
+        if self.manifest.state_machine.is_some() {
+            self.emit_sm_stub(&mut inv)?;
+        }
+
+        // Stage 3d: i18n — stubbed pending APP-02c emission.
+        if self.manifest.i18n.is_some() {
+            self.emit_i18n_stub(&mut inv)?;
+        }
+
+        // Stage 3e: theme — stubbed pending APP-02c emission.
+        if self.manifest.theme.is_some() {
+            self.emit_theme_stub(&mut inv)?;
+        }
+
+        // Stage 5: layout-translator — full impl for rust_inline_v1.
+        if !self.manifest.screens.is_empty() {
+            self.emit_layouts(&mut inv)?;
+        }
+
+        // Stage 6: crate scaffold — minimal placeholders pending APP-02c.
+        self.emit_scaffold_placeholders(&mut inv)?;
+
+        // §9.4: inventory.
+        self.write_inventory(&inv)?;
+
+        Ok(inv)
+    }
+
+    /// Write `bytes` to `<out>/<rel>`, creating parents, and record
+    /// the inventory entry with a blake3 hash.
+    fn emit(
+        &self,
+        rel: impl AsRef<Path>,
+        bytes: &[u8],
+        inv: &mut Inventory,
+        stage: &str,
+        stub: bool,
+    ) -> Result<()> {
+        let rel = rel.as_ref();
+        let abs = self.out.join(rel);
+        if let Some(parent) = abs.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&abs, bytes)?;
+        let hash = blake3::hash(bytes).to_hex().to_string();
+        inv.entries.push(InventoryEntry {
+            path: rel.to_string_lossy().into_owned(),
+            stage: stage.to_string(),
+            hash: format!("blake3:{hash}"),
+            stub,
+        });
+        Ok(())
+    }
+
+    fn emit_bsp_gen_stub(&self, inv: &mut Inventory) -> Result<()> {
+        let body = format!(
+            "// SPDX-License-Identifier: MIT\n\
+             //\n\
+             // src/bsp_generated/mod.rs (orchestrator stub, APP-02b).\n\
+             //\n\
+             // TODO(APP-02c): invoke `rlvgl-creator bsp from-yaml` programmatically\n\
+             // for vendor={} board={} and copy the six emitted files\n\
+             // (mod.rs, pac.rs, clocks.rs, io_mux.rs, peripherals.rs, board.rs)\n\
+             // into this directory per docs/app-schema/02-generator-pipeline.md\n\
+             // §7.2.\n\
+             \n\
+             pub fn init() {{\n\
+             \x20   // TODO(APP-02c): real BSP bring-up.\n\
+             }}\n",
+            self.manifest.target.vendor, self.manifest.target.board,
+        );
+        self.emit("src/bsp_generated/mod.rs", body.as_bytes(), inv, "bsp-gen", true)
+    }
+
+    fn emit_asset_pipeline(&self, inv: &mut Inventory) -> Result<()> {
+        let mut index_lines: Vec<String> = vec![
+            "// SPDX-License-Identifier: MIT".to_string(),
+            "//".to_string(),
+            "// src/assets_generated.rs (asset-pipeline emission, APP-02b).".to_string(),
+            "// Per chapter 02 §7.3: file-copy at v0; converter pipeline".to_string(),
+            "// integration deferred to APP-02c.".to_string(),
+            "".to_string(),
+        ];
+        for asset in &self.manifest.assets {
+            let src = self.manifest_dir.join(&asset.source);
+            let src_canon = lexical_normalise(&src);
+            let ws_canon = lexical_normalise(&self.workspace_root);
+            if !src_canon.starts_with(&ws_canon) {
+                bail!(
+                    "asset '{}' source escapes workspace: {}",
+                    asset.id,
+                    asset.source.display()
+                );
+            }
+            let bytes = std::fs::read(&src_canon).map_err(|e| {
+                anyhow!(
+                    "read asset '{}' from {}: {e}",
+                    asset.id,
+                    src_canon.display()
+                )
+            })?;
+            let ext = asset
+                .source
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("bin");
+            let out_name = format!("{}.{ext}", asset.id);
+            self.emit(
+                Path::new("assets").join(&out_name),
+                &bytes,
+                inv,
+                "asset-pipeline",
+                false,
+            )?;
+            let const_name = ident_upper(&asset.id);
+            index_lines.push(format!(
+                "/// {class} asset bound at build time.",
+                class = asset.class
+            ));
+            index_lines.push(format!(
+                "pub static {const_name}: &[u8] = include_bytes!(\"../assets/{out_name}\");",
+            ));
+            index_lines.push(String::new());
+        }
+        index_lines.push("pub mod meta {".to_string());
+        for asset in &self.manifest.assets {
+            index_lines.push(format!(
+                "    pub const {}_CLASS: &str = {:?};",
+                ident_upper(&asset.id),
+                asset.class
+            ));
+            if let Some(ref pref) = asset.palette_ref {
+                index_lines.push(format!(
+                    "    pub const {}_PALETTE_REF: Option<&str> = Some({:?});",
+                    ident_upper(&asset.id),
+                    pref
+                ));
+            } else {
+                index_lines.push(format!(
+                    "    pub const {}_PALETTE_REF: Option<&str> = None;",
+                    ident_upper(&asset.id)
+                ));
+            }
+        }
+        index_lines.push("}".to_string());
+        let index_body = index_lines.join("\n") + "\n";
+        self.emit(
+            "src/assets_generated.rs",
+            index_body.as_bytes(),
+            inv,
+            "asset-pipeline",
+            false,
+        )
+    }
+
+    fn emit_sm_stub(&self, inv: &mut Inventory) -> Result<()> {
+        let body = "// SPDX-License-Identifier: MIT\n\
+             //\n\
+             // src/state_machine/mod.rs (orchestrator stub, APP-02b).\n\
+             //\n\
+             // TODO(APP-02c+): invoke external MCP state-chart generator\n\
+             // per docs/app-schema/02-generator-pipeline.md §7.4. v0 leaves\n\
+             // the stub in place because the external tool is repo-out-of-tree.\n\
+             \n\
+             pub mod states { /* TODO */ }\n\
+             pub mod vectors { /* TODO */ }\n";
+        self.emit("src/state_machine/mod.rs", body.as_bytes(), inv, "sm-gen", true)
+    }
+
+    fn emit_i18n_stub(&self, inv: &mut Inventory) -> Result<()> {
+        let body = "// SPDX-License-Identifier: MIT\n\
+             //\n\
+             // src/i18n_generated.rs (orchestrator stub, APP-02b).\n\
+             //\n\
+             // TODO(APP-02c): scan i18n.bundle_dir/*.json and emit a match\n\
+             // table per docs/app-schema/02-generator-pipeline.md §7.5.\n\
+             \n\
+             pub fn t(key: &str, _locale: &str) -> &'static str {\n\
+             \x20   // TODO(APP-02c): real translation table.\n\
+             \x20   key\n\
+             }\n";
+        self.emit("src/i18n_generated.rs", body.as_bytes(), inv, "i18n", true)
+    }
+
+    fn emit_theme_stub(&self, inv: &mut Inventory) -> Result<()> {
+        let body = "// SPDX-License-Identifier: MIT\n\
+             //\n\
+             // src/theme.rs (orchestrator stub, APP-02b).\n\
+             //\n\
+             // TODO(APP-02c): consume theme.source per format and emit\n\
+             // colors/space/radii/etc. modules per docs/app-schema/02-generator-pipeline.md §7.6.\n\
+             \n\
+             pub mod colors { /* TODO(APP-02c) */ }\n\
+             pub mod space  { /* TODO(APP-02c) */ }\n\
+             pub mod radii  { /* TODO(APP-02c) */ }\n";
+        self.emit("src/theme.rs", body.as_bytes(), inv, "theme", true)
+    }
+
+    fn emit_layouts(&self, inv: &mut Inventory) -> Result<()> {
+        let mut mod_lines: Vec<String> = vec![
+            "// SPDX-License-Identifier: MIT".to_string(),
+            "//".to_string(),
+            "// src/screens/mod.rs (layout-translator emission, APP-02b).".to_string(),
+            "".to_string(),
+        ];
+        for screen in &self.manifest.screens {
+            match screen.layout_format.as_str() {
+                "rust_inline_v1" => {
+                    let src = self.manifest_dir.join(&screen.layout);
+                    let src_canon = lexical_normalise(&src);
+                    let ws_canon = lexical_normalise(&self.workspace_root);
+                    if !src_canon.starts_with(&ws_canon) {
+                        bail!(
+                            "screen '{}' layout escapes workspace: {}",
+                            screen.id,
+                            screen.layout.display()
+                        );
+                    }
+                    let bytes = std::fs::read(&src_canon).map_err(|e| {
+                        anyhow!(
+                            "read screen '{}' layout from {}: {e}",
+                            screen.id,
+                            src_canon.display()
+                        )
+                    })?;
+                    let mod_name = ident_module(&screen.id);
+                    let rel = Path::new("src/screens").join(format!("{mod_name}.rs"));
+                    self.emit(rel, &bytes, inv, "layout-translator", false)?;
+                    mod_lines.push(format!("pub mod {mod_name};"));
+                }
+                other => {
+                    bail!(
+                        "layout_format '{}' for screen '{}' is not yet implemented in APP-02b. \
+                         Only 'rust_inline_v1' is supported at this milestone; \
+                         figma_export_v1 / uml_widget_v1 land in APP-02c+.",
+                        other,
+                        screen.id
+                    );
+                }
+            }
+        }
+        let mod_body = mod_lines.join("\n") + "\n";
+        self.emit(
+            "src/screens/mod.rs",
+            mod_body.as_bytes(),
+            inv,
+            "layout-translator",
+            false,
+        )
+    }
+
+    fn emit_scaffold_placeholders(&self, inv: &mut Inventory) -> Result<()> {
+        let cargo_toml = format!(
+            "# Generated by rlvgl-creator app from-yaml (APP-02b stub).\n\
+             # Real Cargo.toml emission lands in APP-02c.\n\
+             \n\
+             [package]\n\
+             name = {name:?}\n\
+             version = \"0.1.0\"\n\
+             edition = \"2024\"\n\
+             publish = false\n\
+             \n\
+             # TODO(APP-02c): emit [dependencies] for controller, chipdb,\n\
+             # rlvgl runtime, and per-prong template features.\n\
+             # Manifest target: vendor={vendor} board={board} prong={prong}\n\
+             # Manifest features: {features:?}\n",
+            name = self.manifest.name,
+            vendor = self.manifest.target.vendor,
+            board = self.manifest.target.board,
+            prong = self.manifest.target.prong,
+            features = self.manifest.target.features,
+        );
+        self.emit("Cargo.toml", cargo_toml.as_bytes(), inv, "scaffold", true)?;
+
+        let readme = format!(
+            "# {}\n\n\
+             Generated by `rlvgl-creator app from-yaml` (APP-02b stub).\n\n\
+             Manifest target: `{}/{}` on prong `{}`.\n\n\
+             Real README emission, controller wiring (`src/app.rs`), and\n\
+             per-prong main glue (`src/main.rs`) land in APP-02c.\n",
+            self.manifest.name,
+            self.manifest.target.vendor,
+            self.manifest.target.board,
+            self.manifest.target.prong,
+        );
+        self.emit("README.md", readme.as_bytes(), inv, "scaffold", true)
+    }
+
+    fn write_inventory(&self, inv: &Inventory) -> Result<()> {
+        let path = self.out.join(".rlvgl-app-manifest.json");
+        let body = serde_json::to_string_pretty(inv)?;
+        std::fs::write(&path, body.as_bytes())?;
+        Ok(())
+    }
+}
+
+/// Convert a `kebab-case` reference id to `SCREAMING_SNAKE_CASE`
+/// for use as a Rust constant name.
+fn ident_upper(id: &str) -> String {
+    id.replace('-', "_").to_uppercase()
+}
+
+/// Convert a `kebab-case` reference id to `snake_case` for use as
+/// a Rust module name.
+fn ident_module(id: &str) -> String {
+    id.replace('-', "_")
 }
