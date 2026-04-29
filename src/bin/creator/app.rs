@@ -324,6 +324,136 @@ pub fn app_schema_json() -> Result<String> {
     Ok(serde_json::to_string_pretty(&schema)?)
 }
 
+/// Run the validator and emit a human-readable manifest summary
+/// to stdout. Reports the target tuple, controller wiring, state
+/// machine attachment, asset class histogram, screens shape,
+/// theme/i18n presence, and which chapter 02 §5.1 stage-3 nodes
+/// would run. Useful for "what does this manifest do?" inspection
+/// without invoking the orchestrator's emit pipeline.
+pub fn inspect(manifest_path: &Path) -> Result<()> {
+    let m = validate(manifest_path)?;
+
+    println!("Manifest: {}", manifest_path.display());
+    println!("  schema:  {}", m.schema);
+    println!("  name:    {}", m.name);
+    println!();
+    println!("Target:");
+    println!("  vendor:    {}", m.target.vendor);
+    println!("  board:     {}", m.target.board);
+    println!("  prong:     {}", m.target.prong);
+    if let Some(chip) = &m.target.chip {
+        println!("  chip:      {chip}");
+    }
+    println!(
+        "  generator: {}",
+        m.target.generator.as_deref().unwrap_or("creator-bsp-pac")
+    );
+    if !m.target.features.is_empty() {
+        println!("  features:  {}", m.target.features.join(", "));
+    }
+
+    if let Some(c) = &m.controller {
+        println!();
+        println!("Controller:");
+        println!("  crate:        {}", c.crate_name);
+        if let Some(p) = &c.path {
+            println!("  path:         {}", p.display());
+        }
+        if let Some(v) = &c.version {
+            println!("  version:      {v}");
+        }
+        if let Some(caps) = &c.capabilities {
+            println!("  capabilities: {caps}");
+        }
+        if !c.features.is_empty() {
+            println!("  features:     {}", c.features.join(", "));
+        }
+    }
+
+    if let Some(sm) = &m.state_machine {
+        println!();
+        println!("State machine:");
+        println!("  source:               {}", sm.source.display());
+        println!("  generator:            {}", sm.generator);
+        println!("  vendored_crate:       {}", sm.vendored_crate.display());
+        println!("  verification_vectors: {}", sm.verification_vectors);
+    }
+
+    if !m.assets.is_empty() {
+        println!();
+        println!("Assets ({}):", m.assets.len());
+        let mut classes: std::collections::BTreeMap<&str, usize> =
+            std::collections::BTreeMap::new();
+        for a in &m.assets {
+            *classes.entry(a.class.as_str()).or_insert(0) += 1;
+        }
+        for (class, n) in &classes {
+            println!("  {class:<24} x{n}");
+        }
+    }
+
+    if !m.screens.is_empty() {
+        println!();
+        println!("Screens ({}):", m.screens.len());
+        for s in &m.screens {
+            let mark = if s.default { " [default]" } else { "" };
+            let st = s
+                .state
+                .as_deref()
+                .map(|x| format!(" state={x}"))
+                .unwrap_or_default();
+            println!("  {} ({}){mark}{st}", s.id, s.layout_format);
+        }
+    }
+
+    if let Some(t) = &m.theme {
+        println!();
+        println!("Theme:");
+        println!("  source: {}", t.source.display());
+        println!("  format: {}", t.format);
+    }
+
+    if let Some(i) = &m.i18n {
+        println!();
+        println!("i18n:");
+        println!("  bundle_dir:     {}", i.bundle_dir.display());
+        println!("  default_locale: {}", i.default_locale);
+        println!("  format:         {}", i.format);
+        if !i.locales.is_empty() {
+            println!("  locales:        {}", i.locales.join(", "));
+        }
+    }
+
+    let generator = m.target.generator.as_deref().unwrap_or("creator-bsp-pac");
+    let mut stages: Vec<&str> = Vec::new();
+    if generator == "creator-bsp-pac" {
+        stages.push("bsp-gen");
+    }
+    if !m.assets.is_empty() {
+        stages.push("asset-pipeline");
+    }
+    if m.state_machine.is_some() {
+        stages.push("sm-gen");
+    }
+    if m.i18n.is_some() {
+        stages.push("i18n");
+    }
+    if m.theme.is_some() {
+        stages.push("theme");
+    }
+    println!();
+    if stages.is_empty() {
+        println!("Eligible stage-3 sub-generators: (none)");
+    } else {
+        println!(
+            "Eligible stage-3 sub-generators ({}): {}",
+            stages.len(),
+            stages.join(", ")
+        );
+    }
+    Ok(())
+}
+
 ///
 /// Returns the parsed manifest on success. Any validation rule
 /// failure surfaces as an error tagged with the rule number from

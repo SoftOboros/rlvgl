@@ -355,6 +355,15 @@ enum AppCommand {
         #[arg(long, value_name = "FILE")]
         out: Option<PathBuf>,
     },
+    /// Print a human-readable summary of a manifest: target,
+    /// controller, state machine, asset histogram, screens, theme,
+    /// i18n, and which chapter 02 §5.1 stage-3 sub-generators
+    /// would run. Validates the manifest first.
+    Inspect {
+        /// Path to `app.yaml` (rlvgl-app/v0 manifest).
+        #[arg(value_name = "MANIFEST")]
+        manifest: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1301,6 +1310,7 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                     println!("{body}");
                 }
             }
+            AppCommand::Inspect { manifest } => app::inspect(&manifest)?,
         },
     }
 
