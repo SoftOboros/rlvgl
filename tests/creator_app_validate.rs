@@ -129,9 +129,8 @@ fn rule_4_rejects_path_escape_outside_workspace() {
 
 #[test]
 fn rule_5_rejects_unknown_asset_class() {
-    let body = format!(
-        "{VALID_BASE}\nassets:\n  - id: a\n    class: foo_class\n    source: x.bin\n"
-    );
+    let body =
+        format!("{VALID_BASE}\nassets:\n  - id: a\n    class: foo_class\n    source: x.bin\n");
     let err = validate_snippet(&body);
     assert!(err.contains("rule 5"), "got: {err}");
     assert!(err.contains("class"), "got: {err}");
@@ -222,8 +221,7 @@ screens:
 
 #[test]
 fn validates_state_machine_path_must_be_scxml_or_uml() {
-    let body = format!(
-        r#"
+    let body = r#"
 schema: rlvgl-app/v0
 name: sm-test
 target:
@@ -234,9 +232,9 @@ target:
 state_machine:
   source: states/main.txt
   generator: mcp-statechart
-"#
-    );
-    let err = validate_snippet(&body);
+  vendored_crate: states/sm-crate
+"#;
+    let err = validate_snippet(body);
     assert!(err.contains("rule 5"), "got: {err}");
     assert!(err.contains(".scxml") || err.contains(".uml"), "got: {err}");
 }
@@ -246,5 +244,8 @@ fn rejects_hand_written_for_non_allowlisted_board() {
     let body = VALID_BASE.replace("generator: hosted", "generator: hand_written");
     let err = validate_snippet(&body);
     assert!(err.contains("rule 5"), "got: {err}");
-    assert!(err.contains("hand_written") || err.contains("allow-list"), "got: {err}");
+    assert!(
+        err.contains("hand_written") || err.contains("allow-list"),
+        "got: {err}"
+    );
 }

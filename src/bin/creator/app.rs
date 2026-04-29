@@ -127,6 +127,13 @@ pub struct Controller {
 pub struct StateMachine {
     pub source: PathBuf,
     pub generator: String,
+    /// APP-04c / chapter 01 §5.3 (amended 2026-04-29) / chapter
+    /// 04 §5.3: required when `state_machine:` is present at v0.
+    /// Points at the directory containing
+    /// `.mcp-statechart-manifest.json` plus the pre-generated SM
+    /// crate's source files. Resolves under the cargo workspace
+    /// root per chapter 01 §6 rule 4.
+    pub vendored_crate: PathBuf,
     #[serde(default = "default_true")]
     pub verification_vectors: bool,
 }
@@ -364,6 +371,7 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
     }
     if let Some(sm) = &manifest.state_machine {
         resolve_manifest_path(manifest_dir, &ws_root, &sm.source)?;
+        resolve_manifest_path(manifest_dir, &ws_root, &sm.vendored_crate)?;
     }
     for a in &manifest.assets {
         resolve_manifest_path(manifest_dir, &ws_root, &a.source)?;
@@ -513,6 +521,23 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
                 "rule 5 (cross-references): state_machine.source must end in .scxml or .uml: {}",
                 sm.source.display()
             ),
+        }
+        // chapter 01 §5.3 (amended 2026-04-29) + chapter 04 §5.4:
+        // vendored_crate MUST resolve to an existing directory
+        // carrying the SM-gen self-manifest.
+        let vendored = resolve_manifest_path(manifest_dir, &ws_root, &sm.vendored_crate)?;
+        if !vendored.is_dir() {
+            bail!(
+                "rule 5 (cross-references): state_machine.vendored_crate must resolve to a directory: {}",
+                vendored.display()
+            );
+        }
+        let self_manifest = vendored.join(".mcp-statechart-manifest.json");
+        if !self_manifest.is_file() {
+            bail!(
+                "rule 5 (cross-references): state_machine.vendored_crate is missing the SM-gen self-manifest at {} (chapter 04 §5.5)",
+                self_manifest.display()
+            );
         }
     }
     if let Some(i) = &manifest.i18n {
@@ -875,6 +900,26 @@ fn run_rustfmt_on_emitted(inv: &Inventory, out: &Path) -> usize {
 // for SM, theme, i18n, and creator-bsp-pac BSP-gen emit clearly-marked
 // stub files until APP-02c wires real generators in.
 
+/// SM-gen self-manifest per chapter 04 §5.5. Lives at
+/// `<vendored_crate>/.mcp-statechart-manifest.json`. The orchestrator
+/// reads this for §6 CV-1 cross-validate and for the §5.4 file copy.
+/// Unknown fields are tolerated so SM-gen schema additions don't
+/// break the orchestrator.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SmSelfManifest {
+    pub tool: String,
+    pub version: String,
+    pub source: String,
+    pub files: Vec<SmFile>,
+    pub state_set: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SmFile {
+    pub path: String,
+    pub hash: String,
+}
+
 /// Inventory entry per chapter 02 §9.4. `path` is relative to the
 /// orchestrator's output directory.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -1013,9 +1058,15 @@ impl Orchestrator {
             self.emit_asset_pipeline(&mut inv)?;
         }
 
-        // Stage 3c: SM-gen — stubbed pending external MCP integration.
+        // Stage 3c: SM-gen consumption (chapter 04 §5.3 vendored-crate
+        // offline model). The orchestrator does NOT invoke
+        // `mcp-statechart`; it copies the pre-generated SM crate's
+        // files from `state_machine.vendored_crate` per the §5.5
+        // self-manifest. Stage 4 cross-validate (CV-1, §6) runs
+        // immediately after.
         if self.manifest.state_machine.is_some() {
-            self.emit_sm_stub(&mut inv)?;
+            let sm_self = self.emit_sm_vendored(&mut inv)?;
+            self.cross_validate_sm(&sm_self)?;
         }
 
         // Stage 3d: i18n — stubbed pending APP-02c emission.
@@ -1264,24 +1315,133 @@ impl Orchestrator {
         )
     }
 
-    fn emit_sm_stub(&self, inv: &mut Inventory) -> Result<()> {
-        let body = "// SPDX-License-Identifier: MIT\n\
-             //\n\
-             // src/state_machine/mod.rs (orchestrator stub, APP-02b).\n\
-             //\n\
-             // TODO(APP-02c+): invoke external MCP state-chart generator\n\
-             // per docs/app-schema/02-generator-pipeline.md §7.4. v0 leaves\n\
-             // the stub in place because the external tool is repo-out-of-tree.\n\
+    /// APP-04c: consume the pre-generated SM crate per chapter 04
+    /// §5.3 vendored-crate model. Reads the §5.5 self-manifest from
+    /// `<vendored_crate>/.mcp-statechart-manifest.json`, copies the
+    /// listed `files[]` into `<out>/src/state_machine/`, synthesises
+    /// a child-module-shaped `mod.rs` per chapter 02 §5.4 (matching
+    /// the BSP pattern), and inventories everything as
+    /// `stage = "sm-gen", stub = false`. Returns the parsed
+    /// self-manifest so the caller can run §6 CV-1 immediately
+    /// after.
+    fn emit_sm_vendored(&self, inv: &mut Inventory) -> Result<SmSelfManifest> {
+        let sm = self
+            .manifest
+            .state_machine
+            .as_ref()
+            .expect("emit_sm_vendored called without state_machine:");
+        let vendored = lexical_normalise(&self.manifest_dir.join(&sm.vendored_crate));
+        let self_manifest_path = vendored.join(".mcp-statechart-manifest.json");
+        let self_manifest_text = std::fs::read_to_string(&self_manifest_path).map_err(|e| {
+            anyhow!(
+                "read SM-gen self-manifest at {}: {e}",
+                self_manifest_path.display()
+            )
+        })?;
+        let self_manifest: SmSelfManifest =
+            serde_json::from_str(&self_manifest_text).map_err(|e| {
+                anyhow!(
+                    "parse SM-gen self-manifest at {}: {e}",
+                    self_manifest_path.display()
+                )
+            })?;
+
+        // §7.4 verification_vectors guard: if the manifest says
+        // false, the vendored crate MUST NOT carry vectors.rs.
+        // Conversely (default true), vectors.rs MUST be present.
+        let has_vectors = self_manifest
+            .files
+            .iter()
+            .any(|f| f.path == "src/vectors.rs");
+        if sm.verification_vectors && !has_vectors {
+            bail!(
+                "SM-gen self-manifest at {} is missing src/vectors.rs but state_machine.verification_vectors is true (chapter 04 §7.4)",
+                self_manifest_path.display()
+            );
+        }
+        if !sm.verification_vectors && has_vectors {
+            bail!(
+                "SM-gen self-manifest at {} carries src/vectors.rs but state_machine.verification_vectors is false (chapter 04 §7.4)",
+                self_manifest_path.display()
+            );
+        }
+
+        for f in &self_manifest.files {
+            // Chapter 04 §5.4 inline-module form: copy the SM crate's
+            // src/*.rs files into <out>/src/state_machine/ unchanged.
+            let rel = f.path.strip_prefix("src/").ok_or_else(|| {
+                anyhow!(
+                    "SM-gen self-manifest file path '{}' is not under src/ (chapter 04 §5.4)",
+                    f.path
+                )
+            })?;
+            let src = vendored.join(&f.path);
+            let bytes = std::fs::read(&src)
+                .map_err(|e| anyhow!("read SM-gen output {}: {e}", src.display()))?;
+            self.emit(
+                Path::new("src/state_machine").join(rel),
+                &bytes,
+                inv,
+                "sm-gen",
+                false,
+            )?;
+        }
+
+        // Synthesise the inline-module mod.rs per chapter 04 §5.4 +
+        // chapter 02 §5.4. Always re-export `states`; re-export
+        // `vectors` only when present.
+        let mut mod_rs = String::from(
+            "// SPDX-License-Identifier: MIT\n\
+             //!\n\
+             //! Vendored state machine, wrapped as a child module per\n\
+             //! docs/app-schema/04-state-machine-boundary.md §5.4.\n\
+             //! The sibling files (`states.rs` and optionally `vectors.rs`)\n\
+             //! are copied byte-for-byte from the SM-gen vendored output\n\
+             //! at `state_machine.vendored_crate` per chapter 04 §5.3.\n\
+             //!\n\
+             //! Regenerate the upstream SM crate by running\n\
+             //! `mcp-statechart` against the SCXML at\n\
+             //! `state_machine.source`; then re-run\n\
+             //! `rlvgl-creator app from-yaml`.\n\
              \n\
-             pub mod states { /* TODO */ }\n\
-             pub mod vectors { /* TODO */ }\n";
+             #![allow(dead_code)]\n\
+             \n\
+             pub mod states;\n",
+        );
+        if has_vectors {
+            mod_rs.push_str("\n#[cfg(test)]\npub mod vectors;\n");
+        }
         self.emit(
             "src/state_machine/mod.rs",
-            body.as_bytes(),
+            mod_rs.as_bytes(),
             inv,
             "sm-gen",
-            true,
-        )
+            false,
+        )?;
+
+        Ok(self_manifest)
+    }
+
+    /// APP-04c: chapter 04 §6 CV-1 — every `screens[].state` value
+    /// MUST appear in the SM-gen self-manifest's `state_set`.
+    /// CV-3 is satisfied by construction (this function reads only
+    /// the self-manifest, never the SCXML directly).
+    fn cross_validate_sm(&self, sm_self: &SmSelfManifest) -> Result<()> {
+        let state_set: std::collections::HashSet<&str> =
+            sm_self.state_set.iter().map(String::as_str).collect();
+        for s in &self.manifest.screens {
+            if let Some(state) = &s.state {
+                if !state_set.contains(state.as_str()) {
+                    bail!(
+                        "chapter 04 §6 CV-1: screen '{}' references state '{}' which is not in the SM's emitted state_set {:?}",
+                        s.id,
+                        state,
+                        sm_self.state_set
+                    );
+                }
+            }
+        }
+        Ok(())
     }
 
     fn emit_i18n_stub(&self, inv: &mut Inventory) -> Result<()> {
