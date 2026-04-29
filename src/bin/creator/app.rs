@@ -1076,7 +1076,7 @@ impl Orchestrator {
 
         // Stage 3e: theme — stubbed pending APP-02c emission.
         if self.manifest.theme.is_some() {
-            self.emit_theme_stub(&mut inv)?;
+            self.emit_theme(&mut inv)?;
         }
 
         // Stage 5: layout-translator — full impl for rust_inline_v1.
@@ -1560,18 +1560,148 @@ impl Orchestrator {
         self.emit("src/i18n_generated.rs", body.as_bytes(), inv, "i18n", false)
     }
 
-    fn emit_theme_stub(&self, inv: &mut Inventory) -> Result<()> {
-        let body = "// SPDX-License-Identifier: MIT\n\
-             //\n\
-             // src/theme.rs (orchestrator stub, APP-02b).\n\
-             //\n\
-             // TODO(APP-02c): consume theme.source per format and emit\n\
-             // colors/space/radii/etc. modules per docs/app-schema/02-generator-pipeline.md §7.6.\n\
-             \n\
-             pub mod colors { /* TODO(APP-02c) */ }\n\
-             pub mod space  { /* TODO(APP-02c) */ }\n\
-             pub mod radii  { /* TODO(APP-02c) */ }\n";
-        self.emit("src/theme.rs", body.as_bytes(), inv, "theme", true)
+    /// APP-02g: real theme translator per chapter 02 §7.6.
+    ///
+    /// `raw_palette_v1`: input is a flat `{ name: "#rrggbb" }` map;
+    /// emit `pub mod colors` with one `pub const NAME: u32 = 0xRRGGBB;`
+    /// per entry. Hex strings normalised to uppercase u32 literals.
+    ///
+    /// `chakra_tokens_v1`: input is a JSON object with optional
+    /// top-level `colors` / `space` / `radii` keys (matching the
+    /// chapter 02 §7.6 example shape — a SUBSET of the full
+    /// `extendTheme(...)` output). Emits up to three modules.
+    /// Non-trivial token types (typography scale, shadows) are a
+    /// v1 concern per §7.6 — the orchestrator does not pretend
+    /// to handle them at v0 and ignores any unknown top-level
+    /// keys silently (the upstream chakra exporter still owns
+    /// the full mapping).
+    ///
+    /// Output is byte-deterministic — all maps sorted before
+    /// emission.
+    fn emit_theme(&self, inv: &mut Inventory) -> Result<()> {
+        let theme = self
+            .manifest
+            .theme
+            .as_ref()
+            .expect("emit_theme called without theme:");
+        let source = lexical_normalise(&self.manifest_dir.join(&theme.source));
+        let text = std::fs::read_to_string(&source)
+            .map_err(|e| anyhow!("read theme.source {}: {e}", source.display()))?;
+        let json: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| anyhow!("parse theme.source {}: {e}", source.display()))?;
+
+        let mut body = String::new();
+        body.push_str("// SPDX-License-Identifier: MIT\n");
+        body.push_str("//\n");
+        body.push_str(&format!(
+            "// src/theme.rs (theme-translator emission, APP-02g, format={}).\n",
+            theme.format
+        ));
+        body.push_str(&format!(
+            "// Per chapter 02 §7.6 — consumed from `{}`.\n\n",
+            theme.source.display()
+        ));
+
+        match theme.format.as_str() {
+            "raw_palette_v1" => {
+                let map = json.as_object().ok_or_else(|| {
+                    anyhow!(
+                        "raw_palette_v1: theme.source {} must be a flat JSON object",
+                        source.display()
+                    )
+                })?;
+                Self::emit_color_module(&mut body, map, &source)?;
+            }
+            "chakra_tokens_v1" => {
+                let root = json.as_object().ok_or_else(|| {
+                    anyhow!(
+                        "chakra_tokens_v1: theme.source {} must be a JSON object",
+                        source.display()
+                    )
+                })?;
+                if let Some(colors) = root.get("colors").and_then(|v| v.as_object()) {
+                    Self::emit_color_module(&mut body, colors, &source)?;
+                }
+                if let Some(space) = root.get("space").and_then(|v| v.as_object()) {
+                    Self::emit_u16_module(&mut body, "space", space, &source)?;
+                }
+                if let Some(radii) = root.get("radii").and_then(|v| v.as_object()) {
+                    Self::emit_u16_module(&mut body, "radii", radii, &source)?;
+                }
+            }
+            other => bail!(
+                "theme.format '{other}' is not implemented; supported at v0: {:?}",
+                THEME_FORMATS
+            ),
+        }
+
+        self.emit("src/theme.rs", body.as_bytes(), inv, "theme", false)
+    }
+
+    fn emit_color_module(
+        body: &mut String,
+        map: &serde_json::Map<String, serde_json::Value>,
+        source: &Path,
+    ) -> Result<()> {
+        let mut pairs: Vec<(String, u32)> = Vec::with_capacity(map.len());
+        for (k, v) in map {
+            let s = v.as_str().ok_or_else(|| {
+                anyhow!(
+                    "theme.source {} colors.{} is not a string",
+                    source.display(),
+                    k
+                )
+            })?;
+            let rgb = parse_rgb_hex(s).map_err(|e| {
+                anyhow!(
+                    "theme.source {} colors.{} = {:?}: {e}",
+                    source.display(),
+                    k,
+                    s
+                )
+            })?;
+            pairs.push((upper_snake(k), rgb));
+        }
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        body.push_str("pub mod colors {\n");
+        for (name, rgb) in pairs {
+            body.push_str(&format!("    pub const {name}: u32 = 0x{rgb:06X};\n"));
+        }
+        body.push_str("}\n\n");
+        Ok(())
+    }
+
+    fn emit_u16_module(
+        body: &mut String,
+        module: &str,
+        map: &serde_json::Map<String, serde_json::Value>,
+        source: &Path,
+    ) -> Result<()> {
+        let mut pairs: Vec<(String, u16)> = Vec::with_capacity(map.len());
+        for (k, v) in map {
+            let n = v.as_u64().ok_or_else(|| {
+                anyhow!(
+                    "theme.source {} {module}.{} is not a non-negative integer",
+                    source.display(),
+                    k
+                )
+            })?;
+            if n > u16::MAX as u64 {
+                bail!(
+                    "theme.source {} {module}.{} = {n} does not fit in u16",
+                    source.display(),
+                    k
+                );
+            }
+            pairs.push((upper_snake(k), n as u16));
+        }
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        body.push_str(&format!("pub mod {module} {{\n"));
+        for (name, value) in pairs {
+            body.push_str(&format!("    pub const {name}: u16 = {value};\n"));
+        }
+        body.push_str("}\n\n");
+        Ok(())
     }
 
     fn emit_layouts(&self, inv: &mut Inventory) -> Result<()> {
@@ -2095,4 +2225,69 @@ fn ident_upper(id: &str) -> String {
 /// a Rust module name.
 fn ident_module(id: &str) -> String {
     id.replace('-', "_")
+}
+
+/// APP-02g: convert an arbitrary theme token key into an
+/// `UPPER_SNAKE_CASE` Rust constant name. Handles dotted keys
+/// (`primary.500` → `PRIMARY_500`), camelCase (`primaryLight` →
+/// `PRIMARY_LIGHT`), kebab-case (`primary-500` → `PRIMARY_500`),
+/// and mixed inputs. Non-alphanumeric runs collapse to a single
+/// underscore.
+fn upper_snake(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut prev_was_lower = false;
+    for ch in input.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if ch.is_ascii_uppercase() {
+                if prev_was_lower && !out.ends_with('_') {
+                    out.push('_');
+                }
+                out.push(ch);
+                prev_was_lower = false;
+            } else if ch.is_ascii_lowercase() {
+                out.push(ch.to_ascii_uppercase());
+                prev_was_lower = true;
+            } else {
+                // digit
+                out.push(ch);
+                prev_was_lower = false;
+            }
+        } else if !out.is_empty() && !out.ends_with('_') {
+            out.push('_');
+            prev_was_lower = false;
+        }
+    }
+    while out.ends_with('_') {
+        out.pop();
+    }
+    out
+}
+
+/// APP-02g: parse a CSS-style hex color (`#rrggbb` or `#rgb`) into
+/// a u32 in `0x00RRGGBB` form. Rejects other shapes (`rgb(...)`,
+/// 8-digit `#rrggbbaa`, named colors) at v0 — those are §7.6
+/// non-trivial cases that require the chakra exporter.
+fn parse_rgb_hex(s: &str) -> Result<u32> {
+    let stripped = s.strip_prefix('#').unwrap_or(s);
+    let rgb = match stripped.len() {
+        6 => u32::from_str_radix(stripped, 16).map_err(|e| anyhow!("invalid 6-digit hex: {e}"))?,
+        3 => {
+            // Expand #rgb → #rrggbb.
+            let n = u32::from_str_radix(stripped, 16)
+                .map_err(|e| anyhow!("invalid 3-digit hex: {e}"))?;
+            let r = (n >> 8) & 0xF;
+            let g = (n >> 4) & 0xF;
+            let b = n & 0xF;
+            (r * 0x11 << 16) | (g * 0x11 << 8) | (b * 0x11)
+        }
+        _ => bail!(
+            "expected #rgb or #rrggbb (got {} chars: {:?})",
+            stripped.len(),
+            s
+        ),
+    };
+    if rgb > 0xFFFFFF {
+        bail!("hex value 0x{rgb:X} exceeds 24-bit RGB range");
+    }
+    Ok(rgb)
 }
