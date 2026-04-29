@@ -45,6 +45,9 @@ pub mod interface;
 /// Variable-width packed font renderer (grayscale anti-aliased).
 pub mod packed_font;
 pub mod plugins;
+/// Anti-aliased rasterization kernels (OBB and helpers) usable by both
+/// software and hardware-accelerated `Renderer` implementations.
+pub mod raster;
 pub mod renderer;
 pub mod style;
 pub mod theme;

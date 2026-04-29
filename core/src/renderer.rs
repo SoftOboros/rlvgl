@@ -3,6 +3,7 @@
 //! Implementors of this trait can target displays, off-screen buffers or
 //! simulator windows.
 
+use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
 
 /// Target-agnostic drawing interface.
@@ -47,5 +48,109 @@ pub trait Renderer {
                 }
             }
         }
+    }
+
+    /// Blend a horizontal run of pixels with per-pixel anti-aliased coverage.
+    ///
+    /// `coverage[i]` modulates `color`'s alpha for the pixel at
+    /// `(x + i, y)`. This is the AA inner-loop primitive: every higher-level
+    /// AA method funnels coverage spans through here, so backends with
+    /// hardware blend support (e.g. DMA2D's blend mode with per-pixel alpha
+    /// modulation) should override this for performance.
+    ///
+    /// The default implementation walks the run via [`blend_rect`](Self::blend_rect)
+    /// per pixel — correct, slow, sufficient for non-hot paths.
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        for (i, &cov) in coverage.iter().enumerate() {
+            if cov == 0 {
+                continue;
+            }
+            let alpha = ((color.3 as u16 * cov as u16) / 255) as u8;
+            self.blend_rect(
+                Rect {
+                    x: x + i as i32,
+                    y,
+                    width: 1,
+                    height: 1,
+                },
+                Color(color.0, color.1, color.2, alpha),
+            );
+        }
+    }
+
+    /// Fill an oriented bounding box with anti-aliased coverage.
+    ///
+    /// `obb`'s center is in absolute framebuffer coordinates with sub-pixel
+    /// precision; `theta` is supplied via pre-computed `(cos_t, sin_t)` on
+    /// the [`Obb`] itself. `color`'s alpha is multiplied by per-pixel
+    /// coverage before blending.
+    ///
+    /// The default implementation rasterizes via
+    /// [`raster::rasterize_obb`] and emits coverage spans through
+    /// [`blend_row`](Self::blend_row). Backends that have hardware OBB
+    /// rasterization can override this directly; backends with hardware
+    /// blend but software geometry should override `blend_row` instead and
+    /// inherit this default.
+    fn fill_obb_aa(&mut self, obb: Obb, color: Color) {
+        let clip = obb.aabb();
+        let mut sink = RowBlendSink { r: self, color };
+        raster::rasterize_obb(&obb, clip, &mut sink);
+    }
+
+    /// Fill a disc (filled circle) with anti-aliased coverage at the
+    /// boundary. Sub-pixel center; sqrt is restricted to the 1-pixel AA
+    /// ring so the inner-area fast-path stays integer-arithmetic only.
+    ///
+    /// The default implementation routes through
+    /// [`raster::rasterize_disc`] + [`blend_row`](Self::blend_row), so
+    /// any backend that has overridden `blend_row` for hardware blend
+    /// inherits the acceleration here automatically.
+    fn fill_disc_aa(&mut self, center: crate::raster::PointF, radius: f32, color: Color) {
+        let pad = radius + 1.0;
+        let clip = Rect {
+            x: (center.x - pad) as i32 - 1,
+            y: (center.y - pad) as i32 - 1,
+            width: (pad * 2.0) as i32 + 3,
+            height: (pad * 2.0) as i32 + 3,
+        };
+        let mut sink = RowBlendSink { r: self, color };
+        raster::rasterize_disc(center, radius, clip, &mut sink);
+    }
+
+    /// Stroke a line between `a` and `b` with given `width`, anti-aliased.
+    /// Endpoints are square-cut; see [`raster::rasterize_line`].
+    ///
+    /// Default implementation routes through
+    /// [`raster::rasterize_line`] + [`blend_row`](Self::blend_row), so
+    /// `blend_row` overrides apply automatically.
+    fn stroke_line_aa(
+        &mut self,
+        a: crate::raster::PointF,
+        b: crate::raster::PointF,
+        width: f32,
+        color: Color,
+    ) {
+        // Conservative AABB: full canvas span — `rasterize_line` clips
+        // internally to the OBB AABB anyway, so passing a permissive clip
+        // here only costs a single rect-intersect inside the kernel.
+        let clip = Rect {
+            x: i32::MIN / 2,
+            y: i32::MIN / 2,
+            width: i32::MAX / 2,
+            height: i32::MAX / 2,
+        };
+        let mut sink = RowBlendSink { r: self, color };
+        raster::rasterize_line(a, b, width, clip, &mut sink);
+    }
+}
+
+struct RowBlendSink<'r, R: Renderer + ?Sized> {
+    r: &'r mut R,
+    color: Color,
+}
+
+impl<R: Renderer + ?Sized> CoverageSink for RowBlendSink<'_, R> {
+    fn row(&mut self, x: i32, y: i32, coverage: &[u8]) {
+        self.r.blend_row(x, y, self.color, coverage);
     }
 }

@@ -648,6 +648,84 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
             }
         }
     }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        // AA inner-loop primitive. Direct ARGB8888 source-over with per-pixel
+        // alpha = (color.alpha * coverage[i]) / 255. One planner.add per row
+        // keeps DMA2D refresh granularity efficient versus per-pixel adds.
+        if color.3 == 0 || coverage.is_empty() {
+            return;
+        }
+        if self.surface.format != PixelFmt::Argb8888 {
+            // Non-ARGB8888 surfaces: fall back through the trait default
+            // (per-pixel blend_rect). This branch is rare on disco.
+            for (i, &cov) in coverage.iter().enumerate() {
+                if cov == 0 {
+                    continue;
+                }
+                let alpha = ((color.3 as u16 * cov as u16) / 255) as u8;
+                if alpha == 0 {
+                    continue;
+                }
+                self.blend_rect(
+                    WidgetRect {
+                        x: x + i as i32,
+                        y,
+                        width: 1,
+                        height: 1,
+                    },
+                    Color(color.0, color.1, color.2, alpha),
+                );
+            }
+            return;
+        }
+        let sw = self.surface.width as i32;
+        let sh = self.surface.height as i32;
+        if y < 0 || y >= sh {
+            return;
+        }
+        let stride = self.surface.stride;
+        let src_a = color.3 as u16;
+        let row_off = y as usize * stride;
+        let mut written_x0 = i32::MAX;
+        let mut written_x1 = i32::MIN;
+        for (i, &cov) in coverage.iter().enumerate() {
+            if cov == 0 {
+                continue;
+            }
+            let px = x + i as i32;
+            if px < 0 || px >= sw {
+                continue;
+            }
+            let alpha = (src_a * cov as u16) / 255;
+            if alpha == 0 {
+                continue;
+            }
+            let inv = 255 - alpha;
+            let off = row_off + (px as usize) * 4;
+            let bg_b = self.surface.buf[off] as u16;
+            let bg_g = self.surface.buf[off + 1] as u16;
+            let bg_r = self.surface.buf[off + 2] as u16;
+            self.surface.buf[off] = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+            self.surface.buf[off + 1] = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+            self.surface.buf[off + 2] = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+            self.surface.buf[off + 3] = 0xff;
+            if px < written_x0 {
+                written_x0 = px;
+            }
+            if px > written_x1 {
+                written_x1 = px;
+            }
+        }
+        if written_x0 <= written_x1 {
+            self.planner.add(Rect {
+                x: written_x0,
+                y,
+                w: (written_x1 - written_x0 + 1) as u32,
+                h: 1,
+            });
+        }
+    }
 }
 
 /// Renderer wrapper that applies 90° CCW rotation for platforms where the

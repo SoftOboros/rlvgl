@@ -78,6 +78,17 @@ const D3_CRAWL_DIAG1: u32 = 0x3800_1C70;
 const D3_CRAWL_DIAG2: u32 = 0x3800_1C74;
 #[allow(dead_code)]
 const D3_CRAWL_DIAG3: u32 = 0x3800_1C78;
+// Clock widget telemetry (populated by `clock_demo` feature).
+const D3_CLOCK_DIRTY_PX: u32 = 0x3800_1C7C;
+const D3_CLOCK_PLAN_CYCLES: u32 = 0x3800_1C80;
+const D3_CLOCK_DRAW_CYCLES: u32 = 0x3800_1C84;
+/// Packed: byte 0 = outcome code (0=Skipped, 1=Painted, 2=FullRepaint),
+/// byte 1 = layers_painted, bytes 2–3 = reserved.
+const D3_CLOCK_OUTCOME: u32 = 0x3800_1C88;
+/// High-water mark for `D3_CLOCK_DRAW_CYCLES` since boot. Sample this for
+/// the worst-case-frame baseline; combine with `D3_CLOCK_DIRTY_PX` for
+/// cycles-per-pixel comparison between AA paths.
+const D3_CLOCK_DRAW_MAX: u32 = 0x3800_1C8C;
 
 /// CPU utilisation tracker backed by the DWT cycle counter.
 pub struct CpuStats {
@@ -366,5 +377,47 @@ impl CpuStats {
             (D3_CRAWL_DIAG2 as *mut u32).write_volatile(word2);
             (D3_CRAWL_DIAG3 as *mut u32).write_volatile(word3);
         }
+    }
+}
+
+/// Read the DWT cycle counter directly. Returns garbage if DWT hasn't
+/// been enabled via [`CpuStats::enable_dwt`]; deltas should always be
+/// computed via `wrapping_sub` to handle the 32-bit wrap.
+#[inline]
+#[allow(dead_code)]
+pub fn read_cyccnt() -> u32 {
+    unsafe { (DWT_CYCCNT as *const u32).read_volatile() }
+}
+
+/// Publish a clock-widget telemetry frame to the D3 SRAM slots claimed by
+/// `clock_demo`. Tracks a high-water draw-cycles mark internally so the
+/// debugger can sample the worst-case frame without constant polling.
+///
+/// `outcome_code`: 0 = Skipped, 1 = Painted, 2 = FullRepaint.
+#[inline]
+#[allow(dead_code)]
+pub fn publish_clock_telem(
+    outcome_code: u8,
+    layers_painted: u8,
+    dirty_px: u32,
+    plan_cycles: u32,
+    draw_cycles: u32,
+) {
+    static mut DRAW_MAX: u32 = 0;
+    // Safety: single-writer (called from CM7 main thread only).
+    let prev_max = unsafe { DRAW_MAX };
+    let new_max = if draw_cycles > prev_max {
+        unsafe { DRAW_MAX = draw_cycles };
+        draw_cycles
+    } else {
+        prev_max
+    };
+    let outcome_word = (outcome_code as u32) | ((layers_painted as u32) << 8);
+    unsafe {
+        (D3_CLOCK_DIRTY_PX as *mut u32).write_volatile(dirty_px);
+        (D3_CLOCK_PLAN_CYCLES as *mut u32).write_volatile(plan_cycles);
+        (D3_CLOCK_DRAW_CYCLES as *mut u32).write_volatile(draw_cycles);
+        (D3_CLOCK_OUTCOME as *mut u32).write_volatile(outcome_word);
+        (D3_CLOCK_DRAW_MAX as *mut u32).write_volatile(new_max);
     }
 }

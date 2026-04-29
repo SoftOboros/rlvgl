@@ -8,6 +8,8 @@ extern crate alloc;
 pub mod button;
 /// Checkbox widget for boolean options.
 pub mod checkbox;
+/// Analog clock widget with sub-pixel anti-aliased hand rotation.
+pub mod clock;
 /// Container widget for layout grouping.
 pub mod container;
 /// Image display widget.
