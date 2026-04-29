@@ -488,22 +488,34 @@ The candidate manifests cite:
 Both are "BSP is hand-written" or "hosted" cases. The chipdb still
 needs an entry to validate `target.board`.
 
-**Disposition: ACCEPT.** Chapter 1 [§5.2](01-manifest-schema.md#52-target-required)
-amended with the minimal-entry rule: a board YAML MUST exist
-regardless of `generator`, but for non-`creator-bsp-pac` cases
-only `chip` and `console: { peripheral, baud }` are required.
-Pin assignments MAY be omitted.
+**Disposition: ACCEPT.** Initial closure (2026-04-27) wrote the
+rule against esp-shape-only assumptions; **superseded by the
+2026-04-29 amendment to 01 §5.2** ([01 §15](01-manifest-schema.md#§15-change-log))
+which replaces "file basename in `db/boards/`" with "resolves via
+the vendor crate's `find()` API." The per-vendor backing-storage
+map (esp YAML, stm zstd archive, ti `BOARDS` const, …) now lives
+in 01 §5.2 itself.
 
-**Follow-up work** (filed against the chipdb initiative, not this
-chapter):
+**Follow-up work — landed 2026-04-29 (APP-04a):**
 
-- `chipdb/rlvgl-chips-ti/db/boards/beaglebone_black_nhd_cape.yaml`
-  (minimal entry; AM335x console UART0 115200).
-- `chipdb/rlvgl-chips-stm/db/boards/stm32h747i_disco.yaml`
-  (minimal entry; STM32H747XIH6 console USART1 115200).
-- `chipdb/rlvgl-chips-stm/` may not exist as a vendor crate yet —
-  if so, that's a chipdb bootstrap task before either H747 manifest
-  can be checked in.
+Both stm and ti vendor crates already drive `find()` from a
+hardcoded `BOARDS: &[BoardInfo]` constant in `src/lib.rs`; the
+zstd archive in stm is decorative for `find()` purposes (it
+exposes raw board definitions to *other* tools via `raw_db()`,
+not to the validator). Adding boards is therefore a one-line
+const append per vendor:
+
+- **ti** — `chipdb/rlvgl-chips-ti/src/lib.rs` `BOARDS` const adds
+  `BoardInfo { board: "beaglebone_black_nhd_cape", chip: "AM335x" }`.
+  Unblocks BBB linux/bare-metal/freertos/zephyr round-trip
+  manifests.
+- **stm** — `chipdb/rlvgl-chips-stm/src/lib.rs` `BOARDS` const
+  adds `BoardInfo { board: "stm32h747i_disco", chip: "STM32H747XIH6" }`.
+  Unblocks H747 freertos/zephyr round-trip manifests.
+
+A future PR may regenerate `assets/chipdb.bin.zst` from
+`chips/stm/STM32_open_pin_data/` so `raw_db()` reflects the same
+board set, but that does not block manifest validation.
 
 ### 6.5 🟢 CLOSED — Asset class enum survives round-trip
 
@@ -701,3 +713,5 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-27 | DRAFT  | Initial round-trip pass against all four [00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property) targets. Significant findings: §6.2 (controller-library slot, 🔴), §6.9 (Zephyr sibling-project emission, 🔴), §6.3 (third `target.generator` value, 🟡), §6.4 (chipdb coverage extension, 🟡), §6.10 (`rust_inline_v1` is the primary path today, not the v0 backdoor it was framed as). |
 | 2026-04-27 | DRAFT  | Convergence pass: all §6 findings closed and amended into upstream chapters. **Dispositions:** §6.1 ACCEPT (intent-vs-crate); §6.2 ACCEPT (`controller:` field added to 01 §5.10 + 02 §7.8); §6.3 ACCEPT (`hosted` added to 01 §5.2 generator enum); §6.4 ACCEPT (chipdb minimal-entry rule in 01 §5.2; follow-up chipdb board YAMLs filed); §6.5 ACCEPT (asset class enum holds); §6.6 ACCEPT (informative `options:` keys table at 01 §5.4.1); §6.7 ACCEPT Option A (no `extends:` at v0; recorded in 01 §11); §6.8 ACCEPT (feature-graph in 02 §8 preamble); §6.9 ACCEPT nested layout (02 §5.4.1 + §8.4); §6.10 ACCEPT with v1 gating (01 §5.5). §12 checklist still has the in-tree `app.yaml` check-in items — chapter remains DRAFT pending real manifests landing in round-trip target trees. |
 | 2026-04-27 | DRAFT  | APP-03a partial landing: `examples/beetle-esp32c3/app.yaml` + `layouts/main_screen.rs` checked in as the first round-trip artifact (chapters 00 + 01 RATIFIED same day). Cites `target.generator: hosted`, `layout_format: rust_inline_v1`. Validator `--check` gating awaits APP-02a. Remaining round-trip artifacts (BBB linux, H747 freertos, H747 zephyr) blocked on chipdb minimal entries (01 §5.2 / [03 §6.4 follow-up](#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards)) and corresponding chip families being present in the chipdb tree. |
+| 2026-04-29 | DRAFT  | §6.4 closure superseded after [01 §5.2 amendment](01-manifest-schema.md#§15-change-log) discovered the original wording assumed esp-shape YAML files universally. New rule: board id resolves via vendor-crate `find()` API; backing storage is per-vendor. Follow-up actions rewritten — ti gets a hardcoded `BOARDS` const entry, stm gets a build-script source addition + archive rebuild, no YAML files dropped into trees that don't use them. |
+| 2026-04-29 | DRAFT  | APP-04a landed: ti and stm vendor crates each gained one `BoardInfo` const entry (`beaglebone_black_nhd_cape` → AM335x, `stm32h747i_disco` → STM32H747XIH6). Investigation showed both vendors drive `find()` from a hardcoded `BOARDS` const, so the simpler-than-expected mechanism made the addition trivial. BBB and H747 round-trip manifests are now unblocked at the `target.board` validation level. |

@@ -15,10 +15,16 @@ pub struct BoardInfo {
 }
 
 /// Static list of known boards for this vendor.
-const BOARDS: &[BoardInfo] = &[BoardInfo {
-    board: "MSP432P401R",
-    chip: "MSP432P401R",
-}];
+const BOARDS: &[BoardInfo] = &[
+    BoardInfo {
+        board: "MSP432P401R",
+        chip: "MSP432P401R",
+    },
+    BoardInfo {
+        board: "beaglebone_black_nhd_cape",
+        chip: "AM335x",
+    },
+];
 
 /// Returns the vendor name used by the UI.
 #[must_use]
