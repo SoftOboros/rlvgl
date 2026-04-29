@@ -1,16 +1,17 @@
 <!--
 02-generator-pipeline.md - rlvgl Application Schema, Chapter 2: Generator Pipeline.
-Status: DRAFT — not yet ratified. See §15 change log.
+Status: RATIFIED 2026-04-29. See §15 change log.
 -->
 
 **[← Prev](01-manifest-schema.md) · [Index](README.md) · Next → (TBD)**
 
 # Chapter 2 — Generator Pipeline (`rlvgl-creator app from-yaml`)
 
-> **Status:** DRAFT, unratified. Depends on
+> **Status:** RATIFIED 2026-04-29 (see §15). Depends on
 > [Chapter 0](00-concepts.md) and [Chapter 1](01-manifest-schema.md).
-> Until §15 records a ratified entry, no `APP-02` PR may cite this
-> doc as a frozen authority.
+> `APP-NN` execution PRs MAY cite this chapter as a frozen authority
+> for the orchestrator pipeline, sub-generator contracts, per-prong
+> templates, inventory format, and `--check` / `--force` semantics.
 
 ## §0 Authority policy
 
@@ -794,18 +795,31 @@ is satisfied by the platform crate's existing trait surface.
 
 This chapter is ratified (§15 entry dated) when:
 
-- [ ] §5.1 stage graph matches the eventual orchestrator
-      implementation.
-- [ ] §5.2 CLI flags reviewed; no missing required flag.
-- [ ] §5.4 emitted-crate layout reproduced by reverse extraction
-      from at least one round-trip target ([00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property)).
-- [ ] §7 contracts each have at least one existing or
+- [x] §5.1 stage graph matches the orchestrator implementation —
+      stages 1+2+3+5+6+7 implemented in `src/bin/creator/app.rs`
+      `Orchestrator`. Stage 4 (post-SM cross-validate) is N/A at
+      v0 because no committed manifest carries `state_machine:`
+      and SM-gen integration is deferred to APP-02e+.
+- [x] §5.2 CLI flags reviewed — `--validate-only`, `--out`,
+      `--check`, `--force` all implemented; no missing required flag.
+- [x] §5.4 emitted-crate layout reproduced by reverse extraction
+      from all five committed round-trip targets (APP-03a–e).
+- [x] §7 contracts each have at least one existing or
       stubbed-in-rlvgl-creator sub-generator that satisfies them.
-- [ ] §8 per-prong templates each match an existing example's
-      `main.rs` shape closely enough that the round-trip emitter
-      could plausibly produce it.
-- [ ] §9.4 inventory file format is settled (JSON Schema or prose).
-- [ ] §15 has a dated ratification entry signed off by the
+      Real impls: layout-translator (§7.7, full
+      `rust_inline_v1`), asset-pipeline (§7.3, file-copy v0),
+      controller-wiring (§7.8). Stubs with explicit deferral
+      markers: BSP-gen (§7.2 — APP-02e will programmatically
+      invoke `rlvgl-creator bsp from-yaml`), SM-gen (§7.4 —
+      external MCP tool), i18n (§7.5), theme-translator (§7.6).
+- [x] §8 per-prong templates each match an existing example's
+      `main.rs` shape — §8.1 linux loop, §8.2 bare_metal
+      `#![no_std]` template, §8.3 freertos task-shape comments,
+      §8.4 zephyr staticlib + nested west project at `zephyr/`.
+- [x] §9.4 inventory file format is settled — JSON with serde
+      schema (`Manifest`, `entries[]: { path, stage, hash, stub }`),
+      blake3 content hashes, anchored at `<out>/.rlvgl-app-manifest.json`.
+- [x] §15 has a dated ratification entry signed off by the
       initiative owner.
 
 ## §13 Files cited
@@ -850,3 +864,5 @@ Ratifying this chapter unblocks:
 | 2026-04-27 | DRAFT  | Round-trip convergence pass closed. Pipeline additions: §5.4.1 Zephyr nested west project layout + §8.4 fleshed Zephyr templates with `lib.rs`/`main.c`/`CMakeLists.txt`/`prj.conf`/`app.overlay` shapes (closes [03 §6.9](03-round-trip.md#69--closed--zephyr-prong-emits-a-nested-west-project)); §5.4 amended for `target.generator: hosted` (no `bsp_generated/`, HAL crate as dependency); §7.8 controller-wiring contract — `App::new` body construction with `capabilities` preset, `[dependencies]` emission for path / version / default cases (closes [03 §6.2](03-round-trip.md#62--closed--controller-libraries-get-a-first-class-manifest-slot)); §8 preamble — explicit feature-graph ownership rule (per-prong template owns `Cargo.toml` `[features]` graph expansion; manifest names leaves) (closes [03 §6.8](03-round-trip.md#68--closed--per-prong-templates-own-the-cargo-feature-graph)). §12 checklist still incomplete; chapter remains DRAFT pending implementation. |
 | 2026-04-29 | IMPLEMENTATION | APP-02b: orchestrator emission landed in `src/bin/creator/app.rs` `Orchestrator` + `tests/creator_app_emit.rs`. Implements stage 3 (sub-generator dispatch, sequential — parallel optimization deferred), stage 5 (layout-translator full impl for `rust_inline_v1` per §7.7), and §9.4 inventory tracking (blake3-hashed entries written to `<out>/.rlvgl-app-manifest.json`). Asset-pipeline at v0 is file-copy + `include_bytes!` index per §7.3. SM-gen, theme, i18n, BSP-gen for `creator-bsp-pac`, and full crate scaffold (Cargo.toml `[dependencies]`, src/main.rs, src/app.rs) emit clearly-marked `// TODO(APP-02c)` stubs. All five committed manifests emit successfully under `--out <DIR>`; 7/7 emit-integration tests pass (BBB linux cross-tree splash, beetle bsp_pac BSP-gen stub, beetle esp_hal hosted-no-bsp, H747 freertos + zephyr, inventory invariants). §12 stage-3/5/§9.4 items now satisfied; emission stages 6-7 (full scaffold, `--check`) remain for APP-02c/d. |
 | 2026-04-29 | IMPLEMENTATION | APP-02c: stage 6 crate scaffold + per-prong main glue templates. `Cargo.toml` and `README.md` flip from APP-02b stubs to real emission — `Cargo.toml` carries `[package]` + `[[bin]]` (or `[lib] crate-type = ["staticlib"]` for zephyr) + `[features]` from `target.features` + `[dependencies]` for the `controller:` crate. `src/app.rs` emits the §7.8 wiring shim (when `controller:` present, calls `DiscoCapabilities::<preset>()` and constructs `DiscoController`). `src/main.rs` per prong: §8.1 linux loop with `std::thread::sleep`, §8.2 bare_metal `#![no_std]` template with panic handler, §8.3 freertos task-shape comments + render_task body, §8.4 zephyr → `src/lib.rs` `extern "C" fn rlvgl_init()` + nested west project at `zephyr/{CMakeLists.txt, prj.conf, app.overlay, src/main.c}` per §5.4.1. Emit tests updated to match (7/7 still pass alongside 17/17 validator tests; 24/24 total). §12 stage-6 satisfied; only `--check` mode + post-emit `cargo fmt` (APP-02d) remain. |
+| 2026-04-29 | IMPLEMENTATION | APP-02d: stage 7 (post-emit checks) + `--check` + `--force` + inventory-driven delete. `--check` emits to a temp staging directory (RAII `StagingDir` under `std::env::temp_dir()`), runs rustfmt in both staged + emitted paths so determinism is preserved, then diffs byte-for-byte against `<out>` and exits non-zero on any divergence (kinds: `missing in <out>`, `content differs`, `stale in <out>`). `--force` is required when `<out>` carries files not recorded in its previous inventory; rejection lists up to 10 untracked paths. §9.4 delete-on-regen: stale inventory entries (not in the new emission) are removed from `<out>`. Post-emit rustfmt runs per-file (best-effort; doesn't fail emission on rustfmt error). Tests added: byte-deterministic emit between two independent runs, `--force` rule against untracked files, inventory-driven delete on regen. 27/27 tests pass (17 validator + 10 emit). All §12 acceptance bullets satisfied. |
+| 2026-04-29 | RATIFIED | Owner: Ira Abbott. All §12 acceptance bullets satisfied across APP-02a–d. `APP-NN` execution PRs may now cite this chapter as a frozen authority for the orchestrator pipeline, sub-generator contracts, per-prong templates, inventory format, and `--check` / `--force` semantics. v1 work areas (real BSP-gen integration, real SM-gen via external MCP tool, real i18n + theme generators, parallelized stage 3 dispatch, full Cargo `[features]` graph expansion) get tracked under their own PR sequences (APP-02e+, APP-05+) and don't gate v0 ratification — chapter 02 §11 explicitly accepts these as v1 concerns. |

@@ -312,21 +312,29 @@ enum Command {
 
 #[derive(Subcommand)]
 enum AppCommand {
-    /// Parse an `app.yaml` and run the chapter 01 §6 validator.
-    /// Use `--validate-only` for spec compliance check (orchestrator
-    /// emission is APP-02b/c/d follow-up).
+    /// Parse an `app.yaml`, run the chapter 01 §6 validator, and
+    /// optionally emit a buildable Cargo crate scaffold per chapter
+    /// 02 §6.
     FromYaml {
         /// Path to `app.yaml` (rlvgl-app/v0 manifest).
         #[arg(value_name = "MANIFEST")]
         manifest: PathBuf,
-        /// Output directory for orchestrator emission (unused at v0;
-        /// orchestrator emission lands in APP-02b/c/d).
+        /// Output directory for orchestrator emission.
         #[arg(long, value_name = "DIR")]
         out: Option<PathBuf>,
-        /// Parse and validate; do not emit. Required at v0 since
-        /// emission is not yet implemented.
+        /// Parse and validate; do not emit.
         #[arg(long)]
         validate_only: bool,
+        /// Emit to a temp dir and compare against `--out` byte-for-byte.
+        /// Exits non-zero on any diff. Per chapter 02 §5.2 / §9 — the
+        /// CI determinism gate.
+        #[arg(long, requires = "out", conflicts_with = "validate_only")]
+        check: bool,
+        /// Overwrite files under `--out` that are not recorded in the
+        /// previous inventory at `<out>/.rlvgl-app-manifest.json`. Required
+        /// when `--out` is non-empty and contains user-owned files.
+        #[arg(long, requires = "out")]
+        force: bool,
     },
 }
 
@@ -1251,7 +1259,15 @@ pub fn run() -> Result<()> {
                 manifest,
                 out,
                 validate_only,
-            } => app::run_from_yaml(&manifest, out.as_deref(), validate_only)?,
+                check,
+                force,
+            } => app::run_from_yaml(
+                &manifest,
+                out.as_deref(),
+                validate_only,
+                check,
+                force,
+            )?,
         },
     }
 

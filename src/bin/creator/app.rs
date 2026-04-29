@@ -553,8 +553,15 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
     Ok(manifest)
 }
 
-/// CLI entry: `rlvgl-creator app from-yaml <manifest> [--out <dir>] [--validate-only]`.
-pub fn run_from_yaml(manifest: &Path, out: Option<&Path>, validate_only: bool) -> Result<()> {
+/// CLI entry: `rlvgl-creator app from-yaml <manifest> [--out <dir>]
+/// [--validate-only] [--check] [--force]`.
+pub fn run_from_yaml(
+    manifest: &Path,
+    out: Option<&Path>,
+    validate_only: bool,
+    check: bool,
+    force: bool,
+) -> Result<()> {
     let m = validate(manifest)?;
     eprintln!(
         "ok: {} (schema={}, target={}/{}/{}, screens={}, assets={})",
@@ -579,10 +586,101 @@ pub fn run_from_yaml(manifest: &Path, out: Option<&Path>, validate_only: bool) -
         .parent()
         .ok_or_else(|| anyhow!("manifest has no parent: {}", manifest.display()))?;
     let ws_root = find_workspace_root(manifest_dir);
+
+    if check {
+        // §5.2 / §9 CI determinism gate: emit to a tempdir and diff
+        // against `<out>` byte-for-byte. Exit non-zero on any diff.
+        // rustfmt runs in both paths so post-emit formatting cannot
+        // create false-positive divergences.
+        let staged = StagingDir::new()
+            .map_err(|e| anyhow!("create temp dir for --check: {e}"))?;
+        let mut orch = Orchestrator::new(
+            m,
+            manifest_dir.to_path_buf(),
+            ws_root,
+            staged.path().to_path_buf(),
+        );
+        let new_inv = orch.run()?;
+        let _ = run_rustfmt_on_emitted(&new_inv, staged.path());
+        let diffs = compare_emission(staged.path(), out, &new_inv)?;
+        if diffs.is_empty() {
+            eprintln!(
+                "check: clean ({} files, no divergence from {})",
+                new_inv.entries.len(),
+                out.display()
+            );
+            return Ok(());
+        }
+        eprintln!(
+            "check: {} divergence(s) between staged emission and {}:",
+            diffs.len(),
+            out.display()
+        );
+        for d in &diffs {
+            eprintln!("  {}: {}", d.kind, d.path);
+        }
+        bail!(
+            "--check found {} divergence(s); regenerate with `app from-yaml --out {} {}`",
+            diffs.len(),
+            out.display(),
+            manifest.display()
+        );
+    }
+
+    // Emit mode. Honour the §5.2 inventory-vs-untracked file rule
+    // unless --force is set.
+    if out.exists() {
+        let untracked = scan_untracked_against_inventory(out)?;
+        if !untracked.is_empty() && !force {
+            let mut msg = format!(
+                "{} contains {} file(s) not recorded in a previous inventory:\n",
+                out.display(),
+                untracked.len()
+            );
+            for u in untracked.iter().take(10) {
+                msg.push_str(&format!("  - {u}\n"));
+            }
+            if untracked.len() > 10 {
+                msg.push_str(&format!("  ... ({} more)\n", untracked.len() - 10));
+            }
+            msg.push_str(
+                "Pass --force to overwrite, or move these files outside <out> first.",
+            );
+            bail!(msg);
+        }
+    }
+    let prev_inventory = read_inventory(out).ok();
+
     let mut orch = Orchestrator::new(m, manifest_dir.to_path_buf(), ws_root, out.to_path_buf());
     let inv = orch.run()?;
+
+    // §9.4 inventory-driven delete: any file in the prior inventory
+    // that is not in the new inventory gets removed.
+    let mut deleted = 0_usize;
+    if let Some(prev) = prev_inventory {
+        let new_paths: std::collections::HashSet<&str> =
+            inv.entries.iter().map(|e| e.path.as_str()).collect();
+        for old_entry in &prev.entries {
+            if !new_paths.contains(old_entry.path.as_str()) {
+                let p = out.join(&old_entry.path);
+                if p.exists() {
+                    let _ = std::fs::remove_file(&p);
+                    deleted += 1;
+                }
+            }
+        }
+    }
+
+    // §6 stage 7 / §9.2 post-emit cargo fmt — best effort. We invoke
+    // rustfmt directly on the emitted .rs files because the emitted
+    // Cargo.toml may carry path-deps that resolve only in a workspace
+    // context (e.g. `controller.path: ../apps/disco-demo`), so a
+    // workspace-aware `cargo fmt` from <out> would fail before
+    // rustfmt runs.
+    let fmt_failures = run_rustfmt_on_emitted(&inv, out);
+
     eprintln!(
-        "emit: {} files in {} ({} stage(s) ran, {} stub(s) deferred to APP-02c)",
+        "emit: {} files in {} ({} stage(s), {} stub(s){}{})",
         inv.entries.len(),
         out.display(),
         inv.entries
@@ -591,8 +689,173 @@ pub fn run_from_yaml(manifest: &Path, out: Option<&Path>, validate_only: bool) -
             .collect::<std::collections::HashSet<_>>()
             .len(),
         inv.entries.iter().filter(|e| e.stub).count(),
+        if deleted > 0 {
+            format!(", {deleted} stale file(s) removed")
+        } else {
+            String::new()
+        },
+        if fmt_failures > 0 {
+            format!(", {fmt_failures} rustfmt warning(s)")
+        } else {
+            String::new()
+        },
     );
     Ok(())
+}
+
+/// A divergence found by `--check`.
+#[derive(Debug)]
+struct Divergence {
+    kind: &'static str,
+    path: String,
+}
+
+/// Compare a freshly-emitted tree (`staged`) against the committed
+/// `<out>` directory, using the staged inventory as the source of
+/// truth for what should exist.
+fn compare_emission(staged: &Path, out: &Path, new_inv: &Inventory) -> Result<Vec<Divergence>> {
+    let mut diffs = Vec::new();
+    for entry in &new_inv.entries {
+        let staged_path = staged.join(&entry.path);
+        let out_path = out.join(&entry.path);
+        let staged_bytes = std::fs::read(&staged_path).ok();
+        let out_bytes = std::fs::read(&out_path).ok();
+        match (staged_bytes, out_bytes) {
+            (Some(_), None) => diffs.push(Divergence {
+                kind: "missing in <out>",
+                path: entry.path.clone(),
+            }),
+            (Some(s), Some(o)) if s != o => diffs.push(Divergence {
+                kind: "content differs",
+                path: entry.path.clone(),
+            }),
+            _ => {}
+        }
+    }
+    // Files in <out>'s old inventory but not in the new staged inventory
+    // would be deleted on a real emit; flag them as divergences.
+    if let Ok(prev) = read_inventory(out) {
+        let new_paths: std::collections::HashSet<&str> =
+            new_inv.entries.iter().map(|e| e.path.as_str()).collect();
+        for old_entry in &prev.entries {
+            if !new_paths.contains(old_entry.path.as_str()) {
+                diffs.push(Divergence {
+                    kind: "stale in <out>",
+                    path: old_entry.path.clone(),
+                });
+            }
+        }
+    }
+    Ok(diffs)
+}
+
+/// Scan `<out>` for files that are NOT recorded in its existing
+/// `.rlvgl-app-manifest.json` inventory.
+fn scan_untracked_against_inventory(out: &Path) -> Result<Vec<String>> {
+    let inv = match read_inventory(out) {
+        Ok(i) => i,
+        Err(_) => {
+            // No previous inventory — every existing file is untracked.
+            // We collect anything present so the user has visibility.
+            let mut acc = Vec::new();
+            collect_files(out, out, &mut acc);
+            return Ok(acc);
+        }
+    };
+    let known: std::collections::HashSet<String> =
+        inv.entries.iter().map(|e| e.path.clone()).collect();
+    let mut acc = Vec::new();
+    collect_files(out, out, &mut acc);
+    let untracked: Vec<String> = acc
+        .into_iter()
+        .filter(|p| p != ".rlvgl-app-manifest.json" && !known.contains(p))
+        .collect();
+    Ok(untracked)
+}
+
+fn collect_files(root: &Path, dir: &Path, acc: &mut Vec<String>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(root, &path, acc);
+        } else if let Ok(rel) = path.strip_prefix(root) {
+            acc.push(rel.to_string_lossy().into_owned());
+        }
+    }
+}
+
+fn read_inventory(out: &Path) -> Result<Inventory> {
+    let path = out.join(".rlvgl-app-manifest.json");
+    let body = std::fs::read_to_string(&path)
+        .map_err(|e| anyhow!("read {}: {e}", path.display()))?;
+    let inv: Inventory = serde_json::from_str(&body)
+        .map_err(|e| anyhow!("parse {}: {e}", path.display()))?;
+    Ok(inv)
+}
+
+/// RAII handle for a single-use staging directory under
+/// `std::env::temp_dir()`. Cleaned up on drop. Lightweight stand-in
+/// for `tempfile::tempdir()` which is dev-only in this workspace.
+struct StagingDir {
+    path: PathBuf,
+}
+
+impl StagingDir {
+    fn new() -> Result<Self> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let pid = std::process::id();
+        let path = std::env::temp_dir().join(format!("rlvgl-app-check-{pid}-{nanos}"));
+        std::fs::create_dir_all(&path)?;
+        Ok(Self { path })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for StagingDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+/// Run `rustfmt` on every .rs file recorded in the inventory under
+/// `<out>`. Returns the count of files rustfmt did NOT successfully
+/// format (best-effort: missing rustfmt, parse errors in stub
+/// templates etc. surface as warnings rather than failures).
+fn run_rustfmt_on_emitted(inv: &Inventory, out: &Path) -> usize {
+    let mut failures = 0;
+    for e in &inv.entries {
+        if !e.path.ends_with(".rs") {
+            continue;
+        }
+        let p = out.join(&e.path);
+        let status = std::process::Command::new("rustfmt")
+            .args(["--edition", "2024", "--quiet"])
+            .arg(&p)
+            .status();
+        match status {
+            Ok(s) if s.success() => {}
+            Ok(s) => {
+                eprintln!("rustfmt: {} exited with {}", p.display(), s);
+                failures += 1;
+            }
+            Err(e) => {
+                eprintln!("rustfmt: failed to invoke for {}: {e}", p.display());
+                failures += 1;
+            }
+        }
+    }
+    failures
 }
 
 // ─── APP-02b: orchestrator emission ──────────────────────────────────

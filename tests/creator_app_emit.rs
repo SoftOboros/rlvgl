@@ -248,3 +248,131 @@ fn inventory_path_is_deterministic_relative_to_out() {
         );
     }
 }
+
+// ─── APP-02d: --check / --force / inventory-driven delete ────────────
+
+#[test]
+fn emit_is_byte_deterministic_for_a_given_manifest() {
+    // Per chapter 02 §9.1: same manifest + same chipdb + same orchestrator
+    // version → byte-identical output. Two runs into separate tempdirs
+    // must produce identical files.
+    let ws = workspace_root();
+    let manifest = ws.join("examples/beaglebone-black/app.yaml");
+
+    let make = || {
+        let m = app::validate(&manifest).unwrap();
+        let manifest_dir = manifest.parent().unwrap().to_path_buf();
+        let ws_root = app::find_workspace_root(&manifest_dir);
+        let tmp = tempfile::tempdir().unwrap();
+        let mut orch =
+            app::Orchestrator::new(m, manifest_dir, ws_root, tmp.path().to_path_buf());
+        let inv = orch.run().unwrap();
+        (tmp, inv)
+    };
+
+    let (a, inv_a) = make();
+    let (b, inv_b) = make();
+    assert_eq!(inv_a.entries.len(), inv_b.entries.len());
+    for (ea, eb) in inv_a.entries.iter().zip(inv_b.entries.iter()) {
+        assert_eq!(ea.path, eb.path, "path order must be deterministic");
+        assert_eq!(
+            ea.hash, eb.hash,
+            "byte-identical emission required for {}",
+            ea.path
+        );
+        let pa = a.path().join(&ea.path);
+        let pb = b.path().join(&eb.path);
+        let bytes_a = std::fs::read(&pa).unwrap();
+        let bytes_b = std::fs::read(&pb).unwrap();
+        assert_eq!(bytes_a, bytes_b, "{} differs between runs", ea.path);
+    }
+}
+
+#[test]
+fn untracked_files_block_emit_without_force() {
+    // Reproduce the §5.2 inventory-vs-untracked rule via direct call:
+    // an inventoried <out> that gains a stranger file must require
+    // --force on the next emit.
+    use std::fs;
+
+    let ws = workspace_root();
+    let manifest = ws.join("examples/beetle-esp32c3/app.yaml");
+    let m_first = app::validate(&manifest).unwrap();
+    let manifest_dir = manifest.parent().unwrap().to_path_buf();
+    let ws_root = app::find_workspace_root(&manifest_dir);
+    let tmp = tempfile::tempdir().unwrap();
+
+    // First emit — populates inventory.
+    let mut orch =
+        app::Orchestrator::new(m_first, manifest_dir.clone(), ws_root.clone(), tmp.path().to_path_buf());
+    let _ = orch.run().unwrap();
+
+    // User drops a stranger file into <out>.
+    fs::write(tmp.path().join("HACKED.rs"), "// not from generator\n").unwrap();
+
+    // Re-running run_from_yaml without --force surfaces the untracked
+    // file. We assert the error message names HACKED.rs and the
+    // user is told about --force.
+    let err = app::run_from_yaml(
+        &manifest,
+        Some(tmp.path()),
+        false, // validate_only
+        false, // check
+        false, // force
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("HACKED.rs"), "got:\n{err}");
+    assert!(err.contains("--force"), "got:\n{err}");
+
+    // With --force, the same call succeeds.
+    app::run_from_yaml(
+        &manifest,
+        Some(tmp.path()),
+        false, // validate_only
+        false, // check
+        true,  // force
+    )
+    .expect("--force allows overwriting");
+}
+
+#[test]
+fn inventory_driven_delete_removes_stale_files() {
+    // Emit BBB Linux first (has assets[]), then re-emit the same manifest
+    // after manually overlaying an extra file with a "previous" inventory
+    // that listed it. The orchestrator should delete it.
+    use std::fs;
+
+    let ws = workspace_root();
+    let manifest = ws.join("examples/beetle-esp32c3/app.yaml");
+    let tmp = tempfile::tempdir().unwrap();
+
+    // Real first emit.
+    app::run_from_yaml(&manifest, Some(tmp.path()), false, false, false)
+        .expect("first emit succeeds");
+
+    // Splice an old-only entry into the inventory and drop a matching file.
+    let inv_path = tmp.path().join(".rlvgl-app-manifest.json");
+    let mut inv: app::Inventory =
+        serde_json::from_str(&fs::read_to_string(&inv_path).unwrap()).unwrap();
+    inv.entries.push(app::InventoryEntry {
+        path: "src/legacy_screen.rs".to_string(),
+        stage: "layout-translator".to_string(),
+        hash: "blake3:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        stub: false,
+    });
+    fs::write(&inv_path, serde_json::to_string_pretty(&inv).unwrap()).unwrap();
+    fs::write(tmp.path().join("src/legacy_screen.rs"), "// legacy\n").unwrap();
+
+    assert!(tmp.path().join("src/legacy_screen.rs").exists());
+
+    // Re-emit. Even without --force (since the file IS in the inventory),
+    // §9.4 says the new emission deletes it.
+    app::run_from_yaml(&manifest, Some(tmp.path()), false, false, false)
+        .expect("second emit succeeds");
+
+    assert!(
+        !tmp.path().join("src/legacy_screen.rs").exists(),
+        "stale inventory entry must be deleted on regeneration"
+    );
+}
