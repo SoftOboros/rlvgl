@@ -764,10 +764,15 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
 /// occluder — geometric primitives (OBB, disc, arc, line) don't fully
 /// cover their AABBs and are never occluders even at full alpha.
 ///
-/// Markers (`Barrier`, `SetClip`) are ignored by the occlusion pass for
-/// v1 — they pass through as no-ops on dispatch. A future revision can
-/// segment the list at markers if cross-marker reordering becomes a
-/// correctness concern.
+/// Markers (`Barrier`, `SetClip`) terminate the occlusion search range
+/// for the cmd preceding them. A `Barrier` declares "all cmds before me
+/// must be visible before any cmd after me" (compositor sync, swap
+/// hold, telemetry boundary); a `SetClip` change means subsequent
+/// "covering" cmds may be rendered under a different clip and so their
+/// AABBs aren't true coverage of an earlier cmd's pixels. Either way,
+/// occlusion analysis must respect the segmentation: when scanning
+/// forward from cmd `i`, stop at the first `Barrier` or `SetClip` and
+/// don't propagate occlusion across it.
 fn submit_with_occlusion<B: Blitter, const N: usize>(
     r: &mut BlitterRenderer<'_, B, N>,
     list: &CommandList,
@@ -779,6 +784,10 @@ fn submit_with_occlusion<B: Blitter, const N: usize>(
         };
         let mut occluded = false;
         for later in list.iter().skip(i + 1) {
+            // Segment terminator: never propagate occlusion across.
+            if matches!(later, Cmd::Barrier | Cmd::SetClip { .. }) {
+                break;
+            }
             if !is_opaque_filler(later) {
                 continue;
             }

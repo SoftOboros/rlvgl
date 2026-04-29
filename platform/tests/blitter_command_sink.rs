@@ -254,6 +254,121 @@ fn partially_covered_cmd_is_not_skipped() {
 }
 
 #[test]
+fn barrier_prevents_cross_barrier_occlusion() {
+    // List A: [OBB, Barrier, opaque_cover_containing_obb_aabb]
+    // List B: [OBB,          opaque_cover_containing_obb_aabb]
+    //
+    // In B, the OBB is fully covered by a later opaque FillRect → the
+    // occlusion pre-pass skips it. In A, the Barrier between them must
+    // terminate the search range, so the OBB *is* dispatched. We
+    // observe this through the dirty-rect planner: each dispatched
+    // draw call adds rects to it, so A produces strictly more rects
+    // than B.
+    let cover_rect = Rect {
+        x: 10,
+        y: 10,
+        width: 60,
+        height: 60,
+    };
+    let cover_color = Color(80, 80, 80, 255);
+    let obb = Obb::axis_aligned(PointF::new(40.0, 40.0), 30.0, 6.0);
+
+    let mut list_with_barrier = CommandList::new();
+    list_with_barrier.push(Cmd::FillObb {
+        obb,
+        color: Color(255, 0, 0, 255),
+        blend: BlendMode::SrcOver,
+    });
+    list_with_barrier.push(Cmd::Barrier);
+    list_with_barrier.push(Cmd::FillRect {
+        rect: cover_rect,
+        color: cover_color,
+        blend: BlendMode::Replace,
+    });
+
+    let mut list_without_barrier = CommandList::new();
+    list_without_barrier.push(Cmd::FillObb {
+        obb,
+        color: Color(255, 0, 0, 255),
+        blend: BlendMode::SrcOver,
+    });
+    list_without_barrier.push(Cmd::FillRect {
+        rect: cover_rect,
+        color: cover_color,
+        blend: BlendMode::Replace,
+    });
+
+    let count_a = planner_rect_count(&list_with_barrier);
+    let count_b = planner_rect_count(&list_without_barrier);
+
+    assert!(
+        count_a > count_b,
+        "Barrier must terminate the occlusion search: with-Barrier should \
+         dispatch the OBB (more planner rects) than without-Barrier where \
+         the OBB is occluded. Got {count_a} vs {count_b}"
+    );
+}
+
+#[test]
+fn setclip_marker_also_terminates_occlusion_search() {
+    // Same shape as the Barrier test but with SetClip as the divider.
+    let cover_rect = Rect {
+        x: 10,
+        y: 10,
+        width: 60,
+        height: 60,
+    };
+    let cover_color = Color(80, 80, 80, 255);
+    let obb = Obb::axis_aligned(PointF::new(40.0, 40.0), 30.0, 6.0);
+
+    let mut list = CommandList::new();
+    list.push(Cmd::FillObb {
+        obb,
+        color: Color(255, 0, 0, 255),
+        blend: BlendMode::SrcOver,
+    });
+    list.push(Cmd::SetClip { rect: None });
+    list.push(Cmd::FillRect {
+        rect: cover_rect,
+        color: cover_color,
+        blend: BlendMode::Replace,
+    });
+
+    let mut list_no_marker = CommandList::new();
+    list_no_marker.push(Cmd::FillObb {
+        obb,
+        color: Color(255, 0, 0, 255),
+        blend: BlendMode::SrcOver,
+    });
+    list_no_marker.push(Cmd::FillRect {
+        rect: cover_rect,
+        color: cover_color,
+        blend: BlendMode::Replace,
+    });
+
+    let count_with_clip = planner_rect_count(&list);
+    let count_no_marker = planner_rect_count(&list_no_marker);
+    assert!(
+        count_with_clip > count_no_marker,
+        "SetClip must terminate occlusion search; got {count_with_clip} vs {count_no_marker}"
+    );
+}
+
+/// Submit `list` to a fresh `BlitterRenderer` and return the count of
+/// rects accumulated by the dirty-rect planner. Each dispatched draw
+/// adds at least one rect, so the count is a proxy for "cmds that
+/// actually executed." Used in the Barrier / SetClip segmentation
+/// tests to observe whether the occlusion pre-pass skipped a cmd.
+fn planner_rect_count(list: &CommandList) -> usize {
+    let mut buf = fresh_argb_buf();
+    let mut blitter = CpuBlitter;
+    let surface = Surface::new(&mut buf, STRIDE, PixelFmt::Argb8888, W, H);
+    let mut r: BlitterRenderer<'_, CpuBlitter, 256> = BlitterRenderer::new(&mut blitter, surface);
+    r.submit(list);
+    r.planner().rects().len()
+}
+
+#[test]
 fn translucent_filler_is_not_an_occluder() {
     // A FillRect with alpha < 255 doesn't fully cover what's under it
     // (it blends), so it must not occlude prior cmds.
