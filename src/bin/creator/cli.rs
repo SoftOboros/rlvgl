@@ -345,6 +345,16 @@ enum AppCommand {
         #[arg(long, default_value_t = 1, value_name = "N")]
         jobs: usize,
     },
+    /// Emit a JSON Schema for the rlvgl-app/v0 `app.yaml` manifest
+    /// per chapter 01 §5. Suitable for editor validation and CI
+    /// lint hooks; does not capture runtime cross-reference rules
+    /// (chipdb board lookup, workspace path safety, etc.) which
+    /// require the full validator.
+    Schema {
+        /// Output file. Defaults to stdout.
+        #[arg(long, value_name = "FILE")]
+        out: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1280,6 +1290,17 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                 jobs,
                 bsp_gen,
             )?,
+            AppCommand::Schema { out } => {
+                let body = app::app_schema_json()?;
+                if let Some(path) = out {
+                    std::fs::write(&path, &body)?;
+                    if !cli.silent {
+                        eprintln!("wrote {}", path.display());
+                    }
+                } else {
+                    println!("{body}");
+                }
+            }
         },
     }
 

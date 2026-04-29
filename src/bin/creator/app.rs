@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow, bail};
+use schemars::JsonSchema;
 use serde::Deserialize;
 
 /// Schema tag this validator accepts. Chapter 01 §5.1 / §6 rule 1.
@@ -68,7 +69,7 @@ fn is_ref_id(s: &str) -> bool {
 }
 
 /// Chapter 01 §5.1 top-level manifest shape.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     pub schema: String,
@@ -86,12 +87,17 @@ pub struct Manifest {
     pub theme: Option<Theme>,
     #[serde(default)]
     pub i18n: Option<I18n>,
+    /// Free-form authoring metadata per chapter 01 §5.9.
+    /// Schema modelled as `Option<serde_json::Value>` since YAML's
+    /// arbitrary mapping doesn't have a stable JsonSchema; runtime
+    /// parser still consumes a `serde_yaml::Mapping`.
     #[serde(default)]
+    #[schemars(with = "Option<serde_json::Value>")]
     pub metadata: Option<serde_yaml::Mapping>,
 }
 
 /// Chapter 01 §5.2.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Target {
     pub vendor: String,
@@ -106,7 +112,7 @@ pub struct Target {
 }
 
 /// Chapter 01 §5.10.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Controller {
     #[serde(rename = "crate")]
@@ -122,7 +128,7 @@ pub struct Controller {
 }
 
 /// Chapter 01 §5.3.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StateMachine {
     pub source: PathBuf,
@@ -143,7 +149,7 @@ fn default_true() -> bool {
 }
 
 /// Chapter 01 §5.4.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Asset {
     pub id: String,
@@ -151,12 +157,16 @@ pub struct Asset {
     pub source: PathBuf,
     #[serde(default)]
     pub palette_ref: Option<String>,
+    /// Free-form per-class options per chapter 01 §5.4.1.
+    /// Schema modelled as `Option<serde_json::Value>`; runtime
+    /// parser consumes a `serde_yaml::Mapping`.
     #[serde(default)]
+    #[schemars(with = "Option<serde_json::Value>")]
     pub options: Option<serde_yaml::Mapping>,
 }
 
 /// Chapter 01 §5.5.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Screen {
     pub id: String,
@@ -169,7 +179,7 @@ pub struct Screen {
 }
 
 /// Chapter 01 §5.7.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Theme {
     pub source: PathBuf,
@@ -177,7 +187,7 @@ pub struct Theme {
 }
 
 /// Chapter 01 §5.8.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct I18n {
     pub bundle_dir: PathBuf,
@@ -296,6 +306,24 @@ const VENDORS: &[&str] = &[
 ];
 
 /// Parse and validate an `app.yaml` manifest.
+/// APP-02i: emit a JSON Schema for the v0 `app.yaml` manifest.
+///
+/// The schema describes the chapter 01 §5 grammar — `schema`,
+/// `name`, `target`, `controller`, `state_machine`, `assets[]`,
+/// `screens[]`, `theme`, `i18n`, `metadata` — and is suitable for
+/// editor validation, CI lint hooks, and any authoring tool that
+/// wants to know the manifest shape without running the validator.
+///
+/// Run-time validation rules (chapter 01 §6: workspace path
+/// safety, chipdb cross-references, hand-written allow-list, etc.)
+/// are NOT expressible in JSON Schema; tools that want full
+/// validation should still invoke `rlvgl-creator app from-yaml
+/// --validate-only`.
+pub fn app_schema_json() -> Result<String> {
+    let schema = schemars::schema_for!(Manifest);
+    Ok(serde_json::to_string_pretty(&schema)?)
+}
+
 ///
 /// Returns the parsed manifest on success. Any validation rule
 /// failure surfaces as an error tagged with the rule number from
