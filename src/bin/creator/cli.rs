@@ -28,6 +28,7 @@ pub mod manifest;
 pub mod new;
 pub mod preview;
 pub mod qt;
+pub mod qt_scjson;
 pub mod raw;
 pub mod run;
 pub mod scaffold;
@@ -335,6 +336,14 @@ enum AppCommand {
         /// when `--out` is non-empty and contains user-owned files.
         #[arg(long, requires = "out")]
         force: bool,
+        /// Parallel sub-generator dispatch per chapter 02 §5.2.
+        /// `1` (default) is sequential; `>1` runs the independent
+        /// stage-3 sub-gens (BSP-gen, asset-pipeline, SM-gen,
+        /// i18n, theme) concurrently via `std::thread::scope`.
+        /// Output is byte-deterministic regardless of N
+        /// (chapter 02 §9.1).
+        #[arg(long, default_value_t = 1, value_name = "N")]
+        jobs: usize,
     },
 }
 
@@ -1261,12 +1270,14 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                 validate_only,
                 check,
                 force,
+                jobs,
             } => app::run_from_yaml(
                 &manifest,
                 out.as_deref(),
                 validate_only,
                 check,
                 force,
+                jobs,
                 bsp_gen,
             )?,
         },

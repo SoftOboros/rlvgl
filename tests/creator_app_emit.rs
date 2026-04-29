@@ -394,6 +394,7 @@ fn untracked_files_block_emit_without_force() {
         false, // validate_only
         false, // check
         false, // force
+        1,     // jobs
         bsp_gen_unreachable,
     )
     .unwrap_err()
@@ -408,6 +409,7 @@ fn untracked_files_block_emit_without_force() {
         false, // validate_only
         false, // check
         true,  // force
+        1,     // jobs
         bsp_gen_unreachable,
     )
     .expect("--force allows overwriting");
@@ -431,6 +433,7 @@ fn inventory_driven_delete_removes_stale_files() {
         false,
         false,
         false,
+        1,
         bsp_gen_unreachable,
     )
     .expect("first emit succeeds");
@@ -458,6 +461,7 @@ fn inventory_driven_delete_removes_stale_files() {
         false,
         false,
         false,
+        1,
         bsp_gen_unreachable,
     )
     .expect("second emit succeeds");
