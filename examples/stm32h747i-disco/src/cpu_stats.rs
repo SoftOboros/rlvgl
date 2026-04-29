@@ -432,7 +432,9 @@ impl CpuStats {
 #[inline]
 #[allow(dead_code)]
 pub fn read_cyccnt() -> u32 {
-    unsafe { (DWT_CYCCNT as *const u32).read_volatile() }
+    unsafe {
+        d3_read(DWT_CYCCNT) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    }
 }
 
 /// Publish a clock-widget telemetry frame to the D3 SRAM slots claimed by
@@ -449,21 +451,21 @@ pub fn publish_clock_telem(
     plan_cycles: u32,
     draw_cycles: u32,
 ) {
-    static mut DRAW_MAX: u32 = 0;
-    // Safety: single-writer (called from CM7 main thread only).
-    let prev_max = unsafe { DRAW_MAX };
+    use core::sync::atomic::{AtomicU32, Ordering};
+    static DRAW_MAX: AtomicU32 = AtomicU32::new(0);
+    let prev_max = DRAW_MAX.load(Ordering::Relaxed);
     let new_max = if draw_cycles > prev_max {
-        unsafe { DRAW_MAX = draw_cycles };
+        DRAW_MAX.store(draw_cycles, Ordering::Relaxed);
         draw_cycles
     } else {
         prev_max
     };
     let outcome_word = (outcome_code as u32) | ((layers_painted as u32) << 8);
     unsafe {
-        (D3_CLOCK_DIRTY_PX as *mut u32).write_volatile(dirty_px);
-        (D3_CLOCK_PLAN_CYCLES as *mut u32).write_volatile(plan_cycles);
-        (D3_CLOCK_DRAW_CYCLES as *mut u32).write_volatile(draw_cycles);
-        (D3_CLOCK_OUTCOME as *mut u32).write_volatile(outcome_word);
-        (D3_CLOCK_DRAW_MAX as *mut u32).write_volatile(new_max);
+        d3_write(D3_CLOCK_DIRTY_PX, dirty_px); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_PLAN_CYCLES, plan_cycles); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_DRAW_CYCLES, draw_cycles); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_OUTCOME, outcome_word); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_DRAW_MAX, new_max); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }
