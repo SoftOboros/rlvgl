@@ -354,6 +354,263 @@ fn setclip_marker_also_terminates_occlusion_search() {
     );
 }
 
+#[test]
+fn adjacent_fillrects_horizontal_coalesce() {
+    let mut list = CommandList::new();
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 0,
+            y: 5,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 10,
+            y: 5,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::Replace,
+    });
+    let count = planner_rect_count(&list);
+    assert_eq!(
+        count, 1,
+        "two horizontally edge-adjacent same-color FillRects should coalesce into 1 dispatch"
+    );
+}
+
+#[test]
+fn adjacent_fillrects_vertical_coalesce() {
+    let mut list = CommandList::new();
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 5,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(50, 50, 200, 255),
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 5,
+            y: 10,
+            width: 10,
+            height: 10,
+        },
+        color: Color(50, 50, 200, 255),
+        blend: BlendMode::Replace,
+    });
+    let count = planner_rect_count(&list);
+    assert_eq!(
+        count, 1,
+        "two vertically edge-adjacent same-color FillRects should coalesce"
+    );
+}
+
+#[test]
+fn nonadjacent_fillrects_do_not_coalesce() {
+    let mut list = CommandList::new();
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 30,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::Replace,
+    });
+    let count = planner_rect_count(&list);
+    assert_eq!(count, 2, "rects with a gap must not be merged");
+}
+
+#[test]
+fn different_colors_do_not_coalesce() {
+    let mut list = CommandList::new();
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 10,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(200, 200, 200, 255),
+        blend: BlendMode::Replace,
+    });
+    let count = planner_rect_count(&list);
+    assert_eq!(count, 2, "different colors must not be merged");
+}
+
+#[test]
+fn different_blends_do_not_coalesce() {
+    let mut list = CommandList::new();
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 10,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+        color: Color(100, 100, 100, 255),
+        blend: BlendMode::SrcOver,
+    });
+    let count = planner_rect_count(&list);
+    assert_eq!(count, 2, "different blend modes must not be merged");
+}
+
+#[test]
+fn coalesced_render_is_pixel_identical_to_separate() {
+    // Coalescing must never change output. Render a 4-rect strip via
+    // separate cmds and via a single pre-merged cmd, compare buffers.
+    let row_y = 20i32;
+    let row_h = 10i32;
+    let cell_w = 10i32;
+    let color = Color(150, 150, 50, 255);
+
+    let mut list_separate = CommandList::new();
+    for i in 0..4 {
+        list_separate.push(Cmd::FillRect {
+            rect: Rect {
+                x: 5 + i * cell_w,
+                y: row_y,
+                width: cell_w,
+                height: row_h,
+            },
+            color,
+            blend: BlendMode::Replace,
+        });
+    }
+
+    let mut list_premerged = CommandList::new();
+    list_premerged.push(Cmd::FillRect {
+        rect: Rect {
+            x: 5,
+            y: row_y,
+            width: cell_w * 4,
+            height: row_h,
+        },
+        color,
+        blend: BlendMode::Replace,
+    });
+
+    let mut buf_a = fresh_argb_buf();
+    let mut buf_b = fresh_argb_buf();
+    render_via_command_list(&mut buf_a, &list_separate);
+    render_via_command_list(&mut buf_b, &list_premerged);
+
+    let mut diffs = 0u32;
+    for i in 0..buf_a.len() {
+        if buf_a[i] != buf_b[i] {
+            diffs += 1;
+        }
+    }
+    assert_eq!(
+        diffs, 0,
+        "coalesced render must be pixel-identical to pre-merged render"
+    );
+}
+
+#[test]
+fn occlusion_does_not_break_coalescing_runs() {
+    // List:
+    //   fill_a  (0, 5, 10, 10)        — cell 1
+    //   obb     (50, 50, len=4, w=2)  — small OBB, fully covered later
+    //   fill_b  (10, 5, 10, 10)       — cell 2, edge-adjacent to fill_a
+    //   cover   (45, 45, 20, 20)      — opaque, contains OBB AABB
+    //
+    // After occlusion: OBB is skipped (cover at idx 3 covers its AABB).
+    // Pending preservation across the skipped cmd lets fill_a and fill_b
+    // coalesce into a single 20×10 rect even with the OBB sitting between
+    // them in the original list. Cover dispatches separately (not edge-
+    // adjacent to the merged row). Total: 2 planner rects.
+    //
+    // This is the "skip-doesn't-break-coalescing" invariant — it's why
+    // occluded cmds don't flush pending in the inner loop.
+    let row_color = Color(220, 30, 30, 255);
+    let obb = Obb::axis_aligned(PointF::new(50.0, 50.0), 4.0, 2.0);
+
+    let mut list = CommandList::new();
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 0,
+            y: 5,
+            width: 10,
+            height: 10,
+        },
+        color: row_color,
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillObb {
+        obb,
+        color: Color(0, 0, 0, 255),
+        blend: BlendMode::SrcOver,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 10,
+            y: 5,
+            width: 10,
+            height: 10,
+        },
+        color: row_color,
+        blend: BlendMode::Replace,
+    });
+    list.push(Cmd::FillRect {
+        rect: Rect {
+            x: 45,
+            y: 45,
+            width: 20,
+            height: 20,
+        },
+        color: row_color,
+        blend: BlendMode::Replace,
+    });
+
+    let count = planner_rect_count(&list);
+    assert_eq!(
+        count, 2,
+        "occlusion-skipped OBB must not break the fill_a + fill_b coalescing; \
+         expected merged-row + cover = 2 dispatches, got {count}"
+    );
+}
+
 /// Submit `list` to a fresh `BlitterRenderer` and return the count of
 /// rects accumulated by the dirty-rect planner. Each dispatched draw
 /// adds at least one rect, so the count is a proxy for "cmds that

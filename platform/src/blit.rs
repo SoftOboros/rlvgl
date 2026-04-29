@@ -20,7 +20,7 @@ use alloc::vec::Vec;
 use alloc::{collections::BTreeMap, vec};
 use bitflags::bitflags;
 use heapless::Vec as HVec;
-use rlvgl_core::cmd::{Cmd, CommandList};
+use rlvgl_core::cmd::{BlendMode, Cmd, CommandList};
 #[cfg(feature = "fontdue")]
 use rlvgl_core::fontdue::{Metrics, line_metrics, rasterize_glyph};
 use rlvgl_core::renderer::Renderer;
@@ -764,43 +764,138 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
 /// occluder — geometric primitives (OBB, disc, arc, line) don't fully
 /// cover their AABBs and are never occluders even at full alpha.
 ///
-/// Markers (`Barrier`, `SetClip`) terminate the occlusion search range
-/// for the cmd preceding them. A `Barrier` declares "all cmds before me
-/// must be visible before any cmd after me" (compositor sync, swap
-/// hold, telemetry boundary); a `SetClip` change means subsequent
-/// "covering" cmds may be rendered under a different clip and so their
-/// AABBs aren't true coverage of an earlier cmd's pixels. Either way,
-/// occlusion analysis must respect the segmentation: when scanning
-/// forward from cmd `i`, stop at the first `Barrier` or `SetClip` and
-/// don't propagate occlusion across it.
+/// Two-pass dispatch:
+///
+/// 1. **Occlusion pre-pass.** For each cmd, scan forward looking for a
+///    later opaque [`Cmd::FillRect`] whose AABB fully covers it; if
+///    found, drop the cmd. Markers (`Barrier`, `SetClip`) terminate
+///    the search range — a `Barrier` declares ordering that must be
+///    preserved (compositor sync, swap hold), and a `SetClip` change
+///    means later cmds render under a different clip and can't be
+///    trusted as occluders of earlier pixels.
+///
+/// 2. **Adjacent-FillRect coalescing.** Survivor cmds are dispatched
+///    one at a time, but consecutive [`Cmd::FillRect`]s with identical
+///    `color` + `blend` and edge-adjacent rectangles are merged into a
+///    single wider FillRect. Cuts down on the number of DMA2D fill
+///    ops and reduces dirty-rect tracking pressure when widgets
+///    happen to emit sequential strips of the same fill (toolbars,
+///    background bands, table cells).
+///
+/// The coalescing is conservative — only horizontal or vertical edge
+/// adjacency is detected (no L-shapes, no overlap-into-union). For
+/// the common case of a row of cells fixed-width and same-color, this
+/// reduces N rects to 1.
 fn submit_with_occlusion<B: Blitter, const N: usize>(
     r: &mut BlitterRenderer<'_, B, N>,
     list: &CommandList,
 ) {
+    let mut pending: Option<(WidgetRect, Color, BlendMode)> = None;
+
     for (i, cmd) in list.iter().enumerate() {
-        let Some(bb_i) = cmd.aabb() else {
-            cmd.dispatch_to(r);
-            continue;
+        // Occlusion pre-pass.
+        let occluded = match cmd.aabb() {
+            None => false,
+            Some(bb_i) => {
+                let mut hit = false;
+                for later in list.iter().skip(i + 1) {
+                    if matches!(later, Cmd::Barrier | Cmd::SetClip { .. }) {
+                        break;
+                    }
+                    if !is_opaque_filler(later) {
+                        continue;
+                    }
+                    let Some(bb_j) = later.aabb() else { continue };
+                    if rect_contains(bb_j, bb_i) {
+                        hit = true;
+                        break;
+                    }
+                }
+                hit
+            }
         };
-        let mut occluded = false;
-        for later in list.iter().skip(i + 1) {
-            // Segment terminator: never propagate occlusion across.
-            if matches!(later, Cmd::Barrier | Cmd::SetClip { .. }) {
-                break;
-            }
-            if !is_opaque_filler(later) {
-                continue;
-            }
-            let Some(bb_j) = later.aabb() else { continue };
-            if rect_contains(bb_j, bb_i) {
-                occluded = true;
-                break;
-            }
+        if occluded {
+            // Skip the cmd entirely. Don't flush pending — the next cmd
+            // may still coalesce with what's pending across this gap.
+            continue;
         }
-        if !occluded {
+
+        // Coalescing dispatch.
+        if let Cmd::FillRect { rect, color, blend } = cmd {
+            if let Some((prect, pcolor, pblend)) = pending.as_ref() {
+                if pcolor == color
+                    && pblend == blend
+                    && let Some(merged) = merge_rects_axis_aligned(*prect, *rect)
+                {
+                    pending = Some((merged, *color, *blend));
+                    continue;
+                }
+                // Can't merge — flush pending and start a new pending.
+                flush_pending(r, pending.take());
+            }
+            pending = Some((*rect, *color, *blend));
+        } else {
+            // Markers and non-FillRect cmds break the coalescing run.
+            flush_pending(r, pending.take());
             cmd.dispatch_to(r);
         }
     }
+    flush_pending(r, pending.take());
+}
+
+#[inline]
+fn flush_pending<B: Blitter, const N: usize>(
+    r: &mut BlitterRenderer<'_, B, N>,
+    pending: Option<(WidgetRect, Color, BlendMode)>,
+) {
+    if let Some((rect, color, blend)) = pending {
+        Cmd::FillRect { rect, color, blend }.dispatch_to(r);
+    }
+}
+
+/// Try to merge two rectangles into a single rectangle representing
+/// their union. Returns `Some(union)` only when one of the four
+/// edge-adjacent cases applies; returns `None` for overlap, gap, or
+/// L-shapes (which would require a multi-rect representation).
+#[inline]
+fn merge_rects_axis_aligned(a: WidgetRect, b: WidgetRect) -> Option<WidgetRect> {
+    if a.y == b.y && a.height == b.height {
+        if a.x + a.width == b.x {
+            return Some(WidgetRect {
+                x: a.x,
+                y: a.y,
+                width: a.width + b.width,
+                height: a.height,
+            });
+        }
+        if b.x + b.width == a.x {
+            return Some(WidgetRect {
+                x: b.x,
+                y: b.y,
+                width: a.width + b.width,
+                height: a.height,
+            });
+        }
+    }
+    if a.x == b.x && a.width == b.width {
+        if a.y + a.height == b.y {
+            return Some(WidgetRect {
+                x: a.x,
+                y: a.y,
+                width: a.width,
+                height: a.height + b.height,
+            });
+        }
+        if b.y + b.height == a.y {
+            return Some(WidgetRect {
+                x: b.x,
+                y: b.y,
+                width: a.width,
+                height: a.height + b.height,
+            });
+        }
+    }
+    None
 }
 
 #[inline]
