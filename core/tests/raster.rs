@@ -12,7 +12,9 @@
 //! to the nearest OBB edge is `d` should produce coverage
 //! `clamp(d + 0.5, 0, 1) * 255`.
 
-use rlvgl_core::raster::{BufferSink, Obb, PointF, rasterize_disc, rasterize_line, rasterize_obb};
+use rlvgl_core::raster::{
+    BufferSink, Obb, PointF, rasterize_arc, rasterize_disc, rasterize_line, rasterize_obb,
+};
 use rlvgl_core::widget::Rect;
 
 /// Capture an OBB rasterization into a flat buffer sized to the AABB.
@@ -427,6 +429,324 @@ fn disc_is_radially_symmetric() {
             assert_eq!(q1, q4, "diagonal mirror dx={dx} dy={dy}");
         }
     }
+}
+
+#[test]
+fn arc_full_circle_matches_disc() {
+    // |extent| ≥ TAU bypasses angular filter — pie slice with r_inner=0
+    // and full extent must equal a disc.
+    let canvas_w = 80usize;
+    let canvas_h = 80usize;
+    let center = PointF::new(40.5, 40.5);
+    let radius = 15.0_f32;
+
+    let mut buf_disc = vec![0u8; canvas_w * canvas_h];
+    let mut buf_arc = vec![0u8; canvas_w * canvas_h];
+    let clip = Rect {
+        x: 0,
+        y: 0,
+        width: canvas_w as i32,
+        height: canvas_h as i32,
+    };
+    {
+        let mut s = BufferSink {
+            buf: &mut buf_disc,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        rasterize_disc(center, radius, clip, &mut s);
+    }
+    {
+        let mut s = BufferSink {
+            buf: &mut buf_arc,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        // Full circle: any start ray, extent = TAU. Use start = +x.
+        rasterize_arc(
+            center,
+            radius,
+            0.0, // r_inner
+            1.0,
+            0.0, // start ray = +x
+            1.0,
+            0.0, // end ray (irrelevant, full circle)
+            core::f32::consts::TAU,
+            clip,
+            &mut s,
+        );
+    }
+    // Full-circle pie should be ~identical to disc (small AA edge
+    // differences from the redundant angular path are tolerated).
+    let mut max_diff = 0i32;
+    for i in 0..buf_disc.len() {
+        let d = (buf_disc[i] as i32 - buf_arc[i] as i32).abs();
+        if d > max_diff {
+            max_diff = d;
+        }
+    }
+    assert!(
+        max_diff <= 2,
+        "full-circle arc and disc should match within 2 LSB; max diff {max_diff}"
+    );
+}
+
+#[test]
+fn arc_quadrant_fills_only_quadrant() {
+    // 90° CCW arc from +x to +y: first quadrant of an annulus.
+    let canvas_w = 80usize;
+    let canvas_h = 80usize;
+    let cx = 40.0_f32;
+    let cy = 40.0_f32;
+    let mut buf = vec![0u8; canvas_w * canvas_h];
+    let clip = Rect {
+        x: 0,
+        y: 0,
+        width: canvas_w as i32,
+        height: canvas_h as i32,
+    };
+    {
+        let mut s = BufferSink {
+            buf: &mut buf,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        rasterize_arc(
+            PointF::new(cx, cy),
+            15.0,
+            0.0,
+            1.0,
+            0.0, // start = +x
+            0.0,
+            1.0, // end = +y
+            core::f32::consts::FRAC_PI_2,
+            clip,
+            &mut s,
+        );
+    }
+    // Pixel at (cx + 5, cy + 5) is in the +x +y quadrant — should be
+    // saturated.
+    let in_quadrant = buf[(cy as usize + 5) * canvas_w + (cx as usize + 5)];
+    assert_eq!(in_quadrant, 255, "in-quadrant pixel should be saturated");
+    // Pixel at (cx - 5, cy + 5) is in the -x +y quadrant — should be 0.
+    let out_quadrant1 = buf[(cy as usize + 5) * canvas_w + (cx as usize - 5)];
+    assert_eq!(
+        out_quadrant1, 0,
+        "out-of-quadrant pixel (-x +y) should be zero"
+    );
+    // Pixel at (cx + 5, cy - 5) is in +x -y → outside.
+    let out_quadrant2 = buf[(cy as usize - 5) * canvas_w + (cx as usize + 5)];
+    assert_eq!(
+        out_quadrant2, 0,
+        "out-of-quadrant pixel (+x -y) should be zero"
+    );
+    // Pixel at (cx - 5, cy - 5) is in -x -y → outside.
+    let out_quadrant3 = buf[(cy as usize - 5) * canvas_w + (cx as usize - 5)];
+    assert_eq!(
+        out_quadrant3, 0,
+        "out-of-quadrant pixel (-x -y) should be zero"
+    );
+}
+
+#[test]
+fn arc_major_uses_union_of_half_planes() {
+    // 270° arc (3/4 of a circle, |extent| > π): fills three quadrants,
+    // skips one. Test that the OPPOSITE quadrant from the boundary rays
+    // is filled (only the small wedge between them is empty).
+    let canvas_w = 80usize;
+    let canvas_h = 80usize;
+    let cx = 40.0_f32;
+    let cy = 40.0_f32;
+    let mut buf = vec![0u8; canvas_w * canvas_h];
+    let clip = Rect {
+        x: 0,
+        y: 0,
+        width: canvas_w as i32,
+        height: canvas_h as i32,
+    };
+    {
+        let mut s = BufferSink {
+            buf: &mut buf,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        // Start = +x, end = +y, but extent = 3π/2 (CCW 270°). The empty
+        // wedge is the +x +y quadrant.
+        rasterize_arc(
+            PointF::new(cx, cy),
+            15.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            3.0 * core::f32::consts::FRAC_PI_2,
+            clip,
+            &mut s,
+        );
+    }
+    // For start=(1,0), end=(0,1), |extent|>π: union of half-planes
+    // {cross(start, p) ≥ 0} ∪ {cross(p, end) ≥ 0}. The empty wedge is
+    // where BOTH cross-products are negative — that's the -x -y quadrant
+    // (upper-left in screen coords with y-down).
+    let upper_left = buf[(cy as usize - 5) * canvas_w + (cx as usize - 5)];
+    assert_eq!(upper_left, 0, "empty wedge should not be filled");
+    // The other three quadrants are filled by the union.
+    let lower_right = buf[(cy as usize + 5) * canvas_w + (cx as usize + 5)];
+    assert_eq!(lower_right, 255, "filled quadrant should be saturated");
+    let upper_right = buf[(cy as usize - 5) * canvas_w + (cx as usize + 5)];
+    assert_eq!(upper_right, 255, "filled quadrant should be saturated");
+    let lower_left = buf[(cy as usize + 5) * canvas_w + (cx as usize - 5)];
+    assert_eq!(lower_left, 255, "filled quadrant should be saturated");
+}
+
+#[test]
+fn arc_inner_radius_creates_ring_segment() {
+    // Annulus with r_inner=8, r_outer=15, full circle: pixels with
+    // distance < 7 should be 0; pixels with distance ~11.5 should be
+    // saturated; pixels with distance > 16 should be 0.
+    let canvas_w = 60usize;
+    let canvas_h = 60usize;
+    let cx = 30.0_f32;
+    let cy = 30.0_f32;
+    let mut buf = vec![0u8; canvas_w * canvas_h];
+    let clip = Rect {
+        x: 0,
+        y: 0,
+        width: canvas_w as i32,
+        height: canvas_h as i32,
+    };
+    {
+        let mut s = BufferSink {
+            buf: &mut buf,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        rasterize_arc(
+            PointF::new(cx, cy),
+            15.0,
+            8.0,
+            1.0,
+            0.0,
+            1.0,
+            0.0,
+            core::f32::consts::TAU,
+            clip,
+            &mut s,
+        );
+    }
+    // Center pixel (distance 0): outside inner radius.
+    assert_eq!(
+        buf[cy as usize * canvas_w + cx as usize],
+        0,
+        "center should be empty (inside hole)"
+    );
+    // Pixel at (cx + 11, cy + 1): distance ~11.05, well within ring.
+    assert_eq!(
+        buf[(cy as usize + 1) * canvas_w + (cx as usize + 11)],
+        255,
+        "mid-ring pixel should be saturated"
+    );
+    // Pixel at (cx + 18, cy): distance 18, outside outer radius.
+    assert_eq!(
+        buf[cy as usize * canvas_w + (cx as usize + 18)],
+        0,
+        "beyond outer should be empty"
+    );
+}
+
+#[test]
+fn arc_signed_extent_swaps_direction() {
+    // CW vs CCW arc with the same boundary rays should fill complementary
+    // regions. With start=+x, end=+y, +π/2 fills first quadrant; -3π/2
+    // fills the other three (CW from +x going through -y, -x, ending at
+    // +y).
+    let canvas_w = 80usize;
+    let canvas_h = 80usize;
+    let cx = 40.0_f32;
+    let cy = 40.0_f32;
+    let clip = Rect {
+        x: 0,
+        y: 0,
+        width: canvas_w as i32,
+        height: canvas_h as i32,
+    };
+    let mut buf_pos = vec![0u8; canvas_w * canvas_h];
+    let mut buf_neg = vec![0u8; canvas_w * canvas_h];
+    {
+        let mut s = BufferSink {
+            buf: &mut buf_pos,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        rasterize_arc(
+            PointF::new(cx, cy),
+            15.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            core::f32::consts::FRAC_PI_2,
+            clip,
+            &mut s,
+        );
+    }
+    {
+        let mut s = BufferSink {
+            buf: &mut buf_neg,
+            stride: canvas_w,
+            origin: (0, 0),
+        };
+        rasterize_arc(
+            PointF::new(cx, cy),
+            15.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            -3.0 * core::f32::consts::FRAC_PI_2,
+            clip,
+            &mut s,
+        );
+    }
+    // The +x +y quadrant should be filled in pos, empty in neg.
+    let p1 = buf_pos[(cy as usize + 5) * canvas_w + (cx as usize + 5)];
+    let n1 = buf_neg[(cy as usize + 5) * canvas_w + (cx as usize + 5)];
+    assert_eq!(p1, 255);
+    assert_eq!(n1, 0);
+    // The -x -y quadrant should be empty in pos, filled in neg.
+    let p2 = buf_pos[(cy as usize - 5) * canvas_w + (cx as usize - 5)];
+    let n2 = buf_neg[(cy as usize - 5) * canvas_w + (cx as usize - 5)];
+    assert_eq!(p2, 0);
+    assert_eq!(n2, 255);
+}
+
+#[test]
+fn arc_zero_outer_radius_is_safe() {
+    let mut calls = 0u32;
+    let mut sink = rlvgl_core::raster::FnSink(|_x, _y, _c: &[u8]| {
+        calls += 1;
+    });
+    rasterize_arc(
+        PointF::new(20.0, 20.0),
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        core::f32::consts::TAU,
+        Rect {
+            x: 0,
+            y: 0,
+            width: 50,
+            height: 50,
+        },
+        &mut sink,
+    );
+    assert_eq!(calls, 0);
 }
 
 #[test]

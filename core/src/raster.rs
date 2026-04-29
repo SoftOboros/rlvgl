@@ -225,6 +225,217 @@ pub fn rasterize_obb(obb: &Obb, clip: Rect, sink: &mut dyn CoverageSink) {
     }
 }
 
+/// Rasterize an annular arc (pie slice with optional inner radius) into
+/// per-row anti-aliased coverage.
+///
+/// The angular extent is defined by two pre-computed boundary rays
+/// `(start_cos, start_sin)` and `(end_cos, end_sin)`, each a unit vector
+/// from the center. The `extent` parameter carries the *signed* angular
+/// magnitude in radians:
+///
+/// - `extent > 0`: arc fills CCW from start ray to end ray.
+/// - `extent < 0`: arc fills CW from start ray to end ray (i.e. CCW from
+///   end to start).
+/// - `|extent| ≥ TAU`: full annulus, angular filter is bypassed.
+///
+/// The sign and magnitude together resolve the "short way vs long way"
+/// ambiguity: arcs of magnitude `> π` use the *union* of the two
+/// half-planes defined by the boundary rays; arcs `≤ π` use the
+/// intersection. Anti-aliasing on the boundary rays uses 1-pixel
+/// signed-distance ramps; radial AA uses the same Heron sqrt path as
+/// [`rasterize_disc`], confined to the 1-pixel band at each radius.
+///
+/// Setting `r_inner = 0.0` produces a pie slice (no inner cut-out).
+/// Setting `r_inner > 0.0` produces a ring segment.
+///
+/// `clip` bounds output to its intersection with the arc's AABB.
+#[allow(clippy::too_many_arguments)]
+pub fn rasterize_arc(
+    center: PointF,
+    r_outer: f32,
+    r_inner: f32,
+    start_cos: f32,
+    start_sin: f32,
+    end_cos: f32,
+    end_sin: f32,
+    extent: f32,
+    clip: Rect,
+    sink: &mut dyn CoverageSink,
+) {
+    if r_outer <= 0.0 || r_outer <= r_inner {
+        return;
+    }
+
+    // AABB of the bounding annulus, padded for AA.
+    let r_pad = r_outer + 1.0;
+    let x0 = floor_f32(center.x - r_pad) as i32;
+    let y0 = floor_f32(center.y - r_pad) as i32;
+    let x1 = ceil_f32(center.x + r_pad) as i32;
+    let y1 = ceil_f32(center.y + r_pad) as i32;
+    let x0 = x0.max(clip.x);
+    let y0 = y0.max(clip.y);
+    let x1 = x1.min(clip.x + clip.width);
+    let y1 = y1.min(clip.y + clip.height);
+    if x1 <= x0 || y1 <= y0 {
+        return;
+    }
+
+    let r_outer_inner = if r_outer > 1.0 { r_outer - 1.0 } else { 0.0 };
+    let r_outer_inner2 = r_outer_inner * r_outer_inner;
+    let r_outer_outer = r_outer + 1.0;
+    let r_outer_outer2 = r_outer_outer * r_outer_outer;
+    let has_inner = r_inner > 0.0;
+    let r_inner_inner = if r_inner > 1.0 { r_inner - 1.0 } else { 0.0 };
+    let r_inner_inner2 = r_inner_inner * r_inner_inner;
+    let r_inner_outer = r_inner + 1.0;
+    let r_inner_outer2 = r_inner_outer * r_inner_outer;
+
+    const TAU: f32 = core::f32::consts::TAU;
+    const PI: f32 = core::f32::consts::PI;
+    let abs_ext = if extent < 0.0 { -extent } else { extent };
+    let full_circle = abs_ext >= TAU - 1e-3;
+    let major_arc = abs_ext > PI;
+    // For CW arcs (extent < 0), swap the roles of start/end so the kernel
+    // can treat all cases as "inside iff after start AND before end" (CCW
+    // sense). `cross(a, b) = a.x * b.y - a.y * b.x`.
+    let (sc, ss, ec, es) = if extent < 0.0 {
+        (end_cos, end_sin, start_cos, start_sin)
+    } else {
+        (start_cos, start_sin, end_cos, end_sin)
+    };
+
+    let mut span = [0u8; SPAN_BUF];
+
+    for y in y0..y1 {
+        let py = y as f32 + 0.5;
+        let dy = py - center.y;
+        let dy2 = dy * dy;
+        let mut span_x = 0i32;
+        let mut span_len: usize = 0;
+        let mut entered = false;
+
+        for x in x0..x1 {
+            let px = x as f32 + 0.5;
+            let dx = px - center.x;
+            let dist2 = dx * dx + dy2;
+
+            // Radial coverage: outer-edge ramp ∧ inner-edge ramp.
+            let radial: u8 = if dist2 >= r_outer_outer2 {
+                0
+            } else if dist2 <= r_outer_inner2 {
+                if !has_inner || dist2 >= r_inner_outer2 {
+                    255
+                } else if dist2 <= r_inner_inner2 {
+                    0
+                } else {
+                    // Inside outer body but in inner-edge AA band.
+                    let mut yh = r_inner;
+                    yh = 0.5 * (yh + dist2 / yh);
+                    yh = 0.5 * (yh + dist2 / yh);
+                    let d = yh - r_inner;
+                    let cov_f = d + 0.5;
+                    coverage_u8(cov_f)
+                }
+            } else {
+                // In outer-edge AA band.
+                let mut yh = r_outer;
+                yh = 0.5 * (yh + dist2 / yh);
+                yh = 0.5 * (yh + dist2 / yh);
+                let d = r_outer - yh;
+                let cov_f = d + 0.5;
+                let outer_cov = coverage_u8(cov_f);
+                if !has_inner || dist2 >= r_inner_outer2 {
+                    outer_cov
+                } else if dist2 <= r_inner_inner2 {
+                    0
+                } else {
+                    // Both bands active (very small annulus).
+                    let mut yh = r_inner;
+                    yh = 0.5 * (yh + dist2 / yh);
+                    yh = 0.5 * (yh + dist2 / yh);
+                    let d = yh - r_inner;
+                    let inner_cov = coverage_u8(d + 0.5);
+                    if outer_cov < inner_cov {
+                        outer_cov
+                    } else {
+                        inner_cov
+                    }
+                }
+            };
+
+            // Angular coverage: signed distance to start/end rays.
+            // cross(a, b) = a.x * b.y - a.y * b.x. Sign convention:
+            // cross > 0 means b is CCW of a.
+            let angular: u8 = if full_circle {
+                255
+            } else {
+                // Signed distances (perpendicular, since rays are unit).
+                // d_after_start > 0 when p is CCW of start ray.
+                let d_after_start = sc * dy - ss * dx;
+                // d_before_end > 0 when p is CW of end ray (i.e. before).
+                let d_before_end = -(ec * dy - es * dx);
+                let cov_start = coverage_u8(d_after_start + 0.5);
+                let cov_end = coverage_u8(d_before_end + 0.5);
+                if major_arc {
+                    // |extent| > π: union of half-planes (max of coverages).
+                    if cov_start > cov_end {
+                        cov_start
+                    } else {
+                        cov_end
+                    }
+                } else {
+                    // |extent| ≤ π: intersection (min).
+                    if cov_start < cov_end {
+                        cov_start
+                    } else {
+                        cov_end
+                    }
+                }
+            };
+
+            let cov = if radial < angular { radial } else { angular };
+
+            if cov > 0 {
+                if !entered {
+                    span_x = x;
+                    entered = true;
+                }
+                if span_len < SPAN_BUF {
+                    span[span_len] = cov;
+                    span_len += 1;
+                } else {
+                    sink.row(span_x, y, &span[..span_len]);
+                    span_x = x;
+                    span[0] = cov;
+                    span_len = 1;
+                }
+            } else if entered && span_len > 0 {
+                // Note: arcs are NOT necessarily convex per row (a thin
+                // ring at 45° produces two disjoint spans on some rows).
+                // Flush the current span and continue scanning.
+                sink.row(span_x, y, &span[..span_len]);
+                span_len = 0;
+                entered = false;
+            }
+        }
+
+        if span_len > 0 {
+            sink.row(span_x, y, &span[..span_len]);
+        }
+    }
+}
+
+#[inline]
+fn coverage_u8(cov_f: f32) -> u8 {
+    if cov_f <= 0.0 {
+        0
+    } else if cov_f >= 1.0 {
+        255
+    } else {
+        (cov_f * 255.0 + 0.5) as u8
+    }
+}
+
 /// Rasterize a stroked line of `width` pixels into per-row anti-aliased
 /// coverage. Internally constructs the [`Obb`] enclosing the segment with
 /// major axis along `b - a`, length `|b - a|`, and dispatches to

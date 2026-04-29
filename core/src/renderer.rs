@@ -142,6 +142,42 @@ pub trait Renderer {
         let mut sink = RowBlendSink { r: self, color };
         raster::rasterize_line(a, b, width, clip, &mut sink);
     }
+
+    /// Fill an annular arc / pie slice with anti-aliased coverage.
+    /// See [`raster::rasterize_arc`] for the angle convention; in short,
+    /// `(start_cos, start_sin)` and `(end_cos, end_sin)` are pre-computed
+    /// boundary-ray unit vectors and `extent` is the *signed* angular
+    /// magnitude. `r_inner = 0.0` produces a pie slice; `r_inner > 0.0`
+    /// produces a ring segment.
+    ///
+    /// Default impl routes through [`raster::rasterize_arc`] +
+    /// [`blend_row`](Self::blend_row).
+    #[allow(clippy::too_many_arguments)]
+    fn fill_arc_aa(
+        &mut self,
+        center: crate::raster::PointF,
+        r_outer: f32,
+        r_inner: f32,
+        start_cos: f32,
+        start_sin: f32,
+        end_cos: f32,
+        end_sin: f32,
+        extent: f32,
+        color: Color,
+    ) {
+        let pad = r_outer + 1.0;
+        let clip = Rect {
+            x: (center.x - pad) as i32 - 1,
+            y: (center.y - pad) as i32 - 1,
+            width: (pad * 2.0) as i32 + 3,
+            height: (pad * 2.0) as i32 + 3,
+        };
+        let mut sink = RowBlendSink { r: self, color };
+        raster::rasterize_arc(
+            center, r_outer, r_inner, start_cos, start_sin, end_cos, end_sin, extent, clip,
+            &mut sink,
+        );
+    }
 }
 
 struct RowBlendSink<'r, R: Renderer + ?Sized> {
