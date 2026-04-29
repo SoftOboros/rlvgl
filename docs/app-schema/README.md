@@ -5,16 +5,19 @@ Status: DRAFT — chapters not yet ratified.
 
 # rlvgl Application Schema
 
-> **Status:** All four chapters RATIFIED (owner: Ira Abbott;
-> 00 and 01 on 2026-04-27, 03 and 02 on 2026-04-29). The v0
-> initiative is closed: `APP-NN[a-z]` execution PRs MAY cite any
-> chapter as a frozen authority. v1 work areas (full BSP-gen
-> integration, external MCP SM-gen, real i18n/theme generators,
-> figma/uml layout formats, parallel stage 3 dispatch, Cargo
+> **Status:** v0 chapters 00–03 RATIFIED (owner: Ira Abbott; 00 and
+> 01 on 2026-04-27, 03 and 02 on 2026-04-29). Chapter 04
+> (state-machine boundary, full Option A treatment) DRAFT
+> 2026-04-29 — pending owner review of §10 promotion criteria.
+> `APP-NN[a-z]` execution PRs MAY cite any RATIFIED chapter as a
+> frozen authority. v0.5 work areas (real BSP-gen integration —
+> APP-02e — already shipped; external MCP SM-gen via vendored
+> crate per chapter 04 §5.3; real i18n/theme generators;
+> figma/uml layout formats; parallel stage 3 dispatch; Cargo
 > `[features]` graph expansion) live in follow-up PR sequences
-> (APP-02e+, APP-05+) and don't reopen v0. See
-> [`CLAUDE.md`](../../CLAUDE.md) §"Spec-Before-Code Planning
-> Discipline" for what ratification means.
+> (APP-02f+, APP-04a+, APP-05+) and don't reopen ratified v0
+> chapters. See [`CLAUDE.md`](../../CLAUDE.md) §"Spec-Before-Code
+> Planning Discipline" for what ratification means.
 
 This initiative defines a **stable underschema** — a single
 declarative manifest (`app.yaml`) describing an rlvgl application —
@@ -36,7 +39,7 @@ and authoring tools may evolve freely.
 | 01 | [Manifest Grammar (`app.yaml`, `rlvgl-app/v0`)](01-manifest-schema.md) | **RATIFIED** |
 | 02 | [Generator Pipeline (`rlvgl-creator app from-yaml`)](02-generator-pipeline.md) | **RATIFIED** |
 | 03 | [Round-Trip Targets](03-round-trip.md)                             | **RATIFIED** |
-| 04 | State-Machine Boundary (full Option A / B treatment)               | TBD     |
+| 04 | [State-Machine Boundary (full Option A treatment)](04-state-machine-boundary.md) | **DRAFT** |
 
 ## Conformance
 
