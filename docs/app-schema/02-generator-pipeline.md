@@ -354,6 +354,29 @@ substitutes a child-module-shaped `mod.rs` that uses `super::`
 references. This matches the existing
 beetle-esp32c3 hand-written pattern.
 
+#### 7.2.1 In-process invocation and §7.1 self-manifest waiver (v0)
+
+The orchestrator and the BSP-gen subcommand both ship as
+subcommands of the same `rlvgl-creator` binary. The orchestrator
+MAY therefore invoke the BSP-gen renderer in-process (e.g.
+`crate::bsp::espressif::render_esp_pac(&ir, &staging_dir)`) instead
+of forking a subprocess; in-process and subprocess invocations MUST
+produce byte-identical output for a given (chipdb, vendor, board)
+input set, so the determinism guarantee in §9.1 is unaffected.
+
+The BSP-gen v0 implementation does NOT emit the
+`<out>/.<gen-name>-manifest.json` self-manifest required by §7.1.
+v0 waives this requirement for BSP-gen specifically: the
+orchestrator already knows the §7.2 file list and post-hoc records
+each emitted file (path + blake3 hash + `stage = "bsp-gen"`) in its
+own §9.4 inventory at `<out>/.rlvgl-app-manifest.json`. The §9.4
+inventory therefore serves as the orchestrator-visible equivalent
+of the §7.1 self-manifest.
+
+This waiver is BSP-gen-specific and does NOT generalise: SM-gen,
+i18n, and theme sub-generators that run as separate processes
+remain bound by §7.1 in v1.
+
 ### 7.3 Asset-pipeline contract
 
 Existing `rlvgl-creator` asset converters. v0 wraps each `assets[]`
@@ -866,3 +889,5 @@ Ratifying this chapter unblocks:
 | 2026-04-29 | IMPLEMENTATION | APP-02c: stage 6 crate scaffold + per-prong main glue templates. `Cargo.toml` and `README.md` flip from APP-02b stubs to real emission — `Cargo.toml` carries `[package]` + `[[bin]]` (or `[lib] crate-type = ["staticlib"]` for zephyr) + `[features]` from `target.features` + `[dependencies]` for the `controller:` crate. `src/app.rs` emits the §7.8 wiring shim (when `controller:` present, calls `DiscoCapabilities::<preset>()` and constructs `DiscoController`). `src/main.rs` per prong: §8.1 linux loop with `std::thread::sleep`, §8.2 bare_metal `#![no_std]` template with panic handler, §8.3 freertos task-shape comments + render_task body, §8.4 zephyr → `src/lib.rs` `extern "C" fn rlvgl_init()` + nested west project at `zephyr/{CMakeLists.txt, prj.conf, app.overlay, src/main.c}` per §5.4.1. Emit tests updated to match (7/7 still pass alongside 17/17 validator tests; 24/24 total). §12 stage-6 satisfied; only `--check` mode + post-emit `cargo fmt` (APP-02d) remain. |
 | 2026-04-29 | IMPLEMENTATION | APP-02d: stage 7 (post-emit checks) + `--check` + `--force` + inventory-driven delete. `--check` emits to a temp staging directory (RAII `StagingDir` under `std::env::temp_dir()`), runs rustfmt in both staged + emitted paths so determinism is preserved, then diffs byte-for-byte against `<out>` and exits non-zero on any divergence (kinds: `missing in <out>`, `content differs`, `stale in <out>`). `--force` is required when `<out>` carries files not recorded in its previous inventory; rejection lists up to 10 untracked paths. §9.4 delete-on-regen: stale inventory entries (not in the new emission) are removed from `<out>`. Post-emit rustfmt runs per-file (best-effort; doesn't fail emission on rustfmt error). Tests added: byte-deterministic emit between two independent runs, `--force` rule against untracked files, inventory-driven delete on regen. 27/27 tests pass (17 validator + 10 emit). All §12 acceptance bullets satisfied. |
 | 2026-04-29 | RATIFIED | Owner: Ira Abbott. All §12 acceptance bullets satisfied across APP-02a–d. `APP-NN` execution PRs may now cite this chapter as a frozen authority for the orchestrator pipeline, sub-generator contracts, per-prong templates, inventory format, and `--check` / `--force` semantics. v1 work areas (real BSP-gen integration, real SM-gen via external MCP tool, real i18n + theme generators, parallelized stage 3 dispatch, full Cargo `[features]` graph expansion) get tracked under their own PR sequences (APP-02e+, APP-05+) and don't gate v0 ratification — chapter 02 §11 explicitly accepts these as v1 concerns. |
+| 2026-04-29 | AMENDMENT | §7.2.1 added — clarifies that the orchestrator MAY invoke BSP-gen in-process (since both subcommands live in the same `rlvgl-creator` binary) and waives the §7.1 self-manifest emission for BSP-gen specifically, on the grounds that the orchestrator's §9.4 inventory already records the §7.2 file list with content hashes. Waiver is BSP-gen-only; SM-gen / i18n / theme sub-generators remain bound by §7.1 unchanged. Substantively unblocks APP-02e (real BSP-gen invocation) without forcing a CLI change to the existing `bsp from-yaml` tool. Owner: Ira Abbott. |
+| 2026-04-29 | IMPLEMENTATION | APP-02e: real BSP-gen invocation per §7.2 + §7.2.1. The orchestrator now exposes a `BspGenFn` callback (`pub type` in `app.rs`) and a `with_bsp_gen` builder; the binary CLI in `src/bin/rlvgl_creator/main.rs` provides `bsp_gen_real` which dispatches by `target.vendor` to `crate::bsp::{espressif,nordic,nxp,rp,renesas}::{load_*_db, merge, render_*_pac}`. With the callback wired, `target.generator: creator-bsp-pac` emits all six chipdb-rendered files (`board.rs`, `clocks.rs`, `io_mux.rs`, `pac.rs`, `peripherals.rs` + the synthesised child-module `mod.rs` with `pub mod ...; pub use pac::init;`) into `<out>/src/bsp_generated/`, all marked `stage = "bsp-gen", stub = false` in the §9.4 inventory. STM and TI vendors error cleanly (no PAC renderer at v0). Tests that include `app.rs` via `#[path]` cannot reach the binary-private `bsp/` tree, so they leave the callback unset and the orchestrator falls back to a single-file `mod.rs` stub — the existing `creator_app_emit.rs` integration tests are unchanged in behaviour. End-to-end coverage of the real callback path lives in the new `tests/creator_app_bsp_gen.rs` (subprocess invocation of the compiled binary): asserts six files emitted, child-module `mod.rs` shape, `pac.rs` references `esp32c3`, all six inventory entries `stage = "bsp-gen"` with blake3 hashes, and `--check` clean against the just-emitted output (real-path determinism, §9.1). 29/29 creator tests pass (17 validator + 10 emit + 2 bsp-gen). |

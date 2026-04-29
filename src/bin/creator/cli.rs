@@ -13,8 +13,8 @@ use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 pub mod add_target;
-pub mod app;
 pub mod apng;
+pub mod app;
 pub mod bsp_gen;
 pub mod chakra;
 pub mod check;
@@ -672,7 +672,7 @@ enum AstCommand {
 }
 
 /// Run the rlgvl-creator command-line interface.
-pub fn run() -> Result<()> {
+pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
     let cli = Cli::parse();
     if !cli.silent {
         println!("rlvgl v{} • rlvgl-creator", env!("CARGO_PKG_VERSION"));
@@ -1267,6 +1267,7 @@ pub fn run() -> Result<()> {
                 validate_only,
                 check,
                 force,
+                bsp_gen,
             )?,
         },
     }

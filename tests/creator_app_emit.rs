@@ -15,6 +15,22 @@ use std::path::{Path, PathBuf};
 
 use app::{Inventory, Orchestrator};
 
+/// Stub BSP-gen callback for integration tests that include
+/// `app.rs` directly via `#[path]` and therefore can't reach the
+/// binary-private `bsp/` tree. Tests in this file never exercise
+/// `target.generator: creator-bsp-pac` against a real chipdb —
+/// the bsp_pac case here only checks the orchestrator's stub
+/// fallback (no callback wired). Subprocess-based end-to-end
+/// coverage of the real path lives in `creator_app_bsp_gen.rs`.
+fn bsp_gen_unreachable(
+    _vendor: &str,
+    _board: &str,
+    _chip: Option<&str>,
+    _out_dir: &Path,
+) -> anyhow::Result<String> {
+    panic!("BSP-gen callback should not have been invoked in this test");
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -40,8 +56,12 @@ fn entry_for<'a>(inv: &'a Inventory, rel: &str) -> &'a app::InventoryEntry {
     inv.entries
         .iter()
         .find(|e| e.path == rel)
-        .unwrap_or_else(|| panic!("inventory missing entry for {rel}: {:?}",
-            inv.entries.iter().map(|e| &e.path).collect::<Vec<_>>()))
+        .unwrap_or_else(|| {
+            panic!(
+                "inventory missing entry for {rel}: {:?}",
+                inv.entries.iter().map(|e| &e.path).collect::<Vec<_>>()
+            )
+        })
 }
 
 // ─── BBB Linux: hand_written + controller + cross-tree asset ─────────
@@ -67,8 +87,14 @@ fn emits_bbb_linux_with_cross_tree_splash() {
     assert_eq!(splash.stage, "asset-pipeline");
     let idx = fs::read_to_string(out.join("src/assets_generated.rs")).unwrap();
     assert!(idx.contains("pub static SPLASH:"), "got: {idx}");
-    assert!(idx.contains("include_bytes!(\"../assets/splash.rle\")"), "got: {idx}");
-    assert!(idx.contains("SPLASH_CLASS: &str = \"image_rle_a8\""), "got: {idx}");
+    assert!(
+        idx.contains("include_bytes!(\"../assets/splash.rle\")"),
+        "got: {idx}"
+    );
+    assert!(
+        idx.contains("SPLASH_CLASS: &str = \"image_rle_a8\""),
+        "got: {idx}"
+    );
 
     // APP-02c: Cargo.toml + README.md are no longer stubs.
     let cargo_e = entry_for(&inv, "Cargo.toml");
@@ -79,14 +105,23 @@ fn emits_bbb_linux_with_cross_tree_splash() {
 
     // Cargo.toml content: name, controller dependency, features.
     let cargo = fs::read_to_string(out.join("Cargo.toml")).unwrap();
-    assert!(cargo.contains("name = \"rlvgl-bbb-linux\""), "got:\n{cargo}");
-    assert!(cargo.contains("rlvgl-app-disco-demo = { path = \"../apps/disco-demo\" }"), "got:\n{cargo}");
+    assert!(
+        cargo.contains("name = \"rlvgl-bbb-linux\""),
+        "got:\n{cargo}"
+    );
+    assert!(
+        cargo.contains("rlvgl-app-disco-demo = { path = \"../apps/disco-demo\" }"),
+        "got:\n{cargo}"
+    );
     assert!(cargo.contains("default = [\"linux\""), "got:\n{cargo}");
 
     // app.rs wires the controller with the manifest's capabilities preset.
     assert_file_exists(out, "src/app.rs");
     let app_rs = fs::read_to_string(out.join("src/app.rs")).unwrap();
-    assert!(app_rs.contains("use rlvgl_app_disco_demo::"), "got:\n{app_rs}");
+    assert!(
+        app_rs.contains("use rlvgl_app_disco_demo::"),
+        "got:\n{app_rs}"
+    );
     assert!(
         app_rs.contains("DiscoCapabilities::beaglebone_black_nhd_cape()"),
         "got:\n{app_rs}"
@@ -95,7 +130,10 @@ fn emits_bbb_linux_with_cross_tree_splash() {
     // main.rs is the linux prong template.
     assert_file_exists(out, "src/main.rs");
     let main_rs = fs::read_to_string(out.join("src/main.rs")).unwrap();
-    assert!(main_rs.contains("fn main() -> std::io::Result<()>"), "got:\n{main_rs}");
+    assert!(
+        main_rs.contains("fn main() -> std::io::Result<()>"),
+        "got:\n{main_rs}"
+    );
     assert!(main_rs.contains("std::thread::sleep"), "got:\n{main_rs}");
 
     // hand_written generator → no bsp_generated/.
@@ -113,7 +151,15 @@ fn emits_bbb_linux_with_cross_tree_splash() {
     assert_file_exists(out, ".rlvgl-app-manifest.json");
 }
 
-// ─── beetle bsp_pac: creator-bsp-pac fires the BSP-gen stub ──────────
+// ─── beetle bsp_pac: creator-bsp-pac without a BspGenFn → stub ────────
+//
+// The orchestrator falls back to a single-file stub when no
+// `BspGenFn` callback is wired (chapter 02 §7.2.1 + the
+// `with_bsp_gen` builder on `Orchestrator`). This integration test
+// includes `app.rs` via `#[path]` and therefore can't reach the
+// binary-private `bsp/` tree, so it always lands on the stub
+// fallback — APP-02e end-to-end coverage of the real chipdb path
+// lives in `creator_app_bsp_gen.rs` (subprocess-based).
 
 #[test]
 fn emits_beetle_bsp_pac_with_bsp_generated_stub() {
@@ -123,7 +169,10 @@ fn emits_beetle_bsp_pac_with_bsp_generated_stub() {
     assert_file_exists(out, "src/bsp_generated/mod.rs");
     let bsp = entry_for(&inv, "src/bsp_generated/mod.rs");
     assert_eq!(bsp.stage, "bsp-gen");
-    assert!(bsp.stub, "BSP-gen output is stubbed at APP-02b");
+    assert!(
+        bsp.stub,
+        "without BspGenFn wired, BSP-gen falls back to a stub mod.rs"
+    );
 
     // No assets in this manifest → no asset pipeline output.
     assert!(!out.join("assets").exists());
@@ -161,7 +210,10 @@ fn emits_h747_freertos() {
     assert_file_exists(out, "assets/splash.rle");
     assert_file_exists(out, "src/main.rs");
     let cargo = fs::read_to_string(out.join("Cargo.toml")).unwrap();
-    assert!(cargo.contains("rlvgl-stm32h747i-disco-freertos"), "got:\n{cargo}");
+    assert!(
+        cargo.contains("rlvgl-stm32h747i-disco-freertos"),
+        "got:\n{cargo}"
+    );
     let readme = fs::read_to_string(out.join("README.md")).unwrap();
     assert!(readme.contains("freertos"), "got:\n{readme}");
 
@@ -182,13 +234,22 @@ fn emits_h747_zephyr_nested_west_project() {
     // APP-02c: zephyr prong emits a staticlib (src/lib.rs, not main.rs)
     // plus a nested west project at zephyr/ per chapter 02 §5.4.1.
     assert_file_exists(out, "src/lib.rs");
-    assert!(!out.join("src/main.rs").exists(), "zephyr prong must not emit main.rs");
+    assert!(
+        !out.join("src/main.rs").exists(),
+        "zephyr prong must not emit main.rs"
+    );
     let lib_rs = fs::read_to_string(out.join("src/lib.rs")).unwrap();
-    assert!(lib_rs.contains("pub extern \"C\" fn rlvgl_init()"), "got:\n{lib_rs}");
+    assert!(
+        lib_rs.contains("pub extern \"C\" fn rlvgl_init()"),
+        "got:\n{lib_rs}"
+    );
 
     // Cargo.toml flips to staticlib for zephyr.
     let cargo = fs::read_to_string(out.join("Cargo.toml")).unwrap();
-    assert!(cargo.contains("crate-type = [\"staticlib\"]"), "got:\n{cargo}");
+    assert!(
+        cargo.contains("crate-type = [\"staticlib\"]"),
+        "got:\n{cargo}"
+    );
     assert!(!cargo.contains("[[bin]]"), "got:\n{cargo}");
 
     // Nested west project files.
@@ -198,12 +259,23 @@ fn emits_h747_zephyr_nested_west_project() {
     assert_file_exists(out, "zephyr/src/main.c");
     let cmake = fs::read_to_string(out.join("zephyr/CMakeLists.txt")).unwrap();
     assert!(cmake.contains("find_package(Zephyr"), "got:\n{cmake}");
-    assert!(cmake.contains("rlvgl_stm32h747i_disco_zephyr"), "got:\n{cmake}");
+    assert!(
+        cmake.contains("rlvgl_stm32h747i_disco_zephyr"),
+        "got:\n{cmake}"
+    );
     let main_c = fs::read_to_string(out.join("zephyr/src/main.c")).unwrap();
-    assert!(main_c.contains("extern int rlvgl_init(void)"), "got:\n{main_c}");
+    assert!(
+        main_c.contains("extern int rlvgl_init(void)"),
+        "got:\n{main_c}"
+    );
 
     // Inventory should record each zephyr/* file at scaffold stage.
-    for rel in ["zephyr/CMakeLists.txt", "zephyr/prj.conf", "zephyr/app.overlay", "zephyr/src/main.c"] {
+    for rel in [
+        "zephyr/CMakeLists.txt",
+        "zephyr/prj.conf",
+        "zephyr/app.overlay",
+        "zephyr/src/main.c",
+    ] {
         let e = entry_for(&inv, rel);
         assert_eq!(e.stage, "scaffold");
         assert!(!e.stub, "{rel} should not be a stub");
@@ -264,8 +336,7 @@ fn emit_is_byte_deterministic_for_a_given_manifest() {
         let manifest_dir = manifest.parent().unwrap().to_path_buf();
         let ws_root = app::find_workspace_root(&manifest_dir);
         let tmp = tempfile::tempdir().unwrap();
-        let mut orch =
-            app::Orchestrator::new(m, manifest_dir, ws_root, tmp.path().to_path_buf());
+        let mut orch = app::Orchestrator::new(m, manifest_dir, ws_root, tmp.path().to_path_buf());
         let inv = orch.run().unwrap();
         (tmp, inv)
     };
@@ -303,8 +374,12 @@ fn untracked_files_block_emit_without_force() {
     let tmp = tempfile::tempdir().unwrap();
 
     // First emit — populates inventory.
-    let mut orch =
-        app::Orchestrator::new(m_first, manifest_dir.clone(), ws_root.clone(), tmp.path().to_path_buf());
+    let mut orch = app::Orchestrator::new(
+        m_first,
+        manifest_dir.clone(),
+        ws_root.clone(),
+        tmp.path().to_path_buf(),
+    );
     let _ = orch.run().unwrap();
 
     // User drops a stranger file into <out>.
@@ -319,6 +394,7 @@ fn untracked_files_block_emit_without_force() {
         false, // validate_only
         false, // check
         false, // force
+        bsp_gen_unreachable,
     )
     .unwrap_err()
     .to_string();
@@ -332,6 +408,7 @@ fn untracked_files_block_emit_without_force() {
         false, // validate_only
         false, // check
         true,  // force
+        bsp_gen_unreachable,
     )
     .expect("--force allows overwriting");
 }
@@ -348,8 +425,15 @@ fn inventory_driven_delete_removes_stale_files() {
     let tmp = tempfile::tempdir().unwrap();
 
     // Real first emit.
-    app::run_from_yaml(&manifest, Some(tmp.path()), false, false, false)
-        .expect("first emit succeeds");
+    app::run_from_yaml(
+        &manifest,
+        Some(tmp.path()),
+        false,
+        false,
+        false,
+        bsp_gen_unreachable,
+    )
+    .expect("first emit succeeds");
 
     // Splice an old-only entry into the inventory and drop a matching file.
     let inv_path = tmp.path().join(".rlvgl-app-manifest.json");
@@ -368,8 +452,15 @@ fn inventory_driven_delete_removes_stale_files() {
 
     // Re-emit. Even without --force (since the file IS in the inventory),
     // §9.4 says the new emission deletes it.
-    app::run_from_yaml(&manifest, Some(tmp.path()), false, false, false)
-        .expect("second emit succeeds");
+    app::run_from_yaml(
+        &manifest,
+        Some(tmp.path()),
+        false,
+        false,
+        false,
+        bsp_gen_unreachable,
+    )
+    .expect("second emit succeeds");
 
     assert!(
         !tmp.path().join("src/legacy_screen.rs").exists(),

@@ -190,7 +190,10 @@ pub fn find_workspace_root(start: &Path) -> PathBuf {
         let cargo = dir.join("Cargo.toml");
         if cargo.is_file() {
             if let Ok(text) = std::fs::read_to_string(&cargo) {
-                if text.lines().any(|l| l.trim_start().starts_with("[workspace]")) {
+                if text
+                    .lines()
+                    .any(|l| l.trim_start().starts_with("[workspace]"))
+                {
                     return dir.to_path_buf();
                 }
             }
@@ -293,8 +296,8 @@ const VENDORS: &[&str] = &[
 pub fn validate(manifest_path: &Path) -> Result<Manifest> {
     let text = std::fs::read_to_string(manifest_path)
         .map_err(|e| anyhow!("read {}: {e}", manifest_path.display()))?;
-    let manifest: Manifest = serde_yaml::from_str(&text)
-        .map_err(|e| anyhow!("rule 7 (parse / unknown keys): {e}"))?;
+    let manifest: Manifest =
+        serde_yaml::from_str(&text).map_err(|e| anyhow!("rule 7 (parse / unknown keys): {e}"))?;
 
     let manifest_dir = manifest_path
         .parent()
@@ -555,12 +558,18 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
 
 /// CLI entry: `rlvgl-creator app from-yaml <manifest> [--out <dir>]
 /// [--validate-only] [--check] [--force]`.
+///
+/// `bsp_gen` is the callback the orchestrator uses for the BSP-gen
+/// stage; the binary CLI in `cli.rs` passes the real chipdb-backed
+/// dispatch (defined alongside the bsp/ tree). Tests that drive
+/// `run_from_yaml` directly can pass the same dispatch or a stub.
 pub fn run_from_yaml(
     manifest: &Path,
     out: Option<&Path>,
     validate_only: bool,
     check: bool,
     force: bool,
+    bsp_gen: BspGenFn,
 ) -> Result<()> {
     let m = validate(manifest)?;
     eprintln!(
@@ -592,14 +601,14 @@ pub fn run_from_yaml(
         // against `<out>` byte-for-byte. Exit non-zero on any diff.
         // rustfmt runs in both paths so post-emit formatting cannot
         // create false-positive divergences.
-        let staged = StagingDir::new()
-            .map_err(|e| anyhow!("create temp dir for --check: {e}"))?;
+        let staged = StagingDir::new().map_err(|e| anyhow!("create temp dir for --check: {e}"))?;
         let mut orch = Orchestrator::new(
             m,
             manifest_dir.to_path_buf(),
             ws_root,
             staged.path().to_path_buf(),
-        );
+        )
+        .with_bsp_gen(bsp_gen);
         let new_inv = orch.run()?;
         let _ = run_rustfmt_on_emitted(&new_inv, staged.path());
         let diffs = compare_emission(staged.path(), out, &new_inv)?;
@@ -643,15 +652,14 @@ pub fn run_from_yaml(
             if untracked.len() > 10 {
                 msg.push_str(&format!("  ... ({} more)\n", untracked.len() - 10));
             }
-            msg.push_str(
-                "Pass --force to overwrite, or move these files outside <out> first.",
-            );
+            msg.push_str("Pass --force to overwrite, or move these files outside <out> first.");
             bail!(msg);
         }
     }
     let prev_inventory = read_inventory(out).ok();
 
-    let mut orch = Orchestrator::new(m, manifest_dir.to_path_buf(), ws_root, out.to_path_buf());
+    let mut orch = Orchestrator::new(m, manifest_dir.to_path_buf(), ws_root, out.to_path_buf())
+        .with_bsp_gen(bsp_gen);
     let inv = orch.run()?;
 
     // §9.4 inventory-driven delete: any file in the prior inventory
@@ -790,10 +798,10 @@ fn collect_files(root: &Path, dir: &Path, acc: &mut Vec<String>) {
 
 fn read_inventory(out: &Path) -> Result<Inventory> {
     let path = out.join(".rlvgl-app-manifest.json");
-    let body = std::fs::read_to_string(&path)
-        .map_err(|e| anyhow!("read {}: {e}", path.display()))?;
-    let inv: Inventory = serde_json::from_str(&body)
-        .map_err(|e| anyhow!("parse {}: {e}", path.display()))?;
+    let body =
+        std::fs::read_to_string(&path).map_err(|e| anyhow!("read {}: {e}", path.display()))?;
+    let inv: Inventory =
+        serde_json::from_str(&body).map_err(|e| anyhow!("parse {}: {e}", path.display()))?;
     Ok(inv)
 }
 
@@ -927,6 +935,24 @@ fn chrono_iso8601_today() -> String {
     format!("{:04}-{:02}-{:02}", y, m, d)
 }
 
+/// APP-02e: function pointer the orchestrator invokes for the BSP-gen
+/// stage. Implementations call into the chipdb renderers
+/// (`crate::bsp::espressif::render_esp_pac`, etc.) and return the
+/// snake_case board stem (the directory name BSP-gen creates under
+/// `out_dir`) so the orchestrator can locate the emitted files.
+///
+/// The orchestrator and BSP-gen subcommands ship in the same
+/// `rlvgl-creator` binary, so the binary's CLI wires this callback
+/// up at entry. Tests that include `app.rs` via `#[path]` have no
+/// access to the binary-private `bsp/` tree, so they leave the
+/// callback unset and the orchestrator falls back to a stub
+/// emission per chapter 02 §7.2.1's pre-implementation behaviour
+/// (the stub still satisfies §9.4 inventory). End-to-end
+/// verification of the real callback happens via subprocess in
+/// `tests/creator_app_bsp_gen.rs`.
+pub type BspGenFn =
+    fn(vendor: &str, board: &str, chip: Option<&str>, out_dir: &Path) -> Result<String>;
+
 /// Orchestrator that walks the chapter 02 §6 stage graph against a
 /// validated manifest and emits the chapter 02 §5.4 output tree.
 pub struct Orchestrator {
@@ -934,6 +960,7 @@ pub struct Orchestrator {
     manifest_dir: PathBuf,
     workspace_root: PathBuf,
     out: PathBuf,
+    bsp_gen: Option<BspGenFn>,
 }
 
 impl Orchestrator {
@@ -948,7 +975,16 @@ impl Orchestrator {
             manifest_dir,
             workspace_root,
             out,
+            bsp_gen: None,
         }
+    }
+
+    /// Wire the BSP-gen callback. The CLI calls this with the
+    /// real chipdb-backed dispatch; integration tests that include
+    /// `app.rs` directly leave this unset.
+    pub fn with_bsp_gen(mut self, f: BspGenFn) -> Self {
+        self.bsp_gen = Some(f);
+        self
     }
 
     /// Run the stage graph end to end. Returns the inventory of all
@@ -969,7 +1005,7 @@ impl Orchestrator {
             .as_deref()
             .unwrap_or("creator-bsp-pac");
         if generator == "creator-bsp-pac" {
-            self.emit_bsp_gen_stub(&mut inv)?;
+            self.emit_bsp_gen(&mut inv)?;
         }
 
         // Stage 3b: asset pipeline — file-copy plus include_bytes! index.
@@ -1040,24 +1076,111 @@ impl Orchestrator {
         Ok(())
     }
 
-    fn emit_bsp_gen_stub(&self, inv: &mut Inventory) -> Result<()> {
+    /// APP-02e: real BSP-gen invocation per chapter 02 §7.2 + §7.2.1.
+    ///
+    /// When a [`BspGenFn`] callback is wired (production path: the
+    /// CLI in `cli.rs` plumbs the chipdb renderers through), this
+    /// runs the renderer in-process into a staging directory, then
+    /// copies the five child files into `<out>/src/bsp_generated/`
+    /// and synthesises a child-module-shaped `mod.rs` per §7.2.
+    /// Each file is inventoried as `stage = "bsp-gen", stub = false`
+    /// — the §9.4 inventory is the orchestrator-visible equivalent
+    /// of the §7.1 self-manifest under the §7.2.1 waiver.
+    ///
+    /// When no callback is wired (integration tests that include
+    /// `app.rs` directly via `#[path]` and therefore can't reach
+    /// the binary-private `bsp/` tree), this falls back to emitting
+    /// a single stub `mod.rs` flagged `stub = true`. End-to-end
+    /// coverage of the real path lives in
+    /// `tests/creator_app_bsp_gen.rs` (subprocess invocation).
+    fn emit_bsp_gen(&self, inv: &mut Inventory) -> Result<()> {
+        let board = self.manifest.target.board.as_str();
+        let vendor = self.manifest.target.vendor.as_str();
+        let chip = self.manifest.target.chip.as_deref();
+
+        let Some(render) = self.bsp_gen else {
+            return self.emit_bsp_gen_stub_only(vendor, board, inv);
+        };
+
+        let staging = StagingDir::new()?;
+        let board_stem = render(vendor, board, chip, staging.path())?;
+        let board_dir = staging.path().join(&board_stem);
+        for child in [
+            "board.rs",
+            "clocks.rs",
+            "io_mux.rs",
+            "pac.rs",
+            "peripherals.rs",
+        ] {
+            let src = board_dir.join(child);
+            let bytes = std::fs::read(&src).map_err(|e| {
+                anyhow!(
+                    "BSP-gen produced no '{child}' under {} (vendor={vendor}, \
+                     board={board}): {e}",
+                    board_dir.display()
+                )
+            })?;
+            self.emit(
+                Path::new("src/bsp_generated").join(child),
+                &bytes,
+                inv,
+                "bsp-gen",
+                false,
+            )?;
+        }
+
+        let mod_rs = format!(
+            "// SPDX-License-Identifier: MIT\n\
+             //!\n\
+             //! Generated BSP for vendor={vendor} board={board}, wrapped as a child\n\
+             //! module per docs/app-schema/02-generator-pipeline.md §7.2. The five\n\
+             //! sibling files (`board.rs`, `clocks.rs`, `io_mux.rs`, `pac.rs`,\n\
+             //! `peripherals.rs`) are emitted byte-for-byte from\n\
+             //! `rlvgl-creator bsp from-yaml --vendor {vendor} --board {board}`.\n\
+             //!\n\
+             //! Regenerate via `rlvgl-creator app from-yaml`; see the parent\n\
+             //! README for the manifest path.\n\
+             \n\
+             #![allow(dead_code)]\n\
+             \n\
+             pub mod board;\n\
+             pub mod clocks;\n\
+             pub mod io_mux;\n\
+             pub mod pac;\n\
+             pub mod peripherals;\n\
+             \n\
+             pub use pac::init;\n",
+        );
+        self.emit(
+            "src/bsp_generated/mod.rs",
+            mod_rs.as_bytes(),
+            inv,
+            "bsp-gen",
+            false,
+        )
+    }
+
+    /// Stub fallback emitted when no [`BspGenFn`] callback is wired.
+    fn emit_bsp_gen_stub_only(&self, vendor: &str, board: &str, inv: &mut Inventory) -> Result<()> {
         let body = format!(
             "// SPDX-License-Identifier: MIT\n\
              //\n\
-             // src/bsp_generated/mod.rs (orchestrator stub, APP-02b).\n\
+             // src/bsp_generated/mod.rs (orchestrator stub — no BspGenFn wired).\n\
              //\n\
-             // TODO(APP-02c): invoke `rlvgl-creator bsp from-yaml` programmatically\n\
-             // for vendor={} board={} and copy the six emitted files\n\
-             // (mod.rs, pac.rs, clocks.rs, io_mux.rs, peripherals.rs, board.rs)\n\
-             // into this directory per docs/app-schema/02-generator-pipeline.md\n\
-             // §7.2.\n\
+             // The orchestrator was constructed without a BSP-gen callback. The\n\
+             // production CLI (`rlvgl-creator app from-yaml`) wires this through\n\
+             // to the chipdb renderers; tests that include `app.rs` directly\n\
+             // bypass it and land here. vendor={vendor} board={board}.\n\
              \n\
-             pub fn init() {{\n\
-             \x20   // TODO(APP-02c): real BSP bring-up.\n\
-             }}\n",
-            self.manifest.target.vendor, self.manifest.target.board,
+             pub fn init() {{}}\n",
         );
-        self.emit("src/bsp_generated/mod.rs", body.as_bytes(), inv, "bsp-gen", true)
+        self.emit(
+            "src/bsp_generated/mod.rs",
+            body.as_bytes(),
+            inv,
+            "bsp-gen",
+            true,
+        )
     }
 
     fn emit_asset_pipeline(&self, inv: &mut Inventory) -> Result<()> {
@@ -1152,7 +1275,13 @@ impl Orchestrator {
              \n\
              pub mod states { /* TODO */ }\n\
              pub mod vectors { /* TODO */ }\n";
-        self.emit("src/state_machine/mod.rs", body.as_bytes(), inv, "sm-gen", true)
+        self.emit(
+            "src/state_machine/mod.rs",
+            body.as_bytes(),
+            inv,
+            "sm-gen",
+            true,
+        )
     }
 
     fn emit_i18n_stub(&self, inv: &mut Inventory) -> Result<()> {
@@ -1295,15 +1424,14 @@ impl Orchestrator {
         // [dependencies]
         s.push_str("[dependencies]\n");
         if let Some(c) = &self.manifest.controller {
-            s.push_str(&format!("# Controller library (chapter 01 §5.10 / chapter 02 §7.8).\n"));
+            s.push_str(&format!(
+                "# Controller library (chapter 01 §5.10 / chapter 02 §7.8).\n"
+            ));
             match (&c.path, &c.version) {
                 (Some(p), None) => {
                     let path_str = p.to_string_lossy().into_owned();
                     if c.features.is_empty() {
-                        s.push_str(&format!(
-                            "{} = {{ path = {:?} }}\n",
-                            c.crate_name, path_str
-                        ));
+                        s.push_str(&format!("{} = {{ path = {:?} }}\n", c.crate_name, path_str));
                     } else {
                         s.push_str(&format!(
                             "{} = {{ path = {:?}, features = {:?} }}\n",
@@ -1313,10 +1441,7 @@ impl Orchestrator {
                 }
                 (None, Some(v)) => {
                     if c.features.is_empty() {
-                        s.push_str(&format!(
-                            "{} = {{ version = {:?} }}\n",
-                            c.crate_name, v
-                        ));
+                        s.push_str(&format!("{} = {{ version = {:?} }}\n", c.crate_name, v));
                     } else {
                         s.push_str(&format!(
                             "{} = {{ version = {:?}, features = {:?} }}\n",
@@ -1334,9 +1459,9 @@ impl Orchestrator {
                         ));
                     }
                 }
-                (Some(_), Some(_)) => unreachable!(
-                    "validator rejects controller.path + controller.version both set"
-                ),
+                (Some(_), Some(_)) => {
+                    unreachable!("validator rejects controller.path + controller.version both set")
+                }
             }
         }
         s.push_str(&format!(
@@ -1371,17 +1496,16 @@ impl Orchestrator {
             s.push_str(&format!(
                 "use {crate_ident}::{{DiscoCapabilities, DiscoController}};\n\n"
             ));
-            s.push_str("/// Application wiring shim around the manifest-named controller library.\n");
+            s.push_str(
+                "/// Application wiring shim around the manifest-named controller library.\n",
+            );
             s.push_str("pub struct App {\n");
             s.push_str("    #[allow(dead_code)]\n");
             s.push_str("    controller: DiscoController,\n");
             s.push_str("}\n\n");
             s.push_str("impl App {\n");
             s.push_str("    pub fn new(_bsp: Bsp) -> Self {\n");
-            let caps = c
-                .capabilities
-                .as_deref()
-                .unwrap_or("stm32h747i_disco");
+            let caps = c.capabilities.as_deref().unwrap_or("stm32h747i_disco");
             s.push_str(&format!(
                 "        let _caps = DiscoCapabilities::{caps}();\n"
             ));
@@ -1420,7 +1544,11 @@ impl Orchestrator {
             "zephyr" => self.zephyr_lib_template(),
             other => bail!("unknown prong '{other}' — validator should have caught this"),
         };
-        let path = if prong == "zephyr" { "src/lib.rs" } else { "src/main.rs" };
+        let path = if prong == "zephyr" {
+            "src/lib.rs"
+        } else {
+            "src/main.rs"
+        };
         self.emit(path, s.as_bytes(), inv, "scaffold", false)
     }
 
