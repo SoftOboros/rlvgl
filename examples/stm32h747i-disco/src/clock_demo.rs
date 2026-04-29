@@ -16,6 +16,7 @@
 
 use alloc::rc::Rc;
 use core::cell::{Cell, RefCell};
+use rlvgl_core::cmd::{CommandList, Recorder};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -25,14 +26,35 @@ use rlvgl_widgets::clock::{
 
 use crate::cpu_stats;
 
-/// `Widget` wrapper that brackets [`Clock::draw`] with DWT cycle reads so
-/// per-frame draw cost can be published as telemetry. Insert *this* into
-/// the widget tree, not the bare [`Clock`].
+/// No-op renderer used as the [`Recorder`] passthrough for unstructured
+/// ops. The clock layers only emit structured AA draws, so this is
+/// never invoked in practice — it exists to satisfy `Recorder::new`'s
+/// signature without borrowing the real renderer twice.
+struct NullSink;
+
+impl Renderer for NullSink {
+    fn fill_rect(&mut self, _: Rect, _: Color) {}
+    fn draw_text(&mut self, _: (i32, i32), _: &str, _: Color) {}
+}
+
+/// `Widget` wrapper that captures [`Clock::draw`] into a
+/// [`CommandList`] and submits it through [`Renderer::submit`], picking
+/// up backend specializations (occlusion pre-pass on
+/// `BlitterRenderer`) transparently. Brackets the whole sequence with
+/// DWT cycle reads so per-frame draw cost can be published as
+/// telemetry. Insert *this* into the widget tree, not the bare
+/// [`Clock`].
 pub struct TimedClock {
     clock: Clock,
-    /// Last `Widget::draw` cost in DWT cycles. Read once per frame after
-    /// the tree's draw walk completes.
+    /// Last `Widget::draw` cost in DWT cycles, including both the
+    /// recording phase (cmd-list capture) and the submit phase
+    /// (occlusion analysis + dispatch). Read once per frame after the
+    /// tree's draw walk completes.
     last_draw_cycles: Cell<u32>,
+    /// Number of structured commands emitted into the most recent
+    /// captured list. Useful for telemetry — sample alongside
+    /// `last_draw_cycles` to derive per-cmd cost.
+    last_cmd_count: Cell<u32>,
 }
 
 impl Widget for TimedClock {
@@ -42,7 +64,20 @@ impl Widget for TimedClock {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let start = cpu_stats::read_cyccnt();
-        self.clock.draw(renderer);
+        // Capture the clock's per-frame draws into a CommandList, then
+        // submit through Renderer::submit — `BlitterRenderer` overrides
+        // this with an occlusion pre-pass that drops fully-covered cmds
+        // before any rasterization. The `RotatedRenderer` wrapper on
+        // disco delegates submit to its inner, so the optimization
+        // survives the orientation translation.
+        let mut list = CommandList::new();
+        let mut null_sink = NullSink;
+        {
+            let mut recorder = Recorder::new(&mut list, &mut null_sink);
+            self.clock.draw(&mut recorder);
+        }
+        self.last_cmd_count.set(list.len() as u32);
+        renderer.submit(&list);
         let end = cpu_stats::read_cyccnt();
         self.last_draw_cycles.set(end.wrapping_sub(start));
     }
@@ -102,6 +137,7 @@ impl ClockDemo {
         let timed = TimedClock {
             clock,
             last_draw_cycles: Cell::new(0),
+            last_cmd_count: Cell::new(0),
         };
         Self {
             timed: Rc::new(RefCell::new(timed)),
@@ -138,6 +174,7 @@ impl ClockDemo {
     pub fn publish_telem(&self) {
         let timed = self.timed.borrow();
         let draw_cycles = timed.last_draw_cycles.get();
+        let cmd_count = timed.last_cmd_count.get();
         let outcome = self.last_outcome.get();
         let plan_cycles = self.last_plan_cycles.get();
         let (code, layers, dirty_px) = match outcome {
@@ -151,7 +188,14 @@ impl ClockDemo {
                 layers_painted,
             } => (2u8, layers_painted, dirty_px),
         };
-        cpu_stats::publish_clock_telem(code, layers, dirty_px, plan_cycles, draw_cycles);
+        cpu_stats::publish_clock_telem(
+            code,
+            layers,
+            cmd_count as u16,
+            dirty_px,
+            plan_cycles,
+            draw_cycles,
+        );
     }
 
     /// Force a full repaint on the next [`Self::tick`] call (e.g. after

@@ -15,7 +15,7 @@
 //!    occluded cmd is omitted entirely. That proves the optimization
 //!    actually skips work without semantic change.
 
-use rlvgl_core::cmd::{BlendMode, Cmd, CommandList, CommandSink, Recorder};
+use rlvgl_core::cmd::{BlendMode, Cmd, CommandList, Recorder};
 use rlvgl_core::raster::{Obb, PointF};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};

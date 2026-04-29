@@ -3,6 +3,7 @@
 //! Implementors of this trait can target displays, off-screen buffers or
 //! simulator windows.
 
+use crate::cmd::CommandList;
 use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
 
@@ -177,6 +178,24 @@ pub trait Renderer {
             center, r_outer, r_inner, start_cos, start_sin, end_cos, end_sin, extent, clip,
             &mut sink,
         );
+    }
+
+    /// Execute a captured [`CommandList`] against this renderer.
+    ///
+    /// Default implementation walks the list and dispatches each
+    /// command via [`crate::cmd::Cmd::dispatch_to`] — equivalent to
+    /// having issued the corresponding trait calls directly. Backends
+    /// override this to apply pre-pass optimizations: occlusion
+    /// culling, opaque-cmd skip, hardware command-buffer chaining,
+    /// tile binning. Overrides must preserve byte-identical output to
+    /// the default path.
+    ///
+    /// This is the "graphics-language" entry point on the [`Renderer`]
+    /// trait — code holding `&mut dyn Renderer` can submit captured
+    /// command lists and pick up backend specializations
+    /// transparently. See [`crate::cmd`] for the language model.
+    fn submit(&mut self, list: &CommandList) {
+        list.replay(self);
     }
 }
 

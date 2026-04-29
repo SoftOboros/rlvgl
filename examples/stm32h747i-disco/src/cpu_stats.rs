@@ -83,7 +83,8 @@ const D3_CLOCK_DIRTY_PX: u32 = 0x3800_1C7C;
 const D3_CLOCK_PLAN_CYCLES: u32 = 0x3800_1C80;
 const D3_CLOCK_DRAW_CYCLES: u32 = 0x3800_1C84;
 /// Packed: byte 0 = outcome code (0=Skipped, 1=Painted, 2=FullRepaint),
-/// byte 1 = layers_painted, bytes 2–3 = reserved.
+/// byte 1 = layers_painted, bytes 2–3 = `cmd_count` (u16 — number of
+/// structured commands in the captured CommandList).
 const D3_CLOCK_OUTCOME: u32 = 0x3800_1C88;
 /// High-water mark for `D3_CLOCK_DRAW_CYCLES` since boot. Sample this for
 /// the worst-case-frame baseline; combine with `D3_CLOCK_DIRTY_PX` for
@@ -442,11 +443,14 @@ pub fn read_cyccnt() -> u32 {
 /// debugger can sample the worst-case frame without constant polling.
 ///
 /// `outcome_code`: 0 = Skipped, 1 = Painted, 2 = FullRepaint.
+/// `cmd_count`: number of structured commands in the captured
+/// CommandList for this frame (bytes 16..32 of `D3_CLOCK_OUTCOME`).
 #[inline]
 #[allow(dead_code)]
 pub fn publish_clock_telem(
     outcome_code: u8,
     layers_painted: u8,
+    cmd_count: u16,
     dirty_px: u32,
     plan_cycles: u32,
     draw_cycles: u32,
@@ -460,7 +464,8 @@ pub fn publish_clock_telem(
     } else {
         prev_max
     };
-    let outcome_word = (outcome_code as u32) | ((layers_painted as u32) << 8);
+    let outcome_word =
+        (outcome_code as u32) | ((layers_painted as u32) << 8) | ((cmd_count as u32) << 16);
     unsafe {
         d3_write(D3_CLOCK_DIRTY_PX, dirty_px); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         d3_write(D3_CLOCK_PLAN_CYCLES, plan_cycles); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)

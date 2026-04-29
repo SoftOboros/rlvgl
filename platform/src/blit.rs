@@ -20,7 +20,7 @@ use alloc::vec::Vec;
 use alloc::{collections::BTreeMap, vec};
 use bitflags::bitflags;
 use heapless::Vec as HVec;
-use rlvgl_core::cmd::{Cmd, CommandList, CommandSink};
+use rlvgl_core::cmd::{Cmd, CommandList};
 #[cfg(feature = "fontdue")]
 use rlvgl_core::fontdue::{Metrics, line_metrics, rasterize_glyph};
 use rlvgl_core::renderer::Renderer;
@@ -743,6 +743,10 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
             });
         }
     }
+
+    fn submit(&mut self, list: &CommandList) {
+        submit_with_occlusion(self, list);
+    }
 }
 
 /// `CommandSink` impl with occlusion pre-pass.
@@ -764,27 +768,28 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
 /// v1 — they pass through as no-ops on dispatch. A future revision can
 /// segment the list at markers if cross-marker reordering becomes a
 /// correctness concern.
-impl<B: Blitter, const N: usize> CommandSink for BlitterRenderer<'_, B, N> {
-    fn submit(&mut self, list: &CommandList) {
-        for (i, cmd) in list.iter().enumerate() {
-            let Some(bb_i) = cmd.aabb() else {
-                cmd.dispatch_to(self);
+fn submit_with_occlusion<B: Blitter, const N: usize>(
+    r: &mut BlitterRenderer<'_, B, N>,
+    list: &CommandList,
+) {
+    for (i, cmd) in list.iter().enumerate() {
+        let Some(bb_i) = cmd.aabb() else {
+            cmd.dispatch_to(r);
+            continue;
+        };
+        let mut occluded = false;
+        for later in list.iter().skip(i + 1) {
+            if !is_opaque_filler(later) {
                 continue;
-            };
-            let mut occluded = false;
-            for later in list.iter().skip(i + 1) {
-                if !is_opaque_filler(later) {
-                    continue;
-                }
-                let Some(bb_j) = later.aabb() else { continue };
-                if rect_contains(bb_j, bb_i) {
-                    occluded = true;
-                    break;
-                }
             }
-            if !occluded {
-                cmd.dispatch_to(self);
+            let Some(bb_j) = later.aabb() else { continue };
+            if rect_contains(bb_j, bb_i) {
+                occluded = true;
+                break;
             }
+        }
+        if !occluded {
+            cmd.dispatch_to(r);
         }
     }
 }
@@ -924,6 +929,13 @@ impl Renderer for RotatedRenderer<'_> {
                 }
             }
         }
+    }
+
+    fn submit(&mut self, list: &CommandList) {
+        // Delegate to inner — preserves any backend-specific
+        // optimizations (e.g. BlitterRenderer's occlusion pre-pass)
+        // through the rotation wrapper.
+        self.inner.submit(list);
     }
 }
 
