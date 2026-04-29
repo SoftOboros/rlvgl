@@ -610,6 +610,45 @@ yet, so most layout source is hand-rolled Rust.
 pipeline (e.g. `figma_export_v1` or `uml_widget_v1`) shipping
 first. Don't remove the backdoor before there's a real front door."
 
+### 6.13 🟡 OPEN — `bsp_pac` stretches the screen abstraction
+
+**Surfaced 2026-04-29 by APP-03e** (beetle bsp_pac sibling
+manifest). The bsp_pac binary has **no display, no rlvgl runtime,
+no widget tree** — it is a chipdb → generator → boot pipeline
+proof, not an rlvgl application in the strict
+[chapter 00 §1](00-concepts.md#§1-purpose) sense.
+
+The v0 grammar's `screens[]` validation rule
+([01 §5.5](01-manifest-schema.md#55-screens-optional))
+requires *exactly one default screen* when `state_machine:` is
+absent. There is no `screens: []` path in v0. To express bsp_pac
+as a v0 manifest at all, the LED-blink loop body is interpreted
+as a "screen" — the per-tick body of a headless app — which
+stretches the abstraction.
+
+The landed manifest
+(`examples/beetle-esp32c3/app-bsp-pac.yaml`) takes this stretched
+interpretation explicitly to:
+
+1. Exercise `target.generator: creator-bsp-pac` at v0 ratification
+   (the only landed manifest that does so).
+2. Register the bsp_pac intent for inventory completeness
+   alongside the esp_hal sibling.
+
+**Disposition: DEFER.** v0 grammar unchanged. APP-02 orchestrator
+emission for headless intents is **out of v0 scope** — chapter 02
+§8 per-prong templates assume display + controller. The bsp_pac
+manifest is documentary at v0; the existing hand-written
+`src/bsp_pac_main.rs` remains the canonical source until either
+(a) the binary grows a real rlvgl render path (e.g. SSD1306 with
+PAC I2C chunking, per the chip-class header note), or (b) v1 adds
+a "headless" intent class with its own template family.
+
+A v1 amendment MAY relax §5.5 to allow `screens: []` for a new
+`target.kind: headless` field. Premature now; the bsp_pac binary
+is the only known headless example, and it is itself slated to
+grow a display path.
+
 ### 6.12 🟡 OPEN — Zephyr `prj.conf` has hand-tuned values the template cannot reproduce
 
 **Surfaced 2026-04-29 by APP-03d** (H747 Zephyr round-trip). The
@@ -781,3 +820,4 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-29 | DRAFT  | APP-03b landed: `examples/beaglebone-black/app.yaml` + `layouts/home.rs` checked in as the second round-trip artifact. Cites `target.generator: hand_written` (BBB Linux on §5.6 allow-list), the new `controller:` field at `../apps/disco-demo`, and a cross-tree splash asset at `../stm32h747i-disco/assets/media/splash.rle`. Discovery of the cross-tree paths surfaced [§6.11](#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent) — path-safety rule was over-tight; landed alongside as a 01 §15 ratified amendment scoping path safety to the workspace root rather than the manifest's parent. |
 | 2026-04-29 | DRAFT  | APP-03c landed: `examples/stm32h747i-disco/app.yaml` + `layouts/home.rs` checked in as the third round-trip artifact (FreeRTOS intent, build profile `cm7,freertos,adapted_cmd,dma2d,splash,desktop` per CLAUDE.md). No new spec gaps — the path-safety amendment from APP-03b carried it. Cites the new `controller:` field at `../apps/disco-demo`, capabilities preset `stm32h747i_disco`. Splash asset is local (`assets/media/splash.rle`); same blob is what the BBB manifest cross-references. Three of four round-trip targets now landed (beetle esp_hal, BBB linux, H747 freertos); H747 zephyr (APP-03d) remains. |
 | 2026-04-29 | DRAFT  | APP-03d landed: `examples/stm32h747i-disco/app-zephyr.yaml` checked in as the fourth and final round-trip artifact (Zephyr intent, build profile `cm7,zephyr,splash,desktop,dma2d`). Reuses `layouts/home.rs` with the FreeRTOS manifest — the controller-driven render call is prong-agnostic; cross-prong layout reuse is exactly the schema's value proposition. Filename is `app-zephyr.yaml` (not `app.yaml`) since the same Cargo crate hosts the FreeRTOS intent at the canonical name. Surfaced finding [§6.12](#612--open--zephyr-prjconf-has-hand-tuned-values-the-template-cannot-reproduce) — existing `zephyr/prj.conf` has hand-tuned values (`CONFIG_MAIN_STACK_SIZE=16384`, FT5336 touch tunables, log levels) that neither chipdb nor `target.features` express; **disposition DEFER** with `--check`-flag surfacing in APP-02d, no v0 grammar change. **All four round-trip targets now landed**; remaining §12 acceptance work for chapter 03 is the validator-acceptance proof under APP-02a. |
+| 2026-04-29 | DRAFT  | APP-03e landed: `examples/beetle-esp32c3/app-bsp-pac.yaml` + `layouts/led_blink.rs` checked in as a fifth round-trip artifact, the bsp_pac sibling of APP-03a. Closes the schema-coverage gap on `target.generator: creator-bsp-pac` (only landed manifest that exercises it). Surfaced finding [§6.13](#613--open--bsp_pac-stretches-the-screen-abstraction) — bsp_pac has no display and no rlvgl runtime; the v0 `screens[]` requirement (exactly one default screen when `state_machine:` is absent) doesn't naturally fit headless apps. Manifest uses the stretched "screens[] = what runs each tick" interpretation explicitly. **Disposition DEFER** — v0 grammar unchanged; orchestrator emission of headless intents is out of v0 scope; v1 may add a `target.kind: headless` field with its own template family. |
