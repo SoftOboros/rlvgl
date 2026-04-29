@@ -1,25 +1,27 @@
 <!--
 03-round-trip.md - rlvgl Application Schema, Chapter 3: Round-Trip Targets.
-Status: DRAFT — not yet ratified. See §15 change log.
+Status: RATIFIED 2026-04-29. See §15 change log.
 -->
 
 **[← Prev](02-generator-pipeline.md) · [Index](README.md) · Next → (TBD)**
 
 # Chapter 3 — Round-Trip Targets
 
-> **Status:** DRAFT, unratified. Depends on
-> [Chapter 0](00-concepts.md), [Chapter 1](01-manifest-schema.md),
-> [Chapter 2](02-generator-pipeline.md). Until §15 records a
-> ratified entry, no `APP-03` PR may cite this doc as a frozen
-> authority.
+> **Status:** RATIFIED 2026-04-29 (see §15). Depends on
+> [Chapter 0](00-concepts.md), [Chapter 1](01-manifest-schema.md);
+> independent of [Chapter 2](02-generator-pipeline.md) which remains
+> DRAFT pending orchestrator emission. `APP-NN` execution PRs MAY
+> cite this chapter as a frozen authority for round-trip findings,
+> the per-target manifest shapes, and the schema-coverage proofs.
 >
 > **Purpose:** verify the v0 schema and pipeline against reality
 > before they are frozen. The round-trip property declared in
 > [00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property) —
 > "reverse-engineering an existing example into a manifest, then
 > emitting from that manifest, MUST produce a crate that builds and
-> passes its own pre-publish phases" — is unverified until this
-> chapter exists.
+> passes its own pre-publish phases" — is partially satisfied: all
+> five committed manifests pass `--validate-only` (APP-02a). Full
+> round-trip including emission gets verified once APP-02b/c/d land.
 
 ## §0 Authority policy
 
@@ -791,19 +793,27 @@ readers, not authority.
 
 This chapter is ratified (§15 entry dated) when:
 
-- [ ] §5.1–§5.4 manifests reviewed for accuracy against current
-      `examples/` content. Inventory drift is OK to record (not
-      block ratification) as long as it is recorded in §15.
-- [ ] §6 finding list reviewed; each finding has a disposition
-      (ACCEPT / REJECT / DEFER) recorded in §15.
-- [ ] §6.2 controller-library amendment decided — if ACCEPTED, a
-      corresponding 01 §15 amendment opens before this chapter
-      ratifies.
-- [ ] §6.9 Zephyr sibling-project amendment decided — if
-      ACCEPTED, a corresponding 02 §15 amendment opens before
-      this chapter ratifies.
-- [ ] §6.3 `target.generator` enum decision recorded.
-- [ ] §15 has a dated ratification entry signed off by the
+- [x] §5.1–§5.4 manifests reviewed for accuracy against current
+      `examples/` content. All five committed manifests
+      (`examples/beetle-esp32c3/{app,app-bsp-pac}.yaml`,
+      `examples/beaglebone-black/app.yaml`,
+      `examples/stm32h747i-disco/{app,app-zephyr}.yaml`) pass
+      `rlvgl-creator app from-yaml --validate-only` per APP-02a.
+- [x] §6 finding list reviewed; each finding has a disposition.
+      Closures: §6.1, §6.2, §6.3, §6.4, §6.5, §6.6, §6.7, §6.8,
+      §6.9, §6.10, §6.11, §6.14 (CLOSED). Open with disposition
+      DEFER through v0: §6.12 (Zephyr Kconfig), §6.13 (headless
+      schema fit).
+- [x] §6.2 controller-library amendment ACCEPTED — landed in
+      [01 §5.10](01-manifest-schema.md#510-controller-optional)
+      and [02 §7.8](02-generator-pipeline.md#78-controller-wiring-contract).
+- [x] §6.9 Zephyr sibling-project amendment ACCEPTED — landed in
+      [02 §5.4.1](02-generator-pipeline.md#541-zephyr-prong-nested-west-project)
+      and [02 §8.4](02-generator-pipeline.md#84-zephyr-prong).
+- [x] §6.3 `target.generator` enum decision recorded — added
+      `hosted` value as the third generator
+      ([01 §5.2](01-manifest-schema.md#52-target-required)).
+- [x] §15 has a dated ratification entry signed off by the
       initiative owner.
 
 ## §13 Files cited
@@ -855,3 +865,4 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-29 | DRAFT  | APP-03d landed: `examples/stm32h747i-disco/app-zephyr.yaml` checked in as the fourth and final round-trip artifact (Zephyr intent, build profile `cm7,zephyr,splash,desktop,dma2d`). Reuses `layouts/home.rs` with the FreeRTOS manifest — the controller-driven render call is prong-agnostic; cross-prong layout reuse is exactly the schema's value proposition. Filename is `app-zephyr.yaml` (not `app.yaml`) since the same Cargo crate hosts the FreeRTOS intent at the canonical name. Surfaced finding [§6.12](#612--open--zephyr-prjconf-has-hand-tuned-values-the-template-cannot-reproduce) — existing `zephyr/prj.conf` has hand-tuned values (`CONFIG_MAIN_STACK_SIZE=16384`, FT5336 touch tunables, log levels) that neither chipdb nor `target.features` express; **disposition DEFER** with `--check`-flag surfacing in APP-02d, no v0 grammar change. **All four round-trip targets now landed**; remaining §12 acceptance work for chapter 03 is the validator-acceptance proof under APP-02a. |
 | 2026-04-29 | DRAFT  | APP-03e landed: `examples/beetle-esp32c3/app-bsp-pac.yaml` + `layouts/led_blink.rs` checked in as a fifth round-trip artifact, the bsp_pac sibling of APP-03a. Closes the schema-coverage gap on `target.generator: creator-bsp-pac` (only landed manifest that exercises it). Surfaced finding [§6.13](#613--open--bsp_pac-stretches-the-screen-abstraction) — bsp_pac has no display and no rlvgl runtime; the v0 `screens[]` requirement (exactly one default screen when `state_machine:` is absent) doesn't naturally fit headless apps. Manifest uses the stretched "screens[] = what runs each tick" interpretation explicitly. **Disposition DEFER** — v0 grammar unchanged; orchestrator emission of headless intents is out of v0 scope; v1 may add a `target.kind: headless` field with its own template family. |
 | 2026-04-29 | DRAFT  | APP-02a landed: validator + orchestrator-skeleton subcommand `rlvgl-creator app from-yaml --validate-only` in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. Implements all seven chapter 01 §6 validation rules; integration tests cover (a) all five committed round-trip manifests passing, (b) eight chapter 01 §9 counter-examples each rejected with the rule-tagged error, (c) four targeted feature-coverage tests (`controller:` workspace path-dep, state-machine extension, hand_written allow-list). Surfaced finding [§6.14](#614--closed--chipdb-find-cross-vendor-lookup-key-was-inconsistent) — esp's `find()` matched on human-friendly name only; chapter 01 §3 says board id = file stem; landed a chipdb-side fix making esp's `find()` accept either form. Orchestrator emission (chapter 02 §6 stages 3–7) remains DEFER for APP-02b/c/d. **All five committed manifests now pass `--validate-only`**, which is the chapter 01 §12 acceptance proof for "minimal example accepted by validator." |
+| 2026-04-29 | RATIFIED | Owner: Ira Abbott. All §12 acceptance bullets satisfied. Five round-trip manifests landed and validator-accepted; all 14 §6 findings have recorded dispositions (12 CLOSED, 2 OPEN with DEFER through v0). `APP-NN` execution PRs may now cite this chapter as a frozen authority for round-trip findings and per-target manifest shapes. Chapter 02 remains DRAFT pending orchestrator emission (APP-02b/c/d). |

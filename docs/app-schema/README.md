@@ -5,12 +5,15 @@ Status: DRAFT — chapters not yet ratified.
 
 # rlvgl Application Schema
 
-> **Status:** Chapters 00 and 01 RATIFIED 2026-04-27 (owner: Ira
-> Abbott). Chapters 02 and 03 remain DRAFT — implementation-gated.
-> `APP-NN[a-z]` execution PRs MAY cite ratified chapters as frozen
-> authorities; cite DRAFT chapters only as references-in-progress.
-> See [`CLAUDE.md`](../../CLAUDE.md) §"Spec-Before-Code Planning
-> Discipline" for what ratification means.
+> **Status:** Chapters 00, 01, and 03 RATIFIED (owner: Ira
+> Abbott; 00 and 01 ratified 2026-04-27, 03 ratified 2026-04-29
+> after the APP-02a validator landing closed §12). Chapter 02
+> remains DRAFT — emission-gated, awaiting APP-02b/c/d.
+> `APP-NN[a-z]` execution PRs MAY cite ratified chapters as
+> frozen authorities; cite DRAFT chapters only as
+> references-in-progress. See [`CLAUDE.md`](../../CLAUDE.md)
+> §"Spec-Before-Code Planning Discipline" for what ratification
+> means.
 
 This initiative defines a **stable underschema** — a single
 declarative manifest (`app.yaml`) describing an rlvgl application —
@@ -30,8 +33,8 @@ and authoring tools may evolve freely.
 | -- | ------------------------------------------------------------------ | ------- |
 | 00 | [Concepts & Vocabulary](00-concepts.md)                            | **RATIFIED** |
 | 01 | [Manifest Grammar (`app.yaml`, `rlvgl-app/v0`)](01-manifest-schema.md) | **RATIFIED** |
-| 02 | [Generator Pipeline (`rlvgl-creator app from-yaml`)](02-generator-pipeline.md) | DRAFT (impl-gated) |
-| 03 | [Round-Trip Targets](03-round-trip.md)                             | DRAFT (artifact-gated) |
+| 02 | [Generator Pipeline (`rlvgl-creator app from-yaml`)](02-generator-pipeline.md) | DRAFT (emission-gated) |
+| 03 | [Round-Trip Targets](03-round-trip.md)                             | **RATIFIED** |
 | 04 | State-Machine Boundary (full Option A / B treatment)               | TBD     |
 
 ## Conformance
