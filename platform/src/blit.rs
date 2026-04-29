@@ -20,6 +20,7 @@ use alloc::vec::Vec;
 use alloc::{collections::BTreeMap, vec};
 use bitflags::bitflags;
 use heapless::Vec as HVec;
+use rlvgl_core::cmd::{Cmd, CommandList, CommandSink};
 #[cfg(feature = "fontdue")]
 use rlvgl_core::fontdue::{Metrics, line_metrics, rasterize_glyph};
 use rlvgl_core::renderer::Renderer;
@@ -742,6 +743,67 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
             });
         }
     }
+}
+
+/// `CommandSink` impl with occlusion pre-pass.
+///
+/// Backend-specialized submit path: walks the [`CommandList`] and, for
+/// each cmd, checks whether any *later* opaque [`Cmd::FillRect`] fully
+/// covers its AABB. If so, the cmd is skipped entirely — it would be
+/// overwritten anyway. Survivors are dispatched via the normal
+/// [`Renderer`] trait methods on `self` (existing
+/// [`BlitterRenderer::blend_row`] override applies, so AA cmds get the
+/// hardware-blend fast path).
+///
+/// The check is O(n²) but cmd counts are small (a typical clock frame
+/// is 50–100 cmds). Only `FillRect` with `alpha == 255` qualifies as an
+/// occluder — geometric primitives (OBB, disc, arc, line) don't fully
+/// cover their AABBs and are never occluders even at full alpha.
+///
+/// Markers (`Barrier`, `SetClip`) are ignored by the occlusion pass for
+/// v1 — they pass through as no-ops on dispatch. A future revision can
+/// segment the list at markers if cross-marker reordering becomes a
+/// correctness concern.
+impl<B: Blitter, const N: usize> CommandSink for BlitterRenderer<'_, B, N> {
+    fn submit(&mut self, list: &CommandList) {
+        for (i, cmd) in list.iter().enumerate() {
+            let Some(bb_i) = cmd.aabb() else {
+                cmd.dispatch_to(self);
+                continue;
+            };
+            let mut occluded = false;
+            for later in list.iter().skip(i + 1) {
+                if !is_opaque_filler(later) {
+                    continue;
+                }
+                let Some(bb_j) = later.aabb() else { continue };
+                if rect_contains(bb_j, bb_i) {
+                    occluded = true;
+                    break;
+                }
+            }
+            if !occluded {
+                cmd.dispatch_to(self);
+            }
+        }
+    }
+}
+
+#[inline]
+fn is_opaque_filler(cmd: &Cmd) -> bool {
+    if let Cmd::FillRect { color, .. } = cmd {
+        color.3 == 255
+    } else {
+        false
+    }
+}
+
+#[inline]
+fn rect_contains(outer: WidgetRect, inner: WidgetRect) -> bool {
+    outer.x <= inner.x
+        && outer.y <= inner.y
+        && outer.x + outer.width >= inner.x + inner.width
+        && outer.y + outer.height >= inner.y + inner.height
 }
 
 /// Renderer wrapper that applies 90° CCW rotation for platforms where the
