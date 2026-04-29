@@ -610,6 +610,36 @@ yet, so most layout source is hand-rolled Rust.
 pipeline (e.g. `figma_export_v1` or `uml_widget_v1`) shipping
 first. Don't remove the backdoor before there's a real front door."
 
+### 6.11 🟡 CLOSED — Path safety scoped to workspace root, not manifest parent
+
+**Surfaced 2026-04-29 by APP-03b** (BBB Linux round-trip). The
+existing example uses two cross-tree paths the original
+[01 §3](01-manifest-schema.md#§3-glossary-additions) /
+[§6 rule 4](01-manifest-schema.md#§6-validation-rule-set-normative)
+incorrectly rejected:
+
+- `controller.path: ../apps/disco-demo` — workspace path-dep on
+  the shared `rlvgl-app-disco-demo` crate. The H747 freertos and
+  zephyr round-trip manifests will hit the same.
+- `assets[].source: ../stm32h747i-disco/assets/media/splash.rle`
+  — splash binary shared between the BBB and H747 desktops; the
+  existing BBB main.rs uses
+  `include_bytes!("../../stm32h747i-disco/assets/media/splash.rle")`
+  which Cargo allows but our schema's path-safety rule did not.
+
+Both are legitimate monorepo patterns. The original "outside the
+manifest's parent" wording was over-tight — the right scope for
+manifest paths is the **cargo workspace root**, not the manifest
+file's directory. Beyond the workspace root, absolute paths and
+upward traversals are still rejected (the security intent is
+preserved; only the scope is corrected).
+
+**Disposition: ACCEPT** as ratified amendment to chapter 01
+([§15 entry 2026-04-29](01-manifest-schema.md#§15-change-log)):
+§3 Manifest path glossary, §6 rule 4 Path safety, and §5.10
+`controller.path` validation all updated to scope at workspace
+root.
+
 ## §10 Reconciliation with adjacent initiatives
 
 ### 10.1 vs. the BBB four-prong initiative
@@ -715,3 +745,4 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-27 | DRAFT  | APP-03a partial landing: `examples/beetle-esp32c3/app.yaml` + `layouts/main_screen.rs` checked in as the first round-trip artifact (chapters 00 + 01 RATIFIED same day). Cites `target.generator: hosted`, `layout_format: rust_inline_v1`. Validator `--check` gating awaits APP-02a. Remaining round-trip artifacts (BBB linux, H747 freertos, H747 zephyr) blocked on chipdb minimal entries (01 §5.2 / [03 §6.4 follow-up](#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards)) and corresponding chip families being present in the chipdb tree. |
 | 2026-04-29 | DRAFT  | §6.4 closure superseded after [01 §5.2 amendment](01-manifest-schema.md#§15-change-log) discovered the original wording assumed esp-shape YAML files universally. New rule: board id resolves via vendor-crate `find()` API; backing storage is per-vendor. Follow-up actions rewritten — ti gets a hardcoded `BOARDS` const entry, stm gets a build-script source addition + archive rebuild, no YAML files dropped into trees that don't use them. |
 | 2026-04-29 | DRAFT  | APP-04a landed: ti and stm vendor crates each gained one `BoardInfo` const entry (`beaglebone_black_nhd_cape` → AM335x, `stm32h747i_disco` → STM32H747XIH6). Investigation showed both vendors drive `find()` from a hardcoded `BOARDS` const, so the simpler-than-expected mechanism made the addition trivial. BBB and H747 round-trip manifests are now unblocked at the `target.board` validation level. |
+| 2026-04-29 | DRAFT  | APP-03b landed: `examples/beaglebone-black/app.yaml` + `layouts/home.rs` checked in as the second round-trip artifact. Cites `target.generator: hand_written` (BBB Linux on §5.6 allow-list), the new `controller:` field at `../apps/disco-demo`, and a cross-tree splash asset at `../stm32h747i-disco/assets/media/splash.rle`. Discovery of the cross-tree paths surfaced [§6.11](#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent) — path-safety rule was over-tight; landed alongside as a 01 §15 ratified amendment scoping path safety to the workspace root rather than the manifest's parent. |

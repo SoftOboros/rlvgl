@@ -57,8 +57,16 @@ Only terms *not* defined in [00 §3](00-concepts.md#§3-canonical-glossary):
 
 - **Manifest path** — *Owned by this chapter.* A relative POSIX-style
   path resolved from the directory containing `app.yaml`. Absolute
-  paths and `..` traversals outside the manifest's parent are
-  rejected.
+  paths and traversals outside the **cargo workspace root** are
+  rejected; `..` traversals that stay within the workspace are
+  permitted. The workspace root is the directory containing the
+  workspace's top-level `Cargo.toml` (with `[workspace]`).
+  (Rationale: monorepo workspace patterns legitimately share assets
+  and depend on sibling crates by relative path; the original
+  wording — "outside the manifest's parent" — was too tight. See
+  [03 §6.11](03-round-trip.md#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent)
+  for the round-trip evidence that forced the change. Amended
+  2026-04-29.)
 - **Schema tag** — *Owned by this chapter.* The string value of the
   top-level `schema:` key, of shape `rlvgl-app/v<N>`. v0 is unstable
   and breaking-change-allowed; v1 will be the first stable tag.
@@ -380,8 +388,10 @@ simulator binary).
 - If `controller:` is present, `crate` is required.
 - `path` and `version` are mutually exclusive. Specifying neither
   means "resolve from the workspace's default cargo registry."
-- `path` MUST be a `<manifest-path>` (relative, no escape) that
-  resolves to a directory containing a `Cargo.toml`.
+- `path` MUST be a `<manifest-path>` resolving to a directory
+  containing a `Cargo.toml`. Workspace-sibling traversals
+  (`../apps/disco-demo`, `../../shared-controllers/foo`, etc.) are
+  permitted per §3 — they do not escape the workspace root.
 - `version`, if present, MUST be a valid semver requirement
   (`"0.2.0"`, `"^0.2"`, `">=0.1, <0.3"`).
 - `capabilities` is a free-form string. The manifest validator
@@ -417,8 +427,12 @@ A conforming v0 validator MUST enforce, in this order:
 2. **Required top-level keys present** — `name`, `target`.
 3. **Reference id format** — every `id:` field matches the §3 regex.
 4. **Path safety** — every `<manifest-path>` resolves under the
-   manifest's parent directory; absolute paths and parent-directory
-   escapes are rejected.
+   cargo workspace root containing the manifest; absolute paths
+   and traversals beyond the workspace root are rejected. The
+   workspace root is the nearest ancestor directory whose
+   `Cargo.toml` declares `[workspace]`. `..` traversals that stay
+   within the workspace (e.g. into sibling example or library
+   crates) are permitted.
 5. **Cross-references resolve**:
    - `target.vendor` is a known chipdb vendor.
    - `target.board` resolves via the vendor crate's `find()` API
@@ -683,3 +697,4 @@ Ratifying this chapter unblocks:
 | 2026-04-27 | DRAFT  | Round-trip convergence pass closed. Grammar additions: §5.10 `controller:` field (closes [03 §6.2](03-round-trip.md#62--closed--controller-libraries-get-a-first-class-manifest-slot)); §5.2 `target.generator: hosted` value + chipdb minimal-entry rule (closes [03 §6.3](03-round-trip.md#63--closed--targetgenerator-gets-a-third-value-hosted) and [03 §6.4](03-round-trip.md#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards)); §5.4.1 informative `options:` keys table (closes [03 §6.6](03-round-trip.md#66--closed--common-options-keys-catalogued-informative)); §5.5 explicit v1 gating note for `rust_inline_v1` (closes [03 §6.10](03-round-trip.md#610--closed--rust_inline_v1-v1-removal-is-conditional)); §5.6 expanded with `beaglebone_black_nhd_cape` allow-list entry. §6 validation rule 5 extended for `controller`. §11 amended: explicit "intent vs. crate" language ([03 §6.1](03-round-trip.md#61--closed--the-one-appyaml-per-intent-rule-holds)) and explicit no-`extends:` decision ([03 §6.7](03-round-trip.md#67--closed--sibling-manifests-duplicate-by-copy-at-v0)). §12 checklist still incomplete; chapter remains DRAFT pending validator implementation and round-trip target check-in. |
 | 2026-04-27 | RATIFIED | Owner: Ira Abbott. v0 manifest grammar (`rlvgl-app/v0`) frozen. §6 validator-test-fixture and §7 minimal-example items remain unchecked but are explicitly non-blocking per §12 (tracked under APP-02a / APP-03a). `APP-NN` execution PRs may now cite this chapter as a frozen authority for grammar, validation rules, and field semantics. Future grammar amendments require a new dated entry and matching review depth. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.2 board-lookup rule clarified: replaced "MUST be a file basename in `chipdb/rlvgl-chips-<vendor>/db/boards/`" with "MUST resolve via the vendor crate's `find()` API." §6 validation rule 5 updated to match. **Substance unchanged** — board id MUST still resolve to a real chipdb-registered board with a non-empty `chip` field; only the lookup *mechanism* is now vendor-architecture-aware (esp uses YAML files; stm uses a build-time `chipdb.bin.zst` archive; ti uses a hardcoded `BOARDS` constant). Forced by [03 §6.4 follow-up](03-round-trip.md#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards) discovery that 01 §5.2's original wording was esp-shape-specific. No frozen invariants or enums changed. |
+| 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §3 (Manifest path) and §6 rule 4 (Path safety) re-scoped: traversal scope changed from "manifest's parent directory" to "cargo workspace root." `..` traversals into sibling crates / shared assets within the same workspace are now permitted; absolute paths and traversals beyond the workspace root remain rejected. §5.10 `controller.path` validation updated to acknowledge workspace-sibling path-deps. Forced by APP-03b (BBB Linux round-trip) discovery that monorepo-shared assets (`../stm32h747i-disco/assets/media/splash.rle`) and workspace path-deps (`../apps/disco-demo`) are legitimate Cargo patterns the original wording incorrectly forbade. See [03 §6.11](03-round-trip.md#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent). No frozen invariants or enums changed. |
