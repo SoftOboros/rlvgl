@@ -498,6 +498,7 @@ pub fn decode_argb_into(
 /// * [`Orientation::Rot90Cw`] and [`Orientation::Rot90Ccw`]: `(dst_w, dst_h) == (src_h, src_w)`.
 ///
 /// No heap allocation is performed — suitable for `no_std`.
+#[allow(clippy::too_many_arguments)]
 pub fn decode_argb_into_rotated(
     src_w: usize,
     src_h: usize,

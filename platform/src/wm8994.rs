@@ -25,8 +25,20 @@ const REG_PWR_MGMT_6: u16 = 0x0006;
 const REG_AIF1_CLOCKING_1: u16 = 0x0200;
 const REG_AIF1_CLOCKING_2: u16 = 0x0201;
 const REG_CLOCKING_1: u16 = 0x0208;
-const REG_CLOCKING_2: u16 = 0x0210;
-const REG_AIF1_RATE: u16 = 0x0211;
+// DISCO-XX (2026-04-30) register-map fix per WM8994_Rev4.6.pdf
+// (memalpha-verified). Earlier values were:
+//   REG_CLOCKING_2: 0x0210  → wrong; that's AIF1 Rate
+//   REG_AIF1_RATE: 0x0211  → wrong; that's AIF2 Rate
+// Per p.285: R0x209 = "Clocking (2)" (TOCLK_DIV / DBCLK_DIV / OPCLK_DIV).
+// Per p.194/285-286: R0x210 = "AIF1 Rate" (bits 7:4 AIF1_SR, bits 3:0
+// AIF1CLK_RATE).
+// Per p.286: R0x211 = "AIF2 Rate" (not AIF1).
+// `init_playback`'s previous writes happened to land on benign defaults
+// for its narrow 48 kHz playback path; downstream consumers exercising
+// more of the AIF1 register surface (disco-analyzer's init_record) hit
+// the discrepancy. See AGENT-TASK-WM8994-REGISTER-MAP-FIX.md.
+const REG_CLOCKING_2: u16 = 0x0209;
+const REG_AIF1_RATE: u16 = 0x0210;
 
 // FLL1 (Frequency Locked Loop)
 const REG_FLL1_CTRL_1: u16 = 0x0220;
@@ -167,25 +179,43 @@ where
         // 6. AIF1 clocking: source = FLL1, enable AIF1CLK
         self.write_reg(REG_AIF1_CLOCKING_1, 0x0011)?; // FLL1 source, AIF1CLK_ENA
 
-        // 7. System clocking: AIF1CLK -> SYSCLK
-        self.write_reg(REG_CLOCKING_1, 0x000A)?; // SYSCLK_SRC = AIF1CLK, AIF1CLK / 1
+        // 7. R0x208 Clocking (1) per WM8994_Rev4.6.pdf p.284:
+        //   bit 0 SYSCLK_SRC (0 = MCLK1, 1 = AIF1CLK)
+        //   bit 1 SYSDSPCLK_ENA
+        //   bit 2 AIF2DSPCLK_ENA
+        //   bit 3 AIF1DSPCLK_ENA
+        //   bit 4 TOCLK_ENA
+        // 0x000A = bits 1+3 → SYSDSPCLK + AIF1DSPCLK enabled. SYSCLK_SRC=0
+        // (MCLK1) — relies on MCLK1 being externally driven (SAI1_MCLK_A
+        // on PG7 → codec MCLK1 input). FLL1 separately drives AIF1CLK
+        // for the AIF1 path (see R0x200 = 0x0011 above).
+        self.write_reg(REG_CLOCKING_1, 0x000A)?;
 
-        // 8. AIF1 sample rate
-        let rate_bits = match sample_rate {
+        // 8. R0x210 AIF1 Rate per WM8994_Rev4.6.pdf p.194 / 285-286
+        //   (memalpha-verified, DISCO-XX 2026-04-30):
+        //   bits 7:4 AIF1_SR — sample-rate code:
+        //     0=8k, 1=11.025k, 2=12k, 3=16k, 4=22.05k, 5=24k, 6=32k,
+        //     7=44.1k, 8=48k, 9=88.2k, A=96k.
+        //   bits 3:0 AIF1CLK_RATE — AIF1CLK / Fs ratio:
+        //     1=128, 2=192, 3=256, 4=384, 5=512, 6=768, 7=1024, 8=1408,
+        //     9=1536.
+        //   FLL1 is configured for `sample_rate * 256` (configure_fll1),
+        //   so AIF1CLK_RATE = 0x3 (256·Fs) matches the FLL output.
+        let rate_bits: u16 = match sample_rate {
             8000 => 0x00,
             11025 => 0x01,
-            12000 => 0x01,
-            16000 => 0x02,
-            22050 => 0x03,
-            24000 => 0x03,
-            32000 => 0x04,
-            44100 => 0x05,
-            48000 => 0x06,
-            88200 => 0x07,
-            96000 => 0x07,
-            _ => 0x06, // default 48 kHz
+            12000 => 0x02,
+            16000 => 0x03,
+            22050 => 0x04,
+            24000 => 0x05,
+            32000 => 0x06,
+            44100 => 0x07,
+            48000 => 0x08,
+            88200 => 0x09,
+            96000 => 0x0A,
+            _ => 0x08, // default 48 kHz
         };
-        self.write_reg(REG_AIF1_RATE, (rate_bits << 4) | 0x0001)?; // AIF1CLK_RATE=256Fs
+        self.write_reg(REG_AIF1_RATE, (rate_bits << 4) | 0x0003)?;
 
         // 9. AIF1 control: I2S format, 16-bit word length
         self.write_reg(REG_AIF1_CONTROL_1, 0x4010)?; // FMT=I2S, WL=16-bit
@@ -196,7 +226,17 @@ where
         // 11. AIF1 clocking 2: divide by 1
         self.write_reg(REG_AIF1_CLOCKING_2, 0x0000)?;
 
-        // 12. Clocking 2: enable AIF1DAC, AIF1ADC clocks
+        // 12. R0x209 Clocking (2) per WM8994_Rev4.6.pdf p.285:
+        //   bits 10:8 TOCLK_DIV, bits 6:4 DBCLK_DIV, bits 2:0 OPCLK_DIV.
+        //   No AIF1DAC/ADC clock enables here — those come from
+        //   AIF1DSPCLK_ENA in R0x208 above. Writing 0x0003 sets
+        //   OPCLK_DIV[2:0] = 011 = divide-by-4 for the OPCLK output
+        //   (only used if explicitly routed to a GPIO; benign default).
+        //   Pre-DISCO-XX this address was incorrectly 0x210 which is
+        //   AIF1 Rate; that overwrote the correct AIF1 rate config but
+        //   the bug was masked because R0x211 (also misnamed) was
+        //   getting the rate value first and the codec accepted the
+        //   stomp on R0x210.
         self.write_reg(REG_CLOCKING_2, 0x0003)?;
 
         // 13. Power management: enable DACs and output paths

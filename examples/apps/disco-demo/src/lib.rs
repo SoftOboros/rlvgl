@@ -455,6 +455,7 @@ impl ControllerState {
         ]);
     }
 
+    #[allow(dead_code)]
     fn show_storage(&mut self) {
         self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title("Storage Browser");

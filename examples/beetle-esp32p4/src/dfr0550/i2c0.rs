@@ -60,13 +60,17 @@ pub unsafe fn route_pins() {
 
     // Output enable for both pins (open-drain — line pulled high by ext.
     // pull-up, master pulls low through the pad).
-    p.GPIO.enable_w1ts().write(|w| unsafe {
-        w.bits((1u32 << SCL_GPIO) | (1u32 << SDA_GPIO))
-    });
+    p.GPIO
+        .enable_w1ts()
+        .write(|w| unsafe { w.bits((1u32 << SCL_GPIO) | (1u32 << SDA_GPIO)) });
 
     // Set pad_driver = 1 (open-drain) on both pins.
-    p.GPIO.pin(SCL_GPIO as usize).modify(|_, w| w.pad_driver().set_bit());
-    p.GPIO.pin(SDA_GPIO as usize).modify(|_, w| w.pad_driver().set_bit());
+    p.GPIO
+        .pin(SCL_GPIO as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+    p.GPIO
+        .pin(SDA_GPIO as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
 
     // Output mux: peripheral signal idx → GPIO pin.
     p.GPIO
