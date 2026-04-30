@@ -57,9 +57,20 @@ fn all_boards_render_successfully() {
             }
         };
 
-        if written.len() != 6 {
+        // RISC-V chips with a `linker:` block in their chip yaml
+        // also emit `memory.x` + `<chip>.x` (commit 41c9e16),
+        // bumping the per-board emit from 6 to 8 files. Xtensa
+        // chips go through esp-hal and don't need the linker
+        // scaffolding; RISC-V chips without a linker block (e.g.
+        // esp32c5/c61/h2 minimal seeds) also stay at 6 until their
+        // linker spec is filled in.
+        let emit_linker = ir.chip.linker.is_some() && ir.chip.arch.starts_with("rv32");
+        let expected = if emit_linker { 8 } else { 6 };
+        if written.len() != expected {
             failures.push(format!(
-                "board '{board_stem}': expected 6 files, got {}",
+                "board '{board_stem}' (arch '{}', linker={}): expected {expected} files, got {}",
+                ir.chip.arch,
+                ir.chip.linker.is_some(),
                 written.len()
             ));
             continue;

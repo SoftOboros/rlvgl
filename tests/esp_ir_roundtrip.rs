@@ -295,7 +295,10 @@ fn beetle_esp32p4_board_yaml_parses_and_merges() {
         .iter()
         .find(|p| p.signal == "I2C0_SCL")
         .expect("SCL pin");
-    assert_eq!(scl.gpio, 7);
+    // beetle_esp32p4 fixture's I2C0 pins are gpio 8 (SCL) and
+    // gpio 7 (SDA), matching the DFR1172 P4 schematic for the
+    // DSI-bridge / Pi-7" panel control bus.
+    assert_eq!(scl.gpio, 8);
     assert_eq!(scl.peripheral.as_deref(), Some("i2c0"));
     assert_eq!(scl.direction, EspDir::Inout);
     assert_eq!(scl.pull.as_deref(), Some("up"));
