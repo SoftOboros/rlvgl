@@ -89,16 +89,10 @@ unsafe fn run_bringup() -> u8 {
             Err(_) => return 4,
         };
 
-        // Phase 6: DPI controller — pattern generator path.
-        if dfr0550::dpi_panel::DpiPanel::init_pattern(
-            &dsi,
-            dfr0550::DPI_PIXEL_CLK_MHZ,
-            dfr0550::dpi_panel::PatternType::BarVertical,
-        )
-        .is_err()
-        {
-            return 5;
-        }
+        // Phase 6: DPI controller — currently returns Err(Unimplemented).
+        // Drop the bus handle so it isn't optimized out before the LED loop.
+        let _ = dsi;
+        let _ = dfr0550::dpi_panel::DpiPanel::init(&dsi);
 
         0
     }
