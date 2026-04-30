@@ -309,3 +309,11 @@ gpio_matrix:
   - { id: 88, name: RMT_SIG_IN1,  direction: in  }
   - { id: 89, name: RMT_SIG_OUT0, direction: out }
   - { id: 90, name: RMT_SIG_OUT1, direction: out }
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases for the bsp_pac flashable path. .text/.rodata go to cache-mapped
+# flash (IROM); .data/.bss/.heap/.stack go to internal SRAM (IRAM/DRAM
+# alias the same physical memory on C3).
+linker:
+  region_text: irom
+  region_data: iram

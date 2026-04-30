@@ -491,3 +491,10 @@ io_mux:
 # FireBeetle 2 P4 board actually uses. Expanded when additional boards
 # need different routes.
 gpio_matrix: []
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases. Used by the generator to emit memory.x and esp32p4.x linker
+# supplements for the bsp_pac flashable path.
+linker:
+  region_text: flash_cache
+  region_data: hp_l2mem

@@ -85,6 +85,26 @@ pub struct EspChip {
     pub io_mux: Vec<EspIoMuxPin>,
     /// GPIO matrix signal ID ↔ name table.
     pub gpio_matrix: Vec<EspGpioMatrixSignal>,
+    /// Linker layout — which memory regions back the
+    /// `REGION_TEXT`/`REGION_DATA`/etc aliases that `riscv-rt` and
+    /// `esp-riscv-rt` expect. Only required for RISC-V chips that consume
+    /// the bsp_pac flashable path; absent on Xtensa entries that go
+    /// through esp-hal.
+    #[serde(default)]
+    pub linker: Option<EspLinker>,
+}
+
+/// Linker-region alias map for the chip.
+///
+/// Each field names one of the `name:` entries in [`EspChip::memory`]. The
+/// renderer turns these into `REGION_ALIAS("REGION_TEXT", FLASH_CACHE)` and
+/// friends in the generated `memory.x`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EspLinker {
+    /// Memory region that holds `.init`/`.text`/`.rodata` (e.g. `"flash_cache"`).
+    pub region_text: String,
+    /// Memory region that holds `.data`/`.bss`/`.heap`/`.stack` (e.g. `"hp_l2mem"`).
+    pub region_data: String,
 }
 
 /// Contiguous memory region described by the chip memory map.

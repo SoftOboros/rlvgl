@@ -18,7 +18,8 @@ fn render_beetle_esp32c6_to_tempdir() -> (tempfile::TempDir, std::path::PathBuf)
     let ir = merge(chip, board).expect("merge ok");
     let tmp = tempfile::tempdir().expect("tempdir");
     let written = render_esp_pac(&ir, tmp.path()).expect("render ok");
-    assert_eq!(written.len(), 6);
+    // 6 Rust files + memory.x + esp32_c6.x linker scripts.
+    assert_eq!(written.len(), 8);
     let bsp_dir = tmp.path().join("dfr1172_c6_companion");
     assert!(bsp_dir.is_dir(), "bsp dir created: {}", bsp_dir.display());
     (tmp, bsp_dir)
@@ -34,6 +35,8 @@ fn produces_expected_file_set() {
         "io_mux.rs",
         "peripherals.rs",
         "board.rs",
+        "memory.x",
+        "esp32_c6.x",
     ] {
         let p = bsp_dir.join(name);
         assert!(p.is_file(), "expected {}", p.display());

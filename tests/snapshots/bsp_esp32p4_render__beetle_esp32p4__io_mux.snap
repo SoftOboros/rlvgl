@@ -48,10 +48,10 @@ pub fn init() {
     
     
     
-    // GPIO7 — I2C0_SCL (i2c0)
+    // GPIO8 — I2C0_SCL (i2c0)
     
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
-    p.IO_MUX.gpio(7).modify(|_, w| unsafe {
+    p.IO_MUX.gpio(8).modify(|_, w| unsafe {
         w.mcu_sel().bits(1)
          .fun_ie().set_bit()
          .fun_wpu().set_bit()
@@ -60,10 +60,10 @@ pub fn init() {
     
     
     
-    // GPIO8 — I2C0_SDA (i2c0)
+    // GPIO7 — I2C0_SDA (i2c0)
     
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
-    p.IO_MUX.gpio(8).modify(|_, w| unsafe {
+    p.IO_MUX.gpio(7).modify(|_, w| unsafe {
         w.mcu_sel().bits(1)
          .fun_ie().set_bit()
          .fun_wpu().set_bit()
