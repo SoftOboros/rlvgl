@@ -933,7 +933,13 @@ where
     }
 
     /// Write a 16-bit value to a 16-bit register address.
-    fn write_reg(&mut self, reg: u16, val: u16) -> Result<(), I2C::Error> {
+    ///
+    /// Public for diagnostic / bench-bring-up use. The init_playback /
+    /// init_record sequences cover the canonical register choreography;
+    /// callers reaching for write_reg directly are typically iterating
+    /// register experiments before promoting them into a structured init
+    /// path.
+    pub fn write_reg(&mut self, reg: u16, val: u16) -> Result<(), I2C::Error> {
         let buf = [
             (reg >> 8) as u8,
             (reg & 0xFF) as u8,
@@ -944,7 +950,13 @@ where
     }
 
     /// Read a 16-bit value from a 16-bit register address.
-    fn read_reg(&mut self, reg: u16) -> Result<u16, I2C::Error> {
+    ///
+    /// Public for diagnostic / readback use. Prefer
+    /// [`Self::readback_critical_regs`] / [`Self::readback_output_regs`]
+    /// for the canonical record-path / output-path register snapshots —
+    /// they pack the data into a `(reg << 16) | val` SRAM4-friendly
+    /// layout.
+    pub fn read_reg(&mut self, reg: u16) -> Result<u16, I2C::Error> {
         let addr = [(reg >> 8) as u8, (reg & 0xFF) as u8];
         let mut buf = [0u8; 2];
         self.i2c.write_read(Self::ADDRESS, &addr, &mut buf)?;
