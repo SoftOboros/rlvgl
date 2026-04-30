@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: MIT
+#
+# rlvgl-app/v0 manifest for the STM32H747I-DISCO Zephyr intent.
+# Sibling to ./app.yaml (the FreeRTOS intent) — same Cargo crate hosts
+# both binaries / staticlib variants per the existing repo layout, but
+# each intent gets its own manifest per the "one app.yaml per intent"
+# rule (01 §11).
+#
+# Status: APP-03d candidate. Conforms to docs/app-schema/01-manifest-schema.md
+# (RATIFIED 2026-04-27, 2026-04-29 amendments). Validator-`--check`
+# verification pending APP-02a.
+#
+# Round-trip authority: docs/app-schema/03-round-trip.md §5.4 (the
+# Zephyr intent of examples/stm32h747i-disco/Cargo.toml — staticlib
+# + sibling/nested west project at zephyr/).
+#
+# Build flow (existing repo):
+#   1. cargo build --features cm7,zephyr,splash,desktop,dma2d --lib
+#      -> target/.../librlvgl_example_disco.a
+#   2. west build -b stm32h747i_disco/stm32h747xx/m7 \
+#        examples/stm32h747i-disco/zephyr \
+#        -- -DSHIELD=st_b_lcd40_dsi1_mb1166_a09
+#      -> Zephyr application linking the Rust staticlib
+#
+# Pipeline expectation (per chapter 02 §5.4.1 + §8.4): when the
+# orchestrator emits a target.prong=zephyr crate, the output adds a
+# nested zephyr/ subdir with templated CMakeLists.txt, prj.conf,
+# app.overlay, src/main.c. The existing examples/stm32h747i-disco/zephyr/
+# contains *hand-tuned* values (notably CONFIG_MAIN_STACK_SIZE=16384
+# tuned to avoid stack overflow during star-crawl render). Reconciling
+# template-emitted vs. hand-tuned prj.conf values is follow-up work
+# under APP-02d (CI `--check` mode); the v0 manifest below describes
+# intent and does not enforce specific Kconfig values.
+
+schema: rlvgl-app/v0
+name: rlvgl-stm32h747i-disco-zephyr
+
+metadata:
+  version: 0.2.0
+  description: "rlvgl reference demo on STM32H747I-DISCO (Zephyr prong, hybrid Rust staticlib + west)."
+  license: MIT
+
+target:
+  vendor: stm
+  board: stm32h747i_disco
+  prong: zephyr
+  generator: hand_written
+  features:
+    - cm7
+    - zephyr
+    - splash
+    - desktop
+    - dma2d
+
+controller:
+  crate: rlvgl-app-disco-demo
+  path: ../apps/disco-demo
+  capabilities: stm32h747i_disco
+
+assets:
+  - id: splash
+    class: image_rle_a8
+    source: assets/media/splash.rle
+
+screens:
+  - id: home
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    default: true

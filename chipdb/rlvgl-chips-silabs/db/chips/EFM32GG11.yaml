@@ -1,0 +1,9 @@
+# Silicon Labs EFM32GG11 Giant Gecko 11 (placeholder spec).
+#
+# Seeded by the QT-09 §10 amendment that migrated this crate from
+# the legacy raw_db blob to the per-spec YAML accessor convention.
+# Expand the inventory as the BSP generator gains EFM32GG11 support.
+name: EFM32GG11
+arch: cortex-m4f
+package: BGA112
+pac_crate: efm32gg11_pac

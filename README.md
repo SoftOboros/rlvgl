@@ -23,6 +23,7 @@ Package: `rlvgl`
 - no_std + allocator support with simulator-friendly std features
 - Modular workspace crates for core widgets, platform backends, UI helpers, API bindings, and i18n
 - `rlvgl-creator` support for asset preparation, vendor database browsing, and STM32 BSP generation from CubeMX `.ioc` files
+- Application Schema (`rlvgl-app/v0`) — declarative `app.yaml` manifest plus `rlvgl-creator app from-yaml` orchestrator emit a buildable Cargo crate from one source of truth (BSP, assets, state machine, i18n, theme, layouts, per-prong main glue). See [`docs/app-schema/`](docs/app-schema/).
 - Vendor chip database crates and generated STM BSP crates for board-aware tooling
 - Flagship STM32H747I-DISCO demo covering DSI display, touch, SDRAM, SD/MMC, audio, and DMA2D-assisted rendering
 - Motion, compositor, dirty-region, and accelerated blitting primitives for richer embedded UIs

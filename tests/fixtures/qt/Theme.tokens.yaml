@@ -1,0 +1,29 @@
+# Auto-generated from Qt theme by rlvgl-creator (QT-06)
+# QT-06 theme: tests/fixtures/qt/Theme.qml
+version: 1
+colors:
+  accent: "#ff8800"
+  background: "#ffffff"
+  primary: "#3366ff"
+  text: "#111111"
+spacing:
+  lg: 16
+  md: 8
+  sm: 4
+  xl: 24
+  xs: 2
+radii:
+  full: 255
+  lg: 8
+  md: 4
+  none: 0
+  sm: 2
+fonts:
+  body: "default"
+  heading: "bold"
+  small: "tiny"
+modes:
+  dark:
+    colors:
+      background: "#171923"
+      text: "#f7fafc"

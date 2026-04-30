@@ -1,0 +1,133 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/nested.qml",
+  "imports": [
+    {
+      "module": "QtQuick.Controls",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "app",
+    "properties": [],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "100"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Rectangle",
+        "id": "bg",
+        "properties": [
+          {
+            "name": "alpha",
+            "ty": "int",
+            "default_value": "100",
+            "readonly": false,
+            "default_kw": false
+          }
+        ],
+        "assignments": [
+          {
+            "target": "x",
+            "value": {
+              "kind": "expression",
+              "text": "0"
+            }
+          },
+          {
+            "target": "y",
+            "value": {
+              "kind": "expression",
+              "text": "0"
+            }
+          },
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "200"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "50"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Button",
+        "id": "dim",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "\"Dim\""
+            }
+          },
+          {
+            "target": "x",
+            "value": {
+              "kind": "expression",
+              "text": "0"
+            }
+          },
+          {
+            "target": "y",
+            "value": {
+              "kind": "expression",
+              "text": "50"
+            }
+          },
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "200"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "50"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [
+          {
+            "signal": "onClicked",
+            "body": "bg.alpha -= 10"
+          }
+        ],
+        "children": []
+      }
+    ]
+  }
+}

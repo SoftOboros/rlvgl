@@ -11,6 +11,7 @@ desktop UI, workspace scaffolding.
 - [BSP-STATUS.md](./BSP-STATUS.md) — BSP generator status across all vendors.
 - [UI-DESIGN.md](./UI-DESIGN.md) — desktop UI menus, wizards, command palette.
 - [WORKSPACE-INTEGRATION.md](./WORKSPACE-INTEGRATION.md) — workspace scaffolding and simulator wiring.
+- [QT-INGEST.md](./QT-INGEST.md) — Qt/QML ingestion (`qt ingest` subcommand) and the canonical list of creator's non-Cargo external dependencies.
 
 ## See also
 

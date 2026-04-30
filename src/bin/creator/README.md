@@ -208,6 +208,96 @@ The generated BSP consists of six files under `gen/<board_stem>/`:
 - `peripherals.rs` — per-instance peripheral init
 - `board.rs` — board constants and labeled pin consts
 
+## Application Schema (`app from-yaml`)
+
+Consume an [`app.yaml`](../../../docs/app-schema/01-manifest-schema.md)
+manifest (`schema: rlvgl-app/v0`) and emit a buildable Cargo crate
+scaffold per [chapter 02](../../../docs/app-schema/02-generator-pipeline.md).
+The orchestrator drives the BSP generator, asset pipeline, vendored
+SM-crate consumption, i18n + theme translators, and per-prong main
+glue from one declarative manifest.
+
+```sh
+cargo run --bin rlvgl-creator --features creator -- app from-yaml \
+    examples/beetle-esp32c3/app-bsp-pac.yaml \
+    --out /tmp/rlvgl-beetle-bsp-pac
+```
+
+Validate-only (no emission):
+
+```sh
+cargo run --bin rlvgl-creator --features creator -- app from-yaml \
+    --validate-only examples/beaglebone-black/app.yaml
+```
+
+CI determinism gate — emit to a temp dir and diff against `--out`
+byte-for-byte (chapter 02 §5.2 `--check`):
+
+```sh
+cargo run --bin rlvgl-creator --features creator -- app from-yaml \
+    --check examples/beetle-esp32c3/app-bsp-pac.yaml \
+    --out /tmp/rlvgl-beetle-bsp-pac
+```
+
+`--force` overwrites files in `<out>` that aren't recorded in the
+previous inventory at `<out>/.rlvgl-app-manifest.json`.
+
+`--jobs N` (default 1) parallelises the independent stage-3
+sub-generators (BSP-gen, asset-pipeline, SM-gen, i18n, theme) via
+`std::thread::scope`. Output is byte-deterministic regardless of N
+per chapter 02 §9.1.
+
+Five committed manifests exercise the full grammar:
+
+- `examples/beetle-esp32c3/app.yaml` — esp_hal SSD1306 demo
+  (`generator: hosted`)
+- `examples/beetle-esp32c3/app-bsp-pac.yaml` — raw-PAC LED blink
+  (`generator: creator-bsp-pac`, exercises BSP-gen)
+- `examples/beaglebone-black/app.yaml` — BBB Linux prong with
+  cross-tree splash asset
+- `examples/stm32h747i-disco/app.yaml` — H747 FreeRTOS prong
+  (`generator: hand_written`)
+- `examples/stm32h747i-disco/app-zephyr.yaml` — H747 Zephyr prong
+  with nested west project
+
+State machines vendor a pre-generated SM crate under
+`state_machine.vendored_crate` per
+[chapter 04 §5.3](../../../docs/app-schema/04-state-machine-boundary.md#53-vendored-crate-offline-model--frozen);
+the orchestrator never invokes the external `mcp-statechart` tool
+during emission.
+
+### Authoring lifecycle
+
+Three sibling subcommands round out the manifest workflow:
+
+```sh
+# Scaffold a starter manifest + minimal layout (cargo-new style).
+# Refuses to overwrite an existing path.
+cargo run --bin rlvgl-creator --features creator -- app new my-app
+
+# Human-readable summary: target, controller, state machine,
+# asset histogram, screens, theme, i18n, eligible stage-3 stages.
+# Validates the manifest first.
+cargo run --bin rlvgl-creator --features creator -- app inspect my-app/app.yaml
+
+# Emit a JSON Schema for the rlvgl-app/v0 manifest grammar.
+# Useful for editor validation (VS Code YAML extension, etc.) and
+# CI lint hooks. Captures chapter 01 §5 grammar; runtime cross-
+# reference rules (chipdb lookup, path safety) still need the
+# full validator.
+cargo run --bin rlvgl-creator --features creator -- app schema --out app.schema.json
+```
+
+Together these form the authoring loop:
+
+```
+app new <NAME>                           # scaffold
+app inspect <NAME>/app.yaml              # check the summary
+app from-yaml --validate-only ...        # rule check
+app from-yaml ... --out <DIR>            # emit
+app from-yaml --check ... --out <DIR>    # CI determinism gate
+```
+
 ## Desktop UI and Emulator
 
 Launch the desktop UI explicitly:

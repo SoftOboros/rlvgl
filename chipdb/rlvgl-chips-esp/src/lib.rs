@@ -39,10 +39,20 @@ pub fn boards() -> &'static [BoardInfo] {
     BOARD_INFOS
 }
 
-/// Looks up a board by its human-friendly name (the `name` key in the YAML).
+/// Looks up a board by its human-friendly name (the `name` key in the
+/// YAML) or its file stem (the canonical board id per
+/// `docs/app-schema/01-manifest-schema.md` §3). Both forms are accepted
+/// so the cross-vendor chipdb API uniformly resolves board ids in the
+/// shape app-schema manifests cite.
 #[must_use]
 pub fn find(board_name: &str) -> Option<&'static BoardInfo> {
-    BOARD_INFOS.iter().find(|b| b.board == board_name)
+    if let Some(info) = BOARD_INFOS.iter().find(|b| b.board == board_name) {
+        return Some(info);
+    }
+    BOARD_NAMES
+        .iter()
+        .position(|n| *n == board_name)
+        .map(|i| &BOARD_INFOS[i])
 }
 
 /// Returns the list of chip spec file stems (e.g. `"esp32c3"`).

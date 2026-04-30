@@ -259,8 +259,7 @@ mod tests {
                 count_abs += 1;
             }
         }
-        let abs_only_mean_db =
-            (10.0 * libm::log10(sum_abs_power / count_abs as f64)) as f32;
+        let abs_only_mean_db = (10.0 * libm::log10(sum_abs_power / count_abs as f64)) as f32;
 
         // Direct sanity: the relative-gated reading must exceed the
         // absolute-gated-only baseline when the input has

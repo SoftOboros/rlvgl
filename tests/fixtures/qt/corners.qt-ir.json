@@ -1,0 +1,217 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/corners.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Rectangle",
+        "id": "tlBadge",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "30"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "20"
+            }
+          },
+          {
+            "target": "anchors.left",
+            "value": {
+              "kind": "expression",
+              "text": "parent.left"
+            }
+          },
+          {
+            "target": "anchors.top",
+            "value": {
+              "kind": "expression",
+              "text": "parent.top"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#ff0000\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Rectangle",
+        "id": "trBadge",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "30"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "20"
+            }
+          },
+          {
+            "target": "anchors.right",
+            "value": {
+              "kind": "expression",
+              "text": "parent.right"
+            }
+          },
+          {
+            "target": "anchors.top",
+            "value": {
+              "kind": "expression",
+              "text": "parent.top"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#00ff00\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Rectangle",
+        "id": "blBadge",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "30"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "20"
+            }
+          },
+          {
+            "target": "anchors.left",
+            "value": {
+              "kind": "expression",
+              "text": "parent.left"
+            }
+          },
+          {
+            "target": "anchors.bottom",
+            "value": {
+              "kind": "expression",
+              "text": "parent.bottom"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#0000ff\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Rectangle",
+        "id": "brBadge",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "30"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "20"
+            }
+          },
+          {
+            "target": "anchors.right",
+            "value": {
+              "kind": "expression",
+              "text": "parent.right"
+            }
+          },
+          {
+            "target": "anchors.bottom",
+            "value": {
+              "kind": "expression",
+              "text": "parent.bottom"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#ffff00\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      }
+    ]
+  }
+}

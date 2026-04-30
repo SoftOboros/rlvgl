@@ -1,0 +1,14 @@
+# QT-08c qrc: tests/fixtures/qt/resources.qrc
+version: 1
+rcc_version: "1.0"
+resources:
+  - prefix: "/icons"
+    lang: null
+    files:
+      - { path: play.png, alias: null }
+      - { path: stop.png, alias: null }
+      - { path: reset_button_v3.png, alias: reset }
+  - prefix: "/fonts"
+    lang: null
+    files:
+      - { path: FiraSans-Bold.ttf, alias: null }

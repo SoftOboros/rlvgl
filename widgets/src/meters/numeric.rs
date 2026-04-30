@@ -124,11 +124,7 @@ impl Widget for NumericPeak {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
-        let text_default = self
-            .skin
-            .secondary
-            .scale_text
-            .unwrap_or(DEFAULT_TEXT);
+        let text_default = self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);
 
         renderer.fill_rect(self.bounds, bg);
 

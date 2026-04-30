@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: MIT
+#
+# rlvgl-app/v0 manifest for the STM32H747I-DISCO FreeRTOS intent
+# (the `cm7,freertos,adapted_cmd,dma2d,splash,desktop` build profile
+# documented in CLAUDE.md).
+#
+# Status: APP-03c candidate. Conforms to docs/app-schema/01-manifest-schema.md
+# (RATIFIED 2026-04-27, with chipdb-find() and workspace-root path-safety
+# amendments dated 2026-04-29). Validator-`--check` verification pending
+# APP-02a.
+#
+# Round-trip authority: docs/app-schema/03-round-trip.md §5.3 (the
+# FreeRTOS intent of examples/stm32h747i-disco/Cargo.toml). Sibling
+# intents — bare-metal (`cm7` without `freertos`), CM4 idle binary,
+# Zephyr staticlib (covered separately by APP-03d) — get their own
+# manifests per the "one app.yaml per intent" rule (01 §11).
+#
+# Workspace-relative paths used (allowed per 01 §3 / §6 rule 4
+# amendment 2026-04-29):
+#   controller.path = ../apps/disco-demo (workspace sibling crate;
+#     same controller library the BBB Linux manifest uses)
+#
+# Local assets:
+#   splash.rle is owned by this example's assets/media/ directory
+#   and is also the source the BBB manifest cites cross-tree.
+
+schema: rlvgl-app/v0
+name: rlvgl-stm32h747i-disco-freertos
+
+metadata:
+  version: 0.2.0
+  description: "rlvgl reference demo on STM32H747I-DISCO (FreeRTOS prong)."
+  license: MIT
+
+target:
+  vendor: stm
+  board: stm32h747i_disco
+  prong: freertos
+  generator: hand_written
+  features:
+    - cm7
+    - freertos
+    - adapted_cmd
+    - dma2d
+    - splash
+    - desktop
+
+controller:
+  crate: rlvgl-app-disco-demo
+  path: ../apps/disco-demo
+  capabilities: stm32h747i_disco
+
+assets:
+  - id: splash
+    class: image_rle_a8
+    source: assets/media/splash.rle
+
+screens:
+  - id: home
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    default: true

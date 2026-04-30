@@ -126,11 +126,7 @@ impl LufsGauge {
         let lu = self.to_lu(self.last_i);
         let abs = if lu < 0.0 { -lu } else { lu };
         let id = if self.last_i <= self.skin.scale.range_min_db {
-            return self
-                .skin
-                .secondary
-                .scale_text
-                .unwrap_or(DEFAULT_TEXT);
+            return self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);
         } else if abs <= NOMINAL_LU_HALF_WIDTH {
             MeterColorId::Nominal
         } else if abs <= CAUTION_LU_HALF_WIDTH {
@@ -151,11 +147,7 @@ impl Widget for LufsGauge {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
-        let text_default = self
-            .skin
-            .secondary
-            .scale_text
-            .unwrap_or(DEFAULT_TEXT);
+        let text_default = self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);
 
         renderer.fill_rect(self.bounds, bg);
 
@@ -285,9 +277,7 @@ mod tests {
         };
         g.draw(&mut r);
         let i_color = r.texts[0].1;
-        let nominal = LUFS_EBU_R128_GAUGE
-            .palette
-            .color(MeterColorId::Nominal);
+        let nominal = LUFS_EBU_R128_GAUGE.palette.color(MeterColorId::Nominal);
         assert_eq!(
             i_color, nominal,
             "integrated text should colour as Nominal when at target"

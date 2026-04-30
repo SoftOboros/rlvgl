@@ -39,6 +39,14 @@ mod lottie;
 mod manifest;
 #[path = "../creator/preview.rs"]
 mod preview;
+// QT-09 §6: bring the qt + qt_scjson modules into the desktop-UI
+// tree so the new Qt menu group can call into them.
+#[path = "../creator/qt.rs"]
+#[allow(dead_code)]
+mod qt;
+#[path = "../creator/qt_scjson.rs"]
+#[allow(dead_code)]
+mod qt_scjson;
 #[path = "../creator/scaffold.rs"]
 mod scaffold;
 #[path = "../creator/scan.rs"]

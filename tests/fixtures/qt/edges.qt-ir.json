@@ -1,0 +1,175 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/edges.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Rectangle",
+        "id": "leftBar",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "30"
+            }
+          },
+          {
+            "target": "anchors.left",
+            "value": {
+              "kind": "expression",
+              "text": "parent.left"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#ff0000\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Rectangle",
+        "id": "rightBar",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "40"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "30"
+            }
+          },
+          {
+            "target": "anchors.right",
+            "value": {
+              "kind": "expression",
+              "text": "parent.right"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#00ff00\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Rectangle",
+        "id": "topBar",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "50"
+            }
+          },
+          {
+            "target": "anchors.top",
+            "value": {
+              "kind": "expression",
+              "text": "parent.top"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#0000ff\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Rectangle",
+        "id": "bottomBar",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "60"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "35"
+            }
+          },
+          {
+            "target": "anchors.bottom",
+            "value": {
+              "kind": "expression",
+              "text": "parent.bottom"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#ffff00\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      }
+    ]
+  }
+}

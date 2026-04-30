@@ -1,0 +1,13 @@
+# Silicon Labs EFM32GG11 starter board (placeholder).
+#
+# Seeded alongside the chip spec; expand pin map as the BSP
+# generator grows EFM32GG11 support.
+name: EFM32GG11
+chip: EFM32GG11
+flash_mb: 2
+
+console:
+  peripheral: usart0
+  baud: 115200
+
+pins: []

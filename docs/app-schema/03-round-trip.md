@@ -1,25 +1,27 @@
 <!--
 03-round-trip.md - rlvgl Application Schema, Chapter 3: Round-Trip Targets.
-Status: DRAFT — not yet ratified. See §15 change log.
+Status: RATIFIED 2026-04-29. See §15 change log.
 -->
 
 **[← Prev](02-generator-pipeline.md) · [Index](README.md) · Next → (TBD)**
 
 # Chapter 3 — Round-Trip Targets
 
-> **Status:** DRAFT, unratified. Depends on
-> [Chapter 0](00-concepts.md), [Chapter 1](01-manifest-schema.md),
-> [Chapter 2](02-generator-pipeline.md). Until §15 records a
-> ratified entry, no `APP-03` PR may cite this doc as a frozen
-> authority.
+> **Status:** RATIFIED 2026-04-29 (see §15). Depends on
+> [Chapter 0](00-concepts.md), [Chapter 1](01-manifest-schema.md);
+> independent of [Chapter 2](02-generator-pipeline.md) which remains
+> DRAFT pending orchestrator emission. `APP-NN` execution PRs MAY
+> cite this chapter as a frozen authority for round-trip findings,
+> the per-target manifest shapes, and the schema-coverage proofs.
 >
 > **Purpose:** verify the v0 schema and pipeline against reality
 > before they are frozen. The round-trip property declared in
 > [00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property) —
 > "reverse-engineering an existing example into a manifest, then
 > emitting from that manifest, MUST produce a crate that builds and
-> passes its own pre-publish phases" — is unverified until this
-> chapter exists.
+> passes its own pre-publish phases" — is partially satisfied: all
+> five committed manifests pass `--validate-only` (APP-02a). Full
+> round-trip including emission gets verified once APP-02b/c/d land.
 
 ## §0 Authority policy
 
@@ -488,22 +490,34 @@ The candidate manifests cite:
 Both are "BSP is hand-written" or "hosted" cases. The chipdb still
 needs an entry to validate `target.board`.
 
-**Disposition: ACCEPT.** Chapter 1 [§5.2](01-manifest-schema.md#52-target-required)
-amended with the minimal-entry rule: a board YAML MUST exist
-regardless of `generator`, but for non-`creator-bsp-pac` cases
-only `chip` and `console: { peripheral, baud }` are required.
-Pin assignments MAY be omitted.
+**Disposition: ACCEPT.** Initial closure (2026-04-27) wrote the
+rule against esp-shape-only assumptions; **superseded by the
+2026-04-29 amendment to 01 §5.2** ([01 §15](01-manifest-schema.md#§15-change-log))
+which replaces "file basename in `db/boards/`" with "resolves via
+the vendor crate's `find()` API." The per-vendor backing-storage
+map (esp YAML, stm zstd archive, ti `BOARDS` const, …) now lives
+in 01 §5.2 itself.
 
-**Follow-up work** (filed against the chipdb initiative, not this
-chapter):
+**Follow-up work — landed 2026-04-29 (APP-04a):**
 
-- `chipdb/rlvgl-chips-ti/db/boards/beaglebone_black_nhd_cape.yaml`
-  (minimal entry; AM335x console UART0 115200).
-- `chipdb/rlvgl-chips-stm/db/boards/stm32h747i_disco.yaml`
-  (minimal entry; STM32H747XIH6 console USART1 115200).
-- `chipdb/rlvgl-chips-stm/` may not exist as a vendor crate yet —
-  if so, that's a chipdb bootstrap task before either H747 manifest
-  can be checked in.
+Both stm and ti vendor crates already drive `find()` from a
+hardcoded `BOARDS: &[BoardInfo]` constant in `src/lib.rs`; the
+zstd archive in stm is decorative for `find()` purposes (it
+exposes raw board definitions to *other* tools via `raw_db()`,
+not to the validator). Adding boards is therefore a one-line
+const append per vendor:
+
+- **ti** — `chipdb/rlvgl-chips-ti/src/lib.rs` `BOARDS` const adds
+  `BoardInfo { board: "beaglebone_black_nhd_cape", chip: "AM335x" }`.
+  Unblocks BBB linux/bare-metal/freertos/zephyr round-trip
+  manifests.
+- **stm** — `chipdb/rlvgl-chips-stm/src/lib.rs` `BOARDS` const
+  adds `BoardInfo { board: "stm32h747i_disco", chip: "STM32H747XIH6" }`.
+  Unblocks H747 freertos/zephyr round-trip manifests.
+
+A future PR may regenerate `assets/chipdb.bin.zst` from
+`chips/stm/STM32_open_pin_data/` so `raw_db()` reflects the same
+board set, but that does not block manifest validation.
 
 ### 6.5 🟢 CLOSED — Asset class enum survives round-trip
 
@@ -598,6 +612,141 @@ yet, so most layout source is hand-rolled Rust.
 pipeline (e.g. `figma_export_v1` or `uml_widget_v1`) shipping
 first. Don't remove the backdoor before there's a real front door."
 
+### 6.14 🟡 CLOSED — chipdb `find()` cross-vendor lookup key was inconsistent
+
+**Surfaced 2026-04-29 by APP-02a** (validator implementation).
+Chapter 01 §3 (`Board id`) defines the canonical board id as the
+**file stem** (snake_case, matches chipdb file naming). Most vendor
+chipdb crates (`stm`, `ti`, `nrf`, `nxp`, `renesas`, `silabs`,
+`microchip`, `rp2040`) drive `find()` from a hardcoded `BOARDS`
+const where the `board:` field uses the same form a manifest
+cites.
+
+The `esp` crate, however, is build-script-generated: its
+`BOARD_INFOS` const is built by extracting the YAML's `name:` field
+(human-friendly, e.g. `"DFR0868 Beetle ESP32-C3"`), while file
+stems are kept in a parallel `BOARD_NAMES` array. Esp's `find()`
+matched only on `BoardInfo.board` (human name), so the validator's
+canonical lookup `find("beetle_esp32c3")` returned `None` — a
+chipdb implementation defect against the chapter 01 §3 contract.
+
+**Disposition: ACCEPT** as a chipdb-side fix, not a spec change.
+Esp's `find()` extended (one block) to fall back to the file stem
+via the parallel `BOARD_NAMES` array when the human-name match
+fails. Both forms now resolve, preserving the existing
+`find("ESP32-C3-DevKitM-1")` test path and aligning the
+cross-vendor API with chapter 01 §3's contract. Other vendor
+crates whose hardcoded const happens to use a non-stem
+`board:` value (e.g. `"STM32F4DISCOVERY"`, `"MSP432P401R"`)
+remain reachable by their existing form, but those entries are
+not cited by any landed manifest at v0.
+
+A future chipdb-side cleanup MAY normalize all hardcoded `BOARDS`
+const entries to file-stem form for true uniformity. Out of
+v0 scope.
+
+### 6.13 🟡 OPEN — `bsp_pac` stretches the screen abstraction
+
+**Surfaced 2026-04-29 by APP-03e** (beetle bsp_pac sibling
+manifest). The bsp_pac binary has **no display, no rlvgl runtime,
+no widget tree** — it is a chipdb → generator → boot pipeline
+proof, not an rlvgl application in the strict
+[chapter 00 §1](00-concepts.md#§1-purpose) sense.
+
+The v0 grammar's `screens[]` validation rule
+([01 §5.5](01-manifest-schema.md#55-screens-optional))
+requires *exactly one default screen* when `state_machine:` is
+absent. There is no `screens: []` path in v0. To express bsp_pac
+as a v0 manifest at all, the LED-blink loop body is interpreted
+as a "screen" — the per-tick body of a headless app — which
+stretches the abstraction.
+
+The landed manifest
+(`examples/beetle-esp32c3/app-bsp-pac.yaml`) takes this stretched
+interpretation explicitly to:
+
+1. Exercise `target.generator: creator-bsp-pac` at v0 ratification
+   (the only landed manifest that does so).
+2. Register the bsp_pac intent for inventory completeness
+   alongside the esp_hal sibling.
+
+**Disposition: DEFER.** v0 grammar unchanged. APP-02 orchestrator
+emission for headless intents is **out of v0 scope** — chapter 02
+§8 per-prong templates assume display + controller. The bsp_pac
+manifest is documentary at v0; the existing hand-written
+`src/bsp_pac_main.rs` remains the canonical source until either
+(a) the binary grows a real rlvgl render path (e.g. SSD1306 with
+PAC I2C chunking, per the chip-class header note), or (b) v1 adds
+a "headless" intent class with its own template family.
+
+A v1 amendment MAY relax §5.5 to allow `screens: []` for a new
+`target.kind: headless` field. Premature now; the bsp_pac binary
+is the only known headless example, and it is itself slated to
+grow a display path.
+
+### 6.12 🟡 OPEN — Zephyr `prj.conf` has hand-tuned values the template cannot reproduce
+
+**Surfaced 2026-04-29 by APP-03d** (H747 Zephyr round-trip). The
+existing `examples/stm32h747i-disco/zephyr/prj.conf` contains
+hand-tuned values that derive neither from chipdb nor from
+`target.features`:
+
+- `CONFIG_MAIN_STACK_SIZE=16384` — tuned because the default 4 KB
+  overflowed during star-crawl render (per the in-tree comment).
+- `CONFIG_HEAP_MEM_POOL_SIZE=65536` — same family of memory tuning.
+- `CONFIG_INPUT_FT5336_INTERRUPT=n`, `CONFIG_INPUT_FT5336_PERIOD=10`,
+  `CONFIG_INPUT_MODE_SYNCHRONOUS=y` — touch-driver behavioural
+  tunables resolved during bring-up (per the existing `feedback_acm_ar_zephyr`
+  / `project_zephyr_ft5336_no_touches` memory entries).
+- `CONFIG_LOG_MODE_IMMEDIATE=y`, `CONFIG_INPUT_LOG_LEVEL_DBG=y` —
+  diagnostic-level overrides.
+
+Chapter 02 §8.4 says the Zephyr template emits a baseline `prj.conf`
+the manifest's `target.features` extends. There is no mechanism to
+override individual Kconfig values from the manifest.
+
+**Disposition: DEFER.** v0 ships without per-Kconfig override.
+Pipeline behaviour (APP-02d): emit the template-baselined `prj.conf`,
+then if the destination directory already contains a `prj.conf` with
+hand-edits, `--check` mode flags the divergence (per chapter 02 §9.4
+inventory tracking) and CI surfaces it as an explicit choice. The
+*intent* of the existing tuning gets carried by the in-tree comments
+in `prj.conf`, not by the manifest.
+
+A v1 amendment MAY add a `target.zephyr_kconfig:` map for explicit
+overrides, but only if APP-03d implementation evidence shows the
+deferred approach causes recurring CI noise. Premature now.
+
+### 6.11 🟡 CLOSED — Path safety scoped to workspace root, not manifest parent
+
+**Surfaced 2026-04-29 by APP-03b** (BBB Linux round-trip). The
+existing example uses two cross-tree paths the original
+[01 §3](01-manifest-schema.md#§3-glossary-additions) /
+[§6 rule 4](01-manifest-schema.md#§6-validation-rule-set-normative)
+incorrectly rejected:
+
+- `controller.path: ../apps/disco-demo` — workspace path-dep on
+  the shared `rlvgl-app-disco-demo` crate. The H747 freertos and
+  zephyr round-trip manifests will hit the same.
+- `assets[].source: ../stm32h747i-disco/assets/media/splash.rle`
+  — splash binary shared between the BBB and H747 desktops; the
+  existing BBB main.rs uses
+  `include_bytes!("../../stm32h747i-disco/assets/media/splash.rle")`
+  which Cargo allows but our schema's path-safety rule did not.
+
+Both are legitimate monorepo patterns. The original "outside the
+manifest's parent" wording was over-tight — the right scope for
+manifest paths is the **cargo workspace root**, not the manifest
+file's directory. Beyond the workspace root, absolute paths and
+upward traversals are still rejected (the security intent is
+preserved; only the scope is corrected).
+
+**Disposition: ACCEPT** as ratified amendment to chapter 01
+([§15 entry 2026-04-29](01-manifest-schema.md#§15-change-log)):
+§3 Manifest path glossary, §6 rule 4 Path safety, and §5.10
+`controller.path` validation all updated to scope at workspace
+root.
+
 ## §10 Reconciliation with adjacent initiatives
 
 ### 10.1 vs. the BBB four-prong initiative
@@ -644,19 +793,27 @@ readers, not authority.
 
 This chapter is ratified (§15 entry dated) when:
 
-- [ ] §5.1–§5.4 manifests reviewed for accuracy against current
-      `examples/` content. Inventory drift is OK to record (not
-      block ratification) as long as it is recorded in §15.
-- [ ] §6 finding list reviewed; each finding has a disposition
-      (ACCEPT / REJECT / DEFER) recorded in §15.
-- [ ] §6.2 controller-library amendment decided — if ACCEPTED, a
-      corresponding 01 §15 amendment opens before this chapter
-      ratifies.
-- [ ] §6.9 Zephyr sibling-project amendment decided — if
-      ACCEPTED, a corresponding 02 §15 amendment opens before
-      this chapter ratifies.
-- [ ] §6.3 `target.generator` enum decision recorded.
-- [ ] §15 has a dated ratification entry signed off by the
+- [x] §5.1–§5.4 manifests reviewed for accuracy against current
+      `examples/` content. All five committed manifests
+      (`examples/beetle-esp32c3/{app,app-bsp-pac}.yaml`,
+      `examples/beaglebone-black/app.yaml`,
+      `examples/stm32h747i-disco/{app,app-zephyr}.yaml`) pass
+      `rlvgl-creator app from-yaml --validate-only` per APP-02a.
+- [x] §6 finding list reviewed; each finding has a disposition.
+      Closures: §6.1, §6.2, §6.3, §6.4, §6.5, §6.6, §6.7, §6.8,
+      §6.9, §6.10, §6.11, §6.14 (CLOSED). Open with disposition
+      DEFER through v0: §6.12 (Zephyr Kconfig), §6.13 (headless
+      schema fit).
+- [x] §6.2 controller-library amendment ACCEPTED — landed in
+      [01 §5.10](01-manifest-schema.md#510-controller-optional)
+      and [02 §7.8](02-generator-pipeline.md#78-controller-wiring-contract).
+- [x] §6.9 Zephyr sibling-project amendment ACCEPTED — landed in
+      [02 §5.4.1](02-generator-pipeline.md#541-zephyr-prong-nested-west-project)
+      and [02 §8.4](02-generator-pipeline.md#84-zephyr-prong).
+- [x] §6.3 `target.generator` enum decision recorded — added
+      `hosted` value as the third generator
+      ([01 §5.2](01-manifest-schema.md#52-target-required)).
+- [x] §15 has a dated ratification entry signed off by the
       initiative owner.
 
 ## §13 Files cited
@@ -701,3 +858,11 @@ Ratifying this chapter (with §6 dispositions recorded) unblocks:
 | 2026-04-27 | DRAFT  | Initial round-trip pass against all four [00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property) targets. Significant findings: §6.2 (controller-library slot, 🔴), §6.9 (Zephyr sibling-project emission, 🔴), §6.3 (third `target.generator` value, 🟡), §6.4 (chipdb coverage extension, 🟡), §6.10 (`rust_inline_v1` is the primary path today, not the v0 backdoor it was framed as). |
 | 2026-04-27 | DRAFT  | Convergence pass: all §6 findings closed and amended into upstream chapters. **Dispositions:** §6.1 ACCEPT (intent-vs-crate); §6.2 ACCEPT (`controller:` field added to 01 §5.10 + 02 §7.8); §6.3 ACCEPT (`hosted` added to 01 §5.2 generator enum); §6.4 ACCEPT (chipdb minimal-entry rule in 01 §5.2; follow-up chipdb board YAMLs filed); §6.5 ACCEPT (asset class enum holds); §6.6 ACCEPT (informative `options:` keys table at 01 §5.4.1); §6.7 ACCEPT Option A (no `extends:` at v0; recorded in 01 §11); §6.8 ACCEPT (feature-graph in 02 §8 preamble); §6.9 ACCEPT nested layout (02 §5.4.1 + §8.4); §6.10 ACCEPT with v1 gating (01 §5.5). §12 checklist still has the in-tree `app.yaml` check-in items — chapter remains DRAFT pending real manifests landing in round-trip target trees. |
 | 2026-04-27 | DRAFT  | APP-03a partial landing: `examples/beetle-esp32c3/app.yaml` + `layouts/main_screen.rs` checked in as the first round-trip artifact (chapters 00 + 01 RATIFIED same day). Cites `target.generator: hosted`, `layout_format: rust_inline_v1`. Validator `--check` gating awaits APP-02a. Remaining round-trip artifacts (BBB linux, H747 freertos, H747 zephyr) blocked on chipdb minimal entries (01 §5.2 / [03 §6.4 follow-up](#64--closed--chipdb-minimal-entry-rule-for-non-creator-bsp-pac-boards)) and corresponding chip families being present in the chipdb tree. |
+| 2026-04-29 | DRAFT  | §6.4 closure superseded after [01 §5.2 amendment](01-manifest-schema.md#§15-change-log) discovered the original wording assumed esp-shape YAML files universally. New rule: board id resolves via vendor-crate `find()` API; backing storage is per-vendor. Follow-up actions rewritten — ti gets a hardcoded `BOARDS` const entry, stm gets a build-script source addition + archive rebuild, no YAML files dropped into trees that don't use them. |
+| 2026-04-29 | DRAFT  | APP-04a landed: ti and stm vendor crates each gained one `BoardInfo` const entry (`beaglebone_black_nhd_cape` → AM335x, `stm32h747i_disco` → STM32H747XIH6). Investigation showed both vendors drive `find()` from a hardcoded `BOARDS` const, so the simpler-than-expected mechanism made the addition trivial. BBB and H747 round-trip manifests are now unblocked at the `target.board` validation level. |
+| 2026-04-29 | DRAFT  | APP-03b landed: `examples/beaglebone-black/app.yaml` + `layouts/home.rs` checked in as the second round-trip artifact. Cites `target.generator: hand_written` (BBB Linux on §5.6 allow-list), the new `controller:` field at `../apps/disco-demo`, and a cross-tree splash asset at `../stm32h747i-disco/assets/media/splash.rle`. Discovery of the cross-tree paths surfaced [§6.11](#611--closed--path-safety-scoped-to-workspace-root-not-manifest-parent) — path-safety rule was over-tight; landed alongside as a 01 §15 ratified amendment scoping path safety to the workspace root rather than the manifest's parent. |
+| 2026-04-29 | DRAFT  | APP-03c landed: `examples/stm32h747i-disco/app.yaml` + `layouts/home.rs` checked in as the third round-trip artifact (FreeRTOS intent, build profile `cm7,freertos,adapted_cmd,dma2d,splash,desktop` per CLAUDE.md). No new spec gaps — the path-safety amendment from APP-03b carried it. Cites the new `controller:` field at `../apps/disco-demo`, capabilities preset `stm32h747i_disco`. Splash asset is local (`assets/media/splash.rle`); same blob is what the BBB manifest cross-references. Three of four round-trip targets now landed (beetle esp_hal, BBB linux, H747 freertos); H747 zephyr (APP-03d) remains. |
+| 2026-04-29 | DRAFT  | APP-03d landed: `examples/stm32h747i-disco/app-zephyr.yaml` checked in as the fourth and final round-trip artifact (Zephyr intent, build profile `cm7,zephyr,splash,desktop,dma2d`). Reuses `layouts/home.rs` with the FreeRTOS manifest — the controller-driven render call is prong-agnostic; cross-prong layout reuse is exactly the schema's value proposition. Filename is `app-zephyr.yaml` (not `app.yaml`) since the same Cargo crate hosts the FreeRTOS intent at the canonical name. Surfaced finding [§6.12](#612--open--zephyr-prjconf-has-hand-tuned-values-the-template-cannot-reproduce) — existing `zephyr/prj.conf` has hand-tuned values (`CONFIG_MAIN_STACK_SIZE=16384`, FT5336 touch tunables, log levels) that neither chipdb nor `target.features` express; **disposition DEFER** with `--check`-flag surfacing in APP-02d, no v0 grammar change. **All four round-trip targets now landed**; remaining §12 acceptance work for chapter 03 is the validator-acceptance proof under APP-02a. |
+| 2026-04-29 | DRAFT  | APP-03e landed: `examples/beetle-esp32c3/app-bsp-pac.yaml` + `layouts/led_blink.rs` checked in as a fifth round-trip artifact, the bsp_pac sibling of APP-03a. Closes the schema-coverage gap on `target.generator: creator-bsp-pac` (only landed manifest that exercises it). Surfaced finding [§6.13](#613--open--bsp_pac-stretches-the-screen-abstraction) — bsp_pac has no display and no rlvgl runtime; the v0 `screens[]` requirement (exactly one default screen when `state_machine:` is absent) doesn't naturally fit headless apps. Manifest uses the stretched "screens[] = what runs each tick" interpretation explicitly. **Disposition DEFER** — v0 grammar unchanged; orchestrator emission of headless intents is out of v0 scope; v1 may add a `target.kind: headless` field with its own template family. |
+| 2026-04-29 | DRAFT  | APP-02a landed: validator + orchestrator-skeleton subcommand `rlvgl-creator app from-yaml --validate-only` in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. Implements all seven chapter 01 §6 validation rules; integration tests cover (a) all five committed round-trip manifests passing, (b) eight chapter 01 §9 counter-examples each rejected with the rule-tagged error, (c) four targeted feature-coverage tests (`controller:` workspace path-dep, state-machine extension, hand_written allow-list). Surfaced finding [§6.14](#614--closed--chipdb-find-cross-vendor-lookup-key-was-inconsistent) — esp's `find()` matched on human-friendly name only; chapter 01 §3 says board id = file stem; landed a chipdb-side fix making esp's `find()` accept either form. Orchestrator emission (chapter 02 §6 stages 3–7) remains DEFER for APP-02b/c/d. **All five committed manifests now pass `--validate-only`**, which is the chapter 01 §12 acceptance proof for "minimal example accepted by validator." |
+| 2026-04-29 | RATIFIED | Owner: Ira Abbott. All §12 acceptance bullets satisfied. Five round-trip manifests landed and validator-accepted; all 14 §6 findings have recorded dispositions (12 CLOSED, 2 OPEN with DEFER through v0). `APP-NN` execution PRs may now cite this chapter as a frozen authority for round-trip findings and per-target manifest shapes. Chapter 02 remains DRAFT pending orchestrator emission (APP-02b/c/d). |

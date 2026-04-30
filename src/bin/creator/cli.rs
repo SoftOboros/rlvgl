@@ -14,6 +14,7 @@ use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 pub mod add_target;
 pub mod apng;
+pub mod app;
 pub mod bsp_gen;
 pub mod chakra;
 pub mod check;
@@ -26,6 +27,8 @@ pub mod lottie;
 pub mod manifest;
 pub mod new;
 pub mod preview;
+pub mod qt;
+pub mod qt_scjson;
 pub mod raw;
 pub mod run;
 pub mod scaffold;
@@ -295,6 +298,214 @@ enum Command {
         #[command(subcommand)]
         cmd: AstCommand,
     },
+    /// Qt / QML ingestion commands
+    Qt {
+        #[command(subcommand)]
+        cmd: QtCommand,
+    },
+    /// rlvgl Application Schema (`app.yaml`) commands per
+    /// `docs/app-schema/`.
+    App {
+        #[command(subcommand)]
+        cmd: AppCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AppCommand {
+    /// Parse an `app.yaml`, run the chapter 01 §6 validator, and
+    /// optionally emit a buildable Cargo crate scaffold per chapter
+    /// 02 §6.
+    FromYaml {
+        /// Path to `app.yaml` (rlvgl-app/v0 manifest).
+        #[arg(value_name = "MANIFEST")]
+        manifest: PathBuf,
+        /// Output directory for orchestrator emission.
+        #[arg(long, value_name = "DIR")]
+        out: Option<PathBuf>,
+        /// Parse and validate; do not emit.
+        #[arg(long)]
+        validate_only: bool,
+        /// Emit to a temp dir and compare against `--out` byte-for-byte.
+        /// Exits non-zero on any diff. Per chapter 02 §5.2 / §9 — the
+        /// CI determinism gate.
+        #[arg(long, requires = "out", conflicts_with = "validate_only")]
+        check: bool,
+        /// Overwrite files under `--out` that are not recorded in the
+        /// previous inventory at `<out>/.rlvgl-app-manifest.json`. Required
+        /// when `--out` is non-empty and contains user-owned files.
+        #[arg(long, requires = "out")]
+        force: bool,
+        /// Parallel sub-generator dispatch per chapter 02 §5.2.
+        /// `1` (default) is sequential; `>1` runs the independent
+        /// stage-3 sub-gens (BSP-gen, asset-pipeline, SM-gen,
+        /// i18n, theme) concurrently via `std::thread::scope`.
+        /// Output is byte-deterministic regardless of N
+        /// (chapter 02 §9.1).
+        #[arg(long, default_value_t = 1, value_name = "N")]
+        jobs: usize,
+    },
+    /// Emit a JSON Schema for the rlvgl-app/v0 `app.yaml` manifest
+    /// per chapter 01 §5. Suitable for editor validation and CI
+    /// lint hooks; does not capture runtime cross-reference rules
+    /// (chipdb board lookup, workspace path safety, etc.) which
+    /// require the full validator.
+    Schema {
+        /// Output file. Defaults to stdout.
+        #[arg(long, value_name = "FILE")]
+        out: Option<PathBuf>,
+    },
+    /// Print a human-readable summary of a manifest: target,
+    /// controller, state machine, asset histogram, screens, theme,
+    /// i18n, and which chapter 02 §5.1 stage-3 sub-generators
+    /// would run. Validates the manifest first.
+    Inspect {
+        /// Path to `app.yaml` (rlvgl-app/v0 manifest).
+        #[arg(value_name = "MANIFEST")]
+        manifest: PathBuf,
+    },
+    /// Scaffold a starter `app.yaml` + minimal layout file at
+    /// `<DIR>/<NAME>/`. Defaults `--dir` to the current working
+    /// directory (cargo-new style). Refuses to overwrite an
+    /// existing path. Generated manifest validates against
+    /// chapter 01 §6.
+    New {
+        /// Project name. Must be a valid kebab-case ref-id
+        /// (chapter 01 §3 — `^[a-z][a-z0-9-]*$`, max 63 chars).
+        #[arg(value_name = "NAME")]
+        name: String,
+        /// Parent directory under which `<NAME>/` is created.
+        /// Defaults to the current working directory.
+        #[arg(long, value_name = "DIR")]
+        dir: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum QtCommand {
+    /// Parse a `.qml` file (or every `*.qml` under a directory, per
+    /// QT-08) and emit IR to the output directory
+    Ingest {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Output directory. File-mode writes `qt-ir.json`;
+        /// directory-mode writes `<basename>.qt-ir.json` per file.
+        out: PathBuf,
+    },
+    /// Parse a `.qml` file and exit non-zero on any error (no IR emitted)
+    Check {
+        /// Input `.qml` file
+        input: PathBuf,
+    },
+    /// Emit JSON Schema for `qt-ir.json` (UiModule)
+    Schema {
+        /// Optional output file (defaults to stdout)
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Lower a `.qml` to a Rust module. `--target rlvgl` (default)
+    /// produces a `<basename>.rlvgl.rs` with a runnable
+    /// `build_screen` function; `--target data` produces a
+    /// `<basename>.rs` static-data module per phase QT-03. Accepts
+    /// a directory `<input>` per QT-08 and emits one output per
+    /// `*.qml` child.
+    Emit {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Output directory
+        out: PathBuf,
+        /// Emit target shape
+        #[arg(long, value_enum, default_value_t = QtEmitTarget::Rlvgl)]
+        target: QtEmitTarget,
+    },
+    /// QT-05d: walk a `.qml` file's inline `states:`/`transitions:`
+    /// blocks and write a sibling `.scjson` document. Directory
+    /// mode emits per-`<basename>.scjson`. See
+    /// `docs/qt-support/05d-emit-scjson.md`.
+    EmitScjson {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.scjson` filename. Dir:
+        /// a directory; emits `<basename>.scjson` per input. Defaults
+        /// to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-05e: walk a `.qml` file's attached state-machine scripts
+    /// and write a sibling `<basename>_externals.rs` containing a
+    /// `pub struct ScreenExternals` with `impl Externals` stubs.
+    /// See `docs/qt-support/05e-externals-stubs.md`.
+    EmitExternals {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.rs` filename. Dir:
+        /// a directory; emits `<basename>_externals.rs` per input.
+        /// Defaults to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-06: walk a `.qml` file's root-level `property color/int/string`
+    /// theme declarations and write a sibling `<basename>.tokens.yaml`
+    /// matching the chakra/svelte token schema. See
+    /// `docs/qt-support/06-theme-tokens.md`.
+    EmitTokens {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.tokens.yaml` filename.
+        /// Dir: a directory; emits `<basename>.tokens.yaml` per
+        /// input. Defaults to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-07: walk a `.qml` file's `Image { source: … }` and font
+    /// declarations and write a sibling `<basename>.assets.yaml`
+    /// inventory of referenced assets for handoff to the
+    /// `rlvgl-creator scan` / `vendor` pipeline. See
+    /// `docs/qt-support/07-asset-handoff.md`.
+    ListAssets {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.assets.yaml` filename.
+        /// Dir: a directory; emits `<basename>.assets.yaml` per
+        /// input. Defaults to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-08b: parse a `qmldir` module manifest and emit a stable
+    /// YAML inventory of declared types, singletons, internals,
+    /// imports, and depends. See `docs/qt-support/08b-qmldir-resolution.md`.
+    ListQmldir {
+        /// Input: a `qmldir` file path or a directory containing one.
+        input: PathBuf,
+        /// Optional output path. File: a `.yaml` filename. Dir:
+        /// a directory; emits `<dirname>.qmldir.yaml`.
+        out: Option<PathBuf>,
+    },
+    /// QT-08c: parse a `.qrc` Qt resource manifest and emit a
+    /// stable YAML inventory of declared resources / files /
+    /// aliases. See `docs/qt-support/08c-qrc-resources.md`.
+    ListQrc {
+        /// Input: a `.qrc` file path or a directory containing
+        /// one or more `.qrc` files.
+        input: PathBuf,
+        /// Optional output path. File: a `.yaml` filename. Dir:
+        /// a directory; emits `<basename>.qrc.yaml` per input.
+        out: Option<PathBuf>,
+    },
+}
+
+/// `qt emit --target` value selector. Mirrors `qt::EmitTarget`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum QtEmitTarget {
+    /// QT-03 data-only `pub static SCREEN: Node = …;` shape.
+    Data,
+    /// QT-03b runnable `build_screen(bounds) -> WidgetNode` shape.
+    Rlvgl,
+}
+
+impl From<QtEmitTarget> for qt::EmitTarget {
+    fn from(t: QtEmitTarget) -> Self {
+        match t {
+            QtEmitTarget::Data => qt::EmitTarget::Data,
+            QtEmitTarget::Rlvgl => qt::EmitTarget::Rlvgl,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -574,7 +785,7 @@ enum AstCommand {
 }
 
 /// Run the rlgvl-creator command-line interface.
-pub fn run() -> Result<()> {
+pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
     let cli = Cli::parse();
     if !cli.silent {
         println!("rlvgl v{} • rlvgl-creator", env!("CARGO_PKG_VERSION"));
@@ -1147,6 +1358,58 @@ pub fn run() -> Result<()> {
                     std::fs::write(path, json)?;
                 } else {
                     println!("{}", json);
+                }
+            }
+        },
+        Command::Qt { cmd } => match cmd {
+            QtCommand::Ingest { input, out } => qt::ingest(&input, &out)?,
+            QtCommand::Check { input } => qt::check(&input)?,
+            QtCommand::Schema { out } => qt::schema(out.as_deref())?,
+            QtCommand::Emit { input, out, target } => qt::emit(&input, &out, target.into())?,
+            QtCommand::EmitScjson { input, out } => qt::emit_scjson(&input, out.as_deref())?,
+            QtCommand::EmitExternals { input, out } => qt::emit_externals(&input, out.as_deref())?,
+            QtCommand::EmitTokens { input, out } => qt::emit_tokens(&input, out.as_deref())?,
+            QtCommand::ListAssets { input, out } => qt::list_assets(&input, out.as_deref())?,
+            QtCommand::ListQmldir { input, out } => qt::list_qmldir(&input, out.as_deref())?,
+            QtCommand::ListQrc { input, out } => qt::list_qrc(&input, out.as_deref())?,
+        },
+        Command::App { cmd } => match cmd {
+            AppCommand::FromYaml {
+                manifest,
+                out,
+                validate_only,
+                check,
+                force,
+                jobs,
+            } => app::run_from_yaml(
+                &manifest,
+                out.as_deref(),
+                validate_only,
+                check,
+                force,
+                jobs,
+                bsp_gen,
+            )?,
+            AppCommand::Schema { out } => {
+                let body = app::app_schema_json()?;
+                if let Some(path) = out {
+                    std::fs::write(&path, &body)?;
+                    if !cli.silent {
+                        eprintln!("wrote {}", path.display());
+                    }
+                } else {
+                    println!("{body}");
+                }
+            }
+            AppCommand::Inspect { manifest } => app::inspect(&manifest)?,
+            AppCommand::New { name, dir } => {
+                let parent = dir.unwrap_or_else(|| PathBuf::from("."));
+                let manifest = app::new_scaffold(&parent, &name)?;
+                if !cli.silent {
+                    eprintln!(
+                        "scaffolded {} (run `rlvgl-creator app inspect {0}` to verify)",
+                        manifest.display()
+                    );
                 }
             }
         },

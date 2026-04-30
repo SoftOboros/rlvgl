@@ -20,11 +20,11 @@ pub mod stereo;
 pub use bargraph::LedBargraph;
 pub use lufs_gauge::LufsGauge;
 pub use lufs_gauge_strict::LufsGaugeStrict;
+pub use multi_channel::{MultiChannel, split_horizontal_n, split_vertical_n};
 pub use needle::NeedleVu;
 pub use numeric::NumericPeak;
 pub use skin::{
     Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin,
     SkinAssets, TickLabel, Zone, rgb, rgba,
 };
-pub use multi_channel::{MultiChannel, split_horizontal_n, split_vertical_n};
 pub use stereo::{MeterWidget, StereoPair, split_horizontal};

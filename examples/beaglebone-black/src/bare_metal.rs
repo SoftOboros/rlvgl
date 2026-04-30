@@ -357,10 +357,7 @@ pub extern "C" fn rust_main() -> ! {
                     frame_count = frame_count.wrapping_add(1);
                     if frame_count >= AUTO_RESET_FRAMES {
                         bsp::uart0::puts("rlvgl: auto-reset to Linux\n");
-                        core::ptr::write_volatile(
-                            PRM_RSTCTRL as *mut u32,
-                            PRM_RSTCTRL_RESET,
-                        );
+                        core::ptr::write_volatile(PRM_RSTCTRL as *mut u32, PRM_RSTCTRL_RESET);
                         loop {
                             core::hint::spin_loop();
                         }
@@ -373,12 +370,7 @@ pub extern "C" fn rust_main() -> ! {
             while let Some(b) = bsp::uart0::getc_nonblock() {
                 if b == b'\n' || b == b'\r' {
                     if cmd_len > 0 {
-                        playit_lite::dispatch(
-                            &cmd_buf[..cmd_len],
-                            frame_count,
-                            step,
-                            FB_BASE,
-                        );
+                        playit_lite::dispatch(&cmd_buf[..cmd_len], frame_count, step, FB_BASE);
                         cmd_len = 0;
                     }
                 } else if cmd_len < CMD_BUF_LEN {
@@ -497,9 +489,7 @@ mod playit_lite {
         for row in y0..y1 {
             for col in x0..x1 {
                 let off = (row * stride_px + col) as u32 * 4;
-                let pixel = unsafe {
-                    core::ptr::read_volatile((fb_base + off) as *const u32)
-                };
+                let pixel = unsafe { core::ptr::read_volatile((fb_base + off) as *const u32) };
                 bsp::uart0::put_hex32(pixel);
                 if col + 1 < x1 {
                     bsp::uart0::putc_raw(b' ');

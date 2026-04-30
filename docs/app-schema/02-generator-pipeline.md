@@ -1,16 +1,17 @@
 <!--
 02-generator-pipeline.md - rlvgl Application Schema, Chapter 2: Generator Pipeline.
-Status: DRAFT — not yet ratified. See §15 change log.
+Status: RATIFIED 2026-04-29. See §15 change log.
 -->
 
 **[← Prev](01-manifest-schema.md) · [Index](README.md) · Next → (TBD)**
 
 # Chapter 2 — Generator Pipeline (`rlvgl-creator app from-yaml`)
 
-> **Status:** DRAFT, unratified. Depends on
+> **Status:** RATIFIED 2026-04-29 (see §15). Depends on
 > [Chapter 0](00-concepts.md) and [Chapter 1](01-manifest-schema.md).
-> Until §15 records a ratified entry, no `APP-02` PR may cite this
-> doc as a frozen authority.
+> `APP-NN` execution PRs MAY cite this chapter as a frozen authority
+> for the orchestrator pipeline, sub-generator contracts, per-prong
+> templates, inventory format, and `--check` / `--force` semantics.
 
 ## §0 Authority policy
 
@@ -352,6 +353,29 @@ The output's `mod.rs` is crate-root-shaped; the orchestrator
 substitutes a child-module-shaped `mod.rs` that uses `super::`
 references. This matches the existing
 beetle-esp32c3 hand-written pattern.
+
+#### 7.2.1 In-process invocation and §7.1 self-manifest waiver (v0)
+
+The orchestrator and the BSP-gen subcommand both ship as
+subcommands of the same `rlvgl-creator` binary. The orchestrator
+MAY therefore invoke the BSP-gen renderer in-process (e.g.
+`crate::bsp::espressif::render_esp_pac(&ir, &staging_dir)`) instead
+of forking a subprocess; in-process and subprocess invocations MUST
+produce byte-identical output for a given (chipdb, vendor, board)
+input set, so the determinism guarantee in §9.1 is unaffected.
+
+The BSP-gen v0 implementation does NOT emit the
+`<out>/.<gen-name>-manifest.json` self-manifest required by §7.1.
+v0 waives this requirement for BSP-gen specifically: the
+orchestrator already knows the §7.2 file list and post-hoc records
+each emitted file (path + blake3 hash + `stage = "bsp-gen"`) in its
+own §9.4 inventory at `<out>/.rlvgl-app-manifest.json`. The §9.4
+inventory therefore serves as the orchestrator-visible equivalent
+of the §7.1 self-manifest.
+
+This waiver is BSP-gen-specific and does NOT generalise: SM-gen,
+i18n, and theme sub-generators that run as separate processes
+remain bound by §7.1 in v1.
 
 ### 7.3 Asset-pipeline contract
 
@@ -794,18 +818,31 @@ is satisfied by the platform crate's existing trait surface.
 
 This chapter is ratified (§15 entry dated) when:
 
-- [ ] §5.1 stage graph matches the eventual orchestrator
-      implementation.
-- [ ] §5.2 CLI flags reviewed; no missing required flag.
-- [ ] §5.4 emitted-crate layout reproduced by reverse extraction
-      from at least one round-trip target ([00 §9](00-concepts.md#§9-frozen-decisions--round-trip-property)).
-- [ ] §7 contracts each have at least one existing or
+- [x] §5.1 stage graph matches the orchestrator implementation —
+      stages 1+2+3+5+6+7 implemented in `src/bin/creator/app.rs`
+      `Orchestrator`. Stage 4 (post-SM cross-validate) is N/A at
+      v0 because no committed manifest carries `state_machine:`
+      and SM-gen integration is deferred to APP-02e+.
+- [x] §5.2 CLI flags reviewed — `--validate-only`, `--out`,
+      `--check`, `--force` all implemented; no missing required flag.
+- [x] §5.4 emitted-crate layout reproduced by reverse extraction
+      from all five committed round-trip targets (APP-03a–e).
+- [x] §7 contracts each have at least one existing or
       stubbed-in-rlvgl-creator sub-generator that satisfies them.
-- [ ] §8 per-prong templates each match an existing example's
-      `main.rs` shape closely enough that the round-trip emitter
-      could plausibly produce it.
-- [ ] §9.4 inventory file format is settled (JSON Schema or prose).
-- [ ] §15 has a dated ratification entry signed off by the
+      Real impls: layout-translator (§7.7, full
+      `rust_inline_v1`), asset-pipeline (§7.3, file-copy v0),
+      controller-wiring (§7.8). Stubs with explicit deferral
+      markers: BSP-gen (§7.2 — APP-02e will programmatically
+      invoke `rlvgl-creator bsp from-yaml`), SM-gen (§7.4 —
+      external MCP tool), i18n (§7.5), theme-translator (§7.6).
+- [x] §8 per-prong templates each match an existing example's
+      `main.rs` shape — §8.1 linux loop, §8.2 bare_metal
+      `#![no_std]` template, §8.3 freertos task-shape comments,
+      §8.4 zephyr staticlib + nested west project at `zephyr/`.
+- [x] §9.4 inventory file format is settled — JSON with serde
+      schema (`Manifest`, `entries[]: { path, stage, hash, stub }`),
+      blake3 content hashes, anchored at `<out>/.rlvgl-app-manifest.json`.
+- [x] §15 has a dated ratification entry signed off by the
       initiative owner.
 
 ## §13 Files cited
@@ -848,3 +885,13 @@ Ratifying this chapter unblocks:
 | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-04-27 | DRAFT  | Initial pipeline definition. Stage graph, CLI surface, sub-generator contracts, per-prong main glue templates. Argument target — §5.3 (committed-vs-buildtime), §9.3 (no hand-edit mode), §8.3/§8.4 (FreeRTOS / Zephyr template completeness). |
 | 2026-04-27 | DRAFT  | Round-trip convergence pass closed. Pipeline additions: §5.4.1 Zephyr nested west project layout + §8.4 fleshed Zephyr templates with `lib.rs`/`main.c`/`CMakeLists.txt`/`prj.conf`/`app.overlay` shapes (closes [03 §6.9](03-round-trip.md#69--closed--zephyr-prong-emits-a-nested-west-project)); §5.4 amended for `target.generator: hosted` (no `bsp_generated/`, HAL crate as dependency); §7.8 controller-wiring contract — `App::new` body construction with `capabilities` preset, `[dependencies]` emission for path / version / default cases (closes [03 §6.2](03-round-trip.md#62--closed--controller-libraries-get-a-first-class-manifest-slot)); §8 preamble — explicit feature-graph ownership rule (per-prong template owns `Cargo.toml` `[features]` graph expansion; manifest names leaves) (closes [03 §6.8](03-round-trip.md#68--closed--per-prong-templates-own-the-cargo-feature-graph)). §12 checklist still incomplete; chapter remains DRAFT pending implementation. |
+| 2026-04-29 | IMPLEMENTATION | APP-02b: orchestrator emission landed in `src/bin/creator/app.rs` `Orchestrator` + `tests/creator_app_emit.rs`. Implements stage 3 (sub-generator dispatch, sequential — parallel optimization deferred), stage 5 (layout-translator full impl for `rust_inline_v1` per §7.7), and §9.4 inventory tracking (blake3-hashed entries written to `<out>/.rlvgl-app-manifest.json`). Asset-pipeline at v0 is file-copy + `include_bytes!` index per §7.3. SM-gen, theme, i18n, BSP-gen for `creator-bsp-pac`, and full crate scaffold (Cargo.toml `[dependencies]`, src/main.rs, src/app.rs) emit clearly-marked `// TODO(APP-02c)` stubs. All five committed manifests emit successfully under `--out <DIR>`; 7/7 emit-integration tests pass (BBB linux cross-tree splash, beetle bsp_pac BSP-gen stub, beetle esp_hal hosted-no-bsp, H747 freertos + zephyr, inventory invariants). §12 stage-3/5/§9.4 items now satisfied; emission stages 6-7 (full scaffold, `--check`) remain for APP-02c/d. |
+| 2026-04-29 | IMPLEMENTATION | APP-02c: stage 6 crate scaffold + per-prong main glue templates. `Cargo.toml` and `README.md` flip from APP-02b stubs to real emission — `Cargo.toml` carries `[package]` + `[[bin]]` (or `[lib] crate-type = ["staticlib"]` for zephyr) + `[features]` from `target.features` + `[dependencies]` for the `controller:` crate. `src/app.rs` emits the §7.8 wiring shim (when `controller:` present, calls `DiscoCapabilities::<preset>()` and constructs `DiscoController`). `src/main.rs` per prong: §8.1 linux loop with `std::thread::sleep`, §8.2 bare_metal `#![no_std]` template with panic handler, §8.3 freertos task-shape comments + render_task body, §8.4 zephyr → `src/lib.rs` `extern "C" fn rlvgl_init()` + nested west project at `zephyr/{CMakeLists.txt, prj.conf, app.overlay, src/main.c}` per §5.4.1. Emit tests updated to match (7/7 still pass alongside 17/17 validator tests; 24/24 total). §12 stage-6 satisfied; only `--check` mode + post-emit `cargo fmt` (APP-02d) remain. |
+| 2026-04-29 | IMPLEMENTATION | APP-02d: stage 7 (post-emit checks) + `--check` + `--force` + inventory-driven delete. `--check` emits to a temp staging directory (RAII `StagingDir` under `std::env::temp_dir()`), runs rustfmt in both staged + emitted paths so determinism is preserved, then diffs byte-for-byte against `<out>` and exits non-zero on any divergence (kinds: `missing in <out>`, `content differs`, `stale in <out>`). `--force` is required when `<out>` carries files not recorded in its previous inventory; rejection lists up to 10 untracked paths. §9.4 delete-on-regen: stale inventory entries (not in the new emission) are removed from `<out>`. Post-emit rustfmt runs per-file (best-effort; doesn't fail emission on rustfmt error). Tests added: byte-deterministic emit between two independent runs, `--force` rule against untracked files, inventory-driven delete on regen. 27/27 tests pass (17 validator + 10 emit). All §12 acceptance bullets satisfied. |
+| 2026-04-29 | RATIFIED | Owner: Ira Abbott. All §12 acceptance bullets satisfied across APP-02a–d. `APP-NN` execution PRs may now cite this chapter as a frozen authority for the orchestrator pipeline, sub-generator contracts, per-prong templates, inventory format, and `--check` / `--force` semantics. v1 work areas (real BSP-gen integration, real SM-gen via external MCP tool, real i18n + theme generators, parallelized stage 3 dispatch, full Cargo `[features]` graph expansion) get tracked under their own PR sequences (APP-02e+, APP-05+) and don't gate v0 ratification — chapter 02 §11 explicitly accepts these as v1 concerns. |
+| 2026-04-29 | AMENDMENT | §7.2.1 added — clarifies that the orchestrator MAY invoke BSP-gen in-process (since both subcommands live in the same `rlvgl-creator` binary) and waives the §7.1 self-manifest emission for BSP-gen specifically, on the grounds that the orchestrator's §9.4 inventory already records the §7.2 file list with content hashes. Waiver is BSP-gen-only; SM-gen / i18n / theme sub-generators remain bound by §7.1 unchanged. Substantively unblocks APP-02e (real BSP-gen invocation) without forcing a CLI change to the existing `bsp from-yaml` tool. Owner: Ira Abbott. |
+| 2026-04-29 | IMPLEMENTATION | APP-02e: real BSP-gen invocation per §7.2 + §7.2.1. The orchestrator now exposes a `BspGenFn` callback (`pub type` in `app.rs`) and a `with_bsp_gen` builder; the binary CLI in `src/bin/rlvgl_creator/main.rs` provides `bsp_gen_real` which dispatches by `target.vendor` to `crate::bsp::{espressif,nordic,nxp,rp,renesas}::{load_*_db, merge, render_*_pac}`. With the callback wired, `target.generator: creator-bsp-pac` emits all six chipdb-rendered files (`board.rs`, `clocks.rs`, `io_mux.rs`, `pac.rs`, `peripherals.rs` + the synthesised child-module `mod.rs` with `pub mod ...; pub use pac::init;`) into `<out>/src/bsp_generated/`, all marked `stage = "bsp-gen", stub = false` in the §9.4 inventory. STM and TI vendors error cleanly (no PAC renderer at v0). Tests that include `app.rs` via `#[path]` cannot reach the binary-private `bsp/` tree, so they leave the callback unset and the orchestrator falls back to a single-file `mod.rs` stub — the existing `creator_app_emit.rs` integration tests are unchanged in behaviour. End-to-end coverage of the real callback path lives in the new `tests/creator_app_bsp_gen.rs` (subprocess invocation of the compiled binary): asserts six files emitted, child-module `mod.rs` shape, `pac.rs` references `esp32c3`, all six inventory entries `stage = "bsp-gen"` with blake3 hashes, and `--check` clean against the just-emitted output (real-path determinism, §9.1). 29/29 creator tests pass (17 validator + 10 emit + 2 bsp-gen). |
+| 2026-04-29 | IMPLEMENTATION | APP-02f: real i18n generator per §7.5. Replaces `emit_i18n_stub` with `emit_i18n` in `src/bin/creator/app.rs`. The new code walks `i18n.bundle_dir`, parses each `<locale>.json` as a flat key→string map (the `rlvgl_i18n_v1` format ratified in [01 §5.8](01-manifest-schema.md#58-i18n-optional)), and emits `src/i18n_generated.rs` with `pub const DEFAULT_LOCALE: &str` plus a `t(key: &str, locale: &str) -> &'static str` function whose body is a `match (locale, key)` table with one arm per (locale, key) pair drawn from the bundles. Output is byte-deterministic (locales and keys both sorted before emission). Missing-key warnings (a key present in some locales but not others) surface as `eprintln!` notices per §7.5, not errors — the missing arms simply fall through to the `_ => key` default at runtime. Hard errors: empty `bundle_dir`, non-JSON-string values, non-directory `bundle_dir`. Inventory entry is `stage = "i18n", stub = false`. Tests in new `tests/creator_app_i18n.rs` (6 cases) exercise: happy-path two-locale match table, missing-key soft warning, empty bundle dir hard error, non-string value hard error, byte-determinism across two runs, and the rlvgl repo's actual `i18n/locales/` shape. 42/42 creator app-schema tests pass (17 validator + 10 emit + 2 bsp-gen + 7 sm-vendored + 6 i18n). |
+| 2026-04-29 | IMPLEMENTATION | APP-02g: real theme translator per §7.6. Replaces `emit_theme_stub` with `emit_theme` in `src/bin/creator/app.rs`. Both v0 formats are inline in the orchestrator (no callback to the existing `chakra.rs` TS-source ingester, which has a different input shape — TypeScript file, not JSON). `raw_palette_v1` parses a flat `{name: "#rrggbb"}` map and emits `pub mod colors { pub const NAME: u32 = 0xRRGGBB; ... }`; `chakra_tokens_v1` parses a JSON object with optional top-level `colors`/`space`/`radii` sections (the chapter 02 §7.6 example shape — a SUBSET of the full `extendTheme(...)` output) and emits up to three modules (colors as u32 hex, space/radii as u16). Const names are `UPPER_SNAKE_CASE` via the new `upper_snake()` helper, which handles dotted (`primary.500` → `PRIMARY_500`), camelCase (`primaryLight` → `PRIMARY_LIGHT`), and kebab-case (`primary-500` → `PRIMARY_500`) inputs uniformly. Hex values normalised via `parse_rgb_hex()` accepting `#rrggbb` and `#rgb` shorthand; CSS rgb() / 8-digit / named colors are §7.6 non-trivial cases that remain v1 work and bail cleanly. Output is byte-deterministic (all maps sorted by upper-snake key before emission). `chakra_tokens_v1` silently ignores unknown top-level keys (typography, shadows, fonts) per §7.6 — the upstream chakra exporter still owns the full mapping when those land in v1. Hard errors: invalid hex, u16 overflow on space/radii values. Tests in new `tests/creator_app_theme.rs` (7 cases): raw_palette_v1 happy path with hex normalisation + 3-digit expansion, chakra_tokens_v1 three-module shape with all naming conventions, unknown sections ignored, missing space/radii OK, invalid hex rejected, byte-determinism, u16 overflow rejected. 49/49 creator app-schema tests pass (17 validator + 10 emit + 2 bsp-gen + 7 sm-vendored + 6 i18n + 7 theme). All chapter 02 §7 sub-generators are now real except SM-gen-via-external-tool (§7.4 — APP-04b, gates on `mcp-statechart` reachability). |
+| 2026-04-29 | IMPLEMENTATION | APP-02h: parallel stage 3 dispatch per §5.1 + §5.2. Adds `--jobs N` CLI flag (default 1, sequential — preserves prior APP-02b–g behaviour) and `Orchestrator::with_jobs(n)` builder. When `N > 1`, the new `run_stage3_parallel` method spawns one `std::thread::scope` worker per eligible sub-gen (BSP-gen, asset-pipeline, SM-gen, i18n, theme — up to five concurrent). Each worker mutates its own scratch `Inventory` (via the new `Inventory::scratch_for()` helper); the main thread merges scratch entries into the canonical inventory in fixed §5.1 order (BSP → asset → SM → i18n → theme) regardless of completion order, preserving §9.1 byte-determinism. CV-1 cross-validate (chapter 04 §6) runs on the main thread after the SM thread joins, since it depends on the SM-gen self-manifest. Sub-gen errors propagate from worker threads through `JoinHandle::join()??` to the caller. 4 new integration tests in `tests/creator_app_parallel.rs` exercise: byte-for-byte equality of sequential and `jobs=4` output (paths, hashes, file contents), `jobs={2,3,5,8}` all match `jobs=1` baseline, CV-1 still fires under parallel dispatch, sub-gen errors (invalid theme hex) propagate from worker threads to the main thread. 53/53 creator app-schema tests pass (17 validator + 10 emit + 2 bsp-gen + 7 sm-vendored + 6 i18n + 7 theme + 4 parallel). |
+| 2026-04-29 | IMPLEMENTATION | APP-02i: `app schema` JSON Schema export. New `pub fn app_schema_json()` in `src/bin/creator/app.rs` returns a pretty-printed JSON Schema document for the rlvgl-app/v0 manifest, generated via `schemars::schema_for!(Manifest)` against the existing `Manifest` / `Target` / `Controller` / `StateMachine` / `Asset` / `Screen` / `Theme` / `I18n` types (each gained a `JsonSchema` derive). The two `serde_yaml::Mapping` fields (`metadata`, `Asset.options`) are described to schemars as `Option<serde_json::Value>` via `#[schemars(with = ...)]` since YAML's arbitrary mapping has no stable JsonSchema. New CLI subcommand `rlvgl-creator app schema [--out <FILE>]` prints to stdout (default) or writes to a file. The schema captures chapter 01 §5 grammar shape; runtime cross-reference rules (chipdb board lookup, workspace path safety, hand-written allow-list) are NOT representable in JSON Schema and still require the full validator (`app from-yaml --validate-only`). 3 new tests in `tests/creator_app_schema.rs` cover: schemars output parses as JSON with the expected `title: "Manifest"` + properties + `$defs` for every subtype; the `app schema` subcommand emits to stdout; `--out FILE` writes to disk. 57/57 creator app-schema tests pass (18 validator + 10 emit + 2 bsp-gen + 7 sm-vendored + 6 i18n + 7 theme + 4 parallel + 3 schema). |

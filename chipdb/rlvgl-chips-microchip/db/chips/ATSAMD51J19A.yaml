@@ -1,0 +1,8 @@
+# Microchip ATSAMD51J19A Cortex-M4F MCU (placeholder spec).
+#
+# Seeded by the QT-09 §10 amendment that migrated this crate from
+# the legacy raw_db blob to the per-spec YAML accessor convention.
+name: ATSAMD51J19A
+arch: cortex-m4f
+package: TQFP64
+pac_crate: atsamd51j19a_pac

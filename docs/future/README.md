@@ -8,3 +8,10 @@ moves out of `future/` into the appropriate topic subdir.
 ## Documents
 
 - [MICROPYTHON-INTEGRATION.md](./MICROPYTHON-INTEGRATION.md) — MicroPython on CM7 + rlvgl on CM4.
+
+## Promoted out of `future/`
+
+- Qt/QML support — moved to [`docs/qt-support/`](../qt-support/) once
+  the MVP `qt ingest` subcommand shipped (phase QT-01a). Future
+  phases QT-02 onwards are still aspirational; status lives in the
+  initiative README.

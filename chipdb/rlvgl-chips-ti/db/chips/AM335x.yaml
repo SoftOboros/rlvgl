@@ -1,0 +1,10 @@
+# TI AM335x Sitara Cortex-A8 SoC (placeholder spec).
+#
+# The BeagleBone Black uses this part. Real bring-up data lives in
+# `examples/beaglebone-black/` and `docs/beaglebone-black/`; this
+# YAML is the chipdb-side stub that lets the BSP generator's load_ir
+# round-trip without falling back to the legacy raw_db blob path.
+name: AM335x
+arch: cortex-a8
+package: ZCZ
+linux_kernel_dts: am335x-boneblack.dts
