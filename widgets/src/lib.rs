@@ -8,6 +8,8 @@ extern crate alloc;
 pub mod button;
 /// Checkbox widget for boolean options.
 pub mod checkbox;
+/// Transparent click-area widget — rlvgl analogue of QML `MouseArea`.
+pub mod click_area;
 /// Container widget for layout grouping.
 pub mod container;
 /// Image display widget.

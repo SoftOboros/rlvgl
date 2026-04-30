@@ -187,6 +187,66 @@ rlvgl-creator svg <svg> <out> [--dpi DPI...] [--threshold VAL]
 * `--dpi` – one or more DPI values to render at (default `96`).
 * `--threshold` – monochrome threshold (0–255).
 
+### qt ingest
+Parses one or more `.qml` files and writes their structural IR.
+
+```
+rlvgl-creator qt ingest <input> <out>
+```
+* `input` – path to a `.qml` file **or a directory**.
+* `out` – output directory.
+
+In **file mode** (`<input>` is a single `.qml`), writes
+`<out>/qt-ir.json`.
+
+In **directory mode** (`<input>` is a directory), walks every
+immediate `*.qml` child in lexical order and writes
+`<out>/<basename>.qt-ir.json` per file. Hidden files and
+non-`.qml` files are skipped; the dispatcher does not recurse into
+subdirectories. See [QT-08 §5–§7](../qt-support/08-multi-file-cli.md)
+for the full directory-mode contract.
+
+No external tooling is required (no Qt install, no PySide6). See
+[QT-INGEST.md](./QT-INGEST.md) for the captured-vs-not-captured table
+and the optional richer-ingest tier planned for phase QT-01b.
+
+### qt check
+Parse-only validation. Exits non-zero on any parse error and emits no IR.
+
+```
+rlvgl-creator qt check <input>
+```
+
+### qt schema
+Emits the JSON Schema describing `qt-ir.json` (the `UiModule` type).
+
+```
+rlvgl-creator qt schema [--out <path>]
+```
+* `--out` – optional output file. Without it, the schema is written to stdout.
+
+### qt emit
+Lowers one or more `.qml` files to Rust modules. Two output
+shapes are available via `--target`.
+
+```
+rlvgl-creator qt emit <input> <out> [--target {data,rlvgl}]
+```
+* `input` – path to a `.qml` file **or a directory** (per QT-08).
+* `out` – output directory.
+
+In **directory mode**, walks every immediate `*.qml` child in
+lexical order and writes one output per file using the same
+`<basename>.<suffix>` pattern as file mode.
+* `--target rlvgl` (default) – writes `<basename>.rlvgl.rs` with a
+  runnable `pub fn build_screen(bounds: Rect) -> WidgetNode`. Depends
+  on `rlvgl-core` + `rlvgl-widgets` at the consumer's call site.
+  Shape locked by [../qt-support/03b-rlvgl-widget-mapping.md](../qt-support/03b-rlvgl-widget-mapping.md).
+* `--target data` – writes `<basename>.rs` with a static
+  `pub static SCREEN: Node = …;` literal. No external crate
+  dependency in the emitted file. Shape locked by
+  [../qt-support/03-rlvgl-emitter-widgets.md](../qt-support/03-rlvgl-emitter-widgets.md).
+
 ### bsp from-ioc
 Renders Rust source from a CubeMX project using a MiniJinja template.
 

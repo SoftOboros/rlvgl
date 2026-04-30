@@ -418,6 +418,76 @@ enum QtCommand {
         #[arg(long, value_enum, default_value_t = QtEmitTarget::Rlvgl)]
         target: QtEmitTarget,
     },
+    /// QT-05d: walk a `.qml` file's inline `states:`/`transitions:`
+    /// blocks and write a sibling `.scjson` document. Directory
+    /// mode emits per-`<basename>.scjson`. See
+    /// `docs/qt-support/05d-emit-scjson.md`.
+    EmitScjson {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.scjson` filename. Dir:
+        /// a directory; emits `<basename>.scjson` per input. Defaults
+        /// to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-05e: walk a `.qml` file's attached state-machine scripts
+    /// and write a sibling `<basename>_externals.rs` containing a
+    /// `pub struct ScreenExternals` with `impl Externals` stubs.
+    /// See `docs/qt-support/05e-externals-stubs.md`.
+    EmitExternals {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.rs` filename. Dir:
+        /// a directory; emits `<basename>_externals.rs` per input.
+        /// Defaults to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-06: walk a `.qml` file's root-level `property color/int/string`
+    /// theme declarations and write a sibling `<basename>.tokens.yaml`
+    /// matching the chakra/svelte token schema. See
+    /// `docs/qt-support/06-theme-tokens.md`.
+    EmitTokens {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.tokens.yaml` filename.
+        /// Dir: a directory; emits `<basename>.tokens.yaml` per
+        /// input. Defaults to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-07: walk a `.qml` file's `Image { source: … }` and font
+    /// declarations and write a sibling `<basename>.assets.yaml`
+    /// inventory of referenced assets for handoff to the
+    /// `rlvgl-creator scan` / `vendor` pipeline. See
+    /// `docs/qt-support/07-asset-handoff.md`.
+    ListAssets {
+        /// Input `.qml` file or directory containing `*.qml`
+        input: PathBuf,
+        /// Optional output path. File: a `.assets.yaml` filename.
+        /// Dir: a directory; emits `<basename>.assets.yaml` per
+        /// input. Defaults to the input's parent directory.
+        out: Option<PathBuf>,
+    },
+    /// QT-08b: parse a `qmldir` module manifest and emit a stable
+    /// YAML inventory of declared types, singletons, internals,
+    /// imports, and depends. See `docs/qt-support/08b-qmldir-resolution.md`.
+    ListQmldir {
+        /// Input: a `qmldir` file path or a directory containing one.
+        input: PathBuf,
+        /// Optional output path. File: a `.yaml` filename. Dir:
+        /// a directory; emits `<dirname>.qmldir.yaml`.
+        out: Option<PathBuf>,
+    },
+    /// QT-08c: parse a `.qrc` Qt resource manifest and emit a
+    /// stable YAML inventory of declared resources / files /
+    /// aliases. See `docs/qt-support/08c-qrc-resources.md`.
+    ListQrc {
+        /// Input: a `.qrc` file path or a directory containing
+        /// one or more `.qrc` files.
+        input: PathBuf,
+        /// Optional output path. File: a `.yaml` filename. Dir:
+        /// a directory; emits `<basename>.qrc.yaml` per input.
+        out: Option<PathBuf>,
+    },
 }
 
 /// `qt emit --target` value selector. Mirrors `qt::EmitTarget`.
@@ -1296,6 +1366,12 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
             QtCommand::Check { input } => qt::check(&input)?,
             QtCommand::Schema { out } => qt::schema(out.as_deref())?,
             QtCommand::Emit { input, out, target } => qt::emit(&input, &out, target.into())?,
+            QtCommand::EmitScjson { input, out } => qt::emit_scjson(&input, out.as_deref())?,
+            QtCommand::EmitExternals { input, out } => qt::emit_externals(&input, out.as_deref())?,
+            QtCommand::EmitTokens { input, out } => qt::emit_tokens(&input, out.as_deref())?,
+            QtCommand::ListAssets { input, out } => qt::list_assets(&input, out.as_deref())?,
+            QtCommand::ListQmldir { input, out } => qt::list_qmldir(&input, out.as_deref())?,
+            QtCommand::ListQrc { input, out } => qt::list_qrc(&input, out.as_deref())?,
         },
         Command::App { cmd } => match cmd {
             AppCommand::FromYaml {

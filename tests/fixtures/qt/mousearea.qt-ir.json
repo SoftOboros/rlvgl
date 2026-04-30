@@ -1,0 +1,67 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/mousearea.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [
+      {
+        "name": "taps",
+        "ty": "int",
+        "default_value": "0",
+        "readonly": false,
+        "default_kw": false
+      }
+    ],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "100"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "MouseArea",
+        "id": "hit",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "anchors.fill",
+            "value": {
+              "kind": "expression",
+              "text": "parent"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [
+          {
+            "signal": "onClicked",
+            "body": "taps += 1"
+          }
+        ],
+        "children": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+# Texas Instruments MSP432P401R Cortex-M4F MCU (placeholder spec).
+#
+# Seeded by the QT-09 §10 amendment that migrated this crate from
+# the legacy raw_db blob to the per-spec YAML accessor convention.
+name: MSP432P401R
+arch: cortex-m4f
+package: LQFP100
+pac_crate: msp432p401r_pac

@@ -362,7 +362,126 @@ impl CreatorApp {
             "Save Preset" => self.handle_save_preset(),
             "Scan Convert Preview" => self.handle_scan_convert_preview(),
             "Simulator" => self.handle_simulator(),
+            // QT-09 §3 / §5 — Qt menu dispatch.
+            "Qt Ingest" => self.handle_qt_ingest(),
+            "Qt Check" => self.handle_qt_check(),
+            "Qt Schema" => self.handle_qt_schema(),
+            "Qt Emit" => self.handle_qt_emit(),
+            "Qt Emit Scjson" => self.handle_qt_emit_scjson(),
+            "Qt Emit Externals" => self.handle_qt_emit_externals(),
+            "Qt Emit Tokens" => self.handle_qt_emit_tokens(),
+            "Qt List Assets" => self.handle_qt_list_assets(),
+            "Qt List Qmldir" => self.handle_qt_list_qmldir(),
+            "Qt List Qrc" => self.handle_qt_list_qrc(),
             _ => {}
+        }
+    }
+}
+
+// ============================================================================
+// QT-09 §3 / §5: Qt menu handlers. Each follows the existing
+// `handle_scan` / `handle_vendor` shape: pick input → optionally pick
+// output → invoke the qt::* CLI fn → toast via `show_feedback`.
+// File-picker filters per §5.
+// ============================================================================
+
+impl CreatorApp {
+    /// Pick a `.qml` file (preferred) or fall through to a folder
+    /// picker for directory-mode subcommands.
+    fn pick_qml_input(&self) -> Option<PathBuf> {
+        if let Some(p) = FileDialog::new().add_filter("QML", &["qml"]).pick_file() {
+            return Some(p);
+        }
+        FileDialog::new().pick_folder()
+    }
+
+    pub(crate) fn handle_qt_ingest(&mut self) {
+        if let Some(input) = self.pick_qml_input()
+            && let Some(out) = FileDialog::new().pick_folder()
+        {
+            let res = qt::ingest(&input, &out);
+            self.show_feedback("Qt Ingest", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_check(&mut self) {
+        if let Some(input) = FileDialog::new().add_filter("QML", &["qml"]).pick_file() {
+            let res = qt::check(&input);
+            self.show_feedback("Qt Check", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_schema(&mut self) {
+        // Optional output file; cancelling writes to stdout per
+        // qt::schema's existing CLI shape.
+        let out = FileDialog::new().add_filter("JSON", &["json"]).save_file();
+        let res = qt::schema(out.as_deref());
+        self.show_feedback("Qt Schema", res);
+    }
+
+    pub(crate) fn handle_qt_emit(&mut self) {
+        if let Some(input) = self.pick_qml_input()
+            && let Some(out) = FileDialog::new().pick_folder()
+        {
+            // QT-09 §5: UI defaults to the rlvgl target. Advanced
+            // users use the CLI for `--target data`.
+            let res = qt::emit(&input, &out, qt::EmitTarget::Rlvgl);
+            self.show_feedback("Qt Emit", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_emit_scjson(&mut self) {
+        if let Some(input) = self.pick_qml_input() {
+            let out = FileDialog::new().pick_folder();
+            let res = qt::emit_scjson(&input, out.as_deref());
+            self.show_feedback("Qt Emit Scjson", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_emit_externals(&mut self) {
+        if let Some(input) = self.pick_qml_input() {
+            let out = FileDialog::new().pick_folder();
+            let res = qt::emit_externals(&input, out.as_deref());
+            self.show_feedback("Qt Emit Externals", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_emit_tokens(&mut self) {
+        if let Some(input) = self.pick_qml_input() {
+            let out = FileDialog::new().pick_folder();
+            let res = qt::emit_tokens(&input, out.as_deref());
+            self.show_feedback("Qt Emit Tokens", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_list_assets(&mut self) {
+        if let Some(input) = self.pick_qml_input() {
+            let out = FileDialog::new().pick_folder();
+            let res = qt::list_assets(&input, out.as_deref());
+            self.show_feedback("Qt List Assets", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_list_qmldir(&mut self) {
+        // QT-08b §7 prefers folder input (containing qmldir).
+        if let Some(input) = FileDialog::new().pick_folder() {
+            let out = FileDialog::new().pick_folder();
+            let res = qt::list_qmldir(&input, out.as_deref());
+            self.show_feedback("Qt List Qmldir", res);
+        }
+    }
+
+    pub(crate) fn handle_qt_list_qrc(&mut self) {
+        // QT-08c §7 prefers `.qrc` file input; fall through to
+        // folder for directory mode.
+        let input = FileDialog::new()
+            .add_filter("QRC", &["qrc"])
+            .pick_file()
+            .or_else(|| FileDialog::new().pick_folder());
+        if let Some(input) = input {
+            let out = FileDialog::new().pick_folder();
+            let res = qt::list_qrc(&input, out.as_deref());
+            self.show_feedback("Qt List Qrc", res);
         }
     }
 }

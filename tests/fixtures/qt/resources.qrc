@@ -1,0 +1,14 @@
+<!DOCTYPE RCC>
+<!-- QT-08c fixture: representative .qrc covering RCC version,
+     two qresource blocks with different prefixes, three plain
+     <file> entries plus one with an alias attribute. -->
+<RCC version="1.0">
+    <qresource prefix="/icons">
+        <file>play.png</file>
+        <file>stop.png</file>
+        <file alias="reset">reset_button_v3.png</file>
+    </qresource>
+    <qresource prefix="/fonts">
+        <file>FiraSans-Bold.ttf</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/bound_text.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [
+      {
+        "name": "title",
+        "ty": "string",
+        "default_value": "\"Greetings\"",
+        "readonly": false,
+        "default_kw": false
+      }
+    ],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "320"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "80"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Label",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "title"
+            }
+          },
+          {
+            "target": "anchors.fill",
+            "value": {
+              "kind": "expression",
+              "text": "parent"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/centered.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Rectangle",
+        "id": "badge",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "50"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "50"
+            }
+          },
+          {
+            "target": "anchors.centerIn",
+            "value": {
+              "kind": "expression",
+              "text": "parent"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#ff8800\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      }
+    ]
+  }
+}

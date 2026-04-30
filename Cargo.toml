@@ -55,6 +55,75 @@ name = "creator_run"
 path = "tests/creator_run.rs"
 required-features = ["creator"]
 
+[[test]]
+name = "creator_qt_ingest"
+path = "tests/creator_qt_ingest.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_compile"
+path = "tests/creator_qt_emit_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_rlvgl_compile"
+path = "tests/creator_qt_emit_rlvgl_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_clickable_compile"
+path = "tests/creator_qt_emit_clickable_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_counter_compile"
+path = "tests/creator_qt_emit_counter_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_bound_text_compile"
+path = "tests/creator_qt_emit_bound_text_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_centered_compile"
+path = "tests/creator_qt_emit_centered_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_nested_compile"
+path = "tests/creator_qt_emit_nested_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_edges_compile"
+path = "tests/creator_qt_emit_edges_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_corners_compile"
+path = "tests/creator_qt_emit_corners_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_mousearea_compile"
+path = "tests/creator_qt_emit_mousearea_compile.rs"
+required-features = ["creator"]
+
+# QT-05b: stopwatch dispatch-glue compile-as-mod gate. Depends on the
+# `stopwatch_gen` dev-dep (mock istate-codegen output) per QT-05b §8.
+[[test]]
+name = "creator_qt_emit_stopwatch_compile"
+path = "tests/creator_qt_emit_stopwatch_compile.rs"
+required-features = ["creator"]
+
+# QT-10: strict-mode meta-test. Asserts the chapter file set, version
+# constants, and CLI subcommand surface remain stable.
+[[test]]
+name = "creator_qt_strict_mode"
+path = "tests/creator_qt_strict_mode.rs"
+required-features = ["creator"]
+
 [dependencies]
 rlvgl-core = { version = "0.2.0", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.2.0", path = "widgets", default-features = false }
@@ -265,6 +334,11 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 zstd = "0.13.3"
 syn = { version = "2", features = ["full"] }
+# QT-05b test fixture: hand-vendored mock istate-codegen output that
+# satisfies the QT-05 §6 6-symbol linkage surface. Used only by
+# `tests/creator_qt_emit_stopwatch_compile.rs` to compile-check the
+# emitted dispatch glue without the live softoboros MCP.
+stopwatch_gen = { path = "tests/fixtures/qt/stopwatch_gen" }
 
 [features]
 default = []
@@ -399,4 +473,5 @@ members = [
 ]
 # UEFI example is excluded from workspace — it conflicts with std on host targets.
 # Build it explicitly: cargo build -p rlvgl-example-uefi-disco --target aarch64-unknown-uefi
-exclude = ["examples/uefi-disco", "examples/beetle-avr"]
+# vendor/scjson is a reference-only submodule (BSD-1-Clause); never linked into our build.
+exclude = ["examples/uefi-disco", "examples/beetle-avr", "vendor/scjson"]

@@ -17,5 +17,9 @@ categories = ["config", "embedded"]
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = ["std"]
+std = ["dep:serde"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }

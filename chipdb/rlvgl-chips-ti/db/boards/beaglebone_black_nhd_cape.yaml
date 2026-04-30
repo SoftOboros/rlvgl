@@ -1,0 +1,13 @@
+# BeagleBone Black + NHD-7.0CTP-CAPE-P (placeholder).
+#
+# Real bring-up doc: docs/beaglebone-black/README.md.
+# Real BSP code: examples/beaglebone-black/src/bsp/.
+name: beaglebone_black_nhd_cape
+chip: AM335x
+sdram_mb: 512
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins: []

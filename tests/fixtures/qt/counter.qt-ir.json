@@ -1,0 +1,56 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/counter.qml",
+  "imports": [
+    {
+      "module": "QtQuick.Controls",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Button",
+    "id": "root",
+    "properties": [
+      {
+        "name": "count",
+        "ty": "int",
+        "default_value": "0",
+        "readonly": false,
+        "default_kw": false
+      }
+    ],
+    "assignments": [
+      {
+        "target": "text",
+        "value": {
+          "kind": "expression",
+          "text": "\"Press me\""
+        }
+      },
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "80"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [
+      {
+        "signal": "onClicked",
+        "body": "count += 1"
+      }
+    ],
+    "children": []
+  }
+}

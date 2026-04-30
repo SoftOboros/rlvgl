@@ -1,0 +1,222 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/hello.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    },
+    {
+      "module": "QtQuick.Controls",
+      "version": null,
+      "alias": "QC"
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [
+      {
+        "name": "title",
+        "ty": "string",
+        "default_value": "\"Hello\"",
+        "readonly": false,
+        "default_kw": false
+      },
+      {
+        "name": "count",
+        "ty": "int",
+        "default_value": "0",
+        "readonly": false,
+        "default_kw": false
+      },
+      {
+        "name": "ratio",
+        "ty": "real",
+        "default_value": "1.5",
+        "readonly": true,
+        "default_kw": false
+      }
+    ],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "800"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "480"
+        }
+      },
+      {
+        "target": "anchors.fill",
+        "value": {
+          "kind": "expression",
+          "text": "parent"
+        }
+      },
+      {
+        "target": "anchors.margins",
+        "value": {
+          "kind": "expression",
+          "text": "16"
+        }
+      },
+      {
+        "target": "font",
+        "value": {
+          "kind": "object",
+          "item": {
+            "type_name": "font",
+            "properties": [],
+            "assignments": [
+              {
+                "target": "pixelSize",
+                "value": {
+                  "kind": "expression",
+                  "text": "32"
+                }
+              },
+              {
+                "target": "family",
+                "value": {
+                  "kind": "expression",
+                  "text": "\"Inter\""
+                }
+              }
+            ],
+            "signals": [],
+            "handlers": [],
+            "children": []
+          }
+        }
+      },
+      {
+        "target": "transitions",
+        "value": {
+          "kind": "object",
+          "item": {
+            "type_name": "Transition",
+            "properties": [],
+            "assignments": [
+              {
+                "target": "from",
+                "value": {
+                  "kind": "expression",
+                  "text": "\"*\""
+                }
+              },
+              {
+                "target": "to",
+                "value": {
+                  "kind": "expression",
+                  "text": "\"active\""
+                }
+              }
+            ],
+            "signals": [],
+            "handlers": [],
+            "children": []
+          }
+        }
+      }
+    ],
+    "signals": [
+      {
+        "name": "pressed",
+        "params": [
+          {
+            "name": "x",
+            "ty": "int"
+          },
+          {
+            "name": "y",
+            "ty": "int"
+          }
+        ]
+      }
+    ],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Rectangle",
+        "id": "bg",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "anchors.fill",
+            "value": {
+              "kind": "expression",
+              "text": "parent"
+            }
+          },
+          {
+            "target": "color",
+            "value": {
+              "kind": "expression",
+              "text": "\"#1e1e2e\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "QC.Label",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "root.title"
+            }
+          },
+          {
+            "target": "anchors.centerIn",
+            "value": {
+              "kind": "expression",
+              "text": "parent"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "MouseArea",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "anchors.fill",
+            "value": {
+              "kind": "expression",
+              "text": "parent"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [
+          {
+            "signal": "onClicked",
+            "body": "root.count += 1"
+          },
+          {
+            "signal": "onPressed",
+            "body": "console.log(\"down\"); root.pressed(0, 0)"
+          }
+        ],
+        "children": []
+      }
+    ]
+  }
+}
