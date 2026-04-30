@@ -253,3 +253,9 @@ gpio_matrix:
   - { id: 9,  name: U1TXD_out,        direction: out }
   - { id: 45, name: I2CEXT0_SCL,      direction: inout }
   - { id: 46, name: I2CEXT0_SDA,      direction: inout }
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases for the bsp_pac flashable path.
+linker:
+  region_text: flash_cache
+  region_data: hp_sram
