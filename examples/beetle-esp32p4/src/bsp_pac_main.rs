@@ -70,7 +70,11 @@ fn main() -> ! {
         let _ = dfr0550::i2c_bridge::wake();
 
         // Phase 5: DSI host @ 1 lane × 750 Mbps (PHY M/N PLL config).
-        if let Ok(dsi) = dfr0550::dsi_host::init() {
+        if let Ok(dsi) = dfr0550::dsi_host::init(
+            dfr0550::DSI_LANES,
+            dfr0550::DSI_LANE_MBPS,
+            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m.freq_mhz(),
+        ) {
             // Phase 6: DPI controller @ 26 MHz, RGB888, Pi 7" timings.
             if let Ok((_panel, fb)) = dfr0550::dpi_panel::DpiPanel::init(&dsi) {
                 // Phase 7: continuous re-fill loop with cache writeback.
