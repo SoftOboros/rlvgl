@@ -82,6 +82,9 @@ enum AppFocus {
     InfoWing(usize),
 }
 
+#[cfg(feature = "clock_demo")]
+mod clock_demo;
+
 #[cfg(all(
     feature = "freertos",
     any(target_arch = "arm", target_arch = "aarch64")
@@ -2596,6 +2599,27 @@ fn main() -> ! {
             tag: None,
         });
 
+        // ── Clock demo widget (opt-in via `clock_demo` feature) ──────────
+        // 256x256 face roughly centered horizontally, vertically aligned
+        // with the desktop area. Driven by `tick_count` further down.
+        #[cfg(feature = "clock_demo")]
+        let clock_demo = {
+            const FACE_SIZE: i32 = 256;
+            let bounds = rlvgl_core::widget::Rect {
+                x: (800 - FACE_SIZE) / 2,
+                y: (480 - FACE_SIZE) / 2,
+                width: FACE_SIZE,
+                height: FACE_SIZE,
+            };
+            let demo = clock_demo::ClockDemo::new(bounds, 4.0 * 3600.0 + 30.0 * 60.0, 30.0);
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
+                widget: demo.widget(),
+                children: alloc::vec![],
+                tag: Some("clock"),
+            });
+            demo
+        };
+
         // Enable DMA2D rendering mode for the event window so its draw()
         // becomes a no-op — the DMA2D overlay pipeline handles it.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -3764,6 +3788,14 @@ fn main() -> ! {
                 event_win.borrow_mut().handle_event(&Event::Tick);
                 config_menu.borrow_mut().handle_event(&Event::Tick);
 
+                // Drive the clock demo from the same SysTick cadence.
+                // The widget's `clear_region` will surface its dirty union
+                // to the compositor on the next pass.
+                #[cfg(feature = "clock_demo")]
+                {
+                    let _ = clock_demo.tick(tick_count);
+                }
+
                 let vis = event_win.borrow().is_visible();
                 let entry_count = event_win.borrow().entry_count();
 
@@ -4393,6 +4425,13 @@ fn main() -> ! {
 
                         root.borrow().draw(&mut renderer);
 
+                        // Clock demo telemetry: the TimedClock wrapper
+                        // captured per-frame draw cycles during the walk
+                        // above; pair them with plan cycles + dirty_px
+                        // and publish to D3 SRAM.
+                        #[cfg(feature = "clock_demo")]
+                        clock_demo.publish_telem();
+
                         // If event window visible, start DMA2D overlay pipeline.
                         #[cfg(all(
                             feature = "dma2d",
@@ -4953,6 +4992,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                     DiscoEffect::StarCrawl => {
                         controller.publish_status("STM32 runtime acknowledged star crawl");
                     }
+                    DiscoEffect::Spectrum => {
+                        controller.publish_status("STM32 runtime acknowledged spectrum");
+                    }
                 },
                 DiscoCommand::StopEffect(effect) => match effect {
                     DiscoEffect::AudioScope => {
@@ -4960,6 +5002,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                     }
                     DiscoEffect::StarCrawl => {
                         controller.publish_status("STM32 runtime stopped star crawl");
+                    }
+                    DiscoEffect::Spectrum => {
+                        controller.publish_status("STM32 runtime stopped spectrum");
                     }
                 },
                 DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}

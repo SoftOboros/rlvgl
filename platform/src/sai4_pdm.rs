@@ -79,7 +79,16 @@ const PDMCR_CKEN1: u32 = 1 << 8;
 // ---------------------------------------------------------------------------
 
 const RCC_APB4ENR: u32 = 0x5802_44F4;
-const RCC_D3CCIPR: u32 = 0x5802_4D2C;
+// RCC_D3CCIPR offset is 0x58 per stm32h7 PAC v0.15.1
+// (RegisterBlock::d3ccipr at offset 0x58). The previous constant
+// 0x5802_4D2C resolved to a reserved/unmapped address — the
+// `enable_clock` write silently dropped on the floor, leaving
+// SAI4ASEL stuck at the reset value 0b000 = PLL1_Q. Bench-flash
+// 2026-04-28 verified: PDM publish rate measured at 21 Hz vs the
+// 244 Hz BENCH-FLASH.md prediction → SAI4 was running on PLL1_Q
+// at an unexpected frequency. With this address corrected,
+// `enable_clock(1)` properly selects PLL2_P (SAI4ASEL = 0b001).
+const RCC_D3CCIPR: u32 = 0x5802_4458;
 
 // ---------------------------------------------------------------------------
 // Status register

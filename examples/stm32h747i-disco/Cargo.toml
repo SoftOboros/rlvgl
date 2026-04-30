@@ -34,6 +34,7 @@ cm7 = [
 cm4 = ["stm32h7/stm32h747cm4"]
 splash = ["rlvgl-platform/splash"]
 desktop = []
+clock_demo = ["cpu_stats"]  # Push an analog clock widget onto the desktop tree, with DWT telemetry
 dma2d = ["rlvgl-platform/dma2d"]
 cpu_stats = []
 audio = ["rlvgl-platform/audio"]

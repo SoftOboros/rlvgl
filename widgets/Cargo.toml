@@ -17,7 +17,7 @@ publish = true
 rlvgl-core = { version = "0.2.0", path = "../core", default-features = false }
 rlvgl-platform = { version = "0.2.0", path = "../platform", default-features = false }
 rlvgl-audio-meters-core = { version = "0.2.0", path = "../audio-meters-core", default-features = false }
-libm = "0.2"
+libm = { version = "0.2", default-features = false }
 
 [dev-dependencies]
 rand = "0.9.2"

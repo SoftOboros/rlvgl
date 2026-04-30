@@ -34,6 +34,8 @@ extern crate alloc;
 pub mod animation;
 pub mod application;
 pub mod bitmap_font;
+/// Graphics-language layer: structured drawing commands as data.
+pub mod cmd;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
 pub mod event;
@@ -45,6 +47,9 @@ pub mod interface;
 /// Variable-width packed font renderer (grayscale anti-aliased).
 pub mod packed_font;
 pub mod plugins;
+/// Anti-aliased rasterization kernels (OBB and helpers) usable by both
+/// software and hardware-accelerated `Renderer` implementations.
+pub mod raster;
 pub mod renderer;
 pub mod style;
 pub mod theme;

@@ -135,6 +135,13 @@ pub enum DiscoEffect {
     AudioScope,
     /// The Star Wars style crawl used by the STM32 demo.
     StarCrawl,
+    /// Windowed-FFT spectrum display. The runtime adapter consumes a
+    /// per-mode dBFS band array (e.g. 320 bands across DC..Nyquist)
+    /// from the analyzer's shared-spectrum bus and renders it as
+    /// vertical bars. Added 2026-04-28 for the disco-analyzer
+    /// subrepo's `DAA-02-MEASUREMENT-MODE-FFT-SPECTRUM` walkthrough
+    /// (DAA-02-D 1:1 per-mode `DiscoEffect` mapping ratification).
+    Spectrum,
 }
 
 /// Commands emitted by the shared demo controller for a runtime adapter.
@@ -220,6 +227,7 @@ enum InfoSlot {
     LiveStats = 1,
     StarCrawl = 2,
     AudioScope = 3,
+    Spectrum = 4,
 }
 
 const STRIP_ICON_SIZE: i32 = 60;
@@ -237,6 +245,7 @@ impl InfoSlot {
             1 => Self::LiveStats,
             2 => Self::StarCrawl,
             3 => Self::AudioScope,
+            4 => Self::Spectrum,
             _ => Self::Diagnostics,
         }
     }
@@ -568,7 +577,7 @@ impl ControllerState {
             ),
             FocusState::Wing(WingKind::Info, index) => FocusState::Wing(
                 WingKind::Info,
-                (index as i32 + delta).rem_euclid(4) as usize,
+                (index as i32 + delta).rem_euclid(5) as usize,
             ),
             other => other,
         };
@@ -680,6 +689,16 @@ impl ControllerState {
                     self.queue(DiscoCommand::NoOp);
                 }
             }
+            InfoSlot::Spectrum => {
+                self.active_info = None;
+                if self.capabilities.audio {
+                    self.push_status("Queued FFT spectrum effect");
+                    self.queue(DiscoCommand::StartEffect(DiscoEffect::Spectrum));
+                } else {
+                    self.push_status("FFT spectrum is unavailable on this platform");
+                    self.queue(DiscoCommand::NoOp);
+                }
+            }
         }
     }
 
@@ -707,7 +726,7 @@ impl ControllerState {
                     lines,
                 );
             }
-            InfoSlot::StarCrawl | InfoSlot::AudioScope => {
+            InfoSlot::StarCrawl | InfoSlot::AudioScope | InfoSlot::Spectrum => {
                 // Effects don't render a page; intentionally no-op.
             }
         }
@@ -919,6 +938,10 @@ impl DiscoController {
             (assets::ICON_CPU_48, true),
             (assets::ICON_MONITOR_48, true),
             (assets::ICON_PLAY_48, capabilities.effects),
+            (assets::ICON_AUDIO_48, capabilities.audio),
+            // ICON_AUDIO_48 reused for Spectrum until a dedicated
+            // spectrum icon is added — both effects are audio-related,
+            // so the visual cue is consistent enough for v1.
             (assets::ICON_AUDIO_48, capabilities.audio),
         ])));
 
@@ -1169,7 +1192,7 @@ impl DiscoController {
 
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(0, 4), {
+                ActionHotspot::new(wing_slot_bounds(0, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::Diagnostics)
                 })
@@ -1183,7 +1206,7 @@ impl DiscoController {
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(1, 4), {
+                ActionHotspot::new(wing_slot_bounds(1, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::LiveStats)
                 })
@@ -1197,7 +1220,7 @@ impl DiscoController {
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(2, 4), {
+                ActionHotspot::new(wing_slot_bounds(2, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::StarCrawl)
                 })
@@ -1211,7 +1234,7 @@ impl DiscoController {
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(3, 4), {
+                ActionHotspot::new(wing_slot_bounds(3, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::AudioScope)
                 })
@@ -1222,6 +1245,20 @@ impl DiscoController {
             )),
             children: Vec::new(),
             tag: Some("disco.info.audio_scope"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(4, 5), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_info(InfoSlot::Spectrum)
+                })
+                .with_visibility({
+                    let wing = info_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.info.spectrum"),
         });
 
         let controller = Self { root, state };
@@ -1609,7 +1646,7 @@ mod tests {
         );
         key_down(&mut c, Key::Character('i'));
         assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, 0));
-        for i in 1..4 {
+        for i in 1..5 {
             key_down(&mut c, Key::ArrowDown);
             assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, i));
         }
@@ -1712,6 +1749,50 @@ mod tests {
             commands
                 .iter()
                 .any(|cmd| { matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::AudioScope)) })
+        );
+    }
+
+    #[test]
+    fn spectrum_on_capable_platform_emits_start_effect() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::stm32h747i_disco(),
+        );
+        // Open the info wing, then arrow-down four times to reach the
+        // Spectrum slot (index 4 — after Diagnostics, LiveStats,
+        // StarCrawl, AudioScope) and activate it.
+        key_down(&mut c, Key::Character('i'));
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+        let commands = c.drain_commands();
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| { matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::Spectrum)) }),
+            "expected StartEffect(Spectrum) in {:?}",
+            commands,
+        );
+    }
+
+    #[test]
+    fn unsupported_spectrum_action_neutralizes_without_panicking() {
+        // simulator() has audio = false, so Spectrum should NoOp.
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Character('i'));
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+        let commands = c.drain_commands();
+        assert!(
+            commands.iter().any(|cmd| matches!(cmd, DiscoCommand::NoOp)),
+            "expected NoOp for unsupported Spectrum, got {:?}",
+            commands,
         );
     }
 

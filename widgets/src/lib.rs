@@ -10,6 +10,8 @@ pub mod button;
 pub mod checkbox;
 /// Transparent click-area widget — rlvgl analogue of QML `MouseArea`.
 pub mod click_area;
+/// Analog clock widget with sub-pixel anti-aliased hand rotation.
+pub mod clock;
 /// Container widget for layout grouping.
 pub mod container;
 /// Image display widget.
