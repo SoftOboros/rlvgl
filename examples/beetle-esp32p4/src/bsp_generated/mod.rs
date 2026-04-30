@@ -11,6 +11,8 @@
 //! This `mod.rs` is hand-maintained so we can add board-specific helpers
 //! without regenerating this file.
 
+#![allow(dead_code)]
+
 pub mod board;
 pub mod clocks;
 pub mod io_mux;

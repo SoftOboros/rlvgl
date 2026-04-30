@@ -31,6 +31,8 @@ default = []
 esp32p4 = [
     "dep:esp32p4",
     "dep:esp-riscv-rt",
+    "dep:riscv-rt",
+    "dep:riscv",
     "dep:panic-halt",
 ]
 
@@ -42,4 +44,13 @@ rlvgl-widgets = { path = "../../widgets", default-features = false }
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp32p4 = { version = "0.2", features = ["rt", "critical-section"], optional = true }
 esp-riscv-rt = { version = "0.13", optional = true }
+# Direct dep with the `memory` feature so riscv-rt's build.rs emits
+# `INCLUDE memory.x` into the generated link.x. esp-riscv-rt 0.13 pulls
+# riscv-rt 0.16 *without* this feature, leaving REGION_TEXT undefined.
+riscv-rt = { version = "0.16", features = ["memory"], optional = true }
+# Provides a `_critical_section_1_0_*` impl for the `critical-section`
+# crate. Single-hart is correct here — the HP CPU runs one hart for the
+# bsp_pac path. The PAC pulls `critical-section` as a dep but does not
+# select an impl, which leaves the symbols undefined at link time.
+riscv = { version = "0.15", features = ["critical-section-single-hart"], optional = true }
 panic-halt = { version = "1", optional = true }

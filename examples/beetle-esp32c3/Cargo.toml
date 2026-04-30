@@ -4,6 +4,7 @@ version = "0.2.0"
 edition = "2024"
 publish = false
 rust-version = "1.85"
+build = "build.rs"
 
 # Two parallel bring-up paths for the DFRobot Beetle ESP32-C3 (DFR0868),
 # selected by mutually exclusive feature flags:
@@ -66,6 +67,8 @@ esp_hal = [
 bsp_pac = [
     "dep:esp32c3",
     "dep:esp-riscv-rt",
+    "dep:riscv-rt",
+    "dep:riscv",
     "dep:panic-halt",
 ]
 
@@ -87,5 +90,10 @@ esp-alloc = { version = "0.6", optional = true }
 # bsp_pac-only deps — raw PAC bring-up path.
 esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true }
 esp-riscv-rt = { version = "0.13", optional = true }
+# Direct riscv-rt with `memory` feature so its build.rs INCLUDEs memory.x.
+riscv-rt = { version = "0.16", features = ["memory"], optional = true }
+# Provides _critical_section_1_0_* impl that the PAC's critical-section
+# feature requires but doesn't itself supply.
+riscv = { version = "0.15", features = ["critical-section-single-hart"], optional = true }
 panic-halt = { version = "1", optional = true }
 embedded-hal = { version = "1.0", optional = true }
