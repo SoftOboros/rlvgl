@@ -208,9 +208,7 @@ impl<W: MeterWidget, const N: usize> Widget for MultiChannel<W, N> {
 mod tests {
     use super::*;
     use crate::meters::bargraph::LedBargraph;
-    use crate::meters::presets::{
-        BROADCAST_CLASSIC_BARGRAPH, DIGITAL_STUDIO_BARGRAPH,
-    };
+    use crate::meters::presets::{BROADCAST_CLASSIC_BARGRAPH, DIGITAL_STUDIO_BARGRAPH};
     use rlvgl_core::widget::Color;
 
     struct OpCounter {
@@ -362,7 +360,10 @@ mod tests {
         let before = mc.channel(0).reading_db();
         mc.reset();
         let after = mc.channel(0).reading_db();
-        assert!(after < before, "reset should lower the reading toward floor");
+        assert!(
+            after < before,
+            "reset should lower the reading toward floor"
+        );
     }
 
     #[test]

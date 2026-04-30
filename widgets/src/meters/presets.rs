@@ -15,8 +15,8 @@
 use rlvgl_audio_meters_core::Ballistic;
 
 use super::skin::{
-    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, SkinAssets,
-    TickLabel, Zone, rgb,
+    Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin,
+    SkinAssets, TickLabel, Zone, rgb,
 };
 
 // ---- Scales ---------------------------------------------------------
@@ -34,16 +34,46 @@ pub static SCALE_VU_BROADCAST: Scale = Scale {
     majors: &[-20.0, -10.0, -7.0, -5.0, -3.0, -1.0, 0.0, 1.0, 2.0, 3.0],
     minors_per_major_division: 4,
     tick_labels: &[
-        TickLabel { value: -20.0, label: "−20" },
-        TickLabel { value: -10.0, label: "−10" },
-        TickLabel { value: -7.0,  label: "−7"  },
-        TickLabel { value: -5.0,  label: "−5"  },
-        TickLabel { value: -3.0,  label: "−3"  },
-        TickLabel { value: -1.0,  label: "−1"  },
-        TickLabel { value:  0.0,  label: "0"   },
-        TickLabel { value:  1.0,  label: "+1"  },
-        TickLabel { value:  2.0,  label: "+2"  },
-        TickLabel { value:  3.0,  label: "+3"  },
+        TickLabel {
+            value: -20.0,
+            label: "−20",
+        },
+        TickLabel {
+            value: -10.0,
+            label: "−10",
+        },
+        TickLabel {
+            value: -7.0,
+            label: "−7",
+        },
+        TickLabel {
+            value: -5.0,
+            label: "−5",
+        },
+        TickLabel {
+            value: -3.0,
+            label: "−3",
+        },
+        TickLabel {
+            value: -1.0,
+            label: "−1",
+        },
+        TickLabel {
+            value: 0.0,
+            label: "0",
+        },
+        TickLabel {
+            value: 1.0,
+            label: "+1",
+        },
+        TickLabel {
+            value: 2.0,
+            label: "+2",
+        },
+        TickLabel {
+            value: 3.0,
+            label: "+3",
+        },
     ],
     zones: &[
         Zone {
@@ -82,16 +112,46 @@ pub static SCALE_VU_EBU: Scale = Scale {
     majors: &[-18.0, -10.0, -7.0, -5.0, -3.0, -1.0, 0.0, 1.0, 2.0, 3.0],
     minors_per_major_division: 4,
     tick_labels: &[
-        TickLabel { value: -18.0, label: "−18" },
-        TickLabel { value: -10.0, label: "−10" },
-        TickLabel { value: -7.0,  label: "−7"  },
-        TickLabel { value: -5.0,  label: "−5"  },
-        TickLabel { value: -3.0,  label: "−3"  },
-        TickLabel { value: -1.0,  label: "−1"  },
-        TickLabel { value:  0.0,  label: "0"   },
-        TickLabel { value:  1.0,  label: "+1"  },
-        TickLabel { value:  2.0,  label: "+2"  },
-        TickLabel { value:  3.0,  label: "+3"  },
+        TickLabel {
+            value: -18.0,
+            label: "−18",
+        },
+        TickLabel {
+            value: -10.0,
+            label: "−10",
+        },
+        TickLabel {
+            value: -7.0,
+            label: "−7",
+        },
+        TickLabel {
+            value: -5.0,
+            label: "−5",
+        },
+        TickLabel {
+            value: -3.0,
+            label: "−3",
+        },
+        TickLabel {
+            value: -1.0,
+            label: "−1",
+        },
+        TickLabel {
+            value: 0.0,
+            label: "0",
+        },
+        TickLabel {
+            value: 1.0,
+            label: "+1",
+        },
+        TickLabel {
+            value: 2.0,
+            label: "+2",
+        },
+        TickLabel {
+            value: 3.0,
+            label: "+3",
+        },
     ],
     zones: &[
         Zone {
@@ -130,15 +190,42 @@ pub static SCALE_DIGITAL_PEAK: Scale = Scale {
     majors: &[-60.0, -50.0, -40.0, -30.0, -20.0, -12.0, -6.0, -3.0, 0.0],
     minors_per_major_division: 5,
     tick_labels: &[
-        TickLabel { value: -60.0, label: "−60" },
-        TickLabel { value: -50.0, label: "−50" },
-        TickLabel { value: -40.0, label: "−40" },
-        TickLabel { value: -30.0, label: "−30" },
-        TickLabel { value: -20.0, label: "−20" },
-        TickLabel { value: -12.0, label: "−12" },
-        TickLabel { value:  -6.0, label: "−6"  },
-        TickLabel { value:  -3.0, label: "−3"  },
-        TickLabel { value:   0.0, label: "0"   },
+        TickLabel {
+            value: -60.0,
+            label: "−60",
+        },
+        TickLabel {
+            value: -50.0,
+            label: "−50",
+        },
+        TickLabel {
+            value: -40.0,
+            label: "−40",
+        },
+        TickLabel {
+            value: -30.0,
+            label: "−30",
+        },
+        TickLabel {
+            value: -20.0,
+            label: "−20",
+        },
+        TickLabel {
+            value: -12.0,
+            label: "−12",
+        },
+        TickLabel {
+            value: -6.0,
+            label: "−6",
+        },
+        TickLabel {
+            value: -3.0,
+            label: "−3",
+        },
+        TickLabel {
+            value: 0.0,
+            label: "0",
+        },
     ],
     zones: &[
         Zone {
@@ -178,14 +265,38 @@ pub static SCALE_PPM_DIN: Scale = Scale {
     majors: &[-50.0, -40.0, -30.0, -20.0, -10.0, -5.0, 0.0, 5.0],
     minors_per_major_division: 4,
     tick_labels: &[
-        TickLabel { value: -50.0, label: "−50" },
-        TickLabel { value: -40.0, label: "−40" },
-        TickLabel { value: -30.0, label: "−30" },
-        TickLabel { value: -20.0, label: "−20" },
-        TickLabel { value: -10.0, label: "−10" },
-        TickLabel { value:  -5.0, label: "−5"  },
-        TickLabel { value:   0.0, label: "0"   },
-        TickLabel { value:   5.0, label: "+5"  },
+        TickLabel {
+            value: -50.0,
+            label: "−50",
+        },
+        TickLabel {
+            value: -40.0,
+            label: "−40",
+        },
+        TickLabel {
+            value: -30.0,
+            label: "−30",
+        },
+        TickLabel {
+            value: -20.0,
+            label: "−20",
+        },
+        TickLabel {
+            value: -10.0,
+            label: "−10",
+        },
+        TickLabel {
+            value: -5.0,
+            label: "−5",
+        },
+        TickLabel {
+            value: 0.0,
+            label: "0",
+        },
+        TickLabel {
+            value: 5.0,
+            label: "+5",
+        },
     ],
     zones: &[
         Zone {
@@ -225,13 +336,34 @@ pub static SCALE_PPM_IIA_BBC: Scale = Scale {
     majors: &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
     minors_per_major_division: 0,
     tick_labels: &[
-        TickLabel { value: 1.0, label: "1" },
-        TickLabel { value: 2.0, label: "2" },
-        TickLabel { value: 3.0, label: "3" },
-        TickLabel { value: 4.0, label: "4" },
-        TickLabel { value: 5.0, label: "5" },
-        TickLabel { value: 6.0, label: "6" },
-        TickLabel { value: 7.0, label: "7" },
+        TickLabel {
+            value: 1.0,
+            label: "1",
+        },
+        TickLabel {
+            value: 2.0,
+            label: "2",
+        },
+        TickLabel {
+            value: 3.0,
+            label: "3",
+        },
+        TickLabel {
+            value: 4.0,
+            label: "4",
+        },
+        TickLabel {
+            value: 5.0,
+            label: "5",
+        },
+        TickLabel {
+            value: 6.0,
+            label: "6",
+        },
+        TickLabel {
+            value: 7.0,
+            label: "7",
+        },
     ],
     zones: &[
         Zone {
@@ -267,18 +399,54 @@ pub static SCALE_LUFS_EBU_R128: Scale = Scale {
     ],
     minors_per_major_division: 1,
     tick_labels: &[
-        TickLabel { value: -36.0, label: "−36" },
-        TickLabel { value: -30.0, label: "−30" },
-        TickLabel { value: -27.0, label: "−27" },
-        TickLabel { value: -25.0, label: "−25" },
-        TickLabel { value: -23.0, label: "−23" },
-        TickLabel { value: -21.0, label: "−21" },
-        TickLabel { value: -19.0, label: "−19" },
-        TickLabel { value: -17.0, label: "−17" },
-        TickLabel { value: -15.0, label: "−15" },
-        TickLabel { value: -10.0, label: "−10" },
-        TickLabel { value:  -5.0, label: "−5"  },
-        TickLabel { value:   0.0, label: "0"   },
+        TickLabel {
+            value: -36.0,
+            label: "−36",
+        },
+        TickLabel {
+            value: -30.0,
+            label: "−30",
+        },
+        TickLabel {
+            value: -27.0,
+            label: "−27",
+        },
+        TickLabel {
+            value: -25.0,
+            label: "−25",
+        },
+        TickLabel {
+            value: -23.0,
+            label: "−23",
+        },
+        TickLabel {
+            value: -21.0,
+            label: "−21",
+        },
+        TickLabel {
+            value: -19.0,
+            label: "−19",
+        },
+        TickLabel {
+            value: -17.0,
+            label: "−17",
+        },
+        TickLabel {
+            value: -15.0,
+            label: "−15",
+        },
+        TickLabel {
+            value: -10.0,
+            label: "−10",
+        },
+        TickLabel {
+            value: -5.0,
+            label: "−5",
+        },
+        TickLabel {
+            value: 0.0,
+            label: "0",
+        },
     ],
     zones: &[
         Zone {
@@ -322,18 +490,54 @@ pub static SCALE_LUFS_STREAMING_M14: Scale = Scale {
     ],
     minors_per_major_division: 1,
     tick_labels: &[
-        TickLabel { value: -36.0, label: "−36" },
-        TickLabel { value: -30.0, label: "−30" },
-        TickLabel { value: -24.0, label: "−24" },
-        TickLabel { value: -20.0, label: "−20" },
-        TickLabel { value: -16.0, label: "−16" },
-        TickLabel { value: -14.0, label: "−14" },
-        TickLabel { value: -12.0, label: "−12" },
-        TickLabel { value: -10.0, label: "−10" },
-        TickLabel { value:  -8.0, label: "−8"  },
-        TickLabel { value:  -5.0, label: "−5"  },
-        TickLabel { value:  -3.0, label: "−3"  },
-        TickLabel { value:   0.0, label: "0"   },
+        TickLabel {
+            value: -36.0,
+            label: "−36",
+        },
+        TickLabel {
+            value: -30.0,
+            label: "−30",
+        },
+        TickLabel {
+            value: -24.0,
+            label: "−24",
+        },
+        TickLabel {
+            value: -20.0,
+            label: "−20",
+        },
+        TickLabel {
+            value: -16.0,
+            label: "−16",
+        },
+        TickLabel {
+            value: -14.0,
+            label: "−14",
+        },
+        TickLabel {
+            value: -12.0,
+            label: "−12",
+        },
+        TickLabel {
+            value: -10.0,
+            label: "−10",
+        },
+        TickLabel {
+            value: -8.0,
+            label: "−8",
+        },
+        TickLabel {
+            value: -5.0,
+            label: "−5",
+        },
+        TickLabel {
+            value: -3.0,
+            label: "−3",
+        },
+        TickLabel {
+            value: 0.0,
+            label: "0",
+        },
     ],
     zones: &[
         Zone {

@@ -239,16 +239,8 @@ impl LedBargraph {
     fn draw_ticks(&self, renderer: &mut dyn Renderer, led_bounds: Rect, lo: f32, span: f32) {
         use alloc::format;
         let scale = self.skin.scale;
-        let major_col = self
-            .skin
-            .secondary
-            .major_tick
-            .unwrap_or(DEFAULT_MAJOR_TICK);
-        let text_col = self
-            .skin
-            .secondary
-            .scale_text
-            .unwrap_or(DEFAULT_SCALE_TEXT);
+        let major_col = self.skin.secondary.major_tick.unwrap_or(DEFAULT_MAJOR_TICK);
+        let text_col = self.skin.secondary.scale_text.unwrap_or(DEFAULT_SCALE_TEXT);
 
         let strip_x = led_bounds.x + led_bounds.width;
         let tick_w = 8;

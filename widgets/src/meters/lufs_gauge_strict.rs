@@ -119,11 +119,7 @@ impl<const N: usize> LufsGaugeStrict<N> {
         let lu = lufs - self.target_lufs();
         let abs = if lu < 0.0 { -lu } else { lu };
         let id = if self.last_i <= self.skin.scale.range_min_db {
-            return self
-                .skin
-                .secondary
-                .scale_text
-                .unwrap_or(DEFAULT_TEXT);
+            return self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);
         } else if abs <= NOMINAL_LU_HALF_WIDTH {
             MeterColorId::Nominal
         } else if abs <= CAUTION_LU_HALF_WIDTH {
@@ -144,11 +140,7 @@ impl<const N: usize> Widget for LufsGaugeStrict<N> {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
-        let text_default = self
-            .skin
-            .secondary
-            .scale_text
-            .unwrap_or(DEFAULT_TEXT);
+        let text_default = self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);
 
         renderer.fill_rect(self.bounds, bg);
 
@@ -190,7 +182,12 @@ mod tests {
     fn rejects_non_lufs_skin() {
         let bargraph = &crate::meters::presets::BROADCAST_CLASSIC_BARGRAPH;
         let _: LufsGaugeStrict<128> = LufsGaugeStrict::new(
-            Rect { x: 0, y: 0, width: 240, height: 120 },
+            Rect {
+                x: 0,
+                y: 0,
+                width: 240,
+                height: 120,
+            },
             bargraph,
         );
     }
@@ -198,14 +195,18 @@ mod tests {
     #[test]
     fn at_target_reads_near_zero_lu() {
         let mut g: LufsGaugeStrict<128> = LufsGaugeStrict::new(
-            Rect { x: 0, y: 0, width: 240, height: 120 },
+            Rect {
+                x: 0,
+                y: 0,
+                width: 240,
+                height: 120,
+            },
             &LUFS_EBU_R128_GAUGE,
         );
         for _ in 0..1000 {
             g.update(-23.0, 1.0 / 60.0);
         }
-        let i_lu =
-            (g.skin.scale.dbfs_to_scale_units(g.integrated_db()) - g.target_lufs()).abs();
+        let i_lu = (g.skin.scale.dbfs_to_scale_units(g.integrated_db()) - g.target_lufs()).abs();
         assert!(
             i_lu < 0.5,
             "strict gauge at target should be within 0.5 LU, got {} LU",
@@ -219,11 +220,21 @@ mod tests {
     #[test]
     fn lifts_above_streaming_when_quiet_passages_present() {
         let mut strict: LufsGaugeStrict<256> = LufsGaugeStrict::new(
-            Rect { x: 0, y: 0, width: 240, height: 120 },
+            Rect {
+                x: 0,
+                y: 0,
+                width: 240,
+                height: 120,
+            },
             &LUFS_EBU_R128_GAUGE,
         );
         let mut streaming = LufsGauge::new(
-            Rect { x: 0, y: 0, width: 240, height: 120 },
+            Rect {
+                x: 0,
+                y: 0,
+                width: 240,
+                height: 120,
+            },
             &LUFS_EBU_R128_GAUGE,
         );
         for f in 0..256 {
@@ -252,7 +263,12 @@ mod tests {
     #[test]
     fn draws_one_bg_plus_three_text_lines() {
         let g: LufsGaugeStrict<128> = LufsGaugeStrict::new(
-            Rect { x: 0, y: 0, width: 240, height: 120 },
+            Rect {
+                x: 0,
+                y: 0,
+                width: 240,
+                height: 120,
+            },
             &LUFS_EBU_R128_GAUGE,
         );
         struct Counter {

@@ -10,11 +10,11 @@
 
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
+use rlvgl_widgets::meters::skin::TickLabel;
 use rlvgl_widgets::meters::{
     Layout, MeterColorId, MeterType, Orientation, Palette, Scale, SecondaryColors, Skin, Zone,
     presets,
 };
-use rlvgl_widgets::meters::skin::TickLabel;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -340,10 +340,7 @@ fn skins_match_json() {
         &presets::NORDIC_PPM_BARGRAPH,
         &dir.join("nordic_ppm_bargraph.json"),
     );
-    assert_skin_match(
-        &presets::BBC_PPM_NEEDLE,
-        &dir.join("bbc_ppm_needle.json"),
-    );
+    assert_skin_match(&presets::BBC_PPM_NEEDLE, &dir.join("bbc_ppm_needle.json"));
 }
 
 /// `Zone` is required to be exported so this integration test sees it.
