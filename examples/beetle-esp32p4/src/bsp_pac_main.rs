@@ -43,10 +43,9 @@ fn main() -> ! {
     }
 
     // DFR0550 bring-up phases — see dfr0550/mod.rs for the full sequence.
-    // Each call is currently a no-op stub returning `Err(Unimplemented)`;
-    // we ignore the result so the binary still links and falls through
-    // to the LED-blink sanity check while the implementations are fleshed
-    // out one by one.
+    // PSRAM, DSI host PHY, and DPI panel still return `Err(Unimplemented)`;
+    // we ignore those results so the binary still links and falls through
+    // to the LED-blink sanity check while the PHY layer is staged.
     unsafe {
         // Phase 1: PSRAM octal HEX @ 200 MHz.
         let _ = dfr0550::psram::init();
@@ -54,14 +53,27 @@ fn main() -> ! {
         // Phase 2: DSI DPHY rail (LDO_VO3 @ 2500 mV).
         let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
 
-        // Phase 3: wake the panel bridge (Pi-7"-Atmel protocol).
+        // Phase 3a: ungate DSI bus + bridge clocks, pulse bridge reset.
+        dfr0550::dsi_host::clocks::enable_bus_and_reset();
+        // Phase 3b: ungate PHY config + PLL ref clocks (default = PLL_F20M).
+        dfr0550::dsi_host::clocks::enable_phy_clocks(
+            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
+        );
+        // Phase 3c: configure DPI pixel clock — 26 MHz from PLL_F240M
+        // (actual 240/9 ≈ 26.67 MHz; matches IDF behavior).
+        dfr0550::dsi_host::clocks::enable_dpi_clock(
+            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
+            dfr0550::DPI_PIXEL_CLK_MHZ,
+        );
+
+        // Phase 4: wake the panel bridge (Pi-7"-Atmel protocol).
         let _ = dfr0550::i2c_bridge::wake();
 
-        // Phase 4: DSI host @ 1 lane × 750 Mbps.
+        // Phase 5: DSI host @ 1 lane × 750 Mbps (PHY M/N PLL config).
         if let Ok(dsi) = dfr0550::dsi_host::init() {
-            // Phase 5: DPI controller @ 26 MHz, RGB888, Pi 7" timings.
+            // Phase 6: DPI controller @ 26 MHz, RGB888, Pi 7" timings.
             if let Ok((_panel, fb)) = dfr0550::dpi_panel::DpiPanel::init(&dsi) {
-                // Phase 6: continuous re-fill loop with cache writeback.
+                // Phase 7: continuous re-fill loop with cache writeback.
                 run_color_cycle(fb);
             }
         }
