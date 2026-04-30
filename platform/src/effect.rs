@@ -300,9 +300,9 @@ pub fn blend_a8_row_inline(
     let dst_stride = dst.stride;
     let dst_w = dst.width as i32;
     let row_start = (dy as usize) * dst_stride;
-    let fg_r = ((fg_color >> 16) & 0xFF) as u32;
-    let fg_g = ((fg_color >> 8) & 0xFF) as u32;
-    let fg_b = (fg_color & 0xFF) as u32;
+    let fg_r = (fg_color >> 16) & 0xFF;
+    let fg_g = (fg_color >> 8) & 0xFF;
+    let fg_b = fg_color & 0xFF;
     for (i, &alpha_byte) in alphas.iter().enumerate() {
         let alpha = alpha_byte as u32;
         if alpha == 0 {

@@ -122,10 +122,8 @@ impl<const N: usize> RelativelyGatedLufsI<N> {
     /// cross-runtime API parity with `BallisticState::update`.
     /// Returns the new reading (same as [`Self::reading_db`]).
     pub fn update(&mut self, dbfs: f32, _dt: f32) -> f32 {
-        // Sanitise NaN / -inf to the floor; treat above-+0 dBFS as 0.
-        let clean = if !dbfs.is_finite() {
-            NEG_INFINITY_FLOOR_DB
-        } else if dbfs < NEG_INFINITY_FLOOR_DB {
+        // Sanitise NaN / -inf / sub-floor to the floor.
+        let clean = if !dbfs.is_finite() || dbfs < NEG_INFINITY_FLOOR_DB {
             NEG_INFINITY_FLOOR_DB
         } else {
             dbfs

@@ -133,8 +133,7 @@ pub fn render_esp_pac(ir: &EspIr, out_dir: &Path) -> Result<Vec<std::path::PathB
             .with_context(|| format!("render {name}"))?;
         let out_name: &str = if name == "chip.x" { &chip_x_name } else { name };
         let path = target.join(out_name);
-        std::fs::write(&path, rendered)
-            .with_context(|| format!("write {}", path.display()))?;
+        std::fs::write(&path, rendered).with_context(|| format!("write {}", path.display()))?;
         written.push(path);
     }
     Ok(written)
