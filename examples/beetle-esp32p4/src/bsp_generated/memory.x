@@ -14,7 +14,13 @@ MEMORY
   LP_SRAM : ORIGIN = 0x50108000, LENGTH = 0x00008000    /* rwx */
   MIPI_CSI_MEM : ORIGIN = 0x50104000, LENGTH = 0x00001000    /* rw */
   MIPI_DSI_MEM : ORIGIN = 0x50105000, LENGTH = 0x00001000    /* rw */
-  FLASH_CACHE : ORIGIN = 0x40000000, LENGTH = 0x04000000    /* rx */
+  /* First 256 bytes of the IROM cache window are reserved for the
+   * ESP-IDF app descriptor (esp_app_desc_t). The bootloader looks for
+   * the magic 0xABCD5432 there and refuses to start the app if it's
+   * absent. The descriptor itself lives in src/app_desc.rs and is
+   * placed via `.app_desc` in esp32_p4.x. */
+  FLASH_APP_DESC : ORIGIN = 0x40000000, LENGTH = 0x00000100    /* rx */
+  FLASH_CACHE : ORIGIN = 0x40000100, LENGTH = 0x03FFFF00    /* rx */
   PSRAM_CACHE : ORIGIN = 0x48000000, LENGTH = 0x04000000    /* rwx */
 }
 

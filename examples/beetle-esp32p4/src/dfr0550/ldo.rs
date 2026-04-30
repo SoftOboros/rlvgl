@@ -73,6 +73,11 @@ impl LdoChannel {
                 w.ana_0p2a_dref_0().bits(DREF_FOR_2500MV);
                 w.ana_0p2a_mul_0().bits(MUL_FOR_2500MV);
             }
+            // ldo_ll_enable_ripple_suppression(unit=2, true): en_vdet=1.
+            // IDF calls this immediately before xpd=1; without it the
+            // analog rail can oscillate enough to deassert the DPHY
+            // ready signal mid-PHY-init.
+            w.ana_0p2a_en_vdet_0().set_bit();
             w
         });
         // ldo_ll_enable(unit=2, true): xpd=1.

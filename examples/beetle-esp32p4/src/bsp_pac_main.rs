@@ -25,6 +25,7 @@ use esp_riscv_rt::entry;
 use esp32p4::Peripherals;
 use panic_halt as _;
 
+mod app_desc;
 mod bsp_generated;
 mod dfr0550;
 
@@ -42,12 +43,18 @@ fn main() -> ! {
         dfr0550::i2c0::route_pins();
     }
 
-    // DFR0550 bring-up phases — see dfr0550/mod.rs for the full sequence.
-    // PSRAM, DSI host PHY, and DPI panel still return `Err(Unimplemented)`;
-    // we ignore those results so the binary still links and falls through
-    // to the LED-blink sanity check while the PHY layer is staged.
+    // Set up the user LED so we can encode bring-up status in blink count.
+    unsafe { led_init() };
+
+    // Diagnostic blink count = which step failed (1=I2C wake, 2=PHY lock,
+    // 3=PHY lane cal, 4=DPI panel, 0=all OK = solid ON).
+    let status: u8 = unsafe { run_bringup() };
+    led_status_loop(status)
+}
+
+unsafe fn run_bringup() -> u8 {
     unsafe {
-        // Phase 1: PSRAM octal HEX @ 200 MHz.
+        // Phase 1: PSRAM octal HEX @ 200 MHz (stub).
         let _ = dfr0550::psram::init();
 
         // Phase 2: DSI DPHY rail (LDO_VO3 @ 2500 mV).
@@ -59,37 +66,42 @@ fn main() -> ! {
         dfr0550::dsi_host::clocks::enable_phy_clocks(
             dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
         );
-        // Phase 3c: configure DPI pixel clock — 26 MHz from PLL_F240M
-        // (actual 240/9 ≈ 26.67 MHz; matches IDF behavior).
+        // Phase 3c: configure DPI pixel clock — 26 MHz from PLL_F240M.
         dfr0550::dsi_host::clocks::enable_dpi_clock(
             dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
             dfr0550::DPI_PIXEL_CLK_MHZ,
         );
 
-        // Phase 4: wake the panel bridge (Pi-7"-Atmel protocol).
-        let _ = dfr0550::i2c_bridge::wake();
+        // Phase 4: wake the panel bridge.
+        if dfr0550::i2c_bridge::wake().is_err() {
+            return 1;
+        }
 
-        // Phase 5: DSI host @ 1 lane × 750 Mbps (PHY M/N PLL config).
-        if let Ok(dsi) = dfr0550::dsi_host::init(
+        // Phase 5: DSI host @ 1 lane × 750 Mbps.
+        let dsi = match dfr0550::dsi_host::init(
             dfr0550::DSI_LANES,
             dfr0550::DSI_LANE_MBPS,
             dfr0550::dsi_host::clocks::PhyClockSource::PllF20m.freq_mhz(),
         ) {
-            // Phase 6: DPI controller — first-light path drives the
-            // host's built-in vertical-bar pattern generator. No DMA,
-            // no FB. If we get past this, the panel is showing color
-            // bars and the entire LDO/clock/PHY/bridge stack is alive.
-            let _ = dfr0550::dpi_panel::DpiPanel::init_pattern(
-                &dsi,
-                dfr0550::DPI_PIXEL_CLK_MHZ,
-                dfr0550::dpi_panel::PatternType::BarVertical,
-            );
-        }
-    }
+            Ok(b) => b,
+            Err(dfr0550::dsi_host::DsiError::PllLock) => return 2,
+            Err(dfr0550::dsi_host::DsiError::LaneCal) => return 3,
+            Err(_) => return 4,
+        };
 
-    // Sanity: blink the LED so we can tell when the bring-up stubs are
-    // still no-ops (binary returned but DSI never came up).
-    led_blink_loop()
+        // Phase 6: DPI controller — pattern generator path.
+        if dfr0550::dpi_panel::DpiPanel::init_pattern(
+            &dsi,
+            dfr0550::DPI_PIXEL_CLK_MHZ,
+            dfr0550::dpi_panel::PatternType::BarVertical,
+        )
+        .is_err()
+        {
+            return 5;
+        }
+
+        0
+    }
 }
 
 /// Verified-working color cycle from the IDF reference. Each iteration
@@ -132,22 +144,62 @@ unsafe fn run_color_cycle(fb: dfr0550::dpi_panel::FrameBuffer<'static>) -> ! {
     }
 }
 
-fn led_blink_loop() -> ! {
-    let led_mask = 1u32 << bsp_generated::board::LED;
+/// Configure GPIO3 (the user LED) as a push-pull output. Required because
+/// the BSP only ungates I2C0 — GPIO3 is left in reset-default Hi-Z state
+/// otherwise.
+unsafe fn led_init() {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let pin = bsp_generated::board::LED as usize;
+    let mask = 1u32 << pin;
+
+    // IO MUX: select the simple GPIO function for this pin (mcu_sel = 1).
+    p.IO_MUX
+        .gpio(pin)
+        .modify(|_, w| unsafe { w.mcu_sel().bits(1) }.fun_ie().clear_bit());
+
+    // GPIO matrix: drive output from gpio_out reg (sig_out_sel = 256 = simple).
+    p.GPIO
+        .func_out_sel_cfg(pin)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+
+    // Output enable.
+    p.GPIO.enable_w1ts().write(|w| unsafe { w.bits(mask) });
+    // Start with LED off.
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+}
+
+/// Long delay loop tuned for ~250 ms at 400 MHz CPU. Adjust if the BSP
+/// configures a different CPU clock.
+fn delay_long() {
+    for _ in 0..40_000_000u32 {
+        unsafe { core::arch::asm!("nop") };
+    }
+}
+
+fn delay_short() {
+    for _ in 0..10_000_000u32 {
+        unsafe { core::arch::asm!("nop") };
+    }
+}
+
+/// Encode the bring-up result on the on-board LED.
+///   status = 0   → solid ON (every step succeeded)
+///   status = N>0 → N short blinks, long pause, repeat
+fn led_status_loop(status: u8) -> ! {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let mask = 1u32 << bsp_generated::board::LED;
     loop {
-        unsafe {
-            let gpio = &*esp32p4::GPIO::PTR;
-            gpio.out_w1ts().write(|w| w.bits(led_mask));
+        if status == 0 {
+            p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+            delay_long();
+            continue;
         }
-        for _ in 0..500_000 {
-            unsafe { core::arch::asm!("nop") };
+        for _ in 0..status {
+            p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+            delay_short();
+            p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+            delay_short();
         }
-        unsafe {
-            let gpio = &*esp32p4::GPIO::PTR;
-            gpio.out_w1tc().write(|w| w.bits(led_mask));
-        }
-        for _ in 0..500_000 {
-            unsafe { core::arch::asm!("nop") };
-        }
+        delay_long();
     }
 }

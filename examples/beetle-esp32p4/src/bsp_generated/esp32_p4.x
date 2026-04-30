@@ -18,6 +18,32 @@
  * inside esp-riscv-rt's pre-default trap handler. */
 PROVIDE(_dram_data_start = ORIGIN(REGION_DATA));
 
+/* Place esp_app_desc_t at the very start of the cache-mapped flash
+ * window (0x40000000). memory.x carves off a dedicated FLASH_APP_DESC
+ * region so this section sits before .text without colliding with
+ * riscv-rt's _stext placement. The bootloader scans for magic
+ * 0xABCD5432 here and refuses to start the app if it's absent. */
+SECTIONS
+{
+    .app_desc :
+    {
+        KEEP(*(.app_desc))
+        . = ALIGN(256);
+    } > FLASH_APP_DESC
+} INSERT BEFORE .text;
+
+/* riscv-rt's link.x doesn't discard .eh_frame; it lands at the same
+ * default LMA as .text and collides. Drop it — bare-metal builds don't
+ * unwind. */
+SECTIONS
+{
+    /DISCARD/ :
+    {
+        *(.eh_frame)
+        *(.eh_frame_hdr)
+    }
+}
+
 /* Default Rust-side trap handler. esp-riscv-rt's _dispatch_exception
  * calls this on every unhandled exception. Real HALs override; the
  * default here aborts so the panic handler runs. */
