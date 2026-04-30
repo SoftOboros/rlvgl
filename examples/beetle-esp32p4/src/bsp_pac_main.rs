@@ -75,11 +75,15 @@ fn main() -> ! {
             dfr0550::DSI_LANE_MBPS,
             dfr0550::dsi_host::clocks::PhyClockSource::PllF20m.freq_mhz(),
         ) {
-            // Phase 6: DPI controller @ 26 MHz, RGB888, Pi 7" timings.
-            if let Ok((_panel, fb)) = dfr0550::dpi_panel::DpiPanel::init(&dsi) {
-                // Phase 7: continuous re-fill loop with cache writeback.
-                run_color_cycle(fb);
-            }
+            // Phase 6: DPI controller — first-light path drives the
+            // host's built-in vertical-bar pattern generator. No DMA,
+            // no FB. If we get past this, the panel is showing color
+            // bars and the entire LDO/clock/PHY/bridge stack is alive.
+            let _ = dfr0550::dpi_panel::DpiPanel::init_pattern(
+                &dsi,
+                dfr0550::DPI_PIXEL_CLK_MHZ,
+                dfr0550::dpi_panel::PatternType::BarVertical,
+            );
         }
     }
 
@@ -91,6 +95,11 @@ fn main() -> ! {
 /// Verified-working color cycle from the IDF reference. Each iteration
 /// writes a solid color into the framebuffer and triggers a cache
 /// writeback so the DSI DMA picks up fresh data.
+///
+/// Currently unreachable — `DpiPanel::init_with_fb` (Phase 5b.6 DW-GDMA
+/// bring-up) returns `Err(Unimplemented)`. Kept to lock in the future
+/// shape so the FB API stays stable across that landing.
+#[allow(dead_code)]
 unsafe fn run_color_cycle(fb: dfr0550::dpi_panel::FrameBuffer<'static>) -> ! {
     const CYCLE: &[(u8, u8, u8)] = &[
         (255, 0, 0),     // RED
