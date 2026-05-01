@@ -9,22 +9,25 @@ Status: All five chapters RATIFIED 2026-04-27 / 2026-04-29.
 > 01 on 2026-04-27, 03 and 02 and 04 on 2026-04-29). `APP-NN[a-z]`
 > execution PRs MAY cite any chapter as a frozen authority.
 >
-> **Implementation status as of 2026-04-29:** chapter 02 §7 sub-
-> generators are ALL real except SM-gen-via-external-tool — APP-02e
-> (BSP-gen), APP-02f (i18n), APP-02g (theme), APP-02h (parallel
-> stage 3 dispatch), APP-04c (vendored-crate SM consumption +
-> CV-1 cross-validate) all shipped. 53/53 creator app-schema
-> integration tests pass across seven suites (validator, emit,
-> bsp-gen, sm-vendored, i18n, theme, parallel).
+> **Implementation status as of 2026-04-30:** chapter 02 §7 sub-
+> generators are ALL real — APP-02e (BSP-gen), APP-02f (i18n),
+> APP-02g (theme), APP-02h (parallel stage 3 dispatch), APP-04c
+> (vendored-crate SM consumption + CV-1 cross-validate) all
+> shipped. APP-04b (first SM-bearing round-trip target —
+> `examples/stm32h747i-disco/app-with-sm.yaml` paired with the
+> vendored `disco-demo-states/` SM crate) shipped 2026-04-30; the
+> external `mcp-statechart` codegen produces a clean self-manifest
+> with `state_set` and 6/6 vectors passing host-side via
+> `make verify-all`. Orchestrator now honors the §5.4 wrapper-shape
+> discriminator (`Cargo.toml` present → sibling, no inline copy).
 >
-> **v0.5 work still open:** APP-04b (first SM-bearing round-trip
-> target — gated on external `mcp-statechart` tool reachability;
-> the orchestrator's vendored-crate consumption path is in place
-> and tested, but no committed round-trip target carries
-> `state_machine:` yet); APP-05+ (Cargo `[features]` graph
+> **v0.5 work still open:** APP-05+ (Cargo `[features]` graph
 > expansion — chapter 02 §8 preamble; v1 deferred); figma/uml
-> layout formats (chapter 01 §5.5 v1 work). These don't reopen
-> ratified chapters. See [`CLAUDE.md`](../../CLAUDE.md)
+> layout formats (chapter 01 §5.5 v1 work); upstream
+> `mcp-statechart` to ship §7.2-conforming `src/vectors.rs`
+> emission so APP-04b's manifest can flip
+> `verification_vectors: true`. These don't reopen ratified
+> chapters. See [`CLAUDE.md`](../../CLAUDE.md)
 > §"Spec-Before-Code Planning Discipline" for what ratification
 > means.
 

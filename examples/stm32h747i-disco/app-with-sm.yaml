@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: MIT
+#
+# rlvgl-app/v0 manifest for the STM32H747I-DISCO FreeRTOS intent
+# *with* a vendored SCXML state machine. APP-04b — first SM-bearing
+# round-trip target per docs/app-schema/04-state-machine-boundary.md.
+#
+# Sibling to app.yaml (the SM-less variant of the same intent). The
+# orchestrator does NOT compile the SM crate during `app from-yaml`;
+# it only reads `disco-demo-states/.mcp-statechart-manifest.json` and
+# enforces CV-1 (every screens[].state appears in the self-manifest's
+# state_set). See chapter 04 §5.3 vendored-crate offline model.
+
+schema: rlvgl-app/v0
+name: rlvgl-stm32h747i-disco-freertos-sm
+
+metadata:
+  version: 0.2.0
+  description: "rlvgl reference demo on STM32H747I-DISCO with menu state machine."
+  license: MIT
+
+target:
+  vendor: stm
+  board: stm32h747i_disco
+  prong: freertos
+  generator: hand_written
+  features:
+    - cm7
+    - freertos
+    - adapted_cmd
+    - dma2d
+    - splash
+    - desktop
+
+controller:
+  crate: rlvgl-app-disco-demo
+  path: ../apps/disco-demo
+  capabilities: stm32h747i_disco
+
+state_machine:
+  source: disco-demo-states/states/main.scxml
+  generator: mcp-statechart
+  vendored_crate: disco-demo-states
+  # Vectors *are* authored upstream (vectors/*.txt + harness binary)
+  # but the istate codegen does NOT yet emit them as `#[test] fn
+  # vector_<id>` per chapter 04 §7.2. Until that lands, declare
+  # verification_vectors: false per the §7.4 escape hatch and run
+  # the harness binary out-of-band via the SM crate's Makefile.
+  verification_vectors: false
+
+assets:
+  - id: splash
+    class: image_rle_a8
+    source: assets/media/splash.rle
+
+screens:
+  - id: home
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    default: true
+    state: idle
+  - id: menu
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    state: menu
+  - id: settings
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    state: settings
+  - id: playing
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    state: playing

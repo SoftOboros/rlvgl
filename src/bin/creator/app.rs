@@ -1752,12 +1752,24 @@ impl Orchestrator {
             );
         }
 
+        // Chapter 04 §5.4 wrapper-shape discriminator: presence of
+        // Cargo.toml in the vendored directory means sibling-crate form.
+        // In sibling form the orchestrator does NOT copy files into the
+        // round-trip target — the SM crate stands alone at
+        // vendored_crate, and the round-trip target's own Cargo.toml
+        // brings it in via path-dep. Inline-module form (no Cargo.toml)
+        // copies src/*.rs into <out>/src/state_machine/ and synthesises
+        // a mod.rs index.
+        if vendored.join("Cargo.toml").is_file() {
+            return Ok(self_manifest);
+        }
+
         for f in &self_manifest.files {
             // Chapter 04 §5.4 inline-module form: copy the SM crate's
             // src/*.rs files into <out>/src/state_machine/ unchanged.
             let rel = f.path.strip_prefix("src/").ok_or_else(|| {
                 anyhow!(
-                    "SM-gen self-manifest file path '{}' is not under src/ (chapter 04 §5.4)",
+                    "SM-gen self-manifest file path '{}' is not under src/ (chapter 04 §5.4 inline form)",
                     f.path
                 )
             })?;
