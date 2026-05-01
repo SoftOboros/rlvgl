@@ -147,9 +147,31 @@ const REG_AIF1_DAC1_FILTER_1: u16 = 0x0420;
 const REG_AIF1_DAC1_LEFT_VOL: u16 = 0x0402;
 const REG_AIF1_DAC1_RIGHT_VOL: u16 = 0x0403;
 
-// DAC1 mixer routing
+// DAC1 mixer volumes (sidetone digital gain) and routing.
+//
+// Per WM8994_Rev4.6.pdf p.67 + p.328-329 (memalpha-verified 2026-05-01):
+// - R0x600 DAC1 Mixer Volumes: bits 8:5 ADCR_DAC1_VOL, bits 3:0
+//   ADCL_DAC1_VOL — both 4-bit fields, 0000 = -36 dB up to 1100 = 0 dB
+//   in 3 dB steps. Default 0000 ≈ silent.
+// - R0x601 DAC1 Left Mixer Routing: bit 5 ADCR_TO_DAC1L, bit 4
+//   ADCL_TO_DAC1L (sidetone enables), bit 0 AIF1DAC1L_TO_DAC1L.
+// - R0x602 DAC1 Right Mixer Routing: bit 5 ADCR_TO_DAC1R, bit 4
+//   ADCL_TO_DAC1R (sidetone enables), bit 0 AIF1DAC1R_TO_DAC1R.
+//
+// HISTORICAL BUG (DISCO-XX, fixed 2026-05-01): `REG_DAC1R_MIXER` was
+// previously 0x0603 — that's actually DAC2 Mixer Volumes, an entirely
+// different register controlling DAC2 sidetone gain. Right-channel
+// routing writes were silently going to DAC2 vol bits and never
+// touching DAC1R routing, which fortunately defaults to bit 0 = 1
+// (AIF1DAC1R_TO_DAC1R enabled), so playback wasn't visibly broken —
+// but the right-channel sidetone path was never wired through. The
+// DAA-side wrapper had the same constant error; the rlvgl promotion
+// inherited it. memalpha-quoted register-summary snapshot (R1538/0602h
+// = "DAC1 Right Mixer Routing", R1539/0603h = "DAC2 Mixer Volumes")
+// is the authoritative source.
+const REG_DAC1_MIXER_VOLUMES: u16 = 0x0600;
 const REG_DAC1L_MIXER: u16 = 0x0601;
-const REG_DAC1R_MIXER: u16 = 0x0603;
+const REG_DAC1R_MIXER: u16 = 0x0602;
 
 // AIF1 ADC1 mixer routing (record path)
 const REG_AIF1_ADC1L_MIXER: u16 = 0x0606;
@@ -165,18 +187,24 @@ const REG_SW_RESET: u16 = 0x0000;
 // Expected chip ID value
 const WM8994_ID: u16 = 0x8994;
 
-/// Busy-loop delay calibrated for ~400 MHz CM7. `core::hint::black_box`
-/// prevents the optimizer from collapsing the loop. The factor 400
-/// matches `init_playback`'s historical busy-loop tuning (`for _ in
-/// 0..400_000` ≈ 1 ms). Coarse — adequate for codec settling delays
-/// where datasheet specs are themselves loose (50 ms VMID ramp,
+/// Calibrated delay for the WM8994 codec settling waits (50 ms VMID ramp,
 /// 15 ms charge-pump settle, etc.).
+///
+/// Uses `cortex_m::asm::delay(cycles)` — a single-cycle-accurate spin
+/// implemented in assembly that LLVM's optimizer cannot collapse, even in
+/// release mode. An earlier `core::hint::black_box`-based loop turned out
+/// to be unreliable at `--release`: in optimized code the loop body
+/// degenerates to a tight branch with no memory accesses and completes
+/// far faster than the intended wall-clock time, cutting the VMID ramp
+/// short and leaving the ADC outputting zeros indefinitely (per DAA bench
+/// 2026-04-30 — the same failure mode this routine guards against).
+///
+/// Calibration: `sys_ck = 400 MHz` → 400 cycles per microsecond.
 #[inline(always)]
 fn delay_busy(microseconds: u32) {
-    let iters = microseconds.saturating_mul(400);
-    for _ in 0..iters {
-        core::hint::black_box(0u32);
-    }
+    let cycles = (microseconds as u64).saturating_mul(400);
+    let cycles = cycles.min(u32::MAX as u64) as u32;
+    cortex_m::asm::delay(cycles);
 }
 
 /// Audio output destination.
@@ -503,9 +531,14 @@ where
         //   bit 8 IN1_VU (volume update strobe)
         //   bit 7 IN1L_MUTE (0 = unmuted)
         //   bits 4:0 IN1L_VOL — 0x0B = 0 dB, 0x1F = +30 dB.
-        // 0x011F = VU + unmuted + +30 dB. +30 dB is the bench-iterated
-        // line-in level; production code may want to attenuate.
-        let line_vol: u16 = 0x011F;
+        // 0x010B = VU + unmuted + 0 dB — the codec default volume,
+        // appropriate for line-level inputs (~1 V RMS from a USB-audio
+        // line-out). DAA's bench iteration briefly used +30 dB (0x011F)
+        // to make tiny exploration signals detectable during the
+        // AIF1ADCDAT silence chase, but +30 dB clips line-level sources
+        // (Mac USB audio → distortion → drops); keep the production
+        // default at 0 dB.
+        let line_vol: u16 = 0x010B;
         self.write_reg(REG_LEFT_LINE_IN1_2_VOL, line_vol)?;
         self.write_reg(REG_RIGHT_LINE_IN1_2_VOL, line_vol)?;
 
@@ -523,14 +556,21 @@ where
 
         // R0x29 Input Mixer 3 / R0x2A Input Mixer 4: per-input PGA →
         // MIXIN routing.
-        //   IN1L_TO_MIXINL bit 5, IN1L_MIXINL_VOL bit 4 (+30 dB)
-        //   IN2L_TO_MIXINL bit 8, IN2L_MIXINL_VOL bit 7 (+30 dB)
+        //   IN1L_TO_MIXINL bit 5 (1 = un-mute IN1L → MIXINL)
+        //   IN1L_MIXINL_VOL bit 4 (1 = +30 dB on this gain stage)
+        //   IN2L_TO_MIXINL bit 8 (1 = un-mute IN2L → MIXINL)
+        //   IN2L_MIXINL_VOL bit 7 (1 = +30 dB on this gain stage)
         // Drop bits 2:0 (MIXOUTL→MIXINL loopback) — that's a play→record
         // loop that injects DC bias from the un-clocked DAC into the
-        // ADC front-end (bench-2026-04-30 caught this).
+        // ADC front-end (bench 2026-04-30 caught this).
+        // Use the un-mute bit only (no +30 dB stage). The PGA gain at
+        // R0x18/0x1A is the load-bearing input-level control; layering
+        // a second +30 dB here in series with the PGA's own +30 dB
+        // saturates line-level sources (Mac USB audio) → distortion +
+        // codec overload protection drops the path (bench 2026-05-01).
         let (mixer3, mixer4) = match input {
-            InputDevice::LineIn1 => (0x0030u16, 0x0030u16), // IN1L/R → MIXINL/R, +30 dB
-            InputDevice::LineIn2 => (0x0180u16, 0x0180u16), // IN2L/R → MIXINL/R, +30 dB
+            InputDevice::LineIn1 => (0x0020u16, 0x0020u16), // IN1L/R → MIXINL/R, 0 dB
+            InputDevice::LineIn2 => (0x0100u16, 0x0100u16), // IN2L/R → MIXINL/R, 0 dB
         };
         self.write_reg(REG_INPUT_MIXER_3, mixer3)?;
         self.write_reg(REG_INPUT_MIXER_4, mixer4)?;
@@ -641,21 +681,68 @@ where
         // R0x01 PM1: add HPOUT1L_ENA (bit 9) + HPOUT1R_ENA (bit 8) to
         // existing BIAS+VMID+MICBIAS = 0x0033 → 0x0333.
         self.write_reg(REG_PWR_MGMT_1, 0x0333)?;
-        // R0x601 DAC1L Mixer: AIF1DAC1L_TO_DAC1L (bit 0) + ADCL_TO_DAC1L
-        // sidetone (bit 4) = 0x0011.
-        self.write_reg(REG_DAC1L_MIXER, 0x0011)?;
-        // R0x603 DAC1R Mixer: AIF1DAC1R_TO_DAC1R (bit 0) + ADCR_TO_DAC1R
-        // sidetone (bit 5) = 0x0021.
-        self.write_reg(REG_DAC1R_MIXER, 0x0021)?;
-        // R0x2D / R0x2E Output Mixer 1/2: DAC1L/R_TO_MIXOUTL/R unmute.
+        // R0x600 DAC1 Mixer Volumes — sidetone digital gain.
+        //   bits 8:5 ADCR_DAC1_VOL[3:0]: STR sidetone vol (1100 = 0 dB)
+        //   bits 3:0 ADCL_DAC1_VOL[3:0]: STL sidetone vol (1100 = 0 dB)
+        // Reset default = 0000_0000 ≈ -36 dB ≈ inaudible. Without this
+        // write the sidetone routing bits below have no audible effect
+        // (memalpha-verified 2026-05-01 — this was the load-bearing
+        // missing register write that hid the working ADC chain behind
+        // -36 dB attenuation; symptom was "sidetone path silent" even
+        // when the analog input reached the codec correctly via the
+        // R0x2D/0x2E IN1→MIXOUT bypass).
+        // 0x018C = (0xC << 5) | 0xC = both channels at 0 dB.
+        self.write_reg(REG_DAC1_MIXER_VOLUMES, 0x018C)?;
+        // R0x601 DAC1 Left Mixer Routing (memalpha-verified
+        // WM8994_Rev4.6.pdf p.328):
+        //   bit 5 ADCR_TO_DAC1L  (right-channel sidetone → L; cross-feed)
+        //   bit 4 ADCL_TO_DAC1L  (sidetone STL → DAC1L; bench-validated
+        //                         2026-05-01 to carry line-in music
+        //                         audibly once R0x600 vol is set)
+        //   bit 0 AIF1DAC1L_TO_DAC1L (AIF1 left → DAC1L)
+        // `init_record` default is **sidetone only** — bit 4 set, bit 0
+        // CLEARED (= 0x0010). Reasoning: this routine sets up the codec
+        // for record. Whatever the application sends on SAI1 TX (e.g.
+        // a bench fixture, a captured loopback, or silence) shouldn't
+        // leak into the headphone monitor unless the caller explicitly
+        // opts in. Callers wanting full record-with-AIF1-playback can
+        // OR bit 0 in via a follow-up `write_reg(0x0601, 0x0011)` after
+        // init_record returns.
+        self.write_reg(REG_DAC1L_MIXER, 0x0010)?;
+        // R0x602 DAC1 Right Mixer Routing (memalpha-verified
+        // WM8994_Rev4.6.pdf p.328 — was mis-addressed as 0x0603 = DAC2
+        // Mixer Volumes prior to 2026-05-01 fix; this write never
+        // reached DAC1R routing in earlier code revisions. The codec's
+        // reset default for R0x602 has bit 0 = 1 so AIF1 right playback
+        // happened to work via default routing, masking the bug for
+        // playback-only callers; record-side sidetone on the right
+        // channel was permanently silent until this fix). Bits:
+        //   bit 5 ADCR_TO_DAC1R  (sidetone STR → DAC1R)
+        //   bit 4 ADCL_TO_DAC1R  (left-channel sidetone → R; cross-feed)
+        //   bit 0 AIF1DAC1R_TO_DAC1R (AIF1 right → DAC1R)
+        // Sidetone-only by default (bit 5 set, bit 0 cleared = 0x0020),
+        // same reasoning as R0x601 above. Note this overrides the
+        // codec's reset default of bit 0 = 1, so playback-only callers
+        // who previously relied on init_record's right-channel default
+        // routing will need to opt in explicitly post-call.
+        self.write_reg(REG_DAC1R_MIXER, 0x0020)?;
+        // R0x2D / R0x2E Output Mixer 1/2: bit 0 DAC1L/R_TO_MIXOUTL/R
+        // unmute. The bit-6 IN1L/R analog passthrough was a 2026-05-01
+        // bench probe used to prove the input chain worked while the
+        // sidetone path was silent; the real silence cause was the
+        // missing R0x600 write above, so the analog passthrough is
+        // dropped from production now.
         self.write_reg(REG_OUTPUT_MIXER_1, 0x0001)?;
         self.write_reg(REG_OUTPUT_MIXER_2, 0x0001)?;
         // R0x1E Line-out volume: clear all 4 mute bits, 0 dB.
         self.write_reg(REG_LINEOUT_VOL, 0x0000)?;
-        // R0x1C / R0x1D HPOUT1 L/R: VU + unmuted, -12 dB to leave
-        // headroom over loud test signals.
-        //   bit 8 HPOUT1_VU, bit 6 HPOUT1L_MUTE_N=1, bits 5:0 VOL=0x2D
-        let hpout_vol: u16 = 0x100 | 0x40 | 0x2D;
+        // R0x1C / R0x1D HPOUT1 L/R: VU + unmuted, 0 dB.
+        //   bit 8 HPOUT1_VU, bit 6 HPOUT1L_MUTE_N=1, bits 5:0 VOL.
+        // Vol encoding: 0 = -57 dB, 0x39 (57) = 0 dB, 0x3F (63) = +6 dB,
+        // 1 dB per step. 0 dB matches direct-line-jack speaker levels
+        // (bench-validated 2026-05-01: Mac → CN10 → sidetone → CN11
+        // matches Mac → speaker direct).
+        let hpout_vol: u16 = 0x100 | 0x40 | 0x39;
         self.write_reg(REG_LEFT_OUTPUT_VOL, hpout_vol)?;
         self.write_reg(REG_RIGHT_OUTPUT_VOL, hpout_vol)?;
         // R0x420 AIF1 DAC1 filters: clear soft-mute (default = muted).
@@ -795,7 +882,10 @@ where
             REG_AIF1_DAC1_RIGHT_VOL, // 18: R0x403
             REG_AIF1_DAC1_FILTER_1,  // 19: R0x420
             REG_DAC1L_MIXER,         // 20: R0x601
-            REG_DAC1R_MIXER,         // 21: R0x603
+            REG_DAC1R_MIXER,         // 21: R0x602 (DAC1R routing — was
+                                     //              mis-addressed as
+                                     //              R0x603 prior to the
+                                     //              2026-05-01 fix)
         ];
         for (i, &reg) in REGS.iter().enumerate() {
             if i >= out.len() {
