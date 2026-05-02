@@ -236,24 +236,26 @@ const BASELINE: &[(&str, &str)] = &[
     // their DCB-NN retrofit phase lands. DCB-00 §4 / §10 reconciles
     // each site with the typestate API:
     //
-    //  - sd_emmc_adapter.rs:47,57 — DCB-02c retrofit (cache-line-padded
-    //    DcaBuf<u8, BLOCK_BYTES> collapses bidirectional clean+invalidate
-    //    to directional ops via INV-D2).
-    //  - stm32h747i_disco_sd.rs:35,46 — DCB-02c retrofit (same lifecycle
-    //    as the adapter; SDMMC R/W lend the buffer with the matching
-    //    direction).
+    //  - sd_emmc_adapter.rs:47,57 — DCB-02c retrofit cleared
+    //    (2026-05-02). Routes through DcaCacheCtx + DcaCache trait;
+    //    SCB calls live in dca.rs (whitelisted). The pre-DCB
+    //    bidirectional `clean_invalidate_dcache_by_address`
+    //    workaround for unaligned Block buffers collapsed to
+    //    directional ops because DcaCache uses the alignment-
+    //    tolerant address-form internally.
+    //  - stm32h747i_disco_sd.rs:35,46 — DCB-02c retrofit cleared
+    //    (2026-05-02). Same pattern as the adapter.
     //  - freertos_entry.rs:1011,1451 — LTDC scanout pre-clean before
     //    handing FRONT to the display engine. DCB-00 §10 Scanout row
     //    deferred to DCB-04: the typestate-on-publish vs MPU
     //    non-cacheable carve-out decision happens there. Until DCB-04
-    //    ratifies, these sites are grandfathered. The audio_player.rs
-    //    private `clean_dcache` helper at line 253 uses raw DCCMVAC
-    //    writes rather than the SCB API, so does not trigger this
-    //    rule — its existing `raw_addr_cast` / `raw_mmio_cast` opt-out
-    //    markers cover the access; DCB-02b absorbs it.
+    //    ratifies, this site stays grandfathered. The audio_player.rs
+    //    pre-DCB private `clean_dcache` helper at line 253 wrote
+    //    DCCMVAC directly (raw_addr_cast / raw_mmio_cast opt-outs);
+    //    DCB-02b retrofit (2026-05-02) replaced it with a
+    //    typestate-driven BankGuard<Read>, removing the helper
+    //    entirely.
     ("raw_dcache", "examples/stm32h747i-disco/src/freertos_entry.rs"),
-    ("raw_dcache", "platform/src/sd_emmc_adapter.rs"),
-    ("raw_dcache", "platform/src/stm32h747i_disco_sd.rs"),
 ];
 
 // ─── Test entry point ───────────────────────────────────────────────────
