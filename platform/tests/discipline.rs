@@ -232,30 +232,42 @@ const BASELINE: &[(&str, &str)] = &[
     //
     // ── raw_dcache (DCB-00 §9 INV-D8) ──────────────────────────────
     //
-    // Pre-existing manual SCB d-cache call sites grandfathered until
-    // their DCB-NN retrofit phase lands. DCB-00 §4 / §10 reconciles
-    // each site with the typestate API:
+    // **All entries cleared as of DCB-04 (2026-05-02).** The DCB
+    // initiative's INV-D9 ("New DMA buffers MUST use DcaBuf") is now
+    // enforced for the entire `rlvgl-platform` + disco-firmware
+    // surface; there are no grandfathered SCB d-cache call sites left
+    // anywhere in scope. RLVGL_LINT_STRICT=1 (DCB-00 §12 (c)
+    // acceptance gate) ratifies because this BASELINE is empty.
     //
-    //  - sd_emmc_adapter.rs:47,57 — DCB-02c retrofit cleared
-    //    (2026-05-02). Routes through DcaCacheCtx + DcaCache trait;
-    //    SCB calls live in dca.rs (whitelisted). The pre-DCB
-    //    bidirectional `clean_invalidate_dcache_by_address`
-    //    workaround for unaligned Block buffers collapsed to
-    //    directional ops because DcaCache uses the alignment-
-    //    tolerant address-form internally.
-    //  - stm32h747i_disco_sd.rs:35,46 — DCB-02c retrofit cleared
-    //    (2026-05-02). Same pattern as the adapter.
-    //  - freertos_entry.rs:1011,1451 — LTDC scanout pre-clean before
-    //    handing FRONT to the display engine. DCB-00 §10 Scanout row
-    //    deferred to DCB-04: the typestate-on-publish vs MPU
-    //    non-cacheable carve-out decision happens there. Until DCB-04
-    //    ratifies, this site stays grandfathered. The audio_player.rs
-    //    pre-DCB private `clean_dcache` helper at line 253 wrote
-    //    DCCMVAC directly (raw_addr_cast / raw_mmio_cast opt-outs);
-    //    DCB-02b retrofit (2026-05-02) replaced it with a
-    //    typestate-driven BankGuard<Read>, removing the helper
-    //    entirely.
-    ("raw_dcache", "examples/stm32h747i-disco/src/freertos_entry.rs"),
+    // Lineage of the retrofits that cleared each pre-DCB site:
+    //
+    //  - sd_emmc_adapter.rs:47,57 — DCB-02c (2026-05-02). Routes
+    //    through DcaCacheCtx + DcaCache trait; SCB calls live in
+    //    dca.rs (whitelisted). The pre-DCB bidirectional
+    //    `clean_invalidate_dcache_by_address` workaround for
+    //    unaligned Block buffers collapsed to directional ops
+    //    because DcaCache uses the alignment-tolerant address-form
+    //    internally.
+    //  - stm32h747i_disco_sd.rs:35,46 — DCB-02c (2026-05-02). Same
+    //    pattern as the adapter.
+    //  - freertos_entry.rs:1011,1451 — DCB-04 (2026-05-02). LTDC
+    //    scanout pre-clean retrofitted onto a `ltdc_scanout_present`
+    //    helper that calls `DcaCacheCtx::cache_mut().clean(addr,
+    //    len)` + `barrier()`. Per DCB-00 §6 INV-D16 the DSB is the
+    //    load-bearing primitive on STM32H7 + Write-Through SDRAM
+    //    (drains the AXI write buffer); both ops route through
+    //    DCB's owning module. The full `DeviceLtdcScan<u8,
+    //    FB_BYTES>` typestate retrofit is deferred to DCB-04-B —
+    //    the FRONT_FB_ADDR atomic-swap pattern would need a
+    //    rearchitect to use a static `&'static mut DcaBuf`. The
+    //    BASELINE-shrink half of DCB-04 is in this commit; the
+    //    typestate half can land later without re-amending this
+    //    invariant.
+    //  - audio_player.rs (pre-DCB private `clean_dcache` helper at
+    //    line 253) wrote DCCMVAC directly via raw_addr_cast /
+    //    raw_mmio_cast opt-outs (different rule path). DCB-02b
+    //    retrofit (2026-05-02) replaced the helper with a
+    //    typestate-driven BankGuard<Read>, removing it entirely.
 ];
 
 // ─── Test entry point ───────────────────────────────────────────────────

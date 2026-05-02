@@ -28,8 +28,52 @@
 
 use core::sync::atomic::{AtomicPtr, Ordering};
 
+use rlvgl_platform::hwcore::dca::{DcaCache, DcaCacheCtx};
 use rlvgl_platform::hwcore::regs::gpio::Gpio;
 use rlvgl_platform::hwcore::regs::tim::TimBasic;
+
+/// Publish CPU-written framebuffer pixels for the LTDC scanout engine.
+///
+/// DCB-04 retrofit (2026-05-02): replaces the manual
+/// `scb.clean_dcache_by_address(addr, len)` + `cortex_m::asm::dsb()`
+/// pair that previously appeared inline at the two LTDC pre-scanout
+/// sites in this file (the splash A8 expansion at the yellow-splash
+/// path and the desktop widget-tree render at the FRONT_FB write
+/// path). Routes both ops through the DCB cache-controller
+/// abstraction:
+///
+/// - `DcaCache::clean(addr, len)` lives in
+///   `rlvgl-platform/src/hwcore/dca.rs`, whitelisted by the
+///   discipline scanner's `raw_dcache` rule.
+/// - `DcaCache::barrier()` emits the DSB that drains the AXI
+///   write buffer (DCB-00 §6 INV-D16: the load-bearing primitive
+///   on Cortex-M7 + Write-Through SDRAM).
+///
+/// The full `DeviceLtdcScan<T, N>` typestate retrofit (DCB-01c
+/// API surface) is deferred — `front` and `bytes` are dynamic at
+/// these call sites (FRONT_FB_ADDR + FB_BYTES atomics; in some
+/// modes the FRONT swaps), so a static `&'static mut DcaBuf<u8,
+/// FB_BYTES>` would constrain the existing FRONT-swap pattern.
+/// A future DCB-04-B refactor could lift the FB ownership into a
+/// statically-sized DcaBuf with a swap shim, or adopt the
+/// `LtdcScan<u8, FB_BYTES>` typestate against a fixed-address
+/// FRONT once FRONT-swap-by-atomic is retired. Until then the
+/// trait-dispatch shape here gives DCB-equivalent containment
+/// (clean + barrier ops live inside `dca.rs`'s whitelisted SCB
+/// impl) without forcing the buffer-typestate change.
+fn ltdc_scanout_present(addr: usize, len: usize) {
+    // SAFETY: per DCB-00 §9 INV-D13 the SCB steal is performed at a
+    // DCB-aware call site (the trait dispatch routes through
+    // hwcore::dca's typed wrapper). Single-threaded with respect to
+    // any other DCB consumer in the disco binary; under FreeRTOS the
+    // render task is the sole caller of this function.
+    unsafe {
+        let mut scb = cortex_m::Peripherals::steal().SCB;
+        let mut ctx = DcaCacheCtx::new(&mut scb);
+        ctx.cache_mut().clean(addr, len);
+        ctx.cache_mut().barrier();
+    }
+}
 
 use crate::freertos_sync::{self, FreeRtosFrameSync, SemaphoreHandle_t, StaticSemaphore};
 
@@ -1001,14 +1045,13 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         *ARGB_DST.add(i) = (alpha << 24) | YELLOW_RGB;
                     }
                 }
-                // D-cache clean: CPU writes are in write-back cache;
-                // LTDC reads SDRAM via AXI (bypasses D-cache). Without
-                // clean, LTDC sees stale/zero data.
-                {
-                    let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                    cp.SCB.clean_dcache_by_address(0xD180_0000usize, ARGB_BYTES);
-                }
-                cortex_m::asm::dsb();
+                // DCB-04 retrofit: clean + DSB via the DcaCache trait
+                // (`hwcore::dca::DcaCacheCtx`). Per DCB-00 §6 INV-D16
+                // the DSB is the load-bearing primitive on STM32H7 +
+                // Write-Through SDRAM (drains the AXI write buffer);
+                // the cache clean alone does not enforce ordering for
+                // LTDC's continuous scanout reads.
+                ltdc_scanout_present(0xD180_0000usize, ARGB_BYTES);
             }
 
             continue;
@@ -1443,12 +1486,10 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
                     ctrl.root().borrow().draw(&mut renderer);
 
-                    {
-                        let mut cp = unsafe { cortex_m::Peripherals::steal() };
-                        cp.SCB
-                            .clean_dcache_by_address(front as usize, bytes as usize);
-                    }
-                    cortex_m::asm::dsb();
+                    // DCB-04 retrofit: clean + DSB via the DcaCache
+                    // trait (see `ltdc_scanout_present`'s docs and
+                    // DCB-00 §6 INV-D16).
+                    ltdc_scanout_present(front as usize, bytes as usize);
                 }
                 // No buf_ready — present retriggers the same FRONT.
                 // Single-buffer = zero flicker.
