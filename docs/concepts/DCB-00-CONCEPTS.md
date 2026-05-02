@@ -1,11 +1,13 @@
 # DCB-00 — DMA Cacheable Buffers Concepts
 
 **Status:** Ratified 2026-05-02 (§15); amended 2026-05-02 with
-DCB-02-A resolution (DMA double-buffer-mode coverage). DCB-01
-(typestate API) is shipped; DCB-01b (`DeviceActiveDoubleBuf<DIR>`)
-unblocked. Per the parent CLAUDE.md spec-before-code discipline,
-future modifications to the §5 typestate set, §6 layout invariants,
-§8 engine submission contract, or §9 INV-D8..D13 require a §15
+DCB-02-A resolution (DMA double-buffer-mode coverage); amended
+2026-05-02 with DCB-04-A resolution (LTDC scanout typestate).
+DCB-01 (typestate API) and DCB-01b (`DeviceActiveDoubleBuf<DIR>`)
+are shipped; DCB-01c (`DeviceLtdcScan<T, N>`) is unblocked. Per
+the parent CLAUDE.md spec-before-code discipline, future
+modifications to the §5 typestate set, §6 layout invariants, §8
+engine submission contract, or §9 INV-D8..D13 require a §15
 amendment **first**, in a separate PR, before any behaviour PR
 rides on the change.
 
@@ -106,7 +108,9 @@ introduce drift and are forbidden in normative sections.
 | **Bank** | One of `M0` / `M1`; analogous to `Half` for the double-buffer-mode case. The DMA engine alternates which bank is the active write target (read target for TX-style direction); the CPU operates on the *inactive* bank. | DCB. |
 | **Bank-guard** | The RAII handle returned when the CPU asks for the inactive bank of a `DeviceActiveDoubleBuf<DIR>` buffer. Performs the cache op on entry (clean for `Read`, invalidate for `Write`) and revokes itself on drop. Live-recheck on `release(current_target)` reads the engine's `CT` bit to detect bank flip during the guard's lifetime — the double-buffer-mode analogue of `HalfGuard`'s NDTR re-read. | DCB. |
 | **CT bit (current target)** | Bit field in the STM32 DMA stream's `CR` register (bit 19 on H7) reporting which bank (M0 or M1) the engine is *currently* writing or reading. The single-read source-of-truth for `BankGuard::release`'s INV-D15 live-recheck. | RM0399 §15 (DMA). |
-| **MPU non-cacheable carve-out** | An alternative compliance path for buffers where per-frame cache maintenance is too expensive (LTDC scanout is the canonical case): an MPU region marks the buffer non-cacheable, and DCB's typestate becomes a no-op on that buffer. Covered in §10; not the default. | DCB. |
+| **DeviceLtdcScan\<T, N\>** | Typestate for a buffer continuously read by a fixed-rate pixel-stream consumer (LTDC, DCMI display-out, parallel RGB) where the CPU paints in place between consumer reads. The engine never pauses; per-frame ordering between CPU writes and consumer reads is enforced by `present()` (cache clean + DSB, draining the AXI / interconnect write buffer). Distinct from `DeviceActiveCirc<DIR>` because there's no half / bank-rotation: the consumer reads the same buffer continuously and the CPU paints into it in place. | DCB. |
+| **Scanout-FB region** | A `DcaBuf<T, N>` (or `DcaDoubleBuf<T, N>` for the swap-pair form) configured in `DeviceLtdcScan<...>` typestate. Lives in cacheable RAM with the Write-Through MPU attribute on STM32H7 platforms (the current disco default); the per-frame `present()` drains the AXI write buffer rather than writing back dirty cache lines. | DCB. |
+| **MPU non-cacheable carve-out** | An alternative compliance path for buffers where per-frame cache maintenance is too expensive (LTDC scanout is the canonical case): an MPU region marks the buffer non-cacheable, and DCB's typestate becomes a no-op on that buffer. Covered in §10; not the default — DCB-04-A §3 / §4 ratified `DeviceLtdcScan` over MPU carve-out for the LTDC scanout class. | DCB. |
 
 ## 4. Source-of-truth map
 
@@ -243,6 +247,68 @@ CACHE_LINE) / size_of::<T>()`. Padding bytes are not exposed through
 the CPU view (`as_slice` / `as_mut_slice` return `&[T; N]` / `&mut
 [T; N]`).
 
+### Continuous-read variant: `DeviceLtdcScan<T, N>` (LTDC scanout)
+
+For consumers continuously read by a fixed-rate pixel-stream engine
+(LTDC, DCMI display-out, parallel RGB) where the CPU paints in
+place between consumer reads, DCB exposes a fifth typestate variant
+on `DcaBuf<T, N>`: `DeviceLtdcScan<T, N>`. Selection between the
+existing engine-driven typestates (`DeviceReadPending` /
+`DeviceWritePending` / `DeviceActiveCirc<DIR>`) and this one is at
+construction; a buffer family chooses one based on the consumer's
+ownership model.
+
+```text
+DcaBuf<T, N>
+   │ ... (existing typestates from the ASCII tree above)
+   │
+   └─ DeviceLtdcScan<T, N>      ─ engine reads continuously; never
+                                   pauses. CPU paints in place.
+         per-frame API:
+            paint_full(&mut self) → &mut [T; N]
+                — slice valid until the next present()
+            present(&mut self, ctx: &mut DcaCacheCtx)
+                — emits clean + dsb over the full padded extent;
+                  no typestate transition (the engine is still
+                  reading, did not pause). Per §6 INV-D16 BOTH
+                  the cache clean AND the memory barrier are
+                  required: the cache op alone does not flush
+                  the AXI / interconnect write buffer.
+            stop_scan(self, ctx: &mut DcaCacheCtx) → Cpu<'a, T, N>
+                — caller MUST stop the consumer engine first;
+                  emits a final clean + dsb before returning the
+                  buffer to CpuOwned typestate.
+```
+
+The transitions, with ownership rules, are frozen as:
+
+| From | To | Triggered by | Cache op inserted |
+|---|---|---|---|
+| `CpuOwned` | `DeviceLtdcScan<T, N>` | `buf.start_ltdc_scan(engine_handle, ctx)` returning `DcaBuf<DeviceLtdcScan<T, N>>` | `clean_dcache_by_address` + `dsb` over the padded extent (initial publish so the consumer's first scan reads CPU-written data) |
+| `DeviceLtdcScan<T, N>` | `DeviceLtdcScan<T, N>` (paint scope) | `buf.paint_full() -> &mut [T; N]` returning a borrow valid until the next `present()` | none (paint accumulates in cache; ordering is enforced at `present`) |
+| `DeviceLtdcScan<T, N>` | `DeviceLtdcScan<T, N>` (present checkpoint) | `buf.present(ctx)` | `clean_dcache_by_address` + `dsb` over the padded extent (drains the AXI write buffer per §6 INV-D16) |
+| `DeviceLtdcScan<T, N>` | `CpuOwned` | `buf.stop_scan(ctx)` after engine-stop handshake | `clean_dcache_by_address` + `dsb` over the padded extent (final publish so the next phase's CPU read sees the buffer's terminal state) |
+
+`DeviceLtdcScan<T, N>` deliberately **does not have a `DIR`
+parameter**. The CPU is always the producer and the consumer
+always reads — the inverse direction is a different typestate
+family altogether (it would be a `DeviceLtdcGrab` for camera
+input via DCMI; not in scope here, would ratify in a future §15
+amendment). Likewise it does not have a `HalfGuard` /
+`BankGuard`-style scope guard because the consumer reads the same
+buffer continuously: there is no inactive-half / inactive-bank
+to protect.
+
+For the **swap-pair pattern** (the existing
+`platform/src/hwcore/surface.rs::Scanout` type), the two
+`FrameBuffer`s are independently wrapped as `DcaBuf<T,
+N>::DeviceLtdcScan` handles. `Scanout::swap()` is software-driven
+(it changes which handle the LTDC engine reads from); each
+frame's `present()` is on the back-becoming-front. A parallel
+`DcaDoubleBuf<T, N> + DeviceLtdcScanDouble<T, N>` typestate is
+deferred until a hardware-managed swap (DBM / DSI command-mode
+swap) ratifies a per-bank model.
+
 ## 6. Layout & alignment invariants
 
 These are properties of `DcaBuf<T, N>` and of any region a DCB-owned
@@ -309,6 +375,22 @@ buffer overlaps. They are normative.
   lifetime, `BankGuard::release(current_target)` observation is a
   hard error per the same release-mode policy as INV-D7
   (`debug_assertions` → panic; release → return error).
+- **INV-D16: `DeviceLtdcScan<T, N>` ordering contract.** The
+  `present()` call MUST emit *both* a `DcaCache::clean` over the
+  buffer's full padded extent **AND** a memory barrier (`dsb` on
+  Cortex-M; `__DSB()` equivalent on other targets) that drains
+  the AXI / interconnect write buffer. The individual `clean` is
+  insufficient on Cortex-M7 + Write-Through SDRAM because the
+  AXI write buffer can hold pending writes past the cache
+  write-back; the DSB is the load-bearing ordering primitive.
+  `start_ltdc_scan` and `stop_scan` carry the same contract: a
+  `clean` *plus* a `dsb` are both required at the typestate
+  boundaries. Implementations of `DeviceLtdcScan<T, N>` MUST
+  invoke the DSB through the platform's typed barrier wrapper
+  rather than via a raw `cortex_m::asm::dsb()` call site —
+  consolidating the DSB through DCB's owning module preserves
+  the discipline-scanner whitelist for the underlying
+  architecturally-mandated barrier intrinsic.
 
 ## 7. Cross-core / multi-master scope
 
@@ -435,6 +517,7 @@ primitive. Consumer code follows the *Composition* column.
 | `sd_emmc_adapter.rs` `clean_invalidate_dcache_by_address` (line 47) | **Replaces.** Same lifecycle as the `_disco_sd.rs` retrofit. The aligned-padded storage removes the original justification for the bidirectional op. | DCB-02c retrofit. |
 | DAA `analyzer-cm7/src/main.rs` SAI1 TX clean (current bench fix) | **Replaces.** The SAI1 line-out TX ring becomes a `DcaBuf<i16, SAI1_TX_BUF_HALFWORDS, DeviceActiveCirc<Read>>`, and the per-half-fill code path becomes a `HalfGuard<Read>` whose construction takes the current `NDTR` and whose existence enforces "DMA is on the other half". The manual `clean_dcache_by_address` call disappears. | DCB-02 retrofit, **shipped 2026-05-02** (disco-analyzer `c117a20`). The `rlvgl-platform` API surface lands in DCB-01 (`a56987b`). Bench-validation gate (§12 (b)) is hardware-flash + audio reproduction; pending. |
 | DAA `analyzer-audio/src/sai1_linein.rs` SAI1 RX invalidate (line 279) and SAI4 PDM RX (`sai4_pdm.rs`) | **Replaces.** Both RX paths use **STM32 DMA double-buffer mode** (M0AR + M1AR alternating) with non-contiguous physical banks. They become `DcaDoubleBuf<i16, SAI1_DMA_HALFWORDS>` (and equivalent for PDM) with `DeviceActiveDoubleBuf<Write>` + `BankGuard<Write>` per the parallel typestate family added by the DCB-02-A resolution. The manual `scb.invalidate_dcache_by_address` calls disappear; the bank-guard's entry op performs the invalidate and INV-D15's CT-bit re-check enforces "engine is on the other bank". | DCB-02-R retrofit. Lands after DCB-01b ships `DcaDoubleBuf` / `BankGuard<DIR>` / `DeviceActiveDoubleBuf<DIR>`. Future users: SDMMC streaming reads, USB HS bulk endpoints, DCMI camera frame-grab. |
+| LTDC scanout pre-clean (`examples/stm32h747i-disco/src/freertos_entry.rs:1011, 1449` — single-FRONT model; and the `platform/src/hwcore/surface.rs::Scanout` swap-pair pattern) | **Replaces.** Wraps the buffer in the `DeviceLtdcScan<T, N>` typestate added by the DCB-04-A resolution. `paint_full()` returns a `&mut [T; N]` for in-place CPU writes; `present()` emits the existing clean + DSB pattern (which on STM32H7 + Write-Through SDRAM acts as an AXI-write-buffer drain per §6 INV-D16, *not* as a cache write-back). The manual `scb.clean_dcache_by_address` calls disappear; the last `raw_dcache` BASELINE entry clears, unblocking `RLVGL_LINT_STRICT=1` (§12 (c)). | DCB-04 retrofit. Targets: `freertos_entry.rs` single-FRONT path; `surface.rs::Scanout` swap-pair path (a parallel `DeviceLtdcScanDouble` for hardware-managed swap is deferred until needed). Lands after DCB-01c ships the new typestate. |
 | DAA `analyzer-cm4` shared-memory cross-core regions (DAA-03 D3 SRAM4 pool) | **Out of scope.** Per §7. Cross-core blocks live in D3 SRAM4 which CM7 does not cache; DCB does not own them. | DAA-03 §7 / INV-D14 governs. |
 | Future SDMMC DMA, USB endpoint buffers, QSPI memory-mapped writes | **In scope; later phases.** Each peripheral's submission API gains a `DcaBuf` parameter when its DCB-NN retrofit phase lands. | Pending. |
 
@@ -580,9 +663,22 @@ Ratifying DCB-00 unblocks the following work:
 - **DCB-03** — DMA2D destination retrofit. Most invasive surface
   because DMA2D is widely consumed; phased per current `BASELINE`
   scanner pattern.
-- **DCB-04** — `Scanout` / LTDC policy: typestate-on-publish vs MPU
-  non-cacheable carve-out. Separate sub-letter doc (DCB-04-A) likely
-  required.
+- **DCB-01c** — Land `DeviceLtdcScan<T, N>` in
+  `platform/src/hwcore/dca.rs`. Add trybuild compile-fail fixtures
+  parallel to existing dca-typestate fixtures (use-after-paint,
+  double-paint rejection, present-without-stop sound). No changes
+  to existing `DcaBuf` / `DcaDoubleBuf` typestates. Unblocked by
+  the 2026-05-02 DCB-04-A resolution amendment in §15.
+- **DCB-04** — Retrofit
+  `examples/stm32h747i-disco/src/freertos_entry.rs:1011, 1449`
+  onto `DeviceLtdcScan<u8, FB_BYTES>` + `present()`. Removes the
+  last `raw_dcache` BASELINE entry, unblocking
+  `RLVGL_LINT_STRICT=1` (§12 (c) acceptance gate). The bare-metal
+  `Scanout`-based render path can adopt the same typestate in
+  the same PR or follow-up. Sub-letter analysis: DCB-04-A
+  (resolved 2026-05-02 — Option A: typestate-on-publish over MPU
+  non-cacheable carve-out, on bench-behaviour-preservation and
+  portability grounds).
 
 The following work remains *blocked* by DCB-00 ratification (no
 behaviour MAY land touching these surfaces until DCB-00 ratifies):
@@ -714,4 +810,80 @@ behaviour MAY land touching these surfaces until DCB-00 ratifies):
   DCB-01b is now unblocked. DCB-02-R is unblocked once DCB-01b
   ships. The DCB-02-A sub-letter analysis at
   `docs/concepts/DCB-02-A.md` is preserved as historical record;
+  its decision has folded into this entry.
+- **2026-05-02 — `DeviceLtdcScan<T, N>` amendment (DCB-04-A
+  resolution; Standards Action).** Adds the
+  `DeviceLtdcScan<T, N>` typestate as a fifth variant on the
+  `DcaBuf<T, N>` family for buffers continuously read by a
+  fixed-rate pixel-stream consumer (LTDC, DCMI display-out,
+  parallel RGB). Selection between `DeviceLtdcScan<T, N>` and the
+  existing engine-driven typestates
+  (`DeviceReadPending` / `DeviceWritePending` /
+  `DeviceActiveCirc<DIR>`) is at construction; consumer ownership
+  shape determines which.
+
+  Sections amended:
+  - §3 glossary: `DeviceLtdcScan<T, N>`, "Scanout-FB region", and
+    a clarifying note on the `MPU non-cacheable carve-out` row
+    (the carve-out alternative is rejected for the LTDC scanout
+    class per DCB-04-A §3 / §4).
+  - §5: new "Continuous-read variant: `DeviceLtdcScan<T, N>`"
+    subsection at the end of §5, with the typestate diagram and
+    a four-row transition table covering
+    `start_ltdc_scan` / `paint_full` / `present` / `stop_scan`.
+    Existing typestate sets (DcaBuf and DcaDoubleBuf) are
+    unchanged. The `DIR` parameter is *deliberately* omitted (the
+    CPU is always producer; the inverse direction would be a
+    different family — `DeviceLtdcGrab` for DCMI camera input —
+    not in scope here).
+  - §6: INV-D16 (`DeviceLtdcScan<T, N>` ordering contract). Per
+    DCB-04-A §2b, `present()` MUST emit *both* the cache clean
+    AND a memory barrier (DSB on Cortex-M); on STM32H7 +
+    Write-Through SDRAM the DSB is the load-bearing primitive
+    (drains the AXI write buffer that would otherwise hold pixel
+    writes past the cache write-back). The DSB also flows
+    through DCB's owning module rather than via raw
+    `cortex_m::asm::dsb()` call sites — preserving the
+    discipline-scanner's ability to keep raw barrier-intrinsic
+    calls out of consumer code.
+  - §10: new reconciliation row covering both LTDC scanout
+    patterns — single-FRONT (the
+    `examples/stm32h747i-disco/src/freertos_entry.rs:1011, 1449`
+    BASELINE entry) and the swap-pair `Scanout::swap` pattern
+    in `platform/src/hwcore/surface.rs:399`. Both wrap their
+    buffer(s) as `DeviceLtdcScan<T, N>` handles. The
+    parallel `DeviceLtdcScanDouble<T, N>` for hardware-managed
+    swap is deferred until a consumer needs it.
+  - §14: DCB-01c (typestate API for the LTDC family) and DCB-04
+    (the freertos / Scanout retrofit) bullets added. DCB-01c
+    unblocks DCB-04; both are unblocked once this amendment
+    ratifies.
+
+  Motivation (DCB-04-A §3 / §4): the disco firmware's existing
+  `clean_dcache_by_address(FRONT_FB, FB_BYTES)` + `dsb()` pre-
+  scanout pattern is bench-validated. On STM32H7 + Write-Through
+  SDRAM (already configured at
+  `platform/src/stm32h747i_disco.rs:1322`), the cache clean is
+  *cache-redundant* but the DSB drains the AXI write buffer —
+  load-bearing for LTDC's continuous-read access pattern. Option
+  A (typestate-on-publish) preserves this verified runtime; Option
+  B (MPU non-cacheable carve-out) was rejected because the SDRAM
+  region split has bigger hardware-config footprint, weaker
+  portability story (each port MPU-configures independently), and
+  imposes ~45× CPU-FB-read latency penalty on diagnostic dumps.
+  Option B remains a future amendment if a platform's CPU-FB-read
+  path becomes hot enough to justify it. Option C (permanent
+  BASELINE) was rejected because it hollows out INV-D9 and
+  prevents §12 (c) STRICT-mode ratification.
+
+  This is a Standards Action *addition* to §5 (a new typestate
+  variant on the existing `DcaBuf<T, N>` family); no existing
+  typestate or invariant is modified. The `raw_dcache` scanner
+  rule does not need a change — it already matches direction-
+  independent SCB calls; the DCB-04 retrofit removes the last
+  BASELINE entry rather than adding a new exemption.
+
+  DCB-01c is now unblocked. DCB-04 is unblocked once DCB-01c
+  ships. The DCB-04-A sub-letter analysis at
+  `docs/concepts/DCB-04-A.md` is preserved as historical record;
   its decision has folded into this entry.

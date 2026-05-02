@@ -55,10 +55,11 @@ disco-analyzer subrepo's first concepts doc).
     during DCB-02c BASELINE shrink. The remaining `raw_dcache`
     entry is the LTDC scanout pre-clean in `freertos_entry.rs`;
     DCB-00 §10 deferred the typestate-vs-MPU decision to
-    DCB-04. Proposes Option A (`DeviceLtdcScan<T, N>` typestate)
+    DCB-04. Proposed Option A (`DeviceLtdcScan<T, N>` typestate)
     over Option B (MPU non-cacheable carve-out) on bench-
     behaviour-preservation and portability grounds.
-    **Drafted 2026-05-02; awaiting DCB-00 §15 ratification.**
+    **Resolved 2026-05-02 — Option A ratified into DCB-00
+    §3/§5/§6/§10/§14/§15. DCB-01c + DCB-04 unblocked.**
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

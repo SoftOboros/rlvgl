@@ -1,14 +1,11 @@
 # DCB-04-A — LTDC scanout cache discipline
 
-**Status:** Drafted 2026-05-02. Sub-letter analysis surfaced during
-DCB-02c when the SD-adapter retrofit shrank the `raw_dcache`
-BASELINE to a single remaining entry — the LTDC scanout pre-clean
-in `freertos_entry.rs:1011, 1449`. DCB-00 §10 deferred the
-typestate-vs-MPU decision to this phase. Per the parent CLAUDE.md
-"Sub-letter doc convention" this analysis ratifies its resolution
-into DCB-00 §3 / §5 / §6 / §10 + §15 as a Standards Action
-amendment, after which this file is preserved as historical record
-only.
+**Status:** **Resolved 2026-05-02 — Option A ratified.** Folded into
+DCB-00 §3 / §5 / §6 / §10 / §14 / §15 via the 2026-05-02
+`DeviceLtdcScan<T, N>` amendment. This file is preserved as
+historical analysis only; no behaviour PRs reference it directly.
+DCB-01c implementation and DCB-04 retrofit are now unblocked per
+the parent doc's §14 list.
 
 ## 1. Purpose
 
@@ -380,3 +377,16 @@ After DCB-00 §15 ratifies the amendment:
   a single remaining LTDC scanout entry. Recommendation:
   Option A (`DeviceLtdcScan<T, N>` typestate). Awaiting owner
   ratification via a DCB-00 §15 amendment.
+- **2026-05-02 — Resolved.** Option A ratified by owner go-ahead.
+  Resolution folded into DCB-00 §3 (glossary additions for
+  `DeviceLtdcScan<T, N>`, "Scanout-FB region", and a
+  cross-reference clarification on the `MPU non-cacheable
+  carve-out` row), §5 (new "Continuous-read variant:
+  `DeviceLtdcScan<T, N>`" subsection at the end of §5 with a
+  four-row transition table), §6 (INV-D16: `present()` ordering
+  contract; clean + DSB are both required, the DSB is the
+  load-bearing AXI-write-buffer drain on STM32H7), §10
+  (reconciliation row covering both single-FRONT and Scanout
+  swap-pair patterns), §14 (DCB-01c + DCB-04 unblocks added),
+  and §15 (`DeviceLtdcScan<T, N>` amendment entry). This
+  sub-letter is now historical record only.
