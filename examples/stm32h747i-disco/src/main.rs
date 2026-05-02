@@ -2378,13 +2378,66 @@ fn main() -> ! {
         }));
 
         // ── Audio player (created before SD block, started after WAV load) ──
+        //
+        // DCB-02b retrofit (2026-05-02): the M0/M1 banks at 0xD048_0000
+        // / 0xD048_1000 are now wrapped in a `DcaDoubleBuf<u8, 4096>`
+        // built once via `from_addrs`. The player consumes that DCA
+        // when `start()` is called and holds the resulting `DbufRead`
+        // for the playback's lifetime; the cache clean previously
+        // emitted by the player's private `clean_dcache(ptr, len)`
+        // helper (DCCMVAC raw write) is now handled by `BankGuard<Read>`
+        // construction inside `refill_done`.
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_BUF0: u32 = 0xD048_0000;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_BUF1: u32 = 0xD048_1000;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_BUF_SIZE: usize = 4096;
+        // DcaDoubleBuf for the audio buffer pair, built once via
+        // from_addrs and pinned in a static so the player's
+        // DbufRead<'static, 'static, ...> can reference it.
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        let audio_dca: &'static mut rlvgl_platform::hwcore::dca::DcaDoubleBuf< // rlvgl-discipline: allow(static_mut)
+            'static,
+            u8,
+            AUDIO_BUF_SIZE,
+        > = {
+            use core::mem::MaybeUninit;
+            use core::sync::atomic::{AtomicBool, Ordering};
+            use rlvgl_platform::hwcore::dca::DcaDoubleBuf;
+            static AUDIO_DCA_INIT: AtomicBool = AtomicBool::new(false);
+            static mut AUDIO_DCA: MaybeUninit<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>> = // rlvgl-discipline: allow(static_mut)
+                MaybeUninit::uninit();
+            // SAFETY: AtomicBool gates the once-only `from_addrs` write;
+            // subsequent reads via the raw pointer chain return a
+            // `&'static mut` to the initialised DCA. The two banks
+            // (AUDIO_BUF0 / AUDIO_BUF1) are dedicated SDRAM regions —
+            // no other code holds references to them.
+            unsafe {
+                if !AUDIO_DCA_INIT.swap(true, Ordering::AcqRel) {
+                    (&raw mut AUDIO_DCA).write(MaybeUninit::new(DcaDoubleBuf::from_addrs(
+                        AUDIO_BUF0 as usize,
+                        AUDIO_BUF1 as usize,
+                    )));
+                }
+                &mut *(&raw mut AUDIO_DCA)
+                    .cast::<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>>()
+            }
+        };
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         let mut audio_player = {
             use rlvgl_platform::AudioPlayer;
-            const AUDIO_BUF0: u32 = 0xD048_0000;
-            const AUDIO_BUF1: u32 = 0xD048_1000;
-            const AUDIO_BUF_SIZE: usize = 4096;
-            AudioPlayer::new(AUDIO_BUF0 as *mut u8, AUDIO_BUF1 as *mut u8, AUDIO_BUF_SIZE)
+            // SAFETY: per DCB-00 §9 INV-D13, AudioPlayer::new takes
+            // ownership of the SCB peripheral via Peripherals::steal.
+            // No other &mut SCB owner overlaps the player's lifetime
+            // in this binary; the disco firmware acquires `cp` once
+            // at line 1510 (cortex_m::Peripherals::take) but does not
+            // hold cp.SCB across this scope, so the player's stolen
+            // SCB is the sole owner. `audio_dca` is the
+            // freshly-constructed `&'static mut DcaDoubleBuf` from
+            // the once-only init above; no parallel reference to it
+            // exists.
+            unsafe { AudioPlayer::<AUDIO_BUF_SIZE>::new(audio_dca) }
         };
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         const AUDIO_PCM_BASE: u32 = 0xD048_2000;
