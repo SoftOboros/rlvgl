@@ -60,6 +60,19 @@ disco-analyzer subrepo's first concepts doc).
     behaviour-preservation and portability grounds.
     **Resolved 2026-05-02 — Option A ratified into DCB-00
     §3/§5/§6/§10/§14/§15. DCB-01c + DCB-04 unblocked.**
+  - [DCB-01b-A.md](DCB-01b-A.md) — sub-letter analysis on
+    the cache-op placement for the `Read` direction of
+    `HalfGuard` / `BankGuard`. The DCB-01b shipped pattern
+    cleans at *guard entry*; the pre-DCB SAI1 TX pattern
+    cleans *after* CPU writes. Steady-state effect: audio is
+    correct but ~10.67 ms (2 half-periods) late vs the
+    pre-DCB shape — a latency regression rather than a "bees"
+    repeat. Recommends Option A (move clean to `release` for
+    `Read`; keep entry for `Write`); requires a small
+    DCB-01b API change (`release` gains `&mut DcaCacheCtx`)
+    and mechanical updates to the two disco-analyzer
+    consumer sites.
+    **Drafted 2026-05-02; awaiting DCB-00 §15 ratification.**
   - [DCB-03-A.md](DCB-03-A.md) — sub-letter analysis on the
     DMA2D destination retrofit. Documented that DMA2D
     destinations on the disco target all live in MPU-Write-
