@@ -13,6 +13,7 @@
 //! [discipline]: https://github.com/softoboros/rlvgl/blob/main/CLAUDE.md
 
 pub mod addr;
+pub mod dca;
 pub mod isr;
 pub mod regs;
 pub mod surface;

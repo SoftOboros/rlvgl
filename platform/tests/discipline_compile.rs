@@ -23,4 +23,5 @@ fn ui() {
     t.compile_fail("tests/ui/inflight_*.rs");
     t.compile_fail("tests/ui/scanout_*.rs");
     t.compile_fail("tests/ui/mmio_*.rs");
+    t.compile_fail("tests/ui/dca_*.rs");
 }

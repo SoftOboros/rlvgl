@@ -89,6 +89,29 @@ const RULES: &[Rule] = &[
         matcher: |line| line.contains("compiler_fence("),
         whitelist: &["platform/src/hwcore/"],
     },
+    // DCB-00 §9 INV-D8: D-cache maintenance for cacheable-RAM DMA
+    // buffers must go through `hwcore::dca` (DcaBuf typestate API)
+    // rather than direct SCB calls. Whitelisted in `hwcore/dca.rs`
+    // (the rule's owning module) and `hwcore/regs/` (for typed
+    // SCB wrappers, if they grow). Pre-existing call sites are
+    // grandfathered via BASELINE until the DCB-02b/DCB-02c
+    // retrofits land.
+    Rule {
+        id: "raw_dcache",
+        description: "raw SCB d-cache call outside hwcore/dca",
+        matcher: |line| {
+            line.contains("clean_dcache_by_address")
+                || line.contains("clean_dcache_by_slice")
+                || line.contains("invalidate_dcache_by_address")
+                || line.contains("invalidate_dcache_by_slice")
+                || line.contains("clean_invalidate_dcache_by_address")
+                || line.contains("clean_invalidate_dcache_by_slice")
+        },
+        whitelist: &[
+            "platform/src/hwcore/dca.rs",
+            "platform/src/hwcore/regs/",
+        ],
+    },
 ];
 
 /// Known-grandfathered violations. `(rule_id, repo_relative_path)`.
@@ -206,6 +229,31 @@ const BASELINE: &[(&str, &str)] = &[
     //    queues (different concurrency model from ISR rings).
     //  - disco-sim crawl_buffers.rs uses `&'static mut [u8]` slice
     //    return types (false-positive of the regex).
+    //
+    // ── raw_dcache (DCB-00 §9 INV-D8) ──────────────────────────────
+    //
+    // Pre-existing manual SCB d-cache call sites grandfathered until
+    // their DCB-NN retrofit phase lands. DCB-00 §4 / §10 reconciles
+    // each site with the typestate API:
+    //
+    //  - sd_emmc_adapter.rs:47,57 — DCB-02c retrofit (cache-line-padded
+    //    DcaBuf<u8, BLOCK_BYTES> collapses bidirectional clean+invalidate
+    //    to directional ops via INV-D2).
+    //  - stm32h747i_disco_sd.rs:35,46 — DCB-02c retrofit (same lifecycle
+    //    as the adapter; SDMMC R/W lend the buffer with the matching
+    //    direction).
+    //  - freertos_entry.rs:1011,1451 — LTDC scanout pre-clean before
+    //    handing FRONT to the display engine. DCB-00 §10 Scanout row
+    //    deferred to DCB-04: the typestate-on-publish vs MPU
+    //    non-cacheable carve-out decision happens there. Until DCB-04
+    //    ratifies, these sites are grandfathered. The audio_player.rs
+    //    private `clean_dcache` helper at line 253 uses raw DCCMVAC
+    //    writes rather than the SCB API, so does not trigger this
+    //    rule — its existing `raw_addr_cast` / `raw_mmio_cast` opt-out
+    //    markers cover the access; DCB-02b absorbs it.
+    ("raw_dcache", "examples/stm32h747i-disco/src/freertos_entry.rs"),
+    ("raw_dcache", "platform/src/sd_emmc_adapter.rs"),
+    ("raw_dcache", "platform/src/stm32h747i_disco_sd.rs"),
 ];
 
 // ─── Test entry point ───────────────────────────────────────────────────
