@@ -967,8 +967,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             let t0 = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let mut timeout = 20_000_000u32;
             while timeout > 0 {
-                if (0x5000_040Cu32 as *const u32).read_volatile() & 0x02 != 0 {
-                    // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                let sr = (0x5000_040Cu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                if sr & 0x02 != 0 {
                     break;
                 }
                 timeout -= 1;

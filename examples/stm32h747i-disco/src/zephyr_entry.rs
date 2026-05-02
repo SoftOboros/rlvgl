@@ -432,8 +432,7 @@ pub unsafe extern "C" fn rlvgl_init(
         // ── 1. Construct sync object ──────────────────────────────────────
         use core::sync::atomic::AtomicBool;
         static INIT_DONE: AtomicBool = AtomicBool::new(false);
-        static mut SYNC_STORAGE: core::mem::MaybeUninit<ZephyrFrameSync> =
-            // rlvgl-discipline: allow(static_mut)
+        static mut SYNC_STORAGE: core::mem::MaybeUninit<ZephyrFrameSync> = // rlvgl-discipline: allow(static_mut)
             core::mem::MaybeUninit::uninit();
 
         if INIT_DONE.swap(true, Ordering::AcqRel) {

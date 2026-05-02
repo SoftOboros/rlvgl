@@ -168,11 +168,11 @@ pub fn build_star_crawl_window(
     let text_ptr = (CRAWL_BASE + JUMBO_BYTES) as *mut u8; // rlvgl-discipline: allow(raw_addr_cast)
     let scanline_ptr = (CRAWL_BASE + JUMBO_BYTES + TEXT_BYTES) as *mut u8; // rlvgl-discipline: allow(raw_addr_cast)
 
-    let jumbo_slice: &'static mut [u8] =
+    let jumbo_slice: &'static mut [u8] = // rlvgl-discipline: allow(static_mut)
         unsafe { core::slice::from_raw_parts_mut(jumbo_ptr, jumbo_bytes_needed) };
-    let text_slice: &'static mut [u8] =
+    let text_slice: &'static mut [u8] = // rlvgl-discipline: allow(static_mut)
         unsafe { core::slice::from_raw_parts_mut(text_ptr, TEXT_BYTES) };
-    let scanline_slice: &'static mut [u8] =
+    let scanline_slice: &'static mut [u8] = // rlvgl-discipline: allow(static_mut)
         unsafe { core::slice::from_raw_parts_mut(scanline_ptr, SCANLINE_BYTES) };
 
     // Zero the text column so stale SDRAM bytes don't leak through

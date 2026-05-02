@@ -10,6 +10,8 @@
 //!    override must produce bit-identical output, otherwise the same OBB
 //!    would render differently on backends with vs. without the override.
 
+#![cfg(feature = "simulator")]
+
 use rlvgl_core::raster::{Obb, PointF};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};

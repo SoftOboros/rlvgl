@@ -432,9 +432,9 @@ fn strip_comments(src: &str) -> String {
             continue;
         }
         if in_string {
-            if b == b'\\' && next.is_some() {
+            if let (b'\\', Some(n)) = (b, next) {
                 out.push(b as char);
-                out.push(next.unwrap() as char);
+                out.push(n as char);
                 i += 2;
                 continue;
             }

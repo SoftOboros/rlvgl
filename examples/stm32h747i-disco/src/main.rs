@@ -1995,10 +1995,8 @@ fn main() -> ! {
             // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE+FIFOEN
             let usart1 = 0x4001_1000u32;
             ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            ((usart1 + 0x00) as *mut u32).write_volatile(
-                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                (1 << 29) | (1 << 3) | (1 << 2) | (1 << 0), // FIFOEN + TE + RE + UE
-            );
+            ((usart1 + 0x00) as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                .write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE
         }
 
         unsafe {
@@ -2891,12 +2889,8 @@ fn main() -> ! {
                     iw.borrow_mut().close();
                     let vis = sw.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis {
-                            // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                            0x5E77_0001
-                        } else {
-                            0x5E77_0000
-                        });
+                        let p = 0x3800_06A0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        p.write_volatile(if vis { 0x5E77_0001 } else { 0x5E77_0000 });
                     }
                 }));
 
@@ -2915,12 +2909,8 @@ fn main() -> ! {
                     sw2.borrow_mut().close();
                     let vis = iw2.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis {
-                            // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                            0x1AF0_0001
-                        } else {
-                            0x1AF0_0000
-                        });
+                        let p = 0x3800_06A4u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        p.write_volatile(if vis { 0x1AF0_0001 } else { 0x1AF0_0000 });
                     }
                 }));
 
@@ -4088,24 +4078,18 @@ fn main() -> ! {
                     (0x3800_0604u32 as *mut u32).write_volatile(evt_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     (0x3800_0608u32 as *mut u32).write_volatile(tick_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     (0x3800_060Cu32 as *mut u32).write_volatile(render_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                    (0x3800_0610u32 as *mut u32).write_volatile(
-                        // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                        ((dirty_frames as u32) << 16)
-                            | ((was_visible as u32) << 8)
-                            | (event_win.borrow().is_visible() as u32),
-                    );
+                    let telem = ((dirty_frames as u32) << 16)
+                        | ((was_visible as u32) << 8)
+                        | (event_win.borrow().is_visible() as u32);
+                    (0x3800_0610u32 as *mut u32).write_volatile(telem); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     (0x3800_0614u32 as *mut u32).write_volatile(display.back_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     (0x3800_0618u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         .write_volatile((0x5000_10ACu32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // Cortex-M fault registers
-                    (0x3800_0638u32 as *mut u32).write_volatile(
-                        // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                        (0xE000_ED28u32 as *const u32).read_volatile(), // CFSR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                    );
-                    (0x3800_063Cu32 as *mut u32).write_volatile(
-                        // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                        (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-                    );
+                    let cfsr = (0xE000_ED28u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0638u32 as *mut u32).write_volatile(cfsr); // CFSR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    let mmfar = (0xE000_ED38u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_063Cu32 as *mut u32).write_volatile(mmfar); // MMFAR/BFAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // LTDC ISR — FUIF (bit 1) / LIF (bit 0)
                     (0x3800_0640u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         .write_volatile((0x5000_1038u32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
@@ -4841,11 +4825,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // UART8: BRR = APB1_clk / baud = 100_000_000 / 115200 ≈ 868
         ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-        ((UART8 + 0x00) as *mut u32).write_volatile(
-            // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            (1 << 3)  // TE (transmitter enable)
-            | (1 << 0), // UE (USART enable)
-        );
+        ((UART8 + 0x00) as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            .write_volatile((1 << 3) | (1 << 0)); // TE | UE
     }
 
     // ── USART1 debug serial via ST-LINK VCP (PA9=TX AF7, 115200 8N1) ────
