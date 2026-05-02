@@ -38,6 +38,7 @@ pub const CLOSE_SIZE: i32 = 48;
 /// - `title`: header title text
 /// - `font`: bitmap font for the title and close "X"
 /// - `title_color` / `close_color` / `divider_color`: styling
+#[allow(clippy::too_many_arguments)]
 pub fn draw_panel_header(
     renderer: &mut dyn Renderer,
     bounds: Rect,

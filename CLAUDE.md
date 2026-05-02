@@ -211,6 +211,12 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32p4_cli --features creator
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_render --features creator,regression
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_cli --features creator
 
+# Phase 4.7b: remaining RISC-V chips with linker-script emission
+# (ESP32-C5 / H2 / C61). Render tests cover memory.x + <chip>.x.
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c5_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32h2_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,regression
+
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
 

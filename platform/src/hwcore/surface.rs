@@ -429,14 +429,14 @@ impl Scanout {
     /// SDRAM bank. Framebuffers whose `bank()` returns `None` (non-SDRAM
     /// RAM, test mocks) are accepted without a collision check.
     pub fn try_new(front: FrameBuffer, back: FrameBuffer) -> Result<Self, BankCollision> {
-        if let (Some(fb), Some(bb)) = (front.bank(), back.bank()) {
-            if fb == bb {
-                return Err(BankCollision {
-                    front,
-                    back,
-                    bank: fb,
-                });
-            }
+        if let (Some(fb), Some(bb)) = (front.bank(), back.bank())
+            && fb == bb
+        {
+            return Err(BankCollision {
+                front,
+                back,
+                bank: fb,
+            });
         }
         Ok(Self { front, back })
     }

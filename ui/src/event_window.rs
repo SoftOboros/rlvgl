@@ -210,7 +210,7 @@ impl Widget for EventWindow {
             self.bounds,
             Color(0x58, 0xB3, 0xF5, 0xFF), // accent blue
             "Events",
-            &self.font,
+            self.font,
             self.text_color,
             Color(255, 80, 80, 255), // close red
             Color(44, 58, 79, 255),  // divider
@@ -254,13 +254,12 @@ impl Widget for EventWindow {
             }
         }
         // Close button
-        if self.visible {
-            if let Event::PressRelease { x, y } = event {
-                if crate::draw_helpers::panel_close_hit(self.bounds, *x, *y) {
-                    self.hide();
-                    return true;
-                }
-            }
+        if self.visible
+            && let Event::PressRelease { x, y } = event
+            && crate::draw_helpers::panel_close_hit(self.bounds, *x, *y)
+        {
+            self.hide();
+            return true;
         }
         false
     }

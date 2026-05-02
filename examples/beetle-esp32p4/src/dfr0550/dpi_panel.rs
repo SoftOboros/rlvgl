@@ -67,5 +67,4 @@ pub enum DpiError {
 }
 
 /// Total framebuffer size in bytes (RGB888).
-pub const FB_BYTES: usize =
-    super::H_RES as usize * super::V_RES as usize * 3;
+pub const FB_BYTES: usize = super::H_RES as usize * super::V_RES as usize * 3;

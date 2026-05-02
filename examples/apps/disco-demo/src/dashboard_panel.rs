@@ -96,6 +96,7 @@ impl DashboardPanel {
     }
 
     /// Returns `true` if the panel is visible.
+    #[allow(dead_code)]
     pub fn is_visible(&self) -> bool {
         self.visible
     }
@@ -177,11 +178,11 @@ impl Widget for DashboardPanel {
         if !self.visible {
             return false;
         }
-        if let Event::PressRelease { x, y } = event {
-            if panel_close_hit(self.bounds, *x, *y) {
-                self.hide();
-                return true;
-            }
+        if let Event::PressRelease { x, y } = event
+            && panel_close_hit(self.bounds, *x, *y)
+        {
+            self.hide();
+            return true;
         }
         false
     }
