@@ -43,7 +43,7 @@ disco-analyzer subrepo's first concepts doc).
 
   - [DCB-00-CONCEPTS.md](DCB-00-CONCEPTS.md) — foundational
     vocabulary, frozen typestate, invariants, source-of-truth map.
-    **Drafted 2026-05-02; awaiting ratification.**
+    **Ratified 2026-05-02 (§15); DCB-01 unblocked.**
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

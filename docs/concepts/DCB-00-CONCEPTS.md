@@ -1,10 +1,11 @@
 # DCB-00 — DMA Cacheable Buffers Concepts
 
-**Status:** Drafted 2026-05-02. Awaiting ratification before DCB-01
-(typestate API in `rlvgl-platform`) lands. Per the parent CLAUDE.md
-spec-before-code discipline, no implementation MAY land that touches
-the §5 typestate set or §9 invariants until this doc has a §15
-ratification entry.
+**Status:** Ratified 2026-05-02 (§15). DCB-01 (typestate API in
+`rlvgl-platform`) is unblocked. Per the parent CLAUDE.md
+spec-before-code discipline, future modifications to the §5
+typestate set, §6 layout invariants, §8 engine submission contract,
+or §9 INV-D8..D13 require a §15 amendment **first**, in a separate
+PR, before any behaviour PR rides on the change.
 
 ## 0. Authority policy
 
@@ -150,14 +151,20 @@ DcaBuf<T, N>            ─ owning storage; typestate is its current owner
    │     (exit returning to CpuOwned: optional re-invalidate per §6 INV-D5)
    │
    └─ DeviceActiveCirc<DIR> ─ DMA in continuous transfer
-         DIR ∈ {Read, Write, ReadWrite}
+         DIR ∈ {Read, Write}
          Half-guard API: half_guard(stream_pos) → HalfGuard<DIR>
-            (HalfGuard entry: clean (Read), invalidate (Write),
-             or clean+invalidate (ReadWrite) on the inactive half)
+            (HalfGuard entry: clean (Read) or invalidate (Write)
+             on the inactive half)
             (HalfGuard drop: state revalidated against current
              stream_pos; if the DMA has crossed into this half,
              panic in debug, return-error in release per §9 INV-D7)
 ```
+
+`DeviceActiveCirc<DIR>` deliberately omits a `ReadWrite` direction: no
+`rlvgl-platform` consumer today drives a circular DMA that both reads
+from and writes to the same buffer. If a future consumer needs that
+shape (e.g. a chained M2M pipeline), the direction is added via §15
+amendment with a named first user.
 
 The transitions, with ownership rules, are frozen as:
 
@@ -166,10 +173,10 @@ The transitions, with ownership rules, are frozen as:
 | `CpuOwned` | `DeviceReadPending` | `buf.lend_for_read(engine)` returning `(DcaBuf<DeviceReadPending>, DmaAddr)` | `clean_dcache_by_address` over the padded extent |
 | `CpuOwned` | `DeviceWritePending` | `buf.lend_for_write(engine)` returning `(DcaBuf<DeviceWritePending>, DmaAddr)` | `invalidate_dcache_by_address` over the padded extent |
 | `CpuOwned` | `DeviceActiveCirc<DIR>` | `buf.start_circular(engine, DIR)` returning `DcaBuf<DeviceActiveCirc<DIR>>` | per-DIR initial op (clean, invalidate, or clean+invalidate) |
-| `DeviceReadPending` | `CpuOwned` | DMA-engine completion handler returning the borrow | none (CPU only ever reads buf next; cached lines remain valid) |
-| `DeviceWritePending` | `CpuOwned` | DMA-engine completion handler returning the borrow | none at exit; the entry-side invalidate already enforced coherency for the next CPU read |
-| `DeviceActiveCirc<DIR>` | `DeviceActiveCirc<DIR>` (HalfGuard scope) | `buf.half_guard(stream_pos)` returning `HalfGuard<DIR>` | per-DIR op on the *inactive half only* |
-| `DeviceActiveCirc<DIR>` | `CpuOwned` | `buf.stop_circular()` after engine-stop handshake | engine-DIR-dependent op over the full padded extent |
+| `DeviceReadPending` | `CpuOwned` | DMA-engine completion handler returning the borrow | none (the device only *read* RAM; the CPU's cached copy is unchanged from before the transfer and remains authoritative) |
+| `DeviceWritePending` | `CpuOwned` | DMA-engine completion handler returning the borrow | none at exit (the entry-side invalidate evicted the buffer's cache lines; INV-D3 forbids cache-line sharing with adjacent state, so no stale prefetch can reintroduce them during the transfer; the CPU's first read after exit therefore hits RAM and observes the DMA-written data) |
+| `DeviceActiveCirc<DIR>` | `DeviceActiveCirc<DIR>` (HalfGuard scope) | `buf.half_guard(stream_pos)` returning `HalfGuard<DIR>` | per-DIR op on the *inactive half only*: `clean` for `Read`, `invalidate` for `Write` |
+| `DeviceActiveCirc<DIR>` | `CpuOwned` | `buf.stop_circular()` after engine-stop handshake | engine-DIR-dependent op over the full padded extent (`clean` for `Read`, `invalidate` for `Write`) |
 
 `DcaBuf<T, N>` itself is a `#[repr(C, align(32))]` newtype around
 `[T; N_padded]` where `N_padded = round_up(N * size_of::<T>(),
@@ -229,11 +236,11 @@ DMA engine, or a buffer shared across CM7 and CM4 — are out of scope
 for the DCB-00 contract.
 
 The CM7/CM4 cross-core case is governed by a separate concept (the
-DAA subrepo's DAA-03 INV-D14 "no D-cache maintenance on cross-core
-shared regions; the regions live in D3 SRAM4 which is not cached
-from CM7"). DCB and the cross-core convention compose: a buffer
-owned by DCB MUST live in a cacheable region; a buffer in D3 SRAM4
-is not a DCB buffer.
+DAA subrepo's DAA-03 §7 / INV-D14: "no D-cache maintenance on
+cross-core shared regions; the regions live in D3 SRAM4 which is not
+cached from CM7"). DCB and the cross-core convention compose: a
+buffer owned by DCB MUST live in a cacheable region; a buffer in D3
+SRAM4 is not a DCB buffer.
 
 This is a **non-goal**, not a deferred goal. The single-master
 scope is what makes the typestate sound. If a future use case needs
@@ -313,6 +320,22 @@ These are normative for `rlvgl-platform` consumers once DCB-01 lands.
   inside DCB's implementation MUST carry the `// SAFETY:` comment
   required by Register-Mashing Discipline rule #7. DCB extends
   the existing convention; it does not relax it.
+- **INV-D13: SCB ownership consolidation.** The `&mut SCB` borrow
+  required to drive `clean_dcache_by_*` / `invalidate_dcache_by_*`
+  MUST be plumbed through DCB construction sites only. New code in
+  `rlvgl-platform` and downstream consumers MUST NOT take a
+  `&mut SCB` borrow outside of (a) constructing a `DcaBuf` family,
+  (b) constructing a DCB-owning engine driver (e.g. `AudioPlayer`,
+  `SdmmcEngine`), or (c) the existing pre-DCB call sites
+  grandfathered by INV-D10. This is the inverse of §11's "DCB does
+  not change the `cortex-m` SCB ownership convention": DCB does
+  consolidate *where* the convention is invoked, so that
+  `&mut SCB` plumbing through application code (the
+  `audio_player.rs:248` rationale) does not recur. New
+  `&mut SCB` borrow sites added after DCB-01 ratifies are a
+  discipline violation; the scanner SHOULD grow a follow-on rule
+  `raw_scb_for_cache` to make this enforceable, with `BASELINE`
+  initialised from the same three sites as INV-D10.
 
 ## 10. Reconciliation with adjacent primitives
 
@@ -323,7 +346,7 @@ primitive. Consumer code follows the *Composition* column.
 | Adjacent primitive | DCB relationship | Composition |
 |---|---|---|
 | `BackBuffer<'a>` / `BorrowedForDma<'dma, T>` / `InFlight<'dma, T>` (Register-Mashing rule #3) | **Extends.** `BackBuffer` represents a framebuffer in *any* memory; `DcaBuf<u8, FB_BYTES>` represents a cacheable framebuffer with cache-state ownership. A DMA2D destination becomes a `DcaBuf` *containing* the framebuffer pixels, with `BackBuffer` as the format/geometry view. The DMA2D `start_*_typed` API takes `DcaBuf<u8, FB_BYTES, CpuOwned>` and a `BorrowedForDma<'dma, BackBuffer<'fb>>`, and returns `InFlight<'dma, BackBuffer<'fb>>` whose Drop releases the cache typestate back to `CpuOwned`. (Concrete refactor lands in DCB-03.) | DMA2D consumers continue to call `start_fill_typed` etc.; the type signatures gain a `DcaBuf` parameter. The borrow-checker integration is unchanged. |
-| `Scanout` (LTDC double-buffer) | **Decision deferred to DCB-04.** LTDC continuously reads the front buffer at frame rate; per-frame cache ops are expensive. Two options: (a) wrap the front buffer in `DcaBuf<..., DeviceActiveCirc<Read>>` and clean only the dirty rectangle on present, (b) MPU-mark the scanout pair non-cacheable and use `DcaBuf::in_uncached_region` so DCB elides cache ops. DCB-00 §11 lists this as a non-goal at this phase; DCB-04 ratifies the choice. | Pending. Code continues to use the existing `Scanout` API verbatim until DCB-04. |
+| `Scanout` (LTDC double-buffer) | **Decision deferred to DCB-04.** LTDC continuously reads the front buffer at frame rate; per-frame cache ops are expensive. Two options, **structurally distinct, not equivalent alternatives**: (a) keep the front buffer cacheable, wrap it in `DcaBuf<..., DeviceActiveCirc<Read>>`, and clean only the dirty rectangle on present — DCB ownership and cache discipline apply at runtime; (b) MPU-mark the scanout pair non-cacheable and use `DcaBuf::in_uncached_region` — DCB ownership still applies but cache ops elide *at construction*, and the MPU table becomes part of the platform's frozen memory map. Option (b) trades runtime cost for static-config rigidity (every consumer of the front buffer must accept non-cacheable read latency); option (a) keeps the buffer cacheable for incidental CPU reads (screenshots, FB dumps) at the cost of per-frame maintenance. DCB-00 §11 lists this as a non-goal at this phase; DCB-04 ratifies the choice — and DCB-04 MUST NOT default to (a) on the assumption that the typestate-everywhere story is uniform. | Pending. Code continues to use the existing `Scanout` API verbatim until DCB-04. |
 | `audio_player.rs` private `clean_dcache(ptr, len)` (line 253) | **Replaces.** The audio-player TX buffer is a single-master DMA-read scenario with no special cache geometry. Becomes a `DcaBuf<i16, PLAYER_BUF_SAMPLES>` produced by an `AudioPlayer::lend_chunk_for_tx()` API that internally returns `DeviceReadPending`. The `static SCB`-bypass comment at `audio_player.rs:248` is resolved by the typestate API owning a single `&mut SCB` borrow at construction. | DCB-02b retrofit. Removes the private helper. |
 | `stm32h747i_disco_sd.rs` `Sd::clean_dcache_by_slice` / `invalidate_dcache_by_slice` (lines 35, 46) | **Replaces.** SDMMC R/W buffers become `DcaBuf<u8, BLOCK_BYTES>`. The W path lends `DeviceReadPending`; the R path lends `DeviceWritePending`. Cache-line-padded storage means the unaligned-slice rationale at `sd_emmc_adapter.rs:39` no longer applies (INV-D2 forces the multiple-of-line size), and the bidirectional `clean_invalidate` collapses to the directional op. | DCB-02c retrofit. |
 | `sd_emmc_adapter.rs` `clean_invalidate_dcache_by_address` (line 47) | **Replaces.** Same lifecycle as the `_disco_sd.rs` retrofit. The aligned-padded storage removes the original justification for the bidirectional op. | DCB-02c retrofit. |
@@ -445,7 +468,15 @@ Ratifying DCB-00 unblocks the following work:
   transitions.
 - **DCB-02** — First user (disco-analyzer SAI1 RX + TX rings) on the
   bench. Demonstrates the contract on the path that drove the
-  initiative.
+  initiative. **Cross-repo timing dependency:** DCB-02 lands in the
+  `streamz/submodules/disco-analyzer` subrepo, not in this tree, and
+  consumes the DCB-01 API surface as a published `rlvgl-platform`
+  release. DCB-02 cannot land before DCB-01 publishes; conversely
+  DCB-01's acceptance gate (§12 (a)) does not block on DCB-02 — DCB-01
+  may publish with the `BASELINE` exemption list still populated. The
+  §12 (b) gate ratifies separately when disco-analyzer's bring-up
+  schedule allows. Coordinate with the DAA owner before scheduling
+  DCB-02; do not assume DCB-01 + DCB-02 land in lockstep.
 - **DCB-02b** — `audio_player.rs` retrofit; remove private
   `clean_dcache` helper.
 - **DCB-02c** — `stm32h747i_disco_sd.rs` + `sd_emmc_adapter.rs`
@@ -473,4 +504,59 @@ behaviour MAY land touching these surfaces until DCB-00 ratifies):
 - **2026-05-02 — Drafted.** Initial draft written following the
   GPT-suggested typestate pattern and the bench-driven motivation
   in §2 (SAI1 TX cache-coherency bees on disco-analyzer 2026-04-30
-  / 2026-05-01). Awaiting ratification.
+  / 2026-05-01).
+- **2026-05-02 — Pre-ratification clarifications (non-substantive).**
+  Tightening pass before §15 ratification entry. Changes:
+  - §5 typestate ASCII tree: dropped `ReadWrite` from
+    `DeviceActiveCirc<DIR>`'s direction set; restricted to {Read,
+    Write} with a note that future directions ratify via §15
+    amendment with a named first user. Rationale: no current
+    `rlvgl-platform` consumer drives a circular DMA that both reads
+    from and writes to the same buffer; the spec surface was
+    unmotivated. (Standards Action subtraction; per-policy this
+    requires §15 documentation, which this entry provides.)
+  - §5 transition table: expanded the cache-state justification on
+    both `DeviceXxxPending → CpuOwned` rows so the "no cache op"
+    cells are self-explanatory rather than relying on the reader to
+    re-derive the symmetry. Cited INV-D3 in the `DeviceWritePending`
+    row as the load-bearing reason adjacent-line refill cannot
+    reintroduce stale lines during transfer.
+  - §5 transition table: spelled out per-DIR cache ops on the
+    `DeviceActiveCirc<DIR>` HalfGuard and `stop_circular` rows
+    (`clean` for `Read`, `invalidate` for `Write`) so the table is
+    closed under the {Read, Write} set without the reader looking
+    up the ASCII tree.
+  - §10 `Scanout` row: relabelled options (a) and (b) as
+    "structurally distinct, not equivalent alternatives" and
+    explained the trade — (a) keeps cacheable + per-frame cache ops
+    + incidental CPU reads cheap; (b) MPU-non-cacheable + static
+    map + non-cacheable-read latency for any CPU consumer. Added a
+    DCB-04 MUST that forbids defaulting to (a) on uniformity
+    grounds.
+  - §9 INV-D13: added. Consolidates the `&mut SCB` borrow into DCB
+    construction sites; new code MUST NOT take `&mut SCB` outside
+    of DCB construction or grandfathered call sites. Notes a
+    follow-on scanner rule `raw_scb_for_cache` SHOULD grow once
+    DCB-01 lands. This is the inverse of §11's "DCB does not change
+    the SCB ownership convention" — DCB consolidates *where* the
+    convention is invoked.
+  - §14 DCB-02 bullet: added the cross-repo timing dependency note.
+    DCB-02 lands in `streamz/submodules/disco-analyzer`, consumes
+    DCB-01 as a published `rlvgl-platform` release, and does not
+    block DCB-01's §12 (a) acceptance gate. §12 (b) ratifies
+    separately on the DAA owner's bring-up schedule.
+  - §7 / §10 citation normalisation: both now cite "DAA-03 §7 /
+    INV-D14" in the same form. No semantic change; prevents drift
+    if DAA-03 renumbers.
+
+  None of the above modify the frozen typestate set (subtraction of
+  `ReadWrite` is the only typestate-set change, and it is documented
+  here per Standards Action policy), §6 layout invariants, §8 engine
+  submission contract, §9 INV-D8..D12, or §11 non-goals.
+- **2026-05-02 — Ratified.** §0–§14 ratified at the form above. DCB-01
+  (typestate API + `raw_dcache` discipline rule + starting `BASELINE`)
+  is now unblocked; subsequent phases follow the §14 unblocks list.
+  Future modifications to the §5 typestate set, §6 layout invariants,
+  §8 engine submission contract, or §9 INV-D8..D13 require a §15
+  amendment **first**, in a separate PR, before any behaviour PR
+  rides on the change.
