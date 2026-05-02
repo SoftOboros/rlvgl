@@ -90,6 +90,26 @@ pub trait DcaCache {
     /// engine drivers that need bidirectional handoff for unrelated
     /// reasons.
     fn clean_invalidate(&mut self, addr: usize, len: usize);
+
+    /// Emit a memory barrier sufficient to drain pending writes from
+    /// the architectural write buffer (the AXI write buffer on
+    /// Cortex-M7; the equivalent on other targets).
+    ///
+    /// Required by DCB-00 §6 INV-D16: a `clean` alone does not flush
+    /// the AXI write buffer on STM32H7 + Write-Through SDRAM; pixel
+    /// writes can sit in the buffer past the cache write-back. The
+    /// `DeviceLtdcScan<T, N>` typestate's `present()` /
+    /// `start_ltdc_scan` / `stop_scan` boundaries call this *in
+    /// addition to* the `clean` to enforce ordering for
+    /// continuous-read consumers (LTDC, DCMI display-out, parallel
+    /// RGB).
+    ///
+    /// Routing the DSB through this trait keeps raw
+    /// `cortex_m::asm::dsb()` (or equivalent) call sites contained
+    /// to DCB's owning module — preserving the discipline scanner's
+    /// containment guarantee for the architecturally-mandated
+    /// barrier intrinsic.
+    fn barrier(&mut self);
 }
 
 /// No-op [`DcaCache`] for host tests.
@@ -111,6 +131,8 @@ pub enum NullCacheOp {
     Invalidate(usize, usize),
     /// `clean_invalidate(addr, len)` was called.
     CleanInvalidate(usize, usize),
+    /// `barrier()` was called.
+    Barrier,
 }
 
 impl DcaCache for NullCache {
@@ -122,6 +144,9 @@ impl DcaCache for NullCache {
     }
     fn clean_invalidate(&mut self, addr: usize, len: usize) {
         self.last = Some(NullCacheOp::CleanInvalidate(addr, len));
+    }
+    fn barrier(&mut self) {
+        self.last = Some(NullCacheOp::Barrier);
     }
 }
 
@@ -151,6 +176,17 @@ impl DcaCache for cortex_m::peripheral::SCB {
         unsafe {
             cortex_m::peripheral::SCB::clean_invalidate_dcache_by_address(self, addr, len);
         }
+    }
+    fn barrier(&mut self) {
+        // The architecturally-mandated DSB barrier; on Cortex-M7 this
+        // drains the AXI write buffer (the load-bearing primitive
+        // for `DeviceLtdcScan<T, N>::present()` per DCB-00 §6
+        // INV-D16). Routing through this method (rather than
+        // letting consumers call `cortex_m::asm::dsb()` directly)
+        // keeps the discipline scanner's `compiler_fence` /
+        // barrier-intrinsic containment intact — the raw
+        // intrinsic stays inside `hwcore::dca`.
+        cortex_m::asm::dsb();
     }
 }
 
@@ -399,6 +435,27 @@ impl<'a, T: Copy, const N: usize> Cpu<'a, T, N> {
         ctx.cache.invalidate(addr, len);
         CircWrite { buf: self.buf }
     }
+
+    /// Transition to [`LtdcScan`] (continuous-read consumer; LTDC,
+    /// DCMI display-out, parallel RGB).
+    ///
+    /// Per DCB-00 §5 transition table + INV-D16: emits
+    /// [`DcaCache::clean`] over the full padded extent **and** a
+    /// [`DcaCache::barrier`] (DSB on Cortex-M; AXI-write-buffer
+    /// drain on STM32H7 + Write-Through SDRAM). Both are required;
+    /// the clean alone does not enforce ordering on architectures
+    /// where the cache write-back queues into a separate write
+    /// buffer.
+    pub fn start_ltdc_scan<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+    ) -> LtdcScan<'a, T, N> {
+        let addr = self.buf.addr_usize();
+        let len = self.buf.byte_len();
+        ctx.cache.clean(addr, len);
+        ctx.cache.barrier();
+        LtdcScan { buf: self.buf }
+    }
 }
 
 // ── DeviceRead / DeviceWrite (one-shot) ────────────────────────────────
@@ -579,6 +636,91 @@ impl<'a, T: Copy, const N: usize> CircWrite<'a, T, N> {
         let addr = self.buf.addr_usize();
         let len = self.buf.byte_len();
         ctx.cache.invalidate(addr, len);
+        Cpu { buf: self.buf }
+    }
+}
+
+// ── LtdcScan (continuous-read consumer; DeviceLtdcScan typestate) ──────
+
+/// Continuous-read typestate handle for fixed-rate pixel-stream
+/// consumers (LTDC, DCMI display-out, parallel RGB).
+///
+/// Distinguished from [`CircRead`]:
+///
+/// - the consumer never pauses (no half-rotation; same buffer is
+///   read continuously),
+/// - the CPU paints in place between consumer reads rather than
+///   producing into an inactive half,
+/// - per-frame ordering is enforced by [`LtdcScan::present`] (clean
+///   plus DSB) at checkpoints chosen by the caller, not by an
+///   engine-side completion flag.
+///
+/// The `DIR` parameter is **deliberately omitted** — the CPU is
+/// always producer for this family. The inverse direction (camera
+/// frame-grab via DCMI) would be a separate `LtdcGrab` family;
+/// not in scope here, would ratify in a future §15 amendment with
+/// a named first user.
+pub struct LtdcScan<'a, T: Copy, const N: usize> {
+    buf: &'a mut DcaBuf<T, N>,
+}
+
+impl<'a, T: Copy, const N: usize> LtdcScan<'a, T, N> {
+    /// DMA bus address of the buffer (stable for the typestate's
+    /// lifetime; equal to the address returned during the
+    /// `start_ltdc_scan` transition). Pass to the consumer engine's
+    /// frame-buffer base register (e.g. LTDC `CFBAR`).
+    #[inline]
+    pub fn dma_addr(&self) -> DmaAddr {
+        self.buf.dma_addr()
+    }
+
+    /// In-place CPU access to the full buffer.
+    ///
+    /// Returns a `&mut [T; N]` valid until the next call that
+    /// borrows `self` mutably ([`LtdcScan::present`] /
+    /// [`LtdcScan::stop_scan`]). The borrow checker rejects
+    /// concurrent `paint_full` / `present` calls.
+    ///
+    /// No cache op is emitted here; ordering between the CPU's
+    /// writes and the consumer's reads is enforced at `present`
+    /// (DCB-00 §5 transition table).
+    #[inline]
+    pub fn paint_full(&mut self) -> &mut [T; N] {
+        // SAFETY: typestate LtdcScan holds an `&mut DcaBuf` — no
+        // other borrow of the storage exists for `self`'s lifetime.
+        // The consumer reads the same memory continuously but does
+        // so at engine-determined timing; aliasing with the consumer
+        // is the documented contract of `DeviceLtdcScan<T, N>` and
+        // is mediated by `present()`.
+        unsafe { &mut *self.buf.storage.get() }
+    }
+
+    /// Per-frame checkpoint: publish CPU writes to RAM for the
+    /// consumer's next read.
+    ///
+    /// Per DCB-00 §6 INV-D16 emits **both** [`DcaCache::clean`]
+    /// over the full padded extent AND [`DcaCache::barrier`]
+    /// (DSB-equivalent). Does not transition the typestate — the
+    /// consumer engine is still reading; only the ordering between
+    /// CPU writes and consumer reads is checkpointed.
+    pub fn present<C: DcaCache>(&mut self, ctx: &mut DcaCacheCtx<'_, C>) {
+        let addr = self.buf.addr_usize();
+        let len = self.buf.byte_len();
+        ctx.cache.clean(addr, len);
+        ctx.cache.barrier();
+    }
+
+    /// Transition back to [`Cpu`].
+    ///
+    /// Caller MUST stop the consumer engine before calling. Per
+    /// DCB-00 §5: emits a final [`DcaCache::clean`] +
+    /// [`DcaCache::barrier`] over the full padded extent so the
+    /// next phase's CPU read sees the buffer's terminal state.
+    pub fn stop_scan<C: DcaCache>(self, ctx: &mut DcaCacheCtx<'_, C>) -> Cpu<'a, T, N> {
+        let addr = self.buf.addr_usize();
+        let len = self.buf.byte_len();
+        ctx.cache.clean(addr, len);
+        ctx.cache.barrier();
         Cpu { buf: self.buf }
     }
 }
@@ -1413,5 +1555,130 @@ mod tests {
             guard.release(Bank::M1),
             Err(BankGuardOverrun { bank: Bank::M1 })
         );
+    }
+
+    // ── LtdcScan (DCB-01c) ──────────────────────────────────────────
+
+    type ScanBuf = DcaBuf<u8, 64>;
+
+    #[test]
+    fn ltdc_scan_round_trip_through_cpu() {
+        let mut buf = ScanBuf::new([0; 64]);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = buf.cpu();
+        let scan = cpu.start_ltdc_scan(&mut ctx);
+        let _cpu_back = scan.stop_scan(&mut ctx);
+    }
+
+    #[test]
+    fn start_ltdc_scan_emits_clean_then_barrier() {
+        let mut buf = ScanBuf::new([0; 64]);
+        let mut cache = NullCache::default();
+        {
+            let mut ctx = DcaCacheCtx::new(&mut cache);
+            let cpu = buf.cpu();
+            let scan = cpu.start_ltdc_scan(&mut ctx);
+            // After start: last op observed is the barrier (issued
+            // *after* the clean per INV-D16).
+            assert_eq!(ctx.cache_mut().last, Some(NullCacheOp::Barrier));
+            let _ = scan.stop_scan(&mut ctx);
+        }
+        // After stop: the FINAL op is also a barrier (clean + barrier
+        // emitted at exit).
+        assert_eq!(cache.last, Some(NullCacheOp::Barrier));
+    }
+
+    #[test]
+    fn ltdc_scan_paint_full_yields_buffer_slice() {
+        let mut buf = ScanBuf::new([0; 64]);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = buf.cpu();
+        let mut scan = cpu.start_ltdc_scan(&mut ctx);
+        let pixels = scan.paint_full();
+        pixels[0] = 0xAA;
+        pixels[63] = 0x55;
+        // Borrow ends here; subsequent paint_full / present ok.
+        assert_eq!(scan.paint_full()[0], 0xAA);
+        assert_eq!(scan.paint_full()[63], 0x55);
+    }
+
+    #[test]
+    fn ltdc_scan_present_emits_clean_then_barrier_no_transition() {
+        let mut buf = ScanBuf::new([0; 64]);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = buf.cpu();
+        let mut scan = cpu.start_ltdc_scan(&mut ctx);
+        // Drop the start_ltdc_scan op record by observing it then
+        // calling present, which must emit clean + barrier again.
+        scan.paint_full()[5] = 0x42;
+        scan.present(&mut ctx);
+        assert_eq!(ctx.cache_mut().last, Some(NullCacheOp::Barrier));
+        // Typestate is still LtdcScan — paint_full should still work.
+        scan.paint_full()[7] = 0x33;
+        scan.present(&mut ctx);
+        let _ = scan.stop_scan(&mut ctx);
+    }
+
+    #[test]
+    fn ltdc_scan_dma_addr_is_cache_line_aligned() {
+        let mut buf = ScanBuf::new([0; 64]);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = buf.cpu();
+        let scan = cpu.start_ltdc_scan(&mut ctx);
+        let addr = scan.dma_addr();
+        assert_eq!(addr.raw() as usize % CACHE_LINE, 0);
+        let _ = scan.stop_scan(&mut ctx);
+    }
+
+    #[test]
+    fn ltdc_scan_present_clean_extent_is_full_buffer() {
+        // Track multiple ops by inspecting them in sequence — switch
+        // to a custom local `LoggingCache` that records all calls.
+        struct LoggingCache {
+            ops: alloc::vec::Vec<NullCacheOp>,
+        }
+        impl DcaCache for LoggingCache {
+            fn clean(&mut self, addr: usize, len: usize) {
+                self.ops.push(NullCacheOp::Clean(addr, len));
+            }
+            fn invalidate(&mut self, addr: usize, len: usize) {
+                self.ops.push(NullCacheOp::Invalidate(addr, len));
+            }
+            fn clean_invalidate(&mut self, addr: usize, len: usize) {
+                self.ops.push(NullCacheOp::CleanInvalidate(addr, len));
+            }
+            fn barrier(&mut self) {
+                self.ops.push(NullCacheOp::Barrier);
+            }
+        }
+
+        let mut buf = ScanBuf::new([0; 64]);
+        let mut cache = LoggingCache {
+            ops: alloc::vec::Vec::new(),
+        };
+        {
+            let mut ctx = DcaCacheCtx::new(&mut cache);
+            let cpu = buf.cpu();
+            let mut scan = cpu.start_ltdc_scan(&mut ctx);
+            scan.present(&mut ctx);
+            let _ = scan.stop_scan(&mut ctx);
+        }
+        // Expected sequence: start (clean+barrier), present (clean+
+        // barrier), stop (clean+barrier) = 6 ops, alternating.
+        assert_eq!(cache.ops.len(), 6);
+        for (i, op) in cache.ops.iter().enumerate() {
+            if i % 2 == 0 {
+                assert!(
+                    matches!(op, NullCacheOp::Clean(_, 64)),
+                    "expected Clean(_, 64) at index {i}, got {op:?}"
+                );
+            } else {
+                assert_eq!(*op, NullCacheOp::Barrier);
+            }
+        }
     }
 }
