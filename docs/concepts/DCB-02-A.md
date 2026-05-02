@@ -1,12 +1,11 @@
 # DCB-02-A — RX double-buffer-mode coverage
 
-**Status:** Drafted 2026-05-02. Sub-letter analysis surfaced during
-DCB-02 (SAI1 TX retrofit). Awaiting resolution before DCB-02 RX-side
-work proceeds. Per DCB-00 README "Sub-letter doc convention" this
-doc is *scoped to one decision* and *transient*: the chosen option
-folds into DCB-00 §5 / §6 / §10 + §15 as a Standards Action
-amendment, after which this file is preserved as historical
-analysis only.
+**Status:** **Resolved 2026-05-02 — Option A ratified.** Folded into
+DCB-00 §3 / §5 / §6 / §10 / §15 via the 2026-05-02
+`DeviceActiveDoubleBuf<DIR>` amendment. This file is preserved as
+historical analysis only; no behaviour PRs reference it directly.
+DCB-01b implementation and DCB-02-R retrofit are now unblocked per
+the parent doc's §14 list.
 
 ## 1. Purpose
 
@@ -293,3 +292,12 @@ After DCB-00 §15 ratifies the amendment:
   unified retrofit. Recommendation: Option A
   (`DeviceActiveDoubleBuf<DIR>`). Awaiting owner ratification
   via a DCB-00 §15 amendment.
+- **2026-05-02 — Resolved.** Option A ratified by owner go-ahead.
+  Resolution folded into DCB-00 §3 (glossary additions for
+  `DcaDoubleBuf<T, N>`, `Bank`, `Bank-guard`, `CT bit`), §5
+  (parallel `DcaDoubleBuf<T, N>` typestate family with
+  `DeviceActiveDoubleBuf<DIR>`), §6 (INV-D14 per-bank
+  alignment/padding, INV-D15 CT-bit live-recheck), §10 (SAI1 RX +
+  SAI4 PDM RX reconciliation row), §14 (DCB-01b + DCB-02-R bullets
+  added), and §15 (`DeviceActiveDoubleBuf<DIR>` amendment entry).
+  This sub-letter is now historical record only.

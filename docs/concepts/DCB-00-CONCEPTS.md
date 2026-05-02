@@ -1,11 +1,13 @@
 # DCB-00 — DMA Cacheable Buffers Concepts
 
-**Status:** Ratified 2026-05-02 (§15). DCB-01 (typestate API in
-`rlvgl-platform`) is unblocked. Per the parent CLAUDE.md
-spec-before-code discipline, future modifications to the §5
-typestate set, §6 layout invariants, §8 engine submission contract,
-or §9 INV-D8..D13 require a §15 amendment **first**, in a separate
-PR, before any behaviour PR rides on the change.
+**Status:** Ratified 2026-05-02 (§15); amended 2026-05-02 with
+DCB-02-A resolution (DMA double-buffer-mode coverage). DCB-01
+(typestate API) is shipped; DCB-01b (`DeviceActiveDoubleBuf<DIR>`)
+unblocked. Per the parent CLAUDE.md spec-before-code discipline,
+future modifications to the §5 typestate set, §6 layout invariants,
+§8 engine submission contract, or §9 INV-D8..D13 require a §15
+amendment **first**, in a separate PR, before any behaviour PR
+rides on the change.
 
 ## 0. Authority policy
 
@@ -100,6 +102,10 @@ introduce drift and are forbidden in normative sections.
 | **Cache op** | One of the SCB primitives `clean_dcache_by_address` (CPU→device handoff), `invalidate_dcache_by_address` (device→CPU handoff), `clean_invalidate_dcache_by_address` (bidirectional handoff or unaligned-slice case). DCB owns *which* op is applied at *which* transition; user code does not choose. | DCB. |
 | **DcaBuf\<T, N\>** | The owning, cache-line-aligned, cache-line-padded buffer type. Lives in CPU-owned typestate at construction. Type parameters: element type `T`, element count `N`. Reborrows produce typestate-transitioned guards that consume / restore ownership. | DCB. |
 | **Half-guard** | The wait-free RAII handle returned when the CPU asks for the inactive half of a Device-active-circular buffer. Performs the cache op on entry (e.g. invalidate, for a device-writer ring) and revokes itself on drop / on next half toggle. | DCB. |
+| **DcaDoubleBuf\<T, N\>** | The owning, cache-line-aligned, cache-line-padded buffer family for **STM32 DMA double-buffer mode** (M0AR + M1AR alternating). Holds two `[T; N]` banks that MAY be physically non-contiguous. Each bank independently satisfies INV-D1 / INV-D2 / INV-D3. Distinct from `DcaBuf<T, N>` because the engine register layout (M0AR + M1AR + `CT` bit + `MBM` flag) is different from circular mode. | DCB. |
+| **Bank** | One of `M0` / `M1`; analogous to `Half` for the double-buffer-mode case. The DMA engine alternates which bank is the active write target (read target for TX-style direction); the CPU operates on the *inactive* bank. | DCB. |
+| **Bank-guard** | The RAII handle returned when the CPU asks for the inactive bank of a `DeviceActiveDoubleBuf<DIR>` buffer. Performs the cache op on entry (clean for `Read`, invalidate for `Write`) and revokes itself on drop. Live-recheck on `release(current_target)` reads the engine's `CT` bit to detect bank flip during the guard's lifetime — the double-buffer-mode analogue of `HalfGuard`'s NDTR re-read. | DCB. |
+| **CT bit (current target)** | Bit field in the STM32 DMA stream's `CR` register (bit 19 on H7) reporting which bank (M0 or M1) the engine is *currently* writing or reading. The single-read source-of-truth for `BankGuard::release`'s INV-D15 live-recheck. | RM0399 §15 (DMA). |
 | **MPU non-cacheable carve-out** | An alternative compliance path for buffers where per-frame cache maintenance is too expensive (LTDC scanout is the canonical case): an MPU region marks the buffer non-cacheable, and DCB's typestate becomes a no-op on that buffer. Covered in §10; not the default. | DCB. |
 
 ## 4. Source-of-truth map
@@ -166,6 +172,59 @@ from and writes to the same buffer. If a future consumer needs that
 shape (e.g. a chained M2M pipeline), the direction is added via §15
 amendment with a named first user.
 
+### Parallel family: `DcaDoubleBuf<T, N>` (DMA double-buffer mode)
+
+For consumers using **STM32 DMA double-buffer mode** (M0AR + M1AR
+alternating; engine never stops between banks), DCB exposes a
+parallel storage family with a parallel typestate set. Selection
+between `DcaBuf<T, N>` (circular) and `DcaDoubleBuf<T, N>`
+(double-buffer) is at construction and is mutually exclusive — a
+buffer family chooses one based on the engine's DMA mode and cannot
+switch.
+
+```text
+DcaDoubleBuf<T, N>            ─ owning storage; two physically-disjoint
+   │                            [T; N] banks; typestate is its current
+   │                            owner.
+   │
+   ├─ CpuOwned                ─ same shape as DcaBuf::CpuOwned. CPU may
+   │                            freely read and write either bank.
+   │
+   └─ DeviceActiveDoubleBuf<DIR> ─ DMA in continuous double-buffer
+         DIR ∈ {Read, Write}      transfer; engine alternates between
+                                  M0 and M1 on each TC.
+         Bank-guard API: bank_guard(current_target: Bank)
+                                  → BankGuard<DIR>
+            (BankGuard entry: clean (Read), invalidate (Write)
+             on the inactive bank — i.e. the bank the engine is
+             *not* currently servicing per the CT bit)
+            (BankGuard drop / release: re-read the engine's CT bit;
+             if it names the same bank the guard exposed, the
+             post-condition observation is a fault per §6 INV-D15:
+             panic in debug, return-error in release)
+```
+
+The transitions, with ownership rules, are frozen as:
+
+| From | To | Triggered by | Cache op inserted |
+|---|---|---|---|
+| `CpuOwned` | `DeviceActiveDoubleBuf<DIR>` | `buf.start_double_buffer(engine, DIR)` returning `DcaDoubleBuf<DeviceActiveDoubleBuf<DIR>>` | per-DIR initial op (clean for `Read`, invalidate for `Write`) over **both** banks |
+| `DeviceActiveDoubleBuf<DIR>` | `DeviceActiveDoubleBuf<DIR>` (BankGuard scope) | `buf.bank_guard(current_target)` returning `BankGuard<DIR>` | per-DIR op on the *inactive bank only* (`clean` for `Read`, `invalidate` for `Write`) |
+| `DeviceActiveDoubleBuf<DIR>` | `CpuOwned` | `buf.stop_double_buffer()` after engine-stop handshake | engine-DIR-dependent op over both banks (`clean` for `Read`, `invalidate` for `Write`) |
+
+`DcaDoubleBuf<T, N>` storage layout: each bank is independently
+`#[repr(C, align(32))]` with `[T; N_padded]` payload satisfying
+INV-D1 / INV-D2 / INV-D3 (per §6 INV-D14). The two banks MAY live
+at arbitrary disjoint addresses — wrapping pre-existing fixed-
+address buffers (e.g. `0x3000_0000` + `0x3000_1000` for SAI1 RX) is
+the supported construction path via an `unsafe fn from_addrs(m0,
+m1)` constructor.
+
+Like `DeviceActiveCirc<DIR>`, the `ReadWrite` direction is
+deliberately omitted; no engine drives M0/M1 with both directions
+simultaneously, and adding it would require a §15 amendment with a
+named first user.
+
 The transitions, with ownership rules, are frozen as:
 
 | From | To | Triggered by | Cache op inserted |
@@ -226,6 +285,30 @@ buffer overlaps. They are normative.
   observation is a hard error: panic in `debug_assertions`,
   return-an-error / set-fault-flag in release builds (the exact
   release-mode policy is settled in DCB-01a).
+- **INV-D14: `DcaDoubleBuf<T, N>` per-bank alignment / padding.**
+  Each of the two banks of a `DcaDoubleBuf<T, N>` MUST
+  independently satisfy INV-D1 (cache-line alignment) and INV-D2
+  (`size_of::<T>() * N` is a multiple of `CACHE_LINE`). The two
+  banks MAY live at arbitrary disjoint addresses; INV-D3 (no
+  cache-line sharing) applies independently within each bank,
+  and across the two banks even when they are non-adjacent. A
+  `DcaDoubleBuf::from_addrs(m0, m1)` constructor for fixed-
+  address banks asserts both bank addresses are cache-line
+  aligned; a `[m0_addr, m0_addr + bank_bytes)` /
+  `[m1_addr, m1_addr + bank_bytes)` extent must be cleanly
+  separated (no overlap), but the *gap between banks* is
+  unconstrained.
+- **INV-D15: Double-buffer DMA bank-ownership is enforced by the
+  engine's CT bit.** A `BankGuard<DIR>` for the inactive bank is
+  constructed from the *current* `CT` value read from the DMA
+  stream's `CR` register (bit 19 on STM32H7). The CT-based check
+  is the double-buffer-mode analogue of INV-D7's NDTR check, and
+  is strictly simpler: a single 32-bit register read disambiguates
+  active vs inactive bank with no half-mark math. If the engine
+  flips CT into the bank exposed by the guard during the guard's
+  lifetime, `BankGuard::release(current_target)` observation is a
+  hard error per the same release-mode policy as INV-D7
+  (`debug_assertions` → panic; release → return error).
 
 ## 7. Cross-core / multi-master scope
 
@@ -350,7 +433,8 @@ primitive. Consumer code follows the *Composition* column.
 | `audio_player.rs` private `clean_dcache(ptr, len)` (line 253) | **Replaces.** The audio-player TX buffer is a single-master DMA-read scenario with no special cache geometry. Becomes a `DcaBuf<i16, PLAYER_BUF_SAMPLES>` produced by an `AudioPlayer::lend_chunk_for_tx()` API that internally returns `DeviceReadPending`. The `static SCB`-bypass comment at `audio_player.rs:248` is resolved by the typestate API owning a single `&mut SCB` borrow at construction. | DCB-02b retrofit. Removes the private helper. |
 | `stm32h747i_disco_sd.rs` `Sd::clean_dcache_by_slice` / `invalidate_dcache_by_slice` (lines 35, 46) | **Replaces.** SDMMC R/W buffers become `DcaBuf<u8, BLOCK_BYTES>`. The W path lends `DeviceReadPending`; the R path lends `DeviceWritePending`. Cache-line-padded storage means the unaligned-slice rationale at `sd_emmc_adapter.rs:39` no longer applies (INV-D2 forces the multiple-of-line size), and the bidirectional `clean_invalidate` collapses to the directional op. | DCB-02c retrofit. |
 | `sd_emmc_adapter.rs` `clean_invalidate_dcache_by_address` (line 47) | **Replaces.** Same lifecycle as the `_disco_sd.rs` retrofit. The aligned-padded storage removes the original justification for the bidirectional op. | DCB-02c retrofit. |
-| DAA `analyzer-cm7/src/main.rs` SAI1 TX clean (current bench fix) | **Replaces (first user).** The SAI1 line-out TX ring becomes a `DcaBuf<i16, SAI1_TX_HALFWORDS, DeviceActiveCirc<Read>>`, and the per-half-fill code path becomes a `HalfGuard<Read>` whose construction takes the current `NDTR` and whose existence enforces "DMA is on the other half". The manual `clean_dcache_by_address` call disappears. SAI1 RX (the FFT input) similarly becomes `DeviceActiveCirc<Write>` with a `HalfGuard<Write>`. | DCB-02 retrofit, in the disco-analyzer subrepo. The `rlvgl-platform` API surface is added in DCB-01; the consumer migration in DCB-02 is the first proof point. |
+| DAA `analyzer-cm7/src/main.rs` SAI1 TX clean (current bench fix) | **Replaces.** The SAI1 line-out TX ring becomes a `DcaBuf<i16, SAI1_TX_BUF_HALFWORDS, DeviceActiveCirc<Read>>`, and the per-half-fill code path becomes a `HalfGuard<Read>` whose construction takes the current `NDTR` and whose existence enforces "DMA is on the other half". The manual `clean_dcache_by_address` call disappears. | DCB-02 retrofit, **shipped 2026-05-02** (disco-analyzer `c117a20`). The `rlvgl-platform` API surface lands in DCB-01 (`a56987b`). Bench-validation gate (§12 (b)) is hardware-flash + audio reproduction; pending. |
+| DAA `analyzer-audio/src/sai1_linein.rs` SAI1 RX invalidate (line 279) and SAI4 PDM RX (`sai4_pdm.rs`) | **Replaces.** Both RX paths use **STM32 DMA double-buffer mode** (M0AR + M1AR alternating) with non-contiguous physical banks. They become `DcaDoubleBuf<i16, SAI1_DMA_HALFWORDS>` (and equivalent for PDM) with `DeviceActiveDoubleBuf<Write>` + `BankGuard<Write>` per the parallel typestate family added by the DCB-02-A resolution. The manual `scb.invalidate_dcache_by_address` calls disappear; the bank-guard's entry op performs the invalidate and INV-D15's CT-bit re-check enforces "engine is on the other bank". | DCB-02-R retrofit. Lands after DCB-01b ships `DcaDoubleBuf` / `BankGuard<DIR>` / `DeviceActiveDoubleBuf<DIR>`. Future users: SDMMC streaming reads, USB HS bulk endpoints, DCMI camera frame-grab. |
 | DAA `analyzer-cm4` shared-memory cross-core regions (DAA-03 D3 SRAM4 pool) | **Out of scope.** Per §7. Cross-core blocks live in D3 SRAM4 which CM7 does not cache; DCB does not own them. | DAA-03 §7 / INV-D14 governs. |
 | Future SDMMC DMA, USB endpoint buffers, QSPI memory-mapped writes | **In scope; later phases.** Each peripheral's submission API gains a `DcaBuf` parameter when its DCB-NN retrofit phase lands. | Pending. |
 
@@ -466,17 +550,28 @@ Ratifying DCB-00 unblocks the following work:
   `rlvgl-platform`. Add the `raw_dcache` discipline rule with starting
   `BASELINE`. Compile-fail trybuild fixtures for the typestate
   transitions.
-- **DCB-02** — First user (disco-analyzer SAI1 RX + TX rings) on the
-  bench. Demonstrates the contract on the path that drove the
-  initiative. **Cross-repo timing dependency:** DCB-02 lands in the
-  `streamz/submodules/disco-analyzer` subrepo, not in this tree, and
-  consumes the DCB-01 API surface as a published `rlvgl-platform`
-  release. DCB-02 cannot land before DCB-01 publishes; conversely
-  DCB-01's acceptance gate (§12 (a)) does not block on DCB-02 — DCB-01
-  may publish with the `BASELINE` exemption list still populated. The
-  §12 (b) gate ratifies separately when disco-analyzer's bring-up
-  schedule allows. Coordinate with the DAA owner before scheduling
-  DCB-02; do not assume DCB-01 + DCB-02 land in lockstep.
+- **DCB-02** — First user: disco-analyzer SAI1 **TX** ring on the
+  bench. **Shipped 2026-05-02** as disco-analyzer commit `c117a20`
+  (combined with bench-9l foundation work). The manual
+  `scb.clean_dcache_by_address` in the SAI1 TX drain loop is
+  replaced by `HalfGuard<Read>`. Consumes the DCB-01 API surface
+  via a temporary local-path patch on `rlvgl-platform`; reverts to
+  the published version once DCB-01 publishes. Bench-validation
+  gate (§12 (b) — synth tone / live-mic reproduction) is
+  hardware-dependent and tracked separately.
+- **DCB-01b** — Land `DcaDoubleBuf<T, N>`, `Bank`, `BankGuard<DIR>`,
+  and the `DeviceActiveDoubleBuf<DIR>` typestate in
+  `platform/src/hwcore/dca.rs`. Add trybuild compile-fail fixtures
+  parallel to `dca_use_after_lend.rs` / `dca_double_lend.rs` /
+  `dca_half_guard_double.rs` covering the new typestate. No changes
+  to existing `DcaBuf` typestates. Unblocked by the 2026-05-02
+  DCB-02-A resolution amendment in §15.
+- **DCB-02-R** — Retrofit `Sai1LineInSource` (analyzer-audio) and
+  `Sai4PdmSource` onto `DcaDoubleBuf` + `BankGuard<Write>`.
+  Removes the manual `scb.invalidate_dcache_by_address` at
+  `sai1_linein.rs:279` and the equivalent in `sai4_pdm.rs`.
+  Bench-flash reproduces the current FFT / spectrum result with
+  the typestate API. Unblocked by DCB-01b.
 - **DCB-02b** — `audio_player.rs` retrofit; remove private
   `clean_dcache` helper.
 - **DCB-02c** — `stm32h747i_disco_sd.rs` + `sd_emmc_adapter.rs`
@@ -560,3 +655,63 @@ behaviour MAY land touching these surfaces until DCB-00 ratifies):
   §8 engine submission contract, or §9 INV-D8..D13 require a §15
   amendment **first**, in a separate PR, before any behaviour PR
   rides on the change.
+- **2026-05-02 — `DeviceActiveDoubleBuf<DIR>` amendment (DCB-02-A
+  resolution; Standards Action).** Adds the `DcaDoubleBuf<T, N>`
+  storage family, the `DeviceActiveDoubleBuf<DIR>` typestate (with
+  `DIR ∈ {Read, Write}`), and the `Bank` / `BankGuard<DIR>` types as
+  a parallel-and-mutually-exclusive sibling of `DcaBuf<T, N>` /
+  `DeviceActiveCirc<DIR>` / `HalfGuard<DIR>`. The two families
+  cover the two STM32 DMA continuous-transfer modes
+  (circular vs double-buffer M0AR+M1AR); a buffer chooses one at
+  construction and cannot switch.
+
+  Sections amended:
+  - §3 glossary: `DcaDoubleBuf<T, N>`, `Bank`, `Bank-guard`, `CT
+    bit (current target)` added. `Half-guard` row left unchanged.
+  - §5: new "Parallel family: `DcaDoubleBuf<T, N>`" subsection
+    after the `DeviceActiveCirc<DIR>` ASCII tree, with the
+    typestate diagram and a transition table parallel to the
+    `DcaBuf` table. The ratified `DcaBuf` transitions are
+    untouched.
+  - §6: INV-D14 (per-bank alignment / padding) and INV-D15
+    (CT-bit live-recheck) added. INV-D1..D13 untouched.
+  - §10: SAI1 RX + SAI4 PDM RX reconciliation row added; the
+    existing SAI1 TX row reworded to remove the obsolete
+    "RX similarly becomes DeviceActiveCirc<Write>" sentence and
+    to mark DCB-02 as shipped.
+  - §14: DCB-02 entry updated to reflect 2026-05-02 ship; new
+    DCB-01b (typestate API for DoubleBuf family) and DCB-02-R
+    (RX-side retrofit consuming DCB-01b) bullets added.
+
+  Motivation (DCB-02-A §3 / §4): SAI1 RX (and SAI4 PDM RX) use
+  STM32 DMA double-buffer mode with non-contiguous physical banks
+  (BUF0 at 0x3000_0000 + BUF1 at 0x3000_1000, 3 KiB gap), which
+  doesn't fit `HalfGuard<DIR>`'s contiguous-halves assumption.
+  `BankGuard<DIR>` mirrors `HalfGuard<DIR>` but reads the engine's
+  `CT` bit directly (RM0399 §15) for the live-recheck, which is
+  strictly simpler than NDTR-based half-mark math and unambiguous
+  in double-buffer mode. Multiple known consumers (SAI1 RX, SAI4
+  PDM RX today; SDMMC streaming, USB HS bulk, DCMI camera
+  frame-grab likely) amortise the new API surface (~200
+  implementation lines).
+
+  Options enumerated and rejected in DCB-02-A §3: (B) linker-
+  coerce buffers contiguous → doesn't generalise, leaves CT-vs-
+  NDTR mismatch; (C) one-shot DeviceWritePending per bank → typestate
+  would falsely claim engine-off during Cpu-owned phases of a
+  continuous transfer; (D) permanent BASELINE entry → hollows out
+  INV-D9.
+
+  This is a Standards Action *addition* to §5; no existing
+  typestate or invariant is modified. INV-D9 ("New DMA buffers
+  MUST use `DcaBuf`") is read by reference as also-applies-to
+  `DcaDoubleBuf<T, N>` for the double-buffer-mode case; the
+  scanner rule `raw_dcache` already covers both code paths
+  because the matched calls (SCB d-cache APIs) are direction-
+  independent. No `BASELINE` change is required by this
+  amendment.
+
+  DCB-01b is now unblocked. DCB-02-R is unblocked once DCB-01b
+  ships. The DCB-02-A sub-letter analysis at
+  `docs/concepts/DCB-02-A.md` is preserved as historical record;
+  its decision has folded into this entry.
