@@ -44,6 +44,12 @@ disco-analyzer subrepo's first concepts doc).
   - [DCB-00-CONCEPTS.md](DCB-00-CONCEPTS.md) — foundational
     vocabulary, frozen typestate, invariants, source-of-truth map.
     **Ratified 2026-05-02 (§15); DCB-01 unblocked.**
+  - [DCB-02-A.md](DCB-02-A.md) — sub-letter analysis surfaced
+    during DCB-02 TX retrofit. Proposes a
+    `DeviceActiveDoubleBuf<DIR>` typestate amendment (Standards
+    Action) so DMA double-buffer-mode consumers (SAI1 RX, SAI4
+    PDM RX, future SDMMC / USB streaming) fit the type system.
+    **Drafted 2026-05-02; awaiting DCB-00 §15 ratification.**
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
