@@ -667,6 +667,415 @@ pub struct HalfGuardOverrun {
     pub half: Half,
 }
 
+// ── DcaDoubleBuf storage (DMA double-buffer mode) ──────────────────────
+
+/// Identifies which bank of a double-buffer-mode DMA buffer is the
+/// engine's *current target* (or, conversely, which bank is inactive
+/// and safe for CPU access via a [`BankGuard`]).
+///
+/// Maps to the STM32 DMA `CR.CT` bit (bit 19 on H7): `M0` ↔ `CT=0`,
+/// `M1` ↔ `CT=1`. Per DCB-00 §6 INV-D15 the bit is the source-of-truth
+/// for `BankGuard::release` live-recheck.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Bank {
+    /// First bank (programmed into the DMA stream's `M0AR` register).
+    M0,
+    /// Second bank (programmed into the DMA stream's `M1AR` register).
+    M1,
+}
+
+/// Owning handle for **STM32 DMA double-buffer mode** storage: a pair
+/// of cache-line-aligned, cache-line-padded banks of `[T; N]`.
+///
+/// The two banks MAY live at arbitrary disjoint addresses (DCB-00 §6
+/// INV-D14): the typical embedded use is `from_addrs(m0_addr, m1_addr)`
+/// wrapping pre-existing fixed-address regions (e.g. SAI1 RX banks at
+/// `0x3000_0000` + `0x3000_1000`). Host tests use [`DcaDoubleBuf::new`]
+/// over two stack-allocated [`DcaBuf`]s.
+///
+/// Distinct from [`DcaBuf`] because the engine register layout (M0AR +
+/// M1AR + `CT` bit + `MBM` flag) is different from circular mode. A
+/// buffer family chooses one or the other at construction and cannot
+/// switch — see DCB-00 §5 "Parallel family: `DcaDoubleBuf<T, N>`".
+pub struct DcaDoubleBuf<'b, T: Copy, const N: usize> {
+    m0: &'b mut DcaBuf<T, N>,
+    m1: &'b mut DcaBuf<T, N>,
+}
+
+impl<'b, T: Copy, const N: usize> DcaDoubleBuf<'b, T, N> {
+    /// Wrap two pre-existing [`DcaBuf`]s as the M0 / M1 banks.
+    ///
+    /// The borrow checker enforces that no other access path to either
+    /// bank exists for the lifetime of the returned `DcaDoubleBuf`.
+    /// Host tests use this; embedded code typically uses
+    /// [`DcaDoubleBuf::from_addrs`].
+    #[inline]
+    pub fn new(m0: &'b mut DcaBuf<T, N>, m1: &'b mut DcaBuf<T, N>) -> Self {
+        Self { m0, m1 }
+    }
+
+    /// Take ownership of this storage as a CPU-owned typestate handle.
+    #[inline]
+    pub fn cpu(&mut self) -> DbufCpu<'_, 'b, T, N> {
+        DbufCpu { buf: self }
+    }
+}
+
+impl<T: Copy, const N: usize> DcaDoubleBuf<'static, T, N> {
+    /// Construct from two fixed bank addresses with `'static` lifetime.
+    ///
+    /// Both addresses are reinterpreted as `&'static mut DcaBuf<T, N>`;
+    /// the typical embedded use case is wrapping pre-existing fixed-
+    /// address DMA buffers (e.g. `0x3000_0000` and `0x3000_1000` for
+    /// SAI1 RX banks BUF0 and BUF1).
+    ///
+    /// # Safety
+    ///
+    /// The caller MUST ensure that:
+    ///
+    /// - both `m0_addr` and `m1_addr` name disjoint, mapped, writable
+    ///   RAM regions of `size_of::<DcaBuf<T, N>>()` bytes each, valid
+    ///   for `'static`,
+    /// - the two regions do not overlap each other and share no cache
+    ///   line with each other or with any other `DcaBuf` /
+    ///   `DcaDoubleBuf` (INV-D3 / INV-D14),
+    /// - both addresses are aligned to [`CACHE_LINE`] (32 bytes) — the
+    ///   `#[repr(C, align(32))]` requirement on `DcaBuf<T, N>`,
+    /// - no other `&mut` to overlapping bytes exists for `'static`,
+    /// - `from_addrs` is called *at most once* per pair of addresses;
+    ///   producing two `DcaDoubleBuf<'static, T, N>` instances over
+    ///   the same physical regions would alias the underlying
+    ///   `&'static mut`.
+    pub unsafe fn from_addrs(m0_addr: usize, m1_addr: usize) -> Self {
+        debug_assert!(
+            m0_addr.is_multiple_of(CACHE_LINE),
+            "DcaDoubleBuf::from_addrs: m0_addr must be cache-line aligned (INV-D14)",
+        );
+        debug_assert!(
+            m1_addr.is_multiple_of(CACHE_LINE),
+            "DcaDoubleBuf::from_addrs: m1_addr must be cache-line aligned (INV-D14)",
+        );
+        debug_assert!(
+            m0_addr != m1_addr,
+            "DcaDoubleBuf::from_addrs: m0_addr and m1_addr must be distinct",
+        );
+        // SAFETY: caller contract — addresses name disjoint, mapped,
+        // exclusive `'static` regions of `DcaBuf<T, N>` size and
+        // alignment.
+        let m0 = unsafe { &mut *(m0_addr as *mut DcaBuf<T, N>) };
+        // SAFETY: as above.
+        let m1 = unsafe { &mut *(m1_addr as *mut DcaBuf<T, N>) };
+        Self { m0, m1 }
+    }
+}
+
+// ── DbufCpu typestate ──────────────────────────────────────────────────
+
+/// CPU-owned typestate handle for a [`DcaDoubleBuf`].
+///
+/// Per DCB-00 §3 / §5: the CPU may freely read and write either bank;
+/// no DMA master is reading or writing them. Cache state is
+/// unconstrained — the CPU's view is authoritative.
+pub struct DbufCpu<'a, 'b, T: Copy, const N: usize> {
+    buf: &'a mut DcaDoubleBuf<'b, T, N>,
+}
+
+impl<'a, 'b, T: Copy, const N: usize> DbufCpu<'a, 'b, T, N> {
+    /// Read-only view of the M0 bank.
+    #[inline]
+    pub fn as_m0_slice(&self) -> &[T; N] {
+        // SAFETY: typestate DbufCpu holds `&mut DcaDoubleBuf` which
+        // itself holds `&mut DcaBuf` for each bank — no other borrow
+        // of the storage exists for `self`'s lifetime.
+        unsafe { &*self.buf.m0.storage.get() }
+    }
+
+    /// Read-only view of the M1 bank.
+    #[inline]
+    pub fn as_m1_slice(&self) -> &[T; N] {
+        // SAFETY: as above.
+        unsafe { &*self.buf.m1.storage.get() }
+    }
+
+    /// Mutable view of the M0 bank.
+    #[inline]
+    pub fn as_m0_mut_slice(&mut self) -> &mut [T; N] {
+        // SAFETY: as above; `&mut self` is the unique borrow.
+        unsafe { &mut *self.buf.m0.storage.get() }
+    }
+
+    /// Mutable view of the M1 bank.
+    #[inline]
+    pub fn as_m1_mut_slice(&mut self) -> &mut [T; N] {
+        // SAFETY: as above.
+        unsafe { &mut *self.buf.m1.storage.get() }
+    }
+
+    /// DMA bus address of the M0 bank (program into the engine's `M0AR`).
+    #[inline]
+    pub fn m0_dma_addr(&self) -> DmaAddr {
+        self.buf.m0.dma_addr()
+    }
+
+    /// DMA bus address of the M1 bank (program into the engine's `M1AR`).
+    #[inline]
+    pub fn m1_dma_addr(&self) -> DmaAddr {
+        self.buf.m1.dma_addr()
+    }
+
+    /// Transition to [`DbufRead`] (DMA reads RAM, CPU is producer).
+    ///
+    /// Cache op (DCB-00 §5 transition table): `clean_dcache_by_address`
+    /// over **both** banks (CPU may have pre-filled either bank before
+    /// arming).
+    pub fn start_double_buffer_read<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+    ) -> DbufRead<'a, 'b, T, N> {
+        let m0_addr = self.buf.m0.addr_usize();
+        let m1_addr = self.buf.m1.addr_usize();
+        let len = self.buf.m0.byte_len();
+        ctx.cache.clean(m0_addr, len);
+        ctx.cache.clean(m1_addr, len);
+        DbufRead { buf: self.buf }
+    }
+
+    /// Transition to [`DbufWrite`] (DMA writes RAM, CPU is consumer).
+    ///
+    /// Cache op (DCB-00 §5 transition table): `invalidate_dcache_by_address`
+    /// over **both** banks so the CPU's first read after the first
+    /// bank flip observes DMA-written data.
+    pub fn start_double_buffer_write<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+    ) -> DbufWrite<'a, 'b, T, N> {
+        let m0_addr = self.buf.m0.addr_usize();
+        let m1_addr = self.buf.m1.addr_usize();
+        let len = self.buf.m0.byte_len();
+        ctx.cache.invalidate(m0_addr, len);
+        ctx.cache.invalidate(m1_addr, len);
+        DbufWrite { buf: self.buf }
+    }
+}
+
+// ── DbufRead / DbufWrite + BankGuard ──────────────────────────────────
+
+/// Continuous DMA-read typestate handle for double-buffer mode.
+///
+/// The DMA engine reads M0 and M1 alternately in continuous transfer.
+/// The CPU is the producer and may fill the *inactive* bank through a
+/// [`BankGuard<Read, _, _>`] obtained from [`DbufRead::bank_guard`].
+pub struct DbufRead<'a, 'b, T: Copy, const N: usize> {
+    buf: &'a mut DcaDoubleBuf<'b, T, N>,
+}
+
+impl<'a, 'b, T: Copy, const N: usize> DbufRead<'a, 'b, T, N> {
+    /// DMA bus address of the M0 bank (stable for the typestate's
+    /// lifetime).
+    #[inline]
+    pub fn m0_dma_addr(&self) -> DmaAddr {
+        self.buf.m0.dma_addr()
+    }
+
+    /// DMA bus address of the M1 bank.
+    #[inline]
+    pub fn m1_dma_addr(&self) -> DmaAddr {
+        self.buf.m1.dma_addr()
+    }
+
+    /// Acquire a guard over the inactive bank.
+    ///
+    /// `current_target` names the bank the engine is **currently**
+    /// servicing (read from the stream's `CT` bit). The guard exposes
+    /// the *opposite* bank.
+    ///
+    /// Cache op for [`Read`] direction: [`DcaCache::clean`] over the
+    /// inactive bank's full extent so the DMA engine's next pass over
+    /// that bank sees CPU-written data.
+    pub fn bank_guard<'g, C: DcaCache>(
+        &'g mut self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+        current_target: Bank,
+    ) -> BankGuard<'g, Read, T, N> {
+        let exposed_bank = inactive_bank(current_target);
+        let exposed = match exposed_bank {
+            Bank::M0 => &mut *self.buf.m0,
+            Bank::M1 => &mut *self.buf.m1,
+        };
+        let addr = exposed.addr_usize();
+        let len = exposed.byte_len();
+        ctx.cache.clean(addr, len);
+        BankGuard {
+            bank_storage: exposed,
+            bank: exposed_bank,
+            _dir: PhantomData,
+        }
+    }
+
+    /// Stop the double-buffer transfer and transition back to
+    /// [`DbufCpu`].
+    ///
+    /// Caller MUST stop the engine before calling. Cache op:
+    /// [`DcaCache::clean`] over both banks.
+    pub fn stop_double_buffer<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+    ) -> DbufCpu<'a, 'b, T, N> {
+        let m0_addr = self.buf.m0.addr_usize();
+        let m1_addr = self.buf.m1.addr_usize();
+        let len = self.buf.m0.byte_len();
+        ctx.cache.clean(m0_addr, len);
+        ctx.cache.clean(m1_addr, len);
+        DbufCpu { buf: self.buf }
+    }
+}
+
+/// Continuous DMA-write typestate handle for double-buffer mode.
+///
+/// The DMA engine writes M0 and M1 alternately. The CPU is the
+/// consumer and may drain the *inactive* bank through a
+/// [`BankGuard<Write, _, _>`].
+pub struct DbufWrite<'a, 'b, T: Copy, const N: usize> {
+    buf: &'a mut DcaDoubleBuf<'b, T, N>,
+}
+
+impl<'a, 'b, T: Copy, const N: usize> DbufWrite<'a, 'b, T, N> {
+    /// DMA bus address of the M0 bank.
+    #[inline]
+    pub fn m0_dma_addr(&self) -> DmaAddr {
+        self.buf.m0.dma_addr()
+    }
+
+    /// DMA bus address of the M1 bank.
+    #[inline]
+    pub fn m1_dma_addr(&self) -> DmaAddr {
+        self.buf.m1.dma_addr()
+    }
+
+    /// Acquire a guard over the inactive bank.
+    ///
+    /// Cache op for [`Write`] direction: [`DcaCache::invalidate`] over
+    /// the inactive bank's full extent so the CPU's next read of that
+    /// bank observes DMA-written data.
+    pub fn bank_guard<'g, C: DcaCache>(
+        &'g mut self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+        current_target: Bank,
+    ) -> BankGuard<'g, Write, T, N> {
+        let exposed_bank = inactive_bank(current_target);
+        let exposed = match exposed_bank {
+            Bank::M0 => &mut *self.buf.m0,
+            Bank::M1 => &mut *self.buf.m1,
+        };
+        let addr = exposed.addr_usize();
+        let len = exposed.byte_len();
+        ctx.cache.invalidate(addr, len);
+        BankGuard {
+            bank_storage: exposed,
+            bank: exposed_bank,
+            _dir: PhantomData,
+        }
+    }
+
+    /// Stop the double-buffer transfer and transition back to
+    /// [`DbufCpu`].
+    pub fn stop_double_buffer<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+    ) -> DbufCpu<'a, 'b, T, N> {
+        let m0_addr = self.buf.m0.addr_usize();
+        let m1_addr = self.buf.m1.addr_usize();
+        let len = self.buf.m0.byte_len();
+        ctx.cache.invalidate(m0_addr, len);
+        ctx.cache.invalidate(m1_addr, len);
+        DbufCpu { buf: self.buf }
+    }
+}
+
+/// RAII guard for inactive-bank access in a double-buffer DMA transfer.
+///
+/// Holds an `&'g mut` reborrow of one bank's [`DcaBuf`], obtained by
+/// reborrowing through the parent [`DbufRead`] / [`DbufWrite`]. A
+/// second concurrent `bank_guard` call is rejected by the borrow
+/// checker until this guard is dropped.
+///
+/// The `DIR` parameter is one of [`Read`] / [`Write`] and selects
+/// which cache op was emitted at construction (DCB-00 §5 transition
+/// row for `DeviceActiveDoubleBuf<DIR>` BankGuard).
+pub struct BankGuard<'a, DIR, T: Copy, const N: usize> {
+    bank_storage: &'a mut DcaBuf<T, N>,
+    bank: Bank,
+    _dir: PhantomData<DIR>,
+}
+
+impl<'a, DIR, T: Copy, const N: usize> BankGuard<'a, DIR, T, N> {
+    /// Read-only view of the guarded bank.
+    #[inline]
+    pub fn as_slice(&self) -> &[T; N] {
+        // SAFETY: guard borrows the parent DbufRead/DbufWrite mutably,
+        // which itself holds `&mut DcaDoubleBuf` (and through it
+        // `&mut DcaBuf` for each bank) — no other access path to this
+        // bank exists for `self`'s lifetime.
+        unsafe { &*self.bank_storage.storage.get() }
+    }
+
+    /// Mutable view of the guarded bank.
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [T; N] {
+        // SAFETY: as above; `&mut self` is the unique borrow.
+        unsafe { &mut *self.bank_storage.storage.get() }
+    }
+
+    /// Which bank this guard exposes.
+    #[inline]
+    pub fn bank(&self) -> Bank {
+        self.bank
+    }
+
+    /// Release the guard with a CT-bit checkpoint (DCB-00 §6 INV-D15).
+    ///
+    /// `current_target` is the bank the DMA engine is **currently**
+    /// servicing per the latest read of the stream's `CT` bit. If the
+    /// engine has flipped CT into the bank this guard exposes (i.e.
+    /// `current_target == self.bank`), the post-condition check fires:
+    /// `panic!` in `debug_assertions` builds, error return in release
+    /// builds.
+    pub fn release(self, current_target: Bank) -> Result<(), BankGuardOverrun> {
+        if current_target == self.bank {
+            #[cfg(debug_assertions)]
+            {
+                panic!(
+                    "DCB BankGuard overrun: DMA flipped CT into the inactive bank ({:?}) during the guard's lifetime; INV-D15 violated. Stream is faster than the CPU consumer/producer.",
+                    self.bank
+                );
+            }
+            #[cfg(not(debug_assertions))]
+            {
+                return Err(BankGuardOverrun { bank: self.bank });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Error returned by [`BankGuard::release`] in release builds when the
+/// DMA engine flipped its `CT` bit into the guarded bank during the
+/// guard's lifetime — INV-D15 violation.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct BankGuardOverrun {
+    /// The bank the guard exposed at construction.
+    pub bank: Bank,
+}
+
+/// Internal helper: the inactive bank, given the current target.
+#[inline]
+const fn inactive_bank(current_target: Bank) -> Bank {
+    match current_target {
+        Bank::M0 => Bank::M1,
+        Bank::M1 => Bank::M0,
+    }
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────
 
 /// Compute (addr, len) of one half of a `DcaBuf<T, N>` starting at
@@ -852,6 +1261,157 @@ mod tests {
             Err(HalfGuardOverrun {
                 half: Half::Second
             })
+        );
+    }
+
+    // ── DcaDoubleBuf (DCB-01b) ─────────────────────────────────────────
+
+    type DbBank = DcaBuf<i16, 16>;
+
+    #[test]
+    fn dbufcpu_round_trip_through_active_double_buffer_write() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = dca.cpu();
+        let active = cpu.start_double_buffer_write(&mut ctx);
+        let _cpu_back = active.stop_double_buffer(&mut ctx);
+    }
+
+    #[test]
+    fn dbufcpu_can_read_and_write_either_bank() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cpu = dca.cpu();
+        cpu.as_m0_mut_slice()[3] = 42;
+        cpu.as_m1_mut_slice()[7] = 99;
+        assert_eq!(cpu.as_m0_slice()[3], 42);
+        assert_eq!(cpu.as_m1_slice()[7], 99);
+    }
+
+    #[test]
+    fn dbufcpu_dma_addrs_are_distinct_and_aligned() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let cpu = dca.cpu();
+        let a0 = cpu.m0_dma_addr().raw() as usize;
+        let a1 = cpu.m1_dma_addr().raw() as usize;
+        assert_eq!(a0 % CACHE_LINE, 0);
+        assert_eq!(a1 % CACHE_LINE, 0);
+        assert_ne!(a0, a1, "M0 / M1 must address distinct memory");
+    }
+
+    #[test]
+    fn start_double_buffer_read_cleans_both_banks() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cache = NullCache::default();
+        {
+            let mut ctx = DcaCacheCtx::new(&mut cache);
+            let cpu = dca.cpu();
+            let active = cpu.start_double_buffer_read(&mut ctx);
+            let _ = active.stop_double_buffer(&mut ctx);
+        }
+        // The last operation observed by the cache during start_*_read
+        // is the *second* clean (M1). The first clean (M0) was overwritten.
+        // Accept either; both must be `Clean`.
+        assert!(matches!(cache.last, Some(NullCacheOp::Clean(_, 32))));
+    }
+
+    #[test]
+    fn start_double_buffer_write_invalidates_both_banks() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cache = NullCache::default();
+        {
+            let mut ctx = DcaCacheCtx::new(&mut cache);
+            let cpu = dca.cpu();
+            let active = cpu.start_double_buffer_write(&mut ctx);
+            let _ = active.stop_double_buffer(&mut ctx);
+        }
+        assert!(matches!(cache.last, Some(NullCacheOp::Invalidate(_, 32))));
+    }
+
+    #[test]
+    fn dbuf_read_bank_guard_emits_clean_on_inactive_bank() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let m0_addr = (&raw const m0) as usize;
+        let m1_addr = (&raw const m1) as usize;
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = dca.cpu();
+        let mut active = cpu.start_double_buffer_read(&mut ctx);
+        // Engine currently on M0 → inactive bank is M1.
+        let mut guard = active.bank_guard(&mut ctx, Bank::M0);
+        assert_eq!(guard.bank(), Bank::M1);
+        guard.as_mut_slice()[0] = 0xAB;
+        // Confirm cache op was a Clean over M1's extent (32 bytes).
+        let last = ctx.cache_mut().last.unwrap();
+        match last {
+            NullCacheOp::Clean(addr, len) => {
+                assert_eq!(len, 32);
+                assert_eq!(addr, m1_addr, "expected M1 (inactive) cleaned");
+                assert_ne!(addr, m0_addr);
+            }
+            other => panic!("expected Clean, got {other:?}"),
+        }
+        // Engine still on M0 — release OK.
+        guard.release(Bank::M0).unwrap();
+    }
+
+    #[test]
+    fn dbuf_write_bank_guard_emits_invalidate_on_inactive_bank() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let m0_addr = (&raw const m0) as usize;
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = dca.cpu();
+        let mut active = cpu.start_double_buffer_write(&mut ctx);
+        // Engine currently on M1 → inactive bank is M0.
+        let guard = active.bank_guard(&mut ctx, Bank::M1);
+        assert_eq!(guard.bank(), Bank::M0);
+        let last = ctx.cache_mut().last.unwrap();
+        match last {
+            NullCacheOp::Invalidate(addr, len) => {
+                assert_eq!(len, 32);
+                assert_eq!(addr, m0_addr, "expected M0 (inactive) invalidated");
+            }
+            other => panic!("expected Invalidate, got {other:?}"),
+        }
+        guard.release(Bank::M1).unwrap();
+    }
+
+    #[test]
+    fn inactive_bank_swaps_correctly() {
+        assert_eq!(inactive_bank(Bank::M0), Bank::M1);
+        assert_eq!(inactive_bank(Bank::M1), Bank::M0);
+    }
+
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn bank_guard_release_returns_err_on_overrun_in_release() {
+        let mut m0 = DbBank::new([0; 16]);
+        let mut m1 = DbBank::new([0; 16]);
+        let mut dca = DcaDoubleBuf::new(&mut m0, &mut m1);
+        let mut cache = NullCache::default();
+        let mut ctx = DcaCacheCtx::new(&mut cache);
+        let cpu = dca.cpu();
+        let mut active = cpu.start_double_buffer_read(&mut ctx);
+        let guard = active.bank_guard(&mut ctx, Bank::M0);
+        // Guard exposes M1; engine flipped CT into M1 → overrun.
+        assert_eq!(
+            guard.release(Bank::M1),
+            Err(BankGuardOverrun { bank: Bank::M1 })
         );
     }
 }
