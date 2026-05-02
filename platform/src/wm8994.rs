@@ -136,6 +136,12 @@ const REG_FLL1_CTRL_5: u16 = 0x0224;
 const REG_AIF1_CONTROL_1: u16 = 0x0300;
 const REG_AIF1_CONTROL_2: u16 = 0x0301;
 const REG_AIF1_MASTER_SLAVE: u16 = 0x0302;
+// AIF1 ADC LRCLK control (bit 11 = AIF1ADC_LRCLK_DIR — slave-mode enable
+// for the ADC LRCLK reception path; bits 10:0 = AIF1ADC_RATE).
+const REG_AIF1_ADC_LRCLK: u16 = 0x0304;
+// AIF1 DAC LRCLK control (bit 11 = AIF1DAC_LRCLK_DIR — slave-mode enable
+// for the DAC LRCLK reception path; bits 10:0 = AIF1DAC_RATE).
+const REG_AIF1_DAC_LRCLK: u16 = 0x0305;
 
 // AIF1 ADC volume + filters (record path)
 const REG_AIF1_ADC1_L_VOL: u16 = 0x0400;
@@ -614,6 +620,28 @@ where
         // Final: 0x4010.
         self.write_reg(REG_AIF1_CONTROL_1, 0x4010)?;
         self.write_reg(REG_AIF1_MASTER_SLAVE, 0x0000)?; // codec is slave
+
+        // R0x304 AIF1 ADC LRCLK and R0x305 AIF1 DAC LRCLK.
+        // Bit 11 = AIF1{ADC,DAC}_LRCLK_DIR — must be set in SLAVE mode
+        // to enable the codec to *receive* the external LRCLK1 from the
+        // SAI1 master. Without these bits the codec ignores LRCLK1
+        // entirely, never knows where slot boundaries fall, and never
+        // shifts ADC data out on AIF1ADCDAT (= MCU PE3) — pin reads
+        // 0 forever, RX captures all-zero halfwords. AIF1CLK / SYSCLK
+        // / FLL1 still lock from BCLK1, so codec-internal sidetone
+        // (analog → ADC1 → DSP → DAC1 → analog) appears to work,
+        // masking the problem until the AIF1 digital path is exercised.
+        // Multi-session bench debug 2026-04-30 → 2026-05-01.
+        //
+        // Bits 10:0 = AIF1{ADC,DAC}_RATE: BCLK1 / LRCLK1 ratio used by
+        // the codec to derive its internal SR-dependent filters.
+        // 0x040 = 64 — matches a 32-BCLK-per-stereo-frame layout
+        // padded internally to 32-bit slots, codec reset default.
+        // Keep the rate field at 0x040 and OR in bit 11 (LRCLK_DIR
+        // slave-mode enable). Final value = 0x0840.
+        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0840; // bit 11 + AIF1xxx_RATE = 64
+        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
+        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
 
         // R0x210 AIF1 Rate. Per WM8994_Rev4.6.pdf p.194 Tables 105+106:
         //   bits 7:4 AIF1_SR — sample-rate code (0x0=8k..0xA=96k)
