@@ -61,16 +61,18 @@ disco-analyzer subrepo's first concepts doc).
     **Resolved 2026-05-02 — Option A ratified into DCB-00
     §3/§5/§6/§10/§14/§15. DCB-01c + DCB-04 unblocked.**
   - [DCB-03-A.md](DCB-03-A.md) — sub-letter analysis on the
-    DMA2D destination retrofit. Documents that DMA2D
+    DMA2D destination retrofit. Documented that DMA2D
     destinations on the disco target all live in MPU-Write-
     Through SDRAM, so the §10-prescribed cache discipline
     emits no-op runtime ops; the §10 row's value is forward-
     looking design hygiene rather than a fix for an observed
-    bug. Recommends Option C (close DCB-03 as deferred; future
+    bug. Proposed Option C (close DCB-03 as deferred; future
     non-Write-Through consumers route through `DcaCacheCtx`
     per the DCB-02c / DCB-04 pattern, or reopen DCB-03-B with
     a named first user).
-    **Drafted 2026-05-02; awaiting DCB-00 §15 ratification.**
+    **Resolved 2026-05-02 — Option C ratified into DCB-00
+    §10/§14/§15 with normative Reopen triggers; the
+    initiative's BASELINE-shrink track ends at DCB-04.**
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

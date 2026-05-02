@@ -2,14 +2,15 @@
 
 **Status:** Ratified 2026-05-02 (§15); amended 2026-05-02 with
 DCB-02-A resolution (DMA double-buffer-mode coverage); amended
-2026-05-02 with DCB-04-A resolution (LTDC scanout typestate).
-DCB-01 (typestate API) and DCB-01b (`DeviceActiveDoubleBuf<DIR>`)
-are shipped; DCB-01c (`DeviceLtdcScan<T, N>`) is unblocked. Per
-the parent CLAUDE.md spec-before-code discipline, future
-modifications to the §5 typestate set, §6 layout invariants, §8
-engine submission contract, or §9 INV-D8..D13 require a §15
-amendment **first**, in a separate PR, before any behaviour PR
-rides on the change.
+2026-05-02 with DCB-04-A resolution (LTDC scanout typestate);
+amended 2026-05-02 with DCB-03-A resolution (DMA2D destination
+retrofit closed-with-deferral). DCB-01 / DCB-01b / DCB-01c
+typestate APIs are shipped; the BASELINE-shrink track ends at
+DCB-04. Per the parent CLAUDE.md spec-before-code discipline,
+future modifications to the §5 typestate set, §6 layout
+invariants, §8 engine submission contract, or §9 INV-D8..D13
+require a §15 amendment **first**, in a separate PR, before any
+behaviour PR rides on the change.
 
 ## 0. Authority policy
 
@@ -510,7 +511,7 @@ primitive. Consumer code follows the *Composition* column.
 
 | Adjacent primitive | DCB relationship | Composition |
 |---|---|---|
-| `BackBuffer<'a>` / `BorrowedForDma<'dma, T>` / `InFlight<'dma, T>` (Register-Mashing rule #3) | **Extends.** `BackBuffer` represents a framebuffer in *any* memory; `DcaBuf<u8, FB_BYTES>` represents a cacheable framebuffer with cache-state ownership. A DMA2D destination becomes a `DcaBuf` *containing* the framebuffer pixels, with `BackBuffer` as the format/geometry view. The DMA2D `start_*_typed` API takes `DcaBuf<u8, FB_BYTES, CpuOwned>` and a `BorrowedForDma<'dma, BackBuffer<'fb>>`, and returns `InFlight<'dma, BackBuffer<'fb>>` whose Drop releases the cache typestate back to `CpuOwned`. (Concrete refactor lands in DCB-03.) | DMA2D consumers continue to call `start_fill_typed` etc.; the type signatures gain a `DcaBuf` parameter. The borrow-checker integration is unchanged. |
+| `BackBuffer<'a>` / `BorrowedForDma<'dma, T>` / `InFlight<'dma, T>` (Register-Mashing rule #3) | **Closed-with-deferral (DCB-03-A 2026-05-02).** The originally-prescribed shape — "DMA2D destination becomes a `DcaBuf` *containing* the framebuffer pixels, with `BackBuffer` as the format/geometry view; `start_*_typed` takes `DcaBuf<u8, FB_BYTES, CpuOwned>` and returns an `InFlight` whose Drop releases the cache typestate" — remains the correct shape *if and when* a non-Write-Through DMA2D destination materializes. On the only platform that currently uses DMA2D (STM32H7 disco), every destination buffer lives in MPU-Write-Through SDRAM (`platform/src/stm32h747i_disco.rs:1322`); the `lend_for_write` runtime cache op would be a functional no-op. The §10 prescription is preserved here as design hygiene; until a consumer needs it the existing `BackBuffer` / `BorrowedForDma` / `InFlight` chain (Register-Mashing rule #3) is grandfathered, and INV-D9 ("new DMA buffers MUST use DcaBuf") is read as "new DMA buffers in *new* DMA paths". **Reopen triggers** — any of the following warrants a DCB-03-B sub-letter analysis with a named first user: (a) a new DMA2D destination in cacheable RAM that is NOT MPU-Write-Through (D1 SRAM scratch, AXI SRAM tile cache, glyph atlas in cacheable region, M2M-only buffer pairs that stay off-screen); (b) a port to a chip / board where SDRAM is not pre-MPU-configured Write-Through (any non-disco platform, or a future H7 bring-up that disables Write-Through for bus-utilization reasons); (c) the SDRAM Write-Through configuration in `configure_mpu_sdram_writethrough` is itself revised (e.g. switched to Normal Write-Back). | Existing DMA2D consumers continue to call `start_fill_typed` / `start_blit_typed` unchanged. Future consumers in non-Write-Through cacheable RAM route through `DcaCacheCtx::cache.invalidate(...)` per the DCB-02c / DCB-04 trait-dispatch pattern, *or* land DCB-03-B with the named first user. |
 | `Scanout` (LTDC double-buffer) | **Decision deferred to DCB-04.** LTDC continuously reads the front buffer at frame rate; per-frame cache ops are expensive. Two options, **structurally distinct, not equivalent alternatives**: (a) keep the front buffer cacheable, wrap it in `DcaBuf<..., DeviceActiveCirc<Read>>`, and clean only the dirty rectangle on present — DCB ownership and cache discipline apply at runtime; (b) MPU-mark the scanout pair non-cacheable and use `DcaBuf::in_uncached_region` — DCB ownership still applies but cache ops elide *at construction*, and the MPU table becomes part of the platform's frozen memory map. Option (b) trades runtime cost for static-config rigidity (every consumer of the front buffer must accept non-cacheable read latency); option (a) keeps the buffer cacheable for incidental CPU reads (screenshots, FB dumps) at the cost of per-frame maintenance. DCB-00 §11 lists this as a non-goal at this phase; DCB-04 ratifies the choice — and DCB-04 MUST NOT default to (a) on the assumption that the typestate-everywhere story is uniform. | Pending. Code continues to use the existing `Scanout` API verbatim until DCB-04. |
 | `audio_player.rs` private `clean_dcache(ptr, len)` (line 253) | **Replaces.** The audio-player TX buffer is a single-master DMA-read scenario with no special cache geometry. Becomes a `DcaBuf<i16, PLAYER_BUF_SAMPLES>` produced by an `AudioPlayer::lend_chunk_for_tx()` API that internally returns `DeviceReadPending`. The `static SCB`-bypass comment at `audio_player.rs:248` is resolved by the typestate API owning a single `&mut SCB` borrow at construction. | DCB-02b retrofit. Removes the private helper. |
 | `stm32h747i_disco_sd.rs` `Sd::clean_dcache_by_slice` / `invalidate_dcache_by_slice` (lines 35, 46) | **Replaces.** SDMMC R/W buffers become `DcaBuf<u8, BLOCK_BYTES>`. The W path lends `DeviceReadPending`; the R path lends `DeviceWritePending`. Cache-line-padded storage means the unaligned-slice rationale at `sd_emmc_adapter.rs:39` no longer applies (INV-D2 forces the multiple-of-line size), and the bidirectional `clean_invalidate` collapses to the directional op. | DCB-02c retrofit. |
@@ -660,9 +661,22 @@ Ratifying DCB-00 unblocks the following work:
 - **DCB-02c** — `stm32h747i_disco_sd.rs` + `sd_emmc_adapter.rs`
   retrofit; collapse the bidirectional `clean_invalidate` to
   directional ops via padded storage.
-- **DCB-03** — DMA2D destination retrofit. Most invasive surface
-  because DMA2D is widely consumed; phased per current `BASELINE`
-  scanner pattern.
+- **DCB-03** — **Closed (deferred), 2026-05-02.** DMA2D
+  destination retrofit. Closure rationale and reopen path:
+  DCB-03-A. The originally-prescribed shape (FrameBuffer
+  composes `DcaBuf<u8, FB_BYTES>`; `start_*_typed` threads the
+  typestate) is the correct design when a consumer needs it,
+  but on the only current platform with DMA2D (the disco) every
+  destination buffer is in MPU-Write-Through SDRAM where the
+  cache op is a no-op. The §10 row preserves the prescription
+  with explicit reopen triggers; `DcaCacheCtx`-route is
+  available for ad-hoc future consumers without reopening.
+  **Reopen with DCB-03-B** when any of: (a) a non-Write-Through
+  DMA2D destination is needed, (b) a port without H7-style
+  Write-Through SDRAM defaults adopts DMA2D, (c) the disco's
+  own SDRAM Write-Through config changes. Any of those would
+  warrant a fresh DCB-03-B sub-letter naming the first user
+  before the FrameBuffer rearchitect lands.
 - **DCB-01c** — Land `DeviceLtdcScan<T, N>` in
   `platform/src/hwcore/dca.rs`. Add trybuild compile-fail fixtures
   parallel to existing dca-typestate fixtures (use-after-paint,
@@ -887,3 +901,62 @@ behaviour MAY land touching these surfaces until DCB-00 ratifies):
   ships. The DCB-04-A sub-letter analysis at
   `docs/concepts/DCB-04-A.md` is preserved as historical record;
   its decision has folded into this entry.
+- **2026-05-02 — DCB-03-A resolution: Option C
+  (closure-with-deferral).** DCB-03 is closed without a
+  retrofit. The DMA2D destination cache discipline that the
+  §10 row prescribed is not currently load-bearing because every
+  DMA2D destination on the disco target lives in
+  MPU-Write-Through SDRAM (`platform/src/stm32h747i_disco.rs:
+  1322`); the prescribed `lend_for_write` runtime cache op
+  would be a functional no-op on the only platform that
+  currently uses DMA2D.
+
+  Sections amended:
+  - §10: the `BackBuffer` / `BorrowedForDma` / `InFlight` row
+    is reworded to mark the prescription as "closed-with-
+    deferral" rather than "concrete refactor lands in DCB-03",
+    and gains a normative **Reopen triggers** clause
+    enumerating (a) a new non-Write-Through DMA2D destination,
+    (b) a port without H7-style Write-Through SDRAM defaults,
+    (c) a change to the disco's SDRAM Write-Through config.
+    Any of those triggers a DCB-03-B sub-letter analysis with a
+    named first user before the FrameBuffer rearchitect lands.
+  - §14: DCB-03 marked **Closed (deferred), 2026-05-02** with
+    a back-pointer to DCB-03-A and the same reopen-trigger set
+    documented in §10. The DCB-03-B reopen path is preserved
+    explicitly so future maintainers don't need to re-derive
+    the analysis.
+
+  Motivation (DCB-03-A §3 / §4): DCB has delivered observable
+  runtime safety where it mattered (DCB-02 SAI1 "loud bees" fix;
+  DCB-02b/c removal of pre-DCB cache hacks; DCB-04 BASELINE
+  clearance). DMA2D's destination boundary doesn't have an
+  analogous load-bearing target on the current MCU + MPU
+  configuration; forcing the §10 rearchitect now (~300-line
+  cross-cutting change with bench-validation risk in the hot
+  rendering path) trades real refactor budget against
+  imagined future requirements. The infrastructure for a soft
+  retrofit (`DcaCacheCtx`-route per DCB-02c / DCB-04) is
+  already in place for ad-hoc future consumers without
+  reopening DCB-03; only a structurally new requirement
+  (typestate-tracked DMA2D destination ownership) warrants
+  reopening.
+
+  This is **not** a Standards Action change to the typestate
+  set, layout invariants, engine submission contract, or
+  scanner rule. It is a closure-with-deferral on the §10
+  reconciliation prescription only. INV-D9 wording remains
+  unchanged but is read forward-looking — "new DMA buffers in
+  *new* DMA paths MUST use DcaBuf"; existing
+  pre-DCB DMA2D destinations are grandfathered alongside the
+  `FrameBuffer` / `BackBuffer` chain. No `BASELINE` change is
+  required; the `raw_dcache` BASELINE is already empty after
+  DCB-04.
+
+  The DCB-03-A sub-letter analysis at
+  `docs/concepts/DCB-03-A.md` is preserved as historical
+  record; its decision has folded into this entry. The
+  initiative's BASELINE-shrink track formally ends at DCB-04.
+  Future DCB-NN phases (DCB-03-B if reopened, future port-
+  specific phases, future engine-specific phases) ratify into
+  §15 here on first need.

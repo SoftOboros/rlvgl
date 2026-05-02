@@ -1,16 +1,14 @@
 # DCB-03-A — DMA2D destination cache discipline
 
-**Status:** Drafted 2026-05-02. Sub-letter analysis surfaced when
-DCB-04 cleared the last `raw_dcache` BASELINE entry and DCB-03 was
-the next named §14 unblock. DCB-00 §10's `BackBuffer` /
-`BorrowedForDma` / `InFlight` reconciliation row prescribes a
-specific shape for the DMA2D destination retrofit; this doc takes
-inventory of what that retrofit actually buys on the current
-target set, surveys the option set, and recommends a path. Per
-the parent CLAUDE.md "Sub-letter doc convention" this analysis
-ratifies its resolution into DCB-00 §3 / §5 / §10 + §15 (or
-ratifies a closure-with-deferral) as a Standards Action amendment,
-after which this file is preserved as historical record only.
+**Status:** **Resolved 2026-05-02 — Option C ratified
+(closure-with-deferral).** Folded into DCB-00 §10 / §14 / §15
+via the 2026-05-02 closure-with-deferral entry. DCB-03 is
+closed; **DCB-03-B reopen** is triggered by any of: (a) a new
+DMA2D destination in non-Write-Through cacheable RAM; (b) a port
+without H7-style Write-Through SDRAM defaults adopting DMA2D;
+(c) a change to the disco's SDRAM Write-Through config. This
+file is preserved as historical analysis only; no behaviour PRs
+reference it directly.
 
 ## 1. Purpose
 
@@ -338,3 +336,14 @@ track ends at DCB-04.
   runtime cache op at the DMA2D destination boundary on the
   Write-Through SDRAM disco target). Awaiting owner
   ratification via a DCB-00 §15 amendment.
+- **2026-05-02 — Resolved.** Option C ratified by owner go-ahead
+  with explicit reopen path. Resolution folded into DCB-00 §10
+  (DMA2D row reworded to "closed-with-deferral" with a
+  normative **Reopen triggers** clause), §14 (DCB-03 marked
+  Closed (deferred); DCB-03-B reopen path preserved with the
+  same trigger set), and §15 (closure-with-deferral
+  ratification entry; not a Standards Action change to the
+  typestate set or invariants — only the §10 reconciliation
+  prescription is amended). The initiative's BASELINE-shrink
+  track formally ends at DCB-04. This sub-letter is now
+  historical record only.
