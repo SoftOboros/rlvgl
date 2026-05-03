@@ -85,6 +85,21 @@ disco-analyzer subrepo's first concepts doc).
     consumer (disco bare-metal binary) updates mechanically.
     **Resolved 2026-05-03 — Option A ratified into DCB-00
     §10/§15. DCB-02b-A2 unblocked.**
+  - [DCB-04-B.md](DCB-04-B.md) — sub-letter analysis on the
+    full `LtdcScan<u8, FB_BYTES>` typestate refactor for
+    `freertos_entry.rs`'s FRONT_FB atomic-swap pattern (and
+    the bare-metal `Scanout::swap` parallel). DCB-04 cleared
+    the `raw_dcache` BASELINE entry via trait-dispatch
+    (`DcaCacheCtx::cache.clean + barrier`); the §10 row
+    prescribed pushing the FB ownership through the
+    `LtdcScan` typestate. The atomic-swap pattern doesn't
+    fit `&'static mut DcaBuf`'s exclusive-borrow rule
+    without rearchitecting render/present task ownership.
+    Recommends Option C (close-with-deferral, mirroring
+    DCB-03-A and DCB-02c-A): the `LtdcScan` typestate is
+    preserved in-tree (DCB-01c) for future ports to adopt;
+    reopen DCB-04-B-2 with a named first user.
+    **Drafted 2026-05-03; awaiting DCB-00 §15 ratification.**
   - [DCB-02c-A.md](DCB-02c-A.md) — sub-letter analysis on the
     §10-prescribed `DcaBuf` push through the
     `rlvgl_core::fs::BlockDevice` trait surface. DCB-02c
