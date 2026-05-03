@@ -297,13 +297,20 @@ impl<const BUF_BYTES: usize> AudioPlayer<BUF_BYTES> {
         // could thread the `&mut [u8]` through `NeedRefill` to make
         // the slice access typesafe end-to-end; that's deferred to a
         // DCB-02b-A follow-up.
+        // DCB-02b-r2 (DCB-01b-A 2026-05-03 amendment): release now
+        // takes &mut DcaCacheCtx as the first arg. For Read direction
+        // (audio playback: DMA reads RAM → SAI peripheral → DAC) the
+        // release-time clean publishes the just-completed PCM writes
+        // before the engine flips back to this bank, eliminating the
+        // ~10.67 ms latency regression that DCB-02b inherited from
+        // DCB-01b's entry-clean placement.
         let new_target_bit = self.dma.current_target();
         let new_target = if new_target_bit == 0 {
             Bank::M0
         } else {
             Bank::M1
         };
-        let _ = guard.release(new_target);
+        let _ = guard.release(&mut ctx, new_target);
 
         // If we've queued all the data, enter draining state
         if self.bytes_queued >= self.data_total {
