@@ -1,18 +1,11 @@
 # DCB-02b-A — `NeedRefill` slice API revision for audio_player
 
-**Status:** Drafted 2026-05-03. Sub-letter analysis surfaced
-during the post-DCB-04 sweep for unblocked outstanding items.
-DCB-02b's retrofit (rlvgl `dbfa440`) replaced the
-`audio_player.rs` private `clean_dcache` helper with a
-typestate-driven `BankGuard<Read>` for the cache op, but kept
-the legacy `PollResult::NeedRefill { buf: *mut u8, ... }` raw-
-pointer API for the actual PCM byte writes. This sub-letter
-proposes the residual cleanup: thread `&mut [u8]` through the
-refill path so the type system covers the write side
-end-to-end. Per the parent CLAUDE.md "Sub-letter doc
-convention" the resolution folds into DCB-00 §10
-(audio_player row update) + DCB-02b API + the disco consumer
-once ratified.
+**Status:** **Resolved 2026-05-03 — Option A ratified.** Folded
+into DCB-00 §10 (audio_player row updated) + §15
+(ratification entry) via the 2026-05-03 callback-refill
+amendment. DCB-02b-A2 implementation is now unblocked. This
+file is preserved as historical analysis only; no behaviour
+PRs reference it directly.
 
 ## 1. Purpose
 
@@ -265,3 +258,14 @@ If Option A is ratified:
   retrofit" shape. Recommendation: Option A (callback-based
   refill API). Awaiting owner ratification via a DCB-00 §15
   amendment.
+- **2026-05-03 — Resolved.** Option A ratified by owner
+  go-ahead ("I agree with A — it fits the style of the
+  library"). Resolution folded into DCB-00 §10 (audio_player
+  row updated to document the post-DCB-02b-A `poll_refill<F>`
+  shape; references DCB-02b cache discipline + DCB-01b-A
+  release-side placement) and §15 (closure-based-refill
+  amendment entry; not a Standards Action change to the
+  typestate set or invariants — only the consumer-facing
+  `audio_player` API surface). DCB-02b-A2 (the
+  implementation) is now unblocked. This sub-letter is now
+  historical record only.

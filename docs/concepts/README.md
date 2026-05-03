@@ -78,12 +78,13 @@ disco-analyzer subrepo's first concepts doc).
     the residual raw-pointer write path in
     `audio_player::PollResult::NeedRefill`. DCB-02b made the
     cache op type-system-tracked but kept the legacy raw
-    `*mut u8` for PCM byte writes. Proposes Option A
+    `*mut u8` for PCM byte writes. Proposed Option A
     (callback-based `poll_refill<F>` replacing `poll()` +
     `refill_done(pcm)`; closure scope = bank-guard scope;
     no self-referential token complexity); single in-tree
     consumer (disco bare-metal binary) updates mechanically.
-    **Drafted 2026-05-03; awaiting DCB-00 §15 ratification.**
+    **Resolved 2026-05-03 — Option A ratified into DCB-00
+    §10/§15. DCB-02b-A2 unblocked.**
   - [DCB-03-A.md](DCB-03-A.md) — sub-letter analysis on the
     DMA2D destination retrofit. Documented that DMA2D
     destinations on the disco target all live in MPU-Write-
