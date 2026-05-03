@@ -1,21 +1,21 @@
 # DCB-04-B — Full LtdcScan typestate refactor for FRONT_FB swap atomics
 
-**Status:** Drafted 2026-05-03. Sub-letter analysis surfaced
-during the post-DCB-04 sweep for unblocked outstanding items.
-DCB-04 (rlvgl `f7b728c`) routed the two LTDC scanout pre-clean
-sites through `DcaCacheCtx::cache.clean + barrier` — a "soft
-retrofit" that closed the `raw_dcache` BASELINE entry without
-threading the buffer ownership through the `LtdcScan<u8,
-FB_BYTES>` typestate that DCB-01c added (rlvgl `a825522`).
-DCB-04's commit notes flagged that the full typestate
-retrofit was deferred because the FRONT_FB_ADDR atomic-swap
-pattern in `freertos_entry.rs` would need rearchitecting to
-fit a `&'static mut DcaBuf` ownership model. This sub-letter
-inventories what the deferral actually trades, surveys the
-option set, and recommends a path. Per the parent CLAUDE.md
-"Sub-letter doc convention" the resolution folds into DCB-00
-§10 / §14 / §15 (or ratifies a closure-with-deferral) as a
-Standards Action amendment.
+**Status:** **Resolved 2026-05-03 — Option C ratified
+(closure-with-deferral). DCB initiative reaches natural
+software-side completion at this amendment.** Folded into
+DCB-00 §10 (LTDC scanout reconciliation row reworded as
+closed-with-deferral with normative Reopen triggers) + §14
+(DCB-04 entry gains the closure note + DCB-04-B-2 reopen
+path) + §15 via the 2026-05-03 closure-with-deferral entry.
+**DCB-04-B-2 reopen** is triggered by any of: (a) a port
+adopts LTDC and needs typestate-tracked FB ownership the
+trait-dispatch shape doesn't provide; (b) bench results
+surface a cache-coherency hazard in the LTDC path; (c) a new
+feature requires `LtdcScan`'s specific guarantees (compile-
+time FB-size contracts, hardware-managed swap via DBM / DSI
+command-mode needing `DeviceLtdcScanDouble`). This file is
+preserved as historical analysis only; no behaviour PRs
+reference it directly.
 
 ## 1. Purpose
 
@@ -328,3 +328,15 @@ outstanding item.
   dispatch shape is the stable end state; the `LtdcScan`
   typestate stays in-tree for future ports). Awaiting
   owner ratification via a DCB-00 §15 amendment.
+- **2026-05-03 — Resolved.** Option C ratified by owner
+  go-ahead. Resolution folded into DCB-00 §10 (LTDC scanout
+  reconciliation row reworded as closed-with-deferral with
+  normative Reopen triggers naming the three conditions for
+  a DCB-04-B-2 sub-letter), §14 (DCB-04 entry gains the
+  closure note + DCB-04-B-2 reopen path), and §15
+  (closure-with-deferral ratification entry; not a Standards
+  Action change to the typestate set or invariants — only
+  the §10 reconciliation prescription is amended). With
+  this ratification, the DCB initiative reaches its natural
+  software-side completion. This sub-letter is now
+  historical record only.

@@ -95,11 +95,13 @@ disco-analyzer subrepo's first concepts doc).
     `LtdcScan` typestate. The atomic-swap pattern doesn't
     fit `&'static mut DcaBuf`'s exclusive-borrow rule
     without rearchitecting render/present task ownership.
-    Recommends Option C (close-with-deferral, mirroring
+    Proposed Option C (close-with-deferral, mirroring
     DCB-03-A and DCB-02c-A): the `LtdcScan` typestate is
     preserved in-tree (DCB-01c) for future ports to adopt;
     reopen DCB-04-B-2 with a named first user.
-    **Drafted 2026-05-03; awaiting DCB-00 §15 ratification.**
+    **Resolved 2026-05-03 — Option C ratified into DCB-00
+    §10/§14/§15 with normative Reopen triggers. DCB
+    initiative reaches natural software-side completion.**
   - [DCB-02c-A.md](DCB-02c-A.md) — sub-letter analysis on the
     §10-prescribed `DcaBuf` push through the
     `rlvgl_core::fs::BlockDevice` trait surface. DCB-02c
