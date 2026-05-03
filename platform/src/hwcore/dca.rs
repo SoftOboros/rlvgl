@@ -557,19 +557,28 @@ impl<'a, T: Copy, const N: usize> CircRead<'a, T, N> {
     /// (`NDTR` for STM32 DMA, `LIVR` for SAI, etc.) which half the
     /// DMA is currently servicing. Per DCB-00 §6 INV-D7, releasing
     /// the guard with [`HalfGuard::release`] re-checks the
-    /// stream-position; the live-recheck infrastructure is engine-
-    /// specific and is plumbed through DCB-02 / DCB-03.
+    /// stream-position.
     ///
-    /// Cache op for [`Read`] direction: [`DcaCache::clean`] over the
-    /// inactive half so the DMA engine's next pass over that half
-    /// sees CPU-written data.
+    /// **No cache op is emitted at construction.** Per DCB-00 §5
+    /// (DCB-01b-A 2026-05-03 amendment), the `Read` direction's
+    /// cache op fires at `release` — the CPU is about to write
+    /// new data via the guard's slice, so cleaning *now* would
+    /// publish stale data. The clean at release publishes the
+    /// just-completed CPU writes before the engine wraps to this
+    /// half on its next pass.
+    ///
+    /// `ctx` is unused at construction for `Read` direction (kept
+    /// in the signature for symmetry with `CircWrite::half_guard`,
+    /// which uses it for the entry-side invalidate).
     pub fn half_guard<'b, C: DcaCache>(
         &'b mut self,
-        ctx: &mut DcaCacheCtx<'_, C>,
+        _ctx: &mut DcaCacheCtx<'_, C>,
         half: Half,
     ) -> HalfGuard<'b, Read, T, N> {
-        let (addr, len) = half_extent::<T, N>(self.buf.addr_usize(), half);
-        ctx.cache.clean(addr, len);
+        // INV-D2 / half_extent debug_assert is still useful for
+        // sanity-checking the call-site geometry, even though no
+        // cache op fires here. Compute and discard.
+        let _ = half_extent::<T, N>(self.buf.addr_usize(), half);
         HalfGuard {
             buf: self.buf,
             half,
@@ -772,7 +781,21 @@ impl<'a, DIR, T: Copy, const N: usize> HalfGuard<'a, DIR, T, N> {
         self.half
     }
 
-    /// Release the guard with a stream-position checkpoint.
+}
+
+/// Direction-specific `release` for `HalfGuard<Read, _, _>`.
+///
+/// Per DCB-00 §5 (DCB-01b-A 2026-05-03 amendment) the `Read`
+/// direction's cache op fires at `release`, not at construction:
+/// the CPU is the producer; cleaning before the writes would
+/// publish stale data. The clean here publishes the just-completed
+/// CPU writes before the engine wraps to this half on its next
+/// pass.
+impl<'a, T: Copy, const N: usize> HalfGuard<'a, Read, T, N> {
+    /// Release the guard. Emits [`DcaCache::clean`] over the
+    /// guarded half's extent (the cache op for the `Read`
+    /// direction; publishes CPU writes), then performs the
+    /// INV-D7 stream-position checkpoint.
     ///
     /// `current_half` is the half the DMA engine is **currently**
     /// servicing; the caller reads it from `NDTR` / `LIVR` / etc.
@@ -780,24 +803,60 @@ impl<'a, DIR, T: Copy, const N: usize> HalfGuard<'a, DIR, T, N> {
     /// the half this guard exposes (i.e. `current_half == self.half`),
     /// the post-condition check fires per DCB-00 §6 INV-D7:
     /// `panic!` in `debug_assertions`, error return in release.
-    /// The release-mode error path is plumbed through `Result` so
-    /// callers can decide whether to propagate or set a fault flag.
-    pub fn release(self, current_half: Half) -> Result<(), HalfGuardOverrun> {
-        if current_half == self.half {
-            #[cfg(debug_assertions)]
-            {
-                panic!(
-                    "DCB HalfGuard overrun: DMA crossed into the inactive half ({:?}) during the guard's lifetime; INV-D7 violated. Stream is faster than the CPU consumer/producer.",
-                    self.half
-                );
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                return Err(HalfGuardOverrun { half: self.half });
-            }
-        }
-        Ok(())
+    pub fn release<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+        current_half: Half,
+    ) -> Result<(), HalfGuardOverrun> {
+        // Cache op first: publish the just-completed CPU writes
+        // before checking the live stream-position. If the engine
+        // has flipped, we still want the clean to fire so the
+        // stale-data window is bounded — the overrun is reported
+        // separately for the caller to act on.
+        let (addr, len) = half_extent::<T, N>(self.buf.addr_usize(), self.half);
+        ctx.cache.clean(addr, len);
+        check_half_overrun(self.half, current_half)
     }
+}
+
+/// Direction-specific `release` for `HalfGuard<Write, _, _>`.
+///
+/// Per DCB-00 §5 the `Write` direction's cache op fires at
+/// construction (`invalidate` over the inactive half). `release`
+/// performs only the INV-D7 stream-position checkpoint — the CPU
+/// has only read; no dirty lines need publishing.
+impl<'a, T: Copy, const N: usize> HalfGuard<'a, Write, T, N> {
+    /// Release the guard. No cache op (the entry-side invalidate
+    /// already drained stale lines). Performs the INV-D7
+    /// stream-position checkpoint.
+    ///
+    /// `_ctx` is unused for `Write` direction (kept for symmetry
+    /// with `HalfGuard<Read>::release`).
+    pub fn release<C: DcaCache>(
+        self,
+        _ctx: &mut DcaCacheCtx<'_, C>,
+        current_half: Half,
+    ) -> Result<(), HalfGuardOverrun> {
+        check_half_overrun(self.half, current_half)
+    }
+}
+
+/// Internal helper: direction-independent INV-D7 live-recheck.
+#[inline]
+fn check_half_overrun(guard_half: Half, current_half: Half) -> Result<(), HalfGuardOverrun> {
+    if current_half == guard_half {
+        #[cfg(debug_assertions)]
+        {
+            panic!(
+                "DCB HalfGuard overrun: DMA crossed into the inactive half ({guard_half:?}) during the guard's lifetime; INV-D7 violated. Stream is faster than the CPU consumer/producer."
+            );
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            return Err(HalfGuardOverrun { half: guard_half });
+        }
+    }
+    Ok(())
 }
 
 /// Error returned by [`HalfGuard::release`] in release builds when the
@@ -1031,12 +1090,20 @@ impl<'a, 'b, T: Copy, const N: usize> DbufRead<'a, 'b, T, N> {
     /// servicing (read from the stream's `CT` bit). The guard exposes
     /// the *opposite* bank.
     ///
-    /// Cache op for [`Read`] direction: [`DcaCache::clean`] over the
-    /// inactive bank's full extent so the DMA engine's next pass over
-    /// that bank sees CPU-written data.
+    /// **No cache op is emitted at construction.** Per DCB-00 §5
+    /// (DCB-01b-A 2026-05-03 amendment), the `Read` direction's
+    /// cache op fires at `release` — the CPU is about to write
+    /// new data via the guard's slice, so cleaning *now* would
+    /// publish stale data. The clean at release publishes the
+    /// just-completed CPU writes before the engine flips back to
+    /// this bank.
+    ///
+    /// `_ctx` is unused at construction for `Read` direction (kept
+    /// for symmetry with `DbufWrite::bank_guard`, which uses it
+    /// for the entry-side invalidate).
     pub fn bank_guard<'g, C: DcaCache>(
         &'g mut self,
-        ctx: &mut DcaCacheCtx<'_, C>,
+        _ctx: &mut DcaCacheCtx<'_, C>,
         current_target: Bank,
     ) -> BankGuard<'g, Read, T, N> {
         let exposed_bank = inactive_bank(current_target);
@@ -1044,9 +1111,6 @@ impl<'a, 'b, T: Copy, const N: usize> DbufRead<'a, 'b, T, N> {
             Bank::M0 => &mut *self.buf.m0,
             Bank::M1 => &mut *self.buf.m1,
         };
-        let addr = exposed.addr_usize();
-        let len = exposed.byte_len();
-        ctx.cache.clean(addr, len);
         BankGuard {
             bank_storage: exposed,
             bank: exposed_bank,
@@ -1174,30 +1238,76 @@ impl<'a, DIR, T: Copy, const N: usize> BankGuard<'a, DIR, T, N> {
         self.bank
     }
 
-    /// Release the guard with a CT-bit checkpoint (DCB-00 §6 INV-D15).
+}
+
+/// Direction-specific `release` for `BankGuard<Read, _, _>`.
+///
+/// Per DCB-00 §5 (DCB-01b-A 2026-05-03 amendment) the `Read`
+/// direction's cache op fires at `release`, not at construction:
+/// the CPU is the producer; cleaning before the writes would
+/// publish stale data. The clean here publishes the just-completed
+/// CPU writes before the engine flips back to this bank.
+impl<'a, T: Copy, const N: usize> BankGuard<'a, Read, T, N> {
+    /// Release the guard. Emits [`DcaCache::clean`] over the
+    /// guarded bank's full extent, then performs the INV-D15
+    /// CT-bit checkpoint.
     ///
     /// `current_target` is the bank the DMA engine is **currently**
-    /// servicing per the latest read of the stream's `CT` bit. If the
-    /// engine has flipped CT into the bank this guard exposes (i.e.
-    /// `current_target == self.bank`), the post-condition check fires:
-    /// `panic!` in `debug_assertions` builds, error return in release
-    /// builds.
-    pub fn release(self, current_target: Bank) -> Result<(), BankGuardOverrun> {
-        if current_target == self.bank {
-            #[cfg(debug_assertions)]
-            {
-                panic!(
-                    "DCB BankGuard overrun: DMA flipped CT into the inactive bank ({:?}) during the guard's lifetime; INV-D15 violated. Stream is faster than the CPU consumer/producer.",
-                    self.bank
-                );
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                return Err(BankGuardOverrun { bank: self.bank });
-            }
-        }
-        Ok(())
+    /// servicing per the latest read of the stream's `CT` bit. If
+    /// the engine has flipped CT into the bank this guard exposes
+    /// (i.e. `current_target == self.bank`), the post-condition
+    /// check fires: `panic!` in `debug_assertions` builds, error
+    /// return in release builds.
+    pub fn release<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+        current_target: Bank,
+    ) -> Result<(), BankGuardOverrun> {
+        let addr = self.bank_storage.addr_usize();
+        let len = self.bank_storage.byte_len();
+        ctx.cache.clean(addr, len);
+        check_bank_overrun(self.bank, current_target)
     }
+}
+
+/// Direction-specific `release` for `BankGuard<Write, _, _>`.
+///
+/// Per DCB-00 §5 the `Write` direction's cache op fires at
+/// construction (`invalidate` over the inactive bank). `release`
+/// performs only the INV-D15 CT-bit checkpoint — the CPU has
+/// only read; no dirty lines need publishing.
+impl<'a, T: Copy, const N: usize> BankGuard<'a, Write, T, N> {
+    /// Release the guard. No cache op (the entry-side invalidate
+    /// already drained stale lines). Performs the INV-D15 CT-bit
+    /// checkpoint.
+    ///
+    /// `_ctx` is unused for `Write` direction (kept for symmetry
+    /// with `BankGuard<Read>::release`).
+    pub fn release<C: DcaCache>(
+        self,
+        _ctx: &mut DcaCacheCtx<'_, C>,
+        current_target: Bank,
+    ) -> Result<(), BankGuardOverrun> {
+        check_bank_overrun(self.bank, current_target)
+    }
+}
+
+/// Internal helper: direction-independent INV-D15 live-recheck.
+#[inline]
+fn check_bank_overrun(guard_bank: Bank, current_target: Bank) -> Result<(), BankGuardOverrun> {
+    if current_target == guard_bank {
+        #[cfg(debug_assertions)]
+        {
+            panic!(
+                "DCB BankGuard overrun: DMA flipped CT into the inactive bank ({guard_bank:?}) during the guard's lifetime; INV-D15 violated. Stream is faster than the CPU consumer/producer."
+            );
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            return Err(BankGuardOverrun { bank: guard_bank });
+        }
+    }
+    Ok(())
 }
 
 /// Error returned by [`BankGuard::release`] in release builds when the
@@ -1337,10 +1447,20 @@ mod tests {
             Some(NullCacheOp::Clean(_, 64))
         ));
 
+        // Per DCB-01b-A 2026-05-03: Read direction emits NO cache op
+        // at half_guard construction; the clean fires at release.
         let mut guard = circ.half_guard(&mut ctx, Half::Second);
+        // The last op observed is still the start_circular_read clean
+        // (no new op fired by half_guard).
+        assert!(matches!(
+            ctx.cache_mut().last,
+            Some(NullCacheOp::Clean(_, 64))
+        ));
         guard.as_mut_slice()[0] = 0xAB;
         // Engine reports we're still in First half — release OK.
-        guard.release(Half::First).unwrap();
+        // The release-time clean for Read direction publishes the
+        // CPU writes we just made.
+        guard.release(&mut ctx, Half::First).unwrap();
         assert!(matches!(
             ctx.cache_mut().last,
             Some(NullCacheOp::Clean(_, 32))
@@ -1397,9 +1517,10 @@ mod tests {
         let cpu = buf.cpu();
         let mut circ = cpu.start_circular_read(&mut ctx);
         let guard = circ.half_guard(&mut ctx, Half::Second);
-        // DMA crossed into Second — overrun.
+        // DMA crossed into Second — overrun. Per DCB-01b-A the
+        // release-time clean still fires before the overrun check.
         assert_eq!(
-            guard.release(Half::Second),
+            guard.release(&mut ctx, Half::Second),
             Err(HalfGuardOverrun {
                 half: Half::Second
             })
@@ -1492,9 +1613,14 @@ mod tests {
         let cpu = dca.cpu();
         let mut active = cpu.start_double_buffer_read(&mut ctx);
         // Engine currently on M0 → inactive bank is M1.
+        // Per DCB-01b-A 2026-05-03: Read direction emits NO cache op
+        // at bank_guard construction; the clean fires at release.
         let mut guard = active.bank_guard(&mut ctx, Bank::M0);
         assert_eq!(guard.bank(), Bank::M1);
         guard.as_mut_slice()[0] = 0xAB;
+        // Engine still on M0 — release OK. The release-time clean
+        // for Read direction publishes the CPU writes we just made.
+        guard.release(&mut ctx, Bank::M0).unwrap();
         // Confirm cache op was a Clean over M1's extent (32 bytes).
         let last = ctx.cache_mut().last.unwrap();
         match last {
@@ -1505,8 +1631,6 @@ mod tests {
             }
             other => panic!("expected Clean, got {other:?}"),
         }
-        // Engine still on M0 — release OK.
-        guard.release(Bank::M0).unwrap();
     }
 
     #[test]
@@ -1530,7 +1654,7 @@ mod tests {
             }
             other => panic!("expected Invalidate, got {other:?}"),
         }
-        guard.release(Bank::M1).unwrap();
+        guard.release(&mut ctx, Bank::M1).unwrap();
     }
 
     #[test]
@@ -1551,8 +1675,10 @@ mod tests {
         let mut active = cpu.start_double_buffer_read(&mut ctx);
         let guard = active.bank_guard(&mut ctx, Bank::M0);
         // Guard exposes M1; engine flipped CT into M1 → overrun.
+        // Per DCB-01b-A the release-time clean still fires before
+        // the overrun check.
         assert_eq!(
-            guard.release(Bank::M1),
+            guard.release(&mut ctx, Bank::M1),
             Err(BankGuardOverrun { bank: Bank::M1 })
         );
     }
