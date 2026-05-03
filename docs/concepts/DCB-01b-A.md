@@ -1,15 +1,13 @@
 # DCB-01b-A — Cache-op placement for DMA-Read direction
 
-**Status:** Drafted 2026-05-02. Sub-letter analysis surfaced when
-re-reading DCB-01b's `HalfGuard` / `BankGuard` cache-op placement
-during the post-DCB-04 sweep for unblocked outstanding items.
-DCB-01b puts the cache `clean` at *guard entry* for the `Read`
-direction; that placement is off-by-one against the pre-DCB
-"write then clean" pattern. This doc characterises the issue,
-recommends a fix, and proposes the API + spec amendments. Per
-the parent CLAUDE.md "Sub-letter doc convention" the resolution
-folds into DCB-00 §5 + DCB-01b API + the consuming retrofits
-(DCB-02 / DCB-02-R) once ratified.
+**Status:** **Resolved 2026-05-03 — Option A ratified.** Folded
+into DCB-00 §5 (transition table rows) + §6 INV-D7 / INV-D15
+(clarifying sentences) + §15 (ratification entry) via the
+2026-05-03 cache-op-placement amendment. DCB-01d implementation
+is unblocked; DCB-02-r2 / DCB-02-R-r2 disco-analyzer consumer
+updates are unblocked once DCB-01d ships. This file is
+preserved as historical analysis only; no behaviour PRs
+reference it directly.
 
 ## 1. Purpose
 
@@ -279,3 +277,14 @@ After DCB-00 §15 ratifies the amendment (call it DCB-00e):
   half-period), not a "bees" repeat. Recommendation: Option A
   (move clean to release for `Read`; keep entry for `Write`).
   Awaiting owner ratification via a DCB-00 §15 amendment.
+- **2026-05-03 — Resolved.** Option A ratified by owner
+  go-ahead. Resolution folded into DCB-00 §5 (HalfGuard /
+  BankGuard scope rows gain direction-specific boundary
+  text), §6 INV-D7 / INV-D15 (clarifying sentence noting
+  release performs the cache op for Read in addition to the
+  live-recheck), and §15 (Standards Action ratification entry
+  documenting the §5 + API change + the small consumer
+  blast radius). DCB-01d implementation unblocked;
+  DCB-02-r2 / DCB-02-R-r2 disco-analyzer consumer updates
+  unblocked once DCB-01d ships. This sub-letter is now
+  historical record only.

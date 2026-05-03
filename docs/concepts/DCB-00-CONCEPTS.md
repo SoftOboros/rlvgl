@@ -4,13 +4,15 @@
 DCB-02-A resolution (DMA double-buffer-mode coverage); amended
 2026-05-02 with DCB-04-A resolution (LTDC scanout typestate);
 amended 2026-05-02 with DCB-03-A resolution (DMA2D destination
-retrofit closed-with-deferral). DCB-01 / DCB-01b / DCB-01c
-typestate APIs are shipped; the BASELINE-shrink track ends at
-DCB-04. Per the parent CLAUDE.md spec-before-code discipline,
-future modifications to the §5 typestate set, §6 layout
-invariants, §8 engine submission contract, or §9 INV-D8..D13
-require a §15 amendment **first**, in a separate PR, before any
-behaviour PR rides on the change.
+retrofit closed-with-deferral); amended 2026-05-03 with
+DCB-01b-A resolution (cache-op placement for `Read` direction
+moves to `release`). DCB-01 / DCB-01b / DCB-01c typestate APIs
+are shipped; the BASELINE-shrink track ends at DCB-04; DCB-01d
+is unblocked. Per the parent CLAUDE.md spec-before-code
+discipline, future modifications to the §5 typestate set, §6
+layout invariants, §8 engine submission contract, or §9
+INV-D8..D13 require a §15 amendment **first**, in a separate
+PR, before any behaviour PR rides on the change.
 
 ## 0. Authority policy
 
@@ -214,7 +216,7 @@ The transitions, with ownership rules, are frozen as:
 | From | To | Triggered by | Cache op inserted |
 |---|---|---|---|
 | `CpuOwned` | `DeviceActiveDoubleBuf<DIR>` | `buf.start_double_buffer(engine, DIR)` returning `DcaDoubleBuf<DeviceActiveDoubleBuf<DIR>>` | per-DIR initial op (clean for `Read`, invalidate for `Write`) over **both** banks |
-| `DeviceActiveDoubleBuf<DIR>` | `DeviceActiveDoubleBuf<DIR>` (BankGuard scope) | `buf.bank_guard(current_target)` returning `BankGuard<DIR>` | per-DIR op on the *inactive bank only* (`clean` for `Read`, `invalidate` for `Write`) |
+| `DeviceActiveDoubleBuf<DIR>` | `DeviceActiveDoubleBuf<DIR>` (BankGuard scope) | `buf.bank_guard(current_target)` returning `BankGuard<DIR>` | per-DIR op on the *inactive bank only*, at the boundary appropriate to the direction: `Read` direction emits **no op at construction** (CPU is about to write; nothing to publish yet) and **`clean` at `release`** (publishes the just-completed CPU writes before the engine flips). `Write` direction emits **`invalidate` at construction** (drains stale cache lines so CPU's next read pulls DMA-written data from RAM) and **no op at `release`** (CPU has only read; no dirty lines to publish). Both directions' `release` performs the INV-D15 CT-bit live-recheck regardless. |
 | `DeviceActiveDoubleBuf<DIR>` | `CpuOwned` | `buf.stop_double_buffer()` after engine-stop handshake | engine-DIR-dependent op over both banks (`clean` for `Read`, `invalidate` for `Write`) |
 
 `DcaDoubleBuf<T, N>` storage layout: each bank is independently
@@ -239,7 +241,7 @@ The transitions, with ownership rules, are frozen as:
 | `CpuOwned` | `DeviceActiveCirc<DIR>` | `buf.start_circular(engine, DIR)` returning `DcaBuf<DeviceActiveCirc<DIR>>` | per-DIR initial op (clean, invalidate, or clean+invalidate) |
 | `DeviceReadPending` | `CpuOwned` | DMA-engine completion handler returning the borrow | none (the device only *read* RAM; the CPU's cached copy is unchanged from before the transfer and remains authoritative) |
 | `DeviceWritePending` | `CpuOwned` | DMA-engine completion handler returning the borrow | none at exit (the entry-side invalidate evicted the buffer's cache lines; INV-D3 forbids cache-line sharing with adjacent state, so no stale prefetch can reintroduce them during the transfer; the CPU's first read after exit therefore hits RAM and observes the DMA-written data) |
-| `DeviceActiveCirc<DIR>` | `DeviceActiveCirc<DIR>` (HalfGuard scope) | `buf.half_guard(stream_pos)` returning `HalfGuard<DIR>` | per-DIR op on the *inactive half only*: `clean` for `Read`, `invalidate` for `Write` |
+| `DeviceActiveCirc<DIR>` | `DeviceActiveCirc<DIR>` (HalfGuard scope) | `buf.half_guard(stream_pos)` returning `HalfGuard<DIR>` | per-DIR op on the *inactive half only*, at the boundary appropriate to the direction: `Read` direction emits **no op at construction** (CPU is about to write; nothing to publish yet) and **`clean` at `release`** (publishes the just-completed CPU writes before the engine wraps to this half). `Write` direction emits **`invalidate` at construction** (drains stale cache lines so CPU's next read pulls DMA-written data from RAM) and **no op at `release`** (CPU has only read; no dirty lines to publish). Both directions' `release` performs the INV-D7 NDTR live-recheck regardless. |
 | `DeviceActiveCirc<DIR>` | `CpuOwned` | `buf.stop_circular()` after engine-stop handshake | engine-DIR-dependent op over the full padded extent (`clean` for `Read`, `invalidate` for `Write`) |
 
 `DcaBuf<T, N>` itself is a `#[repr(C, align(32))]` newtype around
@@ -351,7 +353,12 @@ buffer overlaps. They are normative.
   half during the guard's lifetime, the guard's `Drop`
   observation is a hard error: panic in `debug_assertions`,
   return-an-error / set-fault-flag in release builds (the exact
-  release-mode policy is settled in DCB-01a).
+  release-mode policy is settled in DCB-01a). `release` also
+  performs the direction-appropriate cache op per the §5
+  transition table for the `Read` direction (Read: clean at
+  release; Write: invalidate at construction, no op at release);
+  the `&mut DcaCacheCtx` parameter on `release` plumbs the cache
+  controller for that op AND for the live-recheck.
 - **INV-D14: `DcaDoubleBuf<T, N>` per-bank alignment / padding.**
   Each of the two banks of a `DcaDoubleBuf<T, N>` MUST
   independently satisfy INV-D1 (cache-line alignment) and INV-D2
@@ -373,9 +380,14 @@ buffer overlaps. They are normative.
   is strictly simpler: a single 32-bit register read disambiguates
   active vs inactive bank with no half-mark math. If the engine
   flips CT into the bank exposed by the guard during the guard's
-  lifetime, `BankGuard::release(current_target)` observation is a
-  hard error per the same release-mode policy as INV-D7
-  (`debug_assertions` → panic; release → return error).
+  lifetime, `BankGuard::release(ctx, current_target)` observation
+  is a hard error per the same release-mode policy as INV-D7
+  (`debug_assertions` → panic; release → return error). `release`
+  also performs the direction-appropriate cache op per the §5
+  transition table (Read: clean at release; Write: invalidate at
+  construction, no op at release); the `&mut DcaCacheCtx`
+  parameter on `release` plumbs the cache controller for that op
+  AND for the live-recheck.
 - **INV-D16: `DeviceLtdcScan<T, N>` ordering contract.** The
   `present()` call MUST emit *both* a `DcaCache::clean` over the
   buffer's full padded extent **AND** a memory barrier (`dsb` on
@@ -960,3 +972,78 @@ behaviour MAY land touching these surfaces until DCB-00 ratifies):
   Future DCB-NN phases (DCB-03-B if reopened, future port-
   specific phases, future engine-specific phases) ratify into
   §15 here on first need.
+- **2026-05-03 — DCB-01b-A resolution: Option A (cache-op
+  placement for `Read` direction moves to `release`).** The
+  DCB-01b shipped pattern emitted the cache `clean` at *guard
+  entry* for `HalfGuard<Read>` / `BankGuard<Read>`. The
+  pre-DCB SAI1 TX pattern (proven working at the bench)
+  emits the `clean` *after* CPU writes. The DCB-02 / DCB-02-R
+  retrofits inherited the entry-clean placement, introducing
+  a steady-state ~10.67 ms latency regression at SAI1's
+  5.33 ms half-period — audio is correct (not garbage; not a
+  "loud bees" repeat) but two half-periods late vs the
+  pre-DCB shape. This amendment moves the `Read`-direction
+  cache op from guard entry to guard release; `Write`
+  direction is unchanged.
+
+  Sections amended:
+  - §5: the `DeviceActiveCirc<DIR>` HalfGuard scope row and
+    the parallel `DeviceActiveDoubleBuf<DIR>` BankGuard scope
+    row both gain direction-specific boundary text. `Read`
+    direction emits **no op at construction** and **`clean`
+    at `release`**; `Write` direction unchanged
+    (`invalidate` at construction, no op at release). Both
+    directions' `release` performs the live-recheck (INV-D7
+    / INV-D15) regardless.
+  - §6 INV-D7 and INV-D15: clarifying sentence noting
+    `release` now performs the cache op for `Read` direction
+    in addition to the live-recheck. The `&mut DcaCacheCtx`
+    parameter on `release` plumbs the cache controller for
+    both purposes.
+  - DCB-01b API: `HalfGuard::release` and `BankGuard::release`
+    gain a `&mut DcaCacheCtx<'_, C>` parameter (signature
+    becomes `fn release<C: DcaCache>(self, ctx: &mut
+    DcaCacheCtx<'_, C>, current: Half|Bank) -> Result<(),
+    overrun_error>`). Implementation lands in DCB-01d; the
+    two disco-analyzer consumer call sites
+    (`analyzer-cm7/src/main.rs` SAI1 TX, `analyzer-audio/src/
+    sai1_linein.rs` SAI1 RX) update mechanically to pass
+    `&mut ctx` as the new parameter.
+
+  Motivation (DCB-01b-A §2 / §4): the entry-clean placement
+  for `Read` is off-by-one against the producer-into-
+  inactive-bank model. With entry-clean, CPU writes go into
+  cache after the clean fires; the next iteration's clean
+  publishes them, but the engine has already flipped and read
+  stale RAM contents in between. Steady-state effect: ~10 ms
+  audio latency vs the pre-DCB pattern that cleaned after
+  writes. Likely hasn't been bench-flagged on disco-analyzer
+  because (a) spectrum analyzer output is latency-insensitive,
+  (b) the MCU loopback path doesn't reveal a 2-half delay
+  without a reference signal. §12 (b) bench validation is
+  still pending; a low-latency comparison would surface the
+  regression.
+
+  This is a **Standards Action change** to the §5 transition
+  table (the `Read` direction's cache-op placement is part of
+  the ratified typestate contract). It is also a **breaking
+  API change** on `HalfGuard::release` / `BankGuard::release`.
+  The blast radius is small: only the two disco-analyzer
+  consumer sites use the guard pattern. `audio_player.rs`
+  (DCB-02b) doesn't use guards itself; the SD adapters
+  (DCB-02c) don't use guards at all; the LTDC retrofit
+  (DCB-04) routes through `DcaCacheCtx::cache.clean +
+  barrier` directly, no guards involved.
+
+  No `BASELINE` change is required by this amendment —
+  `raw_dcache` BASELINE remains empty after DCB-04. INV-D9 /
+  INV-D11 / INV-D13 / INV-D14 / INV-D16 unchanged. The
+  `DeviceLtdcScan<T, N>` typestate (which doesn't use a guard
+  pattern; cache ops are at explicit `present()` checkpoints)
+  is unaffected.
+
+  DCB-01d is now unblocked. The disco-analyzer call-site
+  updates (DCB-02-r2 / DCB-02-R-r2) are unblocked once
+  DCB-01d ships. The DCB-01b-A sub-letter analysis at
+  `docs/concepts/DCB-01b-A.md` is preserved as historical
+  record; its decision has folded into this entry.

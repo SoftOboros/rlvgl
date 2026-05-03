@@ -67,12 +67,13 @@ disco-analyzer subrepo's first concepts doc).
     cleans *after* CPU writes. Steady-state effect: audio is
     correct but ~10.67 ms (2 half-periods) late vs the
     pre-DCB shape — a latency regression rather than a "bees"
-    repeat. Recommends Option A (move clean to `release` for
+    repeat. Proposed Option A (move clean to `release` for
     `Read`; keep entry for `Write`); requires a small
     DCB-01b API change (`release` gains `&mut DcaCacheCtx`)
     and mechanical updates to the two disco-analyzer
     consumer sites.
-    **Drafted 2026-05-02; awaiting DCB-00 §15 ratification.**
+    **Resolved 2026-05-03 — Option A ratified into DCB-00
+    §5/§6/§15. DCB-01d unblocked.**
   - [DCB-03-A.md](DCB-03-A.md) — sub-letter analysis on the
     DMA2D destination retrofit. Documented that DMA2D
     destinations on the disco target all live in MPU-Write-
