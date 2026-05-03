@@ -92,14 +92,15 @@ disco-analyzer subrepo's first concepts doc).
     (clearing the `raw_dcache` BASELINE) but kept the
     caller-supplied `&mut [u8]` trait shape. The §10 row
     prescribed pushing `DcaBuf<u8, BLOCK_BYTES>` into the
-    trait. Recommends Option C (close-with-deferral
-    analogous to DCB-03-A): no current consumer needs the
-    typestate at the trait surface; the embedded-sdmmc
-    adapter is third-party so can't take DcaBuf anyway;
-    future non-Write-Through consumers route through
-    `DcaCacheCtx` or reopen DCB-02c-B with a named first
-    user.
-    **Drafted 2026-05-03; awaiting DCB-00 §15 ratification.**
+    trait. Proposed Option C (close-with-deferral analogous
+    to DCB-03-A): no current consumer needs the typestate at
+    the trait surface; the embedded-sdmmc adapter is
+    third-party so can't take DcaBuf anyway; future
+    non-Write-Through consumers route through `DcaCacheCtx`
+    or reopen DCB-02c-B with a named first user.
+    **Resolved 2026-05-03 — Option C ratified into DCB-00
+    §10/§14/§15 with normative Reopen triggers; the
+    initiative's optional-cleanup track ends here.**
   - [DCB-03-A.md](DCB-03-A.md) — sub-letter analysis on the
     DMA2D destination retrofit. Documented that DMA2D
     destinations on the disco target all live in MPU-Write-

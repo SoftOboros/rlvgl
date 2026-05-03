@@ -7,12 +7,14 @@ amended 2026-05-02 with DCB-03-A resolution (DMA2D destination
 retrofit closed-with-deferral); amended 2026-05-03 with
 DCB-01b-A resolution (cache-op placement for `Read` direction
 moves to `release`); amended 2026-05-03 with DCB-02b-A
-resolution (`audio_player` `NeedRefill` slice API revision).
-DCB-01 / DCB-01b / DCB-01c typestate APIs are shipped; the
+resolution (`audio_player` `NeedRefill` slice API revision);
+amended 2026-05-03 with DCB-02c-A resolution (DcaBuf push
+through BlockDevice trait closed-with-deferral). DCB-01 /
+DCB-01b / DCB-01c typestate APIs are shipped; the
 BASELINE-shrink track ends at DCB-04; DCB-01d shipped;
-DCB-02b-A2 is unblocked. Per the parent CLAUDE.md spec-before-
-code discipline, future modifications to the §5 typestate set,
-§6 layout invariants, §8 engine submission contract, or §9
+DCB-02b-A2 shipped. Per the parent CLAUDE.md spec-before-code
+discipline, future modifications to the §5 typestate set, §6
+layout invariants, §8 engine submission contract, or §9
 INV-D8..D13 require a §15 amendment **first**, in a separate
 PR, before any behaviour PR rides on the change.
 
@@ -528,8 +530,7 @@ primitive. Consumer code follows the *Composition* column.
 | `BackBuffer<'a>` / `BorrowedForDma<'dma, T>` / `InFlight<'dma, T>` (Register-Mashing rule #3) | **Closed-with-deferral (DCB-03-A 2026-05-02).** The originally-prescribed shape — "DMA2D destination becomes a `DcaBuf` *containing* the framebuffer pixels, with `BackBuffer` as the format/geometry view; `start_*_typed` takes `DcaBuf<u8, FB_BYTES, CpuOwned>` and returns an `InFlight` whose Drop releases the cache typestate" — remains the correct shape *if and when* a non-Write-Through DMA2D destination materializes. On the only platform that currently uses DMA2D (STM32H7 disco), every destination buffer lives in MPU-Write-Through SDRAM (`platform/src/stm32h747i_disco.rs:1322`); the `lend_for_write` runtime cache op would be a functional no-op. The §10 prescription is preserved here as design hygiene; until a consumer needs it the existing `BackBuffer` / `BorrowedForDma` / `InFlight` chain (Register-Mashing rule #3) is grandfathered, and INV-D9 ("new DMA buffers MUST use DcaBuf") is read as "new DMA buffers in *new* DMA paths". **Reopen triggers** — any of the following warrants a DCB-03-B sub-letter analysis with a named first user: (a) a new DMA2D destination in cacheable RAM that is NOT MPU-Write-Through (D1 SRAM scratch, AXI SRAM tile cache, glyph atlas in cacheable region, M2M-only buffer pairs that stay off-screen); (b) a port to a chip / board where SDRAM is not pre-MPU-configured Write-Through (any non-disco platform, or a future H7 bring-up that disables Write-Through for bus-utilization reasons); (c) the SDRAM Write-Through configuration in `configure_mpu_sdram_writethrough` is itself revised (e.g. switched to Normal Write-Back). | Existing DMA2D consumers continue to call `start_fill_typed` / `start_blit_typed` unchanged. Future consumers in non-Write-Through cacheable RAM route through `DcaCacheCtx::cache.invalidate(...)` per the DCB-02c / DCB-04 trait-dispatch pattern, *or* land DCB-03-B with the named first user. |
 | `Scanout` (LTDC double-buffer) | **Decision deferred to DCB-04.** LTDC continuously reads the front buffer at frame rate; per-frame cache ops are expensive. Two options, **structurally distinct, not equivalent alternatives**: (a) keep the front buffer cacheable, wrap it in `DcaBuf<..., DeviceActiveCirc<Read>>`, and clean only the dirty rectangle on present — DCB ownership and cache discipline apply at runtime; (b) MPU-mark the scanout pair non-cacheable and use `DcaBuf::in_uncached_region` — DCB ownership still applies but cache ops elide *at construction*, and the MPU table becomes part of the platform's frozen memory map. Option (b) trades runtime cost for static-config rigidity (every consumer of the front buffer must accept non-cacheable read latency); option (a) keeps the buffer cacheable for incidental CPU reads (screenshots, FB dumps) at the cost of per-frame maintenance. DCB-00 §11 lists this as a non-goal at this phase; DCB-04 ratifies the choice — and DCB-04 MUST NOT default to (a) on the assumption that the typestate-everywhere story is uniform. | Pending. Code continues to use the existing `Scanout` API verbatim until DCB-04. |
 | `audio_player.rs` private `clean_dcache(ptr, len)` (line 253) | **Replaces.** Cache discipline ratified by DCB-02b (rlvgl `dbfa440`, 2026-05-02): the buffer pair becomes a `DcaDoubleBuf<u8, BUF_BYTES>` (DMA double-buffer mode, M0AR + M1AR alternating) with `DeviceActiveDoubleBuf<Read>` + `BankGuard<Read>`. The cache clean fires at `BankGuard::release` per DCB-01b-A's release-side placement (rlvgl `b47b9a1`, 2026-05-03). The `static SCB`-bypass comment at the original `audio_player.rs:248` is resolved by the player owning a single `&mut SCB` via `Peripherals::steal()` at construction (per INV-D13). DCB-02b-A 2026-05-03 closes the residual raw-pointer write path: `PollResult::NeedRefill { buf: *mut u8, ... }` is replaced by `poll_refill<F>(refill: F)` where `F: FnOnce(&mut [u8], u32) -> usize` — the closure scope IS the bank-guard scope, so the destination becomes a safe slice end-to-end. | DCB-02b retrofit (cache discipline) shipped; DCB-02b-A2 (slice-API revision) lands the closure-based `poll_refill`. |
-| `stm32h747i_disco_sd.rs` `Sd::clean_dcache_by_slice` / `invalidate_dcache_by_slice` (lines 35, 46) | **Replaces.** SDMMC R/W buffers become `DcaBuf<u8, BLOCK_BYTES>`. The W path lends `DeviceReadPending`; the R path lends `DeviceWritePending`. Cache-line-padded storage means the unaligned-slice rationale at `sd_emmc_adapter.rs:39` no longer applies (INV-D2 forces the multiple-of-line size), and the bidirectional `clean_invalidate` collapses to the directional op. | DCB-02c retrofit. |
-| `sd_emmc_adapter.rs` `clean_invalidate_dcache_by_address` (line 47) | **Replaces.** Same lifecycle as the `_disco_sd.rs` retrofit. The aligned-padded storage removes the original justification for the bidirectional op. | DCB-02c retrofit. |
+| `stm32h747i_disco_sd.rs` + `sd_emmc_adapter.rs` SCB d-cache calls (originally lines 35, 46, 47, 57) | **Closed-with-deferral (DCB-02c-A 2026-05-03).** DCB-02c retrofit (rlvgl `9d90d81`, 2026-05-02) routed the four SCB call sites through `DcaCacheCtx` + the `DcaCache` trait, so the SCB calls now live inside `hwcore::dca`'s whitelisted module and the `raw_dcache` BASELINE for these files is empty. The originally-prescribed shape — "SDMMC R/W buffers become `DcaBuf<u8, BLOCK_BYTES>`; W path lends `DeviceReadPending`; R path lends `DeviceWritePending`" — remains the correct shape *if and when* a non-Write-Through SDMMC destination materializes. On the only platform that currently uses SDMMC (STM32H7 disco), the buffer addresses live in MPU-Write-Through SDRAM (`platform/src/stm32h747i_disco.rs:1322`); the typestate's runtime cache op would be a functional no-op. The DCB-02c trait-dispatch shape is the stable end state until a real consumer arrives. The `embedded_sdmmc::BlockDevice` trait is third-party so cannot accept a `DcaBuf` parameter directly even if the DCB-02c-A retrofit happened. **Reopen triggers** — any of the following warrants a DCB-02c-B sub-letter analysis with a named first user: (a) a new SDMMC destination buffer in cacheable RAM that is NOT MPU-Write-Through (D1 SRAM tile cache, AXI SRAM read-ahead ring, glyph atlas in cacheable region); (b) a port to a chip / board where SDRAM is not pre-MPU-configured Write-Through (any non-disco platform adopting SDMMC, or a future H7 bring-up that disables Write-Through); (c) a consumer needing strict 32-byte buffer alignment as a compile-time contract (some Renesas / Microchip SDMMC blocks). | DCB-02c (cache-call containment) shipped; DCB-02c-A 2026-05-03 closes the trait-surface-push as deferred. |
 | DAA `analyzer-cm7/src/main.rs` SAI1 TX clean (current bench fix) | **Replaces.** The SAI1 line-out TX ring becomes a `DcaBuf<i16, SAI1_TX_BUF_HALFWORDS, DeviceActiveCirc<Read>>`, and the per-half-fill code path becomes a `HalfGuard<Read>` whose construction takes the current `NDTR` and whose existence enforces "DMA is on the other half". The manual `clean_dcache_by_address` call disappears. | DCB-02 retrofit, **shipped 2026-05-02** (disco-analyzer `c117a20`). The `rlvgl-platform` API surface lands in DCB-01 (`a56987b`). Bench-validation gate (§12 (b)) is hardware-flash + audio reproduction; pending. |
 | DAA `analyzer-audio/src/sai1_linein.rs` SAI1 RX invalidate (line 279) and SAI4 PDM RX (`sai4_pdm.rs`) | **Replaces.** Both RX paths use **STM32 DMA double-buffer mode** (M0AR + M1AR alternating) with non-contiguous physical banks. They become `DcaDoubleBuf<i16, SAI1_DMA_HALFWORDS>` (and equivalent for PDM) with `DeviceActiveDoubleBuf<Write>` + `BankGuard<Write>` per the parallel typestate family added by the DCB-02-A resolution. The manual `scb.invalidate_dcache_by_address` calls disappear; the bank-guard's entry op performs the invalidate and INV-D15's CT-bit re-check enforces "engine is on the other bank". | DCB-02-R retrofit. Lands after DCB-01b ships `DcaDoubleBuf` / `BankGuard<DIR>` / `DeviceActiveDoubleBuf<DIR>`. Future users: SDMMC streaming reads, USB HS bulk endpoints, DCMI camera frame-grab. |
 | LTDC scanout pre-clean (`examples/stm32h747i-disco/src/freertos_entry.rs:1011, 1449` — single-FRONT model; and the `platform/src/hwcore/surface.rs::Scanout` swap-pair pattern) | **Replaces.** Wraps the buffer in the `DeviceLtdcScan<T, N>` typestate added by the DCB-04-A resolution. `paint_full()` returns a `&mut [T; N]` for in-place CPU writes; `present()` emits the existing clean + DSB pattern (which on STM32H7 + Write-Through SDRAM acts as an AXI-write-buffer drain per §6 INV-D16, *not* as a cache write-back). The manual `scb.clean_dcache_by_address` calls disappear; the last `raw_dcache` BASELINE entry clears, unblocking `RLVGL_LINT_STRICT=1` (§12 (c)). | DCB-04 retrofit. Targets: `freertos_entry.rs` single-FRONT path; `surface.rs::Scanout` swap-pair path (a parallel `DeviceLtdcScanDouble` for hardware-managed swap is deferred until needed). Lands after DCB-01c ships the new typestate. |
@@ -674,7 +675,23 @@ Ratifying DCB-00 unblocks the following work:
   `clean_dcache` helper.
 - **DCB-02c** — `stm32h747i_disco_sd.rs` + `sd_emmc_adapter.rs`
   retrofit; collapse the bidirectional `clean_invalidate` to
-  directional ops via padded storage.
+  directional ops via padded storage. **DCB-02c (cache-call
+  containment via DcaCacheCtx) shipped 2026-05-02 as
+  `9d90d81`. DCB-02c-A (the §10-prescribed DcaBuf push
+  through the BlockDevice trait surface) closed
+  2026-05-03 as deferred** — closure rationale and reopen
+  path: DCB-02c-A. The originally-prescribed shape
+  (`DcaBuf<u8, BLOCK_BYTES>` threaded through
+  `rlvgl_core::fs::BlockDevice`) is the correct design when a
+  consumer needs it, but on the only current platform with
+  SDMMC (the disco) every block buffer is in MPU-Write-Through
+  SDRAM where the typestate's cache op is a no-op. The
+  DCB-02c trait-dispatch shape is the stable end state.
+  **Reopen with DCB-02c-B** when any of: (a) a new SDMMC
+  destination is needed in non-Write-Through cacheable RAM,
+  (b) a port without H7-style Write-Through SDRAM defaults
+  adopts SDMMC, (c) a consumer needs strict 32-byte buffer
+  alignment as a compile-time contract.
 - **DCB-03** — **Closed (deferred), 2026-05-02.** DMA2D
   destination retrofit. Closure rationale and reopen path:
   DCB-03-A. The originally-prescribed shape (FrameBuffer
@@ -1089,3 +1106,66 @@ behaviour MAY land touching these surfaces until DCB-00 ratifies):
   DCB-02b-A sub-letter analysis at
   `docs/concepts/DCB-02b-A.md` is preserved as historical
   record; its decision has folded into this entry.
+- **2026-05-03 — DCB-02c-A resolution: Option C (closure-with-
+  deferral).** DCB-02c-A (the §10-prescribed `DcaBuf<u8,
+  BLOCK_BYTES>` push through the `rlvgl_core::fs::BlockDevice`
+  trait surface) is closed without a retrofit. Mirrors the
+  DCB-03-A resolution structurally: both DMA2D and SDMMC
+  destinations live in MPU-Write-Through SDRAM on the only
+  platform that currently uses them
+  (`platform/src/stm32h747i_disco.rs:1322`); the §10
+  prescription is forward-looking design hygiene rather than
+  a fix for an observed bug. The DCB-02c trait-dispatch
+  shape (cache calls routed through `DcaCacheCtx` per
+  rlvgl `9d90d81`) is the stable end state for the SD path.
+
+  Sections amended:
+  - §10: the SD reconciliation row is reworded to mark the
+    prescription as "closed-with-deferral" rather than
+    "Replaces", consolidates the two pre-existing entries
+    (`stm32h747i_disco_sd.rs` + `sd_emmc_adapter.rs`) into
+    one row naming DCB-02c-A 2026-05-03 as the resolution
+    trigger, and gains a normative **Reopen triggers**
+    clause enumerating (a) a new non-Write-Through SDMMC
+    destination, (b) a port without H7-style Write-Through
+    SDRAM defaults adopting SDMMC, (c) a consumer needing
+    strict 32-byte buffer alignment as a compile-time
+    contract. Any of those triggers a DCB-02c-B sub-letter
+    analysis with a named first user before the trait-
+    surface push lands.
+  - §14: the DCB-02c entry gains the closure note + reopen
+    path. The DCB-02c-B reopen path is preserved with the
+    same trigger set as §10 — future maintainers don't need
+    to re-derive the analysis to know when a reopen is
+    warranted.
+
+  Motivation (DCB-02c-A §3 / §4): the embedded-sdmmc
+  `BlockDevice` trait is third-party; forcing a `DcaBuf`
+  through that boundary requires an internal memcpy which
+  makes the adapter *worse* in shape. Rippling FAT consumers
+  / playit asset loader / future filesystems for pure
+  spec-driven cleanup trades real refactor budget against
+  imagined future requirements. The trait-dispatch route
+  (`DcaCacheCtx::cache.invalidate(addr, len)`) is already
+  available for ad-hoc future consumers without reopening
+  DCB-02c.
+
+  This is **not a Standards Action change** to the typestate
+  set, layout invariants, engine submission contract, or
+  scanner rule. It is a closure-with-deferral on the §10
+  reconciliation prescription only. INV-D9 wording remains
+  unchanged but is read forward-looking — pre-DCB SDMMC
+  adapters grandfathered alongside the `BlockDevice` trait
+  surface that pre-dates DCB. No `BASELINE` change required;
+  the `raw_dcache` BASELINE is already empty after DCB-04.
+
+  The DCB-02c-A sub-letter analysis at
+  `docs/concepts/DCB-02c-A.md` is preserved as historical
+  record; its decision has folded into this entry. With this
+  ratification, the DCB initiative's optional-cleanup track
+  closes: DCB-02b-A2 (audio_player slice API) was the last
+  code change. DCB-04-B (full LtdcScan typestate refactor
+  for `freertos_entry.rs`'s FRONT_FB swap atomics) remains
+  the only outstanding optional improvement; if not pursued,
+  the LTDC scanout path stays at the DCB-04 trait-dispatch
+  shape (analogous to DCB-02c / DCB-03 closures).

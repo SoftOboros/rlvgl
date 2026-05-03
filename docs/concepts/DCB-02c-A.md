@@ -1,22 +1,17 @@
 # DCB-02c-A — DcaBuf push through the BlockDevice trait surface
 
-**Status:** Drafted 2026-05-03. Sub-letter analysis surfaced
-during the post-DCB-04 sweep for unblocked outstanding items.
-DCB-02c (rlvgl `9d90d81`) retrofitted the two SD adapters
-(`stm32h747i_disco_sd.rs`, `sd_emmc_adapter.rs`) onto
-`DcaCacheCtx` so the SCB cache calls live inside `hwcore::dca`'s
-whitelisted module — clearing the `raw_dcache` BASELINE for
-those files. DCB-02c did **not** change the trait surface; the
-caller-supplied `&mut [u8]` block buffers stayed unchanged.
-DCB-00 §10's SD reconciliation row prescribed the more
-aggressive shape: "SDMMC R/W buffers become `DcaBuf<u8,
-BLOCK_BYTES>`. The W path lends `DeviceReadPending`; the R
-path lends `DeviceWritePending`." This sub-letter takes
-inventory of what that retrofit actually buys, surveys the
-option set the §10 row leaves open, and recommends a path. Per
-the parent CLAUDE.md "Sub-letter doc convention" the
-resolution folds into DCB-00 §10 / §14 / §15 (or ratifies a
-closure-with-deferral) as a Standards Action amendment.
+**Status:** **Resolved 2026-05-03 — Option C ratified
+(closure-with-deferral).** Folded into DCB-00 §10 (SD
+reconciliation row reworded as closed-with-deferral with
+normative Reopen triggers) + §14 (DCB-02c entry gains the
+closure note + DCB-02c-B reopen path) + §15 via the
+2026-05-03 closure-with-deferral entry. **DCB-02c-B reopen**
+is triggered by any of: (a) a new SDMMC destination in
+non-Write-Through cacheable RAM; (b) a port without H7-style
+Write-Through SDRAM defaults adopting SDMMC; (c) a consumer
+needing strict 32-byte buffer alignment as a compile-time
+contract. This file is preserved as historical analysis only;
+no behaviour PRs reference it directly.
 
 ## 1. Purpose
 
@@ -299,3 +294,15 @@ behaviour PRs follow.
   end state; reopen DCB-02c-B when a real consumer
   materializes). Awaiting owner ratification via a DCB-00
   §15 amendment.
+- **2026-05-03 — Resolved.** Option C ratified by owner
+  go-ahead. Resolution folded into DCB-00 §10 (SD
+  reconciliation row reworded as closed-with-deferral with
+  normative Reopen triggers naming the three conditions for
+  a DCB-02c-B sub-letter), §14 (DCB-02c entry gains the
+  closure note + DCB-02c-B reopen path), and §15
+  (closure-with-deferral ratification entry; not a Standards
+  Action change to the typestate set or invariants — only
+  the §10 reconciliation prescription is amended). With this
+  ratification, the DCB initiative's optional-cleanup track
+  closes: DCB-02b-A2 (audio_player slice API) was the last
+  code change. This sub-letter is now historical record only.
