@@ -37,28 +37,22 @@ use crate::hwcore::dca::{Bank, DbufCpu, DbufRead, DcaCacheCtx, DcaDoubleBuf};
 use crate::sai::Sai1Audio;
 use crate::wav::WavHeader;
 
-/// Result of an [`AudioPlayer::poll`] call.
+/// Result of an [`AudioPlayer::poll_refill`] call.
+///
+/// Refill cases are no longer surfaced as a `PollResult` variant —
+/// per the DCB-02b-A 2026-05-03 amendment, the refill is invoked
+/// inline through the closure passed to `poll_refill`. The `Idle`
+/// / `Playing` / `Finished` variants here describe the *engine's*
+/// state at the call boundary, independent of whether a refill
+/// happened during the call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PollResult {
     /// No playback in progress.
     Idle,
-    /// Playback is running; no action needed this iteration.
+    /// Playback is running; no further action needed this iteration
+    /// (the closure may or may not have been invoked — either way,
+    /// the engine is still streaming).
     Playing,
-    /// A buffer needs to be refilled by the caller.
-    ///
-    /// The caller should:
-    /// 1. Read up to `max_bytes` of PCM data from the file at `file_offset`
-    /// 2. Write the data into the returned buffer pointer
-    /// 3. If fewer bytes are available (end of file), zero-fill the remainder
-    /// 4. Call [`AudioPlayer::refill_done`] with the number of PCM bytes written
-    NeedRefill {
-        /// Pointer to the buffer that needs filling.
-        buf: *mut u8,
-        /// Byte offset into the WAV PCM data to read from.
-        file_offset: u32,
-        /// Maximum number of bytes to read (buffer capacity).
-        max_bytes: usize,
-    },
     /// Playback has finished (end of file reached and final buffer drained).
     Finished,
 }
@@ -252,58 +246,88 @@ impl<const BUF_BYTES: usize> AudioPlayer<BUF_BYTES> {
         self.state = PlayState::Playing;
     }
 
-    /// Poll the player.  Call once per main loop iteration.
-    pub fn poll(&mut self) -> PollResult {
+    /// Poll the player and run a refill closure if one is needed.
+    ///
+    /// The closure `refill` is invoked when the DMA engine has just
+    /// completed a half-period and the freshly-vacated (inactive)
+    /// bank needs new PCM data. It receives:
+    ///
+    /// - `&mut [u8]` — the inactive bank's slice, **clipped to the
+    ///   number of valid PCM bytes the file still has at this offset**
+    ///   (i.e. `min(remaining, BUF_BYTES)`). At end-of-file the slice
+    ///   may be shorter than `BUF_BYTES`; the closure should zero-fill
+    ///   any indices it doesn't write valid PCM into.
+    /// - `u32` — the byte offset into the WAV PCM data the caller
+    ///   should read from.
+    ///
+    /// And returns the number of valid PCM bytes actually written
+    /// (≤ `slice.len()`). The player uses this to advance
+    /// `bytes_queued` and decide when to transition into `Draining`.
+    ///
+    /// DCB-02b-A2 (2026-05-03): the closure scope IS the `BankGuard<
+    /// Read>` scope. Per DCB-01b-A's release-side cache-op placement
+    /// (DCB-01d), the release-time clean fires *after* the closure
+    /// returns, publishing the just-written PCM bytes to RAM before
+    /// the engine flips back to this bank. The INV-D15 CT-bit
+    /// re-check on `release` catches "engine flipped during the
+    /// closure" as a stream-faster-than-CPU fault.
+    ///
+    /// `PollResult` describes the engine's state at the call
+    /// boundary. The refill happens in-band: a `Playing` return may
+    /// or may not have invoked the closure depending on whether the
+    /// DMA had completed a half. `Idle` / `Finished` are returned
+    /// without invoking the closure.
+    pub fn poll_refill<F>(&mut self, refill: F) -> PollResult
+    where
+        F: FnOnce(&mut [u8], u32) -> usize,
+    {
         match self.state {
-            PlayState::Idle => PollResult::Idle,
-            PlayState::Ready => PollResult::Idle, // not started yet
-            PlayState::Playing => self.poll_playing(),
-            PlayState::Draining => self.poll_draining(),
+            PlayState::Idle | PlayState::Ready => return PollResult::Idle,
+            PlayState::Playing => {}
+            PlayState::Draining => return self.poll_draining(),
         }
-    }
 
-    /// Acknowledge that a buffer refill has been completed.
-    ///
-    /// `pcm_bytes` is the number of valid PCM bytes written (may be less than
-    /// `max_bytes` at end of file — the caller should zero-fill the rest).
-    ///
-    /// DCB-02b: the cache clean for the just-refilled bank is emitted
-    /// by `BankGuard<Read>` construction (DCB-00 §5 transition row).
-    /// The release-time CT-bit re-check (INV-D15) catches the case
-    /// where the engine flipped CT into the inactive bank during the
-    /// caller's fill — a stream-faster-than-CPU fault.
-    pub fn refill_done(&mut self, pcm_bytes: usize) {
-        self.bytes_queued += pcm_bytes as u32;
+        // Check if DMA has switched buffers (transfer complete).
+        if !self.dma.transfer_complete() {
+            return PollResult::Playing;
+        }
+        self.dma.clear_transfer_complete();
 
-        let dbuf_read = match &mut self.dca {
-            DcaState::Active(d) => d,
-            _ => return, // refill_done called outside Active — no-op
-        };
+        // Calculate how much data remains to be read from the file.
+        let remaining = self.data_total.saturating_sub(self.bytes_queued);
+        if remaining == 0 {
+            // All data has been queued; enter draining.
+            self.state = PlayState::Draining;
+            return PollResult::Playing;
+        }
+
+        let max_bytes = core::cmp::min(remaining as usize, BUF_BYTES);
+        let file_offset = self.data_file_offset + self.bytes_queued;
 
         // Determine the engine's current target. `DmaSai1Tx::current_target`
         // reads `DMA1_S0CR` bit 19 (the CT bit) via the typed wrapper —
         // the live-recheck source-of-truth for INV-D15.
         let target_bit = self.dma.current_target();
         let current_target = if target_bit == 0 { Bank::M0 } else { Bank::M1 };
+        self.last_target = target_bit;
+
+        let dbuf_read = match &mut self.dca {
+            DcaState::Active(d) => d,
+            _ => return PollResult::Idle,
+        };
 
         let mut ctx = DcaCacheCtx::new(&mut self.scb);
-        let guard = dbuf_read.bank_guard(&mut ctx, current_target);
-        // The bank-guard's `as_mut_slice()` is intentionally NOT used
-        // here — the caller already wrote PCM bytes through the raw
-        // pointer returned by `PollResult::NeedRefill`. The guard's
-        // role on this code path is to (a) emit the cache clean for
-        // the inactive bank, (b) provide the borrow-check guarantee
-        // that no concurrent guard exists. A future API revision
-        // could thread the `&mut [u8]` through `NeedRefill` to make
-        // the slice access typesafe end-to-end; that's deferred to a
-        // DCB-02b-A follow-up.
-        // DCB-02b-r2 (DCB-01b-A 2026-05-03 amendment): release now
-        // takes &mut DcaCacheCtx as the first arg. For Read direction
-        // (audio playback: DMA reads RAM → SAI peripheral → DAC) the
-        // release-time clean publishes the just-completed PCM writes
-        // before the engine flips back to this bank, eliminating the
-        // ~10.67 ms latency regression that DCB-02b inherited from
-        // DCB-01b's entry-clean placement.
+        let mut guard = dbuf_read.bank_guard(&mut ctx, current_target);
+
+        // Run the user's refill closure with the inactive bank's
+        // slice clipped to `max_bytes`. The closure scope IS the
+        // bank-guard scope; the destination is a safe `&mut [u8]`
+        // end-to-end.
+        let bank_slice: &mut [u8; BUF_BYTES] = guard.as_mut_slice();
+        let pcm_bytes = refill(&mut bank_slice[..max_bytes], file_offset);
+
+        // Release-time clean (DCB-01b-A: Read direction's clean fires
+        // at release, not at construction) + INV-D15 CT-bit re-check.
         let new_target_bit = self.dma.current_target();
         let new_target = if new_target_bit == 0 {
             Bank::M0
@@ -312,10 +336,12 @@ impl<const BUF_BYTES: usize> AudioPlayer<BUF_BYTES> {
         };
         let _ = guard.release(&mut ctx, new_target);
 
-        // If we've queued all the data, enter draining state
+        self.bytes_queued += pcm_bytes as u32;
         if self.bytes_queued >= self.data_total {
             self.state = PlayState::Draining;
         }
+
+        PollResult::Playing
     }
 
     /// Stop playback immediately.
@@ -339,47 +365,6 @@ impl<const BUF_BYTES: usize> AudioPlayer<BUF_BYTES> {
     // -----------------------------------------------------------------------
     // Private
     // -----------------------------------------------------------------------
-
-    fn poll_playing(&mut self) -> PollResult {
-        // Check if DMA has switched buffers (transfer complete)
-        if !self.dma.transfer_complete() {
-            return PollResult::Playing;
-        }
-        self.dma.clear_transfer_complete();
-
-        // DMA switched targets — the buffer it just finished is now free.
-        // Recover the just-completed (inactive) bank's address from the
-        // DbufRead handle.
-        let current = self.dma.current_target();
-        let dbuf_read = match &self.dca {
-            DcaState::Active(d) => d,
-            _ => return PollResult::Idle,
-        };
-        // The free buffer is the one DMA just left (opposite of current).
-        let free_buf: *mut u8 = if current == 1 {
-            dbuf_read.m0_dma_addr().raw() as *mut u8
-        } else {
-            dbuf_read.m1_dma_addr().raw() as *mut u8
-        };
-        self.last_target = current;
-
-        // Calculate how much data remains to be read from the file.
-        let remaining = self.data_total.saturating_sub(self.bytes_queued);
-        if remaining == 0 {
-            // All data has been queued; enter draining
-            self.state = PlayState::Draining;
-            return PollResult::Playing;
-        }
-
-        let max_bytes = core::cmp::min(remaining as usize, BUF_BYTES);
-        let file_offset = self.data_file_offset + self.bytes_queued;
-
-        PollResult::NeedRefill {
-            buf: free_buf,
-            file_offset,
-            max_bytes,
-        }
-    }
 
     fn poll_draining(&mut self) -> PollResult {
         // Wait for one more transfer complete — the final buffer has been played

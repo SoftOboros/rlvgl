@@ -3313,40 +3313,42 @@ fn main() -> ! {
             }
 
             // ── Poll audio player ──
+            //
+            // DCB-02b-A2 (2026-05-03 amendment): refill happens inline
+            // through the closure passed to `poll_refill`. The slice
+            // is the inactive bank's view (clipped to the file's
+            // remaining bytes); the destination is a safe `&mut [u8]`
+            // — no raw pointer arithmetic on the player's buffers.
+            // The source PCM lives at AUDIO_PCM_BASE (a fixed SDRAM
+            // region), still accessed via raw pointer because the
+            // upstream copy isn't part of DCB-02b-A's scope.
             #[cfg(all(feature = "audio", feature = "sd_storage"))]
             {
                 use rlvgl_platform::audio_player::PollResult;
-                match audio_player.poll() {
-                    PollResult::NeedRefill {
-                        buf,
-                        file_offset: _,
-                        max_bytes,
-                    } => {
-                        let pcm_base = AUDIO_PCM_BASE as *const u8;
-                        let cursor = audio_read_cursor;
-                        let remaining = audio_pcm_len.saturating_sub(cursor) as usize;
-                        let to_copy = core::cmp::min(max_bytes, remaining);
-                        if to_copy > 0 {
-                            unsafe {
-                                core::ptr::copy_nonoverlapping(
-                                    pcm_base.add(cursor as usize),
-                                    buf,
-                                    to_copy,
-                                );
-                            }
+                let result = audio_player.poll_refill(|buf, _file_offset| {
+                    let pcm_base = AUDIO_PCM_BASE as *const u8;
+                    let cursor = audio_read_cursor;
+                    let remaining = audio_pcm_len.saturating_sub(cursor) as usize;
+                    let to_copy = core::cmp::min(buf.len(), remaining);
+                    if to_copy > 0 {
+                        // SAFETY: AUDIO_PCM_BASE is a fixed SDRAM
+                        // region populated at SD-load time; reading
+                        // `to_copy` bytes from offset `cursor` stays
+                        // within `audio_pcm_len`. The destination is
+                        // a safe slice owned by the bank guard.
+                        unsafe {
+                            buf[..to_copy].copy_from_slice(core::slice::from_raw_parts(
+                                pcm_base.add(cursor as usize),
+                                to_copy,
+                            ));
                         }
-                        if to_copy < max_bytes {
-                            unsafe {
-                                core::ptr::write_bytes(buf.add(to_copy), 0, max_bytes - to_copy);
-                            }
-                        }
-                        audio_read_cursor += to_copy as u32;
-                        audio_player.refill_done(to_copy);
                     }
-                    PollResult::Finished => {
-                        audio_player.stop(&sai);
-                    }
-                    _ => {}
+                    buf[to_copy..].fill(0);
+                    audio_read_cursor += to_copy as u32;
+                    to_copy
+                });
+                if result == PollResult::Finished {
+                    audio_player.stop(&sai);
                 }
             }
 
