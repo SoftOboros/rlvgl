@@ -44,6 +44,16 @@ disco-analyzer subrepo's first concepts doc).
   - [DCB-00-CONCEPTS.md](DCB-00-CONCEPTS.md) — foundational
     vocabulary, frozen typestate, invariants, source-of-truth map.
     **Ratified 2026-05-02 (§15); DCB-01 unblocked.**
+  - [DCB-POST-MORTEM.md](DCB-POST-MORTEM.md) — initiative-
+    completion post-mortem (2026-05-03). Captures divergences
+    against the original DCB-00 spec, refactor inflection
+    points, portable mitigation patterns, deferred-work
+    reclassification (Safe / Coupled / Abandoned), and
+    forward constraints for future register-mashing-
+    discipline-scoped initiatives. Provenance hooks link each
+    entry to commit hashes, doc sections, and datasheet
+    references for outcome → issue → fix → evidence
+    traversal.
   - [DCB-02-A.md](DCB-02-A.md) — sub-letter analysis surfaced
     during DCB-02 TX retrofit. Proposed Option A
     (`DeviceActiveDoubleBuf<DIR>` typestate) for DMA double-buffer-
