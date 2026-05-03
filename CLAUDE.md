@@ -551,6 +551,108 @@ Conventional-commit style (`feat:`, `fix:`, `docs:`, `tools:`) remains
 the default for non-initiative work; the initiative prefix replaces the
 conventional type when the change is scoped to a ratified phase.
 
+### Initiative retrospective
+
+Multi-phase initiatives MUST land an **initiative retrospective**
+when they reach natural completion (every named phase either
+shipped or closed-with-deferral; the BASELINE / acceptance
+gate the initiative was designed to clear is satisfied; or the
+owner declares completion explicitly). Retrospective in the
+agile sense — neutral framing, oriented at *what to encode for
+next time*, not at blame or celebration.
+
+#### File and naming
+
+One retrospective per initiative, co-located with the phase
+docs at `<initiative-dir>/<INIT>-RETROSPECTIVE.md` (e.g.
+`docs/concepts/DCB-RETROSPECTIVE.md`,
+`docs/disco-platform-guide/DISCO-RETROSPECTIVE.md`,
+`docs/beaglebone-black/BBB-RETROSPECTIVE.md`). The file is
+preserved as a historical artifact; behaviour PRs reference
+the canonical concepts doc + §15 change log directly, never
+the retrospective.
+
+A second retrospective for the same initiative is permitted
+only if the initiative resumes from a closed state (a
+DCB-NN-B reopen succeeds, a paused phase-set reactivates,
+etc.) and produces a structurally distinct second completion
+event. The second retrospective amends the original via a
+new dated entry in §8, not a separate file.
+
+#### Content shape (sections §1–§7)
+
+The retrospective MUST capture:
+
+- **§1 Outcome snapshot**. Final architecture / artifacts;
+  deferred items enumerated explicitly (not implied); known
+  residual risks named with the configuration-or-platform
+  assumption each one rides on.
+- **§2 Divergence log**. Where reality diverged from plan,
+  one entry per divergence. Each entry as **Assumption →
+  Symptom → Root cause → Detection gap**: what the spec
+  said; observable failure mode (not interpretation);
+  mechanistic root cause (not narrative); why automated
+  gates didn't catch it earlier. This is the load-bearing
+  section.
+- **§3 Refactor points**. Decision inflection nodes —
+  where the initiative changed direction. Each as
+  **Trigger → Alternatives → Selection rationale → Cost of
+  switch**. Future efforts use this section to short-circuit
+  re-exploration of branches that were already evaluated.
+- **§4 Mitigation patterns**. Abstract the fixes into
+  reusable units. "When X + Y → apply Z pattern". Encode as
+  guardrails, invariants, pre-flight checks, or template
+  code patterns. This is the bridge into project-wide
+  AGENTS.md / coding guidelines.
+- **§5 Deferred work reclassification**. Don't leave
+  deferred items as a flat list. Classify as **Safe**
+  (orthogonal, no impact on core invariants), **Coupled**
+  (affects assumptions; must be revisited with context —
+  name the assumption explicitly), or **Abandoned**
+  (explicitly killed, with a resurrection-prevention note
+  to deter future agents from re-deriving it).
+- **§6 Forward constraints**. Lessons turned into
+  preconditions for the next initiative. "Do not start
+  without X validated"; "Y must be treated as unstable
+  boundary"; "Z requires instrumentation before
+  integration". This is the only normative section in the
+  retrospective; future planning docs treat these as
+  binding rules.
+- **§7 Provenance hooks**. Link each divergence and
+  refactor point to the authoritative artifacts: commit
+  range, sub-letter doc, §15 amendment, datasheet
+  reference, external evidence. Future agents traverse
+  **outcome → issue → fix → underlying evidence** in one
+  hop.
+
+A `§8 change log` follows §1–§7, dated, recording when the
+retrospective was drafted and any subsequent amendments.
+
+#### Tone
+
+Neutral. Surface root causes mechanistically; don't soften
+findings or assign blame. The audience is future Codex /
+Claude agents working on a structurally similar initiative
+— they need actionable signal, not narrative.
+
+#### Applicability
+
+The retrospective discipline applies to every initiative
+covered by this Spec-Before-Code Planning Discipline section
+(see §Applicability below). For port-shaped initiatives
+(`DISCO-NN`, `BBB-NN`, `CHIPS-VENDOR-NN`) the retrospective
+captures lessons from the multi-prong / multi-chapter
+trajectory. For cross-cutting initiatives (`DCB`, future
+`docs/concepts/`-based families) the retrospective captures
+the spec-vs-implementation divergences that the per-phase
+docs don't.
+
+The first reference implementation is
+`docs/concepts/DCB-RETROSPECTIVE.md` (DCB initiative,
+2026-05-03). Future retrospectives MAY adopt that doc's
+specific section breakdowns or amend the §1–§7 shape with a
+named justification in their §8 change log.
+
 ### Applicability
 
 This discipline applies to:

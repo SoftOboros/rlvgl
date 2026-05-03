@@ -1,15 +1,24 @@
-# DCB Post-Mortem — divergences, refactor points, forward constraints
+# DCB Retrospective — divergences, refactor points, forward constraints
 
-**Status:** Drafted 2026-05-03. Initiative-completion post-mortem
-for the DCB (DMA Cacheable Buffers) initiative on rlvgl
-`v0.2.0`. Not a chronicle and not a celebration — a delta
-against the original DCB-00 spec, organized for future
+**Status:** Drafted 2026-05-03. Initiative-completion
+retrospective for the DCB (DMA Cacheable Buffers) initiative
+on rlvgl `v0.2.0`. Not a chronicle and not a celebration — a
+delta against the original DCB-00 spec, organized for future
 register-mashing-discipline-scoped initiatives to consume.
 
-This doc is a **historical artifact** with one normative section
-(§7 forward constraints). Behaviour PRs reference DCB-00
-directly; this post-mortem is the bridge between *what we
-shipped* and *what to do differently next time*.
+Retrospective in the agile sense: surfaces what diverged from
+plan, what gates worked / didn't work, what patterns to carry
+forward, and what preconditions future initiatives must
+satisfy. The initiative-retrospective convention is documented
+in `CLAUDE.md` "Spec-Before-Code Planning Discipline →
+Initiative retrospective"; one retrospective per multi-phase
+initiative, co-located with the phase docs at
+`<initiative-dir>/<INIT>-RETROSPECTIVE.md`.
+
+This doc is a **historical artifact** with one normative
+section (§6 forward constraints). Behaviour PRs reference
+DCB-00 directly; this retrospective is the bridge between
+*what we shipped* and *what to do differently next time*.
 
 ## 1. Outcome snapshot
 
@@ -405,10 +414,11 @@ via DCB-00 §15 amendment; only then implement. Don't ship a
 half-retrofit.
 
 **Encode as**: DCB-00 §15 policy gate. The sub-letter
-discipline is already documented; the post-mortem here is
-that we *had* it and shouldn't have shipped DCB-01b without
-sub-letter review of the cache-op-placement question — the
-spec text was the bug, not just the implementation.
+discipline is already documented; the retrospective
+observation here is that we *had* it and shouldn't have
+shipped DCB-01b without sub-letter review of the cache-op-
+placement question — the spec text was the bug, not just
+the implementation.
 
 ### 4.5. "Closure-with-deferral for forward-looking §10 prescriptions"
 
@@ -638,25 +648,33 @@ initiative should traverse:
   outcome + closures + reopen triggers).
 - `docs/concepts/DCB-00-CONCEPTS.md` §15 (canonical change
   log with all amendments).
-- This post-mortem (`docs/concepts/DCB-POST-MORTEM.md`) for
-  the divergences-and-mitigations corpus.
+- This retrospective
+  (`docs/concepts/DCB-RETROSPECTIVE.md`) for the
+  divergences-and-mitigations corpus.
 - `docs/concepts/DCB-NN-X.md` sub-letters for the
   resolution-decision history (preserved as historical
   record; no behaviour PR references them directly).
 
 The traversal pattern is: **start at MEMORY.md, drill into
 DCB-00 §15 for the canonical decisions, drill into this
-post-mortem for the failure-mode analysis, drill into
+retrospective for the failure-mode analysis, drill into
 sub-letters for the option-space exploration**. Behaviour PRs
 reference DCB-00 sections only.
 
 ## 8. Change log
 
-- **2026-05-03 — Drafted.** Initiative-completion post-mortem
-  for the DCB initiative on rlvgl `v0.2.0`. Captures
-  divergences (§2), refactor points (§3), portable mitigation
-  patterns (§4), deferred-work reclassification (§5), and
-  forward constraints (§6) for use by future register-mashing-
-  discipline-scoped initiatives. Provenance hooks (§7) link
-  each entry to the authoritative artifact (commit hash, doc
-  section, datasheet reference).
+- **2026-05-03 — Drafted.** Initiative-completion
+  retrospective for the DCB initiative on rlvgl `v0.2.0`.
+  Captures divergences (§2), refactor points (§3), portable
+  mitigation patterns (§4), deferred-work reclassification
+  (§5), and forward constraints (§6) for use by future
+  register-mashing-discipline-scoped initiatives. Provenance
+  hooks (§7) link each entry to the authoritative artifact
+  (commit hash, doc section, datasheet reference).
+- **2026-05-03 — Renamed `DCB-POST-MORTEM.md` →
+  `DCB-RETROSPECTIVE.md`.** Aligned with the
+  initiative-retrospective convention added to CLAUDE.md
+  "Spec-Before-Code Planning Discipline → Initiative
+  retrospective". Agile retrospective framing (neutral) over
+  post-mortem (project-management connotation); content
+  unchanged except for terminology cleanup.
