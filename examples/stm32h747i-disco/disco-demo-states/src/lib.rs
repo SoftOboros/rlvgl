@@ -2,6 +2,12 @@
 
 use std::collections::VecDeque;
 
+// Verification-vector test family per chapter 04 §7.2 of the rlvgl
+// app-schema spec. The submodule is gated on `cfg(test)` so the vendored
+// crate's release builds don't pull in the host-only `include_str!` payload.
+#[cfg(test)]
+mod vectors;
+
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -144,7 +150,7 @@ impl Machine {
         }
     }
 
-    fn raise_name(&mut self, name: &str) {
+    pub fn raise_name(&mut self, name: &str) {
         if !self.internal_events { return; }
         if let Some(ev) = event_from_name(name) {
             self.queue.push_back(ev);
@@ -181,8 +187,8 @@ pub fn guard_t5(m: &Machine) -> bool {
     true
 }
 
-// Map string name to Event (for raise/send)
-fn event_from_name(s: &str) -> Option<Event> {
+// Map string name to Event (for raise/send and external dispatch)
+pub fn event_from_name(s: &str) -> Option<Event> {
     match s {
         "open_menu" => Some(Event::OpenMenu),
         "play" => Some(Event::Play),

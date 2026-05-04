@@ -40,12 +40,12 @@ state_machine:
   source: disco-demo-states/states/main.scxml
   generator: mcp-statechart
   vendored_crate: disco-demo-states
-  # Vectors *are* authored upstream (vectors/*.txt + harness binary)
-  # but the istate codegen does NOT yet emit them as `#[test] fn
-  # vector_<id>` per chapter 04 §7.2. Until that lands, declare
-  # verification_vectors: false per the §7.4 escape hatch and run
-  # the harness binary out-of-band via the SM crate's Makefile.
-  verification_vectors: false
+  # Upstream istate codegen now emits chapter 04 §7.2-conforming
+  # `src/vectors.rs` (`#[test] fn vector_<scxml_id_snake_case>`).
+  # `cargo test --manifest-path
+  #  examples/stm32h747i-disco/disco-demo-states/Cargo.toml`
+  # runs all five host-side.
+  verification_vectors: true
 
 assets:
   - id: splash

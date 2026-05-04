@@ -1,5 +1,5 @@
 {
-  "tool": "softoboros-istate-codegen",
+  "tool": "mcp-statechart",
   "version": "0.1.0",
   "source": "rlvgl-app04b/menu",
   "files": [
@@ -21,7 +21,11 @@
     },
     {
       "path": "src/lib.rs",
-      "hash": "sha256:4365e1392f07bc9c124943a2c6e4bfc4cd56a87940aa7d4a880269d547a988b6"
+      "hash": "sha256:6584bdb7bc8d5492cace3ba56e9c1419d653b953a3f76849983306b62d1bcb7a"
+    },
+    {
+      "path": "src/vectors.rs",
+      "hash": "sha256:66e8846663fa8568e5d59ec4a00bc6f44819a4f9ee4e9db0c6f093c8c81a8037"
     },
     {
       "path": "src/externals_user.rs.sample",
@@ -97,5 +101,6 @@
     "menu",
     "settings",
     "playing"
-  ]
+  ],
+  "verification_vectors": true
 }
