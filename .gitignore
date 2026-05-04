@@ -4,6 +4,8 @@
 /Cargo.lock
 examples/uefi-disco/target/
 examples/uefi-disco/Cargo.lock
+examples/stm32h747i-disco/disco-demo-states/target/
+examples/stm32h747i-disco/disco-demo-states/Cargo.lock
 **/*.rs.bk
 /coverage
 .envrc
