@@ -17,6 +17,47 @@ use anyhow::{Result, anyhow, bail};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
+#[path = "app/feature_graphs.rs"]
+mod feature_graphs;
+
+/// Format a `feature_graphs::Dep` as a single Cargo.toml `[dependencies]`
+/// line. Used by `emit_cargo_toml` per APP-05a.
+fn format_dep_line(dep: &feature_graphs::Dep) -> String {
+    use feature_graphs::DepSource;
+    let mut parts: Vec<String> = Vec::new();
+    match &dep.source {
+        DepSource::Path(p) => parts.push(format!("path = {p:?}")),
+        DepSource::Version(v) => parts.push(format!("version = {v:?}")),
+        DepSource::PackageRename { package, version } => {
+            parts.push(format!("package = {package:?}"));
+            parts.push(format!("version = {version:?}"));
+        }
+    }
+    if !dep.default_features {
+        parts.push("default-features = false".to_string());
+    }
+    if !dep.features.is_empty() {
+        parts.push(format!("features = {:?}", dep.features));
+    }
+    if dep.optional {
+        parts.push("optional = true".to_string());
+    }
+    // Inline-table form when the dep has any attributes beyond a bare
+    // version. The bare-version form (`name = "0.2"`) is preserved
+    // when the only attribute is a Version source with default
+    // features and no other knobs.
+    let bare_version_ok = matches!(&dep.source, DepSource::Version(_))
+        && dep.default_features
+        && dep.features.is_empty()
+        && !dep.optional;
+    if bare_version_ok {
+        if let DepSource::Version(v) = &dep.source {
+            return format!("{} = {:?}\n", dep.name, v);
+        }
+    }
+    format!("{} = {{ {} }}\n", dep.name, parts.join(", "))
+}
+
 /// Schema tag this validator accepts. Chapter 01 §5.1 / §6 rule 1.
 pub const SCHEMA_TAG: &str = "rlvgl-app/v0";
 
@@ -2184,9 +2225,23 @@ impl Orchestrator {
         }
         s.push('\n');
 
+        // Look up the per-prong template (APP-05). Falls through to
+        // the pre-APP-05 placeholder shape when no template matches —
+        // out-of-allow-list manifests still get a buildable shell.
+        let prong = self.manifest.target.prong.as_str();
+        let generator = self
+            .manifest
+            .target
+            .generator
+            .as_deref()
+            .unwrap_or("creator-bsp-pac");
+        let vendor = self.manifest.target.vendor.as_str();
+        let board = self.manifest.target.board.as_str();
+        let template = feature_graphs::lookup(prong, generator, vendor, board);
+
         // [lib] / [[bin]] sections — Zephyr prong is staticlib; others
         // are binary crates with main.rs.
-        if self.manifest.target.prong == "zephyr" {
+        if prong == "zephyr" {
             s.push_str("# Zephyr prong: Rust side is a staticlib linked into the\n");
             s.push_str("# nested west project at zephyr/. See zephyr/CMakeLists.txt.\n");
             s.push_str("[lib]\n");
@@ -2195,17 +2250,71 @@ impl Orchestrator {
         } else {
             s.push_str("[[bin]]\n");
             s.push_str(&format!("name = {:?}\n", self.manifest.name));
-            s.push_str("path = \"src/main.rs\"\n\n");
+            s.push_str("path = \"src/main.rs\"\n");
+            if let Some(t) = template {
+                if !t.bin_required_features.is_empty() {
+                    s.push_str(&format!(
+                        "required-features = {:?}\n",
+                        t.bin_required_features
+                    ));
+                }
+            }
+            s.push('\n');
+            // Sibling-intent extra binaries from the template.
+            if let Some(t) = template {
+                for bin in t.extra_bins {
+                    s.push_str("[[bin]]\n");
+                    s.push_str(&format!("name = {:?}\n", bin.name));
+                    s.push_str(&format!("path = {:?}\n", bin.path));
+                    if !bin.required_features.is_empty() {
+                        s.push_str(&format!(
+                            "required-features = {:?}\n",
+                            bin.required_features
+                        ));
+                    }
+                    s.push('\n');
+                }
+            }
         }
 
-        // [features] — flat list per chapter 02 §8 preamble (graph
-        // expansion is per-prong template work, deferred to v1 + APP-NN
-        // template tunings). Default features mirror target.features.
+        // [features] — APP-05 graph expansion via the per-prong
+        // template's feature_expansions table. Manifest features
+        // absent from the table emit as `feat = []` (preserves the
+        // pre-APP-05 fallback for ad-hoc app-level features).
         if !self.manifest.target.features.is_empty() {
             s.push_str("[features]\n");
-            s.push_str(&format!("default = {:?}\n", self.manifest.target.features));
+            // default = ... per template policy.
+            let default_line = match template.map(|t| &t.default_features) {
+                Some(feature_graphs::DefaultPolicy::Empty) => "default = []".to_string(),
+                Some(feature_graphs::DefaultPolicy::Explicit(list)) => {
+                    format!("default = {list:?}")
+                }
+                // Pre-APP-05 fallback: mirror the manifest features.
+                Some(feature_graphs::DefaultPolicy::AllManifestFeatures) | None => {
+                    format!("default = {:?}", self.manifest.target.features)
+                }
+            };
+            s.push_str(&default_line);
+            s.push('\n');
             for feat in &self.manifest.target.features {
-                s.push_str(&format!("{feat} = []\n"));
+                let expansion = template
+                    .and_then(|t| {
+                        t.feature_expansions
+                            .iter()
+                            .find(|(k, _)| k == feat)
+                            .map(|(_, v)| *v)
+                    })
+                    .unwrap_or(&[]);
+                s.push_str(&format!("{feat} = {expansion:?}\n"));
+            }
+            // Extra template-declared features the manifest doesn't list.
+            if let Some(t) = template {
+                for (name, exp) in t.extra_features {
+                    if self.manifest.target.features.iter().any(|f| f == name) {
+                        continue;
+                    }
+                    s.push_str(&format!("{name} = {exp:?}\n"));
+                }
             }
             s.push('\n');
         }
@@ -2213,9 +2322,9 @@ impl Orchestrator {
         // [dependencies]
         s.push_str("[dependencies]\n");
         if let Some(c) = &self.manifest.controller {
-            s.push_str(&format!(
-                "# Controller library (chapter 01 §5.10 / chapter 02 §7.8).\n"
-            ));
+            s.push_str(
+                "# Controller library (chapter 01 §5.10 / chapter 02 §7.8).\n",
+            );
             match (&c.path, &c.version) {
                 (Some(p), None) => {
                     let path_str = p.to_string_lossy().into_owned();
@@ -2253,16 +2362,31 @@ impl Orchestrator {
                 }
             }
         }
-        s.push_str(&format!(
-            "\n# TODO(template-tuning): rlvgl runtime + chipdb + per-generator\n\
-             # HAL deps. Manifest target.generator={} target.prong={}\n",
-            self.manifest
-                .target
-                .generator
-                .as_deref()
-                .unwrap_or("creator-bsp-pac"),
-            self.manifest.target.prong,
-        ));
+        if let Some(t) = template {
+            for dep in t.base_deps {
+                s.push_str(&format_dep_line(dep));
+            }
+            for (cfg, deps) in t.target_cfg_deps {
+                s.push('\n');
+                s.push_str(&format!("[target.{cfg:?}.dependencies]\n"));
+                for dep in *deps {
+                    s.push_str(&format_dep_line(dep));
+                }
+            }
+            if !t.build_deps.is_empty() {
+                s.push('\n');
+                s.push_str("[build-dependencies]\n");
+                for dep in t.build_deps {
+                    s.push_str(&format_dep_line(dep));
+                }
+            }
+        } else {
+            s.push_str(&format!(
+                "\n# TODO(template-tuning): no APP-05 feature-graph template\n\
+                 # registered for (prong={prong}, generator={generator}, vendor={vendor},\n\
+                 # board={board}). Add one in src/bin/creator/app/feature_graphs.rs.\n",
+            ));
+        }
 
         self.emit("Cargo.toml", s.as_bytes(), inv, "scaffold", false)
     }
