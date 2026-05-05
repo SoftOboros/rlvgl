@@ -450,3 +450,85 @@ fn app_05d_h747_freertos_no_template_tuning_todo() {
         "H747 freertos emit still carries TODO(template-tuning)"
     );
 }
+
+// ─── APP-05e: STM32H747I-DISCO zephyr feature graph ────────────────────
+
+const H747_ZEPHYR_FEATURES: &[&str] = &["cm7", "zephyr", "splash", "desktop", "dma2d"];
+
+#[test]
+fn app_05e_h747_zephyr_feature_graph_matches_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app-zephyr.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/stm32h747i-disco/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+
+    for feat in H747_ZEPHYR_FEATURES {
+        let emitted_exp = feature_expansion(&emitted, feat)
+            .unwrap_or_else(|| panic!("emitted [features] missing {feat}"));
+        let reference_exp = feature_expansion(&reference, feat)
+            .unwrap_or_else(|| panic!("reference [features] missing {feat}"));
+        assert_eq!(
+            emitted_exp, reference_exp,
+            "feature `{feat}` expansion mismatch:\n  emitted: {emitted_exp:?}\n  reference: {reference_exp:?}"
+        );
+    }
+    let emitted_default = feature_expansion(&emitted, "default").expect("emitted default");
+    assert!(
+        emitted_default.is_empty(),
+        "expected default = [] for H747 zephyr, got {emitted_default:?}"
+    );
+}
+
+#[test]
+fn app_05e_h747_zephyr_dependencies_subset_of_reference() {
+    // Same H747 base + cross-compile deps as APP-05d (shared
+    // statics in feature_graphs.rs).
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app-zephyr.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/stm32h747i-disco/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+    assert_h747_freertos_deps(&emitted, &reference);
+}
+
+#[test]
+fn app_05e_h747_zephyr_emits_staticlib_lib_section() {
+    // The zephyr prong's Rust side is a staticlib (chapter 02 §5.4.1).
+    // Already handled by `emit_cargo_toml` pre-APP-05; assert the
+    // template integration didn't regress that.
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app-zephyr.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let lib = emitted
+        .get("lib")
+        .and_then(toml::Value::as_table)
+        .expect("[lib] section present for zephyr prong");
+    let crate_type = lib
+        .get("crate-type")
+        .and_then(toml::Value::as_array)
+        .expect("[lib].crate-type is an array");
+    assert!(
+        crate_type
+            .iter()
+            .any(|v| v.as_str() == Some("staticlib")),
+        "[lib].crate-type missing `staticlib` for zephyr prong: {crate_type:?}"
+    );
+}
+
+#[test]
+fn app_05e_h747_zephyr_no_template_tuning_todo() {
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app-zephyr.yaml");
+    let emitted = fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    assert!(
+        !emitted.contains("TODO(template-tuning)"),
+        "H747 zephyr emit still carries TODO(template-tuning)"
+    );
+}

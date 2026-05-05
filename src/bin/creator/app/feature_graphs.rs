@@ -144,6 +144,15 @@ const TEMPLATES: &[TemplateKey] = &[
         "stm32h747i_disco",
         &H747_FREERTOS,
     ),
+    // APP-05e: zephyr + hand_written + stm + stm32h747i_disco.
+    // Covers app-zephyr.yaml. Shares H747 base deps with APP-05d.
+    (
+        "zephyr",
+        "hand_written",
+        "stm",
+        "stm32h747i_disco",
+        &H747_ZEPHYR,
+    ),
 ];
 
 // ─── APP-05a: BBB linux template ──────────────────────────────────────
@@ -409,6 +418,145 @@ static BEETLE_BSP_PAC: ProngTemplate = ProngTemplate {
     extra_bins: &[],
 };
 
+// ─── APP-05d/e shared: H747 base + cross-compile deps ────────────────
+//
+// The freertos and zephyr H747 manifests target the same chip and
+// the same hand-written `examples/stm32h747i-disco/Cargo.toml`;
+// only their `target.features` sets differ. Per APP-05-A §6, factor
+// the shared rlvgl runtime + cortex-m + stm32h7 PAC dep set so
+// APP-05d and APP-05e load the same data without duplication.
+
+static H747_BASE_DEPS: &[Dep] = &[
+    Dep {
+        name: "rlvgl-core",
+        source: DepSource::Path("../../core"),
+        default_features: false,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "rlvgl-platform",
+        source: DepSource::Path("../../platform"),
+        default_features: false,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "rlvgl-widgets",
+        source: DepSource::Path("../../widgets"),
+        default_features: false,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "rlvgl-ui",
+        source: DepSource::Path("../../ui"),
+        default_features: false,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "rlvgl-i18n",
+        source: DepSource::Path("../../i18n"),
+        default_features: true,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "rlvgl-decomp",
+        source: DepSource::Path("../../rlvgl-decomp"),
+        default_features: true,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "rlvgl-playit",
+        source: DepSource::Path("../../playit"),
+        default_features: false,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "cortex-m-rt",
+        source: DepSource::Version("0.7"),
+        default_features: true,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "cortex-m",
+        source: DepSource::Version("0.7"),
+        default_features: true,
+        features: &["critical-section-single-core"],
+        optional: false,
+    },
+    Dep {
+        name: "embedded-alloc",
+        source: DepSource::Version("=0.5.1"),
+        default_features: true,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "panic-halt",
+        source: DepSource::Version("1"),
+        default_features: true,
+        features: &[],
+        optional: false,
+    },
+    Dep {
+        name: "stm32h7",
+        source: DepSource::Version("0.15.1"),
+        default_features: true,
+        features: &["rt"],
+        optional: false,
+    },
+    Dep {
+        name: "critical-section",
+        source: DepSource::Version("1.1.2"),
+        default_features: true,
+        features: &[],
+        optional: false,
+    },
+];
+
+static H747_TARGET_CFG_DEPS: &[(&str, &[Dep])] = &[(
+    "cfg(any(target_arch = \"arm\", target_os = \"none\"))",
+    &[
+        Dep {
+            name: "stm32h7xx-hal",
+            source: DepSource::Version("0.16"),
+            default_features: true,
+            features: &["stm32h747cm7", "sdmmc", "fmc", "xspi"],
+            optional: true,
+        },
+        Dep {
+            name: "embedded-hal",
+            source: DepSource::Version("1"),
+            default_features: true,
+            features: &[],
+            optional: true,
+        },
+        Dep {
+            name: "embedded-hal-02",
+            source: DepSource::PackageRename {
+                package: "embedded-hal",
+                version: "0.2.7",
+            },
+            default_features: true,
+            features: &["unproven"],
+            optional: true,
+        },
+        Dep {
+            name: "embedded-sdmmc",
+            source: DepSource::Version("0.9"),
+            default_features: false,
+            features: &[],
+            optional: true,
+        },
+    ],
+)];
+
 // ─── APP-05d: STM32H747I-DISCO freertos hand_written template ─────────
 //
 // Reference: examples/stm32h747i-disco/Cargo.toml.
@@ -449,149 +597,23 @@ static BEETLE_BSP_PAC: ProngTemplate = ProngTemplate {
 // stm32h7xx-hal / embedded-hal / embedded-hal-02 (package rename) /
 // embedded-sdmmc — all gated by the cm7 feature.
 
+/// `cm7` feature expansion shared by the H747 freertos + zephyr
+/// templates; same chip, same PAC, same HAL deps.
+const H747_CM7_EXPANSION: &[&str] = &[
+    "rlvgl-platform/stm32h747i_disco",
+    "stm32h7/stm32h747cm7",
+    "dep:stm32h7xx-hal",
+    "dep:embedded-hal",
+    "dep:embedded-hal-02",
+    "dep:embedded-sdmmc",
+];
+
 static H747_FREERTOS: ProngTemplate = ProngTemplate {
-    base_deps: &[
-        Dep {
-            name: "rlvgl-core",
-            source: DepSource::Path("../../core"),
-            default_features: false,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "rlvgl-platform",
-            source: DepSource::Path("../../platform"),
-            default_features: false,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "rlvgl-widgets",
-            source: DepSource::Path("../../widgets"),
-            default_features: false,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "rlvgl-ui",
-            source: DepSource::Path("../../ui"),
-            default_features: false,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "rlvgl-i18n",
-            source: DepSource::Path("../../i18n"),
-            default_features: true,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "rlvgl-decomp",
-            source: DepSource::Path("../../rlvgl-decomp"),
-            default_features: true,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "rlvgl-playit",
-            source: DepSource::Path("../../playit"),
-            default_features: false,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "cortex-m-rt",
-            source: DepSource::Version("0.7"),
-            default_features: true,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "cortex-m",
-            source: DepSource::Version("0.7"),
-            default_features: true,
-            features: &["critical-section-single-core"],
-            optional: false,
-        },
-        Dep {
-            name: "embedded-alloc",
-            source: DepSource::Version("=0.5.1"),
-            default_features: true,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "panic-halt",
-            source: DepSource::Version("1"),
-            default_features: true,
-            features: &[],
-            optional: false,
-        },
-        Dep {
-            name: "stm32h7",
-            source: DepSource::Version("0.15.1"),
-            default_features: true,
-            features: &["rt"],
-            optional: false,
-        },
-        Dep {
-            name: "critical-section",
-            source: DepSource::Version("1.1.2"),
-            default_features: true,
-            features: &[],
-            optional: false,
-        },
-    ],
-    target_cfg_deps: &[(
-        "cfg(any(target_arch = \"arm\", target_os = \"none\"))",
-        &[
-            Dep {
-                name: "stm32h7xx-hal",
-                source: DepSource::Version("0.16"),
-                default_features: true,
-                features: &["stm32h747cm7", "sdmmc", "fmc", "xspi"],
-                optional: true,
-            },
-            Dep {
-                name: "embedded-hal",
-                source: DepSource::Version("1"),
-                default_features: true,
-                features: &[],
-                optional: true,
-            },
-            Dep {
-                name: "embedded-hal-02",
-                source: DepSource::PackageRename {
-                    package: "embedded-hal",
-                    version: "0.2.7",
-                },
-                default_features: true,
-                features: &["unproven"],
-                optional: true,
-            },
-            Dep {
-                name: "embedded-sdmmc",
-                source: DepSource::Version("0.9"),
-                default_features: false,
-                features: &[],
-                optional: true,
-            },
-        ],
-    )],
+    base_deps: H747_BASE_DEPS,
+    target_cfg_deps: H747_TARGET_CFG_DEPS,
     build_deps: &[],
     feature_expansions: &[
-        (
-            "cm7",
-            &[
-                "rlvgl-platform/stm32h747i_disco",
-                "stm32h7/stm32h747cm7",
-                "dep:stm32h7xx-hal",
-                "dep:embedded-hal",
-                "dep:embedded-hal-02",
-                "dep:embedded-sdmmc",
-            ],
-        ),
+        ("cm7", H747_CM7_EXPANSION),
         ("freertos", &["rlvgl-platform/freertos"]),
         ("adapted_cmd", &[]),
         ("dma2d", &["rlvgl-platform/dma2d"]),
@@ -601,5 +623,40 @@ static H747_FREERTOS: ProngTemplate = ProngTemplate {
     extra_features: &[],
     default_features: DefaultPolicy::Empty,
     bin_required_features: &["cm7"],
+    extra_bins: &[],
+};
+
+// ─── APP-05e: STM32H747I-DISCO zephyr hand_written template ───────────
+//
+// Shares the H747 base deps + cross-compile deps with APP-05d via
+// the H747_BASE_DEPS / H747_TARGET_CFG_DEPS / H747_CM7_EXPANSION
+// statics. The zephyr-prong-specific bits:
+//
+// - Manifest features: [cm7, zephyr, splash, desktop, dma2d]
+//   (`freertos` is replaced by `zephyr`; `adapted_cmd` is omitted —
+//   the zephyr port uses video-mode DSI by default per the
+//   `disco-zephyr-guide`).
+// - `zephyr` feature expands to `[]` in the reference Cargo.toml
+//   (the staticlib emit / nested west project layout is what
+//   activates the prong; the Cargo feature is just a marker).
+// - The orchestrator emits `[lib] crate-type = ["staticlib"]` for
+//   the zephyr prong (already handled by `emit_cargo_toml`); the
+//   `bin_required_features` is irrelevant on staticlib but kept
+//   consistent for symmetry.
+
+static H747_ZEPHYR: ProngTemplate = ProngTemplate {
+    base_deps: H747_BASE_DEPS,
+    target_cfg_deps: H747_TARGET_CFG_DEPS,
+    build_deps: &[],
+    feature_expansions: &[
+        ("cm7", H747_CM7_EXPANSION),
+        ("zephyr", &[]),
+        ("dma2d", &["rlvgl-platform/dma2d"]),
+        ("splash", &["rlvgl-platform/splash"]),
+        ("desktop", &[]),
+    ],
+    extra_features: &[],
+    default_features: DefaultPolicy::Empty,
+    bin_required_features: &[],
     extra_bins: &[],
 };
