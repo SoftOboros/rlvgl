@@ -21,13 +21,19 @@ Status: All five chapters RATIFIED 2026-04-27 / 2026-04-29.
 > `make verify-all`. Orchestrator now honors the §5.4 wrapper-shape
 > discriminator (`Cargo.toml` present → sibling, no inline copy).
 >
-> **v0.5 work still open:** APP-05+ (Cargo `[features]` graph
-> expansion — chapter 02 §8 preamble; v1 deferred); figma/uml
-> layout formats (chapter 01 §5.5 v1 work); upstream
-> `mcp-statechart` to ship §7.2-conforming `src/vectors.rs`
-> emission so APP-04b's manifest can flip
-> `verification_vectors: true`. These don't reopen ratified
-> chapters. See [`CLAUDE.md`](../../CLAUDE.md)
+> **APP-05 family shipped 2026-04 → 2026-05-04.** Per-prong /
+> per-generator / per-vendor / per-board feature-graph templates
+> wired into `emit_cargo_toml`; sub-letter analysis at
+> [`APP-05-A.md`](APP-05-A.md). All six committed round-trip
+> manifests now emit Cargo.toml's with feature expansions
+> set-equal to the reference and `[dependencies]` subsets of the
+> reference. APP-05f discipline scanner enforces template
+> registration as a closed-list invariant.
+>
+> **Remaining v0.5 work:** figma/uml layout formats (chapter 01
+> §5.5 v1 work — `rust_inline_v1` is the de facto path until a
+> real authoring pipeline ships first). These don't reopen
+> ratified chapters. See [`CLAUDE.md`](../../CLAUDE.md)
 > §"Spec-Before-Code Planning Discipline" for what ratification
 > means.
 

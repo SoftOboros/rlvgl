@@ -18,7 +18,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 #[path = "app/feature_graphs.rs"]
-mod feature_graphs;
+pub mod feature_graphs;
 
 /// Format a `feature_graphs::Dep` as a single Cargo.toml `[dependencies]`
 /// line. Used by `emit_cargo_toml` per APP-05a.

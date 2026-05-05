@@ -1,6 +1,10 @@
 # APP-05-A — Cargo `[features]` graph + `[dependencies]` emission
 
-**Status:** **DRAFT 2026-05-04.** Sub-letter analysis for the
+**Status:** **Resolved 2026-05-04 — APP-05 family complete (a/b/c/d/e + f shipped same day).**
+Folded into chapter 02 §15 via the 2026-05-04 IMPLEMENTATION entry.
+This file is preserved as historical analysis only; behaviour PRs
+reference chapter 02 §8 preamble (frozen rule) and the
+`feature_graphs` module directly. Sub-letter analysis for the
 APP-05 family named in [chapter 02 §15](02-generator-pipeline.md#§15-change-log)
 (2026-04-29 RATIFIED entry: "full Cargo `[features]` graph
 expansion ... tracked under APP-05+"). This doc proposes the
@@ -415,3 +419,4 @@ The initiative-wide acceptance gate — APP-05f — is:
 | Date       | Status | Note                                                                                                     |
 | ---------- | ------ | -------------------------------------------------------------------------------------------------------- |
 | 2026-05-04 | DRAFT  | Initial sub-letter analysis. Option 1 (in-binary tables) recommended; per-phase sequencing APP-05a–f.    |
+| 2026-05-04 | RESOLVED | APP-05 family complete same day. APP-05a–e shipped with five `ProngTemplate` entries (BBB / beetle esp_hal / beetle bsp_pac / H747 freertos / H747 zephyr); H747 base + cross-compile dep tables factored to shared statics for APP-05d/e to share. APP-05f discipline scanner asserts every committed manifest's `(prong, generator, vendor, board)` tuple resolves to a template and every manifest feature appears in that template's `feature_expansions`. 19/19 parity tests pass. Closes the §8 preamble's feature-graph rule at v0. Open question from §6 ("two manifests, one Cargo.toml" union for the beetle esp_hal/bsp_pac pair) deferred to v1+: the orchestrator emits one Cargo.toml per manifest into its own `<out>` directory; composing both intents into a shared output tree was not needed at v0. |

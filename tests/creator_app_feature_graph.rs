@@ -532,3 +532,92 @@ fn app_05e_h747_zephyr_no_template_tuning_todo() {
         "H747 zephyr emit still carries TODO(template-tuning)"
     );
 }
+
+// ─── APP-05f: discipline scanner — round-trip cross-cut ────────────────
+
+/// Every round-trip target manifest committed under `examples/`.
+/// Per chapter 03 + APP-05-A §6, this set is closed at v0; adding
+/// a new manifest requires both a §15 amendment to chapter 03 and
+/// a corresponding APP-05x feature-graph template registration in
+/// `src/bin/creator/app/feature_graphs.rs`.
+const ROUND_TRIP_MANIFESTS: &[&str] = &[
+    "examples/beaglebone-black/app.yaml",
+    "examples/beetle-esp32c3/app.yaml",
+    "examples/beetle-esp32c3/app-bsp-pac.yaml",
+    "examples/stm32h747i-disco/app.yaml",
+    "examples/stm32h747i-disco/app-with-sm.yaml",
+    "examples/stm32h747i-disco/app-zephyr.yaml",
+];
+
+#[test]
+fn app_05f_every_round_trip_manifest_has_a_template() {
+    // Every committed manifest's (prong, generator, vendor, board)
+    // tuple MUST resolve to a feature-graph template, and every
+    // feature in the manifest's target.features MUST appear in
+    // that template's `feature_expansions` table. This is the
+    // initiative-wide acceptance gate per APP-05-A §8.
+    let ws = workspace_root();
+    let mut failures: Vec<String> = Vec::new();
+    for rel in ROUND_TRIP_MANIFESTS {
+        let manifest = match app::validate(&ws.join(rel)) {
+            Ok(m) => m,
+            Err(e) => {
+                failures.push(format!("{rel}: validate failed: {e}"));
+                continue;
+            }
+        };
+        let prong = manifest.target.prong.as_str();
+        let generator = manifest
+            .target
+            .generator
+            .as_deref()
+            .unwrap_or("creator-bsp-pac");
+        let vendor = manifest.target.vendor.as_str();
+        let board = manifest.target.board.as_str();
+
+        let Some(template) = app::feature_graphs::lookup(prong, generator, vendor, board) else {
+            failures.push(format!(
+                "{rel}: no APP-05x template registered for (prong={prong}, generator={generator}, vendor={vendor}, board={board})"
+            ));
+            continue;
+        };
+        for feat in &manifest.target.features {
+            let in_table = template
+                .feature_expansions
+                .iter()
+                .any(|(k, _)| k == feat)
+                || template.extra_features.iter().any(|(k, _)| k == feat);
+            if !in_table {
+                failures.push(format!(
+                    "{rel}: target.features `{feat}` missing from template feature_expansions"
+                ));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "APP-05f discipline scan: {} failure(s):\n  - {}",
+        failures.len(),
+        failures.join("\n  - ")
+    );
+}
+
+#[test]
+fn app_05f_no_emitted_cargo_toml_carries_template_tuning_marker() {
+    // Aggregate of the per-phase no_template_tuning_todo tests.
+    // Emits every committed round-trip manifest and confirms none
+    // of the emitted Cargo.tomls contain the placeholder marker.
+    let mut offenders: Vec<&str> = Vec::new();
+    for rel in ROUND_TRIP_MANIFESTS {
+        let tmp = emit_to_tempdir(rel);
+        let emitted =
+            fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+        if emitted.contains("TODO(template-tuning)") {
+            offenders.push(rel);
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "APP-05f: emitted Cargo.toml(s) carry TODO(template-tuning) marker: {offenders:?}"
+    );
+}
