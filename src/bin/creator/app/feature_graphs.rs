@@ -135,6 +135,15 @@ const TEMPLATES: &[TemplateKey] = &[
         "beetle_esp32c3",
         &BEETLE_BSP_PAC,
     ),
+    // APP-05d: freertos + hand_written + stm + stm32h747i_disco.
+    // Covers app.yaml + app-with-sm.yaml (shared feature set).
+    (
+        "freertos",
+        "hand_written",
+        "stm",
+        "stm32h747i_disco",
+        &H747_FREERTOS,
+    ),
 ];
 
 // ─── APP-05a: BBB linux template ──────────────────────────────────────
@@ -397,5 +406,200 @@ static BEETLE_BSP_PAC: ProngTemplate = ProngTemplate {
     extra_features: &[],
     default_features: DefaultPolicy::Empty,
     bin_required_features: &["bsp_pac"],
+    extra_bins: &[],
+};
+
+// ─── APP-05d: STM32H747I-DISCO freertos hand_written template ─────────
+//
+// Reference: examples/stm32h747i-disco/Cargo.toml.
+//
+// Two manifests share this template (chapter 03 §6.5 amendments —
+// app.yaml + app-with-sm.yaml carry the same target.features set
+// `[cm7, freertos, adapted_cmd, dma2d, splash, desktop]` and differ
+// only in their `state_machine:` block, which is orthogonal to
+// Cargo.toml emission). APP-05e (zephyr prong) shares this same
+// chip + board but with a different feature set.
+//
+// Reference [features] expansions for the manifest's six features:
+//   cm7 = ["rlvgl-platform/stm32h747i_disco", "stm32h7/stm32h747cm7",
+//          "dep:stm32h7xx-hal", "dep:embedded-hal",
+//          "dep:embedded-hal-02", "dep:embedded-sdmmc"]
+//   freertos = ["rlvgl-platform/freertos"]
+//   adapted_cmd = []
+//   dma2d = ["rlvgl-platform/dma2d"]
+//   splash = ["rlvgl-platform/splash"]
+//   desktop = []
+//
+// The reference also carries 16 sibling-intent features
+// (cm4, clock_demo, cpu_stats, audio, qspi_flash, sd_storage,
+// c_hal, c_hal_cm4, pac_sdram_init, sdram_ramtest, hal_sdram,
+// backlight_pwm, semihosting, bsp_log, zephyr) — those belong to
+// other manifests (the cm4 idle binary, the audio profile, etc.)
+// per chapter 03 §6.7 "duplicate by copy" and are NOT emitted here.
+//
+// Base [dependencies]: rlvgl runtime crates + cortex-m runtime +
+// allocator + panic handler + stm32h7 PAC + critical-section. The
+// optional `cortex-m-semihosting` / `stm32-fmc` / `rlvgl-bsps-stm`
+// / `rlvgl-app-demo` deps from the reference are gated by features
+// the manifest doesn't enable, so they're skipped at single-intent
+// emit.
+//
+// Cross-compile-only deps under
+// [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]:
+// stm32h7xx-hal / embedded-hal / embedded-hal-02 (package rename) /
+// embedded-sdmmc — all gated by the cm7 feature.
+
+static H747_FREERTOS: ProngTemplate = ProngTemplate {
+    base_deps: &[
+        Dep {
+            name: "rlvgl-core",
+            source: DepSource::Path("../../core"),
+            default_features: false,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "rlvgl-platform",
+            source: DepSource::Path("../../platform"),
+            default_features: false,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "rlvgl-widgets",
+            source: DepSource::Path("../../widgets"),
+            default_features: false,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "rlvgl-ui",
+            source: DepSource::Path("../../ui"),
+            default_features: false,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "rlvgl-i18n",
+            source: DepSource::Path("../../i18n"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "rlvgl-decomp",
+            source: DepSource::Path("../../rlvgl-decomp"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "rlvgl-playit",
+            source: DepSource::Path("../../playit"),
+            default_features: false,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "cortex-m-rt",
+            source: DepSource::Version("0.7"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "cortex-m",
+            source: DepSource::Version("0.7"),
+            default_features: true,
+            features: &["critical-section-single-core"],
+            optional: false,
+        },
+        Dep {
+            name: "embedded-alloc",
+            source: DepSource::Version("=0.5.1"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "panic-halt",
+            source: DepSource::Version("1"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "stm32h7",
+            source: DepSource::Version("0.15.1"),
+            default_features: true,
+            features: &["rt"],
+            optional: false,
+        },
+        Dep {
+            name: "critical-section",
+            source: DepSource::Version("1.1.2"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+    ],
+    target_cfg_deps: &[(
+        "cfg(any(target_arch = \"arm\", target_os = \"none\"))",
+        &[
+            Dep {
+                name: "stm32h7xx-hal",
+                source: DepSource::Version("0.16"),
+                default_features: true,
+                features: &["stm32h747cm7", "sdmmc", "fmc", "xspi"],
+                optional: true,
+            },
+            Dep {
+                name: "embedded-hal",
+                source: DepSource::Version("1"),
+                default_features: true,
+                features: &[],
+                optional: true,
+            },
+            Dep {
+                name: "embedded-hal-02",
+                source: DepSource::PackageRename {
+                    package: "embedded-hal",
+                    version: "0.2.7",
+                },
+                default_features: true,
+                features: &["unproven"],
+                optional: true,
+            },
+            Dep {
+                name: "embedded-sdmmc",
+                source: DepSource::Version("0.9"),
+                default_features: false,
+                features: &[],
+                optional: true,
+            },
+        ],
+    )],
+    build_deps: &[],
+    feature_expansions: &[
+        (
+            "cm7",
+            &[
+                "rlvgl-platform/stm32h747i_disco",
+                "stm32h7/stm32h747cm7",
+                "dep:stm32h7xx-hal",
+                "dep:embedded-hal",
+                "dep:embedded-hal-02",
+                "dep:embedded-sdmmc",
+            ],
+        ),
+        ("freertos", &["rlvgl-platform/freertos"]),
+        ("adapted_cmd", &[]),
+        ("dma2d", &["rlvgl-platform/dma2d"]),
+        ("splash", &["rlvgl-platform/splash"]),
+        ("desktop", &[]),
+    ],
+    extra_features: &[],
+    default_features: DefaultPolicy::Empty,
+    bin_required_features: &["cm7"],
     extra_bins: &[],
 };

@@ -324,3 +324,129 @@ fn app_05c_beetle_bsp_pac_no_template_tuning_todo() {
         "beetle bsp_pac emit still carries TODO(template-tuning)"
     );
 }
+
+// ─── APP-05d: STM32H747I-DISCO freertos feature graph ──────────────────
+
+const H747_FREERTOS_FEATURES: &[&str] =
+    &["cm7", "freertos", "adapted_cmd", "dma2d", "splash", "desktop"];
+
+fn assert_h747_freertos_features(emitted: &Table, reference: &Table) {
+    for feat in H747_FREERTOS_FEATURES {
+        let emitted_exp = feature_expansion(emitted, feat)
+            .unwrap_or_else(|| panic!("emitted [features] missing {feat}"));
+        let reference_exp = feature_expansion(reference, feat)
+            .unwrap_or_else(|| panic!("reference [features] missing {feat}"));
+        assert_eq!(
+            emitted_exp, reference_exp,
+            "feature `{feat}` expansion mismatch:\n  emitted: {emitted_exp:?}\n  reference: {reference_exp:?}"
+        );
+    }
+    let emitted_default = feature_expansion(emitted, "default").expect("emitted default");
+    assert!(
+        emitted_default.is_empty(),
+        "expected default = [] for H747 freertos, got {emitted_default:?}"
+    );
+}
+
+fn assert_h747_freertos_deps(emitted: &Table, reference: &Table) {
+    let emitted_deps = dep_names(emitted, "dependencies");
+    let reference_deps = dep_names(reference, "dependencies");
+    let extra: Vec<_> = emitted_deps.difference(&reference_deps).collect();
+    assert!(
+        extra.is_empty(),
+        "emitted [dependencies] introduces deps not in reference: {extra:?}"
+    );
+    for required in [
+        "rlvgl-core",
+        "rlvgl-platform",
+        "rlvgl-widgets",
+        "rlvgl-ui",
+        "rlvgl-i18n",
+        "rlvgl-decomp",
+        "rlvgl-playit",
+        "rlvgl-app-disco-demo", // controller
+        "cortex-m-rt",
+        "cortex-m",
+        "embedded-alloc",
+        "panic-halt",
+        "stm32h7",
+        "critical-section",
+    ] {
+        assert!(
+            emitted_deps.contains(required),
+            "emitted [dependencies] missing `{required}` (set: {emitted_deps:?})"
+        );
+    }
+
+    let emitted_cfg_deps = target_cfg_dep_names(emitted);
+    let reference_cfg_deps = target_cfg_dep_names(reference);
+    let cfg_extra: Vec<_> = emitted_cfg_deps.difference(&reference_cfg_deps).collect();
+    assert!(
+        cfg_extra.is_empty(),
+        "emitted [target.cfg.dependencies] introduces deps not in reference: {cfg_extra:?}"
+    );
+    for required in [
+        "stm32h7xx-hal",
+        "embedded-hal",
+        "embedded-hal-02",
+        "embedded-sdmmc",
+    ] {
+        assert!(
+            emitted_cfg_deps.contains(required),
+            "emitted [target.cfg.dependencies] missing `{required}` (set: {emitted_cfg_deps:?})"
+        );
+    }
+}
+
+#[test]
+fn app_05d_h747_freertos_feature_graph_matches_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/stm32h747i-disco/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+    assert_h747_freertos_features(&emitted, &reference);
+}
+
+#[test]
+fn app_05d_h747_freertos_dependencies_subset_of_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/stm32h747i-disco/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+    assert_h747_freertos_deps(&emitted, &reference);
+}
+
+#[test]
+fn app_05d_h747_freertos_with_sm_shares_template() {
+    // Both freertos manifests (app.yaml + app-with-sm.yaml) carry
+    // the same target.features set and therefore must produce the
+    // same feature-graph + dependencies shape from the same template.
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app-with-sm.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/stm32h747i-disco/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+    assert_h747_freertos_features(&emitted, &reference);
+    assert_h747_freertos_deps(&emitted, &reference);
+}
+
+#[test]
+fn app_05d_h747_freertos_no_template_tuning_todo() {
+    let tmp = emit_to_tempdir("examples/stm32h747i-disco/app.yaml");
+    let emitted = fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    assert!(
+        !emitted.contains("TODO(template-tuning)"),
+        "H747 freertos emit still carries TODO(template-tuning)"
+    );
+}
