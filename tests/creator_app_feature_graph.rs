@@ -242,3 +242,85 @@ fn app_05b_beetle_esp_hal_no_template_tuning_todo() {
         "beetle esp_hal emit still carries TODO(template-tuning)"
     );
 }
+
+// ─── APP-05c: beetle bsp_pac creator-bsp-pac feature graph ─────────────
+
+#[test]
+fn app_05c_beetle_bsp_pac_feature_graph_matches_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/beetle-esp32c3/app-bsp-pac.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/beetle-esp32c3/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+
+    let emitted_exp =
+        feature_expansion(&emitted, "bsp_pac").expect("emitted [features] missing bsp_pac");
+    let reference_exp =
+        feature_expansion(&reference, "bsp_pac").expect("reference [features] missing bsp_pac");
+    assert_eq!(
+        emitted_exp, reference_exp,
+        "feature `bsp_pac` expansion mismatch:\n  emitted: {emitted_exp:?}\n  reference: {reference_exp:?}"
+    );
+
+    let emitted_default = feature_expansion(&emitted, "default").expect("emitted default");
+    assert!(
+        emitted_default.is_empty(),
+        "expected default = [] for beetle bsp_pac, got {emitted_default:?}"
+    );
+}
+
+#[test]
+fn app_05c_beetle_bsp_pac_dependencies_subset_of_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/beetle-esp32c3/app-bsp-pac.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/beetle-esp32c3/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+
+    // bsp_pac is headless — no rlvgl runtime base deps expected.
+    // The emit's [dependencies] block will contain at most the
+    // controller (none in this manifest) so it's empty.
+    let emitted_deps = dep_names(&emitted, "dependencies");
+    assert!(
+        emitted_deps.is_empty(),
+        "bsp_pac is headless; emitted [dependencies] expected empty, got {emitted_deps:?}"
+    );
+
+    // [target.cfg(target_arch = "riscv32").dependencies] entries
+    // gated by bsp_pac.
+    let emitted_cfg_deps = target_cfg_dep_names(&emitted);
+    let reference_cfg_deps = target_cfg_dep_names(&reference);
+    let cfg_extra: Vec<_> = emitted_cfg_deps.difference(&reference_cfg_deps).collect();
+    assert!(
+        cfg_extra.is_empty(),
+        "emitted [target.cfg.dependencies] introduces deps not in reference: {cfg_extra:?}"
+    );
+    for required in [
+        "esp32c3",
+        "esp-riscv-rt",
+        "riscv-rt",
+        "riscv",
+        "panic-halt",
+    ] {
+        assert!(
+            emitted_cfg_deps.contains(required),
+            "emitted [target.cfg.dependencies] missing `{required}` (set: {emitted_cfg_deps:?})"
+        );
+    }
+}
+
+#[test]
+fn app_05c_beetle_bsp_pac_no_template_tuning_todo() {
+    let tmp = emit_to_tempdir("examples/beetle-esp32c3/app-bsp-pac.yaml");
+    let emitted = fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    assert!(
+        !emitted.contains("TODO(template-tuning)"),
+        "beetle bsp_pac emit still carries TODO(template-tuning)"
+    );
+}

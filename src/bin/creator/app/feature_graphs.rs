@@ -127,6 +127,14 @@ const TEMPLATES: &[TemplateKey] = &[
         "beetle_esp32c3",
         &BEETLE_ESP_HAL,
     ),
+    // APP-05c: bare_metal + creator-bsp-pac + esp + beetle_esp32c3 (bsp_pac).
+    (
+        "bare_metal",
+        "creator-bsp-pac",
+        "esp",
+        "beetle_esp32c3",
+        &BEETLE_BSP_PAC,
+    ),
 ];
 
 // ─── APP-05a: BBB linux template ──────────────────────────────────────
@@ -315,5 +323,79 @@ static BEETLE_ESP_HAL: ProngTemplate = ProngTemplate {
     extra_features: &[],
     default_features: DefaultPolicy::Empty,
     bin_required_features: &["esp_hal"],
+    extra_bins: &[],
+};
+
+// ─── APP-05c: beetle ESP32-C3 bsp_pac creator-bsp-pac template ────────
+//
+// Reference: examples/beetle-esp32c3/Cargo.toml (bsp_pac half).
+//
+// The bsp_pac intent is "headless" — a raw-PAC LED-blink proof of
+// the chipdb → generator → boot pipeline, with no display, no rlvgl
+// render stack, no widget tree (chapter 03 §6.13 documents this as
+// "bsp_pac stretches the screen abstraction"). Per the reference
+// comment block: "rlvgl deps are only pulled in by the esp_hal
+// feature — the bsp_pac demo uses only the raw esp32c3 PAC".
+//
+// Reference [features].bsp_pac expansion:
+//   ["dep:esp32c3", "dep:esp-riscv-rt", "dep:riscv-rt",
+//    "dep:riscv", "dep:panic-halt"]
+
+static BEETLE_BSP_PAC: ProngTemplate = ProngTemplate {
+    base_deps: &[],
+    target_cfg_deps: &[(
+        "cfg(target_arch = \"riscv32\")",
+        &[
+            Dep {
+                name: "esp32c3",
+                source: DepSource::Version("0.31"),
+                default_features: true,
+                features: &["critical-section", "rt"],
+                optional: true,
+            },
+            Dep {
+                name: "esp-riscv-rt",
+                source: DepSource::Version("0.13"),
+                default_features: true,
+                features: &[],
+                optional: true,
+            },
+            Dep {
+                name: "riscv-rt",
+                source: DepSource::Version("0.16"),
+                default_features: true,
+                features: &["memory"],
+                optional: true,
+            },
+            Dep {
+                name: "riscv",
+                source: DepSource::Version("0.15"),
+                default_features: true,
+                features: &["critical-section-single-hart"],
+                optional: true,
+            },
+            Dep {
+                name: "panic-halt",
+                source: DepSource::Version("1"),
+                default_features: true,
+                features: &[],
+                optional: true,
+            },
+        ],
+    )],
+    build_deps: &[],
+    feature_expansions: &[(
+        "bsp_pac",
+        &[
+            "dep:esp32c3",
+            "dep:esp-riscv-rt",
+            "dep:riscv-rt",
+            "dep:riscv",
+            "dep:panic-halt",
+        ],
+    )],
+    extra_features: &[],
+    default_features: DefaultPolicy::Empty,
+    bin_required_features: &["bsp_pac"],
     extra_bins: &[],
 };
