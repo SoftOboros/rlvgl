@@ -30,12 +30,17 @@ Status: All five chapters RATIFIED 2026-04-27 / 2026-04-29.
 > reference. APP-05f discipline scanner enforces template
 > registration as a closed-list invariant.
 >
-> **Remaining v0.5 work:** figma/uml layout formats (chapter 01
-> §5.5 v1 work — `rust_inline_v1` is the de facto path until a
-> real authoring pipeline ships first). These don't reopen
-> ratified chapters. See [`CLAUDE.md`](../../CLAUDE.md)
+> **APP initiative open work: none.** The figma/uml layout
+> authoring deferred items previously listed here are formally
+> classified Coupled deferred per
+> [`APP-06-A.md`](APP-06-A.md) (2026-05-04). `rust_inline_v1`
+> is accepted as the primary layout authoring path with no v1
+> sunset gated until either deferred format ships against a
+> concrete external consumer; APP-06-A names the unfreeze
+> criteria. See [`CLAUDE.md`](../../CLAUDE.md)
 > §"Spec-Before-Code Planning Discipline" for what ratification
-> means.
+> means and §"Initiative retrospective" §5 for the deferral
+> classification.
 
 This initiative defines a **stable underschema** — a single
 declarative manifest (`app.yaml`) describing an rlvgl application —

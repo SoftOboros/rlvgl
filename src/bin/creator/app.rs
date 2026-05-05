@@ -2177,9 +2177,12 @@ impl Orchestrator {
                 }
                 other => {
                     bail!(
-                        "layout_format '{}' for screen '{}' is not yet implemented in APP-02b. \
-                         Only 'rust_inline_v1' is supported at this milestone; \
-                         figma_export_v1 / uml_widget_v1 land in APP-02c+.",
+                        "layout_format '{}' for screen '{}' is not implemented at v0.5. \
+                         Only 'rust_inline_v1' has an implementation; \
+                         'figma_export_v1' and 'uml_widget_v1' are reclassified \
+                         Coupled deferred per docs/app-schema/APP-06-A.md \
+                         (2026-05-04). See APP-06-A §4 for the unfreeze criteria \
+                         on each deferred format.",
                         other,
                         screen.id
                     );

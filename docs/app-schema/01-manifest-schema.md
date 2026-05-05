@@ -286,6 +286,15 @@ screens:
   shows it is the primary path today, not the backdoor it was
   framed as. Don't remove the backdoor before there's a real front
   door.
+- `layout_format` of `figma_export_v1` and `uml_widget_v1` are
+  enum-permitted but **not implemented** at v0.5. Both are
+  classified **Coupled deferred** per
+  [`APP-06-A.md`](APP-06-A.md) (2026-05-04). Each carries an
+  explicit named assumption that hasn't been met yet (Figma:
+  external authoring pipeline + 6-month-stable JSON schema; UML:
+  rlvgl-widgets surface stabilisation + 3-manifest convergence
+  signal). The orchestrator hard-errors if a manifest specifies
+  either; APP-06-A names the unfreeze criteria.
 
 ### 5.6 `target.generator: hand_written` allow-list
 
@@ -722,3 +731,4 @@ Ratifying this chapter unblocks:
 | 2026-04-29 | IMPLEMENTATION | APP-02a: validator landed in `src/bin/creator/app.rs` + `tests/creator_app_validate.rs`. All seven §6 validation rules implemented; 17/17 integration tests pass (5 committed-manifest happy-path + 8 §9 counter-examples + 4 targeted feature). All five round-trip manifests now have validator-acceptance proof. §12 acceptance bullets §6 / §7 flipped checked. No spec change; this entry records the implementation milestone that satisfies §12 acceptance gates. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §5.3 grammar extended with required `vendored_crate: <manifest-path>` field. Forced by [04 §5.3](04-state-machine-boundary.md#53-vendored-crate-offline-model--frozen) freezing the vendored-crate offline model: the orchestrator does NOT invoke `mcp-statechart` during `app from-yaml`, so the manifest needs an explicit pointer to the pre-generated SM crate's directory (where `.mcp-statechart-manifest.json` lives). The field is required *only when* `state_machine:` is present — manifests without `state_machine:` are unaffected. Path-safety rule 4 applies (workspace-root scoped). All five committed round-trip manifests are unaffected because none currently carry `state_machine:`; the field activates with APP-04b (first SM-bearing round-trip target). No frozen invariants or enums changed. |
 | 2026-04-29 | AMENDMENT | Owner: Ira Abbott. §6 rule 6 retitled "State-machine invariant" and extended to also forbid `screens[].state` when `state_machine:` is absent. Forced by [04 §6](04-state-machine-boundary.md#6-cross-validate-normative) CV-2's claim that "a non-empty `screens[].state` without an SM is rejected by 01 §6 rule 6" — that claim was aspirational since the prior wording only covered the default-screen invariant. This amendment makes the chapter 04 cross-reference accurate. New §9 counter-example row added: `screens[].state: idle` without `state_machine:` → rule 6. None of the five committed round-trip manifests carry `screens[].state` (verified by grep), so none are impacted. No frozen invariants or enums changed. |
+| 2026-05-04 | AMENDMENT | Owner: Ira Abbott. §5.5 prose extended with an explicit deferral classification for the two unimplemented layout formats. `figma_export_v1` and `uml_widget_v1` reclassified **Coupled deferred** per [`APP-06-A.md`](APP-06-A.md); the enum values themselves are preserved at v0 (no grammar change), but the chapter now points at APP-06-A for the unfreeze criteria. Forced by closure of the APP initiative's open-work list at v0.5 — APP-05 family complete same week, leaving figma/uml as the only remaining v0.5 item that didn't have a structured deferral. APP-06-A names the assumptions each format depends on (Figma: external authoring pipeline + 6-month-stable JSON; UML: rlvgl-widgets surface stabilisation + 3-manifest convergence) and the resurrection-prevention notes. No frozen invariants or enums changed. |

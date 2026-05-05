@@ -612,6 +612,14 @@ yet, so most layout source is hand-rolled Rust.
 pipeline (e.g. `figma_export_v1` or `uml_widget_v1`) shipping
 first. Don't remove the backdoor before there's a real front door."
 
+**Promoted 2026-05-04 — deferred-Coupled per
+[`APP-06-A.md`](../app-schema/APP-06-A.md).** Both
+`figma_export_v1` and `uml_widget_v1` now carry explicit named
+assumptions and unfreeze criteria. `rust_inline_v1` is the
+primary path indefinitely; v1 sunset only applies once either
+deferred format ships against a concrete external consumer per
+APP-06-A §4.
+
 ### 6.14 🟡 CLOSED — chipdb `find()` cross-vendor lookup key was inconsistent
 
 **Surfaced 2026-04-29 by APP-02a** (validator implementation).
