@@ -334,6 +334,9 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 zstd = "0.13.3"
 syn = { version = "2", features = ["full"] }
+# APP-05 parity tests: parse emitted + reference Cargo.toml as real TOML
+# so multi-line `[features]` lists round-trip cleanly.
+toml = "0.8"
 # QT-05b test fixture: hand-vendored mock istate-codegen output that
 # satisfies the QT-05 §6 6-symbol linkage surface. Used only by
 # `tests/creator_qt_emit_stopwatch_compile.rs` to compile-check the

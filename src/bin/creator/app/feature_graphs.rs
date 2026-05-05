@@ -119,6 +119,14 @@ const TEMPLATES: &[TemplateKey] = &[
         "beaglebone_black_nhd_cape",
         &BBB_LINUX,
     ),
+    // APP-05b: bare_metal + hosted + esp + beetle_esp32c3 (esp_hal).
+    (
+        "bare_metal",
+        "hosted",
+        "esp",
+        "beetle_esp32c3",
+        &BEETLE_ESP_HAL,
+    ),
 ];
 
 // ─── APP-05a: BBB linux template ──────────────────────────────────────
@@ -204,5 +212,108 @@ static BBB_LINUX: ProngTemplate = ProngTemplate {
     extra_features: &[],
     default_features: DefaultPolicy::AllManifestFeatures,
     bin_required_features: &[],
+    extra_bins: &[],
+};
+
+// ─── APP-05b: beetle ESP32-C3 esp_hal hosted template ─────────────────
+//
+// Reference: examples/beetle-esp32c3/Cargo.toml (esp_hal half).
+//
+// The beetle reference Cargo.toml carries TWO mutually-exclusive
+// `[[bin]]` entries gated by `required-features = ["esp_hal"]` and
+// `["bsp_pac"]`. APP-05b emits ONLY the esp_hal half — the bsp_pac
+// sibling lands via APP-05c from `app-bsp-pac.yaml`. Per chapter 03
+// §6.7 "duplicate by copy", each manifest's emit is single-intent.
+//
+// Reference [features].esp_hal expansion:
+//   ["dep:esp-hal", "dep:esp-backtrace", "dep:esp-println",
+//    "dep:esp-alloc", "dep:ssd1306", "dep:rlvgl-core",
+//    "dep:rlvgl-platform", "dep:rlvgl-widgets", "rlvgl-platform/ssd1306"]
+//
+// Cross-compile-only deps (esp-hal family, ssd1306 transport) live
+// under [target.'cfg(target_arch = "riscv32")'.dependencies].
+
+static BEETLE_ESP_HAL: ProngTemplate = ProngTemplate {
+    base_deps: &[
+        Dep {
+            name: "rlvgl-core",
+            source: DepSource::Path("../../core"),
+            default_features: false,
+            features: &[],
+            optional: true,
+        },
+        Dep {
+            name: "rlvgl-platform",
+            source: DepSource::Path("../../platform"),
+            default_features: false,
+            features: &[],
+            optional: true,
+        },
+        Dep {
+            name: "rlvgl-widgets",
+            source: DepSource::Path("../../widgets"),
+            default_features: false,
+            features: &[],
+            optional: true,
+        },
+        Dep {
+            name: "ssd1306",
+            source: DepSource::Version("0.9"),
+            default_features: false,
+            features: &["graphics"],
+            optional: true,
+        },
+    ],
+    target_cfg_deps: &[(
+        "cfg(target_arch = \"riscv32\")",
+        &[
+            Dep {
+                name: "esp-hal",
+                source: DepSource::Version("=1.0.0-beta.0"),
+                default_features: true,
+                features: &["esp32c3", "unstable"],
+                optional: true,
+            },
+            Dep {
+                name: "esp-backtrace",
+                source: DepSource::Version("0.15"),
+                default_features: true,
+                features: &["esp32c3", "panic-handler", "println"],
+                optional: true,
+            },
+            Dep {
+                name: "esp-println",
+                source: DepSource::Version("0.13"),
+                default_features: true,
+                features: &["esp32c3", "log"],
+                optional: true,
+            },
+            Dep {
+                name: "esp-alloc",
+                source: DepSource::Version("0.6"),
+                default_features: true,
+                features: &[],
+                optional: true,
+            },
+        ],
+    )],
+    build_deps: &[],
+    feature_expansions: &[(
+        "esp_hal",
+        &[
+            "dep:esp-hal",
+            "dep:esp-backtrace",
+            "dep:esp-println",
+            "dep:esp-alloc",
+            "dep:ssd1306",
+            "dep:rlvgl-core",
+            "dep:rlvgl-platform",
+            "dep:rlvgl-widgets",
+            "rlvgl-platform/ssd1306",
+        ],
+    )],
+    extra_features: &[],
+    default_features: DefaultPolicy::Empty,
+    bin_required_features: &["esp_hal"],
     extra_bins: &[],
 };

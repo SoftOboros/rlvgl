@@ -7,8 +7,7 @@
 //! `docs/app-schema/APP-05-A.md` §8:
 //!
 //! - For each manifest feature in `target.features`, the emitted
-//!   expansion equals the reference's expansion (set-equal,
-//!   ordering tolerated).
+//!   expansion is set-equal to the reference's expansion.
 //! - The emitted `[dependencies]` set is a subset of the reference
 //!   `[dependencies]` (by dep name).
 //!
@@ -19,11 +18,12 @@
 #[path = "../src/bin/creator/app.rs"]
 mod app;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use app::Orchestrator;
+use toml::{Table, Value};
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -41,86 +41,37 @@ fn emit_to_tempdir(manifest_rel: &str) -> tempfile::TempDir {
     tmp
 }
 
-/// Extract the body of a `[<header>]` section from a Cargo.toml,
-/// stopping at the next `[...]` line or EOF. The body retains its
-/// blank lines and comments verbatim. Section header line itself is
-/// not included.
-fn section_body<'a>(text: &'a str, header: &str) -> Option<&'a str> {
-    let needle = format!("[{header}]");
-    let start = text.find(&needle)?;
-    // Move to start of line containing the header.
-    let after_header = &text[start + needle.len()..];
-    // Skip the rest of the header line (newline).
-    let body_start_off = after_header.find('\n').map(|i| i + 1).unwrap_or(0);
-    let body = &after_header[body_start_off..];
-    // Find the next `[` that starts a line (next section).
-    let mut end = body.len();
-    for (idx, line) in body.lines().enumerate() {
-        if idx == 0 {
-            continue;
-        }
-        if line.trim_start().starts_with('[') {
-            // Locate the byte offset of this line.
-            let mut byte_off = 0usize;
-            for (i, l) in body.lines().enumerate() {
-                if i == idx {
-                    end = byte_off;
-                    break;
-                }
-                byte_off += l.len() + 1; // +1 for the \n
-            }
-            break;
-        }
-    }
-    Some(&body[..end])
+fn parse_cargo_toml(text: &str) -> Table {
+    text.parse::<Table>().expect("Cargo.toml parses as TOML")
 }
 
-/// Parse a `[features]` section body into a map of feature name →
-/// set of expansion strings. Lines like `default = [...]` are kept
-/// under the `default` key. Skips blank lines and comments.
-fn parse_features_block(body: &str) -> BTreeMap<String, BTreeSet<String>> {
-    let mut out = BTreeMap::new();
-    for line in body.lines() {
-        let t = line.trim();
-        if t.is_empty() || t.starts_with('#') {
-            continue;
-        }
-        let Some(eq) = t.find('=') else {
-            continue;
-        };
-        let name = t[..eq].trim().to_string();
-        let rhs = t[eq + 1..].trim();
-        // rhs is a [..] list; tolerate a single string fallback.
-        let mut entries = BTreeSet::new();
-        let inner = rhs
-            .strip_prefix('[')
-            .and_then(|s| s.strip_suffix(']'))
-            .unwrap_or(rhs);
-        for piece in inner.split(',') {
-            let p = piece.trim().trim_matches('"').trim();
-            if !p.is_empty() {
-                entries.insert(p.to_string());
-            }
-        }
-        out.insert(name, entries);
-    }
-    out
+/// Pull a feature's expansion list from a parsed Cargo.toml's
+/// `[features]` table. Missing key returns an empty set.
+fn feature_expansion(t: &Table, name: &str) -> Option<BTreeSet<String>> {
+    let arr = t.get("features")?.as_table()?.get(name)?.as_array()?;
+    Some(arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
 }
 
-/// Parse a `[dependencies]` (or `[build-dependencies]` /
-/// `[target.cfg.dependencies]`) section body into the set of dep
-/// names that appear on the LHS. The RHS is intentionally NOT
-/// parsed — APP-05 acceptance only requires set-subset by name at
-/// v0; per-dep source-kind/version reconciliation is not in scope.
-fn parse_dep_names(body: &str) -> BTreeSet<String> {
+/// Names of all keys under `[dependencies]` (or another dep section
+/// when `header` is e.g. `"build-dependencies"`).
+fn dep_names(t: &Table, header: &str) -> BTreeSet<String> {
+    t.get(header)
+        .and_then(|v| v.as_table())
+        .map(|tbl| tbl.keys().cloned().collect())
+        .unwrap_or_default()
+}
+
+/// Names of all keys under `[target.<cfg>.dependencies]` for any cfg.
+fn target_cfg_dep_names(t: &Table) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
-    for line in body.lines() {
-        let t = line.trim();
-        if t.is_empty() || t.starts_with('#') {
-            continue;
-        }
-        if let Some(eq) = t.find('=') {
-            out.insert(t[..eq].trim().to_string());
+    let Some(target) = t.get("target").and_then(Value::as_table) else {
+        return out;
+    };
+    for (_cfg, body) in target {
+        if let Some(deps) = body.get("dependencies").and_then(Value::as_table) {
+            for k in deps.keys() {
+                out.insert(k.clone());
+            }
         }
     }
     out
@@ -132,27 +83,17 @@ fn parse_dep_names(body: &str) -> BTreeSet<String> {
 fn app_05a_bbb_linux_feature_graph_matches_reference() {
     let ws = workspace_root();
     let tmp = emit_to_tempdir("examples/beaglebone-black/app.yaml");
-    let emitted = fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
-    let reference =
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
         fs::read_to_string(ws.join("examples/beaglebone-black/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
 
-    let emitted_features = parse_features_block(
-        section_body(&emitted, "features").expect("emitted has [features] section"),
-    );
-    let reference_features = parse_features_block(
-        section_body(&reference, "features").expect("reference has [features] section"),
-    );
-
-    // Every feature the manifest declares (target.features) must
-    // appear in the emitted [features] block with an expansion that
-    // is set-equal to the reference's.
-    let manifest_feats = ["linux", "splash", "desktop", "playit", "star_crawl"];
-    for feat in manifest_feats {
-        let emitted_exp = emitted_features
-            .get(feat)
+    for feat in ["linux", "splash", "desktop", "playit", "star_crawl"] {
+        let emitted_exp = feature_expansion(&emitted, feat)
             .unwrap_or_else(|| panic!("emitted [features] missing {feat}"));
-        let reference_exp = reference_features
-            .get(feat)
+        let reference_exp = feature_expansion(&reference, feat)
             .unwrap_or_else(|| panic!("reference [features] missing {feat}"));
         assert_eq!(
             emitted_exp, reference_exp,
@@ -162,12 +103,8 @@ fn app_05a_bbb_linux_feature_graph_matches_reference() {
 
     // Default policy: BBB reference has the same default set as the
     // manifest features (AllManifestFeatures policy in the template).
-    let emitted_default = emitted_features
-        .get("default")
-        .expect("emitted has default = ...");
-    let reference_default = reference_features
-        .get("default")
-        .expect("reference has default = ...");
+    let emitted_default = feature_expansion(&emitted, "default").expect("emitted default");
+    let reference_default = feature_expansion(&reference, "default").expect("reference default");
     assert_eq!(emitted_default, reference_default, "default = ... mismatch");
 }
 
@@ -175,25 +112,20 @@ fn app_05a_bbb_linux_feature_graph_matches_reference() {
 fn app_05a_bbb_linux_dependencies_subset_of_reference() {
     let ws = workspace_root();
     let tmp = emit_to_tempdir("examples/beaglebone-black/app.yaml");
-    let emitted = fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
-    let reference =
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
         fs::read_to_string(ws.join("examples/beaglebone-black/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
 
-    let emitted_deps = parse_dep_names(
-        section_body(&emitted, "dependencies").expect("emitted has [dependencies] section"),
-    );
-    let reference_deps = parse_dep_names(
-        section_body(&reference, "dependencies").expect("reference has [dependencies] section"),
-    );
-
-    // Every emitted dep must exist in the reference.
+    let emitted_deps = dep_names(&emitted, "dependencies");
+    let reference_deps = dep_names(&reference, "dependencies");
     let extra: Vec<_> = emitted_deps.difference(&reference_deps).collect();
     assert!(
         extra.is_empty(),
         "emitted [dependencies] introduces deps not in reference: {extra:?}"
     );
-
-    // Specific dep-name expectations from the BBB template.
     for required in [
         "rlvgl-core",
         "rlvgl-platform",
@@ -210,11 +142,7 @@ fn app_05a_bbb_linux_dependencies_subset_of_reference() {
         );
     }
 
-    // [build-dependencies] also expected.
-    let emitted_build = parse_dep_names(
-        section_body(&emitted, "build-dependencies")
-            .expect("emitted has [build-dependencies] section"),
-    );
+    let emitted_build = dep_names(&emitted, "build-dependencies");
     assert!(
         emitted_build.contains("cc"),
         "emitted [build-dependencies] missing `cc`"
@@ -230,5 +158,87 @@ fn app_05a_bbb_linux_no_template_tuning_todo() {
     assert!(
         !emitted.contains("TODO(template-tuning)"),
         "BBB linux emit still carries TODO(template-tuning); APP-05a template should have replaced it"
+    );
+}
+
+// ─── APP-05b: beetle esp_hal hosted feature graph ──────────────────────
+
+#[test]
+fn app_05b_beetle_esp_hal_feature_graph_matches_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/beetle-esp32c3/app.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/beetle-esp32c3/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+
+    let emitted_exp =
+        feature_expansion(&emitted, "esp_hal").expect("emitted [features] missing esp_hal");
+    let reference_exp =
+        feature_expansion(&reference, "esp_hal").expect("reference [features] missing esp_hal");
+    assert_eq!(
+        emitted_exp, reference_exp,
+        "feature `esp_hal` expansion mismatch:\n  emitted: {emitted_exp:?}\n  reference: {reference_exp:?}"
+    );
+
+    // Beetle reference has default = []; the emit must match.
+    let emitted_default = feature_expansion(&emitted, "default").expect("emitted default");
+    assert!(
+        emitted_default.is_empty(),
+        "expected default = [] for beetle esp_hal, got {emitted_default:?}"
+    );
+}
+
+#[test]
+fn app_05b_beetle_esp_hal_dependencies_subset_of_reference() {
+    let ws = workspace_root();
+    let tmp = emit_to_tempdir("examples/beetle-esp32c3/app.yaml");
+    let emitted_text =
+        fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    let reference_text =
+        fs::read_to_string(ws.join("examples/beetle-esp32c3/Cargo.toml")).expect("reference");
+    let emitted = parse_cargo_toml(&emitted_text);
+    let reference = parse_cargo_toml(&reference_text);
+
+    let emitted_deps = dep_names(&emitted, "dependencies");
+    let reference_deps = dep_names(&reference, "dependencies");
+    let extra: Vec<_> = emitted_deps.difference(&reference_deps).collect();
+    assert!(
+        extra.is_empty(),
+        "emitted [dependencies] introduces deps not in reference: {extra:?}"
+    );
+    for required in ["rlvgl-core", "rlvgl-platform", "rlvgl-widgets", "ssd1306"] {
+        assert!(
+            emitted_deps.contains(required),
+            "emitted [dependencies] missing `{required}` (emitted set: {emitted_deps:?})"
+        );
+    }
+
+    // [target.cfg(target_arch = "riscv32").dependencies] entries gated
+    // by esp_hal.
+    let emitted_cfg_deps = target_cfg_dep_names(&emitted);
+    let reference_cfg_deps = target_cfg_dep_names(&reference);
+    let cfg_extra: Vec<_> = emitted_cfg_deps.difference(&reference_cfg_deps).collect();
+    assert!(
+        cfg_extra.is_empty(),
+        "emitted [target.cfg.dependencies] introduces deps not in reference: {cfg_extra:?}"
+    );
+    for required in ["esp-hal", "esp-backtrace", "esp-println", "esp-alloc"] {
+        assert!(
+            emitted_cfg_deps.contains(required),
+            "emitted [target.cfg.dependencies] missing `{required}` (set: {emitted_cfg_deps:?})"
+        );
+    }
+}
+
+#[test]
+fn app_05b_beetle_esp_hal_no_template_tuning_todo() {
+    let tmp = emit_to_tempdir("examples/beetle-esp32c3/app.yaml");
+    let emitted = fs::read_to_string(tmp.path().join("Cargo.toml")).expect("emitted Cargo.toml");
+    assert!(
+        !emitted.contains("TODO(template-tuning)"),
+        "beetle esp_hal emit still carries TODO(template-tuning)"
     );
 }
