@@ -633,7 +633,7 @@ When the BBB is bricked (no USB, no network, solid LEDs):
 - [ ] DT split: 24-bit-from-SD vs 16-bit-from-eMMC variant (deferred)
 - [ ] 32bpp XRGB8888 fbdev mode via DRM client-side mode set (deferred;
       needs to not conflict with eMMC pin sharing)
-- [ ] R/B swap in `LinuxFbdevDisplay::flush` 16bpp path (cosmetic)
+- [x] R/B swap in `LinuxFbdevDisplay::flush` 16bpp path (cosmetic, fixed 2026-05-11)
 - [x] Dirty-rect redraw — present path consumes the `BlitterRenderer`
       planner rects + the crawl viewport instead of repacking the full
       ARGB→BGR565 frame each tick. `BlitPlanner::overflowed()` flips the

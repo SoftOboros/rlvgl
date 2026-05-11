@@ -240,12 +240,11 @@ impl DisplayDriver for LinuxFbdevDisplay {
                         }
                     }
                     16 => {
-                        // RGB565
                         if offset + 1 < fb.len() {
                             let r5 = (color.0 >> 3) as u16;
                             let g6 = (color.1 >> 2) as u16;
                             let b5 = (color.2 >> 3) as u16;
-                            let pixel = (r5 << 11) | (g6 << 5) | b5;
+                            let pixel = (b5 << 11) | (g6 << 5) | r5;
                             fb[offset] = pixel as u8;
                             fb[offset + 1] = (pixel >> 8) as u8;
                         }
