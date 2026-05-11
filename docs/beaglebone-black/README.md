@@ -1000,6 +1000,9 @@ SD card.
 
 ### Phase 5: Zephyr
 
+See also: [`05-zephyr-prong.md`](./05-zephyr-prong.md) — the ratified
+concepts chapter for the Zephyr prong (§0–§15, normative).
+
 - [ ] Zephyr board support for AM335x LCDC
 - [ ] Staticlib integration
 - [ ] Touch via Zephyr input subsystem
