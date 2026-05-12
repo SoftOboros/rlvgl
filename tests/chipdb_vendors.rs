@@ -28,7 +28,7 @@ vendor_check!(
     silabs,
     rlvgl_chips_silabs,
     "silabs",
-    "EFM32GG11",
+    "SLSTK3701A",
     "EFM32GG11"
 );
 vendor_check!(
