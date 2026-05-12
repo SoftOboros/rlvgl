@@ -31,7 +31,7 @@ pub fn init() {
     //           per CHIPS-MICROCHIP §15.
     {% endif %}
     {% if pad.pmux_enable %}
-    // PMUX letter {{ pad.pmux_letter }} → bits 0x{{ "%01x" | format(pad.pmux_bits) }}
+    // PMUX letter {{ pad.pmux_letter }} → bits {{ pad.pmux_bits }}
     p.PORT.group({{ pad.group }}).pmux({{ pad.pmux_half }}).modify(|_, w| unsafe {
         w.{% if pad.pmux_odd %}pmuxo{% else %}pmuxe{% endif %}().bits({{ pad.pmux_bits }})
     });
