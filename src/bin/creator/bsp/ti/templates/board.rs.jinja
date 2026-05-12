@@ -1,0 +1,39 @@
+//! Board-level constants for {{ ir.board.name }}.
+//!
+//! Each pin label from `db/boards/{{ board_stem }}.yaml` becomes a `pub const`
+//! DIO number so application code can refer to board features by name
+//! rather than magic pin numbers.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "{{ ir.chip.name }}";
+
+/// Chip package.
+pub const PACKAGE: &str = "{{ ir.chip.package }}";
+
+/// On-module flash capacity, megabytes.
+pub const FLASH_MB: u32 = {{ ir.board.flash_mb }};
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+///
+/// On SimpleLink Cortex-M4F the CPU runs directly off SCLK_HF; there is
+/// no PLL (TI SWCU185 §4).
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+/// APB / peripheral bus clock frequency, in hertz.
+pub const APB_HZ: u32 = {{ ir.clocks.apb_hz }};
+
+/// High-frequency crystal frequency, in hertz (XOSC_HF).
+pub const XTAL_HZ: u32 = {{ ir.clocks.xtal_hi_hz | default(ir.clocks.xtal_hz) }};
+
+/// Low-frequency crystal frequency, in hertz (XOSC_LF, 32.768 kHz typical).
+pub const XTAL_LF_HZ: u32 = {{ ir.clocks.xtal_lo_hz | default(32768) }};
+
+{% for pin in ir.pins %}
+{% if pin.label %}
+/// DIO number for `{{ pin.label }}` ({{ pin.signal }}).
+pub const {{ pin.label | upper }}: u8 = {{ pin.dio | default(pin.gpio) }};
+{% endif %}
+{% endfor %}

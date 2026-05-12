@@ -1,0 +1,126 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits real register writes for UART0 (when it is the console)
+//! and TODO stubs for everything else. Future CHIPS-TI-NN sub-letters will
+//! grow real init bodies for the SimpleLink I2C / SSI / I2S / GPT classes;
+//! see the Espressif `peripherals.rs.jinja` for the precedent shape.
+//!
+//! All access goes through the `{{ ir.chip.pac_crate }}` PAC's
+//! `Peripherals::steal()` handle, with uppercase instance access
+//! (`p.UART0.fbrd()`, `p.I2C0.mcr()`, etc.) per the
+//! "Peripheral instance access style" rule frozen in CHIPS-TI-00 §3.
+
+use {{ ir.chip.pac_crate }} as pac;
+
+#[allow(unused_imports)]
+use super::board::{APB_HZ, XTAL_HZ};
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and IOC are configured.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% set periph = ir.chip.peripherals[name] %}
+{% if periph %}
+{% if name == "uart0" and ir.board.console and ir.board.console.peripheral == "uart0" %}
+/// Bring up UART0 as the console at {{ ir.board.console.baud }} baud, 8N1.
+///
+/// SimpleLink UART (TI SWCU185 §23) uses a PrimeCell-style integer +
+/// fractional baud-rate divisor: `BRD = APB_HZ / (16 * BAUD)`, with the
+/// integer part written to IBRD and the 6-bit fractional part to FBRD.
+/// Per SWCU185 §23.2 the fractional part is `round(64 * (BRD - IBRD))`.
+///
+/// Clock gating and reset release are already done by `crate::clocks::init`.
+pub fn init_uart0() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const BAUD: u32 = {{ ir.board.console.baud }};
+    // Disable UART before reconfiguring (CTL.UARTEN = 0).
+    p.UART0.ctl().modify(|_, w| w.uarten().clear_bit());
+    // Baud-rate divisor: BRD = APB_HZ / (16 * BAUD). Compute scaled by 64
+    // so we can split IBRD (integer) and FBRD (6-bit fractional) cleanly.
+    let brd64: u32 = (APB_HZ * 4) / BAUD;       // == BRD * 64
+    let ibrd: u32 = brd64 >> 6;
+    let fbrd: u32 = brd64 & 0x3F;
+    p.UART0.ibrd().write(|w| unsafe { w.bits(ibrd) });
+    p.UART0.fbrd().write(|w| unsafe { w.bits(fbrd) });
+    // Line control: 8 data bits, no parity, 1 stop, FIFOs enabled.
+    p.UART0.lcrh().write(|w| unsafe { w.bits((0b11 << 5) | (1 << 4)) });
+    // Enable UART, TX, RX (CTL.UARTEN | CTL.TXE | CTL.RXE).
+    p.UART0.ctl().modify(|_, w| {
+        w.uarten().set_bit().txe().set_bit().rxe().set_bit()
+    });
+}
+{% elif periph.class == "i2c" %}
+/// TODO: bring up {{ name }} as an I2C master.
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// Clock gating is already done by `crate::clocks::init`. SimpleLink I2C
+/// (TI SWCU185 §21) is configured by writing MCR.MFE=1 (master function
+/// enable) and MTPR for the SCL clock divider:
+/// `TPR = APB_HZ / (2 * 10 * SCL_HZ) - 1` for standard mode.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: SimpleLink I2C master init for {{ name }} (SWCU185 §21).
+}
+{% elif periph.class == "spi_master" %}
+/// TODO: bring up {{ name }} as an SSI (SPI) master.
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// Clock gating is already done by `crate::clocks::init`. SimpleLink SSI
+/// (TI SWCU185 §20) uses CR0 (data width, frame format, CPOL, CPHA), CR1
+/// (master/slave, enable), and CPSR (clock prescaler) to derive SCLK.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: SimpleLink SSI master init for {{ name }} (SWCU185 §20).
+}
+{% elif periph.class == "i2s" %}
+/// TODO: bring up {{ name }} (I2S audio interface).
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// SimpleLink I2S is documented in TI SWCU185 §19.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: SimpleLink I2S init for {{ name }} (SWCU185 §19).
+}
+{% elif periph.class == "gptimer" %}
+/// TODO: bring up {{ name }} (General-Purpose Timer).
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// SimpleLink GPT (TI SWCU185 §16) supports 16/32-bit timers with PWM,
+/// edge-count, and one-shot/periodic modes.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: GPT init for {{ name }} (SWCU185 §16).
+}
+{% elif periph.class == "watchdog" %}
+/// TODO: disable the watchdog for {{ name }}.
+///
+/// Targets the `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block.
+/// SimpleLink WDT (TI SWCU185 §17) is locked by default; unlock via
+/// `LOCK = 0x1ACCE551` before disabling.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: WDT disable for {{ name }} (SWCU185 §17).
+}
+{% else %}
+/// TODO: initialize {{ name }} (class `{{ periph.class }}`, base {{ periph.base }}).
+///
+/// Populate this function by writing into the `{{ ir.chip.pac_crate }}::{{ name | upper }}`
+/// register block. Clock gating is already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: {{ periph.class }} init sequence for {{ name }}
+}
+{% endif %}
+{% else %}
+/// TODO: unknown peripheral `{{ name }}` (no entry in chip IR).
+pub fn init_{{ name }}() {}
+{% endif %}
+
+{% endfor %}
