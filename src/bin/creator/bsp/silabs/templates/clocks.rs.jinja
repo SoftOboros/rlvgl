@@ -1,0 +1,43 @@
+//! CMU clock-gate initialization for {{ ir.board.name }}.
+//!
+//! Silicon Labs EFM32 Series 1 peripheral clock gating lives in three
+//! CMU register families:
+//!
+//! * `cmu.hfperclken0` / `cmu.hfperclken1` — HF peripheral bus (USART,
+//!   UART, I2C, TIMER, ADC, ACMP, IDAC, VDAC, PRS, GPIO).
+//! * `cmu.hfbusclken0` — HF system bus (LDMA, GPCRC, EBI, ETH, CRYPTO,
+//!   SDIO, QSPI, `le` — wakeup gate to LF peripherals).
+//! * `cmu.lfaclken0` / `cmu.lfbclken0` / `cmu.lfeclken0` — LF
+//!   peripheral buses (LETIMER, LEUART, RTC, RTCC, PCNT, LCD, WDOG).
+//!
+//! EFM32GG11 does NOT have a per-peripheral CMU reset register; reset
+//! is via the peripheral's own CMD/CTRL write. This template therefore
+//! emits clock-enable only.
+
+use {{ ir.chip.pac_crate | replace("-", "_") }} as pac;
+
+/// Enable the CMU clock gate for every peripheral used by this board.
+///
+/// Called by [`crate::pac::init`] as the first bring-up step, before
+/// IO routing so that peripheral registers are writable.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    {% for name in peripherals_used %}
+    {% set gate = ir.chip.clock_tree.system_gates[name] %}
+    {% if gate %}
+    // {{ name }} — CMU clock enable {{ gate.clk_en_field }} on {{ gate.clk_en_reg }}
+    p.{{ gate.clk_en_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_en_field }}().set_bit());
+    {% if gate.rst_reg and gate.rst_field %}
+    // Optional reset toggle (Series 2 only — Series 1 leaves this null)
+    p.{{ gate.rst_reg | pac_path }}.modify(|_, w| w.{{ gate.rst_field }}().set_bit());
+    p.{{ gate.rst_reg | pac_path }}.modify(|_, w| w.{{ gate.rst_field }}().clear_bit());
+    {% endif %}
+    {% if gate.clk_sel_reg and gate.clk_sel_field %}
+    // {{ name }} — kernel clock source select
+    p.{{ gate.clk_sel_reg | pac_path }}.modify(|_, w| unsafe { w.{{ gate.clk_sel_field }}().bits(0) });
+    {% endif %}
+    {% else %}
+    // {{ name }}: no CMU gate entry in chip IR (always-on or external)
+    {% endif %}
+    {% endfor %}
+}

@@ -1147,6 +1147,11 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                         println!("{name}");
                     }
                 }
+                "silabs" => {
+                    for name in rlvgl_chips_silabs::chip_names() {
+                        println!("{name}");
+                    }
+                }
                 other => return Err(anyhow!("unsupported vendor: {other}")),
             },
             BspCommand::ListBoards { vendor, chip } => match vendor.as_str() {
@@ -1212,6 +1217,16 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                 }
                 "microchip" => {
                     for info in rlvgl_chips_microchip::boards() {
+                        if let Some(ref filter) = chip {
+                            if !info.chip.eq_ignore_ascii_case(filter) {
+                                continue;
+                            }
+                        }
+                        println!("{:<40} {}", info.board, info.chip);
+                    }
+                }
+                "silabs" => {
+                    for info in rlvgl_chips_silabs::boards() {
                         if let Some(ref filter) = chip {
                             if !info.chip.eq_ignore_ascii_case(filter) {
                                 continue;
@@ -1408,10 +1423,39 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                             println!("generated {} files in {}", written.len(), out.display());
                         }
                     }
+                    "silabs" => {
+                        let board_ir = if let Some(path) = board_yaml.as_ref() {
+                            crate::bsp::silabs::load_board_file(path)?
+                        } else {
+                            crate::bsp::silabs::load_board_db(&board)?
+                        };
+                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
+                            crate::bsp::silabs::load_chip_file(path)?
+                        } else {
+                            let name = match chip.as_deref() {
+                                Some(c) => c.to_string(),
+                                None => board_ir.chip.clone(),
+                            };
+                            crate::bsp::silabs::load_chip_db(&name)?
+                        };
+                        let mut ir = crate::bsp::silabs::merge(chip_ir, board_ir)?;
+                        if let Some(hz) = cpu_hz {
+                            ir.clocks.cpu_hz = hz;
+                        }
+                        if let Some(baud) = baud {
+                            if let Some(console) = ir.board.console.as_mut() {
+                                console.baud = baud;
+                            }
+                        }
+                        let written = crate::bsp::silabs::render_silabs_pac(&ir, &out)?;
+                        if !cli.silent {
+                            println!("generated {} files in {}", written.len(), out.display());
+                        }
+                    }
                     other => {
                         return Err(anyhow!(
                             "bsp from-yaml does not support vendor '{other}' \
-                             (supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040, renesas, ra, ti, microchip)"
+                             (supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040, renesas, ra, ti, microchip, silabs)"
                         ));
                     }
                 }

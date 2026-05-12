@@ -35,6 +35,8 @@ pub mod rp;
 pub mod ti;
 #[path = "../creator/bsp/microchip/mod.rs"]
 pub mod microchip;
+#[path = "../creator/bsp/silabs/mod.rs"]
+pub mod silabs;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {
@@ -47,6 +49,7 @@ mod bsp {
     pub use super::nxp;
     pub use super::renesas;
     pub use super::rp;
+    pub use super::silabs;
     pub use super::ti;
 }
 
@@ -129,10 +132,20 @@ fn bsp_gen_real(vendor: &str, board: &str, chip: Option<&str>, out_dir: &Path) -
             crate::bsp::microchip::render_microchip_pac(&ir, out_dir)?;
             Ok(snake_case(&ir.board.name))
         }
+        "silabs" => {
+            let board_ir = crate::bsp::silabs::load_board_db(board)?;
+            let chip_name = chip
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| board_ir.chip.clone());
+            let chip_ir = crate::bsp::silabs::load_chip_db(&chip_name)?;
+            let ir = crate::bsp::silabs::merge(chip_ir, board_ir)?;
+            crate::bsp::silabs::render_silabs_pac(&ir, out_dir)?;
+            Ok(snake_case(&ir.board.name))
+        }
         other => Err(anyhow!(
             "target.generator: creator-bsp-pac is not implemented for vendor '{other}' \
              at v0; supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040, \
-             renesas, ra, ti, microchip. (chapter 02 §7.2 + §7.2.1)"
+             renesas, ra, ti, microchip, silabs. (chapter 02 §7.2 + §7.2.1)"
         )),
     }
 }
