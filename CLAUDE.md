@@ -217,6 +217,25 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c5_render --features creator,re
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32h2_render --features creator,regression
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,regression
 
+# Phase 4.7c: Silicon Labs BSP generator (CHIPS-SILABS-NN). Render test
+# covers the 6-file emission set for SLSTK3701A; no linker emission per
+# CHIPS-SILABS-00 §11 (deferred to -05).
+RUSTFLAGS="" cargo test -p rlvgl-chips-silabs
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features creator,regression
+
+# Phase 4.7d: Texas Instruments BSP generator (CHIPS-TI-NN). Render
+# test covers the 8-file emission set (6 .rs + memory.x + cc1352_r.x)
+# for LAUNCHXL-CC1352R1.
+RUSTFLAGS="" cargo test -p rlvgl-chips-ti
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_render --features creator,regression
+
+# Phase 4.8: Microchip BSP generator (CHIPS-MICROCHIP-NN). Render test
+# covers the 7-file emission set (6 .rs + memory.x) for the Adafruit
+# Feather M4 Express. PB22/PB23 chip-yaml MISMATCH comments are captured
+# verbatim in the golden snapshot pending a future -01a amendment.
+RUSTFLAGS="" cargo test -p rlvgl-chips-microchip
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_render --features creator,regression
+
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
 
