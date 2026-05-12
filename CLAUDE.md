@@ -219,22 +219,40 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,r
 
 # Phase 4.7c: Silicon Labs BSP generator (CHIPS-SILABS-NN). Render test
 # covers the 6-file emission set for SLSTK3701A; no linker emission per
-# CHIPS-SILABS-00 §11 (deferred to -05).
+# CHIPS-SILABS-00 §11 (deferred to -05). The opt-in compile-verify test
+# (CHIPS-SILABS-04) materialises a throwaway cargo project around the
+# generated BSP and runs `cargo check --target thumbv7em-none-eabihf`
+# against efm32gg11b-pac 0.1.4. Currently expected to FAIL until the
+# SILABS pac.rs template flattens the SKU sub-module
+# (`pub use efm32gg11b_pac::efm32gg11b820::*;`).
 RUSTFLAGS="" cargo test -p rlvgl-chips-silabs
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features creator,regression
+# RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.7d: Texas Instruments BSP generator (CHIPS-TI-NN). Render
 # test covers the 8-file emission set (6 .rs + memory.x + cc1352_r.x)
-# for LAUNCHXL-CC1352R1.
+# for LAUNCHXL-CC1352R1. The opt-in compile-verify test (CHIPS-TI-01d)
+# runs `cargo check --target thumbv7em-none-eabihf` against
+# cc13x2_26x2_pac 0.10. Currently expected to FAIL until the TI
+# templates lowercase peripheral field accessors (`p.PRCM` → `p.prcm`,
+# `p.IOC` → `p.ioc`, etc.) to match this PAC's pre-uppercase svd2rust
+# convention.
 RUSTFLAGS="" cargo test -p rlvgl-chips-ti
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_render --features creator,regression
+# RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.8: Microchip BSP generator (CHIPS-MICROCHIP-NN). Render test
 # covers the 7-file emission set (6 .rs + memory.x) for the Adafruit
 # Feather M4 Express. PB22/PB23 chip-yaml MISMATCH comments are captured
-# verbatim in the golden snapshot pending a future -01a amendment.
+# verbatim in the golden snapshot pending a future -01a amendment. The
+# opt-in compile-verify test (CHIPS-MICROCHIP-04) runs `cargo check
+# --target thumbv7em-none-eabihf` against atsamd51j19a 0.7. Currently
+# expected to FAIL until the Microchip templates switch to field-style
+# register access (`p.MCLK.apbamask.modify(...)`) to match this PAC's
+# pre-method-accessor svd2rust era.
 RUSTFLAGS="" cargo test -p rlvgl-chips-microchip
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_render --features creator,regression
+# RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_compile --features compile-verify -- --test-threads=1
 
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
