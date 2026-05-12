@@ -1142,6 +1142,11 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                         println!("{name}");
                     }
                 }
+                "microchip" => {
+                    for name in rlvgl_chips_microchip::chip_names() {
+                        println!("{name}");
+                    }
+                }
                 other => return Err(anyhow!("unsupported vendor: {other}")),
             },
             BspCommand::ListBoards { vendor, chip } => match vendor.as_str() {
@@ -1197,6 +1202,16 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                 }
                 "ti" => {
                     for info in rlvgl_chips_ti::boards() {
+                        if let Some(ref filter) = chip {
+                            if !info.chip.eq_ignore_ascii_case(filter) {
+                                continue;
+                            }
+                        }
+                        println!("{:<40} {}", info.board, info.chip);
+                    }
+                }
+                "microchip" => {
+                    for info in rlvgl_chips_microchip::boards() {
                         if let Some(ref filter) = chip {
                             if !info.chip.eq_ignore_ascii_case(filter) {
                                 continue;
@@ -1364,10 +1379,39 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                             println!("generated {} files in {}", written.len(), out.display());
                         }
                     }
+                    "microchip" => {
+                        let board_ir = if let Some(path) = board_yaml.as_ref() {
+                            crate::bsp::microchip::load_board_file(path)?
+                        } else {
+                            crate::bsp::microchip::load_board_db(&board)?
+                        };
+                        let chip_ir = if let Some(path) = chip_yaml.as_ref() {
+                            crate::bsp::microchip::load_chip_file(path)?
+                        } else {
+                            let name = match chip.as_deref() {
+                                Some(c) => c.to_string(),
+                                None => board_ir.chip.clone(),
+                            };
+                            crate::bsp::microchip::load_chip_db(&name)?
+                        };
+                        let mut ir = crate::bsp::microchip::merge(chip_ir, board_ir)?;
+                        if let Some(hz) = cpu_hz {
+                            ir.clocks.cpu_hz = hz;
+                        }
+                        if let Some(baud) = baud {
+                            if let Some(console) = ir.board.console.as_mut() {
+                                console.baud = baud;
+                            }
+                        }
+                        let written = crate::bsp::microchip::render_microchip_pac(&ir, &out)?;
+                        if !cli.silent {
+                            println!("generated {} files in {}", written.len(), out.display());
+                        }
+                    }
                     other => {
                         return Err(anyhow!(
                             "bsp from-yaml does not support vendor '{other}' \
-                             (supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040, renesas, ra, ti)"
+                             (supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040, renesas, ra, ti, microchip)"
                         ));
                     }
                 }

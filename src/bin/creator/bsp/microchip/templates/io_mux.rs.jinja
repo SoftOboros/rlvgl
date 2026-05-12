@@ -1,0 +1,69 @@
+//! PORT PMUX and PINCFG configuration for {{ ir.board.name }}.
+//!
+//! Per CHIPS-MICROCHIP-00 §9, each SAM pad is identified by a
+//! `(group, pin)` pair and carries:
+//!
+//! - **PMUX** register — 4-bit selector picking one of A..H (D5x) or
+//!   A..N (D21 superset) alternate-function columns. Adjacent pads share
+//!   a `PMUXn` register byte: even pin → `pmuxe`, odd pin → `pmuxo`.
+//!   Half-index is `pin / 2`.
+//! - **PINCFG** register — input-enable / pull / drive-strength bits.
+//!   PMUXEN selects whether PMUX is honoured (peripheral function) or
+//!   the pad is plain software-driven GPIO.
+//!
+//! Each board pin's `pmux:` letter is matched against the chip yaml's
+//! `io_mux.fn_<letter>:` column to produce a 4-bit field value
+//! (A=0, B=1, ..., H=7, N=0xf). Pins with `signal: GPIO` skip the PMUX
+//! write entirely and configure PINCFG for direct GPIO use.
+
+use {{ ir.chip.pac_crate }} as pac;
+
+/// Apply the board's PORT PMUX and PINCFG routing.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    {% for pad in pad_routes %}
+    // {{ pad.pad }} (group {{ pad.group }} pin {{ pad.pin }}) — {{ pad.signal }}{% if pad.peripheral %} ({{ pad.peripheral }}){% endif %}
+    {% if pad.unmatched_peripheral %}
+    // MISMATCH: board claims peripheral signal `{{ pad.signal }}` on
+    //           pad {{ pad.pad }} but chip yaml `io_mux.fn_<letter>:` columns
+    //           do not list it. Falling back to plain GPIO PINCFG. Fix
+    //           by amending chipdb/rlvgl-chips-microchip/db/chips/{{ ir.chip.name }}.yaml
+    //           per CHIPS-MICROCHIP §15.
+    {% endif %}
+    {% if pad.pmux_enable %}
+    // PMUX letter {{ pad.pmux_letter }} → bits 0x{{ "%01x" | format(pad.pmux_bits) }}
+    p.PORT.group({{ pad.group }}).pmux({{ pad.pmux_half }}).modify(|_, w| unsafe {
+        w.{% if pad.pmux_odd %}pmuxo{% else %}pmuxe{% endif %}().bits({{ pad.pmux_bits }})
+    });
+    p.PORT.group({{ pad.group }}).pincfg({{ pad.pin }}).write(|w| {
+        w.pmuxen().set_bit()
+         .inen().{% if pad.direction == "in" or pad.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
+         .pullen().{% if pad.pull == "up" or pad.pull == "down" %}set_bit{% else %}clear_bit{% endif %}()
+    });
+    {% if pad.pull == "up" %}
+    // Pull-up: OUT bit selects pull direction when PULLEN is set.
+    p.PORT.group({{ pad.group }}).outset().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    {% elif pad.pull == "down" %}
+    p.PORT.group({{ pad.group }}).outclr().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    {% endif %}
+    {% else %}
+    // Plain GPIO (signal `{{ pad.signal }}`): no PMUX, configure PINCFG only.
+    p.PORT.group({{ pad.group }}).pincfg({{ pad.pin }}).write(|w| {
+        w.pmuxen().clear_bit()
+         .inen().{% if pad.direction == "in" or pad.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
+         .pullen().{% if pad.pull == "up" or pad.pull == "down" %}set_bit{% else %}clear_bit{% endif %}()
+    });
+    {% if pad.direction == "out" or pad.direction == "inout" %}
+    // Drive direction set for output pad.
+    p.PORT.group({{ pad.group }}).dirset().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    {% else %}
+    p.PORT.group({{ pad.group }}).dirclr().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    {% endif %}
+    {% if pad.pull == "up" %}
+    p.PORT.group({{ pad.group }}).outset().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    {% elif pad.pull == "down" %}
+    p.PORT.group({{ pad.group }}).outclr().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+}
