@@ -1,0 +1,83 @@
+---
+source: tests/bsp_ti_cc1352r_render.rs
+assertion_line: 103
+expression: text
+---
+//! Per-peripheral initialization for LAUNCHXL-CC1352R1.
+//!
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits real register writes for UART0 (when it is the console)
+//! and TODO stubs for everything else. Future CHIPS-TI-NN sub-letters will
+//! grow real init bodies for the SimpleLink I2C / SSI / I2S / GPT classes;
+//! see the Espressif `peripherals.rs.jinja` for the precedent shape.
+//!
+//! All access goes through the `cc13x2_26x2_pac` PAC's
+//! `Peripherals::steal()` handle, with uppercase instance access
+//! (`p.UART0.fbrd()`, `p.I2C0.mcr()`, etc.) per the
+//! "Peripheral instance access style" rule frozen in CHIPS-TI-00 §3.
+
+use cc13x2_26x2_pac as pac;
+
+#[allow(unused_imports)]
+use super::board::{APB_HZ, XTAL_HZ};
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and IOC are configured.
+pub fn init() {
+    
+    init_uart0();
+    
+    init_i2c0();
+    
+}
+
+
+
+
+
+/// Bring up UART0 as the console at 115200 baud, 8N1.
+///
+/// SimpleLink UART (TI SWCU185 §23) uses a PrimeCell-style integer +
+/// fractional baud-rate divisor: `BRD = APB_HZ / (16 * BAUD)`, with the
+/// integer part written to IBRD and the 6-bit fractional part to FBRD.
+/// Per SWCU185 §23.2 the fractional part is `round(64 * (BRD - IBRD))`.
+///
+/// Clock gating and reset release are already done by `crate::clocks::init`.
+pub fn init_uart0() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const BAUD: u32 = 115200;
+    // Disable UART before reconfiguring (CTL.UARTEN = 0).
+    p.UART0.ctl().modify(|_, w| w.uarten().clear_bit());
+    // Baud-rate divisor: BRD = APB_HZ / (16 * BAUD). Compute scaled by 64
+    // so we can split IBRD (integer) and FBRD (6-bit fractional) cleanly.
+    let brd64: u32 = (APB_HZ * 4) / BAUD;       // == BRD * 64
+    let ibrd: u32 = brd64 >> 6;
+    let fbrd: u32 = brd64 & 0x3F;
+    p.UART0.ibrd().write(|w| unsafe { w.bits(ibrd) });
+    p.UART0.fbrd().write(|w| unsafe { w.bits(fbrd) });
+    // Line control: 8 data bits, no parity, 1 stop, FIFOs enabled.
+    p.UART0.lcrh().write(|w| unsafe { w.bits((0b11 << 5) | (1 << 4)) });
+    // Enable UART, TX, RX (CTL.UARTEN | CTL.TXE | CTL.RXE).
+    p.UART0.ctl().modify(|_, w| {
+        w.uarten().set_bit().txe().set_bit().rxe().set_bit()
+    });
+}
+
+
+
+
+
+
+
+/// TODO: bring up i2c0 as an I2C master.
+///
+/// Targets the `cc13x2_26x2_pac::I2C0` register block.
+/// Clock gating is already done by `crate::clocks::init`. SimpleLink I2C
+/// (TI SWCU185 §21) is configured by writing MCR.MFE=1 (master function
+/// enable) and MTPR for the SCL clock divider:
+/// `TPR = APB_HZ / (2 * 10 * SCL_HZ) - 1` for standard mode.
+pub fn init_i2c0() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: SimpleLink I2C master init for i2c0 (SWCU185 §21).
+}

@@ -1,0 +1,69 @@
+# Texas Instruments LAUNCHXL-CC1352R1 SimpleLink LaunchPad board IR.
+#
+# The LAUNCHXL-CC1352R1 is TI's reference development kit for the
+# CC1352R1 SimpleLink multi-band wireless MCU. It pairs the
+# CC1352R1F3RGZ (CC1352R chip family, RGZ VQFN-48 package) with an
+# XDS110 on-board debugger that also exposes a USB-serial backchannel
+# wired to the MCU's UART0.
+#
+# Reference:
+#   - TI SWRU527 "CC1352R1 LaunchPad Development Kit (LAUNCHXL-CC1352R1)
+#     Hardware User's Guide". §2.3 covers the XDS110 debugger and
+#     backchannel UART pinout (DIO_2/DIO_3 wired to the XDS110
+#     /XDS110_UART_TX / /XDS110_UART_RX nets); §2.4 the user LEDs
+#     (LED_RED on DIO_6, LED_GREEN on DIO_7); §2.5 the user buttons
+#     (BTN1 on DIO_13, BTN2 on DIO_14); §2.6 the BoosterPack standard
+#     I2C bus (SDA on DIO_5, SCL on DIO_4).
+#   - TI CC1352R datasheet SWRS196I §7.2 Table 7-1 "Signal Descriptions –
+#     RGZ Package" for DIO-to-pin mapping (cross-checked against the
+#     chip inventory `chipdb/rlvgl-chips-ti/db/chips/CC1352R.yaml`).
+#
+# Console:
+#   The XDS110 debugger enumerates a CDC-ACM USB-serial endpoint that
+#   bridges to the CC1352R's UART0 RX (DIO_2) / TX (DIO_3) at 115200 Bd
+#   by default. This matches the convention used by TI's SimpleLink SDK
+#   examples (Display_HOST output, NoRTOS UART2 driver default).
+
+name: LAUNCHXL-CC1352R1
+chip: CC1352R
+module: LAUNCHXL-CC1352R1
+flash_mb: 0
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 backchannel via XDS110 (SWRU527 §2.3).
+  # MCU's UART0_RX (input) is DIO_2; UART0_TX (output) is DIO_3.
+  - { dio: 2,  signal: UART0_RX, peripheral: uart0, direction: in,  label: uart_rx }
+  - { dio: 3,  signal: UART0_TX, peripheral: uart0, direction: out, label: uart_tx }
+
+  # BoosterPack standard I2C bus (SWRU527 §2.6).
+  # I2C0 is the only I2C master on CC1352R; SDA/SCL are open-drain.
+  - { dio: 5,  signal: I2C0_SDA, peripheral: i2c0,  direction: inout, pull: up, label: i2c_sda }
+  - { dio: 4,  signal: I2C0_SCL, peripheral: i2c0,  direction: inout, pull: up, label: i2c_scl }
+
+  # User LEDs (SWRU527 §2.4). Both are high-drive DIOs (8 mA capable).
+  - { dio: 6,  signal: LED_RED,                    direction: out, label: led_red }
+  - { dio: 7,  signal: LED_GREEN,                  direction: out, label: led_green }
+
+  # User push-buttons (SWRU527 §2.5). Pull-up because the XDS110 side
+  # of the BTN net is active-low to GND through the switch.
+  - { dio: 13, signal: BTN1,                       direction: in,  pull: up, label: btn1 }
+  - { dio: 14, signal: BTN2,                       direction: in,  pull: up, label: btn2 }
+
+i2c_configs:
+  i2c0:
+    # BoosterPack standard fast-mode I2C.
+    scl_hz: 400000
+
+features:
+  console: uart0
+  led_red: dio6
+  led_green: dio7
+  btn1: dio13
+  btn2: dio14
+  i2c_bus: i2c0
+  i2c_sda: dio5
+  i2c_scl: dio4

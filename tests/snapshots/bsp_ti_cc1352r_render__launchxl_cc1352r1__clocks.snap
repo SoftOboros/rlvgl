@@ -1,0 +1,64 @@
+---
+source: tests/bsp_ti_cc1352r_render.rs
+assertion_line: 89
+expression: text
+---
+//! Clock tree initialization for LAUNCHXL-CC1352R1.
+//!
+//! Peripheral clock gating and reset on CC1352R are controlled
+//! by the Power, Reset and Clock Module (PRCM) — see TI SWCU185 §4. The
+//! SimpleLink PRCM model differs from the Espressif SYSTEM / PCR block in
+//! two ways called out by CHIPS-TI-00 §10.2:
+//!
+//! 1. PRCM CLKGR (run-mode), CLKGS (sleep-mode), CLKGDS (deep-sleep-mode)
+//!    writes are **staged** — they do not take effect until software
+//!    pulses `PRCM.CLKLOADCTL.LOAD` and polls `LOAD_DONE`.
+//! 2. Peripheral resets live in dedicated per-class registers
+//!    (`PRCM.RESETUART`, `PRCM.RESETI2C`, `PRCM.RESETGPIO`, etc.) and are
+//!    asserted high / released by clearing.
+//!
+//! Bring-up order per used peripheral: enable CLKGR bit -> pulse
+//! `CLKLOADCTL.LOAD` -> poll `CLKLOADCTL.LOAD_DONE` -> release reset.
+//!
+//! High-frequency SCLK_HF source selection (XOSC_HF / RCOSC_HF / TCXO) is
+//! handled by the bootloader and AON oscillator state machine; this code
+//! does not currently reprogram the CPU clock. See `board.rs` for the
+//! constants.
+
+use cc13x2_26x2_pac as pac;
+
+/// Enable and reset every peripheral used by this board.
+///
+/// Called by [`crate::pac::init`] as the first bring-up step, before IOC
+/// configuration so that peripheral registers are writable. Each used
+/// peripheral's `prcm:` entry in `chipdb/rlvgl-chips-ti/db/chips/cc1352_r.yaml`
+/// names the clock-gate register/field and the reset register/field;
+/// fields are written via the svd2rust-shaped `cc13x2_26x2_pac` PAC.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    
+    
+    
+    // uart0 — clock enable clk_en on prcm.uartclkgr,
+    //             reset uart on prcm.resetuart
+    p.PRCM.uartclkgr().modify(|_, w| w.clk_en().set_bit());
+    // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
+    p.PRCM.clkloadctl().modify(|_, w| w.load().set_bit());
+    while p.PRCM.clkloadctl().read().load_done().bit_is_clear() {}
+    // Release the peripheral from reset (clear bit deasserts reset).
+    p.PRCM.resetuart().modify(|_, w| w.uart().clear_bit());
+    
+    
+    
+    
+    // i2c0 — clock enable clk_en on prcm.i2cclkgr,
+    //             reset i2c on prcm.reseti2c
+    p.PRCM.i2cclkgr().modify(|_, w| w.clk_en().set_bit());
+    // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
+    p.PRCM.clkloadctl().modify(|_, w| w.load().set_bit());
+    while p.PRCM.clkloadctl().read().load_done().bit_is_clear() {}
+    // Release the peripheral from reset (clear bit deasserts reset).
+    p.PRCM.reseti2c().modify(|_, w| w.i2c().clear_bit());
+    
+    
+}
