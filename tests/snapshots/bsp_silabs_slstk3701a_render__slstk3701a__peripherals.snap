@@ -1,0 +1,104 @@
+---
+source: tests/bsp_silabs_slstk3701a_render.rs
+expression: text
+---
+//! Per-peripheral initialization for SLSTK3701A.
+//!
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits a real USART async-UART init for the console
+//! peripheral (mirroring the ESP UART0 path) and stub bodies for
+//! every other peripheral.
+
+use efm32gg11b_pac as pac;
+
+#[allow(unused_imports)]
+use super::board::{CPU_HZ, HFCLK_HZ};
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and IO routing are
+/// configured.
+pub fn init() {
+    
+    init_usart4();
+    
+    init_gpio();
+    
+    init_i2c2();
+    
+}
+
+
+
+
+
+/// Bring up usart4 as the VCOM console at 115200 baud,
+/// 8N1, no flow control.
+///
+/// Async-UART mode: `USART.CTRL.SYNC = 0` (the cold-reset value), 16x
+/// oversampling, frame format 8 data bits / no parity / 1 stop bit
+/// (the cold-reset frame). The clock divider is computed from HFCLK
+/// (50000000 Hz) using the EFM32 RM async-mode formula:
+///
+/// ```text
+///     CLKDIV = 256 * (HFCLK / (oversample * baud) - 1)
+/// ```
+///
+/// for oversample = 16 and rounded toward zero. The result is written
+/// to the 15-bit `DIV` field of `USART.CLKDIV` (the low 3 bits are
+/// reserved). After clocks + framing are set, the TX and RX state
+/// machines are enabled via `CMD.TXEN | CMD.RXEN`.
+pub fn init_usart4() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const HF: u32 = HFCLK_HZ;
+    const BAUD: u32 = 115200;
+    // EFM32 async-mode CLKDIV = 256 * (HFCLK / (16 * baud) - 1), 15-bit DIV field.
+    let div: u32 = ((256u32.saturating_mul(HF)) / (16 * BAUD)).saturating_sub(256);
+    // Clear the peripheral via CMD.CLEARRX|CLEARTX (idempotent on a fresh boot).
+    p.USART4.cmd().write(|w| w.clearrx().set_bit().cleartx().set_bit());
+    p.USART4.ctrl().modify(|_, w| w.sync().clear_bit());
+    p.USART4.frame().write(|w| unsafe { w.bits(0x1005) }); // 8 data bits, 1 stop bit, no parity
+    p.USART4.clkdiv().write(|w| unsafe { w.bits(div) });
+    // Enable TX + RX, then prime by clearing flags via CMD.
+    p.USART4.cmd().write(|w| w.txen().set_bit().rxen().set_bit());
+}
+
+
+
+
+
+
+
+/// Bring up the GPIO block.
+///
+/// The GPIO clock gate is already enabled by `crate::clocks::init`;
+/// per-pin mode bits are written by `crate::io_mux::init`. This stub
+/// is a no-op so the per-peripheral dispatch table compiles.
+pub fn init_gpio() {
+    let _ = unsafe { pac::Peripherals::steal() };
+}
+
+
+
+
+
+
+
+/// Bring up i2c2 as an I2C master at
+/// 400000 Hz.
+///
+/// Targets the
+/// `efm32gg11b_pac::I2C2`
+/// register block. Clock gating is already done by
+/// `crate::clocks::init` — this stub leaves the peripheral idle so the
+/// consumer crate can opt into a runtime init sequence.
+///
+/// TODO: emit a full bring-up. See EFM32GG11-RM "I2C - Inter-
+/// Integrated Circuit Interface" §28.5 for the CTRL / CLKDIV /
+/// SADDR / SADDRMASK / EN register layout. CLKDIV derives from HFCLK
+/// (50000000 Hz) and the target SCL frequency
+/// (400000 Hz).
+pub fn init_i2c2() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: I2C master init for i2c2
+}
