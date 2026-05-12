@@ -77,16 +77,21 @@ mod tests {
     }
 
     #[test]
-    fn efm32gg11_board_is_present() {
-        assert!(board_names().contains(&"EFM32GG11"));
-        let yaml = board_yaml("EFM32GG11").expect("EFM32GG11 board yaml");
+    fn slstk3701a_board_is_present() {
+        // CHIPS-SILABS-01b: SLSTK3701A is the first real Silicon Labs
+        // board (Giant Gecko 11 Starter Kit). The file stem is
+        // `slstk3701a`; the YAML top-level `name:` is `SLSTK3701A`
+        // (UG287 hardware silkscreen) and `chip: EFM32GG11`
+        // cross-references the chip YAML frozen by CHIPS-SILABS-01a.
+        assert!(board_names().contains(&"slstk3701a"));
+        let yaml = board_yaml("slstk3701a").expect("slstk3701a board yaml");
         assert!(yaml.contains("chip: EFM32GG11"));
     }
 
     #[test]
     fn board_info_lookup_uses_yaml_name_field() {
-        let info = find("EFM32GG11").expect("EFM32GG11 board info");
-        assert_eq!(info.board, "EFM32GG11");
+        let info = find("SLSTK3701A").expect("SLSTK3701A board info");
+        assert_eq!(info.board, "SLSTK3701A");
         assert_eq!(info.chip, "EFM32GG11");
     }
 
