@@ -77,16 +77,22 @@ mod tests {
     }
 
     #[test]
-    fn atsamd51j19a_board_is_present() {
-        assert!(board_names().contains(&"ATSAMD51J19A"));
-        let yaml = board_yaml("ATSAMD51J19A").expect("ATSAMD51J19A board yaml");
+    fn adafruit_feather_m4_express_board_is_present() {
+        // CHIPS-MICROCHIP-01b: per the §10 reconciliation table
+        // "Path B (ESP convention)" was selected — the board YAML
+        // is renamed off the chip stem so the chipdb mirrors the
+        // ESP layout (separate `esp32c3.yaml` + `esp32c3_devkitm_1.yaml`).
+        assert!(board_names().contains(&"adafruit_feather_m4_express"));
+        let yaml = board_yaml("adafruit_feather_m4_express")
+            .expect("adafruit_feather_m4_express board yaml");
         assert!(yaml.contains("chip: ATSAMD51J19A"));
     }
 
     #[test]
     fn board_info_lookup_uses_yaml_name_field() {
-        let info = find("ATSAMD51J19A").expect("ATSAMD51J19A board info");
-        assert_eq!(info.board, "ATSAMD51J19A");
+        let info = find("Adafruit Feather M4 Express")
+            .expect("Adafruit Feather M4 Express board info");
+        assert_eq!(info.board, "Adafruit Feather M4 Express");
         assert_eq!(info.chip, "ATSAMD51J19A");
     }
 

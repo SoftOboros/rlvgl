@@ -35,7 +35,7 @@ vendor_check!(
     microchip,
     rlvgl_chips_microchip,
     "microchip",
-    "ATSAMD51J19A",
+    "Adafruit Feather M4 Express",
     "ATSAMD51J19A"
 );
 vendor_check!(
