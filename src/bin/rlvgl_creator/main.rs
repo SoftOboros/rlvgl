@@ -31,6 +31,8 @@ pub mod nxp;
 pub mod renesas;
 #[path = "../creator/bsp/rp/mod.rs"]
 pub mod rp;
+#[path = "../creator/bsp/ti/mod.rs"]
+pub mod ti;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {
@@ -42,6 +44,7 @@ mod bsp {
     pub use super::nxp;
     pub use super::renesas;
     pub use super::rp;
+    pub use super::ti;
 }
 
 pub use cli::*;
@@ -103,10 +106,20 @@ fn bsp_gen_real(vendor: &str, board: &str, chip: Option<&str>, out_dir: &Path) -
             crate::bsp::renesas::render_renesas_pac(&ir, out_dir)?;
             Ok(snake_case(&ir.board.name))
         }
+        "ti" => {
+            let board_ir = crate::bsp::ti::load_board_db(board)?;
+            let chip_name = chip
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| board_ir.chip.clone());
+            let chip_ir = crate::bsp::ti::load_chip_db(&chip_name)?;
+            let ir = crate::bsp::ti::merge(chip_ir, board_ir)?;
+            crate::bsp::ti::render_ti_pac(&ir, out_dir)?;
+            Ok(snake_case(&ir.board.name))
+        }
         other => Err(anyhow!(
             "target.generator: creator-bsp-pac is not implemented for vendor '{other}' \
              at v0; supported: esp, espressif, nrf, nordic, nxp, imxrt, rp, rp2040, \
-             renesas, ra. (chapter 02 §7.2 + §7.2.1)"
+             renesas, ra, ti. (chapter 02 §7.2 + §7.2.1)"
         )),
     }
 }
