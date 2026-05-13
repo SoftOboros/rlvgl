@@ -38,14 +38,16 @@ pub fn init() {
     
     
     
-    // uart0 — clock enable clk_en on prcm.uartclkgr,
-    //             reset uart on prcm.resetuart
-    p.prcm.uartclkgr().modify(|_, w| w.clk_en().set_bit());
+    // uart0 — clock enable clk_en.uart0 on prcm.uartclkgr,
+    //             reset uart0 on prcm.resetuart
+    // `clk_en` is a multi-bit enum FieldWriter in this PAC
+    // vintage; select the instance variant rather than calling `.set_bit()`.
+    p.prcm.uartclkgr().modify(|_, w| w.clk_en().uart0());
     // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
     p.prcm.clkloadctl().modify(|_, w| w.load().set_bit());
     while p.prcm.clkloadctl().read().load_done().bit_is_clear() {}
     // Release the peripheral from reset (clear bit deasserts reset).
-    p.prcm.resetuart().modify(|_, w| w.uart().clear_bit());
+    p.prcm.resetuart().modify(|_, w| w.uart0().clear_bit());
     
     
     

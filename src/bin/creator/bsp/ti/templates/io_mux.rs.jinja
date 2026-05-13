@@ -36,7 +36,7 @@ pub fn init() {
     // DIO{{ pin.dio }} — {{ pin.signal }}{% if pin.peripheral %} ({{ pin.peripheral }}){% endif %}{% if pin.label %} — `{{ pin.label }}`{% endif %}
     {% if pin.route.kind == "ioc" %}
     // IOC PORT_CFG: port_id={{ pin.route.port_id }} ({{ pin.route.port_name }})
-    p.ioc.iocfg({{ pin.dio }}).write(|w| unsafe {
+    p.ioc.iocfg{{ pin.dio }}().write(|w| unsafe {
         w.port_id().bits({{ pin.route.port_id }})
          .ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
          .pull_ctl().bits(
@@ -53,7 +53,7 @@ pub fn init() {
     {% else %}
     // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
     // enable from direction, and set DOE for outputs.
-    p.ioc.iocfg({{ pin.dio }}).write(|w| unsafe {
+    p.ioc.iocfg{{ pin.dio }}().write(|w| unsafe {
         w.port_id().bits(0x00)
          .ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
          .pull_ctl().bits(

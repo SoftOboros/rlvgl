@@ -831,3 +831,63 @@ chapter. The BBB initiative continues independently per §10.1.
 - No other initiative was touched. CLAUDE.md was not modified.
   Sister initiatives `CHIPS-SILABS-01b` and `CHIPS-MICROCHIP-01b`
   remain on independent parallel paths.
+
+### 2026-05-13 — TI-01e three structural amendments for cc13x2_26x2_pac 0.10
+
+- **iocfg per-DIO methods**: `io_mux.rs.jinja` now emits
+  `p.ioc.iocfg{{ pin.dio }}()` (per-DIO method form) instead of
+  `p.ioc.iocfg({{ pin.dio }})` (indexer call). `cc13x2_26x2_pac::ioc::Ioc`
+  exposes `iocfg0()`..`iocfg31()` accessors directly, with no
+  `iocfg(n)` indexer — this matches the pre-indexer-API svd2rust
+  output era the PAC was generated under.
+- **`uartclkgr.clk_en` enum FieldWriter**: `clocks.rs.jinja` now
+  branches on a new optional chip-YAML field `clk_en_variant`. When
+  present, the template emits `w.{{ clk_en_field }}().{{ clk_en_variant }}()`
+  (e.g. `w.clk_en().uart0()`); when absent, it falls back to
+  `.set_bit()` for single-bit BitWriter fields. `TiPrcmGate` in
+  `src/bin/creator/bsp/ti/ir.rs` gained the corresponding
+  `Option<String>` field. The matrix of which `*CLKGR` registers
+  carry an enum FieldWriter in `cc13x2_26x2_pac 0.10` is:
+    * Enum (variants encode the instance):
+      `uartclkgr.clk_en` (`Uart0`/`Uart1`),
+      `ssiclkgr.clk_en` (`Ssi0`/`Ssi1`),
+      `gptclkgr.clk_en` (`Gpt0`/`Gpt1`/`Gpt2`/`Gpt3`).
+    * BitWriter (`set_bit`/`clear_bit`):
+      `i2cclkgr.clk_en`, `i2sclkgr.clk_en`, `gpioclkgr.clk_en`, and
+      the per-class `secdmaclkgr.{crypto,trng,pka,dma}_clk_en`.
+  This is encoded data-side in `CC1352R.yaml` rather than template
+  conditionals, so future SimpleLink chips can carry their own
+  PAC-vintage matrix in the same shape.
+- **PRCM reset-register field naming (chip-YAML fix)**: Fixed the
+  `prcm:` block in `chipdb/rlvgl-chips-ti/db/chips/CC1352R.yaml` so
+  `rst_field` matches the PAC's actual writer-method names. The
+  fixes split into two classes:
+    * Per-instance bits in the reset register: `resetuart.uart0` /
+      `resetuart.uart1` — `uart0` / `uart1` rst_field (was the
+      generic `uart`).
+    * Single shared reset bit per peripheral class:
+      `resetssi.ssi`, `reseti2c.i2c`, `reseti2s.i2s`, `resetgpio.gpio`,
+      `resetgpt.gpt`, `resetsecdma.{crypto,trng,pka,dma}` — chip
+      YAML now names the correct register (`reseti2s`, not the
+      bogus `resetaudio`; `resetsecdma`, not the bogus `resetsec`)
+      and the actual single-field name from the PAC. None of the
+      currently-used peripherals on `launchxl_cc1352r1` exercise
+      these (only `uart0` and `i2c0` are touched at compile-verify
+      time), but the corrected YAML is now accurate for sibling
+      board YAMLs that may use SSI / I2S / GPT.
+  Chip-YAML was preferred over template-side stringification because
+  the reset-register topology is genuinely *data* — it varies per
+  PAC vintage and per chip member (CC2640R may differ from CC1352R).
+  Template-side instance-suffix derivation would hard-code one PAC
+  family's convention.
+- `bsp_ti_cc1352r_compile` test gate (CHIPS-TI-01d) now **PASSES**
+  on `thumbv7em-none-eabihf` against `cc13x2_26x2_pac 0.10.3`.
+  Snapshots re-blessed; render test (CHIPS-TI-01c) green; all 13
+  cases pass. `chip_x`, `memory_x`, `mod.rs`, `pac.rs`, `board.rs`,
+  `peripherals.rs` snapshots were unaffected — only `clocks.rs`
+  and `io_mux.rs` diff against -01b.
+- No other initiative touched. CLAUDE.md was not modified — the PM
+  will uncomment the Phase 4.7d `bsp_ti_cc1352r_compile` bullet in
+  the next slate. Sister initiatives `CHIPS-SILABS-02b` and the
+  Microchip post-promotion path remain on independent parallel
+  workers.

@@ -40,7 +40,7 @@ pub fn init() {
     // DIO2 — UART0_RX (uart0) — `uart_rx`
     
     // IOC PORT_CFG: port_id=8 (UART0_RX)
-    p.ioc.iocfg(2).write(|w| unsafe {
+    p.ioc.iocfg2().write(|w| unsafe {
         w.port_id().bits(8)
          .ie().set_bit()
          .pull_ctl().bits(0b11)
@@ -51,7 +51,7 @@ pub fn init() {
     // DIO3 — UART0_TX (uart0) — `uart_tx`
     
     // IOC PORT_CFG: port_id=7 (UART0_TX)
-    p.ioc.iocfg(3).write(|w| unsafe {
+    p.ioc.iocfg3().write(|w| unsafe {
         w.port_id().bits(7)
          .ie().clear_bit()
          .pull_ctl().bits(0b11)
@@ -65,7 +65,7 @@ pub fn init() {
     // DIO5 — I2C0_SDA (i2c0) — `i2c_sda`
     
     // IOC PORT_CFG: port_id=36 (I2C_MSSDA)
-    p.ioc.iocfg(5).write(|w| unsafe {
+    p.ioc.iocfg5().write(|w| unsafe {
         w.port_id().bits(36)
          .ie().set_bit()
          .pull_ctl().bits(0b01)
@@ -79,7 +79,7 @@ pub fn init() {
     // DIO4 — I2C0_SCL (i2c0) — `i2c_scl`
     
     // IOC PORT_CFG: port_id=37 (I2C_MSSCL)
-    p.ioc.iocfg(4).write(|w| unsafe {
+    p.ioc.iocfg4().write(|w| unsafe {
         w.port_id().bits(37)
          .ie().set_bit()
          .pull_ctl().bits(0b01)
@@ -94,7 +94,7 @@ pub fn init() {
     
     // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
     // enable from direction, and set DOE for outputs.
-    p.ioc.iocfg(6).write(|w| unsafe {
+    p.ioc.iocfg6().write(|w| unsafe {
         w.port_id().bits(0x00)
          .ie().clear_bit()
          .pull_ctl().bits(0b11)
@@ -108,7 +108,7 @@ pub fn init() {
     
     // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
     // enable from direction, and set DOE for outputs.
-    p.ioc.iocfg(7).write(|w| unsafe {
+    p.ioc.iocfg7().write(|w| unsafe {
         w.port_id().bits(0x00)
          .ie().clear_bit()
          .pull_ctl().bits(0b11)
@@ -122,7 +122,7 @@ pub fn init() {
     
     // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
     // enable from direction, and set DOE for outputs.
-    p.ioc.iocfg(13).write(|w| unsafe {
+    p.ioc.iocfg13().write(|w| unsafe {
         w.port_id().bits(0x00)
          .ie().set_bit()
          .pull_ctl().bits(0b01)
@@ -134,7 +134,7 @@ pub fn init() {
     
     // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
     // enable from direction, and set DOE for outputs.
-    p.ioc.iocfg(14).write(|w| unsafe {
+    p.ioc.iocfg14().write(|w| unsafe {
         w.port_id().bits(0x00)
          .ie().set_bit()
          .pull_ctl().bits(0b01)

@@ -186,15 +186,31 @@ fn default_xtal_lo_hz() -> u32 {
 /// template emits svd2rust-shaped writes like
 /// `p.PRCM.uartclkgr().modify(|_, w| w.clk_en().set_bit())` followed by
 /// the PRCM staged-write protocol pulse on `CLKLOADCTL.LOAD`.
+///
+/// `clk_en_variant` is OPTIONAL and used when `clk_en_field` resolves to
+/// a multi-bit enum-style FieldWriter in the PAC (e.g.
+/// `cc13x2_26x2_pac::prcm::uartclkgr::ClkEn` with variants `Uart0`/`Uart1`,
+/// or `gptclkgr::ClkEn` with variants `Gpt0`/`Gpt1`/`Gpt2`/`Gpt3`).
+/// When `clk_en_variant: Some("uart0")` is present the template emits
+/// `w.clk_en().uart0()` instead of `w.clk_en().set_bit()`. Single-bit
+/// `clk_en` fields (e.g. `i2cclkgr`, `gpioclkgr`, `i2sclkgr`) leave it
+/// `None` and the template falls back to `.set_bit()`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TiPrcmGate {
     /// PAC path of the clock-enable register (e.g. `"prcm.uartclkgr"`).
     pub clk_en_reg: String,
     /// Field name within the clock-enable register (e.g. `"clk_en"`).
     pub clk_en_field: String,
+    /// Optional enum variant name when `clk_en_field` is a multi-bit
+    /// FieldWriter (e.g. `"uart0"` / `"uart1"` / `"gpt0"` / ...). Single-bit
+    /// `clk_en` fields leave this `None`.
+    #[serde(default)]
+    pub clk_en_variant: Option<String>,
     /// PAC path of the reset register (e.g. `"prcm.resetuart"`).
     pub rst_reg: String,
-    /// Field name within the reset register (e.g. `"uart"`).
+    /// Field name within the reset register (e.g. `"uart0"` for the
+    /// per-instance bit in `RESETUART`, or `"i2c"` for the shared
+    /// reset bit in `RESETI2C`).
     pub rst_field: String,
 }
 

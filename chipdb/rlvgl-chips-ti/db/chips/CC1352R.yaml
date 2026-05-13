@@ -87,27 +87,45 @@ clock_tree:
   # register-block field names (snake_case, e.g. `prcm.uartclkgr.clk_en`)
   # so the future `clocks.rs.jinja` template can reference them as
   # `p.PRCM.<reg>().write(...)`.
+  #
+  # NOTE: CHIPS-TI-01e (2026-05-13 §15) introduced the optional
+  # `clk_en_variant` field. SimpleLink CC13x2/CC26x2 packs multiple
+  # peripheral instances into a single `*CLKGR.CLK_EN` register that
+  # `cc13x2_26x2_pac 0.10` exposes as a multi-bit enum FieldWriter
+  # (`prcm::uartclkgr::ClkEn::{Uart0,Uart1}`, `prcm::gptclkgr::ClkEn::{
+  # Gpt0,Gpt1,Gpt2,Gpt3}`, `prcm::ssiclkgr::ClkEn::{Ssi0,Ssi1}`). The
+  # `clk_en_variant` value names the enum variant (lowercase, matching
+  # the generated `pub fn <variant>() -> &'a mut W<REG>` method). Single
+  # -bit `clk_en` fields (e.g. `i2cclkgr`, `i2sclkgr`, `gpioclkgr`) leave
+  # `clk_en_variant` absent; the template falls back to `.set_bit()`.
+  # `rst_field` similarly tracks per-instance bits (`uart0` vs `uart1`)
+  # for registers that have them, and the shared field name (`i2c`,
+  # `i2s`, `gpio`, `gpt`) for registers that don't.
 prcm:
   uart0:
-    clk_en_reg:    prcm.uartclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetuart
-    rst_field:     uart
+    clk_en_reg:     prcm.uartclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: uart0
+    rst_reg:        prcm.resetuart
+    rst_field:      uart0
   uart1:
-    clk_en_reg:    prcm.uartclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetuart
-    rst_field:     uart
+    clk_en_reg:     prcm.uartclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: uart1
+    rst_reg:        prcm.resetuart
+    rst_field:      uart1
   ssi0:
-    clk_en_reg:    prcm.ssiclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetssi
-    rst_field:     ssi
+    clk_en_reg:     prcm.ssiclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: ssi0
+    rst_reg:        prcm.resetssi
+    rst_field:      ssi
   ssi1:
-    clk_en_reg:    prcm.ssiclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetssi
-    rst_field:     ssi
+    clk_en_reg:     prcm.ssiclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: ssi1
+    rst_reg:        prcm.resetssi
+    rst_field:      ssi
   i2c0:
     clk_en_reg:    prcm.i2cclkgr
     clk_en_field:  clk_en
@@ -116,52 +134,56 @@ prcm:
   i2s0:
     clk_en_reg:    prcm.i2sclkgr
     clk_en_field:  clk_en
-    rst_reg:       prcm.resetaudio
-    rst_field:     audio
+    rst_reg:       prcm.reseti2s
+    rst_field:     i2s
   gpio:
     clk_en_reg:    prcm.gpioclkgr
     clk_en_field:  clk_en
     rst_reg:       prcm.resetgpio
     rst_field:     gpio
   gpt0:
-    clk_en_reg:    prcm.gptclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetgpt
-    rst_field:     gpt
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt0
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
   gpt1:
-    clk_en_reg:    prcm.gptclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetgpt
-    rst_field:     gpt
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt1
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
   gpt2:
-    clk_en_reg:    prcm.gptclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetgpt
-    rst_field:     gpt
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt2
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
   gpt3:
-    clk_en_reg:    prcm.gptclkgr
-    clk_en_field:  clk_en
-    rst_reg:       prcm.resetgpt
-    rst_field:     gpt
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt3
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
   udma0:
     clk_en_reg:    prcm.secdmaclkgr
     clk_en_field:  dma_clk_en
-    rst_reg:       prcm.resetsec
+    rst_reg:       prcm.resetsecdma
     rst_field:     dma
   trng:
     clk_en_reg:    prcm.secdmaclkgr
     clk_en_field:  trng_clk_en
-    rst_reg:       prcm.resetsec
+    rst_reg:       prcm.resetsecdma
     rst_field:     trng
   crypto:
     clk_en_reg:    prcm.secdmaclkgr
     clk_en_field:  crypto_clk_en
-    rst_reg:       prcm.resetsec
+    rst_reg:       prcm.resetsecdma
     rst_field:     crypto
   pka:
     clk_en_reg:    prcm.secdmaclkgr
     clk_en_field:  pka_clk_en
-    rst_reg:       prcm.resetsec
+    rst_reg:       prcm.resetsecdma
     rst_field:     pka
 
 # Peripheral instance map.

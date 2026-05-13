@@ -34,9 +34,15 @@ pub fn init() {
     {% for name in peripherals_used %}
     {% set gate = ir.chip.prcm[name] %}
     {% if gate %}
-    // {{ name }} — clock enable {{ gate.clk_en_field }} on {{ gate.clk_en_reg }},
+    // {{ name }} — clock enable {{ gate.clk_en_field }}{% if gate.clk_en_variant %}.{{ gate.clk_en_variant }}{% endif %} on {{ gate.clk_en_reg }},
     //             reset {{ gate.rst_field }} on {{ gate.rst_reg }}
+    {% if gate.clk_en_variant -%}
+    // `{{ gate.clk_en_field }}` is a multi-bit enum FieldWriter in this PAC
+    // vintage; select the instance variant rather than calling `.set_bit()`.
+    p.prcm.{{ gate.clk_en_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_en_field }}().{{ gate.clk_en_variant }}());
+    {%- else -%}
     p.prcm.{{ gate.clk_en_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_en_field }}().set_bit());
+    {%- endif %}
     // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
     p.prcm.clkloadctl().modify(|_, w| w.load().set_bit());
     while p.prcm.clkloadctl().read().load_done().bit_is_clear() {}

@@ -402,8 +402,9 @@ mod tests {
             crate::bsp::ti::ir::TiPrcmGate {
                 clk_en_reg: "prcm.uartclkgr".to_string(),
                 clk_en_field: "clk_en".to_string(),
+                clk_en_variant: Some("uart0".to_string()),
                 rst_reg: "prcm.resetuart".to_string(),
-                rst_field: "uart".to_string(),
+                rst_field: "uart0".to_string(),
             },
         );
 
