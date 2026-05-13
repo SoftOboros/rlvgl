@@ -947,3 +947,65 @@ Ratifying this chapter unblocks:
 | ---------- | ------ | ------------------------------------------------------------------------------------- |
 | 2026-05-11 | Ratified (owner: Ira Abbott) | Doc *shape* ratified. `CHIPS-SILABS-NN[a-z]:` PRs MAY now cite §-numbers as frozen authority. Open TBDs (§3 DPLLOC register-block naming, §4 per-family RM revision pins, §9 INV-SL5 wait-cycle count, §10.5 Series 2 HFXO register path) remain open and gate `CHIPS-SILABS-01` chip-YAML population rather than this doc. |
 | 2026-05-11 | DRAFT — awaiting ratification | Initial skeleton. Argument target — review §10.2 (ROUTELOC vs DPLLOC) first, then §10.3 (port-pin tuple), then §5.1 (family set), then §11 (non-goals). |
+
+### 2026-05-13 — SILABS-02 SKU-flatten amendment for efm32gg11b-pac 0.1.4
+
+- **Divergence**: `efm32gg11b-pac` 0.1.4 (svd2rust 0.28.0) gates the
+  per-SKU `Peripherals` type behind a SKU sub-module
+  (`efm32gg11b_pac::efm32gg11b820::Peripherals`) rather than re-exporting
+  it at the crate root. The original SILABS-02 templates emitted
+  `use efm32gg11b_pac as pac;` and called `pac::Peripherals::steal()`,
+  which produced 5×E0433 ("could not find `Peripherals` in `pac`")
+  errors and 61×E0282 cascading type-inference failures during the
+  CHIPS-SILABS-04 compile-verify gate (one E0433 per `use ... as pac;`
+  site across `pac.rs`, `clocks.rs`, `io_mux.rs`, and `peripherals.rs`).
+- **Schema extension**: `SilabsChip` gained an optional
+  `pac_sku_module: Option<String>` field (defaulted via `#[serde(default)]`
+  so existing chip YAMLs deserialise unchanged). `EFM32GG11.yaml` sets
+  `pac_sku_module: efm32gg11b820`. No other chip YAMLs in the chipdb
+  are affected.
+- **Template change**: all four templates that import the PAC crate
+  (`pac.rs.jinja`, `clocks.rs.jinja`, `io_mux.rs.jinja`,
+  `peripherals.rs.jinja`) now emit
+  `use efm32gg11b_pac::efm32gg11b820 as pac;` when `pac_sku_module` is
+  set, falling back to the original `use efm32gg11b_pac as pac;` when
+  the field is absent. This binds the `pac` alias to the SKU
+  sub-module so `pac::Peripherals::steal()` resolves without
+  per-call-site changes. Render snapshots re-blessed.
+- **Residual divergence (NOT addressed by this amendment)**:
+  post-SKU-flatten the compile-verify gate still fails with a separate
+  class of errors — `efm32gg11b-pac 0.1.4` exposes register blocks as
+  **fields** on the peripheral instance (`p.CMU.hfperclken0`, no
+  parentheses) rather than as **methods** (`p.CMU.hfperclken0()`) as
+  the current SILABS templates emit. Resulting errors:
+  - 41×E0599 ("no method named `<register>` found for struct
+    `efm32gg11b_pac::efm32gg11b820::<PERIPH>`") covering CMU
+    (`.hfperclken0`), GPIO (`.ph_dout`, `.ph_model`, `.ph_modeh`,
+    `.pb_model`, `.pb_dout`, `.pe_model`, `.pe_dout`, `.pc_modeh`,
+    `.pc_dout`, `.pi_model`), USART4 (`.routeloc0`, `.routepen`,
+    `.cmd`, `.ctrl`, `.frame`, `.clkdiv`), and I2C2 (`.routeloc0`,
+    `.routepen`).
+  - 61×E0282 cascade — same as before, because `w` in the
+    `.modify(|_, w| ...)` closures still cannot infer its type when
+    the receiver method is missing.
+  This is structurally identical to the CHIPS-MICROCHIP-04 divergence
+  documented in `CLAUDE.md` (atsamd51j19a 0.7 also uses field-style
+  accessors). Resolution deferred to a follow-up amendment that
+  switches the SILABS templates from `p.CMU.hfperclken0().modify(...)`
+  to `p.CMU.hfperclken0.modify(...)` form, gated on the same chip
+  yaml schema. NOT in scope for this SILABS-02 amendment; the
+  CHIPS-SILABS-04 gate stays commented out in `CLAUDE.md` until both
+  divergences are resolved.
+- **Validation**:
+  - `cargo test -p rlvgl-chips-silabs` — pass (4 tests).
+  - `cargo test -p rlvgl --test bsp_silabs_slstk3701a_render
+    --features creator,regression` — pass (10 tests, snapshots
+    re-blessed).
+  - `cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile
+    --features compile-verify -- --test-threads=1` — **still FAILS**
+    on the residual divergence above. E0433 count went from 5 to 0;
+    E0282 count unchanged at 61; new E0599 count is 41.
+  - The older `bsp_silabs.rs` round-trip test (against the generic
+    `Ir` adapter at `src/bin/creator/bsp/silabs.rs`) was already
+    failing at v0.2.0 baseline (committed `.snap.new` artifacts);
+    unaffected by this amendment.

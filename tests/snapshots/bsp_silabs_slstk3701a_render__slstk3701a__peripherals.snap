@@ -9,7 +9,10 @@ expression: text
 //! peripheral (mirroring the ESP UART0 path) and stub bodies for
 //! every other peripheral.
 
-use efm32gg11b_pac as pac;
+// `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
+// a `efm32gg11b820` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use efm32gg11b_pac::efm32gg11b820 as pac;
 
 #[allow(unused_imports)]
 use super::board::{CPU_HZ, HFCLK_HZ};

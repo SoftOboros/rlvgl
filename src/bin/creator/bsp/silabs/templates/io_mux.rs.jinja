@@ -23,7 +23,14 @@
 //! (with pull-up if `pull: up` is set), `0b0100` for outputs, and
 //! `0b0110` for inout (I2C) lines.
 
+{% if ir.chip.pac_sku_module -%}
+// `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
+// a `{{ ir.chip.pac_sku_module }}` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use {{ ir.chip.pac_crate | replace("-", "_") }}::{{ ir.chip.pac_sku_module }} as pac;
+{%- else %}
 use {{ ir.chip.pac_crate | replace("-", "_") }} as pac;
+{%- endif %}
 
 /// Apply the board's GPIO mode bits and peripheral ROUTELOC writes.
 pub fn init() {

@@ -18,8 +18,18 @@
 //! module can be either a crate root (when consumed directly) or a
 //! child module of the host crate.
 
+{% if ir.chip.pac_sku_module -%}
+// `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
+// a `{{ ir.chip.pac_sku_module }}` sub-module rather than re-exporting
+// it at the crate root, so the `pac` alias resolves to the SKU module
+// here (not the crate root) and `pac::Peripherals::steal()` continues
+// to resolve at the BSP's call sites.
+#[allow(unused_imports)]
+pub use {{ ir.chip.pac_crate | replace("-", "_") }}::{{ ir.chip.pac_sku_module }} as pac;
+{%- else %}
 #[allow(unused_imports)]
 pub use {{ ir.chip.pac_crate | replace("-", "_") }} as pac;
+{%- endif %}
 
 /// Bring up the board.
 ///

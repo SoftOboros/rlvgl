@@ -30,6 +30,14 @@ name: EFM32GG11
 arch: cortex-m4f
 package: BGA192
 pac_crate: efm32gg11b-pac
+# `efm32gg11b-pac` 0.1.4 (svd2rust 0.28.0) gates the per-SKU
+# `Peripherals` type behind a SKU sub-module
+# (`efm32gg11b_pac::efm32gg11b820::Peripherals`) rather than
+# re-exporting it at the crate root. The BSP template flattens this
+# sub-module into the `pac` namespace via
+# `pub use efm32gg11b_pac::efm32gg11b820::*;` so the generated
+# `pac::Peripherals::steal()` call site continues to resolve.
+pac_sku_module: efm32gg11b820
 gpio_count: 144
 
 # routing_kind: §10.2 frozen enum. EFM32GG11 is Series 1 — uses the

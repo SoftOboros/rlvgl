@@ -102,6 +102,18 @@ pub struct SilabsChip {
     pub package: String,
     /// PAC crate name used in generated code (`use <pac_crate> as pac;`).
     pub pac_crate: String,
+    /// Optional SKU sub-module to flatten into the `pac` namespace.
+    ///
+    /// Some Silicon Labs PAC crates (notably `efm32gg11b-pac` 0.1.4)
+    /// gate the per-SKU `Peripherals` type behind a SKU-named sub-module
+    /// (`efm32gg11b_pac::efm32gg11b820::Peripherals`) rather than
+    /// re-exporting it at the crate root. When this field is set, the
+    /// `pac.rs` template emits an additional
+    /// `pub use <pac_crate>::<pac_sku_module>::*;` line so the BSP's
+    /// `pac::Peripherals::steal()` call site continues to resolve
+    /// without per-call-site changes.
+    #[serde(default)]
+    pub pac_sku_module: Option<String>,
     /// Number of user-accessible GPIO pads on this chip.
     pub gpio_count: u16,
     /// Pin-routing family per §10.2.

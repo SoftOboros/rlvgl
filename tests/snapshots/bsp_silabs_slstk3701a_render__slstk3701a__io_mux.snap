@@ -27,7 +27,10 @@ expression: text
 //! (with pull-up if `pull: up` is set), `0b0100` for outputs, and
 //! `0b0110` for inout (I2C) lines.
 
-use efm32gg11b_pac as pac;
+// `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
+// a `efm32gg11b820` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use efm32gg11b_pac::efm32gg11b820 as pac;
 
 /// Apply the board's GPIO mode bits and peripheral ROUTELOC writes.
 pub fn init() {

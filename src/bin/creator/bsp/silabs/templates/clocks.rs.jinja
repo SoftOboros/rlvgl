@@ -14,7 +14,14 @@
 //! is via the peripheral's own CMD/CTRL write. This template therefore
 //! emits clock-enable only.
 
+{% if ir.chip.pac_sku_module -%}
+// `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
+// a `{{ ir.chip.pac_sku_module }}` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use {{ ir.chip.pac_crate | replace("-", "_") }}::{{ ir.chip.pac_sku_module }} as pac;
+{%- else %}
 use {{ ir.chip.pac_crate | replace("-", "_") }} as pac;
+{%- endif %}
 
 /// Enable the CMU clock gate for every peripheral used by this board.
 ///

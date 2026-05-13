@@ -22,8 +22,13 @@ expression: text
 //! module can be either a crate root (when consumed directly) or a
 //! child module of the host crate.
 
+// `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
+// a `efm32gg11b820` sub-module rather than re-exporting
+// it at the crate root, so the `pac` alias resolves to the SKU module
+// here (not the crate root) and `pac::Peripherals::steal()` continues
+// to resolve at the BSP's call sites.
 #[allow(unused_imports)]
-pub use efm32gg11b_pac as pac;
+pub use efm32gg11b_pac::efm32gg11b820 as pac;
 
 /// Bring up the board.
 ///
