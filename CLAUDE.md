@@ -222,13 +222,16 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,r
 # CHIPS-SILABS-00 §11 (deferred to -05). The opt-in compile-verify test
 # (CHIPS-SILABS-04) materialises a throwaway cargo project around the
 # generated BSP and runs `cargo check --target thumbv7em-none-eabihf`
-# against efm32gg11b-pac 0.1.4. SKU-flatten amendment (CHIPS-SILABS-02
-# of 2026-05-13) resolved the 5×E0433 errors on `pac::Peripherals`,
-# leaving a second-order divergence: `efm32gg11b-pac 0.1.4` exposes
-# register blocks as fields (`p.CMU.hfperclken0`) not methods —
-# structurally identical to the atsamd51j19a divergence Microchip
-# already fixed. Currently expected to FAIL until the SILABS clocks /
-# io_mux / peripherals templates switch to field-style register access.
+# against efm32gg11b-pac 0.1.4. SKU-flatten amendment (-02 of
+# 2026-05-13) resolved 5×E0433. Field-style amendment (-02b of
+# 2026-05-13) dropped errors 102 → 11 by converting register-block
+# access from method-style to field-direct. Currently expected to FAIL
+# until two residual orthogonal divergences are amended: (a) -01c
+# chipdb fix — `system_gates.gpio.clk_en_reg` is `cmu.hfperclken0` in
+# chip yaml but PAC routes GPIO clock-gate through
+# `cmu.hfbusclken0.gpio` bit 5; (b) -02c template fix — io_mux MODEH
+# branch shifts pin index by -8 but PAC uses absolute `mode8..mode15`
+# field names on the MODEH writer.
 RUSTFLAGS="" cargo test -p rlvgl-chips-silabs
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features creator,regression
 # RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile --features compile-verify -- --test-threads=1
@@ -237,18 +240,16 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features 
 # test covers the 8-file emission set (6 .rs + memory.x + cc1352_r.x)
 # for LAUNCHXL-CC1352R1. The opt-in compile-verify test (CHIPS-TI-01d)
 # runs `cargo check --target thumbv7em-none-eabihf` against
-# cc13x2_26x2_pac 0.10. Lowercase-peripheral amendment (CHIPS-TI-01b
-# of 2026-05-13) dropped errors from 40+ to 18 by lowercasing
-# `p.PRCM` / `p.IOC` / `p.GPIO` / `p.UART0` field access. Currently
-# expected to FAIL until three residual structural divergences are
-# amended (CHIPS-TI-01e): (1) `pac::ioc::Ioc` has per-DIO methods
-# `iocfg0()..iocfg31()` rather than an `iocfg(n)` indexer; (2)
-# `uartclkgr.clk_en` is a 2-bit enum field (`ClkEn::Uart0`), not a
-# bit; (3) PRCM reset-register fields are `uart0`/`i2c0` in PAC vs
-# chip yaml's `uart`/`i2c`.
+# cc13x2_26x2_pac 0.10.3. Lowercase-peripheral amendment (-01b of
+# 2026-05-13) lowercased `p.PRCM` / `p.IOC` / `p.GPIO` / `p.UART0`
+# field access. Residual-structural amendment (-01e of 2026-05-13)
+# converted `iocfg(n)` indexer → per-DIO `iocfgN()` methods, added
+# `clk_en_variant` chip-yaml field for the 2-bit `ClkEn` FieldWriter,
+# and corrected PRCM reset-register field names to PAC's instance
+# suffixes (`uart0`/`i2c0`). Compile-verify gate now PASSES end-to-end.
 RUSTFLAGS="" cargo test -p rlvgl-chips-ti
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_render --features creator,regression
-# RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_compile --features compile-verify -- --test-threads=1
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.8: Microchip BSP generator (CHIPS-MICROCHIP-NN). Render test
 # covers the 7-file emission set (6 .rs + memory.x) for the Adafruit
