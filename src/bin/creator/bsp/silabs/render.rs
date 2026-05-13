@@ -285,10 +285,18 @@ fn hex32_filter(value: u32) -> String {
 }
 
 /// Convert a spec-level dotted PAC path like `cmu.hfperclken0` into
-/// the svd2rust form `CMU.hfperclken0()`. The first segment is the
+/// the svd2rust form `CMU.hfperclken0`. The first segment is the
 /// peripheral instance — in svd2rust-generated PAC crates that's an
 /// uppercase field on `Peripherals`. Subsequent segments are
-/// registers or blocks within the instance and stay as method calls.
+/// registers or sub-blocks within the instance.
+///
+/// The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+/// register accessors (svd2rust 0.28.0 / Dec 2020): register blocks
+/// expose each register as a direct `#[repr(C)]` struct field
+/// (`p.CMU.hfperclken0`), not a method (`p.CMU.hfperclken0()`). This
+/// filter therefore emits the field-direct form. Structurally
+/// identical to the `atsamd51j19a 0.7.1` divergence handled by
+/// CHIPS-MICROCHIP-02.
 fn pac_path_filter(value: String) -> String {
     let mut segments = value.split('.');
     let mut out = match segments.next() {
@@ -298,7 +306,6 @@ fn pac_path_filter(value: String) -> String {
     for rest in segments {
         out.push('.');
         out.push_str(rest);
-        out.push_str("()");
     }
     out
 }
@@ -348,15 +355,18 @@ mod tests {
     }
 
     #[test]
-    fn pac_path_filter_uppercases_instance_and_method_chains_registers() {
+    fn pac_path_filter_uppercases_instance_and_emits_field_direct_registers() {
+        // `efm32gg11b-pac 0.1.4` exposes register-block accessors as
+        // direct struct fields rather than methods (pre-method-accessor
+        // svd2rust era — same vintage as `atsamd51j19a 0.7.1`).
         assert_eq!(
             pac_path_filter("cmu.hfperclken0".into()),
-            "CMU.hfperclken0()"
+            "CMU.hfperclken0"
         );
         assert_eq!(pac_path_filter("gpio".into()), "GPIO");
         assert_eq!(
             pac_path_filter("usart4.routeloc0".into()),
-            "USART4.routeloc0()"
+            "USART4.routeloc0"
         );
     }
 

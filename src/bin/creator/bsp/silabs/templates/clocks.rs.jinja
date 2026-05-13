@@ -13,6 +13,12 @@
 //! EFM32GG11 does NOT have a per-peripheral CMU reset register; reset
 //! is via the peripheral's own CMD/CTRL write. This template therefore
 //! emits clock-enable only.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: register blocks expose each register as a
+//! direct `#[repr(C)]` struct field (`p.CMU.hfperclken0`), not a
+//! method (`p.CMU.hfperclken0()`). Same vintage as `atsamd51j19a 0.7.1`
+//! — see CHIPS-MICROCHIP-02 for the parallel pattern.
 
 {% if ir.chip.pac_sku_module -%}
 // `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind

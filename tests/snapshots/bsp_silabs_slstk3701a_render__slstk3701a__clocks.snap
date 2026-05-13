@@ -17,6 +17,12 @@ expression: text
 //! EFM32GG11 does NOT have a per-peripheral CMU reset register; reset
 //! is via the peripheral's own CMD/CTRL write. This template therefore
 //! emits clock-enable only.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: register blocks expose each register as a
+//! direct `#[repr(C)]` struct field (`p.CMU.hfperclken0`), not a
+//! method (`p.CMU.hfperclken0()`). Same vintage as `atsamd51j19a 0.7.1`
+//! — see CHIPS-MICROCHIP-02 for the parallel pattern.
 
 // `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
 // a `efm32gg11b820` sub-module; bind `pac` to the SKU
@@ -33,7 +39,7 @@ pub fn init() {
     
     
     // usart4 — CMU clock enable usart4 on cmu.hfperclken0
-    p.CMU.hfperclken0().modify(|_, w| w.usart4().set_bit());
+    p.CMU.hfperclken0.modify(|_, w| w.usart4().set_bit());
     
     
     
@@ -41,7 +47,7 @@ pub fn init() {
     
     
     // gpio — CMU clock enable gpio on cmu.hfperclken0
-    p.CMU.hfperclken0().modify(|_, w| w.gpio().set_bit());
+    p.CMU.hfperclken0.modify(|_, w| w.gpio().set_bit());
     
     
     
@@ -49,7 +55,7 @@ pub fn init() {
     
     
     // i2c2 — CMU clock enable i2c2 on cmu.hfperclken0
-    p.CMU.hfperclken0().modify(|_, w| w.i2c2().set_bit());
+    p.CMU.hfperclken0.modify(|_, w| w.i2c2().set_bit());
     
     
     

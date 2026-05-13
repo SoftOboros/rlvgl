@@ -22,6 +22,13 @@
 //! pull-up/down variants. The template emits `0b0001` for plain inputs
 //! (with pull-up if `pull: up` is set), `0b0100` for outputs, and
 //! `0b0110` for inout (I2C) lines.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: GPIO port-mode registers (`pa_model`, `pa_modeh`,
+//! `pa_dout`, ...) and peripheral routing registers (`routeloc0`,
+//! `routepen`) are direct `#[repr(C)]` struct fields, not method
+//! accessors. Same vintage as `atsamd51j19a 0.7.1` — see
+//! CHIPS-MICROCHIP-02 for the parallel pattern.
 
 {% if ir.chip.pac_sku_module -%}
 // `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
@@ -43,25 +50,25 @@ pub fn init() {
     {% set mode_field = "mode" ~ mode_idx %}
     {% if pin.direction == "in" %}
     // Input{% if pin.pull == "up" %} with pull-up{% elif pin.pull == "down" %} with pull-down{% endif %}
-    p.GPIO.{{ mode_reg }}().modify(|_, w| unsafe { w.{{ mode_field }}().bits({% if pin.pull %}0b1000{% else %}0b0001{% endif %}) });
+    p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits({% if pin.pull %}0b1000{% else %}0b0001{% endif %}) });
     {% if pin.pull == "up" %}
     // DOUT=1 selects pull-up when MODE is set to inputpull (0b1000)
-    p.GPIO.p{{ port_lower }}_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.pin }})) });
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.pin }})) });
     {% elif pin.pull == "down" %}
     // DOUT=0 selects pull-down when MODE is set to inputpull (0b1000)
-    p.GPIO.p{{ port_lower }}_dout().modify(|r, w| unsafe { w.bits(r.bits() & !(1 << {{ pin.pin }})) });
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << {{ pin.pin }})) });
     {% endif %}
     {% elif pin.direction == "out" %}
     // Output (push-pull)
     {% if pin.initial == "high" %}
-    p.GPIO.p{{ port_lower }}_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.pin }})) });
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.pin }})) });
     {% else %}
-    p.GPIO.p{{ port_lower }}_dout().modify(|r, w| unsafe { w.bits(r.bits() & !(1 << {{ pin.pin }})) });
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << {{ pin.pin }})) });
     {% endif %}
-    p.GPIO.{{ mode_reg }}().modify(|_, w| unsafe { w.{{ mode_field }}().bits(0b0100) });
+    p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits(0b0100) });
     {% elif pin.direction == "inout" %}
     // Inout (wired-AND / open-drain){% if pin.pull == "up" %} with filter + pull-up{% endif %}
-    p.GPIO.{{ mode_reg }}().modify(|_, w| unsafe { w.{{ mode_field }}().bits(0b0110) });
+    p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits(0b0110) });
     {% endif %}
     {% if pin.route.kind == "routeloc" %}
     // ROUTELOC: {{ pin.route.route_reg }}.{{ pin.route.route_field }} = {{ pin.route.loc }}; {{ pin.route.pen_reg }}.{{ pin.route.pen_field }} = 1

@@ -4,6 +4,12 @@
 //! generator emits a real USART async-UART init for the console
 //! peripheral (mirroring the ESP UART0 path) and stub bodies for
 //! every other peripheral.
+//!
+//! Targeted at the pinned `efm32gg11b-pac 0.1.4`: register-block
+//! accessors (`cmd`, `ctrl`, `frame`, `clkdiv`, `routeloc0`,
+//! `routepen`, ...) are direct `#[repr(C)]` struct fields, not method
+//! accessors. The pre-method-accessor svd2rust era — same vintage as
+//! `atsamd51j19a 0.7.1` handled by CHIPS-MICROCHIP-02.
 
 {% if ir.chip.pac_sku_module -%}
 // `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
@@ -54,12 +60,12 @@ pub fn init_{{ name }}() {
     // EFM32 async-mode CLKDIV = 256 * (HFCLK / (16 * baud) - 1), 15-bit DIV field.
     let div: u32 = ((256u32.saturating_mul(HF)) / (16 * BAUD)).saturating_sub(256);
     // Clear the peripheral via CMD.CLEARRX|CLEARTX (idempotent on a fresh boot).
-    p.{{ name | upper }}.cmd().write(|w| w.clearrx().set_bit().cleartx().set_bit());
-    p.{{ name | upper }}.ctrl().modify(|_, w| w.sync().clear_bit());
-    p.{{ name | upper }}.frame().write(|w| unsafe { w.bits(0x1005) }); // 8 data bits, 1 stop bit, no parity
-    p.{{ name | upper }}.clkdiv().write(|w| unsafe { w.bits(div) });
+    p.{{ name | upper }}.cmd.write(|w| w.clearrx().set_bit().cleartx().set_bit());
+    p.{{ name | upper }}.ctrl.modify(|_, w| w.sync().clear_bit());
+    p.{{ name | upper }}.frame.write(|w| unsafe { w.bits(0x1005) }); // 8 data bits, 1 stop bit, no parity
+    p.{{ name | upper }}.clkdiv.write(|w| unsafe { w.bits(div) });
     // Enable TX + RX, then prime by clearing flags via CMD.
-    p.{{ name | upper }}.cmd().write(|w| w.txen().set_bit().rxen().set_bit());
+    p.{{ name | upper }}.cmd.write(|w| w.txen().set_bit().rxen().set_bit());
 }
 {% elif ir.board.console and ir.board.console.peripheral == name and periph.class == "leuart" %}
 /// Bring up {{ name }} as the VCOM console at {{ ir.board.console.baud }} baud,

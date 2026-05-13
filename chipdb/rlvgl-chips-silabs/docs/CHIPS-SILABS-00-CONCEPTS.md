@@ -1009,3 +1009,51 @@ Ratifying this chapter unblocks:
     `Ir` adapter at `src/bin/creator/bsp/silabs.rs`) was already
     failing at v0.2.0 baseline (committed `.snap.new` artifacts);
     unaffected by this amendment.
+
+### 2026-05-13 — SILABS-02b field-style register amendment for efm32gg11b-pac 0.1.4
+
+- clocks/io_mux/peripherals templates now emit field-direct register
+  access (`p.CMU.hfperclken0.modify(...)`, `p.GPIO.ph_modeh.modify(...)`,
+  `p.USART4.frame.write(...)`) instead of method-style access. Matches
+  `efm32gg11b-pac 0.1.4`'s pre-method-accessor svd2rust era — same
+  vintage as `atsamd51j19a 0.7.1` (Dec 2020). Pattern ported from
+  CHIPS-MICROCHIP-02 amendment (commit fc88383).
+- Implementation: the `pac_path` Jinja filter in
+  `src/bin/creator/bsp/silabs/render.rs` (used by `clocks.rs.jinja` and
+  `io_mux.rs.jinja` for ROUTELOC writes) was switched from appending
+  `()` after each register segment to emitting the segment verbatim;
+  the `peripherals.rs.jinja` console-USART init was hand-edited to drop
+  `.cmd()` / `.ctrl()` / `.frame()` / `.clkdiv()` parens; the
+  `io_mux.rs.jinja` GPIO mode-register / DOUT writes were hand-edited
+  similarly. The filter's unit test was renamed and updated to assert
+  the new field-direct shape.
+- Compile-verify error count: 41×E0599 + 61×E0282 → 11×E0599. The
+  field-style amendment landed cleanly; the residual 11 errors are
+  two orthogonal divergences against this PAC vintage:
+  - `cmu.hfperclken0` writer has no `gpio` field. The PAC routes the
+    GPIO clock-gate through `cmu.hfbusclken0.gpio` instead. The chip
+    YAML's `system_gates.gpio.clk_en_reg: cmu.hfperclken0` is divergent
+    against `efm32gg11b-pac 0.1.4`. RM CMU §11 documents GPIO under
+    HFPERCLKEN0; the SVD-derived PAC disagrees. Treat as a chipdb-YAML
+    correction (CHIPS-SILABS-01c follow-up).
+  - GPIO `MODEH` writer field naming uses absolute pin index
+    (`mode8`..`mode15`) rather than the half-register-relative index
+    (`mode0`..`mode7`) that the `io_mux.rs.jinja` template currently
+    emits. `MODEL` is unaffected because the relative and absolute
+    indices both fall in `0..7`. Fix is template-only: drop the
+    `(pin.pin - 8)` shift for MODEH so `pin.pin` flows through as the
+    field name. Treat as a CHIPS-SILABS-02c follow-up so it stays
+    isolated from this amendment's field-style shift.
+- Both residual divergences are orthogonal to field-style access; the
+  field-style amendment is complete and steady-state on its own. The
+  CHIPS-SILABS-04 gate remains commented out in `CLAUDE.md` until the
+  follow-ups land.
+- **Validation**:
+  - `cargo test -p rlvgl-chips-silabs` — pass (4 tests).
+  - `cargo test -p rlvgl --test bsp_silabs_slstk3701a_render
+    --features creator,regression` — pass (10 tests, snapshots
+    re-blessed for the new field-direct emit shape).
+  - `cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile
+    --features compile-verify -- --test-threads=1` — **still FAILS**
+    on the two residual divergences above (11×E0599). Up from
+    fully-broken (102 errors) to within reach of a one-shot fix.

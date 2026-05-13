@@ -26,6 +26,13 @@ expression: text
 //! pull-up/down variants. The template emits `0b0001` for plain inputs
 //! (with pull-up if `pull: up` is set), `0b0100` for outputs, and
 //! `0b0110` for inout (I2C) lines.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: GPIO port-mode registers (`pa_model`, `pa_modeh`,
+//! `pa_dout`, ...) and peripheral routing registers (`routeloc0`,
+//! `routepen`) are direct `#[repr(C)]` struct fields, not method
+//! accessors. Same vintage as `atsamd51j19a 0.7.1` — see
+//! CHIPS-MICROCHIP-02 for the parallel pattern.
 
 // `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
 // a `efm32gg11b820` sub-module; bind `pac` to the SKU
@@ -44,14 +51,14 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
     
-    p.GPIO.ph_model().modify(|_, w| unsafe { w.mode4().bits(0b0100) });
+    p.GPIO.ph_model.modify(|_, w| unsafe { w.mode4().bits(0b0100) });
     
     
     // ROUTELOC: usart4.routeloc0.txloc = 4; usart4.routepen.txpen = 1
-    p.USART4.routeloc0().modify(|_, w| unsafe { w.txloc().bits(4) });
-    p.USART4.routepen().modify(|_, w| w.txpen().set_bit());
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.txloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.txpen().set_bit());
     
     
     // PH5 — USART4_RX (usart4)
@@ -61,13 +68,13 @@ pub fn init() {
     
     
     // Input
-    p.GPIO.ph_model().modify(|_, w| unsafe { w.mode5().bits(0b0001) });
+    p.GPIO.ph_model.modify(|_, w| unsafe { w.mode5().bits(0b0001) });
     
     
     
     // ROUTELOC: usart4.routeloc0.rxloc = 4; usart4.routepen.rxpen = 1
-    p.USART4.routeloc0().modify(|_, w| unsafe { w.rxloc().bits(4) });
-    p.USART4.routepen().modify(|_, w| w.rxpen().set_bit());
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.rxloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.rxpen().set_bit());
     
     
     // PH8 — USART4_CTS (usart4)
@@ -77,13 +84,13 @@ pub fn init() {
     
     
     // Input
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode0().bits(0b0001) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode0().bits(0b0001) });
     
     
     
     // ROUTELOC: usart4.routeloc0.rxloc = 4; usart4.routepen.rxpen = 1
-    p.USART4.routeloc0().modify(|_, w| unsafe { w.rxloc().bits(4) });
-    p.USART4.routepen().modify(|_, w| w.rxpen().set_bit());
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.rxloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.rxpen().set_bit());
     
     
     // PH9 — USART4_RTS (usart4)
@@ -94,14 +101,14 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode1().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode1().bits(0b0100) });
     
     
     // ROUTELOC: usart4.routeloc0.txloc = 4; usart4.routepen.txpen = 1
-    p.USART4.routeloc0().modify(|_, w| unsafe { w.txloc().bits(4) });
-    p.USART4.routepen().modify(|_, w| w.txpen().set_bit());
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.txloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.txpen().set_bit());
     
     
     // PE1 — VCOM_ENABLE (gpio)
@@ -112,9 +119,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.pe_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 1)) });
+    p.GPIO.pe_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 1)) });
     
-    p.GPIO.pe_model().modify(|_, w| unsafe { w.mode1().bits(0b0100) });
+    p.GPIO.pe_model.modify(|_, w| unsafe { w.mode1().bits(0b0100) });
     
     
     
@@ -125,10 +132,10 @@ pub fn init() {
     
     
     // Input with pull-up
-    p.GPIO.pc_modeh().modify(|_, w| unsafe { w.mode0().bits(0b1000) });
+    p.GPIO.pc_modeh.modify(|_, w| unsafe { w.mode0().bits(0b1000) });
     
     // DOUT=1 selects pull-up when MODE is set to inputpull (0b1000)
-    p.GPIO.pc_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 8)) });
+    p.GPIO.pc_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 8)) });
     
     
     
@@ -140,10 +147,10 @@ pub fn init() {
     
     
     // Input with pull-up
-    p.GPIO.pc_modeh().modify(|_, w| unsafe { w.mode1().bits(0b1000) });
+    p.GPIO.pc_modeh.modify(|_, w| unsafe { w.mode1().bits(0b1000) });
     
     // DOUT=1 selects pull-up when MODE is set to inputpull (0b1000)
-    p.GPIO.pc_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 9)) });
+    p.GPIO.pc_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 9)) });
     
     
     
@@ -156,9 +163,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 10)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 10)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode2().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode2().bits(0b0100) });
     
     
     
@@ -170,9 +177,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 11)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 11)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode3().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode3().bits(0b0100) });
     
     
     
@@ -184,9 +191,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 12)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 12)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode4().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode4().bits(0b0100) });
     
     
     
@@ -198,9 +205,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 13)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 13)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode5().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode5().bits(0b0100) });
     
     
     
@@ -212,9 +219,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 14)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 14)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode6().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode6().bits(0b0100) });
     
     
     
@@ -226,9 +233,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.ph_dout().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 15)) });
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 15)) });
     
-    p.GPIO.ph_modeh().modify(|_, w| unsafe { w.mode7().bits(0b0100) });
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode7().bits(0b0100) });
     
     
     
@@ -240,9 +247,9 @@ pub fn init() {
     
     // Output (push-pull)
     
-    p.GPIO.pb_dout().modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    p.GPIO.pb_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
     
-    p.GPIO.pb_model().modify(|_, w| unsafe { w.mode3().bits(0b0100) });
+    p.GPIO.pb_model.modify(|_, w| unsafe { w.mode3().bits(0b0100) });
     
     
     
@@ -253,12 +260,12 @@ pub fn init() {
     
     
     // Inout (wired-AND / open-drain) with filter + pull-up
-    p.GPIO.pi_model().modify(|_, w| unsafe { w.mode5().bits(0b0110) });
+    p.GPIO.pi_model.modify(|_, w| unsafe { w.mode5().bits(0b0110) });
     
     
     // ROUTELOC: i2c2.routeloc0.sclloc = 7; i2c2.routepen.sclpen = 1
-    p.I2C2.routeloc0().modify(|_, w| unsafe { w.sclloc().bits(7) });
-    p.I2C2.routepen().modify(|_, w| w.sclpen().set_bit());
+    p.I2C2.routeloc0.modify(|_, w| unsafe { w.sclloc().bits(7) });
+    p.I2C2.routepen.modify(|_, w| w.sclpen().set_bit());
     
     
     // PI4 — I2C2_SDA (i2c2)
@@ -268,12 +275,12 @@ pub fn init() {
     
     
     // Inout (wired-AND / open-drain) with filter + pull-up
-    p.GPIO.pi_model().modify(|_, w| unsafe { w.mode4().bits(0b0110) });
+    p.GPIO.pi_model.modify(|_, w| unsafe { w.mode4().bits(0b0110) });
     
     
     // ROUTELOC: i2c2.routeloc0.sdaloc = 7; i2c2.routepen.sdapen = 1
-    p.I2C2.routeloc0().modify(|_, w| unsafe { w.sdaloc().bits(7) });
-    p.I2C2.routepen().modify(|_, w| w.sdapen().set_bit());
+    p.I2C2.routeloc0.modify(|_, w| unsafe { w.sdaloc().bits(7) });
+    p.I2C2.routepen.modify(|_, w| w.sdapen().set_bit());
     
     
     // PB0 — SENSOR_HALL_VOUT (gpio)
@@ -283,7 +290,7 @@ pub fn init() {
     
     
     // Input
-    p.GPIO.pb_model().modify(|_, w| unsafe { w.mode0().bits(0b0001) });
+    p.GPIO.pb_model.modify(|_, w| unsafe { w.mode0().bits(0b0001) });
     
     
     
