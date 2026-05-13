@@ -29,18 +29,18 @@
 #     (accessed 2026-05-11). The USB DM/DP pad assignment
 #     (PA24/PA25) and NeoPixel pad (PB03) cross-check.
 #
-# Chip pad-mux discrepancies vs. variant.cpp (NOTE for a future
-# CHIPS-MICROCHIP §15 amendment to the -01a chip YAML):
-#   - PB22 fn_c: should read `SERCOM1_PAD2` per DS60001507
-#     Table 6-1; chip YAML currently lists `null`. The variant
-#     routes MISO via PMUX C on PB22 to SERCOM1/PAD[2].
-#   - PB23 fn_c: should read `SERCOM1_PAD3` per DS60001507
-#     Table 6-1; chip YAML currently lists `SERCOM1_PAD2`. The
+# Chip pad-mux notes vs. variant.cpp (carried as historical context;
+# the CHIPS-MICROCHIP-01a amendment landed 2026-05-13):
+#   - PB22 fn_c: `SERCOM1_PAD2` per DS60001507 Table 6-1; the
+#     variant routes MISO via PMUX C on PB22 to SERCOM1/PAD[2].
+#     The chip YAML row carried `null` here prior to -01a.
+#   - PB23 fn_c: `SERCOM1_PAD3` per DS60001507 Table 6-1; the
 #     variant routes MOSI via PMUX C on PB23 to SERCOM1/PAD[3].
-# Until that amendment lands, the snapshot test will catch the
-# mismatch; CHIPS-MICROCHIP-01b only carries the data (per the
-# §12(a) gate — "pins: non-empty, console: set, cited
-# user-guide source") and does not exercise the generator.
+#     The chip YAML row carried `SERCOM1_PAD2` (a transcription
+#     carry-over from the PB22 row) prior to -01a.
+# Both rows are now correct in
+# `chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml`.
+# See CHIPS-MICROCHIP-00 §15 entry dated 2026-05-13.
 #
 # Console choice (CHIPS-MICROCHIP-00 §5 board YAML format):
 #   The Feather M4 Express has no on-board USB-to-serial bridge.
@@ -100,10 +100,8 @@ pins:
   - { pad: PA13, signal: SERCOM2_PAD1, peripheral: sercom2, direction: inout, label: scl } # SCL
 
   # ===== SPI — header MOSI/MISO/SCK — SERCOM1 ====
-  # MISO -> PB22 PMUX C -> SERCOM1/PAD[2]  (NOTE: chip YAML row
-  #         fn_c: null; see header NOTE above for §15 amendment)
-  # MOSI -> PB23 PMUX C -> SERCOM1/PAD[3]  (NOTE: chip YAML row
-  #         fn_c: SERCOM1_PAD2; should be SERCOM1_PAD3)
+  # MISO -> PB22 PMUX C -> SERCOM1/PAD[2]  (chip yaml fn_c: SERCOM1_PAD2 since -01a, 2026-05-13)
+  # MOSI -> PB23 PMUX C -> SERCOM1/PAD[3]  (chip yaml fn_c: SERCOM1_PAD3 since -01a, 2026-05-13)
   # SCK  -> PA17 PMUX C -> SERCOM1/PAD[1]
   - { pad: PB22, signal: SERCOM1_PAD2, peripheral: sercom1, direction: in,    label: miso } # MISO
   - { pad: PB23, signal: SERCOM1_PAD3, peripheral: sercom1, direction: out,   label: mosi } # MOSI

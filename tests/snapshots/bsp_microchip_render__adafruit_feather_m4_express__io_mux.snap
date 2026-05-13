@@ -88,44 +88,31 @@ pub fn init() {
     
     // PB22 (group 1 pin 22) — SERCOM1_PAD2 (sercom1)
     
-    // MISMATCH: board claims peripheral signal `SERCOM1_PAD2` on
-    //           pad PB22 but chip yaml `io_mux.fn_<letter>:` columns
-    //           do not list it. Falling back to plain GPIO PINCFG. Fix
-    //           by amending chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml
-    //           per CHIPS-MICROCHIP §15.
     
-    
-    // Plain GPIO (signal `SERCOM1_PAD2`): no PMUX, configure PINCFG only.
+    // PMUX letter C → bits 2
+    p.PORT.group(1).pmux(11).modify(|_, w| unsafe {
+        w.pmuxe().bits(2)
+    });
     p.PORT.group(1).pincfg(22).write(|w| {
-        w.pmuxen().clear_bit()
+        w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
-    
-    p.PORT.group(1).dirclr().write(|w| unsafe { w.bits(1 << 22) });
-    
     
     
     
     // PB23 (group 1 pin 23) — SERCOM1_PAD3 (sercom1)
     
-    // MISMATCH: board claims peripheral signal `SERCOM1_PAD3` on
-    //           pad PB23 but chip yaml `io_mux.fn_<letter>:` columns
-    //           do not list it. Falling back to plain GPIO PINCFG. Fix
-    //           by amending chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml
-    //           per CHIPS-MICROCHIP §15.
     
-    
-    // Plain GPIO (signal `SERCOM1_PAD3`): no PMUX, configure PINCFG only.
+    // PMUX letter C → bits 2
+    p.PORT.group(1).pmux(11).modify(|_, w| unsafe {
+        w.pmuxo().bits(2)
+    });
     p.PORT.group(1).pincfg(23).write(|w| {
-        w.pmuxen().clear_bit()
+        w.pmuxen().set_bit()
          .inen().clear_bit()
          .pullen().clear_bit()
     });
-    
-    // Drive direction set for output pad.
-    p.PORT.group(1).dirset().write(|w| unsafe { w.bits(1 << 23) });
-    
     
     
     

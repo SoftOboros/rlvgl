@@ -708,6 +708,24 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-13 — MICROCHIP-01a amendment.**
+  `chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml`
+  `io_mux.fn_c:` column corrected for PB22 / PB23 to expose the
+  SERCOM1 SPI peripheral function (`SERCOM1_PAD2` on PB22,
+  `SERCOM1_PAD3` on PB23) per DS60001507 Table 6-1. PB22
+  previously held `null`; PB23 previously held `SERCOM1_PAD2`
+  (a transcription carry-over from the PB22 row). The
+  `adafruit_feather_m4_express.yaml` board YAML's `pmux: c`
+  references on those two pads (MISO / MOSI on SERCOM1) now
+  resolve cleanly. This eliminates the two PB22 / PB23 MISMATCH
+  fallback comments from the `bsp_microchip_render` golden
+  snapshot (the only consumer that exercises the chip yaml's
+  PMUX columns at slate 4); snapshot re-blessed. The four other
+  field columns on those rows (`fn_a`, `fn_d`, `fn_e`, `fn_n`)
+  are unchanged. Unrelated MISMATCH comments on PA04 / PA06
+  (ADC0_AIN4 / ADC0_AIN6) remain — those are §15 work for a
+  future -01b amendment. No `INV-MC<n>` invariant changes.
+
 - **2026-05-11 — Ratified. Status: Ratified 2026-05-11 (owner:
   Ira Abbott).** Doc *shape* ratified; the TBDs enumerated under
   the prior draft entry remain open and gate CHIPS-MICROCHIP-01

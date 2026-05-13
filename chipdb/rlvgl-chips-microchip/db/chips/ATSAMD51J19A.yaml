@@ -465,8 +465,8 @@ io_mux:
   - { pad: PB15, group: 1, pin: 15, fn_a: EIC_EXTINT_15, fn_b: null,           fn_c: SERCOM4_PAD3, fn_d: null,        fn_e: TC5_WO1,    fn_f: TCC4_WO1,    fn_g: TCC0_WO3,       fn_h: null,           fn_n: GCLK_IO1, analog: null }
   - { pad: PB16, group: 1, pin: 16, fn_a: EIC_EXTINT_0,  fn_b: null,           fn_c: SERCOM5_PAD0, fn_d: null,        fn_e: TC6_WO0,    fn_f: TCC3_WO0,    fn_g: TCC0_WO4,       fn_h: null,           fn_n: GCLK_IO2, analog: null }
   - { pad: PB17, group: 1, pin: 17, fn_a: EIC_EXTINT_1,  fn_b: null,           fn_c: SERCOM5_PAD1, fn_d: null,        fn_e: TC6_WO1,    fn_f: TCC3_WO1,    fn_g: TCC0_WO5,       fn_h: null,           fn_n: GCLK_IO3, analog: null }
-  - { pad: PB22, group: 1, pin: 22, fn_a: EIC_EXTINT_6,  fn_b: null,           fn_c: null,         fn_d: SERCOM5_PAD2, fn_e: TC7_WO0,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO0, analog: null }
-  - { pad: PB23, group: 1, pin: 23, fn_a: EIC_EXTINT_7,  fn_b: null,           fn_c: SERCOM1_PAD2, fn_d: SERCOM5_PAD3, fn_e: TC7_WO1,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO1, analog: null }
+  - { pad: PB22, group: 1, pin: 22, fn_a: EIC_EXTINT_6,  fn_b: null,           fn_c: SERCOM1_PAD2, fn_d: SERCOM5_PAD2, fn_e: TC7_WO0,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO0, analog: null }
+  - { pad: PB23, group: 1, pin: 23, fn_a: EIC_EXTINT_7,  fn_b: null,           fn_c: SERCOM1_PAD3, fn_d: SERCOM5_PAD3, fn_e: TC7_WO1,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO1, analog: null }
   - { pad: PB30, group: 1, pin: 30, fn_a: EIC_EXTINT_14, fn_b: null,           fn_c: SERCOM5_PAD0, fn_d: SERCOM7_PAD0, fn_e: TC0_WO0,    fn_f: TCC4_WO0,    fn_g: TCC0_WO0,       fn_h: CM4_SWO,        fn_n: null, analog: null }
   - { pad: PB31, group: 1, pin: 31, fn_a: EIC_EXTINT_15, fn_b: null,           fn_c: SERCOM5_PAD1, fn_d: SERCOM7_PAD1, fn_e: TC0_WO1,    fn_f: TCC4_WO1,    fn_g: TCC0_WO1,       fn_h: null,           fn_n: null, analog: null }
 
