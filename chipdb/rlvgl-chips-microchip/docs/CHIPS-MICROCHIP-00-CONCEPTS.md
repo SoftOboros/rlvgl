@@ -708,6 +708,34 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-13 — MICROCHIP-02 amendment.**
+  `src/bin/creator/bsp/microchip/templates/` `clocks.rs.jinja`,
+  `io_mux.rs.jinja`, and `peripherals.rs.jinja` now emit
+  field-direct register access (`p.MCLK.apbamask`,
+  `p.GCLK.pchctrl[N]`, `p.GCLK.pchctrl[N].read().chen()`,
+  `p.PORT.group0.pmux[H]`, `p.PORT.group1.pincfg[P]`,
+  `p.PORT.group0.dirset`, `p.SERCOM5.usart_int().ctrla`,
+  `.syncbusy`) instead of the modern method-style access shape
+  (`p.MCLK.apbamask()`, `p.GCLK.pchctrl(N)`,
+  `p.PORT.group(N).pmux(H)`, etc.). This matches the pinned
+  `atsamd51j19a 0.7.1` PAC crate's pre-method-accessor svd2rust
+  era output: `MCLK.APBAMASK` is a struct field of type
+  `APBAMASK`, `GCLK.pchctrl` is `[PCHCTRL; 48]`, `PORT.group0`
+  and `PORT.group1` are direct `GROUP`-typed fields, and within
+  `GROUP` the `pmux` / `pincfg` are fixed arrays. The
+  mode-union accessors on `SERCOM*` (`usart_int()`, `i2cm()`,
+  `spim()`) and the union-variant `baud()` method on
+  `USART_INT` remain methods on this PAC era; only the
+  per-register field handles (`ctrla`, `ctrlb`, `syncbusy`)
+  change to field access. The `gen` writer field on
+  `GCLK.PCHCTRL` is also emitted as `w.gen()` (not `w.gen_()`)
+  per the PAC's actual writer name on this era. The opt-in
+  compile-verify gate (`bsp_microchip_compile` under
+  `--features compile-verify`, §12 (d)) now passes end-to-end
+  against `atsamd51j19a 0.7` on `thumbv7em-none-eabihf`.
+  Snapshots re-blessed. No `INV-MC<n>` invariant changes; this
+  is a code-emission-shape amendment only.
+
 - **2026-05-13 — MICROCHIP-01a amendment.**
   `chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml`
   `io_mux.fn_c:` column corrected for PB22 / PB23 to expose the

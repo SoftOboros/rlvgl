@@ -19,6 +19,13 @@ expression: text
 //! `io_mux.fn_<letter>:` column to produce a 4-bit field value
 //! (A=0, B=1, ..., H=7, N=0xf). Pins with `signal: GPIO` skip the PMUX
 //! write entirely and configure PINCFG for direct GPIO use.
+//!
+//! The pinned `atsamd51j19a 0.7.1` PAC predates svd2rust's method-style
+//! register accessors: `PORT` exposes `group0` / `group1` as direct
+//! register-block fields, and within each group `pmux` / `pincfg` are
+//! fixed-size arrays (`[PMUX; 16]`, `[PINCFG; 32]`). The generator
+//! emits the corresponding `p.PORT.groupN.pmux[H]` / `p.PORT.groupN.pincfg[P]`
+//! field-and-index syntax accordingly.
 
 use atsamd51j19a as pac;
 
@@ -30,10 +37,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(1).pmux(8).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[8].modify(|_, w| unsafe {
         w.pmuxo().bits(2)
     });
-    p.PORT.group(1).pincfg(17).write(|w| {
+    p.PORT.group1.pincfg[17].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -45,10 +52,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(1).pmux(8).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[8].modify(|_, w| unsafe {
         w.pmuxe().bits(2)
     });
-    p.PORT.group(1).pincfg(16).write(|w| {
+    p.PORT.group1.pincfg[16].write(|w| {
         w.pmuxen().set_bit()
          .inen().clear_bit()
          .pullen().clear_bit()
@@ -60,10 +67,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(0).pmux(6).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[6].modify(|_, w| unsafe {
         w.pmuxe().bits(2)
     });
-    p.PORT.group(0).pincfg(12).write(|w| {
+    p.PORT.group0.pincfg[12].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -75,10 +82,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(0).pmux(6).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[6].modify(|_, w| unsafe {
         w.pmuxo().bits(2)
     });
-    p.PORT.group(0).pincfg(13).write(|w| {
+    p.PORT.group0.pincfg[13].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -90,10 +97,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(1).pmux(11).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[11].modify(|_, w| unsafe {
         w.pmuxe().bits(2)
     });
-    p.PORT.group(1).pincfg(22).write(|w| {
+    p.PORT.group1.pincfg[22].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -105,10 +112,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(1).pmux(11).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[11].modify(|_, w| unsafe {
         w.pmuxo().bits(2)
     });
-    p.PORT.group(1).pincfg(23).write(|w| {
+    p.PORT.group1.pincfg[23].write(|w| {
         w.pmuxen().set_bit()
          .inen().clear_bit()
          .pullen().clear_bit()
@@ -120,10 +127,10 @@ pub fn init() {
     
     
     // PMUX letter C → bits 2
-    p.PORT.group(0).pmux(8).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[8].modify(|_, w| unsafe {
         w.pmuxo().bits(2)
     });
-    p.PORT.group(0).pincfg(17).write(|w| {
+    p.PORT.group0.pincfg[17].write(|w| {
         w.pmuxen().set_bit()
          .inen().clear_bit()
          .pullen().clear_bit()
@@ -135,14 +142,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(14).write(|w| {
+    p.PORT.group0.pincfg[14].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 14) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 14) });
     
     
     
@@ -151,14 +158,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(16).write(|w| {
+    p.PORT.group0.pincfg[16].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 16) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 16) });
     
     
     
@@ -167,14 +174,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(18).write(|w| {
+    p.PORT.group0.pincfg[18].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 18) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 18) });
     
     
     
@@ -183,14 +190,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(19).write(|w| {
+    p.PORT.group0.pincfg[19].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 19) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 19) });
     
     
     
@@ -199,14 +206,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(20).write(|w| {
+    p.PORT.group0.pincfg[20].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 20) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 20) });
     
     
     
@@ -215,14 +222,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(21).write(|w| {
+    p.PORT.group0.pincfg[21].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 21) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 21) });
     
     
     
@@ -231,14 +238,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(22).write(|w| {
+    p.PORT.group0.pincfg[22].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 22) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 22) });
     
     
     
@@ -247,14 +254,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `LED`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(23).write(|w| {
+    p.PORT.group0.pincfg[23].write(|w| {
         w.pmuxen().clear_bit()
          .inen().clear_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(0).dirset().write(|w| unsafe { w.bits(1 << 23) });
+    p.PORT.group0.dirset.write(|w| unsafe { w.bits(1 << 23) });
     
     
     
@@ -263,10 +270,10 @@ pub fn init() {
     
     
     // PMUX letter B → bits 1
-    p.PORT.group(0).pmux(1).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[1].modify(|_, w| unsafe {
         w.pmuxe().bits(1)
     });
-    p.PORT.group(0).pincfg(2).write(|w| {
+    p.PORT.group0.pincfg[2].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -278,10 +285,10 @@ pub fn init() {
     
     
     // PMUX letter B → bits 1
-    p.PORT.group(0).pmux(2).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[2].modify(|_, w| unsafe {
         w.pmuxo().bits(1)
     });
-    p.PORT.group(0).pincfg(5).write(|w| {
+    p.PORT.group0.pincfg[5].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -293,10 +300,10 @@ pub fn init() {
     
     
     // PMUX letter B → bits 1
-    p.PORT.group(1).pmux(4).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[4].modify(|_, w| unsafe {
         w.pmuxe().bits(1)
     });
-    p.PORT.group(1).pincfg(8).write(|w| {
+    p.PORT.group1.pincfg[8].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -308,10 +315,10 @@ pub fn init() {
     
     
     // PMUX letter B → bits 1
-    p.PORT.group(1).pmux(4).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[4].modify(|_, w| unsafe {
         w.pmuxo().bits(1)
     });
-    p.PORT.group(1).pincfg(9).write(|w| {
+    p.PORT.group1.pincfg[9].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -329,13 +336,13 @@ pub fn init() {
     
     
     // Plain GPIO (signal `ADC0_AIN4`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(4).write(|w| {
+    p.PORT.group0.pincfg[4].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
-    p.PORT.group(0).dirclr().write(|w| unsafe { w.bits(1 << 4) });
+    p.PORT.group0.dirclr.write(|w| unsafe { w.bits(1 << 4) });
     
     
     
@@ -350,13 +357,13 @@ pub fn init() {
     
     
     // Plain GPIO (signal `ADC0_AIN6`): no PMUX, configure PINCFG only.
-    p.PORT.group(0).pincfg(6).write(|w| {
+    p.PORT.group0.pincfg[6].write(|w| {
         w.pmuxen().clear_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
     
-    p.PORT.group(0).dirclr().write(|w| unsafe { w.bits(1 << 6) });
+    p.PORT.group0.dirclr.write(|w| unsafe { w.bits(1 << 6) });
     
     
     
@@ -365,10 +372,10 @@ pub fn init() {
     
     
     // PMUX letter B → bits 1
-    p.PORT.group(1).pmux(0).modify(|_, w| unsafe {
+    p.PORT.group1.pmux[0].modify(|_, w| unsafe {
         w.pmuxo().bits(1)
     });
-    p.PORT.group(1).pincfg(1).write(|w| {
+    p.PORT.group1.pincfg[1].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -380,14 +387,14 @@ pub fn init() {
     
     
     // Plain GPIO (signal `GPIO`): no PMUX, configure PINCFG only.
-    p.PORT.group(1).pincfg(3).write(|w| {
+    p.PORT.group1.pincfg[3].write(|w| {
         w.pmuxen().clear_bit()
          .inen().clear_bit()
          .pullen().clear_bit()
     });
     
     // Drive direction set for output pad.
-    p.PORT.group(1).dirset().write(|w| unsafe { w.bits(1 << 3) });
+    p.PORT.group1.dirset.write(|w| unsafe { w.bits(1 << 3) });
     
     
     
@@ -396,10 +403,10 @@ pub fn init() {
     
     
     // PMUX letter H → bits 7
-    p.PORT.group(0).pmux(12).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[12].modify(|_, w| unsafe {
         w.pmuxe().bits(7)
     });
-    p.PORT.group(0).pincfg(24).write(|w| {
+    p.PORT.group0.pincfg[24].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
@@ -411,10 +418,10 @@ pub fn init() {
     
     
     // PMUX letter H → bits 7
-    p.PORT.group(0).pmux(12).modify(|_, w| unsafe {
+    p.PORT.group0.pmux[12].modify(|_, w| unsafe {
         w.pmuxo().bits(7)
     });
-    p.PORT.group(0).pincfg(25).write(|w| {
+    p.PORT.group0.pincfg[25].write(|w| {
         w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()

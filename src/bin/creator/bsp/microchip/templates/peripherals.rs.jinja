@@ -4,6 +4,12 @@
 //! generator emits real register writes for SERCOM-as-USART (when it is
 //! the console), SERCOM-as-I²C-master (timing setup), and SERCOM-as-SPI-
 //! master (clock + mode). Other classes get TODO stubs.
+//!
+//! Targeted at the pinned `atsamd51j19a 0.7.1` PAC: SERCOM mode unions
+//! (`usart_int()` / `i2cm()` / `spim()`) and the mode-union `baud()`
+//! accessor remain methods on this PAC era, but the per-register
+//! handles inside each mode block (`ctrla`, `ctrlb`, `syncbusy`,
+//! etc.) are direct fields, not methods.
 
 use {{ ir.chip.pac_crate }} as pac;
 
@@ -39,13 +45,13 @@ pub fn init_{{ name }}() {
     //   BAUD = 65536 - (65536 * 16 * BAUD_HZ / SERCOM_CLK_HZ)
     // Clamp to u16 range; the SERCOM USART BAUD field is 16-bit.
     let baud_div: u32 = 65536u32.saturating_sub((65536u64 * 16 * BAUD as u64 / CPU_HZ as u64) as u32);
-    p.{{ name | upper }}.usart_int().ctrla().write(|w| unsafe {
+    p.{{ name | upper }}.usart_int().ctrla.write(|w| unsafe {
         w.mode().bits(0x1) // USART internal clock
          .dord().set_bit()  // LSB first
          .rxpo().bits(0x1)  // RX on PAD[1] (typical)
          .txpo().bits(0x0)  // TX on PAD[0]
     });
-    p.{{ name | upper }}.usart_int().ctrlb().write(|w| unsafe {
+    p.{{ name | upper }}.usart_int().ctrlb.write(|w| unsafe {
         w.chsize().bits(0x0) // 8 data bits
          .sbmode().clear_bit() // 1 stop bit
          .pmode().clear_bit()  // no parity
@@ -54,8 +60,8 @@ pub fn init_{{ name }}() {
     });
     p.{{ name | upper }}.usart_int().baud().write(|w| unsafe { w.baud().bits(baud_div as u16) });
     // Enable the SERCOM and wait for the synchronisation barrier.
-    p.{{ name | upper }}.usart_int().ctrla().modify(|_, w| w.enable().set_bit());
-    while p.{{ name | upper }}.usart_int().syncbusy().read().enable().bit_is_set() {}
+    p.{{ name | upper }}.usart_int().ctrla.modify(|_, w| w.enable().set_bit());
+    while p.{{ name | upper }}.usart_int().syncbusy.read().enable().bit_is_set() {}
 }
 {% elif periph.class == "sercom" %}
 /// Bring up {{ name }} as a SERCOM peripheral.

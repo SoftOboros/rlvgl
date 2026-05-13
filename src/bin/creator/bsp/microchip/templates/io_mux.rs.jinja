@@ -15,6 +15,13 @@
 //! `io_mux.fn_<letter>:` column to produce a 4-bit field value
 //! (A=0, B=1, ..., H=7, N=0xf). Pins with `signal: GPIO` skip the PMUX
 //! write entirely and configure PINCFG for direct GPIO use.
+//!
+//! The pinned `atsamd51j19a 0.7.1` PAC predates svd2rust's method-style
+//! register accessors: `PORT` exposes `group0` / `group1` as direct
+//! register-block fields, and within each group `pmux` / `pincfg` are
+//! fixed-size arrays (`[PMUX; 16]`, `[PINCFG; 32]`). The generator
+//! emits the corresponding `p.PORT.groupN.pmux[H]` / `p.PORT.groupN.pincfg[P]`
+//! field-and-index syntax accordingly.
 
 use {{ ir.chip.pac_crate }} as pac;
 
@@ -32,37 +39,37 @@ pub fn init() {
     {% endif %}
     {% if pad.pmux_enable %}
     // PMUX letter {{ pad.pmux_letter }} → bits {{ pad.pmux_bits }}
-    p.PORT.group({{ pad.group }}).pmux({{ pad.pmux_half }}).modify(|_, w| unsafe {
+    p.PORT.group{{ pad.group }}.pmux[{{ pad.pmux_half }}].modify(|_, w| unsafe {
         w.{% if pad.pmux_odd %}pmuxo{% else %}pmuxe{% endif %}().bits({{ pad.pmux_bits }})
     });
-    p.PORT.group({{ pad.group }}).pincfg({{ pad.pin }}).write(|w| {
+    p.PORT.group{{ pad.group }}.pincfg[{{ pad.pin }}].write(|w| {
         w.pmuxen().set_bit()
          .inen().{% if pad.direction == "in" or pad.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
          .pullen().{% if pad.pull == "up" or pad.pull == "down" %}set_bit{% else %}clear_bit{% endif %}()
     });
     {% if pad.pull == "up" %}
     // Pull-up: OUT bit selects pull direction when PULLEN is set.
-    p.PORT.group({{ pad.group }}).outset().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    p.PORT.group{{ pad.group }}.outset.write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
     {% elif pad.pull == "down" %}
-    p.PORT.group({{ pad.group }}).outclr().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    p.PORT.group{{ pad.group }}.outclr.write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
     {% endif %}
     {% else %}
     // Plain GPIO (signal `{{ pad.signal }}`): no PMUX, configure PINCFG only.
-    p.PORT.group({{ pad.group }}).pincfg({{ pad.pin }}).write(|w| {
+    p.PORT.group{{ pad.group }}.pincfg[{{ pad.pin }}].write(|w| {
         w.pmuxen().clear_bit()
          .inen().{% if pad.direction == "in" or pad.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
          .pullen().{% if pad.pull == "up" or pad.pull == "down" %}set_bit{% else %}clear_bit{% endif %}()
     });
     {% if pad.direction == "out" or pad.direction == "inout" %}
     // Drive direction set for output pad.
-    p.PORT.group({{ pad.group }}).dirset().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    p.PORT.group{{ pad.group }}.dirset.write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
     {% else %}
-    p.PORT.group({{ pad.group }}).dirclr().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    p.PORT.group{{ pad.group }}.dirclr.write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
     {% endif %}
     {% if pad.pull == "up" %}
-    p.PORT.group({{ pad.group }}).outset().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    p.PORT.group{{ pad.group }}.outset.write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
     {% elif pad.pull == "down" %}
-    p.PORT.group({{ pad.group }}).outclr().write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
+    p.PORT.group{{ pad.group }}.outclr.write(|w| unsafe { w.bits(1 << {{ pad.pin }}) });
     {% endif %}
     {% endif %}
     {% endfor %}
