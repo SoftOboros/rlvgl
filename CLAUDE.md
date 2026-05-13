@@ -222,9 +222,13 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,r
 # CHIPS-SILABS-00 §11 (deferred to -05). The opt-in compile-verify test
 # (CHIPS-SILABS-04) materialises a throwaway cargo project around the
 # generated BSP and runs `cargo check --target thumbv7em-none-eabihf`
-# against efm32gg11b-pac 0.1.4. Currently expected to FAIL until the
-# SILABS pac.rs template flattens the SKU sub-module
-# (`pub use efm32gg11b_pac::efm32gg11b820::*;`).
+# against efm32gg11b-pac 0.1.4. SKU-flatten amendment (CHIPS-SILABS-02
+# of 2026-05-13) resolved the 5×E0433 errors on `pac::Peripherals`,
+# leaving a second-order divergence: `efm32gg11b-pac 0.1.4` exposes
+# register blocks as fields (`p.CMU.hfperclken0`) not methods —
+# structurally identical to the atsamd51j19a divergence Microchip
+# already fixed. Currently expected to FAIL until the SILABS clocks /
+# io_mux / peripherals templates switch to field-style register access.
 RUSTFLAGS="" cargo test -p rlvgl-chips-silabs
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features creator,regression
 # RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile --features compile-verify -- --test-threads=1
@@ -233,26 +237,31 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features 
 # test covers the 8-file emission set (6 .rs + memory.x + cc1352_r.x)
 # for LAUNCHXL-CC1352R1. The opt-in compile-verify test (CHIPS-TI-01d)
 # runs `cargo check --target thumbv7em-none-eabihf` against
-# cc13x2_26x2_pac 0.10. Currently expected to FAIL until the TI
-# templates lowercase peripheral field accessors (`p.PRCM` → `p.prcm`,
-# `p.IOC` → `p.ioc`, etc.) to match this PAC's pre-uppercase svd2rust
-# convention.
+# cc13x2_26x2_pac 0.10. Lowercase-peripheral amendment (CHIPS-TI-01b
+# of 2026-05-13) dropped errors from 40+ to 18 by lowercasing
+# `p.PRCM` / `p.IOC` / `p.GPIO` / `p.UART0` field access. Currently
+# expected to FAIL until three residual structural divergences are
+# amended (CHIPS-TI-01e): (1) `pac::ioc::Ioc` has per-DIO methods
+# `iocfg0()..iocfg31()` rather than an `iocfg(n)` indexer; (2)
+# `uartclkgr.clk_en` is a 2-bit enum field (`ClkEn::Uart0`), not a
+# bit; (3) PRCM reset-register fields are `uart0`/`i2c0` in PAC vs
+# chip yaml's `uart`/`i2c`.
 RUSTFLAGS="" cargo test -p rlvgl-chips-ti
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_render --features creator,regression
 # RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.8: Microchip BSP generator (CHIPS-MICROCHIP-NN). Render test
 # covers the 7-file emission set (6 .rs + memory.x) for the Adafruit
-# Feather M4 Express. PB22/PB23 chip-yaml MISMATCH comments are captured
-# verbatim in the golden snapshot pending a future -01a amendment. The
-# opt-in compile-verify test (CHIPS-MICROCHIP-04) runs `cargo check
-# --target thumbv7em-none-eabihf` against atsamd51j19a 0.7. Currently
-# expected to FAIL until the Microchip templates switch to field-style
-# register access (`p.MCLK.apbamask.modify(...)`) to match this PAC's
-# pre-method-accessor svd2rust era.
+# Feather M4 Express. PB22/PB23 chip-yaml correction (CHIPS-MICROCHIP-01a
+# of 2026-05-13) replaced the MISMATCH fallback comments with real
+# SERCOM1_PAD2/PAD3 PMUX writes. Field-style template amendment
+# (CHIPS-MICROCHIP-02 of 2026-05-13) switched `p.MCLK.apbamask` /
+# `p.GCLK.pchctrl[N]` / `p.PORT.groupN.pmux[H]` to direct field access
+# matching atsamd51j19a 0.7.1's pre-method-accessor svd2rust era.
+# Compile-verify gate (CHIPS-MICROCHIP-04) now PASSES end-to-end.
 RUSTFLAGS="" cargo test -p rlvgl-chips-microchip
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_render --features creator,regression
-# RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_compile --features compile-verify -- --test-threads=1
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_compile --features compile-verify -- --test-threads=1
 
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
