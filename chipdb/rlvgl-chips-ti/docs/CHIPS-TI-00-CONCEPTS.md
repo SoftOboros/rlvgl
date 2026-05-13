@@ -786,3 +786,48 @@ chapter. The BBB initiative continues independently per §10.1.
 | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-05-11 | Ratified (owner: Ira Abbott) | Doc *shape* ratified. `CHIPS-TI-NN[a-z]:` PRs MAY now cite §-numbers as frozen authority. Open TBDs (§6 PAC crate version pins, §7 TI SWCU117 register-bit cites) remain open and gate `CHIPS-TI-01a` chip-YAML population rather than this doc. AM335x carve-out per §10.1 stands: this initiative does NOT subsume the BBB hand-written prong. |
 | 2026-05-11 | DRAFT — awaiting ratification | Initial skeleton. Initial scope: SimpleLink Cortex-M4F per §1.1; AM335x carve-out resolved in §10.1; MSPM0 / Sitara / C2000 / MSP430 / TDA non-goals in §11. |
+
+### 2026-05-13 — TI-01b template amendment for cc13x2_26x2_pac 0.10
+
+- Templates `clocks.rs.jinja`, `io_mux.rs.jinja`, `peripherals.rs.jinja`
+  now emit **lowercase** peripheral field accessors (`p.prcm`, `p.ioc`,
+  `p.gpio`, `p.uart0`) instead of the originally-frozen uppercase form
+  (`p.PRCM`, `p.IOC`, `p.GPIO`, `p.UART0`). This matches
+  `cc13x2_26x2_pac 0.10`'s pre-uppercase svd2rust-era output. The
+  `pac::Peripherals` *type* stays capitalized — only field-access on
+  the `p` instance changes. This row supersedes the "Peripheral
+  instance access style" rule in §3 and §5 for the SimpleLink
+  Cortex-M4F family; the original style was inherited from the
+  Espressif precedent and assumed a newer svd2rust version than
+  `cc13x2_26x2_pac 0.10` was generated against.
+- The `bsp_ti_cc1352r_render` snapshot test was re-blessed; the
+  diffs are limited to the three files above. `chip_x`, `memory_x`,
+  `mod.rs`, `pac.rs`, `board.rs` snapshots were unaffected.
+- The `bsp_ti_cc1352r_compile` test gate (CHIPS-TI-01d) advanced
+  from ~40+ casing errors to 18 remaining errors. **The casing
+  amendment alone is not sufficient to make the gate pass.** Three
+  additional `cc13x2_26x2_pac 0.10` divergences remain, all
+  structural rather than cosmetic:
+    1. `pac::ioc::Ioc` exposes per-DIO methods (`iocfg0()`,
+       `iocfg1()`, ... `iocfg31()`) rather than an indexed
+       `iocfg(n)` accessor. `io_mux.rs.jinja` currently emits
+       `p.ioc.iocfg({{ pin.dio }})` which has no analogue in
+       this PAC and needs a per-pin codegen branch.
+    2. `pac::prcm::uartclkgr::CLK_EN` is a 2-bit enum field
+       (`ClkEn::Uart0`/`Uart1`) not a single bit; the template's
+       `.clk_en().set_bit()` does not type-check. Real bring-up
+       needs `.clk_en().uart0()` / `.uart1()` driven by chipdb
+       data.
+    3. `pac::prcm::resetuart::W` field is `uart0` (per TI SWCU185
+       UART instance numbering), not the generic `uart` named in
+       the chip YAML `prcm.resetuart.rst_field` entry. Same
+       pattern for `reseti2c.i2c` -> `.i2c0`. This may be a
+       chip-YAML data fix rather than a template fix.
+  These belong to a follow-up worker (CHIPS-TI-01e or similar) with
+  scope to re-shape the IOC/PRCM template structure and audit the
+  chipdb YAML field-name conventions against the actual PAC.
+  `bsp_ti_cc1352r_compile` therefore remains expected-FAIL and the
+  pre-publish bullet for it stays commented out.
+- No other initiative was touched. CLAUDE.md was not modified.
+  Sister initiatives `CHIPS-SILABS-01b` and `CHIPS-MICROCHIP-01b`
+  remain on independent parallel paths.

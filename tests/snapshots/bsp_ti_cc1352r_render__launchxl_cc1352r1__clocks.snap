@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_ti_cc1352r_render.rs
-assertion_line: 89
 expression: text
 ---
 //! Clock tree initialization for LAUNCHXL-CC1352R1.
@@ -41,24 +40,24 @@ pub fn init() {
     
     // uart0 — clock enable clk_en on prcm.uartclkgr,
     //             reset uart on prcm.resetuart
-    p.PRCM.uartclkgr().modify(|_, w| w.clk_en().set_bit());
+    p.prcm.uartclkgr().modify(|_, w| w.clk_en().set_bit());
     // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
-    p.PRCM.clkloadctl().modify(|_, w| w.load().set_bit());
-    while p.PRCM.clkloadctl().read().load_done().bit_is_clear() {}
+    p.prcm.clkloadctl().modify(|_, w| w.load().set_bit());
+    while p.prcm.clkloadctl().read().load_done().bit_is_clear() {}
     // Release the peripheral from reset (clear bit deasserts reset).
-    p.PRCM.resetuart().modify(|_, w| w.uart().clear_bit());
+    p.prcm.resetuart().modify(|_, w| w.uart().clear_bit());
     
     
     
     
     // i2c0 — clock enable clk_en on prcm.i2cclkgr,
     //             reset i2c on prcm.reseti2c
-    p.PRCM.i2cclkgr().modify(|_, w| w.clk_en().set_bit());
+    p.prcm.i2cclkgr().modify(|_, w| w.clk_en().set_bit());
     // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
-    p.PRCM.clkloadctl().modify(|_, w| w.load().set_bit());
-    while p.PRCM.clkloadctl().read().load_done().bit_is_clear() {}
+    p.prcm.clkloadctl().modify(|_, w| w.load().set_bit());
+    while p.prcm.clkloadctl().read().load_done().bit_is_clear() {}
     // Release the peripheral from reset (clear bit deasserts reset).
-    p.PRCM.reseti2c().modify(|_, w| w.i2c().clear_bit());
+    p.prcm.reseti2c().modify(|_, w| w.i2c().clear_bit());
     
     
 }

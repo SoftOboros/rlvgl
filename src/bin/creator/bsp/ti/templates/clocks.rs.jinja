@@ -36,12 +36,12 @@ pub fn init() {
     {% if gate %}
     // {{ name }} — clock enable {{ gate.clk_en_field }} on {{ gate.clk_en_reg }},
     //             reset {{ gate.rst_field }} on {{ gate.rst_reg }}
-    p.PRCM.{{ gate.clk_en_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_en_field }}().set_bit());
+    p.prcm.{{ gate.clk_en_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_en_field }}().set_bit());
     // Stage the gate change: pulse CLKLOADCTL.LOAD and wait for LOAD_DONE.
-    p.PRCM.clkloadctl().modify(|_, w| w.load().set_bit());
-    while p.PRCM.clkloadctl().read().load_done().bit_is_clear() {}
+    p.prcm.clkloadctl().modify(|_, w| w.load().set_bit());
+    while p.prcm.clkloadctl().read().load_done().bit_is_clear() {}
     // Release the peripheral from reset (clear bit deasserts reset).
-    p.PRCM.{{ gate.rst_reg | pac_path }}.modify(|_, w| w.{{ gate.rst_field }}().clear_bit());
+    p.prcm.{{ gate.rst_reg | pac_path }}.modify(|_, w| w.{{ gate.rst_field }}().clear_bit());
     {% else %}
     // {{ name }}: no prcm entry in chip IR (TODO — populate chipdb yaml)
     {% endif %}

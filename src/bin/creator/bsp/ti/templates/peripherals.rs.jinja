@@ -7,9 +7,11 @@
 //! see the Espressif `peripherals.rs.jinja` for the precedent shape.
 //!
 //! All access goes through the `{{ ir.chip.pac_crate }}` PAC's
-//! `Peripherals::steal()` handle, with uppercase instance access
-//! (`p.UART0.fbrd()`, `p.I2C0.mcr()`, etc.) per the
-//! "Peripheral instance access style" rule frozen in CHIPS-TI-00 §3.
+//! `Peripherals::steal()` handle, with lowercase instance access
+//! (`p.uart0.fbrd()`, `p.i2c0.mcr()`, etc.) per the
+//! "Peripheral instance access style" rule frozen in CHIPS-TI-00 §3
+//! as amended on 2026-05-13 (§15) to match `cc13x2_26x2_pac 0.10`'s
+//! pre-uppercase svd2rust output.
 
 use {{ ir.chip.pac_crate }} as pac;
 
@@ -41,18 +43,18 @@ pub fn init_uart0() {
     let p = unsafe { pac::Peripherals::steal() };
     const BAUD: u32 = {{ ir.board.console.baud }};
     // Disable UART before reconfiguring (CTL.UARTEN = 0).
-    p.UART0.ctl().modify(|_, w| w.uarten().clear_bit());
+    p.uart0.ctl().modify(|_, w| w.uarten().clear_bit());
     // Baud-rate divisor: BRD = APB_HZ / (16 * BAUD). Compute scaled by 64
     // so we can split IBRD (integer) and FBRD (6-bit fractional) cleanly.
     let brd64: u32 = (APB_HZ * 4) / BAUD;       // == BRD * 64
     let ibrd: u32 = brd64 >> 6;
     let fbrd: u32 = brd64 & 0x3F;
-    p.UART0.ibrd().write(|w| unsafe { w.bits(ibrd) });
-    p.UART0.fbrd().write(|w| unsafe { w.bits(fbrd) });
+    p.uart0.ibrd().write(|w| unsafe { w.bits(ibrd) });
+    p.uart0.fbrd().write(|w| unsafe { w.bits(fbrd) });
     // Line control: 8 data bits, no parity, 1 stop, FIFOs enabled.
-    p.UART0.lcrh().write(|w| unsafe { w.bits((0b11 << 5) | (1 << 4)) });
+    p.uart0.lcrh().write(|w| unsafe { w.bits((0b11 << 5) | (1 << 4)) });
     // Enable UART, TX, RX (CTL.UARTEN | CTL.TXE | CTL.RXE).
-    p.UART0.ctl().modify(|_, w| {
+    p.uart0.ctl().modify(|_, w| {
         w.uarten().set_bit().txe().set_bit().rxe().set_bit()
     });
 }
