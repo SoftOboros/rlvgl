@@ -222,19 +222,17 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,r
 # CHIPS-SILABS-00 §11 (deferred to -05). The opt-in compile-verify test
 # (CHIPS-SILABS-04) materialises a throwaway cargo project around the
 # generated BSP and runs `cargo check --target thumbv7em-none-eabihf`
-# against efm32gg11b-pac 0.1.4. SKU-flatten amendment (-02 of
-# 2026-05-13) resolved 5×E0433. Field-style amendment (-02b of
-# 2026-05-13) dropped errors 102 → 11 by converting register-block
-# access from method-style to field-direct. Currently expected to FAIL
-# until two residual orthogonal divergences are amended: (a) -01c
-# chipdb fix — `system_gates.gpio.clk_en_reg` is `cmu.hfperclken0` in
-# chip yaml but PAC routes GPIO clock-gate through
-# `cmu.hfbusclken0.gpio` bit 5; (b) -02c template fix — io_mux MODEH
-# branch shifts pin index by -8 but PAC uses absolute `mode8..mode15`
-# field names on the MODEH writer.
+# against efm32gg11b-pac 0.1.4. Four amendments landed: -02 of
+# 2026-05-13 (SKU-flatten in pac.rs) resolved 5×E0433. -02b of
+# 2026-05-13 (field-style register access in clocks/io_mux/peripherals)
+# dropped errors 102 → 11. -01c of 2026-05-14 (chipdb yaml: GPIO
+# clock-gate routed through `cmu.hfbusclken0.gpio` to match PAC, not
+# RM's `hfperclken0`). -02c of 2026-05-14 (io_mux MODEH branch emits
+# absolute `mode{N}` not relative `mode{N-8}` to match PAC's writer
+# field names). Compile-verify gate now PASSES end-to-end.
 RUSTFLAGS="" cargo test -p rlvgl-chips-silabs
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_render --features creator,regression
-# RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile --features compile-verify -- --test-threads=1
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.7d: Texas Instruments BSP generator (CHIPS-TI-NN). Render
 # test covers the 8-file emission set (6 .rs + memory.x + cc1352_r.x)
