@@ -1,0 +1,34 @@
+//! Top-level PAC-style bring-up entry for LAUNCHXL-CC1352R1.
+//!
+//! Call [`init`] once from your application reset handler before touching
+//! any peripheral. It performs the following in order:
+//!
+//! 1. [`super::clocks::init`] — ungate peripheral clocks via the SimpleLink
+//!    Power, Reset and Clock Module (PRCM) and release each used peripheral
+//!    from reset. See TI SWCU185 §4 (PRCM).
+//! 2. [`super::io_mux::init`] — route each board pin via the IO Controller
+//!    (IOC) per the `db/boards/launchxl_cc1352_r1.yaml` pin table. SimpleLink
+//!    uses a single-stage IOC PORT_CFG write per DIO; there is no GPIO
+//!    matrix second stage (cite CHIPS-TI-00 §10.3). See TI SWCU185 §11
+//!    (IO Controller).
+//! 3. [`super::peripherals::init`] — per-peripheral init (UART0 real when
+//!    it is the console, others stubbed).
+//!
+//! The generated code uses the `cc13x2_26x2_pac` PAC crate
+//! (`^0.10`) for all register
+//! access; add it as a dependency of the consuming crate. Sibling references
+//! use `super::` so this module can be either a crate root (when consumed
+//! directly) or a child module of the host crate.
+
+#[allow(unused_imports)]
+pub use cc13x2_26x2_pac as pac;
+
+/// Bring up the board.
+///
+/// Safety: must be called exactly once from a single-threaded reset handler
+/// before any other code touches `cc13x2_26x2_pac::Peripherals`.
+pub fn init() {
+    super::clocks::init();
+    super::io_mux::init();
+    super::peripherals::init();
+}

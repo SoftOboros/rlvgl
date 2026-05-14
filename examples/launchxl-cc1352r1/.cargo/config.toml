@@ -1,0 +1,17 @@
+# CHIPS-TI-06 v0 cargo configuration for the LAUNCHXL-CC1352R1 example.
+#
+# Per CHIPS-TI-05 §5.5 the linker-arg sequence is `-Tmemory.x` +
+# `-T<chip_stem>.x` + `-Tlink.x`. The first two are passed by
+# `build.rs` via `cargo:rustc-link-arg` after copying the linker
+# fragments from `src/bsp_generated/launchxl_cc1352_r1/` into OUT_DIR;
+# `-Tlink.x` (the cortex-m-rt-shipped link script) is passed here. The
+# accumulation order rustc sees is: build.rs args first, then rustflags
+# args — which lands the fragments BEFORE link.x as required.
+
+[build]
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+]
