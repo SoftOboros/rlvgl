@@ -1,0 +1,38 @@
+//! Top-level PAC-style bring-up entry for SLSTK3701A.
+//!
+//! Call [`init`] once from your application reset handler before
+//! touching any peripheral. It performs the following in order:
+//!
+//! 1. [`super::clocks::init`] — ungate the CMU clock-gate bits for the
+//!    peripherals this board uses.
+//! 2. [`super::io_mux::init`] — drive each board pin's GPIO mode bits
+//!    and (for peripheral-owned pins) write the per-peripheral
+//!    ROUTELOC + ROUTEPEN registers per the
+//!    `db/boards/slstk3701_a.yaml` pin table.
+//! 3. [`super::peripherals::init`] — per-peripheral init (USART/LEUART
+//!    console real when configured, others stubbed).
+//!
+//! The generated code uses the `efm32gg11b-pac` PAC crate
+//! pinned to `0.1.4` for all register access; add it as a dependency
+//! of the consuming crate. Sibling references use `super::` so this
+//! module can be either a crate root (when consumed directly) or a
+//! child module of the host crate.
+
+// `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
+// a `efm32gg11b820` sub-module rather than re-exporting
+// it at the crate root, so the `pac` alias resolves to the SKU module
+// here (not the crate root) and `pac::Peripherals::steal()` continues
+// to resolve at the BSP's call sites.
+#[allow(unused_imports)]
+pub use efm32gg11b_pac::efm32gg11b820 as pac;
+
+/// Bring up the board.
+///
+/// Safety: must be called exactly once from a single-threaded reset
+/// handler before any other code touches
+/// `efm32gg11b_pac::Peripherals`.
+pub fn init() {
+    super::clocks::init();
+    super::io_mux::init();
+    super::peripherals::init();
+}

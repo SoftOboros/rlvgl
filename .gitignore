@@ -30,3 +30,5 @@ i18n/translations.bin
 release/
 examples/esp32-devkits-r/target/
 examples/esp32-devkits-r/Cargo.lock
+examples/slstk3701a/target/
+examples/slstk3701a/Cargo.lock
