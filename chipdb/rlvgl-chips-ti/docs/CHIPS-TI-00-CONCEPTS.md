@@ -891,3 +891,12 @@ chapter. The BBB initiative continues independently per §10.1.
   the next slate. Sister initiatives `CHIPS-SILABS-02b` and the
   Microchip post-promotion path remain on independent parallel
   workers.
+
+### 2026-05-14 — CHIPS-TI-05 ratified
+
+Linker emission chapter ratified at
+[`chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md`](CHIPS-TI-05-LINKER.md). Closes the §11
+deferral. The 8-file emission set (6 .rs + memory.x + cc1352_r.x)
+that has shipped since slates 4-5 is now backed by a normative
+spec; future linker-script behaviour changes route through CHIPS-TI-05's
+§15 amendment process.
