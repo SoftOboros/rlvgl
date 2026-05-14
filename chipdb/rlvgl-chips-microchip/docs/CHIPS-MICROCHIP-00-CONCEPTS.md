@@ -708,6 +708,16 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-14 — CHIPS-MICROCHIP-06b SERCOM USART hello-world shipped.**
+  `examples/feather-m4-express/src/bsp_pac_main.rs` now sends "hello\r\n"
+  over the Feather header SERCOM USART before entering the slate-11
+  LED toggle loop. Validates the slate-6 `-02` field-style amendment
+  end-to-end: the generated `peripherals::init()` configures the SERCOM5
+  clock + baud + ctrla/ctrlb, and consumer code can poll INTFLAG.DRE +
+  write DATA successfully. The `usart_int()` mode-union method
+  accessor was confirmed as the right path. rlvgl widget tree deferred
+  to -06c.
+
 - **2026-05-14 — CHIPS-MICROCHIP-06a LED blink shipped.**
   `examples/feather-m4-express/src/bsp_pac_main.rs` now drives PA23
   (LED) in a busy-wait toggle loop using `cortex_m::asm::delay` for
