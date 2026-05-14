@@ -708,6 +708,15 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-14 — CHIPS-MICROCHIP-06 ratified and v0 scaffold landed.**
+  Example crate chapter ratified at
+  [`CHIPS-MICROCHIP-06-EXAMPLE.md`](CHIPS-MICROCHIP-06-EXAMPLE.md) and
+  v0 scaffold shipped at `examples/feather-m4-express/`. The `bsp_pac`
+  feature path consumes the slate-9 BSP output (8-file emission set) and
+  links against the slate-9 linker scripts. `cargo check --target
+  thumbv7em-none-eabihf` passes; LED blink + UART hello-world deferred
+  to -06a / -06b.
+
 - **2026-05-14 — CHIPS-MICROCHIP-05 ratified and implemented.**
   Linker emission chapter ratified at
   [`CHIPS-MICROCHIP-05-LINKER.md`](CHIPS-MICROCHIP-05-LINKER.md) and
