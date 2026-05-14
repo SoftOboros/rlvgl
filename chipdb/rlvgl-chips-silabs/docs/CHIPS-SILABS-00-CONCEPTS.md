@@ -1057,3 +1057,22 @@ Ratifying this chapter unblocks:
     --features compile-verify -- --test-threads=1` — **still FAILS**
     on the two residual divergences above (11×E0599). Up from
     fully-broken (102 errors) to within reach of a one-shot fix.
+
+### 2026-05-14 — SILABS-01c + -02c bundled amendments — compile-verify gate green
+
+**-01c (chip yaml)**: `system_gates.gpio.clk_en_reg` corrected from
+`cmu.hfperclken0` to `cmu.hfbusclken0` with field `gpio` at bit 5.
+The EFM32GG11B Reference Manual and `efm32gg11b-pac 0.1.4` disagree
+on GPIO clock-gate routing; PAC wins because compile-verify type-checks
+against the actual PAC.
+
+**-02c (template)**: io_mux template's MODEH branch no longer shifts
+pin index by -8. The PAC exposes MODEH writer fields as absolute
+`mode8`..`mode15` (matching the pin index), not relative `mode0`..`mode7`.
+MODEL branch was correct as-is.
+
+`bsp_silabs_slstk3701a_compile` test gate (CHIPS-SILABS-04) now
+PASSES end-to-end. All three chipdb compile-verify gates (MICROCHIP,
+TI, SILABS) are now green.
+
+Snapshots re-blessed; render test (CHIPS-SILABS-03) green.

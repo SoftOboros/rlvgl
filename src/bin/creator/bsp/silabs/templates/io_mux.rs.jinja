@@ -46,8 +46,12 @@ pub fn init() {
     // P{{ pin.port }}{{ pin.pin }} — {{ pin.signal }}{% if pin.peripheral %} ({{ pin.peripheral }}){% endif %}
     {% set port_lower = pin.port | lower %}
     {% set mode_reg = "p" ~ port_lower ~ "_mode" ~ ("h" if pin.pin >= 8 else "l") %}
-    {% set mode_idx = (pin.pin - 8) if pin.pin >= 8 else pin.pin %}
-    {% set mode_field = "mode" ~ mode_idx %}
+    {# `efm32gg11b-pac 0.1.4` names MODEH writer fields with absolute pin
+       indices (`mode8`..`mode15`), NOT relative `mode0`..`mode7`. MODEL
+       branch (pins 0-7) is already aligned (`mode0`..`mode7`). The
+       earlier (pin.pin - 8) shift on MODEH was wrong and produced
+       compile errors against the PAC. (CHIPS-SILABS-02c) #}
+    {% set mode_field = "mode" ~ pin.pin %}
     {% if pin.direction == "in" %}
     // Input{% if pin.pull == "up" %} with pull-up{% elif pin.pull == "down" %} with pull-down{% endif %}
     p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits({% if pin.pull %}0b1000{% else %}0b0001{% endif %}) });
