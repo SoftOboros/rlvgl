@@ -17,9 +17,19 @@
 //!    the full BSP integration end-to-end (CMU `HFBUSCLKEN0.GPIO`
 //!    from `clocks::init`, the slate-8 absolute-pin-index `mode10`
 //!    field on `ph_modeh` from `io_mux::init`, and a live GPIO
-//!    `ph_doutset`/`ph_doutclr` write from this entry point). UART
-//!    hello-world is deferred to CHIPS-SILABS-06b; rlvgl widget tree
-//!    to CHIPS-SILABS-06c.
+//!    `ph_doutset`/`ph_doutclr` write from this entry point).
+//! 5. CHIPS-SILABS-06b — before entering the LED toggle loop the reset
+//!    handler now also sends `"hello\r\n"` over USART4 VCOM (PH4 TX,
+//!    routed through the FTDI bridge that is gated by PE1 =
+//!    VCOM_ENABLE, which `io_mux::init` already drives HIGH per the
+//!    board YAML `initial: high` annotation). This validates the
+//!    slate-6 `-02b` field-style amendment end-to-end: `clkdiv`,
+//!    `frame`, `cmd`, `routeloc0`, `routepen`, `status`, and `txdata`
+//!    on the pinned `efm32gg11b-pac 0.1.4` are all direct `#[repr(C)]`
+//!    struct fields, not method accessors, and the generated
+//!    `peripherals::init_usart4` plus our send loop here both consume
+//!    them in that form. rlvgl widget tree is deferred to
+//!    CHIPS-SILABS-06c.
 //!
 //! The example crate also exercises the linker scripts emitted by
 //! CHIPS-SILABS-05a (`memory.x` + `efm32_gg11.x`), wired in via
@@ -37,26 +47,57 @@ use panic_halt as _;
 #[cfg(feature = "bsp_pac")]
 mod bsp_generated;
 
+#[cfg(feature = "bsp_pac")]
+use efm32gg11b_pac::efm32gg11b820 as pac;
+
+/// Block until USART4's TX buffer level reports "empty" (ready for a
+/// new byte), then push `b` into TXDATA.
+///
+/// `STATUS.TXBL` is a single-bit reader on the pinned
+/// `efm32gg11b-pac 0.1.4` (bit 6 of STATUS): `1` = TX buffer has room.
+/// `TXDATA.TXDATA` is an 8-bit FieldWriter at offset 0 of a u32
+/// register, so `w.txdata().bits(b)` is the canonical write — the
+/// reserved upper bits stay zero.
+#[cfg(feature = "bsp_pac")]
+fn usart4_tx_byte(p: &pac::Peripherals, b: u8) {
+    while p.USART4.status.read().txbl().bit_is_clear() {}
+    p.USART4
+        .txdata
+        .write(|w| unsafe { w.txdata().bits(b) });
+}
+
 #[entry]
 fn main() -> ! {
     #[cfg(feature = "bsp_pac")]
     {
         // Bring up CMU clock gates, GPIO MODE bits + ROUTELOC routing,
-        // and per-peripheral init. `io_mux::init` already drives PH10
-        // as push-pull output with DOUT initialised HIGH (LEDs on this
-        // board are active-LOW, so the LED starts off).
+        // and per-peripheral init. After this:
+        //   • PH10 is push-pull output with DOUT high (LED0_R off,
+        //     active-low).
+        //   • PE1 (VCOM_ENABLE) is push-pull output with DOUT high so
+        //     the FTDI level translator passes USART4 TX through to
+        //     the host VCOM port — see `io_mux.rs` line for PE1.
+        //   • USART4 is configured for 115200-8N1 async UART with
+        //     ROUTELOC0 = 4 (PH4 TX / PH5 RX) and TX+RX enabled
+        //     via `CMD.TXEN | CMD.RXEN` — see `peripherals.rs`
+        //     `init_usart4`.
         bsp_generated::slstk3701_a::pac::init();
 
-        // CHIPS-SILABS-06a — busy-wait toggle on PH10 (LED0_R).
+        // CHIPS-SILABS-06b — send "hello\r\n" over USART4 VCOM.
         //
-        // The slate-6 SKU-flatten amendment puts the `Peripherals`
-        // type under the per-SKU sub-module, so the path is
+        // The slate-6 SKU-flatten amendment puts `Peripherals` under
+        // the per-SKU sub-module, so the path is
         // `efm32gg11b_pac::efm32gg11b820::Peripherals::steal()`.
         // The pinned `efm32gg11b-pac 0.1.4` is the pre-method-accessor
-        // svd2rust era — register fields are direct `#[repr(C)]`
-        // struct members (`p.GPIO.ph_douttgl`, not `p.GPIO.ph_douttgl()`).
-        // The slate-8 -02c amendment uses absolute pin-index field
-        // naming on MODEH writers (`mode10` for PH10, not `mode2`).
+        // svd2rust era — `p.USART4.status` / `p.USART4.txdata` are
+        // direct `#[repr(C)]` struct members, not `p.USART4.status()`.
+        let p = unsafe { pac::Peripherals::steal() };
+
+        for &b in b"hello\r\n" {
+            usart4_tx_byte(&p, b);
+        }
+
+        // CHIPS-SILABS-06a — busy-wait toggle on PH10 (LED0_R).
         //
         // This PAC vintage exposes `Px_DOUT` (level) and `Px_DOUTTGL`
         // (atomic XOR) but does not expose the separate `DOUTSET` /
@@ -64,8 +105,6 @@ fn main() -> ! {
         // primitive for a busy-wait blink: one write atomically XORs
         // the bit, so there is no read-modify-write race against
         // adjacent LED pins on the same port.
-        let p = unsafe { efm32gg11b_pac::efm32gg11b820::Peripherals::steal() };
-
         loop {
             // Atomic XOR of PH10 — toggles LED0_R on/off each pass.
             // Active-LOW per the SLSTK3701A schematic; io_mux::init

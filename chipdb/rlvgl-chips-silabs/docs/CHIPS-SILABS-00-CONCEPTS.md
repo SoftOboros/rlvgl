@@ -1110,3 +1110,13 @@ adjacent LED bits on Port H. LEDs are active-LOW on this board;
 `io_mux::init` initialises PH10's DOUT high (LED off) so the first
 toggle turns it on. UART hello-world deferred to -06b; rlvgl widget
 tree deferred to -06c.
+
+### 2026-05-14 — CHIPS-SILABS-06b USART4 hello-world shipped
+
+`examples/slstk3701a/src/bsp_pac_main.rs` now sends "hello\r\n" over
+USART4 VCOM (PH4 TX through FTDI level translator gated by
+PE1=VCOM_ENABLE) before entering the slate-11 LED toggle loop.
+Validates the slate-6 `-02b` field-style amendment end-to-end:
+the generated peripherals::init() configures USART4 clock + baud +
+ROUTELOC, and consumer code can poll STATUS.TXBL + write TXDATA
+successfully. rlvgl widget tree deferred to -06c.
