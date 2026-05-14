@@ -910,3 +910,25 @@ consumes the slate-9 BSP output (8-file emission set) and links
 against the slate-9 linker scripts. `cargo check --target
 thumbv7em-none-eabihf` passes; LED blink + UART hello-world deferred
 to -06a / -06b.
+
+### 2026-05-14 — CHIPS-TI-06a LED blink shipped
+
+`examples/launchxl-cc1352r1/src/bsp_pac_main.rs` now drives DIO_6
+(LED_RED) in a busy-wait toggle loop using cortex_m::asm::delay for
+timing. Validates the slate-10 BSP integration end-to-end: clocks +
+io_mux + peripherals init + a real GPIO write succeeds against the
+slate-9 linker scripts. UART hello-world deferred to -06b; rlvgl
+widget tree deferred to -06c.
+
+The slate-9 `io_mux::init()` already routes DIO_6 to plain GPIO
+(IOC.IOCFG6 port_id=0x00) and sets DOE31_0 bit 6, so main only flips
+DOUTSET31_0 / DOUTCLR31_0 via the per-DIO bit-field writers
+(`p.gpio.doutset31_0().write(|w| w.dio6().set_bit())`). The PAC
+import path is `use cc13x2_26x2_pac as pac;` at the binary scope;
+re-using the generator's `pac.rs` module would have required a
+double-segment `pac::pac::Peripherals` path because pac.rs itself
+performs `pub use cc13x2_26x2_pac as pac;`. Direct PAC import is
+simpler and matches the chipdb yaml's `cc13x2_26x2_pac` declaration.
+
+`cargo check --manifest-path examples/launchxl-cc1352r1/Cargo.toml
+--target thumbv7em-none-eabihf` passes.
