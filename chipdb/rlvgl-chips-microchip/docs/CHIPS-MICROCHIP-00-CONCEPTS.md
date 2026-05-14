@@ -708,6 +708,13 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-14 — CHIPS-MICROCHIP-05 ratified and implemented.**
+  Linker emission chapter ratified at
+  [`CHIPS-MICROCHIP-05-LINKER.md`](CHIPS-MICROCHIP-05-LINKER.md) and
+  implemented via the addition of `atsamd51j19a.x.jinja` alongside the
+  already-shipping `memory.x.jinja`. File emission set grew from 7 to
+  8 files, reaching parity with the TI BSP. Closes the §11 deferral.
+
 - **2026-05-13 — MICROCHIP-02 amendment.**
   `src/bin/creator/bsp/microchip/templates/` `clocks.rs.jinja`,
   `io_mux.rs.jinja`, and `peripherals.rs.jinja` now emit
