@@ -708,6 +708,14 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-14 — CHIPS-MICROCHIP-06a LED blink shipped.**
+  `examples/feather-m4-express/src/bsp_pac_main.rs` now drives PA23
+  (LED) in a busy-wait toggle loop using `cortex_m::asm::delay` for
+  timing. Validates the slate-10 BSP integration end-to-end: clocks
+  (MCLK APBAMASK PORT) + io_mux (PA23 direction) + a real GPIO write
+  succeeds. UART hello-world deferred to -06b; rlvgl widget tree
+  deferred to -06c.
+
 - **2026-05-14 — CHIPS-MICROCHIP-06 ratified and v0 scaffold landed.**
   Example crate chapter ratified at
   [`CHIPS-MICROCHIP-06-EXAMPLE.md`](CHIPS-MICROCHIP-06-EXAMPLE.md) and
