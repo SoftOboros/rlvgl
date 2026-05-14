@@ -144,16 +144,18 @@ the convention in [`CHIPS-MICROCHIP-00`](CHIPS-MICROCHIP-00-CONCEPTS.md)
   this chapter `bsp_pac` is the **only** feature; it is also the
   `default` feature so a bare `cargo check` exercises the bring-up
   path.
-- **`board::init()` entry** — *As emitted by
+- **`init()` entry** — *As emitted by
   [`src/bin/creator/bsp/microchip/templates/pac.rs.jinja`](../../../src/bin/creator/bsp/microchip/templates/pac.rs.jinja)
   via `pub use pac::init` in the generator's `mod.rs.jinja`; used
   without modification.* The single-call bring-up entry. Internally
   it calls `super::clocks::init()` → `super::io_mux::init()` →
   `super::peripherals::init()` (per the generator's `pac.rs.jinja`).
-  v0 of this chapter MUST invoke `bsp_generated::init()` (or the
-  re-exported `bsp_generated::adafruit_feather_m4_express::board::init()`
-  path; the precise access path depends on the host `mod.rs`
-  shape — see §5.3 below) before the `loop { wfi() }` idle.
+  v0 of this chapter MUST invoke
+  `bsp_generated::adafruit_feather_m4_express::init()` before the
+  `loop { wfi() }` idle. The `init` function is re-exported at the
+  generator's `adafruit_feather_m4_express/mod.rs` root (via
+  `pub use pac::init`); the host `bsp_generated/mod.rs` does NOT
+  shadow this re-export.
 - **LED pin** — *As defined in
   [`chipdb/rlvgl-chips-microchip/db/boards/adafruit_feather_m4_express.yaml`](../db/boards/adafruit_feather_m4_express.yaml)
   (`pins:` array, `{ pad: PA23, signal: LED, direction: out,
@@ -290,7 +292,7 @@ mod bsp_generated;
 fn main() -> ! {
     #[cfg(feature = "bsp_pac")]
     {
-        bsp_generated::adafruit_feather_m4_express::board::init();
+        bsp_generated::adafruit_feather_m4_express::init();
     }
     loop {
         cortex_m::asm::wfi();
@@ -300,17 +302,14 @@ fn main() -> ! {
 
 Notes:
 
-1. `bsp_generated::adafruit_feather_m4_express::board::init()` is
-   the through-the-host-module-index access path. The host
-   `mod.rs` (§5.5) re-exports the generator's child directory
-   under its snake_case stem; calling `board::init()` invokes
-   the generated `pub fn init() { clocks::init(); io_mux::init();
-   peripherals::init(); }` from `board.rs`. NOTE: the generator
-   currently exposes `init` at the `pac` module path
-   (`pub use pac::init` in `mod.rs.jinja`); the host module index
-   MAY shadow this with a more ergonomic re-export — either path
-   is acceptable as long as the v0 call site invokes board
-   bring-up exactly once.
+1. `bsp_generated::adafruit_feather_m4_express::init()` is the
+   through-the-host-module-index access path. The host `mod.rs`
+   (§5.5) re-exports the generator's child directory under its
+   snake_case stem; the generator's
+   `adafruit_feather_m4_express/mod.rs` carries `pub use pac::init`
+   which re-exports the `pub fn init()` from `pac.rs`. That `init`
+   internally chains `clocks::init -> io_mux::init ->
+   peripherals::init`.
 2. The `#[cfg(feature = "bsp_pac")]` gates exist to preserve the
    future-proofing for an additional feature without forcing a
    re-write of `main.rs` when that feature lands. When the only
@@ -360,8 +359,8 @@ regeneration).
 The flatten-vs-nest decision is **Specification Required** to
 amend — switching to a flatten layout requires updating both this
 section and the §5.4 access path
-(`bsp_generated::adafruit_feather_m4_express::board::init()` →
-`bsp_generated::board::init()`).
+(`bsp_generated::adafruit_feather_m4_express::init()` →
+`bsp_generated::init()`).
 
 ### 5.6 Panic strategy — Standards Action
 
@@ -706,7 +705,7 @@ This chapter is ratified (§15 entry dated) when:
 - [x] §5.3 feature matrix frozen at single `bsp_pac` feature
       (default).
 - [x] §5.4 binary entry-point shape frozen; access path
-      `bsp_generated::adafruit_feather_m4_express::board::init()`
+      `bsp_generated::adafruit_feather_m4_express::init()`
       explicit.
 - [x] §5.5 host `bsp_generated/mod.rs` index shape frozen.
 - [x] §5.6 panic strategy frozen at `panic-halt 0.2`.
