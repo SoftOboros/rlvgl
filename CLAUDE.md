@@ -268,6 +268,19 @@ RUSTFLAGS="" cargo test -p rlvgl-chips-microchip
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_render --features creator,regression
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_microchip_compile --features compile-verify -- --test-threads=1
 
+# Phase 4.9: CHIPS-* example crates (CHIPS-{TI,SILABS,MICROCHIP}-06 of
+# 2026-05-14). Each vendor ships a standalone bsp_pac example crate
+# under `examples/<board>/` that consumes the slate-9 generator output
+# (8-file emission) and links against the slate-9 linker scripts.
+# Crates are detached from the workspace via empty `[workspace]`
+# stanzas (matching the uefi-disco / disco-demo-states precedent), so
+# they're checked via --manifest-path rather than `-p`. v0 scope is
+# "binary links + board::init() returns"; LED blink / UART / rlvgl
+# deferred to -06a/-06b/-06c per each vendor's CHIPS-*-06 §11.
+RUSTFLAGS="" cargo check --manifest-path examples/launchxl-cc1352r1/Cargo.toml --target thumbv7em-none-eabihf
+RUSTFLAGS="" cargo check --manifest-path examples/slstk3701a/Cargo.toml --target thumbv7em-none-eabihf
+RUSTFLAGS="" cargo check --manifest-path examples/feather-m4-express/Cargo.toml --target thumbv7em-none-eabihf
+
 # Phase 5: docs
 RUSTFLAGS="" cargo doc --workspace --no-deps
 
