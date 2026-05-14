@@ -218,8 +218,9 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32h2_render --features creator,re
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,regression
 
 # Phase 4.7c: Silicon Labs BSP generator (CHIPS-SILABS-NN). Render test
-# covers the 6-file emission set for SLSTK3701A; no linker emission per
-# CHIPS-SILABS-00 §11 (deferred to -05). The opt-in compile-verify test
+# covers the 8-file emission set (6 .rs + memory.x + efm32_gg11.x) for
+# SLSTK3701A after CHIPS-SILABS-05 of 2026-05-14 ratified and shipped
+# the linker emission per CHIPS-SILABS-00 §11. The opt-in compile-verify test
 # (CHIPS-SILABS-04) materialises a throwaway cargo project around the
 # generated BSP and runs `cargo check --target thumbv7em-none-eabihf`
 # against efm32gg11b-pac 0.1.4. Four amendments landed: -02 of
@@ -236,7 +237,9 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile --features
 
 # Phase 4.7d: Texas Instruments BSP generator (CHIPS-TI-NN). Render
 # test covers the 8-file emission set (6 .rs + memory.x + cc1352_r.x)
-# for LAUNCHXL-CC1352R1. The opt-in compile-verify test (CHIPS-TI-01d)
+# for LAUNCHXL-CC1352R1; CHIPS-TI-05 of 2026-05-14 ratified the
+# already-shipping linker emission per CHIPS-TI-00 §11. The opt-in
+# compile-verify test (CHIPS-TI-01d)
 # runs `cargo check --target thumbv7em-none-eabihf` against
 # cc13x2_26x2_pac 0.10.3. Lowercase-peripheral amendment (-01b of
 # 2026-05-13) lowercased `p.PRCM` / `p.IOC` / `p.GPIO` / `p.UART0`
@@ -250,8 +253,11 @@ RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_render --features creator
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_ti_cc1352r_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.8: Microchip BSP generator (CHIPS-MICROCHIP-NN). Render test
-# covers the 7-file emission set (6 .rs + memory.x) for the Adafruit
-# Feather M4 Express. PB22/PB23 chip-yaml correction (CHIPS-MICROCHIP-01a
+# covers the 8-file emission set (6 .rs + memory.x + atsamd51j19a.x)
+# for the Adafruit Feather M4 Express after CHIPS-MICROCHIP-05 of
+# 2026-05-14 ratified the linker chapter and added the per-chip
+# include alongside the already-shipping memory.x per
+# CHIPS-MICROCHIP-00 §11. PB22/PB23 chip-yaml correction (CHIPS-MICROCHIP-01a
 # of 2026-05-13) replaced the MISMATCH fallback comments with real
 # SERCOM1_PAD2/PAD3 PMUX writes. Field-style template amendment
 # (CHIPS-MICROCHIP-02 of 2026-05-13) switched `p.MCLK.apbamask` /
