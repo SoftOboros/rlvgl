@@ -12,20 +12,23 @@
 //!    `pac.rs`) brings up SimpleLink PRCM clocks, IOC pin routing, and
 //!    per-peripheral init (UART0 console real, others stubbed).
 //! 4. This `main` calls [`bsp_generated::launchxl_cc1352_r1::init`] as
-//!    its first action, then drives DIO_6 (LED_RED) in a busy-wait toggle
-//!    loop using `cortex_m::asm::delay` for timing.
+//!    its first action, then sends "hello\r\n" over UART0 (XDS110 VCOM
+//!    bridge) and drops into the slate-11 LED toggle loop on DIO_6.
 //!
 //! v0 scope per CHIPS-TI-06 §9 proved that `init()` returned and the
-//! binary linked. CHIPS-TI-06a (this slate) extends that with a real
-//! GPIO write — DIO_6 LED_RED toggles — to validate that PRCM clock
-//! gating, IOC PORT_CFG routing, and GPIO DOE setup line up against the
-//! real `cc13x2_26x2_pac` PAC on hardware. UART hello-world remains
-//! deferred to -06b; rlvgl widget tree deferred to -06c. See
+//! binary linked. CHIPS-TI-06a extended that with a real GPIO write on
+//! DIO_6. CHIPS-TI-06b (this slate) adds a UART0 hello-world to validate
+//! the slate-7 `-01e` `clk_en` enum FieldWriter amendment end-to-end:
+//! `peripherals::init()` turns on the UART0 clock gate using
+//! `ClkEn::Uart0`, the IOC routes DIO_2 (UART0_RX, `port_id=8`) and
+//! DIO_3 (UART0_TX, `port_id=7`), and this `main` polls `FR.TXFF` and
+//! writes `DR.DATA` to push each byte through the XDS110 VCOM bridge.
+//! rlvgl widget tree remains deferred to -06c. See
 //! [`chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md`].
 //!
 //! The LED pin is `board::LED_RED == DIO_6`. The slate-9
 //! `io_mux::init()` already writes `IOC.IOCFG6 = port_id(0x00 GPIO)` and
-//! `GPIO.DOE31_0 |= 1 << 6`, so this main only needs to flip
+//! `GPIO.DOE31_0 |= 1 << 6`, so the LED loop only needs to flip
 //! `DOUTSET31_0` / `DOUTCLR31_0` to drive the line.
 
 #![no_std]
@@ -40,6 +43,23 @@ use cc13x2_26x2_pac as pac;
 #[cfg(feature = "bsp_pac")]
 mod bsp_generated;
 
+/// Push one byte through UART0, blocking while the TX FIFO is full.
+///
+/// SimpleLink UART (TI SWCU185 §23) exposes a PrimeCell-style flag
+/// register at `FR`. Bit 5 (`TXFF`) is set when the TX FIFO has no room
+/// for another byte, so we spin until it clears before writing `DR.DATA`
+/// (bits 7:0). The `cc13x2_26x2_pac` 0.10.3 PAC exposes `txff()` as a
+/// `BitReader` and `data()` as a `FieldWriter<DR, 8>`, so the byte is
+/// stuffed via `w.data().bits(b)` (unsafe — the field accepts the full
+/// 0..=0xFF range, which exactly matches a `u8`).
+#[cfg(feature = "bsp_pac")]
+fn uart0_tx(p: &pac::Peripherals, b: u8) {
+    while p.uart0.fr().read().txff().bit_is_set() {}
+    p.uart0
+        .dr()
+        .write(|w| unsafe { w.data().bits(b) });
+}
+
 #[entry]
 fn main() -> ! {
     // First action: bring up the BSP. Per CHIPS-TI-06 §5.5 frozen v0
@@ -53,6 +73,14 @@ fn main() -> ! {
         // single-threaded with interrupts disabled at this point and
         // never aliased PAC reference is leaked to ISRs.
         let p = unsafe { pac::Peripherals::steal() };
+
+        // Send "hello\r\n" over UART0 (DIO_3 TX / DIO_2 RX routed via
+        // the XDS110 USB→VCOM bridge — SWRU527 §2.3). `peripherals::
+        // init_uart0()` already programmed IBRD/FBRD for 115200 8N1
+        // and enabled UARTEN|TXE|RXE.
+        for &b in b"hello\r\n" {
+            uart0_tx(&p, b);
+        }
 
         // DIO_6 (LED_RED). DOE31_0 bit 6 is already set by
         // `io_mux::init()` for this pin, so the line is configured as

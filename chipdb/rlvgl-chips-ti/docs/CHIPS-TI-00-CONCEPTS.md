@@ -932,3 +932,13 @@ simpler and matches the chipdb yaml's `cc13x2_26x2_pac` declaration.
 
 `cargo check --manifest-path examples/launchxl-cc1352r1/Cargo.toml
 --target thumbv7em-none-eabihf` passes.
+
+### 2026-05-14 — CHIPS-TI-06b UART0 hello-world shipped
+
+`examples/launchxl-cc1352r1/src/bsp_pac_main.rs` now sends "hello\r\n"
+over UART0 (LAUNCHXL VCOM via XDS110 bridge) before entering the
+slate-11 LED toggle loop. Validates the slate-7 -01e `clk_en` enum
+FieldWriter amendment end-to-end: the generated peripherals::init()
+turns on the UART0 clock-gate using the `ClkEn::Uart0` variant, and
+the consumer code can then poll FR.TXFF + write DR successfully.
+rlvgl widget tree deferred to -06c.
