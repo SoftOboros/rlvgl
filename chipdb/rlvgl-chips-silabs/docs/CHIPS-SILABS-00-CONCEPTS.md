@@ -1094,3 +1094,19 @@ path consumes the slate-9 BSP output (8-file emission set) and links
 against the slate-9 linker scripts. `cargo check --target
 thumbv7em-none-eabihf` passes; LED blink + UART hello-world deferred
 to -06a / -06b.
+
+### 2026-05-14 — CHIPS-SILABS-06a LED blink shipped
+
+`examples/slstk3701a/src/bsp_pac_main.rs` now drives PH10 (LED0_R) in
+a busy-wait toggle loop using `cortex_m::asm::delay` for timing.
+Validates the slate-10 BSP integration end-to-end: clocks (CMU
+HFBUSCLKEN0 GPIO) + io_mux (PH10 push-pull, slate-8 absolute-index
+amendment) + a real GPIO write succeeds. The pinned `efm32gg11b-pac
+0.1.4` exposes `Px_DOUT` (level) and `Px_DOUTTGL` (atomic XOR) but
+not the separate `Px_DOUTSET` / `Px_DOUTCLR` register accessors, so
+the blink uses `p.GPIO.ph_douttgl.write(|w| unsafe { w.bits(1 << 10)
+})` — one atomic write per pass, no read-modify-write race against
+adjacent LED bits on Port H. LEDs are active-LOW on this board;
+`io_mux::init` initialises PH10's DOUT high (LED off) so the first
+toggle turns it on. UART hello-world deferred to -06b; rlvgl widget
+tree deferred to -06c.
