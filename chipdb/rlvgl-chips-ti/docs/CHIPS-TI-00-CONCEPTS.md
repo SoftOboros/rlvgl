@@ -900,3 +900,13 @@ deferral. The 8-file emission set (6 .rs + memory.x + cc1352_r.x)
 that has shipped since slates 4-5 is now backed by a normative
 spec; future linker-script behaviour changes route through CHIPS-TI-05's
 §15 amendment process.
+
+### 2026-05-14 — CHIPS-TI-06 ratified and v0 scaffold landed
+
+Example crate chapter ratified at
+`chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md` and v0 scaffold
+shipped at `examples/launchxl-cc1352r1/`. The `bsp_pac` feature path
+consumes the slate-9 BSP output (8-file emission set) and links
+against the slate-9 linker scripts. `cargo check --target
+thumbv7em-none-eabihf` passes; LED blink + UART hello-world deferred
+to -06a / -06b.
