@@ -1084,3 +1084,13 @@ Linker emission chapter ratified at
 implemented via two new templates (`memory.x.jinja`,
 `efm32gg11b.x.jinja`). File emission set grew from 6 to 8 files,
 reaching parity with the TI BSP. Closes the §11 deferral.
+
+### 2026-05-14 — CHIPS-SILABS-06 ratified and v0 scaffold landed
+
+Example crate chapter ratified at
+`chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md` and v0
+scaffold shipped at `examples/slstk3701a/`. The `bsp_pac` feature
+path consumes the slate-9 BSP output (8-file emission set) and links
+against the slate-9 linker scripts. `cargo check --target
+thumbv7em-none-eabihf` passes; LED blink + UART hello-world deferred
+to -06a / -06b.
