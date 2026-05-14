@@ -218,8 +218,12 @@ clock_tree:
     gpio:
       # GPIO is always-on for register access but the CMU gate is
       # still needed for input-glitch-filter clocks and asynchronous
-      # interrupt path. RM CMU §11 HFPERCLKEN0.GPIO.
-      clk_en_reg:   cmu.hfperclken0
+      # interrupt path. The EFM32GG11B Reference Manual documents the
+      # GPIO gate as CMU.HFPERCLKEN0.GPIO, but `efm32gg11b-pac 0.1.4`
+      # routes the gate through CMU.HFBUSCLKEN0.GPIO (bit 5). PAC
+      # wins because the compile-verify test type-checks against
+      # the actual PAC accessor surface. (CHIPS-SILABS-01c)
+      clk_en_reg:   cmu.hfbusclken0
       clk_en_field: gpio
       rst_reg:      null
       rst_field:    null

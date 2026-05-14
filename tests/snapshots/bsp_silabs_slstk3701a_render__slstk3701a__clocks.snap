@@ -46,8 +46,8 @@ pub fn init() {
     
     
     
-    // gpio — CMU clock enable gpio on cmu.hfperclken0
-    p.CMU.hfperclken0.modify(|_, w| w.gpio().set_bit());
+    // gpio — CMU clock enable gpio on cmu.hfbusclken0
+    p.CMU.hfbusclken0.modify(|_, w| w.gpio().set_bit());
     
     
     
