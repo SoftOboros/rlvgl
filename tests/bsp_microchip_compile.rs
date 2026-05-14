@@ -126,8 +126,10 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
     let ir = merge(chip, board).expect("merge ok");
     let render_tmp = tempfile::tempdir().expect("render tempdir");
     let written = render_microchip_pac(&ir, render_tmp.path()).expect("render ok");
-    // 6 Rust files + memory.x linker script (MICROCHIP-02 emits memory.x.jinja).
-    assert_eq!(written.len(), 7);
+    // 6 Rust files + memory.x + atsamd51j19a.x linker scripts
+    // (CHIPS-MICROCHIP-05a emits both linker fragments when the chip
+    // yaml carries a `linker:` block).
+    assert_eq!(written.len(), 8);
     let bsp_src_dir = render_tmp.path().join(rendered_subdir);
     assert!(bsp_src_dir.is_dir(), "expected {}", bsp_src_dir.display());
 
@@ -171,6 +173,7 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
             "peripherals.rs",
             "board.rs",
             "memory.x",
+            "atsamd51j19a.x",
         ] {
             if let Ok(contents) = fs::read_to_string(bsp_src_dir.join(name)) {
                 eprintln!("\n--- {name} ---\n{contents}");

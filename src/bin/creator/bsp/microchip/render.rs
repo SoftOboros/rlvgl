@@ -5,8 +5,13 @@
 //! usage helpers, then renders each of the six PAC-style templates
 //! (`mod.rs`, `pac.rs`, `clocks.rs`, `io_mux.rs`, `peripherals.rs`,
 //! `board.rs`) into `out_dir/<board_stem>/` per CHIPS-MICROCHIP-00 §6
-//! INV-MC6. A `memory.x` linker fragment is emitted alongside when the
-//! chip yaml carries a `linker:` block.
+//! INV-MC6. Two linker fragments (`memory.x` and `<chip_link_stem>.x`,
+//! concretely `atsamd51j19a.x` for ATSAMD51J19A) are emitted alongside
+//! when the chip yaml carries a `linker:` block, per CHIPS-MICROCHIP-05
+//! §5.1. The `<chip_link_stem>.x` slot is intentionally empty in v0
+//! (CHIPS-MICROCHIP-05 §5.3); it reserves the linker file name so
+//! future chips that need additional `SECTIONS` directives can
+//! populate the template without an emission-shape Standards Action.
 //!
 //! Templates are embedded via `include_str!` so the rendered BSP does not
 //! depend on the filesystem layout of the creator crate.
@@ -24,6 +29,7 @@ const TPL_IO_MUX: &str = include_str!("templates/io_mux.rs.jinja");
 const TPL_PERIPHS: &str = include_str!("templates/peripherals.rs.jinja");
 const TPL_BOARD: &str = include_str!("templates/board.rs.jinja");
 const TPL_MEMORY_X: &str = include_str!("templates/memory.x.jinja");
+const TPL_CHIP_X: &str = include_str!("templates/atsamd51j19a.x.jinja");
 
 /// A resolved per-pad routing decision for the render templates.
 ///
@@ -73,8 +79,11 @@ pub struct PadRoute {
 /// Render a full PAC-style BSP for the given [`MicrochipIr`] under `out_dir`.
 ///
 /// Creates `out_dir/<board_stem>/{mod,pac,clocks,io_mux,peripherals,board}.rs`
-/// (always six files), plus `memory.x` when the chip yaml carries a
-/// `linker:` block. Where `board_stem` is the snake-cased board name.
+/// (always six files), plus the linker fragments `memory.x` and
+/// `<chip_link_stem>.x` when the chip yaml carries a `linker:` block
+/// (per CHIPS-MICROCHIP-05 §5.1). `board_stem` is the snake-cased
+/// board name; `chip_link_stem` is the lowercase-no-separator form of
+/// the chip name (concretely `atsamd51j19a` for `ATSAMD51J19A`).
 ///
 /// # Errors
 /// Returns any I/O failure creating the output directory or writing
@@ -82,6 +91,7 @@ pub struct PadRoute {
 pub fn render_microchip_pac(ir: &MicrochipIr, out_dir: &Path) -> Result<Vec<std::path::PathBuf>> {
     let board_stem = snake_case(&ir.board.name);
     let chip_stem = snake_case(&ir.chip.name);
+    let chip_link_stem = chip_link_stem(&ir.chip.name);
     let target = out_dir.join(&board_stem);
     std::fs::create_dir_all(&target).with_context(|| format!("create {}", target.display()))?;
 
@@ -99,8 +109,10 @@ pub fn render_microchip_pac(ir: &MicrochipIr, out_dir: &Path) -> Result<Vec<std:
     env.add_template("board.rs", TPL_BOARD)?;
 
     let emit_linker = ir.chip.linker.is_some();
+    let chip_x_name = format!("{chip_link_stem}.x");
     if emit_linker {
         env.add_template("memory.x", TPL_MEMORY_X)?;
+        env.add_template("chip.x", TPL_CHIP_X)?;
     }
 
     let ctx = context! {
@@ -109,6 +121,7 @@ pub fn render_microchip_pac(ir: &MicrochipIr, out_dir: &Path) -> Result<Vec<std:
         pad_routes => Value::from_serialize(&pad_routes),
         board_stem => board_stem.clone(),
         chip_stem => chip_stem,
+        chip_link_stem => chip_link_stem.clone(),
     };
 
     let mut files: Vec<String> = [
@@ -124,6 +137,7 @@ pub fn render_microchip_pac(ir: &MicrochipIr, out_dir: &Path) -> Result<Vec<std:
     .collect();
     if emit_linker {
         files.push("memory.x".to_string());
+        files.push("chip.x".to_string());
     }
     let mut written = Vec::new();
     for name in &files {
@@ -131,7 +145,8 @@ pub fn render_microchip_pac(ir: &MicrochipIr, out_dir: &Path) -> Result<Vec<std:
         let rendered = tmpl
             .render(&ctx)
             .with_context(|| format!("render {name}"))?;
-        let path = target.join(name);
+        let out_name: &str = if name == "chip.x" { &chip_x_name } else { name };
+        let path = target.join(out_name);
         std::fs::write(&path, rendered).with_context(|| format!("write {}", path.display()))?;
         written.push(path);
     }
@@ -288,6 +303,23 @@ fn pac_path_filter(value: String) -> String {
     out
 }
 
+/// Convert a chip name into the lowercase-no-separator form used as the
+/// `<chip_link_stem>.x` linker file name per CHIPS-MICROCHIP-05 §5.1.
+///
+/// Distinct from [`snake_case`] in that no underscore separators are
+/// inserted on case transitions — the Microchip PAC crate names on
+/// crates.io are themselves all-lowercase without separators (e.g.
+/// `atsamd51j19a`, `atsamd21j18a`), so the linker file name matches
+/// the PAC crate name for grep-ability against documentation. Any
+/// non-alphanumeric input character is dropped.
+fn chip_link_stem(input: &str) -> String {
+    input
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect()
+}
+
 /// Convert an arbitrary board/chip name into a snake_case file stem.
 fn snake_case(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
@@ -329,6 +361,19 @@ mod tests {
         );
         assert_eq!(snake_case("ATSAMD51J19A"), "atsamd51_j19_a");
         assert_eq!(snake_case("sercom0"), "sercom0");
+    }
+
+    #[test]
+    fn chip_link_stem_strips_separators_and_lowercases() {
+        // ATSAMD51J19A → atsamd51j19a (matches the PAC crate name on
+        // crates.io for grep-ability per CHIPS-MICROCHIP-05 §5.1).
+        assert_eq!(chip_link_stem("ATSAMD51J19A"), "atsamd51j19a");
+        // D21 family member: ATSAMD21J18A → atsamd21j18a.
+        assert_eq!(chip_link_stem("ATSAMD21J18A"), "atsamd21j18a");
+        // L21 family member with mixed case stays alphanumeric only.
+        assert_eq!(chip_link_stem("ATSAML21J18B"), "atsaml21j18b");
+        // Non-alphanumeric separators get dropped.
+        assert_eq!(chip_link_stem("ATSAMD51-J19A"), "atsamd51j19a");
     }
 
     #[test]

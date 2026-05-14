@@ -29,8 +29,10 @@ fn render_feather_m4_to_tempdir() -> (tempfile::TempDir, std::path::PathBuf) {
     let ir = merge(chip, board).expect("merge ok");
     let tmp = tempfile::tempdir().expect("tempdir");
     let written = render_microchip_pac(&ir, tmp.path()).expect("render ok");
-    // 6 Rust files + memory.x linker script.
-    assert_eq!(written.len(), 7);
+    // 6 Rust files + memory.x + atsamd51j19a.x linker scripts (emitted
+    // because the chip yaml carries a `linker:` block, per
+    // CHIPS-MICROCHIP-05 §5.1).
+    assert_eq!(written.len(), 8);
     let bsp_dir = tmp.path().join("adafruit_feather_m4_express");
     assert!(bsp_dir.is_dir(), "bsp dir created: {}", bsp_dir.display());
     (tmp, bsp_dir)
@@ -47,6 +49,7 @@ fn produces_expected_file_set() {
         "peripherals.rs",
         "board.rs",
         "memory.x",
+        "atsamd51j19a.x",
     ] {
         let p = bsp_dir.join(name);
         assert!(p.is_file(), "expected {}", p.display());
@@ -106,4 +109,11 @@ fn snapshot_memory_x() {
     let (_tmp, bsp_dir) = render_feather_m4_to_tempdir();
     let text = fs::read_to_string(bsp_dir.join("memory.x")).expect("read memory.x");
     insta::assert_snapshot!("adafruit_feather_m4_express__memory_x", text);
+}
+
+#[test]
+fn snapshot_atsamd51j19a_x() {
+    let (_tmp, bsp_dir) = render_feather_m4_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("atsamd51j19a.x")).expect("read atsamd51j19a.x");
+    insta::assert_snapshot!("adafruit_feather_m4_express__atsamd51j19a_x", text);
 }
