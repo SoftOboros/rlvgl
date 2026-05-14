@@ -2,15 +2,19 @@
 //!
 //! Consumes a [`SilabsIr`] produced by [`super::merge`], builds a
 //! MiniJinja context enriched with precomputed pin routing and
-//! peripheral-usage helpers, then renders each of the six PAC-style
-//! templates (`mod.rs`, `pac.rs`, `clocks.rs`, `io_mux.rs`,
-//! `peripherals.rs`, `board.rs`) into `out_dir/<board_stem>/`.
+//! peripheral-usage helpers, then renders each of the eight templates
+//! (`mod.rs`, `pac.rs`, `clocks.rs`, `io_mux.rs`, `peripherals.rs`,
+//! `board.rs`, plus `memory.x` and `<chip>.x` linker scripts) into
+//! `out_dir/<board_stem>/`.
 //!
 //! Templates are embedded via `include_str!` so the rendered BSP does
 //! not depend on the filesystem layout of the creator crate.
 //!
-//! Linker emission (`memory.x` / `<chip>.x`) is deferred to
-//! `CHIPS-SILABS-05` per CHIPS-SILABS-00 §11.
+//! Linker emission was deferred at slate 1 per CHIPS-SILABS-00 §11
+//! and ratified in CHIPS-SILABS-05 (chipdb/rlvgl-chips-silabs/docs/
+//! CHIPS-SILABS-05-LINKER.md). The two linker files only render when
+//! the chip yaml carries a `linker:` block (always true for EFM32GG11
+//! after slate 1; reserved as optional for forward Series 2 work).
 
 use super::ir::{SilabsDir, SilabsIr, SilabsRoutingKind};
 use anyhow::{Context, Result};
@@ -24,6 +28,8 @@ const TPL_CLOCKS: &str = include_str!("templates/clocks.rs.jinja");
 const TPL_IO_MUX: &str = include_str!("templates/io_mux.rs.jinja");
 const TPL_PERIPHS: &str = include_str!("templates/peripherals.rs.jinja");
 const TPL_BOARD: &str = include_str!("templates/board.rs.jinja");
+const TPL_MEMORY_X: &str = include_str!("templates/memory.x.jinja");
+const TPL_CHIP_X: &str = include_str!("templates/chip.x.jinja");
 
 /// Kind of routing applied to one board pin.
 #[derive(Serialize, Debug, Clone)]
@@ -81,7 +87,12 @@ pub struct PinRoute {
 ///
 /// Creates
 /// `out_dir/<board_stem>/{mod,pac,clocks,io_mux,peripherals,board}.rs`
-/// where `board_stem` is the snake-cased board name.
+/// plus the linker scripts `memory.x` and `<chip>.x` when the chip
+/// yaml has a `linker:` block. `board_stem` is the snake-cased board
+/// name; `<chip>.x` is named after the snake-cased chip family
+/// (e.g. `efm32_gg11.x` for the EFM32GG11 family). Linker emission
+/// matches the TI shape per CHIPS-SILABS-05 §5.1 (commit ratifying
+/// this dropped the §11 deferral).
 ///
 /// # Errors
 /// Returns any I/O failure creating the output directory or writing
@@ -105,6 +116,13 @@ pub fn render_silabs_pac(ir: &SilabsIr, out_dir: &Path) -> Result<Vec<std::path:
     env.add_template("peripherals.rs", TPL_PERIPHS)?;
     env.add_template("board.rs", TPL_BOARD)?;
 
+    let emit_linker = ir.chip.linker.is_some();
+    let chip_x_name = format!("{chip_stem}.x");
+    if emit_linker {
+        env.add_template("memory.x", TPL_MEMORY_X)?;
+        env.add_template("chip.x", TPL_CHIP_X)?;
+    }
+
     let ctx = context! {
         ir => Value::from_serialize(ir),
         peripherals_used => Value::from_serialize(&peripherals_used),
@@ -113,21 +131,30 @@ pub fn render_silabs_pac(ir: &SilabsIr, out_dir: &Path) -> Result<Vec<std::path:
         chip_stem => chip_stem,
     };
 
-    let files = [
+    let mut files: Vec<String> = [
         "mod.rs",
         "pac.rs",
         "clocks.rs",
         "io_mux.rs",
         "peripherals.rs",
         "board.rs",
-    ];
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    if emit_linker {
+        files.push("memory.x".to_string());
+        files.push("chip.x".to_string());
+    }
+
     let mut written = Vec::new();
-    for name in files {
+    for name in &files {
         let tmpl = env.get_template(name)?;
         let rendered = tmpl
             .render(&ctx)
             .with_context(|| format!("render {name}"))?;
-        let path = target.join(name);
+        let out_name: &str = if name == "chip.x" { &chip_x_name } else { name };
+        let path = target.join(out_name);
         std::fs::write(&path, rendered).with_context(|| format!("write {}", path.display()))?;
         written.push(path);
     }
