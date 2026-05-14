@@ -1076,3 +1076,11 @@ PASSES end-to-end. All three chipdb compile-verify gates (MICROCHIP,
 TI, SILABS) are now green.
 
 Snapshots re-blessed; render test (CHIPS-SILABS-03) green.
+
+### 2026-05-14 — CHIPS-SILABS-05 ratified and implemented
+
+Linker emission chapter ratified at
+`chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md` and
+implemented via two new templates (`memory.x.jinja`,
+`efm32gg11b.x.jinja`). File emission set grew from 6 to 8 files,
+reaching parity with the TI BSP. Closes the §11 deferral.
