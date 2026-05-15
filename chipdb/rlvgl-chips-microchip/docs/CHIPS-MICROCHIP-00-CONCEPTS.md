@@ -708,6 +708,43 @@ Per CLAUDE.md "Execution discipline": touching a frozen invariant
 a §15 amendment in a separate PR before the behaviour PR rides on
 it.
 
+- **2026-05-15 — CHIPS-MICROCHIP-07 + -01b amendments.**
+
+  - **-07 (template)**: `src/bin/creator/bsp/microchip/templates/pac.rs.jinja`
+    collapsed `pub use atsamd51j19a as pac;` re-export to
+    `pub use atsamd51j19a::*;` for a clean consumer path. Before this
+    amendment, `bsp_generated::adafruit_feather_m4_express::pac` exposed
+    the PAC crate under a nested `pac::pac::Peripherals` path, which
+    pushed the slate-11 example crate
+    (`examples/feather-m4-express/src/bsp_pac_main.rs`) to import
+    `atsamd51j19a` directly via `use atsamd51j19a as pac;` rather than
+    going through the BSP re-export. The flat re-export shape now lets
+    consumers write `use bsp_generated::adafruit_feather_m4_express::pac;`
+    and reach `pac::Peripherals` without the double-nest. The example
+    crate's `bsp_pac_main.rs` is updated to use this BSP-relative path
+    and no longer imports `atsamd51j19a` directly. Compile-verify gate
+    (CHIPS-MICROCHIP-04) and `cargo check --target thumbv7em-none-eabihf`
+    on the Feather example crate both pass end-to-end. Snapshot
+    `bsp_microchip_render__adafruit_feather_m4_express__pac.snap`
+    re-blessed. No `INV-MC<n>` invariant changes.
+
+  - **-01b (chip yaml)**: `chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml`
+    `io_mux.fn_b:` column corrected for PA04 / PA06 to list
+    `ADC0_AIN4` (PA04) and `ADC0_AIN6` (PA06) per SAMD51 Family Data
+    Sheet DS60001507. The rows previously held `ANAREF_VREFB`
+    (PA04) and `ANAREF_VREFC` (PA06) in `fn_b:`; the ADC signals lived
+    only in the `analog:` column, which the generator does not consult
+    for PMUX resolution. The board YAML's
+    `pad: PA04, signal: ADC0_AIN4, peripheral: adc0` and
+    `pad: PA06, signal: ADC0_AIN6, peripheral: adc0` references now
+    resolve cleanly. This eliminates the two MISMATCH fallback comments
+    that have lived in the `bsp_microchip_render` io_mux golden
+    snapshot since slate 4 (the last remaining MISMATCHes per the
+    -01a §15 entry). Snapshot
+    `bsp_microchip_render__adafruit_feather_m4_express__io_mux.snap`
+    re-blessed; PA04 and PA06 now emit proper PMUX letter B writes
+    with `pmuxen.set_bit()`. No `INV-MC<n>` invariant changes.
+
 - **2026-05-14 — CHIPS-MICROCHIP-06b SERCOM USART hello-world shipped.**
   `examples/feather-m4-express/src/bsp_pac_main.rs` now sends "hello\r\n"
   over the Feather header SERCOM USART before entering the slate-11

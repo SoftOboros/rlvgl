@@ -324,43 +324,31 @@ pub fn init() {
     
     // PA04 (group 0 pin 4) — ADC0_AIN4 (adc0)
     
-    // MISMATCH: board claims peripheral signal `ADC0_AIN4` on
-    //           pad PA04 but chip yaml `io_mux.fn_<letter>:` columns
-    //           do not list it. Falling back to plain GPIO PINCFG. Fix
-    //           by amending chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml
-    //           per CHIPS-MICROCHIP §15.
     
-    
-    // Plain GPIO (signal `ADC0_AIN4`): no PMUX, configure PINCFG only.
+    // PMUX letter B → bits 1
+    p.PORT.group0.pmux[2].modify(|_, w| unsafe {
+        w.pmuxe().bits(1)
+    });
     p.PORT.group0.pincfg[4].write(|w| {
-        w.pmuxen().clear_bit()
+        w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
-    
-    p.PORT.group0.dirclr.write(|w| unsafe { w.bits(1 << 4) });
-    
     
     
     
     // PA06 (group 0 pin 6) — ADC0_AIN6 (adc0)
     
-    // MISMATCH: board claims peripheral signal `ADC0_AIN6` on
-    //           pad PA06 but chip yaml `io_mux.fn_<letter>:` columns
-    //           do not list it. Falling back to plain GPIO PINCFG. Fix
-    //           by amending chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml
-    //           per CHIPS-MICROCHIP §15.
     
-    
-    // Plain GPIO (signal `ADC0_AIN6`): no PMUX, configure PINCFG only.
+    // PMUX letter B → bits 1
+    p.PORT.group0.pmux[3].modify(|_, w| unsafe {
+        w.pmuxe().bits(1)
+    });
     p.PORT.group0.pincfg[6].write(|w| {
-        w.pmuxen().clear_bit()
+        w.pmuxen().set_bit()
          .inen().set_bit()
          .pullen().clear_bit()
     });
-    
-    p.PORT.group0.dirclr.write(|w| unsafe { w.bits(1 << 6) });
-    
     
     
     
