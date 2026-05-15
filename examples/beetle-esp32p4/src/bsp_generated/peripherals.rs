@@ -5,7 +5,7 @@
 //! I2C (full timing setup), SPI master (clock + mode), and timer groups
 //! (watchdog disable). Other peripherals get TODO stubs.
 
-use esp32p4 as pac;
+use super::pac;
 
 #[allow(unused_imports)]
 use super::board::{APB_HZ, XTAL_HZ};
@@ -14,8 +14,14 @@ use super::board::{APB_HZ, XTAL_HZ};
 ///
 /// Called by [`crate::pac::init`] after clocks and IO MUX are configured.
 pub fn init() {
+    
     init_i2c0();
+    
 }
+
+
+
+
 
 /// Bring up i2c0 as an I2C master at 100000 Hz.
 ///
@@ -39,23 +45,16 @@ pub fn init_i2c0() {
 
     // Select XTAL_CLK as the source (sclk_sel = 0) and enable the clock.
     p.I2C0.clk_conf().modify(|_, w| unsafe {
-        w.sclk_sel()
-            .clear_bit()
-            .sclk_active()
-            .set_bit()
-            .sclk_div_num()
-            .bits(0)
+        w.sclk_sel().clear_bit()
+         .sclk_active().set_bit()
+         .sclk_div_num().bits(0)
     });
     // Master mode, MSB-first on both directions.
     p.I2C0.ctr().modify(|_, w| {
-        w.ms_mode()
-            .set_bit()
-            .tx_lsb_first()
-            .clear_bit()
-            .rx_lsb_first()
-            .clear_bit()
-            .clk_en()
-            .set_bit()
+        w.ms_mode().set_bit()
+         .tx_lsb_first().clear_bit()
+         .rx_lsb_first().clear_bit()
+         .clk_en().set_bit()
     });
     // SCL low/high periods (raw register writes — field widths vary across
     // PAC revisions, so stay register-level).
@@ -71,12 +70,15 @@ pub fn init_i2c0() {
     p.I2C0.scl_stop_hold().write(|w| unsafe { w.bits(half) });
     p.I2C0.scl_stop_setup().write(|w| unsafe { w.bits(half) });
     // Reset TX + RX FIFOs so subsequent transactions start clean.
-    p.I2C0
-        .fifo_conf()
-        .modify(|_, w| w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit());
-    p.I2C0
-        .fifo_conf()
-        .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+    p.I2C0.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit()
+    });
+    p.I2C0.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit()
+    });
     // Publish the config — `conf_upgate` latches the new timings.
     p.I2C0.ctr().modify(|_, w| w.conf_upgate().set_bit());
 }
+
+
+

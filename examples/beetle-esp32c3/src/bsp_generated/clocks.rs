@@ -1,7 +1,7 @@
 //! Clock tree initialization for DFR0868 Beetle ESP32-C3.
 //!
-//! On ESP32-C3 peripheral clock gating and reset live in the `SYSTEM` block
-//! (TRM Chapter 16 SYSREG). To bring up a peripheral this file:
+//! Peripheral clock gating and reset on ESP32-C3 are controlled via
+//! per-peripheral gate registers. To bring up a peripheral this file:
 //!
 //! 1. Asserts reset,
 //! 2. Enables the clock gate,
@@ -11,7 +11,7 @@
 //! code does not currently reprogram the CPU clock. See `pac.rs` for the
 //! constants.
 
-use esp32c3 as pac;
+use super::pac;
 
 /// Enable and reset every peripheral used by this board.
 ///
@@ -19,26 +19,23 @@ use esp32c3 as pac;
 /// configuration so that peripheral registers are writable.
 pub fn init() {
     let p = unsafe { pac::Peripherals::steal() };
-
+    
+    
+    
     // i2c0 — clock enable i2c_ext0_clk_en, reset i2c_ext0_rst
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.i2c_ext0_rst().set_bit());
-    p.SYSTEM
-        .perip_clk_en0()
-        .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.i2c_ext0_rst().clear_bit());
-
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.i2c_ext0_rst().set_bit());
+    p.SYSTEM.perip_clk_en0().modify(|_, w| w.i2c_ext0_clk_en().set_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.i2c_ext0_rst().clear_bit());
+    
+    
+    
+    
+    
     // usb_sj — clock enable usb_device_clk_en, reset usb_device_rst
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.usb_device_rst().set_bit());
-    p.SYSTEM
-        .perip_clk_en0()
-        .modify(|_, w| w.usb_device_clk_en().set_bit());
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.usb_device_rst().clear_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().set_bit());
+    p.SYSTEM.perip_clk_en0().modify(|_, w| w.usb_device_clk_en().set_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().clear_bit());
+    
+    
+    
 }

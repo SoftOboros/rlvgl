@@ -11,67 +11,60 @@
 //! Pins tagged `flash_reserved` in the chip IR are filtered out upstream by
 //! `espressif::load::merge`; any that reach this file are a generator bug.
 
-use esp32p4 as pac;
+use super::pac;
 
 /// Apply the board's pin mux and GPIO matrix routing.
 pub fn init() {
     let p = unsafe { pac::Peripherals::steal() };
-
+    
     // GPIO3 — LED
-
+    
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
     p.IO_MUX.gpio(3).modify(|_, w| unsafe {
-        w.mcu_sel()
-            .bits(1)
-            .fun_ie()
-            .clear_bit()
-            .fun_wpu()
-            .clear_bit()
-            .fun_wpd()
-            .clear_bit()
+        w.mcu_sel().bits(1)
+         .fun_ie().clear_bit()
+         .fun_wpu().clear_bit()
+         .fun_wpd().clear_bit()
     });
-
+    
     p.GPIO.enable_w1ts().write(|w| unsafe { w.bits(1 << 3) });
-
+    
+    
+    
     // GPIO35 — BOOT
-
+    
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
     p.IO_MUX.gpio(35).modify(|_, w| unsafe {
-        w.mcu_sel()
-            .bits(1)
-            .fun_ie()
-            .set_bit()
-            .fun_wpu()
-            .set_bit()
-            .fun_wpd()
-            .clear_bit()
+        w.mcu_sel().bits(1)
+         .fun_ie().set_bit()
+         .fun_wpu().set_bit()
+         .fun_wpd().clear_bit()
     });
-
+    
+    
+    
     // GPIO8 — I2C0_SCL (i2c0)
-
+    
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
     p.IO_MUX.gpio(8).modify(|_, w| unsafe {
-        w.mcu_sel()
-            .bits(1)
-            .fun_ie()
-            .set_bit()
-            .fun_wpu()
-            .set_bit()
-            .fun_wpd()
-            .clear_bit()
+        w.mcu_sel().bits(1)
+         .fun_ie().set_bit()
+         .fun_wpu().set_bit()
+         .fun_wpd().clear_bit()
     });
-
+    
+    
+    
     // GPIO7 — I2C0_SDA (i2c0)
-
+    
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
     p.IO_MUX.gpio(7).modify(|_, w| unsafe {
-        w.mcu_sel()
-            .bits(1)
-            .fun_ie()
-            .set_bit()
-            .fun_wpu()
-            .set_bit()
-            .fun_wpd()
-            .clear_bit()
+        w.mcu_sel().bits(1)
+         .fun_ie().set_bit()
+         .fun_wpu().set_bit()
+         .fun_wpd().clear_bit()
     });
+    
+    
+    
 }
