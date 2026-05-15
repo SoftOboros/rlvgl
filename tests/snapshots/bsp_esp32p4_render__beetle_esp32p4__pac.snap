@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32p4_render.rs
-assertion_line: 60
 expression: text
 ---
 //! Top-level PAC-style bring-up entry for DFR1172 FireBeetle 2 P4.
@@ -21,7 +20,7 @@ expression: text
 //! (when consumed directly) or a child module of the host crate.
 
 #[allow(unused_imports)]
-pub use esp32p4 as pac;
+pub use esp32p4::*;
 
 /// Bring up the board.
 ///

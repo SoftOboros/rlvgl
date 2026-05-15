@@ -20,7 +20,7 @@ expression: text
 //! (when consumed directly) or a child module of the host crate.
 
 #[allow(unused_imports)]
-pub use esp32c3 as pac;
+pub use esp32c3::*;
 
 /// Bring up the board.
 ///
