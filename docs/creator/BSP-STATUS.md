@@ -29,9 +29,33 @@ package generator. The generator operates in two stages:
   - [x] NXP — **full YAML pipeline** (MIMXRT1062, IOMUX ALT + daisy chain, CCM CCGR)
   - [x] RP2040 — **full YAML pipeline** (RP2040, FUNCSEL, RESETS register)
   - [x] Renesas — **full YAML pipeline** (R7FA6M5BH, PFS PSEL + PMR, MSTP gates)
-  - [x] Microchip — stub (chipdb crate only, no IR/render)
-  - [x] Silicon Labs — stub (chipdb crate only, no IR/render)
-  - [x] TI — stub (chipdb crate only, no IR/render)
+  - [x] Microchip — **full YAML pipeline + compile-verify + example crate** (ATSAMD51J19A, Feather M4 Express; retrospective `chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-RETROSPECTIVE.md`)
+  - [x] Silicon Labs — **full YAML pipeline + compile-verify + example crate** (EFM32GG11, SLSTK3701A; retrospective `chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-RETROSPECTIVE.md`)
+  - [x] TI — **full YAML pipeline + compile-verify + example crate** (CC1352R, LAUNCHXL-CC1352R1; retrospective `chipdb/rlvgl-chips-ti/docs/CHIPS-TI-RETROSPECTIVE.md`)
+
+### Pre-discipline closure
+
+CLAUDE.md §"Initiative retrospective" (Spec-Before-Code Planning
+Discipline) requires every multi-phase initiative to land an
+`<INIT>-RETROSPECTIVE.md` at natural completion. The first reference
+implementation is [`docs/concepts/DCB-RETROSPECTIVE.md`](../concepts/DCB-RETROSPECTIVE.md)
+(2026-05-03). Vendors that shipped a production-stable generator
+pipeline **before** that cutoff are pre-discipline:
+
+| Vendor | Status | Retrospective |
+|--------|--------|---------------|
+| Espressif | Production-stable; 3 chips, 5+ boards, compile-verify gate. | **In progress** — structural catch-up at `chipdb/rlvgl-chips-esp/docs/CHIPS-ESP-RETROSPECTIVE.md`. |
+| Nordic | Production-stable; nRF52840-DK. | None required (pre-discipline). |
+| NXP | Production-stable; MIMXRT1060-EVKB. | None required (pre-discipline). |
+| Renesas | Production-stable; EK-RA6M5. | None required (pre-discipline). |
+| RP2040 | Production-stable; Raspberry Pi Pico. | None required (pre-discipline). |
+
+The three subsequent vendors — **TI**, **Silicon Labs**, and
+**Microchip** — adopted the full §0–§15 discipline (concepts doc,
+sub-letter amendments, §05 linker chapter, §06 example chapter,
+ratified §15 change log, closing retrospective) and ARE the
+canonical reference shape for any future chipdb vendor.
+
 - [x] Document template helpers and IR schema so users can supply custom
       templates.
 - [x] Add unit tests that snapshot the IR and generated output for sample
