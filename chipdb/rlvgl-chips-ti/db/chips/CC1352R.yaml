@@ -511,11 +511,13 @@ gpio_matrix:
 # Linker layout — region naming for the `memory.x.jinja` template
 # (CHIPS-TI-00 §7). `.text`/`.rodata` go to internal Flash; `.data`/
 # `.bss`/`.heap`/`.stack` go to System SRAM. `.ccfg` is a fixed-address
-# section that lives in the **last** Flash sector (4 KB at
-# 0x00057FA8..0x00057FFF on the CC1352R1F3) per SWCU185G §11.1; the
+# section anchored at the top of internal Flash; `ccfg_length` below is
+# the size of the CCFG **structure** (88 bytes per SWCU185G §11.1
+# Table 11-1), not a Flash erase-sector boundary. The CCFG structure
+# resides within the last Flash sector but does not span it. The
 # `chip.x.jinja` template emits the SECTIONS directive for it.
 linker:
   region_text: flash
   region_data: sram
   ccfg_origin: 0x00057FA8
-  ccfg_length: 0x00000058
+  ccfg_length: 0x00000058  # CCFG structure size (88 bytes), SWCU185G §11.1 Table 11-1
