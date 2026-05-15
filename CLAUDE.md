@@ -415,12 +415,15 @@ for Espressif boards (ESP32-C3, ESP32-C6, ESP32-P4) from chipdb YAML:
   Ships with `esp32c3_devkitm_1.yaml`, `beetle_esp32c3.yaml`,
   `beetle_esp32p4.yaml` (DFR1172 P4 side), and `beetle_esp32c6.yaml`
   (DFR1172 C6 companion).
-- **Generated output**: 6 files per board (`mod.rs`, `pac.rs`, `clocks.rs`,
-  `io_mux.rs`, `peripherals.rs`, `board.rs`) emitting svd2rust-style writes
-  against `esp32c3 = 0.31`. Peripheral instances use uppercase field access
-  (`p.UART0.clkdiv()`, `p.IO_MUX.gpio(21)`). Sibling module references use
-  `super::` so the output works both as a crate root and as a child module
-  of a host crate.
+- **Generated output**: 8 files per board (6 `.rs` — `mod.rs`, `pac.rs`,
+  `clocks.rs`, `io_mux.rs`, `peripherals.rs`, `board.rs` — plus the
+  `memory.x` + per-chip `<chip>.x` linker scripts) emitting svd2rust-style
+  writes against `esp32c3 = 0.31`. Peripheral instances use uppercase field
+  access (`p.UART0.clkdiv()`, `p.IO_MUX.gpio(21)`). Sibling module
+  references use `super::` so the output works both as a crate root and as
+  a child module of a host crate. The 8-file shape was retrofitted to ESP
+  in commit `41c9e16` (2026-04-30) before TI/SILABS/MICROCHIP cloned the
+  pattern; see `chipdb/rlvgl-chips-esp/docs/CHIPS-ESP-RETROSPECTIVE.md` §3.2.
 - **Templates**: `src/bin/creator/bsp/espressif/templates/*.rs.jinja` —
   edit these to grow peripheral init coverage. `peripherals.rs.jinja`
   currently has real UART0-as-console and I2C0 master init; everything
@@ -436,11 +439,12 @@ cargo run --features creator --bin rlvgl-creator -- --silent bsp from-yaml \
     --emit-pac
 ```
 
-Copy the five child files (`board.rs`, `clocks.rs`, `io_mux.rs`, `pac.rs`,
-`peripherals.rs`) from `/tmp/rlvgl-bsp/dfr0868_beetle_esp32_c3/` to the
-consuming crate's `src/bsp_generated/`. The host `mod.rs` is written by
-hand as a module index; the generator's own `mod.rs` is crate-root-shaped
-and not copied in.
+Copy the seven child files (`board.rs`, `clocks.rs`, `io_mux.rs`, `pac.rs`,
+`peripherals.rs`, `memory.x`, `<chip>.x`) from
+`/tmp/rlvgl-bsp/dfr0868_beetle_esp32_c3/` to the consuming crate's
+`src/bsp_generated/` (the linker scripts go to the crate root or wherever
+your `build.rs` points). The host `mod.rs` is written by hand as a module
+index; the generator's own `mod.rs` is crate-root-shaped and not copied in.
 
 ### Compile-verify the output
 
