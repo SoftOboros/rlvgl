@@ -42,7 +42,7 @@ use panic_halt as _;
 mod bsp_generated;
 
 #[cfg(feature = "bsp_pac")]
-use atsamd51j19a as pac;
+use bsp_generated::adafruit_feather_m4_express::pac;
 
 /// Send a single byte over SERCOM5 USART, blocking until the transmit
 /// data register is empty (INTFLAG.DRE=1) before writing DATA.

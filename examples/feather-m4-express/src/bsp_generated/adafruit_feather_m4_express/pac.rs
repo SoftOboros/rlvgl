@@ -19,7 +19,7 @@
 //! or a child module of the host crate.
 
 #[allow(unused_imports)]
-pub use atsamd51j19a as pac;
+pub use atsamd51j19a::*;
 
 /// Bring up the board.
 ///
