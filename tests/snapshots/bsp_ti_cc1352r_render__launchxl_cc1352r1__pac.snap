@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_ti_cc1352r_render.rs
-assertion_line: 82
 expression: text
 ---
 //! Top-level PAC-style bring-up entry for LAUNCHXL-CC1352R1.
@@ -26,7 +25,7 @@ expression: text
 //! directly) or a child module of the host crate.
 
 #[allow(unused_imports)]
-pub use cc13x2_26x2_pac as pac;
+pub use cc13x2_26x2_pac::*;
 
 /// Bring up the board.
 ///

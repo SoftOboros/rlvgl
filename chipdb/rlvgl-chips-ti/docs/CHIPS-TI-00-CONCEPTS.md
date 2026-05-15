@@ -942,3 +942,22 @@ FieldWriter amendment end-to-end: the generated peripherals::init()
 turns on the UART0 clock-gate using the `ClkEn::Uart0` variant, and
 the consumer code can then poll FR.TXFF + write DR successfully.
 rlvgl widget tree deferred to -06c.
+
+### 2026-05-15 — CHIPS-TI-07 generator pac.rs re-export flatten
+
+`pac.rs.jinja` now emits `pub use cc13x2_26x2_pac::*;` instead of
+`pub use cc13x2_26x2_pac as pac;`. Consumer-side paths reach
+`Peripherals` via `bsp_generated::<board>::pac::Peripherals`
+(single-level) instead of the slate-11 workaround of importing the
+PAC crate directly to avoid `bsp_generated::<board>::pac::pac::Peripherals`
+(double-nest). `examples/launchxl-cc1352r1/src/bsp_pac_main.rs`
+updated to use the clean path.
+
+### 2026-05-15 — CHIPS-TI-05a CCFG byte-count comment correction
+
+`chipdb/rlvgl-chips-ti/db/chips/CC1352R.yaml` linker section comment
+corrected. The emitted `ccfg_length: 0x58` (88 bytes per SWCU185G
+§11.1 Table 11-1) is the CCFG **structure** size; it resides within
+the last Flash sector but does not span it. The previous comment
+conflated CCFG structure size with the Flash erase-sector size and
+asserted "4 KB" which was misleading. No emitted value changes.

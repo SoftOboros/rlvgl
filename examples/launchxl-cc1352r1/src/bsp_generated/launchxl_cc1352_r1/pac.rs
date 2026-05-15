@@ -21,7 +21,7 @@
 //! directly) or a child module of the host crate.
 
 #[allow(unused_imports)]
-pub use cc13x2_26x2_pac as pac;
+pub use cc13x2_26x2_pac::*;
 
 /// Bring up the board.
 ///

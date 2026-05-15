@@ -38,10 +38,10 @@ use cortex_m_rt::entry;
 use panic_halt as _;
 
 #[cfg(feature = "bsp_pac")]
-use cc13x2_26x2_pac as pac;
+mod bsp_generated;
 
 #[cfg(feature = "bsp_pac")]
-mod bsp_generated;
+use bsp_generated::launchxl_cc1352_r1::pac;
 
 /// Push one byte through UART0, blocking while the TX FIFO is full.
 ///
