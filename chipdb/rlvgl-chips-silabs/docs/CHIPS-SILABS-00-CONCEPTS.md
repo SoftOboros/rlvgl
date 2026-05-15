@@ -1120,3 +1120,15 @@ Validates the slate-6 `-02b` field-style amendment end-to-end:
 the generated peripherals::init() configures USART4 clock + baud +
 ROUTELOC, and consumer code can poll STATUS.TXBL + write TXDATA
 successfully. rlvgl widget tree deferred to -06c.
+
+### 2026-05-15 — CHIPS-SILABS-07 generator pac.rs re-export flatten
+
+`pac.rs.jinja` now emits `pub use efm32gg11b_pac::efm32gg11b820::*;`
+instead of `pub use efm32gg11b_pac::efm32gg11b820 as pac;`.
+Consumer-side paths reach `Peripherals` via
+`bsp_generated::<board>::pac::Peripherals` (single-level) instead of
+the slate-11 workaround of importing the SKU sub-module directly.
+`examples/slstk3701a/src/bsp_pac_main.rs` updated to use the clean
+path. Internal `use ... as pac;` aliases in clocks/io_mux/peripherals
+templates retained — those are local generator-private aliases,
+not consumer-facing.

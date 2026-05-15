@@ -24,11 +24,12 @@ expression: text
 
 // `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
 // a `efm32gg11b820` sub-module rather than re-exporting
-// it at the crate root, so the `pac` alias resolves to the SKU module
-// here (not the crate root) and `pac::Peripherals::steal()` continues
-// to resolve at the BSP's call sites.
+// it at the crate root. Hoist the SKU sub-module's contents (including
+// `Peripherals`) directly into this BSP module so consumers can reach
+// `Peripherals` via `bsp_generated::<board>::pac::Peripherals` without
+// a double-nest workaround (CHIPS-SILABS-07).
 #[allow(unused_imports)]
-pub use efm32gg11b_pac::efm32gg11b820 as pac;
+pub use efm32gg11b_pac::efm32gg11b820::*;
 
 /// Bring up the board.
 ///

@@ -48,7 +48,7 @@ use panic_halt as _;
 mod bsp_generated;
 
 #[cfg(feature = "bsp_pac")]
-use efm32gg11b_pac::efm32gg11b820 as pac;
+use bsp_generated::slstk3701_a::pac;
 
 /// Block until USART4's TX buffer level reports "empty" (ready for a
 /// new byte), then push `b` into TXDATA.
@@ -85,9 +85,10 @@ fn main() -> ! {
 
         // CHIPS-SILABS-06b — send "hello\r\n" over USART4 VCOM.
         //
-        // The slate-6 SKU-flatten amendment puts `Peripherals` under
-        // the per-SKU sub-module, so the path is
-        // `efm32gg11b_pac::efm32gg11b820::Peripherals::steal()`.
+        // CHIPS-SILABS-07 of 2026-05-15 flattens the BSP's `pac` module
+        // so `Peripherals` is reachable via
+        // `bsp_generated::slstk3701_a::pac::Peripherals`. The `pac`
+        // alias above resolves through that single-level path.
         // The pinned `efm32gg11b-pac 0.1.4` is the pre-method-accessor
         // svd2rust era — `p.USART4.status` / `p.USART4.txdata` are
         // direct `#[repr(C)]` struct members, not `p.USART4.status()`.
