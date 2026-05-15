@@ -131,17 +131,12 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
     }
 }
 
-// SCAFFOLDED, currently FAILING — follow-up CHIPS-ESP-NN required.
-//
-// Same divergence shape as C6/H2/C5: 3 × E0433 (could not find
-// `Peripherals` in `pac`) in clocks.rs/io_mux.rs/peripherals.rs at
-// `pac::Peripherals::steal()`, cascading into 13 × E0282 (type
-// annotations needed) on the `.modify(|_, w| ...)` writer closures.
-// PAC vintage divergence from `esp32c3 = 0.31`; not a chipdb issue.
-// Most likely responsible: `pac.rs.jinja` (re-export shape) and/or
-// `peripherals.rs.jinja` + sibling templates.
+// CHIPS-ESP-09 (2026-05-15) unblocked this gate via the same fix as
+// `bsp_esp32c6_compile.rs`: `pac_vintage: modern` in chipyaml drives a
+// generated `Peripherals` shim, and the UART0 system-gate paths were
+// updated to use the svd2rust-0.37 cluster accessor
+// (`pcr.uart(0).conf()` instead of `pcr.uart0_conf()`).
 #[test]
-#[ignore = "scaffolded, FAILING — pac::Peripherals reexport + writer closure inference do not match esp32c61 0.3; follow-up CHIPS-ESP-NN"]
 fn esp32c61_minimal_output_compiles_against_real_pac() {
     compile_verify_board("esp32c61_minimal", "esp32_c61_minimal", "c61-minimal");
 }

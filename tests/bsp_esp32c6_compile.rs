@@ -157,19 +157,16 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
     }
 }
 
-// SCAFFOLDED, currently FAILING — follow-up CHIPS-ESP-NN required.
-//
-// The C6 PAC (esp32c6 = 0.23) re-exports `Peripherals` from a sub-namespace
-// rather than the crate root, so `pac::Peripherals::steal()` (as emitted by
-// the current templates) doesn't resolve. Cascade: the resulting type-erased
-// `p` breaks every `.modify(|_, w| ...)` writer-closure inference
-// (13 errors total: 3 × E0433 on `Peripherals`, 10 × E0282 on writer
-// closures in clocks.rs / io_mux.rs / peripherals.rs). Most likely
-// responsible: `pac.rs.jinja` (re-export shape) and/or `peripherals.rs.jinja`
-// + sibling templates (uppercase-field-access pattern). PAC vintage
-// divergence from `esp32c3 = 0.31`, not a chipdb issue.
+// CHIPS-ESP-09 (2026-05-15) unblocked this gate: the C6 PAC
+// (`esp32c6 = 0.23`) was generated with svd2rust 0.37.1, which dropped
+// the top-level `pub struct Peripherals { ... }` aggregate. The chipdb
+// now flags this chip as `pac_vintage: modern`, and `pac.rs.jinja` emits
+// a local `Peripherals` shim populated from chip-IR-derived `IO_MUX` /
+// `GPIO` / used-peripheral / clock-gate instance lists. The same vintage
+// also clusters UART instances (`pcr.uart(0).conf()` rather than the
+// pre-0.37 `pcr.uart0_conf()`), so the C6 chipyaml's UART0 gate paths
+// were re-pointed at the cluster accessor.
 #[test]
-#[ignore = "scaffolded, FAILING — pac::Peripherals reexport + writer closure inference do not match esp32c6 0.23; follow-up CHIPS-ESP-NN"]
 fn beetle_esp32c6_output_compiles_against_real_pac() {
     compile_verify_board("beetle_esp32c6", "dfr1172_c6_companion", "beetle-c6");
 }
