@@ -21,6 +21,13 @@ rlvgl supports and the tooling that sits on top of them.
 - **VS Code + probe-rs + GDB** for line-by-line debugging on
   hardware.
 
+> **Status:** Closed (4/4 chapters; tooling ships in v0.2.0). No
+> `DISCO-TEST-AND-DEBUG-RETROSPECTIVE.md` was authored — this
+> initiative completed before the retrospective discipline was added
+> to CLAUDE.md (first reference implementation
+> `docs/concepts/DCB-RETROSPECTIVE.md`, 2026-05-03). Lessons-learned
+> material is embedded in the per-chapter narratives.
+
 ## Prerequisites
 
 - Vol I completed — you have a build that flashes and runs on

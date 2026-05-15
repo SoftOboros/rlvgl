@@ -19,6 +19,13 @@ no_std UI controller). Follow the chapters in order and you will end up
 with the same shape — minus the deliberately out-of-scope bits listed
 at the bottom of this page.
 
+> **Status:** Closed (7/7 chapters; demo ships in v0.2.0). No
+> `DISCO-TUTORIAL-RETROSPECTIVE.md` was authored — this initiative
+> completed before the retrospective discipline was added to CLAUDE.md
+> (first reference implementation `docs/concepts/DCB-RETROSPECTIVE.md`,
+> 2026-05-03). Lessons-learned material is embedded in the per-chapter
+> narratives.
+
 ## What you will build
 
 | Stage | Screen |

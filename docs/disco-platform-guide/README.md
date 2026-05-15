@@ -25,6 +25,13 @@ An epilogue covers the auto-generated BSP path
 (`rlvgl-creator` + `chips/stm/bsps`) and where it stops being able
 to automate away the gotchas Chapter 1 catalogues.
 
+> **Status:** Closed (11/11 chapters; demo ships in v0.2.0). No
+> `DISCO-PLATFORM-RETROSPECTIVE.md` was authored — this initiative
+> completed before the retrospective discipline was added to CLAUDE.md
+> (first reference implementation `docs/concepts/DCB-RETROSPECTIVE.md`,
+> 2026-05-03). Lessons-learned material is embedded in the per-chapter
+> walkthroughs and the Ch 1 "gap gallery".
+
 ## Design posture
 
 The in-repo rule is **PAC + TRM over HAL crates**. This guide is

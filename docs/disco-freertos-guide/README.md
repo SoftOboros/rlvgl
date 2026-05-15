@@ -23,6 +23,13 @@ busy-wait ISR to an interrupt-driven state machine, wiring the
 widget tree's gesture and keyboard pipelines, and achieving
 flicker-free single-buffer rendering with ERIF-phase-locked timing.
 
+> **Status:** Closed (7/7 chapters; FreeRTOS platform ships in v0.2.0).
+> No `DISCO-FREERTOS-RETROSPECTIVE.md` was authored — this initiative
+> completed before the retrospective discipline was added to CLAUDE.md
+> (first reference implementation `docs/concepts/DCB-RETROSPECTIVE.md`,
+> 2026-05-03). Lessons-learned material is embedded in the per-chapter
+> narratives, especially Ch 7 (flicker, tearing, rendering strategy).
+
 ## Design posture
 
 The in-repo rule is **shared app code, platform-specific plumbing**.

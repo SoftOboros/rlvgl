@@ -24,6 +24,14 @@ For SDK install, build commands, and environment setup, see the
 reference doc at [`docs/ZEPHYR.md`](../ZEPHYR.md). This guide
 focuses on the *how and why* of the platform code.
 
+> **Status:** Closed (7/7 chapters; Zephyr platform ships in v0.2.0).
+> No `DISCO-ZEPHYR-RETROSPECTIVE.md` was authored — this initiative
+> completed before the retrospective discipline was added to CLAUDE.md
+> (first reference implementation `docs/concepts/DCB-RETROSPECTIVE.md`,
+> 2026-05-03). Lessons-learned material is embedded in the per-chapter
+> narratives, especially Ch 3 (video vs adapted-cmd) and Ch 7
+> (adapted command mode deep dive).
+
 ## Design posture
 
 Zephyr provides drivers for clocks, SDRAM, DSI, LTDC, I2C, and
