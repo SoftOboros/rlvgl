@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32c6_render.rs
-assertion_line: 74
 expression: text
 ---
 //! IO MUX and GPIO matrix routing for DFR1172 C6 Companion.
@@ -16,7 +15,7 @@ expression: text
 //! Pins tagged `flash_reserved` in the chip IR are filtered out upstream by
 //! `espressif::load::merge`; any that reach this file are a generator bug.
 
-use esp32c6 as pac;
+use super::pac;
 
 /// Apply the board's pin mux and GPIO matrix routing.
 pub fn init() {

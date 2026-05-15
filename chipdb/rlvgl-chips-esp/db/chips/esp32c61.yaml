@@ -11,6 +11,10 @@ name: ESP32-C61
 arch: rv32imac
 package: QFN32-5x5
 pac_crate: esp32c61
+# `esp32c61 = 0.3` is generated with svd2rust 0.37.x (post-`Peripherals`
+# struct drop); pac.rs.jinja emits a local `Peripherals` shim under
+# `pac_vintage: modern`.
+pac_vintage: modern
 gpio_count: 30
 
 memory:
@@ -29,12 +33,15 @@ clock_tree:
   # PCR clock gates — same pattern as C6.
   system_gates:
     uart0:
-      clk_en_reg:   pcr.uart0_conf
-      clk_en_field: uart0_clk_en
-      rst_reg:      pcr.uart0_conf
-      rst_field:    uart0_rst_en
-      clk_sel_reg:  pcr.uart0_sclk_conf
-      clk_sel_field: uart0_sclk_sel
+      # esp32c61 0.3 PCR clusters UART instances: `pcr.uart(0).conf()` /
+      # `pcr.uart(0).clk_conf()` with cluster-relative field names
+      # (`clk_en`, `rst_en`, `sclk_sel`).
+      clk_en_reg:   pcr.uart(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(0).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(0).clk_conf
+      clk_sel_field: sclk_sel
     uart1:
       clk_en_reg:   pcr.uart1_conf
       clk_en_field: uart1_clk_en

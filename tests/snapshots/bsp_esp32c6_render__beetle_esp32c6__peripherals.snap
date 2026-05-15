@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32c6_render.rs
-assertion_line: 81
 expression: text
 ---
 //! Per-peripheral initialization for DFR1172 C6 Companion.
@@ -10,7 +9,7 @@ expression: text
 //! I2C (full timing setup), SPI master (clock + mode), and timer groups
 //! (watchdog disable). Other peripherals get TODO stubs.
 
-use esp32c6 as pac;
+use super::pac;
 
 #[allow(unused_imports)]
 use super::board::{APB_HZ, XTAL_HZ};

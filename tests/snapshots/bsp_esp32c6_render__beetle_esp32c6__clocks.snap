@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32c6_render.rs
-assertion_line: 67
 expression: text
 ---
 //! Clock tree initialization for DFR1172 C6 Companion.
@@ -16,7 +15,7 @@ expression: text
 //! code does not currently reprogram the CPU clock. See `pac.rs` for the
 //! constants.
 
-use esp32c6 as pac;
+use super::pac;
 
 /// Enable and reset every peripheral used by this board.
 ///
@@ -27,13 +26,13 @@ pub fn init() {
     
     
     
-    // uart0 — clock enable uart0_clk_en, reset uart0_rst_en
-    p.PCR.uart0_conf().modify(|_, w| w.uart0_rst_en().set_bit());
-    p.PCR.uart0_conf().modify(|_, w| w.uart0_clk_en().set_bit());
-    p.PCR.uart0_conf().modify(|_, w| w.uart0_rst_en().clear_bit());
+    // uart0 — clock enable clk_en, reset rst_en
+    p.PCR.uart(0).conf().modify(|_, w| w.rst_en().set_bit());
+    p.PCR.uart(0).conf().modify(|_, w| w.clk_en().set_bit());
+    p.PCR.uart(0).conf().modify(|_, w| w.rst_en().clear_bit());
     
     // uart0 — select APB as kernel clock source
-    p.PCR.uart0_sclk_conf().modify(|_, w| unsafe { w.uart0_sclk_sel().bits(1) });
+    p.PCR.uart(0).clk_conf().modify(|_, w| unsafe { w.sclk_sel().bits(1) });
     
     
     

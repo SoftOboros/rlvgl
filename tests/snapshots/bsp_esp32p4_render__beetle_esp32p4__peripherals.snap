@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32p4_render.rs
-assertion_line: 81
 expression: text
 ---
 //! Per-peripheral initialization for DFR1172 FireBeetle 2 P4.
@@ -10,7 +9,7 @@ expression: text
 //! I2C (full timing setup), SPI master (clock + mode), and timer groups
 //! (watchdog disable). Other peripherals get TODO stubs.
 
-use esp32p4 as pac;
+use super::pac;
 
 #[allow(unused_imports)]
 use super::board::{APB_HZ, XTAL_HZ};
@@ -84,6 +83,3 @@ pub fn init_i2c0() {
     // Publish the config — `conf_upgate` latches the new timings.
     p.I2C0.ctr().modify(|_, w| w.conf_upgate().set_bit());
 }
-
-
-

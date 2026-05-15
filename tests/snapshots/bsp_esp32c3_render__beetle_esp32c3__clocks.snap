@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32c3_render.rs
-assertion_line: 147
 expression: text
 ---
 //! Clock tree initialization for DFR0868 Beetle ESP32-C3.
@@ -16,7 +15,7 @@ expression: text
 //! code does not currently reprogram the CPU clock. See `pac.rs` for the
 //! constants.
 
-use esp32c3 as pac;
+use super::pac;
 
 /// Enable and reset every peripheral used by this board.
 ///

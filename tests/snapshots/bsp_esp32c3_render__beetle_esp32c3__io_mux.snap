@@ -15,7 +15,7 @@ expression: text
 //! Pins tagged `flash_reserved` in the chip IR are filtered out upstream by
 //! `espressif::load::merge`; any that reach this file are a generator bug.
 
-use esp32c3 as pac;
+use super::pac;
 
 /// Apply the board's pin mux and GPIO matrix routing.
 pub fn init() {

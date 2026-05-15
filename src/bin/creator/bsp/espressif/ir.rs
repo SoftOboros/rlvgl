@@ -58,6 +58,10 @@ fn default_version() -> String {
     "0.1".to_string()
 }
 
+fn default_pac_vintage() -> String {
+    "legacy".to_string()
+}
+
 /// Full chip inventory sourced from the vendor Technical Reference Manual.
 ///
 /// This is the schema for `db/chips/<chip>.yaml`. Every field is populated
@@ -73,6 +77,17 @@ pub struct EspChip {
     pub package: String,
     /// PAC crate name used in generated code (`use <pac_crate> as pac;`).
     pub pac_crate: String,
+    /// PAC API vintage. `"legacy"` (default) means the upstream PAC exposes
+    /// a top-level `pub struct Peripherals` with `take()` / `steal()` — the
+    /// pre-svd2rust-0.37 shape used by `esp32c3 = 0.31` and `esp32p4 = 0.2`.
+    /// `"modern"` means the upstream PAC dropped the aggregate `Peripherals`
+    /// struct in favour of per-peripheral `pac::FOO::steal()` (svd2rust 0.37+
+    /// shape used by `esp32c6 = 0.23`, `esp32h2 = 0.19`, `esp32c5 = 0.2`,
+    /// `esp32c61 = 0.3`). When `modern`, `pac.rs.jinja` emits a local
+    /// `Peripherals` shim struct so the rest of the generated code keeps the
+    /// same `p.UART0.foo()` field-access shape across vintages.
+    #[serde(default = "default_pac_vintage")]
+    pub pac_vintage: String,
     /// Number of user-accessible GPIO pads on this chip.
     pub gpio_count: u8,
     /// Memory map (ROM, SRAM, cache windows, RTC).
