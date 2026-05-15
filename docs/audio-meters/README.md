@@ -185,6 +185,16 @@ independently conformant once its checklist passes.
 
 ## Chapters
 
+> **Status:** Open (18/19 chapters ratified). AM-04b concepts
+> ratified 2026-05-11 (post-discipline); execution sub-letters
+> (`AM-04b[a-z]:` — SVG/PNG asset sources, `rlvgl-creator meters
+> from-yaml` rasteriser, asset-aware widget draw paths, 2-3
+> alternate-look skin variants) remain open. When the AM-04b
+> execution sub-letters complete, this initiative will reach
+> natural completion and owe an `AM-RETROSPECTIVE.md` per the
+> retrospective discipline added to `CLAUDE.md` (first reference
+> implementation `docs/concepts/DCB-RETROSPECTIVE.md`, 2026-05-03).
+
 | Phase | Status | Doc |
 |---|---|---|
 | AM-00 — Concepts | Ratified 2026-04-26 | [00-concepts.md](00-concepts.md) |
@@ -193,7 +203,7 @@ independently conformant once its checklist passes.
 | AM-03 — Scale descriptors | Ratified 2026-04-26 | [03-scales.md](03-scales.md) |
 | AM-04a — Skin descriptors | Ratified 2026-04-26 | [04-skins.md](04-skins.md) |
 | AM-04b-stub — Asset hooks | Ratified 2026-04-26 | [13-asset-hooks.md](13-asset-hooks.md) |
-| AM-04b — Visual primitives + creator rasterisation | Deferred | _(aesthetics pass)_ |
+| AM-04b — Aesthetics: visual primitives + creator rasterisation | Concepts ratified 2026-05-11; execution `AM-04b[a-z]:` open | [04b-aesthetics.md](04b-aesthetics.md) |
 | AM-05 — `LedBargraph` (rlvgl) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) |
 | AM-06 — `LedBargraph` (TS) | Ratified 2026-04-26 | [05-led-bargraph.md](05-led-bargraph.md) (combined) |
 | AM-07 — `NeedleVu` (both) | Ratified 2026-04-26 | [06-needle-vu.md](06-needle-vu.md) |
@@ -202,12 +212,12 @@ independently conformant once its checklist passes.
 | AM-08c — Stereo composition | Ratified 2026-04-26 | [09-stereo.md](09-stereo.md) |
 | AM-08d — LUFS gauge | Ratified 2026-04-26 | [11-lufs-gauge.md](11-lufs-gauge.md) |
 | AM-08e — LufsI absolute gating | Ratified 2026-04-26 | [12-lufs-gating.md](12-lufs-gating.md) |
-| AM-08h — BS.1770 relative gating | Ratified 2026-04-26 | [14-bs1770-relative-gating.md](14-bs1770-relative-gating.md) |
-| AM-08i — LufsGaugeStrict widget | Ratified 2026-04-26 | _(commit `4ab8930` follow-up)_ |
-| AM-10 — Multi-channel composite (5.1, EQ, …) | Ratified 2026-04-26 | [15-multi-channel.md](15-multi-channel.md) |
 | AM-08f — Streaming LUFS scale | Ratified 2026-04-26 | _(commit `9d873d1`)_ |
 | AM-08g — PPM skin coverage | Ratified 2026-04-26 | _(commit `7ad4724`)_ |
+| AM-08h — BS.1770 relative gating | Ratified 2026-04-26 | [14-bs1770-relative-gating.md](14-bs1770-relative-gating.md) |
+| AM-08i — LufsGaugeStrict widget | Ratified 2026-04-26 | _(commit `4ab8930` follow-up)_ |
 | AM-09 — Integration | Ratified 2026-04-26 | [10-integration.md](10-integration.md) |
+| AM-10 — Multi-channel composite (5.1, EQ, …) | Ratified 2026-04-26 | [15-multi-channel.md](15-multi-channel.md) |
 
 ## Test surface
 
