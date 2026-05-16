@@ -190,11 +190,19 @@ RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
 RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
 cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test && cd ../..
 
-# Phase 4.6: ESP32-C3 BSP generator + beetle-esp32c3 both feature sets
+# Phase 4.6: ESP32-C3 BSP generator + beetle-esp32c3 both feature sets.
 # The `compile-verify` feature spins up a throwaway cargo project around the
-# generated BSP and type-checks it against real `esp32c3 = 0.31` on
-# `riscv32imc-unknown-none-elf`; it needs `rustup target add riscv32imc-unknown-none-elf`
-# and network access for the PAC crate, so it's opt-in.
+# generated BSP and type-checks it against the real PAC crate on the chip's
+# target triple; it needs `rustup target add <triple>` and network access for
+# the PAC crate, so it's opt-in. CHIPS-ESP-08-NN of 2026-05-15 extended
+# compile-verify coverage from C3-only to all six published-PAC chips
+# (C3, P4, C6, H2, C5, C61). CHIPS-ESP-09 of 2026-05-15 added a cross-vintage
+# `Peripherals` shim in `pac.rs.jinja` driven by `pac_vintage: legacy|modern`
+# in chipdb yaml — modern chips (C6 0.23 / H2 0.19 / C5 0.2 / C61 0.3) dropped
+# the top-level `Peripherals` aggregate, so the generator emits a per-chip
+# shim populated from the `shim_instances` set. Legacy chips (C3 0.31 / P4 0.2)
+# use upstream `Peripherals` directly. See
+# `chipdb/rlvgl-chips-esp/docs/CHIPS-ESP-RETROSPECTIVE.md` §6.2 for context.
 RUSTFLAGS="" cargo test -p rlvgl-chips-esp
 RUSTFLAGS="" cargo test -p rlvgl --test esp_ir_roundtrip --features creator
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c3_render --features creator,regression
@@ -205,17 +213,24 @@ RUSTFLAGS="" cargo check -p rlvgl-example-beetle-esp32c3 --features bsp_pac --ta
 RUSTFLAGS="" cargo clippy -p rlvgl-example-beetle-esp32c3 --features esp_hal --target riscv32imc-unknown-none-elf -- -D warnings
 RUSTFLAGS="" cargo clippy -p rlvgl-example-beetle-esp32c3 --features bsp_pac --target riscv32imc-unknown-none-elf -- -D warnings
 
-# Phase 4.7: ESP32-P4 + ESP32-C6 BSP generator tests
+# Phase 4.7: ESP32-P4 + ESP32-C6 BSP generator tests (render + CLI + compile-verify).
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32p4_render --features creator,regression
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32p4_cli --features creator
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32p4_compile --features compile-verify -- --test-threads=1
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_render --features creator,regression
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_cli --features creator
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c6_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.7b: remaining RISC-V chips with linker-script emission
 # (ESP32-C5 / H2 / C61). Render tests cover memory.x + <chip>.x.
+# Compile-verify added 2026-05-15 via CHIPS-ESP-08 / -09 once the
+# cross-vintage `Peripherals` shim landed.
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c5_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c5_compile --features compile-verify -- --test-threads=1
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32h2_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32h2_compile --features compile-verify -- --test-threads=1
 RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_render --features creator,regression
+RUSTFLAGS="" cargo test -p rlvgl --test bsp_esp32c61_compile --features compile-verify -- --test-threads=1
 
 # Phase 4.7c: Silicon Labs BSP generator (CHIPS-SILABS-NN). Render test
 # covers the 8-file emission set (6 .rs + memory.x + efm32_gg11.x) for
