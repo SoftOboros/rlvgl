@@ -25,7 +25,12 @@
 
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
-use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use core::sync::atomic::Ordering;
+// Use `portable-atomic` so RMW ops (`fetch_add`, `swap`) work on targets
+// that lack hardware atomics, e.g. `riscv32imc-unknown-none-elf`. On
+// targets with `target_has_atomic = "32"` this is a thin re-export of
+// `core::sync::atomic`; on others it falls back via `critical-section`.
+use portable_atomic::{AtomicBool, AtomicU32};
 
 // ── IsrChannel ──────────────────────────────────────────────────────────
 
