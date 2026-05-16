@@ -47,34 +47,47 @@ clock_tree:
       clk_sel_reg:  pcr.uart(0).clk_conf
       clk_sel_field: sclk_sel
     uart1:
-      clk_en_reg:   pcr.uart1_conf
-      clk_en_field: uart1_clk_en
-      rst_reg:      pcr.uart1_conf
-      rst_field:    uart1_rst_en
-      clk_sel_reg:  pcr.uart1_sclk_conf
-      clk_sel_field: uart1_sclk_sel
+      # esp32h2 0.19 clusters UART instances; UART1 uses the same cluster
+      # accessor shape as UART0 with cluster-relative field names.
+      clk_en_reg:   pcr.uart(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(1).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(1).clk_conf
+      clk_sel_field: sclk_sel
     i2c0:
-      clk_en_reg:   pcr.i2c_conf
-      clk_en_field: i2c_clk_en
-      rst_reg:      pcr.i2c_conf
-      rst_field:    i2c_rst_en
-      clk_sel_reg:  pcr.i2c_sclk_conf
-      clk_sel_field: i2c_sclk_sel
+      # esp32h2 0.19 has per-instance flat `i2c0_conf` / `i2c1_conf`
+      # (unlike C6/C5 which only ship i2c0). Fields are
+      # `i2c0_clk_en` / `i2c0_rst_en`. `i2c_sclk_sel` is single-bit
+      # while the template expects multi-bit — see CHIPS-ESP-10y
+      # follow-up note in esp32c6.yaml.
+      clk_en_reg:   pcr.i2c0_conf
+      clk_en_field: i2c0_clk_en
+      rst_reg:      pcr.i2c0_conf
+      rst_field:    i2c0_rst_en
+    i2c1:
+      # H2 has a second I2C instance not present on C6/C5/C61.
+      clk_en_reg:   pcr.i2c1_conf
+      clk_en_field: i2c1_clk_en
+      rst_reg:      pcr.i2c1_conf
+      rst_field:    i2c1_rst_en
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
       rst_reg:      pcr.spi2_conf
       rst_field:    spi2_rst_en
     timg0:
-      clk_en_reg:   pcr.timergroup0_conf
-      clk_en_field: tg0_clk_en
-      rst_reg:      pcr.timergroup0_conf
-      rst_field:    tg0_rst_en
+      # esp32h2 0.19 clusters timer groups: `pcr.timergroup(0).conf()`
+      # with cluster-relative field names (`clk_en`, `rst_en`).
+      clk_en_reg:   pcr.timergroup(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(0).conf
+      rst_field:    rst_en
     timg1:
-      clk_en_reg:   pcr.timergroup1_conf
-      clk_en_field: tg1_clk_en
-      rst_reg:      pcr.timergroup1_conf
-      rst_field:    tg1_rst_en
+      clk_en_reg:   pcr.timergroup(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(1).conf
+      rst_field:    rst_en
     systimer:
       clk_en_reg:   pcr.systimer_conf
       clk_en_field: systimer_clk_en
@@ -138,6 +151,14 @@ peripherals:
     signals:
       - { role: scl, direction: inout, gpio_matrix_id: 45 }
       - { role: sda, direction: inout, gpio_matrix_id: 46 }
+  i2c1:
+    class: i2c
+    instance: i2c1
+    base: 0x60005000        # H2 TRM Table 5.3-2 — second I2C instance
+    irq: null
+    signals:
+      - { role: scl, direction: inout, gpio_matrix_id: 30 }
+      - { role: sda, direction: inout, gpio_matrix_id: 31 }
   spi2:
     class: spi_master
     instance: spi2

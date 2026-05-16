@@ -43,30 +43,43 @@ clock_tree:
       clk_sel_reg:  pcr.uart(0).clk_conf
       clk_sel_field: sclk_sel
     uart1:
-      clk_en_reg:   pcr.uart1_conf
-      clk_en_field: uart1_clk_en
-      rst_reg:      pcr.uart1_conf
-      rst_field:    uart1_rst_en
+      # esp32c5 0.2 clusters UART instances; UART1 uses the same cluster
+      # accessor shape as UART0 with cluster-relative field names.
+      clk_en_reg:   pcr.uart(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(1).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(1).clk_conf
+      clk_sel_field: sclk_sel
     i2c0:
-      clk_en_reg:   pcr.i2c_conf
-      clk_en_field: i2c_clk_en
-      rst_reg:      pcr.i2c_conf
-      rst_field:    i2c_rst_en
+      # esp32c5 0.2 has flat `i2c0_conf` (single I2C instance); fields
+      # are `i2c0_clk_en` / `i2c0_rst_en`. `i2c_sclk_sel` is a
+      # single-bit field but the clocks.rs.jinja template assumes
+      # multi-bit (`bits(1)`); omitting clk_sel here lets the
+      # peripherals.rs i2c init's `sclk_sel().clear_bit()` handle
+      # source selection. See CHIPS-ESP-10y follow-up note in
+      # esp32c6.yaml.
+      clk_en_reg:   pcr.i2c0_conf
+      clk_en_field: i2c0_clk_en
+      rst_reg:      pcr.i2c0_conf
+      rst_field:    i2c0_rst_en
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
       rst_reg:      pcr.spi2_conf
       rst_field:    spi2_rst_en
     timg0:
-      clk_en_reg:   pcr.timergroup0_conf
-      clk_en_field: tg0_clk_en
-      rst_reg:      pcr.timergroup0_conf
-      rst_field:    tg0_rst_en
+      # esp32c5 0.2 clusters timer groups: `pcr.timergroup(0).conf()`
+      # with cluster-relative field names (`clk_en`, `rst_en`).
+      clk_en_reg:   pcr.timergroup(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(0).conf
+      rst_field:    rst_en
     timg1:
-      clk_en_reg:   pcr.timergroup1_conf
-      clk_en_field: tg1_clk_en
-      rst_reg:      pcr.timergroup1_conf
-      rst_field:    tg1_rst_en
+      clk_en_reg:   pcr.timergroup(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(1).conf
+      rst_field:    rst_en
     systimer:
       clk_en_reg:   pcr.systimer_conf
       clk_en_field: systimer_clk_en
