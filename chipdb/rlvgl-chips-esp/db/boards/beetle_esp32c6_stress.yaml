@@ -1,0 +1,52 @@
+# Stress variant of the DFR1172 C6 Companion board for compile-verify
+# regression of non-UART0 peripherals on esp32c6 0.23 (svd2rust 0.37+).
+#
+# Purpose (CHIPS-ESP-10a): the minimal `beetle_esp32c6.yaml` only exercises
+# UART0, which is the only peripheral whose PCR system-gate path was
+# converted to the cluster accessor shape in CHIPS-ESP-09. This stress
+# board pulls I2C0 + TIMG0 + LEDC alongside UART0 so the compile-verify
+# gate proves the cluster-path conversion across the remaining
+# peripherals (`pcr.i2c0_conf()`, `pcr.timergroup(0).conf()`,
+# `pcr.ledc_conf()`).
+#
+# SPI2 is deliberately omitted: the `peripherals.rs.jinja` init_spi
+# stub uses C3-only field names (`wr_byte_order`) absent on the
+# modern svd2rust-0.37 SPI2 USER register. Tracked as CHIPS-ESP-10y
+# follow-up; this slate is chipdb-yaml-only and doesn't touch the
+# peripherals.rs template.
+#
+# Not a physical board layout — pin assignments are derived from C6 IO
+# MUX defaults and GPIO matrix routing for plausibility but not from a
+# specific schematic.
+
+name: DFR1172 C6 Stress
+chip: ESP32-C6
+module: ESP32-C6-MINI-1
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 console (matches beetle_esp32c6.yaml)
+  - { gpio: 16, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_tx }
+  - { gpio: 17, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rx }
+  # I2C0 — SCL/SDA via GPIO matrix (signals 45/46 in the C6 chipdb)
+  - { gpio: 22, signal: I2C0_SCL, peripheral: i2c0,  direction: inout, label: scl }
+  - { gpio: 23, signal: I2C0_SDA, peripheral: i2c0,  direction: inout, label: sda }
+  # TIMG0 — no external pin signal; pin route lands as Plain GPIO but
+  # the `peripherals_used` set still pulls TIMG0 in, exercising
+  # `pcr.timergroup(0).conf()` cluster paths.
+  - { gpio: 6,  signal: TIMG0_PULSE, peripheral: timg0, direction: out, label: timg_pulse }
+  # LEDC channel 0 — GPIO matrix signal 0 on GPIO10 (typical board LED)
+  - { gpio: 10, signal: LEDC_CH0,  peripheral: ledc, direction: out, label: led }
+
+i2c_configs:
+  i2c0:
+    scl_hz: 400000  # Standard fast-mode I2C — required for template render
+
+features:
+  role: stress_test
+  scope: compile_verify

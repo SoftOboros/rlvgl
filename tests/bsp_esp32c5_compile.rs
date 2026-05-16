@@ -140,3 +140,11 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
 fn esp32c5_minimal_output_compiles_against_real_pac() {
     compile_verify_board("esp32c5_minimal", "esp32_c5_minimal", "c5-minimal");
 }
+
+// CHIPS-ESP-10a (2026-05-15) added this stress-board variant covering
+// non-UART0 PCR system-gate paths (I2C0 + SPI2 + LEDC + clustered
+// TIMG, exercising the cluster-path conversion).
+#[test]
+fn esp32c5_stress_output_compiles_against_real_pac() {
+    compile_verify_board("esp32c5_stress", "esp32_c5_stress", "c5-stress");
+}

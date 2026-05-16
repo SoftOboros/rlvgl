@@ -140,3 +140,13 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
 fn esp32c61_minimal_output_compiles_against_real_pac() {
     compile_verify_board("esp32c61_minimal", "esp32_c61_minimal", "c61-minimal");
 }
+
+// CHIPS-ESP-10a (2026-05-15) added this stress-board variant covering
+// non-UART0 PCR system-gate paths. C61 has a trimmed peripheral set vs
+// C6 — no RMT, no TWAI — so the stress board pulls only peripherals
+// whose PCR system-gate is present in the C61 PAC: UART0 + I2C0 +
+// SPI2 + LEDC.
+#[test]
+fn esp32c61_stress_output_compiles_against_real_pac() {
+    compile_verify_board("esp32c61_stress", "esp32_c61_stress", "c61-stress");
+}

@@ -170,3 +170,18 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
 fn beetle_esp32c6_output_compiles_against_real_pac() {
     compile_verify_board("beetle_esp32c6", "dfr1172_c6_companion", "beetle-c6");
 }
+
+// CHIPS-ESP-10a (2026-05-15) added this stress-board variant. The
+// minimal board only exercises UART0, which is the only peripheral
+// whose PCR system-gate path was converted to the cluster accessor
+// shape in CHIPS-ESP-09. This stress variant pulls I2C0 + SPI2 + LEDC
+// alongside UART0 so the compile-verify gate proves the cluster-path
+// and i2c0_conf renaming across the remaining peripherals.
+#[test]
+fn beetle_esp32c6_stress_output_compiles_against_real_pac() {
+    compile_verify_board(
+        "beetle_esp32c6_stress",
+        "dfr1172_c6_stress",
+        "beetle-c6-stress",
+    );
+}

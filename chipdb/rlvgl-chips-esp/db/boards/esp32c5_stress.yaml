@@ -1,0 +1,38 @@
+# Stress variant of the ESP32-C5 Minimal board for compile-verify
+# regression of non-UART0 peripherals on esp32c5 0.2 (svd2rust 0.37+).
+#
+# Purpose (CHIPS-ESP-10a): same rationale as the C6/H2 stress boards —
+# exercise the cluster-path conversion across multiple PCR system-gate
+# entries beyond UART0. The stress board uses I2C0 + TIMG0 + LEDC.
+#
+# SPI2 is deliberately omitted — see beetle_esp32c6_stress.yaml.
+
+name: ESP32-C5 Stress
+chip: ESP32-C5
+module: null
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 console (matches esp32c5_minimal.yaml)
+  - { gpio: 16, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 17, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  # I2C0 — SCL/SDA via GPIO matrix
+  - { gpio: 22, signal: I2C0_SCL, peripheral: i2c0,  direction: inout, label: scl }
+  - { gpio: 23, signal: I2C0_SDA, peripheral: i2c0,  direction: inout, label: sda }
+  # TIMG0 — exercises cluster gate path.
+  - { gpio: 6,  signal: TIMG0_PULSE, peripheral: timg0, direction: out, label: timg_pulse }
+  # LEDC channel 0 — GPIO matrix signal 0
+  - { gpio: 10, signal: LEDC_CH0,  peripheral: ledc, direction: out, label: led }
+
+i2c_configs:
+  i2c0:
+    scl_hz: 400000  # Standard fast-mode I2C — required for template render
+
+features:
+  role: stress_test
+  scope: compile_verify

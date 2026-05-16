@@ -140,3 +140,16 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
 fn esp32h2_devkitm_1_output_compiles_against_real_pac() {
     compile_verify_board("esp32h2_devkitm_1", "esp32_h2_dev_kit_m_1", "h2-devkitm-1");
 }
+
+// CHIPS-ESP-10a (2026-05-15) added this stress-board variant covering
+// non-UART0 PCR system-gate paths. H2 specifically tests the
+// per-instance i2c_conf / i2c_sclk_conf shape (`pcr.i2c0_sclk_conf()`)
+// which differs from C6's singular-sclk shape.
+#[test]
+fn esp32h2_devkitm_1_stress_output_compiles_against_real_pac() {
+    compile_verify_board(
+        "esp32h2_devkitm_1_stress",
+        "esp32_h2_dev_kit_m_1_stress",
+        "h2-devkitm-1-stress",
+    );
+}
