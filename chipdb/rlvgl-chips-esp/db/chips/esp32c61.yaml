@@ -178,7 +178,17 @@ peripherals:
     instance: spi2
     base: 0x60081000
     irq: null
-    signals: []
+    # IO MUX fast-path signals — ESP32-C61 Series Datasheet v1.0 §2.3.3
+    # Table 2-3 "IO MUX Pin Functions" (FSPI = SPI2 main interface).
+    # All six FSPI signals are F2 on their respective IO MUX pins; chip
+    # select sits on GPIO8.
+    signals:
+      - { role: sck,  direction: out, iomux_pin: 6, iomux_fn: 2 }
+      - { role: mosi, direction: out, iomux_pin: 7, iomux_fn: 2 }
+      - { role: miso, direction: in,  iomux_pin: 2, iomux_fn: 2 }
+      - { role: cs0,  direction: out, iomux_pin: 8, iomux_fn: 2 }
+      - { role: hd,   direction: out, iomux_pin: 3, iomux_fn: 2 }
+      - { role: wp,   direction: out, iomux_pin: 4, iomux_fn: 2 }
   timg0:
     class: timg
     instance: timg0
