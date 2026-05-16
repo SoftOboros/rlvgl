@@ -77,8 +77,8 @@ pub(crate) fn run(root: &Path, manifest_path: &Path, force: bool) -> Result<()> 
             .unwrap_or_default()
             .as_secs();
 
-        if !force {
-            if let Some(entry) = cache.entries.get(&rel_str) {
+        if !force
+            && let Some(entry) = cache.entries.get(&rel_str) {
                 let outputs_exist = entry.outputs.iter().all(|o| root.join(&o.path).exists());
                 let outputs_fresh = entry.outputs.iter().all(|o| o.mtime >= src_mtime);
                 if entry.src_mtime == src_mtime && outputs_exist && outputs_fresh {
@@ -86,15 +86,14 @@ pub(crate) fn run(root: &Path, manifest_path: &Path, force: bool) -> Result<()> 
                     continue;
                 }
             }
-        }
 
         let data = fs::read(path)?;
         let mut hasher = Hasher::new();
         hasher.update(&data);
         let hash = hasher.finalize().to_hex().to_string();
 
-        if !force {
-            if let Some(entry) = cache.entries.get_mut(&rel_str) {
+        if !force
+            && let Some(entry) = cache.entries.get_mut(&rel_str) {
                 let outputs_exist = entry.outputs.iter().all(|o| root.join(&o.path).exists());
                 if entry.hash == hash && outputs_exist {
                     entry.src_mtime = src_mtime;
@@ -105,7 +104,6 @@ pub(crate) fn run(root: &Path, manifest_path: &Path, force: bool) -> Result<()> 
                     continue;
                 }
             }
-        }
 
         tasks.push(Task {
             rel: rel_str,

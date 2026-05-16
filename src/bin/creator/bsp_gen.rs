@@ -219,7 +219,7 @@ pub(crate) fn render_from_ir(
 
     match layout {
         Layout::OneFile => {
-            let filtered = maybe_filter_ir(&ir);
+            let filtered = maybe_filter_ir(ir);
             let rendered = env.get_template("gen")?.render(context! {
                 spec => &filtered,
                 grouped_writes,
@@ -236,11 +236,10 @@ pub(crate) fn render_from_ir(
             use indexmap::IndexMap;
             let mut mods = Vec::new();
             for (name, per) in &ir.peripherals {
-                if let Some(sel) = core_filter {
-                    if per.core.map(|c| c != sel).unwrap_or(false) {
+                if let Some(sel) = core_filter
+                    && per.core.map(|c| c != sel).unwrap_or(false) {
                         continue;
                     }
-                }
                 let pins: Vec<_> = ir
                     .pinctrl
                     .iter()
@@ -322,11 +321,9 @@ impl crate::bsp::af::AfProvider for McuAf {
             .get(pin)
             .and_then(|m| m.get(normalized).copied())
             .or_else(|| self.pins.get(pin).and_then(|m| m.get(func).copied()))
-        {
-            if v != 0 {
+            && v != 0 {
                 return Some(v);
             }
-        }
         // Minimal fallbacks for STM32H747I-DISCO bring-up
         match (pin, func) {
             // I2C4 on PD12/PD13 uses AF4
@@ -342,7 +339,7 @@ impl crate::bsp::af::AfProvider for McuAf {
 
 fn load_mcu_af(mcu: &str) -> Result<McuAf> {
     let blob = stm::raw_db();
-    let data = zstd::decode_all(&blob[..])?;
+    let data = zstd::decode_all(blob)?;
     {
         let mut archive = tar::Archive::new(std::io::Cursor::new(&data));
         let target = format!("mcu/{mcu}.json");
@@ -416,7 +413,7 @@ fn parse_raw_db(blob: &[u8]) -> std::collections::HashMap<String, Vec<u8>> {
     while let Some(line) = lines.next() {
         if let Some(name) = line.strip_prefix('>') {
             let mut content = String::new();
-            while let Some(l) = lines.next() {
+            for l in lines.by_ref() {
                 if l == "<" {
                     break;
                 }
@@ -429,6 +426,60 @@ fn parse_raw_db(blob: &[u8]) -> std::collections::HashMap<String, Vec<u8>> {
         }
     }
     files
+}
+
+/// Emits a top-level `mod.rs` exposing available forms for a board.
+#[allow(dead_code)]
+pub(crate) fn emit_board_mod(
+    out_dir: &Path,
+    has_hal: bool,
+    has_pac: bool,
+    has_summary: bool,
+    has_pinreport: bool,
+) -> Result<()> {
+    let tmpl = include_str!("bsp/templates/board_mod.rs.jinja");
+    let mut env = Environment::new();
+    env.add_template("board", tmpl)?;
+    let rendered = env.get_template("board")?.render(context! {
+        hal => has_hal,
+        pac => has_pac,
+        summary => has_summary,
+        pinreport => has_pinreport
+    })?;
+    fs::write(out_dir.join("mod.rs"), rendered)?;
+    // Also emit a user-editable board.rs with defaults if missing.
+    let board_rs = out_dir.join("board.rs");
+    if !board_rs.exists() {
+        let tmpl = include_str!("bsp/templates/board.rs.jinja");
+        fs::write(board_rs, tmpl)?;
+    }
+    Ok(())
+}
+fn sanitize_ident(label: &str, prefix: Option<&str>) -> String {
+    // Lowercase and replace non-alphanumeric with underscores
+    let mut s: String = label
+        .chars()
+        .map(|c| {
+            let lc = c.to_ascii_lowercase();
+            if lc.is_ascii_alphanumeric() { lc } else { '_' }
+        })
+        .collect();
+    while s.contains("__") {
+        s = s.replace("__", "_");
+    }
+    if s.starts_with(|c: char| c.is_ascii_digit() | c.eq(&'_')) {
+        s = format!("{}{}", prefix.unwrap_or("pin_"), s.trim_start_matches('_'));
+    }
+    // Avoid Rust keywords minimally
+    match s.as_str() {
+        "fn" | "let" | "mod" | "type" | "struct" | "enum" | "impl" | "trait" | "const"
+        | "static" | "crate" | "super" | "self" | "Self" | "use" | "pub" | "move" | "async"
+        | "await" | "loop" | "while" | "for" | "in" | "match" | "if" | "else" | "return" => {
+            s.push_str("_pin");
+        }
+        _ => {}
+    }
+    s.trim_matches('_').to_string()
 }
 
 #[cfg(test)]
@@ -522,58 +573,4 @@ mod tests {
             .unwrap();
         assert!(rendered.contains("let stlink_rx ="));
     }
-}
-
-/// Emits a top-level `mod.rs` exposing available forms for a board.
-#[allow(dead_code)]
-pub(crate) fn emit_board_mod(
-    out_dir: &Path,
-    has_hal: bool,
-    has_pac: bool,
-    has_summary: bool,
-    has_pinreport: bool,
-) -> Result<()> {
-    let tmpl = include_str!("bsp/templates/board_mod.rs.jinja");
-    let mut env = Environment::new();
-    env.add_template("board", tmpl)?;
-    let rendered = env.get_template("board")?.render(context! {
-        hal => has_hal,
-        pac => has_pac,
-        summary => has_summary,
-        pinreport => has_pinreport
-    })?;
-    fs::write(out_dir.join("mod.rs"), rendered)?;
-    // Also emit a user-editable board.rs with defaults if missing.
-    let board_rs = out_dir.join("board.rs");
-    if !board_rs.exists() {
-        let tmpl = include_str!("bsp/templates/board.rs.jinja");
-        fs::write(board_rs, tmpl)?;
-    }
-    Ok(())
-}
-fn sanitize_ident(label: &str, prefix: Option<&str>) -> String {
-    // Lowercase and replace non-alphanumeric with underscores
-    let mut s: String = label
-        .chars()
-        .map(|c| {
-            let lc = c.to_ascii_lowercase();
-            if lc.is_ascii_alphanumeric() { lc } else { '_' }
-        })
-        .collect();
-    while s.contains("__") {
-        s = s.replace("__", "_");
-    }
-    if s.starts_with(|c: char| c.is_ascii_digit() | c.eq(&'_')) {
-        s = format!("{}{}", prefix.unwrap_or("pin_"), s.trim_start_matches('_'));
-    }
-    // Avoid Rust keywords minimally
-    match s.as_str() {
-        "fn" | "let" | "mod" | "type" | "struct" | "enum" | "impl" | "trait" | "const"
-        | "static" | "crate" | "super" | "self" | "Self" | "use" | "pub" | "move" | "async"
-        | "await" | "loop" | "while" | "for" | "in" | "match" | "if" | "else" | "return" => {
-            s.push_str("_pin");
-        }
-        _ => {}
-    }
-    s.trim_matches('_').to_string()
 }

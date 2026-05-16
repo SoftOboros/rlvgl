@@ -5,9 +5,7 @@ use std::path::Path;
 /// Generate a SCREAMING_SNAKE constant name from a path.
 pub(crate) fn const_name(path: &str) -> String {
     let name = path
-        .replace('/', "_")
-        .replace('.', "_")
-        .replace('-', "_")
+        .replace(['/', '.', '-'], "_")
         .to_uppercase();
     if let Some(stripped) = name.strip_prefix("ICONS_") {
         format!("ICON_{}", stripped)

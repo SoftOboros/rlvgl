@@ -250,7 +250,7 @@ fn rle_decode(data: &[u8]) -> Vec<u8> {
     for pair in &mut iter {
         let run = pair[0];
         let val = pair[1];
-        out.extend(std::iter::repeat(val).take(run as usize));
+        out.extend(std::iter::repeat_n(val, run as usize));
     }
     out
 }
