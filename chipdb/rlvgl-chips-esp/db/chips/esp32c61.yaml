@@ -91,12 +91,51 @@ clock_tree:
       clk_en_field: ledc_clk_en
       rst_reg:      pcr.ledc_conf
       rst_field:    ledc_rst_en
-    # rmt:  absent in esp32c61 0.3 PAC — track as CHIPS-ESP-10z follow-up.
-    #   The C61 chip itself lacks RMT (datasheet confirms — peripheral
-    #   list trims RMT/TWAI vs C6). The `peripherals:` block below still
-    #   defines an `rmt` instance for forward-compat but no board may
-    #   reference it until a future C61 PAC revision adds the gate.
-    # twai0: same as rmt — absent in esp32c61 0.3 PAC, deferred.
+    # rmt + twai0: ABSENT in esp32c61 0.3.2 PAC AND in the C61 silicon
+    #   itself — investigated and confirmed under CHIPS-ESP-10z
+    #   (2026-05-16).
+    #
+    # Evidence trail (do not re-derive):
+    #
+    #   1. PAC source — grep -rEi 'rmt|twai|infrared|\bcan\b' in
+    #      `~/.cargo/registry/.../esp32c61-0.3.2/src/` returns zero hits.
+    #      No `rmt.rs`, no `twai0.rs`, no `pcr/rmt_conf.rs`, no
+    #      `pcr/twai0_conf.rs`. The full `pcr/` submodule listing
+    #      contains gates for the peripherals present in this SKU
+    #      (uart, i2c0, spi2, timergroup, systimer, ledc, usb_device,
+    #      gdma, etc.) but nothing for RMT or TWAI.
+    #
+    #   2. PAC version — 0.3.2 is the latest published release on
+    #      crates.io (versions: 0.2.0, 0.3.0, 0.3.1, 0.3.2). Upstream
+    #      `esp-rs/esp-pacs` `main` is also at 0.3.2 with the same
+    #      module set. No 0.4.x exists.
+    #
+    #   3. Silicon datasheet — ESP32-C61 Series Datasheet v1.0 (memalpha
+    #      doc 230) "Advanced Peripheral Interfaces" lists: SPI ports,
+    #      3× UART, I2C, I2S, LEDC (6 ch), USB Serial/JTAG, SDIO 2.0
+    #      slave, GDMA, JTAG, ETM. Neither RMT nor TWAI appears in the
+    #      peripheral list or the functional block diagram. C61 is a
+    #      stripped-down C6 variant; Espressif trimmed both peripherals.
+    #
+    #   4. ESP-IDF API surface — the official ESP32-C61 peripherals
+    #      driver index lists 22 drivers; RMT and TWAI are not among
+    #      them.
+    #
+    # Implication: this is a permanent hardware-level absence, NOT a
+    # PAC-version gap. A future esp32c61 PAC bump will NOT surface RMT
+    # or TWAI gates. The `peripherals:` block below still declares
+    # `rmt`/`twai0` instances (with placeholder base addresses) purely
+    # to keep the chipdb schema symmetric across the ESP family — they
+    # MUST NOT be referenced by any board's `pins:` table and MUST NOT
+    # be added to `system_gates:` here.
+    #
+    # pending_pac: []   # No peripherals are "absent-pending-PAC-bump"
+    #                   #   for C61. The gap above is a silicon-level
+    #                   #   absence. If a future PAC revision adds any
+    #                   #   genuinely-missing-but-present-in-hardware
+    #                   #   peripheral gates (none currently known),
+    #                   #   list them here so future-PAC-bumps surface
+    #                   #   them as actionable TODOs in the yaml diff.
     usb_sj:
       clk_en_reg:   pcr.usb_device_conf
       clk_en_field: usb_device_clk_en
@@ -170,6 +209,12 @@ peripherals:
       - { role: ch3, direction: out, gpio_matrix_id: 3 }
       - { role: ch4, direction: out, gpio_matrix_id: 4 }
       - { role: ch5, direction: out, gpio_matrix_id: 5 }
+  # rmt/twai0: PLACEHOLDER instances for schema symmetry across the ESP
+  # family — see the `system_gates:` evidence-trail comment above. The
+  # C61 silicon does not implement these peripherals (datasheet v1.0)
+  # and the esp32c61 0.3.2 PAC does not expose registers for them. The
+  # base addresses below are the C6 layout values, retained only to
+  # avoid `None` fields in the chipdb. Boards MUST NOT reference these.
   rmt:
     class: rmt
     instance: rmt
