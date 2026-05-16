@@ -9,7 +9,11 @@
 # remaining peripherals. H2 has flat `i2c0_conf` distinct from C6 so
 # this gates the per-instance I2C system-gate path independently.
 #
-# SPI2 is deliberately omitted — see beetle_esp32c6_stress.yaml.
+# CHIPS-ESP-12a (2026-05-16) made the SPI2 init template vintage-agnostic
+# (byte order moved off USER → bit order on CTRL), so this stress board
+# now also pulls SPI2 on the IO MUX fast-path pins (GPIO4/5/0 = sck/mosi/
+# miso per H2 chipdb signals[]). TIMG0 was moved off GPIO4 to free the
+# SPI2 fast path.
 
 name: ESP32-H2-DevKitM-1 Stress
 chip: ESP32-H2
@@ -28,8 +32,14 @@ pins:
   # I2C0 — SCL/SDA via GPIO matrix on free GPIO pins
   - { gpio: 12, signal: I2C0_SCL, peripheral: i2c0,  direction: inout, label: scl }
   - { gpio: 13, signal: I2C0_SDA, peripheral: i2c0,  direction: inout, label: sda }
-  # TIMG0 — no external pin signal but exercises the cluster gate path.
-  - { gpio: 4,  signal: TIMG0_PULSE, peripheral: timg0, direction: out, label: timg_pulse }
+  # SPI2 — IO MUX fast-path pins per H2 chipdb signals[] (GPIO4/5/0 =
+  # sck/mosi/miso, function slot 2).
+  - { gpio: 4,  signal: SPI2_SCK,  peripheral: spi2, direction: out, label: sck  }
+  - { gpio: 5,  signal: SPI2_MOSI, peripheral: spi2, direction: out, label: mosi }
+  - { gpio: 0,  signal: SPI2_MISO, peripheral: spi2, direction: in,  label: miso }
+  # TIMG0 — moved off GPIO4 to free the SPI2 IO MUX fast path; still
+  # pulls TIMG0 into `peripherals_used`.
+  - { gpio: 9,  signal: TIMG0_PULSE, peripheral: timg0, direction: out, label: timg_pulse }
   # LEDC channel 0 — GPIO matrix signal 0 (typical board LED on GPIO8)
   - { gpio: 8,  signal: LEDC_CH0,  peripheral: ledc, direction: out, label: led }
 
