@@ -40,6 +40,7 @@ pub enum Layout {
 ///
 /// AFs are derived from the embedded vendor database. Rendered output is
 /// written into `out_dir` with the template's base name.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn from_ioc(
     ioc_path: &Path,
     template: TemplateKind,
@@ -103,6 +104,7 @@ pub(crate) fn from_ioc(
 }
 
 /// Render Rust source from a precomputed IR using MiniJinja templates.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_from_ir(
     ir: &ir::Ir,
     template: TemplateKind,

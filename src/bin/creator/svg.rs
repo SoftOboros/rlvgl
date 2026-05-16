@@ -22,8 +22,10 @@ pub(crate) fn run(svg: &Path, out: &Path, dpis: &[f32], threshold: Option<u8>) -
         .ok_or_else(|| anyhow!("invalid SVG name"))?;
 
     for dpi in dpis {
-        let mut opt = Options::default();
-        opt.dpi = *dpi;
+        let opt = Options {
+            dpi: *dpi,
+            ..Default::default()
+        };
         let tree = Tree::from_data(&data, &opt)?;
         let size = tree.size().to_int_size();
         let mut pixmap = tiny_skia::Pixmap::new(size.width(), size.height())

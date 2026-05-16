@@ -16,8 +16,11 @@ use std::path::{Path, PathBuf};
 #[cfg(not(test))]
 pub use crate::ir;
 // In tests that include this file directly, provide a local IR module.
+// In binary test builds the parent `rlvgl_creator/main.rs` also pulls
+// in `bsp/ir.rs`, so clippy flags the duplicate; that's expected.
 #[cfg(test)]
 #[path = "bsp/ir.rs"]
+#[allow(clippy::duplicate_mod)]
 pub mod ir;
 
 /// Options to guide C-source extraction.
