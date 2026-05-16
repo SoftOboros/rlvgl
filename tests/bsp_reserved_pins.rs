@@ -1,5 +1,9 @@
 //! Verifies reserved SWD pins are rejected unless explicitly allowed.
 #![cfg(feature = "creator")]
+// The `#[path]` includes below pull in source modules from the
+// `rlvgl-creator` binary; only a subset of their public surface is
+// exercised by this test, so the unused helpers are expected.
+#![allow(dead_code, clippy::too_many_arguments, clippy::duplicate_mod)]
 
 #[path = "../src/bin/creator/bsp/af.rs"]
 mod af;
