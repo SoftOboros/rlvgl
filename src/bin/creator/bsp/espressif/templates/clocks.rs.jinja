@@ -27,8 +27,19 @@ pub fn init() {
     p.{{ gate.clk_en_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_en_field }}().set_bit());
     p.{{ gate.rst_reg | pac_path }}.modify(|_, w| w.{{ gate.rst_field }}().clear_bit());
     {% if gate.clk_sel_reg and gate.clk_sel_field %}
+    {%- set _width = gate.clk_sel_width or 2 %}
+    {%- set _value = gate.clk_sel_value if gate.clk_sel_value is not none else 1 %}
+    {%- if _width == 1 %}
+    // {{ name }} — kernel clock source select (single-bit field)
+    {%- if _value == 0 %}
+    p.{{ gate.clk_sel_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_sel_field }}().clear_bit());
+    {%- else %}
+    p.{{ gate.clk_sel_reg | pac_path }}.modify(|_, w| w.{{ gate.clk_sel_field }}().set_bit());
+    {%- endif %}
+    {%- else %}
     // {{ name }} — select APB as kernel clock source
-    p.{{ gate.clk_sel_reg | pac_path }}.modify(|_, w| unsafe { w.{{ gate.clk_sel_field }}().bits(1) });
+    p.{{ gate.clk_sel_reg | pac_path }}.modify(|_, w| unsafe { w.{{ gate.clk_sel_field }}().bits({{ _value }}) });
+    {%- endif %}
     {% endif %}
     {% else %}
     // {{ name }}: no system gate entry in chip IR (TODO)

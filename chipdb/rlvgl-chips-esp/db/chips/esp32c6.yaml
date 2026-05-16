@@ -63,18 +63,17 @@ clock_tree:
     i2c0:
       # esp32c6 0.23 has flat `i2c0_conf` (single I2C instance on C6,
       # but PAC retains the `0` suffix); fields are `i2c0_clk_en` /
-      # `i2c0_rst_en`. The SCLK select register exists
-      # (`pcr.i2c_sclk_conf`, field `i2c_sclk_sel`) but
-      # `i2c_sclk_sel` is a single-bit FieldWriter; the current
-      # clocks.rs.jinja `bits(1)` template idiom needs a multi-bit
-      # FieldWriter. Tracking as CHIPS-ESP-10y follow-up — for now
-      # I2C clock selection falls through to its hardware default
-      # (XTAL), which matches the peripherals.rs init template's
-      # `sclk_sel().clear_bit()` write.
+      # `i2c0_rst_en`. The SCLK select register lives at
+      # `pcr.i2c_sclk_conf.i2c_sclk_sel` — a single-bit FieldWriter,
+      # handled here via `clk_sel_width: 1` per CHIPS-ESP-11.
       clk_en_reg:   pcr.i2c0_conf
       clk_en_field: i2c0_clk_en
       rst_reg:      pcr.i2c0_conf
       rst_field:    i2c0_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf
+      clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0   # XTAL — matches peripherals.rs sclk_sel().clear_bit()
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en

@@ -179,6 +179,27 @@ pub struct EspSystemGate {
     /// Optional kernel clock mux field.
     #[serde(default)]
     pub clk_sel_field: Option<String>,
+    /// Optional bit-width of the kernel clock mux field.
+    ///
+    /// Defaults to 2 when absent (the legacy svd2rust-0.31-era shape used
+    /// by `esp32c3 = 0.31` and `esp32p4 = 0.2` for UART and SPI mux fields:
+    /// a 2-bit `FieldWriter` accepting `bits(n)`). Modern svd2rust-0.37
+    /// PACs (`esp32{c6,h2,c5,c61}`) treat single-bit mux fields like
+    /// `pcr.i2c_sclk_conf.i2c_sclk_sel` as a 1-bit `BitWriter`, which
+    /// rejects `.bits(...)` at compile time. Chip YAMLs MUST set
+    /// `clk_sel_width: 1` for those entries; the template branches on
+    /// width=1 → `set_bit()/clear_bit()` and width>1 → `bits(N)`.
+    #[serde(default)]
+    pub clk_sel_width: Option<u8>,
+    /// Optional value to write into the mux field (matches the width).
+    ///
+    /// For width=1: 0 → `clear_bit()`, non-zero → `set_bit()`.
+    /// For width>1: passed verbatim to `bits(N)`. Defaults to 1 when
+    /// absent — matches the prior hard-coded `bits(1)` template line so
+    /// existing chip YAMLs render byte-for-byte the same as before this
+    /// field was introduced.
+    #[serde(default)]
+    pub clk_sel_value: Option<u8>,
 }
 
 /// Peripheral instance with its signal list.

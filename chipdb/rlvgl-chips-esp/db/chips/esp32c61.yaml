@@ -53,13 +53,17 @@ clock_tree:
       clk_sel_field: sclk_sel
     i2c0:
       # esp32c61 0.3 has flat `i2c0_conf` (single I2C instance); fields
-      # are `i2c0_clk_en` / `i2c0_rst_en`. `i2c_sclk_sel` is single-bit
-      # while the template expects multi-bit — see CHIPS-ESP-10y
-      # follow-up note in esp32c6.yaml.
+      # are `i2c0_clk_en` / `i2c0_rst_en`. The SCLK select register
+      # `pcr.i2c_sclk_conf.i2c_sclk_sel` is a single-bit FieldWriter —
+      # handled via `clk_sel_width: 1` per CHIPS-ESP-11.
       clk_en_reg:   pcr.i2c0_conf
       clk_en_field: i2c0_clk_en
       rst_reg:      pcr.i2c0_conf
       rst_field:    i2c0_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf
+      clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0   # XTAL — matches peripherals.rs sclk_sel().clear_bit()
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
