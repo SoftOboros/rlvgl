@@ -430,19 +430,25 @@ peripherals:
 #
 # P4 has no `flash_reserved` pins because the flash interface uses
 # dedicated FLASH_* pins outside the GPIO numbering (datasheet §2.4).
+# Verified from datasheet 2026-05-17 (ESP32-P4 Series Datasheet v1.0
+# Table 2-3 IO MUX Pin Functions; pin numbers per Appendix A).
+# Note GPIO0 is NOT listed in datasheet Table 2-3 — the table starts at
+# GPIO1. Keep a GPIO0 row for chipdb-schema symmetry but mark it as a
+# plain GPIO. JTAG pads (MTCK/MTDI/MTMS/MTDO) live on GPIO2..5 F0.
+# SPI2 (FSPI) signals occupy F3 on GPIO6..11.
 io_mux:
   - { gpio: 0,  pad_name: GPIO0,  fn0: GPIO0,  fn1: GPIO0 }
   - { gpio: 1,  pad_name: GPIO1,  fn0: GPIO1,  fn1: GPIO1, analog: XTAL_32K_P }
-  - { gpio: 2,  pad_name: GPIO2,  fn0: GPIO2,  fn1: GPIO2, analog: XTAL_32K_N }
-  - { gpio: 3,  pad_name: GPIO3,  fn0: GPIO3,  fn1: GPIO3 }
-  - { gpio: 4,  pad_name: GPIO4,  fn0: GPIO4,  fn1: GPIO4 }
-  - { gpio: 5,  pad_name: GPIO5,  fn0: GPIO5,  fn1: GPIO5 }
-  - { gpio: 6,  pad_name: GPIO6,  fn0: GPIO6,  fn1: GPIO6 }
-  - { gpio: 7,  pad_name: GPIO7,  fn0: GPIO7,  fn1: GPIO7 }
-  - { gpio: 8,  pad_name: GPIO8,  fn0: GPIO8,  fn1: GPIO8 }
-  - { gpio: 9,  pad_name: GPIO9,  fn0: GPIO9,  fn1: GPIO9 }
-  - { gpio: 10, pad_name: GPIO10, fn0: GPIO10, fn1: GPIO10 }
-  - { gpio: 11, pad_name: GPIO11, fn0: GPIO11, fn1: GPIO11 }
+  - { gpio: 2,  pad_name: GPIO2,  fn0: MTCK,   fn1: GPIO2 }
+  - { gpio: 3,  pad_name: GPIO3,  fn0: MTDI,   fn1: GPIO3 }
+  - { gpio: 4,  pad_name: GPIO4,  fn0: MTMS,   fn1: GPIO4 }
+  - { gpio: 5,  pad_name: GPIO5,  fn0: MTDO,   fn1: GPIO5 }
+  - { gpio: 6,  pad_name: GPIO6,  fn0: GPIO6,  fn1: GPIO6,  fn3: SPI2_HOLD_PAD }
+  - { gpio: 7,  pad_name: GPIO7,  fn0: GPIO7,  fn1: GPIO7,  fn3: SPI2_CS_PAD }
+  - { gpio: 8,  pad_name: GPIO8,  fn0: GPIO8,  fn1: GPIO8,  fn3: SPI2_D_PAD }
+  - { gpio: 9,  pad_name: GPIO9,  fn0: GPIO9,  fn1: GPIO9,  fn3: SPI2_CK_PAD }
+  - { gpio: 10, pad_name: GPIO10, fn0: GPIO10, fn1: GPIO10, fn3: SPI2_Q_PAD }
+  - { gpio: 11, pad_name: GPIO11, fn0: GPIO11, fn1: GPIO11, fn3: SPI2_WP_PAD }
   - { gpio: 12, pad_name: GPIO12, fn0: GPIO12, fn1: GPIO12 }
   - { gpio: 13, pad_name: GPIO13, fn0: GPIO13, fn1: GPIO13 }
   - { gpio: 14, pad_name: GPIO14, fn0: GPIO14, fn1: GPIO14 }
