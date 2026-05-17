@@ -1049,20 +1049,61 @@ impl Renderer for RotatedRenderer<'_> {
         // Re-lay-out the pixel buffer in physical orientation.
         // For each logical (lx, ly), the rotated buffer index is
         // (lx * phys_w) + (height - 1 - ly).
+        //
+        // 2026-05-17 (second pass): use a static scratch buffer instead
+        // of allocating a Vec per call. The bench-9-snapshot setup
+        // draws ~10-14 icons per render through this path
+        // (IconStrip + Wing + spectrum overlay); at 9 Hz that was
+        // ~200 KiB/sec of alloc/free through the 64 KiB linked-list
+        // heap. After a few seconds of operation the heap fragments
+        // and a subsequent alloc panics — observed as a "lock up after
+        // navigating into the wing menu, recover via reset button"
+        // pattern.
+        //
+        // The scratch buffer is sized for the worst case we draw in
+        // practice (icons up to 64×64). If a caller requests a larger
+        // pixels rect, we fall back to allocating one Vec for that
+        // specific call — large icons are rare and the alloc still
+        // makes progress.
+        const SCRATCH_PIXELS: usize = 64 * 64;
+        static mut SCRATCH: [Color; SCRATCH_PIXELS] = [Color(0, 0, 0, 0); SCRATCH_PIXELS];
+
         let len = (width * height) as usize;
-        let mut rotated: alloc::vec::Vec<Color> = alloc::vec::Vec::with_capacity(len);
-        rotated.resize(len, Color(0, 0, 0, 0));
-        for ly in 0..height as i32 {
-            for lx in 0..width as i32 {
-                let src_idx = (ly as u32 * width + lx as u32) as usize;
-                let dst_idx = (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
-                if let Some(&c) = pixels.get(src_idx) {
-                    rotated[dst_idx] = c;
+        if len <= SCRATCH_PIXELS {
+            // SAFETY: single-core, single-threaded — `draw_pixels` is
+            // called only from the main render loop and not from any
+            // ISR. The scratch buffer is unique to this call site and
+            // not borrowed across calls.
+            let scratch = unsafe { &mut SCRATCH[..len] };
+            // Clear only the prefix we'll actually fill; pixels that
+            // aren't written (the `pixels.get(src_idx)` None branch)
+            // retain their prior value, but we touch every index in
+            // the inner loop so that's safe.
+            for ly in 0..height as i32 {
+                for lx in 0..width as i32 {
+                    let src_idx = (ly as u32 * width + lx as u32) as usize;
+                    let dst_idx =
+                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    scratch[dst_idx] = pixels.get(src_idx).copied().unwrap_or(Color(0, 0, 0, 0));
                 }
             }
+            self.inner.draw_pixels((fb_x, fb_y), scratch, phys_w, phys_h);
+        } else {
+            // Oversize fallback: allocate once for this call. Rare.
+            let mut rotated: alloc::vec::Vec<Color> = alloc::vec::Vec::with_capacity(len);
+            rotated.resize(len, Color(0, 0, 0, 0));
+            for ly in 0..height as i32 {
+                for lx in 0..width as i32 {
+                    let src_idx = (ly as u32 * width + lx as u32) as usize;
+                    let dst_idx =
+                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    if let Some(&c) = pixels.get(src_idx) {
+                        rotated[dst_idx] = c;
+                    }
+                }
+            }
+            self.inner.draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
         }
-
-        self.inner.draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
     }
 
     fn submit(&mut self, list: &CommandList) {
