@@ -1041,46 +1041,59 @@ impl DiscoController {
             }));
         }
 
-        root.borrow_mut().children.push(WidgetNode {
-            widget: title,
-            children: Vec::new(),
-            tag: None,
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: subtitle.clone(),
-            children: Vec::new(),
-            tag: Some("disco.subtitle"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: dashboard,
-            children: Vec::new(),
-            tag: Some("disco.dashboard"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: footer.clone(),
-            children: Vec::new(),
-            tag: Some("disco.footer"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: event_window,
-            children: Vec::new(),
-            tag: Some("disco.events"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: settings_wing.clone(),
-            children: Vec::new(),
-            tag: None,
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: info_wing.clone(),
-            children: Vec::new(),
-            tag: None,
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: icon_strip.clone(),
-            children: Vec::new(),
-            tag: None,
-        });
+        // 2026-05-17: consolidate the initial 8 root.children.push calls
+        // into a single borrow_mut() scope. The original pattern of 8
+        // separate `root.borrow_mut().children.push(...)` statements panics
+        // with `BorrowMutError` on the disco-analyzer bare-metal build at
+        // the first call (panic-halt stack scan resolved to lib.rs:1044).
+        // Host tests pass identically with either pattern; the target-
+        // specific panic suggests a temp-RefMut-lifetime corner. A single
+        // borrow eliminates the repeated-temp surface and gates whether
+        // the remaining 13 root.borrow_mut() chains at lines ~1085+ have
+        // the same problem.
+        {
+            let mut r = root.borrow_mut();
+            r.children.push(WidgetNode {
+                widget: title,
+                children: Vec::new(),
+                tag: None,
+            });
+            r.children.push(WidgetNode {
+                widget: subtitle.clone(),
+                children: Vec::new(),
+                tag: Some("disco.subtitle"),
+            });
+            r.children.push(WidgetNode {
+                widget: dashboard,
+                children: Vec::new(),
+                tag: Some("disco.dashboard"),
+            });
+            r.children.push(WidgetNode {
+                widget: footer.clone(),
+                children: Vec::new(),
+                tag: Some("disco.footer"),
+            });
+            r.children.push(WidgetNode {
+                widget: event_window,
+                children: Vec::new(),
+                tag: Some("disco.events"),
+            });
+            r.children.push(WidgetNode {
+                widget: settings_wing.clone(),
+                children: Vec::new(),
+                tag: None,
+            });
+            r.children.push(WidgetNode {
+                widget: info_wing.clone(),
+                children: Vec::new(),
+                tag: None,
+            });
+            r.children.push(WidgetNode {
+                widget: icon_strip.clone(),
+                children: Vec::new(),
+                tag: None,
+            });
+        }
 
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(ActionHotspot::new(
