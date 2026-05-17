@@ -1576,6 +1576,31 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         self.dma2d = Some(dma2d);
     }
 
+    /// Atomically swap the LTDC layer-1 framebuffer pointer to the back
+    /// buffer and trigger a shadow reload. Does NOT pulse `DSI_WCR`'s
+    /// LTDCEN — the caller is responsible for ensuring LTDC scans are
+    /// triggered elsewhere (e.g., a periodic timer/SysTick ISR that
+    /// pulses LTDCEN at panel-TE rate, in the
+    /// `freertos_entry`-style render/present-task split).
+    ///
+    /// 2026-05-17 (disco-analyzer wave-3): `present()` pulses LTDCEN
+    /// per call which couples render rate to panel scan rate — at
+    /// render rates < 60 Hz the panel update flickers ("slow flash").
+    /// `swap()` decouples: render writes to back, then `swap()`
+    /// atomically points LTDC at the new front. A separate scan-
+    /// pulser keeps panel updates at panel-TE rate independent of
+    /// render rate.
+    pub fn swap(&mut self) {
+        cortex_m::asm::dsb();
+        let next = self.fb_addr_back;
+        unsafe {
+            (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
+        core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
+        cortex_m::asm::dsb();
+    }
+
     /// Swap LTDC layer address between front/back buffers and reload.
     ///
     /// Clears ERIF before triggering LTDCEN so the next `wait_frame_done()`
