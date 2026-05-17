@@ -24,15 +24,18 @@ const BG_COLOR: Color = Color(30, 30, 30, 240);
 const BORDER_COLOR: Color = Color(80, 80, 80, 255);
 const BORDER_WIDTH: u8 = 2;
 
-/// Maximum icon pixel count we will decode. 128×128 is well above
-/// the demo's actual icon sizes (60×60) and below any pathological
-/// blob that would exhaust the linked-list-allocator heap (64 KiB).
-/// 2026-05-17: bench-9-snapshot wave-3 round-9 saw a `Wing::decode_into`
-/// reserve request of ~1.5 million elements (≈ 1920×800) panic with
-/// `alloc::raw_vec::capacity_overflow` on a joystick-triggered wing
-/// open. Cap the decode here so a stray asset can't lock the
-/// firmware; the slot just renders blank.
-const MAX_ICON_PIXELS: u32 = 128 * 128;
+/// Maximum icon pixel count we will decode. Demo icons are 48-60
+/// pixels per side; 64×64 = 4096 fits comfortably alongside the
+/// IconStrip cache in the 64 KiB heap.
+const MAX_ICON_PIXELS: u32 = 64 * 64;
+
+/// Maximum palette byte count we will allocate. A WM8994-style RLE
+/// palette is at most 256 entries × 2 bytes = 512 bytes. Bench-9
+/// wave-3 round-10 caught a wing slot whose `parse_rle_blob` returned
+/// a palette slice ~1.5 MiB long, which then crashed the `alloc::vec!
+/// [0u16; palette_len]` allocation with `capacity_overflow` before
+/// even reaching the pixel-count check below.
+const MAX_PALETTE_BYTES: usize = 512;
 
 /// One slot's decoded RLE → `Vec<Color>` plus dimensions.
 struct DecodedIcon {
@@ -147,12 +150,21 @@ impl Wing {
 
     fn decode_into(rle: &[u8], buf: &mut Vec<Color>) -> Option<(u32, u32)> {
         let (width, height, palette_bytes, stream) = rlvgl_decomp::parse_rle_blob(rle).ok()?;
-        // Reject pathological sizes BEFORE allocating. Bench-9-snapshot
-        // wave-3 round-9 (2026-05-17) saw one wing slot return ~1920×800
-        // from parse_rle_blob and the subsequent Vec reserve panic with
-        // `capacity_overflow` (~6 MiB request against a 64 KiB heap).
-        // Cap and return None instead of panicking — the slot just
-        // renders blank, the firmware keeps running.
+        // Reject pathological sizes BEFORE ANY allocation. Bench-9-snapshot
+        // wave-3 round-10 (2026-05-17) caught a slot where `parse_rle_blob`
+        // returned `palette_bytes.len() ≈ 1.5 MiB` — the `alloc::vec![0u16;
+        // palette_len]` allocation panicked with `capacity_overflow` before
+        // reaching the pixel-count check that the prior round had added.
+        // Three independent caps now bracket the decode:
+        //   1. palette byte count (≤ 512 — datasheet-bounded for 256-entry
+        //      u16 palette)
+        //   2. pixel count (≤ 64×64 — comfortably fits alongside IconStrip
+        //      cache in the 64 KiB heap)
+        //   3. fallible reserve (if either of the above is wrong, the
+        //      reserve_exact request stays bounded)
+        if palette_bytes.len() > MAX_PALETTE_BYTES {
+            return None;
+        }
         let pixels = (width as u32).saturating_mul(height as u32);
         if pixels == 0 || pixels > MAX_ICON_PIXELS {
             return None;
@@ -165,6 +177,11 @@ impl Wing {
         }
         let rgba =
             rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
+        // rgba should be width*height*4 bytes; if decode_rgba returned
+        // something pathological, refuse rather than push 1.5 MiB into buf.
+        if rgba.len() != (pixels as usize) * 4 {
+            return None;
+        }
         buf.reserve_exact(pixels as usize);
         buf.extend(
             rgba.chunks_exact(4)
