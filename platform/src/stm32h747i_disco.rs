@@ -1591,14 +1591,25 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
     /// pulser keeps panel updates at panel-TE rate independent of
     /// render rate.
     pub fn swap(&mut self) {
-        cortex_m::asm::dsb();
-        let next = self.fb_addr_back;
-        unsafe {
-            (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-        }
-        core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
-        cortex_m::asm::dsb();
+        // 2026-05-17 (wave-3 round-14): critical section around the
+        // L1CFBAR + SRCR.IMR pair. Without it the bare-metal SysTick
+        // ISR (which pulses DSI_WCR.LTDCEN at 60 Hz) can fire between
+        // those two writes, see the new L1CFBAR but un-reloaded
+        // shadow, and trigger a scan with stale shadow state. The
+        // visible symptom is intermittent flashing at the beat
+        // frequency of (panel scan rate / render rate). Disabling
+        // interrupts across the pair makes the swap atomic w.r.t. the
+        // ISR — any pending SysTick fires AFTER both writes land.
+        cortex_m::interrupt::free(|_| {
+            cortex_m::asm::dsb();
+            let next = self.fb_addr_back;
+            unsafe {
+                (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            }
+            core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
+            cortex_m::asm::dsb();
+        });
     }
 
     /// Swap LTDC layer address between front/back buffers and reload.
