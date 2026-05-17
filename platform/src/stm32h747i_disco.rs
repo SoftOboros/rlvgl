@@ -1576,20 +1576,39 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         self.dma2d = Some(dma2d);
     }
 
-    /// Atomically swap the LTDC layer-1 framebuffer pointer to the back
-    /// buffer and trigger a shadow reload. Does NOT pulse `DSI_WCR`'s
-    /// LTDCEN — the caller is responsible for ensuring LTDC scans are
-    /// triggered elsewhere (e.g., a periodic timer/SysTick ISR that
-    /// pulses LTDCEN at panel-TE rate, in the
-    /// `freertos_entry`-style render/present-task split).
+    /// Publish the back buffer's address into `ready` (for a DSI ERIF
+    /// ISR to consume and update L1CFBAR), then block until the ISR
+    /// has signalled consumption by clearing `ready` to 0. Once the
+    /// ISR has consumed the publish, LTDC is scanning the new front
+    /// and the old front is free to become the new back; this method
+    /// `mem::swap`s the internal `fb_addr` / `fb_addr_back` pair to
+    /// reflect that ownership transfer.
     ///
-    /// 2026-05-17 (disco-analyzer wave-3): `present()` pulses LTDCEN
-    /// per call which couples render rate to panel scan rate — at
-    /// render rates < 60 Hz the panel update flickers ("slow flash").
-    /// `swap()` decouples: render writes to back, then `swap()`
-    /// atomically points LTDC at the new front. A separate scan-
-    /// pulser keeps panel updates at panel-TE rate independent of
-    /// render rate.
+    /// 2026-05-17 (disco-analyzer wave-3 round-15): replaces the
+    /// MMIO-from-main-thread `swap()` pattern with a single-writer
+    /// ISR model (mirrors `examples/stm32h747i-disco/freertos_entry.rs`
+    /// where ERIF ISR + present_task own all LTDC writes). Eliminates
+    /// the render-vs-LTDC race that produced beat-frequency flicker.
+    pub fn publish_back_and_wait(&mut self, ready: &core::sync::atomic::AtomicU32) {
+        let new_front = self.fb_addr_back;
+        cortex_m::asm::dsb(); // ensure back-buffer writes are visible to LTDC before publish
+        ready.store(new_front, core::sync::atomic::Ordering::Release);
+        // Block until the DSI ERIF ISR has consumed the publish. The
+        // ISR writes 0 back into `ready` after writing L1CFBAR +
+        // SRCR.IMR, so a load of 0 here means LTDC is now scanning the
+        // new front. Old front is safe to render into next.
+        while ready.load(core::sync::atomic::Ordering::Acquire) != 0 {
+            core::hint::spin_loop();
+        }
+        core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
+    }
+
+    /// (Deprecated for the ERIF-driven pattern; see
+    /// `publish_back_and_wait`.) Atomically swap the LTDC layer-1
+    /// framebuffer pointer to the back buffer and trigger a shadow
+    /// reload. Used at boot for the first frame before the ERIF ISR
+    /// is armed; once ERIE is enabled callers should use
+    /// `publish_back_and_wait` instead.
     pub fn swap(&mut self) {
         // 2026-05-17 (wave-3 round-14): critical section around the
         // L1CFBAR + SRCR.IMR pair. Without it the bare-metal SysTick
