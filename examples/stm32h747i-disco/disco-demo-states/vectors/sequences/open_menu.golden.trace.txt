@@ -1,0 +1,4 @@
+on_entry:idle
+on_exit:idle
+transition:idle->menu
+on_entry:menu

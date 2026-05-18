@@ -20,7 +20,8 @@ fn render_devkitm_1_to_tempdir() -> (tempfile::TempDir, std::path::PathBuf) {
     let ir = merge(chip, board).expect("merge ok");
     let tmp = tempfile::tempdir().expect("tempdir");
     let written = render_esp_pac(&ir, tmp.path()).expect("render ok");
-    assert_eq!(written.len(), 6);
+    // 6 Rust files + memory.x + esp32_c3.x linker scripts.
+    assert_eq!(written.len(), 8);
     let bsp_dir = tmp.path().join("esp32_c3_dev_kit_m_1");
     assert!(bsp_dir.is_dir(), "bsp dir created: {}", bsp_dir.display());
     (tmp, bsp_dir)
@@ -36,6 +37,8 @@ fn produces_expected_file_set() {
         "io_mux.rs",
         "peripherals.rs",
         "board.rs",
+        "memory.x",
+        "esp32_c3.x",
     ] {
         let p = bsp_dir.join(name);
         assert!(p.is_file(), "expected {}", p.display());
@@ -98,7 +101,8 @@ fn render_beetle_esp32c3_to_tempdir() -> (tempfile::TempDir, std::path::PathBuf)
     let ir = merge(chip, board).expect("merge ok");
     let tmp = tempfile::tempdir().expect("tempdir");
     let written = render_esp_pac(&ir, tmp.path()).expect("render ok");
-    assert_eq!(written.len(), 6);
+    // 6 Rust files + memory.x + esp32_c3.x linker scripts.
+    assert_eq!(written.len(), 8);
     let bsp_dir = tmp.path().join("dfr0868_beetle_esp32_c3");
     assert!(bsp_dir.is_dir(), "bsp dir created: {}", bsp_dir.display());
     (tmp, bsp_dir)
@@ -114,6 +118,8 @@ fn beetle_produces_expected_file_set() {
         "io_mux.rs",
         "peripherals.rs",
         "board.rs",
+        "memory.x",
+        "esp32_c3.x",
     ] {
         let p = bsp_dir.join(name);
         assert!(p.is_file(), "expected {}", p.display());

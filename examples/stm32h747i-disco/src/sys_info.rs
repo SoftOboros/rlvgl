@@ -263,7 +263,8 @@ impl ChipInfoPanel {
         push_line(&mut self.lines, &mut self.line_count, b"FPS", &buf[..n]);
 
         // Flash size
-        let flash_kb = unsafe { (0x1FF1_E880u32 as *const u16).read_volatile() } as u32;
+        // Flash size lives in System Memory at 0x1FF1_E880 (factory option byte).
+        let flash_kb = unsafe { (0x1FF1_E880u32 as *const u16).read_volatile() } as u32; // rlvgl-discipline: allow(raw_addr_cast)
         let mut buf = [0u8; VAL_BUF_LEN];
         let n = fmt_dec(flash_kb, &mut buf);
         buf[n] = b' ';
@@ -277,10 +278,12 @@ impl ChipInfoPanel {
         );
 
         // SYSCLK
-        let rcc_cr = unsafe { (0x5802_4000u32 as *const u32).read_volatile() };
+        // RCC_CR / PLL config reads — typed RCC handle is future work
+        // (RCC has 70+ registers across all clock domains).
+        let rcc_cr = unsafe { (0x5802_4000u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let sysclk_mhz = if rcc_cr & (1 << 25) != 0 {
-            let pll1divr = unsafe { (0x5802_4830u32 as *const u32).read_volatile() };
-            let pllckselr = unsafe { (0x5802_4828u32 as *const u32).read_volatile() };
+            let pll1divr = unsafe { (0x5802_4830u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let pllckselr = unsafe { (0x5802_4828u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let n1 = ((pll1divr & 0x1FF) + 1) as u32;
             let p = (((pll1divr >> 9) & 0x7F) + 1) as u32;
             let m = ((pllckselr >> 4) & 0x3F) as u32;
@@ -531,7 +534,8 @@ impl LiveStatsPanel {
         }
 
         // Ticks
-        let ticks = unsafe { (0x3800_0660u32 as *const u32).read_volatile() };
+        // D3 SRAM event-count telemetry slot.
+        let ticks = unsafe { (0x3800_0660u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         let mut buf = [0u8; VAL_BUF_LEN];
         let n = fmt_dec(ticks, &mut buf);
         push_line(&mut self.lines, &mut self.line_count, b"Ticks", &buf[..n]);

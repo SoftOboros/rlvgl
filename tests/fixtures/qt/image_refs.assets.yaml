@@ -1,0 +1,10 @@
+# Auto-generated from Qt project by rlvgl-creator (QT-07)
+# QT-07 assets: tests/fixtures/qt/image_refs.qml
+version: 1
+images:
+  - icons/background.png
+  - icons/play.png
+  - icons/stop.png
+fonts:
+  - "FiraSans Bold"
+  - Roboto

@@ -11,7 +11,11 @@ name: ESP32-C5
 arch: rv32imac
 package: QFN40-5x5
 pac_crate: esp32c5
-gpio_count: 30
+# `esp32c5 = 0.2` is generated with svd2rust 0.37.x (post-`Peripherals`
+# struct drop); pac.rs.jinja emits a local `Peripherals` shim under
+# `pac_vintage: modern`.
+pac_vintage: modern
+gpio_count: 29   # GPIO0..GPIO28 per ESP32-C5 Datasheet v1.2 Table 2-3
 
 memory:
   - { name: rom,        base: 0x40000000, size: 0x00020000, access: rx  }
@@ -29,37 +33,54 @@ clock_tree:
   # PCR peripheral clock gates — same register pattern as C6.
   system_gates:
     uart0:
-      clk_en_reg:   pcr.uart0_conf
-      clk_en_field: uart0_clk_en
-      rst_reg:      pcr.uart0_conf
-      rst_field:    uart0_rst_en
-      clk_sel_reg:  pcr.uart0_sclk_conf
-      clk_sel_field: uart0_sclk_sel
+      # esp32c5 0.2 PCR clusters UART instances: `pcr.uart(0).conf()` /
+      # `pcr.uart(0).clk_conf()` with cluster-relative field names
+      # (`clk_en`, `rst_en`, `sclk_sel`).
+      clk_en_reg:   pcr.uart(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(0).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(0).clk_conf
+      clk_sel_field: sclk_sel
     uart1:
-      clk_en_reg:   pcr.uart1_conf
-      clk_en_field: uart1_clk_en
-      rst_reg:      pcr.uart1_conf
-      rst_field:    uart1_rst_en
+      # esp32c5 0.2 clusters UART instances; UART1 uses the same cluster
+      # accessor shape as UART0 with cluster-relative field names.
+      clk_en_reg:   pcr.uart(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(1).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(1).clk_conf
+      clk_sel_field: sclk_sel
     i2c0:
-      clk_en_reg:   pcr.i2c_conf
-      clk_en_field: i2c_clk_en
-      rst_reg:      pcr.i2c_conf
-      rst_field:    i2c_rst_en
+      # esp32c5 0.2 has flat `i2c0_conf` (single I2C instance); fields
+      # are `i2c0_clk_en` / `i2c0_rst_en`. The SCLK select register
+      # `pcr.i2c_sclk_conf.i2c_sclk_sel` is a single-bit FieldWriter —
+      # handled via `clk_sel_width: 1` per CHIPS-ESP-11.
+      clk_en_reg:   pcr.i2c0_conf
+      clk_en_field: i2c0_clk_en
+      rst_reg:      pcr.i2c0_conf
+      rst_field:    i2c0_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf
+      clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0   # XTAL — matches peripherals.rs sclk_sel().clear_bit()
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
       rst_reg:      pcr.spi2_conf
       rst_field:    spi2_rst_en
     timg0:
-      clk_en_reg:   pcr.timergroup0_conf
-      clk_en_field: tg0_clk_en
-      rst_reg:      pcr.timergroup0_conf
-      rst_field:    tg0_rst_en
+      # esp32c5 0.2 clusters timer groups: `pcr.timergroup(0).conf()`
+      # with cluster-relative field names (`clk_en`, `rst_en`).
+      clk_en_reg:   pcr.timergroup(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(0).conf
+      rst_field:    rst_en
     timg1:
-      clk_en_reg:   pcr.timergroup1_conf
-      clk_en_field: tg1_clk_en
-      rst_reg:      pcr.timergroup1_conf
-      rst_field:    tg1_rst_en
+      clk_en_reg:   pcr.timergroup(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(1).conf
+      rst_field:    rst_en
     systimer:
       clk_en_reg:   pcr.systimer_conf
       clk_en_field: systimer_clk_en
@@ -132,7 +153,17 @@ peripherals:
     instance: spi2
     base: 0x60081000
     irq: null
-    signals: []
+    # IO MUX fast-path signals — ESP32-C5 Series Datasheet v1.2 §2.3.3
+    # Table 2-3 "IO MUX Pin Functions" (FSPI = SPI2 main interface).
+    # All six FSPI signals are F2 on their respective IO MUX pins; chip
+    # select sits on the SDIO_CMD pad (GPIO10).
+    signals:
+      - { role: sck,  direction: out, iomux_pin: 6,  iomux_fn: 2 }
+      - { role: mosi, direction: out, iomux_pin: 7,  iomux_fn: 2 }
+      - { role: miso, direction: in,  iomux_pin: 2,  iomux_fn: 2 }
+      - { role: cs0,  direction: out, iomux_pin: 10, iomux_fn: 2 }
+      - { role: hd,   direction: out, iomux_pin: 4,  iomux_fn: 2 }
+      - { role: wp,   direction: out, iomux_pin: 5,  iomux_fn: 2 }
   timg0:
     class: timg
     instance: timg0
@@ -208,39 +239,49 @@ peripherals:
     irq: null
     signals: []
 
-# IO MUX — C5 has same structure as C6 (F0, F1, F2; 30 GPIOs on QFN40).
+# IO MUX — ESP32-C5 Datasheet v1.2 Table 2-3 IO MUX Pin Functions.
+# Verified from datasheet 2026-05-17. Prior contents were a stale copy of
+# the ESP32-C6 table with C6's GPIO0..30 layout — C5's IO MUX is laid out
+# very differently: JTAG pads on GPIO2-5, FSPI on F2 (GPIO2-7,10), UART0
+# default on GPIO11 (TXD) / GPIO12 (RXD), SPI0/1 flash on GPIO15-22,
+# and only GPIO0..28 exist.
 io_mux:
-  - { gpio: 0,  pad_name: XTAL_32K_P, fn0: XTAL_32K_P, fn1: GPIO0 }
-  - { gpio: 1,  pad_name: XTAL_32K_N, fn0: XTAL_32K_N, fn1: GPIO1 }
-  - { gpio: 2,  pad_name: GPIO2,      fn0: GPIO2,      fn1: GPIO2,  fn2: FSPIQ }
-  - { gpio: 3,  pad_name: GPIO3,      fn0: GPIO3,      fn1: GPIO3 }
-  - { gpio: 4,  pad_name: MTMS,       fn0: MTMS,       fn1: GPIO4,  fn2: FSPIHD }
-  - { gpio: 5,  pad_name: MTDI,       fn0: MTDI,       fn1: GPIO5,  fn2: FSPIWP }
-  - { gpio: 6,  pad_name: MTCK,       fn0: MTCK,       fn1: GPIO6,  fn2: FSPICLK }
-  - { gpio: 7,  pad_name: MTDO,       fn0: MTDO,       fn1: GPIO7,  fn2: FSPID }
-  - { gpio: 8,  pad_name: GPIO8,      fn0: GPIO8,      fn1: GPIO8,  strap: true }
-  - { gpio: 9,  pad_name: GPIO9,      fn0: GPIO9,      fn1: GPIO9,  strap: true }
-  - { gpio: 10, pad_name: GPIO10,     fn0: GPIO10,     fn1: GPIO10 }
-  - { gpio: 11, pad_name: GPIO11,     fn0: GPIO11,     fn1: GPIO11 }
-  - { gpio: 12, pad_name: GPIO12,     fn0: GPIO12,     fn1: GPIO12 }
-  - { gpio: 13, pad_name: GPIO13,     fn0: GPIO13,     fn1: GPIO13 }
-  - { gpio: 14, pad_name: GPIO14,     fn0: GPIO14,     fn1: GPIO14 }
-  - { gpio: 15, pad_name: GPIO15,     fn0: GPIO15,     fn1: GPIO15,  strap: true }
-  - { gpio: 16, pad_name: U0TXD,      fn0: U0TXD,      fn1: GPIO16 }
-  - { gpio: 17, pad_name: U0RXD,      fn0: U0RXD,      fn1: GPIO17 }
-  - { gpio: 18, pad_name: GPIO18,     fn0: GPIO18,     fn1: GPIO18 }
-  - { gpio: 19, pad_name: GPIO19,     fn0: GPIO19,     fn1: GPIO19 }
-  - { gpio: 20, pad_name: GPIO20,     fn0: GPIO20,     fn1: GPIO20 }
-  - { gpio: 21, pad_name: GPIO21,     fn0: GPIO21,     fn1: GPIO21 }
-  - { gpio: 22, pad_name: GPIO22,     fn0: GPIO22,     fn1: GPIO22 }
-  - { gpio: 23, pad_name: GPIO23,     fn0: GPIO23,     fn1: GPIO23 }
-  - { gpio: 24, pad_name: SPICS0,     fn0: SPICS0,     fn1: GPIO24, flash_reserved: true }
-  - { gpio: 25, pad_name: SPIQ,       fn0: SPIQ,       fn1: GPIO25, flash_reserved: true }
-  - { gpio: 26, pad_name: SPIWP,      fn0: SPIWP,      fn1: GPIO26, flash_reserved: true }
-  - { gpio: 27, pad_name: GPIO27,     fn0: GPIO27,     fn1: GPIO27 }
-  - { gpio: 28, pad_name: SPIHD,      fn0: SPIHD,      fn1: GPIO28, flash_reserved: true }
-  - { gpio: 29, pad_name: SPICLK,     fn0: SPICLK,     fn1: GPIO29, flash_reserved: true }
-  - { gpio: 30, pad_name: SPID,       fn0: SPID,       fn1: GPIO30, flash_reserved: true }
+  - { gpio: 0,  pad_name: GPIO0,      fn0: GPIO0,        fn1: GPIO0 }
+  - { gpio: 1,  pad_name: GPIO1,      fn0: GPIO1,        fn1: GPIO1 }
+  - { gpio: 2,  pad_name: GPIO2,      fn0: MTMS,         fn1: GPIO2,  fn2: FSPIQ }
+  - { gpio: 3,  pad_name: GPIO3,      fn0: MTDI,         fn1: GPIO3 }
+  - { gpio: 4,  pad_name: GPIO4,      fn0: MTCK,         fn1: GPIO4,  fn2: FSPIHD }
+  - { gpio: 5,  pad_name: GPIO5,      fn0: MTDO,         fn1: GPIO5,  fn2: FSPIWP }
+  - { gpio: 6,  pad_name: GPIO6,      fn0: GPIO6,        fn1: GPIO6,  fn2: FSPICLK }
+  - { gpio: 7,  pad_name: GPIO7,      fn0: SDIO_DATA1,   fn1: GPIO7,  fn2: FSPID }
+  - { gpio: 8,  pad_name: GPIO8,      fn0: SDIO_DATA0,   fn1: GPIO8,  strap: true }
+  - { gpio: 9,  pad_name: GPIO9,      fn0: SDIO_CLK,     fn1: GPIO9,  strap: true }
+  - { gpio: 10, pad_name: GPIO10,     fn0: SDIO_CMD,     fn1: GPIO10, fn2: FSPICS0 }
+  - { gpio: 11, pad_name: GPIO11,     fn0: U0TXD,        fn1: GPIO11 }
+  - { gpio: 12, pad_name: GPIO12,     fn0: U0RXD,        fn1: GPIO12 }
+  - { gpio: 13, pad_name: GPIO13,     fn0: SDIO_DATA3,   fn1: GPIO13 }
+  - { gpio: 14, pad_name: GPIO14,     fn0: SDIO_DATA2,   fn1: GPIO14 }
+  - { gpio: 15, pad_name: GPIO15,     fn0: SPICS1,       fn1: GPIO15 }
+  # GPIO16..22 expose SPI0/1 flash-bus signals on F0 per Datasheet Table
+  # 2-3, but ESP32-C5 modules vary in whether they bond an in-package
+  # flash — flash_reserved is NOT applied here unconditionally; a module-
+  # specific board yaml should narrow the available pin set.
+  - { gpio: 16, pad_name: GPIO16,     fn0: SPICS0,       fn1: GPIO16 }
+  - { gpio: 17, pad_name: GPIO17,     fn0: SPIQ,         fn1: GPIO17 }
+  - { gpio: 18, pad_name: GPIO18,     fn0: SPIWP,        fn1: GPIO18 }
+  - { gpio: 19, pad_name: GPIO19,     fn0: GPIO19,       fn1: GPIO19 }
+  - { gpio: 20, pad_name: GPIO20,     fn0: SPIHD,        fn1: GPIO20 }
+  - { gpio: 21, pad_name: GPIO21,     fn0: SPICLK,       fn1: GPIO21 }
+  - { gpio: 22, pad_name: GPIO22,     fn0: SPID,         fn1: GPIO22 }
+  - { gpio: 23, pad_name: GPIO23,     fn0: GPIO23,       fn1: GPIO23 }
+  - { gpio: 24, pad_name: GPIO24,     fn0: GPIO24,       fn1: GPIO24 }
+  - { gpio: 25, pad_name: GPIO25,     fn0: GPIO25,       fn1: GPIO25 }
+  - { gpio: 26, pad_name: GPIO26,     fn0: GPIO26,       fn1: GPIO26 }
+  - { gpio: 27, pad_name: GPIO27,     fn0: GPIO27,       fn1: GPIO27 }
+  - { gpio: 28, pad_name: GPIO28,     fn0: GPIO28,       fn1: GPIO28 }
+  # GPIO29 and GPIO30 do NOT exist on ESP32-C5 silicon — datasheet
+  # Table 2-3 stops at GPIO28. Prior entries were stale copies from
+  # the C6 chipdb yaml.
 
 gpio_matrix:
   - { id: 0,  name: ledc_ls_sig_out0, direction: out }
@@ -253,3 +294,9 @@ gpio_matrix:
   - { id: 9,  name: U1TXD_out,        direction: out }
   - { id: 45, name: I2CEXT0_SCL,      direction: inout }
   - { id: 46, name: I2CEXT0_SDA,      direction: inout }
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases for the bsp_pac flashable path.
+linker:
+  region_text: flash_cache
+  region_data: hp_sram

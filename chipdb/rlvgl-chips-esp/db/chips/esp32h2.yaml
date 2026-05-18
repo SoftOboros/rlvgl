@@ -14,6 +14,10 @@ name: ESP32-H2
 arch: rv32imac
 package: QFN32-5x5
 pac_crate: esp32h2
+# `esp32h2 = 0.19` is generated with svd2rust 0.37.x (post-`Peripherals`
+# struct drop); pac.rs.jinja emits a local `Peripherals` shim under
+# `pac_vintage: modern`.
+pac_vintage: modern
 gpio_count: 28
 
 memory:
@@ -33,41 +37,69 @@ clock_tree:
   # PCR peripheral clock gates — same register naming pattern as C6.
   system_gates:
     uart0:
-      clk_en_reg:   pcr.uart0_conf
-      clk_en_field: uart0_clk_en
-      rst_reg:      pcr.uart0_conf
-      rst_field:    uart0_rst_en
-      clk_sel_reg:  pcr.uart0_sclk_conf
-      clk_sel_field: uart0_sclk_sel
+      # esp32h2 0.19 PCR clusters UART instances: `pcr.uart(0).conf()` /
+      # `pcr.uart(0).clk_conf()` with cluster-relative field names
+      # (`clk_en`, `rst_en`, `sclk_sel`).
+      clk_en_reg:   pcr.uart(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(0).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(0).clk_conf
+      clk_sel_field: sclk_sel
     uart1:
-      clk_en_reg:   pcr.uart1_conf
-      clk_en_field: uart1_clk_en
-      rst_reg:      pcr.uart1_conf
-      rst_field:    uart1_rst_en
-      clk_sel_reg:  pcr.uart1_sclk_conf
-      clk_sel_field: uart1_sclk_sel
+      # esp32h2 0.19 clusters UART instances; UART1 uses the same cluster
+      # accessor shape as UART0 with cluster-relative field names.
+      clk_en_reg:   pcr.uart(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(1).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(1).clk_conf
+      clk_sel_field: sclk_sel
     i2c0:
-      clk_en_reg:   pcr.i2c_conf
-      clk_en_field: i2c_clk_en
-      rst_reg:      pcr.i2c_conf
-      rst_field:    i2c_rst_en
-      clk_sel_reg:  pcr.i2c_sclk_conf
+      # esp32h2 0.19 has per-instance flat `i2c0_conf` / `i2c1_conf`
+      # (unlike C6/C5 which only ship i2c0). Fields are
+      # `i2c0_clk_en` / `i2c0_rst_en`. H2 has TWO I2C instances, so
+      # `pcr.i2c_sclk_conf` is a clustered accessor
+      # (`pcr.i2c_sclk_conf(0)` / `pcr.i2c_sclk_conf(1)`) — unlike
+      # C6/C5/C61 which only ship one I2C and use the flat accessor.
+      # `i2c_sclk_sel` is still a single-bit FieldWriter — handled
+      # via `clk_sel_width: 1` per CHIPS-ESP-11.
+      clk_en_reg:   pcr.i2c0_conf
+      clk_en_field: i2c0_clk_en
+      rst_reg:      pcr.i2c0_conf
+      rst_field:    i2c0_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf(0)
       clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0   # XTAL — matches peripherals.rs sclk_sel().clear_bit()
+    i2c1:
+      # H2 has a second I2C instance not present on C6/C5/C61, with a
+      # dedicated clustered `pcr.i2c_sclk_conf(1)` SCLK mux entry.
+      clk_en_reg:   pcr.i2c1_conf
+      clk_en_field: i2c1_clk_en
+      rst_reg:      pcr.i2c1_conf
+      rst_field:    i2c1_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf(1)
+      clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
       rst_reg:      pcr.spi2_conf
       rst_field:    spi2_rst_en
     timg0:
-      clk_en_reg:   pcr.timergroup0_conf
-      clk_en_field: tg0_clk_en
-      rst_reg:      pcr.timergroup0_conf
-      rst_field:    tg0_rst_en
+      # esp32h2 0.19 clusters timer groups: `pcr.timergroup(0).conf()`
+      # with cluster-relative field names (`clk_en`, `rst_en`).
+      clk_en_reg:   pcr.timergroup(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(0).conf
+      rst_field:    rst_en
     timg1:
-      clk_en_reg:   pcr.timergroup1_conf
-      clk_en_field: tg1_clk_en
-      rst_reg:      pcr.timergroup1_conf
-      rst_field:    tg1_rst_en
+      clk_en_reg:   pcr.timergroup(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(1).conf
+      rst_field:    rst_en
     systimer:
       clk_en_reg:   pcr.systimer_conf
       clk_en_field: systimer_clk_en
@@ -131,16 +163,27 @@ peripherals:
     signals:
       - { role: scl, direction: inout, gpio_matrix_id: 45 }
       - { role: sda, direction: inout, gpio_matrix_id: 46 }
+  i2c1:
+    class: i2c
+    instance: i2c1
+    base: 0x60005000        # H2 TRM Table 5.3-2 — second I2C instance
+    irq: null
+    signals:
+      - { role: scl, direction: inout, gpio_matrix_id: 30 }
+      - { role: sda, direction: inout, gpio_matrix_id: 31 }
   spi2:
     class: spi_master
     instance: spi2
     base: 0x60081000
     irq: null
+    # FSPI signals per ESP32-H2 Datasheet Table 2-3 (verified 2026-05-17):
+    # GPIO0=FSPIQ, GPIO1=FSPICS0, GPIO2=FSPIWP, GPIO3=FSPIHD,
+    # GPIO4=FSPICLK, GPIO5=FSPID.
     signals:
       - { role: sck,  direction: out, iomux_pin: 4, iomux_fn: 2 }
       - { role: mosi, direction: out, iomux_pin: 5, iomux_fn: 2 }
       - { role: miso, direction: in,  iomux_pin: 0, iomux_fn: 2 }
-      - { role: cs0,  direction: out }
+      - { role: cs0,  direction: out, iomux_pin: 1, iomux_fn: 2 }
   timg0:
     class: timg
     instance: timg0
@@ -210,25 +253,30 @@ peripherals:
     irq: null
     signals: []
 
-# IO MUX function table — ESP32-H2 Datasheet Table 2-3.
-# H2 has F0..F4 (5 function slots). 28 GPIOs on QFN32.
-# H2 UART0 default: U0TXD=GPIO24, U0RXD=GPIO23 via IO MUX F0.
+# IO MUX function table — ESP32-H2 TRM v1.1 Table 6.13-1 + Datasheet Table 2-3.
+# Verified from datasheet 2026-05-17.
+# H2 silicon exposes GPIO0..5, GPIO8..14, GPIO22..27 — GPIO6/7 do NOT exist
+# (per H2 TRM Table 6.13-1 and H2 datasheet Table 2-3). XTAL_32K_P/N are on
+# GPIO13/14 (NOT GPIO0/1 as a stale C6-derived copy claimed). UART0
+# default pins are GPIO24 (U0TXD) and GPIO23 (U0RXD). NOTE: although the
+# datasheet text introduces "F0..F4 (five function slots)" the actual
+# Table 2-3 / Table 6.13-1 only populates F0..F2; F3/F4 are reserved.
 io_mux:
-  - { gpio: 0,  pad_name: XTAL_32K_P, fn0: XTAL_32K_P, fn1: GPIO0,  fn2: FSPIQ }
-  - { gpio: 1,  pad_name: XTAL_32K_N, fn0: XTAL_32K_N, fn1: GPIO1,  fn2: FSPID }
-  - { gpio: 2,  pad_name: GPIO2,      fn0: GPIO2,      fn1: GPIO2,  fn2: FSPIWP }
-  - { gpio: 3,  pad_name: GPIO3,      fn0: GPIO3,      fn1: GPIO3,  fn2: FSPIHD }
-  - { gpio: 4,  pad_name: MTMS,       fn0: MTMS,       fn1: GPIO4,  fn2: FSPICLK }
-  - { gpio: 5,  pad_name: MTDI,       fn0: MTDI,       fn1: GPIO5,  fn2: FSPICS0 }
-  - { gpio: 6,  pad_name: MTCK,       fn0: MTCK,       fn1: GPIO6 }
-  - { gpio: 7,  pad_name: MTDO,       fn0: MTDO,       fn1: GPIO7 }
+  - { gpio: 0,  pad_name: GPIO0,      fn0: GPIO0,      fn1: GPIO0,  fn2: FSPIQ }
+  - { gpio: 1,  pad_name: GPIO1,      fn0: GPIO1,      fn1: GPIO1,  fn2: FSPICS0 }
+  - { gpio: 2,  pad_name: MTMS,       fn0: MTMS,       fn1: GPIO2,  fn2: FSPIWP }
+  - { gpio: 3,  pad_name: MTDO,       fn0: MTDO,       fn1: GPIO3,  fn2: FSPIHD }
+  - { gpio: 4,  pad_name: MTCK,       fn0: MTCK,       fn1: GPIO4,  fn2: FSPICLK }
+  - { gpio: 5,  pad_name: MTDI,       fn0: MTDI,       fn1: GPIO5,  fn2: FSPID }
+  # GPIO6 and GPIO7 absent on ESP32-H2 silicon (TRM Table 6.13-1 skips
+  # from GPIO5 to GPIO8). Do not add placeholder rows.
   - { gpio: 8,  pad_name: GPIO8,      fn0: GPIO8,      fn1: GPIO8,  strap: true }
   - { gpio: 9,  pad_name: GPIO9,      fn0: GPIO9,      fn1: GPIO9,  strap: true }
   - { gpio: 10, pad_name: GPIO10,     fn0: GPIO10,     fn1: GPIO10 }
   - { gpio: 11, pad_name: GPIO11,     fn0: GPIO11,     fn1: GPIO11 }
   - { gpio: 12, pad_name: GPIO12,     fn0: GPIO12,     fn1: GPIO12 }
-  - { gpio: 13, pad_name: GPIO13,     fn0: GPIO13,     fn1: GPIO13 }
-  - { gpio: 14, pad_name: GPIO14,     fn0: GPIO14,     fn1: GPIO14 }
+  - { gpio: 13, pad_name: XTAL_32K_P, fn0: XTAL_32K_P, fn1: GPIO13 }
+  - { gpio: 14, pad_name: XTAL_32K_N, fn0: XTAL_32K_N, fn1: GPIO14 }
   - { gpio: 15, pad_name: SPICS0,     fn0: SPICS0,     fn1: GPIO15, flash_reserved: true }
   - { gpio: 16, pad_name: SPIQ,       fn0: SPIQ,       fn1: GPIO16, flash_reserved: true }
   - { gpio: 17, pad_name: SPIWP,      fn0: SPIWP,      fn1: GPIO17, flash_reserved: true }
@@ -236,12 +284,12 @@ io_mux:
   - { gpio: 19, pad_name: SPIHD,      fn0: SPIHD,      fn1: GPIO19, flash_reserved: true }
   - { gpio: 20, pad_name: SPICLK,     fn0: SPICLK,     fn1: GPIO20, flash_reserved: true }
   - { gpio: 21, pad_name: SPID,       fn0: SPID,       fn1: GPIO21, flash_reserved: true }
-  - { gpio: 22, pad_name: USB_DM,     fn0: USB_DM,     fn1: GPIO22 }
-  - { gpio: 23, pad_name: USB_DP,     fn0: USB_DP,     fn1: GPIO23 }
-  - { gpio: 24, pad_name: U0TXD,      fn0: U0TXD,      fn1: GPIO24 }
-  - { gpio: 25, pad_name: U0RXD,      fn0: U0RXD,      fn1: GPIO25, strap: true }
-  - { gpio: 26, pad_name: GPIO26,     fn0: GPIO26,     fn1: GPIO26 }
-  - { gpio: 27, pad_name: GPIO27,     fn0: GPIO27,     fn1: GPIO27 }
+  - { gpio: 22, pad_name: GPIO22,     fn0: GPIO22,     fn1: GPIO22 }
+  - { gpio: 23, pad_name: U0RXD,      fn0: U0RXD,      fn1: GPIO23, fn2: FSPICS1 }
+  - { gpio: 24, pad_name: U0TXD,      fn0: U0TXD,      fn1: GPIO24, fn2: FSPICS2 }
+  - { gpio: 25, pad_name: GPIO25,     fn0: GPIO25,     fn1: GPIO25, fn2: FSPICS3 }
+  - { gpio: 26, pad_name: GPIO26,     fn0: GPIO26,     fn1: GPIO26, fn2: FSPICS4 }
+  - { gpio: 27, pad_name: GPIO27,     fn0: GPIO27,     fn1: GPIO27, fn2: FSPICS5 }
 
 # GPIO matrix signal IDs — same numbering scheme as C6.
 gpio_matrix:
@@ -255,3 +303,9 @@ gpio_matrix:
   - { id: 9,  name: U1TXD_out,        direction: out }
   - { id: 45, name: I2CEXT0_SCL,      direction: inout }
   - { id: 46, name: I2CEXT0_SDA,      direction: inout }
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases for the bsp_pac flashable path.
+linker:
+  region_text: flash_cache
+  region_data: hp_sram

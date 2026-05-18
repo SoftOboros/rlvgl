@@ -42,12 +42,18 @@ mod file_browser_panel;
 mod fonts;
 
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod crawl_buffers;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod effect;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod event_overlay;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod readme_crawl;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod star_crawl;
 
 // ── Zephyr-specific modules ──────────────────────────────────────────────────
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-mod zephyr_sync;
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 mod zephyr_entry;
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+mod zephyr_sync;

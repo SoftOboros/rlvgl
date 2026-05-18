@@ -1,0 +1,25 @@
+{
+  "$schema": "../schema/skin.schema.json",
+  "id": "lufs_ebu_r128_gauge",
+  "title": "EBU R 128 — LUFS Loudness Gauge",
+  "scale_id": "lufs_ebu_r128",
+  "default_ballistic": "LufsI",
+  "meter_type": "lufs_gauge",
+  "palette": {
+    "Safe":    "#3ed27a",
+    "Nominal": "#3ed27a",
+    "Caution": "#e6b22c",
+    "Hot":     "#d24b2e",
+    "Over":    "#ff2a1f"
+  },
+  "secondary_colors": {
+    "background": "#08080a",
+    "frame":      "#1d2126",
+    "scale_text": "#dde2e6"
+  },
+  "layout": {
+    "orientation": "horizontal",
+    "aspect_ratio": 2.0,
+    "peak_hold_ms": 0
+  }
+}

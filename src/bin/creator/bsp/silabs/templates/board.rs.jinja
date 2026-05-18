@@ -1,0 +1,45 @@
+//! Board-level constants for {{ ir.board.name }}.
+//!
+//! Each labelled pin from `db/boards/{{ board_stem }}.yaml` becomes
+//! a pair of `pub const`s — `<LABEL>_PORT: char` and
+//! `<LABEL>_PIN: u8` — per CHIPS-SILABS-00 §10.3. This keeps the EFM32
+//! `(port, pin)` addressing model intact at the application boundary
+//! rather than collapsing it to a flat integer.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "{{ ir.chip.name }}";
+
+/// Chip package.
+pub const PACKAGE: &str = "{{ ir.chip.package }}";
+
+/// On-module flash capacity, megabytes.
+pub const FLASH_MB: u32 = {{ ir.board.flash_mb }};
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+/// HFCLK frequency configured by [`crate::clocks::init`], in hertz.
+pub const HFCLK_HZ: u32 = {{ ir.clocks.hfclk_hz }};
+
+/// HFXO crystal frequency, in hertz.
+pub const HFXO_HZ: u32 = {{ ir.clocks.hfxo_hz }};
+
+/// LFXO crystal frequency, in hertz.
+pub const LFXO_HZ: u32 = {{ ir.clocks.lfxo_hz }};
+
+/// HFRCO frequency, in hertz.
+pub const HFRCO_HZ: u32 = {{ ir.clocks.hfrco_hz }};
+
+{% for pin in ir.pins %}
+{% if pin.label %}
+/// Port letter for `{{ pin.label }}` ({{ pin.signal }}).
+pub const {{ pin.label | upper }}_PORT: char = '{{ pin.port }}';
+
+/// Pin number for `{{ pin.label }}` ({{ pin.signal }}).
+pub const {{ pin.label | upper }}_PIN: u8 = {{ pin.pin }};
+
+{% endif %}
+{% endfor %}

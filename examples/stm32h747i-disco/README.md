@@ -7,13 +7,16 @@ examples/stm32h747i-disco/README.md - STM32H747I-DISCO board demo.
 
 # STM32H747I-DISCO Demo
 ---
-Demonstrates rlvgl on the STM32H747I-DISCO discovery board using placeholder
-display and touch drivers.
+Primary rlvgl target. The full demo (splash → desktop → touch → star crawl)
+runs on three task models (bare-metal, FreeRTOS, Zephyr) over the OTM8009A
+DSI panel and FT5336 I²C touch controller.
 
 ## Quick Links
 - Boot options and dual-core flow: see `BOOT.md`
 - Memory map and regions: see `MEMORY.md`
-- STM32 BSP generation behavior and flags: see `docs/STM_BSP_GENERATION.md`
+- Hardware reference (pinmap, peripherals): see `HARDWARE.md`
+- Bring-up checklist + history: see `BRINGUP.md`
+- STM32 BSP generation behavior and flags: see [`docs/bsp/STM32.md`](../../docs/bsp/STM32.md)
 
 ## BSP Generation
 The `bsp` directory is produced by `rlvgl-creator` and demonstrates
@@ -27,9 +30,30 @@ let dp = pac::Peripherals::take().unwrap();
 hal::init_board_hal(&dp);
 ```
 
+## Platform Variants
+
+The same `rlvgl-app-disco-demo` crate and `DiscoController` widget tree
+run on three platforms, each with its own task model and display driver:
+
+| Platform | Entry point | Task model | Display | Guide |
+|----------|-------------|------------|---------|-------|
+| **Bare-metal** | `main.rs` cooperative loop | Single-threaded, SysTick-driven | Compositor + double-buffer | [Vol II](../../docs/disco-platform-guide/README.md) |
+| **FreeRTOS** | `freertos_entry.rs` + `ffi_shims.c` | Preemptive tasks (present/render/touch/playit) | Single-buffer FRONT, 32 ms holdoff | [Vol IV](../../docs/disco-freertos-guide/README.md) |
+| **Zephyr** | `zephyr_entry.rs` + `zephyr/src/main.c` | Zephyr threads, C+Rust FFI | Video mode or adapted command mode | [Vol V](../../docs/disco-zephyr-guide/README.md) |
+
+Build targets:
+
+| Platform | Build | Flash |
+|----------|-------|-------|
+| Bare-metal | `make build-disco` | `make flash-disco` |
+| FreeRTOS | `make build-disco-freertos` | `make flash-disco-freertos` |
+| Zephyr (video) | `make zephyr-disco` | `make zephyr-disco-flash` |
+| Zephyr (ACM) | `make zephyr-disco-acm` | `make zephyr-disco-flash` |
+
 ## Requirements
 - Rust target `thumbv7em-none-eabihf`
 - `arm-none-eabi` cross toolchain
+- For Zephyr: Zephyr SDK 0.16.x + west (see [docs/ZEPHYR.md](../../docs/ZEPHYR.md))
 
 ## Building
 
@@ -94,11 +118,14 @@ st-flash write firmware.bin 0x08000000
 - LTDC timings (typical OTM8009A 800×480):
   - HSW=20, HBP=140, HFP=20
   - VSW=4,  VBP=34,  VFP=10
-- Layer 1: RGB565 framebuffer; DMA2D planned for blits/fills.
+- Layer 1: ARGB8888 framebuffer; DMA2D handles blits/fills when `dma2d`
+  feature is enabled.
 - Notes:
   - These values are labeled in `platform/src/stm32h747i_disco.rs::configure_ltdc_timing()`
     for easy tweaking during tuning.
-  - DSI panel init is stubbed; LTDC draws are WIP.
+  - DSI video-mode bring-up + OTM8009A init are implemented end-to-end.
+    See [`docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md`](../../docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md)
+    for the LTDC/DSI/AXI holdoff details.
 
 ## Touch (FT5336)
 

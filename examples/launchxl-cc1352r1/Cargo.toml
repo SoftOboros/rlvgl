@@ -1,0 +1,65 @@
+# Empty [workspace] table so cargo treats this crate as standalone for
+# the v0 slate. The PM adds this crate to the parent workspace
+# `[workspace] members` array at integration time (CHIPS-TI-06 §10.2);
+# until then this stanza lets `cargo check --manifest-path .../Cargo.toml`
+# work without touching the parent workspace manifest. Remove this
+# stanza at PM integration time.
+[workspace]
+
+[package]
+name = "rlvgl-example-launchxl-cc1352r1"
+version = "0.0.1"
+edition = "2021"
+publish = false
+build = "build.rs"
+
+# CHIPS-TI-06 v0 example crate for the TI LAUNCHXL-CC1352R1 SimpleLink
+# LaunchPad. Consumes the slate-9 generated BSP under `src/bsp_generated/`
+# via the `bsp_pac` feature; proves the chipdb -> generator -> compile ->
+# linked-binary pipeline end-to-end. Acceptance gate per CHIPS-TI-06 §12:
+#
+#   cargo check --manifest-path examples/launchxl-cc1352r1/Cargo.toml \
+#       --target thumbv7em-none-eabihf
+#
+# Regenerate the files under `src/bsp_generated/launchxl_cc1352_r1/`
+# whenever the chip YAML, board YAML, or generator templates change:
+#
+#   cargo run --features creator --bin rlvgl-creator -- --silent bsp from-yaml \
+#       --vendor ti --board launchxl_cc1352r1 \
+#       --out examples/launchxl-cc1352r1/src/bsp_generated --emit-pac
+#
+# The hand-written `src/bsp_generated/mod.rs` is a module index that
+# declares `pub mod launchxl_cc1352_r1;`; the generator does NOT
+# overwrite it (the generator's own top-level mod.rs lands inside the
+# per-board subdirectory).
+
+[[bin]]
+name = "rlvgl-launchxl-cc1352r1"
+path = "src/bsp_pac_main.rs"
+required-features = ["bsp_pac"]
+
+[features]
+default = ["bsp_pac"]
+## Generated-BSP + raw-PAC path. Consumes `src/bsp_generated/` produced
+## by `rlvgl-creator bsp from-yaml --vendor ti --board launchxl_cc1352r1`.
+## v0 scope per CHIPS-TI-06 §9: proves `init()` returns and the binary
+## links. LED blink deferred to -06a; UART hello-world deferred to -06b;
+## rlvgl widget tree deferred to -06c.
+bsp_pac = []
+
+[dependencies]
+# The PAC's `critical-section` feature pulls in the `critical-section`
+# crate as a dependency, which is required for `cortex-m`-style
+# register-access patterns; `rt` enables `cortex-m-rt/device` for the
+# vector table. This matches the dep set used by the compile-verify
+# gate (tests/bsp_ti_cc1352r_compile.rs line 101).
+cc13x2_26x2_pac = { version = "0.10.3", features = ["critical-section", "rt"] }
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+panic-halt = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false

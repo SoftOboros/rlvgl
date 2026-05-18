@@ -11,11 +11,44 @@
 #include <zephyr/device.h>
 #include <zephyr/irq.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/uart.h>
 #include <zephyr/cache.h>
 #include <zephyr/input/input.h>
 #include <string.h>
 #include <zephyr/fs/fs.h>
 #include <ff.h>
+
+/* ── Early PG3 reset pulse ──────────────────────────────────────────────
+ *
+ * On ACM builds the zephyr `nt35510` node is disabled by overlay, so
+ * Zephyr never pulses the shared DSI/touch reset line (PG3). Meanwhile,
+ * the FT5336 driver init runs at POST_KERNEL 50 and starts hammering the
+ * chip with I2C reads immediately. The FT5336 IC apparently enters a
+ * broken state when it receives I2C before its first reset — subsequent
+ * resets recover it to "ACK but all-zero registers" rather than normal
+ * operation.
+ *
+ * Fix: drop in a pre-POST_KERNEL SYS_INIT hook that pulses PG3 BEFORE
+ * the FT5336 driver comes up, mimicking what Zephyr's NT35510 driver
+ * would have done on a non-ACM build. Priority 45 runs ahead of the
+ * default input-device priority of 50.
+ */
+static int ft5336_early_reset(void)
+{
+	const struct device *gpiog = DEVICE_DT_GET(DT_NODELABEL(gpiog));
+	if (!device_is_ready(gpiog)) {
+		return -ENODEV;
+	}
+	gpio_pin_configure(gpiog, 3, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_set(gpiog, 3, 0); /* low = hold in reset */
+	k_busy_wait(10000);        /* 10 ms */
+	gpio_pin_set(gpiog, 3, 1); /* high = release reset */
+	k_busy_wait(300000);       /* 300 ms settle for chip boot */
+	return 0;
+}
+SYS_INIT(ft5336_early_reset, POST_KERNEL, 45);
 
 /* ── Kernel objects ──────────────────────────────────────────────────── */
 
@@ -65,6 +98,31 @@ void rlvgl_k_sleep_ms(uint32_t ms)
 	k_sleep(K_MSEC(ms));
 }
 
+/* ── USART1 RX poll for test automation ──────────────────────────────
+ *
+ * Polls the Zephyr UART device for a single byte using uart_poll_in().
+ * Non-blocking: returns -1 if no byte available, otherwise the byte
+ * value in the low 8 bits. Lets Rust inject debug-trigger characters
+ * (e.g. 'c' to fire the star crawl) from a serial terminal without
+ * needing touch/joystick input.
+ *
+ * Uses the device chosen as zephyr,console (USART1 per stm32h747i_disco
+ * overlay). Both Zephyr console TX (printk) and our raw TX writes
+ * coexist with the poll-based RX since RX is a separate FIFO. */
+int32_t rlvgl_serial_poll_rx(void)
+{
+	const struct device *uart_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+	if (!device_is_ready(uart_dev)) {
+		return -1;
+	}
+	unsigned char c;
+	int r = uart_poll_in(uart_dev, &c);
+	if (r == 0) {
+		return (int32_t)c;
+	}
+	return -1;
+}
+
 /* Present: trigger Zephyr LTDC driver's double-buffer swap.
  * Writes the full back buffer as a new frame, which triggers
  * LINE ISR -> CFBAR update -> sem give. Blocks until swap completes.
@@ -95,6 +153,20 @@ int rlvgl_present(const uint8_t *back_buf, uint16_t width, uint16_t height)
 
 /* ── Touch input ─────────────────────────────────────────────────────── */
 
+/* Raw USART1 banner — bypasses Zephyr console driver so we can tell
+ * whether main() is running at all, independent of console routing. */
+static void usart1_raw_str(const char *s)
+{
+	volatile uint32_t *isr = (volatile uint32_t *)0x4001101C;
+	volatile uint32_t *tdr = (volatile uint32_t *)0x40011028;
+	while (*s) {
+		uint32_t t = 100000;
+		while (!(*isr & (1 << 7))) { if (--t == 0) break; }
+		*tdr = (uint32_t)(uint8_t)*s;
+		s++;
+	}
+}
+
 /* Touch event sent to Rust. Coordinates are raw panel space. */
 struct rlvgl_touch_event {
 	int16_t x;
@@ -112,6 +184,11 @@ static bool touch_pressed;
 static void input_cb(struct input_event *evt, void *user_data)
 {
 	ARG_UNUSED(user_data);
+
+	/* Debug: mark every input event with 'I' on USART1 so we can tell
+	 * whether Zephyr's input subsystem delivers events from FT5336 /
+	 * gpio_keys at all. */
+	usart1_raw_str("I");
 
 	switch (evt->code) {
 	case INPUT_ABS_X:
@@ -209,8 +286,66 @@ int main(void)
 	 * being able to print to UART. Lets us tell whether main()
 	 * runs at all when serial is silent. */
 	*(volatile uint32_t *)0x38000200 = 0xB0070001; /* main entered */
+	usart1_raw_str("\r\n[C-MAIN]\r\n");
 	printk("rlvgl-zephyr: starting\n");
+	usart1_raw_str("[C-after-printk]\r\n");
 	*(volatile uint32_t *)0x38000200 = 0xB0070002; /* after first printk */
+
+	/* Probe FT5336 device readiness — helps tell whether the i2c touch
+	 * controller actually bound in this build (adapted_cmd overlay
+	 * disables zephyr display nodes, which may have collaterally removed
+	 * parents the FT5336 node depended on).
+	 *
+	 * Also: pulse PG3 (the shared DSI/touch reset line) from here so the
+	 * FT5336 IC gets a clean reset BEFORE the Rust panel init runs —
+	 * matches what Zephyr's normal NT35510 driver would have done at
+	 * POST_KERNEL 87, and unblocks the FT5336 polling which was
+	 * starting in an indeterminate state on the ACM build. Then probe
+	 * the chip ID over I2C to verify it responds with real data (not
+	 * just 0s) after reset. */
+#if DT_NODE_EXISTS(DT_NODELABEL(ft5336))
+	{
+		const struct device *ft5336_dev =
+			DEVICE_DT_GET(DT_NODELABEL(ft5336));
+		if (ft5336_dev == NULL) {
+			printk("rlvgl-zephyr: ft5336 DEVICE_DT_GET returned NULL\n");
+		} else if (!device_is_ready(ft5336_dev)) {
+			printk("rlvgl-zephyr: ft5336 NOT READY\n");
+		} else {
+			printk("rlvgl-zephyr: ft5336 OK, name=%s\n",
+			       ft5336_dev->name);
+
+			/* Verify FT5336 is in good state after the early
+			 * SYS_INIT reset (ft5336_early_reset at POST_KERNEL 45).
+			 * Chip ID 0x64 indicates a healthy FT5x36 family chip.
+			 * NO second reset here — doing so corrupts the chip.
+			 *
+			 * Also force REG_CTRL (0x86) = 0x00 ("keep active" mode).
+			 * Default is 0x01 (monitor mode) where the chip only
+			 * scans the sensor after activity on the INT pin — that
+			 * keeps TD_STATUS stuck at 0 under Zephyr's polling-only
+			 * driver on our PG3-shared-reset build. */
+			const struct device *i2c_dev =
+				DEVICE_DT_GET(DT_BUS(DT_NODELABEL(ft5336)));
+			if (device_is_ready(i2c_dev)) {
+				uint8_t chip_id = 0xFF, fw_ver = 0xFF, ctrl = 0xFF;
+				int r1 = i2c_reg_read_byte(i2c_dev, 0x38, 0xA3, &chip_id);
+				int r2 = i2c_reg_read_byte(i2c_dev, 0x38, 0xA6, &fw_ver);
+				int r3 = i2c_reg_read_byte(i2c_dev, 0x38, 0x86, &ctrl);
+				printk("rlvgl-zephyr: ft5336 chip_id=0x%02x rc=%d, "
+				       "fw=0x%02x rc=%d, ctrl=0x%02x rc=%d\n",
+				       chip_id, r1, fw_ver, r2, ctrl, r3);
+				int r4 = i2c_reg_write_byte(i2c_dev, 0x38, 0x86, 0x00);
+				uint8_t ctrl_rb = 0xFF;
+				int r5 = i2c_reg_read_byte(i2c_dev, 0x38, 0x86, &ctrl_rb);
+				printk("rlvgl-zephyr: ft5336 WR CTRL=0 rc=%d, RB=0x%02x rc=%d\n",
+				       r4, ctrl_rb, r5);
+			}
+		}
+	}
+#else
+	printk("rlvgl-zephyr: ft5336 DT node MISSING\n");
+#endif
 
 	/* Register DMA2D ISR (IRQ 90, pri 3). */
 	irq_connect_dynamic(90, 3, dma2d_isr_wrapper, NULL, 0);

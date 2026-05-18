@@ -7,17 +7,25 @@
 //! contention with LTDC scanout.
 
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-use rlvgl_platform::blit::PixelFmt;
+use rlvgl_platform::blit::{PixelFmt, Rect as BlitRect};
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use rlvgl_platform::dma2d::Dma2dBlitter;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 use rlvgl_platform::frame_sync::{Dma2dSync, FrameSync, ScopeProbe};
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+use rlvgl_platform::hwcore::addr::PhysAddr;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+use rlvgl_platform::hwcore::surface::{BackBuffer, FrameBuffer};
 
 use rlvgl_core::bitmap_font::BitmapFont;
 use rlvgl_ui::EventWindow;
 
 // ── Portrait framebuffer constants ──────────────────────────────────────────
 const FB_W: u32 = 480;
+/// Portrait framebuffer height (NT35510 panel on the 747I-DISCO).
+/// Used to synthesize a [`FrameBuffer`] handle around `self.back_buf`
+/// when calling the typed DMA2D submission API.
+const FB_H: u32 = 800;
 const BPP: u32 = 4;
 
 // ── Event window geometry (portrait FB coords) ─────────────────────────────
@@ -148,21 +156,36 @@ impl EventOverlay {
                 if !sync.dma2d_admits(100_000) {
                     return StepResult::Pending;
                 }
-                // DMA2D R2M fill: entire event rect with border color.
-                let dst = unsafe {
-                    self.back_buf
-                        .add((EV_FB_Y * self.fb_w * BPP + EV_FB_X * BPP) as usize)
-                };
                 sync.note_start();
                 sync.dma2d_active();
-                dma2d.start_fill_raw(
-                    dst,
-                    self.fb_w * BPP,
-                    EV_FB_W,
-                    EV_FB_H,
+                // SAFETY: `self.back_buf` was supplied by `begin_frame`
+                // and points at the SDRAM back buffer the LTDC is not
+                // currently scanning; `self` exclusively holds it for
+                // the duration of this DMA2D submission. The synthesized
+                // `BackBuffer<'_>` lives only across the typed call —
+                // its borrow is released on `into_borrow`, restoring
+                // the caller's view of `self.back_buf`.
+                let mut fb = unsafe {
+                    FrameBuffer::from_phys(
+                        PhysAddr::new(self.back_buf as u32),
+                        self.fb_w,
+                        FB_H,
+                        self.fb_w * BPP,
+                        PixelFmt::Argb8888,
+                    )
+                };
+                let mut back = BackBuffer::wrap(&mut fb);
+                let inflight = dma2d.start_fill_typed(
+                    back.dma_dst(),
+                    BlitRect {
+                        x: EV_FB_X as i32,
+                        y: EV_FB_Y as i32,
+                        w: EV_FB_W,
+                        h: EV_FB_H,
+                    },
                     BORDER_COLOR,
-                    PixelFmt::Argb8888,
                 );
+                let _ = inflight.into_borrow();
                 self.stage = Stage::WaitBorder;
                 StepResult::Pending
             }
@@ -220,20 +243,30 @@ impl EventOverlay {
         if !sync.dma2d_admits(100_000) {
             return StepResult::Pending;
         }
-        let dst = unsafe {
-            self.back_buf
-                .add(((EV_FB_Y + BORDER_W) * self.fb_w * BPP + (EV_FB_X + BORDER_W) * BPP) as usize)
-        };
         sync.note_start();
         sync.dma2d_active();
-        dma2d.start_fill_raw(
-            dst,
-            self.fb_w * BPP,
-            EV_FB_W - 2 * BORDER_W,
-            EV_FB_H - 2 * BORDER_W,
+        // SAFETY: see `Stage::FillBorder` arm above.
+        let mut fb = unsafe {
+            FrameBuffer::from_phys(
+                PhysAddr::new(self.back_buf as u32),
+                self.fb_w,
+                FB_H,
+                self.fb_w * BPP,
+                PixelFmt::Argb8888,
+            )
+        };
+        let mut back = BackBuffer::wrap(&mut fb);
+        let inflight = dma2d.start_fill_typed(
+            back.dma_dst(),
+            BlitRect {
+                x: (EV_FB_X + BORDER_W) as i32,
+                y: (EV_FB_Y + BORDER_W) as i32,
+                w: EV_FB_W - 2 * BORDER_W,
+                h: EV_FB_H - 2 * BORDER_W,
+            },
             BG_COLOR,
-            PixelFmt::Argb8888,
         );
+        let _ = inflight.into_borrow();
         self.stage = Stage::WaitInterior;
         StepResult::Pending
     }
@@ -339,7 +372,7 @@ fn render_str_a8(font: &BitmapFont, draw_x: i32, draw_y: i32, text: &str) {
 /// Uses DCCMVAC (Data Cache Clean by MVA to Point of Coherency) at
 /// 0xE000_EF68, one write per 32-byte cache line.
 fn dcache_clean_range(addr: usize, size: usize) {
-    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32;
+    const DCCMVAC: *mut u32 = 0xE000_EF68 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     const LINE_SIZE: usize = 32;
     let start = addr & !(LINE_SIZE - 1);
     let end = (addr + size + LINE_SIZE - 1) & !(LINE_SIZE - 1);

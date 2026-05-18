@@ -1,0 +1,567 @@
+{
+  "$comment": "schemas/qt-ir.schema.json - rlvgl-creator qt-ir IR. Regenerate with `rlvgl-creator qt schema --out schemas/qt-ir.schema.json`. See docs/qt-support/02-ir-schema.md for the bumping policy.",
+  "$defs": {
+    "UiAction": {
+      "description": "QT-05 §3 — sealed enum over the scjson executable-content\nelements in the QT-05 §5 subset that contribute to entry/exit/\ntransition action lists. Adding a variant requires a\nSpecification-Required amendment to QT-05 §5 + this glossary.",
+      "oneOf": [
+        {
+          "description": "`<assign location=\"…\" expr=\"…\"/>` — write to a `DataModel`\nfield.",
+          "properties": {
+            "expr": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "assign",
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "location"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`<raise event=\"…\"/>` — internal-event raise.",
+          "properties": {
+            "event": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "raise",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "event"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`<script name=\"…\"/>` — callout to an `Externals` method.\n`name` references back into `UiStateMachine.scripts[*].name`.",
+          "properties": {
+            "kind": {
+              "const": "script",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "UiAssignment": {
+      "description": "`target: <expression-or-object-or-list>` and dotted variants.",
+      "properties": {
+        "target": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/UiAssignmentValue"
+        }
+      },
+      "required": [
+        "target",
+        "value"
+      ],
+      "type": "object"
+    },
+    "UiAssignmentValue": {
+      "description": "Value side of an assignment.",
+      "oneOf": [
+        {
+          "description": "Plain expression text, opaque (e.g. `parent.width * 0.5`).",
+          "properties": {
+            "kind": {
+              "const": "expression",
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`target: SomeType { ... }` — value is a sub-item.",
+          "properties": {
+            "item": {
+              "$ref": "#/$defs/UiItem"
+            },
+            "kind": {
+              "const": "object",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "item"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "`target: [Item {}, Item {}, ...]`.",
+          "properties": {
+            "items": {
+              "items": {
+                "$ref": "#/$defs/UiAssignmentValue"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "list",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "UiDmField": {
+      "description": "QT-05 §3 — DataModel field. v1 mirrors istate's `f64`-only\nscaffold; type widening is reserved for future linkage versions.",
+      "properties": {
+        "id": {
+          "description": "snake_case Rust ident exposed at `<sm>_gen::DataModel.<id>`.",
+          "type": "string"
+        },
+        "initial": {
+          "description": "Numeric literal initializer; `None` = default 0.0.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "UiHandler": {
+      "description": "`onClicked: ...` signal-handler binding. Body captured raw.",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "signal": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "signal",
+        "body"
+      ],
+      "type": "object"
+    },
+    "UiImport": {
+      "description": "`import QtQuick 2.15 as Q` style declaration.",
+      "properties": {
+        "alias": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "module": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "module"
+      ],
+      "type": "object"
+    },
+    "UiItem": {
+      "description": "A QML type instance — `Item { ... }`, `Rectangle { ... }`, etc.",
+      "properties": {
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/UiAssignment"
+          },
+          "type": "array"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/UiItem"
+          },
+          "type": "array"
+        },
+        "handlers": {
+          "items": {
+            "$ref": "#/$defs/UiHandler"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "properties": {
+          "items": {
+            "$ref": "#/$defs/UiProperty"
+          },
+          "type": "array"
+        },
+        "signals": {
+          "items": {
+            "$ref": "#/$defs/UiSignal"
+          },
+          "type": "array"
+        },
+        "type_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type_name",
+        "properties",
+        "assignments",
+        "signals",
+        "handlers",
+        "children"
+      ],
+      "type": "object"
+    },
+    "UiProperty": {
+      "description": "`[default] [readonly] property <ty> <name>[: <expr>]`.",
+      "properties": {
+        "default_kw": {
+          "type": "boolean"
+        },
+        "default_value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "readonly": {
+          "type": "boolean"
+        },
+        "ty": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "ty",
+        "readonly",
+        "default_kw"
+      ],
+      "type": "object"
+    },
+    "UiScript": {
+      "description": "QT-05 §3 — discovered `<script name=\"…\"/>` callout. Method name\non the generated `<sm>_gen::Externals` trait.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/UiScriptOrigin",
+          "description": "Where the script lived in the SCXML tree — used by QT-05e\nwhen emitting the `// QT-05e externals-stub:` comment for\nreviewer context."
+        }
+      },
+      "required": [
+        "name",
+        "origin"
+      ],
+      "type": "object"
+    },
+    "UiScriptOrigin": {
+      "description": "QT-05 §3 — provenance of a discovered `<script>` callout.",
+      "oneOf": [
+        {
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "index": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "transition",
+              "type": "string"
+            },
+            "to": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "index",
+            "from"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "on_entry",
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "on_exit",
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "state"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "UiSignal": {
+      "description": "`signal pressed(int x, int y)` declaration.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/UiSignalParam"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "params"
+      ],
+      "type": "object"
+    },
+    "UiSignalParam": {
+      "description": "Single `(int x)` style signal parameter.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ty": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "ty"
+      ],
+      "type": "object"
+    },
+    "UiState": {
+      "description": "QT-05 §3 — flat state record. Compound nesting and parallel\nregions are deferred per QT-05 §5 (covered by future QT-05x).",
+      "properties": {
+        "id": {
+          "description": "State ID; PascalCased to `<sm>_gen::State::<Id>` per the\nistate template's `to_rust_ident | capitalize` rule.",
+          "type": "string"
+        },
+        "on_entry": {
+          "items": {
+            "$ref": "#/$defs/UiAction"
+          },
+          "type": "array"
+        },
+        "on_exit": {
+          "items": {
+            "$ref": "#/$defs/UiAction"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "UiStateMachine": {
+      "description": "QT-05 §3 — Qt-side state-machine record. Lives next to\n[`UiModule.root`] and links to a `<screen>.scjson` side-file plus\na pre-walked enumeration of states/transitions/dm/scripts.",
+      "properties": {
+        "datamodel": {
+          "items": {
+            "$ref": "#/$defs/UiDmField"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Rust crate name stem; the istate-codegen Rust crate is\n`<id>_gen` per QT-05 §6.",
+          "type": "string"
+        },
+        "initial": {
+          "description": "Initial state ID; mirrors scjson `<scxml initial=\"…\">`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scripts": {
+          "items": {
+            "$ref": "#/$defs/UiScript"
+          },
+          "type": "array"
+        },
+        "source": {
+          "description": "Path to the scjson side-file, relative to the QML project\nroot. Stored as `String` on the wire (see QT-05 §3 amendment\n2026-04-29) — ingest treats it as a path.",
+          "type": "string"
+        },
+        "states": {
+          "items": {
+            "$ref": "#/$defs/UiState"
+          },
+          "type": "array"
+        },
+        "transitions": {
+          "items": {
+            "$ref": "#/$defs/UiTransition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "states",
+        "transitions",
+        "datamodel",
+        "scripts"
+      ],
+      "type": "object"
+    },
+    "UiTransition": {
+      "description": "QT-05 §3 — transition record.",
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/UiAction"
+          },
+          "type": "array"
+        },
+        "cond": {
+          "description": "Raw scjson `cond` expression. Parsed by istate-codegen, not\nby us — we pass it through verbatim.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "event": {
+          "description": "PascalCased to `<sm>_gen::Event::<Name>`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rlvgl.dev/schemas/qt-ir.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Top-level QML module — the parsed shape of a single `.qml` file.\n\nQT-05 amendment: the optional `state_machine` field carries a\nlinked scjson side-file once QT-05a ingest lands. `None` for any\nQML that does not declare a state machine; never written by\nQT-05 itself (concepts only).",
+  "properties": {
+    "imports": {
+      "items": {
+        "$ref": "#/$defs/UiImport"
+      },
+      "type": "array"
+    },
+    "pragmas": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "root": {
+      "$ref": "#/$defs/UiItem"
+    },
+    "source": {
+      "type": "string"
+    },
+    "state_machine": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UiStateMachine"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "QT-05: linked scjson state-machine, populated by QT-05a ingest.\nAlways `None` from the QT-01a structural parser."
+    },
+    "version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "source",
+    "imports",
+    "pragmas",
+    "root"
+  ],
+  "title": "UiModule",
+  "type": "object"
+}

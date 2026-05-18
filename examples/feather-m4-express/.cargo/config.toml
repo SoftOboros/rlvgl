@@ -1,0 +1,19 @@
+# CHIPS-MICROCHIP-06 §6.2 — Microchip example crate Cargo config.
+#
+# Defaults the build target to `thumbv7em-none-eabihf` (Cortex-M4F) so a
+# bare `cargo check` from inside this directory exercises the bring-up
+# binary's link target. `cortex-m-rt ~0.6.12`'s `link.x` template handles
+# `INCLUDE memory.x` and `INCLUDE device.x` internally; the only
+# explicit `-T` we need is `-Tlink.x`. The slate-9 `atsamd51j19a.x`
+# linker fragment is currently an empty slot (CHIPS-MICROCHIP-05 §5.3)
+# and is not linked in v0; when a future amendment populates its body
+# with `SECTIONS` directives, this rustflags array gains a second
+# `-T...` line.
+
+[build]
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+]

@@ -1,0 +1,156 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits real register writes for SERCOM-as-USART (when it is
+//! the console), SERCOM-as-I²C-master (timing setup), and SERCOM-as-SPI-
+//! master (clock + mode). Other classes get TODO stubs.
+//!
+//! Targeted at the pinned `atsamd51j19a 0.7.1` PAC: SERCOM mode unions
+//! (`usart_int()` / `i2cm()` / `spim()`) and the mode-union `baud()`
+//! accessor remain methods on this PAC era, but the per-register
+//! handles inside each mode block (`ctrla`, `ctrlb`, `syncbusy`,
+//! etc.) are direct fields, not methods.
+
+use {{ ir.chip.pac_crate }} as pac;
+
+#[allow(unused_imports)]
+use super::board::{APBA_HZ, CPU_HZ};
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and PORT PMUX are
+/// configured.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% set periph = ir.chip.peripherals[name] %}
+{% if periph %}
+{% if periph.class == "sercom" and ir.board.console and ir.board.console.peripheral == name %}
+/// Bring up {{ name }} as the SERCOM USART console at {{ ir.board.console.baud }} baud, 8N1.
+///
+/// SERCOM internal clock is GCLK PCHCTRL channel {{ periph.gclk_pchctrl_id }}; the
+/// arithmetic-mode baud divisor BAUD register holds
+/// `65536 * (1 - 16 * (BAUD_HZ / GCLK_HZ))`. We use CPU_HZ as a
+/// conservative approximation of the SERCOM CORE clock; real applications
+/// SHOULD override this via the board's `clock_tree.pchctrl_channels`
+/// kernel override map.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const BAUD: u32 = {{ ir.board.console.baud }};
+    // BAUD divisor (asynchronous arithmetic mode, OVERSAMPLE=16):
+    //   BAUD = 65536 - (65536 * 16 * BAUD_HZ / SERCOM_CLK_HZ)
+    // Clamp to u16 range; the SERCOM USART BAUD field is 16-bit.
+    let baud_div: u32 = 65536u32.saturating_sub((65536u64 * 16 * BAUD as u64 / CPU_HZ as u64) as u32);
+    p.{{ name | upper }}.usart_int().ctrla.write(|w| unsafe {
+        w.mode().bits(0x1) // USART internal clock
+         .dord().set_bit()  // LSB first
+         .rxpo().bits(0x1)  // RX on PAD[1] (typical)
+         .txpo().bits(0x0)  // TX on PAD[0]
+    });
+    p.{{ name | upper }}.usart_int().ctrlb.write(|w| unsafe {
+        w.chsize().bits(0x0) // 8 data bits
+         .sbmode().clear_bit() // 1 stop bit
+         .pmode().clear_bit()  // no parity
+         .rxen().set_bit()
+         .txen().set_bit()
+    });
+    p.{{ name | upper }}.usart_int().baud().write(|w| unsafe { w.baud().bits(baud_div as u16) });
+    // Enable the SERCOM and wait for the synchronisation barrier.
+    p.{{ name | upper }}.usart_int().ctrla.modify(|_, w| w.enable().set_bit());
+    while p.{{ name | upper }}.usart_int().syncbusy.read().enable().bit_is_set() {}
+}
+{% elif periph.class == "sercom" %}
+/// Bring up {{ name }} as a SERCOM peripheral.
+///
+/// Role is determined by the board YAML's pad assignments — `SDA`/`SCL`
+/// roles → I²C master, `MOSI`/`MISO`/`SCK` → SPI master, `TX`/`RX` →
+/// USART. The chipdb does not currently emit role-specific init for non-
+/// console SERCOMs; application code reaches for
+/// `p.{{ name | upper }}` directly through the {{ ir.chip.pac_crate }} PAC.
+///
+/// Clock gating + PCHCTRL channel {{ periph.gclk_pchctrl_id }} are
+/// already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: emit I²C / SPI / USART init based on board pad role hints.
+    // For now, the SERCOM clock is gated on and the application is
+    // responsible for protocol-specific configuration via the PAC.
+}
+{% elif periph.class == "tc" %}
+/// Bring up {{ name }} (Timer/Counter).
+///
+/// Clock gating + PCHCTRL are already done by `crate::clocks::init`.
+/// Application code configures `p.{{ name | upper }}.count16()` /
+/// `count8()` / `count32()` mode at runtime.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: TC mode + waveform setup
+}
+{% elif periph.class == "tcc" %}
+/// Bring up {{ name }} (Timer/Counter for Control).
+///
+/// Clock gating + PCHCTRL are already done by `crate::clocks::init`.
+/// Application code configures `p.{{ name | upper }}` waveform mode at
+/// runtime.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: TCC mode + waveform setup
+}
+{% elif periph.class == "adc" %}
+/// Bring up {{ name }} (Analog-to-Digital Converter).
+///
+/// Clock gating + PCHCTRL are already done by `crate::clocks::init`.
+/// Application code configures reference / resolution / input mux at
+/// runtime via `p.{{ name | upper }}`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: ADC calibration loading + input mux setup
+}
+{% elif periph.class == "dac" %}
+/// Bring up {{ name }} (Digital-to-Analog Converter).
+///
+/// Clock gating + PCHCTRL are already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: DAC reference + output enable
+}
+{% elif periph.class == "usb" %}
+/// Bring up {{ name }} (Universal Serial Bus).
+///
+/// AHB-only — clock gating done by `crate::clocks::init` PCHCTRL channel
+/// {{ periph.gclk_pchctrl_id }}. The pads must already be muxed to
+/// USB_DM / USB_DP (PMUX letter H on D5x).
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: USB device controller bring-up (descriptor table, attach).
+}
+{% elif periph.class == "eic" %}
+/// Bring up {{ name }} (External Interrupt Controller).
+///
+/// Per CHIPS-MICROCHIP-00 §11 #11, EIC routing is deferred — this
+/// function only ensures the EIC bus + GCLK channel are alive.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: per-line CONFIG + INTENSET writes (deferred, §11 #11).
+}
+{% else %}
+/// TODO: initialize {{ name }} (class `{{ periph.class }}`, base 0x{{ "%08x" | format(periph.base) }}).
+///
+/// Populate this function by writing into the
+/// `{{ ir.chip.pac_crate }}::{{ name | upper }}` register block. Clock
+/// gating is already done by `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: {{ periph.class }} init sequence for {{ name }}
+}
+{% endif %}
+{% else %}
+/// TODO: unknown peripheral `{{ name }}` (no entry in chip IR).
+pub fn init_{{ name }}() {}
+{% endif %}
+
+{% endfor %}

@@ -1,0 +1,188 @@
+//! Board-level constants for SLSTK3701A.
+//!
+//! Each labelled pin from `db/boards/slstk3701_a.yaml` becomes
+//! a pair of `pub const`s — `<LABEL>_PORT: char` and
+//! `<LABEL>_PIN: u8` — per CHIPS-SILABS-00 §10.3. This keeps the EFM32
+//! `(port, pin)` addressing model intact at the application boundary
+//! rather than collapsing it to a flat integer.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "SLSTK3701A";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "EFM32GG11";
+
+/// Chip package.
+pub const PACKAGE: &str = "BGA192";
+
+/// On-module flash capacity, megabytes.
+pub const FLASH_MB: u32 = 2;
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const CPU_HZ: u32 = 50000000;
+
+/// HFCLK frequency configured by [`crate::clocks::init`], in hertz.
+pub const HFCLK_HZ: u32 = 50000000;
+
+/// HFXO crystal frequency, in hertz.
+pub const HFXO_HZ: u32 = 50000000;
+
+/// LFXO crystal frequency, in hertz.
+pub const LFXO_HZ: u32 = 32768;
+
+/// HFRCO frequency, in hertz.
+pub const HFRCO_HZ: u32 = 19000000;
+
+
+
+/// Port letter for `console_tx` (USART4_TX).
+pub const CONSOLE_TX_PORT: char = 'H';
+
+/// Pin number for `console_tx` (USART4_TX).
+pub const CONSOLE_TX_PIN: u8 = 4;
+
+
+
+
+/// Port letter for `console_rx` (USART4_RX).
+pub const CONSOLE_RX_PORT: char = 'H';
+
+/// Pin number for `console_rx` (USART4_RX).
+pub const CONSOLE_RX_PIN: u8 = 5;
+
+
+
+
+/// Port letter for `console_cts` (USART4_CTS).
+pub const CONSOLE_CTS_PORT: char = 'H';
+
+/// Pin number for `console_cts` (USART4_CTS).
+pub const CONSOLE_CTS_PIN: u8 = 8;
+
+
+
+
+/// Port letter for `console_rts` (USART4_RTS).
+pub const CONSOLE_RTS_PORT: char = 'H';
+
+/// Pin number for `console_rts` (USART4_RTS).
+pub const CONSOLE_RTS_PIN: u8 = 9;
+
+
+
+
+/// Port letter for `vcom_enable` (VCOM_ENABLE).
+pub const VCOM_ENABLE_PORT: char = 'E';
+
+/// Pin number for `vcom_enable` (VCOM_ENABLE).
+pub const VCOM_ENABLE_PIN: u8 = 1;
+
+
+
+
+/// Port letter for `btn0` (GPIO).
+pub const BTN0_PORT: char = 'C';
+
+/// Pin number for `btn0` (GPIO).
+pub const BTN0_PIN: u8 = 8;
+
+
+
+
+/// Port letter for `btn1` (GPIO_EM4WU2).
+pub const BTN1_PORT: char = 'C';
+
+/// Pin number for `btn1` (GPIO_EM4WU2).
+pub const BTN1_PIN: u8 = 9;
+
+
+
+
+/// Port letter for `led0_r` (GPIO).
+pub const LED0_R_PORT: char = 'H';
+
+/// Pin number for `led0_r` (GPIO).
+pub const LED0_R_PIN: u8 = 10;
+
+
+
+
+/// Port letter for `led0_g` (GPIO).
+pub const LED0_G_PORT: char = 'H';
+
+/// Pin number for `led0_g` (GPIO).
+pub const LED0_G_PIN: u8 = 11;
+
+
+
+
+/// Port letter for `led0_b` (GPIO).
+pub const LED0_B_PORT: char = 'H';
+
+/// Pin number for `led0_b` (GPIO).
+pub const LED0_B_PIN: u8 = 12;
+
+
+
+
+/// Port letter for `led1_r` (GPIO).
+pub const LED1_R_PORT: char = 'H';
+
+/// Pin number for `led1_r` (GPIO).
+pub const LED1_R_PIN: u8 = 13;
+
+
+
+
+/// Port letter for `led1_g` (GPIO).
+pub const LED1_G_PORT: char = 'H';
+
+/// Pin number for `led1_g` (GPIO).
+pub const LED1_G_PIN: u8 = 14;
+
+
+
+
+/// Port letter for `led1_b` (GPIO).
+pub const LED1_B_PORT: char = 'H';
+
+/// Pin number for `led1_b` (GPIO).
+pub const LED1_B_PIN: u8 = 15;
+
+
+
+
+/// Port letter for `sensor_enable` (SENSOR_ENABLE).
+pub const SENSOR_ENABLE_PORT: char = 'B';
+
+/// Pin number for `sensor_enable` (SENSOR_ENABLE).
+pub const SENSOR_ENABLE_PIN: u8 = 3;
+
+
+
+
+/// Port letter for `sensor_i2c_scl` (I2C2_SCL).
+pub const SENSOR_I2C_SCL_PORT: char = 'I';
+
+/// Pin number for `sensor_i2c_scl` (I2C2_SCL).
+pub const SENSOR_I2C_SCL_PIN: u8 = 5;
+
+
+
+
+/// Port letter for `sensor_i2c_sda` (I2C2_SDA).
+pub const SENSOR_I2C_SDA_PORT: char = 'I';
+
+/// Pin number for `sensor_i2c_sda` (I2C2_SDA).
+pub const SENSOR_I2C_SDA_PIN: u8 = 4;
+
+
+
+
+/// Port letter for `si7210_alert` (SENSOR_HALL_VOUT).
+pub const SI7210_ALERT_PORT: char = 'B';
+
+/// Pin number for `si7210_alert` (SENSOR_HALL_VOUT).
+pub const SI7210_ALERT_PIN: u8 = 0;
+
+

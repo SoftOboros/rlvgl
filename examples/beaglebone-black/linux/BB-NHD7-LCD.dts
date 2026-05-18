@@ -1,0 +1,107 @@
+/*
+ * BB-NHD7-LCD.dts — Overlay for BeagleBone Black + NHD-7.0CTP-CAPE-P.
+ *
+ * Merges into /boot/dtbs/<kver>/am335x-boneblack.dtb via `fdtoverlay`
+ * on the BBB (not applied at u-boot time; memory notes earlier u-boot
+ * overlay port/endpoint support is flaky on this Bookworm image).
+ *
+ * What this overlay adds:
+ *   1. `bb-lcd-pins` pinctrl state under `&am33xx_pinmux` — 28 pads
+ *      (LCD_DATA0..23 + VSYNC/HSYNC/PCLK/AC_BIAS_EN) each muxed to
+ *      Mode 0 with pull disabled (value 0x08).
+ *   2. Wires those pins into the existing `&lcdc` node as its default
+ *      pinctrl state. tilcdc applies the state on probe; the pads
+ *      stay in Mode 0 even after we unbind tilcdc so rlvgl-bbb can
+ *      own LCDC from userspace.
+ *   3. A `/panel` node (`compatible = "panel-dpi"` — no innolux
+ *      compatible because the 6.12 kernel's innolux,at070tn92 driver
+ *      ignores the DTB `connector-type` override) with NHD-7 timing.
+ *   4. Rewires the existing `&lcdc_0` endpoint to point at the panel.
+ *
+ * Compile:   dtc -@ -I dts -O dtb -o BB-NHD7-LCD.dtbo BB-NHD7-LCD.dts
+ * Apply:     fdtoverlay -i am335x-boneblack.dtb.orig \
+ *                       -o am335x-boneblack.dtb \
+ *                       BB-NHD7-LCD.dtbo
+ */
+
+/dts-v1/;
+/plugin/;
+
+&am33xx_pinmux {
+    bb_lcd_pins: bb-lcd-pins {
+        pinctrl-single,pins = <
+            0x0a0 0x08  /* LCD_DATA0  — P8.45 */
+            0x0a4 0x08  /* LCD_DATA1  — P8.46 */
+            0x0a8 0x08  /* LCD_DATA2  — P8.43 */
+            0x0ac 0x08  /* LCD_DATA3  — P8.44 */
+            0x0b0 0x08  /* LCD_DATA4  — P8.41 */
+            0x0b4 0x08  /* LCD_DATA5  — P8.42 */
+            0x0b8 0x08  /* LCD_DATA6  — P8.39 */
+            0x0bc 0x08  /* LCD_DATA7  — P8.40 */
+            0x0c0 0x08  /* LCD_DATA8  — P8.37 */
+            0x0c4 0x08  /* LCD_DATA9  — P8.38 */
+            0x0c8 0x08  /* LCD_DATA10 — P8.36 */
+            0x0cc 0x08  /* LCD_DATA11 — P8.34 */
+            0x0d0 0x08  /* LCD_DATA12 — P8.35 */
+            0x0d4 0x08  /* LCD_DATA13 — P8.33 */
+            0x0d8 0x08  /* LCD_DATA14 — P8.31 */
+            0x0dc 0x08  /* LCD_DATA15 — P8.32 */
+            0x0e0 0x08  /* LCD_DATA16 */
+            0x0e4 0x08  /* LCD_DATA17 */
+            0x0e8 0x08  /* LCD_DATA18 */
+            0x0ec 0x08  /* LCD_DATA19 */
+            0x0f0 0x08  /* LCD_DATA20 */
+            0x0f4 0x08  /* LCD_DATA21 */
+            0x0f8 0x08  /* LCD_DATA22 */
+            0x0fc 0x08  /* LCD_DATA23 */
+            0x100 0x08  /* LCD_VSYNC      — P8.27 */
+            0x104 0x08  /* LCD_HSYNC      — P8.29 */
+            0x108 0x08  /* LCD_PCLK       — P8.28 */
+            0x10c 0x08  /* LCD_AC_BIAS_EN — P8.30 */
+        >;
+    };
+};
+
+/*
+ * &lcdc status change intentionally omitted. rlvgl-bbb drives LCDC
+ * directly via /dev/mem, so tilcdc binding is not required. Enabling
+ * &lcdc here (as a prior iteration did) triggered a boot hang on this
+ * Bookworm image — likely because the base DTB's lcdc endpoint points
+ * at a non-existent HDMI bridge, so tilcdc probe wedges. Skipping.
+ *
+ * Graph wiring (port/endpoint ↔ &lcdc_0) intentionally omitted too:
+ * the `lcdc_0` symbol is absent from am335x-boneblack-uboot.dtb's
+ * __symbols__, and we don't need DRM pipeline completion.
+ */
+
+&{/} {
+    panel {
+        compatible = "panel-dpi";
+        status = "okay";
+        connector-type = <14>;    /* DRM_MODE_CONNECTOR_DPI */
+        bus-format = <0x1013>;    /* MEDIA_BUS_FMT_RGB888_1X24 */
+
+        /* Apply LCD pad mux through this consumer. panel-simple binds
+         * to this node and applies the pinctrl state as a side effect
+         * of its probe — pads end up in Mode 0, which is all
+         * rlvgl-bbb needs. */
+        pinctrl-names = "default";
+        pinctrl-0 = <&bb_lcd_pins>;
+
+        panel-timing {
+            clock-frequency = <33300000>;
+            hactive = <800>;
+            vactive = <480>;
+            hfront-porch = <210>;
+            hback-porch = <46>;
+            hsync-len = <20>;
+            vfront-porch = <22>;
+            vback-porch = <23>;
+            vsync-len = <10>;
+            hsync-active = <0>;
+            vsync-active = <0>;
+            de-active = <1>;
+            pixelclk-active = <0>;
+        };
+    };
+};

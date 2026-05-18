@@ -10,11 +10,11 @@
 
 extern crate alloc;
 
-mod assets;
+pub mod assets;
 mod dashboard_panel;
 mod hotspot;
-mod icon_strip;
-mod wing;
+pub mod icon_strip;
+pub mod wing;
 
 use alloc::{format, rc::Rc, string::String, vec, vec::Vec};
 use core::cell::RefCell;
@@ -104,6 +104,22 @@ impl DiscoCapabilities {
             platform: "Zephyr RTOS",
         }
     }
+
+    /// Capability preset for the BeagleBone Black with NHD-7.0CTP-CAPE-P.
+    ///
+    /// No on-board audio codec (HDMI audio disabled when LCD cape is active).
+    /// Storage available via eMMC and microSD. Cap touch via FT5x06 on I2C.
+    /// Effects run CPU-only (no DMA2D on AM3358).
+    pub const fn beaglebone_black() -> Self {
+        Self {
+            audio: false,
+            storage: true,
+            diagnostics: true,
+            effects: true,
+            pointer: true,
+            platform: "BeagleBone Black",
+        }
+    }
 }
 
 impl Default for DiscoCapabilities {
@@ -119,6 +135,13 @@ pub enum DiscoEffect {
     AudioScope,
     /// The Star Wars style crawl used by the STM32 demo.
     StarCrawl,
+    /// Windowed-FFT spectrum display. The runtime adapter consumes a
+    /// per-mode dBFS band array (e.g. 320 bands across DC..Nyquist)
+    /// from the analyzer's shared-spectrum bus and renders it as
+    /// vertical bars. Added 2026-04-28 for the disco-analyzer
+    /// subrepo's `DAA-02-MEASUREMENT-MODE-FFT-SPECTRUM` walkthrough
+    /// (DAA-02-D 1:1 per-mode `DiscoEffect` mapping ratification).
+    Spectrum,
 }
 
 /// Commands emitted by the shared demo controller for a runtime adapter.
@@ -204,6 +227,7 @@ enum InfoSlot {
     LiveStats = 1,
     StarCrawl = 2,
     AudioScope = 3,
+    Spectrum = 4,
 }
 
 const STRIP_ICON_SIZE: i32 = 60;
@@ -221,6 +245,7 @@ impl InfoSlot {
             1 => Self::LiveStats,
             2 => Self::StarCrawl,
             3 => Self::AudioScope,
+            4 => Self::Spectrum,
             _ => Self::Diagnostics,
         }
     }
@@ -354,16 +379,32 @@ impl ControllerState {
             format!(
                 "Audio: {}  Storage: {}  Effects: {}",
                 if self.capabilities.audio { "yes" } else { "no" },
-                if self.capabilities.storage { "yes" } else { "no" },
-                if self.capabilities.effects { "yes" } else { "no" },
+                if self.capabilities.storage {
+                    "yes"
+                } else {
+                    "no"
+                },
+                if self.capabilities.effects {
+                    "yes"
+                } else {
+                    "no"
+                },
             ),
             format!(
                 "Pointer: {}",
-                if self.capabilities.pointer { "yes" } else { "no" },
+                if self.capabilities.pointer {
+                    "yes"
+                } else {
+                    "no"
+                },
             ),
             format!(
                 "Diagnostics: {}",
-                if self.capabilities.diagnostics { "yes" } else { "no" },
+                if self.capabilities.diagnostics {
+                    "yes"
+                } else {
+                    "no"
+                },
             ),
             format!("Backlight: {}%", self.backlight),
         ]);
@@ -414,6 +455,7 @@ impl ControllerState {
         ]);
     }
 
+    #[allow(dead_code)]
     fn show_storage(&mut self) {
         self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title("Storage Browser");
@@ -536,7 +578,7 @@ impl ControllerState {
             ),
             FocusState::Wing(WingKind::Info, index) => FocusState::Wing(
                 WingKind::Info,
-                (index as i32 + delta).rem_euclid(4) as usize,
+                (index as i32 + delta).rem_euclid(5) as usize,
             ),
             other => other,
         };
@@ -585,8 +627,16 @@ impl ControllerState {
             SettingsSlot::Locale => {
                 self.push_status(format!(
                     "Pointer: {} | Diag: {}",
-                    if self.capabilities.pointer { "on" } else { "off" },
-                    if self.capabilities.diagnostics { "on" } else { "off" },
+                    if self.capabilities.pointer {
+                        "on"
+                    } else {
+                        "off"
+                    },
+                    if self.capabilities.diagnostics {
+                        "on"
+                    } else {
+                        "off"
+                    },
                 ));
             }
             SettingsSlot::Backlight => {
@@ -640,6 +690,16 @@ impl ControllerState {
                     self.queue(DiscoCommand::NoOp);
                 }
             }
+            InfoSlot::Spectrum => {
+                self.active_info = None;
+                if self.capabilities.audio {
+                    self.push_status("Queued FFT spectrum effect");
+                    self.queue(DiscoCommand::StartEffect(DiscoEffect::Spectrum));
+                } else {
+                    self.push_status("FFT spectrum is unavailable on this platform");
+                    self.queue(DiscoCommand::NoOp);
+                }
+            }
         }
     }
 
@@ -667,7 +727,7 @@ impl ControllerState {
                     lines,
                 );
             }
-            InfoSlot::StarCrawl | InfoSlot::AudioScope => {
+            InfoSlot::StarCrawl | InfoSlot::AudioScope | InfoSlot::Spectrum => {
                 // Effects don't render a page; intentionally no-op.
             }
         }
@@ -809,9 +869,7 @@ impl DiscoController {
         });
         // Transparent root — desktop/splash background shows through.
         // Alpha=0 means draw_widget_bg skips the fill entirely.
-        root_container.style = StyleBuilder::new()
-            .bg_color(Color(0, 0, 0, 0))
-            .build();
+        root_container.style = StyleBuilder::new().bg_color(Color(0, 0, 0, 0)).build();
         let root = Rc::new(RefCell::new(WidgetNode {
             widget: Rc::new(RefCell::new(root_container)),
             children: Vec::new(),
@@ -881,6 +939,10 @@ impl DiscoController {
             (assets::ICON_CPU_48, true),
             (assets::ICON_MONITOR_48, true),
             (assets::ICON_PLAY_48, capabilities.effects),
+            (assets::ICON_AUDIO_48, capabilities.audio),
+            // ICON_AUDIO_48 reused for Spectrum until a dedicated
+            // spectrum icon is added — both effects are audio-related,
+            // so the visual cue is consistent enough for v1.
             (assets::ICON_AUDIO_48, capabilities.audio),
         ])));
 
@@ -979,46 +1041,59 @@ impl DiscoController {
             }));
         }
 
-        root.borrow_mut().children.push(WidgetNode {
-            widget: title,
-            children: Vec::new(),
-            tag: None,
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: subtitle.clone(),
-            children: Vec::new(),
-            tag: Some("disco.subtitle"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: dashboard,
-            children: Vec::new(),
-            tag: Some("disco.dashboard"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: footer.clone(),
-            children: Vec::new(),
-            tag: Some("disco.footer"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: event_window,
-            children: Vec::new(),
-            tag: Some("disco.events"),
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: settings_wing.clone(),
-            children: Vec::new(),
-            tag: None,
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: info_wing.clone(),
-            children: Vec::new(),
-            tag: None,
-        });
-        root.borrow_mut().children.push(WidgetNode {
-            widget: icon_strip.clone(),
-            children: Vec::new(),
-            tag: None,
-        });
+        // 2026-05-17: consolidate the initial 8 root.children.push calls
+        // into a single borrow_mut() scope. The original pattern of 8
+        // separate `root.borrow_mut().children.push(...)` statements panics
+        // with `BorrowMutError` on the disco-analyzer bare-metal build at
+        // the first call (panic-halt stack scan resolved to lib.rs:1044).
+        // Host tests pass identically with either pattern; the target-
+        // specific panic suggests a temp-RefMut-lifetime corner. A single
+        // borrow eliminates the repeated-temp surface and gates whether
+        // the remaining 13 root.borrow_mut() chains at lines ~1085+ have
+        // the same problem.
+        {
+            let mut r = root.borrow_mut();
+            r.children.push(WidgetNode {
+                widget: title,
+                children: Vec::new(),
+                tag: None,
+            });
+            r.children.push(WidgetNode {
+                widget: subtitle.clone(),
+                children: Vec::new(),
+                tag: Some("disco.subtitle"),
+            });
+            r.children.push(WidgetNode {
+                widget: dashboard,
+                children: Vec::new(),
+                tag: Some("disco.dashboard"),
+            });
+            r.children.push(WidgetNode {
+                widget: footer.clone(),
+                children: Vec::new(),
+                tag: Some("disco.footer"),
+            });
+            r.children.push(WidgetNode {
+                widget: event_window,
+                children: Vec::new(),
+                tag: Some("disco.events"),
+            });
+            r.children.push(WidgetNode {
+                widget: settings_wing.clone(),
+                children: Vec::new(),
+                tag: None,
+            });
+            r.children.push(WidgetNode {
+                widget: info_wing.clone(),
+                children: Vec::new(),
+                tag: None,
+            });
+            r.children.push(WidgetNode {
+                widget: icon_strip.clone(),
+                children: Vec::new(),
+                tag: None,
+            });
+        }
 
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(ActionHotspot::new(
@@ -1131,7 +1206,7 @@ impl DiscoController {
 
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(0, 4), {
+                ActionHotspot::new(wing_slot_bounds(0, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::Diagnostics)
                 })
@@ -1145,7 +1220,7 @@ impl DiscoController {
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(1, 4), {
+                ActionHotspot::new(wing_slot_bounds(1, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::LiveStats)
                 })
@@ -1159,7 +1234,7 @@ impl DiscoController {
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(2, 4), {
+                ActionHotspot::new(wing_slot_bounds(2, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::StarCrawl)
                 })
@@ -1173,7 +1248,7 @@ impl DiscoController {
         });
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(
-                ActionHotspot::new(wing_slot_bounds(3, 4), {
+                ActionHotspot::new(wing_slot_bounds(3, 5), {
                     let state = state.clone();
                     move || state.borrow_mut().activate_info(InfoSlot::AudioScope)
                 })
@@ -1184,6 +1259,20 @@ impl DiscoController {
             )),
             children: Vec::new(),
             tag: Some("disco.info.audio_scope"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(
+                ActionHotspot::new(wing_slot_bounds(4, 5), {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_info(InfoSlot::Spectrum)
+                })
+                .with_visibility({
+                    let wing = info_wing.clone();
+                    move || wing.borrow().is_visible()
+                }),
+            )),
+            children: Vec::new(),
+            tag: Some("disco.info.spectrum"),
         });
 
         let controller = Self { root, state };
@@ -1571,7 +1660,7 @@ mod tests {
         );
         key_down(&mut c, Key::Character('i'));
         assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, 0));
-        for i in 1..4 {
+        for i in 1..5 {
             key_down(&mut c, Key::ArrowDown);
             assert_eq!(focus(&c), FocusState::Wing(WingKind::Info, i));
         }
@@ -1674,6 +1763,50 @@ mod tests {
             commands
                 .iter()
                 .any(|cmd| { matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::AudioScope)) })
+        );
+    }
+
+    #[test]
+    fn spectrum_on_capable_platform_emits_start_effect() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::stm32h747i_disco(),
+        );
+        // Open the info wing, then arrow-down four times to reach the
+        // Spectrum slot (index 4 — after Diagnostics, LiveStats,
+        // StarCrawl, AudioScope) and activate it.
+        key_down(&mut c, Key::Character('i'));
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+        let commands = c.drain_commands();
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| { matches!(cmd, DiscoCommand::StartEffect(DiscoEffect::Spectrum)) }),
+            "expected StartEffect(Spectrum) in {:?}",
+            commands,
+        );
+    }
+
+    #[test]
+    fn unsupported_spectrum_action_neutralizes_without_panicking() {
+        // simulator() has audio = false, so Spectrum should NoOp.
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Character('i'));
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+        let commands = c.drain_commands();
+        assert!(
+            commands.iter().any(|cmd| matches!(cmd, DiscoCommand::NoOp)),
+            "expected NoOp for unsupported Spectrum, got {:?}",
+            commands,
         );
     }
 

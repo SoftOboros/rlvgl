@@ -58,6 +58,10 @@ fn default_version() -> String {
     "0.1".to_string()
 }
 
+fn default_pac_vintage() -> String {
+    "legacy".to_string()
+}
+
 /// Full chip inventory sourced from the vendor Technical Reference Manual.
 ///
 /// This is the schema for `db/chips/<chip>.yaml`. Every field is populated
@@ -73,6 +77,17 @@ pub struct EspChip {
     pub package: String,
     /// PAC crate name used in generated code (`use <pac_crate> as pac;`).
     pub pac_crate: String,
+    /// PAC API vintage. `"legacy"` (default) means the upstream PAC exposes
+    /// a top-level `pub struct Peripherals` with `take()` / `steal()` — the
+    /// pre-svd2rust-0.37 shape used by `esp32c3 = 0.31` and `esp32p4 = 0.2`.
+    /// `"modern"` means the upstream PAC dropped the aggregate `Peripherals`
+    /// struct in favour of per-peripheral `pac::FOO::steal()` (svd2rust 0.37+
+    /// shape used by `esp32c6 = 0.23`, `esp32h2 = 0.19`, `esp32c5 = 0.2`,
+    /// `esp32c61 = 0.3`). When `modern`, `pac.rs.jinja` emits a local
+    /// `Peripherals` shim struct so the rest of the generated code keeps the
+    /// same `p.UART0.foo()` field-access shape across vintages.
+    #[serde(default = "default_pac_vintage")]
+    pub pac_vintage: String,
     /// Number of user-accessible GPIO pads on this chip.
     pub gpio_count: u8,
     /// Memory map (ROM, SRAM, cache windows, RTC).
@@ -85,6 +100,26 @@ pub struct EspChip {
     pub io_mux: Vec<EspIoMuxPin>,
     /// GPIO matrix signal ID ↔ name table.
     pub gpio_matrix: Vec<EspGpioMatrixSignal>,
+    /// Linker layout — which memory regions back the
+    /// `REGION_TEXT`/`REGION_DATA`/etc aliases that `riscv-rt` and
+    /// `esp-riscv-rt` expect. Only required for RISC-V chips that consume
+    /// the bsp_pac flashable path; absent on Xtensa entries that go
+    /// through esp-hal.
+    #[serde(default)]
+    pub linker: Option<EspLinker>,
+}
+
+/// Linker-region alias map for the chip.
+///
+/// Each field names one of the `name:` entries in [`EspChip::memory`]. The
+/// renderer turns these into `REGION_ALIAS("REGION_TEXT", FLASH_CACHE)` and
+/// friends in the generated `memory.x`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EspLinker {
+    /// Memory region that holds `.init`/`.text`/`.rodata` (e.g. `"flash_cache"`).
+    pub region_text: String,
+    /// Memory region that holds `.data`/`.bss`/`.heap`/`.stack` (e.g. `"hp_l2mem"`).
+    pub region_data: String,
 }
 
 /// Contiguous memory region described by the chip memory map.
@@ -144,6 +179,27 @@ pub struct EspSystemGate {
     /// Optional kernel clock mux field.
     #[serde(default)]
     pub clk_sel_field: Option<String>,
+    /// Optional bit-width of the kernel clock mux field.
+    ///
+    /// Defaults to 2 when absent (the legacy svd2rust-0.31-era shape used
+    /// by `esp32c3 = 0.31` and `esp32p4 = 0.2` for UART and SPI mux fields:
+    /// a 2-bit `FieldWriter` accepting `bits(n)`). Modern svd2rust-0.37
+    /// PACs (`esp32{c6,h2,c5,c61}`) treat single-bit mux fields like
+    /// `pcr.i2c_sclk_conf.i2c_sclk_sel` as a 1-bit `BitWriter`, which
+    /// rejects `.bits(...)` at compile time. Chip YAMLs MUST set
+    /// `clk_sel_width: 1` for those entries; the template branches on
+    /// width=1 → `set_bit()/clear_bit()` and width>1 → `bits(N)`.
+    #[serde(default)]
+    pub clk_sel_width: Option<u8>,
+    /// Optional value to write into the mux field (matches the width).
+    ///
+    /// For width=1: 0 → `clear_bit()`, non-zero → `set_bit()`.
+    /// For width>1: passed verbatim to `bits(N)`. Defaults to 1 when
+    /// absent — matches the prior hard-coded `bits(1)` template line so
+    /// existing chip YAMLs render byte-for-byte the same as before this
+    /// field was introduced.
+    #[serde(default)]
+    pub clk_sel_value: Option<u8>,
 }
 
 /// Peripheral instance with its signal list.

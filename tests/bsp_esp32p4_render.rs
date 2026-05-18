@@ -18,7 +18,10 @@ fn render_beetle_esp32p4_to_tempdir() -> (tempfile::TempDir, std::path::PathBuf)
     let ir = merge(chip, board).expect("merge ok");
     let tmp = tempfile::tempdir().expect("tempdir");
     let written = render_esp_pac(&ir, tmp.path()).expect("render ok");
-    assert_eq!(written.len(), 6);
+    // 6 Rust files + memory.x + esp32_p4.x linker scripts (the latter are
+    // emitted because the chip yaml has a `linker:` block and the arch
+    // starts with rv32).
+    assert_eq!(written.len(), 8);
     let bsp_dir = tmp.path().join("dfr1172_fire_beetle_2_p4");
     assert!(bsp_dir.is_dir(), "bsp dir created: {}", bsp_dir.display());
     (tmp, bsp_dir)
@@ -34,6 +37,8 @@ fn produces_expected_file_set() {
         "io_mux.rs",
         "peripherals.rs",
         "board.rs",
+        "memory.x",
+        "esp32_p4.x",
     ] {
         let p = bsp_dir.join(name);
         assert!(p.is_file(), "expected {}", p.display());
@@ -86,4 +91,18 @@ fn snapshot_board_rs() {
     let (_tmp, bsp_dir) = render_beetle_esp32p4_to_tempdir();
     let text = fs::read_to_string(bsp_dir.join("board.rs")).expect("read board.rs");
     insta::assert_snapshot!("beetle_esp32p4__board", text);
+}
+
+#[test]
+fn snapshot_memory_x() {
+    let (_tmp, bsp_dir) = render_beetle_esp32p4_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("memory.x")).expect("read memory.x");
+    insta::assert_snapshot!("beetle_esp32p4__memory_x", text);
+}
+
+#[test]
+fn snapshot_chip_x() {
+    let (_tmp, bsp_dir) = render_beetle_esp32p4_to_tempdir();
+    let text = fs::read_to_string(bsp_dir.join("esp32_p4.x")).expect("read esp32_p4.x");
+    insta::assert_snapshot!("beetle_esp32p4__esp32_p4_x", text);
 }

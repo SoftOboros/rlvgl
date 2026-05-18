@@ -149,7 +149,7 @@ your binary; Chapter 3 expands.
 - [`examples/apps/disco-demo/README.md`](../../examples/apps/disco-demo/README.md)
   — the shared-controller pattern that makes sim + UEFI +
   hardware run the same UI code.
-- [`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+- [`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
   — how the simulator's wgpu blitter slots into the same
   `Blitter` trait the hardware DMA2D blitter does.
 - [`docs/CUSTOM-SIMULATOR.md`](../CUSTOM-SIMULATOR.md) —

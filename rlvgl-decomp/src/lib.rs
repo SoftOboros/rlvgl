@@ -51,6 +51,42 @@ pub enum Error {
     BadMagic,
 }
 
+/// Memory orientation for decoding a compressed asset into a destination
+/// framebuffer.
+///
+/// The decoder walks the encoded stream in source raster order
+/// (left→right, top→bottom). `Orientation` selects the mapping from
+/// source pixel coordinates `(sx, sy)` to destination pixel coordinates
+/// `(dx, dy)`, so the decoded image lands in the destination buffer in
+/// the orientation the platform's scan-out reads.
+///
+/// This exists so each board's BSP code can choose the splash/asset
+/// memory layout that matches its render pipeline without relying on
+/// a separate post-decode rotation pass:
+///
+/// * STM32H747I-DISCO video mode scans a landscape 800×480 FB; the 480×800
+///   portrait splash decodes with `Rot90Ccw`.
+/// * STM32H747I-DISCO adapted-cmd mode scans a portrait 480×800 FB; the
+///   same splash decodes with `Identity`.
+/// * BeagleBone Black + NHD-7 cape is a native landscape 800×480 panel;
+///   the portrait splash decodes with `Rot90Ccw` so its orientation
+///   agrees with the landscape widget tree that paints on top.
+///
+/// The destination buffer's dimensions must match the chosen orientation:
+/// for 90° rotations `(dst_w, dst_h) == (src_h, src_w)`; for identity /
+/// 180° they match.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Orientation {
+    /// Source pixels written in raster order, dst dims = src dims.
+    Identity,
+    /// 90° clockwise. Source `(sx, sy)` → dst `(sh-1-sy, sx)`. Dst dims = `(sh, sw)`.
+    Rot90Cw,
+    /// 90° counter-clockwise. Source `(sx, sy)` → dst `(sy, sw-1-sx)`. Dst dims = `(sh, sw)`.
+    Rot90Ccw,
+    /// 180°. Source `(sx, sy)` → dst `(sw-1-sx, sh-1-sy)`. Dst dims = src dims.
+    Rot180,
+}
+
 fn rgb565_to_rgba(c: u16) -> [u8; 4] {
     let r5 = ((c >> 11) & 0x1F) as u8;
     let g6 = ((c >> 5) & 0x3F) as u8;
@@ -447,6 +483,156 @@ pub fn decode_argb_into(
     Ok(())
 }
 
+/// Decode RLE ARGB8888 pixels into a destination buffer with a specified
+/// memory [`Orientation`].
+///
+/// Source dimensions `(src_w, src_h)` describe the blob's intrinsic size.
+/// Destination dimensions `(dst_w, dst_h)` describe the buffer layout the
+/// platform's scan-out reads. The decoder iterates the compressed stream
+/// in source raster order and computes each pixel's destination slot from
+/// [`Orientation`], so the landing memory matches the platform's native
+/// read pattern.
+///
+/// Expected dimensions by orientation:
+/// * [`Orientation::Identity`] and [`Orientation::Rot180`]: `(dst_w, dst_h) == (src_w, src_h)`.
+/// * [`Orientation::Rot90Cw`] and [`Orientation::Rot90Ccw`]: `(dst_w, dst_h) == (src_h, src_w)`.
+///
+/// No heap allocation is performed — suitable for `no_std`.
+#[allow(clippy::too_many_arguments)]
+pub fn decode_argb_into_rotated(
+    src_w: usize,
+    src_h: usize,
+    palette_rgb565: &[u16],
+    stream: &[u8],
+    out: &mut [u8],
+    dst_w: usize,
+    dst_h: usize,
+    orientation: Orientation,
+) -> Result<(), Error> {
+    use consts::*;
+
+    // Validate dst dims match the chosen orientation.
+    let dims_ok = match orientation {
+        Orientation::Identity | Orientation::Rot180 => dst_w == src_w && dst_h == src_h,
+        Orientation::Rot90Cw | Orientation::Rot90Ccw => dst_w == src_h && dst_h == src_w,
+    };
+    if !dims_ok {
+        return Err(Error::SizeMismatch);
+    }
+
+    let total = src_w * src_h;
+    if out.len() < dst_w * dst_h * 4 {
+        return Err(Error::SizeMismatch);
+    }
+
+    // Precompute ARGB u32 palette for fast lookup.
+    let mut pal_argb = [0u32; MAX_PALETTE];
+    for (i, &c) in palette_rgb565.iter().enumerate() {
+        pal_argb[i] = rgb565_to_argb_u32(c);
+    }
+
+    let base_ptr = out.as_mut_ptr() as *mut u32;
+
+    // Inline helper: source linear pos → destination linear pos under
+    // the chosen orientation. Kept inline so the compiler can hoist the
+    // orientation branch out of the hot loop.
+    let to_dst = |pos: usize| -> usize {
+        let sx = pos % src_w;
+        let sy = pos / src_w;
+        let (dx, dy) = match orientation {
+            Orientation::Identity => (sx, sy),
+            Orientation::Rot90Cw => (src_h - 1 - sy, sx),
+            Orientation::Rot90Ccw => (sy, src_w - 1 - sx),
+            Orientation::Rot180 => (src_w - 1 - sx, src_h - 1 - sy),
+        };
+        dy * dst_w + dx
+    };
+
+    let write_one = |pos: usize, argb: u32| unsafe {
+        base_ptr.add(to_dst(pos)).write_volatile(argb);
+    };
+
+    let mut pos: usize = 0;
+    let mut recent_idx: u8 = 0;
+    let mut i = 0;
+
+    while i < stream.len() && pos < total {
+        let b = stream[i];
+        i += 1;
+        match b {
+            ENCODE_KEY_SINGLE_INLINE_PIXEL => {
+                if i + 1 >= stream.len() {
+                    return Err(Error::Truncated);
+                }
+                let c = ((stream[i] as u16) << 8) | (stream[i + 1] as u16);
+                i += 2;
+                write_one(pos, rgb565_to_argb_u32(c));
+                pos += 1;
+            }
+            ENCODE_KEY_DOUBLE_INLINE_PIXEL => {
+                if i + 1 >= stream.len() {
+                    return Err(Error::Truncated);
+                }
+                let c = ((stream[i] as u16) << 8) | (stream[i + 1] as u16);
+                i += 2;
+                let argb = rgb565_to_argb_u32(c);
+                write_one(pos, argb);
+                pos += 1;
+                if pos < total {
+                    write_one(pos, argb);
+                    pos += 1;
+                }
+            }
+            ENCODE_KEY_LONG_REPEAT => {
+                if i >= stream.len() {
+                    return Err(Error::Truncated);
+                }
+                let add = stream[i] as usize;
+                i += 1;
+                let count = (SHORT_REPEAT_MAX as usize + 1) + add;
+                let idx = recent_idx as usize;
+                if idx >= palette_rgb565.len() {
+                    return Err(Error::Truncated);
+                }
+                let argb = pal_argb[idx];
+                for _ in 0..count {
+                    if pos >= total {
+                        break;
+                    }
+                    write_one(pos, argb);
+                    pos += 1;
+                }
+            }
+            data => {
+                if (data as usize) < palette_rgb565.len() {
+                    recent_idx = data;
+                    write_one(pos, pal_argb[data as usize]);
+                    pos += 1;
+                } else {
+                    let base = palette_rgb565.len() as u8;
+                    let count = (data.saturating_sub(base)).saturating_add(1) as usize;
+                    let idx = recent_idx as usize;
+                    if idx >= palette_rgb565.len() {
+                        return Err(Error::Truncated);
+                    }
+                    let argb = pal_argb[idx];
+                    for _ in 0..count {
+                        if pos >= total {
+                            break;
+                        }
+                        write_one(pos, argb);
+                        pos += 1;
+                    }
+                }
+            }
+        }
+    }
+    if pos != total {
+        return Err(Error::SizeMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     extern crate alloc;
@@ -538,5 +724,163 @@ mod tests {
     fn parse_blob_truncated() {
         let data = b"RLEC\x01";
         assert_eq!(parse_rle_blob(data), Err(Error::Truncated));
+    }
+
+    /// Build an RGBA image with four distinctly-colored corner pixels so
+    /// orientation-aware decoding can be verified by reading those corners
+    /// out of the rotated destination buffer.
+    fn corner_marker_image(w: usize, h: usize) -> Vec<u8> {
+        let mut rgba = vec![0u8; w * h * 4];
+        let set = |rgba: &mut [u8], x: usize, y: usize, r: u8, g: u8, b: u8| {
+            let off = (y * w + x) * 4;
+            rgba[off] = r;
+            rgba[off + 1] = g;
+            rgba[off + 2] = b;
+            rgba[off + 3] = 0xFF;
+        };
+        // Fill background gray (so RLE produces runs).
+        for y in 0..h {
+            for x in 0..w {
+                set(&mut rgba, x, y, 0x40, 0x40, 0x40);
+            }
+        }
+        set(&mut rgba, 0, 0, 0xF8, 0x00, 0x00); // TL red (5-bit safe)
+        set(&mut rgba, w - 1, 0, 0x00, 0xFC, 0x00); // TR green
+        set(&mut rgba, 0, h - 1, 0x00, 0x00, 0xF8); // BL blue
+        set(&mut rgba, w - 1, h - 1, 0xF8, 0xFC, 0x00); // BR yellow
+        rgba
+    }
+
+    fn pixel_at(buf: &[u8], w: usize, x: usize, y: usize) -> u32 {
+        let off = (y * w + x) * 4;
+        u32::from_ne_bytes([buf[off], buf[off + 1], buf[off + 2], buf[off + 3]])
+    }
+
+    /// Helper: decode the marker image with a given orientation and check
+    /// that each source corner lands at the expected destination corner.
+    fn check_orientation(
+        orientation: Orientation,
+        src_corner: (usize, usize),
+        dst_corner: (usize, usize),
+        src_w: usize,
+        src_h: usize,
+    ) {
+        let rgba = corner_marker_image(src_w, src_h);
+        let (palette, stream) = encode_rgba(src_w, src_h, &rgba).unwrap();
+        let mut blob = Vec::new();
+        write_rle_blob(src_w as u16, src_h as u16, &palette, &stream, &mut blob);
+        let (_, _, pal_bytes, bstream) = parse_rle_blob(&blob).unwrap();
+        let pal_count = pal_bytes.len() / 2;
+        let mut pal: Vec<u16> = Vec::with_capacity(pal_count);
+        for i in 0..pal_count {
+            pal.push(u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]));
+        }
+
+        let (dst_w, dst_h) = match orientation {
+            Orientation::Identity | Orientation::Rot180 => (src_w, src_h),
+            Orientation::Rot90Cw | Orientation::Rot90Ccw => (src_h, src_w),
+        };
+        let mut out = vec![0u8; dst_w * dst_h * 4];
+        decode_argb_into_rotated(
+            src_w,
+            src_h,
+            &pal,
+            bstream,
+            &mut out,
+            dst_w,
+            dst_h,
+            orientation,
+        )
+        .unwrap();
+
+        // Fetch source corner colour from the ORIGINAL rgba, then compare to
+        // the pixel at the expected destination corner.
+        let src_px = pixel_at(&rgba, src_w, src_corner.0, src_corner.1);
+        let src_rgba_r = (src_px >> 0) & 0xFF;
+        let src_rgba_g = (src_px >> 8) & 0xFF;
+        let src_rgba_b = (src_px >> 16) & 0xFF;
+        let dst_px = pixel_at(&out, dst_w, dst_corner.0, dst_corner.1);
+        let dst_r = (dst_px >> 16) & 0xFF;
+        let dst_g = (dst_px >> 8) & 0xFF;
+        let dst_b = dst_px & 0xFF;
+        // RGB565 round-trip loses the low bits — compare with tolerance.
+        assert!(
+            (dst_r as i32 - src_rgba_r as i32).abs() <= 8
+                && (dst_g as i32 - src_rgba_g as i32).abs() <= 8
+                && (dst_b as i32 - src_rgba_b as i32).abs() <= 8,
+            "orientation {:?}: src{:?} RGB({:#X},{:#X},{:#X}) ≠ dst{:?} RGB({:#X},{:#X},{:#X})",
+            orientation,
+            src_corner,
+            src_rgba_r,
+            src_rgba_g,
+            src_rgba_b,
+            dst_corner,
+            dst_r,
+            dst_g,
+            dst_b,
+        );
+    }
+
+    #[test]
+    fn decode_rotated_identity() {
+        // src (0,0) → dst (0,0) and each corner stays put.
+        check_orientation(Orientation::Identity, (0, 0), (0, 0), 4, 3);
+        check_orientation(Orientation::Identity, (3, 0), (3, 0), 4, 3);
+        check_orientation(Orientation::Identity, (0, 2), (0, 2), 4, 3);
+        check_orientation(Orientation::Identity, (3, 2), (3, 2), 4, 3);
+    }
+
+    #[test]
+    fn decode_rotated_cw_90() {
+        // 90° CW: src (0,0) → dst (sh-1, 0). With sh=3, sw=4:
+        //   src TL(0,0) → dst(2, 0)     (top-right of dst)
+        //   src TR(3,0) → dst(2, 3)     (bottom-right of dst)
+        //   src BL(0,2) → dst(0, 0)     (top-left of dst)
+        //   src BR(3,2) → dst(0, 3)     (bottom-left of dst)
+        check_orientation(Orientation::Rot90Cw, (0, 0), (2, 0), 4, 3);
+        check_orientation(Orientation::Rot90Cw, (3, 0), (2, 3), 4, 3);
+        check_orientation(Orientation::Rot90Cw, (0, 2), (0, 0), 4, 3);
+        check_orientation(Orientation::Rot90Cw, (3, 2), (0, 3), 4, 3);
+    }
+
+    #[test]
+    fn decode_rotated_ccw_90() {
+        // 90° CCW: src (sx,sy) → dst (sy, sw-1-sx). With sw=4, sh=3:
+        //   src TL(0,0) → dst(0, 3)     (bottom-left of dst)
+        //   src TR(3,0) → dst(0, 0)     (top-left of dst)
+        //   src BL(0,2) → dst(2, 3)     (bottom-right of dst)
+        //   src BR(3,2) → dst(2, 0)     (top-right of dst)
+        check_orientation(Orientation::Rot90Ccw, (0, 0), (0, 3), 4, 3);
+        check_orientation(Orientation::Rot90Ccw, (3, 0), (0, 0), 4, 3);
+        check_orientation(Orientation::Rot90Ccw, (0, 2), (2, 3), 4, 3);
+        check_orientation(Orientation::Rot90Ccw, (3, 2), (2, 0), 4, 3);
+    }
+
+    #[test]
+    fn decode_rotated_180() {
+        // 180°: each corner flips to the diagonally opposite corner.
+        check_orientation(Orientation::Rot180, (0, 0), (3, 2), 4, 3);
+        check_orientation(Orientation::Rot180, (3, 0), (0, 2), 4, 3);
+        check_orientation(Orientation::Rot180, (0, 2), (3, 0), 4, 3);
+        check_orientation(Orientation::Rot180, (3, 2), (0, 0), 4, 3);
+    }
+
+    #[test]
+    fn decode_rotated_dim_mismatch_rejected() {
+        let rgba = corner_marker_image(4, 3);
+        let (palette, stream) = encode_rgba(4, 3, &rgba).unwrap();
+        let mut blob = Vec::new();
+        write_rle_blob(4, 3, &palette, &stream, &mut blob);
+        let (_, _, pal_bytes, bstream) = parse_rle_blob(&blob).unwrap();
+        let pal_count = pal_bytes.len() / 2;
+        let mut pal: Vec<u16> = Vec::with_capacity(pal_count);
+        for i in 0..pal_count {
+            pal.push(u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]));
+        }
+        // Rot90Ccw needs dst = (src_h, src_w) = (3, 4). Pass (4, 3) → mismatch.
+        let mut bad = vec![0u8; 4 * 3 * 4];
+        let res =
+            decode_argb_into_rotated(4, 3, &pal, bstream, &mut bad, 4, 3, Orientation::Rot90Ccw);
+        assert_eq!(res, Err(Error::SizeMismatch));
     }
 }

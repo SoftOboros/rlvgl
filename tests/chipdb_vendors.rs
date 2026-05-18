@@ -28,14 +28,14 @@ vendor_check!(
     silabs,
     rlvgl_chips_silabs,
     "silabs",
-    "EFM32GG11",
+    "SLSTK3701A",
     "EFM32GG11"
 );
 vendor_check!(
     microchip,
     rlvgl_chips_microchip,
     "microchip",
-    "ATSAMD51J19A",
+    "Adafruit Feather M4 Express",
     "ATSAMD51J19A"
 );
 vendor_check!(

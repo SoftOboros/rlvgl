@@ -7,8 +7,10 @@ use rlvgl_core::widget::{Color, Rect};
 
 #[test]
 fn fade_updates_bg_color() {
-    let mut style = Style::default();
-    style.bg_color = Color(0, 0, 0, 255);
+    let mut style = Style {
+        bg_color: Color(0, 0, 0, 255),
+        ..Default::default()
+    };
     let start_color = style.bg_color;
     let mut timeline = Timeline::new();
     timeline.add_fade(Fade::new(
@@ -357,8 +359,10 @@ fn key_fade_looping() {
 
 #[test]
 fn timeline_mixes_all_types() {
-    let mut style = Style::default();
-    style.bg_color = Color(0, 0, 0, 255);
+    let mut style = Style {
+        bg_color: Color(0, 0, 0, 255),
+        ..Default::default()
+    };
     let mut rect = Rect {
         x: 0,
         y: 0,

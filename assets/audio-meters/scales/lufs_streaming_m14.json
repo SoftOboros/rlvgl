@@ -1,0 +1,32 @@
+{
+  "$schema": "../schema/scale.schema.json",
+  "id": "lufs_streaming_m14",
+  "label_units": "LUFS",
+  "range_db": { "min": -36.0, "max": 0.0 },
+  "pivot": { "value": -14, "label": "−14", "input_dbfs": -14.0 },
+  "ticks": {
+    "majors": [-36, -30, -24, -20, -16, -14, -12, -10, -8, -5, -3, 0],
+    "minors_per_major_division": 1,
+    "labels": {
+      "-36": "−36",
+      "-30": "−30",
+      "-24": "−24",
+      "-20": "−20",
+      "-16": "−16",
+      "-14": "−14",
+      "-12": "−12",
+      "-10": "−10",
+      "-8":  "−8",
+      "-5":  "−5",
+      "-3":  "−3",
+      "0":   "0"
+    }
+  },
+  "zones": [
+    { "from_db": -36.0, "to_db": -16.0, "color": "Safe" },
+    { "from_db": -16.0, "to_db": -12.0, "color": "Nominal" },
+    { "from_db": -12.0, "to_db":  -8.0, "color": "Caution" },
+    { "from_db":  -8.0, "to_db":   0.0, "color": "Hot" }
+  ],
+  "compatible_ballistics": ["LufsM", "LufsS", "LufsI"]
+}

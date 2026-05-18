@@ -20,6 +20,7 @@ use alloc::vec::Vec;
 use alloc::{collections::BTreeMap, vec};
 use bitflags::bitflags;
 use heapless::Vec as HVec;
+use rlvgl_core::cmd::{BlendMode, Cmd, CommandList};
 #[cfg(feature = "fontdue")]
 use rlvgl_core::fontdue::{Metrics, line_metrics, rasterize_glyph};
 use rlvgl_core::renderer::Renderer;
@@ -148,19 +149,29 @@ pub trait Blitter {
 /// [`Self::add`] to register a region that changed during rendering and
 /// [`Self::rects`] to obtain the batched list for flushing. After presenting
 /// the frame, call [`Self::clear`] to reuse the planner for the next frame.
+///
+/// Adds beyond `N` are silently dropped, but [`Self::overflowed`] flips to
+/// `true` so callers driving a dirty-rect present path know the rect set is
+/// incomplete and can fall back to a full-frame repaint for that frame.
 pub struct BlitPlanner<const N: usize> {
     rects: HVec<Rect, N>,
+    overflowed: bool,
 }
 
 impl<const N: usize> BlitPlanner<N> {
     /// Create an empty planner.
     pub fn new() -> Self {
-        Self { rects: HVec::new() }
+        Self {
+            rects: HVec::new(),
+            overflowed: false,
+        }
     }
 
     /// Record a dirty rectangle.
     pub fn add(&mut self, rect: Rect) {
-        let _ = self.rects.push(rect);
+        if self.rects.push(rect).is_err() {
+            self.overflowed = true;
+        }
     }
 
     /// Return all accumulated rectangles.
@@ -168,9 +179,15 @@ impl<const N: usize> BlitPlanner<N> {
         &self.rects
     }
 
+    /// Whether [`Self::add`] dropped a rect because the planner was full.
+    pub fn overflowed(&self) -> bool {
+        self.overflowed
+    }
+
     /// Remove all stored rectangles.
     pub fn clear(&mut self) {
         self.rects.clear();
+        self.overflowed = false;
     }
 }
 
@@ -648,6 +665,254 @@ impl<B: Blitter, const N: usize> Renderer for BlitterRenderer<'_, B, N> {
             }
         }
     }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        // AA inner-loop primitive. Direct ARGB8888 source-over with per-pixel
+        // alpha = (color.alpha * coverage[i]) / 255. One planner.add per row
+        // keeps DMA2D refresh granularity efficient versus per-pixel adds.
+        if color.3 == 0 || coverage.is_empty() {
+            return;
+        }
+        if self.surface.format != PixelFmt::Argb8888 {
+            // Non-ARGB8888 surfaces: fall back through the trait default
+            // (per-pixel blend_rect). This branch is rare on disco.
+            for (i, &cov) in coverage.iter().enumerate() {
+                if cov == 0 {
+                    continue;
+                }
+                let alpha = ((color.3 as u16 * cov as u16) / 255) as u8;
+                if alpha == 0 {
+                    continue;
+                }
+                self.blend_rect(
+                    WidgetRect {
+                        x: x + i as i32,
+                        y,
+                        width: 1,
+                        height: 1,
+                    },
+                    Color(color.0, color.1, color.2, alpha),
+                );
+            }
+            return;
+        }
+        let sw = self.surface.width as i32;
+        let sh = self.surface.height as i32;
+        if y < 0 || y >= sh {
+            return;
+        }
+        let stride = self.surface.stride;
+        let src_a = color.3 as u16;
+        let row_off = y as usize * stride;
+        let mut written_x0 = i32::MAX;
+        let mut written_x1 = i32::MIN;
+        for (i, &cov) in coverage.iter().enumerate() {
+            if cov == 0 {
+                continue;
+            }
+            let px = x + i as i32;
+            if px < 0 || px >= sw {
+                continue;
+            }
+            let alpha = (src_a * cov as u16) / 255;
+            if alpha == 0 {
+                continue;
+            }
+            let inv = 255 - alpha;
+            let off = row_off + (px as usize) * 4;
+            let bg_b = self.surface.buf[off] as u16;
+            let bg_g = self.surface.buf[off + 1] as u16;
+            let bg_r = self.surface.buf[off + 2] as u16;
+            self.surface.buf[off] = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+            self.surface.buf[off + 1] = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+            self.surface.buf[off + 2] = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+            self.surface.buf[off + 3] = 0xff;
+            if px < written_x0 {
+                written_x0 = px;
+            }
+            if px > written_x1 {
+                written_x1 = px;
+            }
+        }
+        if written_x0 <= written_x1 {
+            self.planner.add(Rect {
+                x: written_x0,
+                y,
+                w: (written_x1 - written_x0 + 1) as u32,
+                h: 1,
+            });
+        }
+    }
+
+    fn submit(&mut self, list: &CommandList) {
+        submit_with_occlusion(self, list);
+    }
+}
+
+/// `CommandSink` impl with occlusion pre-pass.
+///
+/// Backend-specialized submit path: walks the [`CommandList`] and, for
+/// each cmd, checks whether any *later* opaque [`Cmd::FillRect`] fully
+/// covers its AABB. If so, the cmd is skipped entirely — it would be
+/// overwritten anyway. Survivors are dispatched via the normal
+/// [`Renderer`] trait methods on `self` (existing
+/// [`BlitterRenderer::blend_row`] override applies, so AA cmds get the
+/// hardware-blend fast path).
+///
+/// The check is O(n²) but cmd counts are small (a typical clock frame
+/// is 50–100 cmds). Only `FillRect` with `alpha == 255` qualifies as an
+/// occluder — geometric primitives (OBB, disc, arc, line) don't fully
+/// cover their AABBs and are never occluders even at full alpha.
+///
+/// Two-pass dispatch:
+///
+/// 1. **Occlusion pre-pass.** For each cmd, scan forward looking for a
+///    later opaque [`Cmd::FillRect`] whose AABB fully covers it; if
+///    found, drop the cmd. Markers (`Barrier`, `SetClip`) terminate
+///    the search range — a `Barrier` declares ordering that must be
+///    preserved (compositor sync, swap hold), and a `SetClip` change
+///    means later cmds render under a different clip and can't be
+///    trusted as occluders of earlier pixels.
+///
+/// 2. **Adjacent-FillRect coalescing.** Survivor cmds are dispatched
+///    one at a time, but consecutive [`Cmd::FillRect`]s with identical
+///    `color` + `blend` and edge-adjacent rectangles are merged into a
+///    single wider FillRect. Cuts down on the number of DMA2D fill
+///    ops and reduces dirty-rect tracking pressure when widgets
+///    happen to emit sequential strips of the same fill (toolbars,
+///    background bands, table cells).
+///
+/// The coalescing is conservative — only horizontal or vertical edge
+/// adjacency is detected (no L-shapes, no overlap-into-union). For
+/// the common case of a row of cells fixed-width and same-color, this
+/// reduces N rects to 1.
+fn submit_with_occlusion<B: Blitter, const N: usize>(
+    r: &mut BlitterRenderer<'_, B, N>,
+    list: &CommandList,
+) {
+    let mut pending: Option<(WidgetRect, Color, BlendMode)> = None;
+
+    for (i, cmd) in list.iter().enumerate() {
+        // Occlusion pre-pass.
+        let occluded = match cmd.aabb() {
+            None => false,
+            Some(bb_i) => {
+                let mut hit = false;
+                for later in list.iter().skip(i + 1) {
+                    if matches!(later, Cmd::Barrier | Cmd::SetClip { .. }) {
+                        break;
+                    }
+                    if !is_opaque_filler(later) {
+                        continue;
+                    }
+                    let Some(bb_j) = later.aabb() else { continue };
+                    if rect_contains(bb_j, bb_i) {
+                        hit = true;
+                        break;
+                    }
+                }
+                hit
+            }
+        };
+        if occluded {
+            // Skip the cmd entirely. Don't flush pending — the next cmd
+            // may still coalesce with what's pending across this gap.
+            continue;
+        }
+
+        // Coalescing dispatch.
+        if let Cmd::FillRect { rect, color, blend } = cmd {
+            if let Some((prect, pcolor, pblend)) = pending.as_ref() {
+                if pcolor == color
+                    && pblend == blend
+                    && let Some(merged) = merge_rects_axis_aligned(*prect, *rect)
+                {
+                    pending = Some((merged, *color, *blend));
+                    continue;
+                }
+                // Can't merge — flush pending and start a new pending.
+                flush_pending(r, pending.take());
+            }
+            pending = Some((*rect, *color, *blend));
+        } else {
+            // Markers and non-FillRect cmds break the coalescing run.
+            flush_pending(r, pending.take());
+            cmd.dispatch_to(r);
+        }
+    }
+    flush_pending(r, pending.take());
+}
+
+#[inline]
+fn flush_pending<B: Blitter, const N: usize>(
+    r: &mut BlitterRenderer<'_, B, N>,
+    pending: Option<(WidgetRect, Color, BlendMode)>,
+) {
+    if let Some((rect, color, blend)) = pending {
+        Cmd::FillRect { rect, color, blend }.dispatch_to(r);
+    }
+}
+
+/// Try to merge two rectangles into a single rectangle representing
+/// their union. Returns `Some(union)` only when one of the four
+/// edge-adjacent cases applies; returns `None` for overlap, gap, or
+/// L-shapes (which would require a multi-rect representation).
+#[inline]
+fn merge_rects_axis_aligned(a: WidgetRect, b: WidgetRect) -> Option<WidgetRect> {
+    if a.y == b.y && a.height == b.height {
+        if a.x + a.width == b.x {
+            return Some(WidgetRect {
+                x: a.x,
+                y: a.y,
+                width: a.width + b.width,
+                height: a.height,
+            });
+        }
+        if b.x + b.width == a.x {
+            return Some(WidgetRect {
+                x: b.x,
+                y: b.y,
+                width: a.width + b.width,
+                height: a.height,
+            });
+        }
+    }
+    if a.x == b.x && a.width == b.width {
+        if a.y + a.height == b.y {
+            return Some(WidgetRect {
+                x: a.x,
+                y: a.y,
+                width: a.width,
+                height: a.height + b.height,
+            });
+        }
+        if b.y + b.height == a.y {
+            return Some(WidgetRect {
+                x: b.x,
+                y: b.y,
+                width: a.width,
+                height: a.height + b.height,
+            });
+        }
+    }
+    None
+}
+
+#[inline]
+fn is_opaque_filler(cmd: &Cmd) -> bool {
+    if let Cmd::FillRect { color, .. } = cmd {
+        color.3 == 255
+    } else {
+        false
+    }
+}
+
+#[inline]
+fn rect_contains(outer: WidgetRect, inner: WidgetRect) -> bool {
+    outer.x <= inner.x
+        && outer.y <= inner.y
+        && outer.x + outer.width >= inner.x + inner.width
+        && outer.y + outer.height >= inner.y + inner.height
 }
 
 /// Renderer wrapper that applies 90° CCW rotation for platforms where the
@@ -752,22 +1017,100 @@ impl Renderer for RotatedRenderer<'_> {
     }
 
     fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
-        for py in 0..height as i32 {
-            for px in 0..width as i32 {
-                let idx = (py as u32 * width + px as u32) as usize;
-                if let Some(&c) = pixels.get(idx) {
-                    self.fill_rect(
-                        WidgetRect {
-                            x: position.0 + px,
-                            y: position.1 + py,
-                            width: 1,
-                            height: 1,
-                        },
-                        c,
-                    );
+        // 2026-05-17: replace the per-pixel `fill_rect` slow path with a
+        // rotate-then-delegate pattern. The previous implementation made
+        // W*H calls to self.fill_rect (each a 1×1 logical rect) through
+        // the full rotation + clip + blitter pipeline. For a 60×60 icon
+        // that's 3600 single-pixel fill_rects per draw, and IconStrip
+        // draws 3 icons per frame — pinning CM7 inside the blitter for
+        // seconds at a time and making poll_joystick effectively
+        // unreachable (probe-rs halt evidence: 3 sequential halts ~1s
+        // apart all landed at byte-identical PC/LR/SP inside
+        // CpuBlitter::fill's row loop, called from this site).
+        //
+        // The inner `BlitterRenderer::draw_pixels` (line 617) already has
+        // an Argb8888 fast path that writes pixels directly into the
+        // surface buffer + adds one dirty rect — H+W work per call, no
+        // per-pixel fill_rect dispatch. Rotating the source buffer once
+        // (W*H copies) and calling inner.draw_pixels once collapses
+        // 3 × 60 × 60 = 10,800 fill_rect dispatches down to 3 fast blits.
+        if width == 0 || height == 0 {
+            return;
+        }
+
+        // 90° rotation mapping (mirrors `fill_rect` above):
+        // physical (fb_x, fb_y) = (fb_width - rect.y - rect.height, rect.x)
+        // physical (width, height) = (rect.height, rect.width)
+        let fb_x = self.fb_width - position.1 - height as i32;
+        let fb_y = position.0;
+        let phys_w = height; // physical width = logical height
+        let phys_h = width; // physical height = logical width
+
+        // Re-lay-out the pixel buffer in physical orientation.
+        // For each logical (lx, ly), the rotated buffer index is
+        // (lx * phys_w) + (height - 1 - ly).
+        //
+        // 2026-05-17 (second pass): use a static scratch buffer instead
+        // of allocating a Vec per call. The bench-9-snapshot setup
+        // draws ~10-14 icons per render through this path
+        // (IconStrip + Wing + spectrum overlay); at 9 Hz that was
+        // ~200 KiB/sec of alloc/free through the 64 KiB linked-list
+        // heap. After a few seconds of operation the heap fragments
+        // and a subsequent alloc panics — observed as a "lock up after
+        // navigating into the wing menu, recover via reset button"
+        // pattern.
+        //
+        // The scratch buffer is sized for the worst case we draw in
+        // practice (icons up to 64×64). If a caller requests a larger
+        // pixels rect, we fall back to allocating one Vec for that
+        // specific call — large icons are rare and the alloc still
+        // makes progress.
+        const SCRATCH_PIXELS: usize = 64 * 64;
+        static mut SCRATCH: [Color; SCRATCH_PIXELS] = [Color(0, 0, 0, 0); SCRATCH_PIXELS];
+
+        let len = (width * height) as usize;
+        if len <= SCRATCH_PIXELS {
+            // SAFETY: single-core, single-threaded — `draw_pixels` is
+            // called only from the main render loop and not from any
+            // ISR. The scratch buffer is unique to this call site and
+            // not borrowed across calls.
+            let scratch = unsafe { &mut SCRATCH[..len] };
+            // Clear only the prefix we'll actually fill; pixels that
+            // aren't written (the `pixels.get(src_idx)` None branch)
+            // retain their prior value, but we touch every index in
+            // the inner loop so that's safe.
+            for ly in 0..height as i32 {
+                for lx in 0..width as i32 {
+                    let src_idx = (ly as u32 * width + lx as u32) as usize;
+                    let dst_idx =
+                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    scratch[dst_idx] = pixels.get(src_idx).copied().unwrap_or(Color(0, 0, 0, 0));
                 }
             }
+            self.inner.draw_pixels((fb_x, fb_y), scratch, phys_w, phys_h);
+        } else {
+            // Oversize fallback: allocate once for this call. Rare.
+            let mut rotated: alloc::vec::Vec<Color> = alloc::vec::Vec::with_capacity(len);
+            rotated.resize(len, Color(0, 0, 0, 0));
+            for ly in 0..height as i32 {
+                for lx in 0..width as i32 {
+                    let src_idx = (ly as u32 * width + lx as u32) as usize;
+                    let dst_idx =
+                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    if let Some(&c) = pixels.get(src_idx) {
+                        rotated[dst_idx] = c;
+                    }
+                }
+            }
+            self.inner.draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
         }
+    }
+
+    fn submit(&mut self, list: &CommandList) {
+        // Delegate to inner — preserves any backend-specific
+        // optimizations (e.g. BlitterRenderer's occlusion pre-pass)
+        // through the rotation wrapper.
+        self.inner.submit(list);
     }
 }
 

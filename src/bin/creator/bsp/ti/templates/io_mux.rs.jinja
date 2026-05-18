@@ -1,0 +1,71 @@
+//! IO Controller (IOC) pin routing for {{ ir.board.name }}.
+//!
+//! SimpleLink CC13x2/CC26x2 uses a **single-stage** IOC routing model
+//! (CHIPS-TI-00 §10.3): the IOC writes one `IOCFGn` register per DIO that
+//! names the peripheral event signal directly via the `port_id` field.
+//! There is no separate "GPIO matrix" stage as on Espressif chips — the
+//! IOC PORT_CFG (a.k.a. `IOCFG`) register IS the routing fabric.
+//!
+//! For each pin assigned by the board YAML this file writes:
+//!
+//! * `port_id` (PORT_CFG[5:0]) — selects the peripheral signal (0x00 plain
+//!   GPIO, 0x07 UART0_TX, 0x24 I2C_MSSDA, ... per TI SWCU185 §11.2
+//!   Table 11-2 "port_id Encoding").
+//! * `io_mode` (PORT_CFG[26:24]) — drive mode (push-pull, open-drain, etc.).
+//! * `pull_ctl` (PORT_CFG[14:13]) — pull-up / pull-down / disabled.
+//! * `ie` (PORT_CFG[29]) — input enable for read-back and digital input.
+//!
+//! Output enable for GPIOs is established by writing `GPIO.DOE` after the
+//! IOC PORT_CFG is in place; for peripheral-routed pins the peripheral
+//! itself drives the line and `DOE` is left alone.
+//!
+//! Filename remains `io_mux.rs` for cross-vendor uniformity even though the
+//! emitted module's *content* is IOC-specific (CHIPS-TI-00 §10.3).
+
+use {{ ir.chip.pac_crate }} as pac;
+
+/// Apply the board's IOC pin routing.
+///
+/// Walks the board YAML's `pins:` array and writes one `IOC.IOCFGn`
+/// register per assigned pin. Called by [`crate::pac::init`] after
+/// [`super::clocks::init`] has ungated the IOC clock domain and released
+/// it from reset.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    {% for pin in pin_routes %}
+    // DIO{{ pin.dio }} — {{ pin.signal }}{% if pin.peripheral %} ({{ pin.peripheral }}){% endif %}{% if pin.label %} — `{{ pin.label }}`{% endif %}
+    {% if pin.route.kind == "ioc" %}
+    // IOC PORT_CFG: port_id={{ pin.route.port_id }} ({{ pin.route.port_name }})
+    p.ioc.iocfg{{ pin.dio }}().write(|w| unsafe {
+        w.port_id().bits({{ pin.route.port_id }})
+         .ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
+         .pull_ctl().bits(
+            {%- if pin.pull == "up" -%}0b01
+            {%- elif pin.pull == "down" -%}0b10
+            {%- else -%}0b11
+            {%- endif -%}
+         )
+    });
+    {% if pin.direction == "out" or pin.direction == "inout" %}
+    // GPIO DOE: enable output for DIO{{ pin.dio }}.
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.dio }})) });
+    {% endif %}
+    {% else %}
+    // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
+    // enable from direction, and set DOE for outputs.
+    p.ioc.iocfg{{ pin.dio }}().write(|w| unsafe {
+        w.port_id().bits(0x00)
+         .ie().{% if pin.direction == "in" or pin.direction == "inout" %}set_bit{% else %}clear_bit{% endif %}()
+         .pull_ctl().bits(
+            {%- if pin.pull == "up" -%}0b01
+            {%- elif pin.pull == "down" -%}0b10
+            {%- else -%}0b11
+            {%- endif -%}
+         )
+    });
+    {% if pin.direction == "out" or pin.direction == "inout" %}
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.dio }})) });
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+}

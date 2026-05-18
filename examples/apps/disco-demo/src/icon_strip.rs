@@ -2,6 +2,7 @@
 //! Vertical icon strip widget for the shared 747-style disco demo.
 
 use alloc::boxed::Box;
+use core::cell::RefCell;
 
 use rlvgl_core::{
     event::Event,
@@ -25,9 +26,27 @@ pub struct IconSlot {
     pub on_tap: Option<Box<dyn FnMut(usize)>>,
 }
 
+/// One slot's RLE blob decoded into a `Vec<Color>` plus its dimensions.
+/// Populated on the first `draw()` and reused thereafter (2026-05-17 —
+/// PC-sampling on disco-analyzer showed 35% of CM7 wall-time inside
+/// `decode_into` re-running every render, allocating ~30 KiB of
+/// transient heap per slot per frame; caching collapses that to a
+/// one-time cost at boot).
+struct DecodedIcon {
+    pixels: alloc::vec::Vec<Color>,
+    width: u32,
+    height: u32,
+}
+
 /// Right-edge icon strip that mirrors the STM32H747I-DISCO demo layout.
 pub struct IconStrip {
     slots: [Option<IconSlot>; SLOT_COUNT],
+    /// One-time-decoded pixels for each slot. Lazily filled from
+    /// `slot.rle` on the first draw and never rebuilt unless the slot
+    /// is replaced via `set_slot` (which clears the cached entry).
+    /// `RefCell` lets `draw(&self)` populate the cache without forcing
+    /// the Widget trait to switch to `&mut self`.
+    decoded: RefCell<[Option<DecodedIcon>; SLOT_COUNT]>,
     x: i32,
     margin_top: i32,
     gap: i32,
@@ -40,6 +59,7 @@ impl IconStrip {
     pub fn new(x: i32, icon_size: i32, margin_top: i32, gap: i32) -> Self {
         Self {
             slots: [const { None }; SLOT_COUNT],
+            decoded: RefCell::new([const { None }; SLOT_COUNT]),
             x,
             margin_top,
             gap,
@@ -53,10 +73,12 @@ impl IconStrip {
         &mut self.slots
     }
 
-    /// Set the slot contents at `index`.
+    /// Set the slot contents at `index`. Invalidates the decoded-icon
+    /// cache for that index so the new RLE is decoded on the next draw.
     pub fn set_slot(&mut self, index: usize, slot: IconSlot) {
         if index < SLOT_COUNT {
             self.slots[index] = Some(slot);
+            self.decoded.borrow_mut()[index] = None;
         }
     }
 
@@ -113,22 +135,45 @@ impl Widget for IconStrip {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        let mut buf: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
+        // 2026-05-17: decode each slot's RLE ONCE on the first draw,
+        // cache the resulting `Vec<Color>` + dimensions in `self.decoded`.
+        // Subsequent draws skip the parse_rle_blob + decode_rgba +
+        // chunks-to-Color extend chain entirely. The disabled-slot
+        // dim variant uses a small scratch Vec built from the cache.
+        let mut decoded = self.decoded.borrow_mut();
+        let mut dim_scratch: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
         for (index, slot) in self.slots.iter().enumerate() {
             if let Some(slot) = slot {
-                buf.clear();
-                if let Some((width, height)) = Self::decode_into(slot.rle, &mut buf) {
-                    let bounds = self.slot_bounds(index);
-                    let x = bounds.x + (bounds.width - width as i32) / 2;
-                    let y = bounds.y + (bounds.height - height as i32) / 2;
-                    if !slot.enabled {
-                        for color in &mut buf {
-                            color.0 /= 2;
-                            color.1 /= 2;
-                            color.2 /= 2;
-                        }
+                if decoded[index].is_none() {
+                    let mut pixels: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
+                    if let Some((width, height)) = Self::decode_into(slot.rle, &mut pixels) {
+                        decoded[index] = Some(DecodedIcon {
+                            pixels,
+                            width,
+                            height,
+                        });
                     }
-                    renderer.draw_pixels((x, y), &buf, width, height);
+                }
+                if let Some(entry) = decoded[index].as_ref() {
+                    let bounds = self.slot_bounds(index);
+                    let x = bounds.x + (bounds.width - entry.width as i32) / 2;
+                    let y = bounds.y + (bounds.height - entry.height as i32) / 2;
+                    let pixels: &[Color] = if slot.enabled {
+                        &entry.pixels
+                    } else {
+                        dim_scratch.clear();
+                        dim_scratch.reserve(entry.pixels.len());
+                        for color in &entry.pixels {
+                            dim_scratch.push(Color(
+                                color.0 / 2,
+                                color.1 / 2,
+                                color.2 / 2,
+                                color.3,
+                            ));
+                        }
+                        &dim_scratch
+                    };
+                    renderer.draw_pixels((x, y), pixels, entry.width, entry.height);
                 }
                 if self.focused_slot == Some(index) {
                     let bounds = self.slot_bounds(index);

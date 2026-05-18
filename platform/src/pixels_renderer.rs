@@ -128,6 +128,37 @@ impl<'a> Renderer for PixelsRenderer<'a> {
             let _ = Text::new(text, Point::new(position.0, position.1), style).draw(self);
         }
     }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        if y < 0 || (y as usize) >= self.height || color.3 == 0 {
+            return;
+        }
+        let row_y = y as usize;
+        let row_base = row_y * self.width * 4;
+        let src_a = color.3 as u16;
+        for (i, &cov) in coverage.iter().enumerate() {
+            if cov == 0 {
+                continue;
+            }
+            let px = x + i as i32;
+            if px < 0 || (px as usize) >= self.width {
+                continue;
+            }
+            let alpha = (src_a * cov as u16) / 255;
+            if alpha == 0 {
+                continue;
+            }
+            let inv = 255 - alpha;
+            let idx = row_base + (px as usize) * 4;
+            let bg_r = self.frame[idx] as u16;
+            let bg_g = self.frame[idx + 1] as u16;
+            let bg_b = self.frame[idx + 2] as u16;
+            self.frame[idx] = ((color.0 as u16 * alpha + bg_r * inv) / 255) as u8;
+            self.frame[idx + 1] = ((color.1 as u16 * alpha + bg_g * inv) / 255) as u8;
+            self.frame[idx + 2] = ((color.2 as u16 * alpha + bg_b * inv) / 255) as u8;
+            self.frame[idx + 3] = 0xff;
+        }
+    }
 }
 
 impl<'a> DrawTarget for PixelsRenderer<'a> {

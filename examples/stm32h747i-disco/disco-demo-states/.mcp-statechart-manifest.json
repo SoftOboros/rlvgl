@@ -1,0 +1,106 @@
+{
+  "tool": "mcp-statechart",
+  "version": "0.1.0",
+  "source": "rlvgl-app04b/menu",
+  "files": [
+    {
+      "path": "Makefile",
+      "hash": "sha256:d45dcd1517d9a402443661fd3fbe554e4704d8616136d7f8b478f6708eba5147"
+    },
+    {
+      "path": "README.md",
+      "hash": "sha256:b46b819327455d9c1d4b4fa11551ceab7875c6dcfc1ed22fd500ea850a5dd541"
+    },
+    {
+      "path": "vectors.README.md",
+      "hash": "sha256:920b9ae366cd5ff71f447336c7ccd89a9940c20e8225fcd6c3aaef5c86236653"
+    },
+    {
+      "path": "Cargo.toml",
+      "hash": "sha256:8d486e26ab21e028349ff86f61f400aa247ce6670fb64893028025646ed35628"
+    },
+    {
+      "path": "src/lib.rs",
+      "hash": "sha256:6584bdb7bc8d5492cace3ba56e9c1419d653b953a3f76849983306b62d1bcb7a"
+    },
+    {
+      "path": "src/vectors.rs",
+      "hash": "sha256:66e8846663fa8568e5d59ec4a00bc6f44819a4f9ee4e9db0c6f093c8c81a8037"
+    },
+    {
+      "path": "src/externals_user.rs.sample",
+      "hash": "sha256:bba9b47f90f57ce0388ea974132ea260343dd67e2c4e15e8ec2bc182b97bf2b7"
+    },
+    {
+      "path": "src/bin/harness.rs",
+      "hash": "sha256:af649ecfd426d6b6bb0a3a1cca780b0f075f9c5cd882cb6ab055fd854a3aef7f"
+    },
+    {
+      "path": "vectors/events.txt",
+      "hash": "sha256:b627eb0faecbcbf28d26b4602a4891dc7f2750d07245c2aceef7f12099471473"
+    },
+    {
+      "path": "vectors/golden.trace.txt",
+      "hash": "sha256:2a31a957e3c44bdef03c1848bb95a60c45acd2beb6bc52aff5ddf76b15eb57c6"
+    },
+    {
+      "path": "vectors/coverage.json",
+      "hash": "sha256:a2144adc52785a8e4a1e91d005d47149ba783fe1a52ccc6a46c64a96a9dded2c"
+    },
+    {
+      "path": "vectors/vector.json",
+      "hash": "sha256:650a64beb0eb6bea00cb314de98d7508c2e770e81dfcea9770581582673f08f4"
+    },
+    {
+      "path": "vectors/sequences/open_menu.events.txt",
+      "hash": "sha256:ed9f33abf174e61e9c964d462b0d95013c51973421cef5d0cc78b44b852b6b89"
+    },
+    {
+      "path": "vectors/sequences/open_menu.golden.trace.txt",
+      "hash": "sha256:1ce3d98d7bf19a7ade7531339832fb05a98455aed93c2a3041ba23abc43ec383"
+    },
+    {
+      "path": "vectors/sequences/play.events.txt",
+      "hash": "sha256:045e3639f49d5d7a5e90deee95736f420dfe3fed649b53607f0e2a385154a41e"
+    },
+    {
+      "path": "vectors/sequences/play.golden.trace.txt",
+      "hash": "sha256:453276d92ae86cbc566551ee63b3032aecb2344489aef952d3c217302bf57fdd"
+    },
+    {
+      "path": "vectors/sequences/back.events.txt",
+      "hash": "sha256:2ec0cfe9c0f501021df290b9dbfdba6466bd5f8136d601b302705b87a74ada83"
+    },
+    {
+      "path": "vectors/sequences/back.golden.trace.txt",
+      "hash": "sha256:949a7b2a7b99c64a3d80b3c021121f2f6f2782be1a354bc85d0824804c9d7568"
+    },
+    {
+      "path": "vectors/sequences/open_settings.events.txt",
+      "hash": "sha256:8b672518983987d1a40a3398aea6d769ea009738a14a53525ae1f3569e25bb4f"
+    },
+    {
+      "path": "vectors/sequences/open_settings.golden.trace.txt",
+      "hash": "sha256:d24122b36152edd008a99a32ff875f65c03562dfd660562a9586cd5088b0750a"
+    },
+    {
+      "path": "vectors/sequences/stop.events.txt",
+      "hash": "sha256:a11c3d917a2149a4b548217038bc8f2dd2130a1966e0c7af5c4225d81f25a8c3"
+    },
+    {
+      "path": "vectors/sequences/stop.golden.trace.txt",
+      "hash": "sha256:6f6ae7670bd37c7ffc2ce358dc564f6edbb2d65f58bfe0342452e02c127d0782"
+    },
+    {
+      "path": "externals.map.json",
+      "hash": "sha256:5c9d1c4484590e58cedc6f4618cfd2f4224b9b14f50cadf1d61bddbc8648a544"
+    }
+  ],
+  "state_set": [
+    "idle",
+    "menu",
+    "settings",
+    "playing"
+  ],
+  "verification_vectors": true
+}

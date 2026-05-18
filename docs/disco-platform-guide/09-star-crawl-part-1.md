@@ -302,7 +302,7 @@ happens.
   rasterizer `pre_render_text` calls into.
 - RM0399 §8.7.30 "RCC AHB2 Clock Enable Register" — the D2
   SRAM clock bits.
-- [`docs/IMAGE-COMPRESSION-FORMAT.md`](../IMAGE-COMPRESSION-FORMAT.md)
+- [`docs/assets/IMAGE-COMPRESSION-FORMAT.md`](../assets/IMAGE-COMPRESSION-FORMAT.md)
   — explains RLVGLRAW, which the crawl also renders (logo).
 
 ---

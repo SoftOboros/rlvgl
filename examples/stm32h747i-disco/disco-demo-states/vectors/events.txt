@@ -1,0 +1,4 @@
+play
+stop
+open_menu
+open_settings

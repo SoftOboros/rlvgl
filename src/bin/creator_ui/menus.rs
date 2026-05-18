@@ -34,4 +34,21 @@ pub const MENU_GROUPS: &[(&str, &[&str])] = &[
         &["Lottie Import", "Lottie CLI", "Run Preset", "Save Preset"],
     ),
     ("Emulator", &["Simulator"]),
+    // QT-09 §3: Qt menu group surfacing the 10 `qt …` CLI
+    // subcommands (docs/qt-support/09-desktop-ui.md).
+    (
+        "Qt",
+        &[
+            "Qt Ingest",
+            "Qt Check",
+            "Qt Schema",
+            "Qt Emit",
+            "Qt Emit Scjson",
+            "Qt Emit Externals",
+            "Qt Emit Tokens",
+            "Qt List Assets",
+            "Qt List Qmldir",
+            "Qt List Qrc",
+        ],
+    ),
 ];

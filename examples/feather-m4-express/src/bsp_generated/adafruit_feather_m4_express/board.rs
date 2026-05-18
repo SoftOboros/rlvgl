@@ -1,0 +1,161 @@
+//! Board-level constants for Adafruit Feather M4 Express.
+//!
+//! Each labelled pin from `db/boards/adafruit_feather_m4_express.yaml` becomes a
+//! `pub const` `(group, pin)` tuple so application code can refer to
+//! board features by name rather than by pad number.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "Adafruit Feather M4 Express";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "ATSAMD51J19A";
+
+/// Chip package.
+pub const PACKAGE: &str = "TQFP64";
+
+/// On-chip flash capacity, megabytes.
+pub const FLASH_MB: f32 = 0.5;
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const CPU_HZ: u32 = 120000000;
+
+/// APB-A clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBA_HZ: u32 = 120000000;
+
+/// APB-B clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBB_HZ: u32 = 120000000;
+
+/// APB-C clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBC_HZ: u32 = 120000000;
+
+/// APB-D clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBD_HZ: u32 = 120000000;
+
+/// External crystal frequency, in hertz (zero if not used).
+pub const XOSC_HZ: u32 = 0;
+
+
+
+/// PORT (group, pin) tuple for `u_rx` (SERCOM5_PAD1).
+pub const U_RX: (u8, u8) = (1, 17);
+
+
+
+/// PORT (group, pin) tuple for `u_tx` (SERCOM5_PAD0).
+pub const U_TX: (u8, u8) = (1, 16);
+
+
+
+/// PORT (group, pin) tuple for `sda` (SERCOM2_PAD0).
+pub const SDA: (u8, u8) = (0, 12);
+
+
+
+/// PORT (group, pin) tuple for `scl` (SERCOM2_PAD1).
+pub const SCL: (u8, u8) = (0, 13);
+
+
+
+/// PORT (group, pin) tuple for `miso` (SERCOM1_PAD2).
+pub const MISO: (u8, u8) = (1, 22);
+
+
+
+/// PORT (group, pin) tuple for `mosi` (SERCOM1_PAD3).
+pub const MOSI: (u8, u8) = (1, 23);
+
+
+
+/// PORT (group, pin) tuple for `sck` (SERCOM1_PAD1).
+pub const SCK: (u8, u8) = (0, 17);
+
+
+
+/// PORT (group, pin) tuple for `d4` (GPIO).
+pub const D4: (u8, u8) = (0, 14);
+
+
+
+/// PORT (group, pin) tuple for `d5` (GPIO).
+pub const D5: (u8, u8) = (0, 16);
+
+
+
+/// PORT (group, pin) tuple for `d6` (GPIO).
+pub const D6: (u8, u8) = (0, 18);
+
+
+
+/// PORT (group, pin) tuple for `d9` (GPIO).
+pub const D9: (u8, u8) = (0, 19);
+
+
+
+/// PORT (group, pin) tuple for `d10` (GPIO).
+pub const D10: (u8, u8) = (0, 20);
+
+
+
+/// PORT (group, pin) tuple for `d11` (GPIO).
+pub const D11: (u8, u8) = (0, 21);
+
+
+
+/// PORT (group, pin) tuple for `d12` (GPIO).
+pub const D12: (u8, u8) = (0, 22);
+
+
+
+/// PORT (group, pin) tuple for `led` (LED).
+pub const LED: (u8, u8) = (0, 23);
+
+
+
+/// PORT (group, pin) tuple for `a0` (ADC0_AIN0).
+pub const A0: (u8, u8) = (0, 2);
+
+
+
+/// PORT (group, pin) tuple for `a1` (ADC0_AIN5).
+pub const A1: (u8, u8) = (0, 5);
+
+
+
+/// PORT (group, pin) tuple for `a2` (ADC0_AIN2).
+pub const A2: (u8, u8) = (1, 8);
+
+
+
+/// PORT (group, pin) tuple for `a3` (ADC0_AIN3).
+pub const A3: (u8, u8) = (1, 9);
+
+
+
+/// PORT (group, pin) tuple for `a4` (ADC0_AIN4).
+pub const A4: (u8, u8) = (0, 4);
+
+
+
+/// PORT (group, pin) tuple for `a5` (ADC0_AIN6).
+pub const A5: (u8, u8) = (0, 6);
+
+
+
+/// PORT (group, pin) tuple for `a6` (ADC0_AIN13).
+pub const A6: (u8, u8) = (1, 1);
+
+
+
+/// PORT (group, pin) tuple for `neopixel` (GPIO).
+pub const NEOPIXEL: (u8, u8) = (1, 3);
+
+
+
+/// PORT (group, pin) tuple for `usb_dm` (USB_DM).
+pub const USB_DM: (u8, u8) = (0, 24);
+
+
+
+/// PORT (group, pin) tuple for `usb_dp` (USB_DP).
+pub const USB_DP: (u8, u8) = (0, 25);
+

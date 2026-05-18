@@ -1,0 +1,209 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits a real USART async-UART init for the console
+//! peripheral (mirroring the ESP UART0 path) and stub bodies for
+//! every other peripheral.
+//!
+//! Targeted at the pinned `efm32gg11b-pac 0.1.4`: register-block
+//! accessors (`cmd`, `ctrl`, `frame`, `clkdiv`, `routeloc0`,
+//! `routepen`, ...) are direct `#[repr(C)]` struct fields, not method
+//! accessors. The pre-method-accessor svd2rust era — same vintage as
+//! `atsamd51j19a 0.7.1` handled by CHIPS-MICROCHIP-02.
+
+{% if ir.chip.pac_sku_module -%}
+// `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
+// a `{{ ir.chip.pac_sku_module }}` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use {{ ir.chip.pac_crate | replace("-", "_") }}::{{ ir.chip.pac_sku_module }} as pac;
+{%- else %}
+use {{ ir.chip.pac_crate | replace("-", "_") }} as pac;
+{%- endif %}
+
+#[allow(unused_imports)]
+use super::board::{CPU_HZ, HFCLK_HZ};
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and IO routing are
+/// configured.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% set periph = ir.chip.peripherals[name] %}
+{% if periph %}
+{% if ir.board.console and ir.board.console.peripheral == name and periph.class == "usart" %}
+/// Bring up {{ name }} as the VCOM console at {{ ir.board.console.baud }} baud,
+/// 8N1, no flow control.
+///
+/// Async-UART mode: `USART.CTRL.SYNC = 0` (the cold-reset value), 16x
+/// oversampling, frame format 8 data bits / no parity / 1 stop bit
+/// (the cold-reset frame). The clock divider is computed from HFCLK
+/// ({{ ir.clocks.hfclk_hz }} Hz) using the EFM32 RM async-mode formula:
+///
+/// ```text
+///     CLKDIV = 256 * (HFCLK / (oversample * baud) - 1)
+/// ```
+///
+/// for oversample = 16 and rounded toward zero. The result is written
+/// to the 15-bit `DIV` field of `USART.CLKDIV` (the low 3 bits are
+/// reserved). After clocks + framing are set, the TX and RX state
+/// machines are enabled via `CMD.TXEN | CMD.RXEN`.
+pub fn init_{{ name }}() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const HF: u32 = HFCLK_HZ;
+    const BAUD: u32 = {{ ir.board.console.baud }};
+    // EFM32 async-mode CLKDIV = 256 * (HFCLK / (16 * baud) - 1), 15-bit DIV field.
+    let div: u32 = ((256u32.saturating_mul(HF)) / (16 * BAUD)).saturating_sub(256);
+    // Clear the peripheral via CMD.CLEARRX|CLEARTX (idempotent on a fresh boot).
+    p.{{ name | upper }}.cmd.write(|w| w.clearrx().set_bit().cleartx().set_bit());
+    p.{{ name | upper }}.ctrl.modify(|_, w| w.sync().clear_bit());
+    p.{{ name | upper }}.frame.write(|w| unsafe { w.bits(0x1005) }); // 8 data bits, 1 stop bit, no parity
+    p.{{ name | upper }}.clkdiv.write(|w| unsafe { w.bits(div) });
+    // Enable TX + RX, then prime by clearing flags via CMD.
+    p.{{ name | upper }}.cmd.write(|w| w.txen().set_bit().rxen().set_bit());
+}
+{% elif ir.board.console and ir.board.console.peripheral == name and periph.class == "leuart" %}
+/// Bring up {{ name }} as the VCOM console at {{ ir.board.console.baud }} baud,
+/// 8N1, no flow control.
+///
+/// LEUART runs from the LF clock branch (LFB, typically 32.768 kHz)
+/// and uses a different CLKDIV formula:
+///
+/// ```text
+///     CLKDIV = 32 * (refclk - 256 * baud) / baud
+/// ```
+///
+/// where `refclk` is the LFB-derived LEUART input clock. The template
+/// emits the cold-reset 8N1 frame; the consumer crate is responsible
+/// for selecting the LF clock source via the CMU before this runs.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    const _BAUD: u32 = {{ ir.board.console.baud }};
+    // TODO: derive LEUART CLKDIV from the active LF clock source.
+    // See EFM32GG11-RM "Low Energy UART (LEUART)" §38.5 for the
+    // CLKDIV / CMD / CTRL / FRAME register layout.
+}
+{% elif periph.class == "i2c" %}
+/// Bring up {{ name }} as an I2C master at
+/// {{ ir.board.i2c_configs[name].scl_hz | default(100000) }} Hz.
+///
+/// Targets the
+/// `{{ ir.chip.pac_crate | replace("-", "_") }}::{{ name | upper }}`
+/// register block. Clock gating is already done by
+/// `crate::clocks::init` — this stub leaves the peripheral idle so the
+/// consumer crate can opt into a runtime init sequence.
+///
+/// TODO: emit a full bring-up. See EFM32GG11-RM "I2C - Inter-
+/// Integrated Circuit Interface" §28.5 for the CTRL / CLKDIV /
+/// SADDR / SADDRMASK / EN register layout. CLKDIV derives from HFCLK
+/// ({{ ir.clocks.hfclk_hz }} Hz) and the target SCL frequency
+/// ({{ ir.board.i2c_configs[name].scl_hz | default(100000) }} Hz).
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: I2C master init for {{ name }}
+}
+{% elif periph.class == "usart" %}
+/// Bring up {{ name }} (USART instance).
+///
+/// Clock gating is already done by `crate::clocks::init`. This stub
+/// leaves the peripheral idle; consumer crates configure it for SPI
+/// master, USART sync, or async UART per their needs.
+///
+/// TODO: emit a class-specific init. See EFM32GG11-RM "Universal
+/// Synchronous Asynchronous Receiver/Transmitter (USART)" §33.5
+/// register descriptions.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: USART init for {{ name }}
+}
+{% elif periph.class == "uart" %}
+/// Bring up {{ name }} (Series-0-compatible plain async UART).
+///
+/// Clock gating is already done by `crate::clocks::init`. This stub
+/// leaves the peripheral idle.
+///
+/// TODO: emit async UART init. See EFM32GG11-RM "Universal
+/// Asynchronous Receiver/Transmitter (UART)" — register layout is a
+/// strict subset of USART.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: UART init for {{ name }}
+}
+{% elif periph.class == "leuart" %}
+/// Bring up {{ name }} (Low-Energy UART).
+///
+/// Runs from the LFB clock branch. This stub leaves the peripheral
+/// idle.
+///
+/// TODO: emit LEUART init. See EFM32GG11-RM "Low Energy UART
+/// (LEUART)" §38.5 for the register layout.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: LEUART init for {{ name }}
+}
+{% elif periph.class == "timer" %}
+/// Bring up {{ name }} (16-bit timer / 32-bit WTIMER).
+///
+/// Clock gating is already done by `crate::clocks::init`. The timer is
+/// left disabled; consumer crates configure it for PWM, capture, or
+/// interval counting.
+///
+/// TODO: emit timer init. See EFM32GG11-RM "Timer/Counter (TIMER)"
+/// register descriptions.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: TIMER init for {{ name }}
+}
+{% elif periph.class == "letimer" %}
+/// Bring up {{ name }} (Low-Energy timer).
+///
+/// Runs from the LFA clock branch. This stub leaves the peripheral
+/// idle.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: LETIMER init for {{ name }}
+}
+{% elif periph.class == "wdog" %}
+/// Bring up {{ name }} (watchdog).
+///
+/// The watchdog is left disabled by this generated BSP. EFM32GG11
+/// WDOG_CTRL has a ~3 LFRCO-cycle synchronisation latency after
+/// disable — consumer crates that enable the watchdog must honour
+/// that on subsequent reconfigures.
+pub fn init_{{ name }}() {
+    let _p = unsafe { pac::Peripherals::steal() };
+    // TODO: WDOG remains disabled by default.
+}
+{% elif periph.class == "gpio" %}
+/// Bring up the GPIO block.
+///
+/// The GPIO clock gate is already enabled by `crate::clocks::init`;
+/// per-pin mode bits are written by `crate::io_mux::init`. This stub
+/// is a no-op so the per-peripheral dispatch table compiles.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+}
+{% else %}
+/// TODO: initialize {{ name }} (class `{{ periph.class }}`,
+/// base {{ periph.base | hex32 }}).
+///
+/// Populate this function by writing into the
+/// `{{ ir.chip.pac_crate | replace("-", "_") }}::{{ name | upper }}`
+/// register block. Clock gating is already done by
+/// `crate::clocks::init`.
+pub fn init_{{ name }}() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: {{ periph.class }} init sequence for {{ name }}
+}
+{% endif %}
+{% else %}
+/// TODO: unknown peripheral `{{ name }}` (no entry in chip IR).
+pub fn init_{{ name }}() {}
+{% endif %}
+
+{% endfor %}

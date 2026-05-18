@@ -11,7 +11,7 @@
 //! Pins tagged `flash_reserved` in the chip IR are filtered out upstream by
 //! `espressif::load::merge`; any that reach this file are a generator bug.
 
-use {{ ir.chip.pac_crate }} as pac;
+use super::pac;
 
 /// Apply the board's pin mux and GPIO matrix routing.
 pub fn init() {

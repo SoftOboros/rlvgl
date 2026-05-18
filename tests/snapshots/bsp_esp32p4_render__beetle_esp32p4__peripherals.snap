@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32p4_render.rs
-assertion_line: 81
 expression: text
 ---
 //! Per-peripheral initialization for DFR1172 FireBeetle 2 P4.
@@ -10,7 +9,7 @@ expression: text
 //! I2C (full timing setup), SPI master (clock + mode), and timer groups
 //! (watchdog disable). Other peripherals get TODO stubs.
 
-use esp32p4 as pac;
+use super::pac;
 
 #[allow(unused_imports)]
 use super::board::{APB_HZ, XTAL_HZ};
@@ -28,7 +27,7 @@ pub fn init() {
 
 
 
-/// Bring up i2c0 as an I2C master at 400000 Hz.
+/// Bring up i2c0 as an I2C master at 100000 Hz.
 ///
 /// Targets the `esp32p4::I2C0` register block.
 /// Clock gating is already done by `crate::clocks::init` — this function
@@ -42,7 +41,7 @@ pub fn init() {
 /// XTAL directly when `sclk_sel = 0`).
 pub fn init_i2c0() {
     let p = unsafe { pac::Peripherals::steal() };
-    const SCL_HZ: u32 = 400000;
+    const SCL_HZ: u32 = 100000;
     // Full SCL period in XTAL cycles. Split 50/50 between low and high
     // halves. For 400 kHz @ 40 MHz XTAL that's 100 cycles, 50 per half.
     let period: u32 = XTAL_HZ / SCL_HZ;

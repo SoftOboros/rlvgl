@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: MIT
+#
+# rlvgl-app/v0 manifest for the DFR0868 Beetle ESP32-C3 bsp_pac intent
+# (the `bsp_pac` feature of examples/beetle-esp32c3/Cargo.toml — raw-PAC
+# LED blink driven by the chipdb-generated BSP under src/bsp_generated/).
+#
+# Status: APP-03e candidate. Conforms to docs/app-schema/01-manifest-schema.md
+# (RATIFIED 2026-04-27, 2026-04-29 amendments). Validator-`--check`
+# verification pending APP-02a.
+#
+# **Marginal schema fit** — see [03 §6.13](../../docs/app-schema/03-round-trip.md
+# #613--open--bsp_pac-stretches-the-screen-abstraction). The bsp_pac binary has
+# no display, no rlvgl runtime, no widget tree. It is a chipdb→generator→boot
+# pipeline proof, not an rlvgl application in the strict v0 sense. The
+# manifest below uses the workable "screens[] = what runs each tick"
+# interpretation so the existing intent has *some* manifest representation
+# and so target.generator: creator-bsp-pac is exercised at all by a landed
+# manifest at v0 ratification. APP-02 orchestrator emission for headless
+# intents is explicitly deferred (chapter 02 §8 templates assume display +
+# controller).
+#
+# Round-trip authority: docs/app-schema/03-round-trip.md §5.1 (the bsp_pac
+# intent of examples/beetle-esp32c3/Cargo.toml). Sibling intent — the
+# esp_hal SSD1306 demo — has its own manifest at ./app.yaml (APP-03a).
+#
+# Filename `app-bsp-pac.yaml` matches the convention set by the H747
+# zephyr sibling (`app-zephyr.yaml`).
+
+schema: rlvgl-app/v0
+name: rlvgl-beetle-esp32c3-pac
+
+metadata:
+  version: 0.2.0
+  description: "Raw-PAC LED blink proving the chipdb -> generator -> boot pipeline."
+  license: MIT
+
+target:
+  vendor: esp
+  board: beetle_esp32c3
+  prong: bare_metal
+  generator: creator-bsp-pac
+  features:
+    - bsp_pac
+
+screens:
+  - id: led-blink
+    layout: layouts/led_blink.rs
+    layout_format: rust_inline_v1
+    default: true

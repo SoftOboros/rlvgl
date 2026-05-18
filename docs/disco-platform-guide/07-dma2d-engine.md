@@ -53,7 +53,7 @@ Four DMA2D transfer modes matter for this crate:
 `Dma2dBlitter` impl in
 [`platform/src/dma2d.rs`](../../platform/src/dma2d.rs) drives
 the DMA2D register block directly.
-[`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+[`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
 documents how a given display picks a blitter.
 
 ### 2. Admission control — `dma2d_admits`
@@ -203,11 +203,11 @@ DMA2D @ 0x5200_1000  (RM0399 §18)
 
 - RM0399 §18 "Chrom-Art Accelerator (DMA2D)" — the full
   register table and blend-mode equations.
-- [`docs/RENDERING-BACKEND-ARCHITECTURE.md`](../RENDERING-BACKEND-ARCHITECTURE.md)
+- [`docs/rendering/BACKEND-ARCHITECTURE.md`](../rendering/BACKEND-ARCHITECTURE.md)
   — how the `Blitter` trait is picked per target.
-- [`docs/RENDERING-ALPHA-BLENDING.md`](../RENDERING-ALPHA-BLENDING.md)
+- [`docs/rendering/ALPHA-BLENDING.md`](../rendering/ALPHA-BLENDING.md)
   — the alpha math DMA2D is accelerating.
-- [`docs/IMAGE-COMPRESSION-FORMAT.md`](../IMAGE-COMPRESSION-FORMAT.md)
+- [`docs/assets/IMAGE-COMPRESSION-FORMAT.md`](../assets/IMAGE-COMPRESSION-FORMAT.md)
   — the RLE decoder that feeds DMA2D's `FGMAR`.
 
 ---

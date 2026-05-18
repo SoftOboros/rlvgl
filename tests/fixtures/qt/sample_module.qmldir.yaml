@@ -1,0 +1,17 @@
+# QT-08b qmldir: tests/fixtures/qt/sample_module/qmldir
+version: 1
+module: SampleModule
+types:
+  - { name: MyButton, version: "1.0", file: MyButton.qml }
+  - { name: MyLabel, version: "1.0", file: MyLabel.qml }
+singletons:
+  - { name: Theme, version: "1.0", file: Theme.qml }
+internals:
+  - { name: _Helper, version: null, file: _Helper.qml }
+imports:
+  - { module: QtQuick, version: "2.15" }
+depends:
+  - { module: QtQuick.Controls, version: "2.15" }
+plugins:
+other:
+  - "typeinfo plugin.qmltypes"

@@ -8,6 +8,10 @@ extern crate alloc;
 pub mod button;
 /// Checkbox widget for boolean options.
 pub mod checkbox;
+/// Transparent click-area widget — rlvgl analogue of QML `MouseArea`.
+pub mod click_area;
+/// Analog clock widget with sub-pixel anti-aliased hand rotation.
+pub mod clock;
 /// Container widget for layout grouping.
 pub mod container;
 /// Image display widget.
@@ -16,6 +20,8 @@ pub mod image;
 pub mod label;
 /// Scrollable list widget.
 pub mod list;
+/// Audio-meter widgets (LED bargraph; needle and others to follow).
+pub mod meters;
 /// UI motion components (crawls, scrollers, tickers).
 pub mod motion;
 /// Progress bar widget.

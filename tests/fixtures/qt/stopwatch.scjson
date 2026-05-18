@@ -1,0 +1,58 @@
+{
+  "name": "stopwatch",
+  "initial": ["idle"],
+  "datamodel_attribute": "null",
+  "datamodel": [
+    {
+      "data": [
+        { "id": "elapsed", "expr": "0" },
+        { "id": "lap", "expr": "0" }
+      ]
+    }
+  ],
+  "state": [
+    {
+      "id": "idle",
+      "onentry": [
+        {
+          "assign": [
+            { "location": "elapsed", "expr": "0", "type": "replacechildren" }
+          ]
+        }
+      ],
+      "transition": [
+        {
+          "event": "start",
+          "target": ["running"]
+        },
+        {
+          "event": "reset",
+          "target": ["idle"],
+          "assign": [
+            { "location": "lap", "expr": "0", "type": "replacechildren" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "running",
+      "onentry": [
+        {
+          "script": [{ "other_attributes": { "name": "tick_start" } }]
+        }
+      ],
+      "onexit": [
+        {
+          "script": [{ "other_attributes": { "name": "tick_stop" } }]
+        }
+      ],
+      "transition": [
+        {
+          "event": "stop",
+          "target": ["idle"],
+          "raise": [{ "event": "stopped" }]
+        }
+      ]
+    }
+  ]
+}

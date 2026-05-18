@@ -1,0 +1,333 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/stopwatch.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    },
+    {
+      "module": "QtQuick.Controls",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "root",
+    "properties": [
+      {
+        "name": "title",
+        "ty": "string",
+        "default_value": "\"Stopwatch\"",
+        "readonly": false,
+        "default_kw": false
+      }
+    ],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "320"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "200"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": [
+      {
+        "type_name": "Label",
+        "id": "display",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "x",
+            "value": {
+              "kind": "expression",
+              "text": "0"
+            }
+          },
+          {
+            "target": "y",
+            "value": {
+              "kind": "expression",
+              "text": "0"
+            }
+          },
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "320"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "80"
+            }
+          },
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "root.title"
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [],
+        "children": []
+      },
+      {
+        "type_name": "Button",
+        "id": "startBtn",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "x",
+            "value": {
+              "kind": "expression",
+              "text": "0"
+            }
+          },
+          {
+            "target": "y",
+            "value": {
+              "kind": "expression",
+              "text": "100"
+            }
+          },
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "100"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "60"
+            }
+          },
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "\"Start\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [
+          {
+            "signal": "onClicked",
+            "body": "dispatch(\"start\")"
+          }
+        ],
+        "children": []
+      },
+      {
+        "type_name": "Button",
+        "id": "stopBtn",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "x",
+            "value": {
+              "kind": "expression",
+              "text": "110"
+            }
+          },
+          {
+            "target": "y",
+            "value": {
+              "kind": "expression",
+              "text": "100"
+            }
+          },
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "100"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "60"
+            }
+          },
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "\"Stop\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [
+          {
+            "signal": "onClicked",
+            "body": "dispatch(\"stop\")"
+          }
+        ],
+        "children": []
+      },
+      {
+        "type_name": "Button",
+        "id": "resetBtn",
+        "properties": [],
+        "assignments": [
+          {
+            "target": "x",
+            "value": {
+              "kind": "expression",
+              "text": "220"
+            }
+          },
+          {
+            "target": "y",
+            "value": {
+              "kind": "expression",
+              "text": "100"
+            }
+          },
+          {
+            "target": "width",
+            "value": {
+              "kind": "expression",
+              "text": "100"
+            }
+          },
+          {
+            "target": "height",
+            "value": {
+              "kind": "expression",
+              "text": "60"
+            }
+          },
+          {
+            "target": "text",
+            "value": {
+              "kind": "expression",
+              "text": "\"Reset\""
+            }
+          }
+        ],
+        "signals": [],
+        "handlers": [
+          {
+            "signal": "onClicked",
+            "body": "dispatch(\"reset\")"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "state_machine": {
+    "id": "stopwatch",
+    "source": "stopwatch.scjson",
+    "initial": "idle",
+    "states": [
+      {
+        "id": "idle",
+        "on_entry": [
+          {
+            "kind": "assign",
+            "location": "elapsed",
+            "expr": "0"
+          }
+        ]
+      },
+      {
+        "id": "running",
+        "on_entry": [
+          {
+            "kind": "script",
+            "name": "tick_start"
+          }
+        ],
+        "on_exit": [
+          {
+            "kind": "script",
+            "name": "tick_stop"
+          }
+        ]
+      }
+    ],
+    "transitions": [
+      {
+        "source": "idle",
+        "event": "start",
+        "target": "running"
+      },
+      {
+        "source": "idle",
+        "event": "reset",
+        "target": "idle",
+        "actions": [
+          {
+            "kind": "assign",
+            "location": "lap",
+            "expr": "0"
+          }
+        ]
+      },
+      {
+        "source": "running",
+        "event": "stop",
+        "target": "idle",
+        "actions": [
+          {
+            "kind": "raise",
+            "event": "stopped"
+          }
+        ]
+      }
+    ],
+    "datamodel": [
+      {
+        "id": "elapsed",
+        "initial": 0.0
+      },
+      {
+        "id": "lap",
+        "initial": 0.0
+      }
+    ],
+    "scripts": [
+      {
+        "name": "tick_start",
+        "origin": {
+          "kind": "on_entry",
+          "state": "running"
+        }
+      },
+      {
+        "name": "tick_stop",
+        "origin": {
+          "kind": "on_exit",
+          "state": "running"
+        }
+      }
+    ]
+  }
+}

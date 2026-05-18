@@ -12,8 +12,8 @@ use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_ui::draw_helpers::{
-    draw_panel_header, draw_rounded_border, fill_rounded_rect, panel_close_hit,
-    PANEL_PADDING as STD_PADDING, PANEL_RADIUS,
+    PANEL_PADDING as STD_PADDING, PANEL_RADIUS, draw_panel_header, draw_rounded_border,
+    fill_rounded_rect, panel_close_hit,
 };
 use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 

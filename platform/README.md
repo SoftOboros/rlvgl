@@ -55,6 +55,19 @@ by the main hardware demo path in this repository. That includes the display
 stack, FT5336 touch controller support, storage helpers, and optional
 DMA2D/audio paths depending on the features you enable.
 
+The STM32H747I-DISCO demo runs on three platforms — all sharing the same
+display init, touch I2C, and DMA2D engine code from this crate:
+
+| Platform | Feature | Task model | Guide |
+|----------|---------|------------|-------|
+| Bare-metal | (default) | Cooperative main loop | [Vol II](../docs/disco-platform-guide/README.md) |
+| FreeRTOS | `freertos` | Preemptive tasks with semaphores | [Vol IV](../docs/disco-freertos-guide/README.md) |
+| Zephyr | `zephyr` | Zephyr threads with C FFI shell | [Vol V](../docs/disco-zephyr-guide/README.md) |
+
+The `freertos` and `zephyr` features gate platform-specific code paths
+(e.g., skipping the second PG3 reset pulse under Zephyr, CSleep LPENR
+register variants for FreeRTOS/Zephyr low-power modes).
+
 See [README-VENDOR.md](./README-VENDOR.md) for the vendor support policy.
 
 ## License

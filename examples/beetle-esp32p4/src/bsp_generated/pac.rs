@@ -16,7 +16,9 @@
 //! (when consumed directly) or a child module of the host crate.
 
 #[allow(unused_imports)]
-pub use esp32p4 as pac;
+pub use esp32p4::*;
+
+
 
 /// Bring up the board.
 ///

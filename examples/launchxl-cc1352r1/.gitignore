@@ -1,0 +1,8 @@
+# CHIPS-TI-06 v0 — the example crate carries a `[workspace]` stanza in
+# Cargo.toml as a temporary measure so `cargo check --manifest-path .../Cargo.toml`
+# works standalone before PM workspace-integration. That stanza causes
+# cargo to write a per-crate Cargo.lock and target/ here; both will be
+# absorbed by the parent workspace at integration time. Ignore both so
+# the standalone-build artefacts don't enter version control.
+/Cargo.lock
+/target

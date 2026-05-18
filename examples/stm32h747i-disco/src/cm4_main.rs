@@ -34,7 +34,7 @@ static ALLOC: Heap = Heap::empty();
 /// Heap backing store in D2 SRAM.
 const HEAP_SIZE: usize = 16 * 1024;
 #[unsafe(link_section = ".uninit.HEAP")]
-static mut HEAP_MEM: [u8; HEAP_SIZE] = [0u8; HEAP_SIZE];
+static mut HEAP_MEM: [u8; HEAP_SIZE] = [0u8; HEAP_SIZE]; // rlvgl-discipline: allow(static_mut)
 
 #[cfg(not(doc))]
 #[entry]

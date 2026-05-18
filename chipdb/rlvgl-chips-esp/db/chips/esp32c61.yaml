@@ -11,6 +11,10 @@ name: ESP32-C61
 arch: rv32imac
 package: QFN32-5x5
 pac_crate: esp32c61
+# `esp32c61 = 0.3` is generated with svd2rust 0.37.x (post-`Peripherals`
+# struct drop); pac.rs.jinja emits a local `Peripherals` shim under
+# `pac_vintage: modern`.
+pac_vintage: modern
 gpio_count: 30
 
 memory:
@@ -29,37 +33,54 @@ clock_tree:
   # PCR clock gates — same pattern as C6.
   system_gates:
     uart0:
-      clk_en_reg:   pcr.uart0_conf
-      clk_en_field: uart0_clk_en
-      rst_reg:      pcr.uart0_conf
-      rst_field:    uart0_rst_en
-      clk_sel_reg:  pcr.uart0_sclk_conf
-      clk_sel_field: uart0_sclk_sel
+      # esp32c61 0.3 PCR clusters UART instances: `pcr.uart(0).conf()` /
+      # `pcr.uart(0).clk_conf()` with cluster-relative field names
+      # (`clk_en`, `rst_en`, `sclk_sel`).
+      clk_en_reg:   pcr.uart(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(0).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(0).clk_conf
+      clk_sel_field: sclk_sel
     uart1:
-      clk_en_reg:   pcr.uart1_conf
-      clk_en_field: uart1_clk_en
-      rst_reg:      pcr.uart1_conf
-      rst_field:    uart1_rst_en
+      # esp32c61 0.3 clusters UART instances; UART1 uses the same cluster
+      # accessor shape as UART0 with cluster-relative field names.
+      clk_en_reg:   pcr.uart(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(1).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(1).clk_conf
+      clk_sel_field: sclk_sel
     i2c0:
-      clk_en_reg:   pcr.i2c_conf
-      clk_en_field: i2c_clk_en
-      rst_reg:      pcr.i2c_conf
-      rst_field:    i2c_rst_en
+      # esp32c61 0.3 has flat `i2c0_conf` (single I2C instance); fields
+      # are `i2c0_clk_en` / `i2c0_rst_en`. The SCLK select register
+      # `pcr.i2c_sclk_conf.i2c_sclk_sel` is a single-bit FieldWriter —
+      # handled via `clk_sel_width: 1` per CHIPS-ESP-11.
+      clk_en_reg:   pcr.i2c0_conf
+      clk_en_field: i2c0_clk_en
+      rst_reg:      pcr.i2c0_conf
+      rst_field:    i2c0_rst_en
+      clk_sel_reg:  pcr.i2c_sclk_conf
+      clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0   # XTAL — matches peripherals.rs sclk_sel().clear_bit()
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
       rst_reg:      pcr.spi2_conf
       rst_field:    spi2_rst_en
     timg0:
-      clk_en_reg:   pcr.timergroup0_conf
-      clk_en_field: tg0_clk_en
-      rst_reg:      pcr.timergroup0_conf
-      rst_field:    tg0_rst_en
+      # esp32c61 0.3 clusters timer groups: `pcr.timergroup(0).conf()`
+      # with cluster-relative field names (`clk_en`, `rst_en`).
+      clk_en_reg:   pcr.timergroup(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(0).conf
+      rst_field:    rst_en
     timg1:
-      clk_en_reg:   pcr.timergroup1_conf
-      clk_en_field: tg1_clk_en
-      rst_reg:      pcr.timergroup1_conf
-      rst_field:    tg1_rst_en
+      clk_en_reg:   pcr.timergroup(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(1).conf
+      rst_field:    rst_en
     systimer:
       clk_en_reg:   pcr.systimer_conf
       clk_en_field: systimer_clk_en
@@ -70,16 +91,51 @@ clock_tree:
       clk_en_field: ledc_clk_en
       rst_reg:      pcr.ledc_conf
       rst_field:    ledc_rst_en
-    rmt:
-      clk_en_reg:   pcr.rmt_conf
-      clk_en_field: rmt_clk_en
-      rst_reg:      pcr.rmt_conf
-      rst_field:    rmt_rst_en
-    twai0:
-      clk_en_reg:   pcr.twai0_conf
-      clk_en_field: twai0_clk_en
-      rst_reg:      pcr.twai0_conf
-      rst_field:    twai0_rst_en
+    # rmt + twai0: ABSENT in esp32c61 0.3.2 PAC AND in the C61 silicon
+    #   itself — investigated and confirmed under CHIPS-ESP-10z
+    #   (2026-05-16).
+    #
+    # Evidence trail (do not re-derive):
+    #
+    #   1. PAC source — grep -rEi 'rmt|twai|infrared|\bcan\b' in
+    #      `~/.cargo/registry/.../esp32c61-0.3.2/src/` returns zero hits.
+    #      No `rmt.rs`, no `twai0.rs`, no `pcr/rmt_conf.rs`, no
+    #      `pcr/twai0_conf.rs`. The full `pcr/` submodule listing
+    #      contains gates for the peripherals present in this SKU
+    #      (uart, i2c0, spi2, timergroup, systimer, ledc, usb_device,
+    #      gdma, etc.) but nothing for RMT or TWAI.
+    #
+    #   2. PAC version — 0.3.2 is the latest published release on
+    #      crates.io (versions: 0.2.0, 0.3.0, 0.3.1, 0.3.2). Upstream
+    #      `esp-rs/esp-pacs` `main` is also at 0.3.2 with the same
+    #      module set. No 0.4.x exists.
+    #
+    #   3. Silicon datasheet — ESP32-C61 Series Datasheet v1.0 (memalpha
+    #      doc 230) "Advanced Peripheral Interfaces" lists: SPI ports,
+    #      3× UART, I2C, I2S, LEDC (6 ch), USB Serial/JTAG, SDIO 2.0
+    #      slave, GDMA, JTAG, ETM. Neither RMT nor TWAI appears in the
+    #      peripheral list or the functional block diagram. C61 is a
+    #      stripped-down C6 variant; Espressif trimmed both peripherals.
+    #
+    #   4. ESP-IDF API surface — the official ESP32-C61 peripherals
+    #      driver index lists 22 drivers; RMT and TWAI are not among
+    #      them.
+    #
+    # Implication: this is a permanent hardware-level absence, NOT a
+    # PAC-version gap. A future esp32c61 PAC bump will NOT surface RMT
+    # or TWAI gates. The `peripherals:` block below still declares
+    # `rmt`/`twai0` instances (with placeholder base addresses) purely
+    # to keep the chipdb schema symmetric across the ESP family — they
+    # MUST NOT be referenced by any board's `pins:` table and MUST NOT
+    # be added to `system_gates:` here.
+    #
+    # pending_pac: []   # No peripherals are "absent-pending-PAC-bump"
+    #                   #   for C61. The gap above is a silicon-level
+    #                   #   absence. If a future PAC revision adds any
+    #                   #   genuinely-missing-but-present-in-hardware
+    #                   #   peripheral gates (none currently known),
+    #                   #   list them here so future-PAC-bumps surface
+    #                   #   them as actionable TODOs in the yaml diff.
     usb_sj:
       clk_en_reg:   pcr.usb_device_conf
       clk_en_field: usb_device_clk_en
@@ -122,7 +178,17 @@ peripherals:
     instance: spi2
     base: 0x60081000
     irq: null
-    signals: []
+    # IO MUX fast-path signals — ESP32-C61 Series Datasheet v1.0 §2.3.3
+    # Table 2-3 "IO MUX Pin Functions" (FSPI = SPI2 main interface).
+    # All six FSPI signals are F2 on their respective IO MUX pins; chip
+    # select sits on GPIO8.
+    signals:
+      - { role: sck,  direction: out, iomux_pin: 6, iomux_fn: 2 }
+      - { role: mosi, direction: out, iomux_pin: 7, iomux_fn: 2 }
+      - { role: miso, direction: in,  iomux_pin: 2, iomux_fn: 2 }
+      - { role: cs0,  direction: out, iomux_pin: 8, iomux_fn: 2 }
+      - { role: hd,   direction: out, iomux_pin: 3, iomux_fn: 2 }
+      - { role: wp,   direction: out, iomux_pin: 4, iomux_fn: 2 }
   timg0:
     class: timg
     instance: timg0
@@ -153,6 +219,12 @@ peripherals:
       - { role: ch3, direction: out, gpio_matrix_id: 3 }
       - { role: ch4, direction: out, gpio_matrix_id: 4 }
       - { role: ch5, direction: out, gpio_matrix_id: 5 }
+  # rmt/twai0: PLACEHOLDER instances for schema symmetry across the ESP
+  # family — see the `system_gates:` evidence-trail comment above. The
+  # C61 silicon does not implement these peripherals (datasheet v1.0)
+  # and the esp32c61 0.3.2 PAC does not expose registers for them. The
+  # base addresses below are the C6 layout values, retained only to
+  # avoid `None` fields in the chipdb. Boards MUST NOT reference these.
   rmt:
     class: rmt
     instance: rmt
@@ -229,3 +301,9 @@ gpio_matrix:
   - { id: 5,  name: ledc_ls_sig_out5, direction: out }
   - { id: 6,  name: U0TXD_out,        direction: out }
   - { id: 9,  name: U1TXD_out,        direction: out }
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases for the bsp_pac flashable path.
+linker:
+  region_text: flash_cache
+  region_data: hp_sram

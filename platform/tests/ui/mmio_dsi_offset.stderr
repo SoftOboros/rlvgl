@@ -1,0 +1,5 @@
+error[E0080]: evaluation panicked: assertion failed: offset_of!(DsiRegsBroken, lccr) == 0x064
+  --> tests/ui/mmio_dsi_offset.rs:45:15
+   |
+45 | const _: () = assert!(offset_of!(DsiRegsBroken, lccr) == 0x064);
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here

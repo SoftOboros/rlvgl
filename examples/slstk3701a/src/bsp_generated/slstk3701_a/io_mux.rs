@@ -1,0 +1,294 @@
+//! GPIO mode + ROUTELOC routing for SLSTK3701A.
+//!
+//! Silicon Labs EFM32 Series 1 routing has two halves per pin:
+//!
+//! 1. **Pad direction / drive** — set the per-pin mode bits inside the
+//!    owning GPIO port's `MODEL` (pins 0..7) or `MODEH` (pins 8..15)
+//!    register, plus the `DOUT` initial state for outputs. The PAC
+//!    field name for pin `n` is `mode<n>` (e.g. `mode4` on `pa_modeh`
+//!    addresses PA12's mode bits — see EFM32GG11-RM §32.5
+//!    "GPIO_Px_MODEL / MODEH").
+//! 2. **Peripheral routing** — for peripheral-owned pins, write the
+//!    routeloc integer (0..31) supplied by the board YAML into the
+//!    per-peripheral `ROUTELOC0`/`ROUTELOC1` register, then set the
+//!    matching `ROUTEPEN` bit so the pad is driven by the peripheral
+//!    rather than the GPIO data register.
+//!
+//! Field widths for ROUTELOC vary across PAC revisions, so the writes
+//! below use `unsafe { w.<field>().bits(loc) }` to stay
+//! register-level. Mode-bit values follow EFM32GG11-RM §32.5 Table:
+//! `0b0000` disabled, `0b0001` input, `0b0100` pushpull output,
+//! `0b0110` wired-and (open-drain), `0b1000..0b1011` filter +
+//! pull-up/down variants. The template emits `0b0001` for plain inputs
+//! (with pull-up if `pull: up` is set), `0b0100` for outputs, and
+//! `0b0110` for inout (I2C) lines.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: GPIO port-mode registers (`pa_model`, `pa_modeh`,
+//! `pa_dout`, ...) and peripheral routing registers (`routeloc0`,
+//! `routepen`) are direct `#[repr(C)]` struct fields, not method
+//! accessors. Same vintage as `atsamd51j19a 0.7.1` — see
+//! CHIPS-MICROCHIP-02 for the parallel pattern.
+
+// `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
+// a `efm32gg11b820` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use efm32gg11b_pac::efm32gg11b820 as pac;
+
+/// Apply the board's GPIO mode bits and peripheral ROUTELOC writes.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    
+    // PH4 — USART4_TX (usart4)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 4)) });
+    
+    p.GPIO.ph_model.modify(|_, w| unsafe { w.mode4().bits(0b0100) });
+    
+    
+    // ROUTELOC: usart4.routeloc0.txloc = 4; usart4.routepen.txpen = 1
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.txloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.txpen().set_bit());
+    
+    
+    // PH5 — USART4_RX (usart4)
+    
+    
+    
+    
+    
+    // Input
+    p.GPIO.ph_model.modify(|_, w| unsafe { w.mode5().bits(0b0001) });
+    
+    
+    
+    // ROUTELOC: usart4.routeloc0.rxloc = 4; usart4.routepen.rxpen = 1
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.rxloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.rxpen().set_bit());
+    
+    
+    // PH8 — USART4_CTS (usart4)
+    
+    
+    
+    
+    
+    // Input
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode8().bits(0b0001) });
+    
+    
+    
+    // ROUTELOC: usart4.routeloc0.rxloc = 4; usart4.routepen.rxpen = 1
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.rxloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.rxpen().set_bit());
+    
+    
+    // PH9 — USART4_RTS (usart4)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 9)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode9().bits(0b0100) });
+    
+    
+    // ROUTELOC: usart4.routeloc0.txloc = 4; usart4.routepen.txpen = 1
+    p.USART4.routeloc0.modify(|_, w| unsafe { w.txloc().bits(4) });
+    p.USART4.routepen.modify(|_, w| w.txpen().set_bit());
+    
+    
+    // PE1 — VCOM_ENABLE (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.pe_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 1)) });
+    
+    p.GPIO.pe_model.modify(|_, w| unsafe { w.mode1().bits(0b0100) });
+    
+    
+    
+    // PC8 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Input with pull-up
+    p.GPIO.pc_modeh.modify(|_, w| unsafe { w.mode8().bits(0b1000) });
+    
+    // DOUT=1 selects pull-up when MODE is set to inputpull (0b1000)
+    p.GPIO.pc_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 8)) });
+    
+    
+    
+    
+    // PC9 — GPIO_EM4WU2 (gpio)
+    
+    
+    
+    
+    
+    // Input with pull-up
+    p.GPIO.pc_modeh.modify(|_, w| unsafe { w.mode9().bits(0b1000) });
+    
+    // DOUT=1 selects pull-up when MODE is set to inputpull (0b1000)
+    p.GPIO.pc_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 9)) });
+    
+    
+    
+    
+    // PH10 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 10)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode10().bits(0b0100) });
+    
+    
+    
+    // PH11 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 11)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode11().bits(0b0100) });
+    
+    
+    
+    // PH12 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 12)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode12().bits(0b0100) });
+    
+    
+    
+    // PH13 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 13)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode13().bits(0b0100) });
+    
+    
+    
+    // PH14 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 14)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode14().bits(0b0100) });
+    
+    
+    
+    // PH15 — GPIO (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.ph_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << 15)) });
+    
+    p.GPIO.ph_modeh.modify(|_, w| unsafe { w.mode15().bits(0b0100) });
+    
+    
+    
+    // PB3 — SENSOR_ENABLE (gpio)
+    
+    
+    
+    
+    
+    // Output (push-pull)
+    
+    p.GPIO.pb_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 3)) });
+    
+    p.GPIO.pb_model.modify(|_, w| unsafe { w.mode3().bits(0b0100) });
+    
+    
+    
+    // PI5 — I2C2_SCL (i2c2)
+    
+    
+    
+    
+    
+    // Inout (wired-AND / open-drain) with filter + pull-up
+    p.GPIO.pi_model.modify(|_, w| unsafe { w.mode5().bits(0b0110) });
+    
+    
+    // ROUTELOC: i2c2.routeloc0.sclloc = 7; i2c2.routepen.sclpen = 1
+    p.I2C2.routeloc0.modify(|_, w| unsafe { w.sclloc().bits(7) });
+    p.I2C2.routepen.modify(|_, w| w.sclpen().set_bit());
+    
+    
+    // PI4 — I2C2_SDA (i2c2)
+    
+    
+    
+    
+    
+    // Inout (wired-AND / open-drain) with filter + pull-up
+    p.GPIO.pi_model.modify(|_, w| unsafe { w.mode4().bits(0b0110) });
+    
+    
+    // ROUTELOC: i2c2.routeloc0.sdaloc = 7; i2c2.routepen.sdapen = 1
+    p.I2C2.routeloc0.modify(|_, w| unsafe { w.sdaloc().bits(7) });
+    p.I2C2.routepen.modify(|_, w| w.sdapen().set_bit());
+    
+    
+    // PB0 — SENSOR_HALL_VOUT (gpio)
+    
+    
+    
+    
+    
+    // Input
+    p.GPIO.pb_model.modify(|_, w| unsafe { w.mode0().bits(0b0001) });
+    
+    
+    
+    
+}

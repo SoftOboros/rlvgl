@@ -1,9 +1,15 @@
 //! Shared DSI adapted command mode register configuration.
 //!
-//! Raw-register functions for configuring the STM32H7 DSI host/wrapper
-//! in adapted command mode, presenting frames, and handling the ERIF ISR.
-//! Used by both bare-metal and Zephyr builds so the critical register
-//! sequences are identical across platforms.
+//! Functions for configuring the STM32H7 DSI host/wrapper in adapted
+//! command mode, presenting frames, and handling the ERIF ISR. Used by
+//! both bare-metal and Zephyr builds so the critical register sequences
+//! are identical across platforms.
+//!
+//! All DSI / LTDC / GPIO register access flows through typed handles in
+//! `crate::hwcore::regs`. The named const-eval offset assertions on
+//! `DsiRegs` / `LtdcRegs` / `GpioRegs` are what make the LCCR-at-0x64
+//! contract a compile-time invariant rather than a runtime hazard
+//! (the original "snow over splash" bug class).
 //!
 //! # Reference
 //!
@@ -11,89 +17,23 @@
 //! - RM0432 Rev 9 §30.14 (identical DSI IP on STM32L4R9)
 //! - RM0456 Rev 7 §44.14 (identical DSI IP on STM32U5)
 //! - STM32CubeH7 `stm32h747i_discovery_lcd.c`, `nt35510.c`
-//!
-//! # Register map
-//!
-//! - DSI host base: `0x5000_0000`
-//! - DSI wrapper base: `0x5000_0400` (host + 0x400)
-//! - LTDC base: `0x5000_1000`
-//! - GPIOJ base: `0x5802_2400`
-//! - DWT_CYCCNT: `0xE000_1004`
 
-// ── DSI register addresses ───────────────────────────────────────────────────
+use crate::hwcore::regs::dsi::{Dsi, DsiWrapper};
+use crate::hwcore::regs::gpio::Gpio;
+use crate::hwcore::regs::ltdc::Ltdc;
 
-const DSI: u32 = 0x5000_0000;
-
-/// DSI Host control register — bit 0 = EN.
-const DSI_CR: *mut u32 = (DSI + 0x04) as *mut u32;
-
-/// DSI Host LTDC command configuration register — CMDSIZE field.
+/// Singleton typed handles. Construction is `unsafe const fn` so we can
+/// pin them in `static` context — every accessor on these gives a
+/// `'static` borrow of the underlying register block.
 ///
-/// **Offset is 0x64**, not 0x2C. 0x2C is PCR (Protocol Configuration).
-/// Confirmed against `stm32h7-0.15.1` PAC `dsihost::lccr` and RM0399 §34.16.
-const DSI_LCCR: *mut u32 = (DSI + 0x64) as *mut u32;
-
-/// DSI Host mode configuration register — bit 0 = CMDM.
-const DSI_MCR: *mut u32 = (DSI + 0x34) as *mut u32;
-
-/// DSI Host command mode configuration register — bit 0 = TEARE.
-const DSI_CMCR: *mut u32 = (DSI + 0x68) as *mut u32;
-
-/// DSI Host generic header configuration register — DCS command FIFO.
-const DSI_GHCR: *mut u32 = (DSI + 0x6C) as *mut u32;
-
-/// DSI Host generic payload status register — CMDFE = bit 0.
-const DSI_GPSR: *const u32 = (DSI + 0x74) as *const u32;
-
-/// DSI Host ISR 0 — ACK/PHY errors.
-const DSI_ISR0: *const u32 = (DSI + 0xBC) as *const u32;
-
-/// DSI Host ISR 1 — payload errors.
-const DSI_ISR1: *const u32 = (DSI + 0xC0) as *const u32;
-
-/// DSI Host flag clear 0.
-const DSI_FIR0: *mut u32 = (DSI + 0xD8) as *mut u32;
-
-/// DSI Host flag clear 1.
-const DSI_FIR1: *mut u32 = (DSI + 0xDC) as *mut u32;
-
-// ── DSI Wrapper registers (base = DSI + 0x400) ──────────────────────────────
-
-const DSI_W: u32 = DSI + 0x400;
-
-/// Wrapper configuration register — DSIM, COLMUX, TESRC, AR.
-const DSI_WCFGR: *mut u32 = DSI_W as *mut u32;
-
-/// Wrapper control register — DSIEN (bit 3), LTDCEN (bit 2).
-const DSI_WCR: *mut u32 = (DSI_W + 0x04) as *mut u32;
-
-/// Wrapper interrupt enable register — TEIE (bit 0), ERIE (bit 1).
-const DSI_WIER: *mut u32 = (DSI_W + 0x08) as *mut u32;
-
-/// Wrapper interrupt & status register — TEIF (bit 0), ERIF (bit 1).
-const DSI_WISR: *const u32 = (DSI_W + 0x0C) as *const u32;
-
-/// Wrapper interrupt flag clear register — CTEIF (bit 0), CERIF (bit 1).
-const DSI_WIFCR: *mut u32 = (DSI_W + 0x10) as *mut u32;
-
-// ── LTDC registers ───────────────────────────────────────────────────────────
-
-const LTDC: u32 = 0x5000_1000;
-
-/// LTDC shadow reload control register — bit 0 = IMR (immediate).
-const LTDC_SRCR: *mut u32 = (LTDC + 0x24) as *mut u32;
-
-/// LTDC Layer 1 color frame buffer address register.
-const LTDC_L1CFBAR: *mut u32 = (LTDC + 0x84 + 0x28) as *mut u32; // 0x50001084 + 0x28 = 0x500010AC
-
-// ── GPIO ─────────────────────────────────────────────────────────────────────
-
-const GPIOJ: u32 = 0x5802_2400;
-const GPIOJ_BSRR: *mut u32 = (GPIOJ + 0x18) as *mut u32;
-
-// ── DWT ──────────────────────────────────────────────────────────────────────
-
-const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+/// SAFETY: this module is the platform-side owner of DSI / LTDC during
+/// adapted-command-mode configuration. GPIOJ access is limited to PJ2
+/// AF setup and PJ0 BSRR pulses (atomic, single-bit) — no aliasing
+/// concern with the bare-metal `scope_probe` GPIOJ writers.
+static DSI_HOST: Dsi = unsafe { Dsi::new() };
+static DSI_W: DsiWrapper = unsafe { DsiWrapper::new() };
+static LTDC_PERIPH: Ltdc = unsafe { Ltdc::new() };
+static GPIOJ: Gpio = unsafe { Gpio::gpioj() };
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -108,10 +48,10 @@ const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
 /// `start_dsi()` is called.
 pub unsafe fn stop_dsi() {
     // Clear LTDCEN + DSIEN in wrapper control
-    DSI_WCR.write_volatile(0);
+    DSI_W.regs().wcr.write(0);
     cortex_m::asm::dsb();
     // Disable DSI host
-    DSI_CR.write_volatile(0);
+    DSI_HOST.regs().cr.write(0);
     cortex_m::asm::dsb();
     // Brief settle time
     cortex_m::asm::delay(100_000);
@@ -125,10 +65,10 @@ pub unsafe fn stop_dsi() {
 /// calling this.
 pub unsafe fn start_dsi() {
     // Enable DSI host
-    DSI_CR.write_volatile(1); // CR.EN = 1
+    DSI_HOST.regs().cr.write(1); // CR.EN = 1
     cortex_m::asm::dsb();
     // Enable DSI wrapper (DSIEN only — LTDCEN is pulsed per frame)
-    DSI_WCR.write_volatile(0x08); // bit 3 = DSIEN
+    DSI_W.regs().wcr.write(0x08); // bit 3 = DSIEN
     cortex_m::asm::dsb();
     cortex_m::asm::delay(2_000_000); // ~5ms settle at 400 MHz
 }
@@ -150,8 +90,12 @@ pub unsafe fn start_dsi() {
 /// DSI host must be stopped (CR.EN=0) before calling. PLL, PHY, lane
 /// timings, and video timing registers must already be configured.
 pub unsafe fn configure_adapted_cmd_mode(width: u16) {
-    // LCCR: command size = display width (pixels per WMS packet)
-    DSI_LCCR.write_volatile(width as u32);
+    let host = DSI_HOST.regs();
+    let wrap = DSI_W.regs();
+    // LCCR: command size = display width (pixels per WMS packet).
+    // The LCCR_OFFSET_IS_0X64 const assertion in `hwcore::regs::dsi`
+    // makes the "0x64 not 0x2C" invariant compile-enforced.
+    host.lccr.write(width as u32);
 
     // WCFGR: adapted command mode + RGB888 + external TE + MANUAL refresh
     //   bit 0: DSIM = 1 (adapted command mode)
@@ -163,19 +107,19 @@ pub unsafe fn configure_adapted_cmd_mode(width: u16) {
     //                   the difference is likely in how the ERIF ISR
     //                   interacts with our render loop / swap timing.
     //                   Sticking with AR=0 here for stability.)
-    DSI_WCFGR.write_volatile(
+    wrap.wcfgr.write(
         (1 << 0)       // DSIM = adapted command mode
         | (5 << 1)     // COLMUX = RGB888
-        | (1 << 4),    // TESRC (kept, but AR=0 makes it advisory)
+        | (1 << 4), // TESRC (kept, but AR=0 makes it advisory)
     );
 
     // CMCR: enable TE-acknowledge handshake for adapted command mode.
     // Keep TEARE=1 (bit 0) only — LP command overrides are set separately
     // during panel init and cleared afterward.
-    DSI_CMCR.write_volatile(1); // TEARE = 1
+    host.cmcr.write(1); // TEARE = 1
 
     // WIER: enable tearing effect + end-of-refresh interrupts
-    DSI_WIER.write_volatile(0x03); // TEIE (bit 0) + ERIE (bit 1)
+    wrap.wier.write(0x03); // TEIE (bit 0) + ERIE (bit 1)
 }
 
 /// Configure PJ2 as DSI_TE alternate function (AF13).
@@ -187,12 +131,13 @@ pub unsafe fn configure_adapted_cmd_mode(width: u16) {
 ///
 /// GPIOJ clock must be enabled.
 pub unsafe fn configure_te_gpio() {
-    // PJ2: MODER = alternate function (0b10)
-    let moder = (GPIOJ as *mut u32).read_volatile();
-    (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 4)) | (2u32 << 4));
+    let regs = GPIOJ.regs();
+    // PJ2: MODER[5:4] = 10 (alternate function)
+    let moder = regs.moder.read();
+    regs.moder.write((moder & !(3u32 << 4)) | (2u32 << 4));
     // PJ2: AFRL bits [11:8] = AF13
-    let afrl = ((GPIOJ + 0x20) as *mut u32).read_volatile();
-    ((GPIOJ + 0x20) as *mut u32).write_volatile((afrl & !(0xFu32 << 8)) | (13u32 << 8));
+    let afrl = regs.afrl.read();
+    regs.afrl.write((afrl & !(0xFu32 << 8)) | (13u32 << 8));
 }
 
 /// Wait for the DSI command FIFO to be empty (GPSR.CMDFE = bit 0).
@@ -200,7 +145,7 @@ pub unsafe fn configure_te_gpio() {
 /// Returns `true` if FIFO emptied within the timeout, `false` on timeout.
 unsafe fn wait_cmd_fifo_empty() -> bool {
     let mut tries = 1_000_000u32;
-    while DSI_GPSR.read_volatile() & 1 == 0 {
+    while DSI_HOST.regs().gpsr.read() & 1 == 0 {
         tries -= 1;
         if tries == 0 {
             return false;
@@ -229,7 +174,10 @@ pub unsafe fn send_set_tear_on() {
     // DCS short write with 1 parameter (data type 0x15):
     //   GHCR = DT[5:0]=0x15 | VCID[7:6]=0 | WCLSB[15:8]=0x35 | WCMSB[23:16]=0x00
     // 0x35 = set_tear_on, param 0x00 = V-blank only
-    DSI_GHCR.write_volatile(0x15 | (0x35 << 8) | (0x00 << 16));
+    DSI_HOST
+        .regs()
+        .ghcr
+        .write(0x15 | (0x35 << 8) | (0x00 << 16));
     // Wait for command to be sent
     wait_cmd_fifo_empty();
 }
@@ -246,14 +194,14 @@ pub unsafe fn enable_lp_cmd_overrides() {
     // PAC bit positions (verified from stm32h7-0.15.1 dsihost/cmcr.rs):
     //   DSW0TX=16, DSW1TX=17, DLWTX=19, GLWTX=14,
     //   GSW0TX=8,  GSW1TX=9,  GSW2TX=10
-    DSI_CMCR.write_volatile(
+    DSI_HOST.regs().cmcr.write(
         (1 << 19)  // DLWTX — DCS long write in LP
         | (1 << 17)  // DSW1TX — DCS short write 1p in LP
         | (1 << 16)  // DSW0TX — DCS short write 0p in LP
         | (1 << 14)  // GLWTX — generic long write in LP
         | (1 << 10)  // GSW2TX — generic short write 2p in LP
         | (1 << 9)   // GSW1TX — generic short write 1p in LP
-        | (1 << 8)   // GSW0TX — generic short write 0p in LP
+        | (1 << 8), // GSW0TX — generic short write 0p in LP
     );
 }
 
@@ -265,7 +213,7 @@ pub unsafe fn enable_lp_cmd_overrides() {
 ///
 /// DSI host must be enabled.
 pub unsafe fn disable_lp_cmd_overrides() {
-    DSI_CMCR.write_volatile(1); // TEARE only
+    DSI_HOST.regs().cmcr.write(1); // TEARE only
 }
 
 /// Present one frame in adapted command mode.
@@ -285,25 +233,28 @@ pub unsafe fn disable_lp_cmd_overrides() {
 /// DSI must be in adapted command mode with ERIF ISR registered.
 /// `fb_addr` must point to a valid ARGB8888 framebuffer in SDRAM.
 pub unsafe fn present(fb_addr: u32) {
+    let wrap = DSI_W.regs();
+    let ltdc = LTDC_PERIPH.regs();
+
     // Ensure all cache writes have drained to SDRAM
     cortex_m::asm::dsb();
 
     // 1. Clear stale ERIF
-    DSI_WIFCR.write_volatile(0x02); // CERIF
+    wrap.wifcr.write(0x02); // CERIF
     cortex_m::asm::dsb();
 
-    // 2. Swap layer address
-    LTDC_L1CFBAR.write_volatile(fb_addr);
+    // 2. Swap layer address (LTDC L1 CFBAR — typed access via Ltdc::layer1())
+    LTDC_PERIPH.layer1().cfbar.write(fb_addr);
 
     // 3. Immediate shadow reload
-    LTDC_SRCR.write_volatile(1); // IMR
+    ltdc.srcr.write(1); // IMR
 
     // 4. Pulse LTDCEN — next TE edge triggers scan
-    DSI_WCR.write_volatile(0x0C); // DSIEN (bit 3) + LTDCEN (bit 2)
+    wrap.wcr.write(0x0C); // DSIEN (bit 3) + LTDCEN (bit 2)
 
     // 5. Clear any spurious ERIF from the re-enable
     cortex_m::asm::dsb();
-    DSI_WIFCR.write_volatile(0x02); // CERIF
+    wrap.wifcr.write(0x02); // CERIF
 }
 
 /// DSI ERIF interrupt handler body.
@@ -321,30 +272,33 @@ pub unsafe fn present(fb_addr: u32) {
 ///
 /// Must be called from interrupt context. DWT_CYCCNT must be running.
 pub unsafe fn handle_erif_isr() -> Option<u32> {
-    let wisr = DSI_WISR.read_volatile();
+    let host = DSI_HOST.regs();
+    let wrap = DSI_W.regs();
+
+    let wisr = wrap.wisr.read();
     // Clear all wrapper flags
-    DSI_WIFCR.write_volatile(wisr & 0x3FFF);
+    wrap.wifcr.write(wisr & 0x3FFF);
 
     let result = if wisr & 0x02 != 0 {
         // ERIF: end of refresh
-        let cyc = DWT_CYCCNT.read_volatile();
+        let cyc = cortex_m::peripheral::DWT::cycle_count();
         // PJ0 LOW — scope probe: LTDC scan done
-        GPIOJ_BSRR.write_volatile(1u32 << 16); // PJ0 reset
+        GPIOJ.regs().bsrr.write(1u32 << 16); // PJ0 reset
         // Clear LTDCEN to prevent auto-refresh (DMA2D gets exclusive bus)
-        DSI_WCR.write_volatile(0x08); // DSIEN only
+        wrap.wcr.write(0x08); // DSIEN only
         Some(cyc)
     } else {
         None
     };
 
     // Clear host-level flags to prevent re-trigger
-    let isr0 = DSI_ISR0.read_volatile();
+    let isr0 = host.isr0.read();
     if isr0 != 0 {
-        DSI_FIR0.write_volatile(isr0);
+        host.fir0.write(isr0);
     }
-    let isr1 = DSI_ISR1.read_volatile();
+    let isr1 = host.isr1.read();
     if isr1 != 0 {
-        DSI_FIR1.write_volatile(isr1);
+        host.fir1.write(isr1);
     }
 
     result
@@ -355,5 +309,5 @@ pub unsafe fn handle_erif_isr() -> Option<u32> {
 /// Useful for polling without clearing the flag.
 #[inline]
 pub fn check_erif() -> bool {
-    unsafe { DSI_WISR.read_volatile() & 0x02 != 0 }
+    DSI_W.regs().wisr.read() & 0x02 != 0
 }

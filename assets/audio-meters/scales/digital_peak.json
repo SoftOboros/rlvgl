@@ -1,0 +1,29 @@
+{
+  "$schema": "../schema/scale.schema.json",
+  "id": "digital_peak",
+  "label_units": "dBFS",
+  "range_db": { "min": -60.0, "max": 0.0 },
+  "pivot": { "value": 0, "label": "0", "input_dbfs": 0.0 },
+  "ticks": {
+    "majors": [-60, -50, -40, -30, -20, -12, -6, -3, 0],
+    "minors_per_major_division": 5,
+    "labels": {
+      "-60": "−60",
+      "-50": "−50",
+      "-40": "−40",
+      "-30": "−30",
+      "-20": "−20",
+      "-12": "−12",
+      "-6": "−6",
+      "-3": "−3",
+      "0": "0"
+    }
+  },
+  "zones": [
+    { "from_db": -60.0, "to_db": -12.0, "color": "Safe" },
+    { "from_db": -12.0, "to_db": -3.0, "color": "Nominal" },
+    { "from_db": -3.0, "to_db": -0.1, "color": "Caution" },
+    { "from_db": -0.1, "to_db": 0.0, "color": "Over" }
+  ],
+  "compatible_ballistics": ["DigitalPeak", "Rms", "Instant"]
+}

@@ -1,0 +1,23 @@
+# QT-08b fixture: representative qmldir manifest with one of each
+# directive QT-08b §5 recognises, plus one unrecognised line that
+# round-trips through `manifest.other` verbatim.
+
+module SampleModule
+
+# Ordinary type registrations.
+MyButton 1.0 MyButton.qml
+MyLabel  1.0 MyLabel.qml
+
+# Singleton (theme object).
+singleton Theme 1.0 Theme.qml
+
+# Internal type — not exported by the module.
+internal _Helper _Helper.qml
+
+# Imports (depends and import differ semantically; both are recorded).
+import QtQuick 2.15
+depends QtQuick.Controls 2.15
+
+# Unrecognised at v1: the typeinfo directive is captured in `other`
+# verbatim and a future amendment promotes it.
+typeinfo plugin.qmltypes

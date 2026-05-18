@@ -109,7 +109,7 @@ mod font_gen {
             let lm = font.horizontal_line_metrics(*size).unwrap();
             let ascent_i16 = lm.ascent.round() as i16;
 
-            let rust_name = name.replace('-', "_").to_uppercase();
+            let _rust_name = name.replace('-', "_").to_uppercase();
             let count = charset.chars().count();
 
             println!(

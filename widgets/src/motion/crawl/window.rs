@@ -34,7 +34,8 @@
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
-use rlvgl_platform::blit::{Blitter, Surface};
+use rlvgl_platform::blit::{Blitter, PixelFmt, Surface};
+use rlvgl_platform::effect::{BlitterSink, EffectSink, SubSink};
 
 use super::Crawl;
 use crate::motion::direction::Direction;
@@ -113,18 +114,50 @@ impl<C: Crawl> CrawlWindow<C> {
 
     /// Paint the current crawl frame into `dst` using `blitter`.
     ///
-    /// The destination surface and blitter are supplied by the host
-    /// each frame — the widget owns neither. Hosts typically call
-    /// this from their render loop between the regular widget tree
-    /// draw and the screen present.
+    /// Bridges the legacy Blitter-based paint API (what the BBB Linux
+    /// host and tests call) to the new sink-based [`Crawl::draw`]
+    /// entry point. The widget's `bounds` rect is applied as a
+    /// sub-surface view so the crawl paints into its window region
+    /// only, matching the pre-sink behaviour exactly.
     ///
     /// Returns `true` if paint actually ran (the widget was active),
-    /// `false` if it was skipped because the crawl was inactive.
+    /// `false` if it was skipped because the crawl was inactive or
+    /// the bounds intersection with `dst` was empty.
     pub fn paint_frame<B: Blitter>(&mut self, blitter: &mut B, dst: &mut Surface<'_>) -> bool {
         if !self.active {
             return false;
         }
-        self.crawl.paint(blitter, dst);
+        let left = self.bounds.x.max(0).min(dst.width as i32);
+        let top = self.bounds.y.max(0).min(dst.height as i32);
+        let right = (self.bounds.x + self.bounds.width)
+            .max(left)
+            .min(dst.width as i32);
+        let bottom = (self.bounds.y + self.bounds.height)
+            .max(top)
+            .min(dst.height as i32);
+        if left >= right || top >= bottom {
+            return false;
+        }
+
+        let bytes_per_pixel = match dst.format {
+            PixelFmt::Argb8888 => 4,
+            PixelFmt::Rgb565 => 2,
+            PixelFmt::L8 | PixelFmt::A8 | PixelFmt::A4 => 1,
+        };
+        let offset = top as usize * dst.stride + left as usize * bytes_per_pixel;
+        if offset >= dst.buf.len() {
+            return false;
+        }
+
+        let mut view = Surface::new(
+            &mut dst.buf[offset..],
+            dst.stride,
+            dst.format,
+            (right - left) as u32,
+            (bottom - top) as u32,
+        );
+        let mut sink = BlitterSink::new(blitter, &mut view);
+        self.crawl.draw(&mut sink);
         true
     }
 
@@ -133,6 +166,41 @@ impl<C: Crawl> CrawlWindow<C> {
     #[inline]
     pub fn direction(&self) -> Direction {
         self.crawl.direction()
+    }
+}
+
+impl<C: Crawl> rlvgl_platform::effect::Effect for CrawlWindow<C> {
+    fn is_active(&self) -> bool {
+        CrawlWindow::is_active(self)
+    }
+    fn activate(&mut self) {
+        CrawlWindow::activate(self)
+    }
+    fn deactivate(&mut self) {
+        CrawlWindow::deactivate(self)
+    }
+    fn tick(&mut self) {
+        if self.active {
+            self.crawl.tick();
+            if self.crawl.state().finished {
+                self.active = false;
+            }
+        }
+    }
+    fn draw(&mut self, sink: &mut dyn EffectSink) {
+        if !self.active {
+            return;
+        }
+        // Report the bounds as the target size so the inner crawl
+        // self-clips, then offset every op by `(bounds.x, bounds.y)`
+        // in the wrapper before forwarding to the host's sink.
+        let width = self.bounds.width.max(0) as u32;
+        let height = self.bounds.height.max(0) as u32;
+        if width == 0 || height == 0 {
+            return;
+        }
+        let mut sub = SubSink::new(sink, (self.bounds.x, self.bounds.y), width, height);
+        self.crawl.draw(&mut sub);
     }
 }
 
@@ -221,17 +289,20 @@ mod tests {
                 self.state.active = false;
             }
         }
-        fn paint<B: Blitter>(&mut self, _blitter: &mut B, _dst: &mut Surface<'_>) {
+        fn draw(&mut self, sink: &mut dyn EffectSink) {
             self.paints += 1;
+            let w = sink.target_width();
+            let h = sink.target_height();
+            sink.fill(rlvgl_platform::blit::Rect { x: 0, y: 0, w, h }, 0xFFCC_CCCC);
         }
     }
 
     fn bounds() -> Rect {
         Rect {
-            x: 10,
-            y: 20,
-            width: 64,
-            height: 48,
+            x: 2,
+            y: 1,
+            width: 4,
+            height: 2,
         }
     }
 
@@ -305,6 +376,29 @@ mod tests {
         let mut blitter = CpuBlitter;
         assert!(!w.paint_frame(&mut blitter, &mut dst));
         assert_eq!(w.crawl().paints, 0);
+    }
+
+    #[test]
+    fn paint_frame_is_clipped_to_bounds() {
+        use alloc::vec;
+        use rlvgl_platform::CpuBlitter;
+        use rlvgl_platform::blit::{PixelFmt, Surface};
+
+        let mut w = CrawlWindow::new(bounds(), MockCrawl::new(10));
+        w.activate();
+        let mut dst_buf = vec![0u8; 8 * 4 * 4];
+        let mut dst = Surface::new(&mut dst_buf, 8 * 4, PixelFmt::Argb8888, 8, 4);
+        let mut blitter = CpuBlitter;
+        assert!(w.paint_frame(&mut blitter, &mut dst));
+
+        for y in 0..4usize {
+            for x in 0..8usize {
+                let off = (y * 8 + x) * 4;
+                let painted = dst_buf[off] == 0xCC;
+                let inside = (2..6).contains(&x) && (1..3).contains(&y);
+                assert_eq!(painted, inside, "unexpected paint state at ({x}, {y})");
+            }
+        }
     }
 
     #[test]

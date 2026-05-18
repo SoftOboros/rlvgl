@@ -21,6 +21,8 @@ const TPL_CLOCKS: &str = include_str!("templates/clocks.rs.jinja");
 const TPL_IO_MUX: &str = include_str!("templates/io_mux.rs.jinja");
 const TPL_PERIPHS: &str = include_str!("templates/peripherals.rs.jinja");
 const TPL_BOARD: &str = include_str!("templates/board.rs.jinja");
+const TPL_MEMORY_X: &str = include_str!("templates/memory.x.jinja");
+const TPL_CHIP_X: &str = include_str!("templates/chip.x.jinja");
 
 /// Kind of routing applied to one board pin.
 #[derive(Serialize, Debug, Clone)]
@@ -75,9 +77,11 @@ pub fn render_esp_pac(ir: &EspIr, out_dir: &Path) -> Result<Vec<std::path::PathB
 
     let peripherals_used = peripherals_used(ir);
     let pin_routes = resolve_pin_routes(ir);
+    let shim_instances = shim_instances(ir, &peripherals_used);
 
     let mut env = Environment::new();
     env.add_filter("pac_path", pac_path_filter);
+    env.add_filter("hex32", hex32_filter);
     env.add_template("mod.rs", TPL_MOD)?;
     env.add_template("pac.rs", TPL_PAC)?;
     env.add_template("clocks.rs", TPL_CLOCKS)?;
@@ -85,29 +89,52 @@ pub fn render_esp_pac(ir: &EspIr, out_dir: &Path) -> Result<Vec<std::path::PathB
     env.add_template("peripherals.rs", TPL_PERIPHS)?;
     env.add_template("board.rs", TPL_BOARD)?;
 
+    // Linker scripts emit only when the chip yaml has a `linker:` block
+    // AND the chip is RISC-V. Xtensa chips go through esp-hal so don't
+    // need the bsp_pac linker scaffolding.
+    let emit_linker = ir.chip.linker.is_some() && ir.chip.arch.starts_with("rv32");
+    let chip_x_name = format!("{chip_stem}.x");
+    if emit_linker {
+        env.add_template("memory.x", TPL_MEMORY_X)?;
+        // Register chip.x under a fixed template name; the output file
+        // gets renamed below.
+        env.add_template("chip.x", TPL_CHIP_X)?;
+    }
+
     let ctx = context! {
         ir => Value::from_serialize(ir),
         peripherals_used => Value::from_serialize(&peripherals_used),
         pin_routes => Value::from_serialize(&pin_routes),
+        shim_instances => Value::from_serialize(&shim_instances),
         board_stem => board_stem.clone(),
         chip_stem => chip_stem,
     };
 
-    let files = [
+    let mut files: Vec<String> = [
         "mod.rs",
         "pac.rs",
         "clocks.rs",
         "io_mux.rs",
         "peripherals.rs",
         "board.rs",
-    ];
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    if emit_linker {
+        files.push("memory.x".to_string());
+        // chip-x is registered under "chip.x" but written under
+        // "<chip>.x" so the consuming build.rs can do `-T<chip>.x`.
+        files.push("chip.x".to_string());
+    }
     let mut written = Vec::new();
-    for name in files {
+    for name in &files {
         let tmpl = env.get_template(name)?;
         let rendered = tmpl
             .render(&ctx)
             .with_context(|| format!("render {name}"))?;
-        let path = target.join(name);
+        let out_name: &str = if name == "chip.x" { &chip_x_name } else { name };
+        let path = target.join(out_name);
         std::fs::write(&path, rendered).with_context(|| format!("write {}", path.display()))?;
         written.push(path);
     }
@@ -124,6 +151,58 @@ fn peripherals_used(ir: &EspIr) -> Vec<String> {
         if let Some(p) = pin.peripheral.as_deref() {
             if !out.iter().any(|s| s == p) {
                 out.push(p.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Compute the uppercase PAC instance names referenced by the generated
+/// code as `p.<NAME>` field accesses.
+///
+/// On `pac_vintage: modern` chips the upstream PAC no longer exposes an
+/// aggregate `pub struct Peripherals { ... }`, so `pac.rs.jinja` emits a
+/// local shim struct populated from this list. Each entry corresponds to
+/// a top-level `pub type <NAME> = crate::Periph<...>` in the modern PAC
+/// (e.g. `esp32c6::UART0`, `esp32c6::PCR`).
+///
+/// The set is the union of:
+/// - `IO_MUX` and `GPIO` (always referenced by `io_mux.rs`),
+/// - every entry in `peripherals_used`, uppercased,
+/// - the first segment (uppercased) of every `clk_en_reg` / `rst_reg` /
+///   `clk_sel_reg` referenced by a used peripheral's clock gate.
+///
+/// Order is deterministic — `IO_MUX`, `GPIO`, then peripherals in the
+/// order returned by `peripherals_used`, then any additional clock-gate
+/// register blocks in first-seen order.
+fn shim_instances(ir: &EspIr, peripherals_used: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let push = |name: String, out: &mut Vec<String>| {
+        if !out.iter().any(|s| s == &name) {
+            out.push(name);
+        }
+    };
+    push("IO_MUX".to_string(), &mut out);
+    push("GPIO".to_string(), &mut out);
+    for p in peripherals_used {
+        push(p.to_ascii_uppercase(), &mut out);
+    }
+    // Clock-gate register blocks live on the first dotted segment of
+    // `clk_en_reg` / `rst_reg` / `clk_sel_reg`. On C3 that's `system`,
+    // on C6/H2/C5/C61 it's `pcr`, on P4 `hp_sys_clkrst`.
+    for name in peripherals_used {
+        if let Some(gate) = ir.chip.clock_tree.system_gates.get(name) {
+            for reg_path in [
+                Some(gate.clk_en_reg.as_str()),
+                Some(gate.rst_reg.as_str()),
+                gate.clk_sel_reg.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if let Some(first) = reg_path.split('.').next() {
+                    push(first.to_ascii_uppercase(), &mut out);
+                }
             }
         }
     }
@@ -262,6 +341,11 @@ fn dir_to_str(d: EspDir) -> &'static str {
 /// peripheral instance — in svd2rust-generated PAC crates that's an
 /// uppercase field on `Peripherals`, not a method. Subsequent segments are
 /// registers or blocks within the instance and stay as method calls.
+/// Format a u32 as `0xXXXXXXXX` for linker MEMORY blocks.
+fn hex32_filter(value: u32) -> String {
+    format!("0x{value:08X}")
+}
+
 fn pac_path_filter(value: String) -> String {
     let mut segments = value.split('.');
     let mut out = match segments.next() {
@@ -271,7 +355,12 @@ fn pac_path_filter(value: String) -> String {
     for rest in segments {
         out.push('.');
         out.push_str(rest);
-        out.push_str("()");
+        // Cluster accessors (`uart(0)`, `func_out_sel_cfg(N)`) already
+        // include their parens in the chipyaml entry — only add `()` for
+        // plain register-method segments so we don't emit `uart(0)()`.
+        if !rest.ends_with(')') {
+            out.push_str("()");
+        }
     }
     out
 }
@@ -324,5 +413,19 @@ mod tests {
         );
         assert_eq!(pac_path_filter("gpio".into()), "GPIO");
         assert_eq!(pac_path_filter("uart0.conf0".into()), "UART0.conf0()");
+    }
+
+    #[test]
+    fn pac_path_filter_preserves_cluster_accessor_parens() {
+        // svd2rust 0.37+ clusters repeating registers; the chip yaml expresses
+        // these as `pcr.uart(0).conf` so the filter must not emit `uart(0)()`.
+        assert_eq!(
+            pac_path_filter("pcr.uart(0).conf".into()),
+            "PCR.uart(0).conf()"
+        );
+        assert_eq!(
+            pac_path_filter("pcr.uart(0).clk_conf".into()),
+            "PCR.uart(0).clk_conf()"
+        );
     }
 }

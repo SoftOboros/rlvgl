@@ -1,0 +1,10 @@
+error[E0499]: cannot borrow `scan` as mutable more than once at a time
+  --> tests/ui/dca_ltdc_paint_then_present.rs:27:5
+   |
+22 |     let pixels = scan.paint_full();
+   |                  ---- first mutable borrow occurs here
+...
+27 |     scan.present(&mut ctx);
+   |     ^^^^ second mutable borrow occurs here
+28 |     let _ = pixels[0];
+   |             --------- first borrow later used here

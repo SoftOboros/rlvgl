@@ -1,0 +1,12 @@
+[package]
+name = "stopwatch_gen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "QT-05b test fixture: mock istate-codegen output satisfying the QT-05 §6 6-symbol linkage surface."
+
+[lib]
+name = "stopwatch_gen"
+path = "src/lib.rs"
+
+[dependencies]

@@ -1,0 +1,64 @@
+# `[workspace]` empty table detaches this crate from the rlvgl workspace
+# until PM adds it to the root `Cargo.toml` `[workspace.members]` at
+# integration. Without this stanza, `cargo check --manifest-path
+# examples/feather-m4-express/Cargo.toml` walks up and tries to evaluate
+# this crate as part of the root workspace, which requires the same root
+# `Cargo.toml` membership amendment as the integration commit.
+[workspace]
+
+[package]
+name = "rlvgl-example-feather-m4-express"
+version = "0.0.1"
+edition = "2021"
+publish = false
+build = "build.rs"
+
+# CHIPS-MICROCHIP-06 v0 scaffold for the Adafruit Feather M4 Express
+# (ATSAMD51J19A, Cortex-M4F). See
+# `chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md` for the
+# spec-before-code contract that drives this crate's shape.
+#
+# Regenerate the files under `src/bsp_generated/adafruit_feather_m4_express/`
+# whenever the chipdb chip yaml or the board yaml changes:
+#
+#   cargo run --features creator --bin rlvgl-creator -- --silent bsp \
+#       from-yaml --vendor microchip --board adafruit_feather_m4_express \
+#       --out examples/feather-m4-express/src/bsp_generated --emit-pac
+#
+# The hand-written `src/bsp_generated/mod.rs` re-exports the generator's
+# `adafruit_feather_m4_express/` child directory; per
+# CHIPS-MICROCHIP-06 §5.5 the host index avoids inheriting the generator's
+# crate-root inner attributes (`#![no_std]`, `#![deny(missing_docs)]`).
+
+[[bin]]
+name = "rlvgl-feather-m4-express"
+path = "src/bsp_pac_main.rs"
+required-features = ["bsp_pac"]
+
+[features]
+# `bsp_pac` is the v0 default and only feature (CHIPS-MICROCHIP-06 §5.3).
+# Adding a second feature (e.g. `mchip_hal`, `rlvgl`, `usb`) is
+# Specification Required per the §5.3 registration policy.
+default = ["bsp_pac"]
+bsp_pac = []
+
+[dependencies]
+# Pinned to the same vintage the slate-6 compile-verify gate uses. The
+# `rt` feature pulls in cortex-m-rt ~0.6.12 and triggers the PAC's
+# `build.rs` `device.x` emission, which cortex-m-rt's `link.x` consumes
+# via `INCLUDE device.x`. See CHIPS-MICROCHIP-06 §10.2.
+atsamd51j19a = { version = "0.7.1", features = ["rt"] }
+# cortex-m / cortex-m-rt versions matched to the PAC's `rt` dependency
+# closure (cortex-m ~0.6 and cortex-m-rt ~0.6.12 per
+# atsamd51j19a 0.7.1's Cargo.toml).
+cortex-m = "0.6"
+cortex-m-rt = "0.6.12"
+panic-halt = "0.2"
+
+[profile.release]
+# CHIPS-MICROCHIP-06 §5.7 — minimal-binary flash footprint for the
+# Cortex-M4F. Matches `examples/beetle-esp32c3/`'s release profile.
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false

@@ -55,6 +55,75 @@ name = "creator_run"
 path = "tests/creator_run.rs"
 required-features = ["creator"]
 
+[[test]]
+name = "creator_qt_ingest"
+path = "tests/creator_qt_ingest.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_compile"
+path = "tests/creator_qt_emit_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_rlvgl_compile"
+path = "tests/creator_qt_emit_rlvgl_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_clickable_compile"
+path = "tests/creator_qt_emit_clickable_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_counter_compile"
+path = "tests/creator_qt_emit_counter_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_bound_text_compile"
+path = "tests/creator_qt_emit_bound_text_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_centered_compile"
+path = "tests/creator_qt_emit_centered_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_nested_compile"
+path = "tests/creator_qt_emit_nested_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_edges_compile"
+path = "tests/creator_qt_emit_edges_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_corners_compile"
+path = "tests/creator_qt_emit_corners_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_mousearea_compile"
+path = "tests/creator_qt_emit_mousearea_compile.rs"
+required-features = ["creator"]
+
+# QT-05b: stopwatch dispatch-glue compile-as-mod gate. Depends on the
+# `stopwatch_gen` dev-dep (mock istate-codegen output) per QT-05b §8.
+[[test]]
+name = "creator_qt_emit_stopwatch_compile"
+path = "tests/creator_qt_emit_stopwatch_compile.rs"
+required-features = ["creator"]
+
+# QT-10: strict-mode meta-test. Asserts the chapter file set, version
+# constants, and CLI subcommand surface remain stable.
+[[test]]
+name = "creator_qt_strict_mode"
+path = "tests/creator_qt_strict_mode.rs"
+required-features = ["creator"]
+
 [dependencies]
 rlvgl-core = { version = "0.2.0", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.2.0", path = "widgets", default-features = false }
@@ -265,6 +334,14 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 zstd = "0.13.3"
 syn = { version = "2", features = ["full"] }
+# APP-05 parity tests: parse emitted + reference Cargo.toml as real TOML
+# so multi-line `[features]` lists round-trip cleanly.
+toml = "0.8"
+# QT-05b test fixture: hand-vendored mock istate-codegen output that
+# satisfies the QT-05 §6 6-symbol linkage surface. Used only by
+# `tests/creator_qt_emit_stopwatch_compile.rs` to compile-check the
+# emitted dispatch glue without the live softoboros MCP.
+stopwatch_gen = { path = "tests/fixtures/qt/stopwatch_gen" }
 
 [features]
 default = []
@@ -389,12 +466,23 @@ members = [
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
     "examples/beetle-esp32p4",
+    "examples/beaglebone-black",
     "examples/stm32h747i-disco/assets/disco-assets",
     "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp",
     "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip",
     "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040",
     "chips/stm/bsps", "rlvgl-decomp",
+    "audio-meters-core",
 ]
 # UEFI example is excluded from workspace — it conflicts with std on host targets.
 # Build it explicitly: cargo build -p rlvgl-example-uefi-disco --target aarch64-unknown-uefi
-exclude = ["examples/uefi-disco", "examples/beetle-avr"]
+# vendor/scjson is a reference-only submodule (BSD-1-Clause); never linked into our build.
+# disco-demo-states is the APP-04b vendored SM crate (mcp-statechart output);
+# excluded so its non-idiomatic codegen variant naming doesn't fail workspace clippy.
+# It is built/tested separately by tests/creator_app_round_trip_disco_sm.rs.
+exclude = [
+    "examples/uefi-disco",
+    "examples/beetle-avr",
+    "vendor/scjson",
+    "examples/stm32h747i-disco/disco-demo-states",
+]

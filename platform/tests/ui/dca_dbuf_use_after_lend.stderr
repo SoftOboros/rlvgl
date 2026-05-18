@@ -1,0 +1,16 @@
+error[E0382]: borrow of moved value: `cpu`
+  --> tests/ui/dca_dbuf_use_after_lend.rs:23:18
+   |
+19 |     let cpu = dca.cpu();
+   |         --- move occurs because `cpu` has type `DbufCpu<'_, '_, u8, 32>`, which does not implement the `Copy` trait
+20 |     let _active = cpu.start_double_buffer_read(&mut ctx);
+   |                       ---------------------------------- `cpu` moved due to this method call
+...
+23 |     let _slice = cpu.as_m0_slice();
+   |                  ^^^ value borrowed here after move
+   |
+note: `DbufCpu::<'a, 'b, T, N>::start_double_buffer_read` takes ownership of the receiver `self`, which moves `cpu`
+  --> src/hwcore/dca.rs
+   |
+   |         self,
+   |         ^^^^

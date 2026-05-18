@@ -16,6 +16,5 @@ fn pixels_window_draws() {
 #[cfg(not(feature = "simulator"))]
 #[test]
 fn pixels_window_draws() {
-    // Simulator feature not enabled; nothing to test
-    assert!(true);
+    // Simulator feature not enabled; nothing to test.
 }

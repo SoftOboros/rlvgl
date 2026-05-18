@@ -1,0 +1,24 @@
+[Unit]
+# Unbind the Linux framebuffer console (fbcon) from /dev/fb0 so rlvgl's
+# userspace render loop has the framebuffer to itself. Without this,
+# fbcon paints its blinking 8x16 cursor cell over whatever rlvgl just
+# wrote (~2 Hz flash at character cell 18,9 on a 100x30 VGA grid) and
+# reads as a "flashing underline" on the panel.
+#
+# Serial console on ttyS0 is unaffected. SSH login is unaffected. Only
+# the VT-on-framebuffer is torn down.
+#
+# Scope: BeagleBone Black + NHD-7.0CTP-CAPE-P under Debian Bookworm
+# 6.12.x-bone. Any other kernel image that boots text-mode to the LCD
+# panel will need the same unbind.
+Description=Unbind Linux framebuffer console (fbcon) from /dev/fb0 for rlvgl
+DefaultDependencies=no
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'for v in /sys/class/vtconsole/vtcon*; do grep -qi "frame buffer" "$v/name" && echo 0 > "$v/bind"; done'
+
+[Install]
+WantedBy=multi-user.target

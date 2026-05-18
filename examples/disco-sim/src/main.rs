@@ -81,6 +81,7 @@ fn apply_runtime_commands(controller: &mut DiscoController) -> RuntimeCommandOut
                     eprintln!("sim runtime: star crawl requested");
                     outcome.start_star_crawl = true;
                 }
+                DiscoEffect::Spectrum => eprintln!("sim runtime: spectrum requested"),
             },
             DiscoCommand::StopEffect(effect) => match effect {
                 DiscoEffect::AudioScope => eprintln!("sim runtime: audio scope stop requested"),
@@ -88,6 +89,7 @@ fn apply_runtime_commands(controller: &mut DiscoController) -> RuntimeCommandOut
                     eprintln!("sim runtime: star crawl stop requested");
                     outcome.stop_star_crawl = true;
                 }
+                DiscoEffect::Spectrum => eprintln!("sim runtime: spectrum stop requested"),
             },
             DiscoCommand::ShowStatus(status) => eprintln!("sim status: {status}"),
             DiscoCommand::NoOp => {}

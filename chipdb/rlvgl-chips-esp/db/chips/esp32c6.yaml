@@ -16,6 +16,10 @@ name: ESP32-C6
 arch: rv32imac
 package: QFN40-5x5
 pac_crate: esp32c6
+# `esp32c6 = 0.23` is generated with svd2rust 0.37.1 (post-`Peripherals`
+# struct drop); pac.rs.jinja emits a local `Peripherals` shim under
+# `pac_vintage: modern`. Legacy chips (C3, P4) keep the default vintage.
+pac_vintage: modern
 gpio_count: 30  # QFN40; MINI-1 module exposes 22
 
 memory:
@@ -37,41 +41,56 @@ clock_tree:
   # C6 uses PCR_*_CONF_REG for clock/reset bits.
   system_gates:
     uart0:
-      clk_en_reg:   pcr.uart0_conf
-      clk_en_field: uart0_clk_en
-      rst_reg:      pcr.uart0_conf
-      rst_field:    uart0_rst_en
-      clk_sel_reg:  pcr.uart0_sclk_conf
-      clk_sel_field: uart0_sclk_sel
+      # esp32c6 0.23 PCR clusters UART instances: `pcr.uart(0).conf()` /
+      # `pcr.uart(0).clk_conf()` with cluster-relative field names
+      # (`clk_en`, `rst_en`, `sclk_sel`) rather than `uart0_*`. The
+      # `pac_path_filter` preserves the `(0)` accessor parens.
+      clk_en_reg:   pcr.uart(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(0).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(0).clk_conf
+      clk_sel_field: sclk_sel
     uart1:
-      clk_en_reg:   pcr.uart1_conf
-      clk_en_field: uart1_clk_en
-      rst_reg:      pcr.uart1_conf
-      rst_field:    uart1_rst_en
-      clk_sel_reg:  pcr.uart1_sclk_conf
-      clk_sel_field: uart1_sclk_sel
+      # esp32c6 0.23 clusters UART instances; UART1 uses the same cluster
+      # accessor shape as UART0 with cluster-relative field names.
+      clk_en_reg:   pcr.uart(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.uart(1).conf
+      rst_field:    rst_en
+      clk_sel_reg:  pcr.uart(1).clk_conf
+      clk_sel_field: sclk_sel
     i2c0:
-      clk_en_reg:   pcr.i2c_conf
-      clk_en_field: i2c_clk_en
-      rst_reg:      pcr.i2c_conf
-      rst_field:    i2c_rst_en
+      # esp32c6 0.23 has flat `i2c0_conf` (single I2C instance on C6,
+      # but PAC retains the `0` suffix); fields are `i2c0_clk_en` /
+      # `i2c0_rst_en`. The SCLK select register lives at
+      # `pcr.i2c_sclk_conf.i2c_sclk_sel` — a single-bit FieldWriter,
+      # handled here via `clk_sel_width: 1` per CHIPS-ESP-11.
+      clk_en_reg:   pcr.i2c0_conf
+      clk_en_field: i2c0_clk_en
+      rst_reg:      pcr.i2c0_conf
+      rst_field:    i2c0_rst_en
       clk_sel_reg:  pcr.i2c_sclk_conf
       clk_sel_field: i2c_sclk_sel
+      clk_sel_width: 1
+      clk_sel_value: 0   # XTAL — matches peripherals.rs sclk_sel().clear_bit()
     spi2:
       clk_en_reg:   pcr.spi2_conf
       clk_en_field: spi2_clk_en
       rst_reg:      pcr.spi2_conf
       rst_field:    spi2_rst_en
     timg0:
-      clk_en_reg:   pcr.timergroup0_conf
-      clk_en_field: tg0_clk_en
-      rst_reg:      pcr.timergroup0_conf
-      rst_field:    tg0_rst_en
+      # esp32c6 0.23 clusters timer groups: `pcr.timergroup(0).conf()`
+      # with cluster-relative field names (`clk_en`, `rst_en`).
+      clk_en_reg:   pcr.timergroup(0).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(0).conf
+      rst_field:    rst_en
     timg1:
-      clk_en_reg:   pcr.timergroup1_conf
-      clk_en_field: tg1_clk_en
-      rst_reg:      pcr.timergroup1_conf
-      rst_field:    tg1_rst_en
+      clk_en_reg:   pcr.timergroup(1).conf
+      clk_en_field: clk_en
+      rst_reg:      pcr.timergroup(1).conf
+      rst_field:    rst_en
     systimer:
       clk_en_reg:   pcr.systimer_conf
       clk_en_field: systimer_clk_en
@@ -315,3 +334,9 @@ gpio_matrix:
   - { id: 17, name: I2SI_WS,          direction: in }
   - { id: 45, name: I2CEXT0_SCL,      direction: inout }
   - { id: 46, name: I2CEXT0_SDA,      direction: inout }
+
+# Linker layout — which memory regions back the riscv-rt / esp-riscv-rt
+# aliases for the bsp_pac flashable path.
+linker:
+  region_text: flash_cache
+  region_data: hp_sram

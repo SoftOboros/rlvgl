@@ -1,0 +1,145 @@
+---
+source: tests/bsp_ti_cc1352r_render.rs
+expression: text
+---
+//! IO Controller (IOC) pin routing for LAUNCHXL-CC1352R1.
+//!
+//! SimpleLink CC13x2/CC26x2 uses a **single-stage** IOC routing model
+//! (CHIPS-TI-00 §10.3): the IOC writes one `IOCFGn` register per DIO that
+//! names the peripheral event signal directly via the `port_id` field.
+//! There is no separate "GPIO matrix" stage as on Espressif chips — the
+//! IOC PORT_CFG (a.k.a. `IOCFG`) register IS the routing fabric.
+//!
+//! For each pin assigned by the board YAML this file writes:
+//!
+//! * `port_id` (PORT_CFG[5:0]) — selects the peripheral signal (0x00 plain
+//!   GPIO, 0x07 UART0_TX, 0x24 I2C_MSSDA, ... per TI SWCU185 §11.2
+//!   Table 11-2 "port_id Encoding").
+//! * `io_mode` (PORT_CFG[26:24]) — drive mode (push-pull, open-drain, etc.).
+//! * `pull_ctl` (PORT_CFG[14:13]) — pull-up / pull-down / disabled.
+//! * `ie` (PORT_CFG[29]) — input enable for read-back and digital input.
+//!
+//! Output enable for GPIOs is established by writing `GPIO.DOE` after the
+//! IOC PORT_CFG is in place; for peripheral-routed pins the peripheral
+//! itself drives the line and `DOE` is left alone.
+//!
+//! Filename remains `io_mux.rs` for cross-vendor uniformity even though the
+//! emitted module's *content* is IOC-specific (CHIPS-TI-00 §10.3).
+
+use cc13x2_26x2_pac as pac;
+
+/// Apply the board's IOC pin routing.
+///
+/// Walks the board YAML's `pins:` array and writes one `IOC.IOCFGn`
+/// register per assigned pin. Called by [`crate::pac::init`] after
+/// [`super::clocks::init`] has ungated the IOC clock domain and released
+/// it from reset.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    
+    // DIO2 — UART0_RX (uart0) — `uart_rx`
+    
+    // IOC PORT_CFG: port_id=8 (UART0_RX)
+    p.ioc.iocfg2().write(|w| unsafe {
+        w.port_id().bits(8)
+         .ie().set_bit()
+         .pull_ctl().bits(0b11)
+    });
+    
+    
+    
+    // DIO3 — UART0_TX (uart0) — `uart_tx`
+    
+    // IOC PORT_CFG: port_id=7 (UART0_TX)
+    p.ioc.iocfg3().write(|w| unsafe {
+        w.port_id().bits(7)
+         .ie().clear_bit()
+         .pull_ctl().bits(0b11)
+    });
+    
+    // GPIO DOE: enable output for DIO3.
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 3)) });
+    
+    
+    
+    // DIO5 — I2C0_SDA (i2c0) — `i2c_sda`
+    
+    // IOC PORT_CFG: port_id=36 (I2C_MSSDA)
+    p.ioc.iocfg5().write(|w| unsafe {
+        w.port_id().bits(36)
+         .ie().set_bit()
+         .pull_ctl().bits(0b01)
+    });
+    
+    // GPIO DOE: enable output for DIO5.
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 5)) });
+    
+    
+    
+    // DIO4 — I2C0_SCL (i2c0) — `i2c_scl`
+    
+    // IOC PORT_CFG: port_id=37 (I2C_MSSCL)
+    p.ioc.iocfg4().write(|w| unsafe {
+        w.port_id().bits(37)
+         .ie().set_bit()
+         .pull_ctl().bits(0b01)
+    });
+    
+    // GPIO DOE: enable output for DIO4.
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 4)) });
+    
+    
+    
+    // DIO6 — LED_RED — `led_red`
+    
+    // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
+    // enable from direction, and set DOE for outputs.
+    p.ioc.iocfg6().write(|w| unsafe {
+        w.port_id().bits(0x00)
+         .ie().clear_bit()
+         .pull_ctl().bits(0b11)
+    });
+    
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 6)) });
+    
+    
+    
+    // DIO7 — LED_GREEN — `led_green`
+    
+    // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
+    // enable from direction, and set DOE for outputs.
+    p.ioc.iocfg7().write(|w| unsafe {
+        w.port_id().bits(0x00)
+         .ie().clear_bit()
+         .pull_ctl().bits(0b11)
+    });
+    
+    p.gpio.doe31_0().modify(|r, w| unsafe { w.bits(r.bits() | (1 << 7)) });
+    
+    
+    
+    // DIO13 — BTN1 — `btn1`
+    
+    // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
+    // enable from direction, and set DOE for outputs.
+    p.ioc.iocfg13().write(|w| unsafe {
+        w.port_id().bits(0x00)
+         .ie().set_bit()
+         .pull_ctl().bits(0b01)
+    });
+    
+    
+    
+    // DIO14 — BTN2 — `btn2`
+    
+    // Plain GPIO (no peripheral signal) — port_id=0x00 (GPIO), wire input
+    // enable from direction, and set DOE for outputs.
+    p.ioc.iocfg14().write(|w| unsafe {
+        w.port_id().bits(0x00)
+         .ie().set_bit()
+         .pull_ctl().bits(0b01)
+    });
+    
+    
+    
+}

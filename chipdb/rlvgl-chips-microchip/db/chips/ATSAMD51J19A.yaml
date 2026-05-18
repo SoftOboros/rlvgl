@@ -1,0 +1,480 @@
+# Microchip ATSAMD51J19A chip inventory IR.
+#
+# Source: Microchip SAM D5x/E5x Family Data Sheet, DS60001507F (rev F,
+# 2020-09; latest published revision at time of writing). Register paths
+# target the `atsamd51j19a` PAC crate (https://docs.rs/atsamd51j19a),
+# pinned per §6 INV-MC5. Field names use the svd2rust snake_case PAC
+# form: `mclk.apbamask().sercom0_()`, `gclk.pchctrl(7)`, etc.
+#
+# The ATSAMD51J19A is a Cortex-M4F at 120 MHz with FPU and DSP
+# extensions, 512 KB flash, 192 KB SRAM, 64-pin TQFP / WLCSP. Two-step
+# peripheral clock gating (per §6 INV-MC1): MCLK.APBxMASK ungates the
+# bus clock; GCLK.PCHCTRL[n] selects the generic-clock generator and
+# enables the functional clock. The J-package routes 51 of the 64 pins
+# to I/O pads spread across PORT groups A (PA00..PA31) and B
+# (PB00..PB31) — see §9 io_mux table for the exact pad inventory.
+
+name: ATSAMD51J19A
+arch: cortex-m4f
+package: TQFP64
+pac_crate: atsamd51j19a
+pac_version: "0.7"
+
+# Authoritative datasheet citation (§0 authority policy).
+source:
+  datasheet: DS60001507
+  revision: "F"
+  errata: DS80000748 # SAM D5x/E5x errata sheet
+
+# Memory regions. Flash 512 KB at 0x00000000, SRAM 192 KB at 0x20000000;
+# values confirmed against DS60001507 §10 (Physical Memory Map, Table
+# 10-1) and §11.2 (Memory Map). The J19A variant carries an additional
+# 4 KB ITCM + 4 KB DTCM mapped at 0x00800000 / 0x20000000 which the
+# generator does NOT use today; standard cortex-m-rt link.x consumes
+# only the FLASH + RAM regions named below.
+memory:
+  - { name: flash, base: 0x00000000, size: 0x00080000, access: rx  } # 512 KB on-chip flash (DS60001507 §10 Table 10-1)
+  - { name: ram,   base: 0x20000000, size: 0x00030000, access: rwx } # 192 KB SRAM (DS60001507 §10 Table 10-1)
+  - { name: bkupram, base: 0x47000000, size: 0x00002000, access: rwx } # 8 KB backup SRAM (DS60001507 §10 Table 10-1)
+
+# Clock tree. SAM D5x topology per §6 INV-MC1:
+#   XOSC0/XOSC1 (external crystal) -> FDPLL0/FDPLL1 (fractional DPLLs)
+#   DFLL48M (internal 48 MHz, USB recovery-mode capable)
+#   XOSC32K (external 32.768 kHz crystal) -> RTC, OSCULP32K backup
+#   GCLK generators 0..11 multiplex these sources and feed PCHCTRL
+#   channels (one per peripheral functional clock).
+# Per §7, the `gclk_generators:` list captures the GCLK0..GCLK11
+# generator inventory; `mclk_gates:` names the MCLK APBxMASK field
+# name for each peripheral; `pchctrl_channels:` names the PCHCTRL
+# channel index for each peripheral functional clock.
+# Sources: DS60001507 §14 (GCLK), §15 (MCLK), §27 (OSCCTRL), §28
+# (OSC32KCTRL).
+clock_tree:
+  xosc_hz: null            # Board-supplied; no on-chip crystal.
+  dfll_target_hz: 48000000 # DFLL48M nominal output (DS60001507 §27.6.6)
+  dpll_target_hz: 120000000 # FDPLL0 typical CPU target (DS60001507 §27.6.7)
+  cpu_hz: 120000000        # GCLK0 -> CPU; max 120 MHz at 1.21 V (DS60001507 §54.2)
+  apba_hz: 120000000       # APB-A divider /1 (DS60001507 §15 Table 15-1)
+  apbb_hz: 120000000       # APB-B divider /1
+  apbc_hz: 120000000       # APB-C divider /1
+  apbd_hz: 120000000       # APB-D divider /1
+  # GCLK generator inventory (DS60001507 §14 Figure 14-1). 12 generators
+  # total on D5x; generators 0..7 also have direct GCLK_IO output pads.
+  gclk_generators:
+    - { id: 0,  source: dpll0,     div: 1 }  # CPU + bus clocks (gclk_main)
+    - { id: 1,  source: dpll0,     div: 1 }  # general-purpose, often 48 MHz
+    - { id: 2,  source: dfll48m,   div: 1 }  # USB / SERCOM core
+    - { id: 3,  source: dfll48m,   div: 16 } # GCLK_SLOW (3 MHz)
+    - { id: 4,  source: xosc32k,   div: 1 }  # RTC / EIC slow path
+    - { id: 5,  source: dfll48m,   div: 1 }  # spare
+    - { id: 6,  source: dfll48m,   div: 1 }  # spare
+    - { id: 7,  source: dfll48m,   div: 1 }  # spare
+    - { id: 8,  source: dfll48m,   div: 1 }  # spare
+    - { id: 9,  source: dfll48m,   div: 1 }  # spare
+    - { id: 10, source: dfll48m,   div: 1 }  # spare
+    - { id: 11, source: dfll48m,   div: 1 }  # spare
+  # MCLK APB clock-gate fields (DS60001507 §15.8.4 APBAMASK,
+  # §15.8.5 APBBMASK, §15.8.6 APBCMASK, §15.8.7 APBDMASK).
+  # Field names match the svd2rust snake_case PAC accessor convention.
+  mclk_gates:
+    oscctrl:    { reg: apbamask, field: oscctrl_ }     # APBA bit 4 (DS60001507 §15.8.4)
+    osc32kctrl: { reg: apbamask, field: osc32kctrl_ }  # APBA bit 5
+    gclk:       { reg: apbamask, field: gclk_ }        # APBA bit 7
+    eic:        { reg: apbamask, field: eic_ }         # APBA bit 10
+    sercom0:    { reg: apbamask, field: sercom0_ }     # APBA bit 12
+    sercom1:    { reg: apbamask, field: sercom1_ }     # APBA bit 13
+    tc0:        { reg: apbamask, field: tc0_ }         # APBA bit 14
+    tc1:        { reg: apbamask, field: tc1_ }         # APBA bit 15
+    nvmctrl:    { reg: apbbmask, field: nvmctrl_ }     # APBB bit 2 (DS60001507 §15.8.5)
+    port:       { reg: apbbmask, field: port_ }        # APBB bit 4
+    sercom2:    { reg: apbbmask, field: sercom2_ }     # APBB bit 9
+    sercom3:    { reg: apbbmask, field: sercom3_ }     # APBB bit 10
+    tcc0:       { reg: apbbmask, field: tcc0_ }        # APBB bit 11
+    tcc1:       { reg: apbbmask, field: tcc1_ }        # APBB bit 12
+    tc2:        { reg: apbbmask, field: tc2_ }         # APBB bit 13
+    tc3:        { reg: apbbmask, field: tc3_ }         # APBB bit 14
+    tcc2:       { reg: apbcmask, field: tcc2_ }        # APBC bit 1 (DS60001507 §15.8.6)
+    tcc3:       { reg: apbcmask, field: tcc3_ }        # APBC bit 2
+    tc4:        { reg: apbcmask, field: tc4_ }         # APBC bit 3
+    tc5:        { reg: apbcmask, field: tc5_ }         # APBC bit 4
+    sercom4:    { reg: apbdmask, field: sercom4_ }     # APBD bit 0 (DS60001507 §15.8.7)
+    sercom5:    { reg: apbdmask, field: sercom5_ }     # APBD bit 1
+    adc0:       { reg: apbdmask, field: adc0_ }        # APBD bit 7
+    adc1:       { reg: apbdmask, field: adc1_ }        # APBD bit 8
+    dac:        { reg: apbdmask, field: dac_ }         # APBD bit 9
+  # GCLK PCHCTRL channel IDs (DS60001507 §14.6 Table 14-9: GCLK
+  # Generator <-> Peripheral assignment). Each entry names the
+  # PCHCTRL channel index and the default generator binding the
+  # generator template will select (overridable in board YAML).
+  # All SERCOMs share PCHCTRL channel 3 for the SLOW clock per
+  # §14.6 Table 14-9 row 3 ("SERCOMx_SLOW").
+  pchctrl_channels:
+    dfll48_ref:      { id: 0,  generator: 4 }   # DFLL48M reference (XOSC32K)
+    fdpll0_ref:      { id: 1,  generator: 4 }   # FDPLL0 reference (XOSC32K)
+    fdpll1_ref:      { id: 2,  generator: 4 }   # FDPLL1 reference
+    sercom_slow:     { id: 3,  generator: 3 }   # All SERCOMs share SLOW (GCLK3 /16)
+    eic_clk:         { id: 4,  generator: 4 }   # EIC clock (XOSC32K for low-power detect)
+    freqm_msr:       { id: 5,  generator: 0 }
+    freqm_ref:       { id: 6,  generator: 4 }
+    sercom0_core:    { id: 7,  generator: 2 }   # GCLK2 -> 48 MHz core clock
+    sercom1_core:    { id: 8,  generator: 2 }
+    tc0_tc1:         { id: 9,  generator: 0 }   # Shared timer pair
+    usb:             { id: 10, generator: 2 }   # USB requires 48 MHz from DFLL48M
+    evsys0:          { id: 11, generator: 0 }
+    evsys1:          { id: 12, generator: 0 }
+    evsys2:          { id: 13, generator: 0 }
+    evsys3:          { id: 14, generator: 0 }
+    sercom2_core:    { id: 23, generator: 2 }
+    sercom3_core:    { id: 24, generator: 2 }
+    tcc0_tcc1:       { id: 25, generator: 0 }
+    tc2_tc3:         { id: 26, generator: 0 }
+    can0:            { id: 27, generator: 0 }
+    can1:            { id: 28, generator: 0 }
+    tcc2_tcc3:       { id: 29, generator: 0 }
+    tc4_tc5:         { id: 30, generator: 0 }
+    sercom4_core:    { id: 34, generator: 2 }
+    sercom5_core:    { id: 35, generator: 2 }
+    tcc4:            { id: 38, generator: 0 }   # Not routed in J19A 64-pin; available in template
+    tc6_tc7:         { id: 39, generator: 0 }   # Not routed in J19A 64-pin
+    adc0:            { id: 40, generator: 0 }
+    adc1:            { id: 41, generator: 0 }
+    dac:             { id: 42, generator: 0 }
+
+# Peripheral instances. Per §8 (frozen peripheral-instance shape) each
+# entry carries class, instance, base, irq, mclk_field, gclk_pchctrl_id,
+# mode (sercom only), and signals. The `irq:` field names the first
+# NVIC vector for the peripheral; multi-vector peripherals (SERCOM
+# allocates four, EIC sixteen, NVMCTRL two, DMAC five, EVSYS five)
+# carry the base vector and the template expands the range.
+# All vectors confirmed against DS60001507 §10.2 Table 10-1
+# (Interrupt Sources) and the asf4 samd51j19a.h IRQn enum.
+#
+# SAM D5x signal multiplexing is per-pad via PORT.PMUX (§9 io_mux
+# table); `signals:` here is left empty in the chip YAML because
+# pad routing is a board-level decision (which letter-function
+# lands on which pad). The board YAML's `pins:` array supplies the
+# concrete (pad, pmux-letter, role) tuples.
+peripherals:
+  # ========== APB-A peripherals (DS60001507 §10.2 Table 10-1) ==========
+  oscctrl:
+    class: oscctrl
+    instance: oscctrl
+    base: 0x40001000
+    irq: 2                    # OSCCTRL_0_IRQn (XOSC0_FAIL etc.)
+    mclk_field: oscctrl_
+    gclk_pchctrl_id: null     # AHB only
+    mode: null
+    signals: []
+  osc32kctrl:
+    class: osc32kctrl
+    instance: osc32kctrl
+    base: 0x40001400
+    irq: 7                    # OSC32KCTRL_IRQn
+    mclk_field: osc32kctrl_
+    gclk_pchctrl_id: null
+    mode: null
+    signals: []
+  gclk:
+    class: gclk
+    instance: gclk
+    base: 0x40001C00
+    irq: null
+    mclk_field: gclk_
+    gclk_pchctrl_id: null
+    mode: null
+    signals: []
+  eic:
+    class: eic
+    instance: eic
+    base: 0x40002800
+    irq: 12                   # EIC_0_IRQn; lines 0..15 are 12..27
+    mclk_field: eic_
+    gclk_pchctrl_id: 4
+    mode: null
+    signals: []
+  sercom0:
+    class: sercom
+    instance: sercom0
+    base: 0x40003000
+    irq: 46                   # SERCOM0_0_IRQn; consumes 46..49
+    mclk_field: sercom0_
+    gclk_pchctrl_id: 7
+    mode: null                # Board YAML selects usart / i2c_master / spi_master / etc.
+    signals: []
+  sercom1:
+    class: sercom
+    instance: sercom1
+    base: 0x40003400
+    irq: 50                   # SERCOM1_0_IRQn; consumes 50..53
+    mclk_field: sercom1_
+    gclk_pchctrl_id: 8
+    mode: null
+    signals: []
+  tc0:
+    class: tc
+    instance: tc0
+    base: 0x40003800
+    irq: 70                   # TC0_IRQn
+    mclk_field: tc0_
+    gclk_pchctrl_id: 9        # Shared with TC1
+    mode: null
+    signals: []
+  tc1:
+    class: tc
+    instance: tc1
+    base: 0x40003C00
+    irq: 71                   # TC1_IRQn
+    mclk_field: tc1_
+    gclk_pchctrl_id: 9
+    mode: null
+    signals: []
+
+  # ========== APB-B peripherals (DS60001507 §10.2 Table 10-1) ==========
+  nvmctrl:
+    class: nvmctrl
+    instance: nvmctrl
+    base: 0x41004000
+    irq: 29                   # NVMCTRL_0_IRQn; consumes 29..30
+    mclk_field: nvmctrl_
+    gclk_pchctrl_id: null     # AHB; no functional GCLK
+    mode: null
+    signals: []
+  port:
+    class: port
+    instance: port
+    base: 0x41008000
+    irq: null                 # PORT has no NVIC vector; signalling is via EIC
+    mclk_field: port_
+    gclk_pchctrl_id: null
+    mode: null
+    signals: []
+  sercom2:
+    class: sercom
+    instance: sercom2
+    base: 0x41012000
+    irq: 54                   # SERCOM2_0_IRQn; consumes 54..57
+    mclk_field: sercom2_
+    gclk_pchctrl_id: 23
+    mode: null
+    signals: []
+  sercom3:
+    class: sercom
+    instance: sercom3
+    base: 0x41014000
+    irq: 58                   # SERCOM3_0_IRQn; consumes 58..61
+    mclk_field: sercom3_
+    gclk_pchctrl_id: 24
+    mode: null
+    signals: []
+  tcc0:
+    class: tcc
+    instance: tcc0
+    base: 0x41016000
+    irq: 85                   # TCC0_0_IRQn (TCC has multiple vectors per instance)
+    mclk_field: tcc0_
+    gclk_pchctrl_id: 25
+    mode: null
+    signals: []
+  tcc1:
+    class: tcc
+    instance: tcc1
+    base: 0x41018000
+    irq: 92                   # TCC1_0_IRQn
+    mclk_field: tcc1_
+    gclk_pchctrl_id: 25
+    mode: null
+    signals: []
+  tc2:
+    class: tc
+    instance: tc2
+    base: 0x4101A000
+    irq: 72                   # TC2_IRQn
+    mclk_field: tc2_
+    gclk_pchctrl_id: 26
+    mode: null
+    signals: []
+  tc3:
+    class: tc
+    instance: tc3
+    base: 0x4101C000
+    irq: 73                   # TC3_IRQn
+    mclk_field: tc3_
+    gclk_pchctrl_id: 26
+    mode: null
+    signals: []
+
+  # ========== APB-C peripherals (DS60001507 §10.2 Table 10-1) ==========
+  tcc2:
+    class: tcc
+    instance: tcc2
+    base: 0x42000C00
+    irq: 99                   # TCC2_0_IRQn
+    mclk_field: tcc2_
+    gclk_pchctrl_id: 29
+    mode: null
+    signals: []
+  tcc3:
+    class: tcc
+    instance: tcc3
+    base: 0x42001000
+    irq: 104                  # TCC3_0_IRQn
+    mclk_field: tcc3_
+    gclk_pchctrl_id: 29
+    mode: null
+    signals: []
+  tc4:
+    class: tc
+    instance: tc4
+    base: 0x42001400
+    irq: 74                   # TC4_IRQn
+    mclk_field: tc4_
+    gclk_pchctrl_id: 30
+    mode: null
+    signals: []
+  tc5:
+    class: tc
+    instance: tc5
+    base: 0x42001800
+    irq: 75                   # TC5_IRQn
+    mclk_field: tc5_
+    gclk_pchctrl_id: 30
+    mode: null
+    signals: []
+
+  # ========== APB-D peripherals (DS60001507 §10.2 Table 10-1) ==========
+  sercom4:
+    class: sercom
+    instance: sercom4
+    base: 0x43000000
+    irq: 62                   # SERCOM4_0_IRQn; consumes 62..65
+    mclk_field: sercom4_
+    gclk_pchctrl_id: 34
+    mode: null
+    signals: []
+  sercom5:
+    class: sercom
+    instance: sercom5
+    base: 0x43000400
+    irq: 66                   # SERCOM5_0_IRQn; consumes 66..69
+    mclk_field: sercom5_
+    gclk_pchctrl_id: 35
+    mode: null
+    signals: []
+  adc0:
+    class: adc
+    instance: adc0
+    base: 0x43001C00
+    irq: 118                  # ADC0_0_IRQn
+    mclk_field: adc0_
+    gclk_pchctrl_id: 40
+    mode: null
+    signals: []
+  adc1:
+    class: adc
+    instance: adc1
+    base: 0x43002000
+    irq: 120                  # ADC1_0_IRQn
+    mclk_field: adc1_
+    gclk_pchctrl_id: 41
+    mode: null
+    signals: []
+  dac:
+    class: dac
+    instance: dac
+    base: 0x43002400
+    irq: 122                  # DAC_0_IRQn
+    mclk_field: dac_
+    gclk_pchctrl_id: 42
+    mode: null
+    signals: []
+
+  # ========== AHB-only peripherals (no APB gate; AHB clock always-on
+  # for these once MCLK.AHBMASK bit is set; the generator does not
+  # emit AHBMASK writes today, per §11 #12 deferral) ==========
+  usb:
+    class: usb
+    instance: usb
+    base: 0x41000000
+    irq: 80                   # USB_0_IRQn
+    mclk_field: null          # AHB clock (MCLK.AHBMASK.USB_); template treats null as "AHB-only"
+    gclk_pchctrl_id: 10
+    mode: null
+    signals: []
+
+# IO_MUX pad-mux table (§9). One entry per physical pad on the 64-pin
+# J-package, derived from DS60001507 §6 (I/O Multiplexing and
+# Considerations) Table 6-1 (SAM D5x I/O Multiplexing) and the
+# Adafruit ASF4 samd51j19a PIO header (samd51/include/pio/samd51j19a.h).
+#
+# Function-letter columns A..N (D5x supports A..N; positions H..N are
+# mostly reserved on this package). Encoding per §6 INV-MC2: each
+# column carries the signal name in svd2rust uppercase form when the
+# pad routes that function, or null when the pad does not support it.
+# The `analog:` column names the on-chip analog assignment (AINx for
+# ADC, VREFx, DAC_VOUTx, AC AINx, etc.).
+#
+# Pads omitted from this list (PA26, PA28, PA29, PB18..PB21, PB24..PB29)
+# are not bonded out on the J-package per DS60001507 §6 Table 6-1.
+# The J-package routes 51 of the 64 pins to I/O (remaining 13 are
+# power / ground / VDDIO / reset / VDDCORE).
+io_mux:
+  - { pad: PA00, group: 0, pin: 0,  fn_a: EIC_EXTINT_0,  fn_b: null,           fn_c: SERCOM1_PAD0, fn_d: TCC2_WO0,    fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA01, group: 0, pin: 1,  fn_a: EIC_EXTINT_1,  fn_b: null,           fn_c: SERCOM1_PAD1, fn_d: TCC2_WO1,    fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA02, group: 0, pin: 2,  fn_a: EIC_EXTINT_2,  fn_b: ADC0_AIN0,      fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN0_DAC_VOUT0 }
+  - { pad: PA03, group: 0, pin: 3,  fn_a: EIC_EXTINT_3,  fn_b: ANAREF_VREFA,   fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN1 }
+  - { pad: PA04, group: 0, pin: 4,  fn_a: EIC_EXTINT_4,  fn_b: ADC0_AIN4,      fn_c: SERCOM0_PAD0, fn_d: TCC0_WO0,    fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN4 }
+  - { pad: PA05, group: 0, pin: 5,  fn_a: EIC_EXTINT_5,  fn_b: ADC0_AIN5,      fn_c: SERCOM0_PAD1, fn_d: TCC0_WO1,    fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN5_DAC_VOUT1 }
+  - { pad: PA06, group: 0, pin: 6,  fn_a: EIC_EXTINT_6,  fn_b: ADC0_AIN6,      fn_c: SERCOM0_PAD2, fn_d: TCC1_WO0,    fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN6 }
+  - { pad: PA07, group: 0, pin: 7,  fn_a: EIC_EXTINT_7,  fn_b: ADC0_AIN7,      fn_c: SERCOM0_PAD3, fn_d: TCC1_WO1,    fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN7 }
+  - { pad: PA08, group: 0, pin: 8,  fn_a: EIC_NMI,       fn_b: ADC0_AIN8,      fn_c: SERCOM0_PAD0, fn_d: SERCOM2_PAD1, fn_e: TCC0_WO0,   fn_f: TCC1_WO2,    fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN8_ADC1_AIN0 }
+  - { pad: PA09, group: 0, pin: 9,  fn_a: EIC_EXTINT_9,  fn_b: ADC0_AIN9,      fn_c: SERCOM0_PAD1, fn_d: SERCOM2_PAD0, fn_e: TCC0_WO1,   fn_f: TCC1_WO3,    fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN9_ADC1_AIN1 }
+  - { pad: PA10, group: 0, pin: 10, fn_a: EIC_EXTINT_10, fn_b: ADC0_AIN10,     fn_c: SERCOM0_PAD2, fn_d: SERCOM2_PAD2, fn_e: TCC0_WO2,   fn_f: TCC1_WO0,    fn_g: null,           fn_h: null,           fn_n: GCLK_IO4, analog: ADC0_AIN10 }
+  - { pad: PA11, group: 0, pin: 11, fn_a: EIC_EXTINT_11, fn_b: ADC0_AIN11,     fn_c: SERCOM0_PAD3, fn_d: SERCOM2_PAD3, fn_e: TCC0_WO3,   fn_f: TCC1_WO1,    fn_g: null,           fn_h: null,           fn_n: GCLK_IO5, analog: ADC0_AIN11 }
+  - { pad: PA12, group: 0, pin: 12, fn_a: EIC_EXTINT_12, fn_b: null,           fn_c: SERCOM2_PAD0, fn_d: SERCOM4_PAD1, fn_e: TCC0_WO6,   fn_f: TCC1_WO2,    fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA13, group: 0, pin: 13, fn_a: EIC_EXTINT_13, fn_b: null,           fn_c: SERCOM2_PAD1, fn_d: SERCOM4_PAD0, fn_e: TCC0_WO7,   fn_f: TCC1_WO3,    fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA14, group: 0, pin: 14, fn_a: EIC_EXTINT_14, fn_b: null,           fn_c: SERCOM2_PAD2, fn_d: SERCOM4_PAD2, fn_e: TC3_WO0,    fn_f: TCC0_WO4,    fn_g: TCC2_WO0,       fn_h: null,           fn_n: GCLK_IO0, analog: null }
+  - { pad: PA15, group: 0, pin: 15, fn_a: EIC_EXTINT_15, fn_b: null,           fn_c: SERCOM2_PAD3, fn_d: SERCOM4_PAD3, fn_e: TC3_WO1,    fn_f: TCC0_WO5,    fn_g: TCC2_WO1,       fn_h: null,           fn_n: GCLK_IO1, analog: null }
+  - { pad: PA16, group: 0, pin: 16, fn_a: EIC_EXTINT_0,  fn_b: null,           fn_c: SERCOM1_PAD0, fn_d: SERCOM3_PAD1, fn_e: TCC1_WO0,   fn_f: TCC0_WO4,    fn_g: TCC2_WO0,       fn_h: null,           fn_n: GCLK_IO2, analog: null }
+  - { pad: PA17, group: 0, pin: 17, fn_a: EIC_EXTINT_1,  fn_b: null,           fn_c: SERCOM1_PAD1, fn_d: SERCOM3_PAD0, fn_e: TCC1_WO1,   fn_f: TCC0_WO5,    fn_g: TCC2_WO1,       fn_h: null,           fn_n: GCLK_IO3, analog: null }
+  - { pad: PA18, group: 0, pin: 18, fn_a: EIC_EXTINT_2,  fn_b: null,           fn_c: SERCOM1_PAD2, fn_d: SERCOM3_PAD2, fn_e: TCC1_WO2,   fn_f: TCC0_WO6,    fn_g: TC3_WO0,        fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA19, group: 0, pin: 19, fn_a: EIC_EXTINT_3,  fn_b: null,           fn_c: SERCOM1_PAD3, fn_d: SERCOM3_PAD3, fn_e: TCC1_WO3,   fn_f: TCC0_WO7,    fn_g: TC3_WO1,        fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA20, group: 0, pin: 20, fn_a: EIC_EXTINT_4,  fn_b: null,           fn_c: SERCOM5_PAD2, fn_d: SERCOM3_PAD2, fn_e: TCC1_WO4,   fn_f: TCC0_WO0,    fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA21, group: 0, pin: 21, fn_a: EIC_EXTINT_5,  fn_b: null,           fn_c: SERCOM5_PAD3, fn_d: SERCOM3_PAD3, fn_e: TCC1_WO5,   fn_f: TCC0_WO1,    fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA22, group: 0, pin: 22, fn_a: EIC_EXTINT_6,  fn_b: null,           fn_c: SERCOM3_PAD0, fn_d: SERCOM5_PAD1, fn_e: TCC1_WO6,   fn_f: TCC0_WO2,    fn_g: null,           fn_h: null,           fn_n: null, analog: null }
+  - { pad: PA23, group: 0, pin: 23, fn_a: EIC_EXTINT_7,  fn_b: null,           fn_c: SERCOM3_PAD1, fn_d: SERCOM5_PAD0, fn_e: TCC1_WO7,   fn_f: TCC0_WO3,    fn_g: null,           fn_h: USB_SOF_1KHZ,   fn_n: null, analog: null }
+  - { pad: PA24, group: 0, pin: 24, fn_a: EIC_EXTINT_8,  fn_b: null,           fn_c: SERCOM3_PAD2, fn_d: SERCOM5_PAD2, fn_e: TC5_WO0,    fn_f: TCC2_WO2,    fn_g: null,           fn_h: USB_DM,         fn_n: null, analog: null }
+  - { pad: PA25, group: 0, pin: 25, fn_a: EIC_EXTINT_9,  fn_b: null,           fn_c: SERCOM3_PAD3, fn_d: SERCOM5_PAD3, fn_e: TC5_WO1,    fn_f: null,        fn_g: null,           fn_h: USB_DP,         fn_n: null, analog: null }
+  - { pad: PA27, group: 0, pin: 27, fn_a: EIC_EXTINT_11, fn_b: null,           fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO1, analog: null }
+  - { pad: PA30, group: 0, pin: 30, fn_a: EIC_EXTINT_14, fn_b: null,           fn_c: null,         fn_d: SERCOM1_PAD2, fn_e: TC6_WO0,    fn_f: null,        fn_g: null,           fn_h: CM4_SWCLK,      fn_n: GCLK_IO0, analog: null }
+  - { pad: PA31, group: 0, pin: 31, fn_a: EIC_EXTINT_15, fn_b: null,           fn_c: null,         fn_d: SERCOM1_PAD3, fn_e: TC6_WO1,    fn_f: null,        fn_g: null,           fn_h: CM4_SWDIO,      fn_n: null, analog: null }
+  - { pad: PB00, group: 1, pin: 0,  fn_a: EIC_EXTINT_0,  fn_b: ADC0_AIN12,     fn_c: null,         fn_d: SERCOM5_PAD2, fn_e: TC7_WO0,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN12 }
+  - { pad: PB01, group: 1, pin: 1,  fn_a: EIC_EXTINT_1,  fn_b: ADC0_AIN13,     fn_c: null,         fn_d: SERCOM5_PAD3, fn_e: TC7_WO1,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN13 }
+  - { pad: PB02, group: 1, pin: 2,  fn_a: EIC_EXTINT_2,  fn_b: ADC0_AIN14,     fn_c: null,         fn_d: SERCOM5_PAD0, fn_e: TC6_WO0,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN14 }
+  - { pad: PB03, group: 1, pin: 3,  fn_a: EIC_EXTINT_3,  fn_b: ADC0_AIN15,     fn_c: null,         fn_d: SERCOM5_PAD1, fn_e: TC6_WO1,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN15 }
+  - { pad: PB04, group: 1, pin: 4,  fn_a: EIC_EXTINT_4,  fn_b: ADC1_AIN6,      fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC1_AIN6 }
+  - { pad: PB05, group: 1, pin: 5,  fn_a: EIC_EXTINT_5,  fn_b: ADC1_AIN7,      fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC1_AIN7 }
+  - { pad: PB06, group: 1, pin: 6,  fn_a: EIC_EXTINT_6,  fn_b: ADC1_AIN8,      fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC1_AIN8 }
+  - { pad: PB07, group: 1, pin: 7,  fn_a: EIC_EXTINT_7,  fn_b: ADC1_AIN9,      fn_c: null,         fn_d: null,        fn_e: null,        fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC1_AIN9 }
+  - { pad: PB08, group: 1, pin: 8,  fn_a: EIC_EXTINT_8,  fn_b: ADC0_AIN2,      fn_c: null,         fn_d: SERCOM4_PAD0, fn_e: TC4_WO0,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN2_ADC1_AIN0 }
+  - { pad: PB09, group: 1, pin: 9,  fn_a: EIC_EXTINT_9,  fn_b: ADC0_AIN3,      fn_c: null,         fn_d: SERCOM4_PAD1, fn_e: TC4_WO1,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: null, analog: ADC0_AIN3_ADC1_AIN1 }
+  - { pad: PB10, group: 1, pin: 10, fn_a: EIC_EXTINT_10, fn_b: null,           fn_c: null,         fn_d: SERCOM4_PAD2, fn_e: TC5_WO0,    fn_f: TCC0_WO4,    fn_g: TCC1_WO0,       fn_h: null,           fn_n: GCLK_IO4, analog: null }
+  - { pad: PB11, group: 1, pin: 11, fn_a: EIC_EXTINT_11, fn_b: null,           fn_c: null,         fn_d: SERCOM4_PAD3, fn_e: TC5_WO1,    fn_f: TCC0_WO5,    fn_g: TCC1_WO1,       fn_h: null,           fn_n: GCLK_IO5, analog: null }
+  - { pad: PB12, group: 1, pin: 12, fn_a: EIC_EXTINT_12, fn_b: null,           fn_c: SERCOM4_PAD0, fn_d: null,        fn_e: TC4_WO0,    fn_f: TCC3_WO0,    fn_g: TCC0_WO0,       fn_h: null,           fn_n: GCLK_IO6, analog: null }
+  - { pad: PB13, group: 1, pin: 13, fn_a: EIC_EXTINT_13, fn_b: null,           fn_c: SERCOM4_PAD1, fn_d: null,        fn_e: TC4_WO1,    fn_f: TCC3_WO1,    fn_g: TCC0_WO1,       fn_h: null,           fn_n: GCLK_IO7, analog: null }
+  - { pad: PB14, group: 1, pin: 14, fn_a: EIC_EXTINT_14, fn_b: null,           fn_c: SERCOM4_PAD2, fn_d: null,        fn_e: TC5_WO0,    fn_f: TCC4_WO0,    fn_g: TCC0_WO2,       fn_h: null,           fn_n: GCLK_IO0, analog: null }
+  - { pad: PB15, group: 1, pin: 15, fn_a: EIC_EXTINT_15, fn_b: null,           fn_c: SERCOM4_PAD3, fn_d: null,        fn_e: TC5_WO1,    fn_f: TCC4_WO1,    fn_g: TCC0_WO3,       fn_h: null,           fn_n: GCLK_IO1, analog: null }
+  - { pad: PB16, group: 1, pin: 16, fn_a: EIC_EXTINT_0,  fn_b: null,           fn_c: SERCOM5_PAD0, fn_d: null,        fn_e: TC6_WO0,    fn_f: TCC3_WO0,    fn_g: TCC0_WO4,       fn_h: null,           fn_n: GCLK_IO2, analog: null }
+  - { pad: PB17, group: 1, pin: 17, fn_a: EIC_EXTINT_1,  fn_b: null,           fn_c: SERCOM5_PAD1, fn_d: null,        fn_e: TC6_WO1,    fn_f: TCC3_WO1,    fn_g: TCC0_WO5,       fn_h: null,           fn_n: GCLK_IO3, analog: null }
+  - { pad: PB22, group: 1, pin: 22, fn_a: EIC_EXTINT_6,  fn_b: null,           fn_c: SERCOM1_PAD2, fn_d: SERCOM5_PAD2, fn_e: TC7_WO0,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO0, analog: null }
+  - { pad: PB23, group: 1, pin: 23, fn_a: EIC_EXTINT_7,  fn_b: null,           fn_c: SERCOM1_PAD3, fn_d: SERCOM5_PAD3, fn_e: TC7_WO1,    fn_f: null,        fn_g: null,           fn_h: null,           fn_n: GCLK_IO1, analog: null }
+  - { pad: PB30, group: 1, pin: 30, fn_a: EIC_EXTINT_14, fn_b: null,           fn_c: SERCOM5_PAD0, fn_d: SERCOM7_PAD0, fn_e: TC0_WO0,    fn_f: TCC4_WO0,    fn_g: TCC0_WO0,       fn_h: CM4_SWO,        fn_n: null, analog: null }
+  - { pad: PB31, group: 1, pin: 31, fn_a: EIC_EXTINT_15, fn_b: null,           fn_c: SERCOM5_PAD1, fn_d: SERCOM7_PAD1, fn_e: TC0_WO1,    fn_f: TCC4_WO1,    fn_g: TCC0_WO1,       fn_h: null,           fn_n: null, analog: null }
+
+# Linker region naming aliases (§5 chip-inventory table). The
+# `cortex-m-rt`-shaped `link.x.in` consumes regions named FLASH and
+# RAM; the `memory.x` template emits these aliases on top of the
+# `memory:` entries above. Per §5 chip-inventory table: matches the
+# Cortex-M-RT convention exactly.
+linker:
+  region_text: flash
+  region_data: ram

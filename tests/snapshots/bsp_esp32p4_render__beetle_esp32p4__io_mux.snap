@@ -1,6 +1,5 @@
 ---
 source: tests/bsp_esp32p4_render.rs
-assertion_line: 74
 expression: text
 ---
 //! IO MUX and GPIO matrix routing for DFR1172 FireBeetle 2 P4.
@@ -16,7 +15,7 @@ expression: text
 //! Pins tagged `flash_reserved` in the chip IR are filtered out upstream by
 //! `espressif::load::merge`; any that reach this file are a generator bug.
 
-use esp32p4 as pac;
+use super::pac;
 
 /// Apply the board's pin mux and GPIO matrix routing.
 pub fn init() {
@@ -48,10 +47,10 @@ pub fn init() {
     
     
     
-    // GPIO7 — I2C0_SCL (i2c0)
+    // GPIO8 — I2C0_SCL (i2c0)
     
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
-    p.IO_MUX.gpio(7).modify(|_, w| unsafe {
+    p.IO_MUX.gpio(8).modify(|_, w| unsafe {
         w.mcu_sel().bits(1)
          .fun_ie().set_bit()
          .fun_wpu().set_bit()
@@ -60,10 +59,10 @@ pub fn init() {
     
     
     
-    // GPIO8 — I2C0_SDA (i2c0)
+    // GPIO7 — I2C0_SDA (i2c0)
     
     // Plain GPIO (no peripheral): configure IO MUX for software-driven GPIO
-    p.IO_MUX.gpio(8).modify(|_, w| unsafe {
+    p.IO_MUX.gpio(7).modify(|_, w| unsafe {
         w.mcu_sel().bits(1)
          .fun_ie().set_bit()
          .fun_wpu().set_bit()

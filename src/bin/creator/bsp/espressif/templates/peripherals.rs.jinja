@@ -5,7 +5,7 @@
 //! I2C (full timing setup), SPI master (clock + mode), and timer groups
 //! (watchdog disable). Other peripherals get TODO stubs.
 
-use {{ ir.chip.pac_crate }} as pac;
+use super::pac;
 
 #[allow(unused_imports)]
 use super::board::{APB_HZ, XTAL_HZ};
@@ -116,6 +116,14 @@ pub fn init_{{ name }}() {
 /// Clock gating is already done by `crate::clocks::init`.
 /// Default: 1 MHz, mode 0 (CPOL=0, CPHA=0). Override via `spi_configs`
 /// in the board YAML.
+///
+/// CHIPS-ESP-12: the prior template wrote `wr_byte_order` /
+/// `rd_byte_order` on the USER register. Those fields don't exist on any
+/// of the six in-tree ESP32 PACs — SPI byte ordering on these chips is
+/// fixed at MSB-first. Bit-order lives on the CTRL register
+/// (`wr_bit_order` / `rd_bit_order`) and is portable across legacy
+/// (esp32c3 0.31, esp32p4 0.2) and modern (svd2rust 0.37+) PACs alike,
+/// so the template stays vintage-agnostic.
 pub fn init_{{ name }}() {
     let p = unsafe { pac::Peripherals::steal() };
     {% if ir.board.spi_configs is defined and ir.board.spi_configs[name] is defined %}
@@ -131,13 +139,16 @@ pub fn init_{{ name }}() {
     p.{{ name | upper }}.clock().write(|w| unsafe {
         w.bits((clkcnt_n & 0x3F) | ((clkcnt_h & 0x3F) << 6) | ((clkcnt_n & 0x3F) << 12))
     });
-    // Full-duplex mode, MSB first.
-    p.{{ name | upper }}.user().modify(|_, w| {
-        w.doutdin().set_bit()
-         .wr_byte_order().clear_bit()
-         .rd_byte_order().clear_bit()
-    });
-    // CPOL via ck_idle_edge, CPHA via ck_out_edge.
+    // Full-duplex mode. Byte order is fixed in hardware (MSB-first); bit
+    // order also defaults to MSB-first at reset on every in-tree ESP32
+    // PAC vintage (CTRL.wr_bit_order / rd_bit_order both reset to 0) so
+    // there's nothing to write here. The C3 0.31 PAC types those fields
+    // as a 1-bit BitWriter while modern svd2rust-0.37+ PACs (P4 0.2,
+    // C6 0.23, H2 0.19, C5 0.2, C61 0.3) type them as a 2-bit
+    // FieldWriter; not writing them at all sidesteps the divergence
+    // and lets the template stay vintage-agnostic.
+    p.{{ name | upper }}.user().modify(|_, w| w.doutdin().set_bit());
+    // CPOL via misc.ck_idle_edge, CPHA via user.ck_out_edge.
     let cpol = (SPI_MODE >> 1) & 1 != 0;
     let cpha = SPI_MODE & 1 != 0;
     if cpol {

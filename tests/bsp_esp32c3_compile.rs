@@ -106,7 +106,7 @@ fn compile_verify_board(board_slug: &str, rendered_subdir: &str, tag: &str) {
     let ir = merge(chip, board).expect("merge ok");
     let render_tmp = tempfile::tempdir().expect("render tempdir");
     let written = render_esp_pac(&ir, render_tmp.path()).expect("render ok");
-    assert_eq!(written.len(), 6);
+    assert_eq!(written.len(), 8);
     let bsp_src_dir = render_tmp.path().join(rendered_subdir);
     assert!(bsp_src_dir.is_dir(), "expected {}", bsp_src_dir.display());
 

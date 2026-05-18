@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rlvgl.softoboros.com/schemas/audio-meters/scale.schema.json",
+  "title": "AudioMeterScale",
+  "description": "Canonical scale descriptor for the rlvgl audio-meters initiative. See docs/audio-meters/00-concepts.md §6 and §8. One file per scale under assets/audio-meters/scales/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "label_units",
+    "range_db",
+    "pivot",
+    "ticks",
+    "zones",
+    "compatible_ballistics"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier. Lowercase snake_case. MUST match filename stem.",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "label_units": {
+      "type": "string",
+      "description": "Human-readable units shown next to numeric labels (e.g. dBVU, dBFS, LUFS).",
+      "minLength": 1,
+      "maxLength": 16
+    },
+    "range_db": {
+      "type": "object",
+      "description": "Visible value range. Both endpoints are in the same domain as label_units (display-time, after calibration_default if present).",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "pivot": {
+      "type": "object",
+      "description": "Reference point (alignment level). Maps a labelled scale position to its dBFS equivalent so the meter can be driven by the dBFS-domain ballistic state. The numeric `value` is the scale-units coordinate of the pivot (e.g. 0 for vu_broadcast, 4 for ppm_iia_bbc, -23 for lufs_ebu_r128); the `label` is its display text. Widgets derive the dBFS → scale-units offset as `value - input_dbfs`.",
+      "additionalProperties": false,
+      "required": ["value", "label", "input_dbfs"],
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "Numeric scale-units coordinate of the pivot. MUST lie within [range_db.min, range_db.max]."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display text at the pivot tick (e.g. \"0\", \"4\", \"−23\"). MAY include unicode minus / superscripts; widgets render verbatim."
+        },
+        "input_dbfs": {
+          "type": "number",
+          "description": "dBFS sample value that should produce a reading at the pivot. e.g. -20 for vu_broadcast."
+        }
+      }
+    },
+    "calibration_default": {
+      "type": "object",
+      "description": "Optional default display-time additive offset applied to dBFS readings before label rendering. Skins MAY override.",
+      "additionalProperties": false,
+      "required": ["to", "offset_db"],
+      "properties": {
+        "to": {
+          "type": "string",
+          "description": "Target display unit (e.g. dBu, dBV, dBSPL). Free-form; widgets render this verbatim if no override.",
+          "minLength": 1
+        },
+        "offset_db": {
+          "type": "number",
+          "description": "Added to the dBFS-domain reading: display = dbfs + offset_db."
+        }
+      }
+    },
+    "ticks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["majors", "minors_per_major_division"],
+      "properties": {
+        "majors": {
+          "type": "array",
+          "description": "Major-tick positions, in the same domain as range_db. SHOULD include both endpoints.",
+          "items": { "type": "number" },
+          "minItems": 2
+        },
+        "minors_per_major_division": {
+          "type": "integer",
+          "description": "Number of minor ticks between each pair of consecutive majors. 0 means no minor ticks.",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "labels": {
+          "type": "object",
+          "description": "Optional label override map. Keys are stringified major-tick positions (e.g. \"-20\"); values are display strings. Majors without an entry render numeric.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "zones": {
+      "type": "array",
+      "description": "Colour-zone definition. Zones SHOULD partition range_db without gaps (the validator warns on overlaps or holes). Order is bottom-to-top.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_db", "to_db", "color"],
+        "properties": {
+          "from_db": { "type": "number" },
+          "to_db": { "type": "number" },
+          "color": {
+            "type": "string",
+            "description": "MeterColor identifier (concepts §7). Skin maps identifier to RGB.",
+            "enum": ["Safe", "Nominal", "Caution", "Hot", "Over"]
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "compatible_ballistics": {
+      "type": "array",
+      "description": "Ballistic variants this scale is conventionally paired with (concepts §5). Advisory — skins MAY pair any ballistic with any scale; validator warns on advisory crossings.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Vu",
+          "PpmTypeI",
+          "PpmTypeIIa",
+          "PpmTypeIIb",
+          "DigitalPeak",
+          "Rms",
+          "LufsM",
+          "LufsS",
+          "LufsI",
+          "Instant"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}
