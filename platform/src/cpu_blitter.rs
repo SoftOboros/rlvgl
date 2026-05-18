@@ -133,6 +133,17 @@ impl Blitter for CpuBlitter {
 
         match dst.format {
             PixelFmt::Argb8888 => {
+                // 2026-05-17: replace per-pixel `chunks_exact_mut(4) +
+                // copy_from_slice` with a single `slice::fill` on a u32
+                // view. The old inner loop incurred a stack of ub_check
+                // intrinsics per pixel (`is_aligned_to`,
+                // `copy_nonoverlapping::precondition_check`,
+                // `maybe_is_nonoverlapping`, `from_raw_parts_mut`
+                // preconditions) in debug builds; PC-sampling on the
+                // disco-analyzer (2026-05-17) showed 95% of CM7 wall
+                // time inside this loop, pushing render to 0.435 Hz
+                // (~2.3 s per frame). slice::fill emits a single
+                // intrinsic that drops the per-pixel cost.
                 let bpp = 4usize;
                 for row in sy..ey {
                     let start = row as usize * dst.stride + sx as usize * bpp;
@@ -140,10 +151,24 @@ impl Blitter for CpuBlitter {
                     if end > dst.buf.len() {
                         break;
                     }
+                    // SAFETY: `dst.buf[start..end]` is a contiguous
+                    // mutable byte slice owned by `dst` (Surface holds a
+                    // unique `&mut [u8]`). `start` is `row * stride + sx *
+                    // 4`; for Argb8888 surfaces stride is a multiple of 4
+                    // and sx*4 is naturally 4-aligned, so the cast to
+                    // `*mut u32` is sound. `end - start == cw * 4` so the
+                    // resulting `[u32]` has exactly `cw` elements. No
+                    // aliasing: we have unique access for this match arm;
+                    // no ISR touches `dst.buf` (Surface is single-writer
+                    // by construction).
                     let line = &mut dst.buf[start..end];
-                    for px in line.chunks_exact_mut(4) {
-                        px.copy_from_slice(&color.to_le_bytes());
-                    }
+                    let line_u32 = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            line.as_mut_ptr().cast::<u32>(),
+                            cw as usize,
+                        )
+                    };
+                    line_u32.fill(color.to_le());
                 }
             }
             PixelFmt::Rgb565 => {
@@ -155,10 +180,18 @@ impl Blitter for CpuBlitter {
                     if end > dst.buf.len() {
                         break;
                     }
+                    // SAFETY: same provenance argument as the Argb8888
+                    // branch above, with `*mut u16` instead. `start` is
+                    // `row * stride + sx * 2`; Rgb565 surfaces have a
+                    // 2-aligned stride and sx*2 is 2-aligned.
                     let line = &mut dst.buf[start..end];
-                    for px in line.chunks_exact_mut(2) {
-                        px.copy_from_slice(&c.to_le_bytes());
-                    }
+                    let line_u16 = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            line.as_mut_ptr().cast::<u16>(),
+                            cw as usize,
+                        )
+                    };
+                    line_u16.fill(c.to_le());
                 }
             }
             _ => {

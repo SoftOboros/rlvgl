@@ -2,6 +2,7 @@
 //! Vertical popup wing widget for the shared 747-style disco demo.
 
 use alloc::{boxed::Box, vec::Vec};
+use core::cell::RefCell;
 
 use rlvgl_core::{
     event::Event,
@@ -23,6 +24,26 @@ const BG_COLOR: Color = Color(30, 30, 30, 240);
 const BORDER_COLOR: Color = Color(80, 80, 80, 255);
 const BORDER_WIDTH: u8 = 2;
 
+/// Maximum icon pixel count we will decode. Demo icons are 48-60
+/// pixels per side; 64×64 = 4096 fits comfortably alongside the
+/// IconStrip cache in the 64 KiB heap.
+const MAX_ICON_PIXELS: u32 = 64 * 64;
+
+/// Maximum palette byte count we will allocate. A WM8994-style RLE
+/// palette is at most 256 entries × 2 bytes = 512 bytes. Bench-9
+/// wave-3 round-10 caught a wing slot whose `parse_rle_blob` returned
+/// a palette slice ~1.5 MiB long, which then crashed the `alloc::vec!
+/// [0u16; palette_len]` allocation with `capacity_overflow` before
+/// even reaching the pixel-count check below.
+const MAX_PALETTE_BYTES: usize = 512;
+
+/// One slot's decoded RLE → `Vec<Color>` plus dimensions.
+struct DecodedIcon {
+    pixels: Vec<Color>,
+    width: u32,
+    height: u32,
+}
+
 /// A single wing slot with icon data and optional callback.
 pub struct WingSlot {
     /// RLE-compressed icon.
@@ -36,6 +57,12 @@ pub struct WingSlot {
 /// Left-edge wing shown when a main-strip icon expands.
 pub struct Wing {
     slots: [Option<WingSlot>; MAX_SLOTS],
+    /// Lazily-decoded icon cache; populated on first draw, then reused.
+    /// Avoids the ~30 KiB of transient heap churn per slot per frame
+    /// that previously fragmented the 64 KiB heap and panicked on
+    /// every wing-open. `RefCell` lets `draw(&self)` populate without
+    /// changing the `Widget::draw` signature.
+    decoded: RefCell<[Option<DecodedIcon>; MAX_SLOTS]>,
     slot_count: usize,
     visible: bool,
     bounds: Rect,
@@ -59,6 +86,7 @@ impl Wing {
         }
         Self {
             slots,
+            decoded: RefCell::new([const { None }; MAX_SLOTS]),
             slot_count: count,
             visible: false,
             bounds: Rect {
@@ -122,6 +150,25 @@ impl Wing {
 
     fn decode_into(rle: &[u8], buf: &mut Vec<Color>) -> Option<(u32, u32)> {
         let (width, height, palette_bytes, stream) = rlvgl_decomp::parse_rle_blob(rle).ok()?;
+        // Reject pathological sizes BEFORE ANY allocation. Bench-9-snapshot
+        // wave-3 round-10 (2026-05-17) caught a slot where `parse_rle_blob`
+        // returned `palette_bytes.len() ≈ 1.5 MiB` — the `alloc::vec![0u16;
+        // palette_len]` allocation panicked with `capacity_overflow` before
+        // reaching the pixel-count check that the prior round had added.
+        // Three independent caps now bracket the decode:
+        //   1. palette byte count (≤ 512 — datasheet-bounded for 256-entry
+        //      u16 palette)
+        //   2. pixel count (≤ 64×64 — comfortably fits alongside IconStrip
+        //      cache in the 64 KiB heap)
+        //   3. fallible reserve (if either of the above is wrong, the
+        //      reserve_exact request stays bounded)
+        if palette_bytes.len() > MAX_PALETTE_BYTES {
+            return None;
+        }
+        let pixels = (width as u32).saturating_mul(height as u32);
+        if pixels == 0 || pixels > MAX_ICON_PIXELS {
+            return None;
+        }
         let palette_len = palette_bytes.len() / 2;
         let mut palette = alloc::vec![0u16; palette_len];
         for index in 0..palette_len {
@@ -130,6 +177,12 @@ impl Wing {
         }
         let rgba =
             rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
+        // rgba should be width*height*4 bytes; if decode_rgba returned
+        // something pathological, refuse rather than push 1.5 MiB into buf.
+        if rgba.len() != (pixels as usize) * 4 {
+            return None;
+        }
+        buf.reserve_exact(pixels as usize);
         buf.extend(
             rgba.chunks_exact(4)
                 .map(|chunk| Color(chunk[0], chunk[1], chunk[2], chunk[3])),
@@ -157,22 +210,45 @@ impl Widget for Wing {
         fill_rounded_rect(renderer, bg_rect, BG_COLOR, RADIUS);
         draw_rounded_border(renderer, bg_rect, BORDER_COLOR, BORDER_WIDTH, RADIUS);
 
-        let mut buf: Vec<Color> = Vec::new();
+        // 2026-05-17: decode each slot's RLE ONCE on first draw, cache
+        // the resulting `Vec<Color>` + dimensions in `self.decoded`.
+        // Subsequent draws skip the parse_rle_blob + decode_rgba +
+        // chunks-to-Color extend chain entirely. Matches the IconStrip
+        // cache pattern in icon_strip.rs.
+        let mut decoded = self.decoded.borrow_mut();
+        let mut dim_scratch: Vec<Color> = Vec::new();
         for index in 0..self.slot_count {
             if let Some(slot) = &self.slots[index] {
-                buf.clear();
-                if let Some((width, height)) = Self::decode_into(slot.rle, &mut buf) {
-                    let rect = self.icon_rect(index);
-                    let x = rect.x + (rect.width - width as i32) / 2;
-                    let y = rect.y + (rect.height - height as i32) / 2;
-                    if !slot.enabled {
-                        for color in &mut buf {
-                            color.0 /= 2;
-                            color.1 /= 2;
-                            color.2 /= 2;
-                        }
+                if decoded[index].is_none() {
+                    let mut pixels: Vec<Color> = Vec::new();
+                    if let Some((width, height)) = Self::decode_into(slot.rle, &mut pixels) {
+                        decoded[index] = Some(DecodedIcon {
+                            pixels,
+                            width,
+                            height,
+                        });
                     }
-                    renderer.draw_pixels((x, y), &buf, width, height);
+                }
+                if let Some(entry) = decoded[index].as_ref() {
+                    let rect = self.icon_rect(index);
+                    let x = rect.x + (rect.width - entry.width as i32) / 2;
+                    let y = rect.y + (rect.height - entry.height as i32) / 2;
+                    let pixels: &[Color] = if slot.enabled {
+                        &entry.pixels
+                    } else {
+                        dim_scratch.clear();
+                        dim_scratch.reserve(entry.pixels.len());
+                        for color in &entry.pixels {
+                            dim_scratch.push(Color(
+                                color.0 / 2,
+                                color.1 / 2,
+                                color.2 / 2,
+                                color.3,
+                            ));
+                        }
+                        &dim_scratch
+                    };
+                    renderer.draw_pixels((x, y), pixels, entry.width, entry.height);
                 }
                 if self.focused_slot == Some(index) {
                     let rect = self.icon_rect(index);
