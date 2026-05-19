@@ -199,6 +199,28 @@ disco-analyzer subrepo's first concepts doc).
     DPR-02b (BootSentinel migration of the demo's 11 raw `0x3800_0300`
     writes + analyzer adoption prep). **Drafted 2026-05-19; not
     ratified.** DPR-02a/b code PRs remain blocked until §12 is accepted.
+  - [DPR-03-CONCEPTS.md](DPR-03-CONCEPTS.md) — dual-app validation
+    (cross-repo analyzer adoption). Ratifies the cross-repo gate that
+    retires the disco analyzer's ~1200 lines of mirrored bring-up code
+    (per the `DAA-01-B-RLVGL-INTEGRATION.md` §6 Option C ratification of
+    2026-04-27) by routing the analyzer onto the published
+    `BoardRuntime::init` + `FrameScheduler<VideoMode, BareMetalLoopPacing>`
+    + `SafeStop::run` surface. §5.1 freezes the four-step adoption
+    sequence (Cargo.toml → main.rs → bsp.rs → hsem.rs); §5.2 freezes
+    the ShimAllowlist for the embedded-hal 0.2 ↔ 1.0 adapters
+    (`HalGpioBacklight`, `HalResetPin`, `I2c4Adapter`) that wrap
+    `stm32h7xx-hal 0.16`; §5.3 maps the analyzer's five `0xA11C_xxxx`
+    sentinels at `0x3800_0300` onto the DPR-02 §5.2 named set at
+    `0x3800_0500`. New invariants: INV-DPR-3-1 (no `AdaptedCodeOrigin`
+    headers outside ShimAllowlist) and INV-DPR-3-2 (canonical analyzer
+    uses `RuntimeProfile::Analyzer` by name, not `Custom`). Three-sub-
+    phase split: DPR-03a (compile-only adoption), DPR-03b (hardware
+    validation on H747I-DISCO), DPR-03c (header retirement + initiative
+    close). Cross-repo gating per INV-DPR-15: each sub-phase requires a
+    DAA-01-B-2 §15 amendment on the analyzer side. **Drafted 2026-05-19;
+    not ratified.** DPR-03a/b/c PRs remain blocked until §12 is
+    accepted AND DPR-01a + DPR-02a have shipped the surface the
+    analyzer consumes.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
