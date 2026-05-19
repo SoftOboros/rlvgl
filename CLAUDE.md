@@ -621,7 +621,9 @@ Once a concepts doc is ratified (dated change-log entry), execution PRs:
   `BBB-NN[a-z]:` for BeagleBone Black phases,
   `CREATOR-NN[a-z]:` for rlvgl-creator phases,
   `CHIPS-<VENDOR>-NN[a-z]:` for per-vendor chipdb crates
-  (e.g. `CHIPS-ESP-02b:`, `CHIPS-STM-04a:`).
+  (e.g. `CHIPS-ESP-02b:`, `CHIPS-STM-04a:`),
+  `AUDIO-NN[a-z]:` for the audio-subsystem initiative
+  (codec bring-up + SAI / DMA invariants).
 - Name in the PR description which invariants (from the concepts doc's
   frozen-decisions sections) the change touches, and how each is
   preserved.
@@ -749,6 +751,11 @@ This discipline applies to:
 - `docs/beaglebone-black/` (BBB four-prong)
 - `docs/creator/`, `docs/bsp/`, and `chipdb/rlvgl-chips-*` (rlvgl-creator + chipdb
   family)
+- `docs/audio/` (Audio subsystem initiative — codec bring-up, SAI / DMA audio
+  path invariants, multi-codec abstraction). Commit-subject prefix `AUDIO-NN[a-z]:`.
+  First chapter ratified 2026-05-19 (AUDIO-01 — WM8994 FLL1 lock + serializer
+  arm ordering); first chapter of the family means full discipline applies as
+  of the second chapter per the "convergence over time" rule below.
 - Any future multi-chapter initiative with ≥3 phases.
 
 Single-doc TODOs, phase-1 prototypes, and one-off explorations MAY use
