@@ -98,6 +98,11 @@ pub mod mic_capture;
 ))]
 /// NT35510 MIPI-DSI panel driver for MB1166 Rev A-09.
 pub mod nt35510;
+/// DPR-01 Pacing backends — OS-axis dispatch impls for
+/// [`frame_scheduler::Pacing`]. Hosts the generic [`pacing::FreeRtosPacing`]
+/// scaffold per DPR-01-A §4 phase-2 step 1; the Zephyr backend is
+/// deferred to DPR-01c.
+pub mod pacing;
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",

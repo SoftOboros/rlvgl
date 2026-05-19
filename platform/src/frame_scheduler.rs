@@ -28,9 +28,14 @@ use crate::hwcore::addr::PhysAddr;
 use crate::hwcore::regs::dsi::DsiWrapper;
 use crate::hwcore::regs::ltdc::Ltdc;
 
-mod sealed {
+pub(crate) mod sealed {
     /// Sealing trait — prevents downstream impls of [`super::ScanMode`]
     /// and [`super::Pacing`].
+    ///
+    /// Crate-visible so sibling modules within `rlvgl-platform` (e.g.
+    /// [`crate::pacing::freertos`]) can register new [`super::Pacing`]
+    /// impls per DPR-01 §5.6 without exposing the seal to downstream
+    /// crates. External impls remain Standards-Action per DPR-00 §5.2.
     pub trait Sealed {}
 }
 
