@@ -10,6 +10,14 @@ name = "rlvgl_example_disco"
 path = "src/lib.rs"
 crate-type = ["staticlib"]
 required-features = ["zephyr"]
+# This is a no_std staticlib for Zephyr linking. It defines bare-metal
+# panic / personality lang items that conflict with std at host build
+# time. Skip cargo's auto-generated test/bench harnesses (which link
+# std) so `cargo test --workspace` does not try to compile this lib
+# for the host triple.
+test = false
+bench = false
+doctest = false
 
 [[bin]]
 name = "rlvgl-stm32h747i-disco"
@@ -67,11 +75,16 @@ cortex-m-rt = "0.7"
 cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
 embedded-alloc = "=0.5.1"
 panic-halt = "1"
-stm32h7 = { version = "0.15.1", features = ["rt"] }
 cortex-m-semihosting = { version = "0.5", optional = true }
 critical-section = "1.1.2"
 
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
+# stm32h7's build.rs panics with "No device features selected" unless a
+# device feature (e.g. stm32h747cm7) is enabled. Those features are only
+# turned on when the example's `cm7` / `cm4` cargo features are active,
+# which never happens at host build time (workspace test). Gate the PAC
+# crate to ARM/none targets so host workspace builds skip it entirely.
+stm32h7 = { version = "0.15.1", features = ["rt"] }
 stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc", "fmc", "xspi"] }
 embedded-hal = { version = "1", optional = true }
 embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", optional = true, features = ["unproven"] }
