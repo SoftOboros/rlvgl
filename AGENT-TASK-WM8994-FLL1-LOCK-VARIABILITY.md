@@ -2,6 +2,7 @@
 
 **Branch:** `v0.2.0`
 **Filed:** 2026-05-19 by disco-analyzer bench session investigating chronic L/R capture asymmetry
+**Updated:** 2026-05-19 (bench-driven correction — see AUDIO-01 §15 amendment 2026-05-19-b: lock detection polls **R0x732 bit 5 FLL1_LOCK_STS** level status, not R0x731 bit 5 FLL1_LOCK_EINT edge latch).
 **Authoritative source:** `WM8994_Rev4.6.pdf` (queried via memalpha) + [`docs/audio/01-codec-bringup.md`](docs/audio/01-codec-bringup.md) AUDIO-01
 
 ## Why this task exists

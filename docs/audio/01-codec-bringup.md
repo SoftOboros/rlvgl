@@ -94,9 +94,14 @@ re-deriving the timing from bench data.
   used without modification.**
 - **FLL1 lock** — the state where FLL1's F_OUT phase and frequency
   have settled to within the codec's internal tolerance of the
-  intended ratio. The codec reports lock-state *transitions* via the
-  latching `FLL1_LOCK_EINT` bit (R0x731 bit 5). **As defined in
-  `WM8994 p.297`; used without modification.**
+  intended ratio. The codec reports the *current* lock state via the
+  level/raw status bit `FLL1_LOCK_STS` at **R0x732 bit 5** (0 = not
+  locked, 1 = locked), `WM8994 p.346`. The codec separately latches
+  lock-state *transitions* in `FLL1_LOCK_EINT` at R0x731 bit 5
+  (`WM8994 p.297`); this driver polls the level status, not the edge
+  latch — see §15 amendment 2026-05-19-b for the bench-driven
+  rationale. **As defined in `WM8994 p.346`; used without
+  modification.**
 - **AIF1ADC1 serializer** — the codec-internal block that takes the
   digital output of the ADC1 stage and shifts it onto the AIF1ADCDAT
   pin one bit per BCLK1 edge, synchronised against LRCLK1.
@@ -165,21 +170,18 @@ pub enum FllLockOutcome {
 
 After writing `FLL1_ENA = 1` to R0x220, the driver MUST:
 
-1. Clear the latching event bit R0x731 bit 5 (FLL1_LOCK_EINT) by
-   writing `1` to that bit. This discards any stale event from a
-   prior `FLL1_ENA` cycle.
-2. Poll R0x731 bit 5 with a per-attempt timeout. A read returning
-   bit 5 = 1 signals that FLL1 has transitioned to lock since the
-   most recent clear.
-3. On bit 5 = 1 within timeout: continue init. Return
+1. Poll R0x732 bit 5 (FLL1_LOCK_STS, level/raw status) with a
+   per-attempt timeout. A read returning bit 5 = 1 means FLL1 is
+   currently locked.
+2. On bit 5 = 1 within timeout: continue init. Return
    [`FllLockOutcome::LockedFirstTry`] from `init_record` (if the
    loop completed on the first attempt) or
    [`FllLockOutcome::LockedAfterRetry`] (otherwise).
-4. On timeout: write `FLL1_ENA = 0`, wait briefly (~5 ms), re-write
+3. On timeout: write `FLL1_ENA = 0`, wait briefly (~5 ms), re-write
    the FLL config registers (R0x224, R0x223, R0x222, R0x221), re-
    write `FLL1_ENA = 1`, and re-poll. Retry up to `MAX_RETRIES`
    (§9 INV-AUDIO-01-2) times.
-5. If MAX_RETRIES is reached without lock: return
+4. If MAX_RETRIES is reached without lock: return
    [`FllLockOutcome::Failed`] from `init_record` (or `Err` if the
    caller does not consume the enum directly).
 
@@ -190,13 +192,16 @@ writes at `wm8994.rs:621–702` MUST NOT have been issued) until either
 has been returned. This is the load-bearing invariant; absent this
 ordering, the bit-clock-phase-offset symptoms in §2 are not preventable.
 
-**Why a clear-then-poll instead of just-poll:** R0x731 bit 5 is a
-latching event bit triggered on BOTH lock-acquired AND lock-lost edges
-(`WM8994 p.297`). After a power cycle the latch state is undefined
-(the WM8994 datasheet doesn't specify reset value for status bits);
-clearing first ensures the next observed `bit 5 = 1` corresponds to
-the *current* `FLL1_ENA = 1` transition, not a stale event from a
-prior session that the latch retained.
+**Why level polling (R0x732 bit 5) and not edge latching (R0x731
+bit 5):** the initial AUDIO-01 ratification specified the edge latch
+`FLL1_LOCK_EINT` with a clear-then-poll sequence. Bench validation
+2026-05-19 (see §15 amendment 2026-05-19-b) found that the edge latch
+never fires under our init_record sequence — the clear-write at the
+start of each attempt was racing with the actual lock transition in
+a way the hardware decided to lose, leaving the latch at 0 indefinitely
+even after FLL1 successfully achieved lock. Level polling (R0x732
+bit 5) reports the *current* lock state with no transition-timing
+window; it is robust against arbitrary clear-vs-transition races.
 
 ### INV-AUDIO-01-2 — Per-attempt timeout and retry budget
 
@@ -279,16 +284,15 @@ list).
 
 A conforming `Wm8994::init_record` implementation MUST:
 
-- [ ] (a) Clear R0x731 bit 5 before the first `FLL1_ENA = 1` write.
-- [ ] (b) Poll R0x731 bit 5 with the per-attempt timeout from §9 INV-AUDIO-01-2.
-- [ ] (c) Re-arm FLL1 on per-attempt timeout up to the retry budget from §9 INV-AUDIO-01-2.
-- [ ] (d) Issue NO writes to R0x4 (AIF1ADC1L/R_ENA), R0x300, R0x302, R0x304, R0x305, R0x210 (or any other post-FLL AIF1 register) until either `FllLockOutcome::LockedFirstTry` or `LockedAfterRetry` is reached.
-- [ ] (e) Return `Result<FllLockOutcome, I2C::Error>` per §9 INV-AUDIO-01-3.
-- [ ] (f) On `FllLockOutcome::Failed`, NOT proceed with the remainder of `init_record` — return early.
+- [ ] (a) Poll R0x732 bit 5 (FLL1_LOCK_STS, level status) with the per-attempt timeout from §9 INV-AUDIO-01-2 after writing `FLL1_ENA = 1`.
+- [ ] (b) Re-arm FLL1 on per-attempt timeout up to the retry budget from §9 INV-AUDIO-01-2.
+- [ ] (c) Issue NO writes to R0x4 (AIF1ADC1L/R_ENA), R0x300, R0x302, R0x304, R0x305, R0x210 (or any other post-FLL AIF1 register) until either `FllLockOutcome::LockedFirstTry` or `LockedAfterRetry` is reached.
+- [ ] (d) Return `Result<FllLockOutcome, I2C::Error>` per §9 INV-AUDIO-01-3.
+- [ ] (e) On `FllLockOutcome::Failed`, NOT proceed with the remainder of `init_record` — return early.
 
 Optional (RECOMMENDED but not required for conformance):
 
-- [ ] (g) Log `LockedAfterRetry { attempts }` via the platform's `defmt`/`log`/USART telemetry path to support cold-boot-rate observability.
+- [ ] (f) Log `LockedAfterRetry { attempts }` via the platform's `defmt`/`log`/USART telemetry path to support cold-boot-rate observability.
 
 ## §13 Files cited
 
@@ -324,3 +328,28 @@ commit) lands:
   invariants INV-AUDIO-01-1, INV-AUDIO-01-2, INV-AUDIO-01-3 and the
   `FllLockOutcome` enum. Implementation tracker:
   `AGENT-TASK-WM8994-FLL1-LOCK-VARIABILITY.md` (top level).
+- **2026-05-19-b — INV-AUDIO-01-1 corrected from edge latch to
+  level status.** Initial ratification cited R0x731 bit 5
+  `FLL1_LOCK_EINT` (edge-latched interrupt event, write-1-to-clear,
+  fires on both lock-acquired AND lock-lost edges per `WM8994
+  p.297`) as the lock-detection primitive, with a clear-then-poll
+  sequence at the head of each attempt. Bench validation against
+  AUDIO-01a on STM32H747I-DISCO + disco-analyzer firmware found
+  that, with the clear-write executing immediately before
+  `FLL1_ENA = 1`, the codec hardware never latched the
+  lock-acquired transition: post-init readback of R0x731 returned
+  `0x0000` (bit 5 unset) while R0x732 bit 5 (FLL1_LOCK_STS, level
+  status) returned `1` confirming FLL1 *was* in fact locked. The
+  driver thus reported `FllLockOutcome::Failed` and skipped the
+  AIF1 framing + ADC enable writes; the rest of main.rs's post-init
+  workarounds ran on a partially-configured codec and SAI1 RX read
+  all-zero. Root cause hypothesis: the clear-write at attempt-0 was
+  racing with the FLL1-lock transition latch in a way the WM8994
+  hardware decided to lose. Level-status polling (R0x732 bit 5) has
+  no transition-timing window — a read of bit 5 = 1 simply reports
+  current state. Glossary in §3 now cites R0x732 bit 5 as the
+  canonical FLL1-lock observation, §9 INV-AUDIO-01-1 simplifies to
+  poll-until-set (no clear-write), §12 acceptance gates renumbered
+  (a)–(e) (was (a)–(f)). The `FllLockOutcome` enum (§6) and retry
+  budget (§9 INV-AUDIO-01-2) are unchanged. Implementation lands in
+  the same commit as this amendment via AUDIO-01a (corrected).

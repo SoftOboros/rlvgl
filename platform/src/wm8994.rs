@@ -132,14 +132,26 @@ const REG_FLL1_CTRL_3: u16 = 0x0222;
 const REG_FLL1_CTRL_4: u16 = 0x0223;
 const REG_FLL1_CTRL_5: u16 = 0x0224;
 
-// R0x731 Interrupt Status 2 — bit 5 = FLL1_LOCK_EINT (latching,
-// write-1-to-clear, triggered on both lock-acquired AND lock-lost
-// edges per WM8994_Rev4.6.pdf p.297, memalpha-verified 2026-05-19).
-// AUDIO-01 §9 INV-AUDIO-01-1 uses this as the lock-detection
-// primitive for the clear-then-poll loop in
-// `Wm8994::fll1_enable_and_wait_lock`.
-const REG_FLL1_LOCK_EINT: u16 = 0x0731;
-const FLL1_LOCK_EINT_BIT: u16 = 1 << 5;
+// R0x732 Interrupt Raw Status 2 — bit 5 = FLL1_LOCK_STS, the LEVEL
+// status indicator (0 = not locked, 1 = locked) per WM8994_Rev4.6.pdf
+// p.346, memalpha-verified 2026-05-19 (bench-driven correction during
+// AUDIO-01a validation; see AUDIO-01 §15 amendment 2026-05-19-b).
+//
+// The initial AUDIO-01 ratification cited R0x731 bit 5 (FLL1_LOCK_EINT,
+// the edge-latched event bit) as the lock-detection primitive. Bench
+// validation revealed the edge latch never fires under our init_record
+// sequence: the codec's software reset (R0x0 = 0) puts FLL1 in the
+// disabled state, then init_record writes FLL config + FLL1_ENA = 1.
+// The FLL1_ENA = 1 write triggers a "FLL1 starting up" transition that
+// should latch in R0x731 bit 5 — but our clear-write at the start of
+// each attempt was racing with the transition latch in a way the
+// hardware decided to lose (post-bench observation: R0x731 reads 0
+// post-init while R0x732 bit 5 reads 1, confirming FLL IS locked but
+// the latch didn't capture the event). Level status (R0x732) is robust
+// — no transition timing window, no clear-write race — and is what the
+// driver now polls.
+const REG_FLL1_LOCK_STS: u16 = 0x0732;
+const FLL1_LOCK_STS_BIT: u16 = 1 << 5;
 
 // AIF1 (Audio Interface 1) control
 const REG_AIF1_CONTROL_1: u16 = 0x0300;
@@ -1074,11 +1086,11 @@ where
     }
 
     /// Enable FLL1 (in the BCLK1-referenced configuration used by
-    /// [`Self::init_record`]) and poll R0x731 bit 5 for lock
+    /// [`Self::init_record`]) and poll R0x732 bit 5 for lock
     /// acquisition with timeout + retry.
     ///
     /// Implements `docs/audio/01-codec-bringup.md` AUDIO-01 §9
-    /// INV-AUDIO-01-1 (clear-then-poll FLL1_LOCK_EINT) and
+    /// INV-AUDIO-01-1 (poll FLL1_LOCK_STS level status) and
     /// INV-AUDIO-01-2 (100 ms per-attempt timeout, 3 max retries,
     /// 1 ms poll interval). On the cold-boot path where FLL1 takes
     /// 30–50 ms to acquire lock against a power-up-transient BCLK1
@@ -1089,6 +1101,17 @@ where
     /// (AUDIO-01 §2 documents the symptom shapes — 0x0000/0x8000
     /// bimodal on one slot, or 11+5 bit-split, depending on the
     /// metastable arm).
+    ///
+    /// Polls **R0x732 bit 5 (FLL1_LOCK_STS, level/raw status)** rather
+    /// than R0x731 bit 5 (FLL1_LOCK_EINT, the edge-latched event).
+    /// The initial AUDIO-01 ratification specified the edge latch,
+    /// but bench validation 2026-05-19 found the edge latch never
+    /// fires under our init_record sequence (post-software-reset
+    /// FLL is disabled; FLL_ENA=1 transition should latch but the
+    /// clear-write at the start of each attempt was racing with the
+    /// hardware in a way that lost the event). Level status has no
+    /// transition-timing window. AUDIO-01 §15 amendment
+    /// `2026-05-19-b` documents the correction.
     ///
     /// Precondition: caller has already programmed R0x224, R0x223,
     /// R0x222, R0x221 (FLL config; F_REF = BCLK1, N = 64, K = 0,
@@ -1114,16 +1137,7 @@ where
         let poll_iters = PER_ATTEMPT_TIMEOUT_MS / POLL_INTERVAL_MS;
 
         for attempt in 0..=MAX_RETRIES {
-            // Step 1: clear the FLL1_LOCK_EINT latch by writing 1 to
-            // R0x731 bit 5. The latch is triggered on BOTH lock-
-            // acquired AND lock-lost edges and the WM8994 datasheet
-            // does not specify a reset value for status bits, so we
-            // clear unconditionally to make the next observed set bit
-            // correspond to the upcoming FLL1_ENA cycle's lock
-            // acquisition.
-            self.write_reg(REG_FLL1_LOCK_EINT, FLL1_LOCK_EINT_BIT)?;
-
-            // Step 2: on retry, FLL1 was running but failed to lock.
+            // Step 1: on retry, FLL1 was running but failed to lock.
             // Disable it, wait briefly to let the FLL block settle,
             // then re-write the FLL config registers (values mirror
             // what init_record programmed just before calling this
@@ -1139,13 +1153,14 @@ where
             // FLL1_ENA = 1 (re-arm on retry, initial arm on attempt 0).
             self.write_reg(REG_FLL1_CTRL_1, 0x0001)?;
 
-            // Step 3: poll R0x731 bit 5 every POLL_INTERVAL_MS until
-            // set, up to PER_ATTEMPT_TIMEOUT_MS total. On set, return
-            // success.
+            // Step 2: poll R0x732 bit 5 (FLL1_LOCK_STS, level) every
+            // POLL_INTERVAL_MS until set, up to PER_ATTEMPT_TIMEOUT_MS
+            // total. Level polling needs no clear-write — a read of
+            // bit 5 = 1 simply means "FLL1 is locked right now."
             for _ in 0..poll_iters {
                 delay_busy(POLL_INTERVAL_MS * 1_000);
-                let status = self.read_reg(REG_FLL1_LOCK_EINT)?;
-                if status & FLL1_LOCK_EINT_BIT != 0 {
+                let status = self.read_reg(REG_FLL1_LOCK_STS)?;
+                if status & FLL1_LOCK_STS_BIT != 0 {
                     return Ok(if attempt == 0 {
                         FllLockOutcome::LockedFirstTry
                     } else {
