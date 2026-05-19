@@ -727,13 +727,39 @@ where
         // masking the problem until the AIF1 digital path is exercised.
         // Multi-session bench debug 2026-04-30 → 2026-05-01.
         //
-        // Bits 10:0 = AIF1{ADC,DAC}_RATE: BCLK1 / LRCLK1 ratio used by
-        // the codec to derive its internal SR-dependent filters.
-        // 0x040 = 64 — matches a 32-BCLK-per-stereo-frame layout
-        // padded internally to 32-bit slots, codec reset default.
-        // Keep the rate field at 0x040 and OR in bit 11 (LRCLK_DIR
-        // slave-mode enable). Final value = 0x0840.
-        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0840; // bit 11 + AIF1xxx_RATE = 64
+        // Bits 10:0 = AIF1{ADC,DAC}_RATE: the BCLK1 / LRCLK1 ratio.
+        // Per `docs/audio/01-codec-bringup.md` AUDIO-01 §15 amendment
+        // 2026-05-19-c (bench-driven): this MUST match the actual ratio
+        // produced by the SAI master, not a "codec reset default" or
+        // CubeH7-BSP-inherited value. With the SAI1 master configured
+        // for a 32-BCLK frame with two 16-bit slots (the common stereo
+        // I²S 16-bit configuration), BCLK1 / LRCLK1 = 32, so the field
+        // value is 0x020. With bit 11 set, AIF1_LRCLK_SLAVE_ENA = 0x0820.
+        //
+        // **Historical bug** (DAA bench 2026-05-19, fixed by AUDIO-01-c):
+        // earlier versions hardcoded 0x0840 (RATE=64) with a comment
+        // claiming "matches 32-BCLK-per-stereo-frame layout padded
+        // internally to 32-bit slots." Bench measurement on STM32H747I-
+        // DISCO refuted the claim: with RATE=64 mismatched against
+        // actual BCLK1/LRCLK1 = 32, the codec's AIF1ADC1L serializer
+        // state machine fails asymmetrically — it emits valid data
+        // only during the last 5 BCLKs of what it believes is the L
+        // MSB window, holding AIF1ADCDAT at logic 0 (per TDM=0
+        // behavior) for the remaining 11 BCLKs of slot 0. The R
+        // serializer is silicon-level more tolerant of the mismatch
+        // and emits cleanly. Net symptom: L channel reads as a 2-value
+        // bimodal `0x0000 / 0x001f` at SAI1 RX (bottom 5 bits varying,
+        // top 11 zero); R reads as clean 16-bit audio. Setting RATE=32
+        // (matching the actual SAI framing) recovers L to ±99% FS with
+        // L/R correlation +0.92 on a stereo source.
+        //
+        // **Caveat:** this value assumes the caller's SAI master
+        // generates a 32-BCLK frame. If a future use case configures
+        // a different framing (e.g. TDM 4-slot at 64-BCLK frame), the
+        // RATE field MUST be updated to match. A parameterizable
+        // version of `init_record` is future work — see AUDIO-NN
+        // chapter pipeline.
+        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0820; // bit 11 (LRCLK_DIR) + RATE=32
         self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
         self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
 

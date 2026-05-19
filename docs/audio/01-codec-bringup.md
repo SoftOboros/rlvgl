@@ -328,6 +328,46 @@ commit) lands:
   invariants INV-AUDIO-01-1, INV-AUDIO-01-2, INV-AUDIO-01-3 and the
   `FllLockOutcome` enum. Implementation tracker:
   `AGENT-TASK-WM8994-FLL1-LOCK-VARIABILITY.md` (top level).
+- **2026-05-19-c — AIF1ADC_RATE / AIF1DAC_RATE field corrected from
+  64 to 32 in `init_record` (R0x304 / R0x305 low 11 bits).** The
+  driver previously hardcoded `AIF1_LRCLK_SLAVE_ENA = 0x0840` (LRCLK_DIR
+  bit 11 + RATE = 64) with a comment claiming this was the "codec reset
+  default" appropriate for a "32-BCLK-per-stereo-frame layout padded
+  internally to 32-bit slots." Bench measurement on STM32H747I-DISCO +
+  disco-analyzer 2026-05-19 refuted the claim. With the SAI master
+  configured for the standard 32-BCLK frame with two 16-bit slots
+  (BCLK1 / LRCLK1 = 32 exactly), setting `AIF1ADC_RATE` to 64 causes
+  the codec's AIF1ADC1L serializer state machine to fail asymmetrically:
+  only emits valid data during the last 5 BCLKs of what it internally
+  believes is the L MSB window, holds AIF1ADCDAT at logic 0 (per the
+  TDM=0 datasheet-documented behavior) for the remaining 11 BCLKs of
+  slot 0. The R serializer is silicon-level more tolerant of the
+  mismatch and emits cleanly across all 16 BCLKs of slot 1. Net
+  symptom: L channel reads as `0x0000 / 0x001f` 2-value bimodal at
+  SAI1 RX (5 LSBs varying), R channel reads as clean 16-bit audio
+  (~77 distinct values per 256-sample snapshot, ~half-FS amplitude on
+  the test source). The asymmetric serializer behavior is undocumented
+  in the WM8994 datasheet; bench is the only available authority.
+  Fix: hardcoded value changed to `AIF1_LRCLK_SLAVE_ENA = 0x0820`
+  (LRCLK_DIR bit 11 + RATE = 32 = actual BCLK1/LRCLK1 ratio). Bench
+  evidence post-fix: L channel recovered to 266 distinct values per
+  512 samples, ±99.2% FS swing, **L/R correlation +0.92** confirming
+  both channels carry the same stereo source, **L/R peak-peak ratio
+  1.006** (within 0.6%). Verified using the boot-time codec-write
+  mailbox in disco-analyzer's analyzer-cm7/src/main.rs (issuing
+  `write_reg(0x0304, 0x0820)` + `write_reg(0x0305, 0x0820)` at runtime
+  against the existing rlvgl-platform driver, before the render loop
+  starts). Lessons captured in `[[project_rlvgl_audio_01_codec_bringup]]`:
+  comments claiming "codec reset default = correct" without bench
+  validation are a chronic failure mode, and AIF1ADC_RATE is NOT
+  informational — it gates serializer behavior asymmetrically. Caveat:
+  the new value of 0x0820 is correct for the 32-BCLK frame SAI
+  framing assumed throughout AUDIO-01. A future caller running TDM-4
+  at 64-BCLK frame (or any other ratio) MUST update this field to
+  match its actual BCLK1/LRCLK1; future AUDIO-NN chapters may
+  parameterize `init_record`'s framing assumption to make this
+  enforceable at the type level. Implementation lands in this same
+  rlvgl commit as AUDIO-01-c.
 - **2026-05-19-b — INV-AUDIO-01-1 corrected from edge latch to
   level status.** Initial ratification cited R0x731 bit 5
   `FLL1_LOCK_EINT` (edge-latched interrupt event, write-1-to-clear,
