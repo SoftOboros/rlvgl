@@ -154,9 +154,33 @@ disco-analyzer subrepo's first concepts doc).
   that the API is not demo-shaped.
 
   - [DPR-00-CONCEPTS.md](DPR-00-CONCEPTS.md) — foundational
-    vocabulary, scan/profile decisions, invariants, and phase plan.
-    **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
-    DPR-00 §12 is accepted or amended.
+    vocabulary, scan/profile axis decomposition, invariants, telemetry
+    range table, and phase plan. **Revision b ratified 2026-05-19.**
+    Revision b reshapes §5 (4-axis ScanMode, 4-tuple RuntimeProfile),
+    expands §6 (adds INV-DPR-11 HSEM ordering, INV-DPR-12 audio
+    clock-tree invariants, INV-DPR-13 consumed-peripheral set,
+    INV-DPR-14 heap base as profile output, INV-DPR-15 cross-repo
+    gating), and reframes §11 as DPR-01 deliverables. DPR-01 unblocked.
+  - [DPR-01-CONCEPTS.md](DPR-01-CONCEPTS.md) — concrete Rust types,
+    runtime boundary, frame scheduler. Resolves PCDN-DPR-001..005 from
+    DPR-00 §11: (1) `Demo::BareMetal` / `Demo::FreeRtos` as two
+    Standards-Action presets, (2) `Analyzer` as a registered preset
+    (not Custom), (3) three peripheral-sets shape for
+    `BoardRuntime::init`, (4) compile-time generic
+    `FrameScheduler<S: ScanMode, P: Pacing>`, (5) HSEM lines as
+    open-registration bitmask with `LineInRx` reserved. **Drafted
+    2026-05-19; not ratified.** DPR-01a/b code PRs (FrameScheduler
+    scaffold + bare-metal migration / FreeRTOS migration) remain
+    blocked until §12 is accepted.
+  - [DPR-01-A.md](DPR-01-A.md) — sub-letter to DPR-01: per-site MMIO
+    writer inventory (`stm32h747i_disco.rs::{swap,present,
+    wait_frame_done}`, `freertos_entry.rs` task body, `main.rs`
+    init-only writes) and the four-operation consolidation grouping
+    (Op A SWAP, Op B PRESENT, Op C CONSUME_ERIF, Op D INIT). Lays out
+    the DPR-01a phase-1 / DPR-01b phase-2 / DPR-01c phase-3
+    migration sequences and per-step validation checkpoints
+    (discipline scanner diff, golden-frame capture, 24-hour soak).
+    **Drafted 2026-05-19.**
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
