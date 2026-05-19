@@ -32,3 +32,7 @@ examples/esp32-devkits-r/target/
 examples/esp32-devkits-r/Cargo.lock
 examples/slstk3701a/target/
 examples/slstk3701a/Cargo.lock
+
+# Claude Code harness scratch space: subagent worktrees + task transcripts
+.claude/worktrees/
+.claude/tasks/
