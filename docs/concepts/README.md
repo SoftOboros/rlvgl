@@ -181,6 +181,24 @@ disco-analyzer subrepo's first concepts doc).
     migration sequences and per-step validation checkpoints
     (discipline scanner diff, golden-frame capture, 24-hour soak).
     **Drafted 2026-05-19.**
+  - [DPR-02-CONCEPTS.md](DPR-02-CONCEPTS.md) — warm-reset safe-stop
+    vocabulary, boot-sentinel registry, and telemetry slot layout.
+    Implements DPR-00 INV-DPR-5 (warm-reset cleanup is platform-owned)
+    and freezes the byte-offset layout inside the DPR-00 §5.3
+    `0x3800_0500..0x3800_0600` Board Runtime reserved range. Ratifies
+    §5.1 SafeStopSequence ordering (NVIC mask → DMA disable → peripheral
+    disable → NVIC pending clear → telemetry record), §5.2 BootSentinelSet
+    (five named `0xA11C_00x0` constants `PRE_CLOCK_INIT`..`POST_DISPLAY_INIT`),
+    §5.3 TelemetrySlot layout (boot_sentinels / safe_stop_report /
+    service_set_active / reserved), §5.4 PeripheralServiceSet → SafeStop
+    mapping for the five registered services (audio, mems_mic, sd, qspi,
+    codec_reset), and §6 invariants INV-DPR-2-1..4 (safe-stop precedes
+    clock-tree reprogramming; 5 ms total budget; sentinels written
+    post-step; ServiceSet ↔ SafeStopSequence agreement). Phase split:
+    DPR-02a (SafeStop scaffold + demo audio-service validation) and
+    DPR-02b (BootSentinel migration of the demo's 11 raw `0x3800_0300`
+    writes + analyzer adoption prep). **Drafted 2026-05-19; not
+    ratified.** DPR-02a/b code PRs remain blocked until §12 is accepted.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
