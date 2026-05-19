@@ -22,7 +22,13 @@ test('headless disco sim reports advancing status and exposes frame dumps', asyn
     const root = session.widget('disco.root');
     assert.equal(await root.exists(), true);
 
-    const dump = await session.dumpRect({ x: 0, y: 0, width: 6, height: 4, frames: 1 });
+    // 2026-05-19: the disco-sim runtime has no opaque window-background
+    // fill, and at startup the dashboard panel is hidden (`refactor:
+    // dashboard starts hidden` 504d56b, 2026-04-13). The right-edge
+    // IconStrip is the only widget that always renders, so sample a
+    // 6x4 region inside its second slot rather than at (0,0). See
+    // docs/concepts/DPR-01-A-disco-sim-triage.md (Pattern 1).
+    const dump = await session.dumpRect({ x: 760, y: 90, width: 6, height: 4, frames: 1 });
     assert.equal(dump.frames.length, 1);
     assert.equal(dump.frames[0].length, 4);
     assert(dumpHasVisiblePixels(dump));

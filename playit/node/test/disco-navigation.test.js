@@ -95,16 +95,32 @@ test('hotkey roundtrip: s, f, i, b all change controller state', async () => {
     // Escape
     await session.keyDown('Escape');
 
-    // 'f' activates files (no wing opens, but dashboard changes)
-    const beforeF = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
+    // 2026-05-19: the disco-sim runtime has no opaque window-background
+    // fill and the dashboard panel starts hidden (`refactor: dashboard
+    // starts hidden` 504d56b, 2026-04-13), so the original (100, 100)
+    // sample region is unrendered (zero pixels) regardless of which
+    // hotkey fires. Retarget to the IconStrip slot 1 (Files) area on
+    // the right edge: 'f' moves the focus highlight onto slot 1 (border
+    // appears), and 'b' clears the IconStrip highlight (border
+    // disappears). Both transitions touch slot 1's bounding region.
+    // Playit's dump command caps width/height at 40. See
+    // docs/concepts/DPR-01-A-disco-sim-triage.md (Pattern 1).
+    // Slot 1 sits at y=87..147 (margin_top=17 + index*70). The focus
+    // border is drawn 2 px inside the slot's top edge (y=87..89), so a
+    // sample spanning y=80..99 catches the border-on/off transition.
+    const stripSlot1 = { x: 740, y: 80, width: 40, height: 20, frames: 1 };
+
+    // 'f' activates files — IconStrip focus highlight gains slot 1 border
+    const beforeF = await session.dumpRect(stripSlot1);
     await session.keyDown('f');
-    const afterF = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
+    const afterF = await session.dumpRect(stripSlot1);
     assert.notEqual(dumpSignature(afterF), dumpSignature(beforeF));
 
-    // 'b' cycles backlight (dashboard should update)
-    const beforeB = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
+    // 'b' opens settings wing on Backlight slot — IconStrip strip_slot
+    // is cleared (focus moves into the wing) so slot 1 loses its border.
+    const beforeB = await session.dumpRect(stripSlot1);
     await session.keyDown('b');
-    const afterB = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
+    const afterB = await session.dumpRect(stripSlot1);
     assert.notEqual(dumpSignature(afterB), dumpSignature(beforeB));
   } finally {
     await session.close();
@@ -118,22 +134,30 @@ test('framebuffer differs across main panels', async () => {
   });
 
   try {
-    // Settings panel (initial)
-    const sigSettings = dumpSignature(
-      await session.dumpRect({ x: 100, y: 100, width: 20, height: 10, frames: 1 })
-    );
+    // 2026-05-19: the disco-sim runtime has no opaque window-background
+    // fill and the dashboard panel starts hidden (`refactor: dashboard
+    // starts hidden` 504d56b, 2026-04-13). The original (100, 100)
+    // sample region is unrendered (zero pixels) in all three panel
+    // states. Sample IconStrip slot 1 (Files) area instead — slot 1
+    // gains a focus border as 'f' fires (slot 0 -> slot 1) and loses it
+    // as 'i' fires (slot 1 -> slot 2, plus info wing opens). Playit's
+    // dump command caps width/height at 40. See
+    // docs/concepts/DPR-01-A-disco-sim-triage.md (Pattern 1).
+    // Slot 1 sits at y=87..147; the focus border occupies y=87..89, so
+    // a sample spanning y=80..99 catches the border-on/off transition.
+    const dumpArgs = { x: 740, y: 80, width: 40, height: 20, frames: 1 };
 
-    // Files panel
+    // Settings panel (initial — IconStrip slot 0 focused, slot 1 idle)
+    const sigSettings = dumpSignature(await session.dumpRect(dumpArgs));
+
+    // Files panel (IconStrip slot 1 focused — gains border)
     await session.keyDown('f');
-    const sigFiles = dumpSignature(
-      await session.dumpRect({ x: 100, y: 100, width: 20, height: 10, frames: 1 })
-    );
+    const sigFiles = dumpSignature(await session.dumpRect(dumpArgs));
 
-    // Info panel
+    // Info panel (info wing open + IconStrip slot 2 focused — slot 1
+    // loses border)
     await session.keyDown('i');
-    const sigInfo = dumpSignature(
-      await session.dumpRect({ x: 100, y: 100, width: 20, height: 10, frames: 1 })
-    );
+    const sigInfo = dumpSignature(await session.dumpRect(dumpArgs));
 
     // All three should be distinct
     assert.notEqual(sigSettings, sigFiles, 'settings and files panels should differ');

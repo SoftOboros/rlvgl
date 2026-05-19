@@ -173,17 +173,52 @@ the first time.
 - `core/src/draw.rs:480-497` — `draw_widget_bg` alpha-zero guard
   (the invariant the original test was guarding).
 
-## Follow-up — playit node tests
+## Follow-up: Node.js harness
 
-The same stale-setup pattern affects the JS harness tests under
-`playit/node/test/` (e.g. `disco-sim.test.js:25` dumps `(0,0,6,4)`,
-which the post-`504d56b` runtime renders as zero pixels). These run
-via `node --test` in Phase 4.5 of pre-publish (CLAUDE.md), not via
-`cargo test --workspace`, so they were not part of this triage's
-validation gate. The same surgical-dump-relocation fix applies — track
-as a separate follow-up.
+The same stale-setup pattern affected three tests in the JS harness
+under `playit/node/test/`, run via `node --test` in Phase 4.5 of
+pre-publish (CLAUDE.md). Confirmed by running
+`RLVGL_DISCO_SIM_BIN=<abs path> node --test` against the v0.2.0
+disco-sim binary at this commit. The remaining seven Node-side tests
+already sampled live IconStrip / wing regions and passed unchanged.
+
+| # | File / test | Failure mode | Pattern |
+|---|---|---|---|
+| 1 | `disco-sim.test.js:10` `headless disco sim reports advancing status and exposes frame dumps` | `D0,0,6,4` returns zero pixels | Pattern 1 |
+| 2 | `disco-navigation.test.js:76` `hotkey roundtrip: s, f, i, b all change controller state` | `D100,100,10,5` identical before/after `f` and before/after `b` | Pattern 1 |
+| 3 | `disco-navigation.test.js:114` `framebuffer differs across main panels` | `D100,100,20,10` identical across settings/files/info states | Pattern 1 |
+
+Patches are test-code-only:
+
+- **Test 1** — retarget dump to IconStrip slot 1 interior at
+  `(760, 90, 6, 4)`. Slot 1's icon (`ICON_FILE`) is always rendered at
+  startup, so the dump is non-zero on the first present.
+- **Test 2** — retarget both `f`-transition and `b`-transition dumps
+  to `(740, 80, 40, 20)`, which spans the top border row of IconStrip
+  slot 1 (y=87..89). `f` moves focus `Main(0) → Main(1)` (slot 1
+  border appears); `b` moves focus `Main(1) → Wing(Settings, 4)`,
+  which clears `strip_slot` and removes slot 1's border. Both
+  transitions touch the sampled rows.
+- **Test 3** — retarget the three per-panel dumps to the same
+  `(740, 80, 40, 20)` region. Settings (slot 0 focused) → Files (slot
+  1 focused) toggles slot 1's border on; Files → Info (slot 2 focused
+  + info wing open) toggles it off. The two compared pairs both
+  produce a pixel delta in the sample.
+
+Playit's `D<x>,<y>,<w>,<h>` command caps width and height at 40 each
+(`playit/src/protocol.rs:240-241`); the 40×20 stripe is the maximum
+height that still cleanly straddles slot 1's top border without
+spilling into slot 0. Pattern 2 (activation prologue `KD:i` + `KD:Enter`)
+was not needed — focus-only transitions inside the IconStrip suffice
+for all three Node-side failures.
+
+No new failure modes (Pattern 4) observed; all three tests now pass
+stably across three consecutive runs.
 
 ## Change log
 
-- 2026-05-19 — initial triage; four STALE_SETUP failures fixed by
-  test-code patches. Node-side equivalents flagged as follow-up.
+- 2026-05-19 — initial triage; four STALE_SETUP failures in the Rust
+  `playit_automation` suite fixed by test-code patches.
+- 2026-05-19 — Node.js harness follow-up: three additional STALE_SETUP
+  failures (`disco-sim.test.js`, `disco-navigation.test.js`) fixed by
+  applying Pattern 1 (retarget to IconStrip slot 1 border row).
