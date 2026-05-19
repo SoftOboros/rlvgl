@@ -144,6 +144,20 @@ disco-analyzer subrepo's first concepts doc).
     §10/§14/§15 with normative Reopen triggers; the
     initiative's BASELINE-shrink track ends at DCB-04.**
 
+- **DPR** — *Disco Platform Runtime*. Reusable STM32H747I-DISCO
+  board runtime support so the disco demo and disco analyzer can both
+  consume the same RLVGL-owned platform surface instead of copying
+  demo-local bring-up code. Scope includes board runtime construction,
+  display frame scheduling, DSI/LTDC MMIO ownership, warm-reset safe
+  stop, and profile-owned telemetry. The disco demo remains the first
+  hardware validation app; the disco analyzer is the second-app proof
+  that the API is not demo-shaped.
+
+  - [DPR-00-CONCEPTS.md](DPR-00-CONCEPTS.md) — foundational
+    vocabulary, scan/profile decisions, invariants, and phase plan.
+    **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
+    DPR-00 §12 is accepted or amended.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem
