@@ -58,6 +58,14 @@ pub mod dsi_cmd_mode;
 /// Platform-level visual effect primitives ([`Effect`] trait,
 /// [`CrawlParams`] struct).
 pub mod effect;
+/// DPR-01 Frame Scheduler — sole owner of per-frame DSI / LTDC writes
+/// (`DSI_WCR`, `DSI_WIER`, `DSI_WIFCR`, `LTDC_L1CFBAR`, `LTDC_SRCR`)
+/// per DPR-00 INV-DPR-3. Generic over [`frame_scheduler::ScanMode`] and
+/// [`frame_scheduler::Pacing`]. Scaffold — call-site migration lands
+/// under DPR-01a / DPR-01b. Marker types compile on host; the
+/// [`frame_scheduler::FrameScheduler`] constructor still requires the
+/// caller to assert MMIO unaliasing per its `unsafe` contract.
+pub mod frame_scheduler;
 /// Frame synchronization traits for ERIF-based scheduling.
 pub mod frame_sync;
 #[cfg(all(
