@@ -188,7 +188,17 @@ RUSTFLAGS="" cargo test --tests --features "creator" -p rlvgl
 # Phase 4.5: disco demo + simulator automation tests
 RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
 RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
-cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test && cd ../..
+# Note: cargo lands binaries under `target/<host-triple>/debug/` on
+# platforms with a host-triple subdir (macOS Apple Silicon ships an
+# `aarch64-apple-darwin/` directory; Linux x86_64 ships an
+# `x86_64-unknown-linux-gnu/` directory). On hosts where cargo writes
+# `target/debug/` directly, the inner `target/debug/...` path is found
+# first. The `||` fallback keeps the one-liner portable on both shapes.
+cd playit/node && \
+    RLVGL_DISCO_SIM_BIN="$PWD/../../target/$(rustc -vV | sed -n 's/^host: //p')/debug/rlvgl-disco-sim" \
+    node --test \
+    || RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test \
+    && cd ../..
 
 # Phase 4.6: ESP32-C3 BSP generator + beetle-esp32c3 both feature sets.
 # The `compile-verify` feature spins up a throwaway cargo project around the
