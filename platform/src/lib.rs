@@ -25,6 +25,11 @@ pub mod audio_player;
 pub mod bdma;
 /// Blitter traits and helpers.
 pub mod blit;
+/// DPR-02 Board Runtime — warm-reset peripheral safe-stop, named boot
+/// sentinels, and the byte-offset layout for the DPR-00 §5.3 reserved
+/// SRAM4 telemetry window. Scaffold — consumer wiring lands under
+/// DPR-02a / DPR-02b per the DPR-01a / DPR-01b precedent.
+pub mod board_runtime;
 /// Dirty-region compositor for framebuffer restoration.
 pub mod compositor;
 /// CPU fallback blitter.
