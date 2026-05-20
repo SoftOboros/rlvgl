@@ -548,19 +548,19 @@ entry (or re-deferred with a named later phase).
 
 ## 12. Acceptance Checklist
 
-DPR-02 (this concept doc) is ratified when:
+DPR-02 (this concept doc) is **ratified 2026-05-20**:
 
-- [ ] §3 vocabulary additions are accepted.
-- [ ] §5.1 (SafeStopSequence ordering) is accepted.
-- [ ] §5.2 (BootSentinelSet) is accepted.
-- [ ] §5.3 (TelemetrySlot layout) is accepted.
-- [ ] §5.4 (PeripheralServiceSet mapping) is accepted.
-- [ ] §5.5 (SafeStop public surface shape) is accepted.
-- [ ] §6 invariants INV-DPR-2-1..4 are accepted.
-- [ ] §8 phase plan (DPR-02a, DPR-02b) is accepted.
-- [ ] §10 reconciliation rows are accepted (additions allowed via §15
+- [x] §3 vocabulary additions are accepted.
+- [x] §5.1 (SafeStopSequence ordering) is accepted.
+- [x] §5.2 (BootSentinelSet) is accepted.
+- [x] §5.3 (TelemetrySlot layout) is accepted.
+- [x] §5.4 (PeripheralServiceSet mapping) is accepted.
+- [x] §5.5 (SafeStop public surface shape) is accepted.
+- [x] §6 invariants INV-DPR-2-1..4 are accepted.
+- [x] §8 phase plan (DPR-02a, DPR-02b) is accepted.
+- [x] §10 reconciliation rows are accepted (additions allowed via §15
       amendment).
-- [ ] §11 PCDN-DPR-2-001..004 are explicitly deferred to DPR-02a or
+- [x] §11 PCDN-DPR-2-001..004 are explicitly deferred to DPR-02a or
       DPR-02b.
 
 DPR-02a and DPR-02b code PRs have their own acceptance gates per §8.
@@ -606,6 +606,19 @@ analyzer adoption) remains gated on DPR-02a landing AND on DAA-01-B-2
 
 ## 15. Change Log
 
+- **2026-05-20** — **Ratified.** All §12 acceptance gates checked.
+  Scaffold validated by execution: SafeStop scaffold + BootSentinel
+  registry + TelemetrySlot byte-offset table all landed in commit
+  `fbaf54d` without surfacing structural objections. 16/16 new unit
+  tests pass; disco target compile clean. Three signature
+  refinements applied during scaffolding (PostMemoryInit →
+  PostSdramInit per §5.2, RESERVED split into ServiceSetActive + tail
+  per §5.3, repr(C) + Eq/PartialEq derives) align the executed code
+  with the doc; no spec amendment needed. DPR-02a (demo audio-service
+  warm-reset validation) and DPR-02b (BootSentinel migration of the
+  demo's 11 raw `0x3800_0300` writes + analyzer adoption prep) remain
+  binding sub-phase gates per §8. PCDN-DPR-2-001..004 remain deferred
+  per §11.
 - **2026-05-19** — Initial draft. Ratifies §3 vocabulary additions
   (`SafeStopSequence`, `BootSentinel`, `TelemetrySlot`,
   `PeripheralServiceSet`, `IrqClearMask`, `SafeStopReport`);

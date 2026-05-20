@@ -576,17 +576,17 @@ during DPR-01a/b PRs:
 
 ## 12. Acceptance Checklist
 
-DPR-01 (this concept doc) is ratified when:
+DPR-01 (this concept doc) is **ratified 2026-05-20**:
 
-- [ ] §3 vocabulary additions are accepted.
-- [ ] §5.1 (Demo split) is accepted.
-- [ ] §5.2 (Analyzer as registered preset) is accepted.
-- [ ] §5.3 (three peripheral-sets) is accepted.
-- [ ] §5.4 (compile-time generic `FrameScheduler<S>`) is accepted.
-- [ ] §5.5 (HSEM open registration) is accepted.
-- [ ] §5.6 (Pacing trait surface) is accepted.
-- [ ] §8 phase plan (DPR-01a, DPR-01b, DPR-01c) is accepted.
-- [ ] §11 open questions are explicitly deferred to DPR-01a or
+- [x] §3 vocabulary additions are accepted.
+- [x] §5.1 (Demo split) is accepted.
+- [x] §5.2 (Analyzer as registered preset) is accepted.
+- [x] §5.3 (three peripheral-sets) is accepted.
+- [x] §5.4 (compile-time generic `FrameScheduler<S>`) is accepted.
+- [x] §5.5 (HSEM open registration) is accepted.
+- [x] §5.6 (Pacing trait surface) is accepted.
+- [x] §8 phase plan (DPR-01a, DPR-01b, DPR-01c) is accepted.
+- [x] §11 open questions are explicitly deferred to DPR-01a or
       DPR-01b.
 
 DPR-01a/b code PRs have their own acceptance gates per §8.
@@ -626,6 +626,16 @@ DPR-01a/b acceptance.
 
 ## 15. Change Log
 
+- **2026-05-20** — **Ratified.** All §12 acceptance gates checked.
+  The design has been validated by execution: FrameScheduler scaffold
+  (`d0726aa`), FreeRtosPacing scaffold (`bbe7663`), and DPR-01a code
+  migration Steps 1-5 (`6013a5c`, `ea0593e`) all landed against this
+  doc without surfacing structural objections. PCDN-DPR-006
+  (signaling) resolved 2026-05-19 with Option 1 (IsrFlag + IsrCounter
+  + AtomicU32). PCDN-DPR-007 and PCDN-DPR-008 remain deferred to
+  DPR-01a Step 6 and DPR-01b respectively per §11. DPR-01a/b/c
+  sub-phase acceptance gates remain binding per §8; this ratification
+  locks in vocabulary + design choices, not code-side validation.
 - **2026-05-19** — Initial draft. Resolves PCDN-DPR-001..005 from
   DPR-00 §11; freezes the §3 vocabulary additions, §5 frozen
   decisions, §7 API sketch, and §8 phase plan. Defers PCDN-DPR-006..008

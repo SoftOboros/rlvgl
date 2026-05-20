@@ -168,10 +168,12 @@ disco-analyzer subrepo's first concepts doc).
     (not Custom), (3) three peripheral-sets shape for
     `BoardRuntime::init`, (4) compile-time generic
     `FrameScheduler<S: ScanMode, P: Pacing>`, (5) HSEM lines as
-    open-registration bitmask with `LineInRx` reserved. **Drafted
-    2026-05-19; not ratified.** DPR-01a/b code PRs (FrameScheduler
-    scaffold + bare-metal migration / FreeRTOS migration) remain
-    blocked until §12 is accepted.
+    open-registration bitmask with `LineInRx` reserved. **Ratified
+    2026-05-20.** DPR-01a scaffold + Steps 1-5 of the migration
+    have landed (commits `d0726aa`, `6013a5c`, `ea0593e`); Step 6
+    (bare-metal DSI ISR wire) gates on hardware bench validation.
+    DPR-01b (FreeRtosPacing scaffold) landed at `bbe7663`. PCDN-DPR-006
+    resolved (Option 1: IsrFlag + IsrCounter + AtomicU32).
   - [DPR-01-A.md](DPR-01-A.md) — sub-letter to DPR-01: per-site MMIO
     writer inventory (`stm32h747i_disco.rs::{swap,present,
     wait_frame_done}`, `freertos_entry.rs` task body, `main.rs`
@@ -197,8 +199,9 @@ disco-analyzer subrepo's first concepts doc).
     post-step; ServiceSet ↔ SafeStopSequence agreement). Phase split:
     DPR-02a (SafeStop scaffold + demo audio-service validation) and
     DPR-02b (BootSentinel migration of the demo's 11 raw `0x3800_0300`
-    writes + analyzer adoption prep). **Drafted 2026-05-19; not
-    ratified.** DPR-02a/b code PRs remain blocked until §12 is accepted.
+    writes + analyzer adoption prep). **Ratified 2026-05-20.** DPR-02a
+    scaffold landed at `fbaf54d` (16/16 unit tests pass). DPR-02a
+    consumer-wiring + DPR-02b sub-phase gates remain binding per §8.
   - [DPR-03-CONCEPTS.md](DPR-03-CONCEPTS.md) — dual-app validation
     (cross-repo analyzer adoption). Ratifies the cross-repo gate that
     retires the disco analyzer's ~1200 lines of mirrored bring-up code
@@ -217,10 +220,11 @@ disco-analyzer subrepo's first concepts doc).
     phase split: DPR-03a (compile-only adoption), DPR-03b (hardware
     validation on H747I-DISCO), DPR-03c (header retirement + initiative
     close). Cross-repo gating per INV-DPR-15: each sub-phase requires a
-    DAA-01-B-2 §15 amendment on the analyzer side. **Drafted 2026-05-19;
-    not ratified.** DPR-03a/b/c PRs remain blocked until §12 is
-    accepted AND DPR-01a + DPR-02a have shipped the surface the
-    analyzer consumes.
+    DAA-01-B-2 §15 amendment on the analyzer side. **Ratified
+    2026-05-20.** Cross-repo coordination gate now formally binding;
+    DPR-03a/b/c sub-phase work blocks on DPR-01a + DPR-02a shipping
+    the surface the analyzer consumes (DPR-01a Step 6 hardware
+    validation is the current critical path).
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

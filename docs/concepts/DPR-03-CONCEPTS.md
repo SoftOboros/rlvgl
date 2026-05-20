@@ -637,29 +637,30 @@ the named sub-phase PRs. Each MUST be resolved in the named sub-phase's
 
 ## 12. Acceptance Checklist
 
-DPR-03 (this concept doc) is ratified when:
+DPR-03 (this concept doc) acceptance gates:
 
-- [ ] §3 vocabulary additions (`AnalyzerKernel`, `AdaptedCodeOrigin`,
+- [x] §3 vocabulary additions (`AnalyzerKernel`, `AdaptedCodeOrigin`,
       `AnalyzerProfile`, `ShimAllowlist`, `CrossRepoGate`) accepted.
-- [ ] §4 source-of-truth map accepted: §4.1 `bsp.rs` function migrations,
+- [x] §4 source-of-truth map accepted: §4.1 `bsp.rs` function migrations,
       §4.2 `main.rs` boot-stage migrations, §4.3 `hsem.rs` split,
       §4.4 `AdaptedCodeOrigin` header retirement plan.
-- [ ] §5.1 (Adoption sequence: Cargo.toml → main.rs → bsp.rs →
+- [x] §5.1 (Adoption sequence: Cargo.toml → main.rs → bsp.rs →
       hsem.rs) accepted.
-- [ ] §5.2 (ShimAllowlist: `HalGpioBacklight`, `HalResetPin`,
+- [x] §5.2 (ShimAllowlist: `HalGpioBacklight`, `HalResetPin`,
       `I2c4Adapter`) accepted.
-- [ ] §5.3 (BootSentinel value-mapping table) accepted.
-- [ ] §6 invariants INV-DPR-3-1 (no mirrored bring-up) and
+- [x] §5.3 (BootSentinel value-mapping table) accepted.
+- [x] §6 invariants INV-DPR-3-1 (no mirrored bring-up) and
       INV-DPR-3-2 (canonical Analyzer profile uses registered preset)
       accepted.
-- [ ] §8 phase plan (DPR-03a compile-only, DPR-03b hardware validation,
+- [x] §8 phase plan (DPR-03a compile-only, DPR-03b hardware validation,
       DPR-03c AdaptedCodeOrigin retirement) accepted.
-- [ ] §10 reconciliation rows accepted (additions allowed via §15
+- [x] §10 reconciliation rows accepted (additions allowed via §15
       amendment).
-- [ ] §11 PCDN-DPR-3-001..003 explicitly deferred to DPR-03a/b/c.
+- [x] §11 PCDN-DPR-3-001..003 explicitly deferred to DPR-03a/b/c.
 
-DPR-03a/b/c sub-phase PRs have their own acceptance gates per §8 and
-each rides a CrossRepoGate (§0) tied to a DAA-01-B-2 §15 amendment.
+DPR-03 (this concept doc) is **ratified 2026-05-20**. DPR-03a/b/c
+sub-phase PRs have their own acceptance gates per §8 and each rides
+a CrossRepoGate (§0) tied to a DAA-01-B-2 §15 amendment.
 
 ## 13. Files Cited
 
@@ -740,6 +741,19 @@ the CrossRepoGate evidence DPR-03a/b/c cite to claim acceptance.
 
 ## 15. Change Log
 
+- **2026-05-20** — **Ratified.** All §12 acceptance gates checked.
+  No code-side scaffold lives yet (DPR-03 is cross-repo coordination;
+  the rlvgl-side surface it consumes — `RuntimeProfile::Analyzer`,
+  `BoardRuntime::init`, `FrameScheduler<VideoMode, ...>`,
+  `SafeStop::run` — is partially scaffolded under DPR-01a/02a but
+  not yet consumer-wired). Ratification locks in the §4 source-of-
+  truth map, §5 adoption sequence + ShimAllowlist + BootSentinel
+  mapping, and §6 INV-DPR-3-1/INV-DPR-3-2 against the corresponding
+  analyzer-subrepo state at `0f038c7` (the worktree-isolated agents'
+  base commit). DPR-03a/b/c sub-phase gates remain binding per §8;
+  each rides a CrossRepoGate tied to a DAA-01-B-2 §15 amendment that
+  the analyzer subrepo will produce when its side of the migration
+  is ready. PCDN-DPR-3-001..003 remain deferred per §11.
 - **2026-05-19** — Initial draft. Captures the cross-repo adoption
   plan for retiring the analyzer's mirrored bring-up code per
   DAA-01-B §6 (Option C, 2026-04-27). Frozen decisions: §5.1 adoption
