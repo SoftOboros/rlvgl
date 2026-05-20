@@ -23,8 +23,10 @@
 //! [dpr01a]: https://github.com/softoboros/rlvgl/blob/main/docs/concepts/DPR-01-A.md
 
 use core::marker::PhantomData;
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use crate::hwcore::addr::PhysAddr;
+use crate::hwcore::isr::{IsrCounter, IsrFlag};
 use crate::hwcore::regs::dsi::DsiWrapper;
 use crate::hwcore::regs::ltdc::Ltdc;
 
@@ -37,6 +39,61 @@ pub(crate) mod sealed {
     /// impls per DPR-01 §5.6 without exposing the seal to downstream
     /// crates. External impls remain Standards-Action per DPR-00 §5.2.
     pub trait Sealed {}
+}
+
+// ── Module-level typed singletons ───────────────────────────────────────
+//
+// Mirrors the [`crate::dsi_cmd_mode`] precedent (its lines 33..36
+// declare parallel `DSI_HOST`, `DSI_W`, `LTDC_PERIPH`, `GPIOJ`
+// singletons). DPR-01-A-migration-outline.md Step 1 promotes the
+// pattern into `frame_scheduler` so the bare-metal DSI ERIF ISR has a
+// typed-handle path into `WIFCR` without taking a `&FrameScheduler`
+// reference at ISR-context.
+//
+// SAFETY (shared by both statics): the bare-metal demo and the Zephyr
+// demo are mutually exclusive at build time via cargo features
+// (`feature = "freertos"` / `feature = "zephyr"` vs. the bare-metal
+// default), so at most one binary's set of singletons is reachable in
+// a given build. `dsi_cmd_mode`'s parallel statics remain live for
+// the Zephyr path (DPR-01b scope); `frame_scheduler`'s land for
+// bare-metal (DPR-01a scope). After `Stm32h747iDiscoDisplay::new`
+// returns, MMIO ownership of the DSI wrapper + LTDC block is held by
+// this module (and the by-value scheduler held by the display); no
+// other code path may construct its own `DsiWrapper` / `Ltdc` handle.
+
+/// Module-level typed handle on the DSI wrapper. Used by
+/// [`consume_erif_static`] and (transitively) by the per-binary
+/// [`FrameScheduler`]'s by-value handle.
+pub(crate) static DSI_W: DsiWrapper = unsafe { DsiWrapper::new() };
+
+/// Module-level typed handle on the LTDC peripheral. Pairs with
+/// [`DSI_W`] for the same SAFETY contract — see the module comment
+/// immediately above.
+///
+/// Currently `dead_code` — first consumer lands in DPR-01a Step 4
+/// (Op A swap migration), which retargets
+/// `Stm32h747iDiscoDisplay::swap` through `LTDC.layer1().cfbar` +
+/// `LTDC.regs().srcr`. Remove the allow when Step 4 commits.
+#[allow(dead_code)]
+pub(crate) static LTDC: Ltdc = unsafe { Ltdc::new() };
+
+/// ISR-context shim: clear `DSI_WIFCR.CERIF` via the typed singleton.
+///
+/// Called from the bare-metal `#[interrupt] fn DSI()` body to
+/// acknowledge an ERIF edge before the main loop's
+/// [`Pacing::wait_erif`] consumes the wake. Matches Op C in
+/// `DPR-01-A.md` §3.
+///
+/// # Safety
+///
+/// MUST be called from the DSI ISR or with DSI interrupts masked.
+/// Concurrent calls from multiple contexts race the wrapper's
+/// internal flag-latch; the wrapper hardware does not provide
+/// atomic clear-and-readback semantics.
+#[inline]
+pub unsafe fn consume_erif_static() {
+    // Bit 1 of WIFCR is CERIF (Clear End-of-Refresh Interrupt Flag).
+    DSI_W.regs().wifcr.write(0x02);
 }
 
 // ── ScanMode ────────────────────────────────────────────────────────────
@@ -157,25 +214,77 @@ pub trait Pacing: sealed::Sealed {
     fn wait_render_gate(&mut self);
 }
 
-/// Bare-metal pacing — DWT-based holdoff, atomic-flag ERIF signaling.
+/// Static ERIF signal triple consumed by [`BareMetalLoopPacing`] per
+/// PCDN-DPR-006 (resolved 2026-05-19).
 ///
-/// Carries no semaphore handles; the bare-metal demo's main loop and
-/// DSI ISR coordinate through an [`crate::hwcore::isr::IsrFlag`] passed
-/// in at construction time.
+/// Three `&'static` references to typed ISR primitives from
+/// [`crate::hwcore::isr`]: a one-bit flag for the wake edge, an
+/// atomic for the DWT cycle snapshot, and a counter for the
+/// monotonic event index. The bare-metal demo's `#[interrupt] fn
+/// DSI()` body stores the cycle snapshot, bumps the counter, and
+/// sets the flag; [`Pacing::wait_erif`] consumes them.
 ///
-/// DPR-01a wires the bare-metal demo onto this impl. Until then, the
-/// type compiles but has no production consumer.
+/// `Copy` so a single triple constructed at boot can be embedded in
+/// multiple consumers (e.g. logging hooks) without cloning the
+/// `&'static` references.
+#[derive(Clone, Copy)]
+pub struct BareMetalErifSignals {
+    /// One-shot wake edge. ISR calls `set()`; main loop's
+    /// [`Pacing::wait_erif`] busy-spins on `take()`.
+    pub flag: &'static IsrFlag,
+    /// DWT cycle counter snapshot at the ERIF edge. ISR stores;
+    /// `wait_erif` loads.
+    pub cyccnt: &'static AtomicU32,
+    /// Monotonic ERIF event index. ISR `increment()`s; `wait_erif`
+    /// `read()`s. Wraps every `2^32` events.
+    pub count: &'static IsrCounter,
+}
+
+/// Bare-metal pacing — `IsrFlag` + `IsrCounter` + `AtomicU32`-based
+/// ERIF signaling per PCDN-DPR-006.
+///
+/// Two constructors:
+///
+/// - [`Self::new`] — scaffold-only, no signal triple wired. Used by
+///   host unit tests and by callers that just want the pacing type to
+///   compile in isolation. [`Pacing::wait_erif`] returns a stub
+///   ([`ErifInfo`] with `cyccnt: 0` and a wrapping counter) — does NOT
+///   block.
+/// - [`Self::with_signals`] — production constructor. Caller supplies
+///   the three `&'static` references; [`Pacing::wait_erif`] busy-spins
+///   on the flag and returns a real [`ErifInfo`] snapshot.
+///
+/// DPR-01a Step 6 wires the bare-metal demo's `#[interrupt] fn DSI()`
+/// to the matching `static IsrFlag` / `AtomicU32` / `IsrCounter`
+/// declarations in `examples/stm32h747i-disco/src/main.rs` and
+/// constructs the pacing via `with_signals`.
 pub struct BareMetalLoopPacing {
     erif_count: u32,
+    signals: Option<BareMetalErifSignals>,
 }
 
 impl sealed::Sealed for BareMetalLoopPacing {}
 
 impl BareMetalLoopPacing {
-    /// Construct a fresh pacing handle. The caller is responsible for
-    /// installing the DSI ERIF ISR that publishes [`ErifInfo`] (DPR-01a).
+    /// Construct a scaffold-only pacing handle without ERIF signals.
+    /// [`Pacing::wait_erif`] returns a stub. For the production path
+    /// see [`Self::with_signals`].
     pub const fn new() -> Self {
-        Self { erif_count: 0 }
+        Self {
+            erif_count: 0,
+            signals: None,
+        }
+    }
+
+    /// Construct a production pacing handle wired to the
+    /// caller-supplied [`BareMetalErifSignals`] triple. The caller is
+    /// responsible for installing the DSI ERIF ISR that publishes
+    /// snapshots into the same three statics.
+    pub const fn with_signals(signals: BareMetalErifSignals) -> Self {
+        Self {
+            erif_count: 0,
+            signals: Some(signals),
+        }
     }
 }
 
@@ -187,15 +296,37 @@ impl Default for BareMetalLoopPacing {
 
 impl Pacing for BareMetalLoopPacing {
     fn wait_erif(&mut self) -> ErifInfo {
-        // DPR-01a wires this to the bare-metal `ERIF_FLAG` / `ERIF_CYCCNT`
-        // atomics introduced in `examples/stm32h747i-disco/src/main.rs`.
-        // Scaffold returns the current count without a real wait so the
-        // type compiles in isolation; the production migration replaces
-        // this body.
-        self.erif_count = self.erif_count.wrapping_add(1);
-        ErifInfo {
-            cyccnt: 0,
-            erif_count: self.erif_count,
+        match self.signals {
+            // Production path: busy-spin on the typed flag, then load
+            // the cycle snapshot + monotonic count. The ISR side
+            // stores cyccnt before bumping the counter (Release
+            // ordering); we load the counter via `IsrCounter::read`
+            // (Acquire) and cyccnt with explicit Acquire. The counter
+            // read does not need to be earlier than the cyccnt load —
+            // an in-flight ISR may bump the count between the two
+            // loads and we'd see a count value newer than the cyccnt
+            // we report, but never the inverse. Tolerable; the
+            // counter is for telemetry, not correctness.
+            Some(s) => {
+                while !s.flag.take() {
+                    core::hint::spin_loop();
+                }
+                ErifInfo {
+                    cyccnt: s.cyccnt.load(Ordering::Acquire),
+                    erif_count: s.count.read(),
+                }
+            }
+            // Scaffold path (host unit tests, no real ISR). Returns a
+            // wrapping monotonic count without blocking. Preserved
+            // verbatim from the pre-Step-2 scaffold so the existing
+            // host tests stay green.
+            None => {
+                self.erif_count = self.erif_count.wrapping_add(1);
+                ErifInfo {
+                    cyccnt: 0,
+                    erif_count: self.erif_count,
+                }
+            }
         }
     }
 
