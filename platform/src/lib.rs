@@ -1,6 +1,13 @@
 //! Hardware and simulator backends for `rlvgl`.
 #![no_std]
 #![deny(missing_docs)]
+// Register-Mashing Discipline rule #7 enforcement: every `unsafe`
+// operation inside an `unsafe fn` body MUST sit in an explicit
+// `unsafe { ... }` block carrying a `// SAFETY:` comment. Edition 2024
+// makes the lint `warn` by default; this `deny` upgrades it to a hard
+// error so the unsafe envelope can't silently expand through `unsafe
+// fn` body inheritance.
+#![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate alloc;
 
