@@ -14,19 +14,35 @@ MEMORY
   LP_SRAM : ORIGIN = 0x50108000, LENGTH = 0x00008000    /* rwx */
   MIPI_CSI_MEM : ORIGIN = 0x50104000, LENGTH = 0x00001000    /* rw */
   MIPI_DSI_MEM : ORIGIN = 0x50105000, LENGTH = 0x00001000    /* rw */
-  /* First 256 bytes of the IROM cache window are reserved for the
-   * ESP-IDF app descriptor (esp_app_desc_t). The bootloader looks for
-   * the magic 0xABCD5432 there and refuses to start the app if it's
-   * absent. The descriptor itself lives in src/app_desc.rs and is
-   * placed via `.app_desc` in esp32_p4.x. */
-  FLASH_APP_DESC : ORIGIN = 0x40000000, LENGTH = 0x00000100    /* rx */
-  FLASH_CACHE : ORIGIN = 0x40000100, LENGTH = 0x03FFFF00    /* rx */
+  /* Cache-mapped flash, split into DROM (low) + IROM (high). The
+   * bootloader at esp-idf/components/bootloader_support/src/
+   * esp_image_format.c:718-728 reads `esp_app_desc_t` from segment
+   * #0 of the IDF image — and espflash orders segments by paddr in
+   * the .bin file. So the DROM region (which contains .app_desc +
+   * .rodata) MUST have lower paddr than IROM so that segment 0 IS
+   * the DROM segment.
+   *
+   * Both regions start at 0x40000020 — the 0x20 offset is per IDF
+   * convention (image header 0x18 + segment header 0x08) so the
+   * MMU's (paddr % 64KB == vaddr % 64KB) constraint is automatic
+   * (see esp-idf/components/esp_system/ld/esp32p4/memory.ld.in,
+   * `irom_seg`/`drom_seg` both at 0x40000020).
+   *
+   * To force DROM-first segment ordering in the .bin, we give DROM
+   * a LOWER address (0x40000020) and IROM a higher address
+   * (0x40010020). Both are 64KB-aligned. The cache window covers
+   * 0x40000000..0x44000000 so both stay inside the cache-mapped
+   * range. See ERRATA-004. */
+  FLASH_DROM  : ORIGIN = 0x40000020, LENGTH = 0x0000FFE0    /* r  */
+  FLASH_CACHE : ORIGIN = 0x40010020, LENGTH = 0x03FEFFE0    /* rx */
   PSRAM_CACHE : ORIGIN = 0x48000000, LENGTH = 0x04000000    /* rwx */
 }
 
-/* Aliases consumed by riscv-rt's link.x. */
+/* Aliases consumed by riscv-rt's link.x. .rodata maps to FLASH_DROM
+ * so it lands in the same r-- LOAD as .app_desc → one DROM segment
+ * at lower paddr than IROM. */
 REGION_ALIAS("REGION_TEXT",   FLASH_CACHE);
-REGION_ALIAS("REGION_RODATA", FLASH_CACHE);
+REGION_ALIAS("REGION_RODATA", FLASH_DROM);
 REGION_ALIAS("REGION_DATA",   HP_L2MEM);
 REGION_ALIAS("REGION_BSS",    HP_L2MEM);
 REGION_ALIAS("REGION_HEAP",   HP_L2MEM);
