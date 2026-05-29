@@ -515,6 +515,17 @@ keeps this entry 🔴 indefinitely but unblocks downstream work.
   carries the LED-coded sub-error split (5/6/7/8/9 + flash
   sentinel 11) so future bench sessions can decode the failure
   mode at a glance.
+- **Upstream BSP-generator defect:**
+  [`chipdb/rlvgl-chips-esp/docs/ERRATA.md` CHIPS-ESP-001](../../chipdb/rlvgl-chips-esp/docs/ERRATA.md#chips-esp-001--peripheralsrsjinja-i2c-init-body-is-c3-only-not-p4-compatible)
+  tracks the `peripherals.rs.jinja` template defects this bench
+  session uncovered (C3-style `clk_conf` writes that don't work on
+  P4, missing `scl_wait_high_period`, missing master CTR fields,
+  missing filter / timeout / fsm_rst). Fixing that template would
+  move our workaround out of the consumer-side `route_pins` and
+  into the BSP generator's output. **Note:** even with
+  CHIPS-ESP-001 fully resolved, the P4 I2C0 master STILL doesn't
+  start (this entry's remaining mystery) — the template fix is
+  necessary but not sufficient.
 
 ---
 
