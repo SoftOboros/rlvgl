@@ -132,6 +132,27 @@ const REG_FLL1_CTRL_3: u16 = 0x0222;
 const REG_FLL1_CTRL_4: u16 = 0x0223;
 const REG_FLL1_CTRL_5: u16 = 0x0224;
 
+// R0x732 Interrupt Raw Status 2 — bit 5 = FLL1_LOCK_STS, the LEVEL
+// status indicator (0 = not locked, 1 = locked) per WM8994_Rev4.6.pdf
+// p.346, memalpha-verified 2026-05-19 (bench-driven correction during
+// AUDIO-01a validation; see AUDIO-01 §15 amendment 2026-05-19-b).
+//
+// The initial AUDIO-01 ratification cited R0x731 bit 5 (FLL1_LOCK_EINT,
+// the edge-latched event bit) as the lock-detection primitive. Bench
+// validation revealed the edge latch never fires under our init_record
+// sequence: the codec's software reset (R0x0 = 0) puts FLL1 in the
+// disabled state, then init_record writes FLL config + FLL1_ENA = 1.
+// The FLL1_ENA = 1 write triggers a "FLL1 starting up" transition that
+// should latch in R0x731 bit 5 — but our clear-write at the start of
+// each attempt was racing with the transition latch in a way the
+// hardware decided to lose (post-bench observation: R0x731 reads 0
+// post-init while R0x732 bit 5 reads 1, confirming FLL IS locked but
+// the latch didn't capture the event). Level status (R0x732) is robust
+// — no transition timing window, no clear-write race — and is what the
+// driver now polls.
+const REG_FLL1_LOCK_STS: u16 = 0x0732;
+const FLL1_LOCK_STS_BIT: u16 = 1 << 5;
+
 // AIF1 (Audio Interface 1) control
 const REG_AIF1_CONTROL_1: u16 = 0x0300;
 const REG_AIF1_CONTROL_2: u16 = 0x0301;
@@ -239,6 +260,56 @@ pub enum InputDevice {
     /// LINEIN2L / LINEIN2R → IN2L / IN2R PGA → MIXINL / MIXINR → ADC1.
     /// Reserved second line-in input.
     LineIn2,
+}
+
+/// Result of FLL1 lock acquisition from [`Wm8994::init_record`].
+///
+/// Per `docs/audio/01-codec-bringup.md` AUDIO-01 §6 (frozen enum,
+/// registration policy: Standards Action — adding a variant requires a
+/// §15 amendment to AUDIO-01).
+///
+/// FLL1 lock-time on the WM8994 with F_REF = BCLK1 ≈ 1.5 MHz is
+/// 30–50 ms typical (WM8994_Rev4.6.pdf p.202). The post-init AIF1
+/// register writes in [`Wm8994::init_record`] depend on FLL1 having
+/// reached lock; if those writes land first, the AIF1ADC1 serializer
+/// arms against an unstable SYSCLK and latches a wrong bit-clock phase
+/// (the symptom is L/R digital-capture asymmetry that survives every
+/// analog-path test — see AUDIO-01 §2 for the full causal arc).
+///
+/// `Wm8994::init_record` clears the `FLL1_LOCK_EINT` latch at R0x731
+/// bit 5, writes `FLL1_ENA = 1`, then polls the latch with a 100 ms
+/// per-attempt timeout and up to 3 retries (per AUDIO-01 §9
+/// INV-AUDIO-01-2). This enum reports which path the lock acquisition
+/// took so callers can surface cold-vs-warm-reset telemetry without
+/// re-deriving it from external bench observation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FllLockOutcome {
+    /// FLL1 reported lock within the first poll loop's timeout. Healthy
+    /// boot. Expected on every warm reset (BCLK1 already running from
+    /// the prior session) and most cold boots after the FLL config is
+    /// correctly programmed.
+    LockedFirstTry,
+    /// FLL1 acquired lock only after `attempts` re-arm cycles. Callers
+    /// SHOULD log this via `defmt`, USART telemetry, or whatever
+    /// out-of-band path the platform uses — a consistent non-zero
+    /// `attempts` distribution on warm-reset boots indicates the static
+    /// FLL config tuning is wrong; a non-zero distribution on cold-boot
+    /// only is expected and acceptable.
+    LockedAfterRetry {
+        /// Number of full retry cycles that occurred before lock.
+        /// `attempts: 1` means lock was reported on the SECOND attempt
+        /// (i.e. after one re-arm). Maximum value is the retry budget
+        /// from AUDIO-01 §9 INV-AUDIO-01-2 (currently 3).
+        attempts: u8,
+    },
+    /// FLL1 never acquired lock within the configured retry budget. The
+    /// codec is in an undefined state. Callers MUST NOT proceed with
+    /// `init_record`'s post-FLL register sequence (AIF1ADC1 serializer
+    /// arm, AIF1 framing writes, AIF1 LRCLK_DIR slave-mode enables,
+    /// etc.) — `init_record` returns this variant early and the caller
+    /// SHOULD treat it as an error (log + return `Err` to its own
+    /// caller, or panic, depending on platform policy).
+    Failed,
 }
 
 /// WM8994 audio codec driver.
@@ -467,7 +538,7 @@ where
         sample_rate: u32,
         _mclk_hz: u32,
         input: InputDevice,
-    ) -> Result<(), I2C::Error> {
+    ) -> Result<FllLockOutcome, I2C::Error> {
         // Step 1 — software reset.
         self.reset()?;
         // Reset settling: by the time the next I²C transaction lands,
@@ -607,8 +678,31 @@ where
         self.write_reg(REG_FLL1_CTRL_4, 0x0800)?; // N=64
         self.write_reg(REG_FLL1_CTRL_3, 0x0000)?; // K=0
         self.write_reg(REG_FLL1_CTRL_2, 7u16 << 8)?; // OUTDIV-1=7, FRATIO=0
-        self.write_reg(REG_FLL1_CTRL_1, 0x0001)?; // FLL1_ENA=1 (set LAST per p.202)
-        delay_busy(20_000); // FLL settle ~20 ms
+
+        // Enable FLL1 and poll R0x731 bit 5 (FLL1_LOCK_EINT) for lock
+        // acquisition before any post-FLL register writes land. Per
+        // `docs/audio/01-codec-bringup.md` AUDIO-01 §9 INV-AUDIO-01-1:
+        // FLL1 lock MUST be confirmed before the AIF1ADC1 serializer
+        // arms, otherwise the serializer latches a wrong bit-clock
+        // phase relative to LRCLK1 and produces the L/R digital-capture
+        // asymmetry symptoms documented in AUDIO-01 §2 (0x0000/0x8000
+        // bimodal on one slot, or an 11+5 bit-split across both slots,
+        // depending on which phase offset N the metastable arm picked).
+        //
+        // The earlier static `delay_busy(20_000)` covered the
+        // worst-case 30–50 ms WM8994 FLL lock time only on average,
+        // not under cold-boot conditions where BCLK1 is just coming
+        // up from a power-removed state. The poll-and-retry path
+        // makes the post-FLL state deterministic across boots.
+        //
+        // On `FllLockOutcome::Failed`, return immediately — the
+        // codec is in an undefined state and the remainder of
+        // init_record (AIF1 framing, ADC enables, mixer routing,
+        // HP output stage) MUST NOT proceed (AUDIO-01 §12 (d) + (f)).
+        let lock_outcome = self.fll1_enable_and_wait_lock_bclk1()?;
+        if matches!(lock_outcome, FllLockOutcome::Failed) {
+            return Ok(lock_outcome);
+        }
 
         // Step 13 — AIF1 format BEFORE clocks (Cube order). R0x300:
         //   bits 4:3 AIF1_FMT = 0b10 (I²S)
@@ -633,13 +727,39 @@ where
         // masking the problem until the AIF1 digital path is exercised.
         // Multi-session bench debug 2026-04-30 → 2026-05-01.
         //
-        // Bits 10:0 = AIF1{ADC,DAC}_RATE: BCLK1 / LRCLK1 ratio used by
-        // the codec to derive its internal SR-dependent filters.
-        // 0x040 = 64 — matches a 32-BCLK-per-stereo-frame layout
-        // padded internally to 32-bit slots, codec reset default.
-        // Keep the rate field at 0x040 and OR in bit 11 (LRCLK_DIR
-        // slave-mode enable). Final value = 0x0840.
-        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0840; // bit 11 + AIF1xxx_RATE = 64
+        // Bits 10:0 = AIF1{ADC,DAC}_RATE: the BCLK1 / LRCLK1 ratio.
+        // Per `docs/audio/01-codec-bringup.md` AUDIO-01 §15 amendment
+        // 2026-05-19-c (bench-driven): this MUST match the actual ratio
+        // produced by the SAI master, not a "codec reset default" or
+        // CubeH7-BSP-inherited value. With the SAI1 master configured
+        // for a 32-BCLK frame with two 16-bit slots (the common stereo
+        // I²S 16-bit configuration), BCLK1 / LRCLK1 = 32, so the field
+        // value is 0x020. With bit 11 set, AIF1_LRCLK_SLAVE_ENA = 0x0820.
+        //
+        // **Historical bug** (DAA bench 2026-05-19, fixed by AUDIO-01-c):
+        // earlier versions hardcoded 0x0840 (RATE=64) with a comment
+        // claiming "matches 32-BCLK-per-stereo-frame layout padded
+        // internally to 32-bit slots." Bench measurement on STM32H747I-
+        // DISCO refuted the claim: with RATE=64 mismatched against
+        // actual BCLK1/LRCLK1 = 32, the codec's AIF1ADC1L serializer
+        // state machine fails asymmetrically — it emits valid data
+        // only during the last 5 BCLKs of what it believes is the L
+        // MSB window, holding AIF1ADCDAT at logic 0 (per TDM=0
+        // behavior) for the remaining 11 BCLKs of slot 0. The R
+        // serializer is silicon-level more tolerant of the mismatch
+        // and emits cleanly. Net symptom: L channel reads as a 2-value
+        // bimodal `0x0000 / 0x001f` at SAI1 RX (bottom 5 bits varying,
+        // top 11 zero); R reads as clean 16-bit audio. Setting RATE=32
+        // (matching the actual SAI framing) recovers L to ±99% FS with
+        // L/R correlation +0.92 on a stereo source.
+        //
+        // **Caveat:** this value assumes the caller's SAI master
+        // generates a 32-BCLK frame. If a future use case configures
+        // a different framing (e.g. TDM 4-slot at 64-BCLK frame), the
+        // RATE field MUST be updated to match. A parameterizable
+        // version of `init_record` is future work — see AUDIO-NN
+        // chapter pipeline.
+        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0820; // bit 11 (LRCLK_DIR) + RATE=32
         self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
         self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
 
@@ -788,7 +908,7 @@ where
         // HPOUT1 to drive a load. See [`REG_CLASSW_HP`] doc-comment.
         self.write_reg(REG_CLASSW_HP, 0x0005)?;
 
-        Ok(())
+        Ok(lock_outcome)
     }
 
     /// Begin the WM8994 HP output stage enable sequence per
@@ -989,6 +1109,97 @@ where
         }
 
         Ok(())
+    }
+
+    /// Enable FLL1 (in the BCLK1-referenced configuration used by
+    /// [`Self::init_record`]) and poll R0x732 bit 5 for lock
+    /// acquisition with timeout + retry.
+    ///
+    /// Implements `docs/audio/01-codec-bringup.md` AUDIO-01 §9
+    /// INV-AUDIO-01-1 (poll FLL1_LOCK_STS level status) and
+    /// INV-AUDIO-01-2 (100 ms per-attempt timeout, 3 max retries,
+    /// 1 ms poll interval). On the cold-boot path where FLL1 takes
+    /// 30–50 ms to acquire lock against a power-up-transient BCLK1
+    /// reference (WM8994 p.202), the original static 20 ms delay
+    /// after `FLL1_ENA = 1` is insufficient — the post-FLL register
+    /// writes in `init_record` then arm the AIF1ADC1 serializer
+    /// against an unstable SYSCLK and latch a wrong bit-clock phase
+    /// (AUDIO-01 §2 documents the symptom shapes — 0x0000/0x8000
+    /// bimodal on one slot, or 11+5 bit-split, depending on the
+    /// metastable arm).
+    ///
+    /// Polls **R0x732 bit 5 (FLL1_LOCK_STS, level/raw status)** rather
+    /// than R0x731 bit 5 (FLL1_LOCK_EINT, the edge-latched event).
+    /// The initial AUDIO-01 ratification specified the edge latch,
+    /// but bench validation 2026-05-19 found the edge latch never
+    /// fires under our init_record sequence (post-software-reset
+    /// FLL is disabled; FLL_ENA=1 transition should latch but the
+    /// clear-write at the start of each attempt was racing with the
+    /// hardware in a way that lost the event). Level status has no
+    /// transition-timing window. AUDIO-01 §15 amendment
+    /// `2026-05-19-b` documents the correction.
+    ///
+    /// Precondition: caller has already programmed R0x224, R0x223,
+    /// R0x222, R0x221 (FLL config; F_REF = BCLK1, N = 64, K = 0,
+    /// OUTDIV = 8) per the values fixed in
+    /// [`Self::init_record`]'s body just above this call.
+    ///
+    /// Returns [`FllLockOutcome`] per AUDIO-01 §6. On `Failed` the
+    /// caller MUST return early from `init_record` without arming
+    /// the AIF1ADC1 serializer.
+    fn fll1_enable_and_wait_lock_bclk1(&mut self) -> Result<FllLockOutcome, I2C::Error> {
+        /// Per-attempt lock-poll timeout, milliseconds. AUDIO-01 §9
+        /// INV-AUDIO-01-2.
+        const PER_ATTEMPT_TIMEOUT_MS: u32 = 100;
+        /// Inter-poll interval, milliseconds. AUDIO-01 §9 INV-AUDIO-01-2.
+        const POLL_INTERVAL_MS: u32 = 1;
+        /// FLL1 re-arm wait between FLL1_ENA = 0 and the next FLL
+        /// config + FLL1_ENA = 1, milliseconds.
+        const RE_ARM_WAIT_MS: u32 = 5;
+        /// Maximum retry count after the initial attempt. AUDIO-01 §9
+        /// INV-AUDIO-01-2.
+        const MAX_RETRIES: u8 = 3;
+
+        let poll_iters = PER_ATTEMPT_TIMEOUT_MS / POLL_INTERVAL_MS;
+
+        for attempt in 0..=MAX_RETRIES {
+            // Step 1: on retry, FLL1 was running but failed to lock.
+            // Disable it, wait briefly to let the FLL block settle,
+            // then re-write the FLL config registers (values mirror
+            // what init_record programmed just before calling this
+            // helper) and re-enable.
+            if attempt > 0 {
+                self.write_reg(REG_FLL1_CTRL_1, 0x0000)?; // FLL1_ENA = 0
+                delay_busy(RE_ARM_WAIT_MS * 1_000);
+                self.write_reg(REG_FLL1_CTRL_5, 0x0003)?; // REFCLK_SRC=BCLK1, REFCLK_DIV=÷1
+                self.write_reg(REG_FLL1_CTRL_4, 0x0800)?; // N=64
+                self.write_reg(REG_FLL1_CTRL_3, 0x0000)?; // K=0
+                self.write_reg(REG_FLL1_CTRL_2, 7u16 << 8)?; // OUTDIV-1=7, FRATIO=0
+            }
+            // FLL1_ENA = 1 (re-arm on retry, initial arm on attempt 0).
+            self.write_reg(REG_FLL1_CTRL_1, 0x0001)?;
+
+            // Step 2: poll R0x732 bit 5 (FLL1_LOCK_STS, level) every
+            // POLL_INTERVAL_MS until set, up to PER_ATTEMPT_TIMEOUT_MS
+            // total. Level polling needs no clear-write — a read of
+            // bit 5 = 1 simply means "FLL1 is locked right now."
+            for _ in 0..poll_iters {
+                delay_busy(POLL_INTERVAL_MS * 1_000);
+                let status = self.read_reg(REG_FLL1_LOCK_STS)?;
+                if status & FLL1_LOCK_STS_BIT != 0 {
+                    return Ok(if attempt == 0 {
+                        FllLockOutcome::LockedFirstTry
+                    } else {
+                        FllLockOutcome::LockedAfterRetry { attempts: attempt }
+                    });
+                }
+            }
+            // Per-attempt timeout reached without lock. Loop continues
+            // to next retry; on attempt == MAX_RETRIES we fall through
+            // and return Failed.
+        }
+
+        Ok(FllLockOutcome::Failed)
     }
 
     /// Configure output routing and power for the selected output device.
