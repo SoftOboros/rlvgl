@@ -206,6 +206,44 @@ code MUST:
 - Poll `int_raw` for MST_COMPLETE / NACK / TIMEOUT / ARBITRATION_LOST
   / END_DETECT.
 
+### Bench-verified update (2026-05-30)
+
+BEETLE-03 bench session 2026-05-30 resolved [ERRATA-005](../../../docs/beetle-esp32p4/ERRATA.md#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start)
+and produced the empirical ranking of which template defects are
+actually load-bearing on P4 silicon:
+
+- **LOAD-BEARING (must-fix for P4 to work at all):** the SOC-level
+  APB clock gate `HP_SYS_CLKRST.soc_clk_ctrl2.i2c0_apb_clk_en` (bit
+  12) — *not in the original defect list above* — is required for
+  any I2C0 register write to reach the silicon at all. Without it,
+  every CTR/timing/filter write in the current template (and the
+  Part-A-fix template) silently no-ops; reads return reset values.
+  The template MUST emit this write as the FIRST thing in
+  `init_<i2c>()`. **This is the single most critical addition.**
+- **LOAD-BEARING:** the bus-clock-select fix on
+  `HP_SYS_CLKRST.peri_clk_ctrl10` (replacing the current `I2C0.clk_conf`
+  writes) per Part-A item 1 — without this, the master FSM has no
+  clock source and the SCL generator never ticks.
+- **NOT VERIFIED LOAD-BEARING ON P4:** items 2–6 in "Defects in detail"
+  above (scl_wait_high_period zeroing, missing CTR fields, missing
+  filter, missing timeout, missing int_ena, missing fsm_rst). The
+  consumer-side workaround in BEETLE `route_pins` writes them all,
+  but ablating each individually was not attempted at the bench. They
+  remain plausible C3-vs-P4 differences that the template should
+  still emit for correctness, but the bench did not prove any of them
+  block startup on its own.
+
+**Separately, a transaction-layer defect surfaced that is NOT a
+template issue but DOES apply to any future P4-targeted I2C
+transaction code (template or consumer-side):** the COMD command list
+MUST be terminated with `OP_END (4)` in **every** slot past the last
+real command (slots 3–7 if the real commands occupy 0–2). Writing
+END only at one slot past the last command (matching IDF's
+per-chunk pattern) is insufficient on P4 — the FSM walks into stale
+data in higher slots and treats unknown op_codes as
+"continue / loop". Documented for downstream transaction-layer
+consumers.
+
 ### Open question
 
 Whether to go template-conditional (the chipdb-vintage approach above)

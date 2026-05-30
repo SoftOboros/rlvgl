@@ -319,6 +319,64 @@ A conforming BEETLE-03 implementation MUST:
     in [README §Bench setup](README.md#bench-setup) so future
     sessions can replicate in ~5 minutes.
 
+- **2026-05-30** (bench session — ERRATA-005 RESOLVED, gates (a)–(d)
+  closed) — Eleven dispatch rounds on the same bench rig as 2026-05-29.
+  Operator: Ira. Both root causes of ERRATA-005 identified and fixed
+  in [`dfr0550/i2c0.rs`](../../examples/beetle-esp32p4/src/dfr0550/i2c0.rs):
+
+  1. **APB clock gate** —
+     `HP_SYS_CLKRST.soc_clk_ctrl2.i2c0_apb_clk_en` (bit 12) was never
+     enabled. The BSP generator's `clocks::init` enables only the
+     *function* clock (`peri_clk_ctrl10.i2c0_clk_en`); the *APB*
+     register-access clock is a separate gate on the SOC level.
+     Without it, every I2C0 register write silently no-ops. The
+     round-2 LED probe (CTR.ms_mode read-back returned 0 after
+     writing 1) was the diagnostic that surfaced it. Filed
+     upstream as
+     [CHIPS-ESP-001](../../chipdb/rlvgl-chips-esp/docs/ERRATA.md#chips-esp-001--peripheralsrsjinja-i2c-init-body-is-c3-only-not-p4-compatible)
+     §"Bench-verified update".
+  2. **END markers in unused COMD slots** — the master FSM walks
+     COMD slots 0-7 autonomously after `trans_start`. With `END`
+     only at slot 3 (one past the last real command, matching IDF's
+     per-chunk pattern), the FSM walked into stale slot 4-7 data
+     (post-reset op_code = 0 = invalid) and treated it as
+     "continue / loop", generating endless I2C-shaped traffic on
+     SCL/SDA. Filling slots 3–7 with `OP_END` (4) every transaction
+     halts the FSM after the intended STOP.
+
+  After both fixes, round 11 produced a clean wake protocol —
+  POWERON + PORTB poll + PORTA + PWM — on the bench. Saleae trace
+  showed a brief I2C burst at boot followed by silence.
+
+  - **Acceptance gates closed:** (a) confirmed already on 2026-05-29.
+    (b) wake succeeds end-to-end. (c) Hang error path retained but
+    now unused. (d) `I2cBridgeWake` signal — repurposed status code
+    = 1 on the LED to signal success (see ERRATA-005 §"Active-low
+    LED caveat" — solid-on status = 0 is invisible on this board's
+    LED).
+
+  - **Acceptance gates pending:** (e) full bring-up of PORTA + PWM
+    sequence is exercised; visual confirmation of panel backlight
+    coming on awaits next session.
+
+  - **Red herrings ablated** during the eleven rounds (do not
+    re-test in future sessions): `fsm_rst` per-transaction vs
+    init-only; pad-routing-order vs `conf_upgate`; op_code mapping
+    (IDF macros `RESTART=6, STOP=2, READ=3` are authoritative for
+    P4 silicon, despite struct.h doc claiming `0/1/2/3/4`);
+    `force_norst`; `bus_busy` static; `sample_scl_level`;
+    `slv_tx_auto_start_en`; arbitrary timing mismatches with IDF's
+    bus-timing solver. See ERRATA-005 §"What didn't work" for the
+    full ablation log.
+
+  - **Diagnostic technique** that worked: LED-coded register
+    read-back probes (codes 20-29 for init-state checks, 30-36 for
+    post-Hang FSM state capture, 50 for FIFO-write detection,
+    5/7/8/9 for bridge-protocol errors). Each round added ONE more
+    probe or ONE register change; bench operator decoded the LED
+    count visually in seconds. Massively faster than `idf.py
+    monitor`-style serial debugging on unfamiliar silicon.
+
 ---
 
 **[← BEETLE-02](BEETLE-02-LDO.md)** · **[Index](README.md)** · **Next →** [BEETLE-04 — DSI Clocks](BEETLE-04-DSI-CLOCKS.md)

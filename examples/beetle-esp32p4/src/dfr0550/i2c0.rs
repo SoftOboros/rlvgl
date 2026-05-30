@@ -25,11 +25,25 @@
 
 #![allow(dead_code)]
 
+use core::sync::atomic::{AtomicU8, Ordering};
 use esp32p4 as pac;
+
+/// Diagnostic: `I2C0.sr.scl_main_state_last` value captured on the most
+/// recent `publish_and_run` Hang exit. Read by the LED status loop to
+/// emit a 30+state code so the bench operator can tell whether the
+/// master FSM moved at all (state=0=IDLE) or got stuck partway through
+/// (1=AddressShift, 2=AckAddress, ...). Set to 0xFF (sentinel "no hang
+/// captured yet") at boot.
+pub static LAST_HANG_STATE: AtomicU8 = AtomicU8::new(0xFF);
 
 const I2C0_SCL_SIG: u16 = 68;
 const I2C0_SDA_SIG: u16 = 69;
 
+// ESP32-P4 COMD register op_code values per IDF
+// `hal/esp32p4/include/hal/i2c_ll.h` — IDF-authoritative since IDF
+// runs in production on real P4 silicon. The i2c_struct.h doc comment
+// claims a different mapping (0/1/2/3/4 = RSTART/WRITE/READ/STOP/END)
+// but is stale/inherited from an earlier chip variant.
 const OP_RESTART: u32 = 6;
 const OP_WRITE: u32 = 1;
 const OP_READ: u32 = 3;
@@ -57,6 +71,56 @@ const fn cmd(op: u32, byte_num: u8, ack_en: bool, ack_exp: bool, ack_val: bool) 
 /// fun_ie / fun_wpu fields are already set.
 pub unsafe fn route_pins() {
     let p = unsafe { pac::Peripherals::steal() };
+
+    // **Pad routing FIRST.** Connect GPIO 8 ↔ I2C0_SCL and GPIO 7 ↔
+    // I2C0_SDA through the GPIO matrix BEFORE doing any I2C0-peripheral
+    // initialisation. Critically the func_in_sel (peripheral input ← GPIO)
+    // must be routed before `conf_upgate` latches the master config —
+    // otherwise the peripheral's SCL/SDA input signals (68/69) read as
+    // their unrouted default (0 = held low) and the master latches
+    // "bus held" at startup, refusing to issue START even though
+    // `sr.bus_busy` reads 0 at probe time. BEETLE ERRATA-005 round 7:
+    // END marker fixed the runaway FSM loop, but the underlying IDLE-
+    // never-leaves-IDLE failure traced to this pad-vs-conf_upgate
+    // ordering.
+    p.GPIO
+        .enable_w1ts()
+        .write(|w| unsafe { w.bits((1u32 << SCL_GPIO) | (1u32 << SDA_GPIO)) });
+    p.GPIO
+        .pin(SCL_GPIO as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+    p.GPIO
+        .pin(SDA_GPIO as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SCL_SIG) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SDA_SIG) });
+    p.GPIO
+        .func_in_sel_cfg(I2C0_SCL_SIG as usize)
+        .modify(|_, w| unsafe { w.in_sel().bits(SCL_GPIO).sel().set_bit() });
+    p.GPIO
+        .func_in_sel_cfg(I2C0_SDA_SIG as usize)
+        .modify(|_, w| unsafe { w.in_sel().bits(SDA_GPIO).sel().set_bit() });
+
+    // **APB clock gate.** ESP32-P4 splits the per-peripheral clocks into two
+    // gates: the *function* clock (`peri_clk_ctrl10.i2c0_clk_en`, drives
+    // the FSM and SCL generator) AND the *APB* clock
+    // (`soc_clk_ctrl2.i2c0_apb_clk_en` at bit 12, drives register-block
+    // access). The BSP's `clocks::init` enables only the function clock.
+    // Without the APB clock, every write to the I2C0 register block goes
+    // into a dead bus — reads return hardware-reset values, writes are
+    // silently dropped. Round-2 LED diagnostic (BEETLE ERRATA-005 path 1,
+    // 2026-05-29) confirmed this by reading back `ctr.ms_mode = 0`
+    // immediately after writing `ms_mode = 1`. Enable the APB gate FIRST,
+    // before any other I2C0-side write. See BEETLE ERRATA-005 and
+    // CHIPS-ESP-001 — the BSP-generator's `peripherals.rs.jinja` lacks the
+    // per-chip APB-side gate (only the source-clock gate is emitted).
+    p.HP_SYS_CLKRST
+        .soc_clk_ctrl2()
+        .modify(|_, w| w.i2c0_apb_clk_en().set_bit());
 
     // Select the I2C0 source clock. Per IDF `i2c_ll_set_source_clk` in
     // `hal/esp32p4/include/hal/i2c_ll.h`, this lives in
@@ -203,12 +267,32 @@ pub unsafe fn route_pins() {
         w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit()
     });
 
-    // Reset the master FSM with conf_upgate so the new timing latches.
-    p.I2C0.ctr().modify(|_, w| {
-        w.fsm_rst().set_bit();
-        w.conf_upgate().set_bit();
-        w
+    // Enable the master event interrupts ONCE at init (IDF does this
+    // once via `i2c_ll_master_enable_tx_it`, not per-transaction). The
+    // P4 master FSM expects these bits set so it knows which events to
+    // raise. Bit positions per i2c_struct.h:
+    //   NACK            = bit 10
+    //   TIME_OUT        = bit 8
+    //   TRANS_COMPLETE  = bit 7
+    //   ARBITRATION_LOST= bit 5
+    //   END_DETECT      = bit 3
+    p.I2C0.int_ena().write(|w| unsafe {
+        w.bits((1 << 10) | (1 << 8) | (1 << 7) | (1 << 5) | (1 << 3))
     });
+
+    // Latch the master init writes with `conf_upgate`. Critically, do
+    // NOT pulse `fsm_rst` here. On the ESP32-P4, `fsm_rst` and
+    // `conf_upgate` are both WT (write-triggered) bits whose actions
+    // propagate over multiple hardware clock cycles. Pulsing fsm_rst
+    // and conf_upgate back-to-back may latch config while the FSM
+    // reset is still in flight, wedging the FSM in a partially-reset
+    // state that never advances past IDLE (BEETLE ERRATA-005 round 3,
+    // scl_main_state_last = 0 after trans_start). IDF's
+    // `i2c_master.c` post-init sequence (line 822) only calls
+    // `i2c_ll_update` (= conf_upgate); the hardware reset of the
+    // I2C0 register block via `i2c_ll_reset_register` upstream is
+    // sufficient to bring the FSM up cleanly.
+    p.I2C0.ctr().modify(|_, w| w.conf_upgate().set_bit());
 
     // Output enable for both pins (open-drain — line pulled high by ext.
     // pull-up, master pulls low through the pad).
@@ -251,10 +335,32 @@ pub fn write_reg(addr: u8, reg: u8, value: u8) -> Result<(), I2cError> {
     write_fifo_byte(&p, reg);
     write_fifo_byte(&p, value);
 
-    // CMD list: RESTART → WRITE 3 bytes (with ACK check) → STOP.
+    // CMD list: RESTART → WRITE 3 bytes (with ACK check) → STOP → END.
+    // The trailing END (op_code=4) is REQUIRED. Without it the master
+    // FSM walks past slot 2 into slots 3-7 (stale data from reset /
+    // prior transactions, op_code typically 0 = invalid) and loops
+    // forever generating phantom SCL/SDA traffic — never asserting
+    // TRANS_COMPLETE. IDF always appends END at `cmd_idx + 1` after
+    // the last real command (see `s_i2c_write_command` line 204 in
+    // `esp_driver_i2c/i2c_master.c`). Bench round 7 of BEETLE
+    // ERRATA-005 — Saleae trace showed continuous I2C-shaped pattern
+    // that never terminated, scl_main_state_last sampled as IDLE
+    // because the FSM was cycling through states fast enough that the
+    // poll often caught it at idle moments.
     write_cmd(&p, 0, OP_RESTART, 0, false, false, false);
     write_cmd(&p, 1, OP_WRITE, 3, true, false, false);
     write_cmd(&p, 2, OP_STOP, 0, false, false, false);
+    // Fill ALL remaining slots with END (4). Slot 3 alone wasn't
+    // enough to halt the FSM — empirically the bench observed
+    // continuous runaway with COMD3=END and COMD4-7 left at their
+    // post-reset / stale values (likely op_code=0 = invalid =
+    // implementation-defined → looks like the FSM treats it as
+    // "continue / wrap around to slot 0"). Filling every unused slot
+    // with END leaves no room for the FSM to escape past the
+    // intended terminator. BEETLE ERRATA-005 round 8/9.
+    for slot in 3..=7 {
+        write_cmd(&p, slot, OP_END, 0, false, false, false);
+    }
 
     publish_and_run(&p)
 }
@@ -279,6 +385,10 @@ pub fn read_reg(addr: u8, reg: u8) -> Result<u8, I2cError> {
     write_cmd(&p, 3, OP_WRITE, 1, true, false, false);
     write_cmd(&p, 4, OP_READ, 1, false, false, true); // ack_val=NACK on last byte
     write_cmd(&p, 5, OP_STOP, 0, false, false, false);
+    // Fill remaining slots with END so the FSM can't run away into
+    // stale/zero op_codes past the intended terminator — see write_reg.
+    write_cmd(&p, 6, OP_END, 0, false, false, false);
+    write_cmd(&p, 7, OP_END, 0, false, false, false);
 
     publish_and_run(&p)?;
     Ok(read_fifo_byte(&p))
@@ -334,42 +444,31 @@ fn write_cmd(
 }
 
 fn publish_and_run(p: &pac::Peripherals) -> Result<(), I2cError> {
-    // Reset the master FSM and latch the new COMD list. IDF's
-    // i2c_ll_master_fsm_rst sets fsm_rst=1 AND conf_upgate=1 in the
-    // same write (both are self-clearing). Without this, the master
-    // FSM stays in whatever state the bootloader left it (typically
-    // IDLE but sometimes BUS_BUSY) and trans_start has no effect,
-    // producing I2cError::Hang on every transaction.
-    p.I2C0.ctr().modify(|_, w| {
-        w.fsm_rst().set_bit();
-        w.conf_upgate().set_bit();
-        w
-    });
-
-    // Clear all pending interrupt-raw bits.
+    // Per-transaction sequence per IDF `i2c_hal_master_trans_start`:
+    //   1. clear stale int_raw bits,
+    //   2. wait for bus_busy to drop,
+    //   3. conf_upgate=1 (latch COMD list + FIFO data),
+    //   4. trans_start=1 (kick the FSM).
+    //
+    // Critically does NOT pulse fsm_rst here — IDF only does that in
+    // the FSM-recovery path. Pulsing fsm_rst per-transaction was
+    // observed to leave the master stuck in IDLE on the ESP32-P4 PAC
+    // (BEETLE ERRATA-005 round 3, scl_main_state_last = 0).
     p.I2C0.int_clr().write(|w| unsafe { w.bits(0xffff_ffff) });
 
-    // Enable master TX interrupts. Per IDF `i2c_ll_master_enable_tx_it`
-    // in `hal/esp32p4/include/hal/i2c_ll.h`, the master FSM expects
-    // these interrupt-enable bits to be set before `trans_start` —
-    // empirically, some Espressif I2C IP revisions don't advance past
-    // initial states if no relevant interrupts are unmasked. The mask
-    // covers NACK / TIME_OUT / TRANS_COMPLETE / ARBITRATION_LOST /
-    // END_DETECT — bit positions (from i2c_struct.h):
-    //   NACK             = bit 10
-    //   TIME_OUT         = bit 8
-    //   TRANS_COMPLETE   = bit 7  (a.k.a MST_COMPLETE)
-    //   ARBITRATION_LOST = bit 5
-    //   END_DETECT       = bit 3
-    let master_tx_int_mask: u32 =
-        (1 << 10) | (1 << 8) | (1 << 7) | (1 << 5) | (1 << 3);
-    p.I2C0
-        .int_ena()
-        .write(|w| unsafe { w.bits(master_tx_int_mask) });
+    // Bus-busy poll matches IDF `s_i2c_send_command_async` pre-flight.
+    // Bounded so a stuck bus surfaces as I2cError::Timeout rather than
+    // an infinite loop.
+    let mut bus_wait: u32 = 0;
+    while p.I2C0.sr().read().bus_busy().bit_is_set() {
+        bus_wait = bus_wait.wrapping_add(1);
+        if bus_wait > 100_000 {
+            return Err(I2cError::Timeout);
+        }
+    }
 
-    // Re-latch (cmd list / fifo data written between fsm_rst and here).
+    // Latch then trigger — two separate writes per IDF.
     p.I2C0.ctr().modify(|_, w| w.conf_upgate().set_bit());
-    // Trigger transaction.
     p.I2C0.ctr().modify(|_, w| w.trans_start().set_bit());
 
     // Poll for done / NACK / timeout / arbitration. Per i2c_ll.h:
@@ -395,6 +494,17 @@ fn publish_and_run(p: &pac::Peripherals) -> Result<(), I2cError> {
         }
         spins = spins.wrapping_add(1);
         if spins > 1_000_000 {
+            let sr = p.I2C0.sr().read();
+            // Encode txfifo_cnt in upper nibble, scl_main_state_last in
+            // lower 3 bits. If txfifo_cnt is 0 despite us pushing
+            // bytes, the FIFO writes themselves aren't sticking — a
+            // separate failure mode from a stalled FSM. The LED status
+            // loop in `bsp_pac_main` decodes this with priority:
+            //   txfifo_cnt == 0 → code 50 (FIFO writes silently dropped)
+            //   otherwise → code 30 + scl_main_state_last (FSM stall)
+            let state = sr.scl_main_state_last().bits();
+            let txcnt = sr.txfifo_cnt().bits();
+            LAST_HANG_STATE.store((txcnt << 3) | (state & 0x07), Ordering::Relaxed);
             return Err(I2cError::Hang);
         }
     }
@@ -406,4 +516,86 @@ pub enum I2cError {
     Timeout,
     Arbitration,
     Hang,
+}
+
+/// Read back the registers we wrote in [`route_pins`] and verify the
+/// values stuck. Returns 0 if every probe passes; otherwise a distinct
+/// LED-blink count in the 20-29 range identifying which write did not
+/// stick. Implements path (1) of [BEETLE ERRATA-005] fix prescription —
+/// the LED-coded register read-back diagnostic.
+///
+/// Codes:
+///   20 — `HP_SYS_CLKRST.peri_clk_ctrl10.i2c0_clk_en` reads back as 0
+///        (peripheral not actually ungated — write didn't reach the
+///        clock-control register block at all)
+///   21 — `HP_SYS_CLKRST.peri_clk_ctrl10.i2c0_clk_src_sel` reads back
+///        as 1 (we wrote 0 = XTAL_CLK)
+///   22 — `I2C0.ctr.ms_mode` reads back as 0 (master-mode write didn't
+///        stick — most diagnostic single bit)
+///   23 — `I2C0.ctr.clk_en` reads back as 1 (we cleared it)
+///   24 — `I2C0.scl_low_period` reads back not 200 (timing register
+///        write didn't stick)
+///   25 — `I2C0.filter_cfg.scl_filter_en` reads back as 0 (filter
+///        enable write didn't stick)
+///   26 — `SOC_CLK_CTRL2.i2c0_apb_clk_en` reads back as 0 (APB
+///        register-access clock for I2C0 didn't get enabled — every
+///        I2C0 register write below would silently no-op; this is
+///        the round-2 root cause of the original code-22 fault).
+///
+/// If this returns 0 the LED diagnostic should proceed to
+/// `run_bringup()` and we trust path (2) of ERRATA-005 (IDF diff) as
+/// the next investigation step.
+///
+/// # Safety
+///
+/// Steals the PAC; must run after [`route_pins`].
+pub unsafe fn probe_init_state() -> u8 {
+    let p = unsafe { pac::Peripherals::steal() };
+
+    let pcc10 = p.HP_SYS_CLKRST.peri_clk_ctrl10().read();
+    if !pcc10.i2c0_clk_en().bit_is_set() {
+        return 20;
+    }
+    if pcc10.i2c0_clk_src_sel().bit_is_set() {
+        return 21;
+    }
+
+    if !p
+        .HP_SYS_CLKRST
+        .soc_clk_ctrl2()
+        .read()
+        .i2c0_apb_clk_en()
+        .bit_is_set()
+    {
+        return 26;
+    }
+
+    let ctr = p.I2C0.ctr().read();
+    if !ctr.ms_mode().bit_is_set() {
+        return 22;
+    }
+    if ctr.clk_en().bit_is_set() {
+        return 23;
+    }
+
+    let slp = p.I2C0.scl_low_period().read().bits();
+    if slp != 200 {
+        return 24;
+    }
+
+    let fc = p.I2C0.filter_cfg().read();
+    if !fc.scl_filter_en().bit_is_set() {
+        return 25;
+    }
+
+    // SR.bus_busy at init time: should be 0. If it reads as 1, the
+    // master sees the bus as held and will refuse to start any
+    // transaction. SCL/SDA pulled low externally, glitch-filter latch,
+    // or stale FSM state from before our reset pulse can all cause
+    // this. Code 27 surfaces it before we even attempt `trans_start`.
+    if p.I2C0.sr().read().bus_busy().bit_is_set() {
+        return 27;
+    }
+
+    0
 }

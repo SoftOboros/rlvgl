@@ -68,9 +68,20 @@ fn main() -> ! {
     // Set up the user LED so we can encode bring-up status in blink count.
     unsafe { led_init() };
 
-    // Diagnostic blink count = which step failed (1=I2C wake, 2=PHY lock,
-    // 3=PHY lane cal, 4=DPI panel, 0=all OK = solid ON).
-    let status: u8 = unsafe { run_bringup() };
+    // Path (1) of BEETLE ERRATA-005: read back the I2C0 init registers
+    // and surface a 20-29 LED code if any write didn't stick. If this
+    // returns 0, write-sticking is confirmed and the failure is
+    // elsewhere — at which point we fall through to run_bringup() and
+    // expect the same status=11 (Hang) we've been getting, which routes
+    // the investigation to path (2) (IDF first-light register diff).
+    //
+    // Diagnostic blink count:
+    //   1-4   = DSI / DPI bring-up step failures (run_bringup)
+    //   5-9   = I2C0 wake-step failures (run_bringup)
+    //   11    = I2C0 master Hang sentinel (run_bringup)
+    //   20-29 = I2C0 init register read-back probe failed (this call)
+    let probe = unsafe { dfr0550::i2c0::probe_init_state() };
+    let status: u8 = if probe != 0 { probe } else { unsafe { run_bringup() } };
     led_status_loop(status)
 }
 
@@ -117,17 +128,43 @@ unsafe fn run_bringup() -> u8 {
         use dfr0550::i2c_bridge::BridgeError;
         let wake_result = dfr0550::i2c_bridge::wake();
         debug_marker_set(false);
-        // FLASH SANITY MARKER: return 11 for Hang instead of 6, so we
-        // can tell if the binary on the chip is actually current.
+        // Hang now returns 30 + scl_main_state_last so the bench operator
+        // can decode how far the master FSM got before the spin loop
+        // gave up: 30=Idle (never moved), 31=AddressShift, 32=AckAddress,
+        // 33=RxData, 34=TxData, 35=SendAck, 36=WaitAck. See BEETLE
+        // ERRATA-005 — distinguishes "master never started" from
+        // "master started but stalled mid-byte".
+        use core::sync::atomic::Ordering;
         match wake_result {
             Ok(()) => {}
             Err(BridgeError::I2c(I2cError::Nack)) => return 5,
-            Err(BridgeError::I2c(I2cError::Hang)) => return 11,
+            Err(BridgeError::I2c(I2cError::Hang)) => {
+                // Encoded: (txfifo_cnt << 3) | scl_main_state_last.
+                // Priority: txfifo_cnt == 0 outranks FSM state because
+                // an empty FIFO means our bytes never made it to the
+                // hardware — FSM state is meaningless in that case.
+                let st = dfr0550::i2c0::LAST_HANG_STATE.load(Ordering::Relaxed);
+                let txcnt = st >> 3;
+                let scl_state = st & 0x07;
+                if txcnt == 0 {
+                    return 50;
+                }
+                return 30u8.saturating_add(scl_state);
+            }
             Err(BridgeError::I2c(I2cError::Timeout)) => return 7,
             Err(BridgeError::I2c(I2cError::Arbitration)) => return 8,
             Err(BridgeError::NotReady) => return 9,
         }
 
+        // Round-11 BEETLE ERRATA-005: short-circuit on wake success.
+        // We return 1 instead of 0 because the on-board LED appears to
+        // be active-low (in blink-all every pin goes high then low
+        // every ~1 s; LED visible in the low phase). status=0 puts the
+        // LED solid HIGH which on an active-low LED looks indistinguishable
+        // from "no power". status=1 produces a clear 1-blink pattern so
+        // the bench operator can distinguish success from "chip dead".
+        return 1;
+        #[allow(unreachable_code)]
         // Phase 5: DSI host @ 1 lane × 750 Mbps.
         let dsi = match dfr0550::dsi_host::init(
             dfr0550::DSI_LANES,

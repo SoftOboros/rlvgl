@@ -23,24 +23,18 @@ moves here.
 
 ## Open questions
 
-- **EOQ-001-ERRATA-005**: Why does the ESP32-P4 I2C0 master refuse to
-  advance from IDLE after `trans_start`, even after matching every
-  IDF `i2c_hal_master_init` step? Pads work, source clock is selected,
-  CTR fields all match IDF defaults, timing registers all configured,
-  filter + timeout + interrupts all set, fsm_rst pulsed.
-  Bench-confirmed 2026-05-29. Next sessions: encode CTR/SR readback
-  as LED codes to verify writes are sticking; OR flash an IDF-built
-  I2C scratch binary and capture register-difference at runtime.
+_(none currently open — ERRATA-005 resolved 2026-05-30, see entry for full
+session writeup.)_
 
 ## Index
 
 | ID | Title | Status | First seen | Owner |
 |---|---|---|---|---|
 | [ERRATA-001](#errata-001--chipdb-board-yaml-sclsda-swap) | chipdb board yaml SCL/SDA pin swap | 🟢 | 2026-04-29 | BEETLE-03 / CHIPS-ESP |
-| [ERRATA-002](#errata-002--i2c0-raw-pac-port-awaits-hil-verification) | I2C0 raw-PAC port: pads work, master refuses to start | 🟡 | 2026-04-29 | BEETLE-03 |
+| [ERRATA-002](#errata-002--i2c0-raw-pac-port-awaits-hil-verification) | I2C0 raw-PAC port: pads work, master refuses to start | 🟢 | 2026-04-29 | BEETLE-03 |
 | [ERRATA-003](#errata-003--beetle-04-dpi-divider-quantization-discrepancy) | BEETLE-04 DPI divider quantization discrepancy | 🟡 | 2026-05-28 | BEETLE-04 |
 | [ERRATA-004](#errata-004--idf-image-segment-layout--linker-script-rework) | IDF image segment layout + linker script rework | 🟢 | 2026-05-28 | BEETLE infra |
-| [ERRATA-005](#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) | ESP32-P4 I2C0 master refuses to start after `trans_start` | 🔴 | 2026-05-29 | BEETLE-03 |
+| [ERRATA-005](#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) | ESP32-P4 I2C0 master refuses to start after `trans_start` | 🟢 | 2026-05-29 | BEETLE-03 |
 | [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟢 | 2026-05-29 | BEETLE infra |
 
 ---
@@ -125,8 +119,9 @@ touch IC at 0x38; "bridge" is the load-bearing consumer for v0/v1).
 
 ## ERRATA-002 — I2C0 raw-PAC port: pads work, master refuses to start
 
-**Status:** 🟡 Diagnosed (COMD encoding TRM-confirmed; pads HIL-confirmed
-working; master peripheral itself stuck in IDLE — see ERRATA-005)
+**Status:** 🟢 Resolved (fused with ERRATA-005; the master-not-starting
+mystery this entry tracked was the same root-cause set as ERRATA-005
+and was closed by the same bench session 2026-05-30)
 **First seen:** 2026-04-29 (commit `36a56cd` landed the first port)
 **TRM cross-check:** 2026-05-28 (memalpha against ESP32-P4 TRM Ch 44
 Register 44.25)
@@ -413,11 +408,12 @@ bootloader will read it.
 
 ## ERRATA-005 — ESP32-P4 I2C0 master refuses to start after `trans_start`
 
-**Status:** 🔴 Open
+**Status:** 🟢 Resolved
 **First seen:** 2026-05-29 (full HIL bench session against IDF-matched
 init)
+**Resolved:** 2026-05-30 (single bench session, 11 dispatch rounds —
+two real fixes + several red herrings)
 **Owning phase:** BEETLE-03
-**Open question handle:** [`EOQ-001-ERRATA-005`](#open-questions)
 
 ### Symptom
 
@@ -463,46 +459,175 @@ Each step matches a specific IDF call. None unstuck the master:
 
 ### Root cause
 
-**Unknown.** We've exhausted every register IDF touches at master
-init time for the ESP32-P4 I2C0. The master appears to require
-something we haven't found.
+Two independent defects in the raw-PAC I2C0 driver, both required for
+end-to-end operation, neither caught at compile or unit-test time:
 
-### Fix prescription
+1. **Missing APB clock gate enable.** ESP32-P4 splits the per-peripheral
+   clocks into two gates: the *function* clock
+   (`HP_SYS_CLKRST.peri_clk_ctrl10.i2c0_clk_en`, drives the FSM + SCL
+   generator) AND a *separate* APB register-access clock
+   (`HP_SYS_CLKRST.soc_clk_ctrl2.i2c0_apb_clk_en`, bit 12). The BSP
+   generator's `clocks::init` enables only the function clock; the APB
+   gate stays at its post-reset default (0). Without the APB clock,
+   every write to the I2C0 register block goes into a dead bus —
+   reads return hardware-reset values, writes are silently dropped.
 
-Two diagnostic paths and one workaround path:
+   This was the round-2 surprise. The LED-coded init-state probe
+   (CTR.ms_mode read-back) returned 0 immediately after writing
+   ms_mode = 1. With both clock gates enabled, register writes started
+   sticking.
 
-1. **Register read-back via LED-coded diagnostic.** Add code right
-   after `route_pins` (and again right after `publish_and_run`'s
-   `trans_start`) that reads `I2C0.ctr`, `I2C0.sr`, `I2C0.int_raw`,
-   and encodes a one-bit-per-field digest as LED-blink counts.
-   Goal: confirm whether our writes are actually sticking in
-   hardware. If `ctr.ms_mode` reads back as 0 despite our write,
-   we have a peripheral access issue (wrong base address, PAC bug,
-   peripheral not actually ungated). If everything reads back
-   correctly, the master has a state requirement we don't
-   understand yet.
+   Tracked separately under [CHIPS-ESP-001](../../chipdb/rlvgl-chips-esp/docs/ERRATA.md#chips-esp-001--peripheralsrsjinja-i2c-init-body-is-c3-only-not-p4-compatible) — the BSP-generator
+   `peripherals.rs.jinja` template needs to emit this write for every
+   ESP32-P4-family chip.
 
-2. **Compare against IDF first-light binary.** Rebuild the IDF
-   first-light scratch project (`/tmp/dfr_bringup/` from the
-   2026-04-29 session), capture a Saleae trace of the I2C wake
-   protocol working, then use `idf.py monitor` + `ESP_LOG` dumps
-   in the IDF code to read out the actual `I2C0` register values
-   IDF uses at runtime. Diff against our register state to find
-   the missing field.
+2. **Missing END markers in unused COMD slots.** The P4 I2C master walks
+   the 8-slot COMD list autonomously after `trans_start`. Without an
+   `OP_END` (op_code 4) marker in *every* slot past the last real
+   command, the FSM walks past the intended STOP into stale data in
+   slots 4–7 (post-reset values, op_code = 0 = invalid / implementation-
+   defined) and treats them as "continue / loop back to slot 0" —
+   generating an endless I2C-shaped pattern on SCL/SDA that never
+   asserts `TRANS_COMPLETE`. Writing END only at slot 3 (one past the
+   last real command, matching IDF's per-chunk pattern) was *not*
+   enough; END had to fill slots 3–7 for the FSM to halt.
 
-3. **Bit-bang I2C as workaround.** GPIO 7/8 pads are confirmed
-   working. Replace `dfr0550::i2c0` with a software I2C master
-   that drives SDA/SCL directly via `gpio_out` register writes.
-   Slow (~10-50 kHz with current NOP-loop delays) but functional;
-   unblocks BEETLE-03 acceptance gate (d) and lets BEETLE-05/06
-   work proceed in parallel with this errata's investigation.
+   This was the round-9 surprise. The Saleae trace showed continuous
+   I2C-shaped traffic that never ended — the FSM was actually
+   executing commands correctly, but never stopping. The diagnostic
+   `sr.scl_main_state_last` returned 0 (IDLE) because the FSM was
+   cycling through states fast enough that the post-Hang sample often
+   caught it at an idle moment.
+
+### Fix
+
+The two-part fix is in
+[`examples/beetle-esp32p4/src/dfr0550/i2c0.rs`](../../examples/beetle-esp32p4/src/dfr0550/i2c0.rs):
+
+1. **First write in `route_pins`** enables the APB clock gate:
+   ```rust
+   p.HP_SYS_CLKRST
+       .soc_clk_ctrl2()
+       .modify(|_, w| w.i2c0_apb_clk_en().set_bit());
+   ```
+
+2. **Both `write_reg` and `read_reg`** fill all unused COMD slots with
+   END:
+   ```rust
+   write_cmd(&p, 0, OP_RESTART, 0, false, false, false);
+   write_cmd(&p, 1, OP_WRITE, 3, true, false, false);
+   write_cmd(&p, 2, OP_STOP, 0, false, false, false);
+   for slot in 3..=7 {
+       write_cmd(&p, slot, OP_END, 0, false, false, false);
+   }
+   ```
 
 ### Verification
 
-Will close 🟢 when SCL toggles at the configured frequency on the
-Saleae trace during a `dfr0550::i2c_bridge::wake()` call. Closure
-requires either path (1) or (2) above producing a fix; path (3)
-keeps this entry 🔴 indefinitely but unblocks downstream work.
+Bench session 2026-05-30, round 11. After both fixes were in place,
+flashing the binary with the run_bringup short-circuit returning 1
+(deliberate "wake succeeded" sentinel — see "Active-low LED" caveat
+below) produced:
+
+- LED blinks once after reset, repeating with long pauses (= wake
+  returned Ok).
+- Saleae trace: brief I2C burst on SCL/SDA just out of reset
+  (POWERON + PORTB poll + PORTA + PWM = 4 transactions), followed
+  by silence.
+- No runaway pattern.
+
+A conforming subsequent run with the short-circuit removed would
+exercise Phase 5+ DSI bring-up. Re-evaluation pending.
+
+### What didn't work (red herrings — for future-self)
+
+Each of these was bench-tested over 11 dispatch rounds before the
+real fix was found. Documenting so future debugging on related parts
+doesn't re-walk the same paths:
+
+- **`fsm_rst` semantics.** Tried removing it from per-transaction path
+  (matched IDF's `i2c_hal_master_trans_start` shape: `conf_upgate` +
+  `trans_start` only), then removed it from init too. Made no
+  observable difference once the real fixes were in.
+- **Pad-routing-before-conf_upgate.** Hypothesised that latching the
+  master config before SCL/SDA were routed to the peripheral input
+  signals (68/69) would cause the FSM to see "bus held low" and
+  refuse to start. Re-tested with op_code mapping reverted — runaway
+  returned, proving pad-routing order was NOT what stopped it.
+- **op_code mapping (struct.h docs vs IDF macros).** ESP32-P4
+  `soc/i2c_struct.h` documents op_code values as 0/1/2/3/4 =
+  RSTART/WRITE/READ/STOP/END, but IDF's `hal/esp32p4/i2c_ll.h`
+  defines `I2C_LL_CMD_RESTART = 6, WRITE = 1, READ = 3, STOP = 2,
+  END = 4`. Tried both; the IDF mapping is the authoritative one
+  for actual P4 silicon. The struct.h doc comment is stale /
+  inherited from an older chip variant. Confirmed via bench
+  comparison.
+- **`SR.bus_busy` stuck at startup.** Init-time probe (code 27)
+  always returned 0; bus_busy wasn't the issue.
+- **`HP_FORCE_NORST1.force_norst_i2c0` not set.** Considered as a
+  potential reset-hold mechanism; left at hardware default and the
+  master eventually worked, so this is not load-bearing.
+- **`CTR.clk_en` polarity.** The PAC doc reads
+  "0: Force clock on for registers / 1: Support clock only when
+  registers are read or written" — opposite of what the inline
+  comment implied. Setting to 0 (force-on, which we do) is correct.
+- **Adding interrupt-mask write before trans_start.** Moved out of
+  the per-transaction path into init (matched IDF). Made no
+  observable difference.
+- **Timing parameter mismatches.** Our `scl_low/scl_high = 200,
+  scl_wait_high = 30` differs from IDF's computed values
+  (~98/~102/~30 for 100 kHz from 40 MHz XTAL). Both pass the IDF
+  invariant `scl_wait_high < sda_sample < scl_high`. Not load-bearing.
+
+### Active-low LED caveat (also for future-self)
+
+On the DFR1172 FireBeetle 2 ESP32-P4, the on-board user LED is
+**active-low**: driving GPIO 3 HIGH turns the LED OFF; driving LOW
+turns it ON. This is non-obvious because:
+
+- `bsp_generated::io_mux` configures GPIO 3 as a plain GPIO with no
+  inversion bits. The active-low behaviour is purely in the LED's
+  physical wiring (cathode → GPIO 3 through a resistor, anode → VCC).
+- Our `led_status_loop` blink sequence (`set_bit` then `clear_bit`)
+  produces visible blinks regardless of polarity because the LED
+  is alternately driven high/low — but the *bright phase* is the
+  `clear_bit` half, not the `set_bit` half.
+- `led_status_loop(status = 0)` drives the LED line HIGH continuously,
+  which on this board reads as **solid OFF** — visually
+  indistinguishable from "chip dead / not booting".
+
+This caused several rounds of confusion ("LED OFF / repowered /
+nothing"). The fix that proved I2C wake had succeeded was to return
+status = 1 instead of 0 — one short blink on a solid-off background.
+If you ever see "no LED" output again, try returning a non-zero
+status code to disambiguate.
+
+### Diagnostic technique that worked
+
+LED-coded register read-back probes via static numeric codes in the
+20-99 range, decoded by the bench operator counting blinks:
+
+- 20–25: per-register init-write read-back (did `ctr.ms_mode = 1`
+  stick? did `scl_low_period = 200` stick? ...)
+- 26: secondary clock gate (APB) read-back — this was the smoking
+  gun
+- 27: `sr.bus_busy` init-time check
+- 30–36: post-Hang `sr.scl_main_state_last` capture
+  (0 = IDLE, 1 = AddressShift, ...)
+- 50: post-Hang `sr.txfifo_cnt == 0` (FIFO writes silently dropped)
+- 5/7/8/9/11: bridge-protocol-level errors
+
+The probe code is small and cheap to flash, and gives a single
+distinctive blink count per failure mode. This was massively more
+efficient than `idf.py monitor`-style serial logging would have been
+on the unfamiliar P4 silicon, and avoided getting lost in PAC
+register-bit-layout debates by reading back what the hardware
+actually accepted.
+
+Future raw-PAC peripheral bring-ups on unfamiliar Espressif silicon
+should adopt the same pattern as a first-pass diagnostic.
+
+### Tracking
 
 ### Tracking
 
