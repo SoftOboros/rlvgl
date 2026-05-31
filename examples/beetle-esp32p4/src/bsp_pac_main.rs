@@ -43,16 +43,13 @@ fn main() -> ! {
     // BSP-managed clocks, IO MUX, peripheral init.
     bsp_generated::init();
 
-    // Set up GPIO5 as a debug marker output. The Saleae trace
-    // captures a HIGH pulse on this pin spanning each I2C wake
-    // attempt — so the operator can see whether SDA/SCL actually
-    // moved during that window vs the master sitting silent. GPIO5
-    // is broken out on the DFR1237 IO-expansion shield (pin 16 of
-    // U2 ESP32-P4_L, memalpha doc 427), inside the 0-31 range so
-    // standard `enable_w1ts` / `out_w1ts` work without going to
-    // the upper-GPIO register bank. Init the marker BEFORE the pad
-    // sanity test so it can bracket that test window.
-    unsafe { debug_marker_init() };
+    // Set up GPIO 5 (marker) as a Saleae debug output. GPIO 5 carries
+    // *all* phase information: short ~150 µs pulses before each long
+    // bracket (one per phase boundary), then sustained HIGH for wake()
+    // and dsi_host::init. GPIO 4 and GPIO 6 were tried as a second
+    // "refresh" channel and both hung bring-up cold — presumed wired
+    // to something on the DFR1237 shield that we haven't accounted for.
+    unsafe { debug_pins_init() };
 
     // Pad sanity test removed — confirmed via LED-loop mirror that
     // GPIO 4, 7, 8 can all be driven by software. The pads are fine;
@@ -68,42 +65,123 @@ fn main() -> ! {
     // Set up the user LED so we can encode bring-up status in blink count.
     unsafe { led_init() };
 
-    // Path (1) of BEETLE ERRATA-005: read back the I2C0 init registers
-    // and surface a 20-29 LED code if any write didn't stick. If this
-    // returns 0, write-sticking is confirmed and the failure is
-    // elsewhere — at which point we fall through to run_bringup() and
-    // expect the same status=11 (Hang) we've been getting, which routes
-    // the investigation to path (2) (IDF first-light register diff).
-    //
-    // Diagnostic blink count:
-    //   1-4   = DSI / DPI bring-up step failures (run_bringup)
-    //   5-9   = I2C0 wake-step failures (run_bringup)
-    //   11    = I2C0 master Hang sentinel (run_bringup)
-    //   20-29 = I2C0 init register read-back probe failed (this call)
-    let probe = unsafe { dfr0550::i2c0::probe_init_state() };
-    let status: u8 = if probe != 0 { probe } else { unsafe { run_bringup() } };
-    led_status_loop(status)
+    // RECOVERY: just the known-good infinite-feed-blink. No wake, no
+    // DSI. If THIS still produces the heartbeat blink, chip is alive
+    // and the wake-path code from the prior flash had something
+    // wrong. If even this doesn't blink, something in main() setup
+    // chain is now crashing.
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let mask = 1u32 << bsp_generated::board::LED;
+    loop {
+        feed_watchdogs();
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+        for _ in 0..16_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        feed_watchdogs();
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+        for _ in 0..16_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+    }
+}
+
+fn led_blink_n(n: u8) {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let mask = 1u32 << bsp_generated::board::LED;
+    for _ in 0..n {
+        feed_watchdogs();
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) }); // ON
+        for _ in 0..16_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        feed_watchdogs();
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) }); // OFF
+        for _ in 0..16_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+    }
+}
+
+fn led_pause_long() {
+    // Break the long pause into smaller chunks with WDT feeds between
+    // — the WDT counter still ticks even if our disable bit is set.
+    for _ in 0..5 {
+        feed_watchdogs();
+        for _ in 0..16_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+    }
+}
+
+fn led_solid_on() -> ! {
+    // Heartbeat pattern: short blip, brief gap, short blip, long pause.
+    // ON 200ms, OFF 200ms, ON 200ms, OFF 1.5s. Clearly visible and
+    // distinguishable from both solid-ON (hang) and led_blink_n's
+    // regular pattern.
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let mask = 1u32 << bsp_generated::board::LED;
+    loop {
+        // Beat 1: ON 200ms.
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+        for _ in 0..8_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        // OFF 200ms.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+        for _ in 0..8_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        // Beat 2: ON 200ms.
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+        for _ in 0..8_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+        // OFF 1.5s (long pause between heartbeats).
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+        for _ in 0..60_000_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+    }
 }
 
 unsafe fn run_bringup() -> u8 {
     unsafe {
+        // Phase pulses on GPIO 5: one short ~150 µs HIGH pulse *after*
+        // each phase completes. The wake() bracket then takes GPIO 5
+        // HIGH for the duration of wake() (visibly sustained vs. the
+        // short pulses). Counting short pulses on GPIO 5 = how far we
+        // got before any hang.
+        //   1 short pulse  = past Phase 1 (PSRAM)
+        //   2 short pulses = past Phase 2 (LDO)
+        //   3 short pulses = past Phase 3a (DSI bus + reset)
+        //   4 short pulses = past Phase 3b (PHY clocks)
+        //   5 short pulses = past Phase 3c (DPI clock)
+        //   then GPIO 5 sustained HIGH = inside wake()
+        //   6th short pulse after the bracket drops = wake() completed
+
         // Phase 1: PSRAM octal HEX @ 200 MHz (stub).
         let _ = dfr0550::psram::init();
+        debug_phase_pulse();
 
         // Phase 2: DSI DPHY rail (LDO_VO3 @ 2500 mV).
         let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
+        debug_phase_pulse();
 
         // Phase 3a: ungate DSI bus + bridge clocks, pulse bridge reset.
         dfr0550::dsi_host::clocks::enable_bus_and_reset();
+        debug_phase_pulse();
         // Phase 3b: ungate PHY config + PLL ref clocks (default = PLL_F20M).
         dfr0550::dsi_host::clocks::enable_phy_clocks(
             dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
         );
+        debug_phase_pulse();
         // Phase 3c: configure DPI pixel clock — 26 MHz from PLL_F240M.
         dfr0550::dsi_host::clocks::enable_dpi_clock(
             dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
             dfr0550::DPI_PIXEL_CLK_MHZ,
         );
+        debug_phase_pulse();
 
         // Bracket the I2C wake call with a debug marker pulse so the
         // Saleae trace shows exactly when we're inside `wake()`. Goes
@@ -126,8 +204,18 @@ unsafe fn run_bringup() -> u8 {
         //             strap, or wrong PORTB bit).
         use dfr0550::i2c0::I2cError;
         use dfr0550::i2c_bridge::BridgeError;
-        let wake_result = dfr0550::i2c_bridge::wake();
+        // Inlined wake() with progress dips on the marker pin. The
+        // bracket is HIGH for the whole transaction; brief LOW dips
+        // (~150 µs) inside the HIGH band mark each completed sub-step:
+        //   dip 1 = POWERON write returned
+        //   dip 2 = 20 ms post-POWERON delay elapsed
+        //   dip 3 = PORTB poll returned (success or NotReady)
+        //   dip 4 = PORTA write returned
+        //   dip 5 = PWM write returned
+        // Whichever dip is missing identifies the hung step.
+        let wake_result = wake_instrumented();
         debug_marker_set(false);
+        debug_phase_pulse();
         // Hang now returns 30 + scl_main_state_last so the bench operator
         // can decode how far the master FSM got before the spin loop
         // gave up: 30=Idle (never moved), 31=AddressShift, 32=AckAddress,
@@ -156,21 +244,38 @@ unsafe fn run_bringup() -> u8 {
             Err(BridgeError::NotReady) => return 9,
         }
 
-        // Round-11 BEETLE ERRATA-005: short-circuit on wake success.
-        // We return 1 instead of 0 because the on-board LED appears to
-        // be active-low (in blink-all every pin goes high then low
-        // every ~1 s; LED visible in the low phase). status=0 puts the
-        // LED solid HIGH which on an active-low LED looks indistinguishable
-        // from "no power". status=1 produces a clear 1-blink pattern so
-        // the bench operator can distinguish success from "chip dead".
-        return 1;
-        #[allow(unreachable_code)]
-        // Phase 5: DSI host @ 1 lane × 750 Mbps.
-        let dsi = match dfr0550::dsi_host::init(
+        // WAKE-SUCCESS DANCE — five distinct LED flashes (active-low)
+        // that only run if wake() returned Ok. Easy to spot by eye
+        // without a Saleae. If the operator does NOT see five quick
+        // flashes a moment after the boot beacon, wake() is still
+        // hanging despite the marker-dip evidence.
+        {
+            let p = unsafe { esp32p4::Peripherals::steal() };
+            let led_mask = 1u32 << bsp_generated::board::LED;
+            for _ in 0..5 {
+                p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) }); // ON
+                for _ in 0..8_000_000u32 {
+                    unsafe { core::arch::asm!("nop") };
+                }
+                p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) }); // OFF
+                for _ in 0..8_000_000u32 {
+                    unsafe { core::arch::asm!("nop") };
+                }
+            }
+        }
+
+        // Phase 5: DSI host @ 1 lane × 750 Mbps. Bracket the call with
+        // a stage-marker HIGH pulse. Distinct from the wake() pulse:
+        // there's no I2C activity inside this pulse, AND there's now a
+        // visible ~100 ms LOW gap preceding it (the wait loop above).
+        debug_marker_set(true);
+        let dsi_result = dfr0550::dsi_host::init(
             dfr0550::DSI_LANES,
             dfr0550::DSI_LANE_MBPS,
             dfr0550::dsi_host::clocks::PhyClockSource::PllF20m.freq_mhz(),
-        ) {
+        );
+        debug_marker_set(false);
+        let dsi = match dsi_result {
             Ok(b) => b,
             Err(dfr0550::dsi_host::DsiError::PllLock) => return 2,
             Err(dfr0550::dsi_host::DsiError::LaneCal) => return 3,
@@ -245,36 +350,49 @@ unsafe fn run_color_cycle(fb: dfr0550::dpi_panel::FrameBuffer<'static>) -> ! {
 unsafe fn disable_watchdogs() {
     let p = unsafe { esp32p4::Peripherals::steal() };
 
-    // LP_WDT (RTC main): unlock, disable, relock.
-    p.LP_WDT
-        .wprotect()
-        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
-    p.LP_WDT.config0().modify(|_, w| w.wdt_en().clear_bit());
-    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0) });
+    // LP_WDT (RTC main): unlock, write 0 to config0, leave unlocked so
+    // any subsequent stray write doesn't re-arm without us knowing.
+    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.LP_WDT.config0().write(|w| unsafe { w.bits(0) });
+    // Feed once just in case the counter was already part-way to expiry.
+    p.LP_WDT.feed().write(|w| w.feed().set_bit());
 
-    // LP_WDT (Super WDT): unlock, disable, relock. The SWD's "disable"
-    // bit is `swd_disable` in `swd_config`.
-    p.LP_WDT
-        .swd_wprotect()
-        .write(|w| unsafe { w.bits(0x8F1D_312A) });
-    p.LP_WDT
-        .swd_config()
-        .modify(|_, w| w.swd_disable().set_bit());
-    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });
+    // LP_WDT (Super WDT): write protect on this is separate. Setting
+    // swd_disable alone has historically not been enough on ESP32-P4
+    // for our SPI-boot chip — observed reset loop @ ~1.6 s. Enabling
+    // swd_auto_feed_en makes SWD feed itself in hardware, regardless
+    // of CPU activity, which solves the same problem more reliably.
+    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x8F1D_312A) });
+    p.LP_WDT.swd_config().modify(|_, w| {
+        w.swd_disable().set_bit();
+        w.swd_auto_feed_en().set_bit();
+        w
+    });
 
-    // TIMG0 / TIMG1 WDT: unlock, disable, relock. Both share the same
-    // magic value for the write-protect.
-    p.TIMG0
-        .wdtwprotect()
-        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
-    p.TIMG0.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
-    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0) });
+    // TIMG0 / TIMG1 WDT: same brute-force disable + leave unlocked.
+    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG0.wdtconfig0().write(|w| unsafe { w.bits(0) });
+    p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });
 
-    p.TIMG1
-        .wdtwprotect()
-        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
-    p.TIMG1.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
-    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0) });
+    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG1.wdtconfig0().write(|w| unsafe { w.bits(0) });
+    p.TIMG1.wdtfeed().write(|w| unsafe { w.bits(1) });
+}
+
+/// Feed all watchdogs once. Belt-and-suspenders: even with the
+/// disable sequence in [`disable_watchdogs`], call this before any
+/// long-running spin loop (PORTB poll, DSI PLL lock, NOP delays)
+/// to be safe against any WDT that snuck through the disable.
+fn feed_watchdogs() {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.LP_WDT.feed().write(|w| w.feed().set_bit());
+    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x8F1D_312A) });
+    p.LP_WDT.swd_config().modify(|_, w| w.swd_feed().set_bit());
+    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });
+    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG1.wdtfeed().write(|w| unsafe { w.bits(1) });
 }
 
 /// Drive GPIO 7 and GPIO 8 directly as plain push-pull GPIO outputs
@@ -298,7 +416,7 @@ unsafe fn pad_sanity_test() {
     let all_mask = scl_mask | sda_mask | ctrl_mask;
 
     // Configure each pin with the EXACT same write pattern as
-    // `debug_marker_init` (which is confirmed working on GPIO 5). If
+    // `debug_pins_init` (which is confirmed working on GPIO 5). If
     // GPIO 5 toggles but GPIO 4/7/8 don't using identical writes, the
     // issue isn't this code path — it's the pads themselves (module-
     // internal wiring, alt-function lock, or wrong probe placement).
@@ -349,14 +467,20 @@ unsafe fn pad_sanity_test() {
     p.GPIO.out_w1tc().write(|w| unsafe { w.bits(marker_mask) });
 }
 
-/// GPIO pin number used as the Saleae debug marker. Inside the 0-31
-/// range so we don't have to use the upper-GPIO register bank.
+/// GPIO pin number used as the Saleae stage marker (HIGH during a
+/// long-running phase like wake() or DSI init). In the 0-31 range so
+/// standard `out_w1ts` / `out_w1tc` apply.
 const DBG_MARKER_PIN: usize = 5;
 
-/// Configure GPIO48 as a push-pull output for the Saleae debug marker.
-/// Same routing pattern as `led_init` (mcu_sel=1, sig_out_sel=256
-/// "simple GPIO out from gpio_out reg"), just on a different pin.
-unsafe fn debug_marker_init() {
+/// Configure GPIO5 (marker) as a push-pull output. GPIO 4 was tried
+/// as a refresh-tick output and hung bring-up inside wake() with the
+/// marker stuck HIGH (10+ s, no Morse, no I2C activity). GPIO 6 had
+/// the same effect at an even earlier stage. Both pins are presumed
+/// physically tied to something on the DFR1237 shield (bridge reset?
+/// I2C pull-up? unknown without schematic) and are off-limits until
+/// verified. Phase progress is now encoded via short pre-wake pulses
+/// on GPIO 5 itself.
+unsafe fn debug_pins_init() {
     let p = unsafe { esp32p4::Peripherals::steal() };
     let mask = 1u32 << DBG_MARKER_PIN;
     p.IO_MUX
@@ -369,8 +493,8 @@ unsafe fn debug_marker_init() {
     p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
 }
 
-/// Drive the debug marker high or low. Used to bracket I2C transactions
-/// on the Saleae trace.
+/// Drive the stage marker high or low. Used to bracket long-running
+/// phases (I2C wake, DSI init) on the Saleae trace.
 fn debug_marker_set(high: bool) {
     let p = unsafe { esp32p4::Peripherals::steal() };
     let mask = 1u32 << DBG_MARKER_PIN;
@@ -379,6 +503,78 @@ fn debug_marker_set(high: bool) {
     } else {
         p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
     }
+}
+
+/// Emit a short HIGH pulse on the **marker** pin (GPIO 5). Used to
+/// count phase progress on the Saleae before wake()'s long bracket
+/// starts. Pulse width is short (~150 µs at 400 MHz) so individual
+/// pulses are visibly distinct from the sustained wake / DSI brackets.
+fn debug_phase_pulse() {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let mask = 1u32 << DBG_MARKER_PIN;
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+    for _ in 0..60_000u32 {
+        unsafe { core::arch::asm!("nop") };
+    }
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+}
+
+/// Brief LOW dip (~150 µs) on the marker pin, then back HIGH. Inverse
+/// of debug_phase_pulse — for sub-step progress markers *inside* a
+/// sustained-HIGH bracket. Caller must ensure GPIO 5 is already HIGH.
+fn debug_marker_dip() {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let mask = 1u32 << DBG_MARKER_PIN;
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+    for _ in 0..60_000u32 {
+        unsafe { core::arch::asm!("nop") };
+    }
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+}
+
+/// Inlined version of `dfr0550::i2c_bridge::wake()` with a marker dip
+/// after each sub-step. The marker must be HIGH on entry and is
+/// guaranteed HIGH on every return path so the caller's bracket
+/// boundary is preserved.
+unsafe fn wake_instrumented() -> Result<(), dfr0550::i2c_bridge::BridgeError> {
+    use dfr0550::i2c0;
+    use dfr0550::i2c_bridge::{
+        BRIDGE_ADDR, BridgeError, PORTA_KERNEL_DEFAULT, REG_PORTA, REG_PORTB, REG_POWERON, REG_PWM,
+    };
+
+    i2c0::write_reg(BRIDGE_ADDR, REG_POWERON, 1)?;
+    debug_marker_dip(); // dip 1
+
+    for _ in 0..7_200_000u32 {
+        unsafe { core::arch::asm!("nop") };
+    }
+    debug_marker_dip(); // dip 2
+
+    let mut tries = 100;
+    loop {
+        match i2c0::read_reg(BRIDGE_ADDR, REG_PORTB) {
+            Ok(pb) if pb & 0x01 != 0 => break,
+            Ok(_) => {}
+            Err(i2c0::I2cError::Nack) => {}
+            Err(e) => return Err(BridgeError::I2c(e)),
+        }
+        tries -= 1;
+        if tries == 0 {
+            return Err(BridgeError::NotReady);
+        }
+        for _ in 0..3_600_000u32 {
+            unsafe { core::arch::asm!("nop") };
+        }
+    }
+    debug_marker_dip(); // dip 3
+
+    i2c0::write_reg(BRIDGE_ADDR, REG_PORTA, PORTA_KERNEL_DEFAULT)?;
+    debug_marker_dip(); // dip 4
+
+    i2c0::write_reg(BRIDGE_ADDR, REG_PWM, 255)?;
+    debug_marker_dip(); // dip 5
+
+    Ok(())
 }
 
 /// Configure GPIO3 (the user LED) as a push-pull output. Required because
@@ -405,48 +601,126 @@ unsafe fn led_init() {
     p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
 }
 
-/// Long delay loop tuned for ~250 ms at 400 MHz CPU. Adjust if the BSP
-/// configures a different CPU clock.
-fn delay_long() {
-    for _ in 0..40_000_000u32 {
+/// One Morse "unit" in NOPs — tuned for ~100 ms at 400 MHz CPU
+/// (matches the `delay_short` calibration of ~62 ms per 10 M nops →
+/// ~100 ms per 16 M nops). Standard ITU Morse timing:
+///   dot = 1 unit, dash = 3 units, intra-element gap = 1 unit,
+///   inter-character gap = 3 units (i.e. 2 additional after trailing
+///   intra-element), inter-message gap = 7+ units (we use more).
+const MORSE_UNIT_NOPS: u32 = 16_000_000;
+
+/// Morse encoding of digits 0-9 (ITU-R M.1677-1). Each digit is a
+/// fixed 5-element pattern. 0 = dot, 1 = dash.
+const MORSE_DIGITS: [[u8; 5]; 10] = [
+    [1, 1, 1, 1, 1], // 0: -----
+    [0, 1, 1, 1, 1], // 1: .----
+    [0, 0, 1, 1, 1], // 2: ..---
+    [0, 0, 0, 1, 1], // 3: ...--
+    [0, 0, 0, 0, 1], // 4: ....-
+    [0, 0, 0, 0, 0], // 5: .....
+    [1, 0, 0, 0, 0], // 6: -....
+    [1, 1, 0, 0, 0], // 7: --...
+    [1, 1, 1, 0, 0], // 8: ---..
+    [1, 1, 1, 1, 0], // 9: ----.
+];
+
+fn morse_delay(units: u32) {
+    let total = MORSE_UNIT_NOPS.saturating_mul(units);
+    for _ in 0..total {
         unsafe { core::arch::asm!("nop") };
     }
 }
 
-fn delay_short() {
-    for _ in 0..10_000_000u32 {
-        unsafe { core::arch::asm!("nop") };
+fn morse_element(p: &esp32p4::Peripherals, mask: u32, is_dash: bool) {
+    // Active-low LED: pin LOW (out_w1tc) = LED ON, pin HIGH = LED OFF.
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+    morse_delay(if is_dash { 3 } else { 1 });
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+    morse_delay(1); // intra-element gap
+}
+
+fn morse_digit(p: &esp32p4::Peripherals, mask: u32, digit: u8) {
+    for &el in &MORSE_DIGITS[digit as usize] {
+        morse_element(p, mask, el == 1);
     }
 }
 
-/// Encode the bring-up result on the on-board LED.
+/// ITU prosign HH (`........`) — universal "error / correction" cue.
+/// Transmitted as 8 dots with intra-element gaps but no inter-character
+/// gap inside the prosign itself.
+fn morse_hh(p: &esp32p4::Peripherals, mask: u32) {
+    for _ in 0..8 {
+        morse_element(p, mask, false);
+    }
+}
+
+/// Encode the bring-up result on the on-board LED as Morse.
 ///   status = 0   → solid ON (every step succeeded)
-///   status = N>0 → N short blinks, long pause, repeat
+///   status > 0   → preamble "HH HH" (Morse error prosign x2) followed
+///                  by the status code as a 3-digit zero-padded decimal
+///                  (e.g. 30 → "030", 5 → "005"). Long blank silence
+///                  between messages so the preamble is easy to pick
+///                  out as the start of each repeat.
 ///
-/// The debug marker (GPIO5) mirrors the LED state during the status
-/// loop so a bench operator can probe-hunt to find which physical
-/// header pin actually maps to GPIO5 — if the probe is on the right
-/// pin, the marker trace will match the LED's blink pattern. The
-/// marker pulse around `i2c_bridge::wake()` (set in `run_bringup`) is
-/// still the primary diagnostic; this status-loop mirror is just a
-/// "is the probe even on the right pin?" cross-check.
+/// DFR1172 user LED on GPIO 3 is **active-low** — driving the pin LOW
+/// turns the LED ON, driving it HIGH turns it OFF. Confirmed via the
+/// blink-all sanity test (LED visible in the low-phase only).
+///
+/// The debug marker (GPIO5) is held LOW throughout the status loop so
+/// the only marker events on the Saleae trace are the HIGH pulses
+/// bracketing `wake()` and `dsi_host::init()` in `run_bringup`.
 fn led_status_loop(status: u8) -> ! {
     let p = unsafe { esp32p4::Peripherals::steal() };
     let led_mask = 1u32 << bsp_generated::board::LED;
-    let marker_mask = 1u32 << DBG_MARKER_PIN;
-    let combined_mask = led_mask | marker_mask;
+
+    if status == 0 {
+        // Active-low: pin LOW = LED ON.
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) });
+        loop {
+            morse_delay(20);
+        }
+    }
+
+    let digits = [
+        (status / 100) % 10,
+        (status / 10) % 10,
+        status % 10,
+    ];
+
     loop {
-        if status == 0 {
-            p.GPIO.out_w1ts().write(|w| unsafe { w.bits(combined_mask) });
-            delay_long();
-            continue;
+        // Quiet baseline at the start of every transmission.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) });
+        morse_delay(3);
+
+        // Preamble: HH (error prosign) twice. Each HH already trails
+        // one intra-element gap (1 unit); add 2 more for the standard
+        // inter-character gap (3 units total).
+        morse_hh(&p, led_mask);
+        morse_delay(2);
+        morse_hh(&p, led_mask);
+        morse_delay(2);
+
+        // 3-digit zero-padded status code.
+        morse_digit(&p, led_mask, digits[0]);
+        morse_delay(2);
+        morse_digit(&p, led_mask, digits[1]);
+        morse_delay(2);
+        morse_digit(&p, led_mask, digits[2]);
+        morse_delay(2);
+
+        // ITU FULL STOP `.-.-.-` — explicit end-of-message terminator
+        // so the operator knows the digit group has fully transmitted
+        // before the inter-message silence begins.
+        for &el in &MORSE_FULL_STOP {
+            morse_element(&p, led_mask, el == 1);
         }
-        for _ in 0..status {
-            p.GPIO.out_w1ts().write(|w| unsafe { w.bits(combined_mask) });
-            delay_short();
-            p.GPIO.out_w1tc().write(|w| unsafe { w.bits(combined_mask) });
-            delay_short();
-        }
-        delay_long();
+
+        // Long inter-message silence — much longer than ITU's 7 units
+        // so the next preamble reads as a fresh start, not a trailing
+        // continuation of the previous code.
+        morse_delay(20);
     }
 }
+
+/// ITU FULL STOP (period): `.-.-.-` — 6 elements alternating.
+const MORSE_FULL_STOP: [u8; 6] = [0, 1, 0, 1, 0, 1];

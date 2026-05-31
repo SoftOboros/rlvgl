@@ -23,8 +23,12 @@ moves here.
 
 ## Open questions
 
-_(none currently open — ERRATA-005 resolved 2026-05-30, see entry for full
-session writeup.)_
+- **EOQ-001-ERRATA-007** — what is the correct ESP32-P4 watchdog disable
+  sequence that *actually* stops the WDT? The TRM-documented sequence
+  (LP_WDT/SWD/TIMG0/1 unlock + clear + relock) does not fully disable
+  the WDT on the DFR1172 chip — a ~1.6 s reset loop persists. Periodic
+  `feed_watchdogs()` calls keep the chip alive, but a clean disable
+  would simplify bring-up. See [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required).
 
 ## Index
 
@@ -35,7 +39,8 @@ session writeup.)_
 | [ERRATA-003](#errata-003--beetle-04-dpi-divider-quantization-discrepancy) | BEETLE-04 DPI divider quantization discrepancy | 🟡 | 2026-05-28 | BEETLE-04 |
 | [ERRATA-004](#errata-004--idf-image-segment-layout--linker-script-rework) | IDF image segment layout + linker script rework | 🟢 | 2026-05-28 | BEETLE infra |
 | [ERRATA-005](#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) | ESP32-P4 I2C0 master refuses to start after `trans_start` | 🟢 | 2026-05-29 | BEETLE-03 |
-| [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟢 | 2026-05-29 | BEETLE infra |
+| [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟡 | 2026-05-29 | BEETLE infra |
+| [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) | ESP32-P4 WDT disable incomplete — periodic feeding required | 🟡 | 2026-05-30 | BEETLE infra |
 
 ---
 
@@ -656,12 +661,18 @@ should adopt the same pattern as a first-pass diagnostic.
 
 ## ERRATA-006 — IDF bootloader leaves WDTs armed for raw-PAC apps
 
-**Status:** 🟢 Resolved
+**Status:** 🟡 Diagnosed — fix landed but incomplete (see
+[ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)).
+The `disable_watchdogs()` function reduces WDT firing frequency but
+does not fully stop it on ESP32-P4; periodic feeding is required.
 **First seen:** 2026-05-29 (first stable LED blink attempt during the
 bench session — pattern was "5 long blinks + 1 short blink (cut off),
 ~2-3 s gap, repeat")
-**Resolved:** added `disable_watchdogs()` to the top of `main()` in
+**Initial fix:** added `disable_watchdogs()` to the top of `main()` in
 `examples/beetle-esp32p4/src/bsp_pac_main.rs` (same bench session).
+That fix was sufficient for short-running diagnostics (multi-second
+LED blink loops) but the 2026-05-30 bench session discovered it is
+NOT sufficient for longer-running bring-up — see ERRATA-007.
 **Owning phase:** BEETLE infra
 
 ### Symptom
@@ -721,6 +732,112 @@ interrupting the pattern.
   WDT disable to the generated `peripherals::init` or
   `clocks::init` so future raw-PAC ESP32-P4 apps inherit the fix
   automatically.
+
+---
+
+## ERRATA-007 — ESP32-P4 WDT disable incomplete, periodic feeding required
+
+**Status:** 🟡 Diagnosed — workaround landed (`feed_watchdogs()`
+called periodically). Proper disable sequence still unknown; pending
+investigation against IDF's `wdt_hal_iram.c` and bootloader source.
+**First seen:** 2026-05-30 (multi-round bench session attempting to
+verify wake() + DSI bring-up post-ERRATA-005)
+**Owning phase:** BEETLE infra (follow-up to ERRATA-006)
+
+### Symptom
+
+After ERRATA-006's `disable_watchdogs()` landed, longer bring-up
+sequences still presented as "2 LED blinks then solid ON" — looking
+exactly like a code hang. Many diagnostic rounds in the 2026-05-30
+session attempted to debug "wake() hanging" before realizing the
+LED pattern was actually a tight WDT reset loop firing every ~1.6 s.
+
+The "solid ON" was the bootloader + `led_init()` (which writes
+out_w1tc = pin LOW = LED ON for the active-low DFR1172 LED) bringing
+the LED back ON between reset cycles. Each reset cycle let our code
+run for ~1.6 s (= 2 full LED blink cycles at the 800ms cadence we
+were using), then WDT fired, then reset, then repeat. The "solid"
+phase was the gap during which the LED was ON from led_init plus
+the start of iter 2's ON pulse, just before the next WDT reset
+truncated everything.
+
+Symptoms that diagnostically distinguish this from a real code hang:
+- LED pattern looks like "N blinks then solid ON", regardless of
+  what code N is supposed to encode.
+- Same pattern reproduces across totally different binaries.
+- Per-iteration WDT feeding inside the blink loop converts the
+  pattern to "infinite blinking" (the chip stays alive).
+
+### Root cause
+
+The TRM-documented disable sequence (chapter 17 of the ESP32-P4
+TRM):
+
+1. Write magic to wprotect register (`0x50D83AA1` for LP_WDT main
+   and TIMG0/1, `0x8F1D312A` for the LP_WDT Super WDT).
+2. Clear `wdt_en` (and `wdt_flashboot_mod_en` for SPI boot path).
+3. Write any non-magic value to relock.
+
+Empirically on the DFR1172 ESP32-P4 v1.3 chip, this sequence does
+NOT fully stop the watchdog. Even with the entire `config0`
+register written to 0 (clearing every enable bit, every stage
+action, every flashboot bit), and with `swd_disable` set AND
+`swd_auto_feed_en` enabled on the Super WDT, a reset still fires
+every ~1.6 s.
+
+The clock-source clue: the LP_WDT main is driven by `LP_DYN_SLOW_CLK`
+(per TRM chapter 10 / clock-and-reset chapter) and the Super WDT is
+an analog block. Either may have a bring-up sequence the TRM
+doesn't fully document, or the IDF bootloader leaves them in a
+state that requires a step beyond the standard disable.
+
+### Fix prescription
+
+**Workaround currently in `bsp_pac_main.rs`:** a `feed_watchdogs()`
+helper that unlocks each WDT and writes its feed register, leaving
+wprotect unlocked. Called periodically — at least every ~400 ms —
+inside every long-running loop. The reference success-pattern is a
+`loop { feed_watchdogs(); GPIO on; NOPs; feed_watchdogs(); GPIO off;
+NOPs; }` which runs indefinitely. Without the feeds the same loop
+resets every ~1.6 s.
+
+**Proper fix (pending investigation):** read IDF source for ESP32-P4
+WDT disable, specifically:
+- `components/hal/esp32p4/include/hal/wdt_hal.h`
+- `components/hal/esp32p4/wdt_hal_iram.c`
+- `components/bootloader_support/src/bootloader_init.c`
+
+Likely there's a step we're missing — perhaps clearing
+`RTC_CNTL_WDT_FLASHBOOT_MOD_EN` via a different path, or a
+register write in a different power domain, or an interaction with
+the `LP_AON` block that gates the WDT clock at a higher level than
+the WDT itself.
+
+### Verification
+
+The workaround pattern (periodic feeds inside the bring-up flow)
+was verified end-to-end in the 2026-05-30 session — an infinite
+blink with `feed_watchdogs()` calls produced continuous LED blinking
+("heartbeat") for 30+ s. The same loop with the feed calls removed
+hit the standard "2 blinks then solid" reset pattern.
+
+The proper disable verification will be: chip runs an infinite NOP
+loop with NO feed calls for 30+ s without resetting. Until that
+test passes, treat the WDT disable as incomplete and feed
+periodically.
+
+### Tracking
+
+- `examples/beetle-esp32p4/src/bsp_pac_main.rs::disable_watchdogs`
+  + `::feed_watchdogs` carry the current best-effort disable and
+  the workaround feed helper.
+- [BEETLE-03 §15](BEETLE-03-I2C-BRIDGE.md#15-change-log) 2026-05-30
+  entry records the multi-round diagnostic detour and the
+  workaround discovery.
+- The IDF investigation is open work — once the proper disable
+  is found, update both this entry and ERRATA-006 to 🟢.
+- Memory: `project_esp32p4_wdt_persistent.md` carries the
+  cross-session institutional note.
 
 ---
 

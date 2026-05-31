@@ -377,6 +377,53 @@ A conforming BEETLE-03 implementation MUST:
     count visually in seconds. Massively faster than `idf.py
     monitor`-style serial debugging on unfamiliar silicon.
 
+- **2026-05-31** (follow-up bench session — uncovered
+  [ERRATA-007](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)
+  and re-confirmed wake() works). Attempted to advance from
+  wake-success short-circuit to full DSI bring-up. The session
+  spent many rounds chasing what appeared to be a wake() hang —
+  LED pattern was "2 blinks then solid ON" across every binary,
+  regardless of code changes. Final root cause: the
+  `disable_watchdogs()` fix from ERRATA-006 is incomplete on
+  ESP32-P4. A residual watchdog fires every ~1.6 s, looking like
+  a hang because each reset cycle exhibits the same "2 blinks
+  then ON" visual (`led_init` brings LED ON every fresh boot).
+
+  - **wake() re-confirmed working.** When the WDT was tightly fed
+    via a per-iteration `feed_watchdogs()` inside an infinite blink
+    loop, the chip survived long enough to complete all 5 wake
+    sub-steps. The ERRATA-005 fix (APB clock gate + COMD END
+    markers) holds.
+
+  - **Workaround landed:** `feed_watchdogs()` helper called
+    periodically — at least every ~400 ms — keeps the chip alive
+    indefinitely. See ERRATA-007 for the full fix-prescription and
+    the open question of finding the proper IDF disable sequence.
+
+  - **Acceptance gate (e) — full bring-up — still pending.** The
+    next bench session needs to:
+    1. Plumb `feed_watchdogs()` into wake's PORTB poll loop and
+       into `dsi_host::init`'s PLL-lock + lane-cal spin loops.
+    2. Verify wake → DSI → DPI end-to-end without the WDT
+       confounding observations.
+    3. OR investigate IDF source (`wdt_hal_iram.c` +
+       `bootloader_init`) to find the missing disable step and
+       eliminate the need for periodic feeding entirely.
+
+  - **Bench-session anti-pattern (do not repeat):** interpreting
+    a "N blinks then solid ON" LED pattern as a code hang without
+    first running a known-good `loop { feed_watchdogs(); blink; }`
+    sanity check. The visual is indistinguishable from a real
+    hang. Always verify chip aliveness before deep-diving into
+    "what's hanging" — this session burned 6+ hours on that
+    misdiagnosis.
+
+  - **GPIO 4 / GPIO 6 caveat re-confirmed.** Both pins silently
+    halt bring-up if configured as outputs on the DFR1172
+    (presumed shield-internal wiring). Saleae probe channels on
+    those GPIOs should be passive listeners only; markers/refresh
+    debug outputs must use GPIO 5 or pins ≥9.
+
 ---
 
 **[← BEETLE-02](BEETLE-02-LDO.md)** · **[Index](README.md)** · **Next →** [BEETLE-04 — DSI Clocks](BEETLE-04-DSI-CLOCKS.md)
