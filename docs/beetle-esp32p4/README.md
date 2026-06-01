@@ -7,9 +7,14 @@ project, target payload is the shared disco-demo widget tree.
 # FireBeetle 2 ESP32-P4 + DFR0550-V2 — Initiative Family
 
 **Status:** Active. BEETLE-00 ratified pending first §15 entry; chapters
-01-07 implementation in progress, chapter 06 (DPI controller) is the
-live blocker for first light in Rust. Chapter 08 (disco-demo widget
-tree) is the v1 goal.
+01-07 implementation in progress. **Current bench position
+(2026-05-31):** ERRATA-005 (I2C0 master refuses to start) resolved;
+wake() reaches all 5 sub-steps end-to-end. ERRATA-007 (incomplete WDT
+disable) is the active blocker for reaching BEETLE-05/06 — `feed_watchdogs()`
+needs to be plumbed into wake's PORTB poll and DSI host's PLL-lock /
+lane-cal spin loops before the next bench session. Chapter 06 (DPI
+controller) is still the v0 first-light blocker downstream of that.
+Chapter 08 (disco-demo widget tree) is the v1 goal.
 
 **Commit-subject prefix:** `BEETLE-NN[a-z]:` per
 [CLAUDE.md Spec-Before-Code](../../CLAUDE.md#spec-before-code-planning-discipline).
@@ -102,7 +107,7 @@ Read-as-needed, not front-to-back:
 | 00 | [`BEETLE-00-CONCEPTS.md`](BEETLE-00-CONCEPTS.md) | Concepts gate | — | Ratified pending first §15 entry |
 | 01 | [`BEETLE-01-PSRAM.md`](BEETLE-01-PSRAM.md) | PSRAM 200 MHz octal HEX | `dfr0550/psram.rs` | Stub (bootloader-managed) |
 | 02 | [`BEETLE-02-LDO.md`](BEETLE-02-LDO.md) | DPHY LDO_VO3 @ 2500 mV | `dfr0550/ldo.rs` | Implemented |
-| 03 | [`BEETLE-03-I2C-BRIDGE.md`](BEETLE-03-I2C-BRIDGE.md) | Pi-7″ Atmel-bridge wake @ 0x45 | `dfr0550/i2c_bridge.rs`, `dfr0550/i2c0.rs` | Implemented, **not HW-verified** |
+| 03 | [`BEETLE-03-I2C-BRIDGE.md`](BEETLE-03-I2C-BRIDGE.md) | Pi-7″ Atmel-bridge wake @ 0x45 | `dfr0550/i2c_bridge.rs`, `dfr0550/i2c0.rs` | HW-verified (gates a–d), gate (e) pending WDT plumbing per [ERRATA-007](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) |
 | 04 | [`BEETLE-04-DSI-CLOCKS.md`](BEETLE-04-DSI-CLOCKS.md) | HP_SYS_CLKRST DSI gate / DPI / PHY clocks | `dfr0550/dsi_host.rs::clocks` | Implemented |
 | 05 | [`BEETLE-05-DSI-HOST.md`](BEETLE-05-DSI-HOST.md) | DSI host PHY PLL + lane bring-up | `dfr0550/dsi_host.rs::init` | Implemented |
 | 06 | [`BEETLE-06-DPI-PANEL.md`](BEETLE-06-DPI-PANEL.md) | DPI controller + FB + DMA-2D descriptor list | `dfr0550/dpi_panel.rs` | **Stub — live blocker** |
@@ -216,10 +221,18 @@ Per the DFR1237 IO-expansion shield schematic (memalpha doc 427):
 | 0 | **SCL** | 8 | **J7** (3-pin Gravity Blue, any pin) | yellow |
 | 1 | **SDA** | 7 | **J1** (3-pin Gravity Green, any pin) | green |
 | 2 | **MARKER** | 5 | **J3** pin 2 (silkscreen "5") | blue |
-| 3 | **CTRL** | 4 | **J3** pin 1 (silkscreen "4") | pink |
+| 3 | (passive) | 4 | **J3** pin 1 (silkscreen "4") | pink |
 
 GND: any of the GND pads on the shield. Sample rate: **1 MHz**
 (10× margin over 100 kHz I2C).
+
+> **GPIO 4 / GPIO 6 caveat (2026-05-31).** Both pins silently halt
+> bring-up if configured as outputs on the DFR1172 — presumed
+> shield-internal wiring we haven't accounted for. The Saleae channel
+> on GPIO 4 is **passive-listen only**; do not assign it as a debug
+> marker / phase-pulse / refresh-pulse output in `bsp_pac_main.rs`.
+> Marker outputs must use GPIO 5 or GPIO ≥ 9. See
+> [BEETLE-03 §15 2026-05-31 entry](BEETLE-03-I2C-BRIDGE.md#15-change-log).
 
 The MARKER channel is driven by `bsp_pac_main.rs`:
 
@@ -229,9 +242,11 @@ The MARKER channel is driven by `bsp_pac_main.rs`:
 
 Trigger on **rising edge of ch 2** and capture ~3 s; the first
 rising edge is the wake-attempt window. Inside that window:
-- SCL/SDA should toggle if the I2C0 master is running.
-- SCL/SDA stay flat high if the master is stuck (ERRATA-005, open
-  as of this writing).
+- SCL/SDA should toggle if the I2C0 master is running (post-ERRATA-005:
+  the wake protocol completes in a brief burst, then SCL/SDA go silent).
+- SCL/SDA stuck flat high after `trans_start` would indicate the
+  master never advanced from IDLE — see [ERRATA-005](ERRATA.md#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start)
+  for the resolved root causes (APB clock gate + COMD END markers).
 
 ### Toolchain
 
@@ -275,13 +290,13 @@ N short blinks + long pause + repeat, where N encodes the
 
 | N blinks | Cause | Decode |
 |---|---|---|
-| **solid ON** | `AllOk` (0) | All phases succeeded. |
-| **1** | `I2cBridgeWake` (legacy code path) | Generic bridge-wake fail (use 5–9 codes below for sub-causes). |
+| **solid ON (ambiguous)** | `AllOk` (0) **OR** WDT reset loop | See caveat below — distinguish with the chip-aliveness sanity test. |
+| **1** | `I2cBridgeWake` (legacy code path) | Generic bridge-wake fail (use 5–9 codes below for sub-causes). Also used post-ERRATA-005 as the "wake succeeded" sentinel — solid-on status=0 is invisible on this board's active-low LED. |
 | **2** | `DsiPhyLock` | DSI host PHY PLL never locked (BEETLE-05 §9 INV-BEETLE-00-7 step 7). |
 | **3** | `DsiLaneCal` | DSI lane stop-state never reached (BEETLE-05 §9, step 8). |
 | **4** | `DpiPanelInit` | DPI controller stub returned `Unimplemented` (BEETLE-06 v0 blocker). |
 | **5** | `I2cError::Nack` | Bus toggled, slave at 0x45 didn't ACK. |
-| **6** | `I2cError::Hang` | Master never asserted MST_COMPLETE — **current ERRATA-005 state**. |
+| **6** | `I2cError::Hang` | Master never asserted MST_COMPLETE (was the [ERRATA-005](ERRATA.md#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) symptom; now resolved). |
 | **7** | `I2cError::Timeout` | Master reported SCL stuck. |
 | **8** | `I2cError::Arbitration` | Bus contention. |
 | **9** | `BridgeError::NotReady` | POWERON wrote OK but PORTB.0 poll never went high in ~1 s. |
@@ -291,14 +306,39 @@ Cadence at default 40 MHz CPU clock: each short blink ≈ 500 ms
 (250 ms on + 250 ms off), long pause ≈ 1 s. Full cycle for status=6
 is ~4 s.
 
+> **"Solid ON" ambiguity caveat (ERRATA-007).** The DFR1172 user LED
+> on GPIO 3 is **active-low** — driving the pin HIGH turns the LED
+> OFF; driving LOW turns it ON. "Solid ON" can therefore mean one of
+> three things:
+> 1. `AllOk` success path drove the pin LOW and held.
+> 2. The chip is in a tight WDT reset loop (~1.6 s period); each reset
+>    cycle's `led_init()` drives the pin LOW briefly before the next
+>    reset truncates the diagnostic. To the eye this looks like a
+>    steady "solid ON" or "N blinks then solid ON".
+> 3. The chip is genuinely hung in a non-WDT path with the pin LOW.
+>
+> **Distinguish them by flashing a known-good chip-aliveness binary
+> first:** a `loop { feed_watchdogs(); LED on; nops; feed_watchdogs();
+> LED off; nops; }` blink loop. If THIS produces a steady heartbeat,
+> the chip is alive and any LED hangs you observe afterward are real.
+> If THIS also presents as "N blinks then solid ON", the WDT is the
+> issue — see [ERRATA-007](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required).
+> Always run the sanity blink before deep-diving into "what's hanging."
+
 ### Required raw-PAC bring-up hooks
 
 These are in `bsp_pac_main::main()` and MUST run before any other
 work:
 
-1. `disable_watchdogs()` — disable LP_WDT main + SWD + TIMG0/1 WDTs.
-   Without this the LED diagnostic gets cut short every ~3 s by
-   reset. See [`ERRATA-006`](ERRATA.md#errata-006--idf-bootloader-leaves-wdts-armed).
+1. `disable_watchdogs()` — best-effort disable of LP_WDT main + SWD +
+   TIMG0/1 WDTs. Reduces WDT firing frequency but does **NOT** fully
+   stop it on ESP32-P4 (see [`ERRATA-007`](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)).
+   Every long-running spin loop in the bring-up flow (wake's PORTB
+   poll, DSI PLL-lock, DSI lane-cal, dpi descriptor wait, color cycle
+   delays) MUST call `feed_watchdogs()` at least every ~400 ms or the
+   chip resets every ~1.6 s and the LED diagnostic looks like a hang.
+   See also [`ERRATA-006`](ERRATA.md#errata-006--idf-bootloader-leaves-wdts-armed)
+   for the original IDF-bootloader-leaves-WDTs-armed root cause.
 2. `bsp_generated::init()` — BSP-generated clocks/IO-mux/peripherals.
 3. `debug_marker_init()` — GPIO 5 marker output for Saleae correlation.
 4. `dfr0550::i2c0::route_pins()` — GPIO 7/8 matrix routing + full
