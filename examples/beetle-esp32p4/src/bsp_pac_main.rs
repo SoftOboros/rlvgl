@@ -65,20 +65,19 @@ fn main() -> ! {
     // Set up the user LED so we can encode bring-up status in blink count.
     unsafe { led_init() };
 
-    // RECOVERY: just the known-good infinite-feed-blink. No wake, no
-    // DSI. If THIS still produces the heartbeat blink, chip is alive
-    // and the wake-path code from the prior flash had something
-    // wrong. If even this doesn't blink, something in main() setup
-    // chain is now crashing.
+    // ERRATA-007 VERIFICATION: infinite LED blink with NO feed_watchdogs()
+    // calls. If disable_watchdogs() now actually disables all WDTs
+    // (correct 0x50D8_3AA1 magic on SWD wprotect per IDF / esp-hal),
+    // this loop runs indefinitely. If the LED still resets to "2 blinks
+    // then solid ON" at ~1.6 s cadence, the magic fix wasn't sufficient
+    // and there's a second WDT path we're missing.
     let p = unsafe { esp32p4::Peripherals::steal() };
     let mask = 1u32 << bsp_generated::board::LED;
     loop {
-        feed_watchdogs();
         p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
         for _ in 0..16_000_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
-        feed_watchdogs();
         p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
         for _ in 0..16_000_000u32 {
             unsafe { core::arch::asm!("nop") };

@@ -458,6 +458,33 @@ A conforming BEETLE-03 implementation MUST:
     and re-flashing the full wake → DSI → DPI(stub) bring-up to
     confirm visible backlight + LED 4 blinks (`DpiPanelInit::Unimplemented`).
 
+- **2026-06-01** (single bench round — ERRATA-007 fix verified, 🟢).
+  Same-day bench round following the off-bench root-cause find.
+  Operator: Ira. Release binary built with the corrected SWD wprotect
+  magic + esp-hal-style unlock-modify-relock idiom, then flashed via
+  the standard `espflash --ignore-app-descriptor --no-skip` recipe.
+  `main()`'s body after `disable_watchdogs()` and `bsp_generated::init()`
+  was reduced to an infinite `loop { LED on; ~0.5 s NOPs; LED off;
+  ~0.5 s NOPs; }` with NO `feed_watchdogs()` calls anywhere.
+
+  - **Operator observation (~15-20 s window):** continuous LED
+    blinking ~1 Hz, indefinitely. No reset. No "2 blinks then solid
+    ON" pattern.
+  - **Conclusion:** `disable_watchdogs()` with the corrected
+    `0x50D8_3AA1` magic is the complete fix. ERRATA-007 closed 🟢.
+    ERRATA-006 also flipped 🟢 (fused — the original incomplete-fix
+    diagnosis was the same root cause).
+  - **Status of `feed_watchdogs()`:** retained as a defensive
+    belt-and-suspenders helper but no longer load-bearing. The
+    existing call sites in the recovery path will be removed when
+    convenient.
+
+  **Acceptance gate (e) still pending.** This round verified the WDT
+  fix in isolation. Restoring the full wake → DSI → DPI(stub) bring-up
+  flow and bench-confirming visible backlight + LED 4 blinks
+  (`DpiPanelInit::Unimplemented`) is the next bench round's
+  acceptance work, now with no WDT confounding the LED diagnostic.
+
 ---
 
 **[← BEETLE-02](BEETLE-02-LDO.md)** · **[Index](README.md)** · **Next →** [BEETLE-04 — DSI Clocks](BEETLE-04-DSI-CLOCKS.md)

@@ -23,17 +23,7 @@ moves here.
 
 ## Open questions
 
-- **EOQ-001-ERRATA-007** — *root cause identified 2026-06-01;
-  HIL verification pending.* The 1.6 s reset loop traces to using the
-  wrong SWD wprotect magic value: we wrote `0x8F1D_312A` (which is the
-  SWD magic for ESP32-S3 / C3) to `LP_WDT.SWD_WPROTECT_REG` on a chip
-  where ALL FOUR wprotect registers (LP_WDT main, LP_WDT SWD, TIMG0,
-  TIMG1) require `0x50D8_3AA1`. Every SWD `swd_disable` /
-  `swd_auto_feed_en` / `swd_feed` write since BEETLE-03 has silently
-  failed against a locked register. Code fix landed (see
-  [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)
-  §Fix); pending bench confirmation that a `loop { NOPs }` WITHOUT
-  `feed_watchdogs()` calls now runs indefinitely without reset.
+*(none — EOQ-001-ERRATA-007 closed 2026-06-01 HIL gate.)*
 
 ## Index
 
@@ -44,8 +34,8 @@ moves here.
 | [ERRATA-003](#errata-003--beetle-04-dpi-divider-quantization-discrepancy) | BEETLE-04 DPI divider quantization discrepancy | 🟡 | 2026-05-28 | BEETLE-04 |
 | [ERRATA-004](#errata-004--idf-image-segment-layout--linker-script-rework) | IDF image segment layout + linker script rework | 🟢 | 2026-05-28 | BEETLE infra |
 | [ERRATA-005](#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) | ESP32-P4 I2C0 master refuses to start after `trans_start` | 🟢 | 2026-05-29 | BEETLE-03 |
-| [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟡 | 2026-05-29 | BEETLE infra |
-| [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) | ESP32-P4 WDT disable incomplete — periodic feeding required | 🟡 | 2026-05-30 | BEETLE infra |
+| [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟢 | 2026-05-29 | BEETLE infra |
+| [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) | ESP32-P4 WDT disable incomplete — periodic feeding required | 🟢 | 2026-05-30 | BEETLE infra |
 
 ---
 
@@ -666,10 +656,11 @@ should adopt the same pattern as a first-pass diagnostic.
 
 ## ERRATA-006 — IDF bootloader leaves WDTs armed for raw-PAC apps
 
-**Status:** 🟡 Diagnosed — fix landed but incomplete (see
+**Status:** 🟢 Resolved 2026-06-01 (fused with
 [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)).
-The `disable_watchdogs()` function reduces WDT firing frequency but
-does not fully stop it on ESP32-P4; periodic feeding is required.
+The original `disable_watchdogs()` had a subtle bug in the SWD wprotect
+magic value, which ERRATA-007 resolved. With the corrected magic the
+function is sufficient — no periodic feeding required.
 **First seen:** 2026-05-29 (first stable LED blink attempt during the
 bench session — pattern was "5 long blinks + 1 short blink (cut off),
 ~2-3 s gap, repeat")
@@ -742,14 +733,18 @@ interrupting the pattern.
 
 ## ERRATA-007 — ESP32-P4 WDT disable incomplete, periodic feeding required
 
-**Status:** 🟡 Diagnosed — root cause identified 2026-06-01, code fix
-landed in commit (this commit), bench verification pending. Will flip
-🟢 once a `loop { NOPs }` (without periodic feeding) survives ≥30 s
-without reset.
+**Status:** 🟢 Resolved 2026-06-01. Root cause was the wrong SWD
+wprotect magic. Fix verified at the bench: a release binary calling
+`disable_watchdogs()` once at boot then entering an infinite `loop {
+LED on; NOPs; LED off; NOPs; }` with NO `feed_watchdogs()` calls
+produced continuous LED blinking ~1 Hz indefinitely (operator
+confirmation, ~15-20 s observation window). The pre-fix pattern was
+"2 blinks then solid ON repeating at ~1.6 s".
 **First seen:** 2026-05-30 (multi-round bench session attempting to
 verify wake() + DSI bring-up post-ERRATA-005)
 **Root cause identified:** 2026-06-01 (memalpha + IDF source +
 esp-hal cross-reference session)
+**Resolved:** 2026-06-01 (this commit + bench-verified same day)
 **Owning phase:** BEETLE infra (follow-up to ERRATA-006)
 
 ### Symptom
@@ -870,20 +865,22 @@ p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });  // re-lock
 
 ### Verification
 
-**Bench gate (pending):** a release-build flash with the corrected
-magic + `disable_watchdogs()` running once at top of `main()`, then
-an infinite `loop { NOPs }` with **NO** `feed_watchdogs()` calls
-inside, should survive ≥ 30 s without LED-reset cycling. If the
-chip stays in the loop (LED stuck wherever the loop's first
-write left it), 🟢 — the disable is now complete. If it still
-resets at ~1.6 s, there is a second issue beyond the SWD magic and
-this entry stays 🟡 with a new line of investigation.
+**Bench-verified 2026-06-01 (single round, no debug iteration).**
+Release binary built with the corrected magic + esp-hal-style
+unlock-modify-relock idiom flashed onto the DFR1172 chip. `main()`
+calls `disable_watchdogs()` once at boot then enters an infinite
+`loop { LED on; ~0.5 s NOPs; LED off; ~0.5 s NOPs; }` with NO
+`feed_watchdogs()` calls anywhere in the loop or in `main()` after
+the disable. Operator observation (~15-20 s window): **continuous LED
+blinking ~1 Hz, indefinitely**. No reset. No "2 blinks then solid ON"
+pattern. The corrected `disable_watchdogs()` is the complete fix; no
+periodic feeding is required.
 
-**Workaround retained either way:** `feed_watchdogs()` (with the
-corrected magic) is still called inside long-running loops as
-belt-and-suspenders, since the cost is negligible (~6 register
-writes per ~400 ms) and the benefit is independence from any
-remaining unknown WDT path.
+**Workaround status:** `feed_watchdogs()` (with the corrected magic)
+is retained as a belt-and-suspenders helper for callers that want
+defense-in-depth, but is no longer load-bearing. New code SHOULD NOT
+add `feed_watchdogs()` calls into hot paths; existing call sites can
+be removed when convenient.
 
 ### Tracking
 

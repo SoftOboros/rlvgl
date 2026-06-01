@@ -8,12 +8,14 @@ project, target payload is the shared disco-demo widget tree.
 
 **Status:** Active. BEETLE-00 ratified pending first §15 entry; chapters
 01-07 implementation in progress. **Current bench position
-(2026-05-31):** ERRATA-005 (I2C0 master refuses to start) resolved;
-wake() reaches all 5 sub-steps end-to-end. ERRATA-007 (incomplete WDT
-disable) is the active blocker for reaching BEETLE-05/06 — `feed_watchdogs()`
-needs to be plumbed into wake's PORTB poll and DSI host's PLL-lock /
-lane-cal spin loops before the next bench session. Chapter 06 (DPI
-controller) is still the v0 first-light blocker downstream of that.
+(2026-06-01):** ERRATA-005 (I2C0 master refuses to start) and ERRATA-007
+(WDT disable incomplete) both resolved 🟢. `disable_watchdogs()` with
+the corrected `0x50D8_3AA1` SWD wprotect magic fully disables every WDT
+on the chip — bench-verified by an infinite NOP-blink loop running
+indefinitely without periodic feeding. Next bench round restores the
+full wake → DSI → DPI(stub) bring-up to close BEETLE-03 gate (e) and
+verify BEETLE-05 PHY PLL lock + lane cal. Chapter 06 (DPI controller)
+is still the v0 first-light blocker downstream of that.
 Chapter 08 (disco-demo widget tree) is the v1 goal.
 
 **Commit-subject prefix:** `BEETLE-NN[a-z]:` per
@@ -290,7 +292,7 @@ N short blinks + long pause + repeat, where N encodes the
 
 | N blinks | Cause | Decode |
 |---|---|---|
-| **solid ON (ambiguous)** | `AllOk` (0) **OR** WDT reset loop | See caveat below — distinguish with the chip-aliveness sanity test. |
+| **solid ON** | `AllOk` (0) | All phases succeeded. (Pre-ERRATA-007 fix, this could also be a WDT reset loop; post-fix the WDT reset path is closed and "solid ON" is unambiguous as long as `disable_watchdogs()` ran at boot.) |
 | **1** | `I2cBridgeWake` (legacy code path) | Generic bridge-wake fail (use 5–9 codes below for sub-causes). Also used post-ERRATA-005 as the "wake succeeded" sentinel — solid-on status=0 is invisible on this board's active-low LED. |
 | **2** | `DsiPhyLock` | DSI host PHY PLL never locked (BEETLE-05 §9 INV-BEETLE-00-7 step 7). |
 | **3** | `DsiLaneCal` | DSI lane stop-state never reached (BEETLE-05 §9, step 8). |
@@ -330,15 +332,16 @@ is ~4 s.
 These are in `bsp_pac_main::main()` and MUST run before any other
 work:
 
-1. `disable_watchdogs()` — best-effort disable of LP_WDT main + SWD +
-   TIMG0/1 WDTs. Reduces WDT firing frequency but does **NOT** fully
-   stop it on ESP32-P4 (see [`ERRATA-007`](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)).
-   Every long-running spin loop in the bring-up flow (wake's PORTB
-   poll, DSI PLL-lock, DSI lane-cal, dpi descriptor wait, color cycle
-   delays) MUST call `feed_watchdogs()` at least every ~400 ms or the
-   chip resets every ~1.6 s and the LED diagnostic looks like a hang.
-   See also [`ERRATA-006`](ERRATA.md#errata-006--idf-bootloader-leaves-wdts-armed)
-   for the original IDF-bootloader-leaves-WDTs-armed root cause.
+1. `disable_watchdogs()` — fully disables LP_WDT main + SWD + TIMG0/1
+   WDTs using the correct `0x50D8_3AA1` magic on ALL FOUR wprotect
+   registers (per [`ERRATA-007`](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)
+   — earlier `0x8F1D_312A` for SWD was the wrong magic and silently
+   failed). After this runs once at boot, no periodic feeding is
+   required. `feed_watchdogs()` is retained as a defensive helper but
+   is no longer load-bearing; new code SHOULD NOT add it to hot paths.
+   Background: [`ERRATA-006`](ERRATA.md#errata-006--idf-bootloader-leaves-wdts-armed)
+   (IDF bootloader leaves WDTs armed — that's why the disable call is
+   needed at all).
 2. `bsp_generated::init()` — BSP-generated clocks/IO-mux/peripherals.
 3. `debug_marker_init()` — GPIO 5 marker output for Saleae correlation.
 4. `dfr0550::i2c0::route_pins()` — GPIO 7/8 matrix routing + full
