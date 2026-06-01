@@ -8,15 +8,17 @@ project, target payload is the shared disco-demo widget tree.
 
 **Status:** Active. BEETLE-00 ratified pending first §15 entry; chapters
 01-07 implementation in progress. **Current bench position
-(2026-06-01):** ERRATA-005 (I2C0 master refuses to start) and ERRATA-007
-(WDT disable incomplete) both resolved 🟢. `disable_watchdogs()` with
-the corrected `0x50D8_3AA1` SWD wprotect magic fully disables every WDT
-on the chip — bench-verified by an infinite NOP-blink loop running
-indefinitely without periodic feeding. Next bench round restores the
-full wake → DSI → DPI(stub) bring-up to close BEETLE-03 gate (e) and
-verify BEETLE-05 PHY PLL lock + lane cal. Chapter 06 (DPI controller)
-is still the v0 first-light blocker downstream of that.
-Chapter 08 (disco-demo widget tree) is the v1 goal.
+(2026-06-01 evening):** ERRATA-005 (I2C0 master refuses to start) and
+ERRATA-007 (WDT disable incomplete) both resolved 🟢, but
+[ERRATA-008](ERRATA.md#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking)
+🔴 is now the active blocker: with proper WDT disable in place, the
+full bring-up flow exposes a previously-masked I2C0 master MMIO bus
+stall on wake's first transaction. Next bench session: bisect inside
+`publish_and_run` with GPIO toggles around each MMIO write, check
+probe_init_state(), try wake BEFORE DSI clock setup. BEETLE-03 gate
+(e) regressed from "pending" to "blocked on ERRATA-008".
+Chapter 06 (DPI controller) and Chapter 08 (disco-demo widget tree)
+remain downstream of resolving ERRATA-008.
 
 **Commit-subject prefix:** `BEETLE-NN[a-z]:` per
 [CLAUDE.md Spec-Before-Code](../../CLAUDE.md#spec-before-code-planning-discipline).
@@ -109,7 +111,7 @@ Read-as-needed, not front-to-back:
 | 00 | [`BEETLE-00-CONCEPTS.md`](BEETLE-00-CONCEPTS.md) | Concepts gate | — | Ratified pending first §15 entry |
 | 01 | [`BEETLE-01-PSRAM.md`](BEETLE-01-PSRAM.md) | PSRAM 200 MHz octal HEX | `dfr0550/psram.rs` | Stub (bootloader-managed) |
 | 02 | [`BEETLE-02-LDO.md`](BEETLE-02-LDO.md) | DPHY LDO_VO3 @ 2500 mV | `dfr0550/ldo.rs` | Implemented |
-| 03 | [`BEETLE-03-I2C-BRIDGE.md`](BEETLE-03-I2C-BRIDGE.md) | Pi-7″ Atmel-bridge wake @ 0x45 | `dfr0550/i2c_bridge.rs`, `dfr0550/i2c0.rs` | HW-verified (gates a–d), gate (e) pending WDT plumbing per [ERRATA-007](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) |
+| 03 | [`BEETLE-03-I2C-BRIDGE.md`](BEETLE-03-I2C-BRIDGE.md) | Pi-7″ Atmel-bridge wake @ 0x45 | `dfr0550/i2c_bridge.rs`, `dfr0550/i2c0.rs` | Gates a–d closed, gate (e) blocked on [ERRATA-008](ERRATA.md#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking) (MMIO stall in full bring-up) |
 | 04 | [`BEETLE-04-DSI-CLOCKS.md`](BEETLE-04-DSI-CLOCKS.md) | HP_SYS_CLKRST DSI gate / DPI / PHY clocks | `dfr0550/dsi_host.rs::clocks` | Implemented |
 | 05 | [`BEETLE-05-DSI-HOST.md`](BEETLE-05-DSI-HOST.md) | DSI host PHY PLL + lane bring-up | `dfr0550/dsi_host.rs::init` | Implemented |
 | 06 | [`BEETLE-06-DPI-PANEL.md`](BEETLE-06-DPI-PANEL.md) | DPI controller + FB + DMA-2D descriptor list | `dfr0550/dpi_panel.rs` | **Stub — live blocker** |

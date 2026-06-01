@@ -485,6 +485,48 @@ A conforming BEETLE-03 implementation MUST:
   (`DpiPanelInit::Unimplemented`) is the next bench round's
   acceptance work, now with no WDT confounding the LED diagnostic.
 
+- **2026-06-01 (later)** (full-bring-up bench session — ERRATA-008
+  filed, gate (e) REGRESSED). Five bench rounds attempting to verify
+  end-to-end wake → DSI → DPI(stub) with the ERRATA-007 fix in place.
+
+  - **Observed:** wake's first MMIO write inside `publish_and_run`
+    stalls the CPU bus. Marker GPIO 5 bracket sustained HIGH for
+    >30 s with NO dips; LED state frozen; Saleae I2C lines silent.
+    Bounded internal spin loops can't explain this — bus is
+    genuinely stalled on an MMIO write.
+
+  - **Ruled out as cause:** disable_watchdogs() body changes (full
+    revert to 2026-05-30 didn't help); `swd_disable = 1` bit
+    (removed, no help); 2 s pre-wake delay (Checkpoint A removed,
+    no help); 6 s boot-blink delay (removed, no help).
+
+  - **Hypothesis under investigation:** ERRATA-007's proper WDT
+    disable removed the 1.6 s reset-loop masking that previously
+    let wake complete on SOME boot cycles. The 2026-05-30 ERRATA-005
+    "wake works" verification used a `return 1` short-circuit and
+    may have only captured ONE successful boot cycle out of many,
+    leaving a latent failure mode hidden. The latent failure
+    appears to interact with DSI clock setup or LDO_VO3
+    acquisition (post-Phase-3c is where wake is called) but
+    requires inside-publish_and_run instrumentation to bisect.
+
+  - **Filed [ERRATA-008](ERRATA.md#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking)**
+    with the full diagnostic record and a sharp next-session plan:
+    (a) bisect inside publish_and_run with GPIO toggles around each
+    register access, (b) call probe_init_state() right before wake
+    to verify I2C0 registers READ back correctly, (c) try wake
+    BEFORE DSI clock setup, (d) re-obtain the dfr0550_first_light
+    IDF reference to confirm bring-up order.
+
+  - **Acceptance gate (e) regressed** — was "pending HIL after WDT
+    plumbing" in the 2026-05-31 entry; is now "blocked on
+    ERRATA-008". Gates (a)-(d) remain closed (those didn't
+    regress; only the full end-to-end bring-up does).
+
+  - **ERRATA-007 itself remains 🟢** — the WDT fix is correct and
+    bench-verified. The wake regression is a separately-tracked
+    issue that ERRATA-007's resolution merely unmasked.
+
 ---
 
 **[← BEETLE-02](BEETLE-02-LDO.md)** · **[Index](README.md)** · **Next →** [BEETLE-04 — DSI Clocks](BEETLE-04-DSI-CLOCKS.md)

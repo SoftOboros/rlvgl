@@ -65,24 +65,109 @@ fn main() -> ! {
     // Set up the user LED so we can encode bring-up status in blink count.
     unsafe { led_init() };
 
-    // ERRATA-007 VERIFICATION: infinite LED blink with NO feed_watchdogs()
-    // calls. If disable_watchdogs() now actually disables all WDTs
-    // (correct 0x50D8_3AA1 magic on SWD wprotect per IDF / esp-hal),
-    // this loop runs indefinitely. If the LED still resets to "2 blinks
-    // then solid ON" at ~1.6 s cadence, the magic fix wasn't sufficient
-    // and there's a second WDT path we're missing.
+    // DO NOT add any delay between route_pins() / led_init() and
+    // run_bringup() — 2026-06-01 bench round confirmed that a multi-
+    // second gap (3 boot blinks = ~6s) between route_pins and the first
+    // I2C0 transaction causes wake() to hang on the very first MMIO
+    // write (no dips on the marker). The 2026-05-30 wake-works state
+    // had only ~µs between route_pins and wake (the removed
+    // probe_init_state() call was µs-scale, not a load-bearing
+    // initialization). The I2C0 master appears to lose configuration
+    // if not exercised within a short window after route_pins.
+
+    // Full bring-up flow. Diagnostic checkpoints AFTER wake / DSI run
+    // inside run_bringup_instrumented to avoid the same trap.
+    let status = unsafe { run_bringup_instrumented() };
+    led_status_loop(status);
+}
+
+/// Simple LED blink primitive — no wdt feeding, no markers, just N
+/// ON/OFF cycles at ~1Hz. Used as diagnostic checkpoints.
+fn led_blink_simple(n: u8) {
     let p = unsafe { esp32p4::Peripherals::steal() };
     let mask = 1u32 << bsp_generated::board::LED;
-    loop {
-        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+    for _ in 0..n {
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) }); // ON
         for _ in 0..16_000_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
-        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) }); // OFF
         for _ in 0..16_000_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
     }
+}
+
+/// Wrapper around run_bringup that adds slow-LED-blink checkpoints
+/// between phases so we can SEE on the LED how far we got. Unlike the
+/// existing GPIO-5 phase pulses (microsecond scale), these are visible
+/// to the eye without a Saleae.
+unsafe fn run_bringup_instrumented() -> u8 {
+    // After Phase 1-3c, BEFORE wake.
+    let _ = unsafe { dfr0550::psram::init() };
+    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
+    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_phy_clocks(
+            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
+        );
+    }
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_dpi_clock(
+            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
+            dfr0550::DPI_PIXEL_CLK_MHZ,
+        );
+    }
+
+    // (Checkpoint A removed — adding a 2s delay here makes wake() hang.
+    // The original run_bringup() had only ~150µs phase pulses between
+    // DSI clock setup and wake; a 2s delay breaks that ordering. So
+    // diagnostic blinks must come AFTER wake completes, not before it.)
+
+    // Phase 4: wake.
+    let wake_result = unsafe { wake_instrumented() };
+    use dfr0550::i2c0::I2cError;
+    use dfr0550::i2c_bridge::BridgeError;
+    use core::sync::atomic::Ordering;
+    match wake_result {
+        Ok(()) => {}
+        Err(BridgeError::I2c(I2cError::Nack)) => return 5,
+        Err(BridgeError::I2c(I2cError::Hang)) => {
+            let st = dfr0550::i2c0::LAST_HANG_STATE.load(Ordering::Relaxed);
+            let txcnt = st >> 3;
+            let scl_state = st & 0x07;
+            if txcnt == 0 {
+                return 50;
+            }
+            return 30u8.saturating_add(scl_state);
+        }
+        Err(BridgeError::I2c(I2cError::Timeout)) => return 7,
+        Err(BridgeError::I2c(I2cError::Arbitration)) => return 8,
+        Err(BridgeError::NotReady) => return 9,
+    }
+
+    // Checkpoint B: 4 slow blinks = "wake() succeeded, about to DSI".
+    led_blink_simple(4);
+
+    // Phase 5: DSI host.
+    let dsi_result = dfr0550::dsi_host::init(
+        dfr0550::DSI_LANES,
+        dfr0550::DSI_LANE_MBPS,
+        dfr0550::dsi_host::clocks::PhyClockSource::PllF20m.freq_mhz(),
+    );
+    let dsi = match dsi_result {
+        Ok(b) => b,
+        Err(dfr0550::dsi_host::DsiError::PllLock) => return 2,
+        Err(dfr0550::dsi_host::DsiError::LaneCal) => return 3,
+        Err(_) => return 4,
+    };
+
+    // Checkpoint C: 6 slow blinks = "DSI succeeded, about to DPI".
+    led_blink_simple(6);
+
+    let _ = dsi;
+    let _ = dfr0550::dpi_panel::DpiPanel::init(&dsi);
+    0
 }
 
 fn led_blink_n(n: u8) {
@@ -349,41 +434,24 @@ unsafe fn run_color_cycle(fb: dfr0550::dpi_panel::FrameBuffer<'static>) -> ! {
 unsafe fn disable_watchdogs() {
     let p = unsafe { esp32p4::Peripherals::steal() };
 
-    // ALL THREE wprotect registers on ESP32-P4 (LP_WDT main, LP_WDT SWD,
-    // TIMG{0,1}) use the SAME magic 0x50D8_3AA1. The 0x8F1D_312A value
-    // is the SWD wprotect magic for older chips (S3 / C3) and silently
-    // does NOTHING on P4 — confirmed via
-    //   esp-idf/components/hal/esp32p4/include/hal/lpwdt_ll.h:30
-    //     #define LP_WDT_SWD_WKEY_VALUE 0x50D83AA1
-    //   esp-hal/src/rtc_cntl/rtc/esp32p4.rs (same magic across all 4
-    //   wprotect writes).
-    // Earlier 0x8F1D_312A was inherited from older-chip TRM snippets;
-    // see ERRATA-007 for the diagnostic trail.
-    //
-    // Pattern matches esp-hal's: write magic → modify config → write 0
-    // to re-lock. Re-locking is defensive — without it any stray PAC
-    // bit-twiddle could re-arm without us noticing.
-
-    // LP_WDT (RTC main): unlock, clear config0 (disables wdt_en + all
-    // stages + flashboot_mod_en), feed, re-lock.
+    // ALL FOUR wprotect registers on ESP32-P4 (LP_WDT main, LP_WDT SWD,
+    // TIMG0, TIMG1) use the SAME magic 0x50D8_3AA1 (the older-chip SWD
+    // magic 0x8F1D_312A silently no-ops on P4 — see ERRATA-007).
+    // Re-lock each wprotect with write(0) at the end per esp-hal's
+    // pattern (defensive against stray writes re-arming the WDT).
     p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.config0().write(|w| unsafe { w.bits(0) });
     p.LP_WDT.feed().write(|w| w.feed().set_bit());
     p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0) });
 
-    // LP_WDT (Super WDT): enable swd_auto_feed_en so the analog SWD
-    // self-feeds in hardware regardless of CPU activity, and set
-    // swd_disable for belt-and-suspenders. Re-lock after.
+    // SWD: enable swd_auto_feed_en ONLY (matches esp-hal; setting
+    // swd_disable was tested 2026-06-01 and is NOT the wake regression
+    // source — bench-confirmed by reverting to 2026-05-30 bytes for
+    // disable_watchdogs() with no change in observed wake hang).
     p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
-    p.LP_WDT.swd_config().modify(|_, w| {
-        w.swd_disable().set_bit();
-        w.swd_auto_feed_en().set_bit();
-        w
-    });
+    p.LP_WDT.swd_config().modify(|_, w| w.swd_auto_feed_en().set_bit());
     p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
-    // TIMG0 / TIMG1 WDT: clear config0 (disables wdt_en + flashboot),
-    // feed, re-lock.
     p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG0.wdtconfig0().write(|w| unsafe { w.bits(0) });
     p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });

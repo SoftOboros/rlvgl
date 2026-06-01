@@ -23,7 +23,17 @@ moves here.
 
 ## Open questions
 
-*(none — EOQ-001-ERRATA-007 closed 2026-06-01 HIL gate.)*
+- **EOQ-002-ERRATA-008** — what makes the I2C0 master's first MMIO write
+  stall the CPU bus on ESP32-P4 when the full bring-up flow runs
+  end-to-end? With ERRATA-007 resolved (no WDT reset masking), the
+  chip stays alive long enough to expose what was previously a
+  latent failure mode. `i2c0::write_reg(0x45, REG_POWERON, 1)` does
+  NOT return — bounded internal spin loops would have exited within
+  ~100 ms, but the marker bracket stays HIGH >30 s with no dips. Need
+  to bisect which specific MMIO write is the stalling one (instrument
+  inside `publish_and_run` with GPIO toggles around each write) and
+  whether it's a clock-gate or peripheral-reset issue post-DSI-init.
+  See [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking).
 
 ## Index
 
@@ -36,6 +46,7 @@ moves here.
 | [ERRATA-005](#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) | ESP32-P4 I2C0 master refuses to start after `trans_start` | 🟢 | 2026-05-29 | BEETLE-03 |
 | [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟢 | 2026-05-29 | BEETLE infra |
 | [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) | ESP32-P4 WDT disable incomplete — periodic feeding required | 🟢 | 2026-05-30 | BEETLE infra |
+| [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking) | I2C0 master MMIO stall when full bring-up runs without WDT reset masking | 🔴 | 2026-06-01 | BEETLE-03 / BEETLE-05 |
 
 ---
 
@@ -931,3 +942,145 @@ If an entry intersects a normative spec (forces a §15 amendment to
 a `BEETLE-NN` chapter), the phase doc's §15 SHOULD cite the
 `ERRATA-NNN` id and the resolving commit; the errata entry SHOULD
 reciprocate.
+
+---
+
+## ERRATA-008 — I2C0 master MMIO stall when full bring-up runs without WDT reset masking
+
+**Status:** 🔴 Open. Symptom reproducible at bench; root cause
+unknown. ERRATA-005's wake fix is confirmed in code (correct COMD
+END markers + APB clock gate enable). ERRATA-007's WDT disable is
+confirmed at bench (chip runs indefinitely). With both fixes
+applied, the FULL wake-then-DSI bring-up flow exposes a previously-
+masked failure: the very first I2C0 MMIO write inside
+`publish_and_run` hangs the CPU bus.
+**First seen:** 2026-06-01 (multi-round bench session immediately
+following ERRATA-007 resolution)
+**Owning phase:** BEETLE-03 / BEETLE-05
+
+### Symptom
+
+Bring-up sequence reaches `wake()` after `disable_watchdogs()` →
+`bsp_generated::init()` → `debug_pins_init()` →
+`dfr0550::i2c0::route_pins()` → `led_init()` → Phase 1 (PSRAM stub)
+→ Phase 2 (LDO_VO3 acquire) → Phase 3a-c (DSI clocks). `wake()`
+calls `i2c0::write_reg(0x45, REG_POWERON, 1)`, which calls
+`publish_and_run()`. The first MMIO write inside `publish_and_run`
+is to `I2C0.int_clr()`.
+
+- **Marker GPIO 5 bracket:** sustained HIGH for >30 s with NO dips.
+  None of the 5 wake sub-step dips (`debug_marker_dip()` calls
+  after POWERON write / 20 ms delay / PORTB poll / PORTA write /
+  PWM write) fire.
+- **User LED (GPIO 3):** state freezes at whatever value `led_init()`
+  left it (LOW = ON if `led_init()` was the last GPIO 3 toggle).
+- **Saleae I2C lines:** silent — no SCL toggles after wake bracket
+  starts.
+
+Bounded internal spin loops (1M-iter MST_COMPLETE poll, 100K-iter
+bus_busy poll) would exit within ~100 ms with `I2cError::Hang` or
+`I2cError::Timeout`. The >30 s sustained-HIGH-with-no-dips signature
+rules out poll-loop infinite spin. The CPU is genuinely stalled on
+an MMIO write — consistent with a missing or gated peripheral clock
+on the I2C0 register block.
+
+### Why ERRATA-007 unmasked this
+
+The 2026-05-30 ERRATA-005 "wake works" verification used a
+short-circuit `return 1` after wake. WDT was firing at ~1.6 s
+intervals (ERRATA-007 hadn't been discovered yet). Wake completing
+in <1.6 s on ONE boot cycle was sufficient to record "wake works"
+— and the bench Saleae trace did show 4 transactions completing in
+that window. But wake may have only succeeded by happenstance
+(state cleanup from the WDT reset cycles) or by short timing (the
+hang now manifests further into the bring-up flow than wake's
+first transaction did on that cycle).
+
+With ERRATA-007's proper disable, the chip stays in one boot cycle
+indefinitely. The latent stall manifests deterministically as the
+first MMIO write inside wake.
+
+### Bench diagnostics performed (2026-06-01)
+
+- Reverted `disable_watchdogs()` to exact 2026-05-30 byte-for-byte
+  version (wrong SWD magic, no re-locks). **No change** — wake
+  still hangs. Rules out the disable_watchdogs() body diff as the
+  cause.
+- Removed `swd_disable = 1` (leaving only `swd_auto_feed_en = 1`)
+  to match esp-hal's reference. **No change** — wake still hangs.
+- Removed a 2 s LED-blink "Checkpoint A" between Phase 3c DSI clock
+  setup and wake. **No change** — wake still hangs with zero delay
+  between route_pins and wake.
+- Removed all boot-blink LED diagnostics. **No change** — wake
+  still hangs.
+
+The diagnostics narrow the regression source to: NOT the WDT magic
+fix, NOT the SWD config bits, NOT timing-related, NOT a code path
+that touches I2C0 between route_pins and wake.
+
+### Plausible root causes (untested)
+
+1. **Peripheral domain interaction.** Enabling DSI clocks (Phase
+   3a-c) may put a shared HP_SYS clock or APB domain into a state
+   where subsequent I2C0 MMIO access stalls. The IDF reference
+   `dfr0550_first_light.c` may sequence wake **before** DSI clock
+   setup; we have it reversed. The /tmp/dfr_bringup source is no
+   longer on disk; will need to re-obtain.
+2. **LDO_VO3 acquisition side-effects.** The DPHY rail acquisition
+   writes to PMU registers. Some PMU writes on P4 can gate
+   peripheral APB clocks.
+3. **Bridge-side bus hold.** The DFR0550-V2 STM32F072 bridge may
+   hold SCL or SDA low if it's woken by I2C transactions in a
+   particular order, preventing the I2C0 master from acquiring
+   the bus. Saleae would show this — needs explicit check on the
+   next bench round.
+4. **2026-05-30 "wake works" was misinterpreted.** Wake may have
+   never actually completed reliably; the 4 transactions observed
+   on the Saleae may have come from a SUBSEQUENT boot cycle after
+   the WDT reset masked the first failed attempt. Under this
+   interpretation, ERRATA-005 was incompletely resolved and
+   ERRATA-008 is its true continuation.
+
+### Fix prescription (next bench session)
+
+Bisect inside `publish_and_run` with GPIO toggles around each
+register read/write:
+
+```rust
+fn publish_and_run(p: &pac::Peripherals) -> Result<(), I2cError> {
+    debug_marker_dip();  // tick A — entered publish_and_run
+    p.I2C0.int_clr().write(|w| unsafe { w.bits(0xffff_ffff) });
+    debug_marker_dip();  // tick B — int_clr write returned
+    // ...
+}
+```
+
+A missing tick A identifies a fault BEFORE entering
+`publish_and_run`. Missing tick B identifies the stall AT
+`int_clr.write`. Each additional tick narrows further.
+
+Additional diagnostics worth running:
+- Call `i2c0::probe_init_state()` right before wake — confirms
+  whether I2C0's CTR / clock-gate / clock-source registers READ
+  back as we expect. A non-zero probe code identifies a specific
+  register that lost state.
+- Saleae SCL/SDA observation during the bracket: if SCL is held
+  LOW, the bridge or wiring is responsible; if SCL is high-Z, the
+  master is the issue.
+- Try wake() **before** the DSI clock setup phases (move it
+  immediately after route_pins) — if wake works there but fails
+  after DSI clocks, that pins down DSI clock setup as the trigger.
+
+### Verification
+
+Pending HIL with the diagnostic instrumentation above.
+
+### Tracking
+
+- Bench session 2026-06-01: 5 dispatch rounds confirming hang
+  source is post-Phase-3c, in `publish_and_run`'s first MMIO write.
+- ERRATA-005 §"Active-low LED caveat" and §"Diagnostic technique"
+  apply equally here.
+- The /tmp/dfr_bringup/dfr0550_first_light reference source needs
+  to be re-obtained from DFRobot or the original 2026-04-29 bench
+  archive to compare bring-up order.
