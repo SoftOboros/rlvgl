@@ -350,49 +350,79 @@ unsafe fn run_color_cycle(fb: dfr0550::dpi_panel::FrameBuffer<'static>) -> ! {
 unsafe fn disable_watchdogs() {
     let p = unsafe { esp32p4::Peripherals::steal() };
 
-    // LP_WDT (RTC main): unlock, write 0 to config0, leave unlocked so
-    // any subsequent stray write doesn't re-arm without us knowing.
+    // ALL THREE wprotect registers on ESP32-P4 (LP_WDT main, LP_WDT SWD,
+    // TIMG{0,1}) use the SAME magic 0x50D8_3AA1. The 0x8F1D_312A value
+    // is the SWD wprotect magic for older chips (S3 / C3) and silently
+    // does NOTHING on P4 — confirmed via
+    //   esp-idf/components/hal/esp32p4/include/hal/lpwdt_ll.h:30
+    //     #define LP_WDT_SWD_WKEY_VALUE 0x50D83AA1
+    //   esp-hal/src/rtc_cntl/rtc/esp32p4.rs (same magic across all 4
+    //   wprotect writes).
+    // Earlier 0x8F1D_312A was inherited from older-chip TRM snippets;
+    // see ERRATA-007 for the diagnostic trail.
+    //
+    // Pattern matches esp-hal's: write magic → modify config → write 0
+    // to re-lock. Re-locking is defensive — without it any stray PAC
+    // bit-twiddle could re-arm without us noticing.
+
+    // LP_WDT (RTC main): unlock, clear config0 (disables wdt_en + all
+    // stages + flashboot_mod_en), feed, re-lock.
     p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.config0().write(|w| unsafe { w.bits(0) });
-    // Feed once just in case the counter was already part-way to expiry.
     p.LP_WDT.feed().write(|w| w.feed().set_bit());
+    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0) });
 
-    // LP_WDT (Super WDT): write protect on this is separate. Setting
-    // swd_disable alone has historically not been enough on ESP32-P4
-    // for our SPI-boot chip — observed reset loop @ ~1.6 s. Enabling
-    // swd_auto_feed_en makes SWD feed itself in hardware, regardless
-    // of CPU activity, which solves the same problem more reliably.
-    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x8F1D_312A) });
+    // LP_WDT (Super WDT): enable swd_auto_feed_en so the analog SWD
+    // self-feeds in hardware regardless of CPU activity, and set
+    // swd_disable for belt-and-suspenders. Re-lock after.
+    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.swd_config().modify(|_, w| {
         w.swd_disable().set_bit();
         w.swd_auto_feed_en().set_bit();
         w
     });
+    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
-    // TIMG0 / TIMG1 WDT: same brute-force disable + leave unlocked.
+    // TIMG0 / TIMG1 WDT: clear config0 (disables wdt_en + flashboot),
+    // feed, re-lock.
     p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG0.wdtconfig0().write(|w| unsafe { w.bits(0) });
     p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });
+    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0) });
 
     p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG1.wdtconfig0().write(|w| unsafe { w.bits(0) });
     p.TIMG1.wdtfeed().write(|w| unsafe { w.bits(1) });
+    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0) });
 }
 
 /// Feed all watchdogs once. Belt-and-suspenders: even with the
 /// disable sequence in [`disable_watchdogs`], call this before any
 /// long-running spin loop (PORTB poll, DSI PLL lock, NOP delays)
 /// to be safe against any WDT that snuck through the disable.
+///
+/// Uses the correct ESP32-P4 wprotect magic `0x50D8_3AA1` for all
+/// four registers (LP_WDT main, LP_WDT SWD, TIMG0, TIMG1). The
+/// previous `0x8F1D_312A` value used for SWD was the S3/C3 magic and
+/// silently failed on P4 — every "SWD feed" write went into a locked
+/// register. See ERRATA-007.
 fn feed_watchdogs() {
     let p = unsafe { esp32p4::Peripherals::steal() };
     p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.feed().write(|w| w.feed().set_bit());
-    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x8F1D_312A) });
+    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0) });
+
+    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.swd_config().modify(|_, w| w.swd_feed().set_bit());
+    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });
+
     p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });
+    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0) });
+
     p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG1.wdtfeed().write(|w| unsafe { w.bits(1) });
+    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0) });
 }
 
 /// Drive GPIO 7 and GPIO 8 directly as plain push-pull GPIO outputs

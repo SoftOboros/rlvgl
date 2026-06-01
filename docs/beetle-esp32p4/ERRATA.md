@@ -23,12 +23,17 @@ moves here.
 
 ## Open questions
 
-- **EOQ-001-ERRATA-007** — what is the correct ESP32-P4 watchdog disable
-  sequence that *actually* stops the WDT? The TRM-documented sequence
-  (LP_WDT/SWD/TIMG0/1 unlock + clear + relock) does not fully disable
-  the WDT on the DFR1172 chip — a ~1.6 s reset loop persists. Periodic
-  `feed_watchdogs()` calls keep the chip alive, but a clean disable
-  would simplify bring-up. See [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required).
+- **EOQ-001-ERRATA-007** — *root cause identified 2026-06-01;
+  HIL verification pending.* The 1.6 s reset loop traces to using the
+  wrong SWD wprotect magic value: we wrote `0x8F1D_312A` (which is the
+  SWD magic for ESP32-S3 / C3) to `LP_WDT.SWD_WPROTECT_REG` on a chip
+  where ALL FOUR wprotect registers (LP_WDT main, LP_WDT SWD, TIMG0,
+  TIMG1) require `0x50D8_3AA1`. Every SWD `swd_disable` /
+  `swd_auto_feed_en` / `swd_feed` write since BEETLE-03 has silently
+  failed against a locked register. Code fix landed (see
+  [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required)
+  §Fix); pending bench confirmation that a `loop { NOPs }` WITHOUT
+  `feed_watchdogs()` calls now runs indefinitely without reset.
 
 ## Index
 
@@ -737,11 +742,14 @@ interrupting the pattern.
 
 ## ERRATA-007 — ESP32-P4 WDT disable incomplete, periodic feeding required
 
-**Status:** 🟡 Diagnosed — workaround landed (`feed_watchdogs()`
-called periodically). Proper disable sequence still unknown; pending
-investigation against IDF's `wdt_hal_iram.c` and bootloader source.
+**Status:** 🟡 Diagnosed — root cause identified 2026-06-01, code fix
+landed in commit (this commit), bench verification pending. Will flip
+🟢 once a `loop { NOPs }` (without periodic feeding) survives ≥30 s
+without reset.
 **First seen:** 2026-05-30 (multi-round bench session attempting to
 verify wake() + DSI bring-up post-ERRATA-005)
+**Root cause identified:** 2026-06-01 (memalpha + IDF source +
+esp-hal cross-reference session)
 **Owning phase:** BEETLE infra (follow-up to ERRATA-006)
 
 ### Symptom
@@ -770,74 +778,140 @@ Symptoms that diagnostically distinguish this from a real code hang:
 
 ### Root cause
 
-The TRM-documented disable sequence (chapter 17 of the ESP32-P4
-TRM):
+**Wrong SWD wprotect magic value.** On ESP32-P4, all four watchdog
+write-protect registers (LP_WDT main, LP_WDT Super WDT, TIMG0,
+TIMG1) require the **same** unlock key: `0x50D8_3AA1`. The
+`0x8F1D_312A` value our `disable_watchdogs()` and `feed_watchdogs()`
+were writing to `LP_WDT.SWD_WPROTECT_REG` is the SWD magic for
+ESP32-S3 / C3 silicon, NOT P4. The wrong write to wprotect leaves
+SWD's wprotect locked, so subsequent writes to `swd_config`
+(setting `swd_disable`, `swd_auto_feed_en`, `swd_feed`) **silently
+fail** — they go into a locked register that ignores writes.
 
-1. Write magic to wprotect register (`0x50D83AA1` for LP_WDT main
-   and TIMG0/1, `0x8F1D312A` for the LP_WDT Super WDT).
-2. Clear `wdt_en` (and `wdt_flashboot_mod_en` for SPI boot path).
-3. Write any non-magic value to relock.
+Authoritative confirmation across three independent sources:
 
-Empirically on the DFR1172 ESP32-P4 v1.3 chip, this sequence does
-NOT fully stop the watchdog. Even with the entire `config0`
-register written to 0 (clearing every enable bit, every stage
-action, every flashboot bit), and with `swd_disable` set AND
-`swd_auto_feed_en` enabled on the Super WDT, a reset still fires
-every ~1.6 s.
+1. **IDF HAL:** `esp-idf/components/hal/esp32p4/include/hal/lpwdt_ll.h:30`
+   ```c
+   #define LP_WDT_SWD_WKEY_VALUE 0x50D83AA1
+   ```
+   (vs `#define RTC_CNTL_SWD_WKEY 0x8F1D312A` on earlier-chip lpwdt_ll
+   variants).
 
-The clock-source clue: the LP_WDT main is driven by `LP_DYN_SLOW_CLK`
-(per TRM chapter 10 / clock-and-reset chapter) and the Super WDT is
-an analog block. Either may have a bring-up sequence the TRM
-doesn't fully document, or the IDF bootloader leaves them in a
-state that requires a step beyond the standard disable.
+2. **IDF bootloader:**
+   `esp-idf/components/bootloader_support/src/esp32p4/bootloader_esp32p4.c:88`
+   ```c
+   static void bootloader_super_wdt_auto_feed(void)
+   {
+       REG_WRITE(LP_WDT_SWD_WPROTECT_REG, LP_WDT_SWD_WKEY_VALUE);  // 0x50D83AA1
+       REG_SET_BIT(LP_WDT_SWD_CONFIG_REG, LP_WDT_SWD_AUTO_FEED_EN);
+       REG_WRITE(LP_WDT_SWD_WPROTECT_REG, 0);
+   }
+   ```
 
-### Fix prescription
+3. **esp-hal (no_std Rust reference):**
+   `esp-hal/src/rtc_cntl/rtc/esp32p4.rs` uses `0x50D8_3AA1` for ALL
+   four wprotect registers including `swd_wprotect`.
 
-**Workaround currently in `bsp_pac_main.rs`:** a `feed_watchdogs()`
-helper that unlocks each WDT and writes its feed register, leaving
-wprotect unlocked. Called periodically — at least every ~400 ms —
-inside every long-running loop. The reference success-pattern is a
-`loop { feed_watchdogs(); GPIO on; NOPs; feed_watchdogs(); GPIO off;
-NOPs; }` which runs indefinitely. Without the feeds the same loop
-resets every ~1.6 s.
+**Where the bug came from.** Our `0x8F1D_312A` value was inherited
+from older-chip TRM excerpts during initial ERRATA-006 disable-WDT
+implementation. The P4 TRM Chapter 17 documents the wprotect
+mechanism but does NOT spell out the per-register magic value in
+prose — only via signal name `LP_WDT_SWD_WKEY`. The published P4
+SVD / esp32p4 PAC also doesn't enforce the magic in any compile-
+time check; PACs accept arbitrary u32 writes to wprotect. So the
+typo went undetected for ~2 weeks of bench iteration.
 
-**Proper fix (pending investigation):** read IDF source for ESP32-P4
-WDT disable, specifically:
-- `components/hal/esp32p4/include/hal/wdt_hal.h`
-- `components/hal/esp32p4/wdt_hal_iram.c`
-- `components/bootloader_support/src/bootloader_init.c`
+**Why we still observed ~1.6 s reset cadence.** The IDF bootloader
+calls `bootloader_super_wdt_auto_feed()` at boot, which DOES
+correctly use `0x50D83AA1` and leaves `swd_auto_feed_en = 1`. If
+the auto-feed had survived to our app, SWD should not fire. Two
+plausible reasons it doesn't survive:
 
-Likely there's a step we're missing — perhaps clearing
-`RTC_CNTL_WDT_FLASHBOOT_MOD_EN` via a different path, or a
-register write in a different power domain, or an interaction with
-the `LP_AON` block that gates the WDT clock at a higher level than
-the WDT itself.
+- espflash 4.4.0 may bundle a bootloader that doesn't run
+  `bootloader_super_wdt_auto_feed()` — empirically the
+  `--ignore-app-descriptor` and `--no-skip` flags we use suggest a
+  non-standard bootloader path.
+- The bootloader's `bootloader_config_wdt()` re-arms RWDT (LP_WDT
+  main) with `CONFIG_BOOTLOADER_WDT_ENABLE` default ON, configured
+  to RESET_RTC on stage-0 timeout. Our `LP_WDT.config0 = 0` write
+  with CORRECT magic 0x50D83AA1 should disable this — and per the
+  bench evidence, periodic feeding via the LP_WDT.feed register
+  (which uses the SAME 0x50D83AA1 magic) DID keep the chip alive,
+  consistent with LP_WDT being the active timer.
+
+Either way, the fix is the same: use the correct magic for all
+four wprotect registers, on every write.
+
+### Fix
+
+Two code changes in `examples/beetle-esp32p4/src/bsp_pac_main.rs`:
+
+1. **`disable_watchdogs()`** — replace `0x8F1D_312A` with
+   `0x50D8_3AA1` on every `swd_wprotect.write()` call. Also re-lock
+   wprotect with `write(0)` at the end of each disable, matching
+   esp-hal's pattern (defensive; prevents stray writes from re-arming).
+
+2. **`feed_watchdogs()`** — same magic fix on the SWD wprotect path.
+   Also adopt the unlock → feed → re-lock idiom for all four WDTs
+   (LP_WDT main, LP_WDT SWD, TIMG0, TIMG1) for consistency.
+
+The pattern (verbatim):
+
+```rust
+// Correct ESP32-P4 SWD wprotect magic — same as LP_WDT main and TIMG.
+p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+p.LP_WDT.swd_config().modify(|_, w| {
+    w.swd_disable().set_bit();
+    w.swd_auto_feed_en().set_bit();
+    w
+});
+p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });  // re-lock
+```
 
 ### Verification
 
-The workaround pattern (periodic feeds inside the bring-up flow)
-was verified end-to-end in the 2026-05-30 session — an infinite
-blink with `feed_watchdogs()` calls produced continuous LED blinking
-("heartbeat") for 30+ s. The same loop with the feed calls removed
-hit the standard "2 blinks then solid" reset pattern.
+**Bench gate (pending):** a release-build flash with the corrected
+magic + `disable_watchdogs()` running once at top of `main()`, then
+an infinite `loop { NOPs }` with **NO** `feed_watchdogs()` calls
+inside, should survive ≥ 30 s without LED-reset cycling. If the
+chip stays in the loop (LED stuck wherever the loop's first
+write left it), 🟢 — the disable is now complete. If it still
+resets at ~1.6 s, there is a second issue beyond the SWD magic and
+this entry stays 🟡 with a new line of investigation.
 
-The proper disable verification will be: chip runs an infinite NOP
-loop with NO feed calls for 30+ s without resetting. Until that
-test passes, treat the WDT disable as incomplete and feed
-periodically.
+**Workaround retained either way:** `feed_watchdogs()` (with the
+corrected magic) is still called inside long-running loops as
+belt-and-suspenders, since the cost is negligible (~6 register
+writes per ~400 ms) and the benefit is independence from any
+remaining unknown WDT path.
 
 ### Tracking
 
 - `examples/beetle-esp32p4/src/bsp_pac_main.rs::disable_watchdogs`
-  + `::feed_watchdogs` carry the current best-effort disable and
-  the workaround feed helper.
+  + `::feed_watchdogs` carry the corrected magic + unlock-modify-
+  relock idiom matching esp-hal.
 - [BEETLE-03 §15](BEETLE-03-I2C-BRIDGE.md#15-change-log) 2026-05-30
   entry records the multi-round diagnostic detour and the
-  workaround discovery.
-- The IDF investigation is open work — once the proper disable
-  is found, update both this entry and ERRATA-006 to 🟢.
-- Memory: `project_esp32p4_wdt_persistent.md` carries the
-  cross-session institutional note.
+  workaround discovery; 2026-06-01 entry (forthcoming) records
+  the magic-value root cause and code fix.
+- IDF cross-references (read 2026-06-01):
+  - `esp-idf/components/hal/esp32p4/include/hal/lpwdt_ll.h:30`
+    (canonical `LP_WDT_SWD_WKEY_VALUE = 0x50D83AA1`)
+  - `esp-idf/components/hal/esp32p4/include/hal/lpwdt_ll.h:84`
+    (`lpwdt_ll_disable` docstring: "does not disable the flashboot
+    mode" — flashboot is independent enable path, separately
+    cleared by `bootloader_config_wdt`)
+  - `esp-idf/components/bootloader_support/src/esp32p4/bootloader_esp32p4.c:86-91`
+    (`bootloader_super_wdt_auto_feed` — uses correct magic)
+  - `esp-idf/components/bootloader_support/src/bootloader_init.c:64-94`
+    (`bootloader_config_wdt` — disables RWDT/MWDT0 flashboot,
+    optionally re-arms RWDT with `CONFIG_BOOTLOADER_WDT_TIME_MS`
+    stage-0 timeout)
+  - `esp-hal/src/rtc_cntl/rtc/esp32p4.rs` (no_std Rust reference —
+    uses `0x50D8_3AA1` for all four wprotect registers)
+- Memory: `project_esp32p4_wdt_persistent.md` to be updated after
+  bench verification to reflect the corrected magic and code-fix
+  status.
 
 ---
 

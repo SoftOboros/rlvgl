@@ -424,6 +424,40 @@ A conforming BEETLE-03 implementation MUST:
     those GPIOs should be passive listeners only; markers/refresh
     debug outputs must use GPIO 5 or pins ≥9.
 
+- **2026-06-01** (off-bench research session — ERRATA-007 root cause
+  identified). Memalpha + IDF source + esp-hal cross-reference pass
+  on the WDT-reset-loop symptom traced the issue to **wrong SWD
+  wprotect magic value**. We had been writing `0x8F1D_312A` (the
+  ESP32-S3 / C3 SWD magic) to `LP_WDT.SWD_WPROTECT_REG` on a chip
+  where all four wprotect registers (LP_WDT main, LP_WDT SWD,
+  TIMG0, TIMG1) use the same `0x50D8_3AA1` magic. Confirmed via:
+
+  - `esp-idf/components/hal/esp32p4/include/hal/lpwdt_ll.h:30`
+    (`LP_WDT_SWD_WKEY_VALUE 0x50D83AA1`).
+  - `esp-idf/components/bootloader_support/src/esp32p4/bootloader_esp32p4.c:88`
+    (bootloader uses the same magic).
+  - `esp-hal/src/rtc_cntl/rtc/esp32p4.rs` (no_std Rust reference
+    uses `0x50D8_3AA1` for all four wprotect registers).
+
+  Code fix landed in `disable_watchdogs()` + `feed_watchdogs()`:
+  corrected magic + adopted esp-hal's unlock-modify-relock idiom on
+  all four WDTs. See [ERRATA-007 §Fix](ERRATA.md#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required).
+
+  - **No HIL session this turn** — discovery and fix were
+    desk-research-driven. Bench verification of the proper-disable
+    claim (an infinite `loop { NOPs }` without periodic feeds
+    surviving ≥30 s) is the next bench session's first task. If it
+    passes, ERRATA-007 flips 🟢 and the workaround feed calls inside
+    long-running loops become belt-and-suspenders rather than
+    load-bearing.
+
+  - **Acceptance gate (e) still pending** until next bench session;
+    the WDT discovery doesn't itself close the gate, only removes the
+    confound. Once verified, the next moves are plumbing
+    `feed_watchdogs()` defensively into `dsi_host::init` spin loops
+    and re-flashing the full wake → DSI → DPI(stub) bring-up to
+    confirm visible backlight + LED 4 blinks (`DpiPanelInit::Unimplemented`).
+
 ---
 
 **[← BEETLE-02](BEETLE-02-LDO.md)** · **[Index](README.md)** · **Next →** [BEETLE-04 — DSI Clocks](BEETLE-04-DSI-CLOCKS.md)
