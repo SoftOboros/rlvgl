@@ -23,16 +23,24 @@ moves here.
 
 ## Open questions
 
-- **EOQ-002-ERRATA-008** — what makes the I2C0 master's first MMIO write
-  stall the CPU bus on ESP32-P4 when the full bring-up flow runs
-  end-to-end? With ERRATA-007 resolved (no WDT reset masking), the
-  chip stays alive long enough to expose what was previously a
-  latent failure mode. `i2c0::write_reg(0x45, REG_POWERON, 1)` does
-  NOT return — bounded internal spin loops would have exited within
-  ~100 ms, but the marker bracket stays HIGH >30 s with no dips. Need
-  to bisect which specific MMIO write is the stalling one (instrument
-  inside `publish_and_run` with GPIO toggles around each write) and
-  whether it's a clock-gate or peripheral-reset issue post-DSI-init.
+- **EOQ-002-ERRATA-008** — *(updated 2026-06-03)* with all
+  WebFetch'd IDF-canonical configuration landed (bus timing,
+  IO_MUX, op_codes, divider) and hardware verified via in-tree
+  bit-bang probe (slave at 0x45 ACKs), the I2C0 master FSM still
+  refuses to complete COMD0 (RSTART). The FSM moves out of IDLE
+  (`TRANS_START` int latches) and produces bus activity but no
+  `cmd_done` ever sets and no event interrupt fires. Saleae shows
+  "STOP STOP STOP" at 30 µs with the DFR1237/DFR0550 panel
+  attached, "req/ack chain" at 17.4 µs with the panel disconnected
+  — both indicate the FSM bails partway through transmitting the
+  first byte. The original "first MMIO write stalls the CPU" framing
+  was masked by two layered bugs (broken Morse digit renderer +
+  stale `probe_init_state` polarity) that were fixed mid-session;
+  the underlying defect appears to be either order-of-operations
+  in `route_pins` vs IDF's `s_hp_i2c_pins_config`, or an
+  interaction between DSI/LDO bring-up and I2C peripheral state
+  that we can't see at the PAC level. esp-hal reference test
+  abandoned: esp-hal 1.1.1 does not support ESP32-P4.
   See [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking).
 
 ## Index
@@ -46,7 +54,7 @@ moves here.
 | [ERRATA-005](#errata-005--esp32-p4-i2c0-master-refuses-to-start-after-trans_start) | ESP32-P4 I2C0 master refuses to start after `trans_start` | 🟢 | 2026-05-29 | BEETLE-03 |
 | [ERRATA-006](#errata-006--idf-bootloader-leaves-wdts-armed) | IDF bootloader leaves WDTs armed for raw-PAC apps | 🟢 | 2026-05-29 | BEETLE infra |
 | [ERRATA-007](#errata-007--esp32-p4-wdt-disable-incomplete-periodic-feeding-required) | ESP32-P4 WDT disable incomplete — periodic feeding required | 🟢 | 2026-05-30 | BEETLE infra |
-| [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking) | I2C0 master MMIO stall when full bring-up runs without WDT reset masking | 🔴 | 2026-06-01 | BEETLE-03 / BEETLE-05 |
+| [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking) | I2C0 master FSM never completes COMD0 despite IDF-canonical init (was: MMIO stall — symptom reframed 2026-06-03) | 🔴 | 2026-06-01 | BEETLE-03 / BEETLE-05 |
 
 ---
 
@@ -947,15 +955,22 @@ reciprocate.
 
 ## ERRATA-008 — I2C0 master MMIO stall when full bring-up runs without WDT reset masking
 
-**Status:** 🔴 Open. Symptom reproducible at bench; root cause
-unknown. ERRATA-005's wake fix is confirmed in code (correct COMD
-END markers + APB clock gate enable). ERRATA-007's WDT disable is
-confirmed at bench (chip runs indefinitely). With both fixes
-applied, the FULL wake-then-DSI bring-up flow exposes a previously-
-masked failure: the very first I2C0 MMIO write inside
-`publish_and_run` hangs the CPU bus.
+**Status:** 🔴 Open. The 2026-06-01 "CPU stall on first MMIO" framing
+was symptom-misread caused by two layered diagnostic bugs (broken
+Morse digit renderer + stale `probe_init_state` polarity check)
+discovered and fixed in the 2026-06-02 / 2026-06-03 bench sessions.
+The underlying defect persists: with all WebFetch'd IDF-canonical
+config landed (bus timing, IO_MUX, op_codes, divider) and hardware
+verified working via in-tree bit-bang probe, the I2C0 master FSM
+moves out of IDLE (`TRANS_START` int latches) but never completes
+COMD0 (`cmd_done` stays 0 across all 8 slots). No event interrupt
+fires. Bus pattern is "STOP STOP STOP at 30 µs" with panel
+attached, "req/ack chain at 17.4 µs" with panel disconnected —
+neither produces a complete address byte. ERRATA-005's wake fix
+and ERRATA-007's WDT disable both remain in place.
 **First seen:** 2026-06-01 (multi-round bench session immediately
 following ERRATA-007 resolution)
+**Most recent bench:** 2026-06-03 (~19 iterations across two days)
 **Owning phase:** BEETLE-03 / BEETLE-05
 
 ### Symptom
@@ -1075,10 +1090,201 @@ Additional diagnostics worth running:
 
 Pending HIL with the diagnostic instrumentation above.
 
+### 2026-06-02 / 06-03 bench sessions — extensive iteration
+
+A multi-session bench effort (~19+ rounds across two days) made
+significant structural progress but did **not** close the
+underlying defect. The symptom signature shifted from
+"unbounded CPU stall" to "FSM moves out of IDLE then silently
+abandons" — the original CPU-stall framing was actually masked by
+two layered bugs (a stale `probe_init_state` polarity check and a
+broken Morse diagnostic). Once those were fixed and full IDF-derived
+configuration landed, the underlying I2C0 master FSM still refuses
+to complete COMD0 (RSTART), but the surface symptom is now an FSM
+that briefly drives bus activity and abandons rather than a CPU
+that hangs indefinitely.
+
+#### Layered bugs found and fixed (commit 44a5d48 BEETLE-03i)
+
+1. **Morse digit renderer broken in release mode.** The
+   `morse_marker_digit` loop pattern over `MORSE_DIGITS[d]` collapsed
+   consecutive `is_dash=true` calls — digit 1 rendered as `.-...`
+   instead of `.----`. This meant every status code reported via
+   Morse for the entire 2026-06-01 session was MISREAD. Calibration
+   bench (hardcoded literal "0" + "1" emitted via direct
+   `morse_marker_element` calls) isolated the bug. Replaced loop
+   with hand-unrolled `match` using literal bool args.
+
+2. **`probe_init_state` polarity flip mismatch.** route_pins flipped
+   `ctr.clk_en` polarity on 2026-06-02 but the probe wasn't updated
+   — probe returned 23, bring-up aborted before `wake()` ever ran.
+   Every diagnostic added between 2026-06-02 and the calibration
+   bench was hitting the same pre-wake code path, masking the new
+   instrumentation.
+
+#### Resolved sub-finding (commit 96814e8 BEETLE-03k)
+
+3. **GPIO 9-clock SDA-release recovery (`recover_bus()`)** landed
+   per NXP UM10204 §3.1.16 and was wired into `route_pins`. At
+   init time the bus is consistently clean — `quinary=000`
+   (recover_bus saw SDA already high, no clocks needed). Rules out
+   the "bridge mid-byte from cold boot holds SDA low" hypothesis
+   originally framed in this errata's §"Plausible root causes" #3.
+
+#### IDF-derived configuration (commits 85f2802, f4575ce BEETLE-03l/m)
+
+WebFetch'd verbatim from `esp-idf/release/v5.4`
+(components/hal/esp32p4/include/hal/i2c_ll.h,
+components/hal/i2c_hal.c,
+components/esp_driver_i2c/i2c_master.c +
+components/esp_driver_i2c/i2c_common.c):
+
+4. **Bus timing values per `i2c_ll_master_cal_bus_clk`**:
+   For 40 MHz source / 100 kHz target,
+   `half_cycle = 200`, `scl_wait_high = 98`, `scl_high = 102`,
+   `sda_sample = 100`, `sda_hold = 50`, `setup = hold = 200`.
+   IDF writes most fields as `value - 1`. The IP's
+   `HAL_ASSERT(scl_wait_high < sda_sample < scl_high)` constrains
+   these values to cluster tightly around `half_cycle / 2` —
+   wide-margin values (which we had originally, e.g. `sda_sample=50`
+   vs `scl_high=200`) satisfy the assertion but apparently confuse
+   the FSM. With IDF-correct clustering the FSM briefly drove SCL
+   low for the first time — observed `quaternary=014` (SDA=H,
+   **SCL=L**, op_code=6, done=0).
+
+5. **IO_MUX configuration per `s_hp_i2c_pins_config`**:
+   For both SDA and SCL pins, set `fun_ie=1` (input enable),
+   `fun_wpu=1` (internal pull-up), `fun_wpd=0`, `mcu_sel=1`
+   (function 1 = GPIO matrix path). Without `fun_ie=1` the FSM
+   can't read its own SDA/SCL state from the pad, which would
+   explain repeated arbitration-loss-like bailouts. Landed in
+   route_pins after the pad route.
+
+6. **op_code values**: `RESTART=6, WRITE=1, READ=3, STOP=2, END=4`
+   per IDF `i2c_ll.h`. The PAC docstring (esp32p4 0.2.0) claims
+   `0: RSTART, 1: WRITE, 2: READ, 3: STOP, 4: END` — **PAC doc is
+   WRONG**. Brief experimental detour with PAC-doc values changed
+   the bench symptom in no way.
+
+#### Hardware verification (commit f4575ce BEETLE-03m)
+
+7. **Bit-bang address probe** (`bitbang_address_probe()` in
+   i2c0.rs): manual GPIO bit-bang of START + 7-bit address + R/W
+   + ACK-sample + STOP for address 0x45, bypassing the I2C0
+   peripheral entirely. Reported via the 7th Morse line
+   ("septenary"). **Result: `000` — slave at 0x45 ACKs.** Confirms:
+   - Bus electrically alive
+   - Internal pull-ups present (via `fun_wpu=1`)
+   - DFR0550 bridge powered, at the expected address
+   - Pad routing (GPIO matrix + IO_MUX) functionally correct
+
+   Therefore the bug is entirely in the I2C0 peripheral init path.
+   Every layer below the driver has been independently verified.
+
+#### Reference HAL test ABANDONED
+
+8. **esp-hal 1.1.1 does NOT support ESP32-P4.** Supported chip
+   feature flags: esp32, esp32c2/c3/c5/c6/c61, esp32h2,
+   esp32s2/s3. **No esp32p4.** There is currently no upstream Rust
+   HAL implementation we can compare against. The ESP-IDF C source
+   is the sole working reference. An attempted minimal probe is
+   stashed at `examples/beetle-esp32p4/src/esp_hal_probe.rs.bak`
+   for the day esp-hal adds P4 support.
+
+#### Panel-disconnected bench (2026-06-03, end of session)
+
+9. With the DFR1237/DFR0550 FFC physically unplugged:
+   - `septenary` changes `000 → 001` (NACK on bit-bang — no slave
+     to ACK, but bus electrically alive via internal pull-ups). ✓
+   - Saleae bus pattern changes from **"STOP STOP STOP at 30 µs
+     cadence"** to **"req/ack chain at 17.4 µs cadence"**.
+   - All Morse status digits unchanged otherwise: primary=030,
+     secondary=000, tertiary=068, quaternary=030. The master FSM
+     still doesn't complete COMD0.
+
+   17.4 µs is too short for a full 8-bit address + ACK at 100 kHz
+   (~90 µs expected). So even without the panel — i.e. with no
+   slave to clock-stretch or hold SCL/SDA — the FSM bails partway
+   through transmitting the first byte. The panel was causing some
+   form of bail-out (most likely clock-stretching SCL low past our
+   `scl_wait_high = 98` cycles = 2.45 µs tolerance), but removing
+   the panel **does not** fix the underlying defect.
+
+#### Current state (status: 🔴 still open)
+
+All structural IDF-derivable configuration matches the WebFetch'd
+ESP-IDF source. Bus is electrically alive. Hardware is confirmed
+working at the bit-bang level. Master FSM moves out of IDLE
+(TRANS_START int latches reliably), produces bus activity, but
+never completes COMD0 (cmd_done across all 8 slots reads 0). No
+event interrupt fires within the spin window (no NACK, no TIMEOUT,
+no SCL_*_TO, no BYTE_TRANS_DONE) regardless of spin length —
+tested at 25 ms and 250 ms.
+
+#### Empirical divergences from IDF retained
+
+Two CTR bits diverge from the IDF reference but were empirically
+required to produce any FSM activity at all:
+
+- `arbitration_en = 1` (IDF default = 0). With arb_en=0 the FSM is
+  silent — no bus activity, no TRANS_START int. Hypothesis: the
+  FSM's internal progression uses arbitration logic for self-state
+  checks, not only multi-master contention.
+- `clk_en = 1` (IDF default = 0). With clk_en=0 the FSM is silent.
+  PAC doc claims this gates only the register-block clock, but
+  bench evidence shows it also affects FSM activity.
+
+Both are kept set to 1 in the current build; both are CTR bits and
+both readback correctly (`ms_mode` confirmed via `tertiary` bit 6).
+
+#### Remaining hypothesis space
+
+- **Order of operations in route_pins.** IDF's
+  `s_hp_i2c_pins_config` does `gpio_set_level(pin, 1)` FIRST (set
+  GPIO.out = 1) before any other pin config. We never explicitly
+  set GPIO.out = 1 before enabling output — so at the moment we
+  enable output, GPIO.out is at whatever value it had at reset
+  (potentially 0 = drive LOW in open-drain). The FSM may briefly
+  see SDA driven low at the wrong moment.
+- **Interaction with DSI/LDO/PMU bring-up.** Our bring-up runs
+  PSRAM → LDO_VO3 → DSI clocks → `probe_init_state` → wake. The
+  IDF reference may sequence wake before DSI clock setup; the
+  /tmp/dfr_bringup reference source is no longer on disk.
+- **Silicon-level quirk specific to this bring-up order or specific
+  to chip-revision v1.3.** Unverifiable without working reference.
+
+#### Next-session plan
+
+1. Re-order `route_pins` to match IDF's `s_hp_i2c_pins_config`
+   verbatim: `gpio_set_level(pin, 1)` first, then `gpio_input_enable`,
+   then `gpio_od_enable`, then `gpio_pullup_en`, then
+   `gpio_pulldown_dis`, then `gpio_func_sel(pin, PIN_FUNC_GPIO)`,
+   then matrix `connect_out_signal` / `connect_in_signal`.
+2. Try calling `wake()` immediately after `route_pins`, before
+   PSRAM / LDO / DSI setup. If wake works there but fails after the
+   intermediate phases, the trigger is something in PSRAM / LDO /
+   DSI bring-up.
+3. Zoom Saleae trace into one 17.4 µs panel-disconnect cycle and
+   count individual SCL transitions + SDA timing relative to SCL,
+   to identify exactly which FSM state the abort occurs in.
+4. Watch for esp-hal P4 support — switch to reference path
+   immediately if added.
+
 ### Tracking
 
 - Bench session 2026-06-01: 5 dispatch rounds confirming hang
   source is post-Phase-3c, in `publish_and_run`'s first MMIO write.
+- Bench sessions 2026-06-02 / 2026-06-03 (~19+ iterations):
+  layered bugs uncovered and fixed, IDF-canonical config landed,
+  hardware verified, but underlying defect still open.
+  Commits: `44a5d48` (BEETLE-03i), `e34759b` (BEETLE-03j),
+  `96814e8` (BEETLE-03k), `85f2802` (BEETLE-03l),
+  `f4575ce` (BEETLE-03m).
+- The 🟢 "ROOT CAUSE: SDA stuck low externally" finding from the
+  2026-06-03 morning was **retracted** by 2026-06-03 evening
+  diagnostics — the SDA-low at hang was an after-effect of a
+  failed master transaction, not the original cause. The bus is
+  clean at init in every subsequent bench.
 - ERRATA-005 §"Active-low LED caveat" and §"Diagnostic technique"
   apply equally here.
 - The /tmp/dfr_bringup/dfr0550_first_light reference source needs
