@@ -77,14 +77,30 @@ pub static LAST_HANG_CTL_SR: AtomicU8 = AtomicU8::new(0);
 ///   (b) Bus is electrically stuck — SCL or SDA can't be driven
 ///       low for the START condition.
 /// Bit layout:
-///   bits 0-2 — `COMD0.op_code` (bits 13:11 of COMD0). Expected 6
-///              (= 110 binary, RSTART) for write_reg path. If 0
-///              (= 000), the slot was wiped → hypothesis (a) wins.
+///   bits 0-2 — `COMD0.op_code` (bits 13:11 of COMD0). Expected 0
+///              (= 000 binary, RSTART per ESP32-P4 PAC doc) for
+///              write_reg path. Was 6 before BEETLE-03m fix.
 ///   bit 3   — SDA pin INPUT level (GPIO.in bit for SDA_GPIO).
 ///   bit 4   — SCL pin INPUT level (GPIO.in bit for SCL_GPIO).
 ///   bit 5   — `COMD0.done` (bit 31 of COMD0). 1 = RSTART completed.
 ///   bits 6-7 — reserved.
 pub static LAST_HANG_COMD0_PINS: AtomicU8 = AtomicU8::new(0);
+
+/// ERRATA-008 round 2026-06-03 (BEETLE-03m hardware-check probe): result
+/// of a manual GPIO-bit-bang I2C address probe (START + 7-bit addr +
+/// write-bit + ACK sample + STOP). Bypasses the I2C0 peripheral
+/// entirely. Tells us whether the bus is electrically alive and the
+/// bridge is at the expected address, independent of any PAC bug.
+/// Codes:
+///   0    — slave ACKed; bus + address + power all confirmed working.
+///   1    — slave NACKed; bus electrically fine, but no slave at addr.
+///   2    — couldn't drive SDA low after commanding it (pad / wiring).
+///   3    — couldn't drive SCL low after commanding it (pad / wiring).
+///   4    — both lines stuck low at probe entry (external pull-down).
+///   5    — SDA stuck low at probe entry (slave or wiring).
+///   6    — SCL stuck low at probe entry (slave or wiring).
+///   0xFF — probe never ran.
+pub static LAST_BITBANG_ACK: AtomicU8 = AtomicU8::new(0xFF);
 
 /// ERRATA-008 round 2026-06-03 (BEETLE-03k recovery): how many SCL
 /// clocks the bus-recovery loop needed before SDA was released.
@@ -116,6 +132,17 @@ const I2C0_SDA_SIG: u16 = 69;
 // and does not match the P4 hardware. Bench-confirmed at 2026-06-01:
 // swapping to PAC-doc values did not change the ERRATA-008 hang
 // symptom, confirming opcodes are not the load-bearing variable.
+// ESP32-P4 op_code mapping per IDF i2c_ll.h (release/v5.4):
+//   #define I2C_LL_CMD_RESTART    6
+//   #define I2C_LL_CMD_WRITE      1
+//   #define I2C_LL_CMD_READ       3
+//   #define I2C_LL_CMD_STOP       2
+//   #define I2C_LL_CMD_END        4
+// The PAC doc string ("0: RSTART, 1: WRITE, 2: READ, 3: STOP, 4: END")
+// is WRONG — verified by WebFetch'ing the IDF source. Our original
+// values were correct; brief BEETLE-03m experiment with PAC-doc values
+// confirmed neither encoding made the FSM execute, so op_codes aren't
+// the active bug.
 const OP_RESTART: u32 = 6;
 const OP_WRITE: u32 = 1;
 const OP_READ: u32 = 3;
@@ -161,17 +188,26 @@ pub unsafe fn route_pins() {
         .hp_active_icg_hp_func()
         .write(|w| unsafe { w.hp_active_dig_icg_func_en().bits(0xFFFF_FFFF) });
 
-    // **Pad routing FIRST.** Connect GPIO 8 ↔ I2C0_SCL and GPIO 7 ↔
-    // I2C0_SDA through the GPIO matrix BEFORE doing any I2C0-peripheral
-    // initialisation. Critically the func_in_sel (peripheral input ← GPIO)
-    // must be routed before `conf_upgate` latches the master config —
-    // otherwise the peripheral's SCL/SDA input signals (68/69) read as
-    // their unrouted default (0 = held low) and the master latches
-    // "bus held" at startup, refusing to issue START even though
-    // `sr.bus_busy` reads 0 at probe time. BEETLE ERRATA-005 round 7:
-    // END marker fixed the runaway FSM loop, but the underlying IDLE-
-    // never-leaves-IDLE failure traced to this pad-vs-conf_upgate
-    // ordering.
+    // BEETLE-03m: IO_MUX configuration per IDF `s_hp_i2c_pins_config`.
+    // The GPIO matrix routing (func_in_sel_cfg / func_out_sel_cfg) is
+    // necessary but NOT sufficient — the pin's IO_MUX register must
+    // also have fun_ie=1 (input enable, so the FSM can read its own
+    // SDA/SCL state back from the pad), fun_wpu=1 (internal pull-up),
+    // fun_wpd=0 (no pull-down), and mcu_sel=1 (function 1 = GPIO
+    // matrix path, not direct-peripheral). Septenary=000 from the
+    // bit-bang probe confirmed: bus + slave + address all work; the
+    // FSM was silently bailing because it couldn't read SDA back from
+    // the pad. This is the missing init step.
+    for pin in [SDA_GPIO as usize, SCL_GPIO as usize] {
+        p.IO_MUX.gpio(pin).modify(|_, w| unsafe {
+            w.fun_ie().set_bit();
+            w.fun_wpu().set_bit();
+            w.fun_wpd().clear_bit();
+            w.mcu_sel().bits(1);
+            w
+        });
+    }
+
     p.GPIO
         .enable_w1ts()
         .write(|w| unsafe { w.bits((1u32 << SCL_GPIO) | (1u32 << SDA_GPIO)) });
@@ -323,7 +359,16 @@ pub unsafe fn route_pins() {
         w.rx_lsb_first().clear_bit();
         w.sda_force_out().clear_bit();
         w.scl_force_out().clear_bit();
-        w.arbitration_en().set_bit();
+        // BEETLE-03m (2026-06-03 iter 17): back to IDF default arb_en=0
+        // now that IO_MUX input_enable is set. Earlier arb_en=0 failure
+        // (FSM silent) was an artifact of fun_ie=0 — the FSM couldn't
+        // read SDA/SCL back, so it had no way to verify START took.
+        // With fun_ie=1, the FSM now sees its own output and shouldn't
+        // need arb_en=1's paranoid contention checks (which were
+        // triggering the "STOP STOP STOP" 30 µs retry-loop observed on
+        // Saleae — FSM pulled SDA low, falsely concluded arbitration
+        // lost, released SDA = STOP-looking, retry).
+        w.arbitration_en().clear_bit();
         // BEETLE-03l reverted: tried set_bit() (reset value 1) to match
         // C6 TRM reset value; bench showed it RE-INTRODUCED the
         // SDA-stuck-low symptom (quaternary 030→022). So our prior
@@ -332,6 +377,15 @@ pub unsafe fn route_pins() {
         // the FSM interprets some internal ACK state as NACK and
         // bails / drives SDA low. Keep clear_bit().
         w.rx_full_ack_level().clear_bit();
+        // BEETLE-03l iter 15: empirically `clk_en=1` is REQUIRED for the
+        // FSM to actually drive the bus. Doc claims this bit only gates
+        // the register-block clock ("Force clock on for registers") but
+        // bench evidence: with clk_en=0 (IDF default) the FSM goes
+        // silent — quaternary stays at 030 (SDA high, SCL high, no
+        // clocking). With clk_en=1, the FSM clocks SCL low briefly
+        // (quaternary 014 in round 12). So clk_en=1 also keeps an
+        // FSM-internal clock path alive that the doc doesn't mention.
+        // Diverges from IDF; intentional.
         w.clk_en().set_bit();
         w.slv_tx_auto_start_en().clear_bit();
         w
@@ -911,13 +965,8 @@ pub unsafe fn probe_init_state() -> u8 {
     if !ctr.ms_mode().bit_is_set() {
         return 22;
     }
-    // ERRATA-008 round 2026-06-03: probe polarity inverted to match the
-    // current route_pins write of `clk_en().set_bit()`. The check used
-    // to fire when clk_en read back as 1 because route_pins originally
-    // cleared it. We flipped route_pins on 2026-06-02 (clk_en=1 fixed a
-    // stale-register-read symptom), but probe_init_state wasn't updated,
-    // so the probe falsely returned 23 and aborted bring-up BEFORE
-    // wake() — masking the new PMU ICG / fsm_rst / arb_lost diagnostics.
+    // BEETLE-03l iter 15: route_pins re-enables clk_en (empirically
+    // required for FSM bus activity). Probe re-flipped to expect 1.
     if !ctr.clk_en().bit_is_set() {
         return 23;
     }
@@ -1053,6 +1102,138 @@ pub unsafe fn recover_bus() -> u8 {
 /// optimiser cannot elide the loop.
 fn recovery_half_period() {
     let mut n: u32 = 2000;
+    while n > 0 {
+        unsafe { core::arch::asm!("nop", options(nomem, nostack, preserves_flags)) };
+        n = unsafe { core::ptr::read_volatile(&n) }.wrapping_sub(1);
+    }
+}
+
+/// BEETLE-03m hardware-check: manually bit-bang a single I2C address
+/// probe transaction (START + addr<<1 | 0 + ACK sample + STOP) using
+/// only GPIO writes. Bypasses the I2C0 peripheral. Tells us if the
+/// bus + slave + address are electrically working, independent of any
+/// bug in the I2C peripheral init. See LAST_BITBANG_ACK for return
+/// codes.
+///
+/// # Safety
+///
+/// Detaches and re-attaches GPIO matrix routing for SCL/SDA. Must run
+/// after `route_pins` so pad_driver=1 is already set.
+pub unsafe fn bitbang_address_probe(addr: u8) -> u8 {
+    let p = unsafe { pac::Peripherals::steal() };
+    let scl_mask = 1u32 << SCL_GPIO;
+    let sda_mask = 1u32 << SDA_GPIO;
+
+    // Detach from I2C0 peripheral signal — out_sel=256 → GPIO direct.
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+
+    // Initial state: both lines released (GPIO.out=1, output-enabled in
+    // open-drain mode → hi-Z, pull-up wins).
+    p.GPIO
+        .out_w1ts()
+        .write(|w| unsafe { w.bits(scl_mask | sda_mask) });
+    p.GPIO
+        .enable_w1ts()
+        .write(|w| unsafe { w.bits(scl_mask | sda_mask) });
+    bitbang_quarter();
+
+    // Check initial line state — should both be high (pulled up).
+    let in0 = p.GPIO.in_().read().bits();
+    let init_sda = (in0 >> SDA_GPIO) & 1;
+    let init_scl = (in0 >> SCL_GPIO) & 1;
+    let result;
+    if init_sda == 0 && init_scl == 0 {
+        result = 4;
+    } else if init_sda == 0 {
+        result = 5;
+    } else if init_scl == 0 {
+        result = 6;
+    } else {
+        result = bitbang_address_probe_inner(&p, addr, scl_mask, sda_mask);
+    }
+
+    // STOP condition unconditionally (clean up bus).
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(sda_mask) });
+    bitbang_quarter();
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(scl_mask) });
+    bitbang_quarter();
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(sda_mask) });
+    bitbang_quarter();
+
+    // Re-attach to I2C0 peripheral signals.
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SCL_SIG) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SDA_SIG) });
+
+    LAST_BITBANG_ACK.store(result, Ordering::Relaxed);
+    result
+}
+
+fn bitbang_address_probe_inner(
+    p: &pac::Peripherals,
+    addr: u8,
+    scl_mask: u32,
+    sda_mask: u32,
+) -> u8 {
+    // START: SDA H→L while SCL high.
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(sda_mask) });
+    bitbang_quarter();
+    // Verify SDA actually went low.
+    if (p.GPIO.in_().read().bits() >> SDA_GPIO) & 1 != 0 {
+        return 2;
+    }
+    // SCL low — start of clock period.
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(scl_mask) });
+    bitbang_quarter();
+    if (p.GPIO.in_().read().bits() >> SCL_GPIO) & 1 != 0 {
+        return 3;
+    }
+
+    // Clock out 8 bits MSB-first: addr<<1 | 0 (write).
+    let byte: u8 = addr << 1;
+    for i in (0..8).rev() {
+        let bit = (byte >> i) & 1;
+        if bit != 0 {
+            p.GPIO.out_w1ts().write(|w| unsafe { w.bits(sda_mask) });
+        } else {
+            p.GPIO.out_w1tc().write(|w| unsafe { w.bits(sda_mask) });
+        }
+        bitbang_quarter();
+        // SCL high — clock the bit.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(scl_mask) });
+        bitbang_quarter();
+        bitbang_quarter();
+        // SCL low — prepare for next bit / ACK.
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(scl_mask) });
+        bitbang_quarter();
+    }
+
+    // ACK bit: release SDA (hi-Z), clock SCL high, sample SDA.
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(sda_mask) });
+    bitbang_quarter();
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(scl_mask) });
+    bitbang_quarter();
+    let ack = (p.GPIO.in_().read().bits() >> SDA_GPIO) & 1;
+    bitbang_quarter();
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(scl_mask) });
+    bitbang_quarter();
+
+    // ack = 0 → slave pulled SDA low = ACK = success
+    // ack = 1 → SDA stayed high = NACK = no slave at addr
+    ack as u8
+}
+
+fn bitbang_quarter() {
+    // ~2.5 µs at 400 MHz = 1000 cycles. Quarter of a 100 kHz period.
+    let mut n: u32 = 1000;
     while n > 0 {
         unsafe { core::arch::asm!("nop", options(nomem, nostack, preserves_flags)) };
         n = unsafe { core::ptr::read_volatile(&n) }.wrapping_sub(1);

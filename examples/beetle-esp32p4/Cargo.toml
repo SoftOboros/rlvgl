@@ -40,6 +40,12 @@ esp32p4 = [
     "dep:riscv",
     "dep:panic-halt",
 ]
+# BEETLE-03m esp-hal reference path was attempted but esp-hal 1.1.1
+# (latest as of 2026-06-03) does NOT support esp32p4 — chip features
+# are esp32, c2/c3/c5/c6/c61/h2, s2/s3 only. There is no working Rust
+# HAL we can compare against; the ESP-IDF C source is the sole
+# reference. See examples/beetle-esp32p4/src/esp_hal_probe.rs.bak
+# for the attempted code (not built).
 
 [dependencies]
 rlvgl-core = { path = "../../core", default-features = false }

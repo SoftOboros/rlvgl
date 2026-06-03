@@ -62,6 +62,14 @@ fn main() -> ! {
         dfr0550::i2c0::route_pins();
     }
 
+    // BEETLE-03m hardware-check probe: manually bit-bang an I2C address
+    // probe for 0x45 (DFR0550 bridge) using only GPIO writes. If the
+    // slave ACKs, hardware is electrically sound and the bug is in the
+    // I2C0 peripheral init. If it NACKs / hangs, the issue is the
+    // bridge/wiring/power independent of our PAC code. Stores result
+    // into LAST_BITBANG_ACK (7th Morse line in status loop).
+    let _bitbang_ack = unsafe { dfr0550::i2c0::bitbang_address_probe(0x45) };
+
     // Set up the user LED so we can encode bring-up status in blink count.
     unsafe { led_init() };
 
@@ -855,6 +863,7 @@ fn morse_status_loop(status: u8) -> ! {
     let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
     let comd0_pins = dfr0550::i2c0::LAST_HANG_COMD0_PINS.load(core::sync::atomic::Ordering::Relaxed);
     let recovery = dfr0550::i2c0::LAST_RECOVERY_CLOCKS.load(core::sync::atomic::Ordering::Relaxed);
+    let bitbang = dfr0550::i2c0::LAST_BITBANG_ACK.load(core::sync::atomic::Ordering::Relaxed);
     // Derive a compact 6-bit summary of `LAST_HANG_INT_RAW` for the
     // bench Morse readout. Picks the diagnostic-bearing event bits:
     //   bit 0 ← TIMEOUT       (int_raw bit 8)  — internal timeout fired
@@ -951,6 +960,15 @@ fn morse_status_loop(status: u8) -> ! {
         // actually clocked a byte (bus is electrically fine); if
         // SCL_*_TO fired, an FSM-internal timeout — likely root cause.
         morse_marker_number(&p, marker_mask, int_pack);
+        morse_fast_delay(6); // word gap
+
+        // Septenary 3 digits (BEETLE-03m bit-bang hardware-check):
+        //   0    = slave ACKed; hardware confirmed working at 0x45
+        //   1    = NACK; bus electrical OK, but no slave at 0x45
+        //   2/3  = couldn't drive SDA/SCL low (pad/wiring)
+        //   4/5/6= one or both lines stuck low at probe entry
+        //   255  = probe never ran
+        morse_marker_number(&p, marker_mask, bitbang);
 
         // Long inter-message silence (~1 s) — gives a clean gap so the
         // next preamble reads as a fresh repeat.

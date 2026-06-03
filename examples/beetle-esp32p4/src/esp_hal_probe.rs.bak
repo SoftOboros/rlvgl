@@ -1,0 +1,87 @@
+//! BEETLE-03m esp-hal reference probe.
+//!
+//! Bypasses our PAC bring-up entirely and uses esp-hal's official I2C
+//! driver to do a single write to the DFR0550 bridge at 0x45 on the
+//! DFR1172 shield (SDA=GPIO 7, SCL=GPIO 8). The bench result tells us
+//! whether the ESP32-P4 I2C peripheral can in fact talk to this bridge
+//! through standard upstream drivers — if yes, the failure in
+//! `bsp_pac_main.rs`'s ERRATA-008 path is a register-level init issue
+//! we still haven't found; if no, the bug is below the driver
+//! (hardware, wiring, or chip silicon revision).
+//!
+//! LED status code (GPIO 3, active-high — pin HIGH = LED ON):
+//!   1 short blink            = I2C write at 0x45 succeeded (slave ACKed).
+//!   2 short blinks           = I2C returned an error (NACK / timeout /
+//!                              arbitration). Hardware is alive at the
+//!                              driver level.
+//!   3 short blinks           = esp-hal::init failed (very unlikely).
+//!   solid ON (no blinks)     = code reached the end of main without panic.
+//!   no LED activity          = panic / hang before LED init.
+
+#![no_std]
+#![no_main]
+
+use esp_backtrace as _;
+use esp_hal::delay::Delay;
+use esp_hal::gpio::{Level, Output, OutputConfig};
+use esp_hal::i2c::master::{Config as I2cConfig, I2c};
+use esp_hal::main;
+use esp_hal::time::Rate;
+
+const LED_PIN_GPIO: u8 = 3;
+const SDA_GPIO: u8 = 7;
+const SCL_GPIO: u8 = 8;
+const BRIDGE_ADDR: u8 = 0x45;
+
+#[main]
+fn beetle_main() -> ! {
+    esp_alloc::heap_allocator!(8 * 1024);
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    let mut led = Output::new(
+        peripherals.GPIO3,
+        Level::Low,
+        OutputConfig::default(),
+    );
+    let delay = Delay::new();
+
+    // Brief startup pulse so we know we got past init.
+    for _ in 0..4 {
+        led.set_high();
+        delay.delay_millis(80u32);
+        led.set_low();
+        delay.delay_millis(80u32);
+    }
+    delay.delay_millis(400u32);
+
+    // Probe the bridge — write a single dummy byte (POWERON register
+    // 0x07 with value 0x01). Even if the bridge wouldn't normally
+    // accept this byte sequence, an ACK on the address tells us the
+    // bus path works.
+    let blinks = match I2c::new(
+        peripherals.I2C0,
+        I2cConfig::default().with_frequency(Rate::from_khz(100)),
+    ) {
+        Ok(i2c) => {
+            let mut i2c = i2c
+                .with_sda(peripherals.GPIO7)
+                .with_scl(peripherals.GPIO8);
+            match i2c.write(BRIDGE_ADDR, &[0x07, 0x01]) {
+                Ok(()) => 1u8,  // ACKed — hardware confirmed working at driver level
+                Err(_) => 2u8,   // NACK / timeout / arb error
+            }
+        }
+        Err(_) => 3u8,  // hal init failure (unexpected)
+    };
+
+    // Encode result via LED blink count.
+    loop {
+        for _ in 0..blinks {
+            led.set_high();
+            delay.delay_millis(200u32);
+            led.set_low();
+            delay.delay_millis(200u32);
+        }
+        delay.delay_millis(1500u32);
+    }
+}
