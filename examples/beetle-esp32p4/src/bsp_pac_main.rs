@@ -853,6 +853,7 @@ fn morse_status_loop(status: u8) -> ! {
     let led_mask = 1u32 << bsp_generated::board::LED;
     let cmd_done = dfr0550::i2c0::LAST_HANG_CMD_DONE.load(core::sync::atomic::Ordering::Relaxed);
     let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
+    let comd0_pins = dfr0550::i2c0::LAST_HANG_COMD0_PINS.load(core::sync::atomic::Ordering::Relaxed);
 
     if status == 0 {
         // Steady LED ON (and marker high) for full-success indication.
@@ -912,6 +913,12 @@ fn morse_status_loop(status: u8) -> ! {
 
         // Tertiary 3 digits (ctl_sr packed flags).
         morse_marker_number(&p, marker_mask, ctl_sr);
+        morse_fast_delay(6); // word gap
+
+        // Quaternary 3 digits (comd0_pins): op_code low 3 bits +
+        // SDA/SCL input pin levels + COMD0.done. See LAST_HANG_COMD0_PINS
+        // doc comment in dfr0550/i2c0.rs for bit-by-bit interpretation.
+        morse_marker_number(&p, marker_mask, comd0_pins);
 
         // Long inter-message silence (~1 s) — gives a clean gap so the
         // next preamble reads as a fresh repeat.

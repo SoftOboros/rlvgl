@@ -67,6 +67,25 @@ pub static LAST_HANG_CMD_DONE: AtomicU8 = AtomicU8::new(0);
 ///   bits 5-7 — reserved.
 pub static LAST_HANG_CTL_SR: AtomicU8 = AtomicU8::new(0);
 
+/// ERRATA-008 round 2026-06-03 (bench iter 4): packed COMD0 op_code +
+/// bus-pin level snapshot at hang time. Reasoning: previous round
+/// showed TRANS_START int fired but cmd_done=0 across all 8 COMD
+/// slots — the FSM moved out of IDLE briefly then returned without
+/// executing any command. Two remaining hypotheses:
+///   (a) COMD0 was wiped between programming and trans_start (PAC
+///       doc says fsm_rst only resets SCL_FSM, but verify anyway).
+///   (b) Bus is electrically stuck — SCL or SDA can't be driven
+///       low for the START condition.
+/// Bit layout:
+///   bits 0-2 — `COMD0.op_code` (bits 13:11 of COMD0). Expected 6
+///              (= 110 binary, RSTART) for write_reg path. If 0
+///              (= 000), the slot was wiped → hypothesis (a) wins.
+///   bit 3   — SDA pin INPUT level (GPIO.in bit for SDA_GPIO).
+///   bit 4   — SCL pin INPUT level (GPIO.in bit for SCL_GPIO).
+///   bit 5   — `COMD0.done` (bit 31 of COMD0). 1 = RSTART completed.
+///   bits 6-7 — reserved.
+pub static LAST_HANG_COMD0_PINS: AtomicU8 = AtomicU8::new(0);
+
 const I2C0_SCL_SIG: u16 = 68;
 const I2C0_SDA_SIG: u16 = 69;
 
@@ -752,6 +771,20 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     if ctr_bits & (1 << 4) != 0  { ctl |= 1 << 6; } // ms_mode readback
     if sr.slave_rw().bit_is_set() { ctl |= 1 << 7; }
     LAST_HANG_CTL_SR.store(ctl, Ordering::Relaxed);
+
+    // ERRATA-008 round 2026-06-03 iter 4: COMD0 op_code + bus pin levels.
+    let c0 = p.I2C0.comd0().read().bits();
+    let op0 = ((c0 >> 11) & 0x07) as u8;
+    let c0_done = (c0 >> 31) & 1;
+    let gpio_in = p.GPIO.in_().read().bits();
+    let sda_lvl = ((gpio_in >> SDA_GPIO) & 1) as u8;
+    let scl_lvl = ((gpio_in >> SCL_GPIO) & 1) as u8;
+    let mut snap: u8 = 0;
+    snap |= op0 & 0x07;           // bits 0-2
+    snap |= sda_lvl << 3;          // bit 3
+    snap |= scl_lvl << 4;          // bit 4
+    snap |= (c0_done as u8) << 5;  // bit 5
+    LAST_HANG_COMD0_PINS.store(snap, Ordering::Relaxed);
 }
 
 /// Read back the registers we wrote in [`route_pins`] and verify the
