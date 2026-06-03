@@ -770,7 +770,7 @@ fn morse_delay(units: u32) {
 /// Faster Morse unit (10 ms at 400 MHz core) used by the marker-pin
 /// status loop. The Saleae captures both edges so we don't need
 /// human-perceivable timing; ms scale gives a 3-code message in ~3 s.
-const MORSE_UNIT_FAST_NOPS: u32 = 1_600_000; // ~10 ms
+const MORSE_UNIT_FAST_NOPS: u32 = 16_000; // ~0.5 ms (100x faster than prior ~53 ms unit — saleae captures fine at this rate)
 
 #[inline(never)]
 fn morse_fast_delay(units: u32) {
@@ -854,6 +854,23 @@ fn morse_status_loop(status: u8) -> ! {
     let cmd_done = dfr0550::i2c0::LAST_HANG_CMD_DONE.load(core::sync::atomic::Ordering::Relaxed);
     let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
     let comd0_pins = dfr0550::i2c0::LAST_HANG_COMD0_PINS.load(core::sync::atomic::Ordering::Relaxed);
+    let recovery = dfr0550::i2c0::LAST_RECOVERY_CLOCKS.load(core::sync::atomic::Ordering::Relaxed);
+    // Derive a compact 6-bit summary of `LAST_HANG_INT_RAW` for the
+    // bench Morse readout. Picks the diagnostic-bearing event bits:
+    //   bit 0 ← TIMEOUT       (int_raw bit 8)  — internal timeout fired
+    //   bit 1 ← SCL_ST_TO     (int_raw bit 13) — SCL sub-state timeout
+    //   bit 2 ← SCL_MAIN_ST_TO(int_raw bit 14) — SCL main-state timeout
+    //   bit 3 ← BYTE_TRANS_DONE (int_raw bit 4) — at least one byte clocked
+    //   bit 4 ← MST_TX_BUF_REQ (int_raw bit 6) — FSM asked FIFO for more data
+    //   bit 5 ← DET_START     (int_raw bit 15) — start condition detected
+    let int_raw = dfr0550::i2c0::LAST_HANG_INT_RAW.load(core::sync::atomic::Ordering::Relaxed);
+    let mut int_pack: u8 = 0;
+    if int_raw & (1 << 8)  != 0 { int_pack |= 1 << 0; }
+    if int_raw & (1 << 13) != 0 { int_pack |= 1 << 1; }
+    if int_raw & (1 << 14) != 0 { int_pack |= 1 << 2; }
+    if int_raw & (1 << 4)  != 0 { int_pack |= 1 << 3; }
+    if int_raw & (1 << 6)  != 0 { int_pack |= 1 << 4; }
+    if int_raw & (1 << 15) != 0 { int_pack |= 1 << 5; }
 
     if status == 0 {
         // Steady LED ON (and marker high) for full-success indication.
@@ -919,6 +936,21 @@ fn morse_status_loop(status: u8) -> ! {
         // SDA/SCL input pin levels + COMD0.done. See LAST_HANG_COMD0_PINS
         // doc comment in dfr0550/i2c0.rs for bit-by-bit interpretation.
         morse_marker_number(&p, marker_mask, comd0_pins);
+        morse_fast_delay(6); // word gap
+
+        // Quinary 3 digits (recovery_clocks): how many SCL clocks were
+        // needed to release SDA at boot. 0=clean, 1-9=recovered at N,
+        // 10=stuck, 255=never ran. See LAST_RECOVERY_CLOCKS in i2c0.rs.
+        morse_marker_number(&p, marker_mask, recovery);
+        morse_fast_delay(6); // word gap
+
+        // Senary 3 digits (int_raw packed flags):
+        //   bit 0=TIMEOUT, bit 1=SCL_ST_TO, bit 2=SCL_MAIN_ST_TO,
+        //   bit 3=BYTE_TRANS_DONE, bit 4=MST_TX_BUF_REQ, bit 5=DET_START.
+        // High-value diagnostic — if BYTE_TRANS_DONE fired, the FSM
+        // actually clocked a byte (bus is electrically fine); if
+        // SCL_*_TO fired, an FSM-internal timeout — likely root cause.
+        morse_marker_number(&p, marker_mask, int_pack);
 
         // Long inter-message silence (~1 s) — gives a clean gap so the
         // next preamble reads as a fresh repeat.

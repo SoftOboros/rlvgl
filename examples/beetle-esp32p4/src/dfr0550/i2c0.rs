@@ -86,6 +86,17 @@ pub static LAST_HANG_CTL_SR: AtomicU8 = AtomicU8::new(0);
 ///   bits 6-7 — reserved.
 pub static LAST_HANG_COMD0_PINS: AtomicU8 = AtomicU8::new(0);
 
+/// ERRATA-008 round 2026-06-03 (BEETLE-03k recovery): how many SCL
+/// clocks the bus-recovery loop needed before SDA was released.
+/// Initial value 0xFF = "recovery never ran". Real values:
+///   0   — SDA was already high before any clocks; bridge was clean.
+///   1-9 — bridge released SDA mid-recovery; this is the canonical
+///         I2C 9-clock-recovery success.
+///   10  — recovery completed all 9 clocks and SDA STILL low — the
+///         bridge is wedged harder than mid-byte (electrical issue,
+///         no power, or held-low by an external pull-down).
+pub static LAST_RECOVERY_CLOCKS: AtomicU8 = AtomicU8::new(0xFF);
+
 const I2C0_SCL_SIG: u16 = 68;
 const I2C0_SDA_SIG: u16 = 69;
 
@@ -270,7 +281,16 @@ pub unsafe fn route_pins() {
     //   rx_lsb_first = 0       (MSB first receive)
     //   sda_force_out = 0      (open-drain SDA)
     //   scl_force_out = 0      (open-drain SCL)
-    //   arbitration_en = 0     (single-master, no arbitration)
+    //   arbitration_en = 1     (ERRATA-008 round 2026-06-03 iter 8:
+    //                          flipped 0→1. Reset value per C6 TRM is 1,
+    //                          IDF default is 1. Earlier 0 setting was
+    //                          based on the misconception that
+    //                          single-master mode doesn't need arbitration
+    //                          — bench evidence (TRANS_START fires but
+    //                          FSM abandons before COMD0 executes, no
+    //                          other event ints latch) consistent with
+    //                          the SCL_MAIN_FSM needing arbitration logic
+    //                          enabled to advance from TRANS_START state.)
     //   rx_full_ack_level = 0  (IDF default; reset default is 1)
     //   clk_en = 1             (ERRATA-008 test 2026-06-02: PAC doc
     //                          says 0=force-on, 1=auto-gate. We tried
@@ -289,7 +309,7 @@ pub unsafe fn route_pins() {
         w.rx_lsb_first().clear_bit();
         w.sda_force_out().clear_bit();
         w.scl_force_out().clear_bit();
-        w.arbitration_en().clear_bit();
+        w.arbitration_en().set_bit();
         w.rx_full_ack_level().clear_bit();
         w.clk_en().set_bit();
         w.slv_tx_auto_start_en().clear_bit();
@@ -323,12 +343,16 @@ pub unsafe fn route_pins() {
     //   "Configures the timeout threshold period for SCL stucking at
     //    high or low level. The actual period is 2^(reg_time_out_value).
     //    Measurement unit: i2c_sclk."
-    // At 40 MHz I2C_SCLK, 2^20 cycles = ~26 ms — plenty for a 100 kHz
-    // bus where the longest legal SCL stretch is 25 ms. Without
-    // enabling timeout, the master may hang waiting for SCL to release
-    // forever in degenerate bus states.
+    // ERRATA-008 round 2026-06-03 (bench iter 7): lowered from 20 to
+    // 16 (~26 ms → ~1.6 ms at 40 MHz I2C_SCLK). Senary=000 with the
+    // 26 ms value told us TIMEOUT/SCL_*_TO never had a chance to
+    // latch within our ~25 ms spin loop — the internal timeout was
+    // just-after our observation window. With 1.6 ms, the FSM's
+    // timeout fires deeply within the 25 ms spin, so any latched
+    // TIMEOUT / SCL_ST_TO / SCL_MAIN_ST_TO bit will be visible in
+    // LAST_HANG_INT_RAW → senary.
     p.I2C0.to().modify(|_, w| unsafe {
-        w.time_out_value().bits(20);
+        w.time_out_value().bits(16);
         w.time_out_en().set_bit();
         w
     });
@@ -402,6 +426,20 @@ pub unsafe fn route_pins() {
     p.GPIO
         .func_in_sel_cfg(I2C0_SDA_SIG as usize)
         .modify(|_, w| unsafe { w.in_sel().bits(SDA_GPIO).sel().set_bit() });
+
+    // BEETLE-03k I2C bus recovery — runs AT THE END of route_pins, after
+    // the I2C0 peripheral is fully configured (CTR + timing + filter +
+    // conf_upgate). Bench iter 6 (quinary=000, quaternary=022) proved
+    // that running recovery early — before peri reset and CTR config —
+    // is wasted: the reset pulse later re-attaches a slave-mode-defaulted
+    // I2C0 to the pads, which then drives SDA low. At this position the
+    // peripheral idles SDA high (open-drain release) so any 9-clock
+    // sequence we run leaves the bus actually clean when we exit.
+    //
+    // If SDA is already high (clean), recover_bus() returns 0 in one
+    // GPIO read (no clocks emitted). If the bridge held it low across
+    // peri reset, recovery should release SDA in 1-9 clocks.
+    let _recovery_clocks = unsafe { recover_bus() };
 }
 
 /// Write `[reg, value]` to the slave at `addr` and STOP.
@@ -874,4 +912,116 @@ pub unsafe fn probe_init_state() -> u8 {
     }
 
     0
+}
+
+/// BEETLE-03k I2C bus-recovery: bit-bang up to 9 SCL clocks with SDA
+/// hi-Z to release a slave stuck mid-byte. Per NXP UM10204 §3.1.16.
+///
+/// Symptom this fixes: SDA pin reads LOW with SCL idle high — a slave
+/// (here the DFR0550 STM32F072 bridge) is mid-byte from a prior
+/// partial cycle. The master can't issue START (SDA is already low,
+/// no falling edge possible) and returns to IDLE without setting any
+/// cmd_done bit. Diagnosed at BEETLE-03j bench, quaternary=022.
+///
+/// Procedure:
+///   1. Detach SCL/SDA from I2C0 peripheral signal (out_sel=256 makes
+///      the pin pure GPIO controlled by GPIO_OUT_REG, per ESP32-P4
+///      GPIO matrix docs for func_out_sel_cfg).
+///   2. Drive SCL via GPIO.out (open-drain still from pad_driver=1, so
+///      out=0 drives LOW, out=1 releases hi-Z and pull-up wins).
+///   3. Bit-bang up to 9 SCL clocks at ~100 kHz (5 µs HIGH / 5 µs LOW).
+///      After each rising edge check if SDA released; break early.
+///   4. Generate a manual STOP condition (SDA falling-edge → rising-
+///      edge while SCL high) so any in-flight slave transaction is
+///      cleanly terminated.
+///   5. Re-attach both pins to I2C0 peripheral signals.
+///
+/// Stores clocks-needed-to-release into `LAST_RECOVERY_CLOCKS`:
+///   0    — SDA was already high (bus was clean; recovery was a no-op).
+///   1-9  — bridge released SDA at clock N (canonical success).
+///   10   — completed all 9 clocks, SDA still low (bus is hard-stuck
+///          and the failure is electrical / power / external).
+///
+/// # Safety
+///
+/// Steals the PAC; must run after `route_pins`-style pad config so
+/// pad_driver=1 (open-drain) is already set on both pins. Re-routing
+/// is restored before return — safe to call from `route_pins` itself
+/// in the post-pad-config section.
+pub unsafe fn recover_bus() -> u8 {
+    let p = unsafe { pac::Peripherals::steal() };
+
+    let scl_mask = 1u32 << SCL_GPIO;
+    let sda_mask = 1u32 << SDA_GPIO;
+
+    // (1) Detach: out_sel = 256 → pad output value = GPIO_OUT_REG bit.
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+
+    // (2) Initialise GPIO.out = 1 for both (open-drain release = hi-Z).
+    p.GPIO
+        .out_w1ts()
+        .write(|w| unsafe { w.bits(scl_mask | sda_mask) });
+    // Enable output for SCL (we'll drive it). SDA stays output-enabled
+    // too but we leave its GPIO.out = 1, so it's hi-Z (the bridge owns
+    // the line until it releases).
+    p.GPIO
+        .enable_w1ts()
+        .write(|w| unsafe { w.bits(scl_mask | sda_mask) });
+
+    // (3) Up to 9 clocks, check SDA after each rising edge.
+    let mut clocks_run: u8 = 10; // assume worst-case until proven otherwise
+    let initial_sda = ((p.GPIO.in_().read().bits() >> SDA_GPIO) & 1) as u8;
+    if initial_sda != 0 {
+        // SDA already high — bus is clean, no recovery needed.
+        clocks_run = 0;
+    } else {
+        for i in 0..9u8 {
+            // SCL low.
+            p.GPIO.out_w1tc().write(|w| unsafe { w.bits(scl_mask) });
+            recovery_half_period();
+            // SCL high.
+            p.GPIO.out_w1ts().write(|w| unsafe { w.bits(scl_mask) });
+            recovery_half_period();
+
+            // Sample SDA after the rising edge.
+            let sda = (p.GPIO.in_().read().bits() >> SDA_GPIO) & 1;
+            if sda != 0 {
+                clocks_run = i + 1;
+                break;
+            }
+        }
+    }
+
+    // (4) Manual STOP regardless of recovery outcome: SDA low while SCL
+    // high, then SDA high while SCL high = STOP condition.
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(sda_mask) });
+    recovery_half_period();
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(sda_mask) });
+    recovery_half_period();
+
+    // (5) Re-attach to I2C0 peripheral signals.
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SCL_SIG) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SDA_SIG) });
+
+    LAST_RECOVERY_CLOCKS.store(clocks_run, Ordering::Relaxed);
+    clocks_run
+}
+
+/// ~5 µs delay at 400 MHz CPU = 2000 cycles. Volatile counter so the
+/// optimiser cannot elide the loop.
+fn recovery_half_period() {
+    let mut n: u32 = 2000;
+    while n > 0 {
+        unsafe { core::arch::asm!("nop", options(nomem, nostack, preserves_flags)) };
+        n = unsafe { core::ptr::read_volatile(&n) }.wrapping_sub(1);
+    }
 }
