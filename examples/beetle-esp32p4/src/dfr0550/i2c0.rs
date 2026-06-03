@@ -237,11 +237,25 @@ pub unsafe fn route_pins() {
     // hardware-reset values that may produce a divide-by-zero / no
     // peripheral clock condition — manifesting as I2cError::Hang.
     // See BEETLE ERRATA-005.
+    // BEETLE-03l ROOT CAUSE FIX (2026-06-03 via memalpha): per ESP32-P4
+    // TRM Ch.42 the I2C_SCLK divider equation is:
+    //   Divisor = I2C_SCLK_DIV_NUM + 1 + (I2C_SCLK_DIV_A / I2C_SCLK_DIV_B)
+    // We had been writing div_num=0, numerator=0, denominator=0 — which
+    // produces (0/0) in the fractional term: a literal hardware division
+    // by zero. Either the divider outputs no clock, or undefined garbage.
+    // This explains EVERYTHING about ERRATA-008's symptom: TRANS_START
+    // interrupt latches (APB-side, fires from the trans_start bit write
+    // regardless of FSM state), but the SCL_MAIN_FSM has no I2C_SCLK to
+    // advance with — it sits, no cmd_done is ever set, no timeout
+    // interrupt fires (those timers ALSO need I2C_SCLK), and eventually
+    // the FSM returns to IDLE without any observable state transition.
+    // Set denominator=1 (no fractional component, integer-divide-by-1).
+    // Resulting divisor = 0 + 1 + (0/1) = 1. I2C_SCLK = 40 MHz.
     p.HP_SYS_CLKRST.peri_clk_ctrl10().modify(|_, w| unsafe {
         w.i2c0_clk_src_sel().clear_bit();
         w.i2c0_clk_div_num().bits(0);
         w.i2c0_clk_div_numerator().bits(0);
-        w.i2c0_clk_div_denominator().bits(0);
+        w.i2c0_clk_div_denominator().bits(1);
         w
     });
 
@@ -310,34 +324,56 @@ pub unsafe fn route_pins() {
         w.sda_force_out().clear_bit();
         w.scl_force_out().clear_bit();
         w.arbitration_en().set_bit();
+        // BEETLE-03l reverted: tried set_bit() (reset value 1) to match
+        // C6 TRM reset value; bench showed it RE-INTRODUCED the
+        // SDA-stuck-low symptom (quaternary 030→022). So our prior
+        // clear_bit() is actually the load-bearing value despite
+        // diverging from reset. Hypothesis: with rx_full_ack_level=1
+        // the FSM interprets some internal ACK state as NACK and
+        // bails / drives SDA low. Keep clear_bit().
         w.rx_full_ack_level().clear_bit();
         w.clk_en().set_bit();
         w.slv_tx_auto_start_en().clear_bit();
         w
     });
 
-    // SCL low period (200 cycles at 40 MHz = 5 µs → ~100 kHz when
-    // combined with the 200-cycle high period).
+    // BEETLE-03l (2026-06-03): timing values now match the IDF
+    // `i2c_ll_master_cal_bus_clk` formula verbatim. WebFetch'd from
+    // esp-idf/components/hal/esp32p4/include/hal/i2c_ll.h.
+    //
+    // For 40 MHz source, 100 kHz target:
+    //   half_cycle    = sclk / freq / 2 = 200
+    //   scl_wait_high = half/2 - 2 = 98   (freq >= 80 kHz path)
+    //   scl_high      = half - wait = 102
+    //   sda_hold      = half / 4 = 50
+    //   sda_sample    = half / 2 = 100
+    //   setup = hold  = half = 200
+    //
+    // IDF writes (value - 1) to most fields. The HAL ASSERT requires:
+    //   scl_wait_high < sda_sample < scl_high
+    // i.e. 98 < 100 < 102 — narrow margins around half/2. Our previous
+    // values (wait=30, sample=50, high=200) satisfied the constraint by
+    // a huge margin, but the FSM may have been confused by the spacing
+    // (sda_sample sitting at a time when the FSM expected the SCL
+    // transition to have happened or not yet). This is the most
+    // structural unknown left after WebFetch'ing the IDF source.
     p.I2C0
         .scl_low_period()
-        .write(|w| unsafe { w.bits(200) });
+        .write(|w| unsafe { w.bits(200 - 1) });
 
-    // SCL high + wait_high (the critical wait field the BSP missed).
     p.I2C0.scl_high_period().modify(|_, w| unsafe {
-        w.scl_high_period().bits(200);
-        w.scl_wait_high_period().bits(30);
+        w.scl_high_period().bits(102);
+        w.scl_wait_high_period().bits(98);
         w
     });
 
-    // SDA hold / sample times — quarter period defaults.
-    p.I2C0.sda_hold().write(|w| unsafe { w.bits(50) });
-    p.I2C0.sda_sample().write(|w| unsafe { w.bits(50) });
+    p.I2C0.sda_hold().write(|w| unsafe { w.bits(50 - 1) });
+    p.I2C0.sda_sample().write(|w| unsafe { w.bits(100 - 1) });
 
-    // START / repeated-START / STOP setup + hold times — half period.
-    p.I2C0.scl_start_hold().write(|w| unsafe { w.bits(100) });
-    p.I2C0.scl_rstart_setup().write(|w| unsafe { w.bits(100) });
-    p.I2C0.scl_stop_hold().write(|w| unsafe { w.bits(100) });
-    p.I2C0.scl_stop_setup().write(|w| unsafe { w.bits(100) });
+    p.I2C0.scl_start_hold().write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0.scl_rstart_setup().write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0.scl_stop_hold().write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0.scl_stop_setup().write(|w| unsafe { w.bits(200 - 1) });
 
     // Configure SCL stuck-bus timeout. Per the PAC field doc:
     //   "Configures the timeout threshold period for SCL stucking at
@@ -562,20 +598,14 @@ fn write_cmd(
 
 fn publish_and_run(p: &pac::Peripherals) -> Result<(), I2cError> {
     // Per-transaction sequence per IDF `i2c_hal_master_trans_start`:
-    //   1. ERRATA-008 round 2026-06-02: pulse fsm_rst at entry.
+    //   1. pulse fsm_rst (BEETLE-03i — empirically required: removing it
+    //      causes SDA to stay stuck LOW at hang, even with arbitration_en
+    //      = 1. The bit is a self-clearing WT strobe per memalpha; it
+    //      clears latched FSM state from a prior aborted transaction).
     //   2. clear stale int_raw bits,
     //   3. wait for bus_busy to drop,
     //   4. conf_upgate=1 (latch COMD list + FIFO data),
     //   5. trans_start=1 (kick the FSM).
-    //
-    // ERRATA-005 round 3 previously concluded "do not pulse fsm_rst per
-    // transaction." Revisited 2026-06-02 because the IDLE-with-bus-toggle
-    // hang signature looks like a latched arbitration-loss state from a
-    // prior aborted transaction. fsm_rst is hardware-clearing (one-shot)
-    // and per TRM Ch.42 Reg.42.18 it forces the master FSM back to IDLE
-    // clearing any latched arb-lost / stretched-SCL recovery state.
-    // If this re-introduces ERRATA-005's "stuck in IDLE" symptom we know
-    // the issue was actually the fsm_rst pulse — bench delta will tell.
     p.I2C0.ctr().modify(|_, w| w.fsm_rst().set_bit());
 
     p.I2C0.int_clr().write(|w| unsafe { w.bits(0xffff_ffff) });
@@ -892,8 +922,11 @@ pub unsafe fn probe_init_state() -> u8 {
         return 23;
     }
 
+    // BEETLE-03l: updated expected value from 200 to 199 to match the
+    // IDF `i2c_ll_master_set_bus_timing` formula which writes
+    // `bus_cfg->scl_low - 1` (i.e. half_cycle - 1 = 199 for 100 kHz).
     let slp = p.I2C0.scl_low_period().read().bits();
-    if slp != 200 {
+    if slp != 199 {
         return 24;
     }
 
