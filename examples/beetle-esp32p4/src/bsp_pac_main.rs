@@ -772,23 +772,58 @@ fn morse_delay(units: u32) {
 /// human-perceivable timing; ms scale gives a 3-code message in ~3 s.
 const MORSE_UNIT_FAST_NOPS: u32 = 1_600_000; // ~10 ms
 
+#[inline(never)]
 fn morse_fast_delay(units: u32) {
-    let total = MORSE_UNIT_FAST_NOPS.saturating_mul(units);
-    for _ in 0..total {
-        unsafe { core::arch::asm!("nop") };
+    // ERRATA-008 round 2026-06-02b: previous `for _ in 0..total { asm!("nop") }`
+    // pattern collapsed delays for repeated same-arg calls in release mode —
+    // consecutive `morse_fast_delay(3)` calls would render as ~1 unit each,
+    // which is what made the 4-dash run `----` show up as `-...` on the
+    // Saleae. Use an explicit `volatile`-counter loop so the optimiser has
+    // to honour every decrement.
+    let mut total = MORSE_UNIT_FAST_NOPS.saturating_mul(units);
+    while total > 0 {
+        unsafe {
+            core::arch::asm!("nop", options(nomem, nostack, preserves_flags));
+        }
+        // Round-trip through volatile read to defeat loop elision.
+        total = unsafe { core::ptr::read_volatile(&total) }.wrapping_sub(1);
     }
 }
 
+#[inline(never)]
 fn morse_marker_element(p: &esp32p4::Peripherals, mask: u32, is_dash: bool) {
     p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
     morse_fast_delay(if is_dash { 3 } else { 1 });
     p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
-    morse_fast_delay(1); // intra-element gap
+    // ERRATA-008 round 2026-06-02b: widened intra-element gap from 1u to
+    // 2u to give the Saleae unambiguous separation between consecutive
+    // dashes (HIGH 3u + LOW 2u sequences are now clearly element-paired).
+    morse_fast_delay(2);
 }
 
 fn morse_marker_digit(p: &esp32p4::Peripherals, mask: u32, digit: u8) {
-    for &el in &MORSE_DIGITS[digit as usize] {
-        morse_marker_element(p, mask, el == 1);
+    // ERRATA-008 round 2026-06-03: hand-unrolled match. Cal-A (this
+    // path with the prior `for &el in &MORSE_DIGITS[..]` loop) showed
+    // `.-...` for digit 1; Cal-B (literal calls) showed `-----` for
+    // 5 dashes correctly. So `morse_marker_element` itself is fine —
+    // the table-driven loop was collapsing dashes after the first.
+    // Bypass both the lookup and the loop by spelling each digit out
+    // with literal bool args; every call site now matches the
+    // proven-working Cal-B pattern.
+    let d = digit % 10;
+    let t = true;
+    let f = false;
+    match d {
+        0 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
+        1 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
+        2 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
+        3 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
+        4 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); }
+        5 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
+        6 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
+        7 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
+        8 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
+        _ => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); }
     }
 }
 
@@ -841,6 +876,31 @@ fn morse_status_loop(status: u8) -> ! {
             morse_marker_element(&p, marker_mask, false);
         }
         morse_fast_delay(6); // word gap (already 1 from trailing intra-element)
+
+        // ERRATA-008 round 2026-06-02b: TWO calibration digits, both
+        // hardcoded literals — bypass MORSE_DIGITS table lookup so we
+        // can isolate the bug.
+        //
+        //   Cal A: digit "1" via MORSE_DIGITS table lookup (expected
+        //          `.----`, 1 dot + 4 dashes).
+        //   Cal B: digit "0" via EXPLICIT literal element calls
+        //          (expected `-----`, 5 dashes — pure dash run).
+        //
+        // Round 1 (2026-06-02a) showed Cal A as `.-...` (only 1 dash
+        // surviving). If Cal B now reads `-----` correctly with the
+        // bullet-proofed delay loop and 2u intra-element gap, the round-1
+        // failure was the delay-collapse hypothesis and we trust the
+        // table-driven readout from here forward. If Cal B still shows
+        // dashes-eaten, the rendering primitive itself is broken.
+        morse_marker_digit(&p, marker_mask, 1);
+        morse_fast_delay(6); // word gap
+
+        morse_marker_element(&p, marker_mask, true);
+        morse_marker_element(&p, marker_mask, true);
+        morse_marker_element(&p, marker_mask, true);
+        morse_marker_element(&p, marker_mask, true);
+        morse_marker_element(&p, marker_mask, true);
+        morse_fast_delay(6); // word gap
 
         // Primary 3 digits.
         morse_marker_number(&p, marker_mask, status);

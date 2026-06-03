@@ -114,6 +114,23 @@ const fn cmd(op: u32, byte_num: u8, ack_en: bool, ack_exp: bool, ack_val: bool) 
 pub unsafe fn route_pins() {
     let p = unsafe { pac::Peripherals::steal() };
 
+    // **Defensive PMU ICG open.** ESP32-P4 Chapter 8 TRM documents
+    // `PMU_HP_ACTIVE_ICG_HP_FUNC.hp_active_dig_icg_func_en` — a 32-bit
+    // SOC-level Independent Clock Gate mask that sits ABOVE
+    // `HP_SYS_CLKRST.peri_clk_ctrl` and gates functional clock
+    // distribution to every HP peripheral. PAC reset value is
+    // `0xFFFF_FFFF` (all gates open), so in a clean cold-boot this is a
+    // no-op. We write it explicitly anyway in case ROM bootloader / a
+    // prior partially-failed init / future esp_hal interop has cleared
+    // a bit. If PMU ICG were closing bit 29 (I2C controller functional
+    // clock gate per ERRATA-008 memalpha finding #14), SR/INT_RAW reads
+    // would return frozen IDLE state while SCL/SDA could still be
+    // driven by residual FSM latches — exactly what we saw at the
+    // bench 2026-06-01. See [BEETLE ERRATA-008].
+    p.PMU
+        .hp_active_icg_hp_func()
+        .write(|w| unsafe { w.hp_active_dig_icg_func_en().bits(0xFFFF_FFFF) });
+
     // **Pad routing FIRST.** Connect GPIO 8 ↔ I2C0_SCL and GPIO 7 ↔
     // I2C0_SDA through the GPIO matrix BEFORE doing any I2C0-peripheral
     // initialisation. Critically the func_in_sel (peripheral input ← GPIO)
@@ -488,15 +505,22 @@ fn write_cmd(
 
 fn publish_and_run(p: &pac::Peripherals) -> Result<(), I2cError> {
     // Per-transaction sequence per IDF `i2c_hal_master_trans_start`:
-    //   1. clear stale int_raw bits,
-    //   2. wait for bus_busy to drop,
-    //   3. conf_upgate=1 (latch COMD list + FIFO data),
-    //   4. trans_start=1 (kick the FSM).
+    //   1. ERRATA-008 round 2026-06-02: pulse fsm_rst at entry.
+    //   2. clear stale int_raw bits,
+    //   3. wait for bus_busy to drop,
+    //   4. conf_upgate=1 (latch COMD list + FIFO data),
+    //   5. trans_start=1 (kick the FSM).
     //
-    // Critically does NOT pulse fsm_rst here — IDF only does that in
-    // the FSM-recovery path. Pulsing fsm_rst per-transaction was
-    // observed to leave the master stuck in IDLE on the ESP32-P4 PAC
-    // (BEETLE ERRATA-005 round 3, scl_main_state_last = 0).
+    // ERRATA-005 round 3 previously concluded "do not pulse fsm_rst per
+    // transaction." Revisited 2026-06-02 because the IDLE-with-bus-toggle
+    // hang signature looks like a latched arbitration-loss state from a
+    // prior aborted transaction. fsm_rst is hardware-clearing (one-shot)
+    // and per TRM Ch.42 Reg.42.18 it forces the master FSM back to IDLE
+    // clearing any latched arb-lost / stretched-SCL recovery state.
+    // If this re-introduces ERRATA-005's "stuck in IDLE" symptom we know
+    // the issue was actually the fsm_rst pulse — bench delta will tell.
+    p.I2C0.ctr().modify(|_, w| w.fsm_rst().set_bit());
+
     p.I2C0.int_clr().write(|w| unsafe { w.bits(0xffff_ffff) });
 
     // Bus-busy poll matches IDF `s_i2c_send_command_async` pre-flight.
@@ -707,7 +731,15 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
 
     // Pack control/status flags. trans_start (bit 5) and conf_upgate
     // (bit 11) are W1S strobes — PAC exposes writers but no readers, so
-    // we go through raw bits.
+    // we go through raw bits. ms_mode lives at CTR bit 4.
+    // ERRATA-008 round 2026-06-02 expansion: bits 5/6/7 added.
+    //   bit 5 = sr.arb_lost      — master gave up the bus
+    //   bit 6 = ctr.ms_mode      — readback of master-mode bit; 0 means
+    //                              the register block was wiped between
+    //                              route_pins (which set it) and hang
+    //                              (so the FSM was operating as slave!)
+    //   bit 7 = sr.slave_rw      — slave-side R/W indicator; should be 0
+    //                              for a true master-mode failure
     let ctr_bits = p.I2C0.ctr().read().bits();
     let sr = p.I2C0.sr().read();
     let mut ctl: u8 = 0;
@@ -716,6 +748,9 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     if int_raw & (1 << 9) != 0   { ctl |= 1 << 2; }
     if int_raw & (1 << 3) != 0   { ctl |= 1 << 3; }
     if ctr_bits & (1 << 11) != 0 { ctl |= 1 << 4; } // conf_upgate still latched
+    if sr.arb_lost().bit_is_set() { ctl |= 1 << 5; }
+    if ctr_bits & (1 << 4) != 0  { ctl |= 1 << 6; } // ms_mode readback
+    if sr.slave_rw().bit_is_set() { ctl |= 1 << 7; }
     LAST_HANG_CTL_SR.store(ctl, Ordering::Relaxed);
 }
 
@@ -775,7 +810,14 @@ pub unsafe fn probe_init_state() -> u8 {
     if !ctr.ms_mode().bit_is_set() {
         return 22;
     }
-    if ctr.clk_en().bit_is_set() {
+    // ERRATA-008 round 2026-06-03: probe polarity inverted to match the
+    // current route_pins write of `clk_en().set_bit()`. The check used
+    // to fire when clk_en read back as 1 because route_pins originally
+    // cleared it. We flipped route_pins on 2026-06-02 (clk_en=1 fixed a
+    // stale-register-read symptom), but probe_init_state wasn't updated,
+    // so the probe falsely returned 23 and aborted bring-up BEFORE
+    // wake() — masking the new PMU ICG / fsm_rst / arb_lost diagnostics.
+    if !ctr.clk_en().bit_is_set() {
         return 23;
     }
 
