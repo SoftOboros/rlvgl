@@ -78,7 +78,7 @@ fn main() -> ! {
     // Full bring-up flow. Diagnostic checkpoints AFTER wake / DSI run
     // inside run_bringup_instrumented to avoid the same trap.
     let status = unsafe { run_bringup_instrumented() };
-    led_status_loop(status);
+    morse_status_loop(status);
 }
 
 /// Simple LED blink primitive — no wdt feeding, no markers, just N
@@ -87,11 +87,12 @@ fn led_blink_simple(n: u8) {
     let p = unsafe { esp32p4::Peripherals::steal() };
     let mask = 1u32 << bsp_generated::board::LED;
     for _ in 0..n {
-        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) }); // ON
+        // Active-high: pin HIGH (out_w1ts) = LED ON.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) }); // ON
         for _ in 0..16_000_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
-        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) }); // OFF
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) }); // OFF
         for _ in 0..16_000_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
@@ -124,8 +125,25 @@ unsafe fn run_bringup_instrumented() -> u8 {
     // DSI clock setup and wake; a 2s delay breaks that ordering. So
     // diagnostic blinks must come AFTER wake completes, not before it.)
 
+    // ERRATA-008 Round 1: probe I2C0 init state right before wake. If
+    // one of the DSI clock setup steps clobbered an I2C0 init register
+    // (most likely candidate: soc_clk_ctrl2.i2c0_apb_clk_en → code 26),
+    // we surface that as a 20-29 LED-Morse code with no wake attempt.
+    // probe_init_state was confirmed µs-scale by the 2026-06-01 bench
+    // notes above; calling it here adds negligible delay between DSI
+    // setup and wake.
+    let probe_code = unsafe { dfr0550::i2c0::probe_init_state() };
+    if probe_code != 0 {
+        return probe_code;
+    }
+
+    // Bracket wake with the marker HIGH so the granular dips emitted by
+    // `write_reg_instrumented` are visible as LOW pulses inside the
+    // sustained-HIGH region on Saleae GPIO 5.
+    debug_marker_set(true);
     // Phase 4: wake.
     let wake_result = unsafe { wake_instrumented() };
+    debug_marker_set(false);
     use dfr0550::i2c0::I2cError;
     use dfr0550::i2c_bridge::BridgeError;
     use core::sync::atomic::Ordering;
@@ -140,6 +158,14 @@ unsafe fn run_bringup_instrumented() -> u8 {
                 return 50;
             }
             return 30u8.saturating_add(scl_state);
+        }
+        // ERRATA-008: distinct code so the operator can tell whether the
+        // FSM walked through COMD0/1/2 (EndDetect — paused at COMD3 END)
+        // vs. never advanced (Hang — code 30+state).
+        Err(BridgeError::I2c(I2cError::EndDetect)) => {
+            let st = dfr0550::i2c0::LAST_HANG_STATE.load(Ordering::Relaxed);
+            let scl_state = st & 0x07;
+            return 40u8.saturating_add(scl_state);
         }
         Err(BridgeError::I2c(I2cError::Timeout)) => return 7,
         Err(BridgeError::I2c(I2cError::Arbitration)) => return 8,
@@ -322,6 +348,11 @@ unsafe fn run_bringup() -> u8 {
                     return 50;
                 }
                 return 30u8.saturating_add(scl_state);
+            }
+            Err(BridgeError::I2c(I2cError::EndDetect)) => {
+                let st = dfr0550::i2c0::LAST_HANG_STATE.load(Ordering::Relaxed);
+                let scl_state = st & 0x07;
+                return 40u8.saturating_add(scl_state);
             }
             Err(BridgeError::I2c(I2cError::Timeout)) => return 7,
             Err(BridgeError::I2c(I2cError::Arbitration)) => return 8,
@@ -639,8 +670,16 @@ unsafe fn wake_instrumented() -> Result<(), dfr0550::i2c_bridge::BridgeError> {
         BRIDGE_ADDR, BridgeError, PORTA_KERNEL_DEFAULT, REG_PORTA, REG_PORTB, REG_POWERON, REG_PWM,
     };
 
-    i2c0::write_reg(BRIDGE_ADDR, REG_POWERON, 1)?;
-    debug_marker_dip(); // dip 1
+    // ERRATA-008 Round 1: hand-rolled first POWERON write with dips
+    // between EACH MMIO group inside it. The marker bracket is HIGH
+    // on entry (set by run_bringup_instrumented); each `debug_marker_dip`
+    // call drops it ~150 µs then back HIGH so individual dips are
+    // countable on the Saleae inside the sustained bracket. See
+    // `write_reg_instrumented`'s doc-comment for the dip-count semantics
+    // (10 dips total on success; the LAST dip observed identifies the
+    // boundary just BEFORE the CPU stall).
+    i2c0::write_reg_instrumented(BRIDGE_ADDR, REG_POWERON, 1, debug_marker_dip)?;
+    debug_marker_dip(); // dip 1 (post-instrumented-write = legacy boundary)
 
     for _ in 0..7_200_000u32 {
         unsafe { core::arch::asm!("nop") };
@@ -728,11 +767,112 @@ fn morse_delay(units: u32) {
     }
 }
 
-fn morse_element(p: &esp32p4::Peripherals, mask: u32, is_dash: bool) {
-    // Active-low LED: pin LOW (out_w1tc) = LED ON, pin HIGH = LED OFF.
-    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
-    morse_delay(if is_dash { 3 } else { 1 });
+/// Faster Morse unit (10 ms at 400 MHz core) used by the marker-pin
+/// status loop. The Saleae captures both edges so we don't need
+/// human-perceivable timing; ms scale gives a 3-code message in ~3 s.
+const MORSE_UNIT_FAST_NOPS: u32 = 1_600_000; // ~10 ms
+
+fn morse_fast_delay(units: u32) {
+    let total = MORSE_UNIT_FAST_NOPS.saturating_mul(units);
+    for _ in 0..total {
+        unsafe { core::arch::asm!("nop") };
+    }
+}
+
+fn morse_marker_element(p: &esp32p4::Peripherals, mask: u32, is_dash: bool) {
     p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+    morse_fast_delay(if is_dash { 3 } else { 1 });
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
+    morse_fast_delay(1); // intra-element gap
+}
+
+fn morse_marker_digit(p: &esp32p4::Peripherals, mask: u32, digit: u8) {
+    for &el in &MORSE_DIGITS[digit as usize] {
+        morse_marker_element(p, mask, el == 1);
+    }
+}
+
+/// Emit a 3-digit decimal number as Morse on the marker pin, with
+/// proper ITU inter-character spacing (3 units between digits).
+fn morse_marker_number(p: &esp32p4::Peripherals, mask: u32, value: u8) {
+    let digits = [(value / 100) % 10, (value / 10) % 10, value % 10];
+    for (i, &d) in digits.iter().enumerate() {
+        morse_marker_digit(p, mask, d);
+        if i < 2 {
+            // Already 1 unit of trailing intra-element gap from the
+            // last morse_marker_element; add 2 more to reach the ITU
+            // 3-unit inter-character gap.
+            morse_fast_delay(2);
+        }
+    }
+}
+
+/// Drive ERRATA-008 status codes as ITU Morse on the marker pin
+/// (GPIO 5) at ~10 ms/unit. Format per repeat:
+///   "HHHH" (8 dots prosign, easy preamble) → 7-unit word gap →
+///   primary 3 digits → 7-unit gap → secondary 3 digits → 7-unit gap →
+///   tertiary 3 digits → very long inter-message silence.
+fn morse_status_loop(status: u8) -> ! {
+    let p = unsafe { esp32p4::Peripherals::steal() };
+    let marker_mask = 1u32 << DBG_MARKER_PIN;
+    let led_mask = 1u32 << bsp_generated::board::LED;
+    let cmd_done = dfr0550::i2c0::LAST_HANG_CMD_DONE.load(core::sync::atomic::Ordering::Relaxed);
+    let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
+
+    if status == 0 {
+        // Steady LED ON (and marker high) for full-success indication.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) });
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(marker_mask) });
+        loop {
+            for _ in 0..16_000_000u32 {
+                unsafe { core::arch::asm!("nop") };
+            }
+        }
+    }
+
+    // LED blinks slow as a "still alive" indicator while marker carries
+    // the actual Morse payload.
+    loop {
+        // Ensure marker LOW.
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(marker_mask) });
+
+        // Preamble: 8 dots = HH prosign (error/attention).
+        for _ in 0..8 {
+            morse_marker_element(&p, marker_mask, false);
+        }
+        morse_fast_delay(6); // word gap (already 1 from trailing intra-element)
+
+        // Primary 3 digits.
+        morse_marker_number(&p, marker_mask, status);
+        morse_fast_delay(6); // word gap
+
+        // Secondary 3 digits (cmd_done mask).
+        morse_marker_number(&p, marker_mask, cmd_done);
+        morse_fast_delay(6); // word gap
+
+        // Tertiary 3 digits (ctl_sr packed flags).
+        morse_marker_number(&p, marker_mask, ctl_sr);
+
+        // Long inter-message silence (~1 s) — gives a clean gap so the
+        // next preamble reads as a fresh repeat.
+        morse_fast_delay(100);
+
+        // Tick the LED so user knows the board is alive.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) });
+        morse_fast_delay(10);
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) });
+    }
+}
+
+fn morse_element(p: &esp32p4::Peripherals, mask: u32, is_dash: bool) {
+    // GPIO 3 on DFR1172 FireBeetle 2 P4 is **active-high** — pin HIGH
+    // (out_w1ts) = LED ON, pin LOW = LED OFF. The 2026-05-30 memory note
+    // that claimed active-low was corrected at the 2026-06-01 bench: the
+    // operator observed a sustained LED ON during the morse inter-message
+    // silence (when the code parked the pin HIGH), confirming HIGH = ON.
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(mask) });
+    morse_delay(if is_dash { 3 } else { 1 });
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(mask) });
     morse_delay(1); // intra-element gap
 }
 
@@ -771,8 +911,8 @@ fn led_status_loop(status: u8) -> ! {
     let led_mask = 1u32 << bsp_generated::board::LED;
 
     if status == 0 {
-        // Active-low: pin LOW = LED ON.
-        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) });
+        // Active-high: pin HIGH = LED ON. See morse_element() comment.
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) });
         loop {
             morse_delay(20);
         }
@@ -784,38 +924,171 @@ fn led_status_loop(status: u8) -> ! {
         status % 10,
     ];
 
+    // COUNT-BASED ENCODING (replaces Morse, since 40 ms dot vs 120 ms dash
+    // turned out hard to read in real-time). Each digit emitted as
+    // `(digit + 1)` short bright flashes — so digit 0 = 1 flash, digit 9
+    // = 10 flashes; the operator counts and subtracts 1 to decode.
+    //
+    // Frame layout per repeat:
+    //   • 3 long ON pulses (start marker — unmistakably distinct from the
+    //     short digit flashes, can't be confused for a digit count)
+    //   • 2 s dark
+    //   • digit-1 flashes (digit_value + 1)
+    //   • 1.5 s dark
+    //   • digit-2 flashes
+    //   • 1.5 s dark
+    //   • digit-3 flashes
+    //   • 4 s dark (long inter-message silence — next start marker reads
+    //     as a fresh message, not a trailing flash from this one).
+    //
+    // Timings: short flash = 150 ms ON / 250 ms OFF; long start pulse =
+    // 700 ms ON / 250 ms OFF.
+    const NOPS_PER_MS: u32 = 400_000; // ESP32-P4 HP core at 400 MHz, 1 nop/cycle
+    let flash_short_on = NOPS_PER_MS.saturating_mul(150);
+    let flash_short_off = NOPS_PER_MS.saturating_mul(250);
+    let pulse_long_on = NOPS_PER_MS.saturating_mul(700);
+    let pulse_long_off = NOPS_PER_MS.saturating_mul(250);
+    let inter_digit_dark = NOPS_PER_MS.saturating_mul(1500);
+    let post_start_dark = NOPS_PER_MS.saturating_mul(2000);
+    let inter_message_dark = NOPS_PER_MS.saturating_mul(4000);
+
+    let spin = |n: u32| {
+        for _ in 0..n {
+            unsafe { core::arch::asm!("nop") };
+        }
+    };
+    let flash_short = |p: &esp32p4::Peripherals| {
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) }); // ON
+        spin(flash_short_on);
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) }); // OFF
+        spin(flash_short_off);
+    };
+    let pulse_long = |p: &esp32p4::Peripherals| {
+        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) }); // ON
+        spin(pulse_long_on);
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) }); // OFF
+        spin(pulse_long_off);
+    };
+
+    // ERRATA-008 secondary diagnostic: LAST_HANG_CMD_DONE mask emitted
+    // as 3 decimal digits (000-255) after a distinct 5-long-pulse start
+    // marker. Tells the operator how far the FSM advanced through the
+    // 8-slot COMD list at hang time. Key readings:
+    //   000 — FSM never advanced past COMD0 (didn't even start RESTART)
+    //   001 — RESTART done, FSM stuck on COMD1 (WRITE)
+    //   003 — RESTART + WRITE done, FSM stuck on COMD2 (STOP) — but
+    //         then MST_COMPLETE should have fired, so this means
+    //         STOP-recognition is broken
+    //   007 — all three real cmds done; if we see this with no
+    //         MST_COMPLETE the FSM finished the transaction but the
+    //         interrupt bit didn't latch (mask-register failure)
+    //   015-255 — FSM walked into the END terminators; should have
+    //         hit EndDetect, not Hang
+    let cmd_done = dfr0550::i2c0::LAST_HANG_CMD_DONE.load(core::sync::atomic::Ordering::Relaxed);
+    let cmd_done_digits = [
+        (cmd_done / 100) % 10,
+        (cmd_done / 10) % 10,
+        cmd_done % 10,
+    ];
+
+    // Tertiary code: ctl_sr packed flags (see LAST_HANG_CTL_SR doc).
+    //   bit 0 = ctr.trans_start still set
+    //   bit 1 = sr.bus_busy
+    //   bit 2 = int_raw TRANS_START fired
+    //   bit 3 = int_raw END_DETECT fired
+    //   bit 4 = ctr.conf_upgate still set
+    let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
+    let ctl_sr_digits = [
+        (ctl_sr / 100) % 10,
+        (ctl_sr / 10) % 10,
+        ctl_sr % 10,
+    ];
+
     loop {
-        // Quiet baseline at the start of every transmission.
-        p.GPIO.out_w1ts().write(|w| unsafe { w.bits(led_mask) });
-        morse_delay(3);
+        // Ensure LED is OFF at start.
+        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(led_mask) });
 
-        // Preamble: HH (error prosign) twice. Each HH already trails
-        // one intra-element gap (1 unit); add 2 more for the standard
-        // inter-character gap (3 units total).
-        morse_hh(&p, led_mask);
-        morse_delay(2);
-        morse_hh(&p, led_mask);
-        morse_delay(2);
+        // PRIMARY status code — 3 long pulses, 3 digits.
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
 
-        // 3-digit zero-padded status code.
-        morse_digit(&p, led_mask, digits[0]);
-        morse_delay(2);
-        morse_digit(&p, led_mask, digits[1]);
-        morse_delay(2);
-        morse_digit(&p, led_mask, digits[2]);
-        morse_delay(2);
+        // Quiet between start marker and first digit.
+        spin(post_start_dark);
 
-        // ITU FULL STOP `.-.-.-` — explicit end-of-message terminator
-        // so the operator knows the digit group has fully transmitted
-        // before the inter-message silence begins.
-        for &el in &MORSE_FULL_STOP {
-            morse_element(&p, led_mask, el == 1);
+        for _ in 0..(digits[0] + 1) {
+            flash_short(&p);
+        }
+        spin(inter_digit_dark);
+
+        for _ in 0..(digits[1] + 1) {
+            flash_short(&p);
+        }
+        spin(inter_digit_dark);
+
+        for _ in 0..(digits[2] + 1) {
+            flash_short(&p);
         }
 
-        // Long inter-message silence — much longer than ITU's 7 units
-        // so the next preamble reads as a fresh start, not a trailing
-        // continuation of the previous code.
-        morse_delay(20);
+        // 4 s dark between primary and secondary codes.
+        spin(inter_message_dark);
+
+        // SECONDARY ERRATA-008 code — 5 long pulses (distinguishable
+        // from primary's 3), then the cmd_done mask as 3 decimal digits.
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+
+        spin(post_start_dark);
+
+        for _ in 0..(cmd_done_digits[0] + 1) {
+            flash_short(&p);
+        }
+        spin(inter_digit_dark);
+
+        for _ in 0..(cmd_done_digits[1] + 1) {
+            flash_short(&p);
+        }
+        spin(inter_digit_dark);
+
+        for _ in 0..(cmd_done_digits[2] + 1) {
+            flash_short(&p);
+        }
+
+        // 4 s dark between secondary and tertiary codes.
+        spin(inter_message_dark);
+
+        // TERTIARY ERRATA-008 code — 7 long pulses, then 3 decimal
+        // digits encoding ctl_sr packed flags.
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+        pulse_long(&p);
+
+        spin(post_start_dark);
+
+        for _ in 0..(ctl_sr_digits[0] + 1) {
+            flash_short(&p);
+        }
+        spin(inter_digit_dark);
+
+        for _ in 0..(ctl_sr_digits[1] + 1) {
+            flash_short(&p);
+        }
+        spin(inter_digit_dark);
+
+        for _ in 0..(ctl_sr_digits[2] + 1) {
+            flash_short(&p);
+        }
+
+        // Long inter-message silence — 4 s before the next primary code
+        // start marker reads as a fresh repeat.
+        spin(inter_message_dark);
     }
 }
 

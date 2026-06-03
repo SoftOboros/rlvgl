@@ -25,7 +25,7 @@
 
 #![allow(dead_code)]
 
-use core::sync::atomic::{AtomicU8, Ordering};
+use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 use esp32p4 as pac;
 
 /// Diagnostic: `I2C0.sr.scl_main_state_last` value captured on the most
@@ -36,14 +36,56 @@ use esp32p4 as pac;
 /// captured yet") at boot.
 pub static LAST_HANG_STATE: AtomicU8 = AtomicU8::new(0xFF);
 
+/// ERRATA-008 diagnostic: full `I2C0.int_raw` register at the moment
+/// `publish_and_run` declares a Hang. Bits of interest per i2c_ll.h:
+///   bit  3 — END_DETECT (FSM reached an OP_END terminator)
+///   bit  5 — ARBITRATION_LOST
+///   bit  7 — MST_COMPLETE
+///   bit  8 — TIMEOUT
+///   bit 10 — NACK
+///   bit  9 — TRANS_START (latched once FSM kicked)
+pub static LAST_HANG_INT_RAW: AtomicU32 = AtomicU32::new(0);
+
+/// ERRATA-008 diagnostic: bitmask of `done` bit (bit 31) across
+/// COMD0..COMD7 at the moment `publish_and_run` declares a Hang.
+/// Bit N = 1 iff COMD<N>.done was set, meaning the FSM advanced past
+/// command slot N. Distinguishes "FSM never started" (mask=0x00) from
+/// "FSM completed RESTART but stuck on WRITE" (mask=0x01) from
+/// "FSM walked off the end of our 8 cmds" (mask=0xFF).
+pub static LAST_HANG_CMD_DONE: AtomicU8 = AtomicU8::new(0);
+
+/// ERRATA-008 diagnostic: packed control / status snapshot at hang.
+///   bit 0 — `ctr.trans_start` still set (1 = our W1S write didn't
+///           latch / FSM hasn't started yet). Hardware should clear
+///           this as soon as the transaction begins.
+///   bit 1 — `sr.bus_busy` (1 = FSM thinks bus is being used by
+///           someone, may refuse to issue START).
+///   bit 2 — `int_raw` bit 9 (TRANS_START) latched.
+///   bit 3 — `int_raw` bit 3 (END_DETECT) latched.
+///   bit 4 — `ctr.conf_upgate` still set (1 = our conf_upgate W1S
+///           didn't latch either).
+///   bits 5-7 — reserved.
+pub static LAST_HANG_CTL_SR: AtomicU8 = AtomicU8::new(0);
+
 const I2C0_SCL_SIG: u16 = 68;
 const I2C0_SDA_SIG: u16 = 69;
 
 // ESP32-P4 COMD register op_code values per IDF
-// `hal/esp32p4/include/hal/i2c_ll.h` — IDF-authoritative since IDF
-// runs in production on real P4 silicon. The i2c_struct.h doc comment
-// claims a different mapping (0/1/2/3/4 = RSTART/WRITE/READ/STOP/END)
-// but is stale/inherited from an earlier chip variant.
+// `hal/esp32p4/include/hal/i2c_ll.h` (verified 2026-06-01 at
+// `/Users/iraabbott/esp/esp-idf/components/hal/esp32p4/include/hal/i2c_ll.h`):
+//
+//   #define I2C_LL_CMD_RESTART    6
+//   #define I2C_LL_CMD_WRITE      1
+//   #define I2C_LL_CMD_READ       3
+//   #define I2C_LL_CMD_STOP       2
+//   #define I2C_LL_CMD_END        4
+//
+// IDF is authoritative — runs in production on real P4 silicon. The
+// PAC's field-doc comment ("0: RSTART, 1: WRITE, 2: READ, 3: STOP,
+// 4: END") is inherited from an older Espressif I2C IP block's SVD
+// and does not match the P4 hardware. Bench-confirmed at 2026-06-01:
+// swapping to PAC-doc values did not change the ERRATA-008 hang
+// symptom, confirming opcodes are not the load-bearing variable.
 const OP_RESTART: u32 = 6;
 const OP_WRITE: u32 = 1;
 const OP_READ: u32 = 3;
@@ -194,11 +236,16 @@ pub unsafe fn route_pins() {
     //   scl_force_out = 0      (open-drain SCL)
     //   arbitration_en = 0     (single-master, no arbitration)
     //   rx_full_ack_level = 0  (IDF default; reset default is 1)
-    //   clk_en = 0             (force registers' clock always ON —
-    //                          reset default is 1 which gates clock to
-    //                          registers when SW isn't reading/writing.
-    //                          Master FSM may need clock always-on to
-    //                          progress autonomously after trans_start.)
+    //   clk_en = 1             (ERRATA-008 test 2026-06-02: PAC doc
+    //                          says 0=force-on, 1=auto-gate. We tried
+    //                          0 (force-on) — register reads returned
+    //                          stale: int_raw never showed events even
+    //                          though Saleae confirmed 100 kHz bus
+    //                          activity. Hypothesis: PAC doc inverted
+    //                          vs silicon — set 1 (auto-gate, which
+    //                          per docs means "clock active when SW
+    //                          reads/writes" — so reads WOULD return
+    //                          fresh state).)
     //   slv_tx_auto_start_en = 0
     p.I2C0.ctr().modify(|_, w| unsafe {
         w.ms_mode().set_bit();
@@ -208,7 +255,7 @@ pub unsafe fn route_pins() {
         w.scl_force_out().clear_bit();
         w.arbitration_en().clear_bit();
         w.rx_full_ack_level().clear_bit();
-        w.clk_en().clear_bit();
+        w.clk_en().set_bit();
         w.slv_tx_auto_start_en().clear_bit();
         w
     });
@@ -267,18 +314,14 @@ pub unsafe fn route_pins() {
         w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit()
     });
 
-    // Enable the master event interrupts ONCE at init (IDF does this
-    // once via `i2c_ll_master_enable_tx_it`, not per-transaction). The
-    // P4 master FSM expects these bits set so it knows which events to
-    // raise. Bit positions per i2c_struct.h:
-    //   NACK            = bit 10
-    //   TIME_OUT        = bit 8
-    //   TRANS_COMPLETE  = bit 7
-    //   ARBITRATION_LOST= bit 5
-    //   END_DETECT      = bit 3
-    p.I2C0.int_ena().write(|w| unsafe {
-        w.bits((1 << 10) | (1 << 8) | (1 << 7) | (1 << 5) | (1 << 3))
-    });
+    // Enable ALL event interrupts. ERRATA-008 diagnostic round
+    // 2026-06-02: previously we only set NACK|TIMEOUT|MST_COMPLETE|
+    // ARB|END_DETECT (=0x05A8). On some Espressif I2C IP int_raw only
+    // latches a bit if int_ena has that bit set, so the diagnostic
+    // "TRANS_START never fired" was potentially misleading us. Set
+    // all 17 documented bits (0x1FFFF) so int_raw captures every
+    // state-machine transition we can observe.
+    p.I2C0.int_ena().write(|w| unsafe { w.bits(0x0001_FFFF) });
 
     // Latch the master init writes with `conf_upgate`. Critically, do
     // NOT pulse `fsm_rst` here. On the ESP32-P4, `fsm_rst` and
@@ -492,19 +535,13 @@ fn publish_and_run(p: &pac::Peripherals) -> Result<(), I2cError> {
                 I2cError::Arbitration
             });
         }
+        if st & (1 << 3) != 0 {
+            capture_hang(p, st);
+            return Err(I2cError::EndDetect);
+        }
         spins = spins.wrapping_add(1);
         if spins > 1_000_000 {
-            let sr = p.I2C0.sr().read();
-            // Encode txfifo_cnt in upper nibble, scl_main_state_last in
-            // lower 3 bits. If txfifo_cnt is 0 despite us pushing
-            // bytes, the FIFO writes themselves aren't sticking — a
-            // separate failure mode from a stalled FSM. The LED status
-            // loop in `bsp_pac_main` decodes this with priority:
-            //   txfifo_cnt == 0 → code 50 (FIFO writes silently dropped)
-            //   otherwise → code 30 + scl_main_state_last (FSM stall)
-            let state = sr.scl_main_state_last().bits();
-            let txcnt = sr.txfifo_cnt().bits();
-            LAST_HANG_STATE.store((txcnt << 3) | (state & 0x07), Ordering::Relaxed);
+            capture_hang(p, st);
             return Err(I2cError::Hang);
         }
     }
@@ -516,6 +553,170 @@ pub enum I2cError {
     Timeout,
     Arbitration,
     Hang,
+    /// ERRATA-008 diagnostic: FSM asserted END_DETECT (int_raw bit 3).
+    /// Implies the FSM advanced through COMD0/1/2 but failed to
+    /// recognise STOP at COMD2, falling into the END terminators at
+    /// COMD3-7. Distinct from Hang (which means none of the int_raw
+    /// completion bits fired before the spin bound).
+    EndDetect,
+}
+
+/// Hand-rolled version of [`write_reg`] that calls `dip()` between each
+/// distinct MMIO group. Used by ERRATA-008 bench instrumentation to
+/// identify exactly which MMIO operation stalls the CPU during full
+/// bring-up wake().
+///
+/// Dip count semantics (caller must ensure the marker is HIGH on entry):
+///   dip 1 — entered (before any MMIO).
+///   dip 2 — `fifo_conf` modify (assert tx/rx fifo rst) returned.
+///   dip 3 — `fifo_conf` modify (clear rst) returned.
+///   dip 4 — three FIFO byte writes to `I2C0.DATA` returned.
+///   dip 5 — eight COMD register writes returned.
+///   dip 6 — `int_clr` write returned.
+///   dip 7 — `sr.bus_busy` poll exited.
+///   dip 8 — `ctr.modify(conf_upgate)` returned.
+///   dip 9 — `ctr.modify(trans_start)` returned.
+///   dip 10 — MST_COMPLETE observed (transaction done).
+///
+/// The LAST dip observed identifies the boundary just BEFORE the stall.
+/// I.e. if dips 1-4 fire and 5 does not, the stall is somewhere in the
+/// 8 COMD writes (most likely the first one).
+pub fn write_reg_instrumented(
+    addr: u8,
+    reg: u8,
+    value: u8,
+    dip: fn(),
+) -> Result<(), I2cError> {
+    let p = unsafe { pac::Peripherals::steal() };
+
+    dip(); // 1 — entered
+
+    p.I2C0
+        .fifo_conf()
+        .modify(|_, w| w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit());
+    dip(); // 2 — fifo rst asserted
+
+    p.I2C0
+        .fifo_conf()
+        .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+    dip(); // 3 — fifo rst cleared
+
+    let data_ptr = p.I2C0.data().as_ptr();
+    unsafe { data_ptr.write_volatile((addr << 1) as u32) };
+    unsafe { data_ptr.write_volatile(reg as u32) };
+    unsafe { data_ptr.write_volatile(value as u32) };
+    dip(); // 4 — 3 FIFO bytes written
+
+    let v_restart = cmd(OP_RESTART, 0, false, false, false);
+    let v_write = cmd(OP_WRITE, 3, true, false, false);
+    let v_stop = cmd(OP_STOP, 0, false, false, false);
+    let v_end = cmd(OP_END, 0, false, false, false);
+    unsafe {
+        p.I2C0.comd0().write(|w| w.bits(v_restart));
+        p.I2C0.comd1().write(|w| w.bits(v_write));
+        p.I2C0.comd2().write(|w| w.bits(v_stop));
+        p.I2C0.comd3().write(|w| w.bits(v_end));
+        p.I2C0.comd4().write(|w| w.bits(v_end));
+        p.I2C0.comd5().write(|w| w.bits(v_end));
+        p.I2C0.comd6().write(|w| w.bits(v_end));
+        p.I2C0.comd7().write(|w| w.bits(v_end));
+    }
+    dip(); // 5 — 8 COMD writes done
+
+    p.I2C0.int_clr().write(|w| unsafe { w.bits(0xffff_ffff) });
+    dip(); // 6 — int_clr cleared
+
+    let mut bus_wait: u32 = 0;
+    while p.I2C0.sr().read().bus_busy().bit_is_set() {
+        bus_wait = bus_wait.wrapping_add(1);
+        if bus_wait > 100_000 {
+            return Err(I2cError::Timeout);
+        }
+    }
+    dip(); // 7 — bus_busy poll done
+
+    p.I2C0.ctr().modify(|_, w| w.conf_upgate().set_bit());
+    dip(); // 8 — conf_upgate latched
+
+    p.I2C0.ctr().modify(|_, w| w.trans_start().set_bit());
+    dip(); // 9 — trans_start kicked
+
+    let mut spins: u32 = 0;
+    loop {
+        let st = p.I2C0.int_raw().read().bits();
+        if st & (1 << 7) != 0 {
+            dip(); // 10 — MST_COMPLETE
+            return Ok(());
+        }
+        if st & ((1 << 10) | (1 << 8) | (1 << 5)) != 0 {
+            return Err(if st & (1 << 10) != 0 {
+                I2cError::Nack
+            } else if st & (1 << 8) != 0 {
+                I2cError::Timeout
+            } else {
+                I2cError::Arbitration
+            });
+        }
+        // ERRATA-008: END_DETECT (bit 3) means FSM reached an OP_END and
+        // paused. For a [RESTART, WRITE, STOP, END×5] list this should
+        // NEVER fire — STOP at COMD2 should complete the transaction
+        // with MST_COMPLETE. If we see END_DETECT, the FSM advanced past
+        // COMD2 without recognising STOP and stopped at COMD3's END
+        // terminator. Returns a distinct error so the LED can
+        // distinguish it from generic Hang.
+        if st & (1 << 3) != 0 {
+            capture_hang(&p, st);
+            return Err(I2cError::EndDetect);
+        }
+        spins = spins.wrapping_add(1);
+        if spins > 1_000_000 {
+            capture_hang(&p, st);
+            return Err(I2cError::Hang);
+        }
+    }
+}
+
+/// Snapshot diagnostic state at the moment a Hang or EndDetect is
+/// declared. Stores into LAST_HANG_STATE / LAST_HANG_INT_RAW /
+/// LAST_HANG_CMD_DONE so the LED status loop can render them.
+fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
+    let sr = p.I2C0.sr().read();
+    let state = sr.scl_main_state_last().bits();
+    let txcnt = sr.txfifo_cnt().bits();
+    LAST_HANG_STATE.store((txcnt << 3) | (state & 0x07), Ordering::Relaxed);
+    LAST_HANG_INT_RAW.store(int_raw, Ordering::Relaxed);
+    // Build mask: bit N = 1 iff COMD<N>.done (bit 31) was set.
+    let mut mask: u8 = 0;
+    let c0 = p.I2C0.comd0().read().bits();
+    let c1 = p.I2C0.comd1().read().bits();
+    let c2 = p.I2C0.comd2().read().bits();
+    let c3 = p.I2C0.comd3().read().bits();
+    let c4 = p.I2C0.comd4().read().bits();
+    let c5 = p.I2C0.comd5().read().bits();
+    let c6 = p.I2C0.comd6().read().bits();
+    let c7 = p.I2C0.comd7().read().bits();
+    if c0 & 0x8000_0000 != 0 { mask |= 1 << 0; }
+    if c1 & 0x8000_0000 != 0 { mask |= 1 << 1; }
+    if c2 & 0x8000_0000 != 0 { mask |= 1 << 2; }
+    if c3 & 0x8000_0000 != 0 { mask |= 1 << 3; }
+    if c4 & 0x8000_0000 != 0 { mask |= 1 << 4; }
+    if c5 & 0x8000_0000 != 0 { mask |= 1 << 5; }
+    if c6 & 0x8000_0000 != 0 { mask |= 1 << 6; }
+    if c7 & 0x8000_0000 != 0 { mask |= 1 << 7; }
+    LAST_HANG_CMD_DONE.store(mask, Ordering::Relaxed);
+
+    // Pack control/status flags. trans_start (bit 5) and conf_upgate
+    // (bit 11) are W1S strobes — PAC exposes writers but no readers, so
+    // we go through raw bits.
+    let ctr_bits = p.I2C0.ctr().read().bits();
+    let sr = p.I2C0.sr().read();
+    let mut ctl: u8 = 0;
+    if ctr_bits & (1 << 5) != 0  { ctl |= 1 << 0; } // trans_start still latched
+    if sr.bus_busy().bit_is_set() { ctl |= 1 << 1; }
+    if int_raw & (1 << 9) != 0   { ctl |= 1 << 2; }
+    if int_raw & (1 << 3) != 0   { ctl |= 1 << 3; }
+    if ctr_bits & (1 << 11) != 0 { ctl |= 1 << 4; } // conf_upgate still latched
+    LAST_HANG_CTL_SR.store(ctl, Ordering::Relaxed);
 }
 
 /// Read back the registers we wrote in [`route_pins`] and verify the
