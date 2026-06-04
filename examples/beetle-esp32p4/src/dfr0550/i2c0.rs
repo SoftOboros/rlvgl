@@ -143,15 +143,18 @@ const I2C0_SDA_SIG: u16 = 69;
 // values were correct; brief BEETLE-03m experiment with PAC-doc values
 // confirmed neither encoding made the FSM execute, so op_codes aren't
 // the active bug.
-// ESP32-P4 op_codes — the P4 PAC docstring claims
+// BEETLE-03w aftermath: PAC docstring on COMD register claims
 //   "0: RSTART, 1: WRITE, 2: READ, 3: STOP, 4: END"
-// but BEETLE-03u (2026-06-04) bench-tested those values and the FSM did
-// NOTHING — bus dead, quaternary=024 (op_code readback=0, both lines high,
-// no clocking). Reverting to the older C3/S3/H2/C6 mapping
-// (RSTART=6, WRITE=1, READ=3, STOP=2, END=4), which is what the IDF
-// `i2c_ll.h` header defines and what makes the FSM actually drive the
-// bus on P4 v1.3 silicon. The PAC docstring appears to be wrong for
-// P4 — likely copied from a different chip family during SVD generation.
+// BUT the IDF P4 i2c_ll.h (release/v5.3 branch — fetched 2026-06-04)
+// authoritatively defines:
+//   I2C_LL_CMD_RESTART 6
+//   I2C_LL_CMD_WRITE   1
+//   I2C_LL_CMD_READ    3
+//   I2C_LL_CMD_STOP    2
+//   I2C_LL_CMD_END     4
+// Bench corroborates: op=0 → FSM idle; op=6 → FSM clocks at least one
+// SCL transition. The PAC docstring is WRONG for P4 — likely an
+// SVD-extraction error from a different chip's TRM. Use IDF values.
 const OP_RESTART: u32 = 6;
 const OP_WRITE: u32 = 1;
 const OP_READ: u32 = 3;
