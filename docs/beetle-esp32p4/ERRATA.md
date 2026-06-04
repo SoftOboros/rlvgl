@@ -23,24 +23,29 @@ moves here.
 
 ## Open questions
 
-- **EOQ-002-ERRATA-008** — *(updated 2026-06-03)* with all
-  WebFetch'd IDF-canonical configuration landed (bus timing,
-  IO_MUX, op_codes, divider) and hardware verified via in-tree
-  bit-bang probe (slave at 0x45 ACKs), the I2C0 master FSM still
-  refuses to complete COMD0 (RSTART). The FSM moves out of IDLE
-  (`TRANS_START` int latches) and produces bus activity but no
-  `cmd_done` ever sets and no event interrupt fires. Saleae shows
-  "STOP STOP STOP" at 30 µs with the DFR1237/DFR0550 panel
-  attached, "req/ack chain" at 17.4 µs with the panel disconnected
-  — both indicate the FSM bails partway through transmitting the
-  first byte. The original "first MMIO write stalls the CPU" framing
-  was masked by two layered bugs (broken Morse digit renderer +
-  stale `probe_init_state` polarity) that were fixed mid-session;
-  the underlying defect appears to be either order-of-operations
-  in `route_pins` vs IDF's `s_hp_i2c_pins_config`, or an
-  interaction between DSI/LDO bring-up and I2C peripheral state
-  that we can't see at the PAC level. esp-hal reference test
-  abandoned: esp-hal 1.1.1 does not support ESP32-P4.
+- **EOQ-002-ERRATA-008** — *(updated 2026-06-04)* After 10 more
+  bench iterations (BEETLE-03o → -03w), the master-FSM defect is
+  much more narrowly characterised but still 🔴 open. **Ruled out:**
+  pad-init ordering (matched IDF `s_hp_i2c_pins_config` exactly),
+  PSRAM/LDO/DSI bring-up sequencing, bus-timing margin (10 kHz scales
+  cleanly 10x and behaves identically), FIFO loading path (non-FIFO
+  TX RAM direct write produces same bus output), op-code mapping
+  (IDF v5.3 P4 `i2c_ll.h` confirms 6/1/3/2/4 — the ESP32-P4 PAC
+  docstring is wrong). **Confirmed working:** FSM receives
+  `trans_start` kick; master pulls SDA low (START), generates ~1.7
+  SCL transitions per cycle; Saleae I2C analyzer labels each
+  cycle as STOP (FSM aborts mid-byte; SDA-rising-while-SCL-high
+  reads as STOP). Deterministic abort at the same fractional
+  bit-position regardless of bus speed, panel state, or FIFO mode.
+  esp-hal reference comparison blocked upstream: only the
+  unreleased git-main branch has functional P4 i2c support, and
+  `esp_hal::init()` panics on that branch with an illegal-
+  instruction exception writing CSR 0x347. **Remaining hypothesis
+  space:** (a) missing master-init step that IDF does and we
+  don't — side-by-side `route_pins` vs IDF `i2c_hal_master_init`
+  diff is the next move; (b) ESP32-P4 v1.3 silicon errata not in
+  the public TRM; (c) peripheral-coupling register outside I2C0
+  we haven't touched.
   See [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking).
 
 ## Index
@@ -1253,22 +1258,166 @@ both readback correctly (`ms_mode` confirmed via `tertiary` bit 6).
 - **Silicon-level quirk specific to this bring-up order or specific
   to chip-revision v1.3.** Unverifiable without working reference.
 
+#### 2026-06-04 bench session (BEETLE-03o → BEETLE-03w)
+
+Iterations -03n's plan items 1 and 2 + a 10x bus-slowdown experiment
++ esp-hal comparison attempt + non-FIFO TX mode + op-code reconciliation.
+Net: hypothesis space halved, defect still 🔴 open.
+
+**Rulings:**
+
+- **BEETLE-03o** (route_pins reordered to IDF `s_hp_i2c_pins_config`
+  verbatim — `gpio_set_level(1)` first, then input_enable, OD,
+  pullup, pulldown_dis, func_sel, matrix routes): **NEGATIVE.** Same
+  signature both with and without panel. Pad-init order is not the
+  cause. Kept in code — it's the correct order regardless.
+
+- **BEETLE-03p** (`wake()` moved BEFORE PSRAM/LDO/DSI bring-up):
+  **PARTIAL POSITIVE.** Quaternary changed 030 → 014 — SCL is now
+  driven LOW at hang time (FSM clocks the first bit), where before
+  it stayed HIGH (FSM did nothing). Confirmed PSRAM/LDO/DSI was
+  disrupting something I2C0 needs. But the FSM still doesn't
+  complete any transaction.
+
+- **BEETLE-03q** (`route_pins` moved AFTER PSRAM/LDO/DSI but
+  immediately before `wake()`): **NEGATIVE.** Same 030 baseline as
+  late-wake. Re-init via route_pins doesn't restore the I2C0
+  master to working state. Whatever PSRAM/LDO/DSI touches is
+  outside I2C0's peripheral reset scope.
+
+- **BEETLE-03r1** (bisect — kept only `psram::init()` before wake):
+  **NEGATIVE / surfaced a bug in BEETLE-03q logic.** `psram::init()`
+  is a no-op stub (returns `None`, no register writes). The
+  observed 03q regression vs. 03p wasn't from PSRAM/LDO/DSI being
+  present — it was from `route_pins` running AFTER `led_init`
+  instead of before. Even though `led_init` only touches GPIO 3
+  (LED, not SDA/SCL=7/8), the ordering matters empirically.
+
+- **BEETLE-03r2** (reproduce 03p shape: route_pins + bitbang in
+  `main()` before `led_init`, wake before PSRAM/LDO/DSI):
+  **CONFIRMED POSITIVE REPRODUCIBILITY.** Quaternary=014 reproduces
+  reliably. Established as known-good baseline.
+
+- **BEETLE-03s** (esp-hal HAL probe for reference comparison —
+  `examples/beetle-esp32p4-halprobe/`): **BLOCKED upstream.**
+  Pinned esp-hal git main (only path with functional P4 i2c —
+  published 0.16.1 has the chip feature flag but the i2c/delay
+  modules are cfg-gated out; published 1.0/1.1 dropped P4
+  entirely). Updated rustc to 1.96 (esp-hal main requires 1.95+).
+  Added `esp_bootloader_esp_idf::esp_app_desc!()` so the IDF
+  2nd-stage bootloader doesn't reject the image (without it the
+  `min_chip_rev` field parses as v138.28 vs the chip's v0.3).
+  Result: `esp_hal::init()` panics with illegal-instruction
+  exception writing CSR 0x347 (vendor hint register):
+  `mepc=0x40003b66, mtval=0x347296f3`. That's an esp-hal main-branch
+  P4 init bug. Pursuing further has low diagnostic value — a
+  broken HAL init can't tell us anything about whether the I2C
+  peripheral would work. Crate left in tree as starting point
+  for when esp-hal main stabilises for P4.
+
+- **BEETLE-03t** (slow bus 10x by dividing I2C source clock /10
+  via `peri_clk_ctrl10.i2c0_clk_div_num=9`, keep timing register
+  values at 100-kHz shape): **NEGATIVE on the goal but confirms a
+  reading.** Bus train scales exactly 10x — 17.4 µs → 174 µs.
+  Status readout unchanged. **Timing margin is NOT the
+  bottleneck** — the FSM aborts after the same fractional
+  bit-position regardless of bit rate. The defect is structural.
+
+- **BEETLE-03u** (switch op_codes to PAC-documented values: 0=RSTART,
+  1=WRITE, 2=READ, 3=STOP, 4=END): **NEGATIVE.** Bus completely
+  dead, quaternary=024 (op_code readback=0, both lines high, no
+  clocking). On P4 v1.3 silicon `op_code=0` triggers nothing.
+
+- **BEETLE-03v** (non-FIFO mode: set `FIFO_CONF.NONFIFO_EN=1`,
+  write TX bytes directly to TX RAM at offset 0x100+idx*4, read
+  RX bytes from 0x180+): **NEGATIVE on transaction outcome,
+  POSITIVE on FSM hygiene.** Same 174 µs bus train. Quaternary
+  changed 014 → 030 — FSM now releases SCL between aborts
+  instead of holding it low. Kept in code as strictly-cleaner
+  behaviour. Confirms the bug is NOT FIFO loading — FSM produces
+  the same bus activity regardless of where data is sourced.
+
+- **BEETLE-03w** (verify op_codes against IDF source for ESP32-P4):
+  **DISCOVERED a PAC bug.** Fetched
+  `esp-idf/release/v5.3/components/hal/esp32p4/include/hal/i2c_ll.h`
+  and confirmed:
+  ```c
+  #define I2C_LL_CMD_RESTART    6
+  #define I2C_LL_CMD_WRITE      1
+  #define I2C_LL_CMD_READ       3
+  #define I2C_LL_CMD_STOP       2
+  #define I2C_LL_CMD_END        4
+  ```
+  This matches our original constants and contradicts the
+  `esp32p4-0.2.0` PAC docstring which claims
+  `"0: RSTART, 1: WRITE, 2: READ, 3: STOP, 4: END"`. The PAC
+  docstring is almost certainly an SVD-extraction error where
+  comments were pulled from a different chip family's TRM during
+  svd2rust generation. Bench corroborates: op=0 is FSM-idle
+  (per -03u), op=6 actually clocks SCL (per -03t/-03v).
+
+**Saleae trace inspection (BEETLE-03v at 10 kHz):**
+SCL clocking at 5.747 kHz, 64% high-duty, 174 µs period. SDA shows
+transitions. The I2C analyzer labels each cycle as a STOP marker —
+the FSM generates a START + ~1.7 bit-times of activity + abort that
+the decoder interprets as STOP (SDA rising while SCL high during
+the abort). Cycle is too short to include 8 address bits + ACK
+(would take ~900 µs at 10 kHz vs observed 174 µs).
+
+#### Net state after 2026-06-04
+
+Master FSM:
+- Receives `trans_start` kick (TRANS_START_INT bit 9 latches per ctl_sr)
+- Pulls SDA low (START condition)
+- Generates ~1.7 SCL transitions
+- Abandons the transaction without latching NACK / TIMEOUT /
+  ARBITRATION_LOST / MST_TXFIFO_UDF / END_DETECT
+- Loops back to start the cycle again every 174 µs (at 10 kHz)
+
+The abort is deterministic — same fractional bit-position at any
+bus speed, with or without panel, with FIFO or non-FIFO TX path,
+with PSRAM/LDO/DSI before or after, with the BEETLE-03o pad
+re-order or without.
+
+Configuration verified correct:
+- Op-codes match IDF source for P4 (6/1/3/2/4)
+- Cmd struct layout matches IDF's `i2c_ll_hw_cmd_t`
+  (byte_num:8 / ack_en:1 / ack_exp:1 / ack_val:1 / op_code:3 / done:1)
+- COMD list properly terminated with END in unused slots
+- CONF_UPGATE written after CTR + timing + before trans_start
+- FSM_RST pulsed before each transaction
+- TX FIFO loaded via both FIFO and non-FIFO paths (both work,
+  same FSM output)
+- Source clock select + divider + APB gate + function gate all set
+
+#### Remaining hypothesis space (narrowed)
+
+1. **Missing master-init step** that IDF does and we don't. Most
+   likely candidate. The diff against IDF
+   `i2c_hal_master_init` → `i2c_hal_master_set_bus_freq`
+   → `i2c_hal_set_bus_timing` has not been done line-by-line.
+2. **ESP32-P4 v1.3 silicon errata** not in the public TRM. Possible
+   given the chip is preliminary-revision and several other
+   undocumented quirks have surfaced this session (BEETLE-03u op=0
+   doing nothing despite TRM doc; PAC docstring being wrong).
+3. **Some peripheral register** outside I2C0 that affects I2C0
+   behaviour and we haven't touched. E.g., a PMU bit, a system
+   clock-gate, an EFUSE-controlled bypass.
+
 #### Next-session plan
 
-1. Re-order `route_pins` to match IDF's `s_hp_i2c_pins_config`
-   verbatim: `gpio_set_level(pin, 1)` first, then `gpio_input_enable`,
-   then `gpio_od_enable`, then `gpio_pullup_en`, then
-   `gpio_pulldown_dis`, then `gpio_func_sel(pin, PIN_FUNC_GPIO)`,
-   then matrix `connect_out_signal` / `connect_in_signal`.
-2. Try calling `wake()` immediately after `route_pins`, before
-   PSRAM / LDO / DSI setup. If wake works there but fails after the
-   intermediate phases, the trigger is something in PSRAM / LDO /
-   DSI bring-up.
-3. Zoom Saleae trace into one 17.4 µs panel-disconnect cycle and
-   count individual SCL transitions + SDA timing relative to SCL,
-   to identify exactly which FSM state the abort occurs in.
-4. Watch for esp-hal P4 support — switch to reference path
-   immediately if added.
+1. **Side-by-side diff of `route_pins` against IDF P4 source.**
+   Fetch `esp-idf/release/v5.3/components/hal/esp32p4/i2c_hal.c`
+   + `i2c_ll.h` and walk every register write IDF does, line by
+   line, vs. what we do. Anything IDF writes that we don't is a
+   candidate root cause.
+2. Backup plan if (1) finds nothing: instrument
+   `publish_and_run` to capture FSM state IMMEDIATELY after
+   trans_start and at fine-grained intervals (every ~10 µs) to
+   identify exactly which microstate the FSM transitions through
+   before aborting.
+3. Lower priority: search ESP32-P4 v1.3 errata sheet (if public)
+   for known I2C silicon issues. Memalpha pass.
 
 ### Tracking
 
@@ -1280,6 +1429,19 @@ both readback correctly (`ms_mode` confirmed via `tertiary` bit 6).
   Commits: `44a5d48` (BEETLE-03i), `e34759b` (BEETLE-03j),
   `96814e8` (BEETLE-03k), `85f2802` (BEETLE-03l),
   `f4575ce` (BEETLE-03m).
+- Bench session 2026-06-04 (10 iterations, BEETLE-03o → -03w):
+  4 hypotheses ruled out (pad-init order, PSRAM/LDO/DSI sequencing,
+  timing margin, FIFO loading path). PAC docstring shown to
+  contradict IDF source. esp-hal comparison blocked by upstream
+  P4 init bug. Net state: 🔴 open, configuration verified correct
+  against IDF, defect must be in (a) missing init step,
+  (b) silicon errata, or (c) peripheral coupling. Commits:
+  `76e7733` (BEETLE-03o), `ca13385` (BEETLE-03p),
+  `133c67e` (BEETLE-03q), `5457297` (BEETLE-03r2),
+  `82c818c` + `aaf99c1` (BEETLE-03s halprobe + gitignore),
+  `89f19e5` (BEETLE-03t/u 10 kHz + op=0 experiment),
+  `e1852d2` (BEETLE-03v non-FIFO), `7d55d8a` (BEETLE-03w op_codes
+  verified per IDF).
 - The 🟢 "ROOT CAUSE: SDA stuck low externally" finding from the
   2026-06-03 morning was **retracted** by 2026-06-03 evening
   diagnostics — the SDA-low at hang was an after-effect of a
