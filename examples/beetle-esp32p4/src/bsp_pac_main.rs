@@ -55,18 +55,14 @@ fn main() -> ! {
     // GPIO 4, 7, 8 can all be driven by software. The pads are fine;
     // the I2C0 master itself is what fails to start.
 
-    // BEETLE-03q: route_pins() moved INTO run_bringup_instrumented,
-    // AFTER PSRAM/LDO/DSI clock setup. BEETLE-03p showed PSRAM/LDO/DSI
-    // is disrupting I2C0 master state in the gap between route_pins
-    // and wake. By running route_pins AFTER those phases, the I2C0
-    // master is initialized into a quiet system and the route_pins →
-    // wake window stays microseconds tight. As a bonus, the STM32F072
-    // bridge has had milliseconds to boot during PSRAM/LDO/DSI work,
-    // so it's ready when wake() first knocks. led_init() runs here
-    // (early, no I2C0 dependency) so we still get LED feedback.
+    // BEETLE-03r2: reproducing BEETLE-03p shape — route_pins() FIRST,
+    // bitbang, THEN led_init, then run_bringup_instrumented. Goal: verify
+    // the quaternary=014 result was the route_pins-before-led_init shape,
+    // not anything to do with psram::init (which is a no-op stub).
+    unsafe { dfr0550::i2c0::route_pins(); }
+    let _bitbang_ack = unsafe { dfr0550::i2c0::bitbang_address_probe(0x45) };
     unsafe { led_init() };
 
-    // Full bring-up flow.
     let status = unsafe { run_bringup_instrumented() };
     morse_status_loop(status);
 }
@@ -105,30 +101,9 @@ unsafe fn run_bringup_instrumented() -> u8 {
     // between them), AND the bridge has milliseconds to boot during the
     // PSRAM/LDO/DSI work.
 
-    // Phase 1-3c: PSRAM / LDO / DSI clocks (no I2C0 work yet).
-    let _ = unsafe { dfr0550::psram::init() };
-    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
-    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
-    unsafe {
-        dfr0550::dsi_host::clocks::enable_phy_clocks(
-            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
-        );
-    }
-    unsafe {
-        dfr0550::dsi_host::clocks::enable_dpi_clock(
-            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
-            dfr0550::DPI_PIXEL_CLK_MHZ,
-        );
-    }
-
-    // I2C0 master init — pads + clocks + CTR + timing. AFTER PSRAM/LDO/DSI.
-    unsafe { dfr0550::i2c0::route_pins(); }
-
-    // Bit-bang hardware probe (independent of I2C0 master FSM) — proves
-    // the bridge is electrically reachable at this point in boot.
-    let _bitbang_ack = unsafe { dfr0550::i2c0::bitbang_address_probe(0x45) };
-
-    // Probe I2C0 init state right before wake.
+    // BEETLE-03r2: reproducing BEETLE-03p shape — wake() FIRST, then
+    // PSRAM/LDO/DSI. route_pins + bitbang already ran in main(), so
+    // here we go straight to probe_init_state + wake.
     let probe_code = unsafe { dfr0550::i2c0::probe_init_state() };
     if probe_code != 0 {
         return probe_code;
@@ -168,6 +143,22 @@ unsafe fn run_bringup_instrumented() -> u8 {
 
     // Checkpoint B: 4 slow blinks = "wake() succeeded, about to DSI".
     led_blink_simple(4);
+
+    // wake() succeeded — NOW do PSRAM/LDO/DSI clock setup.
+    let _ = unsafe { dfr0550::psram::init() };
+    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
+    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_phy_clocks(
+            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
+        );
+    }
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_dpi_clock(
+            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
+            dfr0550::DPI_PIXEL_CLK_MHZ,
+        );
+    }
 
     // Phase 5: DSI host.
     let dsi_result = dfr0550::dsi_host::init(
