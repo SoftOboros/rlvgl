@@ -1,0 +1,38 @@
+# BEETLE-03s: esp-hal reference probe for ERRATA-008 comparison.
+#
+# Detached from the workspace (empty [workspace]) so its esp-hal stack
+# can pin esp32p4 = 0.1 transitively without colliding with the
+# sibling beetle-esp32p4 crate's esp32p4 = 0.2 raw-PAC pin.
+#
+# Goal: write [0x07, 0x01] to bridge at I2C address 0x45 via
+# esp-hal's official I2C driver. If it succeeds, the raw-PAC code in
+# beetle-esp32p4 has a bug we still haven't found. If it fails the
+# same way (SCL low stall / no ACK), the bug is below the driver
+# (electrical, slave timing, chip silicon).
+
+[workspace]
+
+[package]
+name = "rlvgl-beetle-esp32p4-halprobe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.88"
+
+[[bin]]
+name = "halprobe"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false
+panic = "abort"
+
+[dependencies]
+esp-hal = { git = "https://github.com/esp-rs/esp-hal", branch = "main", features = ["esp32p4", "unstable"] }
+esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal", branch = "main", features = ["esp32p4"] }
+esp-println = { git = "https://github.com/esp-rs/esp-hal", branch = "main", default-features = false, features = ["esp32p4", "jtag-serial"] }
+esp-backtrace = { git = "https://github.com/esp-rs/esp-hal", branch = "main", features = ["esp32p4", "panic-handler", "println"] }
+fugit = "0.3"
