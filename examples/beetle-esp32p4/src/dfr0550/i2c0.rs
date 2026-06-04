@@ -613,27 +613,62 @@ pub fn read_reg(addr: u8, reg: u8) -> Result<u8, I2cError> {
     Ok(read_fifo_byte(&p))
 }
 
+/// BEETLE-03v: tracks the next TX-byte slot in non-FIFO mode. Reset to
+/// 0 by `reset_fifo`. Each `write_fifo_byte` writes the byte to its
+/// own 4-byte word slot in TX RAM (offset 0x100 + idx*4) and bumps
+/// the counter.
+static FIFO_TX_IDX: core::sync::atomic::AtomicUsize =
+    core::sync::atomic::AtomicUsize::new(0);
+static FIFO_RX_IDX: core::sync::atomic::AtomicUsize =
+    core::sync::atomic::AtomicUsize::new(0);
+
 fn reset_fifo(p: &pac::Peripherals) {
-    p.I2C0
-        .fifo_conf()
-        .modify(|_, w| w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit());
-    p.I2C0
-        .fifo_conf()
-        .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+    // BEETLE-03v: enable non-FIFO (APB direct) mode so the CPU writes
+    // TX bytes to TX RAM at offset 0x100..0x17C (one byte per 4-byte
+    // word) instead of pushing through the offset-0x1c data register
+    // whose PAC marker is RX-only on P4. Default FIFO mode may or may
+    // not actually accept writes via the offset-0x1c address; the
+    // BEETLE-03u + earlier 17.4 µs/174 µs train pattern is consistent
+    // with the FSM attempting RSTART then having no FIFO data to clock,
+    // so it bails. With NONFIFO_EN=1 and explicit direct-RAM writes,
+    // the data is guaranteed to be in place.
+    p.I2C0.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().set_bit();
+        w.rx_fifo_rst().set_bit();
+        w.nonfifo_en().set_bit();
+        w
+    });
+    p.I2C0.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().clear_bit();
+        w.rx_fifo_rst().clear_bit();
+        w
+    });
+
+    FIFO_TX_IDX.store(0, core::sync::atomic::Ordering::Relaxed);
+    FIFO_RX_IDX.store(0, core::sync::atomic::Ordering::Relaxed);
 }
 
 fn write_fifo_byte(p: &pac::Peripherals, b: u8) {
-    // The esp32p4 0.2 PAC marks I2C0::DATA as read-only, but the hardware
-    // allows writes (the FIFO write port shares the address). Use the
-    // register's raw pointer to write the low byte. SAFETY: same address
-    // and access semantics as `p.I2C0.data()`; the PAC's missing Writable
-    // impl is a PAC bug, not a hardware constraint.
-    let addr = p.I2C0.data().as_ptr();
-    unsafe { addr.write_volatile(b as u32) };
+    // BEETLE-03v: non-FIFO direct write to TX RAM. Each byte gets a
+    // dedicated 4-byte word slot starting at offset 0x100. SAFETY:
+    // PAC marks `txfifo_start_addr` as a single u32 register at the
+    // start of the TX RAM region, but per the P4 TRM (Ch. 42, §
+    // "FIFO mode") the 0x100..0x17C range is direct-mapped TX RAM
+    // (32 byte slots = 32 bytes max). We write the low byte of each
+    // 4-byte word.
+    let idx = FIFO_TX_IDX
+        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+    let base = p.I2C0.txfifo_start_addr().as_ptr() as *mut u32;
+    unsafe { base.add(idx).write_volatile(b as u32) };
 }
 
 fn read_fifo_byte(p: &pac::Peripherals) -> u8 {
-    p.I2C0.data().read().fifo_rdata().bits()
+    // BEETLE-03v: non-FIFO direct read from RX RAM.
+    let idx = FIFO_RX_IDX
+        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+    let base = p.I2C0.rxfifo_start_addr().as_ptr() as *const u32;
+    let word = unsafe { base.add(idx).read_volatile() };
+    (word & 0xff) as u8
 }
 
 fn write_cmd(
