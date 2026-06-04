@@ -143,6 +143,15 @@ const I2C0_SDA_SIG: u16 = 69;
 // values were correct; brief BEETLE-03m experiment with PAC-doc values
 // confirmed neither encoding made the FSM execute, so op_codes aren't
 // the active bug.
+// ESP32-P4 op_codes — the P4 PAC docstring claims
+//   "0: RSTART, 1: WRITE, 2: READ, 3: STOP, 4: END"
+// but BEETLE-03u (2026-06-04) bench-tested those values and the FSM did
+// NOTHING — bus dead, quaternary=024 (op_code readback=0, both lines high,
+// no clocking). Reverting to the older C3/S3/H2/C6 mapping
+// (RSTART=6, WRITE=1, READ=3, STOP=2, END=4), which is what the IDF
+// `i2c_ll.h` header defines and what makes the FSM actually drive the
+// bus on P4 v1.3 silicon. The PAC docstring appears to be wrong for
+// P4 — likely copied from a different chip family during SVD generation.
 const OP_RESTART: u32 = 6;
 const OP_WRITE: u32 = 1;
 const OP_READ: u32 = 3;
@@ -309,7 +318,9 @@ pub unsafe fn route_pins() {
     // Resulting divisor = 0 + 1 + (0/1) = 1. I2C_SCLK = 40 MHz.
     p.HP_SYS_CLKRST.peri_clk_ctrl10().modify(|_, w| unsafe {
         w.i2c0_clk_src_sel().clear_bit();
-        w.i2c0_clk_div_num().bits(0);
+        // BEETLE-03t: div_num=9 → /10 → I2C_SCLK = 4 MHz. With our
+        // half_cycle=200 timing values that yields a 10 kHz bus.
+        w.i2c0_clk_div_num().bits(9);
         w.i2c0_clk_div_numerator().bits(0);
         w.i2c0_clk_div_denominator().bits(1);
         w
@@ -411,26 +422,17 @@ pub unsafe fn route_pins() {
         w
     });
 
-    // BEETLE-03l (2026-06-03): timing values now match the IDF
-    // `i2c_ll_master_cal_bus_clk` formula verbatim. WebFetch'd from
-    // esp-idf/components/hal/esp32p4/include/hal/i2c_ll.h.
+    // BEETLE-03t: SLOW BUS via source-clock divider — keep the same
+    // 100 kHz-shaped timing-register values but divide I2C_SCLK 40 MHz
+    // → 4 MHz upstream. That makes the actual I2C bit rate 10 kHz
+    // without exceeding the 9-bit / 7-bit width of scl_high_period and
+    // scl_wait_high_period. The source-clock div_num bump lives in the
+    // earlier peri_clk_ctrl10 write block (BEETLE-03t additionally sets
+    // i2c0_clk_div_num=9 → /10).
     //
-    // For 40 MHz source, 100 kHz target:
-    //   half_cycle    = sclk / freq / 2 = 200
-    //   scl_wait_high = half/2 - 2 = 98   (freq >= 80 kHz path)
-    //   scl_high      = half - wait = 102
-    //   sda_hold      = half / 4 = 50
-    //   sda_sample    = half / 2 = 100
-    //   setup = hold  = half = 200
-    //
-    // IDF writes (value - 1) to most fields. The HAL ASSERT requires:
-    //   scl_wait_high < sda_sample < scl_high
-    // i.e. 98 < 100 < 102 — narrow margins around half/2. Our previous
-    // values (wait=30, sample=50, high=200) satisfied the constraint by
-    // a huge margin, but the FSM may have been confused by the spacing
-    // (sda_sample sitting at a time when the FSM expected the SCL
-    // transition to have happened or not yet). This is the most
-    // structural unknown left after WebFetch'ing the IDF source.
+    // For I2C_SCLK = 4 MHz, 10 kHz target:
+    //   half_cycle    = 4_000_000 / 10_000 / 2 = 200  (same as 100 kHz @ 40 MHz)
+    //   scl_wait_high = 98, scl_high = 102 (constraint 98 < 100 < 102 holds)
     p.I2C0
         .scl_low_period()
         .write(|w| unsafe { w.bits(200 - 1) });
@@ -449,18 +451,8 @@ pub unsafe fn route_pins() {
     p.I2C0.scl_stop_hold().write(|w| unsafe { w.bits(200 - 1) });
     p.I2C0.scl_stop_setup().write(|w| unsafe { w.bits(200 - 1) });
 
-    // Configure SCL stuck-bus timeout. Per the PAC field doc:
-    //   "Configures the timeout threshold period for SCL stucking at
-    //    high or low level. The actual period is 2^(reg_time_out_value).
-    //    Measurement unit: i2c_sclk."
-    // ERRATA-008 round 2026-06-03 (bench iter 7): lowered from 20 to
-    // 16 (~26 ms → ~1.6 ms at 40 MHz I2C_SCLK). Senary=000 with the
-    // 26 ms value told us TIMEOUT/SCL_*_TO never had a chance to
-    // latch within our ~25 ms spin loop — the internal timeout was
-    // just-after our observation window. With 1.6 ms, the FSM's
-    // timeout fires deeply within the 25 ms spin, so any latched
-    // TIMEOUT / SCL_ST_TO / SCL_MAIN_ST_TO bit will be visible in
-    // LAST_HANG_INT_RAW → senary.
+    // BEETLE-03t: I2C_SCLK = 4 MHz (BEETLE-03t divider). time_out_value=16
+    // → 2^16 / 4 MHz ≈ 16 ms — plenty for a 1 ms byte at 10 kHz.
     p.I2C0.to().modify(|_, w| unsafe {
         w.time_out_value().bits(16);
         w.time_out_en().set_bit();
@@ -991,9 +983,8 @@ pub unsafe fn probe_init_state() -> u8 {
         return 23;
     }
 
-    // BEETLE-03l: updated expected value from 200 to 199 to match the
-    // IDF `i2c_ll_master_set_bus_timing` formula which writes
-    // `bus_cfg->scl_low - 1` (i.e. half_cycle - 1 = 199 for 100 kHz).
+    // BEETLE-03l: scl_low_period at 199 (half_cycle - 1 for 100 kHz timing
+    // ratios; BEETLE-03t now drives at 10 kHz via source-clock divider).
     let slp = p.I2C0.scl_low_period().read().bits();
     if slp != 199 {
         return 24;
