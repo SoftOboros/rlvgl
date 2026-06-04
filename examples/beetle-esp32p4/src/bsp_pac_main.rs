@@ -55,36 +55,18 @@ fn main() -> ! {
     // GPIO 4, 7, 8 can all be driven by software. The pads are fine;
     // the I2C0 master itself is what fails to start.
 
-    // The BSP generator currently emits I2C pins as plain GPIOs; route
-    // them through the GPIO matrix to the I2C0 peripheral here until the
-    // generator learns to do this itself.
-    unsafe {
-        dfr0550::i2c0::route_pins();
-    }
-
-    // BEETLE-03m hardware-check probe: manually bit-bang an I2C address
-    // probe for 0x45 (DFR0550 bridge) using only GPIO writes. If the
-    // slave ACKs, hardware is electrically sound and the bug is in the
-    // I2C0 peripheral init. If it NACKs / hangs, the issue is the
-    // bridge/wiring/power independent of our PAC code. Stores result
-    // into LAST_BITBANG_ACK (7th Morse line in status loop).
-    let _bitbang_ack = unsafe { dfr0550::i2c0::bitbang_address_probe(0x45) };
-
-    // Set up the user LED so we can encode bring-up status in blink count.
+    // BEETLE-03q: route_pins() moved INTO run_bringup_instrumented,
+    // AFTER PSRAM/LDO/DSI clock setup. BEETLE-03p showed PSRAM/LDO/DSI
+    // is disrupting I2C0 master state in the gap between route_pins
+    // and wake. By running route_pins AFTER those phases, the I2C0
+    // master is initialized into a quiet system and the route_pins →
+    // wake window stays microseconds tight. As a bonus, the STM32F072
+    // bridge has had milliseconds to boot during PSRAM/LDO/DSI work,
+    // so it's ready when wake() first knocks. led_init() runs here
+    // (early, no I2C0 dependency) so we still get LED feedback.
     unsafe { led_init() };
 
-    // DO NOT add any delay between route_pins() / led_init() and
-    // run_bringup() — 2026-06-01 bench round confirmed that a multi-
-    // second gap (3 boot blinks = ~6s) between route_pins and the first
-    // I2C0 transaction causes wake() to hang on the very first MMIO
-    // write (no dips on the marker). The 2026-05-30 wake-works state
-    // had only ~µs between route_pins and wake (the removed
-    // probe_init_state() call was µs-scale, not a load-bearing
-    // initialization). The I2C0 master appears to lose configuration
-    // if not exercised within a short window after route_pins.
-
-    // Full bring-up flow. Diagnostic checkpoints AFTER wake / DSI run
-    // inside run_bringup_instrumented to avoid the same trap.
+    // Full bring-up flow.
     let status = unsafe { run_bringup_instrumented() };
     morse_status_loop(status);
 }
@@ -112,14 +94,41 @@ fn led_blink_simple(n: u8) {
 /// existing GPIO-5 phase pulses (microsecond scale), these are visible
 /// to the eye without a Saleae.
 unsafe fn run_bringup_instrumented() -> u8 {
-    // BEETLE-03p: ERRATA-008 next-session plan #2 — wake() FIRST, BEFORE
-    // PSRAM / LDO / DSI bring-up. If early wake succeeds where late wake
-    // failed, something in PSRAM/LDO/DSI corrupts I2C0 state. If early
-    // wake also fails, the bug is more fundamental than bring-up order.
-    // Either outcome is a hard pivot: success → restructure for good;
-    // failure → look at I2C0 master init itself, not bring-up sequencing.
+    // BEETLE-03q: PSRAM/LDO/DSI FIRST, then route_pins(), then wake().
+    // BEETLE-03p (wake before PSRAM/LDO/DSI) showed those phases disrupt
+    // I2C0 master state — quaternary changed 030→014 (SCL HIGH→LOW),
+    // confirming the FSM advances further when run first. But early wake
+    // hit the STM32F072 bridge before it finished booting, so it stalled
+    // mid-clock on clock-stretch. The fix: do PSRAM/LDO/DSI before
+    // route_pins, so the I2C0 master is initialized into a quiet system,
+    // AND the route_pins→wake window stays tight (no PSRAM/LDO/DSI
+    // between them), AND the bridge has milliseconds to boot during the
+    // PSRAM/LDO/DSI work.
 
-    // ERRATA-008 Round 1: probe I2C0 init state right before wake.
+    // Phase 1-3c: PSRAM / LDO / DSI clocks (no I2C0 work yet).
+    let _ = unsafe { dfr0550::psram::init() };
+    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
+    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_phy_clocks(
+            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
+        );
+    }
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_dpi_clock(
+            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
+            dfr0550::DPI_PIXEL_CLK_MHZ,
+        );
+    }
+
+    // I2C0 master init — pads + clocks + CTR + timing. AFTER PSRAM/LDO/DSI.
+    unsafe { dfr0550::i2c0::route_pins(); }
+
+    // Bit-bang hardware probe (independent of I2C0 master FSM) — proves
+    // the bridge is electrically reachable at this point in boot.
+    let _bitbang_ack = unsafe { dfr0550::i2c0::bitbang_address_probe(0x45) };
+
+    // Probe I2C0 init state right before wake.
     let probe_code = unsafe { dfr0550::i2c0::probe_init_state() };
     if probe_code != 0 {
         return probe_code;
@@ -155,22 +164,6 @@ unsafe fn run_bringup_instrumented() -> u8 {
         Err(BridgeError::I2c(I2cError::Timeout)) => return 7,
         Err(BridgeError::I2c(I2cError::Arbitration)) => return 8,
         Err(BridgeError::NotReady) => return 9,
-    }
-
-    // wake() succeeded — NOW do PSRAM/LDO/DSI clock setup.
-    let _ = unsafe { dfr0550::psram::init() };
-    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
-    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
-    unsafe {
-        dfr0550::dsi_host::clocks::enable_phy_clocks(
-            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
-        );
-    }
-    unsafe {
-        dfr0550::dsi_host::clocks::enable_dpi_clock(
-            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
-            dfr0550::DPI_PIXEL_CLK_MHZ,
-        );
     }
 
     // Checkpoint B: 4 slow blinks = "wake() succeeded, about to DSI".
