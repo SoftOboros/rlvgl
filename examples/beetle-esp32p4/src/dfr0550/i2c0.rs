@@ -188,16 +188,44 @@ pub unsafe fn route_pins() {
         .hp_active_icg_hp_func()
         .write(|w| unsafe { w.hp_active_dig_icg_func_en().bits(0xFFFF_FFFF) });
 
-    // BEETLE-03m: IO_MUX configuration per IDF `s_hp_i2c_pins_config`.
-    // The GPIO matrix routing (func_in_sel_cfg / func_out_sel_cfg) is
-    // necessary but NOT sufficient — the pin's IO_MUX register must
-    // also have fun_ie=1 (input enable, so the FSM can read its own
-    // SDA/SCL state back from the pad), fun_wpu=1 (internal pull-up),
-    // fun_wpd=0 (no pull-down), and mcu_sel=1 (function 1 = GPIO
-    // matrix path, not direct-peripheral). Septenary=000 from the
-    // bit-bang probe confirmed: bus + slave + address all work; the
-    // FSM was silently bailing because it couldn't read SDA back from
-    // the pad. This is the missing init step.
+    // BEETLE-03o: IDF `s_hp_i2c_pins_config` verbatim ordering.
+    // Prior code (BEETLE-03m) had the right *fields* but in the wrong
+    // *order*: IO_MUX → enable_w1ts → pad_driver → matrix. IDF does:
+    //   1. gpio_set_level(pin, 1)      — GPIO.out = 1 FIRST
+    //   2. gpio_input_enable           — fun_ie = 1
+    //   3. gpio_od_enable              — pad_driver = 1
+    //   4. gpio_pullup_en              — fun_wpu = 1
+    //   5. gpio_pulldown_dis           — fun_wpd = 0
+    //   6. gpio_func_sel(PIN_FUNC_GPIO)— mcu_sel = 1
+    //   7. matrix connect_out_signal / connect_in_signal
+    // Critical step #1 was MISSING. At reset, GPIO.out for an unused
+    // pin is 0. The instant we did `enable_w1ts` with the matrix still
+    // at default `out_sel = 256` (GPIO-direct mode), the pad briefly
+    // drove LOW from GPIO.out=0 — open-drain interprets that as an
+    // active LOW pull. Even after we routed `out_sel = I2C0_*_SIG` a
+    // few cycles later, the slave may have seen a malformed START on
+    // SDA/SCL transition. The brief LOW glitch is consistent with the
+    // 17.4 µs req/ack chain Saleae captured with the panel
+    // disconnected — the FSM begins a transaction, sees an ambiguous
+    // bus state from its own startup glitch, and bails.
+
+    let pad_mask = (1u32 << SCL_GPIO) | (1u32 << SDA_GPIO);
+
+    // (1) Pre-set GPIO.out = 1 for both pins.
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(pad_mask) });
+
+    // (2) Enable output drive.
+    p.GPIO.enable_w1ts().write(|w| unsafe { w.bits(pad_mask) });
+
+    // (3) Open-drain on both pins.
+    p.GPIO
+        .pin(SCL_GPIO as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+    p.GPIO
+        .pin(SDA_GPIO as usize)
+        .modify(|_, w| w.pad_driver().set_bit());
+
+    // (4–6) IO_MUX: input enable, pull-up, pull-down disable, function GPIO.
     for pin in [SDA_GPIO as usize, SCL_GPIO as usize] {
         p.IO_MUX.gpio(pin).modify(|_, w| unsafe {
             w.fun_ie().set_bit();
@@ -208,15 +236,7 @@ pub unsafe fn route_pins() {
         });
     }
 
-    p.GPIO
-        .enable_w1ts()
-        .write(|w| unsafe { w.bits((1u32 << SCL_GPIO) | (1u32 << SDA_GPIO)) });
-    p.GPIO
-        .pin(SCL_GPIO as usize)
-        .modify(|_, w| w.pad_driver().set_bit());
-    p.GPIO
-        .pin(SDA_GPIO as usize)
-        .modify(|_, w| w.pad_driver().set_bit());
+    // (7) GPIO matrix — route I2C0 SCL/SDA to the pads LAST.
     p.GPIO
         .func_out_sel_cfg(SCL_GPIO as usize)
         .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SCL_SIG) });
