@@ -112,34 +112,14 @@ fn led_blink_simple(n: u8) {
 /// existing GPIO-5 phase pulses (microsecond scale), these are visible
 /// to the eye without a Saleae.
 unsafe fn run_bringup_instrumented() -> u8 {
-    // After Phase 1-3c, BEFORE wake.
-    let _ = unsafe { dfr0550::psram::init() };
-    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
-    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
-    unsafe {
-        dfr0550::dsi_host::clocks::enable_phy_clocks(
-            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
-        );
-    }
-    unsafe {
-        dfr0550::dsi_host::clocks::enable_dpi_clock(
-            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
-            dfr0550::DPI_PIXEL_CLK_MHZ,
-        );
-    }
+    // BEETLE-03p: ERRATA-008 next-session plan #2 — wake() FIRST, BEFORE
+    // PSRAM / LDO / DSI bring-up. If early wake succeeds where late wake
+    // failed, something in PSRAM/LDO/DSI corrupts I2C0 state. If early
+    // wake also fails, the bug is more fundamental than bring-up order.
+    // Either outcome is a hard pivot: success → restructure for good;
+    // failure → look at I2C0 master init itself, not bring-up sequencing.
 
-    // (Checkpoint A removed — adding a 2s delay here makes wake() hang.
-    // The original run_bringup() had only ~150µs phase pulses between
-    // DSI clock setup and wake; a 2s delay breaks that ordering. So
-    // diagnostic blinks must come AFTER wake completes, not before it.)
-
-    // ERRATA-008 Round 1: probe I2C0 init state right before wake. If
-    // one of the DSI clock setup steps clobbered an I2C0 init register
-    // (most likely candidate: soc_clk_ctrl2.i2c0_apb_clk_en → code 26),
-    // we surface that as a 20-29 LED-Morse code with no wake attempt.
-    // probe_init_state was confirmed µs-scale by the 2026-06-01 bench
-    // notes above; calling it here adds negligible delay between DSI
-    // setup and wake.
+    // ERRATA-008 Round 1: probe I2C0 init state right before wake.
     let probe_code = unsafe { dfr0550::i2c0::probe_init_state() };
     if probe_code != 0 {
         return probe_code;
@@ -149,7 +129,7 @@ unsafe fn run_bringup_instrumented() -> u8 {
     // `write_reg_instrumented` are visible as LOW pulses inside the
     // sustained-HIGH region on Saleae GPIO 5.
     debug_marker_set(true);
-    // Phase 4: wake.
+    // Phase 4 (now Phase 0): wake — moved BEFORE PSRAM/LDO/DSI.
     let wake_result = unsafe { wake_instrumented() };
     debug_marker_set(false);
     use dfr0550::i2c0::I2cError;
@@ -167,9 +147,6 @@ unsafe fn run_bringup_instrumented() -> u8 {
             }
             return 30u8.saturating_add(scl_state);
         }
-        // ERRATA-008: distinct code so the operator can tell whether the
-        // FSM walked through COMD0/1/2 (EndDetect — paused at COMD3 END)
-        // vs. never advanced (Hang — code 30+state).
         Err(BridgeError::I2c(I2cError::EndDetect)) => {
             let st = dfr0550::i2c0::LAST_HANG_STATE.load(Ordering::Relaxed);
             let scl_state = st & 0x07;
@@ -178,6 +155,22 @@ unsafe fn run_bringup_instrumented() -> u8 {
         Err(BridgeError::I2c(I2cError::Timeout)) => return 7,
         Err(BridgeError::I2c(I2cError::Arbitration)) => return 8,
         Err(BridgeError::NotReady) => return 9,
+    }
+
+    // wake() succeeded — NOW do PSRAM/LDO/DSI clock setup.
+    let _ = unsafe { dfr0550::psram::init() };
+    let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
+    unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_phy_clocks(
+            dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
+        );
+    }
+    unsafe {
+        dfr0550::dsi_host::clocks::enable_dpi_clock(
+            dfr0550::dsi_host::clocks::DpiClockSource::PllF240m,
+            dfr0550::DPI_PIXEL_CLK_MHZ,
+        );
     }
 
     // Checkpoint B: 4 slow blinks = "wake() succeeded, about to DSI".
