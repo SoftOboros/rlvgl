@@ -324,8 +324,16 @@ pub unsafe fn route_pins() {
         // BEETLE-03t: div_num=9 → /10 → I2C_SCLK = 4 MHz. With our
         // half_cycle=200 timing values that yields a 10 kHz bus.
         w.i2c0_clk_div_num().bits(9);
+        // BEETLE-03z: revert numerator+denominator to IDF defaults.
+        // IDF `i2c_ll_master_set_bus_timing` (v5.3) explicitly writes
+        // both as 0 ("disable fractional divider"). Our prior 0/1
+        // values were chosen to avoid the 0/0 divide-by-zero per the
+        // ESP32-P4 TRM Ch.42 divider equation — but the silicon
+        // interprets 0/0 as "no fractional contribution" (proven by
+        // IDF running this way in production for years). Matching IDF
+        // exactly to remove this divergence from the hypothesis space.
         w.i2c0_clk_div_numerator().bits(0);
-        w.i2c0_clk_div_denominator().bits(1);
+        w.i2c0_clk_div_denominator().bits(0);
         w
     });
 
@@ -488,6 +496,29 @@ pub unsafe fn route_pins() {
     // state-machine transition we can observe.
     p.I2C0.int_ena().write(|w| unsafe { w.bits(0x0001_FFFF) });
 
+    // BEETLE-03z: invoke the hardware bus-clear pulser per IDF
+    // `i2c_ll_master_clr_bus` in `hal/esp32p4/include/hal/i2c_ll.h`:
+    //   hw->scl_sp_conf.scl_rst_slv_num = N;
+    //   hw->scl_sp_conf.scl_rst_slv_en  = 1;
+    //   hw->ctr.conf_upgate             = 1;
+    // This is a hardware-implemented version of the I2C 9-SCL-pulse
+    // bus-recovery procedure (NXP UM10204 §3.1.16) — once enabled, the
+    // I2C0 peripheral emits N SCL pulses with SDA hi-Z before any
+    // subsequent transaction. Belt-and-suspenders with our
+    // `recover_bus` bit-bang earlier in route_pins: that ran BEFORE
+    // the peri reset re-attached I2C0 to the pads; this runs AFTER
+    // and inside the peripheral, so it covers any state the bridge
+    // entered during reset deassertion. The PAC exposes
+    // `scl_sp_conf.scl_rst_slv_num` (3 bits, 0-7 pulses) and
+    // `scl_sp_conf.scl_rst_slv_en` (W1S). The IDF default is 9 but
+    // the field is 3-bit on P4 — clamp to 7 which is still more than
+    // enough to release any mid-byte slave.
+    p.I2C0.scl_sp_conf().modify(|_, w| unsafe {
+        w.scl_rst_slv_num().bits(7);
+        w.scl_rst_slv_en().set_bit();
+        w
+    });
+
     // Latch the master init writes with `conf_upgate`. Critically, do
     // NOT pulse `fsm_rst` here. On the ESP32-P4, `fsm_rst` and
     // `conf_upgate` are both WT (write-triggered) bits whose actions
@@ -616,29 +647,23 @@ pub fn read_reg(addr: u8, reg: u8) -> Result<u8, I2cError> {
     Ok(read_fifo_byte(&p))
 }
 
-/// BEETLE-03v: tracks the next TX-byte slot in non-FIFO mode. Reset to
-/// 0 by `reset_fifo`. Each `write_fifo_byte` writes the byte to its
-/// own 4-byte word slot in TX RAM (offset 0x100 + idx*4) and bumps
-/// the counter.
-static FIFO_TX_IDX: core::sync::atomic::AtomicUsize =
-    core::sync::atomic::AtomicUsize::new(0);
-static FIFO_RX_IDX: core::sync::atomic::AtomicUsize =
-    core::sync::atomic::AtomicUsize::new(0);
-
 fn reset_fifo(p: &pac::Peripherals) {
-    // BEETLE-03v: enable non-FIFO (APB direct) mode so the CPU writes
-    // TX bytes to TX RAM at offset 0x100..0x17C (one byte per 4-byte
-    // word) instead of pushing through the offset-0x1c data register
-    // whose PAC marker is RX-only on P4. Default FIFO mode may or may
-    // not actually accept writes via the offset-0x1c address; the
-    // BEETLE-03u + earlier 17.4 µs/174 µs train pattern is consistent
-    // with the FSM attempting RSTART then having no FIFO data to clock,
-    // so it bails. With NONFIFO_EN=1 and explicit direct-RAM writes,
-    // the data is guaranteed to be in place.
+    // BEETLE-03y: revert to IDF-canonical FIFO mode. The 2026-06-04
+    // line-by-line diff against `i2c_ll_write_txfifo` in
+    // `hal/esp32p4/include/hal/i2c_ll.h` (release/v5.3) shows IDF
+    // writes TX bytes via:
+    //   HAL_FORCE_MODIFY_U32_REG_FIELD(hw->data, fifo_rdata, ptr[i]);
+    // i.e. the offset-0x1c `data` register, with NONFIFO_EN left at 0.
+    // The PAC's RX-only marker on `data` is a docstring artifact — on
+    // real P4 silicon `data` is bidirectional (write = push TX byte,
+    // read = pop RX byte). BEETLE-03v's NONFIFO_EN=1 + direct TX-RAM
+    // writes diverged from IDF and produced the 174 µs runaway train
+    // signature on Saleae. Reverting to FIFO mode + data-register
+    // pushes matches IDF exactly.
     p.I2C0.fifo_conf().modify(|_, w| {
         w.tx_fifo_rst().set_bit();
         w.rx_fifo_rst().set_bit();
-        w.nonfifo_en().set_bit();
+        w.nonfifo_en().clear_bit();
         w
     });
     p.I2C0.fifo_conf().modify(|_, w| {
@@ -646,31 +671,22 @@ fn reset_fifo(p: &pac::Peripherals) {
         w.rx_fifo_rst().clear_bit();
         w
     });
-
-    FIFO_TX_IDX.store(0, core::sync::atomic::Ordering::Relaxed);
-    FIFO_RX_IDX.store(0, core::sync::atomic::Ordering::Relaxed);
 }
 
 fn write_fifo_byte(p: &pac::Peripherals, b: u8) {
-    // BEETLE-03v: non-FIFO direct write to TX RAM. Each byte gets a
-    // dedicated 4-byte word slot starting at offset 0x100. SAFETY:
-    // PAC marks `txfifo_start_addr` as a single u32 register at the
-    // start of the TX RAM region, but per the P4 TRM (Ch. 42, §
-    // "FIFO mode") the 0x100..0x17C range is direct-mapped TX RAM
-    // (32 byte slots = 32 bytes max). We write the low byte of each
-    // 4-byte word.
-    let idx = FIFO_TX_IDX
-        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-    let base = p.I2C0.txfifo_start_addr().as_ptr() as *mut u32;
-    unsafe { base.add(idx).write_volatile(b as u32) };
+    // BEETLE-03y: write to the bidirectional `data` register (offset
+    // 0x1c) per IDF `i2c_ll_write_txfifo`. Each write pushes one byte
+    // into the TX FIFO regardless of the PAC's RX-only marker.
+    let data_ptr = p.I2C0.data().as_ptr();
+    unsafe { data_ptr.write_volatile(b as u32) };
 }
 
 fn read_fifo_byte(p: &pac::Peripherals) -> u8 {
-    // BEETLE-03v: non-FIFO direct read from RX RAM.
-    let idx = FIFO_RX_IDX
-        .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-    let base = p.I2C0.rxfifo_start_addr().as_ptr() as *const u32;
-    let word = unsafe { base.add(idx).read_volatile() };
+    // BEETLE-03y: read from the bidirectional `data` register (offset
+    // 0x1c) per IDF `i2c_ll_read_rxfifo`. Each read pops one byte from
+    // the RX FIFO.
+    let data_ptr = p.I2C0.data().as_ptr();
+    let word = unsafe { data_ptr.read_volatile() };
     (word & 0xff) as u8
 }
 
