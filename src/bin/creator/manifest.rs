@@ -71,6 +71,7 @@ pub(crate) enum Case {
     Snake,
 }
 
+
 /// Handling mode for Lottie animation assets.
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]

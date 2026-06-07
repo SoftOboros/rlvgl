@@ -8,8 +8,8 @@
 #![no_std]
 #![no_main]
 
-use esp_riscv_rt::entry;
 use esp32p4 as pac;
+use esp_riscv_rt::entry;
 use panic_halt as _;
 
 #[path = "../app_desc.rs"]
@@ -28,9 +28,9 @@ fn main() -> ! {
             continue;
         }
         // mcu_sel = 1 → simple GPIO function on every P4 pad.
-        p.IO_MUX
-            .gpio(pin)
-            .modify(|_, w| unsafe { w.mcu_sel().bits(1).fun_ie().clear_bit() });
+        p.IO_MUX.gpio(pin).modify(|_, w| unsafe {
+            w.mcu_sel().bits(1).fun_ie().clear_bit()
+        });
         // Drive output from the gpio_out register (sig idx 256 = simple).
         p.GPIO
             .func_out_sel_cfg(pin)
@@ -38,12 +38,8 @@ fn main() -> ! {
     }
 
     // Output enable for low pins (0-31) and high pins (32-47).
-    p.GPIO
-        .enable_w1ts()
-        .write(|w| unsafe { w.bits(0xFFFF_FFFF) });
-    p.GPIO
-        .enable1_w1ts()
-        .write(|w| unsafe { w.bits(0x0000_FFFF) });
+    p.GPIO.enable_w1ts().write(|w| unsafe { w.bits(0xFFFF_FFFF) });
+    p.GPIO.enable1_w1ts().write(|w| unsafe { w.bits(0x0000_FFFF) });
 
     loop {
         // All ON.

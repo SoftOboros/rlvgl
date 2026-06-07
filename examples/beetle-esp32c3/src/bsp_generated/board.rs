@@ -25,17 +25,28 @@ pub const APB_HZ: u32 = 80000000;
 /// External crystal frequency, in hertz.
 pub const XTAL_HZ: u32 = 40000000;
 
+
+
 /// GPIO number for `sda` (I2C0_SDA).
 pub const SDA: u8 = 1;
+
+
 
 /// GPIO number for `scl` (I2C0_SCL).
 pub const SCL: u8 = 2;
 
+
+
 /// GPIO number for `usb_dm` (USB_DM).
 pub const USB_DM: u8 = 18;
+
+
 
 /// GPIO number for `usb_dp` (USB_DP).
 pub const USB_DP: u8 = 19;
 
+
+
 /// GPIO number for `led` (LED).
 pub const LED: u8 = 8;
+

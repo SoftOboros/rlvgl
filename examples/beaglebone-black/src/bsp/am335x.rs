@@ -15,7 +15,7 @@
 //! identical init sequence runs under Linux (as a userspace binary) and
 //! under bare-metal / FreeRTOS / Zephyr (as on-chip code).
 
-#![allow(dead_code, clippy::identity_op)]
+#![allow(dead_code)]
 
 // ---------------------------------------------------------------------------
 // Volatile register access helpers

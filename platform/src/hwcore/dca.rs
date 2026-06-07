@@ -316,8 +316,9 @@ impl<T: Copy, const N: usize> DcaBuf<T, N> {
         // DmaAddr conversion succeeds. Host tests that read this
         // value must not feed it to real DMA hardware.
         let phys = PhysAddr::new(addr as u32);
-        DmaAddr::from_phys(phys, CACHE_LINE)
-            .expect("DcaBuf is #[repr(C, align(32))]; storage address is always cache-line aligned")
+        DmaAddr::from_phys(phys, CACHE_LINE).expect(
+            "DcaBuf is #[repr(C, align(32))]; storage address is always cache-line aligned",
+        )
     }
 
     /// Take ownership of the buffer as a CPU-owned typestate handle.
@@ -445,7 +446,10 @@ impl<'a, T: Copy, const N: usize> Cpu<'a, T, N> {
     /// the clean alone does not enforce ordering on architectures
     /// where the cache write-back queues into a separate write
     /// buffer.
-    pub fn start_ltdc_scan<C: DcaCache>(self, ctx: &mut DcaCacheCtx<'_, C>) -> LtdcScan<'a, T, N> {
+    pub fn start_ltdc_scan<C: DcaCache>(
+        self,
+        ctx: &mut DcaCacheCtx<'_, C>,
+    ) -> LtdcScan<'a, T, N> {
         let addr = self.buf.addr_usize();
         let len = self.buf.byte_len();
         ctx.cache.clean(addr, len);
@@ -776,6 +780,7 @@ impl<'a, DIR, T: Copy, const N: usize> HalfGuard<'a, DIR, T, N> {
     pub fn half(&self) -> Half {
         self.half
     }
+
 }
 
 /// Direction-specific `release` for `HalfGuard<Read, _, _>`.
@@ -1232,6 +1237,7 @@ impl<'a, DIR, T: Copy, const N: usize> BankGuard<'a, DIR, T, N> {
     pub fn bank(&self) -> Bank {
         self.bank
     }
+
 }
 
 /// Direction-specific `release` for `BankGuard<Read, _, _>`.
@@ -1515,7 +1521,9 @@ mod tests {
         // release-time clean still fires before the overrun check.
         assert_eq!(
             guard.release(&mut ctx, Half::Second),
-            Err(HalfGuardOverrun { half: Half::Second })
+            Err(HalfGuardOverrun {
+                half: Half::Second
+            })
         );
     }
 

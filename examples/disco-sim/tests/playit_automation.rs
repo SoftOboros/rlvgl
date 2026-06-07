@@ -172,13 +172,7 @@ fn automation_headless_emits_ready_status_and_dump_frames() {
     assert!(width > 0, "settings hotspot did not become visible");
     assert!(height > 0, "settings hotspot did not become visible");
 
-    // 2026-05-19: the disco-sim runtime has no opaque window-background
-    // fill, and at startup the dashboard panel is hidden (`refactor:
-    // dashboard starts hidden` 504d56b, 2026-04-13). The icon strip on
-    // the right edge is the only widget that always renders, so sample
-    // a 4×2 region inside the strip's first slot rather than at (0,0).
-    // See docs/concepts/DPR-01-A-disco-sim-triage.md.
-    session.send("D760,90,4,2,1");
+    session.send("D0,0,4,2,1");
     assert_eq!(session.read_line(), "DUMP:queued");
     assert_eq!(session.read_line(), "F");
     let row_a = session.read_line();
@@ -290,21 +284,14 @@ fn all_tags_exist_at_startup() {
 
 #[test]
 fn framebuffer_has_content_at_startup() {
-    // 2026-05-19: the disco-sim runtime has no opaque window-background
-    // fill; at startup only the right-edge IconStrip widget is drawn.
-    // The dashboard panel starts hidden (`refactor: dashboard starts
-    // hidden` 504d56b, 2026-04-13) and other widgets either have
-    // alpha-zero backgrounds (themed_label) or fontdue-disabled text.
-    // Sample the icon strip area instead of (0,0). See
-    // docs/concepts/DPR-01-A-disco-sim-triage.md.
     let mut session = SimulatorSession::launch();
 
-    session.send("D740,80,40,40,1");
+    session.send("D0,0,40,20,1");
     assert_eq!(session.read_line(), "DUMP:queued");
     assert_eq!(session.read_line(), "F");
 
     let mut has_content = false;
-    for _ in 0..40 {
+    for _ in 0..20 {
         let row = session.read_line();
         if row.split_whitespace().any(|pixel| pixel != "00000000") {
             has_content = true;
@@ -393,18 +380,7 @@ fn dashboard_rounded_corner_arcs_outward() {
     // and curves down to the bottom-left.
     //
     // Dashboard panel is at PANEL_X=84, PANEL_Y=84, radius 18.
-    //
-    // 2026-05-19: dashboard now starts hidden (`refactor: dashboard
-    // starts hidden` 504d56b, 2026-04-13). Open Info wing → Diagnostics
-    // to make it visible before sampling. See
-    // docs/concepts/DPR-01-A-disco-sim-triage.md.
     let mut session = SimulatorSession::launch();
-
-    session.send("KD:i");
-    assert_eq!(session.read_line(), "OK");
-    session.send("KD:Enter");
-    assert_eq!(session.read_line(), "OK");
-    std::thread::sleep(Duration::from_millis(150));
 
     // Dump a 20x20 region from the panel's top-left corner.
     session.send("D84,84,20,20,1");
@@ -468,39 +444,25 @@ fn transparent_label_backgrounds_do_not_blacken_window() {
     // leaving the underlying pixels alone, producing solid black bars
     // where the title/subtitle/footer labels live.
     //
-    // 2026-05-19: the disco-sim runtime no longer draws a window
-    // background fill, and the dashboard panel starts hidden
-    // (`refactor: dashboard starts hidden` 504d56b, 2026-04-13). The
-    // themed_label bands now sit over zero pixels regardless of the
-    // alpha-zero fix, so the original sampling regions (y=30, y=54,
-    // y=450) cannot distinguish the bug from the new rendering model.
-    //
-    // The underlying `draw_widget_bg` alpha-zero guard is exercised
-    // directly by `core::draw::tests` (host unit tests, no simulator).
-    // Here we re-target this test to a strictly stronger assertion:
-    // open the dashboard panel and verify its opaque PANEL_BG fill
-    // renders as the expected dark-navy colour. A regression in
-    // CpuBlitter that overwrote pixels with zero would also fail this
-    // assertion (the panel interior would be zero), so this test still
-    // catches the bug class the original was guarding. See
-    // docs/concepts/DPR-01-A-disco-sim-triage.md.
+    // After the fix the label bands should be the dark navy window
+    // background (Color(13, 19, 30) = 0xFF0D131E), not 0x00000000.
     let mut session = SimulatorSession::launch();
 
-    // Open Info wing and activate Diagnostics to make the dashboard
-    // panel visible.
-    session.send("KD:i");
-    assert_eq!(session.read_line(), "OK");
-    session.send("KD:Enter");
-    assert_eq!(session.read_line(), "OK");
-    std::thread::sleep(Duration::from_millis(150));
+    // Title sits at y=24..42 (themed_label rect at lib.rs:712-717).
+    // Subtitle at y=48..66. Footer at the bottom (y = h - 32 .. h - 14).
+    // Sample inside each band, well to the left of the panel border
+    // and to the right of the screen edge.
+    //
+    // The dump command caps width and height at 40 each.
+    let sample_xs: [(i32, &str); 3] = [(110, "title"), (110, "subtitle"), (250, "footer")];
+    let sample_ys: [(i32, &str); 3] = [(30, "title"), (54, "subtitle"), (450, "footer")];
 
-    // Sample the panel body strip well inside PANEL_BG (Color(22, 29,
-    // 41, 255) = 0xFF161D29, brightness 92). Panel sits at (84, 84,
-    // 620, 312); pick three rows below the header band.
-    let sample_ys: [(i32, &str); 3] = [(200, "body"), (260, "body"), (320, "body")];
-    let dump_command = |y: i32| format!("D200,{y},20,1,1");
+    // Window background should be a non-zero "dark navy" colour with
+    // sum of channels around 62. We just need to ensure pixels are
+    // NOT 0x00000000 — that's the regression.
+    let dump_command = |y: i32| format!("D110,{y},20,1,1");
 
-    for (y, label) in sample_ys.iter() {
+    for ((_, label), (y, _)) in sample_xs.iter().zip(sample_ys.iter()) {
         session.send(&dump_command(*y));
         assert_eq!(session.read_line(), "DUMP:queued");
         assert_eq!(session.read_line(), "F");

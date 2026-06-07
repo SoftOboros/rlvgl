@@ -19,26 +19,23 @@ use super::pac;
 /// configuration so that peripheral registers are writable.
 pub fn init() {
     let p = unsafe { pac::Peripherals::steal() };
-
+    
+    
+    
     // i2c0 — clock enable i2c_ext0_clk_en, reset i2c_ext0_rst
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.i2c_ext0_rst().set_bit());
-    p.SYSTEM
-        .perip_clk_en0()
-        .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.i2c_ext0_rst().clear_bit());
-
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.i2c_ext0_rst().set_bit());
+    p.SYSTEM.perip_clk_en0().modify(|_, w| w.i2c_ext0_clk_en().set_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.i2c_ext0_rst().clear_bit());
+    
+    
+    
+    
+    
     // usb_sj — clock enable usb_device_clk_en, reset usb_device_rst
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.usb_device_rst().set_bit());
-    p.SYSTEM
-        .perip_clk_en0()
-        .modify(|_, w| w.usb_device_clk_en().set_bit());
-    p.SYSTEM
-        .perip_rst_en0()
-        .modify(|_, w| w.usb_device_rst().clear_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().set_bit());
+    p.SYSTEM.perip_clk_en0().modify(|_, w| w.usb_device_clk_en().set_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().clear_bit());
+    
+    
+    
 }

@@ -2,26 +2,8 @@
 use rlvgl_core::style::Style;
 use rlvgl_core::theme::{DarkTheme, LightTheme, Theme};
 use rlvgl_core::widget::Color;
-
-struct StyledFixture {
-    style: Style,
-}
-
-impl StyledFixture {
-    fn new() -> Self {
-        Self {
-            style: Style::default(),
-        }
-    }
-
-    fn style(&self) -> &Style {
-        &self.style
-    }
-
-    fn style_mut(&mut self) -> &mut Style {
-        &mut self.style
-    }
-}
+use rlvgl_core::widget::Rect;
+use rlvgl_widgets::button::Button;
 
 #[test]
 fn light_theme_applies_defaults() {
@@ -53,10 +35,18 @@ fn dark_theme_applies_defaults() {
 
 #[test]
 fn theme_updates_widget_style() {
-    let mut widget = StyledFixture::new();
+    let mut button = Button::new(
+        "ok",
+        Rect {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+        },
+    );
 
-    DarkTheme.apply(widget.style_mut());
+    DarkTheme.apply(button.style_mut());
 
-    assert_eq!(widget.style().bg_color, Color(0, 0, 0, 255));
-    assert_eq!(widget.style().border_color, Color(255, 255, 255, 255));
+    assert_eq!(button.style().bg_color, Color(0, 0, 0, 255));
+    assert_eq!(button.style().border_color, Color(255, 255, 255, 255));
 }

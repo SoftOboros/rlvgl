@@ -75,7 +75,9 @@ pub unsafe fn writeback(ptr: *const u8, len: usize) {
             .sync_map()
             .write(|w| w.sync_map().bits(SYNC_MAP_L1_DCACHE | SYNC_MAP_L2_CACHE));
     }
-    cache.sync_ctrl().modify(|_, w| w.writeback_ena().set_bit());
+    cache
+        .sync_ctrl()
+        .modify(|_, w| w.writeback_ena().set_bit());
 
     // Spin until WRITEBACK_ENA self-clears (sync_done==1).
     while cache.sync_ctrl().read().sync_done().bit_is_clear() {

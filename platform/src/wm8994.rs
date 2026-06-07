@@ -589,17 +589,30 @@ where
         };
         self.write_reg(REG_PWR_MGMT_2, pm2)?;
 
-        // Step 6 — Power up ADC blocks + AIF1 ADC paths (R4).
-        //   bit 9 AIF1ADC1L_ENA, bit 8 AIF1ADC1R_ENA
+        // Step 6 — Power up the analog ADC blocks ONLY (R4 bits 1:0).
         //   bit 1 ADCL_ENA, bit 0 ADCR_ENA
-        self.write_reg(REG_PWR_MGMT_4, (1 << 9) | (1 << 8) | (1 << 1) | 1)?;
+        // AUDIO-01-d H0 (serializer arm-phase reorder): the AIF1ADC1L/R_ENA
+        // serializer-enable bits (b9/b8) are deliberately NOT set here.
+        // Arming the serializer before AIF1CLK is locked + running latches a
+        // metastable BCLK phase offset N≠0 vs LRCLK1 (ERRATA-004 in
+        // disco-analyzer). The b9/b8 enables are deferred to Step 14b below,
+        // after R0x200 AIF1CLK_ENA + the 50 ms settle, so the serializer arms
+        // against an already-stable, already-running LRCLK1 frame. This also
+        // brings the code into compliance with AUDIO-01 §12 gate (c) (no
+        // writes to R0x4 AIF1ADC1L/R_ENA until FLL1 lock). See
+        // AGENT-TASK-WM8994-AIF1-SERIALIZER-ARM-PHASE-CALIBRATION.md §0.
+        self.write_reg(REG_PWR_MGMT_4, (1 << 1) | 1)?;
 
-        // Step 7 — Enable DAC + AIF1DAC paths (R5) for record-with-monitor.
-        //   bit 9 AIF1DAC1L_ENA, bit 8 AIF1DAC1R_ENA
-        //   bit 1 DAC1L_ENA,     bit 0 DAC1R_ENA
+        // Step 7 — Enable the analog DAC blocks ONLY (R5 bits 1:0) for
+        // record-with-monitor.
+        //   bit 1 DAC1L_ENA, bit 0 DAC1R_ENA
         // The DAC path stays live so the headphone jack can monitor the
         // live record stream (digital sidetone from ADC1L/R).
-        self.write_reg(REG_PWR_MGMT_5, 0x0303)?;
+        // AUDIO-01-d H0: the AIF1DAC1L/R_ENA serializer-enable bits (b9/b8)
+        // are likewise deferred to Step 14b (same arm-phase rationale as the
+        // ADC side; ERRATA-009 is the DAC-side manifestation). 0x0003 keeps
+        // only DAC1L/R_ENA.
+        self.write_reg(REG_PWR_MGMT_5, 0x0003)?;
 
         // Step 8 — PM6 default (R6). Bits gate AIF2/AIF3, not AIF1 ADC.
         self.write_reg(REG_PWR_MGMT_6, 0x0000)?;
@@ -805,6 +818,38 @@ where
         // sample-rate converter and digital filters need a few SR
         // cycles to flush stale state. ~50 ms is the canonical Cube
         // BSP value; shorter waits cause first-frame glitches.
+        delay_busy(50_000);
+
+        // Step 14b — Arm the AIF1 serializers (AUDIO-01-d H0).
+        // Only now — FLL1 locked (Step 12), codec in slave LRCLK mode
+        // (R0x304/305), AIF1CLK enabled + settled (R0x200 above) — set the
+        // AIF1ADC1L/R_ENA (R4 b9/b8) and AIF1DAC1L/R_ENA (R5 b9/b8)
+        // serializer-enable bits. The 0→1 edge on these bits is the
+        // serializer-arm event; performing it against an already-running,
+        // phase-stable LRCLK1 frame is the H0 fix for the N≠0 arm-phase race
+        // (ERRATA-004 ADC / ERRATA-009 DAC). Read-modify-write preserves the
+        // analog ADCL/R + DAC1L/R enables set in Steps 6/7.
+        //
+        // BENCH-PENDING: this reorder is the lead AUDIO-01-d candidate but is
+        // NOT yet bench-validated. Validate via the disco-analyzer mailbox
+        // re-arm test (≥10 cold boots, both directions) before relying on it.
+        // See AGENT-TASK-WM8994-AIF1-SERIALIZER-ARM-PHASE-CALIBRATION.md §0.
+        let pm4 = self.read_reg(REG_PWR_MGMT_4)?;
+        self.write_reg(REG_PWR_MGMT_4, pm4 | (1 << 9) | (1 << 8))?;
+        let pm5 = self.read_reg(REG_PWR_MGMT_5)?;
+        self.write_reg(REG_PWR_MGMT_5, pm5 | (1 << 9) | (1 << 8))?;
+
+        // Step 14b settle — let the freshly-armed serializers lock to the
+        // LRCLK1 frame and the digital-core FIFO flush before the path is
+        // exercised. The arm 0→1 edge needs a few LRCLK frames (~20 µs each
+        // at 48 kHz) to settle; 50 ms is the conservative Cube-magnitude
+        // value and is bench-tunable. AUDIO-01-d H0 refinement 2026-05-29:
+        // added a *post*-arm settle (the prior 50 ms covers only the
+        // pre-arm AIF1CLK/ADC startup). WM8994_Rev4.6 exposes no ADC/DSP/
+        // filter-ready status bit to poll instead (memalpha 2026-05-29; only
+        // the Digital-Core-FIFO-Error rate-mismatch flag exists, p.158), so a
+        // timed settle is the only available gate. See
+        // AGENT-TASK-WM8994-AIF1-SERIALIZER-ARM-PHASE-CALIBRATION.md §0.
         delay_busy(50_000);
 
         // Step 15 — ADC volume + filters (R0x400, R0x401, R0x410).

@@ -24,7 +24,7 @@ use rlvgl_i18n::{Locale, set_locale, t};
 
 set_locale(Locale::En);
 
-let title = t!("demo.title", version = "0.2.0");
+let title = t!("demo.title", version = "0.1.9");
 let clicks = t!("demo.clicks", count = 42);
 ```
 

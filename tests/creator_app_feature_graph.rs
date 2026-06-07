@@ -49,11 +49,7 @@ fn parse_cargo_toml(text: &str) -> Table {
 /// `[features]` table. Missing key returns an empty set.
 fn feature_expansion(t: &Table, name: &str) -> Option<BTreeSet<String>> {
     let arr = t.get("features")?.as_table()?.get(name)?.as_array()?;
-    Some(
-        arr.iter()
-            .filter_map(|v| v.as_str().map(String::from))
-            .collect(),
-    )
+    Some(arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
 }
 
 /// Names of all keys under `[dependencies]` (or another dep section
@@ -305,7 +301,13 @@ fn app_05c_beetle_bsp_pac_dependencies_subset_of_reference() {
         cfg_extra.is_empty(),
         "emitted [target.cfg.dependencies] introduces deps not in reference: {cfg_extra:?}"
     );
-    for required in ["esp32c3", "esp-riscv-rt", "riscv-rt", "riscv", "panic-halt"] {
+    for required in [
+        "esp32c3",
+        "esp-riscv-rt",
+        "riscv-rt",
+        "riscv",
+        "panic-halt",
+    ] {
         assert!(
             emitted_cfg_deps.contains(required),
             "emitted [target.cfg.dependencies] missing `{required}` (set: {emitted_cfg_deps:?})"
@@ -325,14 +327,8 @@ fn app_05c_beetle_bsp_pac_no_template_tuning_todo() {
 
 // ─── APP-05d: STM32H747I-DISCO freertos feature graph ──────────────────
 
-const H747_FREERTOS_FEATURES: &[&str] = &[
-    "cm7",
-    "freertos",
-    "adapted_cmd",
-    "dma2d",
-    "splash",
-    "desktop",
-];
+const H747_FREERTOS_FEATURES: &[&str] =
+    &["cm7", "freertos", "adapted_cmd", "dma2d", "splash", "desktop"];
 
 fn assert_h747_freertos_features(emitted: &Table, reference: &Table) {
     for feat in H747_FREERTOS_FEATURES {
@@ -520,7 +516,9 @@ fn app_05e_h747_zephyr_emits_staticlib_lib_section() {
         .and_then(toml::Value::as_array)
         .expect("[lib].crate-type is an array");
     assert!(
-        crate_type.iter().any(|v| v.as_str() == Some("staticlib")),
+        crate_type
+            .iter()
+            .any(|v| v.as_str() == Some("staticlib")),
         "[lib].crate-type missing `staticlib` for zephyr prong: {crate_type:?}"
     );
 }
@@ -584,7 +582,10 @@ fn app_05f_every_round_trip_manifest_has_a_template() {
             continue;
         };
         for feat in &manifest.target.features {
-            let in_table = template.feature_expansions.iter().any(|(k, _)| k == feat)
+            let in_table = template
+                .feature_expansions
+                .iter()
+                .any(|(k, _)| k == feat)
                 || template.extra_features.iter().any(|(k, _)| k == feat);
             if !in_table {
                 failures.push(format!(

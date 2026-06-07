@@ -23,29 +23,37 @@ moves here.
 
 ## Open questions
 
-- **EOQ-002-ERRATA-008** — *(updated 2026-06-04)* After 10 more
-  bench iterations (BEETLE-03o → -03w), the master-FSM defect is
-  much more narrowly characterised but still 🔴 open. **Ruled out:**
-  pad-init ordering (matched IDF `s_hp_i2c_pins_config` exactly),
-  PSRAM/LDO/DSI bring-up sequencing, bus-timing margin (10 kHz scales
-  cleanly 10x and behaves identically), FIFO loading path (non-FIFO
-  TX RAM direct write produces same bus output), op-code mapping
-  (IDF v5.3 P4 `i2c_ll.h` confirms 6/1/3/2/4 — the ESP32-P4 PAC
-  docstring is wrong). **Confirmed working:** FSM receives
-  `trans_start` kick; master pulls SDA low (START), generates ~1.7
-  SCL transitions per cycle; Saleae I2C analyzer labels each
-  cycle as STOP (FSM aborts mid-byte; SDA-rising-while-SCL-high
-  reads as STOP). Deterministic abort at the same fractional
-  bit-position regardless of bus speed, panel state, or FIFO mode.
-  esp-hal reference comparison blocked upstream: only the
-  unreleased git-main branch has functional P4 i2c support, and
-  `esp_hal::init()` panics on that branch with an illegal-
-  instruction exception writing CSR 0x347. **Remaining hypothesis
-  space:** (a) missing master-init step that IDF does and we
-  don't — side-by-side `route_pins` vs IDF `i2c_hal_master_init`
-  diff is the next move; (b) ESP32-P4 v1.3 silicon errata not in
-  the public TRM; (c) peripheral-coupling register outside I2C0
-  we haven't touched.
+- **EOQ-002-ERRATA-008** — *(updated 2026-06-07)* After **eight
+  additional bench iterations** (BEETLE-03y → -03ag) doing the
+  line-by-line IDF `i2c_ll.h` + `i2c_master.c` parity walk, the
+  defect is now sharply characterised but still 🔴 open. **Newly
+  ruled out tonight:** FIFO vs non-FIFO mode (null), divider
+  denominator value (null), whole-register vs field-level timing
+  writes (PAC has single fields — semantically equivalent),
+  hardware bus-clear (`scl_sp_conf.scl_rst_slv_*`) both armed and
+  one-shot (no FSM advance), glitch filter (null), `time_out_en`
+  (null — internal timeout is NOT driving auto-retry), `clk_en`
+  (null — earlier "required" finding from BEETLE-03l was an
+  artifact of other broken init bits). **Defect signature
+  sharpened:** TRANS_START_INT latches, `scl_main_state_last` is
+  IDLE at hang capture, **DET_START never fires** (master does
+  NOT detect a real START on the bus), no TIMEOUT / SCL_*_TO /
+  NACK / ARBITRATION / END_DETECT / MST_COMPLETE ever latch.
+  Saleae shows continuous 174 µs train of decoder-labelled STOPs
+  with NO internal-timeout driver — the auto-retry is autonomous
+  hardware behaviour we have not identified. **IDF-parity
+  hypothesis space is now exhausted.** **Remaining hypothesis
+  space:** (a) `periph_module_enable(PERIPH_I2C0_MODULE)` in IDF's
+  `periph_ctrl.c` composite touches RCC/ICG bits the HAL layer
+  doesn't expose — we may be missing some part of the composite;
+  (b) ESP32-P4 v1.3 silicon errata not in the public TRM (chip is
+  preliminary-revision, multiple PAC-doc contradictions already
+  surfaced); (c) a single peripheral register outside I2C0 that
+  governs whether the FSM can advance from IDLE. **Next-session
+  plan:** trace `periph_module_enable` for `PERIPH_I2C0_MODULE` in
+  IDF source; retry esp-hal git main comparison; build a
+  strip-to-minimum binary that does only pad config +
+  `i2c_hal_master_init` + one trans_start.
   See [ERRATA-008](#errata-008--i2c0-master-mmio-stall-when-full-bring-up-runs-without-wdt-reset-masking).
 
 ## Index
@@ -1419,6 +1427,108 @@ Configuration verified correct:
 3. Lower priority: search ESP32-P4 v1.3 errata sheet (if public)
    for known I2C silicon issues. Memalpha pass.
 
+#### 2026-06-07 bench session (BEETLE-03y → BEETLE-03ag)
+
+Eight bench iterations, all line-by-line IDF parity work against
+`hal/esp32p4/include/hal/i2c_ll.h` (release/v5.3) +
+`esp_driver_i2c/i2c_master.c`. Every IDF-canonical config variable
+was tested; every test produced **identical** slot signature
+`030 000 068 030 000 000 000` plus the 174 µs continuous STOP
+train on Saleae. Negative results:
+
+| Iter   | Change                                                   | Slot 4 | Train | Verdict |
+|--------|----------------------------------------------------------|:------:|:-----:|---------|
+| 03y    | NONFIFO_EN=1 + TX-RAM direct write → FIFO mode + `data()` | 030    | yes   | null    |
+| 03z    | `denominator: 1→0` AND `scl_sp_conf.scl_rst_slv_en=1` armed | 022  | yes   | scl_sp_conf armed pushes FSM to start driving SDA low — only one variable that moved any observable. Denominator change null. |
+| 03aa   | Revert scl_sp_conf only (keep denom=0)                    | 030    | yes   | scl_sp_conf isolated as the active variable in 03z. Denom value is pure null. |
+| 03ab   | (build failed; PAC field names mismatch)                  | n/a    | n/a   | Field-level vs whole-register writes: PAC has single fields named `time`/`scl_low_period`, so `.write(.bits())` ≡ `.modify(.field().bits())`. Hypothesis discarded. |
+| 03ac   | scl_sp_conf one-shot with `bus_busy` poll (IDF pattern)    | 030    | yes   | `bus_busy` was never asserted (bus clean) → wait exited immediately → scl_rst_slv_en disabled before hardware could pulse. |
+| 03ad   | scl_sp_conf one-shot with fixed 1.5 ms delay              | 030    | yes   | Bus-reset hardware definitely ran for at least 7 SCL pulses before disable. No FSM behaviour change. Hardware bus-clear exonerated as a class. |
+| 03ae   | Glitch filter disabled (scl_filter_en = sda_filter_en = 0) | 030    | yes   | Filter exonerated. |
+| 03af   | `time_out_en` disabled                                    | 030    | yes   | Internal timeout not the auto-retry driver. |
+| 03ag   | `clk_en` cleared (revert to IDF default)                  | 030    | yes   | Earlier "clk_en=1 required" finding from BEETLE-03l was an artifact of other broken init bits. clk_en exonerated. |
+
+**Verified IDF-canonical state at session end** (`route_pins` matches
+IDF `i2c_hal_master_init` + `i2c_ll_master_set_bus_timing` +
+`i2c_ll_master_set_filter` + `i2c_ll_set_source_clk` line-by-line):
+
+- `ctr.ms_mode=1`, `sda/scl_force_out=0`, `arbitration_en=0`,
+  `rx_full_ack_level=0`, `tx/rx_lsb_first=0`, `clk_en=0`,
+  `slv_tx_auto_start_en=0`
+- TX FIFO via `data()` register (FIFO mode)
+- `peri_clk_ctrl10`: `i2c0_clk_src_sel=0` (XTAL),
+  `i2c0_clk_div_num=9` (10 kHz bus), `numerator=0`, `denominator=0`
+- `soc_clk_ctrl2.i2c0_apb_clk_en=1`
+- Glitch filter disabled (one BEETLE-03y/aa baseline divergence we
+  may want to revisit — IDF default is enabled)
+- `time_out_en=0` (one divergence — IDF leaves it enabled)
+- `scl_sp_conf` one-shot bus-clear at init with 1.5 ms wait
+
+**Defect signature is now sharp:**
+
+- TRANS_START_INT latches (FSM acknowledges the kick).
+- `scl_main_state_last` reads IDLE at hang capture.
+- **DET_START never fires** — the FSM does NOT detect a real START
+  condition on the bus. Whatever it's doing is not generating an
+  actual START transition.
+- No TIMEOUT, no SCL_ST_TO, no SCL_MAIN_ST_TO, no NACK, no
+  ARBITRATION_LOST, no END_DETECT, no MST_COMPLETE.
+- Yet Saleae shows a continuous 174 µs train decoded as
+  back-to-back STOPs.
+- `cmd_done` mask = 0 (no COMD slot ever completes).
+- SDA reads HIGH at hang capture. SCL reads HIGH at hang capture.
+
+The continuous train + IDLE capture is consistent with: FSM does
+SDA glitches the decoder reads as STOPs, never holds SDA low long
+enough to register as a real START transition, returns to IDLE in
+~174 µs, repeats indefinitely. No software timeout is driving the
+loop — the auto-retry is autonomous hardware behaviour that we have
+NOT identified.
+
+#### Net state after 2026-06-07
+
+The IDF-parity exhaustive search is complete. Every config variable
+in `i2c_hal_master_init`, `i2c_ll_master_set_bus_timing`,
+`i2c_ll_master_set_filter`, `i2c_ll_set_source_clk`,
+`i2c_ll_enable_bus_clock`, `i2c_ll_reset_register`,
+`i2c_ll_master_clr_bus`, `i2c_ll_master_fsm_rst`, and `i2c_ll_update`
+has been individually tested at the bench. **None** make the FSM
+emit a real START.
+
+The remaining hypothesis space is narrow:
+
+1. **A peripheral OUTSIDE the I2C0 register block governs whether
+   the FSM can advance.** Candidates: PMU bits beyond
+   `hp_active_icg_hp_func`, an HP_SYS_CLKRST gate we haven't
+   touched, a system-level interrupt-routing register, an EFUSE
+   silicon-strap bit.
+2. **`i2c_acquire_bus_handle` in IDF calls `periph_module_enable`**
+   which routes through `periph_ctrl` to set RCC + ICG bits in a
+   composite. The exact register sequence is not visible at the
+   HAL layer — we may be missing some part of the periph_ctrl
+   composite.
+3. **ESP32-P4 v1.3 silicon errata** not in public TRM. The chip
+   is preliminary-revision; multiple PAC-doc-contradictions have
+   already surfaced this session.
+
+#### Updated next-session plan
+
+1. **Trace `periph_module_enable` for `PERIPH_I2C0_MODULE`** in IDF
+   source. Walk every register write `periph_ctrl.c` does for the
+   I2C0 module — that's likely where a hidden init step lives.
+2. **Try esp-hal git main I2C as comparison** — the 2026-06-04
+   blocker was esp-hal's `init()` panic with illegal-instruction
+   CSR 0x347. Try a fresh esp-hal pin or work around the init
+   panic with `panic_handler` set up earlier. If esp-hal's I2C
+   works on the same board with same PCB, defect is in our PAC
+   init. If esp-hal also fails, the defect is silicon or board.
+3. **Strip-to-minimum test**: build a separate binary that does
+   ONLY pad config + `i2c_hal_master_init` + one trans_start. No
+   wake, no morse, no PSRAM/LDO/DSI. Confirm symptom on the
+   absolute minimum path.
+4. Memalpha targeted search: "ESP32-P4 v1.3 I2C errata", "DET_START
+   not firing", "trans_start no START condition".
+
 ### Tracking
 
 - Bench session 2026-06-01: 5 dispatch rounds confirming hang
@@ -1442,6 +1552,19 @@ Configuration verified correct:
   `89f19e5` (BEETLE-03t/u 10 kHz + op=0 experiment),
   `e1852d2` (BEETLE-03v non-FIFO), `7d55d8a` (BEETLE-03w op_codes
   verified per IDF).
+- Bench session 2026-06-07 (8 iterations, BEETLE-03y → -03ag):
+  Line-by-line IDF parity against `i2c_ll.h` + `i2c_master.c`
+  v5.3. Every config variable individually tested: NONFIFO mode,
+  denominator, scl_sp_conf bus-clear (armed + one-shot + delayed),
+  glitch filter, time_out_en, clk_en. All produced identical
+  slot signature (030 000 068 030 000 000 000) and same 174 µs
+  STOP train. **Defect signature sharpened**: TRANS_START int
+  latches but DET_START never fires — FSM does not emit a real
+  START condition. Auto-retry mechanism is autonomous hardware
+  behaviour we have not identified. IDF-parity hypothesis space
+  is now exhausted; next-session focus shifts to (a) tracing
+  `periph_module_enable` in IDF for hidden init steps,
+  (b) retrying esp-hal comparison, (c) strip-to-minimum test.
 - The 🟢 "ROOT CAUSE: SDA stuck low externally" finding from the
   2026-06-03 morning was **retracted** by 2026-06-03 evening
   diagnostics — the SDA-low at hang was an after-effect of a

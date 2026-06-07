@@ -43,9 +43,7 @@ impl Dma2dBlitter {
     /// The caller must ensure no other code holds the DMA2D peripheral.
     /// The DMA2D clock must already be enabled (RCC AHB3ENR bit 4).
     pub unsafe fn steal() -> Self {
-        // SAFETY: caller asserts no other code holds DMA2D and the
-        // DMA2D clock is enabled, per this function's contract above.
-        let p = unsafe { stm32h7::stm32h747cm7::Peripherals::steal() };
+        let p = stm32h7::stm32h747cm7::Peripherals::steal();
         Self::new(p.DMA2D)
     }
 

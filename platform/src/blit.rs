@@ -1065,22 +1065,50 @@ impl Renderer for RotatedRenderer<'_> {
         // pixels rect, we fall back to allocating one Vec for that
         // specific call — large icons are rare and the alloc still
         // makes progress.
-        //
-        // Backed by `hwcore::isr::ScratchCell` so the underlying storage
-        // is `UnsafeCell<[Color; N]>` rather than `static mut [Color; N]`
-        // — single-borrower contract is now documented at the type level.
-        use crate::hwcore::isr::ScratchCell;
         const SCRATCH_PIXELS: usize = 64 * 64;
-        static SCRATCH: ScratchCell<Color, SCRATCH_PIXELS> = ScratchCell::new(Color(0, 0, 0, 0));
+        // 2026-05-25 — Place SCRATCH in a named link section so consumers
+        // can map it to RAM that is NOT adjacent to MSP stack growth.
+        //
+        // Why this matters: on Cortex-M with cortex-m-rt's default link.x,
+        // MSP starts at `ORIGIN(RAM) + LENGTH(RAM)` and grows DOWN through
+        // `.bss`. This 16 KiB array (= `[Color; 64*64]` = 16384 bytes) in
+        // `.bss` ends up near MSP's growth path on boards with modest RAM.
+        // On STM32H747I-DISCO (DTCM = 128 KiB), the first render frame's
+        // call chain consumes ~14.5 KiB of MSP via the widget-tree walk,
+        // putting SP INSIDE this array. Inner-loop writes to `scratch[N]`
+        // for large enough N then overwrite the function's own stack
+        // frame — including the slice's fat pointer — leading to seemingly
+        // random hard faults at addresses that look unrelated to the bug.
+        //
+        // Consumers MUST add a SECTIONS block mapping `.rlvgl_blit_scratch`
+        // to a non-stack-adjacent RAM region in their linker script.
+        // Example for STM32H747 (place in D1 AXI SRAM):
+        //
+        //   SECTIONS {
+        //     .rlvgl_blit_scratch (NOLOAD) : ALIGN(4) {
+        //       *(.rlvgl_blit_scratch .rlvgl_blit_scratch.*)
+        //     } > D1_CM7
+        //   } INSERT AFTER .uninit;
+        //
+        // Diagnosed in disco-analyzer ERRATA-005 bench-45 (2026-05-25):
+        // SCRATCH lived at DTCM 0x2001_A459..0x2001_E459; SP at fault was
+        // 0x2001_C5F8 (= inside the array); the slice's fat pointer slot
+        // at sp+176 = scratch[2196] was overwritten by an icon pixel and
+        // the next iteration's load of scratch.data_ptr returned the
+        // trampled bytes (0xFFFFFF59) — a precise data-bus error in the
+        // PPB region followed. Per-iteration capture of scratch.as_ptr()
+        // confirmed the corruption point matched the icon pixel pattern
+        // byte-for-byte.
+        #[unsafe(link_section = ".rlvgl_blit_scratch")]
+        static mut SCRATCH: [Color; SCRATCH_PIXELS] = [Color(0, 0, 0, 0); SCRATCH_PIXELS];
 
         let len = (width * height) as usize;
         if len <= SCRATCH_PIXELS {
             // SAFETY: single-core, single-threaded — `draw_pixels` is
             // called only from the main render loop and not from any
             // ISR. The scratch buffer is unique to this call site and
-            // not borrowed across calls (the borrow returned here is
-            // released before `draw_pixels` returns).
-            let scratch = unsafe { SCRATCH.borrow_mut(len) };
+            // not borrowed across calls.
+            let scratch = unsafe { &mut SCRATCH[..len] };
             // Clear only the prefix we'll actually fill; pixels that
             // aren't written (the `pixels.get(src_idx)` None branch)
             // retain their prior value, but we touch every index in
@@ -1088,12 +1116,12 @@ impl Renderer for RotatedRenderer<'_> {
             for ly in 0..height as i32 {
                 for lx in 0..width as i32 {
                     let src_idx = (ly as u32 * width + lx as u32) as usize;
-                    let dst_idx = (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    let dst_idx =
+                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
                     scratch[dst_idx] = pixels.get(src_idx).copied().unwrap_or(Color(0, 0, 0, 0));
                 }
             }
-            self.inner
-                .draw_pixels((fb_x, fb_y), scratch, phys_w, phys_h);
+            self.inner.draw_pixels((fb_x, fb_y), scratch, phys_w, phys_h);
         } else {
             // Oversize fallback: allocate once for this call. Rare.
             let mut rotated: alloc::vec::Vec<Color> = alloc::vec::Vec::with_capacity(len);
@@ -1101,14 +1129,14 @@ impl Renderer for RotatedRenderer<'_> {
             for ly in 0..height as i32 {
                 for lx in 0..width as i32 {
                     let src_idx = (ly as u32 * width + lx as u32) as usize;
-                    let dst_idx = (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    let dst_idx =
+                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
                     if let Some(&c) = pixels.get(src_idx) {
                         rotated[dst_idx] = c;
                     }
                 }
             }
-            self.inner
-                .draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
+            self.inner.draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
         }
     }
 

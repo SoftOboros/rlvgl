@@ -153,13 +153,11 @@ struct EvtQueue {
     slots: [EventRaw; EVT_CAPACITY as usize],
 }
 
-fn cmd_queue() -> &'static mut CmdQueue {
-    // rlvgl-discipline: allow(static_mut)
+fn cmd_queue() -> &'static mut CmdQueue { // rlvgl-discipline: allow(static_mut)
     unsafe { &mut *(CMD_QUEUE_ADDR as *mut CmdQueue) }
 }
 
-fn evt_queue() -> &'static mut EvtQueue {
-    // rlvgl-discipline: allow(static_mut)
+fn evt_queue() -> &'static mut EvtQueue { // rlvgl-discipline: allow(static_mut)
     unsafe { &mut *(EVT_QUEUE_ADDR as *mut EvtQueue) }
 }
 

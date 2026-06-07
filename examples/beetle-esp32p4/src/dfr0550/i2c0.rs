@@ -419,16 +419,14 @@ pub unsafe fn route_pins() {
         // the FSM interprets some internal ACK state as NACK and
         // bails / drives SDA low. Keep clear_bit().
         w.rx_full_ack_level().clear_bit();
-        // BEETLE-03l iter 15: empirically `clk_en=1` is REQUIRED for the
-        // FSM to actually drive the bus. Doc claims this bit only gates
-        // the register-block clock ("Force clock on for registers") but
-        // bench evidence: with clk_en=0 (IDF default) the FSM goes
-        // silent — quaternary stays at 030 (SDA high, SCL high, no
-        // clocking). With clk_en=1, the FSM clocks SCL low briefly
-        // (quaternary 014 in round 12). So clk_en=1 also keeps an
-        // FSM-internal clock path alive that the doc doesn't mention.
-        // Diverges from IDF; intentional.
-        w.clk_en().set_bit();
+        // BEETLE-03ag: revert clk_en to IDF default 0. The earlier
+        // "clk_en=1 required" finding was from BEETLE-03l iter 15 when
+        // other init bits were still misconfigured (denominator=0/0
+        // div-by-zero, missing APB clock gate, etc.). Now that all
+        // other init is IDF-canonical, retest clk_en=0 (auto-gate)
+        // per IDF v5.3 `i2c_hal_master_init` — which doesn't touch
+        // this bit at all (leaves at reset default = 0).
+        w.clk_en().clear_bit();
         w.slv_tx_auto_start_en().clear_bit();
         w
     });
@@ -444,6 +442,11 @@ pub unsafe fn route_pins() {
     // For I2C_SCLK = 4 MHz, 10 kHz target:
     //   half_cycle    = 4_000_000 / 10_000 / 2 = 200  (same as 100 kHz @ 40 MHz)
     //   scl_wait_high = 98, scl_high = 102 (constraint 98 < 100 < 102 holds)
+    // Timing registers — single-field on P4 (the PAC exposes only
+    // `.time()` / `.scl_low_period()`), so `.write(.bits())` and
+    // `.modify(.field().bits())` are byte-equivalent. Keep .bits()
+    // form since the IDF field-name pattern doesn't map 1:1 to the
+    // PAC's chip-generic `time` naming.
     p.I2C0
         .scl_low_period()
         .write(|w| unsafe { w.bits(200 - 1) });
@@ -457,41 +460,49 @@ pub unsafe fn route_pins() {
     p.I2C0.sda_hold().write(|w| unsafe { w.bits(50 - 1) });
     p.I2C0.sda_sample().write(|w| unsafe { w.bits(100 - 1) });
 
-    p.I2C0
-        .scl_start_hold()
-        .write(|w| unsafe { w.bits(200 - 1) });
-    p.I2C0
-        .scl_rstart_setup()
-        .write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0.scl_start_hold().write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0.scl_rstart_setup().write(|w| unsafe { w.bits(200 - 1) });
     p.I2C0.scl_stop_hold().write(|w| unsafe { w.bits(200 - 1) });
-    p.I2C0
-        .scl_stop_setup()
-        .write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0.scl_stop_setup().write(|w| unsafe { w.bits(200 - 1) });
 
-    // BEETLE-03t: I2C_SCLK = 4 MHz (BEETLE-03t divider). time_out_value=16
-    // → 2^16 / 4 MHz ≈ 16 ms — plenty for a 1 ms byte at 10 kHz.
+    // BEETLE-03af: disable time_out_en to test whether the FSM uses
+    // internal timeout as auto-recovery trigger. The continuous 174 µs
+    // STOP train is consistent with: FSM kick → fail START → internal
+    // timeout fires → FSM auto-resets to IDLE → re-runs COMD list → loop.
+    // If timeout disabling stops the train (single attempt then quiescent
+    // IDLE), we know the FSM uses timeout as auto-recovery. If train
+    // continues unchanged, timeout isn't the driver and the auto-retry
+    // is from somewhere else (possibly SCL_*_TO state-machine timeouts
+    // which are separate from `to`).
     p.I2C0.to().modify(|_, w| unsafe {
         w.time_out_value().bits(16);
-        w.time_out_en().set_bit();
+        w.time_out_en().clear_bit();
         w
     });
 
-    // SDA/SCL glitch filter — IDF default is filter_thres=7 enabled.
+    // BEETLE-03ae: disable glitch filter to test whether filter saturation
+    // is corrupting the FSM's bus-level feedback path. With the filter at
+    // thres=7 the FSM may be seeing delayed/inconsistent SDA/SCL inputs
+    // during its own START sequence and auto-recovering (which would
+    // produce the observed 174 µs continuous retry train). Disabling the
+    // filter feeds the raw pad inputs to the FSM. If the train shape
+    // changes (period, density, or disappears), filter behavior was a
+    // contributing factor.
     p.I2C0.filter_cfg().modify(|_, w| unsafe {
-        w.scl_filter_thres().bits(7);
-        w.sda_filter_thres().bits(7);
-        w.scl_filter_en().set_bit();
-        w.sda_filter_en().set_bit();
+        w.scl_filter_thres().bits(0);
+        w.sda_filter_thres().bits(0);
+        w.scl_filter_en().clear_bit();
+        w.sda_filter_en().clear_bit();
         w
     });
 
     // Reset both FIFOs to a known-empty state.
-    p.I2C0
-        .fifo_conf()
-        .modify(|_, w| w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit());
-    p.I2C0
-        .fifo_conf()
-        .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
+    p.I2C0.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit()
+    });
+    p.I2C0.fifo_conf().modify(|_, w| {
+        w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit()
+    });
 
     // Enable ALL event interrupts. ERRATA-008 diagnostic round
     // 2026-06-02: previously we only set NACK|TIMEOUT|MST_COMPLETE|
@@ -502,28 +513,50 @@ pub unsafe fn route_pins() {
     // state-machine transition we can observe.
     p.I2C0.int_ena().write(|w| unsafe { w.bits(0x0001_FFFF) });
 
-    // BEETLE-03z: invoke the hardware bus-clear pulser per IDF
-    // `i2c_ll_master_clr_bus` in `hal/esp32p4/include/hal/i2c_ll.h`:
-    //   hw->scl_sp_conf.scl_rst_slv_num = N;
-    //   hw->scl_sp_conf.scl_rst_slv_en  = 1;
-    //   hw->ctr.conf_upgate             = 1;
-    // This is a hardware-implemented version of the I2C 9-SCL-pulse
-    // bus-recovery procedure (NXP UM10204 §3.1.16) — once enabled, the
-    // I2C0 peripheral emits N SCL pulses with SDA hi-Z before any
-    // subsequent transaction. Belt-and-suspenders with our
-    // `recover_bus` bit-bang earlier in route_pins: that ran BEFORE
-    // the peri reset re-attached I2C0 to the pads; this runs AFTER
-    // and inside the peripheral, so it covers any state the bridge
-    // entered during reset deassertion. The PAC exposes
-    // `scl_sp_conf.scl_rst_slv_num` (3 bits, 0-7 pulses) and
-    // `scl_sp_conf.scl_rst_slv_en` (W1S). The IDF default is 9 but
-    // the field is 3-bit on P4 — clamp to 7 which is still more than
-    // enough to release any mid-byte slave.
+    // BEETLE-03ac: IDF-canonical hardware bus-clear cycle.
+    // IDF's `i2c_ll_master_clr_bus` pattern is:
+    //   1. set scl_rst_slv_num = N, scl_rst_slv_en = 1
+    //   2. conf_upgate          (latch; hardware begins emitting N SCL pulses)
+    //   3. wait for bus_busy=0  (hardware finished)
+    //   4. set scl_rst_slv_en = 0
+    //   5. conf_upgate          (latch the disable)
+    //
+    // BEETLE-03aa proved that permanently-armed `scl_rst_slv_en=1`
+    // gets the FSM to START (slot 4 SDA went HIGH→LOW) but it never
+    // finishes — likely because the hardware bus-reset state machine
+    // is still running. This BEETLE-03ac pattern lets the bus-reset
+    // run once to completion, then disables it so subsequent
+    // transactions get a clean FSM.
     p.I2C0.scl_sp_conf().modify(|_, w| unsafe {
         w.scl_rst_slv_num().bits(7);
         w.scl_rst_slv_en().set_bit();
         w
     });
+    p.I2C0.ctr().modify(|_, w| w.conf_upgate().set_bit());
+    // BEETLE-03ad: fixed delay rather than bus_busy poll.
+    // BEETLE-03ac waited on `sr.bus_busy` to clear, but bus_busy is
+    // only asserted while the master sees external SCL activity — and
+    // our bus is electrically clean (bitbang ACK confirms slot 7 = 0).
+    // So bus_busy was never set, the wait loop exited immediately,
+    // and we disabled scl_rst_slv_en before the bus-reset hardware
+    // could actually emit any pulses. IDF uses
+    // `i2c_ll_master_is_bus_clear_done` instead of bus_busy, but that
+    // helper isn't exposed via the PAC. A fixed ~1.5 ms delay covers
+    // 7 SCL pulses at our 10 kHz bus (worst case 1.05 ms total)
+    // unconditionally — the bus-reset state machine WILL have run to
+    // completion before we disable it.
+    {
+        let mut n: u32 = 600_000; // ~1.5 ms at 400 MHz CPU with the
+                                  // volatile read keeping each
+                                  // iteration ~1 cycle
+        while n > 0 {
+            unsafe { core::arch::asm!("nop", options(nomem, nostack, preserves_flags)) };
+            n = unsafe { core::ptr::read_volatile(&n) }.wrapping_sub(1);
+        }
+    }
+    p.I2C0
+        .scl_sp_conf()
+        .modify(|_, w| w.scl_rst_slv_en().clear_bit());
 
     // Latch the master init writes with `conf_upgate`. Critically, do
     // NOT pulse `fsm_rst` here. On the ESP32-P4, `fsm_rst` and
@@ -818,7 +851,12 @@ pub enum I2cError {
 /// The LAST dip observed identifies the boundary just BEFORE the stall.
 /// I.e. if dips 1-4 fire and 5 does not, the stall is somewhere in the
 /// 8 COMD writes (most likely the first one).
-pub fn write_reg_instrumented(addr: u8, reg: u8, value: u8, dip: fn()) -> Result<(), I2cError> {
+pub fn write_reg_instrumented(
+    addr: u8,
+    reg: u8,
+    value: u8,
+    dip: fn(),
+) -> Result<(), I2cError> {
     let p = unsafe { pac::Peripherals::steal() };
 
     dip(); // 1 — entered
@@ -927,30 +965,14 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     let c5 = p.I2C0.comd5().read().bits();
     let c6 = p.I2C0.comd6().read().bits();
     let c7 = p.I2C0.comd7().read().bits();
-    if c0 & 0x8000_0000 != 0 {
-        mask |= 1 << 0;
-    }
-    if c1 & 0x8000_0000 != 0 {
-        mask |= 1 << 1;
-    }
-    if c2 & 0x8000_0000 != 0 {
-        mask |= 1 << 2;
-    }
-    if c3 & 0x8000_0000 != 0 {
-        mask |= 1 << 3;
-    }
-    if c4 & 0x8000_0000 != 0 {
-        mask |= 1 << 4;
-    }
-    if c5 & 0x8000_0000 != 0 {
-        mask |= 1 << 5;
-    }
-    if c6 & 0x8000_0000 != 0 {
-        mask |= 1 << 6;
-    }
-    if c7 & 0x8000_0000 != 0 {
-        mask |= 1 << 7;
-    }
+    if c0 & 0x8000_0000 != 0 { mask |= 1 << 0; }
+    if c1 & 0x8000_0000 != 0 { mask |= 1 << 1; }
+    if c2 & 0x8000_0000 != 0 { mask |= 1 << 2; }
+    if c3 & 0x8000_0000 != 0 { mask |= 1 << 3; }
+    if c4 & 0x8000_0000 != 0 { mask |= 1 << 4; }
+    if c5 & 0x8000_0000 != 0 { mask |= 1 << 5; }
+    if c6 & 0x8000_0000 != 0 { mask |= 1 << 6; }
+    if c7 & 0x8000_0000 != 0 { mask |= 1 << 7; }
     LAST_HANG_CMD_DONE.store(mask, Ordering::Relaxed);
 
     // Pack control/status flags. trans_start (bit 5) and conf_upgate
@@ -967,30 +989,14 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     let ctr_bits = p.I2C0.ctr().read().bits();
     let sr = p.I2C0.sr().read();
     let mut ctl: u8 = 0;
-    if ctr_bits & (1 << 5) != 0 {
-        ctl |= 1 << 0;
-    } // trans_start still latched
-    if sr.bus_busy().bit_is_set() {
-        ctl |= 1 << 1;
-    }
-    if int_raw & (1 << 9) != 0 {
-        ctl |= 1 << 2;
-    }
-    if int_raw & (1 << 3) != 0 {
-        ctl |= 1 << 3;
-    }
-    if ctr_bits & (1 << 11) != 0 {
-        ctl |= 1 << 4;
-    } // conf_upgate still latched
-    if sr.arb_lost().bit_is_set() {
-        ctl |= 1 << 5;
-    }
-    if ctr_bits & (1 << 4) != 0 {
-        ctl |= 1 << 6;
-    } // ms_mode readback
-    if sr.slave_rw().bit_is_set() {
-        ctl |= 1 << 7;
-    }
+    if ctr_bits & (1 << 5) != 0  { ctl |= 1 << 0; } // trans_start still latched
+    if sr.bus_busy().bit_is_set() { ctl |= 1 << 1; }
+    if int_raw & (1 << 9) != 0   { ctl |= 1 << 2; }
+    if int_raw & (1 << 3) != 0   { ctl |= 1 << 3; }
+    if ctr_bits & (1 << 11) != 0 { ctl |= 1 << 4; } // conf_upgate still latched
+    if sr.arb_lost().bit_is_set() { ctl |= 1 << 5; }
+    if ctr_bits & (1 << 4) != 0  { ctl |= 1 << 6; } // ms_mode readback
+    if sr.slave_rw().bit_is_set() { ctl |= 1 << 7; }
     LAST_HANG_CTL_SR.store(ctl, Ordering::Relaxed);
 
     // ERRATA-008 round 2026-06-03 iter 4: COMD0 op_code + bus pin levels.
@@ -1001,10 +1007,10 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     let sda_lvl = ((gpio_in >> SDA_GPIO) & 1) as u8;
     let scl_lvl = ((gpio_in >> SCL_GPIO) & 1) as u8;
     let mut snap: u8 = 0;
-    snap |= op0 & 0x07; // bits 0-2
-    snap |= sda_lvl << 3; // bit 3
-    snap |= scl_lvl << 4; // bit 4
-    snap |= (c0_done as u8) << 5; // bit 5
+    snap |= op0 & 0x07;           // bits 0-2
+    snap |= sda_lvl << 3;          // bit 3
+    snap |= scl_lvl << 4;          // bit 4
+    snap |= (c0_done as u8) << 5;  // bit 5
     LAST_HANG_COMD0_PINS.store(snap, Ordering::Relaxed);
 }
 
@@ -1064,9 +1070,9 @@ pub unsafe fn probe_init_state() -> u8 {
     if !ctr.ms_mode().bit_is_set() {
         return 22;
     }
-    // BEETLE-03l iter 15: route_pins re-enables clk_en (empirically
-    // required for FSM bus activity). Probe re-flipped to expect 1.
-    if !ctr.clk_en().bit_is_set() {
+    // BEETLE-03ag: clk_en intentionally cleared per IDF default —
+    // invert the check so probe returns 23 if clk_en is unexpectedly SET.
+    if ctr.clk_en().bit_is_set() {
         return 23;
     }
 
@@ -1077,8 +1083,10 @@ pub unsafe fn probe_init_state() -> u8 {
         return 24;
     }
 
+    // BEETLE-03ae: filter intentionally disabled — invert the check so
+    // probe returns 25 if filter is unexpectedly ENABLED.
     let fc = p.I2C0.filter_cfg().read();
-    if !fc.scl_filter_en().bit_is_set() {
+    if fc.scl_filter_en().bit_is_set() {
         return 25;
     }
 
@@ -1275,7 +1283,12 @@ pub unsafe fn bitbang_address_probe(addr: u8) -> u8 {
     result
 }
 
-fn bitbang_address_probe_inner(p: &pac::Peripherals, addr: u8, scl_mask: u32, sda_mask: u32) -> u8 {
+fn bitbang_address_probe_inner(
+    p: &pac::Peripherals,
+    addr: u8,
+    scl_mask: u32,
+    sda_mask: u32,
+) -> u8 {
     // START: SDA H→L while SCL high.
     p.GPIO.out_w1tc().write(|w| unsafe { w.bits(sda_mask) });
     bitbang_quarter();

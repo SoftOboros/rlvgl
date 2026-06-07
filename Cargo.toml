@@ -110,8 +110,8 @@ name = "creator_qt_emit_mousearea_compile"
 path = "tests/creator_qt_emit_mousearea_compile.rs"
 required-features = ["creator"]
 
-# QT-05b: stopwatch dispatch-glue compile-as-mod gate. The test aliases
-# its fixture module as `stopwatch_gen` to preserve the emitted import path.
+# QT-05b: stopwatch dispatch-glue compile-as-mod gate. Depends on the
+# `stopwatch_gen` dev-dep (mock istate-codegen output) per QT-05b §8.
 [[test]]
 name = "creator_qt_emit_stopwatch_compile"
 path = "tests/creator_qt_emit_stopwatch_compile.rs"
@@ -337,6 +337,11 @@ syn = { version = "2", features = ["full"] }
 # APP-05 parity tests: parse emitted + reference Cargo.toml as real TOML
 # so multi-line `[features]` lists round-trip cleanly.
 toml = "0.8"
+# QT-05b test fixture: hand-vendored mock istate-codegen output that
+# satisfies the QT-05 §6 6-symbol linkage surface. Used only by
+# `tests/creator_qt_emit_stopwatch_compile.rs` to compile-check the
+# emitted dispatch glue without the live softoboros MCP.
+stopwatch_gen = { path = "tests/fixtures/qt/stopwatch_gen" }
 
 [features]
 default = []
