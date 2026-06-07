@@ -107,10 +107,7 @@ const RULES: &[Rule] = &[
                 || line.contains("clean_invalidate_dcache_by_address")
                 || line.contains("clean_invalidate_dcache_by_slice")
         },
-        whitelist: &[
-            "platform/src/hwcore/dca.rs",
-            "platform/src/hwcore/regs/",
-        ],
+        whitelist: &["platform/src/hwcore/dca.rs", "platform/src/hwcore/regs/"],
     },
 ];
 
@@ -230,6 +227,16 @@ const BASELINE: &[(&str, &str)] = &[
     //  - disco-sim crawl_buffers.rs uses `&'static mut [u8]` slice
     //    return types (false-positive of the regex).
     //
+    // Errata (2026-05-18, post-Step-7b regression — RESOLVED 2026-05-18):
+    //  - blit.rs:1069 `static mut SCRATCH: [Color; 64*64]` from 5edc097
+    //    (2026-05-17, wing-open lockup fix) migrated to a typed
+    //    `static SCRATCH: ScratchCell<Color, 64*64>` backed by
+    //    `UnsafeCell` in `hwcore/isr.rs`. The single-borrower contract
+    //    is now expressed at the type level via `ScratchCell::borrow_mut`
+    //    (`unsafe fn` with documented SAFETY preconditions); the
+    //    underlying storage is no longer `static mut`, so the discipline
+    //    scanner reports no violation. No BASELINE entry required.
+    //
     // ── raw_dcache (DCB-00 §9 INV-D8) ──────────────────────────────
     //
     // **All entries cleared as of DCB-04 (2026-05-02).** The DCB
@@ -293,12 +300,12 @@ fn discipline() {
             continue;
         };
         let stripped = strip_comments(&text);
-        for (lineno, raw_line, code_line) in text
-            .lines()
-            .zip(stripped.lines())
-            .enumerate()
-            .map(|(i, (raw, code))| (i + 1, raw, code))
-        {
+        let raw_lines: Vec<&str> = text.lines().collect();
+        let code_lines: Vec<&str> = stripped.lines().collect();
+        for idx in 0..raw_lines.len() {
+            let lineno = idx + 1;
+            let raw_line = raw_lines[idx];
+            let code_line = code_lines.get(idx).copied().unwrap_or("");
             for rule in RULES {
                 if rule.whitelist.iter().any(|p| rel.starts_with(p)) {
                     continue;
@@ -306,7 +313,19 @@ fn discipline() {
                 if !(rule.matcher)(code_line) {
                     continue;
                 }
-                if has_allow_marker(raw_line, rule.id) {
+                // Allow marker on the same line OR on an adjacent line
+                // (handles rustfmt wrapping multi-line `static mut FOO: T =`
+                // declarations where the marker ends up on the line above
+                // or below the keyword pair).
+                if has_allow_marker(raw_line, rule.id)
+                    || idx
+                        .checked_sub(1)
+                        .and_then(|i| raw_lines.get(i))
+                        .is_some_and(|prev| has_allow_marker(prev, rule.id))
+                    || raw_lines
+                        .get(idx + 1)
+                        .is_some_and(|next| has_allow_marker(next, rule.id))
+                {
                     continue;
                 }
                 found.insert((

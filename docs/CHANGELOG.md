@@ -82,7 +82,7 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 ### Infrastructure
 - All 31 workspace crates at version 0.2.0.
-- Publish script with 24-crate dependency-ordered publish and crates.io
+- Publish script with 25-crate dependency-ordered publish and crates.io
   index-wait between dependents.
 - Pre-publish validation: 7 phases (fmt, clippy, tests, playit, creator,
   embedded build, docs).

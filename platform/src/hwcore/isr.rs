@@ -6,10 +6,11 @@
 //! USART1 RX ring) so the discipline scanner can keep `static mut` and
 //! `compiler_fence(` out of application code.
 //!
-//! All three types — [`IsrChannel<T, N>`], [`IsrFlag`], [`IsrCounter`]
-//! — are `Sync` and constructible in `static` context. They do **not**
-//! enforce the single-producer-single-consumer (SPSC) contract at the
-//! type level; callers must respect:
+//! The four types — [`IsrChannel<T, N>`], [`IsrFlag`], [`IsrCounter`],
+//! [`ScratchCell<T, N>`] — are `Sync` and constructible in `static`
+//! context. They do **not** enforce their respective single-borrower /
+//! single-producer-single-consumer (SPSC) contracts at the type level;
+//! callers must respect:
 //!
 //! - **`IsrChannel`**: one writer (typically one ISR) and one reader
 //!   (typically the main loop). Multiple writers or multiple readers
@@ -17,11 +18,15 @@
 //! - **`IsrFlag`** / **`IsrCounter`**: any number of writers/readers
 //!   are safe (atomic), but the high-level semantics typically pair an
 //!   ISR setter with a main-loop consumer.
+//! - **`ScratchCell`**: exactly one borrow live at a time, on a single
+//!   execution context (typically the main render loop, never an ISR).
+//!   It is the typed replacement for function-local `static mut SCRATCH`
+//!   buffers used to dodge alloc traffic in hot paths.
 //!
-//! The push/pop methods on [`IsrChannel`] are `unsafe` to make this
-//! contract visible at the call site. `IsrFlag` and `IsrCounter` are
-//! safe because their atomic operations are well-defined under
-//! contention.
+//! The push/pop methods on [`IsrChannel`] and the `borrow_mut` method on
+//! [`ScratchCell`] are `unsafe` to make these contracts visible at the
+//! call site. `IsrFlag` and `IsrCounter` are safe because their atomic
+//! operations are well-defined under contention.
 
 use core::cell::UnsafeCell;
 use core::mem::MaybeUninit;
@@ -256,6 +261,80 @@ impl Default for IsrCounter {
     }
 }
 
+// ── ScratchCell ─────────────────────────────────────────────────────────
+
+/// Const-constructible single-borrower scratch buffer.
+///
+/// Replaces the function-local `static mut SCRATCH: [T; N]` pattern used
+/// to keep hot-path rotation / blit / compose helpers from allocating a
+/// fresh `Vec` per call. Backed by an `UnsafeCell` rather than `static
+/// mut`, so the resulting `static SCRATCH: ScratchCell<...>` does not
+/// trip the discipline scanner.
+///
+/// The cell carries no runtime borrow tracking — `borrow_mut` is
+/// `unsafe`, and the caller MUST guarantee that no other borrow into
+/// the same instance is live (no re-entrance, no concurrent ISR access).
+/// Typical use is a function-local `static` accessed only from the main
+/// render loop.
+pub struct ScratchCell<T: Copy, const N: usize> {
+    storage: UnsafeCell<[T; N]>,
+}
+
+// SAFETY: contract per the module docs — exactly one borrow live at a
+// time on a single execution context. Within that constraint there are
+// no concurrent accesses to the underlying storage. `T: Send` is
+// required because the returned `&mut [T]` may move values that started
+// life in a different thread of execution at construction time.
+unsafe impl<T: Copy + Send, const N: usize> Sync for ScratchCell<T, N> {}
+
+impl<T: Copy, const N: usize> ScratchCell<T, N> {
+    /// Construct a scratch cell with every slot initialised to `init`.
+    /// Usable in `static` context.
+    pub const fn new(init: T) -> Self {
+        Self {
+            storage: UnsafeCell::new([init; N]),
+        }
+    }
+
+    /// Total slot count.
+    #[inline]
+    pub const fn capacity(&self) -> usize {
+        N
+    }
+
+    /// Borrow the scratch as a mutable slice of `len` elements.
+    ///
+    /// # Safety
+    ///
+    /// The caller MUST guarantee that no other `&mut [T]` returned by a
+    /// prior call to `borrow_mut` on the same cell is still live, and
+    /// that no concurrent context (other thread, ISR) accesses the
+    /// cell's storage during the returned borrow.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `len > N`.
+    //
+    // `clippy::mut_from_ref` triggers because we hand out `&mut [T]`
+    // through `&self`; that's the whole point of the type (interior
+    // mutability for static scratch). The single-borrower contract is
+    // documented above and enforced by the caller via `unsafe`.
+    #[allow(clippy::mut_from_ref)]
+    #[inline]
+    pub unsafe fn borrow_mut(&self, len: usize) -> &mut [T] {
+        assert!(
+            len <= N,
+            "ScratchCell::borrow_mut: requested len {len} exceeds capacity {N}",
+        );
+        // SAFETY: caller upholds the single-borrower contract per the
+        // method's safety docs. `len <= N` per the assert above.
+        unsafe {
+            let ptr = self.storage.get() as *mut T;
+            core::slice::from_raw_parts_mut(ptr, len)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,5 +418,44 @@ mod tests {
         c.add(7);
         assert_eq!(c.store(100), 7);
         assert_eq!(c.read(), 100);
+    }
+
+    #[test]
+    fn scratch_cell_borrow_initialised_to_seed() {
+        let s: ScratchCell<u8, 8> = ScratchCell::new(0xAA);
+        assert_eq!(s.capacity(), 8);
+        // SAFETY: single-threaded test, no concurrent borrow.
+        let slice = unsafe { s.borrow_mut(8) };
+        assert_eq!(slice, &[0xAA; 8]);
+    }
+
+    #[test]
+    fn scratch_cell_borrow_persists_writes_across_calls() {
+        let s: ScratchCell<u32, 4> = ScratchCell::new(0);
+        // SAFETY: borrows are taken sequentially, not concurrently.
+        unsafe {
+            let first = s.borrow_mut(4);
+            first[0] = 0x1111;
+            first[3] = 0x4444;
+        }
+        // SAFETY: prior borrow has been dropped.
+        let second = unsafe { s.borrow_mut(4) };
+        assert_eq!(second, &[0x1111, 0, 0, 0x4444]);
+    }
+
+    #[test]
+    fn scratch_cell_partial_borrow_returns_prefix() {
+        let s: ScratchCell<u8, 16> = ScratchCell::new(0);
+        // SAFETY: single-threaded test.
+        let slice = unsafe { s.borrow_mut(5) };
+        assert_eq!(slice.len(), 5);
+    }
+
+    #[test]
+    #[should_panic(expected = "exceeds capacity")]
+    fn scratch_cell_panics_when_len_exceeds_capacity() {
+        let s: ScratchCell<u8, 4> = ScratchCell::new(0);
+        // SAFETY: about to panic before any UB.
+        let _ = unsafe { s.borrow_mut(5) };
     }
 }

@@ -182,6 +182,7 @@ ordered_crates=(
   disco-assets
   rlvgl-api
   rlvgl-core
+  rlvgl-audio-meters-core
   rlvgl-decomp
   rlvgl-i18n
   rlvgl-playit
@@ -212,6 +213,9 @@ if path_changed '^api/'; then
 fi
 if path_changed '^core/'; then
   append_unique "rlvgl-core"
+fi
+if path_changed '^audio-meters-core/'; then
+  append_unique "rlvgl-audio-meters-core"
 fi
 if path_changed '^rlvgl-decomp/'; then
   append_unique "rlvgl-decomp"

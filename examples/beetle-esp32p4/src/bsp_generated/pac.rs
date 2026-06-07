@@ -18,8 +18,6 @@
 #[allow(unused_imports)]
 pub use esp32p4::*;
 
-
-
 /// Bring up the board.
 ///
 /// Safety: must be called exactly once from a single-threaded reset handler

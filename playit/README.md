@@ -35,7 +35,7 @@ Add the dependency:
 
 ```toml
 [dependencies]
-rlvgl-playit = "0.1"
+rlvgl-playit = "0.2.0"
 ```
 
 ### Embedded (serial transport)

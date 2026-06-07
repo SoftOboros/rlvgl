@@ -90,8 +90,8 @@ mod tests {
 
     #[test]
     fn board_info_lookup_uses_yaml_name_field() {
-        let info = find("Adafruit Feather M4 Express")
-            .expect("Adafruit Feather M4 Express board info");
+        let info =
+            find("Adafruit Feather M4 Express").expect("Adafruit Feather M4 Express board info");
         assert_eq!(info.board, "Adafruit Feather M4 Express");
         assert_eq!(info.chip, "ATSAMD51J19A");
     }

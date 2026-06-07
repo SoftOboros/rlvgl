@@ -239,9 +239,10 @@ pub(crate) fn render_from_ir(
             let mut mods = Vec::new();
             for (name, per) in &ir.peripherals {
                 if let Some(sel) = core_filter
-                    && per.core.map(|c| c != sel).unwrap_or(false) {
-                        continue;
-                    }
+                    && per.core.map(|c| c != sel).unwrap_or(false)
+                {
+                    continue;
+                }
                 let pins: Vec<_> = ir
                     .pinctrl
                     .iter()
@@ -323,9 +324,10 @@ impl crate::bsp::af::AfProvider for McuAf {
             .get(pin)
             .and_then(|m| m.get(normalized).copied())
             .or_else(|| self.pins.get(pin).and_then(|m| m.get(func).copied()))
-            && v != 0 {
-                return Some(v);
-            }
+            && v != 0
+        {
+            return Some(v);
+        }
         // Minimal fallbacks for STM32H747I-DISCO bring-up
         match (pin, func) {
             // I2C4 on PD12/PD13 uses AF4
