@@ -18,19 +18,22 @@
  * inside esp-riscv-rt's pre-default trap handler. */
 PROVIDE(_dram_data_start = ORIGIN(REGION_DATA));
 
-/* Place esp_app_desc_t at the very start of the cache-mapped flash
- * window (0x40000000). memory.x carves off a dedicated FLASH_APP_DESC
- * region so this section sits before .text without colliding with
- * riscv-rt's _stext placement. The bootloader scans for magic
- * 0xABCD5432 here and refuses to start the app if it's absent. */
+/* Place esp_app_desc_t adjacent to .rodata so both end up in the same
+ * r-- LOAD program header. This produces ONE DROM segment in the
+ * IDF image format (.app_desc + .rodata combined), matching the
+ * canonical IDF layout (compare esp-idf/components/esp_system/ld/
+ * esp32p4/sections.ld.in `.flash.appdesc` placement next to
+ * `.flash.rodata` in `rodata_seg_low`). The bootloader scans the
+ * first DROM segment for magic 0xABCD5432 and refuses to start the
+ * app if it's absent. See ERRATA-004 for the layout history. */
 SECTIONS
 {
-    .app_desc :
+    .app_desc : ALIGN(0x10)
     {
         KEEP(*(.app_desc))
-        . = ALIGN(256);
-    } > FLASH_APP_DESC
-} INSERT BEFORE .text;
+        . = ALIGN(0x10);
+    } > FLASH_DROM
+} INSERT BEFORE .rodata;
 
 /* riscv-rt's link.x doesn't discard .eh_frame; it lands at the same
  * default LMA as .text and collides. Drop it — bare-metal builds don't
