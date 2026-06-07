@@ -33,6 +33,7 @@ this family by initial ratification 2026-05-19.
 | Ch | Path | Status | Covers |
 |---|---|---|---|
 | 01 | [`01-codec-bringup.md`](01-codec-bringup.md) | Ratified 2026-05-19 | WM8994 init_record path. FLL1 lock invariant + serializer arm ordering. |
+| Errata | [`ERRATA.md`](ERRATA.md) | Active | Permanent log of WM8994 / audio-path issues that outlive temporary task notes. |
 
 (More chapters land as new audio-subsystem work surfaces invariants
 that deserve a frozen home — e.g. SAI bring-up, DMA double-buffer

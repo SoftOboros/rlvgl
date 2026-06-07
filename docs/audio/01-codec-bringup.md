@@ -127,7 +127,7 @@ For each named concept, exactly one owner:
 
 | Concept | Owner | Reason |
 |---|---|---|
-| WM8994 register addresses + bit positions | `platform/src/wm8994.rs` constants | per `AGENT-TASK-WM8994-REGISTER-MAP-FIX.md` outcome 2026-04-30 |
+| WM8994 register addresses + bit positions | `platform/src/wm8994.rs` constants | per [`ERRATA.md`](ERRATA.md) AUDIO-ERRATA-001 outcome 2026-04-30 |
 | WM8994 register *semantics* (what each bit means, default value, polarity) | `WM8994_Rev4.6.pdf` via memalpha | datasheet is canonical |
 | WM8994 init_record sequence body | `platform/src/wm8994.rs::init_record` | code is canonical |
 | FLL1 lock-status detection | This chapter §9 INV-AUDIO-01-1 | new invariant; no prior owner |
@@ -240,8 +240,8 @@ surfaces what was previously a latent bug class.
 This chapter does not modify:
 
 - The bit-position assignments in `platform/src/wm8994.rs` constants
-  (those are owned by `AGENT-TASK-WM8994-REGISTER-MAP-FIX.md`'s
-  outcome).
+  (those are owned by [`ERRATA.md`](ERRATA.md) AUDIO-ERRATA-001 and
+  mirrored in code).
 - The SAI1 / DMA1 bring-up in `platform/src/sai.rs` /
   `platform/src/dma_sai.rs` (those are owned by future chapters in
   this family).
@@ -270,7 +270,7 @@ list).
   That's a separate invariant (Block B's slot framing must match
   Block A's master clock generation) that deserves its own chapter.
 - This chapter does NOT cover the chronic AIF1ADCDAT-silent issue
-  documented in `AGENT-TASK-WM8994-REGISTER-MAP-FIX.md` — that was
+  tracked in [`ERRATA.md`](ERRATA.md) AUDIO-ERRATA-001 — that was
   resolved by adding R0x304/R0x305 bit 11 (LRCLK_DIR slave-mode
   enable) and is now in the `init_record` body unconditionally
   (`platform/src/wm8994.rs:642–644`). This chapter assumes that
@@ -298,8 +298,8 @@ Optional (RECOMMENDED but not required for conformance):
 
 - `platform/src/wm8994.rs` (lines per §2 and §10)
 - `WM8994_Rev4.6.pdf` (pages per §3 and §9)
-- `AGENT-TASK-WM8994-REGISTER-MAP-FIX.md` (referenced in §10 and §11)
-- `AGENT-TASK-WM8994-FLL1-LOCK-VARIABILITY.md` (implementation tracker for AUDIO-01a, top level)
+- [`ERRATA.md`](ERRATA.md) AUDIO-ERRATA-001 (register-map corrections)
+- [`ERRATA.md`](ERRATA.md) AUDIO-ERRATA-002 (FLL1 lock variability and LRCLK rate fix)
 - Downstream consumer: `softoboros.com:streamz/submodules/disco-analyzer/docs/AUDIO-DATA-PATH-RECON.md`
   (the full-pipeline recon doc; not a normative authority for this chapter, cited for context).
 
@@ -326,8 +326,8 @@ commit) lands:
   bit-split symptom variant and unified it with the prior
   `0x0000/0x8000` bimodal under one root-cause arc. Frozen
   invariants INV-AUDIO-01-1, INV-AUDIO-01-2, INV-AUDIO-01-3 and the
-  `FllLockOutcome` enum. Implementation tracker:
-  `AGENT-TASK-WM8994-FLL1-LOCK-VARIABILITY.md` (top level).
+  `FllLockOutcome` enum. Durable errata entry:
+  [`ERRATA.md`](ERRATA.md) AUDIO-ERRATA-002.
 - **2026-05-19-c — AIF1ADC_RATE / AIF1DAC_RATE field corrected from
   64 to 32 in `init_record` (R0x304 / R0x305 low 11 bits).** The
   driver previously hardcoded `AIF1_LRCLK_SLAVE_ENA = 0x0840` (LRCLK_DIR
