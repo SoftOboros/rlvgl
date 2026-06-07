@@ -3,6 +3,8 @@
 //! Each pad register at CTRLMOD + 0x800..0xA34 controls one pin's mux mode,
 //! pull-up/down, input enable, and slew rate.
 
+#![allow(dead_code)]
+
 use super::am335x::*;
 
 /// Configure all 24 LCD data pins + 4 control signals for Mode 0 (LCD function).

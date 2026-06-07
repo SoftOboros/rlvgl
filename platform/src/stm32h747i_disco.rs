@@ -1674,7 +1674,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             // semantics as the previous two raw casts; the typed
             // path satisfies INV-DPR-3 (no app-level raw register
             // pointers outside the perimeter).
-            self.scheduler.swap(crate::hwcore::addr::PhysAddr::new(next));
+            self.scheduler
+                .swap(crate::hwcore::addr::PhysAddr::new(next));
             core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
             cortex_m::asm::dsb();
         });
@@ -1703,7 +1704,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // Cortex-M7 strongly-ordered MMIO region makes intervening
         // DSB unnecessary for write→write ordering to the same
         // peripheral.
-        self.scheduler.present(crate::hwcore::addr::PhysAddr::new(next));
+        self.scheduler
+            .present(crate::hwcore::addr::PhysAddr::new(next));
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
         // The real ERIF fires ~14ms later when the scan completes.
     }

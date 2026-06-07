@@ -457,10 +457,16 @@ pub unsafe fn route_pins() {
     p.I2C0.sda_hold().write(|w| unsafe { w.bits(50 - 1) });
     p.I2C0.sda_sample().write(|w| unsafe { w.bits(100 - 1) });
 
-    p.I2C0.scl_start_hold().write(|w| unsafe { w.bits(200 - 1) });
-    p.I2C0.scl_rstart_setup().write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0
+        .scl_start_hold()
+        .write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0
+        .scl_rstart_setup()
+        .write(|w| unsafe { w.bits(200 - 1) });
     p.I2C0.scl_stop_hold().write(|w| unsafe { w.bits(200 - 1) });
-    p.I2C0.scl_stop_setup().write(|w| unsafe { w.bits(200 - 1) });
+    p.I2C0
+        .scl_stop_setup()
+        .write(|w| unsafe { w.bits(200 - 1) });
 
     // BEETLE-03t: I2C_SCLK = 4 MHz (BEETLE-03t divider). time_out_value=16
     // → 2^16 / 4 MHz ≈ 16 ms — plenty for a 1 ms byte at 10 kHz.
@@ -480,12 +486,12 @@ pub unsafe fn route_pins() {
     });
 
     // Reset both FIFOs to a known-empty state.
-    p.I2C0.fifo_conf().modify(|_, w| {
-        w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit()
-    });
-    p.I2C0.fifo_conf().modify(|_, w| {
-        w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit()
-    });
+    p.I2C0
+        .fifo_conf()
+        .modify(|_, w| w.tx_fifo_rst().set_bit().rx_fifo_rst().set_bit());
+    p.I2C0
+        .fifo_conf()
+        .modify(|_, w| w.tx_fifo_rst().clear_bit().rx_fifo_rst().clear_bit());
 
     // Enable ALL event interrupts. ERRATA-008 diagnostic round
     // 2026-06-02: previously we only set NACK|TIMEOUT|MST_COMPLETE|
@@ -812,12 +818,7 @@ pub enum I2cError {
 /// The LAST dip observed identifies the boundary just BEFORE the stall.
 /// I.e. if dips 1-4 fire and 5 does not, the stall is somewhere in the
 /// 8 COMD writes (most likely the first one).
-pub fn write_reg_instrumented(
-    addr: u8,
-    reg: u8,
-    value: u8,
-    dip: fn(),
-) -> Result<(), I2cError> {
+pub fn write_reg_instrumented(addr: u8, reg: u8, value: u8, dip: fn()) -> Result<(), I2cError> {
     let p = unsafe { pac::Peripherals::steal() };
 
     dip(); // 1 — entered
@@ -926,14 +927,30 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     let c5 = p.I2C0.comd5().read().bits();
     let c6 = p.I2C0.comd6().read().bits();
     let c7 = p.I2C0.comd7().read().bits();
-    if c0 & 0x8000_0000 != 0 { mask |= 1 << 0; }
-    if c1 & 0x8000_0000 != 0 { mask |= 1 << 1; }
-    if c2 & 0x8000_0000 != 0 { mask |= 1 << 2; }
-    if c3 & 0x8000_0000 != 0 { mask |= 1 << 3; }
-    if c4 & 0x8000_0000 != 0 { mask |= 1 << 4; }
-    if c5 & 0x8000_0000 != 0 { mask |= 1 << 5; }
-    if c6 & 0x8000_0000 != 0 { mask |= 1 << 6; }
-    if c7 & 0x8000_0000 != 0 { mask |= 1 << 7; }
+    if c0 & 0x8000_0000 != 0 {
+        mask |= 1 << 0;
+    }
+    if c1 & 0x8000_0000 != 0 {
+        mask |= 1 << 1;
+    }
+    if c2 & 0x8000_0000 != 0 {
+        mask |= 1 << 2;
+    }
+    if c3 & 0x8000_0000 != 0 {
+        mask |= 1 << 3;
+    }
+    if c4 & 0x8000_0000 != 0 {
+        mask |= 1 << 4;
+    }
+    if c5 & 0x8000_0000 != 0 {
+        mask |= 1 << 5;
+    }
+    if c6 & 0x8000_0000 != 0 {
+        mask |= 1 << 6;
+    }
+    if c7 & 0x8000_0000 != 0 {
+        mask |= 1 << 7;
+    }
     LAST_HANG_CMD_DONE.store(mask, Ordering::Relaxed);
 
     // Pack control/status flags. trans_start (bit 5) and conf_upgate
@@ -950,14 +967,30 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     let ctr_bits = p.I2C0.ctr().read().bits();
     let sr = p.I2C0.sr().read();
     let mut ctl: u8 = 0;
-    if ctr_bits & (1 << 5) != 0  { ctl |= 1 << 0; } // trans_start still latched
-    if sr.bus_busy().bit_is_set() { ctl |= 1 << 1; }
-    if int_raw & (1 << 9) != 0   { ctl |= 1 << 2; }
-    if int_raw & (1 << 3) != 0   { ctl |= 1 << 3; }
-    if ctr_bits & (1 << 11) != 0 { ctl |= 1 << 4; } // conf_upgate still latched
-    if sr.arb_lost().bit_is_set() { ctl |= 1 << 5; }
-    if ctr_bits & (1 << 4) != 0  { ctl |= 1 << 6; } // ms_mode readback
-    if sr.slave_rw().bit_is_set() { ctl |= 1 << 7; }
+    if ctr_bits & (1 << 5) != 0 {
+        ctl |= 1 << 0;
+    } // trans_start still latched
+    if sr.bus_busy().bit_is_set() {
+        ctl |= 1 << 1;
+    }
+    if int_raw & (1 << 9) != 0 {
+        ctl |= 1 << 2;
+    }
+    if int_raw & (1 << 3) != 0 {
+        ctl |= 1 << 3;
+    }
+    if ctr_bits & (1 << 11) != 0 {
+        ctl |= 1 << 4;
+    } // conf_upgate still latched
+    if sr.arb_lost().bit_is_set() {
+        ctl |= 1 << 5;
+    }
+    if ctr_bits & (1 << 4) != 0 {
+        ctl |= 1 << 6;
+    } // ms_mode readback
+    if sr.slave_rw().bit_is_set() {
+        ctl |= 1 << 7;
+    }
     LAST_HANG_CTL_SR.store(ctl, Ordering::Relaxed);
 
     // ERRATA-008 round 2026-06-03 iter 4: COMD0 op_code + bus pin levels.
@@ -968,10 +1001,10 @@ fn capture_hang(p: &pac::Peripherals, int_raw: u32) {
     let sda_lvl = ((gpio_in >> SDA_GPIO) & 1) as u8;
     let scl_lvl = ((gpio_in >> SCL_GPIO) & 1) as u8;
     let mut snap: u8 = 0;
-    snap |= op0 & 0x07;           // bits 0-2
-    snap |= sda_lvl << 3;          // bit 3
-    snap |= scl_lvl << 4;          // bit 4
-    snap |= (c0_done as u8) << 5;  // bit 5
+    snap |= op0 & 0x07; // bits 0-2
+    snap |= sda_lvl << 3; // bit 3
+    snap |= scl_lvl << 4; // bit 4
+    snap |= (c0_done as u8) << 5; // bit 5
     LAST_HANG_COMD0_PINS.store(snap, Ordering::Relaxed);
 }
 
@@ -1242,12 +1275,7 @@ pub unsafe fn bitbang_address_probe(addr: u8) -> u8 {
     result
 }
 
-fn bitbang_address_probe_inner(
-    p: &pac::Peripherals,
-    addr: u8,
-    scl_mask: u32,
-    sda_mask: u32,
-) -> u8 {
+fn bitbang_address_probe_inner(p: &pac::Peripherals, addr: u8, scl_mask: u32, sda_mask: u32) -> u8 {
     // START: SDA H→L while SCL high.
     p.GPIO.out_w1tc().write(|w| unsafe { w.bits(sda_mask) });
     bitbang_quarter();

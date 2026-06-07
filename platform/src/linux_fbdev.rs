@@ -249,13 +249,11 @@ impl DisplayDriver for LinuxFbdevDisplay {
                             fb[offset + 1] = (pixel >> 8) as u8;
                         }
                     }
-                    24 => {
+                    24 if offset + 2 < fb.len() => {
                         // BGR888
-                        if offset + 2 < fb.len() {
-                            fb[offset] = color.2; // B
-                            fb[offset + 1] = color.1; // G
-                            fb[offset + 2] = color.0; // R
-                        }
+                        fb[offset] = color.2; // B
+                        fb[offset + 1] = color.1; // G
+                        fb[offset + 2] = color.0; // R
                     }
                     _ => {} // unsupported bpp, skip
                 }

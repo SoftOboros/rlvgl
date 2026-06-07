@@ -406,7 +406,7 @@ fn main() {
             };
             let mut root_mut = root.borrow_mut();
             executor.poll_with_callback(
-                &mut *root_mut,
+                &mut root_mut,
                 &status,
                 Some(&fb_view),
                 &mut NullPipeline,

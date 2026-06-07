@@ -8,6 +8,8 @@
 //! The panel uses a Sitronix ST7277 driver IC configured in DE mode
 //! (recommended). Data is clocked on the DCLK falling edge.
 
+#![allow(dead_code)]
+
 use super::am335x::*;
 
 /// Horizontal active pixels.

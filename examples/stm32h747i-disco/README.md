@@ -144,21 +144,21 @@ st-flash write firmware.bin 0x08000000
 - Panel reset: PG3 (LCD_RESET on MB1166). Early bring‑up may toggle this via
   GPIO; add datasheet‑compliant delays.
 
-## Optional: SD Assets
+## Optional: SD Storage
 
-- Enable the no_std FATFS adapter and the SD block device when building. For a
-  minimal on-boot listing demo, also enable `sd_assets_demo`:
+- Enable the SD block device when building:
 
 ```bash
-cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+RUSTFLAGS="-C target-cpu=cortex-m7" cargo build \
+    -p rlvgl-example-disco \
+    --bin rlvgl-stm32h747i-disco \
+    --features "cm7,sd_storage" \
     --target thumbv7em-none-eabihf --release
 ```
 
 - The `DiscoSdBlockDevice` driver (SDMMC1 + DMA + D‑Cache hygiene) is available
-  behind the above features. A lightweight `fatfs` adapter is included in the
-  platform crate (`sd_fatfs_adapter`). With `sd_assets_demo`, the firmware will
-  attempt to mount and list `/assets` at startup and render a few names.
+  behind `sd_storage`. A lightweight `fatfs` adapter is included in the platform
+  crate (`sd_fatfs_adapter`) for follow-on filesystem integration.
 
 ### On‑screen indicators
 

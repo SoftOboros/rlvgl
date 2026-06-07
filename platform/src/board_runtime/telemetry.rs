@@ -162,6 +162,12 @@ impl TelemetrySlot {
         }
     }
 
+    /// Whether the slot has zero bytes allocated.
+    #[inline]
+    pub const fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+
     /// One-past-the-end absolute SRAM4 address.
     #[inline]
     pub const fn end(self) -> u32 {
