@@ -1,5 +1,11 @@
-error[E0080]: evaluation panicked: assertion failed: offset_of!(DsiRegsBroken, lccr) == 0x064
-  --> tests/ui/mmio_dsi_offset.rs:45:15
+error[E0080]: evaluation panicked: DSI LCCR offset drift
+  --> tests/ui/mmio_dsi_offset.rs:51:15
    |
-45 | const _: () = assert!(offset_of!(DsiRegsBroken, lccr) == 0x064);
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
+51 | const _: () = assert_dsi_lccr_offset(offset_of!(DsiRegsBroken, lccr) == 0x064);
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed inside this call
+   |
+note: inside `assert_dsi_lccr_offset`
+  --> tests/ui/mmio_dsi_offset.rs:46:9
+   |
+46 |         panic!("DSI LCCR offset drift");
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here

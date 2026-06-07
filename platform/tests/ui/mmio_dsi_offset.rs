@@ -41,7 +41,13 @@ struct DsiRegsBroken {
     lccr: u32,      // 0x54 — SHOULD be 0x64
 }
 
+const fn assert_dsi_lccr_offset(ok: bool) {
+    if !ok {
+        panic!("DSI LCCR offset drift");
+    }
+}
+
 // This must fail to compile because LCCR ends up at 0x54, not 0x64.
-const _: () = assert!(offset_of!(DsiRegsBroken, lccr) == 0x064);
+const _: () = assert_dsi_lccr_offset(offset_of!(DsiRegsBroken, lccr) == 0x064);
 
 fn main() {}
