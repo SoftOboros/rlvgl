@@ -1,0 +1,46 @@
+---
+source: tests/bsp_esp32c6_render.rs
+expression: text
+---
+//! IO MUX and GPIO matrix routing for DFR1172 C6 Companion.
+//!
+//! For each assigned pin we either:
+//!
+//! * take the **direct IO MUX fast path** by writing the `mcu_sel` field of
+//!   `IO_MUX.gpio<n>` when the peripheral signal has `iomux_pin == gpio`;
+//! * or fall back to the **GPIO matrix**, writing
+//!   `GPIO.func<id>_out_sel_cfg` / `func<id>_in_sel_cfg` so the signal is
+//!   routed through the matrix.
+//!
+//! Pins tagged `flash_reserved` in the chip IR are filtered out upstream by
+//! `espressif::load::merge`; any that reach this file are a generator bug.
+
+use super::pac;
+
+/// Apply the board's pin mux and GPIO matrix routing.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    
+    // GPIO16 — UART0_TX (uart0)
+    
+    // Direct IO MUX fast path: fn0
+    p.IO_MUX.gpio(16).modify(|_, w| unsafe {
+        w.mcu_sel().bits(0)
+         .fun_ie().clear_bit()
+         .fun_wpu().clear_bit()
+         .fun_wpd().clear_bit()
+    });
+    
+    
+    // GPIO17 — UART0_RX (uart0)
+    
+    // Direct IO MUX fast path: fn0
+    p.IO_MUX.gpio(17).modify(|_, w| unsafe {
+        w.mcu_sel().bits(0)
+         .fun_ie().set_bit()
+         .fun_wpu().clear_bit()
+         .fun_wpd().clear_bit()
+    });
+    
+    
+}

@@ -1,5 +1,5 @@
 <!--
-docs/README.md - Index of project documentation and TODO lists.
+docs/README.md - Index of project documentation.
 -->
 <p align="center">
   <img src="../rlvgl-logo.png" alt="rlvgl" />
@@ -7,7 +7,7 @@ docs/README.md - Index of project documentation and TODO lists.
 
 # Documentation Index
 
-High-level guides and task lists for rlvgl.
+Guides and design documents for rlvgl.
 
 See crate overviews for:
 - [core](../core/README.md)
@@ -16,31 +16,47 @@ See crate overviews for:
 - [ui](../ui/README.md)
 - [chip database](../chipdb/README.md)
 
-## Guides
-- [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) – Product-level release notes for the v0.1.9 publish.
-- [CREATOR-CLI.md](./CREATOR-CLI.md) – Command-line reference and workflows for rlvgl-creator.
-- [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) – MiniJinja template guidelines for BSP generation.
-- [STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) – STM32 BSP generation behavior, flags, and roadmap.
-- [MAKE.md](./MAKE.md) – Makefile convenience targets and typical flows.
-- [CUSTOM-SIMULATOR.md](./CUSTOM-SIMULATOR.md) – Notes on building a custom simulator backend.
-- [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) – Details for the STM32H747I-DISCO board.
-- [CROSS-TESTING.md](./CROSS-TESTING.md) – Cross-target test linker requirements.
-- [IOC-IR-ALIGNMENT.md](./IOC-IR-ALIGNMENT.md) – Aligning CubeMX IOC data with the internal IR.
-- [CHANGELOG.md](./CHANGELOG.md) – Version history.
+## Release & Project
+- [CHANGELOG.md](./CHANGELOG.md) — Version history (current: v0.2.0).
+- [RELEASE-v0.1.9.md](./RELEASE-v0.1.9.md) — Archived v0.1.9 release notes.
+- [PROJECT-ROADMAP.md](./PROJECT-ROADMAP.md) — High-level project roadmap and work streams.
 
-## TODO Lists
-- [TODO.md](./TODO.md) – High-level project roadmap.
-- [TEST-TODO.md](./TEST-TODO.md) – Planned testing tasks.
-- [TODO-CHIP-SUPPORT.md](./TODO-CHIP-SUPPORT.md) – Chip support backlog.
-- [TODO-CREATOR.md](./TODO-CREATOR.md) – Outstanding work for rlvgl-creator.
-- [TODO-CREATOR-BSP.md](./TODO-CREATOR-BSP.md) – BSP generator tasks.
-- [TODO-CREATOR-UI-FULL.md](./TODO-CREATOR-UI-FULL.md) – Roadmap for the full GUI version of the creator tool.
-- [TODO-CREATOR-WORKSPACES.md](./TODO-CREATOR-WORKSPACES.md) – Roadmap for workspace-first project scaffolding and simulator integration.
-- [TODO-DECOMP.md](./TODO-DECOMP.md) – Plans for the image decompression module.
-- [TODO-FATFS-ASSETS.md](./TODO-FATFS-ASSETS.md) – FATFS asset storage notes.
-- [TODO-MICROPYTHON-DISCO.md](./TODO-MICROPYTHON-DISCO.md) – MicroPython support tasks.
-- [TODO-PLUGGABLE-BLITTER.md](./TODO-PLUGGABLE-BLITTER.md) – Pluggable blitter work items.
-- [TODO-PLUGINS.md](./TODO-PLUGINS.md) – Plugin development tasks.
-- [TODO-RENDERING.md](./TODO-RENDERING.md) – Rendering pipeline improvements.
-- [TODO-STM32H747I-DISCO.md](./TODO-STM32H747I-DISCO.md) – Tasks for the STM32H747I-DISCO demo.
-- [TODO-UI.md](./TODO-UI.md) – UI system tasks.
+## Creator Tool
+- [CREATOR-CLI.md](./CREATOR-CLI.md) — Command-line reference and workflows.
+- [CREATOR-TEMPLATES.md](./CREATOR-TEMPLATES.md) — MiniJinja template guidelines for BSP generation.
+- [CREATOR-ASSET-PIPELINE.md](./CREATOR-ASSET-PIPELINE.md) — Asset manifests, packing, and dual-mode crates.
+- [CREATOR-BSP-STATUS.md](./CREATOR-BSP-STATUS.md) — BSP generator task status (all vendors).
+- [CREATOR-UI-DESIGN.md](./CREATOR-UI-DESIGN.md) — Desktop UI menus, wizards, and command palette.
+- [CREATOR-WORKSPACE-INTEGRATION.md](./CREATOR-WORKSPACE-INTEGRATION.md) — Workspace scaffolding and simulator wiring.
+
+## BSP & Chip Support
+- [STM_BSP_GENERATION.md](./STM_BSP_GENERATION.md) — STM32 BSP generation behavior, flags, and roadmap.
+- [IOC-IR-ALIGNMENT.md](./IOC-IR-ALIGNMENT.md) — Aligning CubeMX IOC data with the internal IR.
+- [CHIP-SUPPORT.md](./CHIP-SUPPORT.md) — Vendor chip/board support: IR per vendor, parsers, chipdb.
+
+## Rendering & Plugins
+- [RENDERING-BACKEND-ARCHITECTURE.md](./RENDERING-BACKEND-ARCHITECTURE.md) — Pluggable blitter backends (CPU, DMA2D, wgpu).
+- [RENDERING-ALPHA-BLENDING.md](./RENDERING-ALPHA-BLENDING.md) — Alpha-blending and layered widget rendering.
+- [IMAGE-COMPRESSION-FORMAT.md](./IMAGE-COMPRESSION-FORMAT.md) — Palette + RLE codec for embedded assets.
+- [PLUGIN-ECOSYSTEM.md](./PLUGIN-ECOSYSTEM.md) — Media plugins: PNG, JPEG, GIF, Lottie, QR, fonts.
+
+## UI Framework
+- [UI-COMPONENT-ARCHITECTURE.md](./UI-COMPONENT-ARCHITECTURE.md) — Theme, components, Chakra-inspired widgets.
+- [SVELTE-DESIGN-TOKEN-ALIGNMENT.md](./SVELTE-DESIGN-TOKEN-ALIGNMENT.md) — Svelte design tokens and component IR.
+
+## Hardware Targets
+- [STM32H747I-DISCO.md](./STM32H747I-DISCO.md) — Board reference (display, touch, pinout).
+- [STM32H747I-DISCO-BRINGUP.md](./STM32H747I-DISCO-BRINGUP.md) — Hardware bring-up checklist and status.
+- [ZEPHYR.md](./ZEPHYR.md) — Zephyr RTOS integration: SDK install, build, video mode, adapted command mode.
+- [FreeRTOS Platform Guide](./disco-freertos-guide/README.md) — Volume IV: FreeRTOS preemptive tasks, interrupt-driven I2C4 touch, single-buffer rendering, joystick navigation.
+- [Zephyr Platform Guide](./disco-zephyr-guide/README.md) — Volume V: Zephyr C+Rust hybrid, video mode vs adapted command mode, DMA2D pipeline, CSleep/LPENR fix.
+- [FILESYSTEM-ASSET-LOADING.md](./FILESYSTEM-ASSET-LOADING.md) — FAT32 asset loading on SD card + simulator.
+- [MICROPYTHON-INTEGRATION.md](./MICROPYTHON-INTEGRATION.md) — MicroPython on CM7 + rlvgl on CM4.
+- [wifi-telemetry.md](./wifi-telemetry.md) — Future WiFi telemetry design and D3 SRAM layout.
+
+## Build & Test
+- [EMBEDDED-TOOLING.md](./EMBEDDED-TOOLING.md) — Install guide for ARM/STM32, ESP32 (RISC-V + Xtensa), and AVR toolchains, with Intel-macOS workarounds.
+- [MAKE.md](./MAKE.md) — Makefile convenience targets.
+- [CROSS-TESTING.md](./CROSS-TESTING.md) — Cross-target test linker requirements.
+- [CUSTOM-SIMULATOR.md](./CUSTOM-SIMULATOR.md) — Building a custom simulator backend.
+- [TEST-STRATEGY.md](./TEST-STRATEGY.md) — Testing workstream: unit, integration, hardware, CI.

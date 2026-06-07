@@ -3,19 +3,25 @@
 
 //! Entry point for the STM32H747I-DISCO hardware demo.
 //!
-//! Initializes placeholder display and touch drivers for the board and
-//! constructs the shared widget demonstration. Real MIPI-DSI and touch
-//! handling will be added in future iterations.
+//! Drives the OTM8009A MIPI-DSI panel (video mode by default, adapted
+//! command mode under `adapted_cmd`) and the FT5336 I²C touch controller
+//! through the shared `DiscoController` widget tree. Same entry point is
+//! used by the bare-metal build; `freertos_entry.rs` and `zephyr_entry.rs`
+//! wrap the same controller for their respective task models.
+//!
+//! See: README.md, BRINGUP.md, HARDWARE.md alongside this crate;
+//! docs/disco-platform-guide/ for the full bring-up walkthrough.
 
 extern crate alloc;
 
 #[cfg(not(feature = "c_hal"))]
 use core::arch::asm;
 use core::ptr::addr_of_mut;
+#[cfg(not(feature = "zephyr"))]
 use cortex_m_rt::entry;
 use embedded_alloc::Heap;
 #[cfg(target_os = "none")]
-#[cfg(not(doc))]
+#[cfg(all(not(doc), not(feature = "zephyr")))]
 use panic_halt as _;
 
 // The demo app crate provides flush_pending and Application trait for widget
@@ -26,6 +32,12 @@ use panic_halt as _;
 // library; not all are consumed in every build configuration.
 #[cfg(feature = "audio")]
 mod audio_scope;
+#[cfg(all(
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod bare_metal_sync;
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
@@ -33,12 +45,15 @@ mod bsp_pac;
 mod config_menu;
 #[cfg(feature = "cpu_stats")]
 mod cpu_stats;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod crawl_buffers;
 mod device_storage;
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+mod effect;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod event_overlay;
 mod file_browser_panel;
 mod fonts;
-mod icon_strip;
 mod ipc;
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod readme_crawl;
@@ -49,7 +64,88 @@ mod settings_dialog;
 mod star_crawl;
 #[allow(dead_code)]
 mod sys_info;
-mod wing;
+
+/// Joystick focus state machine for the bare-metal main loop.
+///
+/// Mirrors the navigation behavior of `disco-demo`'s `ControllerState`
+/// without instantiating a full `DiscoController` (the bare-metal main
+/// composes its own widget tree alongside the disco-demo widgets).
+///
+/// - `Main(i)`: focus is on icon-strip slot `i` (0..ICON_STRIP_SLOT_COUNT).
+/// - `SettingsWing(i)`: focus is inside the settings wing on slot `i`.
+/// - `InfoWing(i)`: focus is inside the info wing on slot `i`.
+#[cfg(not(feature = "c_hal"))]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum AppFocus {
+    Main(usize),
+    SettingsWing(usize),
+    InfoWing(usize),
+}
+
+#[cfg(feature = "clock_demo")]
+mod clock_demo;
+
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_dma2d;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_entry;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_layers;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod freertos_sync;
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod touch_i2c;
+
+/// ISR wrappers routing the DSI / DMA2D IRQs to `freertos_entry` bodies.
+/// These replace the bare-metal `_dsi_isr` / `_dma2d_isr` modules below
+/// when the `freertos` feature is active — a single binary may only
+/// define one `#[interrupt] fn DSI()` (likewise DMA2D).
+#[cfg(all(
+    feature = "freertos",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+mod _freertos_isr {
+    use stm32h7::stm32h747cm7::interrupt;
+
+    #[interrupt]
+    unsafe fn DSI() {
+        super::freertos_entry::dsi_isr_body();
+    }
+
+    #[interrupt]
+    unsafe fn DMA2D() {
+        super::freertos_entry::dma2d_isr_body();
+    }
+
+    /// TIM7 one-pulse timer — present-gate fire (ERIF + 15 ms).
+    /// See `freertos_entry::tim7_isr_body` for the semantics.
+    #[interrupt]
+    unsafe fn TIM7() {
+        super::freertos_entry::tim7_isr_body();
+    }
+
+    /// I2C4 event — interrupt-driven touch read state machine.
+    #[interrupt]
+    unsafe fn I2C4_EV() {
+        super::touch_i2c::i2c4_ev_handler();
+    }
+}
+
 // HAL BSP module is not required for this bring-up path
 
 #[cfg(feature = "splash")]
@@ -76,8 +172,13 @@ fn _bsp_log(args: core::fmt::Arguments) {
 // SysTick exception handler — empty body; sole purpose is to wake WFI.
 // Without an enabled SysTick interrupt the core would sleep past the
 // frame boundary because has_wrapped() only polls the COUNTFLAG.
+// FreeRTOS provides its own SysTick handler via the vector alias in
+// `freertos_entry::SysTick`. The `cpu_stats` empty-body variant below
+// must not collide with it, hence the extra `not(feature = "freertos")`.
 #[cfg(all(
     feature = "cpu_stats",
+    not(feature = "zephyr"),
+    not(feature = "freertos"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 #[cortex_m_rt::exception]
@@ -91,25 +192,30 @@ fn SysTick() {}
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod touch_isr {
-    use core::ptr::{addr_of, addr_of_mut};
-    use core::sync::atomic::Ordering;
-    use core::sync::atomic::compiler_fence;
+    use core::sync::atomic::{AtomicBool, Ordering};
 
-    // I2C4 register addresses (base 0x5800_1C00, RM0399 §50.7)
-    const I2C4_CR2: *mut u32 = 0x5800_1C04 as *mut u32;
-    const I2C4_ISR: *const u32 = 0x5800_1C18 as *const u32;
-    const I2C4_ICR: *mut u32 = 0x5800_1C1C as *mut u32;
-    const I2C4_RXDR: *const u32 = 0x5800_1C24 as *const u32;
-    const I2C4_TXDR: *mut u32 = 0x5800_1C28 as *mut u32;
+    use rlvgl_platform::hwcore::isr::IsrChannel;
+    use rlvgl_platform::hwcore::regs::gpio::Gpio;
+    use rlvgl_platform::hwcore::regs::i2c::I2c;
+    use rlvgl_platform::hwcore::regs::tim::TimBasic;
 
-    // GPIOK IDR for PK7 touch INT pin (active-low)
-    const GPIOK_IDR: *const u32 = 0x5802_2810 as *const u32;
-
-    // TIM6 SR (status register, clear UIF on entry)
-    const TIM6_SR: *mut u32 = 0x4000_1010 as *mut u32;
+    // I2C4 / GPIOK / TIM6 access flows through typed handles from
+    // `rlvgl_platform::hwcore::regs::*`. Each `static` instance pins
+    // the handle for `'static` so call sites read/write via
+    // `I2C4.regs().cr2.write(...)` etc. — every field offset is
+    // const-eval-asserted against RM0399.
+    //
+    // SAFETY: this `touch_isr` module is the bare-metal owner of these
+    // peripherals. The FreeRTOS path uses `touch_i2c.rs` for I2C4 and
+    // its own TIM7 path for the present-gate timer; the two paths are
+    // mutually exclusive at build time via the `freertos` feature.
+    static I2C4: I2c = unsafe { I2c::i2c4() };
+    static GPIOK: Gpio = unsafe { Gpio::gpiok() };
+    static TIM6: TimBasic = unsafe { TimBasic::tim6() };
 
     // FT5336 7-bit address, shifted left into SADD[7:1]
     const FT5336_SADD: u32 = 0x38 << 1; // 0x70
@@ -131,54 +237,40 @@ mod touch_isr {
         };
     }
 
-    pub const TOUCH_RING_CAP: usize = 16;
+    /// Touch ring capacity. The typed `IsrChannel<T, N>` reserves one
+    /// slot for empty/full disambiguation, so usable capacity is N-1.
+    pub const TOUCH_RING_CAP: usize = 17;
 
-    pub struct TouchRing {
-        pub head: u32,
-        pub tail: u32,
-        pub slots: [RawTouchSample; TOUCH_RING_CAP],
-    }
+    /// SPSC ring buffer for touch samples. ISR is the sole writer
+    /// (`touch_ring_push`); main loop is the sole reader
+    /// (`touch_ring_pop`). Encapsulates volatile + Acquire/Release
+    /// ordering — replaces the prior `static mut TouchRing` + manual
+    /// `compiler_fence` pattern.
+    pub static TOUCH_RING: IsrChannel<RawTouchSample, TOUCH_RING_CAP> = IsrChannel::new();
 
-    pub static mut TOUCH_RING: TouchRing = TouchRing {
-        head: 0,
-        tail: 0,
-        slots: [RawTouchSample::EMPTY; TOUCH_RING_CAP],
-    };
-
-    static mut PREV_INT_LOW: bool = false;
+    /// Debounce: previous read of PK7 (FT5336 INT line). ISR-only.
+    static PREV_INT_LOW: AtomicBool = AtomicBool::new(false);
 
     /// Push a sample into the ring (ISR side, single writer).
+    ///
+    /// # Safety
+    ///
+    /// Must be called from the touch ISR only (single-writer contract).
     #[inline]
     pub unsafe fn touch_ring_push(sample: RawTouchSample) {
-        unsafe {
-            let ring = addr_of_mut!(TOUCH_RING);
-            let head = core::ptr::read_volatile(addr_of!((*ring).head));
-            let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
-            if head.wrapping_sub(tail) >= TOUCH_RING_CAP as u32 {
-                return; // full — drop newest
-            }
-            (*ring).slots[(head % TOUCH_RING_CAP as u32) as usize] = sample;
-            compiler_fence(Ordering::Release);
-            core::ptr::write_volatile(addr_of_mut!((*ring).head), head.wrapping_add(1));
-        }
+        // SAFETY: caller asserts single-writer; IsrChannel docs.
+        let _ = unsafe { TOUCH_RING.try_push(sample) }; // drop on full
     }
 
     /// Pop a sample from the ring (main-loop side, single reader).
+    ///
+    /// # Safety
+    ///
+    /// Must be called from the main loop only (single-reader contract).
     #[inline]
     pub unsafe fn touch_ring_pop() -> Option<RawTouchSample> {
-        unsafe {
-            let ring = addr_of_mut!(TOUCH_RING);
-            let head = core::ptr::read_volatile(addr_of!((*ring).head));
-            let tail = core::ptr::read_volatile(addr_of!((*ring).tail));
-            if head == tail {
-                return None;
-            }
-            compiler_fence(Ordering::Acquire);
-            let sample = (*ring).slots[(tail % TOUCH_RING_CAP as u32) as usize];
-            compiler_fence(Ordering::Release);
-            core::ptr::write_volatile(addr_of_mut!((*ring).tail), tail.wrapping_add(1));
-            Some(sample)
-        }
+        // SAFETY: caller asserts single-reader; IsrChannel docs.
+        unsafe { TOUCH_RING.try_pop() }
     }
 
     /// Wait for a bit in I2C4_ISR with timeout.  Returns false on timeout.
@@ -186,10 +278,10 @@ mod touch_isr {
     unsafe fn i2c4_wait(bit: u32) -> bool {
         unsafe {
             for _ in 0..I2C_TIMEOUT {
-                let isr = I2C4_ISR.read_volatile();
+                let isr = I2C4.regs().isr.read();
                 if isr & (1 << 4) != 0 {
                     // NACKF — device didn't acknowledge
-                    I2C4_ICR.write_volatile(1 << 4); // clear NACKCF
+                    I2C4.regs().icr.write(1 << 4); // clear NACKCF
                     return false;
                 }
                 if isr & (1 << bit) != 0 {
@@ -206,14 +298,22 @@ mod touch_isr {
     /// addresses so the HAL I2C peripheral doesn't need to live in a static.
     unsafe fn i2c4_read_touches_raw() -> RawTouchSample {
         unsafe {
+            // Clear stale status flags from any prior aborted transaction.
+            // STOPCF=5, NACKCF=4, BERRCF=8, ARLOCF=9, OVRCF=10.
+            // Without this, a prior timeout leaves STOPF set and new
+            // transactions can hang or return stale data.
+            I2C4.regs()
+                .icr
+                .write((1 << 5) | (1 << 4) | (1 << 8) | (1 << 9) | (1 << 10));
+
             // ── Write phase: send register address 0x02 ──
             // CR2: SADD, NBYTES=1, RD_WRN=0, START=1, AUTOEND=0
-            I2C4_CR2.write_volatile(FT5336_SADD | (1 << 16) | (1 << 13));
+            I2C4.regs().cr2.write(FT5336_SADD | (1 << 16) | (1 << 13));
             // Wait TXIS (bit 1)
             if !i2c4_wait(1) {
                 return RawTouchSample::EMPTY;
             }
-            I2C4_TXDR.write_volatile(0x02);
+            I2C4.regs().txdr.write(0x02);
             // Wait TC (bit 6) — transfer complete (AUTOEND=0, RELOAD=0)
             if !i2c4_wait(6) {
                 return RawTouchSample::EMPTY;
@@ -221,18 +321,20 @@ mod touch_isr {
 
             // ── Read phase: read 31 bytes ──
             // CR2: SADD, NBYTES=31, RD_WRN=1, START=1, AUTOEND=1
-            I2C4_CR2.write_volatile(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
+            I2C4.regs()
+                .cr2
+                .write(FT5336_SADD | (1 << 10) | (31 << 16) | (1 << 13) | (1 << 25));
             let mut buf = [0u8; 31];
             for b in buf.iter_mut() {
                 // Wait RXNE (bit 2)
                 if !i2c4_wait(2) {
                     return RawTouchSample::EMPTY;
                 }
-                *b = (I2C4_RXDR.read_volatile() & 0xFF) as u8;
+                *b = (I2C4.regs().rxdr.read() & 0xFF) as u8;
             }
             // AUTOEND generates STOP; wait STOPF (bit 5) then clear it
             if i2c4_wait(5) {
-                I2C4_ICR.write_volatile(1 << 5); // STOPCF
+                I2C4.regs().icr.write(1 << 5); // STOPCF
             }
 
             // ── Parse (identical to ft5336.rs:48-79) ──
@@ -255,13 +357,13 @@ mod touch_isr {
     pub unsafe fn tim6_dac_handler() {
         unsafe {
             // Clear UIF (bit 0)
-            TIM6_SR.write_volatile(TIM6_SR.read_volatile() & !1);
+            TIM6.regs().sr.write(TIM6.regs().sr.read() & !1);
 
             // Read PK7: low = touch data available
-            let int_low = GPIOK_IDR.read_volatile() & (1 << 7) == 0;
+            let int_low = GPIOK.regs().idr.read() & (1 << 7) == 0;
 
             // Read when INT active OR on the LOW→HIGH edge (catches release)
-            let prev = core::ptr::read_volatile(addr_of!(PREV_INT_LOW));
+            let prev = PREV_INT_LOW.load(Ordering::Acquire);
             let should_read = int_low || prev;
 
             if should_read {
@@ -269,20 +371,24 @@ mod touch_isr {
                 touch_ring_push(sample);
             }
 
-            core::ptr::write_volatile(addr_of_mut!(PREV_INT_LOW), int_low);
+            PREV_INT_LOW.store(int_low, Ordering::Release);
         }
     }
 }
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 use touch_isr::touch_ring_pop;
 
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
+/// In FreeRTOS builds, this runs from TIM6 enable until start()
+/// disables it; touch_task takes over I2C reads after that.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _tim6_isr {
@@ -297,6 +403,7 @@ mod _tim6_isr {
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _usart1_isr {
@@ -312,8 +419,10 @@ mod _usart1_isr {
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    not(feature = "freertos"),
     feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
+    any(target_arch = "arm", target_arch = "aarch64"),
 ))]
 mod _dma2d_isr {
     use stm32h7::stm32h747cm7::interrupt;
@@ -330,27 +439,34 @@ mod _dma2d_isr {
 /// Replaces polling DSI_WISR.ERIF with zero-latency interrupt detection.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static ERIF_FLAG: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+pub(crate) static ERIF_FLAG: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
 /// DWT_CYCCNT snapshot at the instant ERIF fired. T=0 for all scheduling.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static ERIF_CYCCNT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+pub(crate) static ERIF_CYCCNT: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(0);
 /// Measured ERIF-to-ERIF interval (cycles). Adapts to actual panel TE rate.
 /// Default 33ms = 13.2M cycles at 400MHz (one full frame at 30fps).
 /// Must be generous initially — too small blocks all DMA2D admission.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
+pub(crate) static FRAME_BUDGET_CYCLES: core::sync::atomic::AtomicU32 =
     core::sync::atomic::AtomicU32::new(13_200_000);
 
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    not(feature = "freertos"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 mod _dsi_isr {
@@ -361,25 +477,25 @@ mod _dsi_isr {
     /// Clear ALL flags to prevent non-ERIF events from re-triggering.
     #[interrupt]
     unsafe fn DSI() {
-        const WISR: *const u32 = 0x5000_040C as *const u32;
-        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32;
+        const WISR: *const u32 = 0x5000_040C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const WIFCR: *mut u32 = 0x5000_0410 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // DSI Host flag clear registers (prevent re-trigger from host events)
-        const ISR0: *const u32 = 0x5000_00BC as *const u32;
-        const ISR1: *const u32 = 0x5000_00C0 as *const u32;
-        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32;
-        const FIR1: *mut u32 = 0x5000_00DC as *mut u32;
+        const ISR0: *const u32 = 0x5000_00BC as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const ISR1: *const u32 = 0x5000_00C0 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FIR0: *mut u32 = 0x5000_00D8 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const FIR1: *mut u32 = 0x5000_00DC as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe {
             let wisr = WISR.read_volatile();
             // Clear ALL wrapper flags (bits 13..0)
             WIFCR.write_volatile(wisr & 0x3FFF);
             if wisr & 0x02 != 0 {
                 // Snapshot DWT_CYCCNT first — T=0 for all scheduling.
-                let cyc = (0xE000_1004u32 as *const u32).read_volatile();
+                let cyc = (0xE000_1004u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 // PJ0 LOW — LTDC scan done (exact ISR timing, no poll jitter)
-                (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16);
+                (0x5802_2418u32 as *mut u32).write_volatile(1u32 << 16); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 // Clear LTDCEN to prevent auto-refresh from re-scanning
                 // before present() swaps the buffer.
-                const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32;
+                const DSI_WCR: *mut u32 = 0x5000_0404 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 DSI_WCR.write_volatile(0x08); // DSIEN only, clear LTDCEN
                 // Timestamp BEFORE flag so consumers see consistent pair.
                 super::ERIF_CYCCNT.store(cyc, core::sync::atomic::Ordering::Release);
@@ -401,19 +517,21 @@ mod _dsi_isr {
 /// Consume the ERIF flag (set by DSI ISR). Returns true once per scan.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-fn take_erif() -> bool {
+pub(crate) fn take_erif() -> bool {
     ERIF_FLAG.swap(false, core::sync::atomic::Ordering::AcqRel)
 }
 
 /// Cycles elapsed since last ERIF (T=0 for all scheduling decisions).
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub fn cycles_since_erif() -> u32 {
-    let now = unsafe { (0xE000_1004u32 as *const u32).read_volatile() };
+    let now = unsafe { (0xE000_1004u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     now.wrapping_sub(ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire))
 }
 
@@ -421,6 +539,7 @@ pub fn cycles_since_erif() -> u32 {
 /// The guard starts 1ms (400K cycles) before the expected next TE/ERIF.
 #[cfg(all(
     not(feature = "c_hal"),
+    not(feature = "zephyr"),
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 pub fn dma2d_admits(cost: u32) -> bool {
@@ -438,11 +557,13 @@ pub fn dma2d_admits(cost: u32) -> bool {
 mod runtime_serial {
     use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 
-    const USART1_CR1: *mut u32 = 0x4001_1000 as *mut u32;
-    const USART1_ISR: *const u32 = 0x4001_101C as *const u32;
-    const USART1_ICR: *mut u32 = 0x4001_1020 as *mut u32;
-    const USART1_RDR: *const u32 = 0x4001_1024 as *const u32;
-    const USART1_TDR: *mut u32 = 0x4001_1028 as *mut u32;
+    use rlvgl_platform::hwcore::regs::usart::Usart;
+
+    // USART1 access (0x4001_1000) flows through the typed `Usart` handle.
+    // SAFETY: this `runtime_serial` module is the sole owner of USART1 in
+    // the bare-metal disco binary; the FreeRTOS path uses its own serial
+    // wiring (currently routed through the C HAL).
+    static USART1: Usart = unsafe { Usart::usart1() };
 
     const CR1_RXNEIE_RXFNEIE: u32 = 1 << 5;
     const CR1_TXEIE_TXFNFIE: u32 = 1 << 7;
@@ -470,14 +591,14 @@ mod runtime_serial {
     static RX_DROPPED: AtomicU32 = AtomicU32::new(0);
     static TX_DROPPED: AtomicU32 = AtomicU32::new(0);
 
-    static mut RX_BUF: [u8; RX_CAP] = [0; RX_CAP];
-    static mut TX_BUF: [u8; TX_CAP] = [0; TX_CAP];
+    static mut RX_BUF: [u8; RX_CAP] = [0; RX_CAP]; // rlvgl-discipline: allow(static_mut)
+    static mut TX_BUF: [u8; TX_CAP] = [0; TX_CAP]; // rlvgl-discipline: allow(static_mut)
 
     #[inline]
     fn blocking_write_byte(byte: u8) {
         unsafe {
-            while USART1_ISR.read_volatile() & ISR_TXE_TXFNF == 0 {}
-            USART1_TDR.write_volatile(byte as u32);
+            while USART1.regs().isr.read() & ISR_TXE_TXFNF == 0 {}
+            USART1.regs().tdr.write(byte as u32);
         }
     }
 
@@ -543,9 +664,12 @@ mod runtime_serial {
         TX_DROPPED.store(0, Ordering::Relaxed);
 
         unsafe {
-            USART1_ICR.write_volatile(ERROR_CLEAR);
-            let cr1 = USART1_CR1.read_volatile();
-            USART1_CR1.write_volatile((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
+            USART1.regs().icr.write(ERROR_CLEAR);
+            let cr1 = USART1.regs().cr1.read();
+            USART1
+                .regs()
+                .cr1
+                .write((cr1 | CR1_RXNEIE_RXFNEIE) & !CR1_TXEIE_TXFNFIE);
 
             use stm32h7::stm32h747cm7::Interrupt;
             cortex_m::peripheral::NVIC::unmask(Interrupt::USART1);
@@ -563,8 +687,8 @@ mod runtime_serial {
             return;
         }
         unsafe {
-            let cr1 = USART1_CR1.read_volatile();
-            USART1_CR1.write_volatile(cr1 | CR1_TXEIE_TXFNFIE);
+            let cr1 = USART1.regs().cr1.read();
+            USART1.regs().cr1.write(cr1 | CR1_TXEIE_TXFNFIE);
         }
     }
 
@@ -609,29 +733,29 @@ mod runtime_serial {
     }
 
     pub unsafe fn irq_handler() {
-        let isr = unsafe { USART1_ISR.read_volatile() };
+        let isr = unsafe { USART1.regs().isr.read() };
         if isr & ERROR_FLAGS != 0 {
             unsafe {
-                USART1_ICR.write_volatile(ERROR_CLEAR);
+                USART1.regs().icr.write(ERROR_CLEAR);
             }
         }
 
-        while unsafe { USART1_ISR.read_volatile() } & ISR_RXNE_RXFNE != 0 {
-            let byte = unsafe { (USART1_RDR.read_volatile() & 0xFF) as u8 };
+        while unsafe { USART1.regs().isr.read() } & ISR_RXNE_RXFNE != 0 {
+            let byte = unsafe { (USART1.regs().rdr.read() & 0xFF) as u8 };
             if !push_rx(byte) {
                 RX_DROPPED.fetch_add(1, Ordering::Relaxed);
             }
         }
 
-        while unsafe { USART1_ISR.read_volatile() } & ISR_TXE_TXFNF != 0 {
+        while unsafe { USART1.regs().isr.read() } & ISR_TXE_TXFNF != 0 {
             if let Some(byte) = pop_tx() {
                 unsafe {
-                    USART1_TDR.write_volatile(byte as u32);
+                    USART1.regs().tdr.write(byte as u32);
                 }
             } else {
                 unsafe {
-                    let cr1 = USART1_CR1.read_volatile();
-                    USART1_CR1.write_volatile(cr1 & !CR1_TXEIE_TXFNFIE);
+                    let cr1 = USART1.regs().cr1.read();
+                    USART1.regs().cr1.write(cr1 & !CR1_TXEIE_TXFNFIE);
                 }
                 break;
             }
@@ -639,12 +763,85 @@ mod runtime_serial {
     }
 }
 
+// ── PlayitTransport over USART1 ring buffers ────────────────────────
 #[cfg(all(
     not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct UsartTransport;
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+impl rlvgl_playit::PlayitTransport for UsartTransport {
+    fn read_byte(&mut self) -> Option<u8> {
+        runtime_serial::pop_rx()
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) {
+        runtime_serial::write_bytes(bytes);
+        runtime_serial::kick_tx();
+    }
+}
+
+// ── FramebufferReader for SDRAM front buffer ────────────────────────
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct SdramFbReader {
+    fb_addr: u32,
+    width: u32,
+    height: u32,
+    present_count: u32,
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+impl rlvgl_playit::FramebufferReader for SdramFbReader {
+    fn read_pixel(&self, x: i32, y: i32) -> u32 {
+        let ux = x as u32;
+        let uy = y as u32;
+        if ux >= self.width || uy >= self.height {
+            return 0;
+        }
+        let offset = ((uy * self.width + ux) * 4) as usize;
+        let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        unsafe { ptr.read_volatile() }
+    }
+
+    fn read_row(&self, x: i32, y: i32, width: u16, out: &mut [u32]) -> usize {
+        let ux = x.max(0) as u32;
+        let uy = y.max(0) as u32;
+        if uy >= self.height || ux >= self.width {
+            return 0;
+        }
+        let available = ((self.width - ux) as usize)
+            .min(width as usize)
+            .min(out.len());
+        for i in 0..available {
+            let offset = ((uy * self.width + ux + i as u32) * 4) as usize;
+            let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            out[i] = unsafe { ptr.read_volatile() };
+        }
+        available
+    }
+
+    fn present_count(&self) -> u32 {
+        self.present_count
+    }
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
     feature = "dma2d",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
-mod dma2d_irq {
+pub(crate) mod dma2d_irq {
     use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 
     static START_CYCLES: AtomicU32 = AtomicU32::new(0);
@@ -655,7 +852,7 @@ mod dma2d_irq {
     static COMPLETE_LATCH: AtomicBool = AtomicBool::new(false);
     static ERROR_LATCH: AtomicU32 = AtomicU32::new(0);
 
-    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+    const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
     pub fn init(nvic: &mut cortex_m::peripheral::NVIC) {
         use stm32h7::stm32h747cm7::Interrupt;
@@ -782,286 +979,6 @@ fn serial_hex_u32(v: u32) {
     runtime_serial::write_bytes(&out);
 }
 
-#[cfg(all(
-    not(feature = "c_hal"),
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-fn parse_tap(buf: &[u8]) -> Option<(i32, i32)> {
-    if buf.is_empty() || buf[0] != b'T' {
-        return None;
-    }
-    let s = core::str::from_utf8(&buf[1..]).ok()?;
-    let mut parts = s.split(',');
-    let x: i32 = parts.next()?.trim().parse().ok()?;
-    let y: i32 = parts.next()?.trim().parse().ok()?;
-    Some((x, y))
-}
-
-#[cfg(all(
-    not(feature = "c_hal"),
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-struct DumpRequest {
-    wx: i32,
-    wy: i32,
-    ww: i32,
-    wh: i32,
-    remaining: u8,
-    last_present_seen: u32,
-}
-
-#[cfg(all(
-    not(feature = "c_hal"),
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-enum SerialAction {
-    InjectTap(i32, i32),
-    ToggleCrawl,
-}
-
-#[cfg(all(
-    not(feature = "c_hal"),
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-struct SerialTask {
-    line_buf: [u8; 64],
-    line_len: usize,
-    dump: Option<DumpRequest>,
-}
-
-#[cfg(all(
-    not(feature = "c_hal"),
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
-impl SerialTask {
-    const D3_DISPLAY_FLAGS: u32 = 0x3800_1C44;
-    const D3_DISPLAY_FRONT: u32 = 0x3800_1C48;
-    const D3_DISPLAY_BACK: u32 = 0x3800_1C4C;
-    const D3_DISPLAY_ACTIVE: u32 = 0x3800_1C50;
-    const D3_DISPLAY_STATUS: u32 = 0x3800_1C54;
-    const D3_DISPLAY_CPSR: u32 = 0x3800_1C58;
-    const D3_OVERLAY_COUNTS: u32 = 0x3800_1C5C;
-    const D3_OVERLAY_BYTES: u32 = 0x3800_1C60;
-    const D3_EVENT_STATE: u32 = 0x3800_1C64;
-    const D3_EVENT_DRAW_SEQ: u32 = 0x3800_1C68;
-    const D3_CRAWL_DIAG0: u32 = 0x3800_1C6C;
-    const D3_CRAWL_DIAG1: u32 = 0x3800_1C70;
-    const D3_CRAWL_DIAG2: u32 = 0x3800_1C74;
-    const D3_CRAWL_DIAG3: u32 = 0x3800_1C78;
-
-    const fn new() -> Self {
-        Self {
-            line_buf: [0; 64],
-            line_len: 0,
-            dump: None,
-        }
-    }
-
-    fn read_diag(addr: u32) -> u32 {
-        unsafe { (addr as *const u32).read_volatile() }
-    }
-
-    fn poll<F>(
-        &mut self,
-        tick_count: u32,
-        present_count: u32,
-        front_buf: u32,
-        fb_w: u32,
-        mut dispatch: F,
-    ) where
-        F: FnMut(SerialAction),
-    {
-        while let Some(byte) = runtime_serial::pop_rx() {
-            if byte == b'\n' || byte == b'\r' {
-                if self.line_len > 0 {
-                    let line_len = self.line_len;
-                    let mut line = [0u8; 64];
-                    line[..line_len].copy_from_slice(&self.line_buf[..line_len]);
-                    self.handle_line(&line[..line_len], tick_count, present_count, &mut dispatch);
-                    self.line_len = 0;
-                }
-            } else if self.line_len < self.line_buf.len() {
-                self.line_buf[self.line_len] = byte;
-                self.line_len += 1;
-            }
-        }
-
-        self.emit_dump_if_ready(present_count, front_buf as *const u8, fb_w);
-        runtime_serial::kick_tx();
-    }
-
-    fn handle_line<F>(&mut self, cmd: &[u8], tick_count: u32, present_count: u32, dispatch: &mut F)
-    where
-        F: FnMut(SerialAction),
-    {
-        if cmd.is_empty() {
-            return;
-        }
-
-        match cmd[0] {
-            b'?' => {
-                let (rx_depth, tx_depth, rx_drop, tx_drop) = runtime_serial::stats();
-                serial_puts("tick=");
-                serial_dec(tick_count);
-                serial_puts(" present=");
-                serial_dec(present_count);
-                serial_puts(" rx=");
-                serial_dec(rx_depth as u32);
-                serial_puts(" tx=");
-                serial_dec(tx_depth as u32);
-                serial_puts(" drop=");
-                serial_dec(rx_drop as u32);
-                serial_puts("/");
-                serial_dec(tx_drop as u32);
-                serial_puts("\r\n");
-                serial_puts("disp flags=");
-                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_FLAGS));
-                serial_puts(" front=");
-                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_FRONT));
-                serial_puts(" back=");
-                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_BACK));
-                serial_puts(" active=");
-                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_ACTIVE));
-                serial_puts("\r\n");
-                serial_puts("disp stat=");
-                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_STATUS));
-                serial_puts(" cpsr=");
-                serial_hex_u32(Self::read_diag(Self::D3_DISPLAY_CPSR));
-                serial_puts("\r\n");
-                serial_puts("ovl counts=");
-                serial_hex_u32(Self::read_diag(Self::D3_OVERLAY_COUNTS));
-                serial_puts(" bytes=");
-                serial_hex_u32(Self::read_diag(Self::D3_OVERLAY_BYTES));
-                serial_puts("\r\n");
-                serial_puts("evt state=");
-                serial_hex_u32(Self::read_diag(Self::D3_EVENT_STATE));
-                serial_puts(" draw=");
-                serial_hex_u32(Self::read_diag(Self::D3_EVENT_DRAW_SEQ));
-                serial_puts("\r\n");
-                serial_puts("crawl ");
-                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG0));
-                serial_puts(" ");
-                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG1));
-                serial_puts(" ");
-                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG2));
-                serial_puts(" ");
-                serial_hex_u32(Self::read_diag(Self::D3_CRAWL_DIAG3));
-                serial_puts("\r\n");
-                serial_puts("gpio J_MODER=");
-                serial_hex_u32(unsafe { (0x5802_2400u32 as *const u32).read_volatile() });
-                serial_puts(" J_IDR=");
-                serial_hex_u32(unsafe { (0x5802_2410u32 as *const u32).read_volatile() });
-                serial_puts("\r\n");
-                #[cfg(all(
-                    not(feature = "c_hal"),
-                    any(target_arch = "arm", target_arch = "aarch64")
-                ))]
-                {
-                    serial_puts("TE budget=");
-                    serial_dec(
-                        FRAME_BUDGET_CYCLES.load(core::sync::atomic::Ordering::Relaxed) / 400,
-                    );
-                    serial_puts("us phase=");
-                    serial_dec(cycles_since_erif() / 400);
-                    serial_puts("us\r\n");
-                }
-            }
-            b'T' => {
-                if let Some((x, y)) = parse_tap(cmd) {
-                    dispatch(SerialAction::InjectTap(x, y));
-                    serial_puts("OK\r\n");
-                } else {
-                    serial_puts("ERR: bad tap\r\n");
-                }
-            }
-            b'D' | b'd' => {
-                if let Some(req) = Self::parse_dump(cmd, present_count) {
-                    self.dump = Some(req);
-                    serial_puts("DUMP:queued\r\n");
-                } else {
-                    serial_puts("ERR: bad dump\r\n");
-                }
-            }
-            b'C' | b'c' => {
-                dispatch(SerialAction::ToggleCrawl);
-                serial_puts("CRAWL:toggled\r\n");
-            }
-            _ => serial_puts("ERR: unknown cmd\r\n"),
-        }
-    }
-
-    fn parse_dump(cmd: &[u8], present_count: u32) -> Option<DumpRequest> {
-        let mut parts = [0i32; 5];
-        parts[4] = 1;
-        let mut idx = 0usize;
-        let mut value = 0i32;
-        let mut have_digits = false;
-
-        for &byte in &cmd[1..] {
-            if byte == b',' {
-                if have_digits && idx < parts.len() {
-                    parts[idx] = value;
-                    idx += 1;
-                }
-                value = 0;
-                have_digits = false;
-            } else if byte.is_ascii_digit() {
-                value = value * 10 + (byte - b'0') as i32;
-                have_digits = true;
-            } else {
-                return None;
-            }
-        }
-        if have_digits && idx < parts.len() {
-            parts[idx] = value;
-        }
-
-        Some(DumpRequest {
-            wx: parts[0],
-            wy: parts[1],
-            ww: parts[2].max(1).min(40),
-            wh: parts[3].max(1).min(40),
-            remaining: parts[4].max(1).min(4) as u8,
-            last_present_seen: present_count,
-        })
-    }
-
-    fn emit_dump_if_ready(&mut self, present_count: u32, front_buf: *const u8, fb_w: u32) {
-        let Some(req) = self.dump.as_mut() else {
-            return;
-        };
-        if present_count == req.last_present_seen {
-            return;
-        }
-
-        let fb_stride = (fb_w * 4) as usize;
-        let fb_w = fb_w as i32;
-        serial_puts("F\r\n");
-        for row in 0..req.wh {
-            for col in 0..req.ww {
-                let px = fb_w - 1 - (req.wy + row);
-                let py = req.wx + col;
-                if px >= 0 && py >= 0 {
-                    let off = py as usize * fb_stride + px as usize * 4;
-                    let argb = unsafe { (front_buf.add(off) as *const u32).read_volatile() };
-                    serial_hex_u32(argb);
-                    if col < req.ww - 1 {
-                        serial_puts(" ");
-                    }
-                }
-            }
-            serial_puts("\r\n");
-        }
-
-        req.remaining -= 1;
-        req.last_present_seen = present_count;
-        if req.remaining == 0 {
-            serial_puts("END\r\n");
-            self.dump = None;
-        }
-    }
-}
-
 /// Global allocator backed by a fixed-size heap in RAM.
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
@@ -1183,13 +1100,13 @@ fn configure_mpu_regions(cp: &mut cortex_m::Peripherals) {
 #[allow(unknown_lints, unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
-static mut MPU_TRACE: u32 = 0;
+static mut MPU_TRACE: u32 = 0; // rlvgl-discipline: allow(static_mut)
 
 #[cfg(not(feature = "c_hal"))]
 #[allow(unknown_lints, unsafe_attributes)]
 #[unsafe(link_section = ".noinit")]
 #[unsafe(no_mangle)]
-static mut MPU_DUMP: [u32; 12] = [0; 12];
+static mut MPU_DUMP: [u32; 12] = [0; 12]; // rlvgl-discipline: allow(static_mut)
 
 #[cfg(not(feature = "c_hal"))]
 #[inline(always)]
@@ -1273,10 +1190,20 @@ fn issue_sdram_command(
 fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
     unsafe {
         fmc.bcr1.modify(|_, w| w.fmcen().set_bit());
-        // SDCR1: shared bits only (SDCLK, RBURST, RPIPE)
+        // SDCR1: shared bits only (SDCLK, RBURST, RPIPE).
+        // SDCLK = 0b10 = fmc_ker_ck/2 per RM0399 Rev 4 §23.9.5.1
+        // (and RM0433 Rev 8 §22.9.5.1 for the H743 sibling). The previous
+        // `0b01` value was inherited from a CubeMX export; per the RM
+        // it is *Reserved*, not silicon-required. At PLL2_R 150 MHz the
+        // Reserved encoding produced a clock-like waveform but failed
+        // to decode column-address line A0 (byte-address bit 2), so
+        // adjacent 32-bit cells swapped on writeback. Reproduced on
+        // disco-analyzer + lvglpp; memalpha 2026-04-28 verified the
+        // RM encoding table. See docs/disco-platform-guide/03-sdram-and-fmc.md
+        // §"Change log" for the audit trail.
         fmc.sdbank1().sdcr.write(|w| {
             w.sdclk()
-                .bits(0b01) // Reserved per RM0399, but required on this silicon
+                .bits(0b10) // fmc_ker_ck/2 per RM0399 §23.9.5.1
                 .rburst()
                 .set_bit()
                 .rpipe()
@@ -1301,7 +1228,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
         // SDTR1: shared timing (TRP, TRC must be in SDTR1)
         // PAC sdbank1().sdtr offset = 0x144 = SDCR2 (known PAC bug).
         // Use raw write to SDTR1 at 0x148.
-        let sdtr1 = 0x5200_4148u32 as *mut u32;
+        let sdtr1 = 0x5200_4148u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         sdtr1.write_volatile(
             (1 << 20) // TRP = 2 cycles
             | (6 << 12), // TRC = 7 cycles
@@ -1309,7 +1236,7 @@ fn configure_fmc_sdram(fmc: &stm32h7::stm32h747cm7::fmc::RegisterBlock) {
         // SDTR2: bank-specific timing
         // PAC sdbank2().sdtr offset = 0x148 = SDTR1 (same PAC bug pattern).
         // Use raw write to SDTR2 at 0x14C.
-        let sdtr2 = 0x5200_414Cu32 as *mut u32;
+        let sdtr2 = 0x5200_414Cu32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         sdtr2.write_volatile(
             (1 << 24)   // TRCD = 2 cycles
             | (1 << 16) // TWR = 2 cycles
@@ -1430,18 +1357,18 @@ fn early_fmc_setup() {
     let fmc = unsafe { &*stm32h7::stm32h747cm7::FMC::ptr() };
     // D3 SRAM telemetry for early FMC init
     unsafe {
-        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32);
+        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0001u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
     configure_fmc_sdram(fmc);
     // Capture SDCR1, SDTR1, SDSR after init
     unsafe {
-        let sdcr1 = (0x5200_4140u32 as *const u32).read_volatile();
-        let sdtr1 = (0x5200_4148u32 as *const u32).read_volatile();
-        let sdsr = (0x5200_4158u32 as *const u32).read_volatile();
-        (0x3800_0204u32 as *mut u32).write_volatile(sdcr1);
-        (0x3800_0208u32 as *mut u32).write_volatile(sdtr1);
-        (0x3800_020Cu32 as *mut u32).write_volatile(sdsr);
-        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0002u32);
+        let sdcr1 = (0x5200_4140u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let sdtr1 = (0x5200_4148u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let sdsr = (0x5200_4158u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_0204u32 as *mut u32).write_volatile(sdcr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_0208u32 as *mut u32).write_volatile(sdtr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_020Cu32 as *mut u32).write_volatile(sdsr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x3800_0200u32 as *mut u32).write_volatile(0xF0C0_0002u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }
 
@@ -1453,20 +1380,20 @@ fn early_fmc_setup() {
 // TS_CAL2   = 0x1FF1_E840  (factory cal at 110 °C, 16-bit, VDDA=3.3 V)
 
 const ADC3_BASE: u32 = 0x5802_6000;
-const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32; // +0x00
-const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32; // +0x08
-const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32; // +0x18
-const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32; // +0x1C
-const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32; // +0x30
-const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08
+const ADC3_ISR: *mut u32 = ADC3_BASE as *mut u32; // +0x00 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_CR: *mut u32 = (ADC3_BASE + 0x08) as *mut u32; // +0x08 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_SMPR2: *mut u32 = (ADC3_BASE + 0x18) as *mut u32; // +0x18 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_PCSEL: *mut u32 = (ADC3_BASE + 0x1C) as *mut u32; // +0x1C // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_SQR1: *mut u32 = (ADC3_BASE + 0x30) as *mut u32; // +0x30 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+const ADC3_CCR: *mut u32 = (ADC3_BASE + 0x308) as *mut u32; // +0x300+0x08 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
 /// Initialise ADC3 for single-shot temperature sensor reads on channel 18.
 unsafe fn adc3_temp_init() {
     unsafe {
         // 1. Enable ADC3 clock (RCC_AHB4ENR bit 24)
-        let ahb4enr = 0x5802_44E0u32 as *mut u32;
+        let ahb4enr = 0x5802_44E0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         ahb4enr.write_volatile(ahb4enr.read_volatile() | (1 << 24));
-        let _ = (ahb4enr as *const u32).read_volatile(); // readback fence
+        let _ = (ahb4enr as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
         // 2. Exit deep power-down
         let cr = ADC3_CR.read_volatile();
@@ -1517,15 +1444,21 @@ unsafe fn adc3_temp_init() {
 }
 
 /// Cached junction temperature in tenths of °C.
-static mut CACHED_TEMP_X10: i32 = 0;
-/// Heap size in bytes.
+static mut CACHED_TEMP_X10: i32 = 0; // rlvgl-discipline: allow(static_mut)
+/// Heap size in bytes. FreeRTOS adds ~33KB to .bss (heap_4 + task stacks +
+/// TCBs) in the 128K DTCM, leaving less room for the main stack. Reduce
+/// the Rust heap when FreeRTOS is linked to avoid stack overflow.
+/// 64KB: settings wing draws 5 icons; Vec<Color> realloc needs headroom.
+#[cfg(feature = "freertos")]
+const HEAP_SIZE: usize = 64 * 1024;
+#[cfg(not(feature = "freertos"))]
 const HEAP_SIZE: usize = 64 * 1024;
 
 /// Static memory region used to service heap allocations.
-static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+static mut HEAP_MEM: [u8; HEAP_SIZE] = [0; HEAP_SIZE]; // rlvgl-discipline: allow(static_mut)
 
-/// Application entry point.
-#[cfg(not(doc))]
+/// Application entry point (bare-metal only).
+#[cfg(all(not(doc), not(feature = "zephyr")))]
 #[entry]
 fn main() -> ! {
     // Heap must be ready before any Rust allocation (including rlvgl_app_main).
@@ -1539,7 +1472,7 @@ fn main() -> ! {
     // which calls back into rlvgl_app_main() when hardware is ready.
     #[cfg(all(
         feature = "c_hal",
-        feature = "stm32h747i_disco_cm7",
+        feature = "cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
@@ -1554,13 +1487,13 @@ fn main() -> ! {
     // ── Rust HAL path (no c_hal feature) ────────────────────────────────────
     #[cfg(all(
         not(feature = "c_hal"),
-        feature = "stm32h747i_disco_cm7",
+        feature = "cm7",
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     {
         // D3 breadcrumb: very first thing in Rust HAL path
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0001u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // Early spin delay to give debuggers time to attach before
         // peripheral clocks and pin configuration. This is a coarse, cycle-based
@@ -1572,12 +1505,12 @@ fn main() -> ! {
         }
 
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0002u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-delay
         let mut cp = cortex_m::Peripherals::take().unwrap();
         configure_mpu_regions(&mut cp);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0003u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-MPU
 
         use core::convert::Infallible;
@@ -1587,10 +1520,10 @@ fn main() -> ! {
             digital::InputPin,
             pwm::{ErrorType as PwmError, SetDutyCycle},
         };
-        use rlvgl::core::event::{Event, Key};
+        use rlvgl_core::event::{Event, Key};
         #[cfg(feature = "sd_storage")]
-        use rlvgl::platform::SdMmcBlockDev;
-        use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay};
+        use rlvgl_platform::SdMmcBlockDev;
+        use rlvgl_platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay};
         use stm32h7xx_hal::prelude::*;
 
         // Backlight adapter using a HAL GPIO pin as a stand-in for PWM
@@ -1647,7 +1580,10 @@ fn main() -> ! {
         }
         impl<B: InputPin> InputDevice for ButtonInput<B> {
             fn poll(&mut self) -> Option<Event> {
-                let pressed = self.button.is_low().ok()?;
+                // PC13 (B2 wakeup button) on STM32H747I-DISCO is active HIGH:
+                // external pull-down holds the pin LOW when released; pressing
+                // connects PC13 to VDD, reading HIGH.
+                let pressed = self.button.is_high().ok()?;
                 match (pressed, self.last) {
                     (true, false) => {
                         self.last = true;
@@ -1765,6 +1701,14 @@ fn main() -> ! {
         use stm32h7xx_hal::rcc::{PllConfigStrategy, ResetEnable};
         let rcc = RCC.constrain();
         let mut syscfg = SYSCFG;
+        // FreeRTOS: disable SysTick BEFORE HAL freeze() to prevent the
+        // FreeRTOS SysTick handler from running on uninitialized data.
+        // The HAL's freeze() enables SysTick for delay functions; even
+        // one tick through xPortSysTickHandler corrupts scheduler state.
+        #[cfg(feature = "freertos")]
+        unsafe {
+            (0xE000_E010u32 as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
         // HAL RCC: derive SYSCLK and LTDC pixel clock (via PLL3R)
         // Assumes HSE=25 MHz on H747I-DISCO. Adjust if using HSI or a different crystal.
         let ccdr = rcc
@@ -1780,6 +1724,15 @@ fn main() -> ! {
             // Target ~33 MHz pixel clock for 800x480 panel bring-up
             .pll3_r_ck(32.MHz())
             .freeze(vos, &mut syscfg);
+        // HAL freeze() enables SysTick for its delay functions. In
+        // FreeRTOS builds, the SysTick vector points to xPortSysTickHandler
+        // which operates on uninitialized scheduler data — disable SysTick
+        // immediately. The FreeRTOS port re-enables it in vTaskStartScheduler.
+        #[cfg(feature = "freertos")]
+        unsafe {
+            const SYST_CSR: *mut u32 = 0xE000_E010 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            SYST_CSR.write_volatile(0); // disable SysTick
+        }
         // Enable display-related peripherals in D1 domain
         let _ = ccdr.peripheral.LTDC.enable();
         let _ = ccdr.peripheral.DMA2D.enable();
@@ -1789,7 +1742,7 @@ fn main() -> ! {
         // Without PLL3R running, LTDC register reads hang (no pixel clock domain).
         // Force PLL3ON and wait for PLL3RDY.
         unsafe {
-            const RCC_CR: *mut u32 = 0x5802_4400u32 as *mut u32;
+            const RCC_CR: *mut u32 = 0x5802_4400u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             RCC_CR.write_volatile(RCC_CR.read_volatile() | (1 << 28)); // PLL3ON
             while RCC_CR.read_volatile() & (1 << 29) == 0 {} // wait PLL3RDY
         }
@@ -1800,7 +1753,7 @@ fn main() -> ! {
             let _ = bsp_pac::signal_clocks_ready();
         }
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // pre-gpio-split
         let gpioj = GPIOJ.split(ccdr.peripheral.GPIOJ);
         let gpiog = GPIOG.split(ccdr.peripheral.GPIOG);
@@ -1814,7 +1767,7 @@ fn main() -> ! {
         #[cfg(feature = "qspi_flash")]
         let gpiob = GPIOB.split(ccdr.peripheral.GPIOB);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0006u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-gpio-split
 
         // ── ADC3 temperature sensor ──────────────────────────────────────
@@ -1904,19 +1857,19 @@ fn main() -> ! {
         af12_high!(gpioi.pi9);
         af12_high!(gpioi.pi10);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0007u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-FMC-pins
 
         // ── QSPI flash init (MT25TL01G Bank 1) ──────────────────────────
         #[cfg(feature = "qspi_flash")]
         let qspi_flash = {
-            use rlvgl::platform::Mt25tlFlash;
+            use rlvgl_platform::Mt25tlFlash;
             use stm32h7xx_hal::xspi;
 
             // Errata 2.8.5: Select PLL2R (150 MHz) as QSPI kernel clock
             // D1CCIPR QSPISEL bits [5:4]: 00=HCLK, 01=PLL1Q, 10=PLL2R, 11=PER
             unsafe {
-                let d1ccipr = 0x5802_4C18u32 as *mut u32;
+                let d1ccipr = 0x5802_4C18u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let val = d1ccipr.read_volatile();
                 d1ccipr.write_volatile((val & !(0b11 << 4)) | (0b10 << 4));
             }
@@ -1943,14 +1896,14 @@ fn main() -> ! {
                 Ok(id) => {
                     unsafe {
                         // Breadcrumb: write JEDEC ID to D3 SRAM for debug
-                        let bc = 0x3800_0320u32 as *mut u32;
+                        let bc = 0x3800_0320u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         bc.write_volatile(
                             0x0F00_0000 | (id[0] as u32) << 16 | (id[1] as u32) << 8 | id[2] as u32,
                         );
                     }
                 }
                 Err(_) => unsafe {
-                    (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD);
+                    (0x3800_0320u32 as *mut u32).write_volatile(0xDEAD_DEAD); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 },
             }
             flash
@@ -2023,32 +1976,31 @@ fn main() -> ! {
         // Addresses from C HAL path (RCC C1 domain registers at 0x5802_44xx)
         unsafe {
             // Enable GPIOA clock (AHB4ENR at RCC+0xE0)
-            let ahb4 = 0x5802_44E0u32 as *mut u32; // global AHB4ENR
+            let ahb4 = 0x5802_44E0u32 as *mut u32; // global AHB4ENR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ahb4.write_volatile(ahb4.read_volatile() | (1 << 0));
-            let _ = (ahb4 as *const u32).read_volatile();
+            let _ = (ahb4 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits [7:4]=7 (PA9), [11:8]=7 (PA10)
             let gpioa = 0x5802_0000u32;
-            let afrh = (gpioa + 0x24) as *mut u32;
+            let afrh = (gpioa + 0x24) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             afrh.write_volatile(
                 (afrh.read_volatile() & !(0xFFu32 << 4)) | (7u32 << 4) | (7u32 << 8),
             );
             // MODER: PA9 = AF (10), PA10 = AF (10)
-            let moder = gpioa as *mut u32;
+            let moder = gpioa as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             moder.write_volatile((moder.read_volatile() & !(0xF << 18)) | (0b1010 << 18));
             // Enable USART1 clock (C1_APB2ENR bit 4)
-            let apb2 = 0x5802_44F0u32 as *mut u32;
+            let apb2 = 0x5802_44F0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             apb2.write_volatile(apb2.read_volatile() | (1 << 4));
-            let _ = (apb2 as *const u32).read_volatile();
+            let _ = (apb2 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // USART1 config: BRR=868 (100 MHz / 115200), TE+RE+UE+FIFOEN
             let usart1 = 0x4001_1000u32;
-            ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR
-            ((usart1 + 0x00) as *mut u32).write_volatile(
-                (1 << 29) | (1 << 3) | (1 << 2) | (1 << 0), // FIFOEN + TE + RE + UE
-            );
+            ((usart1 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            ((usart1 + 0x00) as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                .write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE
         }
 
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0010u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // pre-display::new
         let mut display = Stm32h747iDiscoDisplay::new(
             blitter,
@@ -2062,12 +2014,12 @@ fn main() -> ! {
             Some(SPLASH_RLE),
         );
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-display::new
         // Early serial breadcrumb (serial_puts not yet defined)
         {
-            const ISR: *const u32 = 0x4001_101C as *const u32;
-            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            const ISR: *const u32 = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for &b in b"POST-DISP\r\n" {
                 unsafe {
                     while ISR.read_volatile() & (1 << 7) == 0 {}
@@ -2105,11 +2057,11 @@ fn main() -> ! {
 
                     // Pattern 1: solid zeros
                     for i in 0..STRIDE {
-                        let p = (mb_base as *mut u32).add(i * 8);
+                        let p = (mb_base as *mut u32).add(i * 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p.write_volatile(0x0000_0000);
                     }
                     for i in 0..STRIDE {
-                        let p = (mb_base as *const u32).add(i * 8);
+                        let p = (mb_base as *const u32).add(i * 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p.read_volatile() != 0x0000_0000 {
                             errs += 1;
                         }
@@ -2117,11 +2069,11 @@ fn main() -> ! {
 
                     // Pattern 2: solid ones
                     for i in 0..STRIDE {
-                        let p = (mb_base as *mut u32).add(i * 8 + 1);
+                        let p = (mb_base as *mut u32).add(i * 8 + 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p.write_volatile(0xFFFF_FFFF);
                     }
                     for i in 0..STRIDE {
-                        let p = (mb_base as *const u32).add(i * 8 + 1);
+                        let p = (mb_base as *const u32).add(i * 8 + 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p.read_volatile() != 0xFFFF_FFFF {
                             errs += 1;
                         }
@@ -2129,12 +2081,12 @@ fn main() -> ! {
 
                     // Pattern 3: address-based
                     for i in 0..STRIDE {
-                        let p = (mb_base as *mut u32).add(i * 8 + 2);
+                        let p = (mb_base as *mut u32).add(i * 8 + 2); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         let v = (mb_base as u32).wrapping_add((i as u32) << 4);
                         p.write_volatile(v);
                     }
                     for i in 0..STRIDE {
-                        let p = (mb_base as *const u32).add(i * 8 + 2);
+                        let p = (mb_base as *const u32).add(i * 8 + 2); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         let v = (mb_base as u32).wrapping_add((i as u32) << 4);
                         if p.read_volatile() != v {
                             errs += 1;
@@ -2143,14 +2095,14 @@ fn main() -> ! {
 
                     // Pattern 4: checkerboard
                     for i in 0..STRIDE {
-                        let p0 = (mb_base as *mut u32).add(i * 8 + 3);
-                        let p1 = (mb_base as *mut u32).add(i * 8 + 4);
+                        let p0 = (mb_base as *mut u32).add(i * 8 + 3); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        let p1 = (mb_base as *mut u32).add(i * 8 + 4); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p0.write_volatile(0xAAAA_AAAA);
                         p1.write_volatile(0x5555_5555);
                     }
                     for i in 0..STRIDE {
-                        let p0 = (mb_base as *const u32).add(i * 8 + 3);
-                        let p1 = (mb_base as *const u32).add(i * 8 + 4);
+                        let p0 = (mb_base as *const u32).add(i * 8 + 3); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        let p1 = (mb_base as *const u32).add(i * 8 + 4); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p0.read_volatile() != 0xAAAA_AAAA {
                             errs += 1;
                         }
@@ -2166,7 +2118,7 @@ fn main() -> ! {
                         seed ^= seed << 13;
                         seed ^= seed >> 17;
                         seed ^= seed << 5;
-                        let p = (mb_base as *mut u32).add(i * 8 + 5);
+                        let p = (mb_base as *mut u32).add(i * 8 + 5); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         p.write_volatile(seed);
                     }
                     let mut seed2: u32 = 0xC0FF_EE11 ^ (mb as u32 * 0x9E37_79B9);
@@ -2174,7 +2126,7 @@ fn main() -> ! {
                         seed2 ^= seed2 << 13;
                         seed2 ^= seed2 >> 17;
                         seed2 ^= seed2 << 5;
-                        let p = (mb_base as *const u32).add(i * 8 + 5);
+                        let p = (mb_base as *const u32).add(i * 8 + 5); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if p.read_volatile() != seed2 {
                             errs += 1;
                         }
@@ -2189,18 +2141,20 @@ fn main() -> ! {
 
         // ── I2C4 for FT5336 touch controller (PD12=SCL, PD13=SDA, AF4 OD) ──
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0020u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // pre-I2C4
         let _scl = gpiod.pd12.into_alternate_open_drain::<4>();
         let _sda = gpiod.pd13.into_alternate_open_drain::<4>();
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0021u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-I2C4-pins
-        let i2c4 =
+        let mut i2c4 =
             stm32h7xx_hal::i2c::I2c::i2c4(I2C4, 400.kHz(), ccdr.peripheral.I2C4, &ccdr.clocks);
         unsafe {
-            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32);
+            (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0022u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-I2C4-init
+        // FT5336 CTRL init deferred — HAL I2C writes hang the bus.
+        // Touch needs PG3 reset re-sequencing (separate task).
         // Wrap for embedded-hal 1.0 (stm32h7xx-hal I2c implements eh 0.2 I2C)
         #[cfg(feature = "audio")]
         struct HalI2c<I>(I);
@@ -2244,8 +2198,8 @@ fn main() -> ! {
             }
         }
         {
-            const ISR: *const u32 = 0x4001_101C as *const u32;
-            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            const ISR: *const u32 = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for &b in b"PRE-AUDIO\r\n" {
                 unsafe {
                     while ISR.read_volatile() & (1 << 7) == 0 {}
@@ -2256,14 +2210,16 @@ fn main() -> ! {
         // ── Audio codec init (before touch claims I2C4) ──
         #[cfg(feature = "audio")]
         let sai = {
-            use rlvgl::platform::Sai1Audio;
+            use rlvgl_platform::Sai1Audio;
+
             let sai = Sai1Audio::new();
             sai.enable_clock(1); // 1 = PLL2_P
+
             sai
         };
         #[cfg(feature = "audio")]
         let i2c4 = {
-            use rlvgl::platform::Wm8994;
+            use rlvgl_platform::Wm8994;
 
             // SAI1 GPIO pins (AF6, VeryHigh speed)
             let _sai1_mclk = gpiog.pg7.into_alternate::<6>().speed(Speed::VeryHigh);
@@ -2283,10 +2239,11 @@ fn main() -> ! {
             // configures FLL for exact audio clocking, and sets up DAC routing.
             // PLL2_P provides the SAI1 kernel clock; MCKDIV=0 means MCLK = kernel_ck.
             // The WM8994 FLL locks to whatever MCLK we provide.
+
             let _ = codec.init_playback(
                 48_000,
                 150_000_000, // approximate MCLK from PLL2_P
-                rlvgl::platform::wm8994::OutputDevice::Headphone,
+                rlvgl_platform::wm8994::OutputDevice::Headphone,
             );
 
             // Enable SAI1 TX — codec is now receiving I2S frames
@@ -2297,13 +2254,15 @@ fn main() -> ! {
             let _sai4_d1 = gpioc.pc1.into_alternate::<10>();
 
             // Release I2C4 back so touch can use it
+
             codec.release().0
         };
         #[cfg(not(feature = "audio"))]
         let i2c4 = i2c4;
+
         {
-            const ISR: *const u32 = 0x4001_101C as *const u32;
-            const TDR: *mut u32 = 0x4001_1028 as *mut u32;
+            const ISR: *const u32 = 0x4001_101C as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            const TDR: *mut u32 = 0x4001_1028 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             for &b in b"POST-AUDIO\r\n" {
                 unsafe {
                     while ISR.read_volatile() & (1 << 7) == 0 {}
@@ -2320,18 +2279,22 @@ fn main() -> ! {
         let _pk7 = gpiok.pk7.into_floating_input();
 
         // ── TIM6 at 120 Hz for interrupt-driven touch sampling ──
+        // Bare-metal: ISR does full I2C reads.
+        // FreeRTOS: ISR just clears UIF; touch_task handles I2C reads.
+        // TIM6 must fire in both builds — disabling it prevents FT5336
+        // sensor calibration from completing.
         unsafe {
             // Enable TIM6 clock (RCC APB1LENR bit 4)
-            let apb1lenr = 0x5802_44E8u32 as *mut u32;
+            let apb1lenr = 0x5802_44E8u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             apb1lenr.write_volatile(apb1lenr.read_volatile() | (1 << 4));
-            let _ = (apb1lenr as *const u32).read_volatile(); // readback fence
+            let _ = (apb1lenr as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             let tim6 = 0x4000_1000u32;
-            let tim6_cr1 = tim6 as *mut u32; // +0x00
-            let tim6_dier = (tim6 + 0x0C) as *mut u32; // +0x0C
-            let tim6_egr = (tim6 + 0x14) as *mut u32; // +0x14
-            let tim6_psc = (tim6 + 0x28) as *mut u32; // +0x28
-            let tim6_arr = (tim6 + 0x2C) as *mut u32; // +0x2C
+            let tim6_cr1 = tim6 as *mut u32; // +0x00 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_dier = (tim6 + 0x0C) as *mut u32; // +0x0C // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_egr = (tim6 + 0x14) as *mut u32; // +0x14 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_psc = (tim6 + 0x28) as *mut u32; // +0x28 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let tim6_arr = (tim6 + 0x2C) as *mut u32; // +0x2C // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Timer clock = 2 × APB1 = 200 MHz (APB1 prescaler > 1)
             // 200 MHz / (199+1) = 1 MHz tick, / (8332+1) = 120.0 Hz
@@ -2340,7 +2303,7 @@ fn main() -> ! {
             tim6_dier.write_volatile(1); // UIE — update interrupt enable
             tim6_egr.write_volatile(1); // UG  — force load PSC/ARR shadow
             // Clear any pending UIF before enabling
-            let tim6_sr = (tim6 + 0x10) as *mut u32;
+            let tim6_sr = (tim6 + 0x10) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             tim6_sr.write_volatile(0);
             tim6_cr1.write_volatile(1); // CEN — start counter
 
@@ -2367,8 +2330,10 @@ fn main() -> ! {
             display_width: display.dimensions().0 as u16,
         };
 
-        // ── Real button: PC13 wakeup button (active-low, external pull-up) ──
-        let button = HalInputPin(gpioc.pc13.into_floating_input());
+        // ── Real button: PC13 B2 wakeup button (active HIGH, external pull-down) ──
+        // Configure internal pull-down for a defined LOW idle state; the
+        // button pulls the pin HIGH when pressed.
+        let button = HalInputPin(gpioc.pc13.into_pull_down_input());
         let mut button_input = ButtonInput::new(button);
 
         // ── Joystick: PK2=SEL, PK3=DOWN, PK4=LEFT, PK5=RIGHT, PK6=UP ──
@@ -2386,21 +2351,21 @@ fn main() -> ! {
         // root container that paints over the SDRAM splash. We use an invisible
         // root that produces no pixels — the splash survives in the framebuffer
         // and the EventWindow draws on top when visible.
-        use rlvgl::core::WidgetNode;
+        use rlvgl_core::WidgetNode;
 
         /// Root widget that draws nothing (splash stays in the framebuffer).
         struct InvisibleRoot;
-        impl rlvgl::core::widget::Widget for InvisibleRoot {
-            fn bounds(&self) -> rlvgl::core::widget::Rect {
+        impl rlvgl_core::widget::Widget for InvisibleRoot {
+            fn bounds(&self) -> rlvgl_core::widget::Rect {
                 // Landscape widget space: 800 wide × 480 tall
-                rlvgl::core::widget::Rect {
+                rlvgl_core::widget::Rect {
                     x: 0,
                     y: 0,
                     width: 800,
                     height: 480,
                 }
             }
-            fn draw(&self, _renderer: &mut dyn rlvgl::core::renderer::Renderer) {}
+            fn draw(&self, _renderer: &mut dyn rlvgl_core::renderer::Renderer) {}
             fn handle_event(&mut self, _event: &Event) -> bool {
                 false
             }
@@ -2409,33 +2374,91 @@ fn main() -> ! {
         let root = Rc::new(RefCell::new(WidgetNode {
             widget: Rc::new(RefCell::new(InvisibleRoot)),
             children: alloc::vec![],
+            tag: None,
         }));
 
         // ── Audio player (created before SD block, started after WAV load) ──
+        //
+        // DCB-02b retrofit (2026-05-02): the M0/M1 banks at 0xD048_0000
+        // / 0xD048_1000 are now wrapped in a `DcaDoubleBuf<u8, 4096>`
+        // built once via `from_addrs`. The player consumes that DCA
+        // when `start()` is called and holds the resulting `DbufRead`
+        // for the playback's lifetime; the cache clean previously
+        // emitted by the player's private `clean_dcache(ptr, len)`
+        // helper (DCCMVAC raw write) is now handled by `BankGuard<Read>`
+        // construction inside `refill_done`.
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_BUF0: u32 = 0xD048_0000;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_BUF1: u32 = 0xD048_1000;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        const AUDIO_BUF_SIZE: usize = 4096;
+        // DcaDoubleBuf for the audio buffer pair, built once via
+        // from_addrs and pinned in a static so the player's
+        // DbufRead<'static, 'static, ...> can reference it.
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        let audio_dca: &'static mut rlvgl_platform::hwcore::dca::DcaDoubleBuf<
+            // rlvgl-discipline: allow(static_mut)
+            'static,
+            u8,
+            AUDIO_BUF_SIZE,
+        > = {
+            use core::mem::MaybeUninit;
+            use core::sync::atomic::{AtomicBool, Ordering};
+            use rlvgl_platform::hwcore::dca::DcaDoubleBuf;
+            static AUDIO_DCA_INIT: AtomicBool = AtomicBool::new(false);
+            static mut AUDIO_DCA: MaybeUninit<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>> =
+                // rlvgl-discipline: allow(static_mut)
+                MaybeUninit::uninit();
+            // SAFETY: AtomicBool gates the once-only `from_addrs` write;
+            // subsequent reads via the raw pointer chain return a
+            // `&'static mut` to the initialised DCA. The two banks
+            // (AUDIO_BUF0 / AUDIO_BUF1) are dedicated SDRAM regions —
+            // no other code holds references to them.
+            unsafe {
+                if !AUDIO_DCA_INIT.swap(true, Ordering::AcqRel) {
+                    (&raw mut AUDIO_DCA).write(MaybeUninit::new(DcaDoubleBuf::from_addrs(
+                        AUDIO_BUF0 as usize,
+                        AUDIO_BUF1 as usize,
+                    )));
+                }
+                &mut *(&raw mut AUDIO_DCA).cast::<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>>()
+            }
+        };
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         let mut audio_player = {
-            use rlvgl::platform::AudioPlayer;
-            const AUDIO_BUF0: u32 = 0xD048_0000;
-            const AUDIO_BUF1: u32 = 0xD048_1000;
-            const AUDIO_BUF_SIZE: usize = 4096;
-            AudioPlayer::new(AUDIO_BUF0 as *mut u8, AUDIO_BUF1 as *mut u8, AUDIO_BUF_SIZE)
+            use rlvgl_platform::AudioPlayer;
+            // SAFETY: per DCB-00 §9 INV-D13, AudioPlayer::new takes
+            // ownership of the SCB peripheral via Peripherals::steal.
+            // No other &mut SCB owner overlaps the player's lifetime
+            // in this binary; the disco firmware acquires `cp` once
+            // at line 1510 (cortex_m::Peripherals::take) but does not
+            // hold cp.SCB across this scope, so the player's stolen
+            // SCB is the sole owner. `audio_dca` is the
+            // freshly-constructed `&'static mut DcaDoubleBuf` from
+            // the once-only init above; no parallel reference to it
+            // exists.
+            unsafe { AudioPlayer::<AUDIO_BUF_SIZE>::new(audio_dca) }
         };
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         const AUDIO_PCM_BASE: u32 = 0xD048_2000;
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
         let mut audio_pcm_len: u32 = 0;
 
+        // Card detect: PI8 is active-low (low = card inserted).
+        // Captured outside the SDMMC init block so it survives for
+        // dev_storage.set_sd_present() later.
         #[cfg(feature = "sd_storage")]
-        let mut sd_card_detected = false;
+        let sd_card_detected = {
+            let sd_detect = gpioi.pi8.into_pull_up_input();
+            sd_detect.is_low()
+        };
         #[cfg(feature = "sd_storage")]
         {
             use rlvgl_i18n::t;
             use stm32h7xx_hal::gpio::Alternate;
 
-            // Card detect: PI8 is active-low (low = card inserted)
-            let sd_detect = gpioi.pi8.into_pull_up_input();
-            let card_present = sd_detect.is_low();
-            sd_card_detected = card_present;
+            let card_present = sd_card_detected;
 
             // SDMMC1 pins: PC12=CK, PD2=CMD, PC8..PC11=D0..D3 (AF12)
             use stm32h7xx_hal::sdmmc::SdmmcExt;
@@ -2460,7 +2483,7 @@ fn main() -> ! {
             let sd_msg: &str = if !card_present {
                 t!("hw.sd_no_card")
             } else {
-                use rlvgl::platform::sd_emmc_adapter as sda;
+                use rlvgl_platform::sd_emmc_adapter as sda;
                 let volume_mgr = embedded_sdmmc::VolumeManager::new(bd, sda::DummyTimeSource);
                 match volume_mgr.open_volume(embedded_sdmmc::VolumeIdx(0)) {
                     Ok(volume) => {
@@ -2501,7 +2524,7 @@ fn main() -> ! {
                                     ) {
                                         let mut hdr_buf = [0u8; 256];
                                         if let Ok(hdr_len) = f.read(&mut hdr_buf) {
-                                            if let Ok(wav_hdr) = rlvgl::platform::parse_wav_header(
+                                            if let Ok(wav_hdr) = rlvgl_platform::parse_wav_header(
                                                 &hdr_buf[..hdr_len],
                                             ) {
                                                 let pcm_max: usize = 24 * 1024 * 1024;
@@ -2610,10 +2633,10 @@ fn main() -> ! {
         // ── EventWindow widget (replaces direct-framebuffer toasts) ──────
         use alloc::rc::Rc;
         use core::cell::RefCell;
-        use rlvgl::core::bitmap_font::FONT_6X10;
-        use rlvgl::platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
-        use rlvgl::ui::EventWindowBuilder;
+        use rlvgl_core::bitmap_font::FONT_6X10;
         use rlvgl_i18n::t;
+        use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
+        use rlvgl_ui::EventWindowBuilder;
 
         let event_win = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10)
@@ -2622,10 +2645,32 @@ fn main() -> ! {
                 .build(),
         ));
 
-        root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+        root.borrow_mut().children.push(rlvgl_core::WidgetNode {
             widget: event_win.clone(),
             children: alloc::vec![],
+            tag: None,
         });
+
+        // ── Clock demo widget (opt-in via `clock_demo` feature) ──────────
+        // 256x256 face roughly centered horizontally, vertically aligned
+        // with the desktop area. Driven by `tick_count` further down.
+        #[cfg(feature = "clock_demo")]
+        let clock_demo = {
+            const FACE_SIZE: i32 = 256;
+            let bounds = rlvgl_core::widget::Rect {
+                x: (800 - FACE_SIZE) / 2,
+                y: (480 - FACE_SIZE) / 2,
+                width: FACE_SIZE,
+                height: FACE_SIZE,
+            };
+            let demo = clock_demo::ClockDemo::new(bounds, 4.0 * 3600.0 + 30.0 * 60.0, 30.0);
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
+                widget: demo.widget(),
+                children: alloc::vec![],
+                tag: Some("clock"),
+            });
+            demo
+        };
 
         // Enable DMA2D rendering mode for the event window so its draw()
         // becomes a no-op — the DMA2D overlay pipeline handles it.
@@ -2645,7 +2690,7 @@ fn main() -> ! {
         let (w_fb, h_fb) = display.dimensions();
 
         unsafe {
-            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001);
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         // ── Icon strip (right edge, 3 slots) + wings ────────────────────
         // Shared crawl toggle flag — set by info wing favicon callback.
@@ -2661,7 +2706,7 @@ fn main() -> ! {
 
         // Wings are created first so icon strip callbacks can reference them.
         let settings_wing = {
-            use crate::wing::Wing;
+            use rlvgl_app_disco_demo::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
                 (include_bytes!("../assets/icons/48/audio48.rle"), true),
                 (include_bytes!("../assets/icons/48/camera48.rle"), false),
@@ -2672,7 +2717,7 @@ fn main() -> ! {
         };
 
         let info_wing = {
-            use crate::wing::Wing;
+            use rlvgl_app_disco_demo::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
                 (include_bytes!("../assets/icons/48/cpu48.rle"), true), // Chip info
                 (include_bytes!("../assets/icons/48/monitor48.rle"), true), // Live stats
@@ -2683,7 +2728,7 @@ fn main() -> ! {
 
         // ── Config menu (language + debug settings) ──────────────────────
         let config_menu = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
                 height: 24,
@@ -2694,7 +2739,7 @@ fn main() -> ! {
             let cur_locale = rlvgl_i18n::locale() as u8;
             let ew_clone = event_win.clone();
             let cm = crate::config_menu::ConfigMenu::new(
-                rlvgl::core::widget::Rect {
+                rlvgl_core::widget::Rect {
                     x: 0,
                     y: 0,
                     width: 0,
@@ -2748,7 +2793,7 @@ fn main() -> ! {
         serial_puts("PRE-SIP\r\n");
         // ── System info panels (static + dynamic) ──────────────────────
         let (chip_info_panel, live_stats_panel) = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT: PackedFont = PackedFont {
                 height: 24,
@@ -2764,7 +2809,7 @@ fn main() -> ! {
 
         // ── File browser panel ────────────────────────────────────────────
         let file_browser_panel = {
-            use rlvgl::core::packed_font::PackedFont;
+            use rlvgl_core::packed_font::PackedFont;
             static FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-24.bin");
             static UI_FONT_FB: PackedFont = PackedFont {
                 height: 24,
@@ -2780,7 +2825,7 @@ fn main() -> ! {
             dev_storage.set_qspi(qspi_flash.clone());
             #[cfg(feature = "sd_storage")]
             dev_storage.set_sd_present(sd_card_detected);
-            let storage: Rc<RefCell<dyn rlvgl::ui::file_browser::StorageBrowser>> =
+            let storage: Rc<RefCell<dyn rlvgl_ui::file_browser::StorageBrowser>> =
                 Rc::new(RefCell::new(dev_storage));
             Rc::new(RefCell::new(
                 crate::file_browser_panel::FileBrowserPanel::new(&UI_FONT_FB, storage),
@@ -2831,14 +2876,46 @@ fn main() -> ! {
             }));
         }
 
+        // Outer-scope handle for the icon strip; populated inside the
+        // block below so the joystick handler (further down the main
+        // body) can update the focus index without restructuring the
+        // existing widget composition flow.
+        let mut _icon_strip_handle: Option<
+            Rc<RefCell<rlvgl_app_disco_demo::icon_strip::IconStrip>>,
+        > = None;
+        // Joystick focus state. Hidden until the operator engages the
+        // joystick (matches disco-demo's "no focus on cold boot" UX).
+        let mut app_focus = AppFocus::Main(0);
+        let mut app_focus_visible: bool = false;
+
+        // Icon strip layout constants — also used by the joystick handler
+        // below to compute the focused slot's center for synthesizing
+        // a `PressRelease` event on Enter. Disco-demo's `IconStrip` does
+        // not expose `slot_center` publicly; the math is duplicated here.
+        const ICON_STRIP_X: i32 = 730;
+        const ICON_STRIP_ICON_SIZE: i32 = 60;
+        const ICON_STRIP_MARGIN_TOP: i32 = 17;
+        const ICON_STRIP_GAP: i32 = 10;
+        const ICON_STRIP_SLOT_COUNT: usize = rlvgl_app_disco_demo::icon_strip::SLOT_COUNT;
+        // Wing layout constants — mirror the private constants in
+        // disco-demo's `wing.rs` (WING_X / ICON_SIZE / MARGIN_TOP / GAP).
+        // Used by the joystick handler to synthesize a `PressRelease`
+        // at a wing slot's center on Enter.
+        const WING_X: i32 = 10;
+        const WING_ICON_SIZE: i32 = 60;
+        const WING_MARGIN_TOP: i32 = 17;
+        const WING_GAP: i32 = 10;
+        const SETTINGS_WING_SLOTS: usize = 5; // see settings_wing icons array
+        const INFO_WING_SLOTS: usize = 4; // see info_wing icons array
+
         {
-            use crate::icon_strip::{IconSlot, IconStrip};
+            use rlvgl_app_disco_demo::icon_strip::{IconSlot, IconStrip};
 
             let mut strip = IconStrip::new(
-                730, // x position
-                60,  // icon size
-                17,  // margin top
-                10,  // gap between icons
+                ICON_STRIP_X,
+                ICON_STRIP_ICON_SIZE,
+                ICON_STRIP_MARGIN_TOP,
+                ICON_STRIP_GAP,
             );
 
             let icons: [(&[u8], bool); 3] = [
@@ -2866,11 +2943,8 @@ fn main() -> ! {
                     iw.borrow_mut().close();
                     let vis = sw.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A0u32 as *mut u32).write_volatile(if vis {
-                            0x5E77_0001
-                        } else {
-                            0x5E77_0000
-                        });
+                        let p = 0x3800_06A0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        p.write_volatile(if vis { 0x5E77_0001 } else { 0x5E77_0000 });
                     }
                 }));
 
@@ -2889,59 +2963,70 @@ fn main() -> ! {
                     sw2.borrow_mut().close();
                     let vis = iw2.borrow_mut().toggle_visible();
                     unsafe {
-                        (0x3800_06A4u32 as *mut u32).write_volatile(if vis {
-                            0x1AF0_0001
-                        } else {
-                            0x1AF0_0000
-                        });
+                        let p = 0x3800_06A4u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        p.write_volatile(if vis { 0x1AF0_0001 } else { 0x1AF0_0000 });
                     }
                 }));
 
             // Overlays dispatched first so they receive events when visible.
             // Config menu (highest priority — modal)
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: config_menu.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // Info panels consume taps to close themselves.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: chip_info_panel.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: live_stats_panel.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // File browser panel — same priority as info panels.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: file_browser_panel.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // Wings next — on the left edge, get events before icon strip.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: settings_wing.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: info_wing.clone(),
                 children: alloc::vec![],
+                tag: None,
             });
             // Icon strip last — only gets events when no overlays are active.
-            root.borrow_mut().children.push(rlvgl::core::WidgetNode {
-                widget: Rc::new(RefCell::new(strip)),
+            // Wrap the strip in an Rc so the joystick handler (declared
+            // outside this scope) can update its focus index. The Rc
+            // is moved out via the outer-scope `_icon_strip_handle` slot
+            // below.
+            let icon_strip_rc: Rc<RefCell<rlvgl_app_disco_demo::icon_strip::IconStrip>> =
+                Rc::new(RefCell::new(strip));
+            _icon_strip_handle = Some(icon_strip_rc.clone());
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
+                widget: icon_strip_rc,
                 children: alloc::vec![],
+                tag: None,
             });
         }
 
         serial_puts("PRE-FB2\r\n");
         unsafe {
-            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003);
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0003); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         let fb_bytes = (w_fb * h_fb * 4) as usize;
         const SDRAM_BANK_STRIDE: u32 = 0x0080_0000;
         const FB2_ADDR: u32 = 0xD080_0000; // SDRAM internal bank 1
-        let front_addr = display.front_buffer_addr();
-        let back_addr = display.back_buffer_addr();
+        let front_addr = display.front_phys().raw();
+        let back_addr = display.back_phys().raw();
         let same_buffer = back_addr == front_addr;
         let same_bank = ((back_addr - 0xD000_0000) / SDRAM_BANK_STRIDE)
             == ((front_addr - 0xD000_0000) / SDRAM_BANK_STRIDE);
@@ -2955,7 +3040,7 @@ fn main() -> ! {
                 );
                 cortex_m::asm::dsb();
             }
-            display.set_back_buffer(FB2_ADDR);
+            display.set_back_phys(rlvgl_platform::PhysAddr::new(FB2_ADDR));
         }
 
         // ── Desktop background ────────────────────────────────────────────
@@ -2973,7 +3058,7 @@ fn main() -> ! {
                 palette[i] = u16::from_le_bytes([pal_bytes[i * 2], pal_bytes[i * 2 + 1]]);
             }
             let fb0 = unsafe {
-                core::slice::from_raw_parts_mut(display.front_buffer_addr() as *mut u8, fb_bytes)
+                core::slice::from_raw_parts_mut(display.front_phys().raw() as *mut u8, fb_bytes)
             };
             let _ = rlvgl_decomp::decode_argb_into(
                 dw as usize,
@@ -2983,7 +3068,7 @@ fn main() -> ! {
                 fb0,
             );
             let fb1 = unsafe {
-                core::slice::from_raw_parts_mut(display.back_buffer_addr() as *mut u8, fb_bytes)
+                core::slice::from_raw_parts_mut(display.back_phys().raw() as *mut u8, fb_bytes)
             };
             let _ = rlvgl_decomp::decode_argb_into(
                 dw as usize,
@@ -2998,8 +3083,8 @@ fn main() -> ! {
 
         // Telemetry: write both fb addresses
         unsafe {
-            (0x3800_0620u32 as *mut u32).write_volatile(display.front_buffer_addr());
-            (0x3800_0624u32 as *mut u32).write_volatile(display.back_buffer_addr());
+            (0x3800_0620u32 as *mut u32).write_volatile(display.front_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x3800_0624u32 as *mut u32).write_volatile(display.back_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         // Save a pristine copy of the desktop framebuffer so we can restore
@@ -3009,7 +3094,7 @@ fn main() -> ! {
         const DESKTOP_PRISTINE: u32 = 0xD030_0000;
         // When desktop feature is off, the pristine copy is still taken so
         // that the solid-black background can be restored correctly.
-        let pristine_ref = display.back_buffer_addr();
+        let pristine_ref = display.back_phys().raw();
         unsafe {
             core::ptr::copy_nonoverlapping(
                 pristine_ref as *const u8,
@@ -3031,10 +3116,10 @@ fn main() -> ! {
 
         // D3 breadcrumb: entering main loop
         unsafe {
-            (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001);
+            (0x3800_0600u32 as *mut u32).write_volatile(0x1C1C_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         unsafe {
-            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004);
+            (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0004); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
         serial_puts("rlvgl: input proof loop started\r\n");
 
@@ -3042,8 +3127,9 @@ fn main() -> ! {
         let _btn_discard: u32 = 0;
 
         // ── Gesture recognizers ───────────────────────────────────────────
-        use rlvgl::platform::gesture::TapRecognizer;
+        use rlvgl_platform::gesture::{DoubleTapRecognizer, TapRecognizer};
         let mut tap = TapRecognizer::new(FRAME_HZ);
+        let mut dtap = DoubleTapRecognizer::new(FRAME_HZ);
 
         // ── Event telemetry ring buffer ──────────────────────────────────
         // 16-entry ring at D3 SRAM 0x3800_0700, each entry = 4 words:
@@ -3058,32 +3144,46 @@ fn main() -> ! {
         const TELEM_DUMP_TICK: u32 = 0x3800_06F4;
 
         unsafe {
-            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
-            (TELEM_DUMP_TICK as *mut u32).write_volatile(0);
+            (TELEM_IDX_ADDR as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (TELEM_DUMP_TICK as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
 
         fn telem_log(tick: u32, code: u32, x: i32, y: i32) {
             unsafe {
-                let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                let idx = (TELEM_IDX_ADDR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let slot = idx % TELEM_ENTRIES;
                 let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
-                (base as *mut u32).write_volatile(tick);
-                ((base + 4) as *mut u32).write_volatile(code);
-                ((base + 8) as *mut u32).write_volatile(x as u32);
-                ((base + 12) as *mut u32).write_volatile(y as u32);
-                (TELEM_IDX_ADDR as *mut u32).write_volatile(idx + 1);
+                (base as *mut u32).write_volatile(tick); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((base + 4) as *mut u32).write_volatile(code); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((base + 8) as *mut u32).write_volatile(x as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                ((base + 12) as *mut u32).write_volatile(y as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (TELEM_IDX_ADDR as *mut u32).write_volatile(idx + 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
         }
 
         // Double-buffer sync: render for 2 frames after any visual change
         // so both ping-pong buffers match.
         serial_puts("MAIN LOOP START\r\n");
-        let mut serial_task = SerialTask::new();
+        // Box the executor — at REC_CAP=32 it's ~2.2KB, but combined with
+        // the dump state and line buffer it's safer on the heap than the stack.
+        let mut playit_executor: alloc::boxed::Box<
+            rlvgl_playit::PlayitExecutor<UsartTransport, 32>,
+        > = alloc::boxed::Box::new(rlvgl_playit::PlayitExecutor::new(UsartTransport));
+        let mut fb_reader = SdramFbReader {
+            fb_addr: display.front_phys().raw(),
+            width: display.dimensions().0,
+            height: display.dimensions().1,
+            present_count: 0,
+        };
         let mut present_count: u32 = 0;
 
         let mut dirty_frames: u8 = 4; // force initial render
         // Pipelined render state: decouple render from present.
         // render_active: back buffer is being rendered to (don't present).
+        // Frame synchronization: abstracts ERIF/DMA2D/scope probe access
+        // so star_crawl and event_overlay can use trait methods.
+        let sync = bare_metal_sync::BareMetalFrameSync;
+
         // buffer_ready: render complete, waiting for back porch to present.
         let mut render_active = false;
         let mut buffer_ready = false;
@@ -3098,27 +3198,29 @@ fn main() -> ! {
 
         // Save-under compositor: saves fb pixels when overlays open,
         // restores when they close.
-        use rlvgl::platform::compositor::Compositor;
+        use rlvgl_platform::compositor::Compositor;
         let mut compositor = Compositor::new(w_fb, h_fb, DESKTOP_PRISTINE);
 
         // Event counter written to D3 SRAM for probe-rs inspection
         let mut evt_count: u32 = 0;
 
         // ── Star Wars opening crawl ─────────────────────────────────────
+        //
+        // Bare-metal now drives the widgets' generic `TextCrawl` via
+        // `rlvgl_platform::BlitterSink<Dma2dBlitter>` — same sink
+        // pattern BBB Linux uses. The retired `crate::star_crawl`
+        // hardware engine still lives in this crate because the
+        // FreeRTOS entry path depends on it; see the follow-up notes
+        // in `crate::crawl_buffers` for orientation + perspective
+        // deltas introduced by the port.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        let mut star_crawl = {
-            use rlvgl::core::packed_font::PackedFont;
-
-            static BOLD_FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans-Bold-32.bin");
-            static BOLD_FONT: PackedFont = PackedFont {
-                height: 32,
-                ascent: 30,
-                glyphs: &crate::fonts::DEJAVU_SANS_BOLD_32_GLYPHS,
-                data: BOLD_FONT_DATA,
-            };
-
-            star_crawl::StarCrawl::new(&BOLD_FONT, crate::readme_crawl::README_CRAWL, FRAME_HZ)
-        };
+        #[allow(unused_imports)]
+        use crate::crawl_buffers::LegacyCrawlApi;
+        // Bare-metal runs the NT35510 in adapted-command portrait mode,
+        // so the framebuffer is 480 × 800. Zephyr's video-mode path
+        // passes (800, 480) to the same builder.
+        #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
+        let mut star_crawl = crawl_buffers::build_star_crawl_window(480, 800, FRAME_HZ);
 
         // Audio read cursor: tracks position in SDRAM PCM buffer.
         // Pre-fill consumed the first 2 * buf_size bytes.
@@ -3127,7 +3229,7 @@ fn main() -> ! {
 
         // ── Audio scope (MEMS mic oscilloscope) ─────────────────────────
         #[cfg(feature = "audio")]
-        let mut mic_capture = rlvgl::platform::mic_capture::MicCapture::new();
+        let mut mic_capture = rlvgl_platform::mic_capture::MicCapture::new();
         #[cfg(feature = "audio")]
         let mut audio_scope = audio_scope::AudioScope::new();
         // SRAM4 addresses for PDM DMA buffers and PCM output
@@ -3154,19 +3256,19 @@ fn main() -> ! {
         // into an incompletely-initialized system.
         unsafe {
             // Disable ALL DSI host interrupts — only wrapper ERIE matters.
-            (0x5000_00C4u32 as *mut u32).write_volatile(0); // IER0 = 0
-            (0x5000_00C8u32 as *mut u32).write_volatile(0); // IER1 = 0
+            (0x5000_00C4u32 as *mut u32).write_volatile(0); // IER0 = 0 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_00C8u32 as *mut u32).write_volatile(0); // IER1 = 0 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Set WIER to ONLY ERIE (bit 1), clearing all others.
-            (0x5000_0408u32 as *mut u32).write_volatile(1 << 1);
+            (0x5000_0408u32 as *mut u32).write_volatile(1 << 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Clear all pending wrapper + host flags
-            (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // WIFCR: all wrapper flags
-            let isr0 = (0x5000_00BCu32 as *const u32).read_volatile();
+            (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // WIFCR: all wrapper flags // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let isr0 = (0x5000_00BCu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             if isr0 != 0 {
-                (0x5000_00D8u32 as *mut u32).write_volatile(isr0);
+                (0x5000_00D8u32 as *mut u32).write_volatile(isr0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
-            let isr1 = (0x5000_00C0u32 as *const u32).read_volatile();
+            let isr1 = (0x5000_00C0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             if isr1 != 0 {
-                (0x5000_00DCu32 as *mut u32).write_volatile(isr1);
+                (0x5000_00DCu32 as *mut u32).write_volatile(isr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             // Clear NVIC pending bit, then unmask
             cortex_m::peripheral::NVIC::unpend(stm32h7::stm32h747cm7::Interrupt::DSI);
@@ -3175,14 +3277,32 @@ fn main() -> ! {
             nvic.set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 1);
         }
 
+        // ── FreeRTOS handoff ──────────────────────────────────────────
+        // Hardware is fully initialized — clocks, SDRAM, DSI, LTDC,
+        // DMA2D, touch I2C, framebuffers. Hand control to the FreeRTOS
+        // scheduler; the bare-metal cooperative loop below is replaced
+        // by preemptive present / render / touch tasks. Never returns.
+        #[cfg(feature = "freertos")]
+        unsafe {
+            let (fw, fh) = display.dimensions();
+            freertos_entry::init_fbs(
+                display.front_phys().raw(),
+                display.back_phys().raw(),
+                fw,
+                fh,
+            );
+            freertos_entry::start();
+        }
+
+        #[allow(unreachable_code)]
         loop {
             loop_count = loop_count.wrapping_add(1);
             // PJ0 is now driven by ISR (ERIF→LOW) and present() (→HIGH).
             // No polling — shows exact scan window without main-loop jitter.
             // Loop heartbeat
             unsafe {
-                let prev = (0x3800_0660u32 as *const u32).read_volatile();
-                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1));
+                let prev = (0x3800_0660u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (0x3800_0660u32 as *mut u32).write_volatile(prev.wrapping_add(1)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             }
             // Handle CM4 commands
             if let Some(cmd) = ipc::cmd_pop() {
@@ -3194,40 +3314,42 @@ fn main() -> ! {
             }
 
             // ── Poll audio player ──
+            //
+            // DCB-02b-A2 (2026-05-03 amendment): refill happens inline
+            // through the closure passed to `poll_refill`. The slice
+            // is the inactive bank's view (clipped to the file's
+            // remaining bytes); the destination is a safe `&mut [u8]`
+            // — no raw pointer arithmetic on the player's buffers.
+            // The source PCM lives at AUDIO_PCM_BASE (a fixed SDRAM
+            // region), still accessed via raw pointer because the
+            // upstream copy isn't part of DCB-02b-A's scope.
             #[cfg(all(feature = "audio", feature = "sd_storage"))]
             {
-                use rlvgl::platform::audio_player::PollResult;
-                match audio_player.poll() {
-                    PollResult::NeedRefill {
-                        buf,
-                        file_offset: _,
-                        max_bytes,
-                    } => {
-                        let pcm_base = AUDIO_PCM_BASE as *const u8;
-                        let cursor = audio_read_cursor;
-                        let remaining = audio_pcm_len.saturating_sub(cursor) as usize;
-                        let to_copy = core::cmp::min(max_bytes, remaining);
-                        if to_copy > 0 {
-                            unsafe {
-                                core::ptr::copy_nonoverlapping(
-                                    pcm_base.add(cursor as usize),
-                                    buf,
-                                    to_copy,
-                                );
-                            }
+                use rlvgl_platform::audio_player::PollResult;
+                let result = audio_player.poll_refill(|buf, _file_offset| {
+                    let pcm_base = AUDIO_PCM_BASE as *const u8;
+                    let cursor = audio_read_cursor;
+                    let remaining = audio_pcm_len.saturating_sub(cursor) as usize;
+                    let to_copy = core::cmp::min(buf.len(), remaining);
+                    if to_copy > 0 {
+                        // SAFETY: AUDIO_PCM_BASE is a fixed SDRAM
+                        // region populated at SD-load time; reading
+                        // `to_copy` bytes from offset `cursor` stays
+                        // within `audio_pcm_len`. The destination is
+                        // a safe slice owned by the bank guard.
+                        unsafe {
+                            buf[..to_copy].copy_from_slice(core::slice::from_raw_parts(
+                                pcm_base.add(cursor as usize),
+                                to_copy,
+                            ));
                         }
-                        if to_copy < max_bytes {
-                            unsafe {
-                                core::ptr::write_bytes(buf.add(to_copy), 0, max_bytes - to_copy);
-                            }
-                        }
-                        audio_read_cursor += to_copy as u32;
-                        audio_player.refill_done(to_copy);
                     }
-                    PollResult::Finished => {
-                        audio_player.stop(&sai);
-                    }
-                    _ => {}
+                    buf[to_copy..].fill(0);
+                    audio_read_cursor += to_copy as u32;
+                    to_copy
+                });
+                if result == PollResult::Finished {
+                    audio_player.stop(&sai);
                 }
             }
 
@@ -3277,7 +3399,7 @@ fn main() -> ! {
             // TIM6 ISR samples FT5336 at 120 Hz; we drain all queued samples
             // and run the coordinate transform + event state machine here.
             while let Some(sample) = unsafe { touch_ring_pop() } {
-                use rlvgl::core::event::{
+                use rlvgl_core::event::{
                     MAX_TOUCH_POINTS, TouchPoint, TouchState as EvtTouchState,
                 };
                 let dw = touch_state.display_width as i32;
@@ -3421,15 +3543,18 @@ fn main() -> ! {
                             _ => {}
                         }
 
-                        // Feed the debounced tap recognizer directly into the widget tree.
-                        // This demo does not consume DoubleTap, so buffering single taps
-                        // behind the double-tap timeout only makes the UI feel sluggish.
+                        // Feed the debounced tap recognizer through the double-tap
+                        // detector, then into the widget tree.  The file browser
+                        // requires DoubleTap to drill into directories.
                         if let Some(gesture) = tap.process(&evt) {
-                            if let Event::PressDown { x, y } = &gesture {
-                                telem_log(tick_count, 0x03, *x, *y);
+                            let (a, b) = dtap.process(&gesture);
+                            for dtap_evt in a.into_iter().chain(b) {
+                                if let Event::PressDown { x, y } = &dtap_evt {
+                                    telem_log(tick_count, 0x03, *x, *y);
+                                }
+                                dirty_frames = 2;
+                                root.borrow_mut().dispatch_event(&dtap_evt);
                             }
-                            dirty_frames = 2;
-                            root.borrow_mut().dispatch_event(&gesture);
                         }
                     } // if !consumed
                 } // if let Some(evt)
@@ -3437,26 +3562,36 @@ fn main() -> ! {
 
             #[cfg(feature = "cpu_stats")]
             let serial_start = cpu_stats.cyccnt();
-            serial_task.poll(
-                tick_count,
-                present_count,
-                display.front_buffer_addr(),
-                display.dimensions().0,
-                |action| match action {
-                    SerialAction::InjectTap(x, y) => {
-                        let tap_evt = Event::PressRelease { x, y };
-                        dirty_frames = 2;
-                        root.borrow_mut().dispatch_event(&tap_evt);
-                    }
-                    SerialAction::ToggleCrawl => {
-                        #[cfg(all(
-                            feature = "dma2d",
-                            any(target_arch = "arm", target_arch = "aarch64")
-                        ))]
-                        crawl_flag.set(true);
-                    }
-                },
-            );
+            {
+                fb_reader.fb_addr = display.front_phys().raw();
+                // Use tick_count for the dump gate so dumps complete even
+                // when the render loop is idle (display.present() is gated
+                // by dirty_frames). Reporting present_count separately in
+                // StatusData keeps the host visibility into actual frames.
+                fb_reader.present_count = tick_count;
+                let status = rlvgl_playit::StatusData {
+                    tick_count,
+                    present_count,
+                };
+                playit_executor.poll(
+                    &mut root.borrow_mut(),
+                    &status,
+                    Some(&fb_reader),
+                    &mut rlvgl_playit::executor::NullPipeline,
+                    |ext| {
+                        // Extension command 'C' toggles the star crawl
+                        if ext.first() == Some(&b'C') || ext.first() == Some(&b'c') {
+                            #[cfg(all(
+                                feature = "dma2d",
+                                any(target_arch = "arm", target_arch = "aarch64")
+                            ))]
+                            crawl_flag.set(true);
+                            runtime_serial::write_bytes(b"CRAWL:toggled\r\n");
+                            runtime_serial::kick_tx();
+                        }
+                    },
+                );
+            }
             #[cfg(feature = "cpu_stats")]
             cpu_stats.record_serial_cycles(cpu_stats.cyccnt().wrapping_sub(serial_start));
 
@@ -3468,7 +3603,7 @@ fn main() -> ! {
                         Event::KeyUp { .. } => 0x4200_8000,
                         _ => 0x4200_FFFF,
                     };
-                    (0x3800_0630u32 as *mut u32).write_volatile(code);
+                    (0x3800_0630u32 as *mut u32).write_volatile(code); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 }
                 if matches!(evt, Event::KeyDown { .. }) {
                     serial_puts("BTN: PRESS\r\n");
@@ -3501,7 +3636,7 @@ fn main() -> ! {
                         Event::KeyUp { .. } => 0x4A00_8000,
                         _ => 0x4A00_FFFF,
                     };
-                    (0x3800_0634u32 as *mut u32).write_volatile(code);
+                    (0x3800_0634u32 as *mut u32).write_volatile(code); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 }
                 if let Event::KeyDown { ref key } = evt {
                     let label = match key {
@@ -3521,6 +3656,119 @@ fn main() -> ! {
                     }
                     dirty_frames = 2;
                     evt_count += 1;
+
+                    // ── Joystick focus navigation ─────────────────────────
+                    // Mirrors disco-demo's `ControllerState::handle_key`:
+                    //   Up/Down  : cycle within current focus surface
+                    //   Left/Right (in Main)  : cycle main slots (wraps)
+                    //   Left/Right (in Wing)  : close the wing → Main
+                    //   Enter    : synthesize PressRelease at focused
+                    //              slot's center; existing on_tap then
+                    //              opens/toggles the wing or panel
+                    //
+                    // First joystick press reveals the focus outline
+                    // (matches "no focus before operator engages" UX).
+                    if !app_focus_visible {
+                        app_focus_visible = true;
+                        // Don't consume the first press — fall through
+                        // so the user sees focus appear AND the action
+                        // execute on the same Enter press.
+                    }
+
+                    // Compute the next focus state.
+                    let prev_focus = app_focus;
+                    match (app_focus, key) {
+                        (AppFocus::Main(i), Key::ArrowUp) => {
+                            app_focus = AppFocus::Main(i.saturating_sub(1));
+                        }
+                        (AppFocus::Main(i), Key::ArrowDown) => {
+                            app_focus = AppFocus::Main((i + 1).min(ICON_STRIP_SLOT_COUNT - 1));
+                        }
+                        (AppFocus::Main(i), Key::ArrowLeft) => {
+                            app_focus = AppFocus::Main(i.saturating_sub(1));
+                        }
+                        (AppFocus::Main(i), Key::ArrowRight) => {
+                            app_focus = AppFocus::Main((i + 1).min(ICON_STRIP_SLOT_COUNT - 1));
+                        }
+                        (AppFocus::SettingsWing(i), Key::ArrowUp) => {
+                            app_focus = AppFocus::SettingsWing(i.saturating_sub(1));
+                        }
+                        (AppFocus::SettingsWing(i), Key::ArrowDown) => {
+                            app_focus =
+                                AppFocus::SettingsWing((i + 1).min(SETTINGS_WING_SLOTS - 1));
+                        }
+                        (AppFocus::SettingsWing(_), Key::ArrowLeft | Key::ArrowRight) => {
+                            settings_wing.borrow_mut().close();
+                            app_focus = AppFocus::Main(0);
+                        }
+                        (AppFocus::InfoWing(i), Key::ArrowUp) => {
+                            app_focus = AppFocus::InfoWing(i.saturating_sub(1));
+                        }
+                        (AppFocus::InfoWing(i), Key::ArrowDown) => {
+                            app_focus = AppFocus::InfoWing((i + 1).min(INFO_WING_SLOTS - 1));
+                        }
+                        (AppFocus::InfoWing(_), Key::ArrowLeft | Key::ArrowRight) => {
+                            info_wing.borrow_mut().close();
+                            app_focus = AppFocus::Main(2);
+                        }
+                        (AppFocus::Main(idx), Key::Enter) => {
+                            // Synthesize PressRelease at icon strip slot's center.
+                            let cx = ICON_STRIP_X + ICON_STRIP_ICON_SIZE / 2;
+                            let cy = ICON_STRIP_MARGIN_TOP
+                                + idx as i32 * (ICON_STRIP_ICON_SIZE + ICON_STRIP_GAP)
+                                + ICON_STRIP_ICON_SIZE / 2;
+                            let press = Event::PressRelease { x: cx, y: cy };
+                            root.borrow_mut().dispatch_event(&press);
+                            // Wing may have opened — transition focus.
+                            if settings_wing.borrow().is_visible() {
+                                app_focus = AppFocus::SettingsWing(0);
+                            } else if info_wing.borrow().is_visible() {
+                                app_focus = AppFocus::InfoWing(0);
+                            }
+                        }
+                        (AppFocus::SettingsWing(idx), Key::Enter) => {
+                            let cx = WING_X + WING_ICON_SIZE / 2;
+                            let cy = WING_MARGIN_TOP
+                                + idx as i32 * (WING_ICON_SIZE + WING_GAP)
+                                + WING_ICON_SIZE / 2;
+                            let press = Event::PressRelease { x: cx, y: cy };
+                            root.borrow_mut().dispatch_event(&press);
+                            // Wing may have closed (slot action toggled
+                            // it, or opened a modal that closed wings).
+                            if !settings_wing.borrow().is_visible() {
+                                app_focus = AppFocus::Main(0);
+                            }
+                        }
+                        (AppFocus::InfoWing(idx), Key::Enter) => {
+                            let cx = WING_X + WING_ICON_SIZE / 2;
+                            let cy = WING_MARGIN_TOP
+                                + idx as i32 * (WING_ICON_SIZE + WING_GAP)
+                                + WING_ICON_SIZE / 2;
+                            let press = Event::PressRelease { x: cx, y: cy };
+                            root.borrow_mut().dispatch_event(&press);
+                            if !info_wing.borrow().is_visible() {
+                                app_focus = AppFocus::Main(2);
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    // Push the current focus down to whichever widget
+                    // owns it; clear the others so only one outline
+                    // is visible at a time.
+                    if app_focus_visible {
+                        let (strip_focus, settings_focus, info_focus) = match app_focus {
+                            AppFocus::Main(i) => (Some(i), None, None),
+                            AppFocus::SettingsWing(i) => (None, Some(i), None),
+                            AppFocus::InfoWing(i) => (None, None, Some(i)),
+                        };
+                        if let Some(ref strip_rc) = _icon_strip_handle {
+                            strip_rc.borrow_mut().set_focused_slot(strip_focus);
+                        }
+                        settings_wing.borrow_mut().set_focused_slot(settings_focus);
+                        info_wing.borrow_mut().set_focused_slot(info_focus);
+                    }
+                    let _ = prev_focus; // suppress unused if logging is added later
                 }
                 root.borrow_mut().dispatch_event(&evt);
             }
@@ -3550,7 +3798,23 @@ fn main() -> ! {
                 loop_count = 0;
                 // Advance gesture settle timer → may emit PressRelease
                 if let Some(held) = tap.tick() {
-                    if let Event::PressRelease { x, y } = &held {
+                    let (a, b) = dtap.process(&held);
+                    for dtap_evt in a.into_iter().chain(b) {
+                        if let Event::PressRelease { x, y } = &dtap_evt {
+                            telem_log(tick_count, 0x14, *x, *y);
+                            {
+                                let mut ew = event_win.borrow_mut();
+                                ew.push_event(t!("hw.touch", x = *x, y = *y));
+                                ew.set_frozen(true);
+                            }
+                        }
+                        dirty_frames = 4;
+                        root.borrow_mut().dispatch_event(&dtap_evt);
+                    }
+                }
+                // Advance double-tap window timer → may emit buffered PressRelease
+                if let Some(expired) = dtap.tick() {
+                    if let Event::PressRelease { x, y } = &expired {
                         telem_log(tick_count, 0x14, *x, *y);
                         {
                             let mut ew = event_win.borrow_mut();
@@ -3559,7 +3823,7 @@ fn main() -> ! {
                         }
                     }
                     dirty_frames = 4;
-                    root.borrow_mut().dispatch_event(&held);
+                    root.borrow_mut().dispatch_event(&expired);
                 }
 
                 // (Wing clear_region handled by widget tree dispatch below)
@@ -3570,6 +3834,14 @@ fn main() -> ! {
                 event_win.borrow_mut().handle_event(&Event::Tick);
                 config_menu.borrow_mut().handle_event(&Event::Tick);
 
+                // Drive the clock demo from the same SysTick cadence.
+                // The widget's `clear_region` will surface its dirty union
+                // to the compositor on the next pass.
+                #[cfg(feature = "clock_demo")]
+                {
+                    let _ = clock_demo.tick(tick_count);
+                }
+
                 let vis = event_win.borrow().is_visible();
                 let entry_count = event_win.borrow().entry_count();
 
@@ -3579,7 +3851,7 @@ fn main() -> ! {
                 // - dirty_frames > 0 (second buffer needs sync)
                 // Track overlay visibility transitions — restore from
                 // pristine desktop when overlays hide.
-                use rlvgl::core::widget::Widget as _;
+                use rlvgl_core::widget::Widget as _;
                 if vis != was_visible {
                     dirty_frames = 4;
                     // Freeze event aging so all dirty frame renders show
@@ -3593,7 +3865,7 @@ fn main() -> ! {
                 }
                 // Track wing visibility for dirty frames + compositor restore
                 let sw_vis = settings_wing.borrow().is_visible();
-                static mut SW_WAS_VISIBLE: bool = false;
+                static mut SW_WAS_VISIBLE: bool = false; // rlvgl-discipline: allow(static_mut)
                 if sw_vis != unsafe { SW_WAS_VISIBLE } {
                     dirty_frames = 4;
                     if !sw_vis {
@@ -3604,7 +3876,7 @@ fn main() -> ! {
                     }
                 }
                 let iw_vis = info_wing.borrow().is_visible();
-                static mut IW_WAS_VISIBLE: bool = false;
+                static mut IW_WAS_VISIBLE: bool = false; // rlvgl-discipline: allow(static_mut)
                 if iw_vis != unsafe { IW_WAS_VISIBLE } {
                     dirty_frames = 4;
                     if !iw_vis {
@@ -3631,7 +3903,7 @@ fn main() -> ! {
                 // Track chip info panel visibility
                 {
                     let vis = chip_info_panel.borrow().is_visible();
-                    static mut CIP_WAS_VIS: bool = false;
+                    static mut CIP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if vis != unsafe { CIP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
@@ -3645,7 +3917,7 @@ fn main() -> ! {
                 // Track live stats panel visibility
                 {
                     let vis = live_stats_panel.borrow().is_visible();
-                    static mut LSP_WAS_VIS: bool = false;
+                    static mut LSP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if vis != unsafe { LSP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
@@ -3659,7 +3931,7 @@ fn main() -> ! {
                 // Track file browser panel visibility
                 {
                     let vis = file_browser_panel.borrow().is_visible();
-                    static mut FBP_WAS_VIS: bool = false;
+                    static mut FBP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if vis != unsafe { FBP_WAS_VIS } {
                         dirty_frames = 4;
                         if !vis {
@@ -3676,7 +3948,7 @@ fn main() -> ! {
                 // Live stats refresh (~2 Hz) — skip first frame after becoming visible
                 {
                     let lsp_now = live_stats_panel.borrow().is_visible();
-                    static mut LSP_PREV_VIS: bool = false;
+                    static mut LSP_PREV_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
                     let was = unsafe { LSP_PREV_VIS };
                     unsafe {
                         LSP_PREV_VIS = lsp_now;
@@ -3713,7 +3985,7 @@ fn main() -> ! {
                 // Track config menu visibility
                 {
                     let cm_vis = config_menu.borrow().is_visible();
-                    static mut CM_WAS: bool = false;
+                    static mut CM_WAS: bool = false; // rlvgl-discipline: allow(static_mut)
                     if cm_vis != unsafe { CM_WAS } {
                         dirty_frames = 4;
                         if !cm_vis {
@@ -3736,7 +4008,7 @@ fn main() -> ! {
                 // entry count change, new event push).
 
                 // Detect entry count change (expiry or new push)
-                static mut LAST_ENTRY_COUNT: usize = 0;
+                static mut LAST_ENTRY_COUNT: usize = 0; // rlvgl-discipline: allow(static_mut)
                 let ec = entry_count;
                 if ec != unsafe { LAST_ENTRY_COUNT } {
                     unsafe {
@@ -3765,18 +4037,17 @@ fn main() -> ! {
                             audio_scope.deactivate();
                             mic_capture.stop();
                         }
-                        if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
-                            blitter.enable_tc_interrupt();
-                            serial_puts("CRAWL:activate()\r\n");
-                            star_crawl.activate(&mut blitter);
-                            serial_puts("CRAWL:active!\r\n");
-                            display.return_dma2d_raw(blitter.into_inner());
-                            render_active = true;
-                            crawl_touch_guard = 20; // ~330ms at 60Hz
-                        } else {
-                            serial_puts("CRAWL:no dma2d!\r\n");
-                        }
+                        // Widgets' `CrawlWindow::activate` paints the
+                        // starfield into the jumbo buffer and pre-renders
+                        // the A8 text column synchronously on the CPU — no
+                        // DMA2D needed at activation time. DMA2D gets
+                        // re-acquired per-frame in the render branch
+                        // below.
+                        serial_puts("CRAWL:activate()\r\n");
+                        star_crawl.activate();
+                        serial_puts("CRAWL:active!\r\n");
+                        render_active = true;
+                        crawl_touch_guard = 20; // ~330ms at 60Hz
                     }
                 }
 
@@ -3860,36 +4131,33 @@ fn main() -> ! {
                 tick_count += 1;
                 // Telemetry at 0x3800_0604..0x3800_0640
                 unsafe {
-                    (0x3800_0604u32 as *mut u32).write_volatile(evt_count);
-                    (0x3800_0608u32 as *mut u32).write_volatile(tick_count);
-                    (0x3800_060Cu32 as *mut u32).write_volatile(render_count);
-                    (0x3800_0610u32 as *mut u32).write_volatile(
-                        ((dirty_frames as u32) << 16)
-                            | ((was_visible as u32) << 8)
-                            | (event_win.borrow().is_visible() as u32),
-                    );
-                    (0x3800_0614u32 as *mut u32).write_volatile(display.back_buffer_addr());
-                    (0x3800_0618u32 as *mut u32)
-                        .write_volatile((0x5000_10ACu32 as *const u32).read_volatile());
+                    (0x3800_0604u32 as *mut u32).write_volatile(evt_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0608u32 as *mut u32).write_volatile(tick_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_060Cu32 as *mut u32).write_volatile(render_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    let telem = ((dirty_frames as u32) << 16)
+                        | ((was_visible as u32) << 8)
+                        | (event_win.borrow().is_visible() as u32);
+                    (0x3800_0610u32 as *mut u32).write_volatile(telem); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0614u32 as *mut u32).write_volatile(display.back_phys().raw()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0618u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        .write_volatile((0x5000_10ACu32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // Cortex-M fault registers
-                    (0x3800_0638u32 as *mut u32).write_volatile(
-                        (0xE000_ED28u32 as *const u32).read_volatile(), // CFSR
-                    );
-                    (0x3800_063Cu32 as *mut u32).write_volatile(
-                        (0xE000_ED38u32 as *const u32).read_volatile(), // MMFAR/BFAR
-                    );
+                    let cfsr = (0xE000_ED28u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_0638u32 as *mut u32).write_volatile(cfsr); // CFSR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    let mmfar = (0xE000_ED38u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    (0x3800_063Cu32 as *mut u32).write_volatile(mmfar); // MMFAR/BFAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // LTDC ISR — FUIF (bit 1) / LIF (bit 0)
-                    (0x3800_0640u32 as *mut u32)
-                        .write_volatile((0x5000_1038u32 as *const u32).read_volatile());
+                    (0x3800_0640u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        .write_volatile((0x5000_1038u32 as *const u32).read_volatile()); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     // EventWindow entry count for debugging
-                    (0x3800_0644u32 as *mut u32)
+                    (0x3800_0644u32 as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         .write_volatile(event_win.borrow().entry_count() as u32);
 
                     // Dump event telemetry ring over serial every ~1s (6 ticks)
-                    let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile();
+                    let last_dump = (TELEM_DUMP_TICK as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     if tick_count - last_dump >= 180 {
                         // ~30s at 6Hz
-                        let idx = (TELEM_IDX_ADDR as *const u32).read_volatile();
+                        let idx = (TELEM_IDX_ADDR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         if idx > 0 {
                             let dump_count = idx.min(TELEM_ENTRIES);
                             let start = if idx > TELEM_ENTRIES {
@@ -3901,10 +4169,10 @@ fn main() -> ! {
                             for i in start..start + dump_count {
                                 let slot = i % TELEM_ENTRIES;
                                 let base = TELEM_BASE + slot * TELEM_ENTRY_WORDS * 4;
-                                let t = (base as *const u32).read_volatile();
-                                let code = ((base + 4) as *const u32).read_volatile();
-                                let x = ((base + 8) as *const u32).read_volatile();
-                                let y = ((base + 12) as *const u32).read_volatile();
+                                let t = (base as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let code = ((base + 4) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let x = ((base + 8) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                                let y = ((base + 12) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                                 // Format: " T:code:x:y"
                                 use core::fmt::Write;
                                 let mut buf = alloc::string::String::new();
@@ -3914,9 +4182,9 @@ fn main() -> ! {
                             }
                             serial_puts("\r\n");
                             // Reset ring
-                            (TELEM_IDX_ADDR as *mut u32).write_volatile(0);
+                            (TELEM_IDX_ADDR as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                         }
-                        (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count);
+                        (TELEM_DUMP_TICK as *mut u32).write_volatile(tick_count); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     }
                 }
 
@@ -3984,12 +4252,12 @@ fn main() -> ! {
                         | ((crawl_waiting_dma as u32) << 19)
                         | ((display.check_erif() as u32) << 18)
                         | (present_count & 0xFFFF);
-                    let active_fb = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() };
+                    let active_fb = unsafe { (0x5000_10ACu32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                     let ltdc_status = (((cdsr & 0xFF) as u16) << 8) | (ltdc_isr as u16 & 0xFF);
                     cpu_stats.record_display_diag(
                         display_flags,
-                        display.front_buffer_addr(),
-                        display.back_buffer_addr(),
+                        display.front_phys().raw(),
+                        display.back_phys().raw(),
                         active_fb,
                         wisr as u16,
                         ltdc_status,
@@ -4025,7 +4293,7 @@ fn main() -> ! {
             // LTDC reads front buffer undisturbed during this time.
             // Three modes: star crawl, audio scope, or normal tree+overlay.
             if render_active && !buffer_ready {
-                const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32;
+                const DWT_CYCCNT: *const u32 = 0xE000_1004 as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let t_frame_start = unsafe { DWT_CYCCNT.read_volatile() };
 
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -4041,7 +4309,7 @@ fn main() -> ! {
                 #[cfg(not(feature = "audio"))]
                 let is_scope = false;
 
-                let back = display.back_buffer_addr();
+                let back = display.back_phys().raw();
                 let (w, h) = display.dimensions();
                 let mut frame_ready = false;
                 #[cfg(any(
@@ -4057,43 +4325,66 @@ fn main() -> ! {
 
                 if is_crawl {
                     // ── Star crawl render ──
-                    // No per-tick bus gating. QoS gives LTDC read priority
-                    // (INI6=0xF). D-cache invalidated after DMA2D blit.
-                    // Render-start is ERIF-gated (below) so we don't begin
-                    // a new frame mid-scan, but once started, run freely.
+                    //
+                    // Widgets' `CrawlWindow::paint_frame` wraps the
+                    // provided `Dma2dBlitter` in a
+                    // `rlvgl_platform::BlitterSink` and runs one full
+                    // frame of ops through it: jumbo-background blit
+                    // (1–2 DMA2D transactions depending on wrap) then
+                    // one `blend_a8_row` per text row. Each DMA2D op is
+                    // start+wait (see `Dma2dBlitter: Blitter`), so the
+                    // call blocks for the frame's DMA2D work inline.
+                    //
+                    // Render-start is ERIF-gated by the outer loop so
+                    // we don't begin a new frame mid-scan. Inside the
+                    // paint the compositor/touch/serial services stall
+                    // until it returns — acceptable at 30 Hz today;
+                    // when that ceases to be true, swap the sink for
+                    // a future `Dma2dBatchSink` with ERIF-aware
+                    // budget-bounded flush.
                     {
                         #[cfg(all(
                             feature = "dma2d",
                             any(target_arch = "arm", target_arch = "aarch64")
                         ))]
                         if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            match star_crawl.tick(&mut blitter, back as *mut u8, w, h) {
-                                star_crawl::StepResult::Idle => {
-                                    render_active = false;
-                                }
-                                star_crawl::StepResult::Pending => {
-                                    keep_rendering = true;
-                                }
-                                star_crawl::StepResult::FrameReady => {
-                                    frame_ready = true;
-                                }
-                                star_crawl::StepResult::Finished => {
-                                    render_active = false;
-                                    serial_puts("CRAWL:done\r\n");
-                                    let (w, h) = display.dimensions();
-                                    compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
-                                        x: 0,
-                                        y: 0,
-                                        width: h as i32,
-                                        height: w as i32,
-                                    });
-                                    dirty_frames = 4;
-                                }
-                            }
+                            let back_bytes = unsafe {
+                                core::slice::from_raw_parts_mut(
+                                    back as *mut u8,
+                                    (w as usize) * (h as usize) * 4,
+                                )
+                            };
+                            let mut dst = rlvgl_platform::Surface::new(
+                                back_bytes,
+                                w as usize * 4,
+                                rlvgl_platform::PixelFmt::Argb8888,
+                                w,
+                                h,
+                            );
+                            let painted = star_crawl.paint_frame(&mut blitter, &mut dst);
                             display.return_dma2d_raw(blitter.into_inner());
+                            let _ = sync; // retained for future cooperative path
+                            if painted {
+                                frame_ready = true;
+                            } else {
+                                render_active = false;
+                            }
+                            if !star_crawl.is_active() {
+                                render_active = false;
+                                serial_puts("CRAWL:done\r\n");
+                                let (w, h) = display.dimensions();
+                                compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                    x: 0,
+                                    y: 0,
+                                    width: w as i32,
+                                    height: h as i32,
+                                });
+                                dirty_frames = 4;
+                            }
                         }
+                        let _ = keep_rendering; // single-blocking paint: no cooperative yield
                     }
                 } else if is_scope {
                     // ── Audio scope render ──
@@ -4140,9 +4431,9 @@ fn main() -> ! {
                             any(target_arch = "arm", target_arch = "aarch64")
                         ))]
                         if let Some(raw) = display.take_dma2d_raw() {
-                            let mut blitter = rlvgl::platform::Dma2dBlitter::new(raw);
+                            let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            match event_overlay.tick(&mut blitter) {
+                            match event_overlay.tick(&mut blitter, &sync) {
                                 event_overlay::StepResult::Pending => {
                                     keep_rendering = true;
                                 }
@@ -4173,6 +4464,13 @@ fn main() -> ! {
                         let mut renderer = RotatedRenderer::new(&mut blit_renderer, w);
 
                         root.borrow().draw(&mut renderer);
+
+                        // Clock demo telemetry: the TimedClock wrapper
+                        // captured per-frame draw cycles during the walk
+                        // above; pair them with plan cycles + dirty_px
+                        // and publish to D3 SRAM.
+                        #[cfg(feature = "clock_demo")]
+                        clock_demo.publish_telem();
 
                         // If event window visible, start DMA2D overlay pipeline.
                         #[cfg(all(
@@ -4366,12 +4664,12 @@ fn main() -> ! {
     #[cfg(not(any(
         all(
             feature = "c_hal",
-            feature = "stm32h747i_disco_cm7",
+            feature = "cm7",
             any(target_arch = "arm", target_arch = "aarch64")
         ),
         all(
             not(feature = "c_hal"),
-            feature = "stm32h747i_disco_cm7",
+            feature = "cm7",
             any(target_arch = "arm", target_arch = "aarch64")
         )
     )))]
@@ -4388,7 +4686,7 @@ fn main() -> ! {
 // Peripherals::take().
 #[cfg(all(
     feature = "c_hal",
-    feature = "stm32h747i_disco_cm7",
+    feature = "cm7",
     any(target_arch = "arm", target_arch = "aarch64")
 ))]
 #[unsafe(no_mangle)]
@@ -4399,8 +4697,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         i2c::{ErrorType as I2cError, I2c as EhI2c, Operation, SevenBitAddress},
         pwm::{ErrorType as PwmError, SetDutyCycle},
     };
-    use rlvgl::core::event::{Event, Key};
-    use rlvgl::platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+    use rlvgl_core::event::{Event, Key};
+    use rlvgl_platform::{CpuBlitter, InputDevice, Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
 
     // ── Signal clocks ready to CM4 ──────────────────────────────────────────
     #[allow(clippy::let_unit_value)]
@@ -4420,11 +4718,11 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
     impl OutputPin for GpioOut {
         fn set_high(&mut self) -> Result<(), Infallible> {
-            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << self.pin) }
+            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << self.pin) } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             Ok(())
         }
         fn set_low(&mut self) -> Result<(), Infallible> {
-            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << (self.pin + 16)) }
+            unsafe { ((self.base + 0x18) as *mut u32).write_volatile(1u32 << (self.pin + 16)) } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             Ok(())
         }
     }
@@ -4457,7 +4755,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     }
     impl InputPin for GpioIn {
         fn is_high(&mut self) -> Result<bool, Infallible> {
-            let idr = unsafe { ((self.base + 0x10) as *const u32).read_volatile() };
+            let idr = unsafe { ((self.base + 0x10) as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             Ok((idr >> self.pin) & 1 != 0)
         }
         fn is_low(&mut self) -> Result<bool, Infallible> {
@@ -4545,9 +4843,9 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // PG3: panel reset — ensure it's in GPIO output mode (C BSP may
     // have left it in AF mode, which prevents BSRR from toggling the pin).
     unsafe {
-        let moder = (GPIOG as *mut u32).read_volatile();
+        let moder = (GPIOG as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Clear bits 7:6 (pin 3 MODER) and set to 01 (GP output)
-        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
+        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
     let panel_reset = GpioOut {
         base: GPIOG,
@@ -4557,8 +4855,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // PJ12: LCD backlight control (DSI_BL_CTRL per UM2411 CN15 pin 53)
     // Configure PJ12 as GP output (clear bits 25:24, set to 01)
     unsafe {
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
+        let moder = (GPIOJ as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
     let backlight = GpioBacklight(GpioOut {
         base: GPIOJ,
@@ -4573,20 +4871,18 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     const RCC_APB1LENR: u32 = 0x5802_44E8;
     unsafe {
         // Enable UART8 clock (RCC_APB1LENR bit 31)
-        let apb1 = (RCC_APB1LENR as *mut u32).read_volatile();
-        (RCC_APB1LENR as *mut u32).write_volatile(apb1 | (1 << 31));
-        (RCC_APB1LENR as *const u32).read_volatile(); // readback fence
+        let apb1 = (RCC_APB1LENR as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (RCC_APB1LENR as *mut u32).write_volatile(apb1 | (1 << 31)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (RCC_APB1LENR as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // PJ8 = AF8: MODER bits 17:16 = 10 (AF), AFRH bits 3:0 = 0x8
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 16)) | (2u32 << 16));
-        let afrh = ((GPIOJ + 0x24) as *mut u32).read_volatile();
-        ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8);
+        let moder = (GPIOJ as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 16)) | (2u32 << 16)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let afrh = ((GPIOJ + 0x24) as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((GPIOJ + 0x24) as *mut u32).write_volatile((afrh & !(0xFu32)) | 8); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // UART8: BRR = APB1_clk / baud = 100_000_000 / 115200 ≈ 868
-        ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR
-        ((UART8 + 0x00) as *mut u32).write_volatile(
-            (1 << 3)  // TE (transmitter enable)
-            | (1 << 0), // UE (USART enable)
-        );
+        ((UART8 + 0x0C) as *mut u32).write_volatile(868); // BRR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((UART8 + 0x00) as *mut u32) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            .write_volatile((1 << 3) | (1 << 0)); // TE | UE
     }
 
     // ── USART1 debug serial via ST-LINK VCP (PA9=TX AF7, 115200 8N1) ────
@@ -4594,30 +4890,30 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     const GPIOA: u32 = 0x5802_0000;
     unsafe {
         // Enable GPIOA clock (AHB4ENR bit 0)
-        let ahb4 = (0x5802_44E0u32 as *mut u32).read_volatile();
-        (0x5802_44E0u32 as *mut u32).write_volatile(ahb4 | (1 << 0));
-        (0x5802_44E0u32 as *const u32).read_volatile();
+        let ahb4 = (0x5802_44E0u32 as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44E0u32 as *mut u32).write_volatile(ahb4 | (1 << 0)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44E0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // PA9 = AF7 (TX), PA10 = AF7 (RX): AFRH bits 7:4 and 11:8 = 7
-        let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile();
-        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFFu32 << 4)) | (0x77u32 << 4));
+        let afrh = ((GPIOA + 0x24) as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((GPIOA + 0x24) as *mut u32).write_volatile((afrh & !(0xFFu32 << 4)) | (0x77u32 << 4)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // MODER: PA9 = AF (10), PA10 = AF (10)
-        let moder = (GPIOA as *mut u32).read_volatile();
-        (GPIOA as *mut u32).write_volatile((moder & !(0xF << 18)) | (0b1010 << 18));
+        let moder = (GPIOA as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOA as *mut u32).write_volatile((moder & !(0xF << 18)) | (0b1010 << 18)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Enable USART1 clock (APB2ENR bit 4)
-        let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile();
-        (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4));
-        (0x5802_44F0u32 as *const u32).read_volatile();
+        let apb2 = (0x5802_44F0u32 as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44F0u32 as *mut u32).write_volatile(apb2 | (1 << 4)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5802_44F0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // BRR = APB2_clk / baud = 100_000_000 / 115200 ≈ 868
-        ((USART1 + 0x0C) as *mut u32).write_volatile(868);
-        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE
+        ((USART1 + 0x0C) as *mut u32).write_volatile(868); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((USART1 + 0x00) as *mut u32).write_volatile((1 << 29) | (1 << 3) | (1 << 2) | (1 << 0)); // FIFOEN + TE + RE + UE // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Send a string over UART8 + USART1 VCP (blocking, dual output).
     fn dbg_print(s: &str) {
-        const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32;
-        const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32;
-        const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32;
-        const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32;
+        const U8_ISR: *const u32 = (0x4000_7C00 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const U8_TDR: *mut u32 = (0x4000_7C00 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const U1_ISR: *const u32 = (0x4001_1000 + 0x1C) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        const U1_TDR: *mut u32 = (0x4001_1000 + 0x28) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         for b in s.bytes() {
             unsafe {
                 while U8_ISR.read_volatile() & (1 << 7) == 0 {}
@@ -4625,6 +4921,16 @@ pub extern "C" fn rlvgl_app_main() -> ! {
                 while U1_ISR.read_volatile() & (1 << 7) == 0 {}
                 U1_TDR.write_volatile(b as u32);
             }
+        }
+    }
+
+    /// Short debug pulse on PJ6 (CN5 D9) to mark major runtime milestones.
+    fn dbg_pulse() {
+        const GPIOJ_BSRR: *mut u32 = (0x58022400 + 0x18) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        unsafe {
+            GPIOJ_BSRR.write_volatile(1u32 << 6);
+            cortex_m::asm::delay(4_000_000);
+            GPIOJ_BSRR.write_volatile(1u32 << (6 + 16));
         }
     }
     dbg_print("rlvgl: UART8+VCP alive\r\n");
@@ -4674,14 +4980,14 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     // constructor or PAC peripheral take() may reset GPIO MODER.
     unsafe {
         // PJ12 backlight: MODER bits 25:24 = 01
-        let moder = (GPIOJ as *mut u32).read_volatile();
-        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24));
+        let moder = (GPIOJ as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOJ as *mut u32).write_volatile((moder & !(3u32 << 24)) | (1u32 << 24)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // Drive PJ12 high (backlight on)
-        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         // PG3 panel reset: MODER bits 7:6 = 01, drive high
-        let moder = (GPIOG as *mut u32).read_volatile();
-        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6));
-        ((GPIOG + 0x18) as *mut u32).write_volatile(1u32 << 3);
+        let moder = (GPIOG as *mut u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (GPIOG as *mut u32).write_volatile((moder & !(3u32 << 6)) | (1u32 << 6)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        ((GPIOG + 0x18) as *mut u32).write_volatile(1u32 << 3); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     // ── IPC + input ──────────────────────────────────────────────────────────
@@ -4690,75 +4996,58 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         Stm32h747iDiscoInput::new_with_int(DummyI2c, touch_int, display.dimensions().0 as u16);
     let mut _button_input = ButtonInput::new(DummyButton);
 
-    // ── Display server widget tree ───────────────────────────────────────────
-    // Static widget tree with well-known IDs that CM4 drives via IPC commands.
-    use alloc::{rc::Rc, vec::Vec};
-    use core::cell::RefCell;
-    use rlvgl::core::WidgetNode;
-    use rlvgl::core::widget::Rect;
-    use rlvgl::widgets::{button::Button, container::Container, label::Label};
-    use rlvgl_i18n::t;
+    // ── Shared disco runtime ─────────────────────────────────────────────────
+    use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
+    use rlvgl_platform::DisplayDriver;
+    use rlvgl_platform::blit::{BlitterRenderer, PixelFmt, RotatedRenderer, Surface};
 
-    let title_label = Rc::new(RefCell::new(Label::new(
-        t!("hw.title", version = env!("CARGO_PKG_VERSION")),
-        Rect {
-            x: 10,
-            y: 10,
-            width: 200,
-            height: 20,
-        },
-    )));
+    let (w_fb, h_fb) = display.dimensions();
+    let mut controller =
+        DiscoController::new(display.screen(), DiscoCapabilities::stm32h747i_disco());
+    let root = controller.root();
 
-    let counter_button = Rc::new(RefCell::new(Button::new(
-        t!("demo.clicks_zero"),
-        Rect {
-            x: 10,
-            y: 40,
-            width: 120,
-            height: 30,
-        },
-    )));
-
-    // When the button is tapped locally, forward ButtonPressed to CM4
+    fn apply_disco_commands<B, BL, RST>(
+        controller: &mut DiscoController,
+        display: &mut Stm32h747iDiscoDisplay<B, BL, RST>,
+    ) where
+        B: rlvgl_platform::Blitter,
+        BL: SetDutyCycle,
     {
-        counter_button
-            .borrow_mut()
-            .set_on_click(|_btn: &mut Button| {
-                let _ = ipc::event_push(ipc::evt_button_pressed(ipc::widget_id::CLICK_COUNTER));
-            });
+        for command in controller.drain_commands() {
+            match command {
+                DiscoCommand::SetBacklight(level) => {
+                    let duty = ((level as u32 * u16::MAX as u32) / 100) as u16;
+                    display.set_brightness(duty);
+                }
+                DiscoCommand::LoadStorageSummary => {
+                    controller.publish_status("STM32 runtime acknowledged storage refresh");
+                }
+                DiscoCommand::StartEffect(effect) => match effect {
+                    DiscoEffect::AudioScope => {
+                        controller.publish_status("STM32 runtime acknowledged audio scope");
+                    }
+                    DiscoEffect::StarCrawl => {
+                        controller.publish_status("STM32 runtime acknowledged star crawl");
+                    }
+                    DiscoEffect::Spectrum => {
+                        controller.publish_status("STM32 runtime acknowledged spectrum");
+                    }
+                },
+                DiscoCommand::StopEffect(effect) => match effect {
+                    DiscoEffect::AudioScope => {
+                        controller.publish_status("STM32 runtime stopped audio scope");
+                    }
+                    DiscoEffect::StarCrawl => {
+                        controller.publish_status("STM32 runtime stopped star crawl");
+                    }
+                    DiscoEffect::Spectrum => {
+                        controller.publish_status("STM32 runtime stopped spectrum");
+                    }
+                },
+                DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}
+            }
+        }
     }
-
-    let status_label = Rc::new(RefCell::new(Label::new(
-        t!("hw.cm4_waiting"),
-        Rect {
-            x: 10,
-            y: 80,
-            width: 300,
-            height: 20,
-        },
-    )));
-
-    let root = Rc::new(RefCell::new(WidgetNode {
-        widget: Rc::new(RefCell::new(Container::new(Rect {
-            x: 0,
-            y: 0,
-            width: 800,
-            height: 480,
-        }))),
-        children: Vec::new(),
-    }));
-    root.borrow_mut().children.push(WidgetNode {
-        widget: title_label.clone(),
-        children: Vec::new(),
-    });
-    root.borrow_mut().children.push(WidgetNode {
-        widget: counter_button.clone(),
-        children: Vec::new(),
-    });
-    root.borrow_mut().children.push(WidgetNode {
-        widget: status_label.clone(),
-        children: Vec::new(),
-    });
 
     // ── Semihosting SDRAM inspector ──────────────────────────────────────────
     // CM7 reads SDRAM perfectly; semihosting passes data via BKPT trap to the
@@ -4771,7 +5060,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             let _ = writeln!(out, "\n── {} @ 0x{:08X} ({} words) ──", label, addr, words);
             for i in 0..words {
                 let a = addr + (i as u32) * 4;
-                let val = unsafe { (a as *const u32).read_volatile() };
+                let val = unsafe { (a as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 if i % 4 == 0 {
                     let _ = write!(out, "  {:08X}:", a);
                 }
@@ -4804,7 +5093,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     fn sh_reg(label: &str, addr: u32) {
         use core::fmt::Write;
         if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
-            let val = unsafe { (addr as *const u32).read_volatile() };
+            let val = unsafe { (addr as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let _ = writeln!(out, "  {} (0x{:08X}) = 0x{:08X}", label, addr, val);
         }
     }
@@ -4871,7 +5160,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
         // Framebuffer content: read from pre-stored CFBAR (0x24070128)
         // (Live LTDC reads are aliased to GCR after LTDCEN)
-        let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };
+        let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         if cfbar >= 0x2400_0000 && cfbar < 0x2408_0000 {
             sh_hexdump("Framebuffer (AXI SRAM)", cfbar, 64);
         } else if cfbar >= 0xC000_0000 {
@@ -4887,11 +5176,11 @@ pub extern "C" fn rlvgl_app_main() -> ! {
         sh_println("\n── SDRAM read/write test ──");
         let test_addr: u32 = 0xC000_0000;
         unsafe {
-            let before = (test_addr as *const u32).read_volatile();
-            (test_addr as *mut u32).write_volatile(0xDEAD_BEEF);
+            let before = (test_addr as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (test_addr as *mut u32).write_volatile(0xDEAD_BEEF); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::dsb();
-            let after = (test_addr as *const u32).read_volatile();
-            (test_addr as *mut u32).write_volatile(before); // restore
+            let after = (test_addr as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (test_addr as *mut u32).write_volatile(before); // restore // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             use core::fmt::Write;
             if let Ok(mut out) = cortex_m_semihosting::hio::hstdout() {
                 let _ = writeln!(
@@ -4914,21 +5203,21 @@ pub extern "C" fn rlvgl_app_main() -> ! {
     for _ in 0..3 {
         unsafe {
             // PJ12 HIGH
-            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::delay(80_000_000); // ~200ms at 400 MHz
             // PJ12 LOW
-            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << (12 + 16));
+            ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << (12 + 16)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             cortex_m::asm::delay(80_000_000);
         }
     }
     // Leave backlight ON
     unsafe {
-        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12);
+        ((GPIOJ + 0x18) as *mut u32).write_volatile(1u32 << 12); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     // ── Display server main loop ─────────────────────────────────────────────
-    let mut tap2 = rlvgl::platform::gesture::TapRecognizer::new(FRAME_HZ);
-    let mut dtap2 = rlvgl::platform::gesture::DoubleTapRecognizer::new(FRAME_HZ);
+    let mut tap2 = rlvgl_platform::gesture::TapRecognizer::new(FRAME_HZ);
+    let mut dtap2 = rlvgl_platform::gesture::DoubleTapRecognizer::new(FRAME_HZ);
     let mut frame_counter: u32 = 0;
 
     #[cfg(feature = "cpu_stats")]
@@ -4946,36 +5235,13 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             match ipc::CmdKind::from_u32(cmd.kind) {
                 ipc::CmdKind::SetBacklight => {
                     let duty = (cmd.a & 0xFFFF) as u16;
-                    let level = if duty < 512 { 0 } else { u16::MAX };
-                    display.set_brightness(level);
+                    display.set_brightness(duty);
                 }
-                ipc::CmdKind::UpdateLabel => {
-                    let mut buf = [0u8; 12];
-                    let len = ipc::extract_label_text(&cmd, &mut buf);
-                    if let Ok(text) = core::str::from_utf8(&buf[..len]) {
-                        let text_owned = alloc::string::String::from(text);
-                        match cmd.a {
-                            ipc::widget_id::TITLE => {
-                                title_label.borrow_mut().set_text(text_owned);
-                            }
-                            ipc::widget_id::CLICK_COUNTER => {
-                                counter_button.borrow_mut().set_text(text_owned);
-                            }
-                            ipc::widget_id::STATUS_LABEL => {
-                                status_label.borrow_mut().set_text(text_owned);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                ipc::CmdKind::Navigate => {
-                    // Screen navigation — placeholder for future screens
-                }
-                ipc::CmdKind::UpdateValue => {
-                    // Numeric value update — placeholder
-                }
-                ipc::CmdKind::ShowWidget => {
-                    // Widget visibility — placeholder
+                ipc::CmdKind::UpdateLabel
+                | ipc::CmdKind::Navigate
+                | ipc::CmdKind::UpdateValue
+                | ipc::CmdKind::ShowWidget => {
+                    controller.publish_status("CM4 IPC command received by shared runtime");
                 }
                 ipc::CmdKind::None => {}
             }
@@ -5001,7 +5267,8 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             if let Some(gesture) = tap2.process(&transformed) {
                 let (e1, e2) = dtap2.process(&gesture);
                 for ge in [e1, e2].into_iter().flatten() {
-                    root.borrow_mut().dispatch_event(&ge);
+                    controller.dispatch_event(&ge);
+                    apply_disco_commands(&mut controller, &mut display);
                 }
             }
             // Forward touch events to CM4 (primary point only for IPC)
@@ -5028,16 +5295,32 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             if let Some(gesture) = tap2.tick() {
                 let (e1, e2) = dtap2.process(&gesture);
                 for ge in [e1, e2].into_iter().flatten() {
-                    root.borrow_mut().dispatch_event(&ge);
+                    controller.dispatch_event(&ge);
+                    apply_disco_commands(&mut controller, &mut display);
                 }
             }
             if let Some(held) = dtap2.tick() {
-                root.borrow_mut().dispatch_event(&held);
+                controller.dispatch_event(&held);
+                apply_disco_commands(&mut controller, &mut display);
             }
+
+            controller.tick();
+            apply_disco_commands(&mut controller, &mut display);
+
+            let back = display.back_phys().raw();
+            let fb_bytes = (w_fb * h_fb * 4) as usize;
+            let stride = (w_fb * 4) as usize;
+            let fb_slice = unsafe { core::slice::from_raw_parts_mut(back as *mut u8, fb_bytes) };
+            let surface = Surface::new(fb_slice, stride, PixelFmt::Argb8888, w_fb, h_fb);
+            let mut frame_blitter = CpuBlitter;
+            let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 32> =
+                BlitterRenderer::new(&mut frame_blitter, surface);
+            let mut renderer = RotatedRenderer::new(&mut blit_renderer, w_fb);
+            root.borrow().draw(&mut renderer);
 
             // Heartbeat toggle on PJ6 (CN5 D9)
             unsafe {
-                const GPIOJ_ODR: *mut u32 = (0x58022400 + 0x14) as *mut u32;
+                const GPIOJ_ODR: *mut u32 = (0x58022400 + 0x14) as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 let odr = GPIOJ_ODR.read_volatile();
                 GPIOJ_ODR.write_volatile(odr ^ (1 << 6));
             }
@@ -5053,7 +5336,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
             if frame_counter % (FRAME_HZ * 30) == FRAME_HZ {
                 sh_println("\n── Periodic SDRAM check ──");
                 // CFBAR is at LTDC+0xAC (aliased after LTDCEN — use pre-stored value)
-                let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() };
+                let cfbar = unsafe { (0x2407_0128u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
                 sh_hexdump("FB snapshot", cfbar, 16);
                 sh_reg("WISR  ", 0x5000_040C);
                 sh_reg("WCR   ", 0x5000_0404);

@@ -23,6 +23,7 @@ Package: `rlvgl`
 - no_std + allocator support with simulator-friendly std features
 - Modular workspace crates for core widgets, platform backends, UI helpers, API bindings, and i18n
 - `rlvgl-creator` support for asset preparation, vendor database browsing, and STM32 BSP generation from CubeMX `.ioc` files
+- Application Schema (`rlvgl-app/v0`) — declarative `app.yaml` manifest plus `rlvgl-creator app from-yaml` orchestrator emit a buildable Cargo crate from one source of truth (BSP, assets, state machine, i18n, theme, layouts, per-prong main glue). See [`docs/app-schema/`](docs/app-schema/).
 - Vendor chip database crates and generated STM BSP crates for board-aware tooling
 - Flagship STM32H747I-DISCO demo covering DSI display, touch, SDRAM, SD/MMC, audio, and DMA2D-assisted rendering
 - Motion, compositor, dirty-region, and accelerated blitting primitives for richer embedded UIs
@@ -42,14 +43,90 @@ Package: `rlvgl`
 - [rlvgl-creator](./src/bin/creator/README.md) – Asset and BSP workflows for command-line and UI tooling
 - [examples](./examples/README.md) – Sample applications and board demos
 - [docs](./docs/README.md) – Project documentation and task lists
-- [lvgl](./lvgl/README.md) – C submodule (reference only)
+- [docs/disco-tutorial](./docs/disco-tutorial/README.md) – Progressive, chapter-by-chapter guide to building the STM32H747I-DISCO demo from scratch
+- [docs/disco-platform-guide](./docs/disco-platform-guide/README.md) – Volume II: bare-metal STM32H747I-DISCO platform bring-up, SVD/PAC limits, AXI holdoff, and the star crawl in full detail
+- [docs/disco-test-and-debug](./docs/disco-test-and-debug/README.md) – Volume III: how to test and debug across the host simulator, UEFI/QEMU, and hardware, including playit automation and VS Code + probe-rs + GDB
+- [docs/disco-freertos-guide](./docs/disco-freertos-guide/README.md) – Volume IV: FreeRTOS preemptive tasks, interrupt-driven I2C4 touch, single-buffer rendering, joystick navigation
+- [docs/disco-zephyr-guide](./docs/disco-zephyr-guide/README.md) – Volume V: Zephyr C+Rust hybrid, video mode vs adapted command mode, DMA2D pipeline, CSleep/LPENR fix
+- [lvgl](https://github.com/lvgl/lvgl) – upstream C library (vendored as a git submodule under `lvgl/`; not mirrored on the site)
 
-## What's New in 0.1.9
+## Building Binary Targets
 
-- `rlvgl-creator` now covers vendor import, board IR generation, and Rust BSP rendering with bundled alternate-function databases.
-- STM32H747I-DISCO moved from bring-up into a flagship demo path with dual-core startup, DSI display, touch, storage, audio, and richer UI flows.
-- The rendering stack gained `EventWindow`, compositor/save-under behavior, motion helpers, DMA2D acceleration, and display-pipeline fixes for smoother presentation.
-- The workspace now includes first-class i18n, API, chip database, and generated BSP crates alongside the core UI crates.
+The workspace currently ships six user-facing binaries. Their package names,
+required targets, and applicable feature flags differ enough that it is best to
+treat them individually instead of relying on `cargo build --workspace`. Every
+binary has a top-level `make` target — run `make help` to see them all, or
+`make build-all-bins` to build every binary in one command.
+
+### Host tools and simulators
+
+| Binary | Package | Make target | Cargo command |
+| --- | --- | --- | --- |
+| `rlvgl-creator` | `rlvgl` | `make build-creator` | `cargo build -p rlvgl --bin rlvgl-creator --features creator` |
+| `rlvgl-sim` | `rlvgl-example-sim` | `make build-sim` | `cargo build -p rlvgl-example-sim --bin rlvgl-sim --features png,jpeg,gif,qrcode,fontdue` |
+| `rlvgl-disco-sim` | `rlvgl-example-disco-sim` | `make build-disco-sim` | `cargo build -p rlvgl-example-disco-sim --bin rlvgl-disco-sim` |
+| `rlvgl-uefi-disco` | `rlvgl-example-uefi-disco` | `make build-uefi-disco` | `cargo build --manifest-path examples/uefi-disco/Cargo.toml --target aarch64-unknown-uefi --bin rlvgl-uefi-disco` |
+
+Notes: `rlvgl-creator` is gated behind the `creator` feature; add `creator_ui`
+for the desktop UI. `rlvgl-sim` accepts `--no-default-features` for a lean
+build. `rlvgl-uefi-disco` is intentionally excluded from the workspace.
+
+### STM32H747I-DISCO firmware
+
+The firmware package is `rlvgl-example-disco` and it produces two binaries from
+the same crate:
+
+| Binary | Required target | Required feature | Make target | Cargo command |
+| --- | --- | --- | --- | --- |
+| `rlvgl-stm32h747i-disco` | `thumbv7em-none-eabihf` | `cm7` | `make build-disco` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
+| `rlvgl-stm32h747i-disco-cm4` | `thumbv7em-none-eabihf` | `cm4` | `make build-disco-cm4` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` |
+
+`make build-disco{,-release}` also runs `rust-objcopy` to emit `.hex` and
+`.bin` artifacts beside the ELF.
+
+### Playit test runners
+
+Every binary that supports the playit automation protocol has a matching
+make target that builds it (where applicable) and runs the playit test
+suite against it:
+
+| Target | Make target | Description |
+| --- | --- | --- |
+| Disco-demo controller (no_std) | `make test-disco-demo` | `cargo test -p rlvgl-app-disco-demo` — 26 unit tests |
+| Disco simulator (host) | `make test-disco-sim` | Builds `rlvgl-disco-sim` and runs the Rust + Node.js suites over a TCP playit socket |
+| UEFI disco (QEMU) | `make test-uefi-disco` | Builds `rlvgl-uefi-disco`, boots it headless under QEMU, and runs the Node.js suite over the pl011 UART |
+| STM32H747I-DISCO hardware | `make test-stm32h747i-disco` | Bridges `/dev/cu.usbmodem*` (ST-Link VCP) to TCP and runs the Node.js suite against live firmware |
+| All of the above | `make test-playit-all` | Runs every suite in sequence |
+
+The hardware runner depends on flashing `make build-disco` first; the UEFI
+runner depends on `qemu-system-aarch64` plus EDK2 firmware (`brew install
+qemu` on macOS provides both). See `playit/README.md` for the full wire
+protocol.
+
+Only the STM32H747I-DISCO package understands the following board-specific
+feature flags: `splash`, `desktop`, `dma2d`, `cpu_stats`, `audio`,
+`qspi_flash`, `sd_storage`, `c_hal`, `c_hal_cm4`, `pac_sdram_init`,
+`sdram_ramtest`, `hal_sdram`, `backlight_pwm`, `semihosting`, and `bsp_log`.
+They are all opt-in; `default = []`.
+
+### Where to find feature details
+
+Every crate in the workspace now has an `OPTIONS.md` file next to its
+`Cargo.toml`. Start with the umbrella crate's [OPTIONS.md](./OPTIONS.md), then
+use the crate-local file for the package you are building:
+
+- [examples/sim/OPTIONS.md](./examples/sim/OPTIONS.md)
+- [examples/disco-sim/OPTIONS.md](./examples/disco-sim/OPTIONS.md)
+- [examples/stm32h747i-disco/OPTIONS.md](./examples/stm32h747i-disco/OPTIONS.md)
+- [examples/uefi-disco/OPTIONS.md](./examples/uefi-disco/OPTIONS.md)
+- [src/bin/creator/README.md](./src/bin/creator/README.md) for CLI and UI workflow details
+
+## What's New in 0.2.0
+
+- `rlvgl-creator` now covers multi-vendor YAML-to-IR BSP generation for Espressif, Nordic, NXP, RP2040, and Renesas targets.
+- STM32H747I-DISCO now runs the shared disco app across bare-metal, FreeRTOS, Zephyr, host simulator, and UEFI test paths.
+- `rlvgl-playit` adds serial automation, touch/key injection, widget queries, framebuffer pixel inspection, and event recording.
+- The rendering stack gained anti-aliased rounded corners, dirty-region save-under restoration, focus highlights, and star crawl motion primitives.
 
 ## Vendor chip databases
 
@@ -107,7 +184,7 @@ RLVGL_CHIP_SRC=chipdb/rlvgl-chips-stm/generated cargo build -p rlvgl-chips-stm
 ```
 
 For a full asset workflow overview see the [rlvgl-creator 🆕 README](./README-CREATOR.md).
-Command details live in [docs/CREATOR-CLI.md](./docs/CREATOR-CLI.md).
+Command details live in [docs/creator/CLI.md](./docs/creator/CLI.md).
 
 ### IR schema
 
@@ -168,10 +245,9 @@ See `docs/TODO-CREATOR-BSP.md` for remaining work.
 
 As-built. See [docs](./docs/README.md) for component-by-component progress and outstanding tasks.
 
-`v0.1.9` shifts rlvgl from a core-library-first workspace toward a fuller
-embedded UI product stack. The main areas of growth are the creator/BSP
-pipeline, the STM32H747I-DISCO showcase target, and the runtime pieces needed
-for more polished embedded applications.
+`v0.2.0` shifts rlvgl from a single-board showcase toward a broader embedded
+UI toolkit with multi-vendor BSP generation, serial automation, UEFI support,
+and RTOS-backed STM32H747I-DISCO paths.
 
 ## Quick Example
 
@@ -237,7 +313,7 @@ cargo add rlvgl
 ```
 Or add the following line to your Cargo.toml:
 ```toml
-rlvgl = "0.1.9"
+rlvgl = "0.2.0"
 ```
 
 ## Community

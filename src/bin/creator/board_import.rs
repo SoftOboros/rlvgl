@@ -69,7 +69,7 @@ fn detect_mcu(text: &str) -> Result<String> {
 
 fn load_mcu_af(mcu: &str) -> Result<McuAf> {
     let blob = stm::raw_db();
-    let data = zstd::decode_all(&blob[..])?;
+    let data = zstd::decode_all(blob)?;
     // Try new tar-based layout first
     {
         let mut archive = Archive::new(Cursor::new(&data));
@@ -138,7 +138,7 @@ fn parse_raw_db(blob: &[u8]) -> HashMap<String, Vec<u8>> {
     while let Some(line) = lines.next() {
         if let Some(name) = line.strip_prefix('>') {
             let mut content = String::new();
-            while let Some(l) = lines.next() {
+            for l in lines.by_ref() {
                 if l == "<" {
                     break;
                 }

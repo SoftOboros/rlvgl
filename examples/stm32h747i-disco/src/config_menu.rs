@@ -8,31 +8,35 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use rlvgl::core::event::Event;
-use rlvgl::core::packed_font::PackedFont;
-use rlvgl::core::renderer::Renderer;
-use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::GridCalc;
-use rlvgl::ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
+use rlvgl_core::event::Event;
+use rlvgl_core::packed_font::PackedFont;
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_ui::GridCalc;
+use rlvgl_ui::draw_helpers::{draw_border, draw_rounded_border, fill_rounded_rect};
 
 // ── D3 SRAM debug slots (readable via probe-rs) ──────────────────
 // ConfigMenu writes to 0x3800_0640..0x3800_066F for live debugging.
+// These are intentional fixed-offset writes to the D3 SRAM telemetry
+// region used by probe-rs scripts. The discipline scanner's regex
+// catches the cast pattern; opt-out markers document the deferral
+// pending a typed `D3Telemetry` module (long-term cleanup item).
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 mod d3 {
     // Touch coordinates captured while panel is open
-    pub const TOUCH_X: *mut u32 = 0x3800_0640 as *mut u32;
-    pub const TOUCH_Y: *mut u32 = 0x3800_0644 as *mut u32;
+    pub const TOUCH_X: *mut u32 = 0x3800_0640 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    pub const TOUCH_Y: *mut u32 = 0x3800_0644 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     // Action code identifying which UI element was hit
-    pub const HIT_CODE: *mut u32 = 0x3800_0648 as *mut u32;
+    pub const HIT_CODE: *mut u32 = 0x3800_0648 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     // Clear-countdown state on menu close
-    pub const CLEAR_STATE: *mut u32 = 0x3800_0658 as *mut u32;
+    pub const CLEAR_STATE: *mut u32 = 0x3800_0658 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     // Menu visibility toggle event
-    pub const VISIBILITY: *mut u32 = 0x3800_065C as *mut u32;
+    pub const VISIBILITY: *mut u32 = 0x3800_065C as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     // PressRelease event counter + last coords + visible state
-    pub const EVENT_COUNT: *mut u32 = 0x3800_0660 as *mut u32;
-    pub const LAST_X: *mut u32 = 0x3800_0664 as *mut u32;
-    pub const LAST_Y: *mut u32 = 0x3800_0668 as *mut u32;
-    pub const MENU_VIS: *mut u32 = 0x3800_066C as *mut u32;
+    pub const EVENT_COUNT: *mut u32 = 0x3800_0660 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    pub const LAST_X: *mut u32 = 0x3800_0664 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    pub const LAST_Y: *mut u32 = 0x3800_0668 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    pub const MENU_VIS: *mut u32 = 0x3800_066C as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
     // Action-code sentinels written to HIT_CODE
     pub const ACT_CLOSE: u32 = 0xC105_E000;
@@ -426,7 +430,7 @@ impl ConfigMenu {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn draw_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
     ) {
         if !self.visible {
@@ -494,7 +498,7 @@ impl ConfigMenu {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn draw_checkbox_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
         row: Rect,
         label: &str,
@@ -538,7 +542,7 @@ impl ConfigMenu {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     fn draw_button_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
         bounds: Rect,
         label: &str,

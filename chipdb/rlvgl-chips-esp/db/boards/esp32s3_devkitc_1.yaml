@@ -1,0 +1,33 @@
+# Espressif ESP32-S3-DevKitC-1 reference board.
+#
+# Source: ESP32-S3-DevKitC-1 schematic (memalpha doc 319).
+# Popular LVGL development board with PSRAM, USB OTG, and rich GPIO breakout.
+
+name: ESP32-S3-DevKitC-1
+chip: ESP32-S3
+module: ESP32-S3-WROOM-1
+flash_mb: 8
+psram_mb: 8
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 console (directly on USB-to-UART bridge)
+  - { gpio: 43, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 44, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  # On-board addressable RGB LED (WS2812)
+  - { gpio: 48, signal: LED,      direction: out,                    label: led_rgb }
+  # BOOT button
+  - { gpio: 0,  signal: BOOT,     direction: in,                     label: boot_btn }
+  # USB OTG (directly on USB Type-C connector)
+  - { gpio: 19, signal: USB_DM,   peripheral: usb_otg, direction: inout, label: usb_dm }
+  - { gpio: 20, signal: USB_DP,   peripheral: usb_otg, direction: inout, label: usb_dp }
+
+features:
+  vendor: espressif
+  usb: type_c_otg
+  led_type: ws2812_addressable
+  wifi: wifi_bgn
+  bluetooth: ble5

@@ -95,9 +95,9 @@ impl BdmaSai4Rx {
     /// Enable the BDMA peripheral clock.
     pub fn enable_clock(&self) {
         unsafe {
-            let reg = RCC_AHB4ENR as *mut u32;
+            let reg = RCC_AHB4ENR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             reg.write_volatile(reg.read_volatile() | (1 << 21)); // bit 21 = BDMAEN
-            let _ = (reg as *const u32).read_volatile(); // readback fence
+            let _ = (reg as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
@@ -118,25 +118,25 @@ impl BdmaSai4Rx {
 
         unsafe {
             // Disable channel
-            let ccr = CH1_CCR as *mut u32;
+            let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() & !CCR_EN);
-            while (ccr as *const u32).read_volatile() & CCR_EN != 0 {}
+            while (ccr as *const u32).read_volatile() & CCR_EN != 0 {} // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Clear all flags for channel 1
-            (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1);
+            (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Number of data items
-            (CH1_CNDTR as *mut u32).write_volatile(transfers as u32);
+            (CH1_CNDTR as *mut u32).write_volatile(transfers as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Peripheral address (SAI4_A DR)
-            (CH1_CPAR as *mut u32).write_volatile(periph_addr);
+            (CH1_CPAR as *mut u32).write_volatile(periph_addr); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Memory buffer addresses
-            (CH1_CM0AR as *mut u32).write_volatile(buf0 as u32);
-            (CH1_CM1AR as *mut u32).write_volatile(buf1 as u32);
+            (CH1_CM0AR as *mut u32).write_volatile(buf0 as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (CH1_CM1AR as *mut u32).write_volatile(buf1 as u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Configure DMAMUX2 channel 1 → SAI4_A (request ID 15)
-            (DMAMUX2_C1CR as *mut u32).write_volatile(SAI4A_DMAREQ_ID);
+            (DMAMUX2_C1CR as *mut u32).write_volatile(SAI4A_DMAREQ_ID); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 
             // Channel configuration:
             // DIR = 0 (periph-to-memory), circular, double-buffer,
@@ -157,7 +157,7 @@ impl BdmaSai4Rx {
     /// Start BDMA transfer.
     pub fn start(&self) {
         unsafe {
-            let ccr = CH1_CCR as *mut u32;
+            let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() | CCR_EN);
         }
     }
@@ -165,52 +165,49 @@ impl BdmaSai4Rx {
     /// Stop BDMA transfer.
     pub fn stop(&self) {
         unsafe {
-            let ccr = CH1_CCR as *mut u32;
+            let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() & !CCR_EN);
-            while (ccr as *const u32).read_volatile() & CCR_EN != 0 {}
-            (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1);
+            while (ccr as *const u32).read_volatile() & CCR_EN != 0 {} // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
     /// Returns which buffer the BDMA is currently writing to (0 or 1).
     pub fn current_target(&self) -> u8 {
         unsafe {
-            if (CH1_CCR as *const u32).read_volatile() & CCR_CT != 0 {
-                1
-            } else {
-                0
-            }
+            let ccr = (CH1_CCR as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            if ccr & CCR_CT != 0 { 1 } else { 0 }
         }
     }
 
     /// Returns `true` if the transfer-complete flag is set.
     pub fn transfer_complete(&self) -> bool {
-        unsafe { (BDMA_ISR as *const u32).read_volatile() & ISR_TCIF1 != 0 }
+        unsafe { (BDMA_ISR as *const u32).read_volatile() & ISR_TCIF1 != 0 } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Returns `true` if the half-transfer flag is set.
     pub fn half_transfer(&self) -> bool {
-        unsafe { (BDMA_ISR as *const u32).read_volatile() & ISR_HTIF1 != 0 }
+        unsafe { (BDMA_ISR as *const u32).read_volatile() & ISR_HTIF1 != 0 } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 
     /// Clear the transfer-complete flag.
     pub fn clear_transfer_complete(&self) {
         unsafe {
-            (BDMA_IFCR as *mut u32).write_volatile(ISR_TCIF1);
+            (BDMA_IFCR as *mut u32).write_volatile(ISR_TCIF1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
     /// Clear the half-transfer flag.
     pub fn clear_half_transfer(&self) {
         unsafe {
-            (BDMA_IFCR as *mut u32).write_volatile(ISR_HTIF1);
+            (BDMA_IFCR as *mut u32).write_volatile(ISR_HTIF1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 
     /// Clear all channel 1 flags.
     pub fn clear_all_flags(&self) {
         unsafe {
-            (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1);
+            (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
 

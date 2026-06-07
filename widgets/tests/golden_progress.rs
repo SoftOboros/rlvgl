@@ -1,4 +1,8 @@
 //! Golden tests for progress bar rendering.
+// The `row * width + col` indexing here is intentional for readability when
+// addressing 2D buffer positions; clippy flags the `1 *` (identity_op) but
+// the symmetry is more legible than collapsing it.
+#![allow(clippy::identity_op)]
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_platform::display::{BufferDisplay, DisplayDriver};

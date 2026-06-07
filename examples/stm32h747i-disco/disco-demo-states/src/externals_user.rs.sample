@@ -1,0 +1,14 @@
+// User externals (callouts) sample — copy to src/externals_user.rs and customize.
+
+use super::{Externals, Machine};
+
+// Sample implementation. Copy to src/externals_user.rs and customize.
+// Implement the Externals trait methods that match your callouts
+// listed in externals.map.json. Example:
+pub struct UserExternals;
+
+impl Externals for UserExternals {
+    fn example_callout(&mut self, m: &mut Machine) {
+        let _ = m; // TODO: implement
+    }
+}

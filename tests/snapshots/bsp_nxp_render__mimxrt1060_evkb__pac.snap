@@ -1,0 +1,14 @@
+---
+source: tests/bsp_nxp_render.rs
+expression: content
+---
+//! Top-level PAC bring-up for MIMXRT1060-EVKB.
+//!
+//! Calls clock gating, IOMUX pad routing, and peripheral init in order.
+
+/// Initialize the board: clock gates, IOMUX, then peripherals.
+pub fn init() {
+    super::clocks::init();
+    super::iomux::init();
+    super::peripherals::init();
+}

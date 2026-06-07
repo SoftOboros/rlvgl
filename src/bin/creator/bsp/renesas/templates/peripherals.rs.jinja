@@ -1,0 +1,150 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Enables and configures each peripheral used by the board.
+//! PFS pin routing is done in `pfs.rs`; clock gating (MSTP release) is
+//! done in `clocks.rs`.  This module handles peripheral-internal
+//! configuration (baud rate, clock frequency, etc.).
+
+/// Initialize every board peripheral in dependency order.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% if ir.chip.peripherals[name] is defined %}
+{% set periph = ir.chip.peripherals[name] %}
+
+{% if periph.class == "sci" %}
+/// Initialize {{ name | upper }} as UART console at {{ ir.board.console.baud }} baud.
+///
+/// SCI in asynchronous (UART) mode:
+/// 1. Clear SCR (disable TE/RE)
+/// 2. Set SMR for async 8N1
+/// 3. Set BRR for the target baud rate from PCLKA
+/// 4. Enable TE + RE in SCR
+pub fn init_{{ name }}() {
+    let base = {{ periph.base }}u32;
+    unsafe {
+        // SCR register (offset 0x0A): disable TE/RE before configuration.
+        let scr = (base + 10) as *mut u8;
+        core::ptr::write_volatile(scr, 0x00);
+
+        // SMR register (offset 0x00): async mode, 8 data bits, no parity,
+        // 1 stop bit, PCLK/1 (CKS=0b00).
+        let smr = base as *mut u8;
+        core::ptr::write_volatile(smr, 0x00);
+
+        // BRR register (offset 0x02): baud rate divisor.
+        // BRR = (PCLKA_HZ / (32 * baud)) - 1   (for n=0, CKS=0b00)
+        let brr_val: u8 = ((super::clocks::PCLKA_HZ / (32 * {{ ir.board.console.baud }})) - 1) as u8;
+        let brr = (base + 2) as *mut u8;
+        core::ptr::write_volatile(brr, brr_val);
+
+        // Brief delay for BRR to take effect (at least 1 bit period).
+        // In practice the subsequent writes provide enough delay.
+
+        // SCR register: enable TE (bit 5) + RE (bit 4).
+        core::ptr::write_volatile(scr, (1u8 << 5) | (1u8 << 4));
+    }
+}
+{% elif periph.class == "iic" %}
+/// Initialize {{ name | upper }} as I2C master.
+///
+/// Configures the IIC peripheral for master transmit/receive at the
+/// target SCL frequency derived from PCLKB.
+pub fn init_{{ name }}() {
+    let base = {{ periph.base }}u32;
+    unsafe {
+        // ICCR1 (offset 0x00): reset — clear ICE (bit 7) to disable.
+        let iccr1 = base as *mut u8;
+        core::ptr::write_volatile(iccr1, 0x00);
+
+        // ICSER (offset 0x06): disable slave address recognition.
+        let icser = (base + 6) as *mut u8;
+        core::ptr::write_volatile(icser, 0x00);
+
+        {% if ir.board.i2c_configs[name] is defined %}
+        // ICMR1 (offset 0x02): set clock divider for ~{{ ir.board.i2c_configs[name].scl_hz }} Hz.
+        // CKS[2:0] selects the PCLKB divisor, BCWP=1 locks bit-counter.
+        // divider = PCLKB / (SCL_HZ * 2 * (CKS_factor))
+        // For simplicity, use CKS=3 (/8) as a default starting point.
+        let icmr1 = (base + 2) as *mut u8;
+        core::ptr::write_volatile(icmr1, (1u8 << 3) | 3u8);  // BCWP=1, CKS=3
+
+        // ICBRH/ICBRL (offsets 0x08/0x09): SCL high/low period counts.
+        let pclkb = super::clocks::PCLKB_HZ;
+        let cks_div = 8u32;  // CKS=3 divides PCLKB by 8
+        let half_period = pclkb / ({{ ir.board.i2c_configs[name].scl_hz }} * 2 * cks_div);
+        let icbrh = (base + 8) as *mut u8;
+        let icbrl = (base + 9) as *mut u8;
+        core::ptr::write_volatile(icbrh, (half_period as u8) | (0b111 << 5));
+        core::ptr::write_volatile(icbrl, (half_period as u8) | (0b111 << 5));
+        {% endif %}
+
+        // ICCR1: enable ICE (bit 7), set to master mode.
+        core::ptr::write_volatile(iccr1, 1u8 << 7);
+    }
+}
+{% elif periph.class == "spi" %}
+/// Initialize {{ name | upper }} (SPI).
+pub fn init_{{ name }}() {
+    // TODO: SPI initialization — configure SPCR for master mode,
+    // set bit rate in SPBR, and enable the peripheral.
+}
+{% elif periph.class == "gpt" %}
+/// Initialize {{ name | upper }} (General PWM Timer).
+pub fn init_{{ name }}() {
+    // TODO: GPT initialization — configure counting mode, period,
+    // and duty cycle registers.
+}
+{% elif periph.class == "agt" %}
+/// Initialize {{ name | upper }} (Asynchronous General-Purpose Timer).
+pub fn init_{{ name }}() {
+    // TODO: AGT initialization — set count source, period,
+    // and start counting.
+}
+{% elif periph.class == "adc" %}
+/// Initialize {{ name | upper }} (A/D Converter).
+pub fn init_{{ name }}() {
+    // TODO: ADC initialization — select channels, set scan mode,
+    // configure sample-and-hold, and enable.
+}
+{% elif periph.class == "dac" %}
+/// Initialize {{ name | upper }} (D/A Converter).
+pub fn init_{{ name }}() {
+    // TODO: DAC initialization — enable output amplifier and set
+    // initial output value.
+}
+{% elif periph.class == "dmac" %}
+/// Initialize {{ name | upper }} (DMA Controller).
+pub fn init_{{ name }}() {
+    // TODO: DMAC initialization — configure transfer source/dest,
+    // block size, and activation source.
+}
+{% elif periph.class == "can" %}
+/// Initialize {{ name | upper }} (CAN bus).
+pub fn init_{{ name }}() {
+    // TODO: CAN initialization — set baud rate, acceptance filters,
+    // and transition to operational mode.
+}
+{% elif periph.class == "usb" %}
+/// Initialize {{ name | upper }} (USB controller).
+pub fn init_{{ name }}() {
+    // TODO: USB initialization — select device/host mode,
+    // configure endpoints, and enable the module.
+}
+{% else %}
+/// Initialize {{ name }} ({{ periph.class }}).
+pub fn init_{{ name }}() {
+    // TODO: {{ periph.class }} peripheral initialization for {{ name }}.
+    // Base address: {{ periph.base }}
+}
+{% endif %}
+{% else %}
+/// TODO: unknown peripheral `{{ name }}` (no entry in chip IR).
+pub fn init_{{ name }}() {}
+{% endif %}
+
+{% endfor %}

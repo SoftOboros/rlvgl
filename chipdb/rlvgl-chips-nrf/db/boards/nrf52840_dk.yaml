@@ -1,0 +1,39 @@
+# Nordic nRF52840 Development Kit (PCA10056).
+#
+# Source: nRF52840 DK User Guide v1.5 (ug_nrf52840_dk).
+# Full GPIO breakout with 4 LEDs, 4 buttons, UART console via J-Link CDC.
+
+name: nRF52840-DK
+chip: nRF52840
+flash_mb: 1
+
+console:
+  peripheral: uarte0
+  baud: 115200
+
+pins:
+  # UART0 console via J-Link CDC ACM
+  - { port: 0, pin: 6,  signal: UARTE0_TXD, peripheral: uarte0, role: txd, direction: out,   label: u0_tx }
+  - { port: 0, pin: 8,  signal: UARTE0_RXD, peripheral: uarte0, role: rxd, direction: in,    label: u0_rx }
+  - { port: 0, pin: 5,  signal: UARTE0_RTS, peripheral: uarte0, role: rts, direction: out,   label: u0_rts }
+  - { port: 0, pin: 7,  signal: UARTE0_CTS, peripheral: uarte0, role: cts, direction: in,    label: u0_cts }
+  # LEDs (active low on DK)
+  - { port: 0, pin: 13, signal: LED1, direction: out, label: led1 }
+  - { port: 0, pin: 14, signal: LED2, direction: out, label: led2 }
+  - { port: 0, pin: 15, signal: LED3, direction: out, label: led3 }
+  - { port: 0, pin: 16, signal: LED4, direction: out, label: led4 }
+  # Buttons (active low with external pull-up on DK)
+  - { port: 0, pin: 11, signal: BUTTON1, direction: in, label: btn1, pull: up }
+  - { port: 0, pin: 12, signal: BUTTON2, direction: in, label: btn2, pull: up }
+  - { port: 0, pin: 24, signal: BUTTON3, direction: in, label: btn3, pull: up }
+  - { port: 0, pin: 25, signal: BUTTON4, direction: in, label: btn4, pull: up }
+  # Reset
+  - { port: 0, pin: 18, signal: RESET, direction: in, label: reset }
+
+features:
+  led_count: "4"
+  button_count: "4"
+  has_jlink: "true"
+  has_nfc: "true"
+  has_usb: "true"
+  has_qspi_flash: "true"

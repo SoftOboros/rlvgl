@@ -1,0 +1,25 @@
+# Espressif ESP32-DevKitS-R reference board.
+#
+# Source: ESP32-DevKitS-R schematic (memalpha doc 275), user guide (doc 276).
+# Classic ESP32 dev board with all GPIOs broken out on headers.
+
+name: ESP32-DevKitS-R
+chip: ESP32
+module: ESP32-WROOM-32E
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  - { gpio: 1,  signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 3,  signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  - { gpio: 2,  signal: LED,      direction: out,                    label: led }
+  - { gpio: 0,  signal: BOOT,     direction: in,                     label: boot_btn }
+
+features:
+  vendor: espressif
+  wifi: wifi_bgn
+  bluetooth: ble_classic_42

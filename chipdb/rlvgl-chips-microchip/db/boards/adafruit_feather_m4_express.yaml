@@ -1,0 +1,165 @@
+# Adafruit Feather M4 Express (Adafruit product 3857) board IR.
+#
+# Cortex-M4F Feather form-factor board built around the
+# ATSAMD51J19A (TQFP64). Carries an onboard 2 MB QSPI flash
+# (GD25Q16C), a NeoPixel on PB03, a red user LED on PA23,
+# native USB on PA24/PA25, an EUI-48-enabled ATECC608 footprint,
+# and a JST 2-pin LiPo connector with on-board charging.
+#
+# Selected as the CHIPS-MICROCHIP-01b first non-stub board per
+# CHIPS-MICROCHIP-00 §12(a): widely stocked, well-documented
+# public pinout sheet, ATSAMD51J19A (matches the -01a chip YAML).
+#
+# Authoritative sources (§0 authority policy → "Board-level
+# pinout" row → "Per-board user guides"):
+#   - Adafruit learn guide: Pinouts page
+#     https://learn.adafruit.com/adafruit-feather-m4-express-atsamd51/pinouts
+#     (accessed 2026-05-11). The header pin → signal labels
+#     ("D0/RX", "D1/TX", "SDA", "SCL", "A0".."A5", "MOSI",
+#     "MISO", "SCK", "13/LED", "8/NeoPixel") come from this page.
+#   - Adafruit ArduinoCore-samd variant for Feather M4:
+#     https://github.com/adafruit/ArduinoCore-samd/blob/master/variants/feather_m4/variant.cpp
+#     (accessed 2026-05-11). The Arduino-pin → (PORT group,
+#     pin number, SERCOM, PAD index) tuples come from this file.
+#     This is the user-guide-equivalent canonical source for the
+#     pad-to-SERCOM-PAD routing the board's onboard CircuitPython
+#     / Arduino firmware uses.
+#   - Adafruit Feather M4 Express schematic (rev B), PDF:
+#     https://cdn-learn.adafruit.com/assets/assets/000/068/750/original/adafruit_products_PCB_3857.png
+#     (accessed 2026-05-11). The USB DM/DP pad assignment
+#     (PA24/PA25) and NeoPixel pad (PB03) cross-check.
+#
+# Chip pad-mux notes vs. variant.cpp (carried as historical context;
+# the CHIPS-MICROCHIP-01a amendment landed 2026-05-13):
+#   - PB22 fn_c: `SERCOM1_PAD2` per DS60001507 Table 6-1; the
+#     variant routes MISO via PMUX C on PB22 to SERCOM1/PAD[2].
+#     The chip YAML row carried `null` here prior to -01a.
+#   - PB23 fn_c: `SERCOM1_PAD3` per DS60001507 Table 6-1; the
+#     variant routes MOSI via PMUX C on PB23 to SERCOM1/PAD[3].
+#     The chip YAML row carried `SERCOM1_PAD2` (a transcription
+#     carry-over from the PB22 row) prior to -01a.
+# Both rows are now correct in
+# `chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml`.
+# See CHIPS-MICROCHIP-00 §15 entry dated 2026-05-13.
+#
+# Console choice (CHIPS-MICROCHIP-00 §5 board YAML format):
+#   The Feather M4 Express has no on-board USB-to-serial bridge.
+#   Its primary debug surface is native USB CDC on PA24/PA25
+#   (USB DM / DP). CHIPS-MICROCHIP-00 §5 requires the `console:`
+#   peripheral to be a SERCOM (the chip YAML's `usb` peripheral
+#   carries `class: usb`, not `class: sercom`/`class:
+#   sercom_usart`). We therefore declare SERCOM5 USART (the
+#   board's `Serial1` on header pins D0/D1, PB16/PB17) as the
+#   chipdb console — matching the Arduino IDE's `Serial1` and
+#   any user-attached external USB-UART adapter. Native USB CDC
+#   remains available secondarily via the `usb` peripheral on
+#   PA24/PA25; that path is exposed by application code, not by
+#   the chipdb console gate.
+
+name: Adafruit Feather M4 Express
+chip: ATSAMD51J19A
+flash_mb: 0.5   # On-chip ATSAMD51J19A flash (DS60001507 §10.1).
+                # The external GD25Q16C QSPI flash (2 MB) is an
+                # additional asset; CHIPS-MICROCHIP-00 §5 reserves
+                # `flash_mb:` for the chip's internal flash to
+                # match the convention used by `nrf52840_dk.yaml`
+                # and `esp32c3_devkitm_1.yaml`.
+
+source:
+  user_guide: adafruit-feather-m4-express-atsamd51 # learn.adafruit.com slug
+  revision: "2026-05-11"                            # Date the source pages were read.
+  pinout_sheet: https://learn.adafruit.com/adafruit-feather-m4-express-atsamd51/pinouts
+
+console:
+  peripheral: sercom5
+  baud: 115200
+
+# Header-broken-out pads + onboard signals. Per CHIPS-MICROCHIP-00
+# §5 board format: pad uses the SAM `PAxx` / `PBxx` form;
+# `signal` carries the svd2rust-style alternate-function name
+# matching the chip YAML's `io_mux.fn_<letter>:` column; `peripheral`
+# names the chip YAML peripheral instance; `direction` is one of
+# in|out|inout; `label` is the silkscreen/header label; `pull`
+# (optional) is up|down for digital inputs that need PORT pull
+# configuration. The Arduino-pin column ("D0".."D13", "A0".."A5",
+# "MISO", "MOSI", "SCK", "SDA", "SCL") in the trailing comment
+# matches the Adafruit learn pinout sheet for cross-reference.
+pins:
+  # ===== Default UART (Serial1) — header D0/D1 — SERCOM5 ====
+  # D0 / RX -> PB17 PMUX C -> SERCOM5/PAD[1]
+  # D1 / TX -> PB16 PMUX C -> SERCOM5/PAD[0]
+  - { pad: PB17, signal: SERCOM5_PAD1, peripheral: sercom5, direction: in,    label: u_rx } # D0 / RX
+  - { pad: PB16, signal: SERCOM5_PAD0, peripheral: sercom5, direction: out,   label: u_tx } # D1 / TX
+
+  # ===== I2C (Wire / "STEMMA QT") — header SDA/SCL — SERCOM2 ====
+  # SDA -> PA12 PMUX C -> SERCOM2/PAD[0]
+  # SCL -> PA13 PMUX C -> SERCOM2/PAD[1]
+  # Feather M4 does NOT carry on-board I2C pull-ups; external
+  # 2.2K..10K pull-ups required (per Adafruit pinouts page).
+  - { pad: PA12, signal: SERCOM2_PAD0, peripheral: sercom2, direction: inout, label: sda } # SDA
+  - { pad: PA13, signal: SERCOM2_PAD1, peripheral: sercom2, direction: inout, label: scl } # SCL
+
+  # ===== SPI — header MOSI/MISO/SCK — SERCOM1 ====
+  # MISO -> PB22 PMUX C -> SERCOM1/PAD[2]  (chip yaml fn_c: SERCOM1_PAD2 since -01a, 2026-05-13)
+  # MOSI -> PB23 PMUX C -> SERCOM1/PAD[3]  (chip yaml fn_c: SERCOM1_PAD3 since -01a, 2026-05-13)
+  # SCK  -> PA17 PMUX C -> SERCOM1/PAD[1]
+  - { pad: PB22, signal: SERCOM1_PAD2, peripheral: sercom1, direction: in,    label: miso } # MISO
+  - { pad: PB23, signal: SERCOM1_PAD3, peripheral: sercom1, direction: out,   label: mosi } # MOSI
+  - { pad: PA17, signal: SERCOM1_PAD1, peripheral: sercom1, direction: out,   label: sck  } # SCK
+
+  # ===== Digital GPIO header pins =====
+  # D4..D13 — direct GPIO with TC/TCC PWM options handled by app.
+  - { pad: PA14, signal: GPIO,         direction: inout, label: d4  } # D4
+  - { pad: PA16, signal: GPIO,         direction: inout, label: d5  } # D5
+  - { pad: PA18, signal: GPIO,         direction: inout, label: d6  } # D6
+  # D7 not bonded on this board variant (Adafruit pinout).
+  - { pad: PA19, signal: GPIO,         direction: inout, label: d9  } # D9
+  - { pad: PA20, signal: GPIO,         direction: inout, label: d10 } # D10
+  - { pad: PA21, signal: GPIO,         direction: inout, label: d11 } # D11
+  - { pad: PA22, signal: GPIO,         direction: inout, label: d12 } # D12
+  - { pad: PA23, signal: LED,          direction: out,   label: led } # D13 / red user LED
+                                                                       # (active-high; pulled to red LED then GND).
+
+  # ===== Analog header pins (A0..A6) =====
+  # A0/A1 are true analog (ADC + DAC). A2/A3 are PB-side ADCs.
+  - { pad: PA02, signal: ADC0_AIN0,    peripheral: adc0, direction: in,  label: a0 } # A0 (DAC_VOUT0 capable)
+  - { pad: PA05, signal: ADC0_AIN5,    peripheral: adc0, direction: in,  label: a1 } # A1 (DAC_VOUT1 capable)
+  - { pad: PB08, signal: ADC0_AIN2,    peripheral: adc0, direction: in,  label: a2 } # A2
+  - { pad: PB09, signal: ADC0_AIN3,    peripheral: adc0, direction: in,  label: a3 } # A3
+  - { pad: PA04, signal: ADC0_AIN4,    peripheral: adc0, direction: in,  label: a4 } # A4
+  - { pad: PA06, signal: ADC0_AIN6,    peripheral: adc0, direction: in,  label: a5 } # A5
+  - { pad: PB01, signal: ADC0_AIN13,   peripheral: adc0, direction: in,  label: a6 } # A6 (battery voltage divider)
+
+  # ===== Onboard signals (not on user-accessible headers) =====
+  # PB03 — NeoPixel data out (single WS2812 onboard).
+  - { pad: PB03, signal: GPIO,         direction: out,   label: neopixel } # Onboard NeoPixel data
+
+  # PA24 / PA25 — native USB DM / DP. PMUX H -> USB_DM / USB_DP.
+  # Used by the `usb` peripheral (class: usb) for native CDC.
+  - { pad: PA24, signal: USB_DM,       peripheral: usb,  direction: inout, label: usb_dm }
+  - { pad: PA25, signal: USB_DP,       peripheral: usb,  direction: inout, label: usb_dp }
+
+i2c_configs:
+  # Adafruit STEMMA QT modules are spec'd to fast-mode 400 kHz;
+  # standard-mode 100 kHz remains the safe default for breadboard
+  # use. We pick 400 kHz to match the convention set by the
+  # `beetle_esp32c3.yaml` board file in this repo.
+  sercom2:
+    scl_hz: 400000
+
+spi_configs:
+  # Default SPI master clock 8 MHz, mode 0 — a portable, well-tested
+  # baseline for the Feather's broken-out SPI bus. Application code
+  # MAY override at runtime; this entry exists so the generator
+  # emits a working master init in `peripherals.rs`.
+  sercom1:
+    clk_hz: 8000000
+    mode: 0
+
+features:
+  led: pa23
+  neopixel: pb03
+  qspi_flash: gd25q16c_2mb_external   # On-board QSPI flash chip; not modelled in `pins:` (uses chip-internal QSPI peripheral pads).
+  usb: native
+  battery_sense: a6
+  charger: mcp73831_500ma_onboard

@@ -1,0 +1,10 @@
+error[E0499]: cannot borrow `active` as mutable more than once at a time
+  --> tests/ui/dca_dbuf_bank_guard_double.rs:27:15
+   |
+22 |     let g1 = active.bank_guard(&mut ctx, Bank::M0);
+   |              ------ first mutable borrow occurs here
+...
+27 |     let _g2 = active.bank_guard(&mut ctx, Bank::M1);
+   |               ^^^^^^ second mutable borrow occurs here
+28 |     let _ = g1.bank();
+   |             -- first borrow later used here

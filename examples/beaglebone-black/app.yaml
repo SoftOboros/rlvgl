@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: MIT
+#
+# rlvgl-app/v0 manifest for the BeagleBone Black + NHD-7.0CTP-CAPE-P
+# Linux intent (default features of examples/beaglebone-black/Cargo.toml).
+#
+# Status: APP-03b candidate. Conforms to docs/app-schema/01-manifest-schema.md
+# (RATIFIED 2026-04-27 with 2026-04-29 amendments for chipdb find() lookup
+# and workspace-root path safety). Validator-`--check` verification pending
+# APP-02a.
+#
+# Round-trip authority: docs/app-schema/03-round-trip.md §5.2 (the Linux
+# intent of examples/beaglebone-black/Cargo.toml). Sibling intents
+# (bare-metal `rlvgl-bbb-bare` binary, freertos / zephyr feature gates)
+# get their own manifests at a future date per the "one app.yaml per
+# intent" rule (01 §11).
+#
+# Workspace-relative paths used (allowed per 01 §3 / §6 rule 4 amendment
+# 2026-04-29):
+#   controller.path = ../apps/disco-demo (workspace sibling crate)
+#   assets[splash].source = ../stm32h747i-disco/assets/media/splash.rle
+#     (shared splash, also consumed by the H747 demo — same blob doubles
+#      as boot splash and desktop background per the existing main.rs
+#      design)
+
+schema: rlvgl-app/v0
+name: rlvgl-bbb-linux
+
+metadata:
+  version: 0.2.0
+  description: "rlvgl on BeagleBone Black + NHD-7.0CTP-CAPE-P (Linux fbdev)."
+  license: MIT
+
+target:
+  vendor: ti
+  board: beaglebone_black_nhd_cape
+  prong: linux
+  generator: hand_written
+  features:
+    - linux
+    - splash
+    - desktop
+    - playit
+    - star_crawl
+
+controller:
+  crate: rlvgl-app-disco-demo
+  path: ../apps/disco-demo
+  capabilities: beaglebone_black_nhd_cape
+
+assets:
+  - id: splash
+    class: image_rle_a8
+    source: ../stm32h747i-disco/assets/media/splash.rle
+    options:
+      orientation: rot90_ccw
+
+screens:
+  - id: home
+    layout: layouts/home.rs
+    layout_format: rust_inline_v1
+    default: true

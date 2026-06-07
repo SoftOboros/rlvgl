@@ -1,0 +1,57 @@
+//! Board-level constants for {{ ir.board.name }}.
+//!
+//! Chip: {{ ir.chip.name }} ({{ ir.chip.arch }}, {{ ir.chip.package }})
+//! PAC crate: {{ ir.chip.pac_crate }}
+
+/// Board name.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip identifier.
+pub const CHIP: &str = "{{ ir.chip.name }}";
+
+/// Target architecture.
+pub const ARCH: &str = "{{ ir.chip.arch }}";
+
+/// PAC crate name.
+pub const PAC_CRATE: &str = "{{ ir.chip.pac_crate }}";
+
+/// CPU clock in Hz.
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+/// AHB bus clock in Hz.
+pub const AHB_HZ: u32 = {{ ir.clocks.ahb_hz }};
+
+/// IPG bus clock in Hz.
+pub const IPG_HZ: u32 = {{ ir.clocks.ipg_hz }};
+
+/// Crystal oscillator frequency in Hz.
+pub const XTAL_HZ: u32 = {{ ir.clocks.xtal_hz }};
+
+{% if ir.board.flash_mb is defined %}
+/// On-board flash size in MB.
+pub const FLASH_MB: u32 = {{ ir.board.flash_mb }};
+{% endif %}
+
+{% if ir.board.sdram_mb is defined %}
+/// On-board SDRAM size in MB.
+pub const SDRAM_MB: u32 = {{ ir.board.sdram_mb }};
+{% endif %}
+
+// --- Pin constants ---
+{% for route in pin_routes %}
+{% if route.label is defined %}
+
+/// {{ route.pad }} — {{ route.signal }} (ALT{{ route.alt }})
+{% if route.gpio_port is defined %}
+pub const {{ route.label | upper }}_GPIO_PORT: u8 = {{ route.gpio_port }};
+pub const {{ route.label | upper }}_GPIO_PIN: u8 = {{ route.gpio_pin }};
+{% endif %}
+pub const {{ route.label | upper }}_PAD: &str = "{{ route.pad }}";
+{% endif %}
+{% endfor %}
+
+// --- Feature flags ---
+{% for key in ir.board.features | list %}
+/// Feature: {{ key }}
+pub const FEATURE_{{ key | upper }}: &str = "{{ ir.board.features[key] }}";
+{% endfor %}

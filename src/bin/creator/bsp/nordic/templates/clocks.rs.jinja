@@ -1,0 +1,41 @@
+//! Clock initialization for {{ ir.board.name }}.
+//!
+//! Configures HFCLK ({{ ir.clocks.hfclk_hz }} Hz, source: {{ ir.clocks.hfclk_src }})
+//! and LFCLK ({{ ir.clocks.lfclk_hz }} Hz, source: {{ ir.clocks.lfclk_src }}).
+
+use {{ ir.chip.pac_crate }} as pac;
+
+/// HFCLK frequency in Hz.
+pub const HFCLK_HZ: u32 = {{ ir.clocks.hfclk_hz }};
+
+/// LFCLK frequency in Hz.
+pub const LFCLK_HZ: u32 = {{ ir.clocks.lfclk_hz }};
+
+/// Start HFCLK and LFCLK with the selected sources.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+
+{% if ir.clocks.hfclk_src == "hfxo" %}
+    // Start the high-frequency crystal oscillator (HFXO).
+    p.CLOCK.tasks_hfclkstart.write(|w| unsafe { w.bits(1) });
+    while p.CLOCK.events_hfclkstarted.read().bits() == 0 {}
+    p.CLOCK.events_hfclkstarted.write(|w| unsafe { w.bits(0) });
+{% else %}
+    // Using HFINT (internal RC) — no explicit start needed.
+    let _ = &p.CLOCK;
+{% endif %}
+
+{% if ir.clocks.lfclk_src == "lfxo" %}
+    // Select LFXO (external 32.768 kHz crystal) and start LFCLK.
+    p.CLOCK.lfclksrc.write(|w| w.src().xtal());
+{% elif ir.clocks.lfclk_src == "lfsynth" %}
+    // Select synthesized LFCLK from HFCLK.
+    p.CLOCK.lfclksrc.write(|w| w.src().synth());
+{% else %}
+    // Select LFRC (internal 32.768 kHz RC oscillator).
+    p.CLOCK.lfclksrc.write(|w| w.src().rc());
+{% endif %}
+    p.CLOCK.tasks_lfclkstart.write(|w| unsafe { w.bits(1) });
+    while p.CLOCK.events_lfclkstarted.read().bits() == 0 {}
+    p.CLOCK.events_lfclkstarted.write(|w| unsafe { w.bits(0) });
+}

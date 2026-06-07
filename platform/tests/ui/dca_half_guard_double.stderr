@@ -1,0 +1,10 @@
+error[E0499]: cannot borrow `circ` as mutable more than once at a time
+  --> tests/ui/dca_half_guard_double.rs:25:15
+   |
+20 |     let g1 = circ.half_guard(&mut ctx, Half::First);
+   |              ---- first mutable borrow occurs here
+...
+25 |     let _g2 = circ.half_guard(&mut ctx, Half::Second);
+   |               ^^^^ second mutable borrow occurs here
+26 |     let _ = g1.half();
+   |             -- first borrow later used here

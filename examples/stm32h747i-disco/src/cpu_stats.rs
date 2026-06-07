@@ -78,6 +78,18 @@ const D3_CRAWL_DIAG1: u32 = 0x3800_1C70;
 const D3_CRAWL_DIAG2: u32 = 0x3800_1C74;
 #[allow(dead_code)]
 const D3_CRAWL_DIAG3: u32 = 0x3800_1C78;
+// Clock widget telemetry (populated by `clock_demo` feature).
+const D3_CLOCK_DIRTY_PX: u32 = 0x3800_1C7C;
+const D3_CLOCK_PLAN_CYCLES: u32 = 0x3800_1C80;
+const D3_CLOCK_DRAW_CYCLES: u32 = 0x3800_1C84;
+/// Packed: byte 0 = outcome code (0=Skipped, 1=Painted, 2=FullRepaint),
+/// byte 1 = layers_painted, bytes 2–3 = `cmd_count` (u16 — number of
+/// structured commands in the captured CommandList).
+const D3_CLOCK_OUTCOME: u32 = 0x3800_1C88;
+/// High-water mark for `D3_CLOCK_DRAW_CYCLES` since boot. Sample this for
+/// the worst-case-frame baseline; combine with `D3_CLOCK_DIRTY_PX` for
+/// cycles-per-pixel comparison between AA paths.
+const D3_CLOCK_DRAW_MAX: u32 = 0x3800_1C8C;
 
 /// CPU utilisation tracker backed by the DWT cycle counter.
 pub struct CpuStats {
@@ -95,6 +107,33 @@ pub struct CpuStats {
     enabled: bool,
     /// Whether this instance publishes to the CM4 telemetry slot.
     is_cm4: bool,
+}
+
+/// Centralised D3 SRAM telemetry writer.
+///
+/// Writes to fixed-offset SRAM4 slots that probe-rs scripts read for
+/// live diagnostics. Single opt-out marker covers all telemetry writes
+/// in this module; per-call-site markers would bloat the file.
+///
+/// # Safety
+///
+/// `addr` must be a writable D3 SRAM telemetry slot — typically one of
+/// the `D3_*` constants declared at module top.
+#[inline(always)]
+unsafe fn d3_write(addr: u32, val: u32) {
+    unsafe {
+        (addr as *mut u32).write_volatile(val); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    }
+}
+
+/// Centralised D3 SRAM telemetry reader. See [`d3_write`].
+///
+/// # Safety
+///
+/// Same as [`d3_write`].
+#[inline(always)]
+unsafe fn d3_read(addr: u32) -> u32 {
+    unsafe { (addr as *const u32).read_volatile() } // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
 }
 
 impl CpuStats {
@@ -116,17 +155,25 @@ impl CpuStats {
     /// # Safety
     /// Writes to DWT control registers in the PPB region.
     pub unsafe fn enable_dwt(&mut self) {
-        // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
-        const DEMCR: u32 = 0xE000_EDFC;
-        let demcr = (DEMCR as *const u32).read_volatile();
-        (DEMCR as *mut u32).write_volatile(demcr | (1 << 24));
-        // Unlock the DWT LAR (some implementations lock DWT on reset).
-        (DWT_LAR as *mut u32).write_volatile(DWT_LAR_KEY);
-        // Set CYCCNTENA (bit 0) in DWT_CTRL.
-        let ctrl = (DWT_CTRL as *const u32).read_volatile();
-        (DWT_CTRL as *mut u32).write_volatile(ctrl | 1);
-        // Reset the cycle counter.
-        (DWT_CYCCNT as *mut u32).write_volatile(0);
+        // DEMCR / DWT_LAR / DWT_CTRL are Cortex-M Private Peripheral Bus
+        // debug registers. The cortex_m crate exposes some of them via
+        // `DCB::enable_trace()` and `DWT::enable_cycle_counter()` but
+        // requires plumbing `&mut DCB` / `&mut DWT` instances through
+        // every caller. Opt-out markers document the deferral pending
+        // a typed Cortex-M debug-control wrapper.
+        unsafe {
+            // DEMCR.TRCENA (bit 24) must be set before DWT registers work.
+            const DEMCR: u32 = 0xE000_EDFC;
+            let demcr = d3_read(DEMCR); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            d3_write(DEMCR, demcr | (1 << 24)); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            // Unlock the DWT LAR (some implementations lock DWT on reset).
+            d3_write(DWT_LAR, DWT_LAR_KEY); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            // Set CYCCNTENA (bit 0) in DWT_CTRL.
+            let ctrl = d3_read(DWT_CTRL); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            d3_write(DWT_CTRL, ctrl | 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            // Reset the cycle counter.
+            d3_write(DWT_CYCCNT, 0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
         cortex_m::asm::dsb();
         self.enabled = true;
     }
@@ -142,7 +189,9 @@ impl CpuStats {
         if !self.enabled {
             return;
         }
-        let now = unsafe { (DWT_CYCCNT as *const u32).read_volatile() };
+        let now = unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        };
 
         // Previous frame duration (wrapping arithmetic handles CYCCNT wrap).
         let total = now.wrapping_sub(self.frame_start);
@@ -157,14 +206,14 @@ impl CpuStats {
         // Publish to D3 SRAM for probe / debugger / CM7 visibility.
         if self.is_cm4 {
             unsafe {
-                (D3_CM4_CPU_PCT as *mut u32).write_volatile(self.cpu_pct);
+                d3_write(D3_CM4_CPU_PCT, self.cpu_pct);
             }
         } else {
             unsafe {
-                (D3_CM7_CPU_PCT as *mut u32).write_volatile(self.cpu_pct);
-                (D3_CM7_BUSY as *mut u32).write_volatile(busy);
-                (D3_CM7_TOTAL as *mut u32).write_volatile(total);
-                (D3_FRAME_IDLE_CYCLES as *mut u32).write_volatile(self.idle_last);
+                d3_write(D3_CM7_CPU_PCT, self.cpu_pct);
+                d3_write(D3_CM7_BUSY, busy);
+                d3_write(D3_CM7_TOTAL, total);
+                d3_write(D3_FRAME_IDLE_CYCLES, self.idle_last);
             }
         }
 
@@ -179,7 +228,9 @@ impl CpuStats {
         if !self.enabled {
             return;
         }
-        self.idle_start = unsafe { (DWT_CYCCNT as *const u32).read_volatile() };
+        self.idle_start = unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        };
     }
 
     /// Accumulate idle duration after WFI returns (idle end).
@@ -188,7 +239,9 @@ impl CpuStats {
         if !self.enabled {
             return;
         }
-        let now = unsafe { (DWT_CYCCNT as *const u32).read_volatile() };
+        let now = unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        };
         self.idle_accum = self
             .idle_accum
             .wrapping_add(now.wrapping_sub(self.idle_start));
@@ -202,14 +255,16 @@ impl CpuStats {
     /// Read the CM4's CPU% from D3 SRAM (written by the CM4 core).
     /// Returns 0 if the CM4 hasn't written a valid value (garbage guard).
     pub fn cm4_cpu_pct(&self) -> u32 {
-        let raw = unsafe { (D3_CM4_CPU_PCT as *const u32).read_volatile() };
+        let raw = unsafe { d3_read(D3_CM4_CPU_PCT) };
         if raw > 100 { 0 } else { raw }
     }
 
     /// Read the raw CYCCNT value (for driver-level bracket timing).
     #[inline]
     pub fn cyccnt(&self) -> u32 {
-        unsafe { (DWT_CYCCNT as *const u32).read_volatile() }
+        unsafe {
+            d3_read(DWT_CYCCNT) /* rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast) */
+        }
     }
 
     // ── Driver metric stubs ────────────────────────────────────────────
@@ -222,7 +277,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_dma2d_cycles(&self, cycles: u32) {
         unsafe {
-            (D3_DMA2D_CYCLES as *mut u32).write_volatile(cycles);
+            d3_write(D3_DMA2D_CYCLES, cycles);
         }
     }
 
@@ -231,7 +286,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_touch_cycles(&self, cycles: u32) {
         unsafe {
-            (D3_TOUCH_CYCLES as *mut u32).write_volatile(cycles);
+            d3_write(D3_TOUCH_CYCLES, cycles);
         }
     }
 
@@ -240,7 +295,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_serial_cycles(&self, cycles: u32) {
         unsafe {
-            (D3_SERIAL_CYCLES as *mut u32).write_volatile(cycles);
+            d3_write(D3_SERIAL_CYCLES, cycles);
         }
     }
 
@@ -249,7 +304,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_loop_count(&self, loops: u32) {
         unsafe {
-            (D3_LOOP_COUNT as *mut u32).write_volatile(loops);
+            d3_write(D3_LOOP_COUNT, loops);
         }
     }
 
@@ -258,7 +313,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_dma2d_max_cycles(&self, cycles: u32) {
         unsafe {
-            (D3_DMA2D_MAX_CYCLES as *mut u32).write_volatile(cycles);
+            d3_write(D3_DMA2D_MAX_CYCLES, cycles);
         }
     }
 
@@ -267,7 +322,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_dma2d_counts(&self, complete: u16, error: u16) {
         unsafe {
-            (D3_DMA2D_COUNTS as *mut u32).write_volatile(((complete as u32) << 16) | error as u32);
+            d3_write(D3_DMA2D_COUNTS, ((complete as u32) << 16) | error as u32);
         }
     }
 
@@ -276,8 +331,10 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_serial_depths(&self, rx_depth: u16, tx_depth: u16) {
         unsafe {
-            (D3_SERIAL_DEPTHS as *mut u32)
-                .write_volatile(((rx_depth as u32) << 16) | tx_depth as u32);
+            d3_write(
+                D3_SERIAL_DEPTHS,
+                ((rx_depth as u32) << 16) | tx_depth as u32,
+            );
         }
     }
 
@@ -286,7 +343,7 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_serial_drops(&self, rx_drop: u16, tx_drop: u16) {
         unsafe {
-            (D3_SERIAL_DROPS as *mut u32).write_volatile(((rx_drop as u32) << 16) | tx_drop as u32);
+            d3_write(D3_SERIAL_DROPS, ((rx_drop as u32) << 16) | tx_drop as u32);
         }
     }
 
@@ -295,7 +352,8 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_pipeline_stage(&self, stage: u8, current_frame: u16, queued_frame: u8) {
         unsafe {
-            (D3_PIPELINE_STAGE as *mut u32).write_volatile(
+            d3_write(
+                D3_PIPELINE_STAGE,
                 ((stage as u32) << 24) | ((queued_frame as u32) << 16) | current_frame as u32,
             );
         }
@@ -306,8 +364,10 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_spin_counts(&self, serial_spins: u16, dma_spins: u16) {
         unsafe {
-            (D3_SPIN_COUNTS as *mut u32)
-                .write_volatile(((serial_spins as u32) << 16) | dma_spins as u32);
+            d3_write(
+                D3_SPIN_COUNTS,
+                ((serial_spins as u32) << 16) | dma_spins as u32,
+            );
         }
     }
 
@@ -325,12 +385,12 @@ impl CpuStats {
         cpsr: u32,
     ) {
         unsafe {
-            (D3_DISPLAY_FLAGS as *mut u32).write_volatile(flags);
-            (D3_DISPLAY_FRONT as *mut u32).write_volatile(front);
-            (D3_DISPLAY_BACK as *mut u32).write_volatile(back);
-            (D3_DISPLAY_ACTIVE as *mut u32).write_volatile(active);
-            (D3_DISPLAY_STATUS as *mut u32).write_volatile(((wisr as u32) << 16) | status as u32);
-            (D3_DISPLAY_CPSR as *mut u32).write_volatile(cpsr);
+            d3_write(D3_DISPLAY_FLAGS, flags);
+            d3_write(D3_DISPLAY_FRONT, front);
+            d3_write(D3_DISPLAY_BACK, back);
+            d3_write(D3_DISPLAY_ACTIVE, active);
+            d3_write(D3_DISPLAY_STATUS, ((wisr as u32) << 16) | status as u32);
+            d3_write(D3_DISPLAY_CPSR, cpsr);
         }
     }
 
@@ -339,8 +399,8 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_overlay_diag(&self, counts: u32, bytes: u32) {
         unsafe {
-            (D3_OVERLAY_COUNTS as *mut u32).write_volatile(counts);
-            (D3_OVERLAY_BYTES as *mut u32).write_volatile(bytes);
+            d3_write(D3_OVERLAY_COUNTS, counts);
+            d3_write(D3_OVERLAY_BYTES, bytes);
         }
     }
 
@@ -349,8 +409,8 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_event_diag(&self, state: u32, draw_seq: u32) {
         unsafe {
-            (D3_EVENT_STATE as *mut u32).write_volatile(state);
-            (D3_EVENT_DRAW_SEQ as *mut u32).write_volatile(draw_seq);
+            d3_write(D3_EVENT_STATE, state);
+            d3_write(D3_EVENT_DRAW_SEQ, draw_seq);
         }
     }
 
@@ -359,10 +419,58 @@ impl CpuStats {
     #[allow(dead_code)]
     pub fn record_crawl_diag(&self, word0: u32, word1: u32, word2: u32, word3: u32) {
         unsafe {
-            (D3_CRAWL_DIAG0 as *mut u32).write_volatile(word0);
-            (D3_CRAWL_DIAG1 as *mut u32).write_volatile(word1);
-            (D3_CRAWL_DIAG2 as *mut u32).write_volatile(word2);
-            (D3_CRAWL_DIAG3 as *mut u32).write_volatile(word3);
+            d3_write(D3_CRAWL_DIAG0, word0);
+            d3_write(D3_CRAWL_DIAG1, word1);
+            d3_write(D3_CRAWL_DIAG2, word2);
+            d3_write(D3_CRAWL_DIAG3, word3);
         }
+    }
+}
+
+/// Read the DWT cycle counter directly. Returns garbage if DWT hasn't
+/// been enabled via [`CpuStats::enable_dwt`]; deltas should always be
+/// computed via `wrapping_sub` to handle the 32-bit wrap.
+#[inline]
+#[allow(dead_code)]
+pub fn read_cyccnt() -> u32 {
+    unsafe {
+        d3_read(DWT_CYCCNT) // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+    }
+}
+
+/// Publish a clock-widget telemetry frame to the D3 SRAM slots claimed by
+/// `clock_demo`. Tracks a high-water draw-cycles mark internally so the
+/// debugger can sample the worst-case frame without constant polling.
+///
+/// `outcome_code`: 0 = Skipped, 1 = Painted, 2 = FullRepaint.
+/// `cmd_count`: number of structured commands in the captured
+/// CommandList for this frame (bytes 16..32 of `D3_CLOCK_OUTCOME`).
+#[inline]
+#[allow(dead_code)]
+pub fn publish_clock_telem(
+    outcome_code: u8,
+    layers_painted: u8,
+    cmd_count: u16,
+    dirty_px: u32,
+    plan_cycles: u32,
+    draw_cycles: u32,
+) {
+    use core::sync::atomic::{AtomicU32, Ordering};
+    static DRAW_MAX: AtomicU32 = AtomicU32::new(0);
+    let prev_max = DRAW_MAX.load(Ordering::Relaxed);
+    let new_max = if draw_cycles > prev_max {
+        DRAW_MAX.store(draw_cycles, Ordering::Relaxed);
+        draw_cycles
+    } else {
+        prev_max
+    };
+    let outcome_word =
+        (outcome_code as u32) | ((layers_painted as u32) << 8) | ((cmd_count as u32) << 16);
+    unsafe {
+        d3_write(D3_CLOCK_DIRTY_PX, dirty_px); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_PLAN_CYCLES, plan_cycles); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_DRAW_CYCLES, draw_cycles); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_OUTCOME, outcome_word); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        d3_write(D3_CLOCK_DRAW_MAX, new_max); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }

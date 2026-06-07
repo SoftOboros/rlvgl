@@ -35,11 +35,8 @@ fn slugify(name: &str) -> String {
 
 fn family_from_slug(slug: &str) -> Option<String> {
     let re = Regex::new(r"^stm32([a-z])(\d)").unwrap();
-    if let Some(c) = re.captures(slug) {
-        Some(format!("stm32-{}{}", &c[1], &c[2]))
-    } else {
-        None
-    }
+    re.captures(slug)
+        .map(|c| format!("stm32-{}{}", &c[1], &c[2]))
 }
 
 /// Walks `src` discovering available forms for each board.

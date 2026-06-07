@@ -1,0 +1,241 @@
+---
+source: tests/bsp_nrf52840_render.rs
+assertion_line: 56
+expression: content
+---
+//! GPIO pin configuration and PSEL routing for nRF52840-DK.
+//!
+//! Configures PIN_CNF registers for direction, pull, and drive strength,
+//! then writes PSEL registers to route peripheral signals to their
+//! assigned pins.
+
+use nrf52840_pac as pac;
+
+/// Configure all board pins and route peripheral signals.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+
+
+
+    // P0.6 — UARTE0_TXD (u0_tx)
+
+    p.P0.pin_cnf[6].write(|w| {
+
+        w.dir().output()
+
+
+         .pull().disabled()
+
+    });
+
+
+    // Route UARTE0_TXD → P0.6 via PSEL
+    p.UARTE0.psel.txd().write(|w| unsafe {
+        w.bits(6)
+    });
+
+
+
+
+    // P0.8 — UARTE0_RXD (u0_rx)
+
+    p.P0.pin_cnf[8].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().disabled()
+
+    });
+
+
+    // Route UARTE0_RXD → P0.8 via PSEL
+    p.UARTE0.psel.rxd().write(|w| unsafe {
+        w.bits(8)
+    });
+
+
+
+
+    // P0.5 — UARTE0_RTS (u0_rts)
+
+    p.P0.pin_cnf[5].write(|w| {
+
+        w.dir().output()
+
+
+         .pull().disabled()
+
+    });
+
+
+    // Route UARTE0_RTS → P0.5 via PSEL
+    p.UARTE0.psel.rts().write(|w| unsafe {
+        w.bits(5)
+    });
+
+
+
+
+    // P0.7 — UARTE0_CTS (u0_cts)
+
+    p.P0.pin_cnf[7].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().disabled()
+
+    });
+
+
+    // Route UARTE0_CTS → P0.7 via PSEL
+    p.UARTE0.psel.cts().write(|w| unsafe {
+        w.bits(7)
+    });
+
+
+
+
+    // P0.13 — LED1 (led1)
+
+    p.P0.pin_cnf[13].write(|w| {
+
+        w.dir().output()
+
+
+         .pull().disabled()
+
+    });
+
+
+
+
+
+    // P0.14 — LED2 (led2)
+
+    p.P0.pin_cnf[14].write(|w| {
+
+        w.dir().output()
+
+
+         .pull().disabled()
+
+    });
+
+
+
+
+
+    // P0.15 — LED3 (led3)
+
+    p.P0.pin_cnf[15].write(|w| {
+
+        w.dir().output()
+
+
+         .pull().disabled()
+
+    });
+
+
+
+
+
+    // P0.16 — LED4 (led4)
+
+    p.P0.pin_cnf[16].write(|w| {
+
+        w.dir().output()
+
+
+         .pull().disabled()
+
+    });
+
+
+
+
+
+    // P0.11 — BUTTON1 (btn1)
+
+    p.P0.pin_cnf[11].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().pullup()
+
+    });
+
+
+
+
+
+    // P0.12 — BUTTON2 (btn2)
+
+    p.P0.pin_cnf[12].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().pullup()
+
+    });
+
+
+
+
+
+    // P0.24 — BUTTON3 (btn3)
+
+    p.P0.pin_cnf[24].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().pullup()
+
+    });
+
+
+
+
+
+    // P0.25 — BUTTON4 (btn4)
+
+    p.P0.pin_cnf[25].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().pullup()
+
+    });
+
+
+
+
+
+    // P0.18 — RESET (reset)
+
+    p.P0.pin_cnf[18].write(|w| {
+
+        w.dir().input()
+         .input().connect()
+
+
+         .pull().disabled()
+
+    });
+
+
+
+
+}

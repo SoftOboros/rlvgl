@@ -16,31 +16,39 @@ use rlvgl_chips_silabs as silabs;
 use rlvgl_chips_ti as ti;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::io::Read;
-use zstd::stream::read::Decoder;
+
 #[cfg(test)]
 mod test_vendor {
-    use std::sync::OnceLock;
-
     pub fn vendor() -> &'static str {
         "test"
     }
 
-    pub fn raw_db() -> &'static [u8] {
-        static DATA: OnceLock<Vec<u8>> = OnceLock::new();
-        DATA.get_or_init(|| {
-            let txt = concat!(
-                ">boards/demo.json\n",
-                "{\"board\":\"demo\",\"chip\":\"STM32F4\",\"pins\":{\"PA0\":{\"USART2_TX\":7}}}\n",
-                "<\n",
-                ">mcu.json\n",
-                "{\"STM32F4\":{\"pins\":{\"PA0\":[{\"instance\":\"USART2\",\"signal\":\"USART2_TX\",\"af\":7}]}}}\n",
-                "<\n",
-            );
-            zstd::stream::encode_all(txt.as_bytes(), 0).expect("zstd")
-        })
-        .as_slice()
+    pub fn board_yaml(name: &str) -> Option<&'static str> {
+        if name == "demo" {
+            Some(concat!(
+                "board: demo\n",
+                "chip: STM32F4\n",
+                "pins:\n",
+                "  PA0:\n",
+                "    USART2_TX: 7\n",
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn chip_yaml(name: &str) -> Option<&'static str> {
+        if name == "STM32F4" {
+            Some(concat!(
+                "pins:\n",
+                "  PA0:\n",
+                "    - instance: USART2\n",
+                "      signal: USART2_TX\n",
+                "      af: 7\n",
+            ))
+        } else {
+            None
+        }
     }
 
     #[derive(Copy, Clone)]
@@ -168,66 +176,47 @@ pub fn find_board(vendor: &str, board: &str) -> Result<VendorBoard, String> {
     Err(format!("Unknown vendor '{}'", vendor))
 }
 
-/// Parses a vendor archive produced by `build.rs` into a map of file names to
-/// contents.
-fn parse_raw_db(blob: &[u8]) -> HashMap<String, Vec<u8>> {
-    let mut decoder = Decoder::new(blob).expect("zstd");
-    let mut text = String::new();
-    decoder.read_to_string(&mut text).expect("read zst");
-    let mut files = HashMap::new();
-    let mut lines = text.lines();
-    while let Some(line) = lines.next() {
-        if let Some(name) = line.strip_prefix('>') {
-            let mut content = String::new();
-            while let Some(l) = lines.next() {
-                if l == "<" {
-                    break;
-                }
-                if !content.is_empty() {
-                    content.push('\n');
-                }
-                content.push_str(l);
-            }
-            files.insert(name.to_string(), content.into_bytes());
-        }
-    }
-    files
-}
-
-/// Loads both the board overlay and canonical MCU definition for the given
-/// vendor board.
+/// Loads both the board overlay and canonical MCU definition for the
+/// given vendor board.
+///
+/// Pulls the YAML strings from the per-vendor chipdb crate's
+/// `board_yaml(name)` / `chip_yaml(name)` accessors and parses them
+/// into `serde_json::Value` (the YAML / JSON serde representation is
+/// interchangeable). Replaced the legacy zstd `raw_db()` blob path
+/// when the chipdb crates migrated to per-spec YAML accessors.
 #[must_use]
 pub fn load_ir(vendor: &str, board: &str) -> Result<(Value, Value), String> {
     let info = find_board(vendor, board)?;
-    let blob = match vendor {
-        v if v == nrf::vendor() => nrf::raw_db(),
-        v if v == esp::vendor() => esp::raw_db(),
-        v if v == nxp::vendor() => nxp::raw_db(),
-        v if v == silabs::vendor() => silabs::raw_db(),
-        v if v == microchip::vendor() => microchip::raw_db(),
-        v if v == renesas::vendor() => renesas::raw_db(),
-        v if v == ti::vendor() => ti::raw_db(),
-        v if v == rp2040::vendor() => rp2040::raw_db(),
-        #[cfg(test)]
-        v if v == test_vendor::vendor() => test_vendor::raw_db(),
-        _ => return Err(format!("Unknown vendor '{}'", vendor)),
-    };
-    let files = parse_raw_db(blob);
-    let board_key = format!("boards/{}.json", board);
-    let board_json = files
-        .get(&board_key)
-        .ok_or_else(|| format!("{} missing from vendor archive", board_key))?;
-    let board_val: Value =
-        serde_json::from_slice(board_json).map_err(|e| format!("parse {board_key}: {e}"))?;
-    let mcu_json = files
-        .get("mcu.json")
-        .ok_or("mcu.json missing from vendor archive")?;
-    let mcu_map: HashMap<String, Value> =
-        serde_json::from_slice(mcu_json).map_err(|e| format!("parse mcu.json: {e}"))?;
-    let mcu_val = mcu_map
-        .get(info.chip)
-        .cloned()
-        .ok_or_else(|| format!("MCU '{}' not in archive", info.chip))?;
+    let (board_yaml_text, chip_yaml_text): (Option<&'static str>, Option<&'static str>) =
+        match vendor {
+            v if v == nrf::vendor() => (nrf::board_yaml(board), nrf::chip_yaml(info.chip)),
+            v if v == esp::vendor() => (esp::board_yaml(board), esp::chip_yaml(info.chip)),
+            v if v == nxp::vendor() => (nxp::board_yaml(board), nxp::chip_yaml(info.chip)),
+            v if v == renesas::vendor() => {
+                (renesas::board_yaml(board), renesas::chip_yaml(info.chip))
+            }
+            v if v == rp2040::vendor() => (rp2040::board_yaml(board), rp2040::chip_yaml(info.chip)),
+            v if v == silabs::vendor() => (silabs::board_yaml(board), silabs::chip_yaml(info.chip)),
+            v if v == microchip::vendor() => (
+                microchip::board_yaml(board),
+                microchip::chip_yaml(info.chip),
+            ),
+            v if v == ti::vendor() => (ti::board_yaml(board), ti::chip_yaml(info.chip)),
+            #[cfg(test)]
+            v if v == test_vendor::vendor() => (
+                test_vendor::board_yaml(board),
+                test_vendor::chip_yaml(info.chip),
+            ),
+            _ => return Err(format!("Unknown vendor '{}'", vendor)),
+        };
+    let board_yaml_text = board_yaml_text
+        .ok_or_else(|| format!("board '{}' missing from {} chipdb crate", board, vendor))?;
+    let chip_yaml_text = chip_yaml_text
+        .ok_or_else(|| format!("chip '{}' missing from {} chipdb crate", info.chip, vendor))?;
+    let board_val: Value = serde_yaml::from_str(board_yaml_text)
+        .map_err(|e| format!("parse {} board yaml: {e}", vendor))?;
+    let mcu_val: Value = serde_yaml::from_str(chip_yaml_text)
+        .map_err(|e| format!("parse {} chip yaml: {e}", vendor))?;
     Ok((board_val, mcu_val))
 }
 

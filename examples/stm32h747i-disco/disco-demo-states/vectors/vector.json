@@ -1,0 +1,12 @@
+{
+  "advanceTime": 0.0,
+  "alphabet": [
+    "open_menu",
+    "play",
+    "back",
+    "open_settings",
+    "stop"
+  ],
+  "payloadHints": {},
+  "sequenceLength": 4
+}

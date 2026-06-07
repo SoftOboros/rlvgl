@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rlvgl.softoboros.com/schemas/audio-meters/skin.schema.json",
+  "title": "AudioMeterSkin",
+  "description": "Canonical skin descriptor for the rlvgl audio-meters initiative. A skin binds a scale + ballistic + colour palette + layout into a named look-and-feel preset. See docs/audio-meters/00-concepts.md §3 (skin glossary entry) and docs/audio-meters/04-skins.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "scale_id",
+    "default_ballistic",
+    "meter_type",
+    "palette",
+    "layout"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier. Lowercase snake_case. MUST match filename stem.",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "title": {
+      "type": "string",
+      "description": "Short human-readable name shown in pickers and design-tool surfaces.",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "scale_id": {
+      "type": "string",
+      "description": "References assets/audio-meters/scales/<scale_id>.json. The validator asserts this scale exists and that `default_ballistic` is in its `compatible_ballistics` (warn-only — non-conventional pairings are permitted).",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "default_ballistic": {
+      "type": "string",
+      "description": "Ballistic variant from concepts §5. Widgets MAY override at instantiation.",
+      "enum": [
+        "Vu",
+        "PpmTypeI",
+        "PpmTypeIIa",
+        "PpmTypeIIb",
+        "DigitalPeak",
+        "Rms",
+        "LufsM",
+        "LufsS",
+        "LufsI",
+        "Instant"
+      ]
+    },
+    "calibration_override": {
+      "type": "object",
+      "description": "Optional override of the scale's `calibration_default`. Same shape as the scale's field.",
+      "additionalProperties": false,
+      "required": ["to", "offset_db"],
+      "properties": {
+        "to": { "type": "string", "minLength": 1 },
+        "offset_db": { "type": "number" }
+      }
+    },
+    "meter_type": {
+      "type": "string",
+      "description": "Widget family this skin is intended for. Widgets pick skins matching their family.",
+      "enum": ["bargraph", "needle", "numeric", "lufs_gauge"]
+    },
+    "palette": {
+      "type": "object",
+      "description": "Concrete colours bound to the §7 MeterColor identifiers. Every identifier present in the bound scale's zones MUST have a palette entry. Colours are RGB hex (`#RRGGBB`) or RGBA hex (`#RRGGBBAA`).",
+      "additionalProperties": false,
+      "required": ["Safe", "Nominal", "Caution", "Hot", "Over"],
+      "properties": {
+        "Safe":    { "$ref": "#/$defs/hexColor" },
+        "Nominal": { "$ref": "#/$defs/hexColor" },
+        "Caution": { "$ref": "#/$defs/hexColor" },
+        "Hot":     { "$ref": "#/$defs/hexColor" },
+        "Over":    { "$ref": "#/$defs/hexColor" }
+      }
+    },
+    "secondary_colors": {
+      "type": "object",
+      "description": "Optional non-zone colours: background, scale text, frame, needle. All optional — widget chooses sensible defaults when missing.",
+      "additionalProperties": false,
+      "properties": {
+        "background":   { "$ref": "#/$defs/hexColor" },
+        "frame":        { "$ref": "#/$defs/hexColor" },
+        "scale_text":   { "$ref": "#/$defs/hexColor" },
+        "minor_tick":   { "$ref": "#/$defs/hexColor" },
+        "major_tick":   { "$ref": "#/$defs/hexColor" },
+        "needle":       { "$ref": "#/$defs/hexColor" },
+        "needle_pivot": { "$ref": "#/$defs/hexColor" },
+        "led_off":      { "$ref": "#/$defs/hexColor" },
+        "peak_hold":    { "$ref": "#/$defs/hexColor" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "description": "Geometry hints for the widget. The widget owns final pixel layout; these are guidelines that survive resizing.",
+      "additionalProperties": false,
+      "required": ["orientation", "aspect_ratio"],
+      "properties": {
+        "orientation": {
+          "type": "string",
+          "enum": ["horizontal", "vertical"]
+        },
+        "aspect_ratio": {
+          "type": "number",
+          "description": "Width:height ratio. e.g. 0.2 for a tall thin bargraph; 1.6 for a wide horizontal needle.",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "led_count": {
+          "type": "integer",
+          "description": "For bargraph meter_type: number of LED segments to draw across the scale. Widgets MAY render solid fill instead and ignore this hint.",
+          "minimum": 4,
+          "maximum": 256
+        },
+        "peak_hold_ms": {
+          "type": "number",
+          "description": "How long the peak-hold pip stays at its maximum before decaying, in milliseconds. 0 disables peak hold. Widget owns the decay rate; this is the hold time.",
+          "minimum": 0,
+          "maximum": 60000
+        }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "description": "Optional pointers to visual primitives (filename references under assets/audio-meters/{svg,png}/). Owned by AM-04b — listed here so the schema is forward-compatible. AM-04a skins do not populate this field.",
+      "additionalProperties": false,
+      "properties": {
+        "led_segment_on_png":  { "type": "string" },
+        "led_segment_off_png": { "type": "string" },
+        "needle_svg":          { "type": "string" },
+        "bezel_svg":           { "type": "string" },
+        "faceplate_svg":       { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+    }
+  }
+}

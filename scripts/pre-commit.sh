@@ -1,40 +1,44 @@
 #!/usr/bin/env bash
-# scripts/pre-commit.sh - Fast, phased validation prior to commit
+# scripts/pre-commit.sh - Phased validation mirroring pre-publish / CI workflow.
+# Stop on first failure.
 set -euo pipefail
 
 echo "[phase 0] format"
-cargo fmt --all
+cargo fmt --all -- --check
 
-echo "[phase 1] clippy (core/workspace)"
-cargo clippy --workspace -- -D warnings
+echo "[phase 1] clippy (workspace, warnings = errors)"
+RUSTFLAGS="" cargo clippy --workspace -- -D warnings
 
 if [[ -d "$HOME/.local/rlottie/lib" ]]; then
   export DYLD_LIBRARY_PATH="$HOME/.local/rlottie/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 fi
 
-echo "[phase 2] build+test: creator CLI & Simulator"
-# Build creator CLI and run its tests (no UI)
-cargo build --bin rlvgl-creator --features creator
-# Build simulator (required for headless tests)
-cargo build --bin rlvgl-sim --features "simulator qrcode png jpeg gif fontdue"
-cargo test --tests --features "creator simulator qrcode png jpeg gif fontdue"
+echo "[phase 2] tests (workspace)"
+RUSTFLAGS="" cargo test --workspace
 
-echo "[phase 3] build+test: creator UI"
-# Layer UI feature on top of creator and run UI-focused tests
-cargo test --tests --features "creator creator_ui"
+echo "[phase 3] playit crate (standalone + no_std cross-compile + package)"
+RUSTFLAGS="" cargo test -p rlvgl-playit
+RUSTFLAGS="-C target-cpu=cortex-m7" cargo check --target thumbv7em-none-eabihf -p rlvgl-playit
+(cd playit && cargo package --list --allow-dirty)
 
-echo "[phase 4] docs (nightly)"
-export ARTIFACTS_INCLUDE_DIR="$(pwd)/scripts/artifacts/include"
-export ARTIFACTS_LIB_DIR="$(pwd)/scripts/artifacts/lib"
-export ARTIFACTS_LIB64_DIR="$ARTIFACTS_LIB_DIR"
-RUSTDOCFLAGS="--cfg docsrs --cfg nightly" \
-    cargo +nightly doc \
-    --no-deps
+echo "[phase 4] simulator + creator tests"
+RUSTFLAGS="" cargo build -p rlvgl-example-sim
+RUSTFLAGS="" cargo test -p rlvgl-example-sim
+RUSTFLAGS="" cargo test --tests --features "creator" -p rlvgl
 
-echo "[phase 5] embedded example (stm32h747i-disco)"
-# Ensure the STM32H747I-DISCO example builds for its target (optional toolchain)
-RUSTFLAGS="" cargo build --target thumbv7em-none-eabihf --bin rlvgl-stm32h747i-disco --features stm32h747i_disco_cm7 || {
-  echo "warning: embedded target build skipped or failed (toolchain/target may be missing)" >&2
-}
+echo "[phase 4.5] disco demo + simulator automation tests"
+RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
+RUSTFLAGS="" cargo build -p rlvgl-example-disco-sim
+RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
+(cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test)
 
-echo "pre-commit: all phases completed"
+echo "[phase 5] docs"
+RUSTFLAGS="" cargo doc --workspace --no-deps
+
+echo "[phase 6] embedded target (CM7 full build + .hex/.bin)"
+make build-disco
+
+echo "[phase 7] publish dry run"
+DRY_RUN=1 scripts/publish_changed.sh HEAD~1
+
+echo "pre-commit: all phases passed"

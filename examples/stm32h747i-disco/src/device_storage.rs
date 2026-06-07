@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
 use core::cell::RefCell;
 
-use rlvgl::ui::file_browser::{EntryKind, FileEntry, StorageBrowser, StorageBrowserError};
+use rlvgl_ui::file_browser::{EntryKind, FileEntry, StorageBrowser, StorageBrowserError};
 
 // ── QSPI block device for embedded-sdmmc ──────────────────────────────────
 
@@ -29,7 +29,7 @@ const QSPI_FAT_SIZE: u32 = 1024 * 1024;
 /// because the trait takes `&self`.
 #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
 pub struct QspiBlockDev {
-    flash: Rc<RefCell<rlvgl::platform::Mt25tlFlash>>,
+    flash: Rc<RefCell<rlvgl_platform::Mt25tlFlash>>,
 }
 
 #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
@@ -40,7 +40,7 @@ pub enum QspiError {
 
 #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
 impl QspiBlockDev {
-    pub fn new(flash: Rc<RefCell<rlvgl::platform::Mt25tlFlash>>) -> Self {
+    pub fn new(flash: Rc<RefCell<rlvgl_platform::Mt25tlFlash>>) -> Self {
         Self { flash }
     }
 }
@@ -103,8 +103,8 @@ impl embedded_sdmmc::blockdevice::BlockDevice for QspiBlockDev {
 /// If not, erase and write a minimal FAT16 boot sector + tables.
 /// Returns true if formatting was performed.
 #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
-pub fn ensure_qspi_formatted(flash: &Rc<RefCell<rlvgl::platform::Mt25tlFlash>>) -> bool {
-    use rlvgl::platform::sd_emmc_adapter::DummyTimeSource;
+pub fn ensure_qspi_formatted(flash: &Rc<RefCell<rlvgl_platform::Mt25tlFlash>>) -> bool {
+    use rlvgl_platform::sd_emmc_adapter::DummyTimeSource;
 
     let bd = QspiBlockDev::new(flash.clone());
     let vm = embedded_sdmmc::VolumeManager::new(bd, DummyTimeSource);
@@ -208,7 +208,7 @@ pub fn ensure_qspi_formatted(flash: &Rc<RefCell<rlvgl::platform::Mt25tlFlash>>) 
 /// Device 1 = SD Card (if present)
 pub struct DeviceStorage {
     #[cfg(feature = "qspi_flash")]
-    qspi: Option<Rc<RefCell<rlvgl::platform::Mt25tlFlash>>>,
+    qspi: Option<Rc<RefCell<rlvgl_platform::Mt25tlFlash>>>,
     #[cfg(feature = "sd_storage")]
     sd_present: bool,
 }
@@ -224,7 +224,7 @@ impl DeviceStorage {
     }
 
     #[cfg(feature = "qspi_flash")]
-    pub fn set_qspi(&mut self, flash: Rc<RefCell<rlvgl::platform::Mt25tlFlash>>) {
+    pub fn set_qspi(&mut self, flash: Rc<RefCell<rlvgl_platform::Mt25tlFlash>>) {
         self.qspi = Some(flash);
     }
 
@@ -236,7 +236,7 @@ impl DeviceStorage {
 
     #[cfg(all(feature = "qspi_flash", feature = "sd_storage"))]
     fn list_qspi_dir(&self, path: &str) -> Result<Vec<FileEntry>, StorageBrowserError> {
-        use rlvgl::platform::sd_emmc_adapter::DummyTimeSource;
+        use rlvgl_platform::sd_emmc_adapter::DummyTimeSource;
 
         let flash = self.qspi.as_ref().ok_or(StorageBrowserError::Unavailable)?;
         let bd = QspiBlockDev::new(flash.clone());

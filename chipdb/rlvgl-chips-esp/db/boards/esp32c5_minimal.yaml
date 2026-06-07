@@ -1,0 +1,19 @@
+# ESP32-C5 minimal board for BSP generator validation.
+#
+# No devkit schematic available in memalpha yet. Minimal pin
+# assignments sufficient to exercise the render pipeline.
+
+name: ESP32-C5 Minimal
+chip: ESP32-C5
+module: null
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  - { gpio: 16, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 17, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  - { gpio: 8,  signal: BOOT,     direction: in,                     label: boot_btn }

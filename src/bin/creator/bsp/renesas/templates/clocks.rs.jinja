@@ -1,0 +1,79 @@
+//! Clock gating (MSTP) for {{ ir.board.name }}.
+//!
+//! Releases peripherals from module-stop by clearing the corresponding
+//! bit in the MSTP control registers.  On Renesas RA MCUs, a peripheral
+//! whose MSTP bit is set has its clock gated and its registers are
+//! inaccessible.
+//!
+//! CPU: {{ ir.clocks.cpu_hz }} Hz
+{%- if ir.clocks.pclka_hz is defined %}
+//! PCLKA: {{ ir.clocks.pclka_hz }} Hz
+{%- endif %}
+{%- if ir.clocks.pclkb_hz is defined %}
+//! PCLKB: {{ ir.clocks.pclkb_hz }} Hz
+{%- endif %}
+{%- if ir.clocks.pclkc_hz is defined %}
+//! PCLKC: {{ ir.clocks.pclkc_hz }} Hz
+{%- endif %}
+{%- if ir.clocks.pclkd_hz is defined %}
+//! PCLKD: {{ ir.clocks.pclkd_hz }} Hz
+{%- endif %}
+
+/// CPU core clock in Hz.
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+{% if ir.clocks.pclka_hz is defined -%}
+/// Peripheral clock A (PCLKA) in Hz.
+pub const PCLKA_HZ: u32 = {{ ir.clocks.pclka_hz }};
+
+{% endif -%}
+{% if ir.clocks.pclkb_hz is defined -%}
+/// Peripheral clock B (PCLKB) in Hz.
+pub const PCLKB_HZ: u32 = {{ ir.clocks.pclkb_hz }};
+
+{% endif -%}
+{% if ir.clocks.pclkc_hz is defined -%}
+/// Peripheral clock C (PCLKC) in Hz.
+pub const PCLKC_HZ: u32 = {{ ir.clocks.pclkc_hz }};
+
+{% endif -%}
+{% if ir.clocks.pclkd_hz is defined -%}
+/// Peripheral clock D (PCLKD) in Hz.
+pub const PCLKD_HZ: u32 = {{ ir.clocks.pclkd_hz }};
+
+{% endif -%}
+
+// MSTP register addresses (RA4/RA6 family).
+const MSTPCRA: u32 = 1074200576;  // 0x4004_7000
+const MSTPCRB: u32 = 1074200580;  // 0x4004_7004
+const MSTPCRC: u32 = 1074200584;  // 0x4004_7008
+const MSTPCRD: u32 = 1074200588;  // 0x4004_700C
+const MSTPCRE: u32 = 1074200592;  // 0x4004_7010
+
+/// Release peripherals from module-stop (ungate clocks).
+///
+/// Each peripheral used by the board has a corresponding MSTP bit that
+/// must be cleared before the peripheral's registers can be accessed.
+pub fn init() {
+    {% for name in peripherals_used %}
+    {% if ir.chip.clock_tree.mstp_gates[name] is defined %}
+    {% set gate = ir.chip.clock_tree.mstp_gates[name] %}
+    // {{ name }} — MSTP{{ gate.reg }} bit {{ gate.bit }}
+    unsafe {
+        {% if gate.reg == "A" -%}
+        let reg = MSTPCRA as *mut u32;
+        {% elif gate.reg == "B" -%}
+        let reg = MSTPCRB as *mut u32;
+        {% elif gate.reg == "C" -%}
+        let reg = MSTPCRC as *mut u32;
+        {% elif gate.reg == "D" -%}
+        let reg = MSTPCRD as *mut u32;
+        {% elif gate.reg == "E" -%}
+        let reg = MSTPCRE as *mut u32;
+        {% endif -%}
+        let val = core::ptr::read_volatile(reg);
+        core::ptr::write_volatile(reg, val & !(1u32 << {{ gate.bit }}));
+    }
+    {% endif %}
+    {% endfor %}
+}

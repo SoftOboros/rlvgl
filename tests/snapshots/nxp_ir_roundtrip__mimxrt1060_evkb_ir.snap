@@ -1,0 +1,763 @@
+---
+source: tests/nxp_ir_roundtrip.rs
+expression: "&ir"
+---
+chip:
+  name: MIMXRT1062
+  arch: cortex-m7
+  package: BGA196
+  pac_crate: imxrt_ral
+  target: thumbv7em-none-eabihf
+  cpu_hz_max: 600000000
+  memory:
+    - name: itcm
+      base: 0
+      size: 524288
+      access: rwx
+    - name: dtcm
+      base: 536870912
+      size: 524288
+      access: rw
+    - name: ocram
+      base: 538968064
+      size: 524288
+      access: rw
+    - name: flexspi
+      base: 1610612736
+      size: 134217728
+      access: rx
+    - name: semc
+      base: 2147483648
+      size: 67108864
+      access: rw
+  cores:
+    - name: cm7
+      arch: cortex-m7
+  gpio_ports:
+    - port: 1
+      pin_count: 32
+    - port: 2
+      pin_count: 32
+    - port: 3
+      pin_count: 28
+    - port: 4
+      pin_count: 32
+    - port: 5
+      pin_count: 3
+  clock_tree:
+    xtal_hz: 24000000
+    plls:
+      arm_pll:
+        base_hz: 0
+        output_range:
+          - 600000000
+          - 1296000000
+        configurable: ~
+      sys_pll1:
+        base_hz: 528000000
+        output_range: ~
+        configurable: ~
+      sys_pll2:
+        base_hz: 480000000
+        output_range: ~
+        configurable: ~
+      audio_pll:
+        base_hz: 0
+        output_range: ~
+        configurable: true
+      video_pll:
+        base_hz: 0
+        output_range: ~
+        configurable: true
+    cpu_hz: 600000000
+    ahb_hz: 600000000
+    ipg_hz: 150000000
+    ccgr_gates:
+      lpuart1:
+        ccgr: 5
+        field: 12
+      lpuart2:
+        ccgr: 0
+        field: 14
+      lpuart3:
+        ccgr: 0
+        field: 6
+      lpuart4:
+        ccgr: 1
+        field: 12
+      lpuart5:
+        ccgr: 3
+        field: 1
+      lpuart6:
+        ccgr: 3
+        field: 3
+      lpuart7:
+        ccgr: 5
+        field: 13
+      lpuart8:
+        ccgr: 6
+        field: 7
+      lpi2c1:
+        ccgr: 2
+        field: 3
+      lpi2c2:
+        ccgr: 2
+        field: 4
+      lpi2c3:
+        ccgr: 2
+        field: 5
+      lpi2c4:
+        ccgr: 6
+        field: 12
+      lpspi1:
+        ccgr: 1
+        field: 0
+      lpspi2:
+        ccgr: 1
+        field: 1
+      lpspi3:
+        ccgr: 1
+        field: 2
+      lpspi4:
+        ccgr: 1
+        field: 3
+      gpt1:
+        ccgr: 1
+        field: 10
+      gpt2:
+        ccgr: 0
+        field: 12
+      pit:
+        ccgr: 1
+        field: 6
+      flexpwm1:
+        ccgr: 4
+        field: 8
+      flexpwm2:
+        ccgr: 4
+        field: 9
+      lcdif:
+        ccgr: 3
+        field: 5
+      usdhc1:
+        ccgr: 6
+        field: 1
+      usdhc2:
+        ccgr: 6
+        field: 2
+      flexspi:
+        ccgr: 6
+        field: 5
+      gpio1:
+        ccgr: 1
+        field: 13
+      gpio2:
+        ccgr: 0
+        field: 15
+      gpio3:
+        ccgr: 2
+        field: 13
+      gpio4:
+        ccgr: 3
+        field: 6
+      gpio5:
+        ccgr: 1
+        field: 15
+      iomuxc:
+        ccgr: 4
+        field: 1
+  peripherals:
+    lpuart1:
+      class: uart
+      instance: lpuart1
+      base: 1075331072
+      irq: 20
+      signals:
+        - role: tx
+          direction: out
+        - role: rx
+          direction: in
+        - role: cts
+          direction: in
+        - role: rts
+          direction: out
+    lpuart2:
+      class: uart
+      instance: lpuart2
+      base: 1075347456
+      irq: 21
+      signals:
+        - role: tx
+          direction: out
+        - role: rx
+          direction: in
+    lpuart3:
+      class: uart
+      instance: lpuart3
+      base: 1075363840
+      irq: 22
+      signals:
+        - role: tx
+          direction: out
+        - role: rx
+          direction: in
+    lpi2c1:
+      class: i2c
+      instance: lpi2c1
+      base: 1077870592
+      irq: 28
+      signals:
+        - role: scl
+          direction: inout
+        - role: sda
+          direction: inout
+    lpi2c2:
+      class: i2c
+      instance: lpi2c2
+      base: 1077886976
+      irq: 29
+      signals:
+        - role: scl
+          direction: inout
+        - role: sda
+          direction: inout
+    lpi2c3:
+      class: i2c
+      instance: lpi2c3
+      base: 1077903360
+      irq: 30
+      signals:
+        - role: scl
+          direction: inout
+        - role: sda
+          direction: inout
+    lpspi1:
+      class: spi
+      instance: lpspi1
+      base: 1077493760
+      irq: 32
+      signals:
+        - role: sck
+          direction: out
+        - role: sdo
+          direction: out
+        - role: sdi
+          direction: in
+        - role: pcs0
+          direction: out
+    lpspi2:
+      class: spi
+      instance: lpspi2
+      base: 1077510144
+      irq: 33
+      signals:
+        - role: sck
+          direction: out
+        - role: sdo
+          direction: out
+        - role: sdi
+          direction: in
+        - role: pcs0
+          direction: out
+    lcdif:
+      class: display
+      instance: lcdif
+      base: 1076592640
+      irq: 40
+      signals:
+        - role: clk
+          direction: out
+        - role: de
+          direction: out
+        - role: hsync
+          direction: out
+        - role: vsync
+          direction: out
+    usdhc1:
+      class: sdmmc
+      instance: usdhc1
+      base: 1076625408
+      irq: 110
+      signals:
+        - role: cmd
+          direction: inout
+        - role: clk
+          direction: out
+        - role: dat0
+          direction: inout
+        - role: dat1
+          direction: inout
+        - role: dat2
+          direction: inout
+        - role: dat3
+          direction: inout
+    gpt1:
+      class: timer
+      instance: gpt1
+      base: 1075757056
+      irq: 100
+      signals: []
+    pit:
+      class: timer
+      instance: pit
+      base: 1074282496
+      irq: 88
+      signals: []
+    flexpwm1:
+      class: pwm
+      instance: flexpwm1
+      base: 1077788672
+      irq: 106
+      signals: []
+  iomux:
+    - pad: GPIO_AD_B0_12
+      mux_reg: 264
+      pad_reg: 760
+      alt0: LPI2C4_SCL
+      alt1: CCM_PMIC_READY
+      alt2: LPUART1_TX
+      alt3: ~
+      alt4: ~
+      alt5: GPIO1_IO12
+      alt6: ~
+      alt7: ~
+      gpio_port: 1
+      gpio_pin: 12
+    - pad: GPIO_AD_B0_13
+      mux_reg: 268
+      pad_reg: 764
+      alt0: LPI2C4_SDA
+      alt1: GPT1_CLK
+      alt2: LPUART1_RX
+      alt3: ~
+      alt4: ~
+      alt5: GPIO1_IO13
+      alt6: ~
+      alt7: ~
+      gpio_port: 1
+      gpio_pin: 13
+    - pad: GPIO_AD_B0_09
+      mux_reg: 252
+      pad_reg: 748
+      alt0: FLEXPWM2_PWMA03
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO1_IO09
+      alt6: ~
+      alt7: ~
+      gpio_port: 1
+      gpio_pin: 9
+    - pad: GPIO_AD_B1_00
+      mux_reg: 288
+      pad_reg: 784
+      alt0: USB_OTG2_ID
+      alt1: ~
+      alt2: ~
+      alt3: LPI2C1_SCL
+      alt4: ~
+      alt5: GPIO1_IO16
+      alt6: ~
+      alt7: ~
+      gpio_port: 1
+      gpio_pin: 16
+    - pad: GPIO_AD_B1_01
+      mux_reg: 292
+      pad_reg: 788
+      alt0: USB_OTG1_PWR
+      alt1: ~
+      alt2: ~
+      alt3: LPI2C1_SDA
+      alt4: ~
+      alt5: GPIO1_IO17
+      alt6: ~
+      alt7: ~
+      gpio_port: 1
+      gpio_pin: 17
+    - pad: GPIO_SD_B0_00
+      mux_reg: 452
+      pad_reg: 948
+      alt0: USDHC1_CMD
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO3_IO12
+      alt6: ~
+      alt7: ~
+      gpio_port: 3
+      gpio_pin: 12
+    - pad: GPIO_SD_B0_01
+      mux_reg: 456
+      pad_reg: 952
+      alt0: USDHC1_CLK
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO3_IO13
+      alt6: ~
+      alt7: ~
+      gpio_port: 3
+      gpio_pin: 13
+    - pad: GPIO_SD_B0_02
+      mux_reg: 460
+      pad_reg: 956
+      alt0: USDHC1_DATA0
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO3_IO14
+      alt6: ~
+      alt7: ~
+      gpio_port: 3
+      gpio_pin: 14
+    - pad: GPIO_SD_B0_03
+      mux_reg: 464
+      pad_reg: 960
+      alt0: USDHC1_DATA1
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO3_IO15
+      alt6: ~
+      alt7: ~
+      gpio_port: 3
+      gpio_pin: 15
+    - pad: GPIO_SD_B0_04
+      mux_reg: 468
+      pad_reg: 964
+      alt0: USDHC1_DATA2
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO3_IO16
+      alt6: ~
+      alt7: ~
+      gpio_port: 3
+      gpio_pin: 16
+    - pad: GPIO_SD_B0_05
+      mux_reg: 472
+      pad_reg: 968
+      alt0: USDHC1_DATA3
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO3_IO17
+      alt6: ~
+      alt7: ~
+      gpio_port: 3
+      gpio_pin: 17
+    - pad: GPIO_B0_00
+      mux_reg: 360
+      pad_reg: 856
+      alt0: LCD_CLK
+      alt1: ~
+      alt2: ~
+      alt3: ~
+      alt4: ~
+      alt5: GPIO2_IO00
+      alt6: ~
+      alt7: ~
+      gpio_port: 2
+      gpio_pin: 0
+  daisy_chain:
+    - signal: LPUART1_TX
+      select_input_reg: 1328
+      options:
+        - pad: GPIO_AD_B0_12
+          alt: 2
+          daisy_val: 0
+    - signal: LPUART1_RX
+      select_input_reg: 1324
+      options:
+        - pad: GPIO_AD_B0_13
+          alt: 2
+          daisy_val: 0
+    - signal: LPI2C1_SCL
+      select_input_reg: 1232
+      options:
+        - pad: GPIO_AD_B1_00
+          alt: 3
+          daisy_val: 1
+    - signal: LPI2C1_SDA
+      select_input_reg: 1236
+      options:
+        - pad: GPIO_AD_B1_01
+          alt: 3
+          daisy_val: 1
+board:
+  name: MIMXRT1060-EVKB
+  chip: MIMXRT1062
+  flash_type: qspi_nor
+  flash_mb: 8
+  sdram_mb: 32
+  console:
+    peripheral: lpuart1
+    baud: 115200
+  pins:
+    - pad: GPIO_AD_B0_12
+      signal: LPUART1_TX
+      peripheral: lpuart1
+      role: tx
+      alt: 2
+      direction: out
+      label: console_tx
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_AD_B0_13
+      signal: LPUART1_RX
+      peripheral: lpuart1
+      role: rx
+      alt: 2
+      direction: in
+      label: console_rx
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_AD_B0_09
+      signal: GPIO
+      peripheral: ~
+      role: ~
+      alt: 5
+      direction: out
+      label: user_led
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_AD_B1_00
+      signal: LPI2C1_SCL
+      peripheral: lpi2c1
+      role: scl
+      alt: 3
+      direction: inout
+      label: i2c1_scl
+      pull: up
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_AD_B1_01
+      signal: LPI2C1_SDA
+      peripheral: lpi2c1
+      role: sda
+      alt: 3
+      direction: inout
+      label: i2c1_sda
+      pull: up
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_SD_B0_00
+      signal: USDHC1_CMD
+      peripheral: usdhc1
+      role: cmd
+      alt: 0
+      direction: inout
+      label: sd_cmd
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_SD_B0_01
+      signal: USDHC1_CLK
+      peripheral: usdhc1
+      role: clk
+      alt: 0
+      direction: out
+      label: sd_clk
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_SD_B0_02
+      signal: USDHC1_DATA0
+      peripheral: usdhc1
+      role: dat0
+      alt: 0
+      direction: inout
+      label: sd_dat0
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_SD_B0_03
+      signal: USDHC1_DATA1
+      peripheral: usdhc1
+      role: dat1
+      alt: 0
+      direction: inout
+      label: sd_dat1
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_SD_B0_04
+      signal: USDHC1_DATA2
+      peripheral: usdhc1
+      role: dat2
+      alt: 0
+      direction: inout
+      label: sd_dat2
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+    - pad: GPIO_SD_B0_05
+      signal: USDHC1_DATA3
+      peripheral: usdhc1
+      role: dat3
+      alt: 0
+      direction: inout
+      label: sd_dat3
+      pull: ~
+      drive_strength: ~
+      slew_rate: ~
+      speed: ~
+  features:
+    vendor: nxp
+    lcd: rk043fn02h_ct
+    lcd_interface: parallel_rgb
+    sdcard: microsd
+    audio_codec: wm8960
+    accelerometer: fxos8700
+    debugger: opensda
+  i2c_configs:
+    lpi2c1:
+      scl_hz: 400000
+  spi_configs: {}
+clocks:
+  cpu_hz: 600000000
+  ahb_hz: 600000000
+  ipg_hz: 150000000
+  xtal_hz: 24000000
+pins:
+  - pad: GPIO_AD_B0_12
+    signal: LPUART1_TX
+    peripheral: lpuart1
+    role: tx
+    alt: 2
+    direction: out
+    label: console_tx
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_AD_B0_13
+    signal: LPUART1_RX
+    peripheral: lpuart1
+    role: rx
+    alt: 2
+    direction: in
+    label: console_rx
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_AD_B0_09
+    signal: GPIO
+    peripheral: ~
+    role: ~
+    alt: 5
+    direction: out
+    label: user_led
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_AD_B1_00
+    signal: LPI2C1_SCL
+    peripheral: lpi2c1
+    role: scl
+    alt: 3
+    direction: inout
+    label: i2c1_scl
+    pull: up
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_AD_B1_01
+    signal: LPI2C1_SDA
+    peripheral: lpi2c1
+    role: sda
+    alt: 3
+    direction: inout
+    label: i2c1_sda
+    pull: up
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_SD_B0_00
+    signal: USDHC1_CMD
+    peripheral: usdhc1
+    role: cmd
+    alt: 0
+    direction: inout
+    label: sd_cmd
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_SD_B0_01
+    signal: USDHC1_CLK
+    peripheral: usdhc1
+    role: clk
+    alt: 0
+    direction: out
+    label: sd_clk
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_SD_B0_02
+    signal: USDHC1_DATA0
+    peripheral: usdhc1
+    role: dat0
+    alt: 0
+    direction: inout
+    label: sd_dat0
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_SD_B0_03
+    signal: USDHC1_DATA1
+    peripheral: usdhc1
+    role: dat1
+    alt: 0
+    direction: inout
+    label: sd_dat1
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_SD_B0_04
+    signal: USDHC1_DATA2
+    peripheral: usdhc1
+    role: dat2
+    alt: 0
+    direction: inout
+    label: sd_dat2
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~
+  - pad: GPIO_SD_B0_05
+    signal: USDHC1_DATA3
+    peripheral: usdhc1
+    role: dat3
+    alt: 0
+    direction: inout
+    label: sd_dat3
+    pull: ~
+    drive_strength: ~
+    slew_rate: ~
+    speed: ~

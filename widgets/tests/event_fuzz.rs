@@ -41,6 +41,7 @@ fn make_button(x: i32, y: i32, counter: Rc<RefCell<usize>>) -> WidgetNode {
     WidgetNode {
         widget: Rc::new(RefCell::new(button)),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -60,6 +61,7 @@ fn event_fuzz_random() {
     let mut root = WidgetNode {
         widget: root_widget,
         children: Vec::new(),
+        tag: None,
     };
 
     let counter1 = Rc::new(RefCell::new(0));

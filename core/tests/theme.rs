@@ -7,9 +7,11 @@ use rlvgl_widgets::button::Button;
 
 #[test]
 fn light_theme_applies_defaults() {
-    let mut style = Style::default();
-    style.bg_color = Color(10, 20, 30, 255);
-    style.border_color = Color(5, 5, 5, 255);
+    let mut style = Style {
+        bg_color: Color(10, 20, 30, 255),
+        border_color: Color(5, 5, 5, 255),
+        ..Default::default()
+    };
 
     LightTheme.apply(&mut style);
 
@@ -19,9 +21,11 @@ fn light_theme_applies_defaults() {
 
 #[test]
 fn dark_theme_applies_defaults() {
-    let mut style = Style::default();
-    style.bg_color = Color(250, 250, 250, 255);
-    style.border_color = Color(10, 10, 10, 255);
+    let mut style = Style {
+        bg_color: Color(250, 250, 250, 255),
+        border_color: Color(10, 10, 10, 255),
+        ..Default::default()
+    };
 
     DarkTheme.apply(&mut style);
 

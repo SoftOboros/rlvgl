@@ -10,7 +10,7 @@ pub(crate) fn sim() -> Result<()> {
     }
 
     // Invoke cargo run -p sim
-    let status = Command::new("cargo").args(&["run", "-p", "sim"]).status()?;
+    let status = Command::new("cargo").args(["run", "-p", "sim"]).status()?;
 
     if !status.success() {
         bail!("Simulator failed to run");

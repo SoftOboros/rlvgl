@@ -168,6 +168,34 @@ chipdb_crates=(
   rlvgl-chips-rp2040
 )
 
+ordered_crates=(
+  rlvgl-chips-stm
+  rlvgl-chips-nrf
+  rlvgl-chips-esp
+  rlvgl-chips-nxp
+  rlvgl-chips-silabs
+  rlvgl-chips-microchip
+  rlvgl-chips-renesas
+  rlvgl-chips-ti
+  rlvgl-chips-rp2040
+  rlvgl-bsps-stm
+  disco-assets
+  rlvgl-api
+  rlvgl-core
+  rlvgl-audio-meters-core
+  rlvgl-decomp
+  rlvgl-i18n
+  rlvgl-playit
+  rlvgl-platform
+  rlvgl-widgets
+  rlvgl-ui
+  rlvgl-fs-sim
+  rlvgl-micropython
+  rlvgl-app-demo
+  rlvgl-app-disco-demo
+  rlvgl
+)
+
 for crate in "${chipdb_crates[@]}"; do
   if path_changed "^chipdb/${crate}/"; then
     append_unique "$crate"
@@ -177,8 +205,29 @@ done
 if path_changed '^chips/stm/bsps/'; then
   append_unique "rlvgl-bsps-stm"
 fi
+if path_changed '^examples/stm32h747i-disco/assets/disco-assets/'; then
+  append_unique "disco-assets"
+fi
+if path_changed '^api/'; then
+  append_unique "rlvgl-api"
+fi
 if path_changed '^core/'; then
   append_unique "rlvgl-core"
+fi
+if path_changed '^audio-meters-core/'; then
+  append_unique "rlvgl-audio-meters-core"
+fi
+if path_changed '^rlvgl-decomp/'; then
+  append_unique "rlvgl-decomp"
+fi
+if path_changed '^i18n/'; then
+  append_unique "rlvgl-i18n"
+fi
+if path_changed '^playit/'; then
+  append_unique "rlvgl-playit"
+fi
+if path_changed '^platform/'; then
+  append_unique "rlvgl-platform"
 fi
 if path_changed '^widgets/'; then
   append_unique "rlvgl-widgets"
@@ -186,17 +235,17 @@ fi
 if path_changed '^ui/'; then
   append_unique "rlvgl-ui"
 fi
-if path_changed '^rlvgl-decomp/'; then
-  append_unique "rlvgl-decomp"
+if path_changed '^fs-sim/'; then
+  append_unique "rlvgl-fs-sim"
 fi
-if path_changed '^platform/'; then
-  append_unique "rlvgl-platform"
-fi
-if path_changed '^i18n/'; then
-  append_unique "rlvgl-i18n"
+if path_changed '^micropython/'; then
+  append_unique "rlvgl-micropython"
 fi
 if path_changed '^examples/apps/demo/'; then
   append_unique "rlvgl-app-demo"
+fi
+if path_changed '^examples/apps/disco-demo/'; then
+  append_unique "rlvgl-app-disco-demo"
 fi
 if path_changed '^(src/|Cargo\.toml$|build\.rs$|README\.md$|rlvgl-logo\.png$|examples/|tests/)'; then
   append_unique "rlvgl"
@@ -206,6 +255,21 @@ if [[ ${#changed[@]} -eq 0 ]]; then
   echo "No changed crates detected; nothing to publish."
   exit 0
 fi
+
+sorted=()
+for crate in "${ordered_crates[@]}"; do
+  for item in "${changed[@]}"; do
+    if [[ "$item" == "$crate" ]]; then
+      sorted+=("$item")
+      break
+    fi
+  done
+done
+if [[ ${#sorted[@]} -ne ${#changed[@]} ]]; then
+  echo "Publish order is missing one or more changed crates." >&2
+  exit 1
+fi
+changed=("${sorted[@]}")
 
 echo "Changed crates (publish order):"
 for crate in "${changed[@]}"; do

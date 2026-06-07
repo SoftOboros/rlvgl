@@ -5,38 +5,92 @@ README.md - Publish-facing overview for the rlvgl-chips-nrf crate.
 # rlvgl-chips-nrf
 Package: `rlvgl-chips-nrf`
 
-`rlvgl-chips-nrf` is the Nordic Semiconductor board catalog crate used by
-`rlvgl-creator` and related code-generation tooling.
+`rlvgl-chips-nrf` is the Nordic Semiconductor nRF chip and board database used
+by `rlvgl-creator` and related code-generation tooling. It ships YAML chip
+inventories (memory map, clock tree, PSEL pin routing, peripheral slot sharing,
+ENABLE values) and board pin assignments embedded directly into the library.
 
 ## What It Provides
 
-- `vendor()` returning the stable vendor key: `"nrf"`
-- `boards()` for a lightweight list of known boards
-- `find()` for exact-name board lookup
-- `raw_db()` for the embedded raw board-definition blob produced at build time
+### Data APIs
+
+- `chip_yaml(name)` — raw YAML source for a chip (e.g. `"nrf52840"`).
+- `board_yaml(name)` — raw YAML source for a board (e.g. `"nrf52840_dk"`).
+- `chip_names()` — list of chip spec file stems currently in the database.
+- `board_names()` — list of board spec file stems currently in the database.
+
+### Compat APIs (vendor uniformity)
+
+- `vendor()` returning the stable vendor key: `"nrf"`.
+- `boards()` returning a lightweight `&[BoardInfo]` slice built from the YAML
+  board specs at build time.
+- `find(board_name)` for exact-name board lookup against the `BoardInfo`
+  slice.
+
+## Embedded Chipdb Structure
+
+```
+chipdb/rlvgl-chips-nrf/db/
+  chips/
+    nrf52840.yaml             # full chip inventory from nRF52840 PS
+  boards/
+    nrf52840_dk.yaml          # nRF52840 DK pin assignments
+```
+
+`build.rs` scans these directories at build time and embeds each file into
+the library via `include_str!`. Adding a new chip or board is a data-only
+change — create a new YAML file in the appropriate subdirectory and rebuild.
+
+### Chip spec shape
+
+Each chip YAML file documents:
+
+- `name`, `arch`, `pac_crate` (`nrf52840_pac`)
+- `gpio_ports` — port and pin_count groupings
+- `memory` — a list of contiguous regions with `base`, `size`, `access`
+- `clock_tree` — HFCLK / LFCLK sources and configuration
+- `peripheral_slots` — shared instances (e.g. TWIM0 / SPIM0 on slot 0)
+  documenting mutual exclusion
+- `peripherals` — per-instance configuration with `psel` roles,
+  `enable_val`, and signal lists
+
+### Board spec shape
+
+Each board YAML references a chip by name and supplies:
+
+- `name`, `chip`, `flash_mb`
+- `console` — peripheral and baud rate
+- `pins` — GPIO assignments with `port`, `pin`, `signal`, `peripheral`,
+  `role`, `direction`, `label`, `pull`
+- `features` — free-form map
 
 ## Build-Time Data Source
 
-When building from a workspace checkout, set `RLVGL_CHIP_SRC` to a directory of
-vendor board-definition files before compiling the crate:
+`RLVGL_CHIP_SRC` is still honoured as an overlay: when set, YAML files under
+`$RLVGL_CHIP_SRC/chips/` and `$RLVGL_CHIP_SRC/boards/` take precedence over
+the in-tree db for matching stems. This lets downstream consumers override
+or extend the chipdb without forking the crate.
+
+## Using With rlvgl-creator
 
 ```sh
-RLVGL_CHIP_SRC=build/chipdb/nrf cargo build -p rlvgl-chips-nrf
+rlvgl-creator bsp from-yaml \
+  --vendor nrf \
+  --board nrf52840_dk \
+  --out gen/ \
+  --emit-pac
 ```
-
-If `RLVGL_CHIP_SRC` is not set, the crate still builds and its baked-in board
-catalog remains available. The raw embedded database blob simply reflects
-whatever the build script packaged during that build.
 
 ## Status
 
-The public API is intentionally small and uniform across the vendor chip crates.
-Its main job today is to feed board-selection and BSP-generation flows in
-`rlvgl-creator`.
+nRF52840 (`nrf52840.yaml`) and the nRF52840 DK are the first chip and board
+with full inventory. nRF5340 and nRF9160 are pending.
 
 ## Features
 
-- `serde`: enable serialization support for the exposed data types
+- `std` (default): enable `serde` + `serde_yaml` + `indexmap` for YAML
+  loading. Disabling this drops the YAML loader and leaves only the
+  `BoardInfo` list and name lookups.
 
 ## License
 

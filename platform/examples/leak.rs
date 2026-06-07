@@ -27,10 +27,12 @@ fn main() {
     let child = WidgetNode {
         widget: Rc::new(RefCell::new(Dummy)),
         children: vec![],
+        tag: None,
     };
     let mut root = WidgetNode {
         widget: Rc::new(RefCell::new(Dummy)),
         children: vec![child],
+        tag: None,
     };
     root.dispatch_event(&Event::Tick);
 }

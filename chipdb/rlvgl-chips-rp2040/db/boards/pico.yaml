@@ -1,0 +1,23 @@
+# Raspberry Pi Pico (RP2040).
+#
+# Source: Raspberry Pi Pico Datasheet (Build-date: 2023-03-02).
+
+name: Raspberry Pi Pico
+chip: RP2040
+flash_mb: 2
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 console (active on GP0/GP1 — directly exposed on header)
+  - { gpio: 0,  signal: UART0_TX,  peripheral: uart0, role: tx,  direction: out, label: u0_tx }
+  - { gpio: 1,  signal: UART0_RX,  peripheral: uart0, role: rx,  direction: in,  label: u0_rx }
+  # On-board LED (active high, directly driven by RP2040)
+  - { gpio: 25, signal: LED,       direction: out, label: led }
+
+features:
+  led_count: "1"
+  has_usb: "true"
+  flash_type: "w25q16jv"

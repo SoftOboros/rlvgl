@@ -1,0 +1,99 @@
+[package]
+name = "rlvgl-example-beetle-esp32c3"
+version = "0.2.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+build = "build.rs"
+
+# Two parallel bring-up paths for the DFRobot Beetle ESP32-C3 (DFR0868),
+# selected by mutually exclusive feature flags:
+#
+#   --features esp_hal  — the default path, uses esp-hal's high-level I2c,
+#                         Delay, and #[esp_hal::main]. Known-working.
+#
+#   --features bsp_pac  — consumes the generated BSP from
+#                         `chipdb/rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml`
+#                         (files under `src/bsp_generated/`) and drives
+#                         SSD1306 over a hand-written raw-PAC I2C transport.
+#                         This is the "PAC + TRM" path that aligns with the
+#                         project preference for register-level bring-up.
+#
+# Regenerate the files under `src/bsp_generated/` whenever the beetle board
+# YAML or the chipdb chip YAML changes:
+#
+#   cargo run --features creator --bin rlvgl-creator -- --silent bsp from-yaml \
+#       --vendor esp --board beetle_esp32c3 \
+#       --out examples/beetle-esp32c3/src/bsp_generated_raw --emit-pac
+#
+# then sync the 5 child files (board, clocks, io_mux, pac, peripherals) from
+# `src/bsp_generated_raw/dfr0868_beetle_esp32_c3/` into `src/bsp_generated/`.
+# The hand-written `src/bsp_generated/mod.rs` just declares the modules so
+# the generator's own `mod.rs` (which is intended to be a crate root, not a
+# child module) doesn't conflict.
+
+[[bin]]
+name = "rlvgl-beetle-esp32c3"
+path = "src/esp_hal_main.rs"
+required-features = ["esp_hal"]
+
+[[bin]]
+name = "rlvgl-beetle-esp32c3-bsp-pac"
+path = "src/bsp_pac_main.rs"
+required-features = ["bsp_pac"]
+
+[features]
+default = []
+## Existing esp-hal path. Known-working, uses the upstream esp-hal crate for
+## I2C/Delay/entry-point boilerplate and pulls in the rlvgl render stack.
+esp_hal = [
+    "dep:esp-hal",
+    "dep:esp-backtrace",
+    "dep:esp-println",
+    "dep:esp-alloc",
+    "dep:ssd1306",
+    "dep:rlvgl-core",
+    "dep:rlvgl-platform",
+    "dep:rlvgl-widgets",
+    "rlvgl-platform/ssd1306",
+]
+## Generated-BSP + raw-PAC path. Consumes `src/bsp_generated/` produced by
+## `rlvgl-creator bsp from-yaml --vendor esp --board beetle_esp32c3`.
+##
+## Scope note: the first-pass bsp_pac_main.rs does an LED blink on GPIO8 to
+## prove the chipdb → generator → BSP → hardware pipeline. Driving SSD1306
+## through a raw-PAC I2C transport (SSD1306's ~1 KB framebuffer needs
+## command-list chunking) is deferred to a follow-up milestone.
+bsp_pac = [
+    "dep:esp32c3",
+    "dep:esp-riscv-rt",
+    "dep:riscv-rt",
+    "dep:riscv",
+    "dep:panic-halt",
+]
+
+[dependencies]
+# rlvgl deps are only pulled in by the `esp_hal` feature — the `bsp_pac`
+# LED-blink demo uses only the raw `esp32c3` PAC and doesn't need the
+# rlvgl render stack (which unconditionally requires an allocator).
+rlvgl-core = { path = "../../core", default-features = false, optional = true }
+rlvgl-platform = { path = "../../platform", default-features = false, optional = true }
+rlvgl-widgets = { path = "../../widgets", default-features = false, optional = true }
+
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+esp-hal = { version = "=1.0.0-beta.0", features = ["esp32c3", "unstable"], optional = true }
+esp-backtrace = { version = "0.15", features = ["esp32c3", "panic-handler", "println"], optional = true }
+esp-println = { version = "0.13", features = ["esp32c3", "log"], optional = true }
+esp-alloc = { version = "0.6", optional = true }
+# bsp_pac-only deps — raw PAC bring-up path.
+esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true }
+esp-riscv-rt = { version = "0.13", optional = true }
+# Direct riscv-rt with `memory` feature so its build.rs INCLUDEs memory.x.
+riscv-rt = { version = "0.16", features = ["memory"], optional = true }
+# Provides _critical_section_1_0_* impl that the PAC's critical-section
+# feature requires but doesn't itself supply.
+riscv = { version = "0.15", features = ["critical-section-single-hart"], optional = true }
+panic-halt = { version = "1", optional = true }
+embedded-hal = { version = "1.0", optional = true }

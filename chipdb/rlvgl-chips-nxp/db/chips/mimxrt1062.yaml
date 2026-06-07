@@ -1,0 +1,314 @@
+# MIMXRT1062 (i.MX RT1060) chip inventory for rlvgl-creator BSP generation.
+#
+# Source: NXP i.MX RT1060 Processor Reference Manual (IMXRT1060RM Rev. 3).
+# Register paths target the `imxrt_ral` crate (https://docs.rs/imxrt-ral).
+# Pad names and IOMUX offsets from Chapter 11 IOMUXC.
+
+name: MIMXRT1062
+arch: cortex-m7
+package: BGA196
+pac_crate: imxrt_ral
+target: thumbv7em-none-eabihf
+cpu_hz_max: 600000000
+
+memory:
+  - { name: itcm,    base: 0x00000000, size: 0x00080000, access: rwx }  # 512 KB ITCM (FlexRAM)
+  - { name: dtcm,    base: 0x20000000, size: 0x00080000, access: rw  }  # 512 KB DTCM (FlexRAM)
+  - { name: ocram,   base: 0x20200000, size: 0x00080000, access: rw  }  # 512 KB OCRAM
+  - { name: flexspi, base: 0x60000000, size: 0x08000000, access: rx  }  # FlexSPI mapped (128 MB window)
+  - { name: semc,    base: 0x80000000, size: 0x04000000, access: rw  }  # SEMC mapped (SDRAM, 64 MB window)
+
+cores:
+  - { name: cm7, arch: cortex-m7 }
+
+gpio_ports:
+  - { port: 1, pin_count: 32 }
+  - { port: 2, pin_count: 32 }
+  - { port: 3, pin_count: 28 }
+  - { port: 4, pin_count: 32 }
+  - { port: 5, pin_count: 3  }
+
+clock_tree:
+  xtal_hz: 24000000
+  plls:
+    arm_pll:  { base_hz: 0, output_range: [600000000, 1296000000] }
+    sys_pll1: { base_hz: 528000000 }
+    sys_pll2: { base_hz: 480000000 }
+    audio_pll: { base_hz: 0, configurable: true }
+    video_pll: { base_hz: 0, configurable: true }
+  cpu_hz: 600000000
+  ahb_hz: 600000000
+  ipg_hz: 150000000
+  # Clock Gating Registers: CCGR0..CCGR6, each 32-bit with 16 × 2-bit fields.
+  # Write 0b11 to ungate (always-on). Field index = CG number.
+  ccgr_gates:
+    lpuart1:  { ccgr: 5, field: 12 }
+    lpuart2:  { ccgr: 0, field: 14 }
+    lpuart3:  { ccgr: 0, field: 6  }
+    lpuart4:  { ccgr: 1, field: 12 }
+    lpuart5:  { ccgr: 3, field: 1  }
+    lpuart6:  { ccgr: 3, field: 3  }
+    lpuart7:  { ccgr: 5, field: 13 }
+    lpuart8:  { ccgr: 6, field: 7  }
+    lpi2c1:   { ccgr: 2, field: 3  }
+    lpi2c2:   { ccgr: 2, field: 4  }
+    lpi2c3:   { ccgr: 2, field: 5  }
+    lpi2c4:   { ccgr: 6, field: 12 }
+    lpspi1:   { ccgr: 1, field: 0  }
+    lpspi2:   { ccgr: 1, field: 1  }
+    lpspi3:   { ccgr: 1, field: 2  }
+    lpspi4:   { ccgr: 1, field: 3  }
+    gpt1:     { ccgr: 1, field: 10 }
+    gpt2:     { ccgr: 0, field: 12 }
+    pit:      { ccgr: 1, field: 6  }
+    flexpwm1: { ccgr: 4, field: 8  }
+    flexpwm2: { ccgr: 4, field: 9  }
+    lcdif:    { ccgr: 3, field: 5  }
+    usdhc1:   { ccgr: 6, field: 1  }
+    usdhc2:   { ccgr: 6, field: 2  }
+    flexspi:  { ccgr: 6, field: 5  }
+    gpio1:    { ccgr: 1, field: 13 }
+    gpio2:    { ccgr: 0, field: 15 }
+    gpio3:    { ccgr: 2, field: 13 }
+    gpio4:    { ccgr: 3, field: 6  }
+    gpio5:    { ccgr: 1, field: 15 }
+    iomuxc:   { ccgr: 4, field: 1  }
+
+peripherals:
+  lpuart1:
+    class: uart
+    instance: lpuart1
+    base: 0x40184000
+    irq: 20
+    signals:
+      - { role: tx,  direction: out }
+      - { role: rx,  direction: in  }
+      - { role: cts, direction: in  }
+      - { role: rts, direction: out }
+  lpuart2:
+    class: uart
+    instance: lpuart2
+    base: 0x40188000
+    irq: 21
+    signals:
+      - { role: tx,  direction: out }
+      - { role: rx,  direction: in  }
+  lpuart3:
+    class: uart
+    instance: lpuart3
+    base: 0x4018C000
+    irq: 22
+    signals:
+      - { role: tx,  direction: out }
+      - { role: rx,  direction: in  }
+  lpi2c1:
+    class: i2c
+    instance: lpi2c1
+    base: 0x403F0000
+    irq: 28
+    signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  lpi2c2:
+    class: i2c
+    instance: lpi2c2
+    base: 0x403F4000
+    irq: 29
+    signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  lpi2c3:
+    class: i2c
+    instance: lpi2c3
+    base: 0x403F8000
+    irq: 30
+    signals:
+      - { role: scl, direction: inout }
+      - { role: sda, direction: inout }
+  lpspi1:
+    class: spi
+    instance: lpspi1
+    base: 0x40394000
+    irq: 32
+    signals:
+      - { role: sck,  direction: out }
+      - { role: sdo,  direction: out }
+      - { role: sdi,  direction: in  }
+      - { role: pcs0, direction: out }
+  lpspi2:
+    class: spi
+    instance: lpspi2
+    base: 0x40398000
+    irq: 33
+    signals:
+      - { role: sck,  direction: out }
+      - { role: sdo,  direction: out }
+      - { role: sdi,  direction: in  }
+      - { role: pcs0, direction: out }
+  lcdif:
+    class: display
+    instance: lcdif
+    base: 0x402B8000
+    irq: 40
+    signals:
+      - { role: clk,   direction: out }
+      - { role: de,    direction: out }
+      - { role: hsync, direction: out }
+      - { role: vsync, direction: out }
+  usdhc1:
+    class: sdmmc
+    instance: usdhc1
+    base: 0x402C0000
+    irq: 110
+    signals:
+      - { role: cmd,  direction: inout }
+      - { role: clk,  direction: out   }
+      - { role: dat0, direction: inout }
+      - { role: dat1, direction: inout }
+      - { role: dat2, direction: inout }
+      - { role: dat3, direction: inout }
+  gpt1:
+    class: timer
+    instance: gpt1
+    base: 0x401EC000
+    irq: 100
+    signals: []
+  pit:
+    class: timer
+    instance: pit
+    base: 0x40084000
+    irq: 88
+    signals: []
+  flexpwm1:
+    class: pwm
+    instance: flexpwm1
+    base: 0x403DC000
+    irq: 106
+    signals: []
+
+# IOMUX pad table (subset — pads used by MIMXRT1060-EVKB board).
+# Full table has ~150 pads; we include those referenced by boards plus
+# a representative sample. Additional pads added as boards require them.
+#
+# Each entry:
+#   pad       — physical pad name (matches NXP reference manual)
+#   mux_reg   — SW_MUX_CTL_PAD register offset in IOMUXC block
+#   pad_reg   — SW_PAD_CTL_PAD register offset in IOMUXC block
+#   alt0..alt7 — signal name for each ALT function (null if unused)
+#   gpio_port/gpio_pin — GPIO assignment when ALT5 is selected
+iomux:
+  # Console UART pads
+  - pad: GPIO_AD_B0_12
+    mux_reg: 0x0108
+    pad_reg: 0x02F8
+    alt0: LPI2C4_SCL
+    alt1: CCM_PMIC_READY
+    alt2: LPUART1_TX
+    alt5: GPIO1_IO12
+    gpio_port: 1
+    gpio_pin: 12
+  - pad: GPIO_AD_B0_13
+    mux_reg: 0x010C
+    pad_reg: 0x02FC
+    alt0: LPI2C4_SDA
+    alt1: GPT1_CLK
+    alt2: LPUART1_RX
+    alt5: GPIO1_IO13
+    gpio_port: 1
+    gpio_pin: 13
+  # User LED
+  - pad: GPIO_AD_B0_09
+    mux_reg: 0x00FC
+    pad_reg: 0x02EC
+    alt0: FLEXPWM2_PWMA03
+    alt5: GPIO1_IO09
+    gpio_port: 1
+    gpio_pin: 9
+  # LPI2C1 pads (audio codec + accelerometer)
+  - pad: GPIO_AD_B1_00
+    mux_reg: 0x0120
+    pad_reg: 0x0310
+    alt0: USB_OTG2_ID
+    alt3: LPI2C1_SCL
+    alt5: GPIO1_IO16
+    gpio_port: 1
+    gpio_pin: 16
+  - pad: GPIO_AD_B1_01
+    mux_reg: 0x0124
+    pad_reg: 0x0314
+    alt0: USB_OTG1_PWR
+    alt3: LPI2C1_SDA
+    alt5: GPIO1_IO17
+    gpio_port: 1
+    gpio_pin: 17
+  # USDHC1 pads (MicroSD)
+  - pad: GPIO_SD_B0_00
+    mux_reg: 0x01C4
+    pad_reg: 0x03B4
+    alt0: USDHC1_CMD
+    alt5: GPIO3_IO12
+    gpio_port: 3
+    gpio_pin: 12
+  - pad: GPIO_SD_B0_01
+    mux_reg: 0x01C8
+    pad_reg: 0x03B8
+    alt0: USDHC1_CLK
+    alt5: GPIO3_IO13
+    gpio_port: 3
+    gpio_pin: 13
+  - pad: GPIO_SD_B0_02
+    mux_reg: 0x01CC
+    pad_reg: 0x03BC
+    alt0: USDHC1_DATA0
+    alt5: GPIO3_IO14
+    gpio_port: 3
+    gpio_pin: 14
+  - pad: GPIO_SD_B0_03
+    mux_reg: 0x01D0
+    pad_reg: 0x03C0
+    alt0: USDHC1_DATA1
+    alt5: GPIO3_IO15
+    gpio_port: 3
+    gpio_pin: 15
+  - pad: GPIO_SD_B0_04
+    mux_reg: 0x01D4
+    pad_reg: 0x03C4
+    alt0: USDHC1_DATA2
+    alt5: GPIO3_IO16
+    gpio_port: 3
+    gpio_pin: 16
+  - pad: GPIO_SD_B0_05
+    mux_reg: 0x01D8
+    pad_reg: 0x03C8
+    alt0: USDHC1_DATA3
+    alt5: GPIO3_IO17
+    gpio_port: 3
+    gpio_pin: 17
+  # LCDIF pads (representative — just CLK for now)
+  - pad: GPIO_B0_00
+    mux_reg: 0x0168
+    pad_reg: 0x0358
+    alt0: LCD_CLK
+    alt5: GPIO2_IO00
+    gpio_port: 2
+    gpio_pin: 0
+
+# Daisy chain (SELECT_INPUT) registers.
+# Only entries relevant to currently-defined board pins are listed.
+daisy_chain:
+  - signal: LPUART1_TX
+    select_input_reg: 0x0530
+    options:
+      - { pad: GPIO_AD_B0_12, alt: 2, daisy_val: 0 }
+  - signal: LPUART1_RX
+    select_input_reg: 0x052C
+    options:
+      - { pad: GPIO_AD_B0_13, alt: 2, daisy_val: 0 }
+  - signal: LPI2C1_SCL
+    select_input_reg: 0x04D0
+    options:
+      - { pad: GPIO_AD_B1_00, alt: 3, daisy_val: 1 }
+  - signal: LPI2C1_SDA
+    select_input_reg: 0x04D4
+    options:
+      - { pad: GPIO_AD_B1_01, alt: 3, daisy_val: 1 }

@@ -7,13 +7,16 @@ examples/stm32h747i-disco/README.md - STM32H747I-DISCO board demo.
 
 # STM32H747I-DISCO Demo
 ---
-Demonstrates rlvgl on the STM32H747I-DISCO discovery board using placeholder
-display and touch drivers.
+Primary rlvgl target. The full demo (splash → desktop → touch → star crawl)
+runs on three task models (bare-metal, FreeRTOS, Zephyr) over the OTM8009A
+DSI panel and FT5336 I²C touch controller.
 
 ## Quick Links
 - Boot options and dual-core flow: see `BOOT.md`
 - Memory map and regions: see `MEMORY.md`
-- STM32 BSP generation behavior and flags: see `docs/STM_BSP_GENERATION.md`
+- Hardware reference (pinmap, peripherals): see `HARDWARE.md`
+- Bring-up checklist + history: see `BRINGUP.md`
+- STM32 BSP generation behavior and flags: see [`docs/bsp/STM32.md`](../../docs/bsp/STM32.md)
 
 ## BSP Generation
 The `bsp` directory is produced by `rlvgl-creator` and demonstrates
@@ -27,33 +30,73 @@ let dp = pac::Peripherals::take().unwrap();
 hal::init_board_hal(&dp);
 ```
 
+## Platform Variants
+
+The same `rlvgl-app-disco-demo` crate and `DiscoController` widget tree
+run on three platforms, each with its own task model and display driver:
+
+| Platform | Entry point | Task model | Display | Guide |
+|----------|-------------|------------|---------|-------|
+| **Bare-metal** | `main.rs` cooperative loop | Single-threaded, SysTick-driven | Compositor + double-buffer | [Vol II](../../docs/disco-platform-guide/README.md) |
+| **FreeRTOS** | `freertos_entry.rs` + `ffi_shims.c` | Preemptive tasks (present/render/touch/playit) | Single-buffer FRONT, 32 ms holdoff | [Vol IV](../../docs/disco-freertos-guide/README.md) |
+| **Zephyr** | `zephyr_entry.rs` + `zephyr/src/main.c` | Zephyr threads, C+Rust FFI | Video mode or adapted command mode | [Vol V](../../docs/disco-zephyr-guide/README.md) |
+
+Build targets:
+
+| Platform | Build | Flash |
+|----------|-------|-------|
+| Bare-metal | `make build-disco` | `make flash-disco` |
+| FreeRTOS | `make build-disco-freertos` | `make flash-disco-freertos` |
+| Zephyr (video) | `make zephyr-disco` | `make zephyr-disco-flash` |
+| Zephyr (ACM) | `make zephyr-disco-acm` | `make zephyr-disco-flash` |
+
 ## Requirements
 - Rust target `thumbv7em-none-eabihf`
 - `arm-none-eabi` cross toolchain
+- For Zephyr: Zephyr SDK 0.16.x + west (see [docs/ZEPHYR.md](../../docs/ZEPHYR.md))
 
 ## Building
+
+The package is `rlvgl-example-disco` and produces two binaries from the same
+crate: `rlvgl-stm32h747i-disco` (CM7, gated by `cm7`) and
+`rlvgl-stm32h747i-disco-cm4` (CM4, gated by `cm4`).  The default profiling
+feature set for CM7 is `cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio`.
+
 ```bash
 rustup target add thumbv7em-none-eabihf
-cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco,qrcode,png,jpeg,fontdue" \
-    --target thumbv7em-none-eabihf
 ```
 
-Alternatively, use the top-level Makefile shortcuts:
+| Method | Command |
+| --- | --- |
+| Make (CM7 debug) | `make build-disco` |
+| Make (CM7 release) | `make build-disco-release` |
+| Make (CM4) | `make build-disco-cm4` |
+| Make (both cores) | `make build-disco-all` |
+| Cargo (CM7 explicit) | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
+| Cargo (CM4 explicit) | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` |
+
+All make `build-disco*` targets call `rust-objcopy` to emit `.hex` and `.bin`
+artifacts beside the ELF.
+
+Top-level Makefile targets (`make help` for all):
 
 ```
+make build-disco                # Build CM7 debug + .hex/.bin
+make build-disco-release        # Build CM7 release + .hex/.bin
+make build-disco-cm4            # Build CM4
+make build-disco-all            # Build CM7 + CM4
+make flash-disco                # Build + flash via probe-rs
+make probe-rs-gdb               # Build + flash + GDB server
 make gen-stm32h747i-disco-bsp   # Regenerate BSP (defaults SMPS/VOS1)
-make build-disco                # Build CM7 example
-make build-disco-cm4            # Build CM4 example
-make build-disco-all            # Build both
-make openocd                    # Start OpenOCD (stlink + stm32h7x)
-make openocd-erase              # Mass erase (DANGER)
+make test-stm32h747i-disco      # Bridge USART1 to TCP and run playit tests
 ```
+
+Per-feature documentation lives in [`OPTIONS.md`](./OPTIONS.md).
 
 Notes:
-- The workspace `build.rs` stages this example’s `memory.x` into the Cargo
-  build directory and passes `-Tmemory.x` to the linker automatically on
-  embedded targets. No global `.cargo/config.toml` is required.
+- The crate `build.rs` stages `memory.x` into the Cargo build directory and
+  passes `-Tlink.x` to the linker automatically on embedded targets.
+- `rust-objcopy` generates `.hex` and `.bin` alongside the ELF after each build.
 - Optional `backlight_pwm` enables TIM8 PWM on `PJ6` for the LCD backlight. The
   default build uses a simple GPIO high/low fallback for bring‑up.
 
@@ -75,11 +118,14 @@ st-flash write firmware.bin 0x08000000
 - LTDC timings (typical OTM8009A 800×480):
   - HSW=20, HBP=140, HFP=20
   - VSW=4,  VBP=34,  VFP=10
-- Layer 1: RGB565 framebuffer; DMA2D planned for blits/fills.
+- Layer 1: ARGB8888 framebuffer; DMA2D handles blits/fills when `dma2d`
+  feature is enabled.
 - Notes:
   - These values are labeled in `platform/src/stm32h747i_disco.rs::configure_ltdc_timing()`
     for easy tweaking during tuning.
-  - DSI panel init is stubbed; LTDC draws are WIP.
+  - DSI video-mode bring-up + OTM8009A init are implemented end-to-end.
+    See [`docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md`](../../docs/disco-platform-guide/05-ltdc-dsi-and-axi-holdoff.md)
+    for the LTDC/DSI/AXI holdoff details.
 
 ## Touch (FT5336)
 
@@ -98,21 +144,21 @@ st-flash write firmware.bin 0x08000000
 - Panel reset: PG3 (LCD_RESET on MB1166). Early bring‑up may toggle this via
   GPIO; add datasheet‑compliant delays.
 
-## Optional: SD Assets
+## Optional: SD Storage
 
-- Enable the no_std FATFS adapter and the SD block device when building. For a
-  minimal on-boot listing demo, also enable `sd_assets_demo`:
+- Enable the SD block device when building:
 
 ```bash
-cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+RUSTFLAGS="-C target-cpu=cortex-m7" cargo build \
+    -p rlvgl-example-disco \
+    --bin rlvgl-stm32h747i-disco \
+    --features "cm7,sd_storage" \
     --target thumbv7em-none-eabihf --release
 ```
 
 - The `DiscoSdBlockDevice` driver (SDMMC1 + DMA + D‑Cache hygiene) is available
-  behind the above features. A lightweight `fatfs` adapter is included in the
-  platform crate (`sd_fatfs_adapter`). With `sd_assets_demo`, the firmware will
-  attempt to mount and list `/assets` at startup and render a few names.
+  behind `sd_storage`. A lightweight `fatfs` adapter is included in the platform
+  crate (`sd_fatfs_adapter`) for follow-on filesystem integration.
 
 ### On‑screen indicators
 

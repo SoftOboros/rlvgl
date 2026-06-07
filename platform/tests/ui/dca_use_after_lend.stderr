@@ -1,0 +1,16 @@
+error[E0382]: borrow of moved value: `cpu`
+  --> tests/ui/dca_use_after_lend.rs:22:18
+   |
+17 |     let cpu = buf.cpu();
+   |         --- move occurs because `cpu` has type `Cpu<'_, u8, 32>`, which does not implement the `Copy` trait
+18 |     let (_pending, _addr) = cpu.lend_for_read(&mut ctx);
+   |                                 ----------------------- `cpu` moved due to this method call
+...
+22 |     let _slice = cpu.as_slice();
+   |                  ^^^ value borrowed here after move
+   |
+note: `Cpu::<'a, T, N>::lend_for_read` takes ownership of the receiver `self`, which moves `cpu`
+  --> src/hwcore/dca.rs
+   |
+   |         self,
+   |         ^^^^

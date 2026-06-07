@@ -5,11 +5,11 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl::core::event::Event;
-use rlvgl::core::packed_font::PackedFont;
-use rlvgl::core::renderer::Renderer;
-use rlvgl::core::widget::{Color, Rect, Widget};
-use rlvgl::ui::draw_helpers::{draw_border, fill_rounded_rect};
+use rlvgl_core::event::Event;
+use rlvgl_core::packed_font::PackedFont;
+use rlvgl_core::renderer::Renderer;
+use rlvgl_core::widget::{Color, Rect, Widget};
+use rlvgl_ui::draw_helpers::{draw_border, fill_rounded_rect};
 
 const PANEL_W: i32 = 320;
 const PANEL_PADDING: i32 = 14;
@@ -160,7 +160,7 @@ impl SettingsDialog {
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
     pub fn draw_hw(
         &self,
-        ctx: &mut rlvgl::platform::dma2d_draw::Dma2dOverlayCtx,
+        ctx: &mut rlvgl_platform::dma2d_draw::Dma2dOverlayCtx,
         scratch: &mut [u8],
     ) {
         if !self.visible {

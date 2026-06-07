@@ -1,0 +1,25 @@
+# Espressif ESP32-H2-DevKitM-1 reference board.
+#
+# Source: ESP32-H2-DevKitM-1 schematic (memalpha doc 322).
+# Minimal board with UART0 console, LED, and BOOT button.
+# 802.15.4 (Zigbee/Thread) + BLE 5.0 connectivity.
+
+name: ESP32-H2-DevKitM-1
+chip: ESP32-H2
+module: ESP32-H2-MINI-1
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  - { gpio: 24, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 25, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  - { gpio: 8,  signal: LED,      direction: out,                    label: led }
+  - { gpio: 9,  signal: BOOT,     direction: in,                     label: boot_btn }
+
+features:
+  ieee802154: zigbee_thread
+  bluetooth: ble5

@@ -1,7 +1,12 @@
 //! Drawing helpers for rounded rectangles and borders.
 //!
-//! Core algorithms live in [`rlvgl_core::draw`] and are re-exported here for
-//! convenience.  This module also provides the [`Rotated90`] renderer wrapper.
+//! Core algorithms live in [`rlvgl_core::draw`] and are re-exported here
+//! for convenience.
+//!
+//! Display rotation used to live here as a `Rotated90` renderer wrapper,
+//! but it was unused and rotation now belongs in the platform layer
+//! (see [`rlvgl_platform::screen::Screen`] and the display driver's
+//! `flush` implementation). This module is rotation-agnostic.
 
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
@@ -16,41 +21,85 @@ pub fn draw_border(renderer: &mut dyn Renderer, rect: Rect, color: Color, width:
     draw_border_straight(renderer, rect, color, width);
 }
 
-/// Renderer wrapper that rotates all drawing 90° CCW.
+/// Standard panel corner radius used by all rlvgl windows.
+pub const PANEL_RADIUS: u8 = 18;
+/// Standard panel padding.
+pub const PANEL_PADDING: i32 = 20;
+/// Standard close button hit area — a square the height of the title area.
+pub const CLOSE_SIZE: i32 = 48;
+
+/// Draw a standard panel header: accent bar, title, close button, divider.
 ///
-/// Maps logical (x, y) → framebuffer (y, x) so that content designed
-/// for a landscape orientation renders correctly on a portrait
-/// framebuffer whose scan direction is rotated.
-pub struct Rotated90<'a>(pub &'a mut dyn Renderer);
+/// Returns the Y coordinate below the divider — callers render body
+/// content starting there.
+///
+/// - `bounds`: panel outer rectangle
+/// - `accent`: accent bar color
+/// - `title`: header title text
+/// - `font`: bitmap font for the title and close "X"
+/// - `title_color` / `close_color` / `divider_color`: styling
+#[allow(clippy::too_many_arguments)]
+pub fn draw_panel_header(
+    renderer: &mut dyn Renderer,
+    bounds: Rect,
+    accent: Color,
+    title: &str,
+    font: &rlvgl_core::bitmap_font::BitmapFont,
+    title_color: Color,
+    close_color: Color,
+    divider_color: Color,
+) -> i32 {
+    // Accent bar
+    fill_rounded_rect(
+        renderer,
+        Rect {
+            x: bounds.x + PANEL_PADDING,
+            y: bounds.y + PANEL_PADDING,
+            width: 72,
+            height: 8,
+        },
+        accent,
+        4,
+    );
 
-impl Renderer for Rotated90<'_> {
-    fn fill_rect(&mut self, rect: Rect, color: Color) {
-        self.0.fill_rect(
-            Rect {
-                x: rect.y,
-                y: rect.x,
-                width: rect.height,
-                height: rect.width,
-            },
-            color,
-        );
-    }
+    // Title
+    let title_y = bounds.y + PANEL_PADDING + 20;
+    font.draw_str(
+        renderer,
+        bounds.x + PANEL_PADDING,
+        title_y,
+        title,
+        title_color,
+    );
 
-    fn blend_rect(&mut self, rect: Rect, color: Color) {
-        self.0.blend_rect(
-            Rect {
-                x: rect.y,
-                y: rect.x,
-                width: rect.height,
-                height: rect.width,
-            },
-            color,
-        );
-    }
+    // Close button "X" — text at right edge, hit area is CLOSE_SIZE square
+    // BitmapFont chars are 6px wide at scale 1; approximate position.
+    let close_text_x = bounds.x + bounds.width - PANEL_PADDING - 12;
+    let close_text_y = bounds.y + PANEL_PADDING;
+    font.draw_str(renderer, close_text_x, close_text_y, "X", close_color);
 
-    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
-        self.0.draw_text((position.1, position.0), text, color);
-    }
+    // Divider line
+    let div_y = title_y + font.scaled_height() + 12;
+    renderer.fill_rect(
+        Rect {
+            x: bounds.x + PANEL_PADDING,
+            y: div_y,
+            width: bounds.width - PANEL_PADDING * 2,
+            height: 1,
+        },
+        divider_color,
+    );
+
+    div_y + 12 // body content starts here
+}
+
+/// Close button hit test for panels using `draw_panel_header`.
+/// Hit area is a CLOSE_SIZE square anchored at the top-right corner
+/// of the panel (inside padding).
+pub fn panel_close_hit(bounds: Rect, x: i32, y: i32) -> bool {
+    let cx = bounds.x + bounds.width - PANEL_PADDING - CLOSE_SIZE;
+    let cy = bounds.y;
+    x >= cx && x < bounds.x + bounds.width && y >= cy && y < cy + CLOSE_SIZE
 }
 
 #[cfg(test)]

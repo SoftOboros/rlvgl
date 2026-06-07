@@ -1,0 +1,77 @@
+---
+source: tests/bsp_ti_cc1352r_render.rs
+assertion_line: 110
+expression: text
+---
+//! Board-level constants for LAUNCHXL-CC1352R1.
+//!
+//! Each pin label from `db/boards/launchxl_cc1352_r1.yaml` becomes a `pub const`
+//! DIO number so application code can refer to board features by name
+//! rather than magic pin numbers.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "LAUNCHXL-CC1352R1";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "CC1352R";
+
+/// Chip package.
+pub const PACKAGE: &str = "RGZ";
+
+/// On-module flash capacity, megabytes.
+pub const FLASH_MB: u32 = 0;
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+///
+/// On SimpleLink Cortex-M4F the CPU runs directly off SCLK_HF; there is
+/// no PLL (TI SWCU185 §4).
+pub const CPU_HZ: u32 = 48000000;
+
+/// APB / peripheral bus clock frequency, in hertz.
+pub const APB_HZ: u32 = 48000000;
+
+/// High-frequency crystal frequency, in hertz (XOSC_HF).
+pub const XTAL_HZ: u32 = 48000000;
+
+/// Low-frequency crystal frequency, in hertz (XOSC_LF, 32.768 kHz typical).
+pub const XTAL_LF_HZ: u32 = 32768;
+
+
+
+/// DIO number for `uart_rx` (UART0_RX).
+pub const UART_RX: u8 = 2;
+
+
+
+/// DIO number for `uart_tx` (UART0_TX).
+pub const UART_TX: u8 = 3;
+
+
+
+/// DIO number for `i2c_sda` (I2C0_SDA).
+pub const I2C_SDA: u8 = 5;
+
+
+
+/// DIO number for `i2c_scl` (I2C0_SCL).
+pub const I2C_SCL: u8 = 4;
+
+
+
+/// DIO number for `led_red` (LED_RED).
+pub const LED_RED: u8 = 6;
+
+
+
+/// DIO number for `led_green` (LED_GREEN).
+pub const LED_GREEN: u8 = 7;
+
+
+
+/// DIO number for `btn1` (BTN1).
+pub const BTN1: u8 = 13;
+
+
+
+/// DIO number for `btn2` (BTN2).
+pub const BTN2: u8 = 14;

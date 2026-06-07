@@ -1,0 +1,59 @@
+//! CMU clock-gate initialization for SLSTK3701A.
+//!
+//! Silicon Labs EFM32 Series 1 peripheral clock gating lives in three
+//! CMU register families:
+//!
+//! * `cmu.hfperclken0` / `cmu.hfperclken1` — HF peripheral bus (USART,
+//!   UART, I2C, TIMER, ADC, ACMP, IDAC, VDAC, PRS, GPIO).
+//! * `cmu.hfbusclken0` — HF system bus (LDMA, GPCRC, EBI, ETH, CRYPTO,
+//!   SDIO, QSPI, `le` — wakeup gate to LF peripherals).
+//! * `cmu.lfaclken0` / `cmu.lfbclken0` / `cmu.lfeclken0` — LF
+//!   peripheral buses (LETIMER, LEUART, RTC, RTCC, PCNT, LCD, WDOG).
+//!
+//! EFM32GG11 does NOT have a per-peripheral CMU reset register; reset
+//! is via the peripheral's own CMD/CTRL write. This template therefore
+//! emits clock-enable only.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: register blocks expose each register as a
+//! direct `#[repr(C)]` struct field (`p.CMU.hfperclken0`), not a
+//! method (`p.CMU.hfperclken0()`). Same vintage as `atsamd51j19a 0.7.1`
+//! — see CHIPS-MICROCHIP-02 for the parallel pattern.
+
+// `efm32gg11b-pac` gates its per-SKU `Peripherals` type behind
+// a `efm32gg11b820` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use efm32gg11b_pac::efm32gg11b820 as pac;
+
+/// Enable the CMU clock gate for every peripheral used by this board.
+///
+/// Called by [`crate::pac::init`] as the first bring-up step, before
+/// IO routing so that peripheral registers are writable.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    
+    
+    
+    // usart4 — CMU clock enable usart4 on cmu.hfperclken0
+    p.CMU.hfperclken0.modify(|_, w| w.usart4().set_bit());
+    
+    
+    
+    
+    
+    
+    // gpio — CMU clock enable gpio on cmu.hfbusclken0
+    p.CMU.hfbusclken0.modify(|_, w| w.gpio().set_bit());
+    
+    
+    
+    
+    
+    
+    // i2c2 — CMU clock enable i2c2 on cmu.hfperclken0
+    p.CMU.hfperclken0.modify(|_, w| w.i2c2().set_bit());
+    
+    
+    
+    
+}

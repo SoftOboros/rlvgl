@@ -1,0 +1,111 @@
+# NXP MIMXRT1060-EVKB reference board.
+#
+# Source: MIMXRT1060-EVKB schematic (SPF-49264 Rev C), NXP UM11151.
+# Pin assignments for on-board console UART, user LED, I2C peripherals,
+# and MicroSD card slot.
+
+name: MIMXRT1060-EVKB
+chip: MIMXRT1062
+flash_type: qspi_nor
+flash_mb: 8
+sdram_mb: 32
+
+console:
+  peripheral: lpuart1
+  baud: 115200
+
+pins:
+  # LPUART1 console (routed to OpenSDA USB-UART bridge)
+  - pad: GPIO_AD_B0_12
+    signal: LPUART1_TX
+    peripheral: lpuart1
+    role: tx
+    alt: 2
+    direction: out
+    label: console_tx
+  - pad: GPIO_AD_B0_13
+    signal: LPUART1_RX
+    peripheral: lpuart1
+    role: rx
+    alt: 2
+    direction: in
+    label: console_rx
+  # User LED D18 (active low, accent green)
+  - pad: GPIO_AD_B0_09
+    signal: GPIO
+    alt: 5
+    direction: out
+    label: user_led
+  # LPI2C1 (WM8960 audio codec at 0x1A, FXOS8700 accel at 0x1E)
+  - pad: GPIO_AD_B1_00
+    signal: LPI2C1_SCL
+    peripheral: lpi2c1
+    role: scl
+    alt: 3
+    direction: inout
+    pull: up
+    label: i2c1_scl
+  - pad: GPIO_AD_B1_01
+    signal: LPI2C1_SDA
+    peripheral: lpi2c1
+    role: sda
+    alt: 3
+    direction: inout
+    pull: up
+    label: i2c1_sda
+  # USDHC1 MicroSD (active on-board; active-high CD on GPIO_B1_12)
+  - pad: GPIO_SD_B0_00
+    signal: USDHC1_CMD
+    peripheral: usdhc1
+    role: cmd
+    alt: 0
+    direction: inout
+    label: sd_cmd
+  - pad: GPIO_SD_B0_01
+    signal: USDHC1_CLK
+    peripheral: usdhc1
+    role: clk
+    alt: 0
+    direction: out
+    label: sd_clk
+  - pad: GPIO_SD_B0_02
+    signal: USDHC1_DATA0
+    peripheral: usdhc1
+    role: dat0
+    alt: 0
+    direction: inout
+    label: sd_dat0
+  - pad: GPIO_SD_B0_03
+    signal: USDHC1_DATA1
+    peripheral: usdhc1
+    role: dat1
+    alt: 0
+    direction: inout
+    label: sd_dat1
+  - pad: GPIO_SD_B0_04
+    signal: USDHC1_DATA2
+    peripheral: usdhc1
+    role: dat2
+    alt: 0
+    direction: inout
+    label: sd_dat2
+  - pad: GPIO_SD_B0_05
+    signal: USDHC1_DATA3
+    peripheral: usdhc1
+    role: dat3
+    alt: 0
+    direction: inout
+    label: sd_dat3
+
+i2c_configs:
+  lpi2c1:
+    scl_hz: 400000
+
+features:
+  vendor: nxp
+  lcd: rk043fn02h_ct
+  lcd_interface: parallel_rgb
+  sdcard: microsd
+  audio_codec: wm8960
+  accelerometer: fxos8700
+  debugger: opensda

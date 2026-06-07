@@ -1,0 +1,5 @@
+error[E0599]: no method named `cpu_slice_mut` found for struct `FrontBuffer<'a>` in the current scope
+  --> tests/ui/scanout_front_write.rs:33:35
+   |
+33 |     let _slice: &mut [u8] = front.cpu_slice_mut();
+   |                                   ^^^^^^^^^^^^^ method not found in `FrontBuffer<'_>`

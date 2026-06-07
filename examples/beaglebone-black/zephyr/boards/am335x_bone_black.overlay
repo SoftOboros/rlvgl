@@ -1,0 +1,51 @@
+/*
+ * Device tree overlay for BeagleBone Black + NHD-7.0CTP-CAPE-P.
+ *
+ * Enables:
+ * - LCDC with NHD panel timing (800x480, 33.3 MHz pclk)
+ * - FT5x06 capacitive touch on I2C2 (address 0x38)
+ * - Backlight GPIO
+ *
+ * NOTE: When the LCD cape is active, the on-board HDMI (TDA19988)
+ * must be disabled since they share the LCDC and pin mux.
+ */
+
+/* FT5x06 capacitive touch on I2C2 */
+&i2c2 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	ft5x06@38 {
+		compatible = "focaltech,ft5336";
+		reg = <0x38>;
+		/* int-gpios = <&gpio1 PIN GPIO_ACTIVE_LOW>; */
+		/* TODO: confirm interrupt GPIO from cape schematic */
+	};
+};
+
+/* LCD panel timing (for LCDC display driver) */
+/ {
+	panel: panel {
+		compatible = "newhaven,nhd-7.0-800480af";
+		status = "okay";
+
+		display-timings {
+			native-mode = <&timing0>;
+			timing0: timing0 {
+				clock-frequency = <33300000>;
+				hactive = <800>;
+				vactive = <480>;
+				hfront-porch = <210>;
+				hback-porch = <46>;
+				hsync-len = <20>;
+				vfront-porch = <22>;
+				vback-porch = <23>;
+				vsync-len = <10>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <1>;
+				pixelclk-active = <0>;
+			};
+		};
+	};
+};

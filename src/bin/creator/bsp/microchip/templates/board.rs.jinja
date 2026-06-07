@@ -1,0 +1,42 @@
+//! Board-level constants for {{ ir.board.name }}.
+//!
+//! Each labelled pin from `db/boards/{{ board_stem }}.yaml` becomes a
+//! `pub const` `(group, pin)` tuple so application code can refer to
+//! board features by name rather than by pad number.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "{{ ir.chip.name }}";
+
+/// Chip package.
+pub const PACKAGE: &str = "{{ ir.chip.package }}";
+
+/// On-chip flash capacity, megabytes.
+pub const FLASH_MB: f32 = {{ ir.board.flash_mb }};
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+/// APB-A clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBA_HZ: u32 = {{ ir.clocks.apba_hz }};
+
+/// APB-B clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBB_HZ: u32 = {{ ir.clocks.apbb_hz }};
+
+/// APB-C clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBC_HZ: u32 = {{ ir.clocks.apbc_hz }};
+
+/// APB-D clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APBD_HZ: u32 = {{ ir.clocks.apbd_hz }};
+
+/// External crystal frequency, in hertz (zero if not used).
+pub const XOSC_HZ: u32 = {{ ir.clocks.xosc_hz }};
+
+{% for pad in pad_routes %}
+{% if pad.label %}
+/// PORT (group, pin) tuple for `{{ pad.label }}` ({{ pad.signal }}).
+pub const {{ pad.label | upper }}: (u8, u8) = ({{ pad.group }}, {{ pad.pin }});
+{% endif %}
+{% endfor %}

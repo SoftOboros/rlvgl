@@ -2,6 +2,10 @@
 
 /target
 /Cargo.lock
+examples/uefi-disco/target/
+examples/uefi-disco/Cargo.lock
+examples/stm32h747i-disco/disco-demo-states/target/
+examples/stm32h747i-disco/disco-demo-states/Cargo.lock
 **/*.rs.bk
 /coverage
 .envrc
@@ -18,6 +22,17 @@ codex_state/
 .svd/
 cookies.txt
 .mcp.json
+.playwright-mcp/
+.playwright*
 tmp/
 **/.cache/
 i18n/translations.bin
+release/
+examples/esp32-devkits-r/target/
+examples/esp32-devkits-r/Cargo.lock
+examples/slstk3701a/target/
+examples/slstk3701a/Cargo.lock
+
+# Claude Code harness scratch space: subagent worktrees + task transcripts
+.claude/worktrees/
+.claude/tasks/

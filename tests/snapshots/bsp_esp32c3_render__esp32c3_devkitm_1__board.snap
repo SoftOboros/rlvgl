@@ -1,0 +1,60 @@
+---
+source: tests/bsp_esp32c3_render.rs
+expression: text
+---
+//! Board-level constants for ESP32-C3-DevKitM-1.
+//!
+//! Each pin label from `db/boards/esp32_c3_dev_kit_m_1.yaml` becomes a `pub const`
+//! GPIO number so application code can refer to board features by name
+//! rather than magic pin numbers.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "ESP32-C3-DevKitM-1";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "ESP32-C3";
+
+/// Chip package.
+pub const PACKAGE: &str = "QFN32-5x5";
+
+/// On-module flash capacity, megabytes.
+pub const FLASH_MB: u32 = 4;
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const CPU_HZ: u32 = 160000000;
+
+/// APB clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APB_HZ: u32 = 80000000;
+
+/// External crystal frequency, in hertz.
+pub const XTAL_HZ: u32 = 40000000;
+
+
+
+/// GPIO number for `u0_tx` (UART0_TX).
+pub const U0_TX: u8 = 21;
+
+
+
+/// GPIO number for `u0_rx` (UART0_RX).
+pub const U0_RX: u8 = 20;
+
+
+
+/// GPIO number for `led` (LED).
+pub const LED: u8 = 8;
+
+
+
+/// GPIO number for `boot_btn` (BOOT).
+pub const BOOT_BTN: u8 = 9;
+
+
+
+/// GPIO number for `usb_dm` (USB_DM).
+pub const USB_DM: u8 = 18;
+
+
+
+/// GPIO number for `usb_dp` (USB_DP).
+pub const USB_DP: u8 = 19;

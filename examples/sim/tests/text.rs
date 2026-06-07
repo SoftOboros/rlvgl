@@ -1,5 +1,5 @@
 //! Tests verifying text rendering alignment and clipping.
-use rlvgl::fontdue::{line_metrics, rasterize_glyph};
+use rlvgl_core::fontdue::{line_metrics, rasterize_glyph};
 
 const FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/DejaVuSans.ttf");
 

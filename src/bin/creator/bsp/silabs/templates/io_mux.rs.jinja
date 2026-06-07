@@ -1,0 +1,83 @@
+//! GPIO mode + ROUTELOC routing for {{ ir.board.name }}.
+//!
+//! Silicon Labs EFM32 Series 1 routing has two halves per pin:
+//!
+//! 1. **Pad direction / drive** — set the per-pin mode bits inside the
+//!    owning GPIO port's `MODEL` (pins 0..7) or `MODEH` (pins 8..15)
+//!    register, plus the `DOUT` initial state for outputs. The PAC
+//!    field name for pin `n` is `mode<n>` (e.g. `mode4` on `pa_modeh`
+//!    addresses PA12's mode bits — see EFM32GG11-RM §32.5
+//!    "GPIO_Px_MODEL / MODEH").
+//! 2. **Peripheral routing** — for peripheral-owned pins, write the
+//!    routeloc integer (0..31) supplied by the board YAML into the
+//!    per-peripheral `ROUTELOC0`/`ROUTELOC1` register, then set the
+//!    matching `ROUTEPEN` bit so the pad is driven by the peripheral
+//!    rather than the GPIO data register.
+//!
+//! Field widths for ROUTELOC vary across PAC revisions, so the writes
+//! below use `unsafe { w.<field>().bits(loc) }` to stay
+//! register-level. Mode-bit values follow EFM32GG11-RM §32.5 Table:
+//! `0b0000` disabled, `0b0001` input, `0b0100` pushpull output,
+//! `0b0110` wired-and (open-drain), `0b1000..0b1011` filter +
+//! pull-up/down variants. The template emits `0b0001` for plain inputs
+//! (with pull-up if `pull: up` is set), `0b0100` for outputs, and
+//! `0b0110` for inout (I2C) lines.
+//!
+//! The pinned `efm32gg11b-pac 0.1.4` predates svd2rust's method-style
+//! register accessors: GPIO port-mode registers (`pa_model`, `pa_modeh`,
+//! `pa_dout`, ...) and peripheral routing registers (`routeloc0`,
+//! `routepen`) are direct `#[repr(C)]` struct fields, not method
+//! accessors. Same vintage as `atsamd51j19a 0.7.1` — see
+//! CHIPS-MICROCHIP-02 for the parallel pattern.
+
+{% if ir.chip.pac_sku_module -%}
+// `{{ ir.chip.pac_crate }}` gates its per-SKU `Peripherals` type behind
+// a `{{ ir.chip.pac_sku_module }}` sub-module; bind `pac` to the SKU
+// module so `pac::Peripherals::steal()` resolves.
+use {{ ir.chip.pac_crate | replace("-", "_") }}::{{ ir.chip.pac_sku_module }} as pac;
+{%- else %}
+use {{ ir.chip.pac_crate | replace("-", "_") }} as pac;
+{%- endif %}
+
+/// Apply the board's GPIO mode bits and peripheral ROUTELOC writes.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    {% for pin in pin_routes %}
+    // P{{ pin.port }}{{ pin.pin }} — {{ pin.signal }}{% if pin.peripheral %} ({{ pin.peripheral }}){% endif %}
+    {% set port_lower = pin.port | lower %}
+    {% set mode_reg = "p" ~ port_lower ~ "_mode" ~ ("h" if pin.pin >= 8 else "l") %}
+    {# `efm32gg11b-pac 0.1.4` names MODEH writer fields with absolute pin
+       indices (`mode8`..`mode15`), NOT relative `mode0`..`mode7`. MODEL
+       branch (pins 0-7) is already aligned (`mode0`..`mode7`). The
+       earlier (pin.pin - 8) shift on MODEH was wrong and produced
+       compile errors against the PAC. (CHIPS-SILABS-02c) #}
+    {% set mode_field = "mode" ~ pin.pin %}
+    {% if pin.direction == "in" %}
+    // Input{% if pin.pull == "up" %} with pull-up{% elif pin.pull == "down" %} with pull-down{% endif %}
+    p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits({% if pin.pull %}0b1000{% else %}0b0001{% endif %}) });
+    {% if pin.pull == "up" %}
+    // DOUT=1 selects pull-up when MODE is set to inputpull (0b1000)
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.pin }})) });
+    {% elif pin.pull == "down" %}
+    // DOUT=0 selects pull-down when MODE is set to inputpull (0b1000)
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << {{ pin.pin }})) });
+    {% endif %}
+    {% elif pin.direction == "out" %}
+    // Output (push-pull)
+    {% if pin.initial == "high" %}
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() | (1 << {{ pin.pin }})) });
+    {% else %}
+    p.GPIO.p{{ port_lower }}_dout.modify(|r, w| unsafe { w.bits(r.bits() & !(1 << {{ pin.pin }})) });
+    {% endif %}
+    p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits(0b0100) });
+    {% elif pin.direction == "inout" %}
+    // Inout (wired-AND / open-drain){% if pin.pull == "up" %} with filter + pull-up{% endif %}
+    p.GPIO.{{ mode_reg }}.modify(|_, w| unsafe { w.{{ mode_field }}().bits(0b0110) });
+    {% endif %}
+    {% if pin.route.kind == "routeloc" %}
+    // ROUTELOC: {{ pin.route.route_reg }}.{{ pin.route.route_field }} = {{ pin.route.loc }}; {{ pin.route.pen_reg }}.{{ pin.route.pen_field }} = 1
+    p.{{ pin.route.route_reg | pac_path }}.modify(|_, w| unsafe { w.{{ pin.route.route_field }}().bits({{ pin.route.loc }}) });
+    p.{{ pin.route.pen_reg | pac_path }}.modify(|_, w| w.{{ pin.route.pen_field }}().set_bit());
+    {% endif %}
+    {% endfor %}
+}

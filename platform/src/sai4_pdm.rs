@@ -79,7 +79,16 @@ const PDMCR_CKEN1: u32 = 1 << 8;
 // ---------------------------------------------------------------------------
 
 const RCC_APB4ENR: u32 = 0x5802_44F4;
-const RCC_D3CCIPR: u32 = 0x5802_4D2C;
+// RCC_D3CCIPR offset is 0x58 per stm32h7 PAC v0.15.1
+// (RegisterBlock::d3ccipr at offset 0x58). The previous constant
+// 0x5802_4D2C resolved to a reserved/unmapped address — the
+// `enable_clock` write silently dropped on the floor, leaving
+// SAI4ASEL stuck at the reset value 0b000 = PLL1_Q. Bench-flash
+// 2026-04-28 verified: PDM publish rate measured at 21 Hz vs the
+// 244 Hz BENCH-FLASH.md prediction → SAI4 was running on PLL1_Q
+// at an unexpected frequency. With this address corrected,
+// `enable_clock(1)` properly selects PLL2_P (SAI4ASEL = 0b001).
+const RCC_D3CCIPR: u32 = 0x5802_4458;
 
 // ---------------------------------------------------------------------------
 // Status register
@@ -109,12 +118,13 @@ impl Sai4Pdm {
     pub fn enable_clock(&self, clock_source: u8) {
         unsafe {
             // Enable SAI4 in APB4ENR (bit 21)
-            let apb4 = RCC_APB4ENR as *mut u32;
+            // RCC clock-gate access — covered by a future typed Rcc handle.
+            let apb4 = RCC_APB4ENR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             apb4.write_volatile(apb4.read_volatile() | (1 << 21));
-            let _ = (apb4 as *const u32).read_volatile(); // readback fence
+            let _ = (apb4 as *const u32).read_volatile(); // readback fence // rlvgl-discipline: allow(raw_mmio_cast)
 
             // Set SAI4ASEL[2:0] in D3CCIPR bits [23:21]
-            let d3ccipr = RCC_D3CCIPR as *mut u32;
+            let d3ccipr = RCC_D3CCIPR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let val = d3ccipr.read_volatile();
             d3ccipr
                 .write_volatile((val & !(0b111 << 21)) | (((clock_source as u32) & 0b111) << 21));
@@ -233,6 +243,9 @@ impl Sai4Pdm {
 
     #[inline(always)]
     unsafe fn reg(&self, offset: u32) -> *mut u32 {
-        (self.base + offset) as *mut u32
+        // SAI4 PDM peripheral access via base+offset helper. Same
+        // deferral as SAI1 in `sai.rs` — a typed register module is
+        // future work.
+        (self.base + offset) as *mut u32 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }

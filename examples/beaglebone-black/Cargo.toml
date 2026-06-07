@@ -1,0 +1,50 @@
+[package]
+name = "rlvgl-example-bbb"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "rlvgl-bbb"
+path = "src/main.rs"
+
+[[bin]]
+name = "rlvgl-bbb-bare"
+path = "src/bare_metal.rs"
+required-features = ["bare_metal"]
+
+[features]
+default = ["linux", "splash", "desktop", "playit", "star_crawl"]
+# Linux userspace: kernel tilcdc fbdev + evdev touch (see docs/beaglebone-black/).
+linux = ["rlvgl-platform/linux_fbdev"]
+# Splash image painted into framebuffer before the render loop. Pulls
+# rlvgl-decomp in through the platform's splash feature.
+splash = ["rlvgl-platform/splash", "dep:rlvgl-decomp"]
+# Desktop gate — DiscoController draws its desktop-layer widgets when set.
+# Pairs with splash so the splash asset doubles as the desktop background.
+desktop = []
+# Drive input + introspection over an SSH-forwarded loopback TCP socket
+# when the `RLVGL_PLAYIT_PORT` env var is set at runtime. Standing in for
+# the broken FT5426 touch sensor while the cape is RMA'd (see
+# examples/beaglebone-black/RMA-newhaven-2026-04-22.md).
+playit = ["dep:rlvgl-playit"]
+# Star-crawl overlay effect (mirrors disco-sim wiring). Activated when
+# DiscoController emits DiscoCommand::StartEffect(StarCrawl) — a playit
+# tap on the launcher/settings button that requests it will fire this.
+star_crawl = ["dep:rlvgl-widgets"]
+bare_metal = []
+freertos = ["bare_metal"]
+zephyr = ["bare_metal"]
+
+[dependencies]
+rlvgl-core = { path = "../../core" }
+rlvgl-platform = { path = "../../platform", default-features = false }
+rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+rlvgl-decomp = { path = "../../rlvgl-decomp", optional = true }
+rlvgl-playit = { path = "../../playit", default-features = false, features = ["std"], optional = true }
+rlvgl-widgets = { path = "../../widgets", default-features = false, optional = true }
+libc = "0.2"
+heapless = { version = "0.8", default-features = false }
+
+[build-dependencies]
+cc = "1"

@@ -1,0 +1,523 @@
+# TI CC1352R SimpleLink Multi-Band Wireless Cortex-M4F MCU chip inventory IR.
+#
+# Sources:
+#   - TI CC1352R datasheet SWRS196I (January 2018 / revised February 2021).
+#     Memory organisation (§9.4), system architecture (§8.1, §9.1–9.3),
+#     timers (§9.7), serial peripherals + I2C + IOC (§9.8). Package RGZ
+#     (7-mm × 7-mm VQFN-48), 28 GPIOs, Cortex-M4F at 48 MHz.
+#   - TI CC13x2, CC26x2 SimpleLink Wireless MCU Technical Reference Manual
+#     SWCU185G (the "SWCU185" cited by CHIPS-TI-00 §0 / §5.5). Authority for
+#     the IO Controller (IOC) PORT_CFG layout and PRCM clock-gate semantics.
+#   - svd2rust-shaped SVD `cc13x2_26x2.svd` from
+#     https://github.com/seanmlyons22/ti-lprf-pacs (also redistributed in
+#     `cc13x2_26x2_pac` 0.10.3 on crates.io, BSD-3-Clause). Authority for
+#     peripheral baseAddress values; cross-checked against SWCU185G §1.5
+#     Memory Map.
+#   - TI driverlib `hw_ints.h` (vendored under zephyrproject-rtos/hal_ti)
+#     for interrupt vector numbers. `irq:` is recorded as the NVIC
+#     **external IRQ number** (NVIC vector index minus 16, i.e. the value
+#     a svd2rust-shaped `pac::interrupt` enum variant takes), not the raw
+#     vector slot. UART0_COMB at NVIC slot 21 → external IRQ 5.
+#
+# Scope note (CHIPS-TI-00 §5.5 SimpleLink Cortex-M4F initial member set):
+#   This file documents CC1352R, the R-suffix CC13x2 member named in
+#   §1.1 as a likely first-chip candidate. The orderable part populated
+#   on the LAUNCHXL-CC1352R1 development kit is CC1352R1F3RGZ (352 KB
+#   flash, 80 KB SRAM, 256 KB ROM, RGZ VQFN-48 package). Sibling chips
+#   CC1312R / CC2642R / CC2652R / CC2652RB / CC1352P / CC2652P share
+#   this PAC and may be populated as additional YAML files under
+#   subsequent CHIPS-TI-NN sub-letters; their memory maps and IOC pin
+#   tables differ only in package / pin count / GPIO count and not in
+#   the CC13x2/CC26x2 register-block topology authoritatively documented
+#   by SWCU185G.
+
+name: CC1352R
+arch: cortex-m4f
+package: RGZ
+pac_crate: cc13x2_26x2_pac
+pac_crate_version: "^0.10"
+target_triple: thumbv7em-none-eabihf
+
+# Memory map (datasheet SWRS196I §9.4 + SWCU185G §1.5 Table 1-5).
+#
+# Flash on CC1352R1F3 is 352 KB at 0x00000000 (the last sector reserved
+# for CCFG, see SWCU185G §11.1). System SRAM is 80 KB at 0x20000000
+# arranged as five 16-KB blocks. ROM holds TI-RTOS kernel + driverlib +
+# bootloader at 0x10000000. 8 KB cache SRAM is alternatively available
+# as on-chip GPRAM at 0x11000000 when CCFG.SRAM_CFG.SRAM_REPL=0 (see
+# SWCU185G §8.2). Sensor Controller has its own 4 KB AUX_RAM block.
+memory:
+  - { name: flash,       base: 0x00000000, size: 0x00058000, access: rx  } # 352 KB internal Flash
+  - { name: rom,         base: 0x10000000, size: 0x00040000, access: rx  } # 256 KB ROM (TI-RTOS + driverlib)
+  - { name: gpram,       base: 0x11000000, size: 0x00002000, access: rwx } # 8 KB GPRAM (cache repurposed)
+  - { name: sram,        base: 0x20000000, size: 0x00014000, access: rwx } # 80 KB System SRAM (5×16 KB blocks)
+  - { name: aux_ram,     base: 0x400E0000, size: 0x00001000, access: rwx } # 4 KB Sensor Controller / AUX SRAM
+  - { name: peripherals, base: 0x40000000, size: 0x00100000, access: rw  } # Peripheral region (MCU + AON + AUX)
+  - { name: fcfg1,       base: 0x50001000, size: 0x00001000, access: r   } # Factory Configuration (FCFG1)
+  - { name: cpu_scs,     base: 0xE0000000, size: 0x00100000, access: rw  } # Cortex-M System Control Space
+
+# Clock tree (datasheet SWRS196I §8.24 + SWCU185G §4 Power, Reset and
+# Clock Module / §22 Oscillator).
+#
+# SCLK_HF is sourced from either a 48 MHz crystal (XOSC_HF), an external
+# 48 MHz TCXO, or the on-chip 48 MHz RC oscillator (RCOSC_HF). The CPU
+# runs at 48 MHz directly off SCLK_HF; there is no PLL. SCLK_LF is
+# either the on-chip 32 kHz RCOSC_LF or an external 32.768 kHz XOSC_LF.
+clock_tree:
+  xtal_hi_hz: 48000000      # XOSC_HF (high-frequency crystal)
+  xtal_lo_hz: 32768         # XOSC_LF (32.768 kHz, optional)
+  cpu_hz:     48000000      # Cortex-M4F MCK = SCLK_HF
+  apb_hz:     48000000      # Peripheral bus clock = SCLK_HF
+  sclk_hf_src: [xosc_hf, rcosc_hf, tcxo]
+  sclk_lf_src: [rcosc_lf, xosc_lf, derived_xosc_hf, derived_rcosc_hf]
+  # PRCM clock-gate / reset table.
+  #
+  # Per SWCU185G §4.4 PRCM register map: each peripheral group has a
+  # CLKGR (run-mode gate), CLKGS (sleep-mode gate), CLKGDS (deep-sleep
+  # gate) and corresponding RSTR/SWRESET in PRCM. To turn a peripheral
+  # on, write 1 to its CLKGR bit and pulse PRCM.CLKLOADCTL.LOAD until
+  # PRCM.CLKLOADCTL.LOAD_DONE returns 1, then release reset via the
+  # peripheral's individual reset register (e.g. PRCM.RESETUART for
+  # UART, PRCM.RESETI2C for I2C). Bit positions below are from
+  # SWCU185G §4.4 Tables — confirmed against svd2rust accessors in
+  # `cc13x2_26x2_pac::prcm`.
+  #
+  # NOTE: This block populates CHIPS-TI-00 §5.1 `prcm:` required field.
+  # The exact bit names used here MUST match the cc13x2_26x2_pac
+  # register-block field names (snake_case, e.g. `prcm.uartclkgr.clk_en`)
+  # so the future `clocks.rs.jinja` template can reference them as
+  # `p.PRCM.<reg>().write(...)`.
+  #
+  # NOTE: CHIPS-TI-01e (2026-05-13 §15) introduced the optional
+  # `clk_en_variant` field. SimpleLink CC13x2/CC26x2 packs multiple
+  # peripheral instances into a single `*CLKGR.CLK_EN` register that
+  # `cc13x2_26x2_pac 0.10` exposes as a multi-bit enum FieldWriter
+  # (`prcm::uartclkgr::ClkEn::{Uart0,Uart1}`, `prcm::gptclkgr::ClkEn::{
+  # Gpt0,Gpt1,Gpt2,Gpt3}`, `prcm::ssiclkgr::ClkEn::{Ssi0,Ssi1}`). The
+  # `clk_en_variant` value names the enum variant (lowercase, matching
+  # the generated `pub fn <variant>() -> &'a mut W<REG>` method). Single
+  # -bit `clk_en` fields (e.g. `i2cclkgr`, `i2sclkgr`, `gpioclkgr`) leave
+  # `clk_en_variant` absent; the template falls back to `.set_bit()`.
+  # `rst_field` similarly tracks per-instance bits (`uart0` vs `uart1`)
+  # for registers that have them, and the shared field name (`i2c`,
+  # `i2s`, `gpio`, `gpt`) for registers that don't.
+prcm:
+  uart0:
+    clk_en_reg:     prcm.uartclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: uart0
+    rst_reg:        prcm.resetuart
+    rst_field:      uart0
+  uart1:
+    clk_en_reg:     prcm.uartclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: uart1
+    rst_reg:        prcm.resetuart
+    rst_field:      uart1
+  ssi0:
+    clk_en_reg:     prcm.ssiclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: ssi0
+    rst_reg:        prcm.resetssi
+    rst_field:      ssi
+  ssi1:
+    clk_en_reg:     prcm.ssiclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: ssi1
+    rst_reg:        prcm.resetssi
+    rst_field:      ssi
+  i2c0:
+    clk_en_reg:    prcm.i2cclkgr
+    clk_en_field:  clk_en
+    rst_reg:       prcm.reseti2c
+    rst_field:     i2c
+  i2s0:
+    clk_en_reg:    prcm.i2sclkgr
+    clk_en_field:  clk_en
+    rst_reg:       prcm.reseti2s
+    rst_field:     i2s
+  gpio:
+    clk_en_reg:    prcm.gpioclkgr
+    clk_en_field:  clk_en
+    rst_reg:       prcm.resetgpio
+    rst_field:     gpio
+  gpt0:
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt0
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
+  gpt1:
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt1
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
+  gpt2:
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt2
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
+  gpt3:
+    clk_en_reg:     prcm.gptclkgr
+    clk_en_field:   clk_en
+    clk_en_variant: gpt3
+    rst_reg:        prcm.resetgpt
+    rst_field:      gpt
+  udma0:
+    clk_en_reg:    prcm.secdmaclkgr
+    clk_en_field:  dma_clk_en
+    rst_reg:       prcm.resetsecdma
+    rst_field:     dma
+  trng:
+    clk_en_reg:    prcm.secdmaclkgr
+    clk_en_field:  trng_clk_en
+    rst_reg:       prcm.resetsecdma
+    rst_field:     trng
+  crypto:
+    clk_en_reg:    prcm.secdmaclkgr
+    clk_en_field:  crypto_clk_en
+    rst_reg:       prcm.resetsecdma
+    rst_field:     crypto
+  pka:
+    clk_en_reg:    prcm.secdmaclkgr
+    clk_en_field:  pka_clk_en
+    rst_reg:       prcm.resetsecdma
+    rst_field:     pka
+
+# Peripheral instance map.
+#
+# Base addresses authoritatively from cc13x2_26x2.svd, cross-checked
+# against SWCU185G §1.5 Memory Map. IRQ numbers from TI driverlib
+# hw_ints.h (NVIC slot — 16, so the external IRQ index a svd2rust
+# `pac::Interrupt` variant takes).
+peripherals:
+  uart0:
+    class: uart
+    instance: uart0
+    base: 0x40001000
+    irq: 5          # INT_UART0_COMB (NVIC slot 21)
+    signals:
+      - { role: tx,  direction: out, ioc_signal: UART0_TX }
+      - { role: rx,  direction: in,  ioc_signal: UART0_RX }
+      - { role: cts, direction: in,  ioc_signal: UART0_CTS }
+      - { role: rts, direction: out, ioc_signal: UART0_RTS }
+  uart1:
+    class: uart
+    instance: uart1
+    base: 0x4000B000
+    irq: 36         # INT_UART1_COMB (NVIC slot 52)
+    signals:
+      - { role: tx,  direction: out, ioc_signal: UART1_TX }
+      - { role: rx,  direction: in,  ioc_signal: UART1_RX }
+      - { role: cts, direction: in,  ioc_signal: UART1_CTS }
+      - { role: rts, direction: out, ioc_signal: UART1_RTS }
+  ssi0:
+    class: spi_master
+    instance: ssi0
+    base: 0x40000000
+    irq: 7          # INT_SSI0_COMB (NVIC slot 23)
+    signals:
+      - { role: sck,  direction: out, ioc_signal: SSI0_CLK }
+      - { role: mosi, direction: out, ioc_signal: SSI0_TX }
+      - { role: miso, direction: in,  ioc_signal: SSI0_RX }
+      - { role: cs,   direction: out, ioc_signal: SSI0_FSS }
+  ssi1:
+    class: spi_master
+    instance: ssi1
+    base: 0x40008000
+    irq: 8          # INT_SSI1_COMB (NVIC slot 24)
+    signals:
+      - { role: sck,  direction: out, ioc_signal: SSI1_CLK }
+      - { role: mosi, direction: out, ioc_signal: SSI1_TX }
+      - { role: miso, direction: in,  ioc_signal: SSI1_RX }
+      - { role: cs,   direction: out, ioc_signal: SSI1_FSS }
+  i2c0:
+    class: i2c
+    instance: i2c0
+    base: 0x40002000
+    irq: 1          # INT_I2C_IRQ (NVIC slot 17)
+    signals:
+      - { role: scl, direction: inout, ioc_signal: I2C_MSSCL }
+      - { role: sda, direction: inout, ioc_signal: I2C_MSSDA }
+  i2s0:
+    class: i2s
+    instance: i2s0
+    base: 0x40021000
+    irq: 12         # INT_I2S_IRQ (NVIC slot 28)
+    signals:
+      - { role: bclk, direction: out, ioc_signal: I2S_BCLK }
+      - { role: wclk, direction: out, ioc_signal: I2S_WCLK }
+      - { role: ad0,  direction: out, ioc_signal: I2S_AD0 }
+      - { role: ad1,  direction: in,  ioc_signal: I2S_AD1 }
+      - { role: mclk, direction: out, ioc_signal: I2S_MCLK }
+  gpio:
+    class: gpio
+    instance: gpio
+    base: 0x40022000
+    irq: 0          # INT_AON_GPIO_EDGE (NVIC slot 16)
+    signals: []
+  ioc:
+    class: io_controller
+    instance: ioc
+    base: 0x40081000
+    irq: null
+    signals: []
+  prcm:
+    class: clock_controller
+    instance: prcm
+    base: 0x40082000
+    irq: null
+    signals: []
+  gpt0:
+    class: gptimer
+    instance: gpt0
+    base: 0x40010000
+    irq: 15         # INT_GPT0A (NVIC slot 31; GPT0B = slot 32 / IRQ 16)
+    signals: []
+  gpt1:
+    class: gptimer
+    instance: gpt1
+    base: 0x40011000
+    irq: 17         # INT_GPT1A (NVIC slot 33; GPT1B = slot 34 / IRQ 18)
+    signals: []
+  gpt2:
+    class: gptimer
+    instance: gpt2
+    base: 0x40012000
+    irq: 19         # INT_GPT2A (NVIC slot 35; GPT2B = slot 36 / IRQ 20)
+    signals: []
+  gpt3:
+    class: gptimer
+    instance: gpt3
+    base: 0x40013000
+    irq: 21         # INT_GPT3A (NVIC slot 37; GPT3B = slot 38 / IRQ 22)
+    signals: []
+  wdt:
+    class: watchdog
+    instance: wdt
+    base: 0x40080000
+    irq: 14         # INT_WDT_IRQ (NVIC slot 30)
+    signals: []
+  trng:
+    class: trng
+    instance: trng
+    base: 0x40028000
+    irq: 33         # INT_TRNG_IRQ (NVIC slot 49)
+    signals: []
+  crypto:
+    class: crypto
+    instance: crypto
+    base: 0x40024000
+    irq: 23         # INT_CRYPTO_RESULT_AVAIL_IRQ (NVIC slot 39)
+    signals: []
+  pka:
+    class: pka
+    instance: pka
+    base: 0x40025000
+    irq: 3          # INT_PKA_IRQ (NVIC slot 19)
+    signals: []
+  udma0:
+    class: dma
+    instance: udma0
+    base: 0x40020000
+    irq: 24         # INT_DMA_DONE_COMB (NVIC slot 40; DMA_ERR = 41 / IRQ 25)
+    signals: []
+  flash:
+    class: flash_controller
+    instance: flash
+    base: 0x40030000
+    irq: 26         # INT_FLASH (NVIC slot 42)
+    signals: []
+  vims:
+    class: vims
+    instance: vims
+    base: 0x40034000
+    irq: null
+    signals: []
+  aon_rtc:
+    class: rtc
+    instance: aon_rtc
+    base: 0x40092000
+    irq: 4          # INT_AON_RTC_COMB (NVIC slot 20)
+    signals: []
+  aon_pmctl:
+    class: power_controller
+    instance: aon_pmctl
+    base: 0x40090000
+    irq: null
+    signals: []
+  aon_event:
+    class: event_fabric
+    instance: aon_event
+    base: 0x40093000
+    irq: null
+    signals: []
+  aon_ioc:
+    class: aon_ioc
+    instance: aon_ioc
+    base: 0x40094000
+    irq: null
+    signals: []
+  aon_batmon:
+    class: monitor
+    instance: aon_batmon
+    base: 0x40095000
+    irq: 37         # INT_BATMON_COMB (NVIC slot 53)
+    signals: []
+  rfc_pwr:
+    class: radio
+    instance: rfc_pwr
+    base: 0x40040000
+    irq: null
+    signals: []
+  rfc_dbell:
+    class: radio
+    instance: rfc_dbell
+    base: 0x40041000
+    irq: 9          # INT_RFC_CPE_0 (NVIC slot 25); CPE_1 = 18/IRQ 2
+    signals: []
+  rfc_rat:
+    class: radio_timer
+    instance: rfc_rat
+    base: 0x40043000
+    irq: null
+    signals: []
+  aux_sysif:
+    class: aux
+    instance: aux_sysif
+    base: 0x400C6000
+    irq: 28         # INT_AUX_COMB (NVIC slot 44)
+    signals: []
+  aux_timer01:
+    class: aux_timer
+    instance: aux_timer01
+    base: 0x400C7000
+    irq: null
+    signals: []
+  aux_timer2:
+    class: aux_timer
+    instance: aux_timer2
+    base: 0x400C3000
+    irq: 35         # INT_AUX_TIMER2_EV0 (NVIC slot 51)
+    signals: []
+
+# IOC (IO Controller) per-pin function table.
+#
+# Authority: SWCU185G §11 IO Controller (IOC), Table 11-1 PORT_CFG event
+# signal map. CC1352R in the RGZ VQFN-48 package exposes 28 GPIOs as
+# DIO_0..DIO_30 (DIO_5..DIO_7 + DIO_16..DIO_17 + DIO_23..DIO_30 are
+# high-drive and/or have JTAG / analog secondary capability — see
+# datasheet SWRS196I §7.2 Table 7-1 "Signal Descriptions – RGZ Package").
+#
+# Unlike Espressif IO_MUX (which selects between a fixed set of "function
+# 0..N" slots per pad), the SimpleLink IOC writes a single PORT_CFG
+# register per DIO that names the **peripheral event signal** directly.
+# So the schema here is "for each GPIO, what peripheral signals MAY be
+# routed to it" — the runtime port_id (0x00=GPIO, 0x01=AON_CLK32K_OUT,
+# 0x07=UART0_TX, 0x08=UART0_RX, …) selection happens in the generated
+# io_mux.rs template per-pin write. See SWCU185G §11.2 Table 11-2 for
+# the full port_id enumeration.
+#
+# `analog_capable: true` marks DIOs that route to AUX_ADC_DIO_n
+# (datasheet SWRS196I §8.10). `high_drive: true` marks the five
+# high-drive DIOs (8 mA at IOCURR=2 instead of 4 mA at IOCURR=1).
+# `jtag_alt:` records the secondary JTAG role on DIO_16/17/24/25.
+#
+# DIO_8 and DIO_9 are not present on RGZ VQFN-48 (the part jumps from
+# DIO_7 at pin 12 to DIO_8 at pin 14 — pin 13 is DCDC_SW per Table 7-1).
+io_mux:
+  - { dio: 0,  pin: 5,   high_drive: false }
+  - { dio: 1,  pin: 6,   high_drive: false }
+  - { dio: 2,  pin: 7,   high_drive: false }
+  - { dio: 3,  pin: 8,   high_drive: false }
+  - { dio: 4,  pin: 9,   high_drive: false }
+  - { dio: 5,  pin: 10,  high_drive: true  }
+  - { dio: 6,  pin: 11,  high_drive: true  }
+  - { dio: 7,  pin: 12,  high_drive: true  }
+  - { dio: 8,  pin: 14,  high_drive: false }
+  - { dio: 9,  pin: 15,  high_drive: false }
+  - { dio: 10, pin: 16,  high_drive: false }
+  - { dio: 11, pin: 17,  high_drive: false }
+  - { dio: 12, pin: 18,  high_drive: false }
+  - { dio: 13, pin: 19,  high_drive: false }
+  - { dio: 14, pin: 20,  high_drive: false }
+  - { dio: 15, pin: 21,  high_drive: false }
+  - { dio: 16, pin: 26,  high_drive: true,  jtag_alt: TDO }
+  - { dio: 17, pin: 27,  high_drive: true,  jtag_alt: TDI }
+  - { dio: 18, pin: 28,  high_drive: false }
+  - { dio: 19, pin: 29,  high_drive: false }
+  - { dio: 20, pin: 30,  high_drive: false }
+  - { dio: 21, pin: 31,  high_drive: false }
+  - { dio: 22, pin: 32,  high_drive: false }
+  - { dio: 23, pin: 36,  high_drive: false, analog_capable: true }
+  - { dio: 24, pin: 37,  high_drive: false, analog_capable: true }
+  - { dio: 25, pin: 38,  high_drive: false, analog_capable: true }
+  - { dio: 26, pin: 39,  high_drive: false, analog_capable: true }
+  - { dio: 27, pin: 40,  high_drive: false, analog_capable: true }
+  - { dio: 28, pin: 41,  high_drive: false, analog_capable: true }
+  - { dio: 29, pin: 42,  high_drive: false, analog_capable: true }
+  - { dio: 30, pin: 43,  high_drive: false, analog_capable: true }
+
+# GPIO matrix subset.
+#
+# SimpleLink CC13x2/CC26x2 has a **single-stage** routing model (see
+# CHIPS-TI-00 §10.3): the IOC PORT_CFG register on each DIO selects one
+# peripheral signal directly; there is no separate "matrix" stage à la
+# Espressif. This block enumerates the **named peripheral event
+# signals** that the IOC's PORT_CFG `port_id` field can resolve. The
+# port_id integer is the value to write to PORT_CFG[5:0] for the named
+# signal; from SWCU185G §11.2 Table 11-2 PORT_CFG port_id encoding.
+#
+# Templates emit per-pin writes by looking up `port_id` for the
+# board-YAML `signal:` token.
+gpio_matrix:
+  - { id: 0x00, name: GPIO,            direction: inout }
+  - { id: 0x01, name: AON_CLK32K_OUT,  direction: out   }
+  - { id: 0x07, name: UART0_TX,        direction: out   }
+  - { id: 0x08, name: UART0_RX,        direction: in    }
+  - { id: 0x09, name: UART0_CTS,       direction: in    }
+  - { id: 0x0A, name: UART0_RTS,       direction: out   }
+  - { id: 0x0B, name: UART1_TX,        direction: out   }
+  - { id: 0x0C, name: UART1_RX,        direction: in    }
+  - { id: 0x0D, name: UART1_CTS,       direction: in    }
+  - { id: 0x0E, name: UART1_RTS,       direction: out   }
+  - { id: 0x0F, name: PORT_EVENT0,     direction: out   }
+  - { id: 0x10, name: PORT_EVENT1,     direction: out   }
+  - { id: 0x11, name: PORT_EVENT2,     direction: out   }
+  - { id: 0x12, name: PORT_EVENT3,     direction: out   }
+  - { id: 0x13, name: PORT_EVENT4,     direction: out   }
+  - { id: 0x14, name: PORT_EVENT5,     direction: out   }
+  - { id: 0x15, name: PORT_EVENT6,     direction: out   }
+  - { id: 0x16, name: PORT_EVENT7,     direction: out   }
+  - { id: 0x17, name: CPU_SWV,         direction: out   }
+  - { id: 0x20, name: SSI0_RX,         direction: in    }
+  - { id: 0x21, name: SSI0_TX,         direction: out   }
+  - { id: 0x22, name: SSI0_FSS,        direction: out   }
+  - { id: 0x23, name: SSI0_CLK,        direction: out   }
+  - { id: 0x24, name: I2C_MSSDA,       direction: inout }
+  - { id: 0x25, name: I2C_MSSCL,       direction: inout }
+  - { id: 0x29, name: SSI1_RX,         direction: in    }
+  - { id: 0x2A, name: SSI1_TX,         direction: out   }
+  - { id: 0x2B, name: SSI1_FSS,        direction: out   }
+  - { id: 0x2C, name: SSI1_CLK,        direction: out   }
+  - { id: 0x2D, name: I2S_AD0,         direction: inout }
+  - { id: 0x2E, name: I2S_AD1,         direction: inout }
+  - { id: 0x2F, name: I2S_WCLK,        direction: out   }
+  - { id: 0x30, name: I2S_BCLK,        direction: out   }
+  - { id: 0x31, name: I2S_MCLK,        direction: out   }
+
+# Linker layout — region naming for the `memory.x.jinja` template
+# (CHIPS-TI-00 §7). `.text`/`.rodata` go to internal Flash; `.data`/
+# `.bss`/`.heap`/`.stack` go to System SRAM. `.ccfg` is a fixed-address
+# section anchored at the top of internal Flash; `ccfg_length` below is
+# the size of the CCFG **structure** (88 bytes per SWCU185G §11.1
+# Table 11-1), not a Flash erase-sector boundary. The CCFG structure
+# resides within the last Flash sector but does not span it. The
+# `chip.x.jinja` template emits the SECTIONS directive for it.
+linker:
+  region_text: flash
+  region_data: sram
+  ccfg_origin: 0x00057FA8
+  ccfg_length: 0x00000058  # CCFG structure size (88 bytes), SWCU185G §11.1 Table 11-1

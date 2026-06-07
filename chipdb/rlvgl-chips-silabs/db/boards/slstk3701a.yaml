@@ -1,0 +1,144 @@
+# Silicon Labs SLSTK3701A — EFM32 Giant Gecko GG11 Starter Kit.
+#
+# First real Silicon Labs board pin map per CHIPS-SILABS-01b
+# (sub-letter named in CHIPS-SILABS-00-CONCEPTS.md §14).
+#
+# Target SKU: EFM32GG11B820F2048GL192 (BGA192, 2 MB flash, 512 KB SRAM,
+# 144 GPIO). Cross-references the chip identity frozen by
+# CHIPS-SILABS-01a in db/chips/EFM32GG11.yaml (commit 5f164e32) — the
+# `chip:` field below must match that chip YAML's top-level `name:`.
+#
+# Authority:
+#   • UG287: EFM32 Giant Gecko GG11 Starter Kit User's Guide
+#     (Silicon Labs, Rev. 1.30, 2024) — section/table citations are
+#     inline below.
+#   • EFM32GG11 Family Reference Manual (EFM32GG11-RM) — referenced
+#     for ROUTELOC encoding (§10.2 of the concepts doc; routing_kind
+#     is "routeloc" per the chip YAML).
+#
+# Pin tuple shape (§10.3 of the concepts doc): each row carries
+# `{ port: <A..I>, pin: <0..15>, signal, peripheral, direction, ... }`
+# scalars. Templates emit two `pub const`s per labelled pin:
+# `<LABEL>_PORT: char` and `<LABEL>_PIN: u8`. Do NOT collapse to a
+# flat integer encoding.
+#
+# Per-signal ROUTELOC values (Series 1, §10.2 ROUTELOC mechanism)
+# are carried as a `routeloc:` integer on each routed pin entry.
+# The chip YAML names the route_reg/route_field/pen_reg/pen_field
+# paths (§4 of the chip YAML, e.g. usart4.routeloc0.txloc); the
+# board YAML supplies the concrete LOC integer (0..31) per
+# UG287 silkscreen notation (e.g. "US4_TX #4" → routeloc: 4).
+
+name: SLSTK3701A
+chip: EFM32GG11
+flash_mb: 2
+
+# VCOM (Virtual COM Port) — UG287 §6.12 "Virtual COM Port" Table 6.1
+# "Virtual COM Port Interface Pins" and Figure 6.12.
+#
+# The VCOM path is USART4 in async UART mode at 115200-8N1, with
+# PH4 as TX (US4_TX #4) and PH5 as RX (US4_RX #4). The board
+# controller's PDM-to-USB bridge exposes this as a /dev/cu.SLAB_USBtoUART-
+# style virtual COM port on the host. VCOM_ENABLE on PE1 must be
+# driven high before VCOM traffic flows (UG287 §6.12 Fig 6.12).
+console:
+  peripheral: usart4
+  baud: 115200
+
+pins:
+  # ───────────────────────────────────────────────────────────────
+  # VCOM (USART4) — UG287 §6.12 Table 6.1, Figure 6.12.
+  # USART4 ROUTELOC value #4 selects PH4/PH5/PH8/PH9 as TX/RX/CTS/RTS
+  # per EFM32GG11-RM "USART" §33.5.30 USARTn_ROUTELOC0 table.
+  # ───────────────────────────────────────────────────────────────
+  - { label: console_tx,      port: H, pin: 4, signal: USART4_TX,
+      peripheral: usart4, direction: out, routeloc: 4 }
+  - { label: console_rx,      port: H, pin: 5, signal: USART4_RX,
+      peripheral: usart4, direction: in,  routeloc: 4 }
+  - { label: console_cts,     port: H, pin: 8, signal: USART4_CTS,
+      peripheral: usart4, direction: in,  routeloc: 4 }
+  - { label: console_rts,     port: H, pin: 9, signal: USART4_RTS,
+      peripheral: usart4, direction: out, routeloc: 4 }
+  - { label: vcom_enable,     port: E, pin: 1, signal: VCOM_ENABLE,
+      peripheral: gpio,   direction: out, initial: high }
+
+  # ───────────────────────────────────────────────────────────────
+  # Push buttons — UG287 §6.1 "Push Buttons and RGB LEDs",
+  # Figure 6.1. BTN0/BTN1 are debounced by on-board RC filters
+  # (1 ms time constant); active-low when pressed. PC9 doubles as
+  # GPIO_EM4WU2 (EM4 wake-up source).
+  # ───────────────────────────────────────────────────────────────
+  - { label: btn0,            port: C, pin: 8, signal: GPIO,
+      peripheral: gpio, direction: in, pull: up }
+  - { label: btn1,            port: C, pin: 9, signal: GPIO_EM4WU2,
+      peripheral: gpio, direction: in, pull: up }
+
+  # ───────────────────────────────────────────────────────────────
+  # RGB LEDs — UG287 §6.1 Figure 6.1. Active-low; each colour can
+  # be PWM-driven via TIMER/WTIMER CC channels. The PH-port pins
+  # carry both GPIO and TIMER routes; the board YAML pins them as
+  # GPIO out (active-low) and the consumer crate opts into PWM by
+  # writing the appropriate TIMER ROUTELOC values listed in the
+  # silkscreen notation below.
+  # ───────────────────────────────────────────────────────────────
+  - { label: led0_r,          port: H, pin: 10, signal: GPIO,
+      peripheral: gpio, direction: out, initial: high,
+      alt_function: WTIMER1_CC2, alt_routeloc: 6 }
+  - { label: led0_g,          port: H, pin: 11, signal: GPIO,
+      peripheral: gpio, direction: out, initial: high,
+      alt_function: WTIMER1_CC3, alt_routeloc: 6 }
+  - { label: led0_b,          port: H, pin: 12, signal: GPIO,
+      peripheral: gpio, direction: out, initial: high,
+      alt_function: WTIMER1_CC0, alt_routeloc: 7 }
+  - { label: led1_r,          port: H, pin: 13, signal: GPIO,
+      peripheral: gpio, direction: out, initial: high,
+      alt_function: TIMER5_CC0,  alt_routeloc: 2 }
+  - { label: led1_g,          port: H, pin: 14, signal: GPIO,
+      peripheral: gpio, direction: out, initial: high,
+      alt_function: TIMER5_CC1,  alt_routeloc: 2 }
+  - { label: led1_b,          port: H, pin: 15, signal: GPIO,
+      peripheral: gpio, direction: out, initial: high,
+      alt_function: TIMER5_CC2,  alt_routeloc: 2 }
+
+  # ───────────────────────────────────────────────────────────────
+  # Sensor I2C bus (Si7021 humidity/temperature + Si7210 hall
+  # effect) — UG287 §6.4 "Si7021 Relative Humidity and Temperature
+  # Sensor" Figure 6.4 and §6.5 "Si7210 Hall-Effect Sensor"
+  # Figure 6.5. PB3 powers both sensors (SENSOR_ENABLE high → VDD
+  # routed via load switch); PI4/PI5 carry the shared I2C2 bus at
+  # ROUTELOC value #7. PB0 is the Si7210 alert/output line.
+  # ───────────────────────────────────────────────────────────────
+  - { label: sensor_enable,   port: B, pin: 3, signal: SENSOR_ENABLE,
+      peripheral: gpio, direction: out, initial: low }
+  - { label: sensor_i2c_scl,  port: I, pin: 5, signal: I2C2_SCL,
+      peripheral: i2c2, direction: inout, pull: up, routeloc: 7 }
+  - { label: sensor_i2c_sda,  port: I, pin: 4, signal: I2C2_SDA,
+      peripheral: i2c2, direction: inout, pull: up, routeloc: 7 }
+  - { label: si7210_alert,    port: B, pin: 0, signal: SENSOR_HALL_VOUT,
+      peripheral: gpio, direction: in }
+
+# Per-peripheral runtime configs. Mirrors the ESP `i2c_configs:`
+# shape so future template arms can emit ASYNCCLOCKDIV / HIGH+LOW
+# CLKDIV writes from these values rather than hard-coding them.
+i2c_configs:
+  i2c2:
+    # 400 kHz fast-mode; Si7021 datasheet allows up to 400 kHz, and
+    # Si7210 datasheet allows up to 400 kHz on the I2C interface.
+    # The shared bus is paced by the slower of the two.
+    scl_hz: 400000
+
+# Board-named conveniences. Free-form key/value per §6.2 of the
+# concepts doc; consumer-side example crates index into these via
+# the generated `BOARD_NAME`-prefixed constants.
+features:
+  led0:           [port_h_pin_10, port_h_pin_11, port_h_pin_12]
+  led1:           [port_h_pin_13, port_h_pin_14, port_h_pin_15]
+  buttons:        [port_c_pin_8,  port_c_pin_9]
+  i2c_bus:        i2c2
+  i2c_scl:        port_i_pin_5
+  i2c_sda:        port_i_pin_4
+  sensor_enable:  port_b_pin_3
+  sensors:
+    - si7021_rht_i2c        # Relative humidity + temperature (UG287 §6.4)
+    - si7210_hall_i2c       # Hall-effect (UG287 §6.5)
+  console:        vcom_usart4

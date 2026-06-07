@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema/scale.schema.json",
+  "id": "vu_broadcast",
+  "label_units": "dBVU",
+  "range_db": { "min": -20.0, "max": 3.0 },
+  "pivot": { "value": 0, "label": "0", "input_dbfs": -20.0 },
+  "calibration_default": { "to": "dBu", "offset_db": 24.0 },
+  "ticks": {
+    "majors": [-20, -10, -7, -5, -3, -1, 0, 1, 2, 3],
+    "minors_per_major_division": 4,
+    "labels": {
+      "-20": "−20",
+      "-10": "−10",
+      "-7": "−7",
+      "-5": "−5",
+      "-3": "−3",
+      "-1": "−1",
+      "0": "0",
+      "1": "+1",
+      "2": "+2",
+      "3": "+3"
+    }
+  },
+  "zones": [
+    { "from_db": -20.0, "to_db": -3.0, "color": "Safe" },
+    { "from_db": -3.0, "to_db": 0.0, "color": "Nominal" },
+    { "from_db": 0.0, "to_db": 1.0, "color": "Caution" },
+    { "from_db": 1.0, "to_db": 3.0, "color": "Hot" }
+  ],
+  "compatible_ballistics": ["Vu", "Rms", "DigitalPeak", "Instant"]
+}

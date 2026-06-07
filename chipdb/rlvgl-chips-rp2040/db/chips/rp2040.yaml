@@ -1,0 +1,198 @@
+# RP2040 chip inventory for rlvgl-creator BSP generation.
+#
+# Source: RP2040 Datasheet (Build-date: 2024-05-22).
+# Register paths target the `rp2040_pac` crate.
+
+name: RP2040
+arch: cortex-m0plus
+cores: 2
+max_freq_hz: 133000000
+package: QFN56
+pac_crate: rp2040_pac
+gpio_count: 30
+
+memory:
+  - { name: xip,   base: 0x10000000, size: 0x01000000, access: rx  }  # up to 16 MB mapped flash
+  - { name: sram0, base: 0x20000000, size: 0x00010000, access: rwx }  # 64 KB bank 0
+  - { name: sram1, base: 0x20010000, size: 0x00010000, access: rwx }  # 64 KB bank 1
+  - { name: sram2, base: 0x20020000, size: 0x00010000, access: rwx }  # 64 KB bank 2
+  - { name: sram3, base: 0x20030000, size: 0x00010000, access: rwx }  # 64 KB bank 3
+  - { name: sram4, base: 0x20040000, size: 0x00001000, access: rwx }  # 4 KB bank 4
+  - { name: sram5, base: 0x20041000, size: 0x00001000, access: rwx }  # 4 KB bank 5
+
+clock_tree:
+  xosc_hz: 12000000
+  rosc_hz: 6500000
+  plls:
+    - { name: sys_pll, ref_div: 1, vco_freq_hz: 1596000000, post_div1: 6, post_div2: 2 }  # -> 133 MHz
+    - { name: usb_pll, ref_div: 1, vco_freq_hz: 1200000000, post_div1: 5, post_div2: 5 }  # -> 48 MHz
+  clk_domains:
+    - { name: clk_sys,  default_hz: 133000000 }
+    - { name: clk_ref,  default_hz: 12000000  }
+    - { name: clk_peri, default_hz: 133000000 }
+    - { name: clk_usb,  default_hz: 48000000  }
+    - { name: clk_adc,  default_hz: 48000000  }
+    - { name: clk_rtc,  default_hz: 46875     }
+
+# RESETS register bit assignments (Datasheet 2.14.3).
+# Write 0 to release from reset, poll reset_done for completion.
+resets:
+  adc:        0
+  busctrl:    1
+  dma:        2
+  i2c0:       3
+  i2c1:       4
+  io_bank0:   5
+  io_qspi:    6
+  jtag:       7
+  pads_bank0: 8
+  pads_qspi:  9
+  pio0:       10
+  pio1:       11
+  pll_sys:    12
+  pll_usb:    13
+  pwm:        14
+  rtc:        15
+  spi0:       16
+  spi1:       17
+  syscfg:     18
+  sysinfo:    19
+  tbman:      20
+  timer:      21
+  uart0:      22
+  uart1:      23
+  usbctrl:    24
+
+peripherals:
+  uart0:
+    class: uart
+    instance: uart0
+    base: 0x40034000
+    irq: 20
+    resets_bit: uart0
+    signals:
+      - { role: tx,  direction: out }
+      - { role: rx,  direction: in  }
+      - { role: cts, direction: in  }
+      - { role: rts, direction: out }
+  uart1:
+    class: uart
+    instance: uart1
+    base: 0x40038000
+    irq: 21
+    resets_bit: uart1
+    signals:
+      - { role: tx,  direction: out }
+      - { role: rx,  direction: in  }
+  spi0:
+    class: spi
+    instance: spi0
+    base: 0x4003C000
+    irq: 18
+    resets_bit: spi0
+    signals:
+      - { role: sck,  direction: out }
+      - { role: mosi, direction: out }
+      - { role: miso, direction: in  }
+      - { role: cs,   direction: out }
+  spi1:
+    class: spi
+    instance: spi1
+    base: 0x40040000
+    irq: 19
+    resets_bit: spi1
+    signals:
+      - { role: sck,  direction: out }
+      - { role: mosi, direction: out }
+      - { role: miso, direction: in  }
+      - { role: cs,   direction: out }
+  i2c0:
+    class: i2c
+    instance: i2c0
+    base: 0x40044000
+    irq: 23
+    resets_bit: i2c0
+    signals:
+      - { role: sda, direction: inout }
+      - { role: scl, direction: inout }
+  i2c1:
+    class: i2c
+    instance: i2c1
+    base: 0x40048000
+    irq: 24
+    resets_bit: i2c1
+    signals:
+      - { role: sda, direction: inout }
+      - { role: scl, direction: inout }
+  pwm:
+    class: pwm
+    instance: pwm
+    base: 0x40050000
+    irq: 4
+    resets_bit: pwm
+    signals: []
+  adc:
+    class: adc
+    instance: adc
+    base: 0x4004C000
+    irq: 22
+    resets_bit: adc
+    signals: []
+  timer:
+    class: timer
+    instance: timer
+    base: 0x40054000
+    irq: 0
+    resets_bit: timer
+    signals: []
+  pio0:
+    class: pio
+    instance: pio0
+    base: 0x50200000
+    irq: 7
+    resets_bit: pio0
+    state_machines: 4
+    signals: []
+  pio1:
+    class: pio
+    instance: pio1
+    base: 0x50300000
+    irq: 9
+    resets_bit: pio1
+    state_machines: 4
+    signals: []
+
+# FUNCSEL table for GPIO0-GPIO29 (Datasheet Table 2, Section 2.19.2).
+# F1=SPI, F2=UART, F3=I2C, F4=PWM, F5=SIO(GPIO), F6=PIO0, F7=PIO1, F9=USB.
+# The pattern repeats every 12 GPIOs for SPI/UART/I2C.
+funcsel:
+  - { gpio: 0,  funcs: [{ sel: 1, func: SPI0_RX   }, { sel: 2, func: UART0_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM0_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 1,  funcs: [{ sel: 1, func: SPI0_CSn  }, { sel: 2, func: UART0_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM0_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 2,  funcs: [{ sel: 1, func: SPI0_SCK  }, { sel: 2, func: UART0_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM1_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_EN }] }
+  - { gpio: 3,  funcs: [{ sel: 1, func: SPI0_TX   }, { sel: 2, func: UART0_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM1_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 4,  funcs: [{ sel: 1, func: SPI0_RX   }, { sel: 2, func: UART1_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM2_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 5,  funcs: [{ sel: 1, func: SPI0_CSn  }, { sel: 2, func: UART1_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM2_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_EN }] }
+  - { gpio: 6,  funcs: [{ sel: 1, func: SPI0_SCK  }, { sel: 2, func: UART1_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM3_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 7,  funcs: [{ sel: 1, func: SPI0_TX   }, { sel: 2, func: UART1_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM3_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 8,  funcs: [{ sel: 1, func: SPI1_RX   }, { sel: 2, func: UART1_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM4_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_EN }] }
+  - { gpio: 9,  funcs: [{ sel: 1, func: SPI1_CSn  }, { sel: 2, func: UART1_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM4_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 10, funcs: [{ sel: 1, func: SPI1_SCK  }, { sel: 2, func: UART1_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM5_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 11, funcs: [{ sel: 1, func: SPI1_TX   }, { sel: 2, func: UART1_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM5_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_EN }] }
+  - { gpio: 12, funcs: [{ sel: 1, func: SPI1_RX   }, { sel: 2, func: UART0_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM6_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 13, funcs: [{ sel: 1, func: SPI1_CSn  }, { sel: 2, func: UART0_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM6_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 14, funcs: [{ sel: 1, func: SPI1_SCK  }, { sel: 2, func: UART0_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM7_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_EN }] }
+  - { gpio: 15, funcs: [{ sel: 1, func: SPI1_TX   }, { sel: 2, func: UART0_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM7_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 16, funcs: [{ sel: 1, func: SPI0_RX   }, { sel: 2, func: UART0_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM0_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 17, funcs: [{ sel: 1, func: SPI0_CSn  }, { sel: 2, func: UART0_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM0_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_EN }] }
+  - { gpio: 18, funcs: [{ sel: 1, func: SPI0_SCK  }, { sel: 2, func: UART0_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM1_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_OVCUR_DET }] }
+  - { gpio: 19, funcs: [{ sel: 1, func: SPI0_TX   }, { sel: 2, func: UART0_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM1_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 9, func: USB_VBUS_DET }] }
+  - { gpio: 20, funcs: [{ sel: 1, func: SPI0_RX   }, { sel: 2, func: UART1_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM2_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 8, func: CLOCK_GPIN0  }] }
+  - { gpio: 21, funcs: [{ sel: 1, func: SPI0_CSn  }, { sel: 2, func: UART1_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM2_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 8, func: CLOCK_GPOUT0 }] }
+  - { gpio: 22, funcs: [{ sel: 1, func: SPI0_SCK  }, { sel: 2, func: UART1_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM3_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 8, func: CLOCK_GPIN1  }] }
+  - { gpio: 23, funcs: [{ sel: 1, func: SPI0_TX   }, { sel: 2, func: UART1_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM3_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 8, func: CLOCK_GPOUT1 }] }
+  - { gpio: 24, funcs: [{ sel: 1, func: SPI1_RX   }, { sel: 2, func: UART1_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM4_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 8, func: CLOCK_GPOUT2 }] }
+  - { gpio: 25, funcs: [{ sel: 1, func: SPI1_CSn  }, { sel: 2, func: UART1_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM4_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }, { sel: 8, func: CLOCK_GPOUT3 }] }
+  - { gpio: 26, funcs: [{ sel: 1, func: SPI1_SCK  }, { sel: 2, func: UART1_CTS }, { sel: 3, func: I2C1_SDA }, { sel: 4, func: PWM5_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }] }
+  - { gpio: 27, funcs: [{ sel: 1, func: SPI1_TX   }, { sel: 2, func: UART1_RTS }, { sel: 3, func: I2C1_SCL }, { sel: 4, func: PWM5_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }] }
+  - { gpio: 28, funcs: [{ sel: 1, func: SPI1_RX   }, { sel: 2, func: UART0_TX  }, { sel: 3, func: I2C0_SDA }, { sel: 4, func: PWM6_A  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }] }
+  - { gpio: 29, funcs: [{ sel: 1, func: SPI1_CSn  }, { sel: 2, func: UART0_RX  }, { sel: 3, func: I2C0_SCL }, { sel: 4, func: PWM6_B  }, { sel: 5, func: SIO }, { sel: 6, func: PIO0 }, { sel: 7, func: PIO1 }] }

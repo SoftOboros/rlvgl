@@ -1,0 +1,23 @@
+[package]
+name = "rlvgl-playit"
+version = "0.2.0"
+authors = ["Ira Abbott <ira@softobotos.com>"]
+edition = "2024"
+license = "MIT"
+description = "Mini-playwright test driver for rlvgl: input injection, widget queries, and pixel inspection."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-playit"
+keywords = ["embedded", "testing", "ui", "no_std", "automation"]
+categories = ["embedded", "development-tools::testing", "no-std"]
+publish = true
+rust-version = "1.85"
+
+[dependencies]
+rlvgl-core = { path = "../core", version = "0.2.0", default-features = false }
+
+[features]
+default = []
+alloc = []
+std = ["alloc"]

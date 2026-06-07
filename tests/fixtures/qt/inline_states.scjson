@@ -1,0 +1,33 @@
+{
+  "state": [
+    {
+      "id": "idle",
+      "transition": [
+        {
+          "event": "start",
+          "target": [
+            "running"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "running",
+      "transition": [
+        {
+          "event": "stop",
+          "target": [
+            "idle"
+          ]
+        }
+      ]
+    }
+  ],
+  "initial": [
+    "idle"
+  ],
+  "datamodel_attribute": "null",
+  "other_attributes": {
+    "_comment": "QT-05d emit-scjson: tests/fixtures/qt/inline_states.qml"
+  }
+}

@@ -1,0 +1,2 @@
+on_entry:idle
+no_transition:idle on open_settings

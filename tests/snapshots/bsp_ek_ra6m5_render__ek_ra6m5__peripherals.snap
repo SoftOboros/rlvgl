@@ -1,0 +1,55 @@
+---
+source: tests/bsp_ek_ra6m5_render.rs
+expression: content
+---
+//! Per-peripheral initialization for EK-RA6M5.
+//!
+//! Enables and configures each peripheral used by the board.
+//! PFS pin routing is done in `pfs.rs`; clock gating (MSTP release) is
+//! done in `clocks.rs`.  This module handles peripheral-internal
+//! configuration (baud rate, clock frequency, etc.).
+
+/// Initialize every board peripheral in dependency order.
+pub fn init() {
+    
+    init_sci0();
+    
+}
+
+
+
+
+
+
+/// Initialize SCI0 as UART console at 115200 baud.
+///
+/// SCI in asynchronous (UART) mode:
+/// 1. Clear SCR (disable TE/RE)
+/// 2. Set SMR for async 8N1
+/// 3. Set BRR for the target baud rate from PCLKA
+/// 4. Enable TE + RE in SCR
+pub fn init_sci0() {
+    let base = 1074200576u32;
+    unsafe {
+        // SCR register (offset 0x0A): disable TE/RE before configuration.
+        let scr = (base + 10) as *mut u8;
+        core::ptr::write_volatile(scr, 0x00);
+
+        // SMR register (offset 0x00): async mode, 8 data bits, no parity,
+        // 1 stop bit, PCLK/1 (CKS=0b00).
+        let smr = base as *mut u8;
+        core::ptr::write_volatile(smr, 0x00);
+
+        // BRR register (offset 0x02): baud rate divisor.
+        // BRR = (PCLKA_HZ / (32 * baud)) - 1   (for n=0, CKS=0b00)
+        let brr_val: u8 = ((super::clocks::PCLKA_HZ / (32 * 115200)) - 1) as u8;
+        let brr = (base + 2) as *mut u8;
+        core::ptr::write_volatile(brr, brr_val);
+
+        // Brief delay for BRR to take effect (at least 1 bit period).
+        // In practice the subsequent writes provide enough delay.
+
+        // SCR register: enable TE (bit 5) + RE (bit 4).
+        core::ptr::write_volatile(scr, (1u8 << 5) | (1u8 << 4));
+    }
+}

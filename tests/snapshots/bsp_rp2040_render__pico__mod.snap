@@ -1,0 +1,13 @@
+---
+source: tests/bsp_rp2040_render.rs
+expression: content
+---
+//! Generated BSP module for raspberry_pi_pico.
+//!
+//! Target chip: rp2040
+
+pub mod pac;
+pub mod clocks;
+pub mod gpio;
+pub mod peripherals;
+pub mod board;

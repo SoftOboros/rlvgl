@@ -1,0 +1,258 @@
+---
+source: tests/bsp_nxp_render.rs
+expression: content
+---
+//! IOMUX pad routing for MIMXRT1060-EVKB.
+//!
+//! Configures SW_MUX_CTL_PAD (ALT function select), SW_PAD_CTL_PAD
+//! (drive/pull/slew), and SELECT_INPUT (daisy chain) for each board pin.
+
+/// IOMUXC base address.
+const IOMUXC_BASE: u32 = 0x401F8000;
+
+/// Configure all board pin IOMUX routing.
+pub fn init() {
+    
+    // GPIO_AD_B0_12 — LPUART1_TX (ALT2)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT2
+        let mux = (IOMUXC_BASE + 264) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 2);
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 760) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + 1328) as *mut u32;
+        core::ptr::write_volatile(sel, 0);
+        
+    }
+    
+    // GPIO_AD_B0_13 — LPUART1_RX (ALT2)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT2
+        let mux = (IOMUXC_BASE + 268) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 2);
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 764) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + 1324) as *mut u32;
+        core::ptr::write_volatile(sel, 0);
+        
+    }
+    
+    // GPIO_AD_B0_09 — GPIO (ALT5)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT5
+        let mux = (IOMUXC_BASE + 252) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 5);
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 748) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+    // GPIO_AD_B1_00 — LPI2C1_SCL (ALT3)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT3
+        let mux = (IOMUXC_BASE + 288) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 3 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 784) as *mut u32;
+        
+        // PKE=1, PUE=1, PUS=01 (47k pull-up), DSE=110 (R0/6), SPEED=10 (100MHz)
+        core::ptr::write_volatile(pad, (1 << 12) | (1 << 13) | (0b01 << 14) | (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + 1232) as *mut u32;
+        core::ptr::write_volatile(sel, 1);
+        
+    }
+    
+    // GPIO_AD_B1_01 — LPI2C1_SDA (ALT3)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT3
+        let mux = (IOMUXC_BASE + 292) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 3 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 788) as *mut u32;
+        
+        // PKE=1, PUE=1, PUS=01 (47k pull-up), DSE=110 (R0/6), SPEED=10 (100MHz)
+        core::ptr::write_volatile(pad, (1 << 12) | (1 << 13) | (0b01 << 14) | (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + 1236) as *mut u32;
+        core::ptr::write_volatile(sel, 1);
+        
+    }
+    
+    // GPIO_SD_B0_00 — USDHC1_CMD (ALT0)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT0
+        let mux = (IOMUXC_BASE + 452) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 0 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 948) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+    // GPIO_SD_B0_01 — USDHC1_CLK (ALT0)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT0
+        let mux = (IOMUXC_BASE + 456) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 0);
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 952) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+    // GPIO_SD_B0_02 — USDHC1_DATA0 (ALT0)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT0
+        let mux = (IOMUXC_BASE + 460) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 0 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 956) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+    // GPIO_SD_B0_03 — USDHC1_DATA1 (ALT0)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT0
+        let mux = (IOMUXC_BASE + 464) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 0 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 960) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+    // GPIO_SD_B0_04 — USDHC1_DATA2 (ALT0)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT0
+        let mux = (IOMUXC_BASE + 468) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 0 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 964) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+    // GPIO_SD_B0_05 — USDHC1_DATA3 (ALT0)
+    unsafe {
+        // SW_MUX_CTL_PAD: select ALT0
+        let mux = (IOMUXC_BASE + 472) as *mut u32;
+        
+        core::ptr::write_volatile(mux, 0 | (1 << 4)); // SION=1 for bidirectional
+        
+
+        // SW_PAD_CTL_PAD: drive strength + pull configuration
+        let pad = (IOMUXC_BASE + 968) as *mut u32;
+        
+        // Default: DSE=110 (R0/6), SPEED=10 (100MHz), no pull
+        core::ptr::write_volatile(pad, (0b110 << 3) | (0b10 << 6));
+        
+
+        
+        // SELECT_INPUT daisy chain
+        let sel = (IOMUXC_BASE + ) as *mut u32;
+        core::ptr::write_volatile(sel, );
+        
+    }
+    
+}

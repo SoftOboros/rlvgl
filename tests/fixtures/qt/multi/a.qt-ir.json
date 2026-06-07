@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "source": "tests/fixtures/qt/multi/a.qml",
+  "imports": [
+    {
+      "module": "QtQuick",
+      "version": "2.15",
+      "alias": null
+    }
+  ],
+  "pragmas": [],
+  "root": {
+    "type_name": "Item",
+    "id": "a",
+    "properties": [],
+    "assignments": [
+      {
+        "target": "width",
+        "value": {
+          "kind": "expression",
+          "text": "100"
+        }
+      },
+      {
+        "target": "height",
+        "value": {
+          "kind": "expression",
+          "text": "100"
+        }
+      }
+    ],
+    "signals": [],
+    "handlers": [],
+    "children": []
+  }
+}

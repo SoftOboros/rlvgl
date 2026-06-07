@@ -1,0 +1,60 @@
+# Standalone manifest. `[workspace]` at the top keeps this crate
+# out of the parent rlvgl workspace until the v0.2.0 PM-side
+# integration pass adds it explicitly (CHIPS-SILABS-06 §11
+# non-goal: this chapter MUST NOT pre-empt the workspace edit).
+[workspace]
+
+[package]
+name = "rlvgl-example-slstk3701a"
+version = "0.0.1"
+edition = "2021"
+publish = false
+build = "build.rs"
+
+# v0 raw-PAC bring-up path for the Silicon Labs SLSTK3701A
+# (EFM32GG11B820 Giant Gecko Starter Kit). Mirrors the
+# `examples/beetle-esp32c3/` ESP precedent.
+#
+# Regenerate the files under `src/bsp_generated/slstk3701_a/` whenever
+# the board YAML or chip YAML changes:
+#
+#   cargo run --features creator --bin rlvgl-creator -- --silent bsp from-yaml \
+#       --vendor silabs --board slstk3701a \
+#       --out examples/slstk3701a/src/bsp_generated --emit-pac
+#
+# The hand-written `src/bsp_generated/mod.rs` declares the snake-cased
+# board module (`slstk3701_a`) so the generator's own crate-root-shaped
+# `mod.rs` (which carries inner `#![no_std]` attributes) sits inside
+# `slstk3701_a/` rather than at the parent.
+
+[[bin]]
+name = "rlvgl-slstk3701a"
+path = "src/bsp_pac_main.rs"
+required-features = ["bsp_pac"]
+
+[features]
+default = ["bsp_pac"]
+## Generated-BSP + raw-PAC path. Consumes `src/bsp_generated/` produced
+## by `rlvgl-creator bsp from-yaml --vendor silabs --board slstk3701a`.
+##
+## v0 scope: `main()` calls `board::init()` and enters `wfi`. LED blink
+## and USART4 hello-world ride on follow-up phases CHIPS-SILABS-06a /
+## CHIPS-SILABS-06b.
+bsp_pac = []
+
+[dependencies]
+# Pinned in CHIPS-SILABS-01a; the `efm32gg11b820` SKU feature gates the
+# per-SKU `Peripherals` sub-module that the generated `pac.rs`
+# re-exports (per CHIPS-SILABS-02 SKU flatten amendment). The default
+# `rt` feature pulls in `cortex-m-rt/device` so device interrupt
+# definitions are wired into the `cortex-m-rt` vector table.
+efm32gg11b-pac = { version = "0.1.4", features = ["efm32gg11b820"] }
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+panic-halt = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false

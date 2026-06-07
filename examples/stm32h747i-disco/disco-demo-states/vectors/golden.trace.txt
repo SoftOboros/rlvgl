@@ -1,0 +1,13 @@
+on_entry:idle
+on_exit:idle
+transition:idle->playing
+on_entry:playing
+on_exit:playing
+transition:playing->idle
+on_entry:idle
+on_exit:idle
+transition:idle->menu
+on_entry:menu
+on_exit:menu
+transition:menu->settings
+on_entry:settings

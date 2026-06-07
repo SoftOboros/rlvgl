@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.1.9"
+version = "0.2.0"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -40,24 +40,6 @@ include = [
 path = "src/lib.rs"
 
 [[bin]]
-name = "rlvgl-sim"
-path = "examples/sim/src/main.rs"
-required-features = ["simulator", "qrcode", "png", "jpeg", "gif", "fontdue"]
-doc = false
-
-[[bin]]
-name = "rlvgl-stm32h747i-disco"
-path = "examples/stm32h747i-disco/src/main.rs"
-required-features = ["stm32h747i_disco_cm7"]
-doc = false
-
-[[bin]]
-name = "rlvgl-stm32h747i-disco-cm4"
-path = "examples/stm32h747i-disco/src/cm4_main.rs"
-required-features = ["stm32h747i_disco_cm4"]
-doc = false
-
-[[bin]]
 name = "rlvgl-creator"
 path = "src/bin/rlvgl_creator/main.rs"
 required-features = ["creator"]
@@ -74,20 +56,82 @@ path = "tests/creator_run.rs"
 required-features = ["creator"]
 
 [[test]]
-name = "headless"
-path = "tests/headless.rs"
-required-features = ["simulator", "qrcode", "png", "jpeg", "gif", "fontdue"]
+name = "creator_qt_ingest"
+path = "tests/creator_qt_ingest.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_compile"
+path = "tests/creator_qt_emit_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_rlvgl_compile"
+path = "tests/creator_qt_emit_rlvgl_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_clickable_compile"
+path = "tests/creator_qt_emit_clickable_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_counter_compile"
+path = "tests/creator_qt_emit_counter_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_bound_text_compile"
+path = "tests/creator_qt_emit_bound_text_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_centered_compile"
+path = "tests/creator_qt_emit_centered_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_nested_compile"
+path = "tests/creator_qt_emit_nested_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_edges_compile"
+path = "tests/creator_qt_emit_edges_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_corners_compile"
+path = "tests/creator_qt_emit_corners_compile.rs"
+required-features = ["creator"]
+
+[[test]]
+name = "creator_qt_emit_mousearea_compile"
+path = "tests/creator_qt_emit_mousearea_compile.rs"
+required-features = ["creator"]
+
+# QT-05b: stopwatch dispatch-glue compile-as-mod gate. Depends on the
+# `stopwatch_gen` dev-dep (mock istate-codegen output) per QT-05b §8.
+[[test]]
+name = "creator_qt_emit_stopwatch_compile"
+path = "tests/creator_qt_emit_stopwatch_compile.rs"
+required-features = ["creator"]
+
+# QT-10: strict-mode meta-test. Asserts the chapter file set, version
+# constants, and CLI subcommand surface remain stable.
+[[test]]
+name = "creator_qt_strict_mode"
+path = "tests/creator_qt_strict_mode.rs"
+required-features = ["creator"]
 
 [dependencies]
-rlvgl-core = { version = "0.1.7", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.1.6", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.1.7", path = "platform", default-features = false }
-rlvgl-ui = { version = "0.1.3", path = "ui", default-features = false }
-rlvgl-i18n = { version = "0.1.1", path = "i18n" }
-rlvgl-app-demo = { version = "0.1.1", path = "examples/apps/demo", default-features = false, optional = true }
-embedded-hal = { version = "1.0", optional = true }
-embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", optional = true }
-stm32h7 = { version = "0.15.1", optional = true, features = ["rt"] }
+rlvgl-core = { version = "0.2.0", path = "core", default-features = false }
+rlvgl-widgets = { version = "0.2.0", path = "widgets", default-features = false }
+rlvgl-platform = { version = "0.2.0", path = "platform", default-features = false }
+rlvgl-ui = { version = "0.2.0", path = "ui", default-features = false }
+rlvgl-i18n = { version = "0.2.0", path = "i18n" }
+rlvgl-app-demo = { version = "0.2.0", path = "examples/apps/demo", default-features = false, optional = true }
+rlvgl-app-disco-demo = { version = "0.2.0", path = "examples/apps/disco-demo", default-features = false, optional = true }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -112,8 +156,14 @@ version = "1"
 default-features = false
 optional = true
 
+[dependencies.rlvgl-playit]
+version = "0.2.0"
+path = "playit"
+default-features = false
+optional = true
+
 [dependencies.rlvgl-decomp]
-version = "0.1.0"
+version = "0.2.0"
 path = "rlvgl-decomp"
 optional = true
 
@@ -124,41 +174,6 @@ optional = true
 version = "0.25"
 default-features = false
 features = ["png"]
-optional = true
-
-[dependencies.cortex-m-rt]
-version = "0.7"
-optional = true
-
-[dependencies.cortex-m]
-version = "0.7"
-features = ["critical-section-single-core"]
-optional = true
-
-[dependencies.cortex-m-semihosting]
-version = "0.5"
-optional = true
-
-[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32h7xx-hal]
-version = "0.16"
-optional = true
-features = ["stm32h747cm7", "sdmmc", "fmc", "xspi"]
-
-[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.embedded-sdmmc]
-version = "0.9"
-default-features = false
-optional = true
-
-[dependencies.panic-halt]
-version = "1.0.0"
-optional = true
-
-[dependencies.embedded-alloc]
-version = "=0.5.1"
-optional = true
-
-[dependencies.critical-section]
-version = "1.1.2"
 optional = true
 
 [dependencies.apng]
@@ -248,51 +263,51 @@ version = "0.16.0"
 optional = true
 
 [dependencies.rlvgl-bsps-stm]
-version = "0.1.1"
+version = "0.2.0"
 path = "chips/stm/bsps"
 optional = true
 [dependencies.rlvgl-chips-stm]
-version = "0.1.1"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-stm"
 optional = true
 
 [dependencies.rlvgl-chips-nrf]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-nrf"
 optional = true
 
 [dependencies.rlvgl-chips-esp]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-esp"
 optional = true
 
 [dependencies.rlvgl-chips-nxp]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-nxp"
 optional = true
 
 [dependencies.rlvgl-chips-silabs]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-silabs"
 optional = true
 
 [dependencies.rlvgl-chips-microchip]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-microchip"
 optional = true
 
 [dependencies.rlvgl-chips-renesas]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-renesas"
 optional = true
 
 [dependencies.rlvgl-chips-ti]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-ti"
 optional = true
 
 [dependencies.rlvgl-chips-rp2040]
-version = "0.0.2"
+version = "0.2.0"
 path = "chipdb/rlvgl-chips-rp2040"
 optional = true
 
@@ -303,15 +318,15 @@ optional = true
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
-rlvgl-chips-stm = { version = "0.1.1", path = "chipdb/rlvgl-chips-stm" }
-rlvgl-chips-nrf = { version = "0.0.2", path = "chipdb/rlvgl-chips-nrf" }
-rlvgl-chips-esp = { version = "0.0.2", path = "chipdb/rlvgl-chips-esp" }
-rlvgl-chips-nxp = { version = "0.0.2", path = "chipdb/rlvgl-chips-nxp" }
-rlvgl-chips-silabs = { version = "0.0.2", path = "chipdb/rlvgl-chips-silabs" }
-rlvgl-chips-microchip = { version = "0.0.2", path = "chipdb/rlvgl-chips-microchip" }
-rlvgl-chips-renesas = { version = "0.0.2", path = "chipdb/rlvgl-chips-renesas" }
-rlvgl-chips-ti = { version = "0.0.2", path = "chipdb/rlvgl-chips-ti" }
-rlvgl-chips-rp2040 = { version = "0.0.2", path = "chipdb/rlvgl-chips-rp2040" }
+rlvgl-chips-stm = { version = "0.2.0", path = "chipdb/rlvgl-chips-stm" }
+rlvgl-chips-nrf = { version = "0.2.0", path = "chipdb/rlvgl-chips-nrf" }
+rlvgl-chips-esp = { version = "0.2.0", path = "chipdb/rlvgl-chips-esp" }
+rlvgl-chips-nxp = { version = "0.2.0", path = "chipdb/rlvgl-chips-nxp" }
+rlvgl-chips-silabs = { version = "0.2.0", path = "chipdb/rlvgl-chips-silabs" }
+rlvgl-chips-microchip = { version = "0.2.0", path = "chipdb/rlvgl-chips-microchip" }
+rlvgl-chips-renesas = { version = "0.2.0", path = "chipdb/rlvgl-chips-renesas" }
+rlvgl-chips-ti = { version = "0.2.0", path = "chipdb/rlvgl-chips-ti" }
+rlvgl-chips-rp2040 = { version = "0.2.0", path = "chipdb/rlvgl-chips-rp2040" }
 serde_json = "1"
 anyhow = "1"
 indexmap = { version = "2", features = ["serde"] }
@@ -319,52 +334,28 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 zstd = "0.13.3"
 syn = { version = "2", features = ["full"] }
+# APP-05 parity tests: parse emitted + reference Cargo.toml as real TOML
+# so multi-line `[features]` lists round-trip cleanly.
+toml = "0.8"
+# QT-05b test fixture: hand-vendored mock istate-codegen output that
+# satisfies the QT-05 §6 6-symbol linkage surface. Used only by
+# `tests/creator_qt_emit_stopwatch_compile.rs` to compile-check the
+# emitted dispatch glue without the live softoboros MCP.
+stopwatch_gen = { path = "tests/fixtures/qt/stopwatch_gen" }
 
 [features]
 default = []
 regression = []
-audio = ["rlvgl-platform/audio"]
-dma2d = ["rlvgl-platform/dma2d"]
-hal_sdram = ["dep:stm32-fmc"]
-sdram_ramtest = ["rlvgl-platform/sdram_ramtest"]
-pac_sdram_init = []
-skip_sdram_mpu = []
-cpu_stats = []
-c_hal = ["dep:rlvgl-bsps-stm", "rlvgl-bsps-stm/c_hal"]
-c_hal_cm4 = ["dep:rlvgl-bsps-stm", "rlvgl-bsps-stm/c_hal_cm4"]
+## Opt-in: run the ESP32-C3 BSP generator and `cargo check` its output against
+## the real `esp32c3` PAC crate on `riscv32imc-unknown-none-elf`. Heavy — needs
+## the riscv32imc target + network access to fetch `esp32c3` from crates.io.
+compile-verify = ["creator", "regression"]
+playit = ["dep:rlvgl-playit"]
 png = ["rlvgl-core/png", "rlvgl-platform/png", "rlvgl-app-demo?/png"]
 jpeg = ["rlvgl-core/jpeg", "rlvgl-platform/jpeg", "rlvgl-app-demo?/jpeg"]
 gif = ["rlvgl-core/gif", "dep:gif", "rlvgl-platform/gif", "rlvgl-app-demo?/gif"]
 qrcode = ["rlvgl-core/qrcode", "rlvgl-platform/qrcode", "rlvgl-app-demo?/qrcode"]
-simulator = ["rlvgl-platform/simulator", "dep:rlvgl-app-demo"]
-st7789 = ["rlvgl-platform/st7789"]
-splash = ["dep:rlvgl-decomp", "rlvgl-platform/splash"]
-desktop = ["dep:rlvgl-decomp"]
-stm32h747i_disco = ["stm32h747i_disco_cm7"]
-stm32h747i_disco_cm7 = [
-    "rlvgl-platform/stm32h747i_disco",
-    "dep:cortex-m-rt",
-    "dep:cortex-m",
-    "dep:embedded-alloc",
-    "dep:panic-halt",
-    "dep:embedded-hal",
-    "dep:embedded-hal-02",
-    "dep:stm32h7",
-    "dep:stm32h7xx-hal",
-    "stm32h7/stm32h747cm7",
-    "stm32h7xx-hal/stm32h747cm7",
-    "dep:rlvgl-app-demo",
-    "dep:rlvgl-decomp",
-]
-
-stm32h747i_disco_cm4 = [
-    "dep:cortex-m-rt",
-    "dep:cortex-m",
-    "dep:embedded-alloc",
-    "dep:panic-halt",
-    "dep:stm32h7",
-    "stm32h7/stm32h747cm4",
-]
+simulator = ["rlvgl-platform/simulator", "dep:rlvgl-app-demo", "dep:rlvgl-app-disco-demo"]
 fontdue = ["rlvgl-core/fontdue", "rlvgl-platform/fontdue", "dep:fontdue", "rlvgl-app-demo?/fontdue"]
 lottie = ["rlvgl-core/lottie", "rlvgl-platform/lottie"]
 lottie_runtime = ["lottie", "rlvgl-core/lottie_backend"]
@@ -441,14 +432,6 @@ creator_ui = [
     "qrcode",
     "fontdue",
 ]
-bsp_log = []
-semihosting = ["dep:cortex-m-semihosting"]
-backlight_pwm = []
-fatfs_nostd = ["rlvgl-platform/fatfs_nostd"]
-sd_assets_demo = ["sd_storage"]
-sd_storage = ["rlvgl-platform/sd_storage", "dep:embedded-sdmmc"]
-qspi_flash = []
-bringup_bkpt = []
  
 
 
@@ -477,8 +460,29 @@ objc2-foundation = "0.3.1"
 objc2-app-kit = "0.3.1"
 
 [workspace]
-members = ["core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "examples/apps/demo", "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp", "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip", "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040", "chips/stm/bsps", "rlvgl-decomp"]
-## duplicated non-target-specific stm32h7xx-hal removed; use the target-specific one above
-[target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies.stm32-fmc]
-version = "0.3.2"
-optional = true
+members = [
+    "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
+    "examples/apps/demo", "examples/apps/disco-demo",
+    "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
+    "examples/beetle-esp32c3",
+    "examples/beetle-esp32p4",
+    "examples/beaglebone-black",
+    "examples/stm32h747i-disco/assets/disco-assets",
+    "chipdb/rlvgl-chips-stm", "chipdb/rlvgl-chips-nrf", "chipdb/rlvgl-chips-esp",
+    "chipdb/rlvgl-chips-nxp", "chipdb/rlvgl-chips-silabs", "chipdb/rlvgl-chips-microchip",
+    "chipdb/rlvgl-chips-renesas", "chipdb/rlvgl-chips-ti", "chipdb/rlvgl-chips-rp2040",
+    "chips/stm/bsps", "rlvgl-decomp",
+    "audio-meters-core",
+]
+# UEFI example is excluded from workspace — it conflicts with std on host targets.
+# Build it explicitly: cargo build -p rlvgl-example-uefi-disco --target aarch64-unknown-uefi
+# vendor/scjson is a reference-only submodule (BSD-1-Clause); never linked into our build.
+# disco-demo-states is the APP-04b vendored SM crate (mcp-statechart output);
+# excluded so its non-idiomatic codegen variant naming doesn't fail workspace clippy.
+# It is built/tested separately by tests/creator_app_round_trip_disco_sm.rs.
+exclude = [
+    "examples/uefi-disco",
+    "examples/beetle-avr",
+    "vendor/scjson",
+    "examples/stm32h747i-disco/disco-demo-states",
+]

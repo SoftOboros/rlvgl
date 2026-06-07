@@ -1,0 +1,33 @@
+//! Board-level constants for {{ ir.board.name }}.
+//!
+//! Each pin label from `db/boards/{{ board_stem }}.yaml` becomes a `pub const`
+//! GPIO number so application code can refer to board features by name
+//! rather than magic pin numbers.
+
+/// Board identifier.
+pub const BOARD_NAME: &str = "{{ ir.board.name }}";
+
+/// Chip targeted by this BSP.
+pub const CHIP: &str = "{{ ir.chip.name }}";
+
+/// Chip package.
+pub const PACKAGE: &str = "{{ ir.chip.package }}";
+
+/// On-module flash capacity, megabytes.
+pub const FLASH_MB: u32 = {{ ir.board.flash_mb }};
+
+/// CPU clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const CPU_HZ: u32 = {{ ir.clocks.cpu_hz }};
+
+/// APB clock frequency configured by [`crate::clocks::init`], in hertz.
+pub const APB_HZ: u32 = {{ ir.clocks.apb_hz }};
+
+/// External crystal frequency, in hertz.
+pub const XTAL_HZ: u32 = {{ ir.clocks.xtal_hz }};
+
+{% for pin in ir.pins %}
+{% if pin.label %}
+/// GPIO number for `{{ pin.label }}` ({{ pin.signal }}).
+pub const {{ pin.label | upper }}: u8 = {{ pin.gpio }};
+{% endif %}
+{% endfor %}

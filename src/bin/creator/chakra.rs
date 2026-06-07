@@ -32,11 +32,12 @@ pub(crate) fn ingest(input: &Path, out: &Path) -> Result<()> {
         let snapshot = palette.clone();
         let mut changed = false;
         for val in palette.values_mut() {
-            if val.starts_with('{') && val.ends_with('}') {
-                if let Some(resolved) = resolve_ref(val, &snapshot) {
-                    *val = resolved;
-                    changed = true;
-                }
+            if val.starts_with('{')
+                && val.ends_with('}')
+                && let Some(resolved) = resolve_ref(val, &snapshot)
+            {
+                *val = resolved;
+                changed = true;
             }
         }
         if !changed {
@@ -83,13 +84,12 @@ pub(crate) fn ingest(input: &Path, out: &Path) -> Result<()> {
     }
 
     // Ensure required rlvgl keys
-    if !all_colors.contains_key("primary") {
-        if let Some(v) = default_colors
+    if !all_colors.contains_key("primary")
+        && let Some(v) = default_colors
             .get("brand.solid")
             .or(palette.get("brand.500"))
-        {
-            all_colors.insert("primary".into(), v.clone());
-        }
+    {
+        all_colors.insert("primary".into(), v.clone());
     }
     if !all_colors.contains_key("background") {
         all_colors.insert(
@@ -97,10 +97,10 @@ pub(crate) fn ingest(input: &Path, out: &Path) -> Result<()> {
             palette.get("gray.900").cloned().unwrap_or("#171923".into()),
         );
     }
-    if !all_colors.contains_key("text") {
-        if let Some(v) = default_colors.get("text") {
-            all_colors.insert("text".into(), v.clone());
-        }
+    if !all_colors.contains_key("text")
+        && let Some(v) = default_colors.get("text")
+    {
+        all_colors.insert("text".into(), v.clone());
     }
 
     // Build YAML output
@@ -229,9 +229,7 @@ fn parse_js_obj(s: &str) -> Result<(JsObj, usize)> {
             map.insert(key, JsValue::Str(val));
         } else {
             // Skip unrecognized values until comma/closing brace/newline
-            let end = rest
-                .find(|c: char| c == ',' || c == '}' || c == '\n')
-                .unwrap_or(rest.len());
+            let end = rest.find([',', '}', '\n']).unwrap_or(rest.len());
             let raw = rest[..end].trim();
             pos += end;
             map.insert(key, JsValue::Str(raw.to_string()));
@@ -337,15 +335,15 @@ fn collect_semantic_refs(
                 let has_dark = inner.contains_key("_dark");
 
                 if has_default || has_dark {
-                    if let Some(JsValue::Obj(def)) = inner.get("default") {
-                        if let Some(JsValue::Str(v)) = def.get("value") {
-                            default_out.insert(path.clone(), v.clone());
-                        }
+                    if let Some(JsValue::Obj(def)) = inner.get("default")
+                        && let Some(JsValue::Str(v)) = def.get("value")
+                    {
+                        default_out.insert(path.clone(), v.clone());
                     }
-                    if let Some(JsValue::Obj(dark)) = inner.get("_dark") {
-                        if let Some(JsValue::Str(v)) = dark.get("value") {
-                            dark_out.insert(path.clone(), v.clone());
-                        }
+                    if let Some(JsValue::Obj(dark)) = inner.get("_dark")
+                        && let Some(JsValue::Str(v)) = dark.get("value")
+                    {
+                        dark_out.insert(path.clone(), v.clone());
                     }
                 } else {
                     // Nested namespace (e.g. brand: { solid: ..., contrast: ... })

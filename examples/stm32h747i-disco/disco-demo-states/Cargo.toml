@@ -1,0 +1,18 @@
+[package]
+name = "menu_gen"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "menu_gen"
+path = "src/lib.rs"
+
+[dependencies]
+
+# Vendored under the rlvgl workspace tree; this empty table marks
+# the SM crate as a standalone workspace root so `cargo test` works
+# locally. The rlvgl root's `workspace.exclude` keeps it out of
+# `cargo --workspace` builds; this stanza handles direct invocation
+# (cargo's path-walk would otherwise reach the parent rlvgl
+# Cargo.toml and refuse). Re-add after every `mcp-statechart` regen.
+[workspace]

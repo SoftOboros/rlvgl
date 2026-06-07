@@ -1,0 +1,18 @@
+---
+source: tests/bsp_nrf52840_render.rs
+assertion_line: 42
+expression: content
+---
+//! Top-level PAC initialization for nRF52840-DK.
+//!
+//! Calls sub-modules in dependency order: clocks first (HFCLK/LFCLK),
+//! then GPIO pin configuration and PSEL routing, then peripheral enable.
+
+/// Initialize the nRF52840-DK BSP.
+///
+/// Call this once from `main` before using any peripherals.
+pub fn init() {
+    super::clocks::init();
+    super::gpio::init();
+    super::peripherals::init();
+}

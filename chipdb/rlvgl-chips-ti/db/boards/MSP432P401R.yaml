@@ -1,0 +1,10 @@
+# Texas Instruments MSP432P401R LaunchPad (placeholder).
+name: MSP432P401R
+chip: MSP432P401R
+flash_mb: 0.25
+
+console:
+  peripheral: euscia0
+  baud: 115200
+
+pins: []

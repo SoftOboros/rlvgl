@@ -34,7 +34,12 @@ jobs:
       - name: Install target
         run: rustup target add thumbv7em-none-eabihf
       - name: Build firmware
-        run: RUSTFLAGS="" cargo build --bin rlvgl-stm32h747i-disco --features "stm32h747i_disco,qrcode,png,jpeg,fontdue" --target thumbv7em-none-eabihf --release
+        run: |
+          RUSTFLAGS="-C target-cpu=cortex-m7" cargo build \
+            -p rlvgl-example-disco \
+            --bin rlvgl-stm32h747i-disco \
+            --features "cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio" \
+            --target thumbv7em-none-eabihf --release
       - name: Firmware size
         run: arm-none-eabi-size target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco | tee size.txt
       - name: Upload firmware
@@ -45,7 +50,7 @@ jobs:
             target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco
             size.txt
 
-  stm32h747i-disco-fatfs:
+  stm32h747i-disco-storage:
     continue-on-error: true
     runs-on: ubuntu-latest
     container:
@@ -56,11 +61,12 @@ jobs:
         run: bash scripts/setup-ci-env.sh
       - name: Install target
         run: rustup target add thumbv7em-none-eabihf
-      - name: Build firmware (fatfs no_std demo)
+      - name: Build firmware (SD storage smoke)
         run: |
-          RUSTFLAGS="" cargo build \
+          RUSTFLAGS="-C target-cpu=cortex-m7" cargo build \
+            -p rlvgl-example-disco \
             --bin rlvgl-stm32h747i-disco \
-            --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+            --features "cm7,sd_storage" \
             --target thumbv7em-none-eabihf --release || true
 
   polish:

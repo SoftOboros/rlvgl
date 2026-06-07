@@ -1,0 +1,84 @@
+//! PFS (Pin Function Select) routing for {{ ir.board.name }}.
+//!
+//! On Renesas RA MCUs, each pin's function is controlled by a PFS register
+//! at `PFS_BASE + port * 0x0040 + pin * 0x0004`.  The key fields are:
+//!
+//! * PMR  (bit 16) — 1 = peripheral mode, 0 = GPIO mode
+//! * PSEL (bits 28:24) — peripheral function select (when PMR=1)
+//! * PDR  (bit 2) — 1 = output, 0 = input
+//! * PCR  (bit 4) — 1 = pull-up enabled
+//! * NCODR (bit 6) — 1 = open-drain (N-channel)
+//!
+//! PFS write protection (PWPR register) must be released before writing.
+
+/// PFS register base address.
+const PFS_BASE: u32 = 1073906688;  // 0x4004_0800
+
+/// PWPR (write-protect register) address.
+const PWPR: u32 = 1073907459;  // 0x4004_0B03
+// PWPR bit fields:
+// B0WI  (bit 7) — write-protect for PFSWE; must be 0 to allow PFSWE write
+// PFSWE (bit 6) — PFS write enable; must be 1 to allow PFS writes
+
+/// Release PFS write protection, configure all board pins, then re-lock.
+pub fn init() {
+    unsafe {
+        // Release write protection: clear B0WI, then set PFSWE.
+        let pwpr = PWPR as *mut u8;
+        core::ptr::write_volatile(pwpr, 0x00);  // B0WI=0
+        core::ptr::write_volatile(pwpr, 0x40);  // PFSWE=1
+    }
+
+    {% for route in pin_routes %}
+    // P{{ route.port }}{{ route.pin }} — {{ route.signal }}
+    {% if route.kind == "Pfs" %}
+    unsafe {
+        let pfs = (PFS_BASE + {{ route.port }} * 64 + {{ route.pin }} * 4) as *mut u32;
+        let mut val: u32 = 0;
+        // PSEL (bits 28:24) = {{ route.psel }}
+        val |= ({{ route.psel }} & 0x1F) << 24;
+        // PMR (bit 16) = 1 — peripheral mode
+        val |= 1 << 16;
+        {% if route.direction == "out" or route.direction == "inout" %}
+        // PDR (bit 2) = 1 — output
+        val |= 1 << 2;
+        {% endif %}
+        {% if route.pull == "up" %}
+        // PCR (bit 4) = 1 — pull-up
+        val |= 1 << 4;
+        {% endif %}
+        {% if route.open_drain is defined and route.open_drain %}
+        // NCODR (bit 6) = 1 — N-channel open drain
+        val |= 1 << 6;
+        {% endif %}
+        core::ptr::write_volatile(pfs, val);
+    }
+    {% elif route.kind == "Gpio" %}
+    unsafe {
+        let pfs = (PFS_BASE + {{ route.port }} * 64 + {{ route.pin }} * 4) as *mut u32;
+        let mut val: u32 = 0;
+        // PMR (bit 16) = 0 — GPIO mode (default, no set needed)
+        {% if route.direction == "out" or route.direction == "inout" %}
+        // PDR (bit 2) = 1 — output
+        val |= 1 << 2;
+        {% endif %}
+        {% if route.pull == "up" %}
+        // PCR (bit 4) = 1 — pull-up
+        val |= 1 << 4;
+        {% endif %}
+        {% if route.open_drain is defined and route.open_drain %}
+        // NCODR (bit 6) = 1 — N-channel open drain
+        val |= 1 << 6;
+        {% endif %}
+        core::ptr::write_volatile(pfs, val);
+    }
+    {% endif %}
+    {% endfor %}
+
+    // Re-enable write protection: clear PFSWE, then set B0WI.
+    unsafe {
+        let pwpr = PWPR as *mut u8;
+        core::ptr::write_volatile(pwpr, 0x00);  // PFSWE=0
+        core::ptr::write_volatile(pwpr, 0x80);  // B0WI=1
+    }
+}

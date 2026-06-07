@@ -1,0 +1,657 @@
+---
+source: tests/nrf_ir_roundtrip.rs
+assertion_line: 40
+expression: "&ir"
+---
+version: "0.1"
+chip:
+  name: nRF52840
+  arch: cortex-m4f
+  package: QFN48-6x6
+  pac_crate: nrf52840_pac
+  gpio_ports:
+    - port: 0
+      pin_count: 32
+    - port: 1
+      pin_count: 16
+  memory:
+    - name: flash
+      base: 0
+      size: 1048576
+      access: rx
+    - name: ram
+      base: 536870912
+      size: 262144
+      access: rwx
+    - name: ficr
+      base: 268435456
+      size: 4096
+      access: r
+    - name: uicr
+      base: 268439552
+      size: 4096
+      access: rw
+  clock_tree:
+    hfclk_hz: 64000000
+    lfclk_hz: 32768
+    hfclk_src:
+      - hfxo
+      - hfint
+    lfclk_src:
+      - lfxo
+      - lfrc
+      - lfsynth
+    pclk16m_hz: 16000000
+  peripheral_slots:
+    - slot: 0
+      instances:
+        - spim0
+        - spis0
+        - twim0
+        - twis0
+      base: 1073754112
+      irq: 3
+    - slot: 1
+      instances:
+        - spim1
+        - spis1
+        - twim1
+        - twis1
+      base: 1073758208
+      irq: 4
+    - slot: 2
+      instances:
+        - spim2
+        - spis2
+      base: 1073885184
+      irq: 35
+    - slot: 3
+      instances:
+        - spim3
+      base: 1073934336
+      irq: 47
+  peripherals:
+    uarte0:
+      class: uart
+      instance: uarte0
+      base: 1073750016
+      irq: 2
+      slot: ~
+      enable_val: 8
+      psel:
+        - role: txd
+          direction: out
+        - role: rxd
+          direction: in
+        - role: cts
+          direction: in
+        - role: rts
+          direction: out
+    uarte1:
+      class: uart
+      instance: uarte1
+      base: 1073905664
+      irq: 40
+      slot: ~
+      enable_val: 8
+      psel:
+        - role: txd
+          direction: out
+        - role: rxd
+          direction: in
+        - role: cts
+          direction: in
+        - role: rts
+          direction: out
+    spim0:
+      class: spi
+      instance: spim0
+      base: 0
+      irq: ~
+      slot: 0
+      enable_val: 7
+      psel:
+        - role: sck
+          direction: out
+        - role: mosi
+          direction: out
+        - role: miso
+          direction: in
+    spis0:
+      class: spi_slave
+      instance: spis0
+      base: 0
+      irq: ~
+      slot: 0
+      enable_val: 2
+      psel:
+        - role: sck
+          direction: in
+        - role: mosi
+          direction: in
+        - role: miso
+          direction: out
+        - role: csn
+          direction: in
+    twim0:
+      class: i2c
+      instance: twim0
+      base: 0
+      irq: ~
+      slot: 0
+      enable_val: 6
+      psel:
+        - role: scl
+          direction: inout
+        - role: sda
+          direction: inout
+    twis0:
+      class: i2c_slave
+      instance: twis0
+      base: 0
+      irq: ~
+      slot: 0
+      enable_val: 9
+      psel:
+        - role: scl
+          direction: inout
+        - role: sda
+          direction: inout
+    spim1:
+      class: spi
+      instance: spim1
+      base: 0
+      irq: ~
+      slot: 1
+      enable_val: 7
+      psel:
+        - role: sck
+          direction: out
+        - role: mosi
+          direction: out
+        - role: miso
+          direction: in
+    twim1:
+      class: i2c
+      instance: twim1
+      base: 0
+      irq: ~
+      slot: 1
+      enable_val: 6
+      psel:
+        - role: scl
+          direction: inout
+        - role: sda
+          direction: inout
+    spim2:
+      class: spi
+      instance: spim2
+      base: 0
+      irq: ~
+      slot: 2
+      enable_val: 7
+      psel:
+        - role: sck
+          direction: out
+        - role: mosi
+          direction: out
+        - role: miso
+          direction: in
+    spim3:
+      class: spi
+      instance: spim3
+      base: 0
+      irq: ~
+      slot: 3
+      enable_val: 7
+      psel:
+        - role: sck
+          direction: out
+        - role: mosi
+          direction: out
+        - role: miso
+          direction: in
+        - role: csn
+          direction: out
+    saadc:
+      class: adc
+      instance: saadc
+      base: 1073770496
+      irq: 7
+      slot: ~
+      enable_val: ~
+      psel:
+        - role: ain0
+          direction: in
+        - role: ain1
+          direction: in
+        - role: ain2
+          direction: in
+        - role: ain3
+          direction: in
+        - role: ain4
+          direction: in
+        - role: ain5
+          direction: in
+        - role: ain6
+          direction: in
+        - role: ain7
+          direction: in
+    timer0:
+      class: timer
+      instance: timer0
+      base: 1073774592
+      irq: 8
+      slot: ~
+      enable_val: ~
+      psel: []
+    timer1:
+      class: timer
+      instance: timer1
+      base: 1073778688
+      irq: 9
+      slot: ~
+      enable_val: ~
+      psel: []
+    timer2:
+      class: timer
+      instance: timer2
+      base: 1073782784
+      irq: 10
+      slot: ~
+      enable_val: ~
+      psel: []
+    pwm0:
+      class: pwm
+      instance: pwm0
+      base: 1073856512
+      irq: 28
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: out0
+          direction: out
+        - role: out1
+          direction: out
+        - role: out2
+          direction: out
+        - role: out3
+          direction: out
+    pwm1:
+      class: pwm
+      instance: pwm1
+      base: 1073876992
+      irq: 33
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: out0
+          direction: out
+        - role: out1
+          direction: out
+        - role: out2
+          direction: out
+        - role: out3
+          direction: out
+    pwm2:
+      class: pwm
+      instance: pwm2
+      base: 1073881088
+      irq: 34
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: out0
+          direction: out
+        - role: out1
+          direction: out
+        - role: out2
+          direction: out
+        - role: out3
+          direction: out
+    pwm3:
+      class: pwm
+      instance: pwm3
+      base: 1073926144
+      irq: 45
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: out0
+          direction: out
+        - role: out1
+          direction: out
+        - role: out2
+          direction: out
+        - role: out3
+          direction: out
+    qdec:
+      class: qdec
+      instance: qdec
+      base: 1073815552
+      irq: 18
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: a
+          direction: in
+        - role: b
+          direction: in
+        - role: led
+          direction: out
+    i2s:
+      class: i2s
+      instance: i2s
+      base: 1073893376
+      irq: 37
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: sck
+          direction: out
+        - role: lrck
+          direction: out
+        - role: sdout
+          direction: out
+        - role: sdin
+          direction: in
+        - role: mck
+          direction: out
+    pdm:
+      class: pdm
+      instance: pdm
+      base: 1073860608
+      irq: 29
+      slot: ~
+      enable_val: 1
+      psel:
+        - role: clk
+          direction: out
+        - role: din
+          direction: in
+    usbd:
+      class: usb
+      instance: usbd
+      base: 1073901568
+      irq: 39
+      slot: ~
+      enable_val: ~
+      psel: []
+    qspi:
+      class: qspi
+      instance: qspi
+      base: 1073909760
+      irq: 41
+      slot: ~
+      enable_val: ~
+      psel:
+        - role: sck
+          direction: out
+        - role: csn
+          direction: out
+        - role: io0
+          direction: inout
+        - role: io1
+          direction: inout
+        - role: io2
+          direction: inout
+        - role: io3
+          direction: inout
+board:
+  name: nRF52840-DK
+  chip: nRF52840
+  flash_mb: 1
+  console:
+    peripheral: uarte0
+    baud: 115200
+  pins:
+    - port: 0
+      pin: 6
+      signal: UARTE0_TXD
+      peripheral: uarte0
+      role: txd
+      direction: out
+      label: u0_tx
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 8
+      signal: UARTE0_RXD
+      peripheral: uarte0
+      role: rxd
+      direction: in
+      label: u0_rx
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 5
+      signal: UARTE0_RTS
+      peripheral: uarte0
+      role: rts
+      direction: out
+      label: u0_rts
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 7
+      signal: UARTE0_CTS
+      peripheral: uarte0
+      role: cts
+      direction: in
+      label: u0_cts
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 13
+      signal: LED1
+      peripheral: ~
+      role: ~
+      direction: out
+      label: led1
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 14
+      signal: LED2
+      peripheral: ~
+      role: ~
+      direction: out
+      label: led2
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 15
+      signal: LED3
+      peripheral: ~
+      role: ~
+      direction: out
+      label: led3
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 16
+      signal: LED4
+      peripheral: ~
+      role: ~
+      direction: out
+      label: led4
+      pull: ~
+      drive: ~
+    - port: 0
+      pin: 11
+      signal: BUTTON1
+      peripheral: ~
+      role: ~
+      direction: in
+      label: btn1
+      pull: up
+      drive: ~
+    - port: 0
+      pin: 12
+      signal: BUTTON2
+      peripheral: ~
+      role: ~
+      direction: in
+      label: btn2
+      pull: up
+      drive: ~
+    - port: 0
+      pin: 24
+      signal: BUTTON3
+      peripheral: ~
+      role: ~
+      direction: in
+      label: btn3
+      pull: up
+      drive: ~
+    - port: 0
+      pin: 25
+      signal: BUTTON4
+      peripheral: ~
+      role: ~
+      direction: in
+      label: btn4
+      pull: up
+      drive: ~
+    - port: 0
+      pin: 18
+      signal: RESET
+      peripheral: ~
+      role: ~
+      direction: in
+      label: reset
+      pull: ~
+      drive: ~
+  features:
+    led_count: "4"
+    button_count: "4"
+    has_jlink: "true"
+    has_nfc: "true"
+    has_usb: "true"
+    has_qspi_flash: "true"
+  spi_configs: {}
+  i2c_configs: {}
+clocks:
+  hfclk_hz: 64000000
+  lfclk_hz: 32768
+  hfclk_src: hfxo
+  lfclk_src: lfxo
+pins:
+  - port: 0
+    pin: 6
+    signal: UARTE0_TXD
+    peripheral: uarte0
+    role: txd
+    direction: out
+    label: u0_tx
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 8
+    signal: UARTE0_RXD
+    peripheral: uarte0
+    role: rxd
+    direction: in
+    label: u0_rx
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 5
+    signal: UARTE0_RTS
+    peripheral: uarte0
+    role: rts
+    direction: out
+    label: u0_rts
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 7
+    signal: UARTE0_CTS
+    peripheral: uarte0
+    role: cts
+    direction: in
+    label: u0_cts
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 13
+    signal: LED1
+    peripheral: ~
+    role: ~
+    direction: out
+    label: led1
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 14
+    signal: LED2
+    peripheral: ~
+    role: ~
+    direction: out
+    label: led2
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 15
+    signal: LED3
+    peripheral: ~
+    role: ~
+    direction: out
+    label: led3
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 16
+    signal: LED4
+    peripheral: ~
+    role: ~
+    direction: out
+    label: led4
+    pull: ~
+    drive: ~
+  - port: 0
+    pin: 11
+    signal: BUTTON1
+    peripheral: ~
+    role: ~
+    direction: in
+    label: btn1
+    pull: up
+    drive: ~
+  - port: 0
+    pin: 12
+    signal: BUTTON2
+    peripheral: ~
+    role: ~
+    direction: in
+    label: btn2
+    pull: up
+    drive: ~
+  - port: 0
+    pin: 24
+    signal: BUTTON3
+    peripheral: ~
+    role: ~
+    direction: in
+    label: btn3
+    pull: up
+    drive: ~
+  - port: 0
+    pin: 25
+    signal: BUTTON4
+    peripheral: ~
+    role: ~
+    direction: in
+    label: btn4
+    pull: up
+    drive: ~
+  - port: 0
+    pin: 18
+    signal: RESET
+    peripheral: ~
+    role: ~
+    direction: in
+    label: reset
+    pull: ~
+    drive: ~
+metadata: {}

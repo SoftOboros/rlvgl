@@ -88,7 +88,15 @@ docstring. These crates are published to crates.io and require clear
 documentation for users.
 All files must include a descriptive file header summarizing their purpose.
 
-Run ./scripts/pre-commit.sh and ensure it succeeds before opening a pull request. This script enforces formatting, runs clippy, builds with all features, and verifies documentation generation using nightly.
+Run `./scripts/pre-commit.sh` and ensure it succeeds before opening a pull request.
+This script enforces formatting, runs clippy, builds with all features, and
+verifies documentation generation using nightly.
+
+For changes touching publishable crates, also run the `/pre-publish` skill (or
+the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
+clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all
+pass.  The publish workflow (`scripts/publish_changed.sh`) must also detect the
+changed crates correctly — verify with `DRY_RUN=1 scripts/publish_changed.sh`.
 
 Use `scripts/check-links.sh` to validate Markdown links before committing documentation changes.
 

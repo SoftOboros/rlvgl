@@ -1,0 +1,75 @@
+---
+source: tests/bsp_esp32c3_render.rs
+expression: text
+---
+//! Per-peripheral initialization for ESP32-C3-DevKitM-1.
+//!
+//! Only the peripherals actually used by the board are referenced. The
+//! generator emits real register writes for UART0 (when it is the console),
+//! I2C (full timing setup), SPI master (clock + mode), and timer groups
+//! (watchdog disable). Other peripherals get TODO stubs.
+
+use super::pac;
+
+#[allow(unused_imports)]
+use super::board::{APB_HZ, XTAL_HZ};
+
+/// Initialize every board peripheral in dependency order.
+///
+/// Called by [`crate::pac::init`] after clocks and IO MUX are configured.
+pub fn init() {
+    
+    init_uart0();
+    
+    init_usb_sj();
+    
+}
+
+
+
+
+
+/// Bring up UART0 as the console at 115200 baud, 8N1.
+///
+/// Clock divider is computed from `APB_HZ` (80000000 Hz) and
+/// the console baud rate (115200 baud).
+pub fn init_uart0() {
+    let p = unsafe { pac::Peripherals::steal() };
+    const BAUD: u32 = 115200;
+    // UART0 CLKDIV on ESP32-C3 is Q20.4 fixed point: integer part in bits
+    // [19:0], fractional part in bits [23:20]. Compute `(APB << 4) / BAUD`,
+    // then write the integer and fractional halves as raw register bits to
+    // sidestep field-width type errors in svd2rust 0.31.
+    let clkdiv: u32 = (APB_HZ << 4) / BAUD;
+    let integer = clkdiv >> 4;
+    let frag = clkdiv & 0xF;
+    p.UART0
+        .clkdiv()
+        .write(|w| unsafe { w.bits((integer & 0xF_FFFF) | (frag << 20)) });
+    // 8 data bits, no parity, 1 stop bit.
+    p.UART0.conf0().modify(|_, w| unsafe {
+        w.bit_num().bits(0b11) // 8 data bits
+         .parity_en().clear_bit()
+         .stop_bit_num().bits(0b01) // 1 stop bit
+    });
+    // Reset FIFOs. Skipping the TX-idle poll: C3's UART0_STATUS layout
+    // differs across PAC revisions and the FIFO reset alone is enough for
+    // a cold bring-up.
+    p.UART0.conf0().modify(|_, w| w.rxfifo_rst().set_bit().txfifo_rst().set_bit());
+    p.UART0.conf0().modify(|_, w| w.rxfifo_rst().clear_bit().txfifo_rst().clear_bit());
+}
+
+
+
+
+
+
+
+/// TODO: initialize usb_sj (class `usb_serial_jtag`, base 1610887168).
+///
+/// Populate this function by writing into the `esp32c3::USB_SJ`
+/// register block. Clock gating is already done by `crate::clocks::init`.
+pub fn init_usb_sj() {
+    let _ = unsafe { pac::Peripherals::steal() };
+    // TODO: usb_serial_jtag init sequence for usb_sj
+}

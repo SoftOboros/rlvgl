@@ -132,13 +132,14 @@ impl Sai1Audio {
     pub fn enable_clock(&self, clock_source: u8) {
         unsafe {
             // Enable SAI1 in APB2ENR (bit 22)
-            let apb2 = RCC_APB2ENR as *mut u32;
+            // RCC clock-gate access — covered by a future typed Rcc handle.
+            let apb2 = RCC_APB2ENR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             apb2.write_volatile(apb2.read_volatile() | (1 << 22));
             // Readback fence
-            let _ = (apb2 as *const u32).read_volatile();
+            let _ = (apb2 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_mmio_cast)
 
             // Set SAI1SEL in D2CCIP1R[2:0]
-            let d2ccip1r = RCC_D2CCIP1R as *mut u32;
+            let d2ccip1r = RCC_D2CCIP1R as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             let val = d2ccip1r.read_volatile();
             d2ccip1r.write_volatile((val & !0b111) | ((clock_source as u32) & 0b111));
         }
@@ -332,6 +333,11 @@ impl Sai1Audio {
 
     #[inline(always)]
     unsafe fn reg(&self, offset: u32) -> *mut u32 {
-        (self.base + offset) as *mut u32
+        // SAI peripheral has a complex multi-sub-block layout (3 SAIs ×
+        // 2 sub-blocks + global control + PDM). The base+offset helper
+        // is the existing abstraction; a full `#[repr(C)] SaiRegs`
+        // would require modelling all sub-blocks. Deferred — opt-out
+        // marker documents the trade-off.
+        (self.base + offset) as *mut u32 // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
     }
 }

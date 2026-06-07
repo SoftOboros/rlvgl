@@ -261,6 +261,7 @@ impl Application for DemoApp {
                         children.push(WidgetNode {
                             widget: qr_button,
                             children: Vec::new(),
+                            tag: None,
                         });
                     }
 
@@ -297,6 +298,7 @@ impl Application for DemoApp {
                         children.push(WidgetNode {
                             widget: png_button,
                             children: Vec::new(),
+                            tag: None,
                         });
                     }
 
@@ -333,6 +335,7 @@ impl Application for DemoApp {
                         children.push(WidgetNode {
                             widget: gif_button,
                             children: Vec::new(),
+                            tag: None,
                         });
                     }
 
@@ -369,12 +372,14 @@ impl Application for DemoApp {
                         children.push(WidgetNode {
                             widget: jpeg_button,
                             children: Vec::new(),
+                            tag: None,
                         });
                     }
 
                     let menu = WidgetNode {
                         widget: menu_w.clone(),
                         children,
+                        tag: None,
                     };
                     menu_ref.borrow_mut().replace(menu_w);
                     pending_add.borrow_mut().push(menu);
@@ -393,16 +398,20 @@ impl Application for DemoApp {
                 WidgetNode {
                     widget: Rc::new(RefCell::new(label)),
                     children: Vec::new(),
+                    tag: None,
                 },
                 WidgetNode {
                     widget: button.clone(),
                     children: Vec::new(),
+                    tag: None,
                 },
                 WidgetNode {
                     widget: plugins.clone(),
                     children: Vec::new(),
+                    tag: None,
                 },
             ],
+            tag: None,
         }
     }
 
@@ -494,6 +503,7 @@ pub fn build_plugin_demo(root_w: u32, root_h: u32) -> WidgetNode {
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -542,6 +552,7 @@ pub fn build_png_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -602,6 +613,7 @@ pub fn build_gif_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNode
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 
@@ -658,6 +670,7 @@ pub fn build_jpeg_demo_scaled(scale: f32, root_w: u32, root_h: u32) -> WidgetNod
             pixels,
         ))),
         children: Vec::new(),
+        tag: None,
     }
 }
 

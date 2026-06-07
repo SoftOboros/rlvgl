@@ -256,10 +256,10 @@ fn infer_core_assignments(kv: &HashMap<String, String>, ir: &mut Ir) {
         }
     }
     // Clock init core via explicit hint if present
-    if ir.clocks.init_by.is_none() {
-        if let Some(v) = kv.get("RCC.InitBy") {
-            ir.clocks.init_by = parse_core_token(v);
-        }
+    if ir.clocks.init_by.is_none()
+        && let Some(v) = kv.get("RCC.InitBy")
+    {
+        ir.clocks.init_by = parse_core_token(v);
     }
     // Project flags heuristic: if only one core project is enabled, prefer that
     if ir.clocks.init_by.is_none() {

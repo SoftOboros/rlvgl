@@ -1,0 +1,10 @@
+//! Top-level PAC bring-up for {{ ir.board.name }}.
+//!
+//! Calls clock gating, IOMUX pad routing, and peripheral init in order.
+
+/// Initialize the board: clock gates, IOMUX, then peripherals.
+pub fn init() {
+    super::clocks::init();
+    super::iomux::init();
+    super::peripherals::init();
+}

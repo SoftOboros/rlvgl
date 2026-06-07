@@ -1,5 +1,6 @@
 //! Driver for the ST7789 LCD controller.
 use crate::display::DisplayDriver;
+use crate::screen::Screen;
 use display_interface::{DataFormat, DisplayError, WriteOnlyDataCommand};
 use display_interface_spi::SPIInterface;
 use embedded_hal::digital::OutputPin;
@@ -56,6 +57,9 @@ where
     SPI: SpiDevice,
     DC: OutputPin,
 {
+    fn screen(&self) -> Screen {
+        Screen::landscape(self.width as u32, self.height as u32)
+    }
     /// Write a pixel buffer to the display at the given rectangle.
     fn flush(&mut self, area: Rect, colors: &[Color]) {
         if let Ok(()) = self.set_window(area) {

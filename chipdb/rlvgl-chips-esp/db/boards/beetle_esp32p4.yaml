@@ -1,0 +1,112 @@
+# DFR1172 FireBeetle 2 ESP32-P4 board IR (P4 primary chip side).
+#
+# DFRobot FireBeetle 2 ESP32-P4 AI Vision Board (SKU DFR1172) — a dual-chip
+# board with ESP32-P4 (main processor, MIPI DSI, I2C, PSRAM) and ESP32-C6
+# (WiFi 6 / BLE / Zigbee / Thread companion coprocessor).
+#
+# This YAML targets the P4 side. The C6 runs its own firmware and is
+# reached via an inter-chip bus (SDIO or SPI — exact GPIO pins TBD from
+# schematic). The MIPI DSI PHY lanes are dedicated chip pins (35-40),
+# NOT part of the GPIO matrix.
+#
+# The DFR1237 IO-expansion shield exposes a Pi-style DSI FFC connector
+# wired to the same DSI lanes, plus the I2C bus on GPIO7/GPIO8 for the
+# Pi-DSI bridge + capacitive touch.
+#
+# Source:
+#   - DFR1172 datasheet v1.0          (memalpha doc 269)
+#   - DFR1172 wiki                    (memalpha doc 271)
+#   - DFR1237 IO-expansion schematic  (memalpha doc 427)
+#   - DFR0550-V2 schematic            (memalpha doc 428)
+#   - DFR0550-V2 wiki                 (memalpha doc 537)
+#   - Pi-7"-Atmel-bridge protocol:    Linux kernel
+#       drivers/gpu/drm/panel/panel-raspberrypi-touchscreen.c
+#   - I2C pin assignment verified by bus scan 2026-04-29 (memory:
+#       project_dfr1237_dfr0550v2.md)
+#   - DSI parameters verified by IDF first-light scratch project
+#       /tmp/dfr_bringup/dfr0550_first_light/ on 2026-04-29
+#
+# GPIO assignments tagged TODO(schematic) need verification from the
+# DFR1172 schematic v1.0 (doc 270, a single-page PDF not RAG-extractable).
+
+name: DFR1172 FireBeetle 2 P4
+chip: ESP32-P4
+module: DFR1172
+flash_mb: 16
+psram_mb: 32   # 32 MB octal HEX PSRAM in-package on ESP32-P4R32
+
+console:
+  peripheral: usb_sj
+  baud: 115200
+
+pins:
+  # GPIO assignments from beetle-esp32p4/src/main.rs TODO(TRM) list.
+  # Exact numbers need schematic verification.
+  - { gpio: 3,  signal: LED,       direction: out,   label: led }           # TODO(schematic)
+  - { gpio: 35, signal: BOOT,      direction: in,    label: boot_btn, pull: up } # TODO(schematic) — strap pin, plausible
+
+  # I2C0 to the DFR1237 IO-expansion shield's Pi-DSI bridge (DFR0550-V2).
+  # Verified 2026-04-29 by multi-pin scan: SCL=GPIO8, SDA=GPIO7.
+  # The bus carries TWO independent slaves on the FFC:
+  #   - 0x45 = Pi-7"-Atmel-bridge (DFR0550's STM32F072 emulating ATTINY88)
+  #   - 0x38 = FocalTech FT5x06/FT6x36 capacitive touch (direct on FFC)
+  - { gpio: 8,  signal: I2C0_SCL,  peripheral: i2c0, direction: inout, label: dsi_bridge_scl, pull: up }
+  - { gpio: 7,  signal: I2C0_SDA,  peripheral: i2c0, direction: inout, label: dsi_bridge_sda, pull: up }
+
+i2c_configs:
+  i2c0:
+    # Pi-7"-Atmel-bridge spec is standard-mode 100 kHz; FT5x06 also runs
+    # happily at 100 kHz. Bump to 400 kHz only after validating bridge.
+    scl_hz: 100000
+
+features:
+  companion_chip: esp32c6
+
+  # MIPI-DSI panel: DFR0550-V2 5" 800x480 IPS via Pi-style DSI FFC.
+  # The on-panel STM32F072 bridges DSI -> RGB-TTL 24-bit to the actual TFT
+  # and exposes the Pi-7" Atmel-bridge protocol at I2C 0x45.
+  dsi_panel: dfr0550_v2_800x480
+  dsi_panel_size_in: "5.0"
+  dsi_panel_h_res: 800
+  dsi_panel_v_res: 480
+
+  # Verified working DSI parameters (2026-04-29):
+  #   1 data lane @ 750 Mbps, 26 MHz pixel clock, RGB888 in/out.
+  # Pi 7" Touchscreen v1 timing: HFP=1, HSA=2, HBP=46, VFP=7, VSA=2, VBP=21.
+  dsi_lanes: 1
+  dsi_lane_mbps: 750
+  dsi_pixel_clk_mhz: 26
+  dsi_pixel_format: rgb888
+  dsi_dphy_ldo_chan: 3
+  dsi_dphy_ldo_mv: 2500
+  dsi_h_front_porch: 1
+  dsi_h_sync: 2
+  dsi_h_back_porch: 46
+  dsi_v_front_porch: 7
+  dsi_v_sync: 2
+  dsi_v_back_porch: 21
+
+  # DSI lane chip-pin assignments (dedicated PHY pins, not GPIO matrix).
+  dsi_clk_n_pin: chip_pin_37
+  dsi_clk_p_pin: chip_pin_38
+  dsi_data0_p_pin: chip_pin_39
+  dsi_data0_n_pin: chip_pin_40
+  dsi_data1_p_pin: chip_pin_35   # unused at 1-lane operation
+  dsi_data1_n_pin: chip_pin_36   # unused at 1-lane operation
+
+  # Pi-7"-Atmel-bridge wake protocol on I2C bus carrying the DSI FFC.
+  dsi_bridge_address: "0x45"
+  dsi_bridge_protocol: pi7_atmel
+  dsi_bridge_porta_value: "0x04"   # kernel "match closed-source firmware orientation"
+
+  # Capacitive touch (5-point) directly on the FFC's I2C bus.
+  touch_controller: ft5x06
+  touch_address: "0x38"
+  touch_bus: i2c0
+
+  led: gpio3
+  boot_button: gpio35
+  console: usb_sj
+  psram_mode: octal_hex
+  psram_speed_mhz: 200
+  flash_mode: qio

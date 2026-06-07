@@ -1,0 +1,69 @@
+# DFRobot FireBeetle Board-ESP32 (SKU: DFR0478)
+#
+# Classic ESP32 board with the richest peripheral breakout of any DFRobot
+# board: SPI, I2C, I2S, UART, ADC (8+3 channels), DAC, touch sensors.
+# Ultra-low power (10 µA deep sleep), onboard LiPo battery charging.
+#
+# Source: DFR0478 datasheet v1.0 (memalpha doc 324), schematic.
+# GPIO assignments from the DFR0478 datasheet pin diagram.
+
+name: DFR0478 FireBeetle ESP32
+chip: ESP32
+module: ESP32-WROOM-32E
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 console
+  - { gpio: 1,  signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 3,  signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  # SPI bus (VSPI default)
+  - { gpio: 18, signal: SPI3_SCK,  peripheral: spi3, direction: out, label: sck }
+  - { gpio: 23, signal: SPI3_MOSI, peripheral: spi3, direction: out, label: mosi }
+  - { gpio: 19, signal: SPI3_MISO, peripheral: spi3, direction: in,  label: miso }
+  # I2C bus
+  - { gpio: 21, signal: I2C0_SDA, peripheral: i2c0, direction: inout, label: sda, pull: up }
+  - { gpio: 22, signal: I2C0_SCL, peripheral: i2c0, direction: inout, label: scl, pull: up }
+  # I2S bus
+  - { gpio: 14, signal: I2S0_BCLK, peripheral: i2s0, direction: out, label: bclk }
+  - { gpio: 12, signal: I2S0_MCLK, peripheral: i2s0, direction: out, label: mclk }
+  - { gpio: 4,  signal: I2S0_DOUT, peripheral: i2s0, direction: out, label: i2s_do }
+  - { gpio: 16, signal: I2S0_DIN,  peripheral: i2s0, direction: in,  label: i2s_di }
+  - { gpio: 17, signal: I2S0_LRCK, peripheral: i2s0, direction: out, label: lrck }
+  # ADC1 analog inputs (input-only pins)
+  - { gpio: 36, signal: ADC1_CH0, direction: in, label: vp }
+  - { gpio: 39, signal: ADC1_CH3, direction: in, label: vn }
+  - { gpio: 34, signal: ADC1_CH6, direction: in, label: a6 }
+  - { gpio: 35, signal: ADC1_CH7, direction: in, label: a7 }
+  # ADC1 bidirectional pins
+  - { gpio: 32, signal: ADC1_CH4, direction: inout, label: a4 }
+  - { gpio: 33, signal: ADC1_CH5, direction: inout, label: a5 }
+  # ADC2 + DAC pins
+  - { gpio: 25, signal: DAC1,     direction: out,   label: dac1 }
+  - { gpio: 26, signal: DAC2,     direction: out,   label: dac2 }
+  - { gpio: 27, signal: ADC2_CH7, direction: inout,  label: a27 }
+  # Digital GPIO (active low LED on DFR0478)
+  - { gpio: 2,  signal: LED,      direction: out,   label: led }
+  # General-purpose digital
+  - { gpio: 0,  signal: BOOT,     direction: in,    label: boot_btn }
+  - { gpio: 15, signal: GPIO,     direction: inout,  label: d15 }
+
+i2c_configs:
+  i2c0:
+    scl_hz: 400000
+
+features:
+  vendor: dfrobot
+  sku: DFR0478
+  battery: lipo_1s
+  low_power_ua: 10
+  wifi: wifi_bgn
+  bluetooth: ble_classic_42
+  adc1_channels: 8
+  adc2_channels: 10
+  dac_channels: 2
+  touch_channels: 10

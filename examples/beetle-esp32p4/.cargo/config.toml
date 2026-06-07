@@ -1,0 +1,11 @@
+[build]
+target = "riscv32imafc-unknown-none-elf"
+
+[target.riscv32imafc-unknown-none-elf]
+runner = "espflash flash --monitor --chip esp32p4 --ignore-app-descriptor"
+# Linker scripts are emitted by build.rs (-Tlink.x -Tesp32_p4.x). Do not
+# duplicate them here — adding -Tlink.x twice or -Tmemory.x explicitly
+# breaks REGION_TEXT/_stext overrides applied by esp32_p4.x.
+
+[unstable]
+build-std = ["core"]

@@ -1,0 +1,11 @@
+error[E0499]: cannot borrow `back` as mutable more than once at a time
+  --> tests/ui/inflight_cpu_access.rs:29:27
+   |
+25 |     let dst = back.dma_dst();
+   |               ---- first mutable borrow occurs here
+...
+29 |     let _slice = unsafe { back.cpu_slice() };
+   |                           ^^^^ second mutable borrow occurs here
+30 |     // Force NLL to keep `dst` alive past `cpu_slice()`.
+31 |     let _ = dst.dma_addr();
+   |             --- first borrow later used here

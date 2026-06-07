@@ -1,0 +1,19 @@
+# ESP32-S2 minimal board for BSP generator validation.
+#
+# No devkit schematic available in memalpha. Minimal pin
+# assignments sufficient to exercise the render pipeline.
+
+name: ESP32-S2 Minimal
+chip: ESP32-S2
+module: null
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  - { gpio: 43, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 44, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  - { gpio: 0,  signal: BOOT,     direction: in,                     label: boot_btn }

@@ -1,0 +1,45 @@
+---
+source: tests/bsp_esp32c3_render.rs
+expression: text
+---
+//! Clock tree initialization for ESP32-C3-DevKitM-1.
+//!
+//! Peripheral clock gating and reset on ESP32-C3 are controlled via
+//! per-peripheral gate registers. To bring up a peripheral this file:
+//!
+//! 1. Asserts reset,
+//! 2. Enables the clock gate,
+//! 3. Releases reset.
+//!
+//! CPU frequency selection against the PLL is handled by the bootrom; this
+//! code does not currently reprogram the CPU clock. See `pac.rs` for the
+//! constants.
+
+use super::pac;
+
+/// Enable and reset every peripheral used by this board.
+///
+/// Called by [`crate::pac::init`] as the first bring-up step, before IO MUX
+/// configuration so that peripheral registers are writable.
+pub fn init() {
+    let p = unsafe { pac::Peripherals::steal() };
+    
+    
+    
+    // uart0 — clock enable uart_clk_en, reset uart_rst
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.uart_rst().set_bit());
+    p.SYSTEM.perip_clk_en0().modify(|_, w| w.uart_clk_en().set_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.uart_rst().clear_bit());
+    
+    
+    
+    
+    
+    // usb_sj — clock enable usb_device_clk_en, reset usb_device_rst
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().set_bit());
+    p.SYSTEM.perip_clk_en0().modify(|_, w| w.usb_device_clk_en().set_bit());
+    p.SYSTEM.perip_rst_en0().modify(|_, w| w.usb_device_rst().clear_bit());
+    
+    
+    
+}

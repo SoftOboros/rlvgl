@@ -1,0 +1,10 @@
+error[E0499]: cannot borrow `buf` as mutable more than once at a time
+  --> tests/ui/dca_double_lend.rs:20:17
+   |
+17 |     let cpu_a = buf.cpu();
+   |                 --- first mutable borrow occurs here
+...
+20 |     let cpu_b = buf.cpu();
+   |                 ^^^ second mutable borrow occurs here
+21 |     let _ = cpu_a.lend_for_read(&mut ctx);
+   |             ----- first borrow later used here

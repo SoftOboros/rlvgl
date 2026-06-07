@@ -1,0 +1,55 @@
+# Stress variant of the ESP32-C5 Minimal board for compile-verify
+# regression of non-UART0 peripherals on esp32c5 0.2 (svd2rust 0.37+).
+#
+# Purpose (CHIPS-ESP-10a): same rationale as the C6/H2 stress boards —
+# exercise the cluster-path conversion across multiple PCR system-gate
+# entries beyond UART0. The stress board uses I2C0 + TIMG0 + LEDC.
+#
+# CHIPS-ESP-12a (2026-05-16) made the SPI2 init template vintage-agnostic
+# (byte order moved off USER → bit order on CTRL), so this stress board
+# also pulls SPI2 alongside the other peripherals.
+#
+# CHIPS-ESP-10w (2026-05-16) populated `peripherals.spi2.signals` in the
+# C5 chip yaml from the C5 datasheet v1.2 Table 2-3 (FSPI = SPI2 on
+# GPIO6/7/2/10/4/5 = sck/mosi/miso/cs0/hd/wp, all F2). SPI2 pins on this
+# stress board are now routed via the IO MUX fast path (matches the C6
+# stress pattern); TIMG0 moved off GPIO6 to GPIO9 to free the SCK pin.
+
+name: ESP32-C5 Stress
+chip: ESP32-C5
+module: null
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: uart0
+  baud: 115200
+
+pins:
+  # UART0 console (matches esp32c5_minimal.yaml)
+  - { gpio: 16, signal: UART0_TX, peripheral: uart0, direction: out, label: u0_txd }
+  - { gpio: 17, signal: UART0_RX, peripheral: uart0, direction: in,  label: u0_rxd }
+  # I2C0 — SCL/SDA via GPIO matrix
+  - { gpio: 22, signal: I2C0_SCL, peripheral: i2c0,  direction: inout, label: scl }
+  - { gpio: 23, signal: I2C0_SDA, peripheral: i2c0,  direction: inout, label: sda }
+  # SPI2 — IO MUX fast-path pins per C5 chipdb signals[] populated by
+  # CHIPS-ESP-10w (GPIO6/7/2 = sck/mosi/miso, function slot 2). Exercises
+  # the direct-route emission in io_mux.rs against the real esp32c5 PAC.
+  - { gpio: 6,  signal: SPI2_SCK,  peripheral: spi2, direction: out, label: sck  }
+  - { gpio: 7,  signal: SPI2_MOSI, peripheral: spi2, direction: out, label: mosi }
+  - { gpio: 2,  signal: SPI2_MISO, peripheral: spi2, direction: in,  label: miso }
+  # TIMG0 — no external pin signal; pin route lands as Plain GPIO but
+  # the `peripherals_used` set still pulls TIMG0 in, exercising
+  # `pcr.timergroup(0).conf()` cluster paths. Moved off GPIO6 to free
+  # the SPI2 IO MUX fast path.
+  - { gpio: 9,  signal: TIMG0_PULSE, peripheral: timg0, direction: out, label: timg_pulse }
+  # LEDC channel 0 — GPIO matrix signal 0
+  - { gpio: 10, signal: LEDC_CH0,  peripheral: ledc, direction: out, label: led }
+
+i2c_configs:
+  i2c0:
+    scl_hz: 400000  # Standard fast-mode I2C — required for template render
+
+features:
+  role: stress_test
+  scope: compile_verify

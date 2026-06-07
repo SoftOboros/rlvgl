@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-widgets"
-version = "0.1.6"
+version = "0.2.0"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -14,8 +14,12 @@ categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
 [dependencies]
-rlvgl-core = { version = "0.1.7", path = "../core", default-features = false }
+rlvgl-core = { version = "0.2.0", path = "../core", default-features = false }
+rlvgl-platform = { version = "0.2.0", path = "../platform", default-features = false }
+rlvgl-audio-meters-core = { version = "0.2.0", path = "../audio-meters-core", default-features = false }
+libm = { version = "0.2", default-features = false }
 
 [dev-dependencies]
-rlvgl-platform = { version = "0.1.6", path = "../platform" }
 rand = "0.9.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

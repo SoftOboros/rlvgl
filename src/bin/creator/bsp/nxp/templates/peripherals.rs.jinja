@@ -1,0 +1,81 @@
+//! Per-peripheral initialization for {{ ir.board.name }}.
+//!
+//! Enables and configures each peripheral used by the board.
+//! IOMUX pin routing is done in `iomux.rs`; this module handles the
+//! peripheral-internal configuration (baud rate, clock frequency, etc.).
+
+/// Initialize every board peripheral in dependency order.
+pub fn init() {
+    {% for name in peripherals_used %}
+    init_{{ name }}();
+    {% endfor %}
+}
+
+{% for name in peripherals_used %}
+{% if ir.chip.peripherals[name] is defined %}
+{% set periph = ir.chip.peripherals[name] %}
+
+{% if periph.class == "uart" %}
+/// Initialize {{ name | upper }} as console at {{ ir.board.console.baud }} baud.
+pub fn init_{{ name }}() {
+    let base = {{ periph.base }}u32 as *mut u32;
+    unsafe {
+        // Disable UART before configuration (CTRL register offset 0x18).
+        let ctrl = base.byte_add(0x18);
+        core::ptr::write_volatile(ctrl, 0);
+
+        // Set baud rate: BAUD register at offset 0x10.
+        // OSR=15 (16x oversampling), SBR = IPG_HZ / (baud * (OSR+1))
+        let sbr = super::clocks::IPG_HZ / ({{ ir.board.console.baud }} * 16);
+        let baud = base.byte_add(0x10);
+        core::ptr::write_volatile(baud, (15 << 24) | (sbr & 0x1FFF));
+
+        // Enable TX and RX (CTRL.TE=1, CTRL.RE=1).
+        core::ptr::write_volatile(ctrl, (1 << 19) | (1 << 18));
+    }
+}
+{% elif periph.class == "i2c" %}
+/// Initialize {{ name | upper }} as I2C master.
+pub fn init_{{ name }}() {
+    let base = {{ periph.base }}u32 as *mut u32;
+    unsafe {
+        // Reset master (MCR offset 0x10, bit 1 = RST).
+        let mcr = base.byte_add(0x10);
+        core::ptr::write_volatile(mcr, 1 << 1);
+        // Wait for reset to clear.
+        while core::ptr::read_volatile(mcr) & (1 << 1) != 0 {}
+
+        {% if ir.board.i2c_configs[name] is defined %}
+        // Configure clock: MCCR0 at offset 0x48.
+        // CLKHI/CLKLO for ~{{ ir.board.i2c_configs[name].scl_hz }} Hz from IPG clock.
+        let prescale = 1u32; // PRESCALE = 0 (div by 1)
+        let clk_lo = super::clocks::IPG_HZ / ({{ ir.board.i2c_configs[name].scl_hz }} * 2 * (prescale + 1));
+        let clk_hi = clk_lo;
+        let mccr0 = base.byte_add(0x48);
+        core::ptr::write_volatile(mccr0, (clk_hi << 8) | clk_lo);
+        {% endif %}
+
+        // Enable master (MCR.MEN = bit 0).
+        core::ptr::write_volatile(mcr, 1);
+    }
+}
+{% elif periph.class == "sdmmc" %}
+/// Initialize {{ name | upper }} (SD/MMC).
+pub fn init_{{ name }}() {
+    // TODO: USDHC initialization — set initial clock divider,
+    // bus width, and card detect.
+}
+{% elif periph.class == "display" %}
+/// Initialize {{ name | upper }} (LCD interface).
+pub fn init_{{ name }}() {
+    // TODO: LCDIF initialization — configure timing, pixel format,
+    // and framebuffer base address.
+}
+{% else %}
+/// Initialize {{ name }}.
+pub fn init_{{ name }}() {
+    // TODO: {{ periph.class }} peripheral initialization.
+}
+{% endif %}
+{% endif %}
+{% endfor %}

@@ -1,0 +1,16 @@
+{
+  "name": "@softoboros/rlvgl-playit-node",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Node automation helper for the rlvgl disco simulator playit socket.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

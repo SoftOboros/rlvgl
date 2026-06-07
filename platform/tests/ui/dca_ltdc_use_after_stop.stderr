@@ -1,0 +1,16 @@
+error[E0382]: borrow of moved value: `scan`
+  --> tests/ui/dca_ltdc_use_after_stop.rs:22:18
+   |
+18 |     let mut scan = cpu.start_ltdc_scan(&mut ctx);
+   |         -------- move occurs because `scan` has type `LtdcScan<'_, u8, 64>`, which does not implement the `Copy` trait
+19 |     let _cpu_back = scan.stop_scan(&mut ctx);
+   |                          ------------------- `scan` moved due to this method call
+...
+22 |     let _slice = scan.paint_full();
+   |                  ^^^^ value borrowed here after move
+   |
+note: `LtdcScan::<'a, T, N>::stop_scan` takes ownership of the receiver `self`, which moves `scan`
+  --> src/hwcore/dca.rs
+   |
+   |     pub fn stop_scan<C: DcaCache>(self, ctx: &mut DcaCacheCtx<'_, C>) -> Cpu<'a, T, N> {
+   |                                   ^^^^

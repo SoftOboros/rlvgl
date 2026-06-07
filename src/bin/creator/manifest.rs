@@ -62,17 +62,13 @@ pub(crate) struct Naming {
 /// Case policy for generated names.
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub(crate) enum Case {
     /// `SCREAMING_SNAKE` case.
+    #[default]
     ScreamingSnake,
     /// `snake_case`.
     Snake,
-}
-
-impl Default for Case {
-    fn default() -> Self {
-        Case::ScreamingSnake
-    }
 }
 
 /// Handling mode for Lottie animation assets.
