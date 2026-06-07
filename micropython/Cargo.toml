@@ -2,9 +2,12 @@
 name = "rlvgl-micropython"
 version = "0.2.0"
 edition = "2024"
-authors = ["Ira Abbott <ira@softobotos.com>"]
+authors = ["Ira Abbott <ira@softoboros.com>"]
 license = "MIT"
 description = "MicroPython bindings for rlvgl"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-micropython"
 
 [lib]
 path = "src/lib.rs"
@@ -15,4 +18,3 @@ rlvgl-api = { path = "../api", version = "0.2.0" }
 [features]
 default = []
 stm32h747i_disco = []
-

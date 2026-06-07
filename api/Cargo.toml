@@ -2,9 +2,12 @@
 name = "rlvgl-api"
 version = "0.2.0"
 edition = "2024"
-authors = ["Ira Abbott <ira@softobotos.com>"]
+authors = ["Ira Abbott <ira@softoboros.com>"]
 license = "MIT"
 description = "Shared API types for rlvgl bindings"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-api"
 
 [lib]
 path = "src/lib.rs"
@@ -17,4 +20,3 @@ micropython = []
 cpython = []
 cm4 = []
 sim = []
-

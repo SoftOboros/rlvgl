@@ -1,12 +1,13 @@
 [package]
 name = "rlvgl-fs-sim"
 version = "0.2.0"
-authors = ["Ira Abbott <ira@softobotos.com>"]
+authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
 description = "Simulator block device using a host file disk image."
 repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-fs-sim"
 
 [dependencies]
 rlvgl-core = { path = "../core", version = "0.2.0", default-features = false, features = ["fs"] }
