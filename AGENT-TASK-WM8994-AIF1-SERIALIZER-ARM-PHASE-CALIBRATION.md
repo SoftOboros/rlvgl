@@ -536,3 +536,70 @@ This narrows the remaining ADC-side root-cause candidates to:
 - **H2b** — decimation-chain config issue (R0x410 bit 12 semantic, R0x300 b14/b15 AIF1ADCR/L_SRC routing, R0x210 AIF1CLK_RATE expected value for our config). Vendor-side memalpha + possible code change.
 
 Bench-side has exhausted what it can do without an rlvgl-side revision. Both H2a and H2b are vendor-side decisions. Recommend the rlvgl thread pick the cheaper of the two to test first (H2a probably, as it follows the H0 reordering principle that's already proven its mechanism on the DAC side).
+
+## Round-3 (2026-06-07, disco-analyzer bench) — bi-directional confirmation + caller-supplied-stimulus harness validated
+
+This round closes the §2 design loop: the "caller-supplied stimulus + capture" architecture (Consequences #3) is now **physically realized and proven** on disco-analyzer, the **DAC side is confirmed to need the same calibration** (not just H0), and we have **real captured N-vectors** to drive the platform-side N-detector unit tests.
+
+### R3.1 — The DAC and ADC corruption are one root cause (mono test rules out L/R coding)
+
+disco-analyzer added a CM4 mono stimulus (`stimulus_mode == 2` → identical L==R==1 kHz on both AIF1 slots; two-tone `== 1` stays L=500 Hz / R=1 kHz). With the **H0-clean DAC build** (rlvgl branch `audio-01-d-h0-serializer-arm-reorder`) flashed and the mono tone played:
+
+- TX bank verified clean mono (identical L/R pairs).
+- Operator scoped the DAC analog output: **1 kHz fundamental present on both channels, buried in HF hash, not a discernible sine.**
+
+Because identical L/R still hashes, an L/R interleave / slot-swap fault is **ruled out** (it would scope clean under mono). The DAC carries the ERRATA-009 "recognizable tone + HF hash" signature **despite H0** — i.e. H0's deferral reduced but did not eliminate the DAC-side arm-phase race. Combined with the ADC results below, this confirms the task's bi-directional framing: **AIF1ADC1 and AIF1DAC1 are the two directions of one arm-phase root cause**, and the calibration (arm → detect → re-arm) is required on **both**, not deferral alone.
+
+### R3.2 — Caller-supplied-stimulus capture channel is built and proven (validates Consequences #1, #3)
+
+The §2 findings concluded detection cannot be headless and must be caller-supplied. disco-analyzer now provides exactly that channel:
+
+- **Stimulus source:** CM4 synthesises a known tone into the AIF1DAC1 TX bank (`stimulus_mode`: 1 = L500/R1k two-tone for slot-mapping checks, 2 = mono-1k for pure serializer-phase checks).
+- **Loopback:** an external physical wire from the codec line/HP output back into line-in carries the DAC analog output into the ADC — closing DAC→analog→ADC so a single capture exercises both serializers.
+- **Capture + display path:** a new CM7 control word `DISPLAY_SHOW_INPUT` (`0x3800_2078`) decouples the scope/FFT display source from the TX synth, so the **real captured ADC samples** (raw SAI1 RX `0x3000_0000`, or the `linein_pool` blocks at `0x3800_E000`) are observable while the synth plays. probe-rs reads the raw RX directly — upstream of the pool/cross-core/display.
+
+This is the concrete instantiation of the design's "downstream consumer owns stimulus + capture; platform owns N-detection arithmetic + re-arm action." The platform's `calibrate_aif1_serializer_arm_phase(stimulus: Some(...))` path now has a real consumer that can feed `(known_stimulus, captured_samples)` and apply the re-arm toggle in a loop.
+
+### R3.3 — Real N-vectors for the platform-side N-detector unit tests
+
+Captured raw SAI1 RX (256 stereo frames, 48 kHz), **H0-clean DAC source**, two boots that armed at different N — concrete fixtures for the host-testable detector arithmetic (§3 `SerializerArmOutcome`):
+
+| Boot | Arm phase | pk-pk | RMS | adj. \|Δ\|>16k | sign-flip | low-byte pattern | DFT |
+|---|---|---|---|---|---|---|---|
+| warm reset | **N≈10–15 (byte-stuck)** | ~8,000 | ~1,470 | 0/255 | 73–76% | low byte stuck `00`/`ff` (~8 eff. bits) | no tone; energy 15–21 kHz |
+| cold boot | **N≈−1 (2× wrap)** | ~64,800 | ~18,300 | ~140/255 | 63–67% | full-range | no tone; sigfrac 0.02–0.06 |
+| *(target)* | **N=0 (clean)** | ≈ 2× synth amplitude | ≈ synth RMS | 0/255 | low (≈ tone) | full 16-bit, smooth | single peak at stimulus freq, signal-bin fraction → 1 |
+
+Detector discriminators (all computable host-side on a captured `[i16; N]` vs the known stimulus, no codec/datasheet dependency):
+
+1. **Adjacent-jump count** `|x[i+1]−x[i]| > 0x4000` → high = 2× overflow-wrap (N≈−1).
+2. **Low-byte stuck rate** (fraction of samples with low byte ∈ {`0x00`,`0xff`}) → high = byte-stuck (N≈8–15).
+3. **Signal-bin energy fraction** (DFT energy at the known stimulus bin ±1 / total) → ≈1 = N=0 clean; ≈0 = corrupted.
+4. **Cross-correlation / phase offset** against the known stimulus → recovers N directly when the capture is partially coherent.
+
+`N=0` accept gate (proposed INV-AUDIO-01-4 observable form): adjacent-jump count = 0 **and** low-byte-stuck rate < 5% **and** signal-bin fraction > 0.8 on the mono-1k stimulus.
+
+### R3.4 — Closed-loop calibration sequence (the disco-side harness contract)
+
+Concrete loop the consumer drives, using re-arm primitive (a) (R0x004/R0x005 enable toggle), now with a working capture channel:
+
+```
+for attempt in 0..BUDGET:
+    play known mono stimulus (CM4 stimulus_mode=2)               # consumer
+    capture 256+ frames at SAI1 RX 0x3000_0000                    # consumer
+    outcome = platform.detect_arm_phase(&captured, &stimulus)     # rlvgl-platform, host-testable
+    if outcome.n == 0 and gate passes: break -> Calibrated
+    platform.rearm_aif1_serializers()                             # rlvgl-platform: toggle R0x004/R0x005 enables
+# budget exhausted -> Misaligned { adc_n, dac_n }   (degraded, no regression)
+```
+
+Open item the bench must still answer (F3 was undocumented): **does toggling R0x004/R0x005 enables actually re-roll N within a powered session?** ERRATA-004 bench-23..33 found `init_record` *reruns* are deterministic (do NOT re-roll N), and the only re-roll we have *observed* is a full codec power-cycle (warm→byte-stuck vs cold→wrap this session). If the enable-toggle does not re-roll N, primitive (a) is insufficient and the loop needs primitive (b) (SAIAEN cycle to force FLL re-lock + re-arm) under the SAI-re-touch doctrine carve-out. **This is the single highest-value next bench measurement** and it is now runnable: in the boot-window codec mailbox (`0x3800_2040`), toggle R0x004 bits 9/8 off→on, re-capture RX, check whether the byte-stuck/wrap signature changes. If it changes → (a) works, the headless-ish calibration is viable; if not → escalate to (b).
+
+### R3.5 — Recommendation update
+
+- **H2a (per-direction arm pivot) remains the lead** vendor-side ordering change, now with bi-directional motivation (DAC needs it too, R3.1).
+- The **N-detector arithmetic + `SerializerArmOutcome` + unit tests are ratifiable and implementable now** (host-testable against the R3.3 vectors; no bench dependency) — this is the unblocked slice.
+- The **re-arm-toggle re-roll question (R3.4)** gates whether primitive (a) suffices or (b) is required; the disco-analyzer loopback rig can answer it next bench round.
+- disco-analyzer should **move its rlvgl pin onto an H0-containing ref** so the default build at least carries H0's partial DAC improvement (today's `main`/`bc69338` pin predates H0, so the default build ships a fully-broken DAC).
+
+Cross-ref: disco-analyzer `docs/concepts/ERRATA.md` ERRATA-009 (2026-06-07 bench chain) + ERRATA-004; memory `project_daa_adc_isolated_loopback_2026-06-07`.
