@@ -2325,9 +2325,7 @@ impl Orchestrator {
         // [dependencies]
         s.push_str("[dependencies]\n");
         if let Some(c) = &self.manifest.controller {
-            s.push_str(
-                "# Controller library (chapter 01 §5.10 / chapter 02 §7.8).\n",
-            );
+            s.push_str("# Controller library (chapter 01 §5.10 / chapter 02 §7.8).\n");
             match (&c.path, &c.version) {
                 (Some(p), None) => {
                     let path_str = p.to_string_lossy().into_owned();

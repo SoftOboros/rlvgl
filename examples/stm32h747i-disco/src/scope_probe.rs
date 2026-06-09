@@ -47,7 +47,7 @@ pub fn init() {
     let m = regs.moder.read();
     // PJ0: MODER[1:0] = 01, PJ6: MODER[13:12] = 01
     regs.moder
-        .write((m & !(3u32 << 0) & !(3u32 << 12)) | (1u32 << 0) | (1u32 << 12));
+        .write((m & !3u32 & !(3u32 << 12)) | 1u32 | (1u32 << 12));
     regs.bsrr.write(PJ0_RESET | PJ6_RESET);
     for _ in 0..4u32 {
         regs.bsrr.write(PJ0_SET | PJ6_SET);

@@ -23,6 +23,8 @@ pub mod espressif;
 pub mod ioc;
 #[path = "../creator/bsp/ir.rs"]
 pub mod ir;
+#[path = "../creator/bsp/microchip/mod.rs"]
+pub mod microchip;
 #[path = "../creator/bsp/nordic/mod.rs"]
 pub mod nordic;
 #[path = "../creator/bsp/nxp/mod.rs"]
@@ -31,12 +33,10 @@ pub mod nxp;
 pub mod renesas;
 #[path = "../creator/bsp/rp/mod.rs"]
 pub mod rp;
-#[path = "../creator/bsp/ti/mod.rs"]
-pub mod ti;
-#[path = "../creator/bsp/microchip/mod.rs"]
-pub mod microchip;
 #[path = "../creator/bsp/silabs/mod.rs"]
 pub mod silabs;
+#[path = "../creator/bsp/ti/mod.rs"]
+pub mod ti;
 
 /// Re-exported board support modules for CLI utilities.
 mod bsp {

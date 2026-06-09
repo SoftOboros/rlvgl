@@ -423,8 +423,8 @@ static BEETLE_BSP_PAC: ProngTemplate = ProngTemplate {
 // The freertos and zephyr H747 manifests target the same chip and
 // the same hand-written `examples/stm32h747i-disco/Cargo.toml`;
 // only their `target.features` sets differ. Per APP-05-A §6, factor
-// the shared rlvgl runtime + cortex-m + stm32h7 PAC dep set so
-// APP-05d and APP-05e load the same data without duplication.
+// the shared rlvgl runtime deps and ARM-only target deps so APP-05d
+// and APP-05e load the same data without duplication.
 
 static H747_BASE_DEPS: &[Dep] = &[
     Dep {
@@ -476,53 +476,53 @@ static H747_BASE_DEPS: &[Dep] = &[
         features: &[],
         optional: false,
     },
-    Dep {
-        name: "cortex-m-rt",
-        source: DepSource::Version("0.7"),
-        default_features: true,
-        features: &[],
-        optional: false,
-    },
-    Dep {
-        name: "cortex-m",
-        source: DepSource::Version("0.7"),
-        default_features: true,
-        features: &["critical-section-single-core"],
-        optional: false,
-    },
-    Dep {
-        name: "embedded-alloc",
-        source: DepSource::Version("=0.5.1"),
-        default_features: true,
-        features: &[],
-        optional: false,
-    },
-    Dep {
-        name: "panic-halt",
-        source: DepSource::Version("1"),
-        default_features: true,
-        features: &[],
-        optional: false,
-    },
-    Dep {
-        name: "stm32h7",
-        source: DepSource::Version("0.15.1"),
-        default_features: true,
-        features: &["rt"],
-        optional: false,
-    },
-    Dep {
-        name: "critical-section",
-        source: DepSource::Version("1.1.2"),
-        default_features: true,
-        features: &[],
-        optional: false,
-    },
 ];
 
 static H747_TARGET_CFG_DEPS: &[(&str, &[Dep])] = &[(
     "cfg(any(target_arch = \"arm\", target_os = \"none\"))",
     &[
+        Dep {
+            name: "cortex-m-rt",
+            source: DepSource::Version("0.7"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "cortex-m",
+            source: DepSource::Version("0.7"),
+            default_features: true,
+            features: &["critical-section-single-core"],
+            optional: false,
+        },
+        Dep {
+            name: "embedded-alloc",
+            source: DepSource::Version("=0.5.1"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "panic-halt",
+            source: DepSource::Version("1"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "critical-section",
+            source: DepSource::Version("1.1.2"),
+            default_features: true,
+            features: &[],
+            optional: false,
+        },
+        Dep {
+            name: "stm32h7",
+            source: DepSource::Version("0.15.1"),
+            default_features: true,
+            features: &["rt"],
+            optional: true,
+        },
         Dep {
             name: "stm32h7xx-hal",
             source: DepSource::Version("0.16"),
@@ -569,7 +569,8 @@ static H747_TARGET_CFG_DEPS: &[(&str, &[Dep])] = &[(
 // chip + board but with a different feature set.
 //
 // Reference [features] expansions for the manifest's six features:
-//   cm7 = ["rlvgl-platform/stm32h747i_disco", "stm32h7/stm32h747cm7",
+//   cm7 = ["rlvgl-platform/stm32h747i_disco", "dep:stm32h7",
+//          "stm32h7/stm32h747cm7",
 //          "dep:stm32h7xx-hal", "dep:embedded-hal",
 //          "dep:embedded-hal-02", "dep:embedded-sdmmc"]
 //   freertos = ["rlvgl-platform/freertos"]
@@ -585,22 +586,23 @@ static H747_TARGET_CFG_DEPS: &[(&str, &[Dep])] = &[(
 // other manifests (the cm4 idle binary, the audio profile, etc.)
 // per chapter 03 §6.7 "duplicate by copy" and are NOT emitted here.
 //
-// Base [dependencies]: rlvgl runtime crates + cortex-m runtime +
-// allocator + panic handler + stm32h7 PAC + critical-section. The
-// optional `cortex-m-semihosting` / `stm32-fmc` / `rlvgl-bsps-stm`
-// / `rlvgl-app-demo` deps from the reference are gated by features
-// the manifest doesn't enable, so they're skipped at single-intent
-// emit.
+// Base [dependencies]: rlvgl runtime crates. The optional
+// `cortex-m-semihosting` / `stm32-fmc` / `rlvgl-bsps-stm` /
+// `rlvgl-app-demo` deps from the reference are gated by features the
+// manifest doesn't enable, so they're skipped at single-intent emit.
 //
 // Cross-compile-only deps under
 // [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]:
-// stm32h7xx-hal / embedded-hal / embedded-hal-02 (package rename) /
-// embedded-sdmmc — all gated by the cm7 feature.
+// cortex-m runtime / allocator / panic handler / critical-section /
+// stm32h7 PAC / stm32h7xx-hal / embedded-hal / embedded-hal-02
+// (package rename) / embedded-sdmmc. The PAC and HAL deps are gated
+// by the cm7 feature.
 
 /// `cm7` feature expansion shared by the H747 freertos + zephyr
 /// templates; same chip, same PAC, same HAL deps.
 const H747_CM7_EXPANSION: &[&str] = &[
     "rlvgl-platform/stm32h747i_disco",
+    "dep:stm32h7",
     "stm32h7/stm32h747cm7",
     "dep:stm32h7xx-hal",
     "dep:embedded-hal",

@@ -107,10 +107,7 @@ const RULES: &[Rule] = &[
                 || line.contains("clean_invalidate_dcache_by_address")
                 || line.contains("clean_invalidate_dcache_by_slice")
         },
-        whitelist: &[
-            "platform/src/hwcore/dca.rs",
-            "platform/src/hwcore/regs/",
-        ],
+        whitelist: &["platform/src/hwcore/dca.rs", "platform/src/hwcore/regs/"],
     },
 ];
 

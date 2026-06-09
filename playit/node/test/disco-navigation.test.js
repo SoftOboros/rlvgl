@@ -7,6 +7,14 @@ import assert from 'node:assert/strict';
 import { launchDiscoSim } from '../src/index.js';
 import { dumpHasVisiblePixels, dumpSignature, assertAllTagsExist, KNOWN_TAGS } from './shared-assertions.js';
 
+async function iconStripSignature(session) {
+  const regions = [];
+  for (const y of [10, 70, 130]) {
+    regions.push(dumpSignature(await session.dumpRect({ x: 740, y, width: 40, height: 40, frames: 1 })));
+  }
+  return regions.join('|');
+}
+
 test('all known widget tags exist at startup', async () => {
   const session = await launchDiscoSim({
     cwd: process.cwd(),
@@ -95,17 +103,19 @@ test('hotkey roundtrip: s, f, i, b all change controller state', async () => {
     // Escape
     await session.keyDown('Escape');
 
-    // 'f' activates files (no wing opens, but dashboard changes)
-    const beforeF = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
+    // 'f' activates files (no wing opens, but main-strip focus changes)
+    const beforeF = await iconStripSignature(session);
     await session.keyDown('f');
-    const afterF = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
-    assert.notEqual(dumpSignature(afterF), dumpSignature(beforeF));
+    const afterF = await iconStripSignature(session);
+    assert.notEqual(afterF, beforeF);
 
-    // 'b' cycles backlight (dashboard should update)
-    const beforeB = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
+    // 'b' cycles backlight and forwards the request to the simulator runtime.
+    let stderr = '';
+    session.child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
     await session.keyDown('b');
-    const afterB = await session.dumpRect({ x: 100, y: 100, width: 10, height: 5, frames: 1 });
-    assert.notEqual(dumpSignature(afterB), dumpSignature(beforeB));
+    assert.match(stderr, /backlight request 100%/);
   } finally {
     await session.close();
   }
@@ -119,21 +129,15 @@ test('framebuffer differs across main panels', async () => {
 
   try {
     // Settings panel (initial)
-    const sigSettings = dumpSignature(
-      await session.dumpRect({ x: 100, y: 100, width: 20, height: 10, frames: 1 })
-    );
+    const sigSettings = await iconStripSignature(session);
 
     // Files panel
     await session.keyDown('f');
-    const sigFiles = dumpSignature(
-      await session.dumpRect({ x: 100, y: 100, width: 20, height: 10, frames: 1 })
-    );
+    const sigFiles = await iconStripSignature(session);
 
     // Info panel
     await session.keyDown('i');
-    const sigInfo = dumpSignature(
-      await session.dumpRect({ x: 100, y: 100, width: 20, height: 10, frames: 1 })
-    );
+    const sigInfo = await iconStripSignature(session);
 
     // All three should be distinct
     assert.notEqual(sigSettings, sigFiles, 'settings and files panels should differ');

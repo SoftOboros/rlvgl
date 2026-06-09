@@ -2397,17 +2397,17 @@ fn main() -> ! {
         // from_addrs and pinned in a static so the player's
         // DbufRead<'static, 'static, ...> can reference it.
         #[cfg(all(feature = "audio", feature = "sd_storage"))]
-        let audio_dca: &'static mut rlvgl_platform::hwcore::dca::DcaDoubleBuf< // rlvgl-discipline: allow(static_mut)
-            'static,
-            u8,
-            AUDIO_BUF_SIZE,
-        > = {
+        use rlvgl_platform::hwcore::dca::DcaDoubleBuf;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        type AudioDca = DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>;
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        type StaticAudioDca = &'static mut AudioDca; // rlvgl-discipline: allow(static_mut)
+        #[cfg(all(feature = "audio", feature = "sd_storage"))]
+        let audio_dca: StaticAudioDca = {
             use core::mem::MaybeUninit;
             use core::sync::atomic::{AtomicBool, Ordering};
-            use rlvgl_platform::hwcore::dca::DcaDoubleBuf;
             static AUDIO_DCA_INIT: AtomicBool = AtomicBool::new(false);
-            static mut AUDIO_DCA: MaybeUninit<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>> = // rlvgl-discipline: allow(static_mut)
-                MaybeUninit::uninit();
+            static mut AUDIO_DCA: MaybeUninit<AudioDca> = MaybeUninit::uninit(); // rlvgl-discipline: allow(static_mut)
             // SAFETY: AtomicBool gates the once-only `from_addrs` write;
             // subsequent reads via the raw pointer chain return a
             // `&'static mut` to the initialised DCA. The two banks
@@ -2420,8 +2420,7 @@ fn main() -> ! {
                         AUDIO_BUF1 as usize,
                     )));
                 }
-                &mut *(&raw mut AUDIO_DCA)
-                    .cast::<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>>()
+                &mut *(&raw mut AUDIO_DCA).cast::<DcaDoubleBuf<'static, u8, AUDIO_BUF_SIZE>>()
             }
         };
         #[cfg(all(feature = "audio", feature = "sd_storage"))]

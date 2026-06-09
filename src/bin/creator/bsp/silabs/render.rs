@@ -386,10 +386,7 @@ mod tests {
         // `efm32gg11b-pac 0.1.4` exposes register-block accessors as
         // direct struct fields rather than methods (pre-method-accessor
         // svd2rust era — same vintage as `atsamd51j19a 0.7.1`).
-        assert_eq!(
-            pac_path_filter("cmu.hfperclken0".into()),
-            "CMU.hfperclken0"
-        );
+        assert_eq!(pac_path_filter("cmu.hfperclken0".into()), "CMU.hfperclken0");
         assert_eq!(pac_path_filter("gpio".into()), "GPIO");
         assert_eq!(
             pac_path_filter("usart4.routeloc0".into()),

@@ -166,7 +166,7 @@ pub const CONF_UART1_RTSN: u32 = CTRLMOD + 0x97C; // I2C2_SCL in Mode 3
 
 pub const PIN_MODE_0: u32 = 0x00;
 pub const PIN_MODE_3: u32 = 0x03;
-pub const PIN_PULL_UP_EN: u32 = (1 << 4) | (0 << 3);
+pub const PIN_PULL_UP_EN: u32 = 1 << 4;
 pub const PIN_RX_ACTIVE: u32 = 1 << 5;
 pub const PIN_SLOW_SLEW: u32 = 1 << 6;
 
@@ -177,7 +177,7 @@ pub const PIN_SLOW_SLEW: u32 = 1 << 6;
 
 pub const LCDC_BASE: u32 = 0x4830_E000;
 
-pub const LCDC_PID: u32 = LCDC_BASE + 0x00;
+pub const LCDC_PID: u32 = LCDC_BASE;
 pub const LCD_CTRL: u32 = LCDC_BASE + 0x04;
 pub const LCDC_STAT: u32 = LCDC_BASE + 0x08;
 pub const RASTER_CTRL: u32 = LCDC_BASE + 0x28;
@@ -214,7 +214,7 @@ pub const SYSCONFIG_AUTOIDLE: u32 = 1 << 0;
 
 pub const DMA_BURST_16: u32 = 4 << 4;
 pub const DMA_FIFO_TH_8: u32 = 0 << 8;
-pub const DMA_FRAME_MODE_SINGLE: u32 = 0 << 0;
+pub const DMA_FRAME_MODE_SINGLE: u32 = 0;
 
 pub const LCD_CTRL_MODESEL_RASTER: u32 = 1 << 0;
 

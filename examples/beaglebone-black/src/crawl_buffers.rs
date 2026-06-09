@@ -228,8 +228,8 @@ pub fn build_star_crawl_window(
     visible_h: u32,
     frame_hz: u32,
 ) -> CrawlWindow<StarCrawl<'static>> {
-    let visible_w = visible_w.max(1).min(CRAWL_VIEW_W);
-    let visible_h = visible_h.max(1).min(CRAWL_VIEW_H);
+    let visible_w = visible_w.clamp(1, CRAWL_VIEW_W);
+    let visible_h = visible_h.clamp(1, CRAWL_VIEW_H);
 
     let params = CrawlParams::star_crawl_disco(visible_w, visible_h, frame_hz.max(1));
 

@@ -190,9 +190,10 @@ fn resolve_tokens(mut tokens: TokensFile, mode: Option<&str>) -> Result<Resolved
         eprintln!("warning: {}", msg);
     }
     if let Some(mode_key) = &chosen_mode
-        && let Some(mode_tokens) = tokens.modes.remove(mode_key) {
-            merge_mode(&mut tokens, mode_tokens);
-        }
+        && let Some(mode_tokens) = tokens.modes.remove(mode_key)
+    {
+        merge_mode(&mut tokens, mode_tokens);
+    }
 
     Ok(ResolvedTokens {
         mode: chosen_mode,
@@ -304,12 +305,13 @@ fn validate_tokens_file(
     errors: &mut Vec<String>,
 ) {
     if let Some(version) = tokens.version
-        && version != 1 {
-            warnings.push(format!(
-                "token version {} is not recognized; expected 1",
-                version
-            ));
-        }
+        && version != 1
+    {
+        warnings.push(format!(
+            "token version {} is not recognized; expected 1",
+            version
+        ));
+    }
 
     validate_colors_map(&tokens.colors, "colors", errors);
     validate_u8_map(&tokens.spacing, "spacing", errors);
@@ -357,9 +359,10 @@ fn resolve_for_mode(tokens: &TokensFile, mode: Option<&str>) -> ResolvedTokens {
     let mut merged = tokens.clone();
     let chosen = mode.map(|m| m.to_string());
     if let Some(mode_key) = mode
-        && let Some(mode_tokens) = merged.modes.remove(mode_key) {
-            merge_mode(&mut merged, mode_tokens);
-        }
+        && let Some(mode_tokens) = merged.modes.remove(mode_key)
+    {
+        merge_mode(&mut merged, mode_tokens);
+    }
     ResolvedTokens {
         mode: chosen,
         colors: merged.colors,
@@ -428,25 +431,30 @@ fn validate_typography_map(
     validate_token_keys(map, group, errors);
     for (name, style) in map {
         if let Some(family) = &style.family
-            && family.trim().is_empty() {
-                errors.push(format!("{} '{}' has empty font family", group, name));
-            }
+            && family.trim().is_empty()
+        {
+            errors.push(format!("{} '{}' has empty font family", group, name));
+        }
         if let Some(size) = style.size
-            && size == 0 {
-                errors.push(format!("{} '{}' has size 0", group, name));
-            }
+            && size == 0
+        {
+            errors.push(format!("{} '{}' has size 0", group, name));
+        }
         if let Some(weight) = style.weight
-            && weight == 0 {
-                errors.push(format!("{} '{}' has weight 0", group, name));
-            }
+            && weight == 0
+        {
+            errors.push(format!("{} '{}' has weight 0", group, name));
+        }
         if let Some(height) = style.line_height
-            && height == 0 {
-                errors.push(format!("{} '{}' has line_height 0", group, name));
-            }
+            && height == 0
+        {
+            errors.push(format!("{} '{}' has line_height 0", group, name));
+        }
         if let Some(spacing) = style.letter_spacing
-            && !spacing.is_finite() {
-                errors.push(format!("{} '{}' has invalid letter_spacing", group, name));
-            }
+            && !spacing.is_finite()
+        {
+            errors.push(format!("{} '{}' has invalid letter_spacing", group, name));
+        }
     }
 }
 

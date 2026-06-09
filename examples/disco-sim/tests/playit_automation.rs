@@ -382,6 +382,14 @@ fn dashboard_rounded_corner_arcs_outward() {
     // Dashboard panel is at PANEL_X=84, PANEL_Y=84, radius 18.
     let mut session = SimulatorSession::launch();
 
+    session.send("KD:i");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
+    session.send("T@disco.info.diagnostics:10,10");
+    assert_eq!(session.read_line(), "OK");
+    std::thread::sleep(Duration::from_millis(100));
+
     // Dump a 20x20 region from the panel's top-left corner.
     session.send("D84,84,20,20,1");
     assert_eq!(session.read_line(), "DUMP:queued");

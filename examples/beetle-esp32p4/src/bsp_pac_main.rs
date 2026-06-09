@@ -59,7 +59,9 @@ fn main() -> ! {
     // bitbang, THEN led_init, then run_bringup_instrumented. Goal: verify
     // the quaternary=014 result was the route_pins-before-led_init shape,
     // not anything to do with psram::init (which is a no-op stub).
-    unsafe { dfr0550::i2c0::route_pins(); }
+    unsafe {
+        dfr0550::i2c0::route_pins();
+    }
     let _bitbang_ack = unsafe { dfr0550::i2c0::bitbang_address_probe(0x45) };
     unsafe { led_init() };
 
@@ -116,9 +118,9 @@ unsafe fn run_bringup_instrumented() -> u8 {
     // Phase 4 (now Phase 0): wake — moved BEFORE PSRAM/LDO/DSI.
     let wake_result = unsafe { wake_instrumented() };
     debug_marker_set(false);
-    use dfr0550::i2c0::I2cError;
-    use dfr0550::i2c_bridge::BridgeError;
     use core::sync::atomic::Ordering;
+    use dfr0550::i2c_bridge::BridgeError;
+    use dfr0550::i2c0::I2cError;
     match wake_result {
         Ok(()) => {}
         Err(BridgeError::I2c(I2cError::Nack)) => return 5,
@@ -297,8 +299,8 @@ unsafe fn run_bringup() -> u8 {
         //             PORTB.0 poll never went high in 1 s (bridge powered
         //             but not coming up — could be panel power, BOOT0
         //             strap, or wrong PORTB bit).
-        use dfr0550::i2c0::I2cError;
         use dfr0550::i2c_bridge::BridgeError;
+        use dfr0550::i2c0::I2cError;
         // Inlined wake() with progress dips on the marker pin. The
         // bracket is HIGH for the whole transaction; brief LOW dips
         // (~150 µs) inside the HIGH band mark each completed sub-step:
@@ -455,7 +457,9 @@ unsafe fn disable_watchdogs() {
     // magic 0x8F1D_312A silently no-ops on P4 — see ERRATA-007).
     // Re-lock each wprotect with write(0) at the end per esp-hal's
     // pattern (defensive against stray writes re-arming the WDT).
-    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.LP_WDT
+        .wprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.config0().write(|w| unsafe { w.bits(0) });
     p.LP_WDT.feed().write(|w| w.feed().set_bit());
     p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0) });
@@ -464,16 +468,24 @@ unsafe fn disable_watchdogs() {
     // swd_disable was tested 2026-06-01 and is NOT the wake regression
     // source — bench-confirmed by reverting to 2026-05-30 bytes for
     // disable_watchdogs() with no change in observed wake hang).
-    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
-    p.LP_WDT.swd_config().modify(|_, w| w.swd_auto_feed_en().set_bit());
+    p.LP_WDT
+        .swd_wprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.LP_WDT
+        .swd_config()
+        .modify(|_, w| w.swd_auto_feed_en().set_bit());
     p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
-    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG0
+        .wdtwprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG0.wdtconfig0().write(|w| unsafe { w.bits(0) });
     p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });
     p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0) });
 
-    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG1
+        .wdtwprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG1.wdtconfig0().write(|w| unsafe { w.bits(0) });
     p.TIMG1.wdtfeed().write(|w| unsafe { w.bits(1) });
     p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0) });
@@ -491,19 +503,27 @@ unsafe fn disable_watchdogs() {
 /// register. See ERRATA-007.
 fn feed_watchdogs() {
     let p = unsafe { esp32p4::Peripherals::steal() };
-    p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.LP_WDT
+        .wprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.feed().write(|w| w.feed().set_bit());
     p.LP_WDT.wprotect().write(|w| unsafe { w.bits(0) });
 
-    p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.LP_WDT
+        .swd_wprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.LP_WDT.swd_config().modify(|_, w| w.swd_feed().set_bit());
     p.LP_WDT.swd_wprotect().write(|w| unsafe { w.bits(0) });
 
-    p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG0
+        .wdtwprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG0.wdtfeed().write(|w| unsafe { w.bits(1) });
     p.TIMG0.wdtwprotect().write(|w| unsafe { w.bits(0) });
 
-    p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+    p.TIMG1
+        .wdtwprotect()
+        .write(|w| unsafe { w.bits(0x50D8_3AA1) });
     p.TIMG1.wdtfeed().write(|w| unsafe { w.bits(1) });
     p.TIMG1.wdtwprotect().write(|w| unsafe { w.bits(0) });
 }
@@ -565,7 +585,9 @@ unsafe fn pad_sanity_test() {
         for _ in 0..200_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
-        p.GPIO.out_w1tc().write(|w| unsafe { w.bits(all_mask & !marker_mask) });
+        p.GPIO
+            .out_w1tc()
+            .write(|w| unsafe { w.bits(all_mask & !marker_mask) });
         for _ in 0..200_000u32 {
             unsafe { core::arch::asm!("nop") };
         }
@@ -650,10 +672,10 @@ fn debug_marker_dip() {
 /// guaranteed HIGH on every return path so the caller's bracket
 /// boundary is preserved.
 unsafe fn wake_instrumented() -> Result<(), dfr0550::i2c_bridge::BridgeError> {
-    use dfr0550::i2c0;
     use dfr0550::i2c_bridge::{
         BRIDGE_ADDR, BridgeError, PORTA_KERNEL_DEFAULT, REG_PORTA, REG_PORTB, REG_POWERON, REG_PWM,
     };
+    use dfr0550::i2c0;
 
     // ERRATA-008 Round 1: hand-rolled first POWERON write with dips
     // between EACH MMIO group inside it. The marker bracket is HIGH
@@ -799,16 +821,76 @@ fn morse_marker_digit(p: &esp32p4::Peripherals, mask: u32, digit: u8) {
     let t = true;
     let f = false;
     match d {
-        0 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
-        1 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
-        2 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
-        3 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); }
-        4 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, t); }
-        5 => { morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
-        6 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
-        7 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
-        8 => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); morse_marker_element(p, mask, f); }
-        _ => { morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, t); morse_marker_element(p, mask, f); }
+        0 => {
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+        }
+        1 => {
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+        }
+        2 => {
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+        }
+        3 => {
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+        }
+        4 => {
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, t);
+        }
+        5 => {
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+        }
+        6 => {
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+        }
+        7 => {
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+        }
+        8 => {
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, f);
+            morse_marker_element(p, mask, f);
+        }
+        _ => {
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, t);
+            morse_marker_element(p, mask, f);
+        }
     }
 }
 
@@ -838,7 +920,8 @@ fn morse_status_loop(status: u8) -> ! {
     let led_mask = 1u32 << bsp_generated::board::LED;
     let cmd_done = dfr0550::i2c0::LAST_HANG_CMD_DONE.load(core::sync::atomic::Ordering::Relaxed);
     let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
-    let comd0_pins = dfr0550::i2c0::LAST_HANG_COMD0_PINS.load(core::sync::atomic::Ordering::Relaxed);
+    let comd0_pins =
+        dfr0550::i2c0::LAST_HANG_COMD0_PINS.load(core::sync::atomic::Ordering::Relaxed);
     let recovery = dfr0550::i2c0::LAST_RECOVERY_CLOCKS.load(core::sync::atomic::Ordering::Relaxed);
     let bitbang = dfr0550::i2c0::LAST_BITBANG_ACK.load(core::sync::atomic::Ordering::Relaxed);
     // Derive a compact 6-bit summary of `LAST_HANG_INT_RAW` for the
@@ -851,12 +934,24 @@ fn morse_status_loop(status: u8) -> ! {
     //   bit 5 ← DET_START     (int_raw bit 15) — start condition detected
     let int_raw = dfr0550::i2c0::LAST_HANG_INT_RAW.load(core::sync::atomic::Ordering::Relaxed);
     let mut int_pack: u8 = 0;
-    if int_raw & (1 << 8)  != 0 { int_pack |= 1 << 0; }
-    if int_raw & (1 << 13) != 0 { int_pack |= 1 << 1; }
-    if int_raw & (1 << 14) != 0 { int_pack |= 1 << 2; }
-    if int_raw & (1 << 4)  != 0 { int_pack |= 1 << 3; }
-    if int_raw & (1 << 6)  != 0 { int_pack |= 1 << 4; }
-    if int_raw & (1 << 15) != 0 { int_pack |= 1 << 5; }
+    if int_raw & (1 << 8) != 0 {
+        int_pack |= 1 << 0;
+    }
+    if int_raw & (1 << 13) != 0 {
+        int_pack |= 1 << 1;
+    }
+    if int_raw & (1 << 14) != 0 {
+        int_pack |= 1 << 2;
+    }
+    if int_raw & (1 << 4) != 0 {
+        int_pack |= 1 << 3;
+    }
+    if int_raw & (1 << 6) != 0 {
+        int_pack |= 1 << 4;
+    }
+    if int_raw & (1 << 15) != 0 {
+        int_pack |= 1 << 5;
+    }
 
     if status == 0 {
         // Steady LED ON (and marker high) for full-success indication.
@@ -1012,11 +1107,7 @@ fn led_status_loop(status: u8) -> ! {
         }
     }
 
-    let digits = [
-        (status / 100) % 10,
-        (status / 10) % 10,
-        status % 10,
-    ];
+    let digits = [(status / 100) % 10, (status / 10) % 10, status % 10];
 
     // COUNT-BASED ENCODING (replaces Morse, since 40 ms dot vs 120 ms dash
     // turned out hard to read in real-time). Each digit emitted as
@@ -1079,11 +1170,7 @@ fn led_status_loop(status: u8) -> ! {
     //   015-255 — FSM walked into the END terminators; should have
     //         hit EndDetect, not Hang
     let cmd_done = dfr0550::i2c0::LAST_HANG_CMD_DONE.load(core::sync::atomic::Ordering::Relaxed);
-    let cmd_done_digits = [
-        (cmd_done / 100) % 10,
-        (cmd_done / 10) % 10,
-        cmd_done % 10,
-    ];
+    let cmd_done_digits = [(cmd_done / 100) % 10, (cmd_done / 10) % 10, cmd_done % 10];
 
     // Tertiary code: ctl_sr packed flags (see LAST_HANG_CTL_SR doc).
     //   bit 0 = ctr.trans_start still set
@@ -1092,11 +1179,7 @@ fn led_status_loop(status: u8) -> ! {
     //   bit 3 = int_raw END_DETECT fired
     //   bit 4 = ctr.conf_upgate still set
     let ctl_sr = dfr0550::i2c0::LAST_HANG_CTL_SR.load(core::sync::atomic::Ordering::Relaxed);
-    let ctl_sr_digits = [
-        (ctl_sr / 100) % 10,
-        (ctl_sr / 10) % 10,
-        ctl_sr % 10,
-    ];
+    let ctl_sr_digits = [(ctl_sr / 100) % 10, (ctl_sr / 10) % 10, ctl_sr % 10];
 
     loop {
         // Ensure LED is OFF at start.

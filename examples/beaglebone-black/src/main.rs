@@ -22,6 +22,8 @@
 //! with `nc 127.0.0.1 <port>`. Stand-in for the RMA'd touch panel (see
 //! `RMA-newhaven-2026-04-22.md` alongside this file).
 
+#![allow(dead_code)]
+
 use heapless::Vec as HVec;
 use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_core::event::Event;
@@ -406,7 +408,7 @@ fn main() {
             };
             let mut root_mut = root.borrow_mut();
             executor.poll_with_callback(
-                &mut *root_mut,
+                &mut root_mut,
                 &status,
                 Some(&fb_view),
                 &mut NullPipeline,

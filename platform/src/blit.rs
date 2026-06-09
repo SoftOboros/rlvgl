@@ -1100,7 +1100,7 @@ impl Renderer for RotatedRenderer<'_> {
         // confirmed the corruption point matched the icon pixel pattern
         // byte-for-byte.
         #[unsafe(link_section = ".rlvgl_blit_scratch")]
-        static mut SCRATCH: [Color; SCRATCH_PIXELS] = [Color(0, 0, 0, 0); SCRATCH_PIXELS];
+        static mut SCRATCH: [Color; SCRATCH_PIXELS] = [Color(0, 0, 0, 0); SCRATCH_PIXELS]; // rlvgl-discipline: allow(static_mut)
 
         let len = (width * height) as usize;
         if len <= SCRATCH_PIXELS {
@@ -1116,12 +1116,12 @@ impl Renderer for RotatedRenderer<'_> {
             for ly in 0..height as i32 {
                 for lx in 0..width as i32 {
                     let src_idx = (ly as u32 * width + lx as u32) as usize;
-                    let dst_idx =
-                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    let dst_idx = (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
                     scratch[dst_idx] = pixels.get(src_idx).copied().unwrap_or(Color(0, 0, 0, 0));
                 }
             }
-            self.inner.draw_pixels((fb_x, fb_y), scratch, phys_w, phys_h);
+            self.inner
+                .draw_pixels((fb_x, fb_y), scratch, phys_w, phys_h);
         } else {
             // Oversize fallback: allocate once for this call. Rare.
             let mut rotated: alloc::vec::Vec<Color> = alloc::vec::Vec::with_capacity(len);
@@ -1129,14 +1129,14 @@ impl Renderer for RotatedRenderer<'_> {
             for ly in 0..height as i32 {
                 for lx in 0..width as i32 {
                     let src_idx = (ly as u32 * width + lx as u32) as usize;
-                    let dst_idx =
-                        (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
+                    let dst_idx = (lx as u32 * phys_w + (height as i32 - 1 - ly) as u32) as usize;
                     if let Some(&c) = pixels.get(src_idx) {
                         rotated[dst_idx] = c;
                     }
                 }
             }
-            self.inner.draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
+            self.inner
+                .draw_pixels((fb_x, fb_y), &rotated, phys_w, phys_h);
         }
     }
 

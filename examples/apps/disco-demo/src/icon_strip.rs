@@ -164,12 +164,7 @@ impl Widget for IconStrip {
                         dim_scratch.clear();
                         dim_scratch.reserve(entry.pixels.len());
                         for color in &entry.pixels {
-                            dim_scratch.push(Color(
-                                color.0 / 2,
-                                color.1 / 2,
-                                color.2 / 2,
-                                color.3,
-                            ));
+                            dim_scratch.push(Color(color.0 / 2, color.1 / 2, color.2 / 2, color.3));
                         }
                         &dim_scratch
                     };

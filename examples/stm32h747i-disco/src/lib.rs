@@ -9,11 +9,12 @@
 //! for non-Zephyr builds and shares all the same application modules.
 
 #![no_std]
+#![allow(dead_code)]
 
 extern crate alloc;
 
 // Panic handler for the static library.
-#[cfg(not(doc))]
+#[cfg(all(not(doc), any(target_arch = "arm", target_arch = "aarch64")))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {
@@ -21,9 +22,11 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     }
 }
 
-// Heap allocator — same as main.rs.
+// Heap allocator - same as main.rs.
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 use embedded_alloc::Heap;
 
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
@@ -34,8 +37,10 @@ pub(crate) static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle
 // ── Shared application modules ────────────────────────────────────────────────
 
 #[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
+#[cfg(feature = "cm7")]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 mod scope_probe;
 
 mod file_browser_panel;
