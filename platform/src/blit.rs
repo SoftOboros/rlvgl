@@ -27,7 +27,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect as WidgetRect};
 
 #[cfg(feature = "fontdue")]
-const FONT_DATA: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
+const FONT_DATA: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
 
 #[cfg(feature = "fontdue")]
 fn round_to_i32(value: f32) -> i32 {
