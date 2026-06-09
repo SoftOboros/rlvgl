@@ -45,7 +45,6 @@ pub(crate) struct SimArgs {
 
 #[cfg(feature = "simulator")]
 pub(crate) fn run(args: SimArgs) -> Result<()> {
-    use rlvgl::core::application::Application;
     use rlvgl::core::event::Event;
     use rlvgl::platform::{
         BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Surface, WgpuBlitter,

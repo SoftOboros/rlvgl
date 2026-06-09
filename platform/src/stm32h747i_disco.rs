@@ -130,29 +130,6 @@ pub struct Stm32h747iDiscoDisplay<B: Blitter, BL = (), RST = ()> {
         any(target_arch = "arm", target_arch = "aarch64")
     ))]
     fb_addr_back: u32,
-    /// DPR-01a Step 3: by-value FrameScheduler held alongside the
-    /// existing display state.
-    ///
-    /// Constructed at the end of `Self::new` (after every init-time
-    /// MMIO write has landed) and parameterized over
-    /// `AdaptedCommand` scan mode + `BareMetalLoopPacing`. The
-    /// scheduler holds typed handles on the DSI wrapper + LTDC
-    /// peripheral; `Self::{swap, present, wait_frame_done}` migrate
-    /// to delegate through these handles in Steps 4-6.
-    ///
-    /// Coexists with `frame_scheduler::DSI_W` / `LTDC` module-level
-    /// statics — only one `Stm32h747iDiscoDisplay` per binary, and
-    /// the statics are accessed from ISR / free-function context
-    /// (`consume_erif_static`) while the `&mut self` methods are
-    /// main-loop context. See PCDN-DPR-006 (resolved 2026-05-19).
-    #[cfg(all(
-        feature = "stm32h747i_disco",
-        any(target_arch = "arm", target_arch = "aarch64")
-    ))]
-    scheduler: crate::frame_scheduler::FrameScheduler<
-        crate::frame_scheduler::AdaptedCommand,
-        crate::frame_scheduler::BareMetalLoopPacing,
-    >,
 }
 
 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
@@ -257,29 +234,6 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             dma2d: Some(dma2d),
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             staging_pool: [StagingBuf::EMPTY; 3],
-            // SAFETY (DPR-01a Step 3): `DsiWrapper::new` and `Ltdc::new`
-            // are `const unsafe fn` that produce typed handles without
-            // touching MMIO. Their underlying contract — DSI / LTDC
-            // clocks enabled before any field is accessed — is
-            // satisfied because (a) the C BSP enables LTDC/DSI/PLL3
-            // before `new()` is reached (see the comment at line
-            // ~244), and (b) the scheduler's `swap` / `present` /
-            // `consume_erif` methods aren't invoked until Steps 4-6
-            // wire the call sites. Construction here is harmless.
-            //
-            // Aliasing with `frame_scheduler::DSI_W` / `LTDC` static
-            // singletons: only this one `Stm32h747iDiscoDisplay` is
-            // ever instantiated per binary, and the statics serve
-            // ISR / free-function contexts only. The `&mut self`
-            // scheduler methods and the static-accessor functions
-            // never alias at runtime — main-loop vs. ISR scoping.
-            scheduler: unsafe {
-                crate::frame_scheduler::FrameScheduler::new(
-                    crate::hwcore::regs::dsi::DsiWrapper::new(),
-                    crate::hwcore::regs::ltdc::Ltdc::new(),
-                    crate::frame_scheduler::BareMetalLoopPacing::new(),
-                )
-            },
         };
         disp.set_backlight(0);
 
@@ -1668,14 +1622,10 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         cortex_m::interrupt::free(|_| {
             cortex_m::asm::dsb();
             let next = self.fb_addr_back;
-            // DPR-01a Step 4: Op A SWAP delegated to FrameScheduler.
-            // Writes `LTDC_L1CFBAR <- next; LTDC_SRCR <- 1` through
-            // typed `hwcore::regs::ltdc` accessors. Same MMIO
-            // semantics as the previous two raw casts; the typed
-            // path satisfies INV-DPR-3 (no app-level raw register
-            // pointers outside the perimeter).
-            self.scheduler
-                .swap(crate::hwcore::addr::PhysAddr::new(next));
+            unsafe {
+                (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            }
             core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
             cortex_m::asm::dsb();
         });
@@ -1690,23 +1640,24 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         // before LTDC starts reading the new buffer.
         cortex_m::asm::dsb();
         let next = self.fb_addr_back;
-        // DPR-01a Step 5: Op B PRESENT delegated to FrameScheduler.
-        // Generated sequence (compile-time specialized on
-        // `AdaptedCommand::PULSED_LTDCEN == true`):
-        //   WIFCR <- 0x02   (CERIF clear, pre-retarget)
-        //   L1CFBAR <- next (layer 1 retarget)
-        //   SRCR <- 1       (shadow reload trigger)
-        //   WCR <- 0x0C     (DSIEN | LTDCEN — pulse scan)
-        //   WIFCR <- 0x02   (clear spurious ERIF from LTDCEN re-enable)
-        // The `dsb` between the pre-clear and the retarget that
-        // existed in the raw path is now elided — the typed
-        // `Rw<u32>::write` is `core::ptr::write_volatile`, and the
-        // Cortex-M7 strongly-ordered MMIO region makes intervening
-        // DSB unnecessary for write→write ordering to the same
-        // peripheral.
-        self.scheduler
-            .present(crate::hwcore::addr::PhysAddr::new(next));
+        unsafe {
+            // 1. Clear stale ERIF so the DSI ISR doesn't fire on the
+            //    previous scan's flag before we finish the swap.
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            cortex_m::asm::dsb();
+
+            // 2. Swap layer address and trigger shadow reload.
+            (0x5000_10AC as *mut u32).write_volatile(next); // L1CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            (0x5000_1024 as *mut u32).write_volatile(1); // SRCR.IMR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
         core::mem::swap(&mut self.fb_addr, &mut self.fb_addr_back);
+        unsafe {
+            // 3. Enable LTDCEN — next TE edge triggers LTDC to scan.
+            (0x5000_0404 as *mut u32).write_volatile(0x0C); // DSI_WCR: DSIEN+LTDCEN // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            // 4. Clear any spurious ERIF from the LTDCEN re-enable.
+            cortex_m::asm::dsb();
+            (0x5000_0410u32 as *mut u32).write_volatile(0x02); // WIFCR.CERIF // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
         // The real ERIF fires ~14ms later when the scan completes.
     }
 

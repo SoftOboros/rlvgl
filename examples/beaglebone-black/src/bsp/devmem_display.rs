@@ -14,8 +14,6 @@
 //! - Binary is invoked with root privileges (`sudo ./rlvgl-bbb`) for
 //!   `/dev/mem` access.
 
-#![allow(dead_code)]
-
 use rlvgl_core::widget::{Color, Rect};
 use rlvgl_platform::{DisplayDriver, Screen};
 

@@ -121,12 +121,12 @@ use the crate-local file for the package you are building:
 - [examples/uefi-disco/OPTIONS.md](./examples/uefi-disco/OPTIONS.md)
 - [src/bin/creator/README.md](./src/bin/creator/README.md) for CLI and UI workflow details
 
-## What's New in 0.2.0
+## What's New in 0.1.9
 
-- `rlvgl-creator` now covers multi-vendor YAML-to-IR BSP generation for Espressif, Nordic, NXP, RP2040, and Renesas targets.
-- STM32H747I-DISCO now runs the shared disco app across bare-metal, FreeRTOS, Zephyr, host simulator, and UEFI test paths.
-- `rlvgl-playit` adds serial automation, touch/key injection, widget queries, framebuffer pixel inspection, and event recording.
-- The rendering stack gained anti-aliased rounded corners, dirty-region save-under restoration, focus highlights, and star crawl motion primitives.
+- `rlvgl-creator` now covers vendor import, board IR generation, and Rust BSP rendering with bundled alternate-function databases.
+- STM32H747I-DISCO moved from bring-up into a flagship demo path with dual-core startup, DSI display, touch, storage, audio, and richer UI flows.
+- The rendering stack gained `EventWindow`, compositor/save-under behavior, motion helpers, DMA2D acceleration, and display-pipeline fixes for smoother presentation.
+- The workspace now includes first-class i18n, API, chip database, and generated BSP crates alongside the core UI crates.
 
 ## Vendor chip databases
 
@@ -245,9 +245,10 @@ See `docs/TODO-CREATOR-BSP.md` for remaining work.
 
 As-built. See [docs](./docs/README.md) for component-by-component progress and outstanding tasks.
 
-`v0.2.0` shifts rlvgl from a single-board showcase toward a broader embedded
-UI toolkit with multi-vendor BSP generation, serial automation, UEFI support,
-and RTOS-backed STM32H747I-DISCO paths.
+`v0.1.9` shifts rlvgl from a core-library-first workspace toward a fuller
+embedded UI product stack. The main areas of growth are the creator/BSP
+pipeline, the STM32H747I-DISCO showcase target, and the runtime pieces needed
+for more polished embedded applications.
 
 ## Quick Example
 
@@ -313,7 +314,7 @@ cargo add rlvgl
 ```
 Or add the following line to your Cargo.toml:
 ```toml
-rlvgl = "0.2.0"
+rlvgl = "0.1.9"
 ```
 
 ## Community

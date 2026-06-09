@@ -146,8 +146,10 @@ impl LinuxEvdevInput {
                     ABS_MT_SLOT => {
                         self.current_slot = ev_value as usize;
                     }
-                    ABS_MT_TRACKING_ID if self.current_slot < self.slots.len() => {
-                        self.slots[self.current_slot].tracking_id = ev_value;
+                    ABS_MT_TRACKING_ID => {
+                        if self.current_slot < self.slots.len() {
+                            self.slots[self.current_slot].tracking_id = ev_value;
+                        }
                     }
                     _ => {}
                 },

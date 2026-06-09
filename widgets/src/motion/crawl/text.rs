@@ -238,8 +238,8 @@ impl<'buf, R: MotionRate, B: BackgroundPattern> TextCrawl<'buf, R, B> {
                     wsum += weight;
                 }
             }
-            if let Some(avg) = acc.checked_div(wsum) {
-                *slot = avg.min(255) as u8;
+            if wsum > 0 {
+                *slot = (acc / wsum).min(255) as u8;
             }
         }
 

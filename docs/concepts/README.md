@@ -154,77 +154,9 @@ disco-analyzer subrepo's first concepts doc).
   that the API is not demo-shaped.
 
   - [DPR-00-CONCEPTS.md](DPR-00-CONCEPTS.md) — foundational
-    vocabulary, scan/profile axis decomposition, invariants, telemetry
-    range table, and phase plan. **Revision b ratified 2026-05-19.**
-    Revision b reshapes §5 (4-axis ScanMode, 4-tuple RuntimeProfile),
-    expands §6 (adds INV-DPR-11 HSEM ordering, INV-DPR-12 audio
-    clock-tree invariants, INV-DPR-13 consumed-peripheral set,
-    INV-DPR-14 heap base as profile output, INV-DPR-15 cross-repo
-    gating), and reframes §11 as DPR-01 deliverables. DPR-01 unblocked.
-  - [DPR-01-CONCEPTS.md](DPR-01-CONCEPTS.md) — concrete Rust types,
-    runtime boundary, frame scheduler. Resolves PCDN-DPR-001..005 from
-    DPR-00 §11: (1) `Demo::BareMetal` / `Demo::FreeRtos` as two
-    Standards-Action presets, (2) `Analyzer` as a registered preset
-    (not Custom), (3) three peripheral-sets shape for
-    `BoardRuntime::init`, (4) compile-time generic
-    `FrameScheduler<S: ScanMode, P: Pacing>`, (5) HSEM lines as
-    open-registration bitmask with `LineInRx` reserved. **Ratified
-    2026-05-20.** DPR-01a scaffold + Steps 1-5 of the migration
-    have landed (commits `d0726aa`, `6013a5c`, `ea0593e`); Step 6
-    (bare-metal DSI ISR wire) gates on hardware bench validation.
-    DPR-01b (FreeRtosPacing scaffold) landed at `bbe7663`. PCDN-DPR-006
-    resolved (Option 1: IsrFlag + IsrCounter + AtomicU32).
-  - [DPR-01-A.md](DPR-01-A.md) — sub-letter to DPR-01: per-site MMIO
-    writer inventory (`stm32h747i_disco.rs::{swap,present,
-    wait_frame_done}`, `freertos_entry.rs` task body, `main.rs`
-    init-only writes) and the four-operation consolidation grouping
-    (Op A SWAP, Op B PRESENT, Op C CONSUME_ERIF, Op D INIT). Lays out
-    the DPR-01a phase-1 / DPR-01b phase-2 / DPR-01c phase-3
-    migration sequences and per-step validation checkpoints
-    (discipline scanner diff, golden-frame capture, 24-hour soak).
-    **Drafted 2026-05-19.**
-  - [DPR-02-CONCEPTS.md](DPR-02-CONCEPTS.md) — warm-reset safe-stop
-    vocabulary, boot-sentinel registry, and telemetry slot layout.
-    Implements DPR-00 INV-DPR-5 (warm-reset cleanup is platform-owned)
-    and freezes the byte-offset layout inside the DPR-00 §5.3
-    `0x3800_0500..0x3800_0600` Board Runtime reserved range. Ratifies
-    §5.1 SafeStopSequence ordering (NVIC mask → DMA disable → peripheral
-    disable → NVIC pending clear → telemetry record), §5.2 BootSentinelSet
-    (five named `0xA11C_00x0` constants `PRE_CLOCK_INIT`..`POST_DISPLAY_INIT`),
-    §5.3 TelemetrySlot layout (boot_sentinels / safe_stop_report /
-    service_set_active / reserved), §5.4 PeripheralServiceSet → SafeStop
-    mapping for the five registered services (audio, mems_mic, sd, qspi,
-    codec_reset), and §6 invariants INV-DPR-2-1..4 (safe-stop precedes
-    clock-tree reprogramming; 5 ms total budget; sentinels written
-    post-step; ServiceSet ↔ SafeStopSequence agreement). Phase split:
-    DPR-02a (SafeStop scaffold + demo audio-service validation) and
-    DPR-02b (BootSentinel migration of the demo's 11 raw `0x3800_0300`
-    writes + analyzer adoption prep). **Ratified 2026-05-20.** DPR-02a
-    scaffold landed at `fbaf54d` (16/16 unit tests pass). DPR-02a
-    consumer-wiring + DPR-02b sub-phase gates remain binding per §8.
-  - [DPR-03-CONCEPTS.md](DPR-03-CONCEPTS.md) — dual-app validation
-    (cross-repo analyzer adoption). Ratifies the cross-repo gate that
-    retires the disco analyzer's ~1200 lines of mirrored bring-up code
-    (per the `DAA-01-B-RLVGL-INTEGRATION.md` §6 Option C ratification of
-    2026-04-27) by routing the analyzer onto the published
-    `BoardRuntime::init` + `FrameScheduler<VideoMode, BareMetalLoopPacing>`
-    + `SafeStop::run` surface. §5.1 freezes the four-step adoption
-    sequence (Cargo.toml → main.rs → bsp.rs → hsem.rs); §5.2 freezes
-    the ShimAllowlist for the embedded-hal 0.2 ↔ 1.0 adapters
-    (`HalGpioBacklight`, `HalResetPin`, `I2c4Adapter`) that wrap
-    `stm32h7xx-hal 0.16`; §5.3 maps the analyzer's five `0xA11C_xxxx`
-    sentinels at `0x3800_0300` onto the DPR-02 §5.2 named set at
-    `0x3800_0500`. New invariants: INV-DPR-3-1 (no `AdaptedCodeOrigin`
-    headers outside ShimAllowlist) and INV-DPR-3-2 (canonical analyzer
-    uses `RuntimeProfile::Analyzer` by name, not `Custom`). Three-sub-
-    phase split: DPR-03a (compile-only adoption), DPR-03b (hardware
-    validation on H747I-DISCO), DPR-03c (header retirement + initiative
-    close). Cross-repo gating per INV-DPR-15: each sub-phase requires a
-    DAA-01-B-2 §15 amendment on the analyzer side. **Ratified
-    2026-05-20.** Cross-repo coordination gate now formally binding;
-    DPR-03a/b/c sub-phase work blocks on DPR-01a + DPR-02a shipping
-    the surface the analyzer consumes (DPR-01a Step 6 hardware
-    validation is the current critical path).
+    vocabulary, scan/profile decisions, invariants, and phase plan.
+    **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
+    DPR-00 §12 is accepted or amended.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

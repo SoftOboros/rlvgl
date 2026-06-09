@@ -142,8 +142,9 @@ impl<const BUF_BYTES: usize> AudioPlayer<BUF_BYTES> {
     /// In single-threaded firmware (analyzer-cm7, disco-bare-metal,
     /// the FreeRTOS / Zephyr ports as currently structured), the
     /// global-singleton steal pattern is the documented usage.
-    pub unsafe fn new(dca: &'static mut DcaDoubleBuf<'static, u8, BUF_BYTES>) -> Self {
-        // rlvgl-discipline: allow(static_mut)
+    pub unsafe fn new(
+        dca: &'static mut DcaDoubleBuf<'static, u8, BUF_BYTES>, // rlvgl-discipline: allow(static_mut)
+    ) -> Self {
         // SAFETY: caller contract — the returned player is the sole
         // SCB consumer; SCB is one of the Cortex-M debug peripherals
         // (`steal()` returns a fresh handle each call but only one

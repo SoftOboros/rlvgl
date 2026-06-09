@@ -168,9 +168,7 @@ unsafe fn wait_cmd_fifo_empty() -> bool {
 ///
 /// DSI host must be enabled and command FIFO accessible.
 pub unsafe fn send_set_tear_on() {
-    // SAFETY: caller asserts DSI host is enabled and the command FIFO
-    // is accessible per this function's contract above.
-    if !unsafe { wait_cmd_fifo_empty() } {
+    if !wait_cmd_fifo_empty() {
         return;
     }
     // DCS short write with 1 parameter (data type 0x15):
@@ -180,8 +178,8 @@ pub unsafe fn send_set_tear_on() {
         .regs()
         .ghcr
         .write(0x15 | (0x35 << 8) | (0x00 << 16));
-    // Wait for command to be sent — same SAFETY argument as above.
-    unsafe { wait_cmd_fifo_empty() };
+    // Wait for command to be sent
+    wait_cmd_fifo_empty();
 }
 
 /// Enable LP command transmission overrides in CMCR for DCS panel init.

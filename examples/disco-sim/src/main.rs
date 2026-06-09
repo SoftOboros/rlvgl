@@ -31,6 +31,8 @@ const DEFAULT_WIDTH: usize = 800;
 const DEFAULT_HEIGHT: usize = 480;
 /// Default output path for headless ASCII dumps.
 const DEFAULT_HEADLESS_PATH: &str = "disco-headless.txt";
+/// Dark simulator shell background visible behind the transparent demo root.
+const WINDOW_BG_ARGB8888: u32 = 0xFF0D_131E;
 
 fn dump_ascii_frame(buffer: &[u8], width: usize, height: usize) -> String {
     let mut out = String::with_capacity((width + 1) * height);
@@ -362,6 +364,9 @@ impl DiscoRuntime {
     }
 
     fn render_frame(&mut self) {
+        for pixel in self.frame.buf.chunks_exact_mut(4) {
+            pixel.copy_from_slice(&WINDOW_BG_ARGB8888.to_le_bytes());
+        }
         {
             let mut blitter = CpuBlitter;
             let surface = Surface::new(

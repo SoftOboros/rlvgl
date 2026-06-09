@@ -369,12 +369,6 @@ fn assert_h747_freertos_deps(emitted: &Table, reference: &Table) {
         "rlvgl-decomp",
         "rlvgl-playit",
         "rlvgl-app-disco-demo", // controller
-        "cortex-m-rt",
-        "cortex-m",
-        "embedded-alloc",
-        "panic-halt",
-        "stm32h7",
-        "critical-section",
     ] {
         assert!(
             emitted_deps.contains(required),
@@ -390,6 +384,12 @@ fn assert_h747_freertos_deps(emitted: &Table, reference: &Table) {
         "emitted [target.cfg.dependencies] introduces deps not in reference: {cfg_extra:?}"
     );
     for required in [
+        "cortex-m-rt",
+        "cortex-m",
+        "embedded-alloc",
+        "panic-halt",
+        "critical-section",
+        "stm32h7",
         "stm32h7xx-hal",
         "embedded-hal",
         "embedded-hal-02",

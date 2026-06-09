@@ -389,9 +389,8 @@ static mut RENDER_STACK: [StackType_t; RENDER_STACK_WORDS] = [0; RENDER_STACK_WO
 static mut TOUCH_STACK: [StackType_t; TOUCH_STACK_WORDS] = [0; TOUCH_STACK_WORDS]; // rlvgl-discipline: allow(static_mut)
 static mut PLAYIT_STACK: [StackType_t; PLAYIT_STACK_WORDS] = [0; PLAYIT_STACK_WORDS]; // rlvgl-discipline: allow(static_mut)
 
-static mut SYNC_STORAGE: core::mem::MaybeUninit<FreeRtosFrameSync> =
-    // rlvgl-discipline: allow(static_mut)
-    core::mem::MaybeUninit::uninit();
+type FreeRtosFrameSyncStorage = core::mem::MaybeUninit<FreeRtosFrameSync>;
+static mut SYNC_STORAGE: FreeRtosFrameSyncStorage = FreeRtosFrameSyncStorage::uninit(); // rlvgl-discipline: allow(static_mut)
 
 /// Binary semaphore: render task signals when back buffer is ready to
 /// present; present task takes it after the ERIF holdoff.
@@ -643,9 +642,8 @@ use crate::touch_i2c::RawTouchSample;
 const TOUCH_EVT_CAP: usize = 16;
 static TOUCH_EVT_HEAD: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 static TOUCH_EVT_TAIL: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
-static mut TOUCH_EVT_SLOTS: [RawTouchSample; TOUCH_EVT_CAP] =
-    // rlvgl-discipline: allow(static_mut)
-    [RawTouchSample::EMPTY; TOUCH_EVT_CAP];
+type TouchEvtSlots = [RawTouchSample; TOUCH_EVT_CAP];
+static mut TOUCH_EVT_SLOTS: TouchEvtSlots = [RawTouchSample::EMPTY; TOUCH_EVT_CAP]; // rlvgl-discipline: allow(static_mut)
 
 fn touch_evt_push(s: RawTouchSample) {
     let head = TOUCH_EVT_HEAD.load(Ordering::Relaxed);

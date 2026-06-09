@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -110,8 +110,8 @@ name = "creator_qt_emit_mousearea_compile"
 path = "tests/creator_qt_emit_mousearea_compile.rs"
 required-features = ["creator"]
 
-# QT-05b: stopwatch dispatch-glue compile-as-mod gate. The test aliases
-# its fixture module as `stopwatch_gen` to preserve the emitted import path.
+# QT-05b: stopwatch dispatch-glue compile-as-mod gate. Depends on the
+# `stopwatch_gen` dev-dep (mock istate-codegen output) per QT-05b §8.
 [[test]]
 name = "creator_qt_emit_stopwatch_compile"
 path = "tests/creator_qt_emit_stopwatch_compile.rs"
@@ -125,13 +125,13 @@ path = "tests/creator_qt_strict_mode.rs"
 required-features = ["creator"]
 
 [dependencies]
-rlvgl-core = { version = "0.2.0", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.2.0", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.2.0", path = "platform", default-features = false }
+rlvgl-core = { version = "0.2.1", path = "core", default-features = false }
+rlvgl-widgets = { version = "0.2.1", path = "widgets", default-features = false }
+rlvgl-platform = { version = "0.2.1", path = "platform", default-features = false }
 rlvgl-ui = { version = "0.2.0", path = "ui", default-features = false }
-rlvgl-i18n = { version = "0.2.0", path = "i18n" }
+rlvgl-i18n = { version = "0.2.1", path = "i18n" }
 rlvgl-app-demo = { version = "0.2.0", path = "examples/apps/demo", default-features = false, optional = true }
-rlvgl-app-disco-demo = { version = "0.2.0", path = "examples/apps/disco-demo", default-features = false, optional = true }
+rlvgl-app-disco-demo = { version = "0.2.1", path = "examples/apps/disco-demo", default-features = false, optional = true }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -157,13 +157,13 @@ default-features = false
 optional = true
 
 [dependencies.rlvgl-playit]
-version = "0.2.0"
+version = "0.2.1"
 path = "playit"
 default-features = false
 optional = true
 
 [dependencies.rlvgl-decomp]
-version = "0.2.0"
+version = "0.2.1"
 path = "rlvgl-decomp"
 optional = true
 
@@ -292,7 +292,7 @@ path = "chipdb/rlvgl-chips-silabs"
 optional = true
 
 [dependencies.rlvgl-chips-microchip]
-version = "0.2.0"
+version = "0.2.1"
 path = "chipdb/rlvgl-chips-microchip"
 optional = true
 
@@ -323,7 +323,7 @@ rlvgl-chips-nrf = { version = "0.2.0", path = "chipdb/rlvgl-chips-nrf" }
 rlvgl-chips-esp = { version = "0.2.0", path = "chipdb/rlvgl-chips-esp" }
 rlvgl-chips-nxp = { version = "0.2.0", path = "chipdb/rlvgl-chips-nxp" }
 rlvgl-chips-silabs = { version = "0.2.0", path = "chipdb/rlvgl-chips-silabs" }
-rlvgl-chips-microchip = { version = "0.2.0", path = "chipdb/rlvgl-chips-microchip" }
+rlvgl-chips-microchip = { version = "0.2.1", path = "chipdb/rlvgl-chips-microchip" }
 rlvgl-chips-renesas = { version = "0.2.0", path = "chipdb/rlvgl-chips-renesas" }
 rlvgl-chips-ti = { version = "0.2.0", path = "chipdb/rlvgl-chips-ti" }
 rlvgl-chips-rp2040 = { version = "0.2.0", path = "chipdb/rlvgl-chips-rp2040" }
@@ -337,6 +337,11 @@ syn = { version = "2", features = ["full"] }
 # APP-05 parity tests: parse emitted + reference Cargo.toml as real TOML
 # so multi-line `[features]` lists round-trip cleanly.
 toml = "0.8"
+# QT-05b test fixture: hand-vendored mock istate-codegen output that
+# satisfies the QT-05 §6 6-symbol linkage surface. Used only by
+# `tests/creator_qt_emit_stopwatch_compile.rs` to compile-check the
+# emitted dispatch glue without the live softoboros MCP.
+stopwatch_gen = { path = "tests/fixtures/qt/stopwatch_gen" }
 
 [features]
 default = []

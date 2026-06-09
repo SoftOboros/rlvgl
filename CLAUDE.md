@@ -188,17 +188,7 @@ RUSTFLAGS="" cargo test --tests --features "creator" -p rlvgl
 # Phase 4.5: disco demo + simulator automation tests
 RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
 RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
-# Note: cargo lands binaries under `target/<host-triple>/debug/` on
-# platforms with a host-triple subdir (macOS Apple Silicon ships an
-# `aarch64-apple-darwin/` directory; Linux x86_64 ships an
-# `x86_64-unknown-linux-gnu/` directory). On hosts where cargo writes
-# `target/debug/` directly, the inner `target/debug/...` path is found
-# first. The `||` fallback keeps the one-liner portable on both shapes.
-cd playit/node && \
-    RLVGL_DISCO_SIM_BIN="$PWD/../../target/$(rustc -vV | sed -n 's/^host: //p')/debug/rlvgl-disco-sim" \
-    node --test \
-    || RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test \
-    && cd ../..
+cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test && cd ../..
 
 # Phase 4.6: ESP32-C3 BSP generator + beetle-esp32c3 both feature sets.
 # The `compile-verify` feature spins up a throwaway cargo project around the
@@ -774,3 +764,31 @@ first, the full discipline applies to that family.
 
 The point is convergence over time: form is cheaper to align than
 vocabulary.
+
+## Worktree hygiene between waves
+
+Per parent `softoboros.com/CLAUDE.md` §(J): when fanning out parallel
+agents on this submodule (for example, chipdb vendor-family lanes
+running concurrently — CHIPS-ESP / CHIPS-TI / CHIPS-SILABS /
+CHIPS-MICROCHIP each in their own worktree), clean leftover
+harness-allocated worktrees and their `worktree-agent-*` branches between
+waves so the harness must allocate fresh against current HEAD:
+
+```sh
+# from the parent repo root (/Users/iraabbott/softoboros), BEFORE the next wave
+for wt in $(git worktree list | awk '$3 ~ /^\[worktree-agent-/ {print $1}'); do
+  git worktree remove --force "$wt"
+done
+git branch | awk '/worktree-agent-/ {print $1}' | xargs -r git branch -D
+```
+
+The harness can't allocate a stale-base worktree from one that doesn't
+exist. This eliminates the `git checkout webslinger -- . && git reset
+webslinger` recovery dance — error-prone because dropping the `-- .`
+silently switches the worktree's branch onto `webslinger` and breaks
+isolation.
+
+Cost: one-time per-agent target-dir rebuild (~30–60s for Rust workspace
+crates, more if many chipdb crates re-compile). Benefit: stale-base
+recovery footgun eliminated by construction. Skip cleanup only when a
+prior wave's worktrees are intentionally being inspected or salvaged.

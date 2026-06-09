@@ -1,5 +1,5 @@
 #!/bin/bash
-export RUSTFLAGS="-C target-cpu=cortex-m7"
+export RUSTFLAGS="-C link-arg=-Texamples/stm32h747i-disco/memory_STM32H747XI.x"
 cargo build \
   --target thumbv7em-none-eabihf \
   -p rlvgl-example-disco \
@@ -8,5 +8,4 @@ cargo build \
 
 cargo size --target thumbv7em-none-eabihf \
   -p rlvgl-example-disco \
-  --bin rlvgl-stm32h747i-disco \
-  --features cm7
+  --bin rlvgl-stm32h747i-disco --features cm7

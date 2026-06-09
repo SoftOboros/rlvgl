@@ -23,6 +23,7 @@
     feature = "fatfs",
     feature = "nes",
     feature = "apng",
+    all(feature = "fontdue", not(target_os = "none")),
     all(feature = "jpeg", not(target_os = "none")),
     all(feature = "png", not(target_os = "none")),
     all(feature = "qrcode", not(target_os = "none"))

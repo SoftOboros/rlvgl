@@ -4,8 +4,6 @@
 //! in its CM_PER_*_CLKCTRL register. IDLEST bits [17:16] report when the
 //! module is functional (0x0).
 
-#![allow(dead_code)]
-
 use super::am335x::*;
 
 /// Bounded poll — wait up to ~roughly N million iterations for IDLEST

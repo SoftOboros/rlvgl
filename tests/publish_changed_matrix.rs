@@ -32,7 +32,6 @@ fn script_lists_publishable_workspace_crates() {
         "disco-assets",
         "rlvgl-api",
         "rlvgl-core",
-        "rlvgl-audio-meters-core",
         "rlvgl-decomp",
         "rlvgl-i18n",
         "rlvgl-playit",
@@ -66,7 +65,6 @@ fn script_orders_publish_dependencies_topologically() {
     };
 
     assert!(find("rlvgl-core") < find("rlvgl-playit"));
-    assert!(find("rlvgl-audio-meters-core") < find("rlvgl-widgets"));
     assert!(find("rlvgl-core") < find("rlvgl-platform"));
     assert!(find("rlvgl-decomp") < find("rlvgl-platform"));
     assert!(find("rlvgl-playit") < find("rlvgl-platform"));

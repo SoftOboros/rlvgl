@@ -12,8 +12,7 @@ use rlvgl_core::packed_font::PackedFont;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_ui::draw_helpers::{
-    PANEL_PADDING as STD_PADDING, PANEL_RADIUS, draw_panel_header, draw_rounded_border,
-    fill_rounded_rect, panel_close_hit,
+    PANEL_RADIUS, draw_panel_header, draw_rounded_border, fill_rounded_rect, panel_close_hit,
 };
 use rlvgl_ui::file_browser::{EntryKind, FileBrowser, StorageBrowser};
 
@@ -225,14 +224,14 @@ impl Widget for FileBrowserPanel {
             return true;
         }
 
-        if let Event::DoubleTap { x, y } = event {
-            if Self::inside(self.bounds, *x, *y) {
-                if self.browser.handle_event(event) {
-                    self.apply_pending_nav();
-                    return true;
-                }
+        if let Event::DoubleTap { x, y } = event
+            && Self::inside(self.bounds, *x, *y)
+        {
+            if self.browser.handle_event(event) {
+                self.apply_pending_nav();
                 return true;
             }
+            return true;
         }
 
         false

@@ -8,20 +8,13 @@
 //! The bare-metal binary target (`main.rs`) is the primary entry point
 //! for non-Zephyr builds and shares all the same application modules.
 
-#![cfg_attr(
-    all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")),
-    no_std
-)]
+#![no_std]
+#![allow(dead_code)]
 
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
 extern crate alloc;
 
 // Panic handler for the static library.
-#[cfg(all(
-    feature = "zephyr",
-    any(target_arch = "arm", target_arch = "aarch64"),
-    not(doc)
-))]
+#[cfg(all(not(doc), any(target_arch = "arm", target_arch = "aarch64")))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {
@@ -29,61 +22,43 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     }
 }
 
-// Heap allocator — same as main.rs.
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
+// Heap allocator - same as main.rs.
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 use embedded_alloc::Heap;
 
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
 // ── Splash / desktop image ────────────────────────────────────────────────────
-#[cfg(all(feature = "zephyr", feature = "splash"))]
+#[cfg(feature = "splash")]
 pub(crate) static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle");
 
 // ── Shared application modules ────────────────────────────────────────────────
 
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
+#[allow(dead_code, unused_imports, unused_macros, unused_unsafe, unknown_lints)]
+#[cfg(feature = "cm7")]
+#[path = "bsp/cm7/pac.rs"]
+mod bsp_pac;
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 mod scope_probe;
 
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
 mod file_browser_panel;
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
 mod fonts;
 
-#[cfg(all(
-    feature = "zephyr",
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod crawl_buffers;
-#[cfg(all(
-    feature = "zephyr",
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod effect;
-#[cfg(all(
-    feature = "zephyr",
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod event_overlay;
-#[cfg(all(
-    feature = "zephyr",
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod readme_crawl;
-#[cfg(all(
-    feature = "zephyr",
-    feature = "dma2d",
-    any(target_arch = "arm", target_arch = "aarch64")
-))]
+#[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
 mod star_crawl;
 
 // ── Zephyr-specific modules ──────────────────────────────────────────────────
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 mod zephyr_entry;
-#[cfg(all(feature = "zephyr", any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 mod zephyr_sync;

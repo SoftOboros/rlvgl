@@ -1,13 +1,6 @@
 //! Hardware and simulator backends for `rlvgl`.
 #![no_std]
 #![deny(missing_docs)]
-// Register-Mashing Discipline rule #7 enforcement: every `unsafe`
-// operation inside an `unsafe fn` body MUST sit in an explicit
-// `unsafe { ... }` block carrying a `// SAFETY:` comment. Edition 2024
-// makes the lint `warn` by default; this `deny` upgrades it to a hard
-// error so the unsafe envelope can't silently expand through `unsafe
-// fn` body inheritance.
-#![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate alloc;
 
@@ -32,11 +25,6 @@ pub mod audio_player;
 pub mod bdma;
 /// Blitter traits and helpers.
 pub mod blit;
-/// DPR-02 Board Runtime — warm-reset peripheral safe-stop, named boot
-/// sentinels, and the byte-offset layout for the DPR-00 §5.3 reserved
-/// SRAM4 telemetry window. Scaffold — consumer wiring lands under
-/// DPR-02a / DPR-02b per the DPR-01a / DPR-01b precedent.
-pub mod board_runtime;
 /// Dirty-region compositor for framebuffer restoration.
 pub mod compositor;
 /// CPU fallback blitter.
@@ -70,14 +58,6 @@ pub mod dsi_cmd_mode;
 /// Platform-level visual effect primitives ([`Effect`] trait,
 /// [`CrawlParams`] struct).
 pub mod effect;
-/// DPR-01 Frame Scheduler — sole owner of per-frame DSI / LTDC writes
-/// (`DSI_WCR`, `DSI_WIER`, `DSI_WIFCR`, `LTDC_L1CFBAR`, `LTDC_SRCR`)
-/// per DPR-00 INV-DPR-3. Generic over [`frame_scheduler::ScanMode`] and
-/// [`frame_scheduler::Pacing`]. Scaffold — call-site migration lands
-/// under DPR-01a / DPR-01b. Marker types compile on host; the
-/// [`frame_scheduler::FrameScheduler`] constructor still requires the
-/// caller to assert MMIO unaliasing per its `unsafe` contract.
-pub mod frame_scheduler;
 /// Frame synchronization traits for ERIF-based scheduling.
 pub mod frame_sync;
 #[cfg(all(
@@ -110,11 +90,6 @@ pub mod mic_capture;
 ))]
 /// NT35510 MIPI-DSI panel driver for MB1166 Rev A-09.
 pub mod nt35510;
-/// DPR-01 Pacing backends — OS-axis dispatch impls for
-/// [`frame_scheduler::Pacing`]. Hosts the generic [`pacing::FreeRtosPacing`]
-/// scaffold per DPR-01-A §4 phase-2 step 1; the Zephyr backend is
-/// deferred to DPR-01c.
-pub mod pacing;
 #[cfg(all(
     feature = "audio",
     feature = "stm32h747i_disco",

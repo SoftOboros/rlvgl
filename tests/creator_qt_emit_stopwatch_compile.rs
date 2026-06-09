@@ -27,16 +27,6 @@
 use rlvgl_core::event::Event as UiEvent;
 use stopwatch_gen::State as SmState;
 
-// Keep the generated modules resolving their production-style
-// `stopwatch_gen::...` imports without requiring an unpublished
-// dev-dependency during `cargo package`.
-extern crate self as stopwatch_gen;
-
-#[path = "fixtures/qt/stopwatch_gen/src/lib.rs"]
-mod stopwatch_gen_fixture;
-
-pub use stopwatch_gen_fixture::{DataModel, DefaultExternals, Event, Externals, Machine, State};
-
 // stopwatch.qml uses camelCase QML IDs (`startBtn`/`stopBtn`/`resetBtn`)
 // so the emitter produces helper names like `build_startBtn`. The
 // emit shape stays QT-04b §8 / QT-05b §6 compliant; the lint warning
