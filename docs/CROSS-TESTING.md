@@ -50,17 +50,21 @@ The current CI workflow executes tests on the host target only, but cross-target
 
 ## Board-specific nuances
 
-- **STM32H747I-DISCO** – Enable the `stm32h747i_disco` feature and let the example's `build.rs` stage `memory.x`. Build or test with:
+- **STM32H747I-DISCO** – Build the Disco example package with the `cm7`
+  feature and let the example's `build.rs` stage `memory.x`. Build or test
+  with:
 
   ```bash
-  cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco" \
+  cargo build -p rlvgl-example-disco \
+    --bin rlvgl-stm32h747i-disco \
+    --features "cm7" \
     --target thumbv7em-none-eabihf
 
   SD + FATFS smoke (no_std adapter; CI marked allow-failure due to `core_io` on newer rustc):
 
-  cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco,fatfs_nostd" \
+  cargo build -p rlvgl-example-disco \
+    --bin rlvgl-stm32h747i-disco \
+    --features "cm7,sd_storage,fatfs_nostd" \
     --target thumbv7em-none-eabihf
   ```
 

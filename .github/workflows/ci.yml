@@ -34,7 +34,12 @@ jobs:
       - name: Install target
         run: rustup target add thumbv7em-none-eabihf
       - name: Build firmware
-        run: RUSTFLAGS="" cargo build --bin rlvgl-stm32h747i-disco --features "stm32h747i_disco,qrcode,png,jpeg,fontdue" --target thumbv7em-none-eabihf --release
+        run: |
+          RUSTFLAGS="" cargo build \
+            -p rlvgl-example-disco \
+            --bin rlvgl-stm32h747i-disco \
+            --features "cm7" \
+            --target thumbv7em-none-eabihf --release
       - name: Firmware size
         run: arm-none-eabi-size target/thumbv7em-none-eabihf/release/rlvgl-stm32h747i-disco | tee size.txt
       - name: Upload firmware
@@ -59,8 +64,9 @@ jobs:
       - name: Build firmware (fatfs no_std demo)
         run: |
           RUSTFLAGS="" cargo build \
+            -p rlvgl-example-disco \
             --bin rlvgl-stm32h747i-disco \
-            --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+            --features "cm7,sd_storage,fatfs_nostd" \
             --target thumbv7em-none-eabihf --release || true
 
   polish:

@@ -146,19 +146,18 @@ st-flash write firmware.bin 0x08000000
 
 ## Optional: SD Assets
 
-- Enable the no_std FATFS adapter and the SD block device when building. For a
-  minimal on-boot listing demo, also enable `sd_assets_demo`:
+- Enable the no_std FATFS adapter and the SD block device when building:
 
 ```bash
-cargo build --bin rlvgl-stm32h747i-disco \
-    --features "stm32h747i_disco,fatfs_nostd,sd_assets_demo" \
+cargo build -p rlvgl-example-disco \
+    --bin rlvgl-stm32h747i-disco \
+    --features "cm7,sd_storage,fatfs_nostd" \
     --target thumbv7em-none-eabihf --release
 ```
 
 - The `DiscoSdBlockDevice` driver (SDMMC1 + DMA + D‑Cache hygiene) is available
   behind the above features. A lightweight `fatfs` adapter is included in the
-  platform crate (`sd_fatfs_adapter`). With `sd_assets_demo`, the firmware will
-  attempt to mount and list `/assets` at startup and render a few names.
+  platform crate (`sd_fatfs_adapter`).
 
 ### On‑screen indicators
 
