@@ -9,7 +9,7 @@ pub mod canvas;
 #[cfg(feature = "fatfs")]
 pub mod fatfs;
 
-#[cfg(feature = "fontdue")]
+#[cfg(all(feature = "fontdue", not(target_os = "none")))]
 pub mod fontdue;
 
 #[cfg(feature = "gif")]

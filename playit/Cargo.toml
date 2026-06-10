@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-playit"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -15,7 +15,7 @@ publish = true
 rust-version = "1.85"
 
 [dependencies]
-rlvgl-core = { path = "../core", version = "0.2.1", default-features = false }
+rlvgl-core = { path = "../core", version = "0.2.2", default-features = false }
 
 [features]
 default = []

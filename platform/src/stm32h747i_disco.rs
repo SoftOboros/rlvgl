@@ -1093,9 +1093,9 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
         let hbp: u32 = 34;
         let vsw: u32 = 120;
         let vbp: u32 = 150;
-        let x0 = hsw + hbp + 1;
+        let x0 = hsw + hbp; // = BPCR.AHBP + 1
         let x1 = x0 + (width as u32) - 1;
-        let y0 = vsw + vbp + 1;
+        let y0 = vsw + vbp; // = BPCR.AVBP + 1
         let y1 = y0 + (height as u32) - 1;
         // ALL raw writes — PAC LAYER struct has wrong offsets for CFBAR+
         // due to missing reserved padding (RM0399 §33.7).
@@ -1108,8 +1108,8 @@ impl<B: Blitter, BL, RST> Stm32h747iDiscoDisplay<B, BL, RST> {
             ((L1 + 0x14) as *mut u32).write_volatile(255); // CACR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ((L1 + 0x1C) as *mut u32).write_volatile(0x0405); // BFCR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ((L1 + 0x28) as *mut u32).write_volatile(fb); // CFBAR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            // CFBLR: bits[28:16]=CFBP (pitch), bits[12:0]=CFBLL (line_len + 7)
-            ((L1 + 0x2C) as *mut u32).write_volatile((pitch << 16) | (pitch + 7)); // CFBLR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            // CFBLR: bits[28:16]=CFBP (pitch), bits[12:0]=CFBLL (line length + 3)
+            ((L1 + 0x2C) as *mut u32).write_volatile((pitch << 16) | (pitch + 3)); // CFBLR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ((L1 + 0x30) as *mut u32).write_volatile(height as u32); // CFBLNR // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             // Enable layer (CR bit 0 = LEN)
             let cr = ((L1) as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)

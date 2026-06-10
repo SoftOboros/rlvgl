@@ -64,7 +64,7 @@ pub use plugins::canvas;
 #[cfg_attr(docsrs, doc(cfg(feature = "fatfs")))]
 pub use plugins::fatfs;
 
-#[cfg(feature = "fontdue")]
+#[cfg(all(feature = "fontdue", not(target_os = "none")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "fontdue")))]
 pub use plugins::fontdue;
 
