@@ -38,18 +38,24 @@ This initiative adds two gates and two harness layers:
 
 | Doc | Status |
 |---|---|
-| [CRATES-CI-00-CONCEPTS.md](CRATES-CI-00-CONCEPTS.md) | RATIFIED 2026-06-10 |
+| [CRATES-CI-00-CONCEPTS.md](CRATES-CI-00-CONCEPTS.md) | RATIFIED 2026-06-10 (§15 amendments through CRATES-CI-01a) |
+| [CRATES-CI-RETROSPECTIVE.md](CRATES-CI-RETROSPECTIVE.md) | Drafted 2026-06-10 at initiative completion |
 
-## Phases
+## Phases — all shipped 2026-06-10
 
 | Phase | Deliverable |
 |---|---|
 | CRATES-CI-00 | Concepts doc ratified; CLAUDE.md amended |
-| CRATES-CI-01 | Gate P harness + `crates-ci.yml` + `consumers/creator-cli/` (CLI features) |
-| CRATES-CI-02 | `consumers/user-sim/` — user-built simulator from crates, playit + golden PNG |
+| CRATES-CI-01 (+01a) | Gate P harness + `crates-ci.yml` + `consumers/creator-cli/`; P-META + version-drift gates |
+| CRATES-CI-02 (+02a) | `consumers/user-sim/` — user-built simulator from crates, playit + golden PNG; P-INCLUDE fix |
 | CRATES-CI-03 | Layer K — kittest harness for `CreatorApp` |
 | CRATES-CI-04 | Layer W — playit-over-kittest TCP server on `rlvgl-creator` |
 | CRATES-CI-05 | Gate R post-publish/scheduled workflow |
-| CRATES-CI-06 | Initiative retrospective |
+| CRATES-CI-06 | [Initiative retrospective](CRATES-CI-RETROSPECTIVE.md) |
+
+The initiative completed its acceptance event the same day: v0.2.2 was
+published through Gate P (INV-C1) and verified green by Gate R against
+live crates.io. §6 forward constraints in the retrospective are binding
+on future initiatives.
 
 Commit-subject prefix: `CRATES-CI-NN[a-z]:`.

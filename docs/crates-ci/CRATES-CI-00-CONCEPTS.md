@@ -420,3 +420,9 @@ upstream — the standard pre-publish mechanism.)*
   positive; local validation had masked it because `SKIP_ASSET_PREP=1`
   skipped those crates' checks. Their source-change → publish
   discipline rides the path mappings in `publish_changed.sh`.
+- **2026-06-10** — CRATES-CI-06: initiative retrospective drafted at
+  completion (`CRATES-CI-RETROSPECTIVE.md`). Acceptance event: v0.2.2
+  published through Gate P and verified green by Gate R against live
+  crates.io the same day. The retrospective's §6 forward constraints
+  (FC-1…FC-6) are normative for future initiatives. Initiative CLOSED;
+  further work proceeds by §15 amendment + sub-letter phases.
