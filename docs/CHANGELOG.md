@@ -7,6 +7,49 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## v0.2.2
+
+Quality release — makes the crates.io distribution work and adds the CI
+to keep it that way (v0.2.1 published with a broken `simulator` feature
+and is superseded). See
+[docs/releases/v0.2.2.md](releases/v0.2.2.md).
+
+### Fixed — crates.io consumers
+- `rlvgl --features simulator` builds from crates.io: disco-demo's RLE
+  icons were `include_bytes!`ed from outside the crate root and could
+  never be packaged; vendored into `rlvgl-app-disco-demo`.
+- `rlvgl-platform` builds on macOS hosts: ELF `link_section` on the
+  blit scratch buffer gated to `target_os = "none"`.
+- `rlvgl-audio-meters-core` added to the publish order; the matrix test
+  now derives the publishable set from `cargo metadata` so omissions
+  fail CI.
+- v0.2.1-cycle packaging repairs: fontdue feature-resolution order in
+  `rlvgl-core`, disco-assets metadata, publish-order dev-dependencies,
+  root-crate include set.
+
+### New — CRATES-CI initiative (docs/crates-ci/, CRATES-CI-00…05)
+- **Gate P** (`crates-ci.yml`, required by `publish.yml`): packages all
+  25 publishable crates in publish order and builds three
+  workspace-detached consumers against the packaged set — lib-smoke,
+  the `rlvgl-creator` CLI (`cargo install` shape, plus the umbrella
+  `simulator` feature), and a user-authored simulator per
+  `docs/CUSTOM-SIMULATOR.md` with playit/node automation and a
+  golden-PNG threshold check.
+- **Gate R** (`gate-r.yml`): the same consumers against real crates.io
+  after every publish and daily; includes the literal
+  `cargo install rlvgl --features creator` end-user path.
+- **Creator GUI testing**: `egui_kittest` in-process harness + snapshot
+  baseline (Layer K), and `rlvgl-creator --automation-headless
+  --playit-port=<n>` behind the new `creator_ui_automation` feature —
+  the playit wire protocol served over TCP against the kittest engine
+  (Layer W), driven by the unmodified `playit/node` client. No display
+  server anywhere.
+
+### Docs
+- `docs/crates-ci/CRATES-CI-00-CONCEPTS.md` (ratified) + initiative README.
+- no_std STM32H747I-DISCO provenance notes.
+- v0.2.2 release notes.
+
 ## v0.2.0
 
 ### Multi-vendor BSP generation
