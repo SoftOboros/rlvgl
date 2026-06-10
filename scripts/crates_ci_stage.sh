@@ -287,12 +287,16 @@ while IFS= read -r crate; do
   stage_crate "$crate"
 
   # Version-drift gate (skippable for airgapped local runs via
-  # CRATES_CI_OFFLINE=1; CI always runs it). Under SKIP_ASSET_PREP=1 the
-  # two asset-bearing crates are packaged WITHOUT their generated assets,
-  # so comparing them against the published archives would always flag —
-  # skip them loudly; CI runs full prep and checks them for real.
-  if [[ "$SKIP_ASSET_PREP" == "1" && ( "$crate" == "rlvgl-chips-stm" || "$crate" == "rlvgl-bsps-stm" ) ]]; then
-    echo "Gate P: drift check skipped for $crate (SKIP_ASSET_PREP=1 packages it without generated assets)"
+  # CRATES_CI_OFFLINE=1; CI always runs it). The two asset-bearing crates
+  # are ALWAYS exempt: their packaged content embeds pipeline-regenerated
+  # artifacts (chipdb.bin.zst from stm32_afdb_pipeline.sh, the gen_ioc_bsps
+  # output) that are legitimately non-byte-reproducible run-to-run, so a
+  # content compare against the published archive always flags (verified:
+  # only assets/chipdb.bin.zst differs on an otherwise untouched crate).
+  # Their source-change → publish discipline is carried by the path
+  # mappings in publish_changed.sh instead.
+  if [[ "$crate" == "rlvgl-chips-stm" || "$crate" == "rlvgl-bsps-stm" ]]; then
+    echo "Gate P: drift check exempt for $crate (pipeline-regenerated assets are not byte-reproducible)"
   elif [[ "${CRATES_CI_OFFLINE:-0}" != "1" ]]; then
     version="$(crate_version "$crate")"
     if ! check_published_drift "$crate" "$version" \

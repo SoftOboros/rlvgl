@@ -407,7 +407,16 @@ upstream — the standard pre-publish mechanism.)*
   `.cargo_vcs_info.json` / normalized `Cargo.toml` / `Cargo.lock`)
   and fails listing every drifted crate. First audit found real drift
   in `rlvgl-micropython` 0.2.0 (bumped to 0.2.2) and disco-assets
-  0.2.0 (metadata fixed + bumped to 0.2.2). `SKIP_ASSET_PREP=1` local
-  runs skip the two asset-bearing crates' drift check loudly; CI
-  checks them for real. `CRATES_CI_OFFLINE=1` skips drift checks for
-  airgapped iteration.
+  0.2.0 (metadata fixed + bumped to 0.2.2). `CRATES_CI_OFFLINE=1`
+  skips drift checks for airgapped iteration.
+- **2026-06-10** — CRATES-CI-01a amendment: the two asset-bearing
+  crates (`rlvgl-chips-stm`, `rlvgl-bsps-stm`) are PERMANENTLY exempt
+  from the drift gate (loud log line, never silent): their packaged
+  content embeds pipeline-regenerated artifacts that are not
+  byte-reproducible run-to-run — verified by a full-prep repro where
+  ONLY `assets/chipdb.bin.zst` differed on an otherwise untouched
+  crate. The first CI execution of the drift gate (publish
+  workflow_dispatch runs from main) failed on exactly this false
+  positive; local validation had masked it because `SKIP_ASSET_PREP=1`
+  skipped those crates' checks. Their source-change → publish
+  discipline rides the path mappings in `publish_changed.sh`.
