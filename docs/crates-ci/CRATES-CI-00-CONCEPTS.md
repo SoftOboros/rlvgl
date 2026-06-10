@@ -330,3 +330,37 @@ upstream — the standard pre-publish mechanism.)*
   `platform/src/blit.rs` ELF `link_section` broke all Mach-O host
   builds of rlvgl-platform (H-SIM-adjacent, crates-first story);
   gated to `target_os = "none"`.
+- **2026-06-10** — CRATES-CI-02 landed: `consumers/user-sim/` (custom
+  simulator per `docs/CUSTOM-SIMULATOR.md` from packaged crates; playit
+  TCP handshake verified byte-compatible with the unmodified
+  `playit/node` client per INV-C7; in-binary golden-PNG check at
+  threshold 3/255 per INV-C4; node tap→pixel-diff test). Finding
+  (P-INCLUDE, the gate's purpose): `rlvgl --features simulator` was
+  unbuildable from packaged crates — `rlvgl-app-disco-demo` referenced
+  10 `.rle` icons OUTSIDE its crate root via `include_bytes!`, so no
+  packaged build of the umbrella simulator feature (including the
+  published 0.2.1) could ever compile. Fixed as CRATES-CI-02a: icons
+  vendored into `examples/apps/disco-demo/assets/`, umbrella
+  `--features simulator` build added to the creator-cli smoke. Known
+  residual: `disco-assets`'s `embed` feature has the same
+  out-of-crate-root pattern (`$CARGO_MANIFEST_DIR/../media/...`) —
+  feature-gated, unused by the simulator path; needs its own repair
+  before any consumer enables `disco-assets/embed` from the registry.
+  Deviation from §8.1 recorded: user-sim consumes
+  `rlvgl-core`/`rlvgl-widgets`/`rlvgl-platform(simulator,fontdue)`/`rlvgl-playit(std)`
+  directly rather than the umbrella `rlvgl` crate (more user-realistic;
+  the umbrella path is covered by creator-cli per CRATES-CI-02a; the
+  root crate also does not re-export `rlvgl-playit`, and platform's
+  `draw_text` is a stub without `fontdue`).
+- **2026-06-10** — CRATES-CI-03 landed: Layer K via
+  `egui_kittest 0.33.3` (dev-dep; `eframe`+`snapshot`+`wgpu` features,
+  `Harness::build_eframe` drives the unmodified `eframe::App` impl —
+  the §7.5 "update→ui refactor" proved unnecessary; only `pub(crate)`
+  visibility changes in `src/bin/creator_ui/mod.rs`).
+  `tests/creator_ui_kittest.rs` (gated `required-features =
+  ["creator", "creator_ui"]`): boot/menu-tree assertions, Build→Fonts
+  Pack wizard flow, and `creator_ui_boot` wgpu snapshot at explicit
+  threshold 0.8 (INV-C4), all headless (INV-C5). §7.5's rfd pre-flight
+  bypass confirmed already satisfied: `CreatorApp::new` is rfd-free;
+  the dialogs live only in `run()`. Layer W (TCP playit server) remains
+  CRATES-CI-04.

@@ -124,6 +124,15 @@ name = "creator_qt_strict_mode"
 path = "tests/creator_qt_strict_mode.rs"
 required-features = ["creator"]
 
+# CRATES-CI-03: kittest Layer K. Drives CreatorApp in-process via the
+# egui_kittest accesskit harness — no display server (INV-C5). The
+# snapshot under tests/snapshots/ is compared with an explicit
+# threshold, never bit-exact (INV-C4).
+[[test]]
+name = "creator_ui_kittest"
+path = "tests/creator_ui_kittest.rs"
+required-features = ["creator", "creator_ui"]
+
 [dependencies]
 rlvgl-core = { version = "0.2.2", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.2.2", path = "widgets", default-features = false }
@@ -318,6 +327,11 @@ optional = true
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
+# CRATES-CI-03: Layer K kittest engine (egui 0.33 line, lockstep with the
+# eframe 0.33.3 GUI wrapper dep). `eframe` provides Harness::new_eframe for
+# eframe::App impls; `wgpu` is the offscreen renderer (works headless,
+# INV-C5); `snapshot` enables threshold-compared image snapshots (INV-C4).
+egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
 rlvgl-chips-stm = { version = "0.2.0", path = "chipdb/rlvgl-chips-stm" }
 rlvgl-chips-nrf = { version = "0.2.0", path = "chipdb/rlvgl-chips-nrf" }
 rlvgl-chips-esp = { version = "0.2.0", path = "chipdb/rlvgl-chips-esp" }

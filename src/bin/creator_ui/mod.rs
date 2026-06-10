@@ -34,9 +34,13 @@ mod fonts;
 mod init;
 #[path = "../creator/lottie.rs"]
 mod lottie;
+// `pub(crate)` so the CRATES-CI-03 Layer K test harness
+// (tests/creator_ui_kittest.rs), which includes this module via
+// `#[path]`, can construct a `manifest::Manifest` for `CreatorApp::new`.
+// Visibility widening only — production behavior is unchanged.
 #[path = "../creator/manifest.rs"]
 #[allow(dead_code)]
-mod manifest;
+pub(crate) mod manifest;
 #[path = "../creator/preview.rs"]
 mod preview;
 // QT-09 §6: bring the qt + qt_scjson modules into the desktop-UI
@@ -77,7 +81,9 @@ mod types;
 use types::*;
 
 mod app;
-use app::CreatorApp;
+// Re-exported `pub(crate)` for the CRATES-CI-03 Layer K test harness
+// (tests/creator_ui_kittest.rs). Same-crate visibility only.
+pub(crate) use app::CreatorApp;
 
 mod commands;
 mod menus;
