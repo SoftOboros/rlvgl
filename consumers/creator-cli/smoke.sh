@@ -58,6 +58,13 @@ echo "smoke.sh: wrote $PKG/.cargo/config.toml (rlvgl self-patch filtered)"
 # Bin name + required-features per the root Cargo.toml [[bin]] section
 # (name = "rlvgl-creator", required-features = ["creator"]).
 (cd "$PKG" && cargo build --bin rlvgl-creator --features creator)
+
+# CRATES-CI-02a: the umbrella `simulator` feature pulls the demo app crates
+# (rlvgl-app-demo / rlvgl-app-disco-demo) and is the path a downstream user
+# hits first per docs/CUSTOM-SIMULATOR.md. It shipped broken in 0.2.1
+# (P-INCLUDE: disco-demo icons referenced outside its crate root, so the
+# packaged crate could never compile). Keep it covered from packaged crates.
+(cd "$PKG" && cargo build --lib --features simulator)
 BIN="$PKG/target/debug/rlvgl-creator"
 if [ ! -x "$BIN" ]; then
   echo "smoke.sh: built binary not found at $BIN" >&2
