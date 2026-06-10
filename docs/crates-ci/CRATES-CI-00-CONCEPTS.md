@@ -14,7 +14,7 @@ Status: RATIFIED 2026-06-10. See §15.
 | Cargo packaging, registries, source replacement, `[workspace]` detachment | The Cargo Book (`cargo package`, `cargo vendor`, source-replacement chapters) |
 | egui/eframe application model, accesskit tree, kittest harness | egui 0.33 / eframe 0.33 / `egui_kittest` 0.33 upstream docs |
 | Playit wire protocol verbs and framing | `playit/README.md` + `playit/` crate source — owned by the playit crate, NOT restated here |
-| Publishable crate set and topological order | `scripts/publish_changed.sh` (lines 172–195) locked by `tests/publish_changed_matrix.rs` |
+| Publishable crate set and topological order | `scripts/publish_changed.sh` (`ordered_crates`, printable via `--print-order`) locked by `tests/publish_changed_matrix.rs` |
 | Downstream consumer recipe (custom simulator) | `docs/CUSTOM-SIMULATOR.md` |
 | Existing test-tier registry | `docs/TEST-STRATEGY.md` |
 
@@ -119,10 +119,10 @@ One owner per concept; Consumer Projects cite these, never restate them.
 1. Two gates, **both** required for a conforming release: Gate P blocks the
    tag; Gate R verifies registry truth after publish and on a 3×-daily
    schedule (mirroring `publish-continue.yml` cadence).
-2. Gate P consumes the full ordered publish list (24 crates,
-   `scripts/publish_changed.sh:172-195`) — packaging every crate is part of
-   the gate even when a Consumer Project only depends on a subset, because
-   P-META/P-INCLUDE failures are per-crate.
+2. Gate P consumes the full ordered publish list (`ordered_crates` in
+   `scripts/publish_changed.sh`; 25 crates as of CRATES-CI-01) — packaging
+   every crate is part of the gate even when a Consumer Project only
+   depends on a subset, because P-META/P-INCLUDE failures are per-crate.
 3. Consumer Projects MUST NOT use `path` dependencies or `[patch]` entries
    pointing into the workspace. Violation = nonconforming run.
 4. The publish workflow (`publish.yml`) MUST require Gate P green on the
@@ -130,21 +130,39 @@ One owner per concept; Consumer Projects cite these, never restate them.
 
 ## §6 Frozen decision — Staged Registry mechanism (Specification Required)
 
-1. Gate P runs `cargo package --no-verify -p <crate>` in publish order,
-   collects `target/package/*.crate`, **extracts** each archive, and
-   exposes the set to Consumer Projects as a cargo **directory source**
-   (`cargo vendor` layout with `.cargo-checksum.json`), replacing
-   crates.io in the Consumer Project's `.cargo/config.toml`.
-2. Rationale: directory-source consumption builds from the *packaged file
-   set* (catches P-INCLUDE, P-META, P-RESOLVE) with no registry server and
-   fully offline. P-ORDER stays covered by `tests/publish_changed_matrix.rs`
-   plus Gate R.
-3. Known residual: a directory source does not exercise index/yank
-   semantics or crates.io's own validation — that is Gate R's job; the
-   split is intentional.
-4. Mechanism details (checksum generation, third-party-dep passthrough)
-   are validated in CRATES-CI-01 and recorded by amendment if the layout
-   must change.
+*(Amended 2026-06-10 during CRATES-CI-01 validation, per the original
+§6.4 escape hatch. The initially drafted pure directory-source
+replacement is unimplementable for Gate P: a replaced crates.io source
+must satisfy ALL dependencies, and the not-yet-published rlvgl versions
+cannot be resolved through it, while third-party deps would all need
+vendoring. `[patch.crates-io]` injects candidates that do not exist
+upstream — the standard pre-publish mechanism.)*
+
+1. Gate P runs `cargo package --no-verify -p <crate>` in publish order
+   (`scripts/crates_ci_stage.sh`), **progressively**: each packaged
+   archive is extracted to `$STAGE_DIR/staged/<name>-<version>/` and
+   appended to `$STAGE_DIR/patch-config.toml` (a `[patch.crates-io]`
+   table) BEFORE the next crate packages, with the partial table fed to
+   cargo via `--config`. This is required — `cargo package` re-resolves
+   the sanitized manifest, and unpublished sibling versions are
+   unresolvable until injected (publish time solves the same problem by
+   actually publishing in order). Side effect: a publish-order topology
+   error fails Gate P at the same crate that would have failed
+   `cargo publish` (P-ORDER caught pre-tag). Consumer Projects consume
+   the finished table as their `.cargo/config.toml`; third-party
+   dependencies continue to resolve from crates.io.
+2. The extracted package directories are NOT the workspace: they contain
+   the normalized Cargo.toml and the packaged file set, so P-INCLUDE,
+   P-META, and P-RESOLVE failures manifest exactly as they would for a
+   crates.io download. INV-C2 forbids workspace paths, not staged
+   package paths.
+3. Known residual: patching does not exercise index/yank semantics or
+   crates.io's server-side validation — that is Gate R's job; the split
+   is intentional.
+4. Asset-bearing crates mirror publish-time prep inside the staging
+   script (`stm32_afdb_pipeline.sh` + force-add for rlvgl-chips-stm,
+   `gen_ioc_bsps.sh` for rlvgl-bsps-stm), so the staged package contents
+   match what `cargo publish` would upload.
 
 ## §7 Frozen decision — GUI Wrapper harness: playit over kittest (Standards Action)
 
@@ -244,7 +262,7 @@ One owner per concept; Consumer Projects cite these, never restate them.
 - **CRATES-CI-00** (this doc): ratified §15 entry; `CLAUDE.md`
   applicability list and commit-prefix table amended.
 - **CRATES-CI-01 — Gate P harness**: workflow `crates-ci.yml` packages all
-  24 crates from a clean ref, materializes the Staged Registry, and builds
+  publishable crates from a clean ref, materializes the Staged Registry, and builds
   `consumers/creator-cli/` (CLI feature set only at this phase). Red on
   any P-META/P-INCLUDE/P-RESOLVE regression replayed from `9bee2f9`'s
   fontdue case as a fixture test.
@@ -300,3 +318,15 @@ One owner per concept; Consumer Projects cite these, never restate them.
 - **2026-06-10** — **RATIFIED** by owner. CLAUDE.md applicability list and
   commit-prefix table amended in the ratification commit. Execution begins
   with CRATES-CI-01.
+- **2026-06-10** — §6 amended during CRATES-CI-01 validation (per §6.4):
+  pure directory-source replacement is unimplementable pre-publish
+  (unpublished versions unresolvable; all third-party deps would need
+  vendoring); mechanism is progressive `cargo package` + extract +
+  `[patch.crates-io]` via `--config`. Findings during bring-up:
+  (a) `rlvgl-audio-meters-core` was `publish = true`, depended on by
+  `rlvgl-widgets`, but absent from the publish order and the matrix
+  test — added to both; matrix test gained a cargo-metadata-derived
+  completeness check so the omission class cannot recur. (b)
+  `platform/src/blit.rs` ELF `link_section` broke all Mach-O host
+  builds of rlvgl-platform (H-SIM-adjacent, crates-first story);
+  gated to `target_os = "none"`.

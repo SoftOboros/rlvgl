@@ -1,0 +1,47 @@
+# CRATES-CI-01: Gate P — package all publishable crates in publish order from a
+# clean tree, then smoke-test consumers against the staged packages.
+# Governed by docs/crates-ci/CRATES-CI-00-CONCEPTS.md §5 (gate topology) and
+# §12 (CRATES-CI-01 acceptance).
+#
+# Conventions mirrored from ci.yml: ubuntu-latest runner, the
+# docker.io/iraa/rlvgl:latest container (which bakes in the Rust toolchain and
+# the system deps used by the workspace, creator-e2e, chipdb, and boards jobs),
+# and scripts/setup-ci-env.sh for environment prep. ci.yml defines no
+# actions/cache steps — the container image is the cache — so none is added
+# here either.
+name: crates-ci (Gate P)
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  gate-p:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container:
+      image: docker.io/iraa/rlvgl:latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      # Stages every publishable crate (ordered_crates in
+      # scripts/publish_changed.sh) in publish order from a clean tree;
+      # runs scripts/stm32_afdb_pipeline.sh and scripts/gen_ioc_bsps.sh itself
+      # for the two asset-bearing crates (mirroring publish), extracts packages
+      # to target/crates-ci/staged/, and emits target/crates-ci/patch-config.toml.
+      - name: Stage publishable crates
+        run: bash scripts/crates_ci_stage.sh
+      # Builds + runs a library consumer against the staged packages.
+      - name: Lib consumer smoke (Gate P)
+        run: bash consumers/lib-smoke/gate_p.sh
+      # Builds the rlvgl-creator bin (--features creator) inside the staged
+      # rlvgl package and runs a CLI round-trip.
+      - name: Creator CLI smoke (Gate P)
+        run: bash consumers/creator-cli/smoke.sh
