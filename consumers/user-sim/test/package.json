@@ -1,0 +1,7 @@
+{
+  "name": "crates-ci-user-sim-test",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ESM marker so user-sim.test.js can import playit/node (type: module).",
+  "type": "module"
+}

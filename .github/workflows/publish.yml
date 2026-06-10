@@ -38,6 +38,10 @@ jobs:
         run: bash consumers/lib-smoke/gate_p.sh
       - name: Creator CLI smoke (Gate P)
         run: bash consumers/creator-cli/smoke.sh
+      # CRATES-CI-02: user-sim consumer — golden-PNG check + playit/node
+      # automation test (kept in sync with crates-ci.yml).
+      - name: User sim consumer (Gate P)
+        run: bash consumers/user-sim/gate_p.sh
 
   publish:
     needs: gate-p

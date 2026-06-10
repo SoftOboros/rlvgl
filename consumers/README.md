@@ -14,5 +14,5 @@ the crate versions they request may not exist on crates.io yet, so a bare
 | Consumer | What it proves | Entry point |
 |---|---|---|
 | `lib-smoke/` | P-RESOLVE on `rlvgl-core` (`png`+`fontdue`, the 9bee2f9 class) + `rlvgl-widgets`, linked from packaged crates | `gate_p.sh` (GATE=p staged / GATE=r crates.io) |
-| `creator-cli/` | P-META/P-INCLUDE/P-RESOLVE on the root crate's `creator` path; CLI round-trip from the packaged file set | `smoke.sh` |
-| `user-sim/` | (CRATES-CI-02, not yet present) `docs/CUSTOM-SIMULATOR.md` recipe + playit automation surface from published crates | — |
+| `creator-cli/` | P-META/P-INCLUDE/P-RESOLVE on the root crate's `creator` path + the umbrella `simulator` feature (CRATES-CI-02a); CLI round-trip from the packaged file set | `smoke.sh` |
+| `user-sim/` | `docs/CUSTOM-SIMULATOR.md` recipe from packaged crates: custom widget tree, `--headless`, playit `--automation-headless` handshake (INV-C7) + node tap→verify test, golden-PNG threshold check (INV-C4) | `gate_p.sh` (GATE=p staged / GATE=r crates.io) |

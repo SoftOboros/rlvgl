@@ -45,3 +45,9 @@ jobs:
       # rlvgl package and runs a CLI round-trip.
       - name: Creator CLI smoke (Gate P)
         run: bash consumers/creator-cli/smoke.sh
+      # CRATES-CI-02: builds the user-sim consumer (custom simulator per
+      # docs/CUSTOM-SIMULATOR.md from packaged crates), runs the in-binary
+      # golden-PNG check (INV-C4) and the playit/node automation test
+      # (INV-C7). Requires node; the script fails loudly if it is absent.
+      - name: User sim consumer (Gate P)
+        run: bash consumers/user-sim/gate_p.sh
