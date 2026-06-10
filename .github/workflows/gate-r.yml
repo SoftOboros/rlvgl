@@ -1,0 +1,70 @@
+# CRATES-CI-05: Gate R — post-publish registry truth. Governed by
+# docs/crates-ci/CRATES-CI-00-CONCEPTS.md §5 (gate topology: Gate R runs
+# after publish and on a schedule) and §12 (CRATES-CI-05 acceptance:
+# "failure pages the repo via workflow failure (no silent skip)").
+#
+# Gate R builds the same Consumer Projects as Gate P (crates-ci.yml), but
+# against REAL crates.io instead of the Staged Registry, plus the literal
+# end-user install path (`cargo install rlvgl --features creator`). A red
+# Gate R means crates.io truth diverged from expectations: a yanked
+# dependency, a broken published version, or registry index lag. There is
+# deliberately no continue-on-error anywhere in this file.
+#
+# EXPECTED RED until v0.2.2 publishes: the GATE=r consumers request
+# version "0.2", which resolves to the LATEST published 0.2.x. While that
+# is 0.2.1, the user-sim consumer WILL fail — 0.2.1's simulator path is
+# known-broken (CRATES-CI-00 §15, P-INCLUDE: disco-demo icons packaged
+# outside the crate root). Per the no-silent-skip clause we keep the step
+# failing rather than masking it; a red Gate R is the truthful state of
+# the registry. It turns green when v0.2.2 lands on crates.io.
+#
+# Conventions mirrored from crates-ci.yml: ubuntu-latest runner, the
+# docker.io/iraa/rlvgl:latest container, scripts/setup-ci-env.sh for
+# environment prep, no actions/cache (the container image is the cache).
+name: crates-ci (Gate R)
+
+on:
+  # (a) After every successful run of publish.yml (name: "Publish") —
+  # registry truth is checked as soon as a publish completes.
+  workflow_run:
+    workflows: ["Publish"]
+    types:
+      - completed
+  # (b) Daily, offset from publish-continue.yml's '15 4,12,20 * * *' so
+  # the scheduled runs don't stampede the same infrastructure.
+  schedule:
+    - cron: '30 16 * * *'
+  # (c) On demand.
+  workflow_dispatch:
+
+jobs:
+  gate-r:
+    # Only gate the workflow_run trigger on the upstream conclusion;
+    # schedule and workflow_dispatch runs always proceed.
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container:
+      image: docker.io/iraa/rlvgl:latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      # No staging step: Gate R consumes real crates.io. GATE=r removes
+      # any [patch] config so nothing shadows the registry.
+      - name: Lib consumer (Gate R, real crates.io)
+        run: GATE=r bash consumers/lib-smoke/gate_p.sh
+      # KNOWN-RED until v0.2.2 publishes: "0.2" resolves to 0.2.1, whose
+      # simulator path is broken (CRATES-CI-00 §15, P-INCLUDE). Kept
+      # failing on purpose — no continue-on-error, no silent skip.
+      - name: User sim consumer (Gate R, real crates.io)
+        run: GATE=r bash consumers/user-sim/gate_p.sh
+      # End-user install path: cargo install rlvgl --features creator
+      # from crates.io, then the same CLI round-trip as smoke.sh.
+      # GATE_R_FEATURES may grow creator_ui[,creator_ui_automation] once
+      # a 0.2.x that builds them is the latest published version.
+      - name: Creator CLI install (Gate R, real crates.io)
+        run: bash consumers/creator-cli/gate_r.sh

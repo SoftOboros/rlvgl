@@ -364,3 +364,33 @@ upstream — the standard pre-publish mechanism.)*
   bypass confirmed already satisfied: `CreatorApp::new` is rfd-free;
   the dialogs live only in `run()`. Layer W (TCP playit server) remains
   CRATES-CI-04.
+- **2026-06-10** — CRATES-CI-04 landed: Layer W. New root-crate feature
+  `creator_ui_automation = ["creator_ui", "dep:egui_kittest",
+  "dep:rlvgl-playit", "rlvgl-playit/std"]`; `rlvgl-creator
+  --automation-headless --playit-port=<n>` (detected before CLI
+  routing; missing manifest is a startup error per §7.5) hosts
+  CreatorApp in a kittest harness and serves the playit verb set over
+  loopback TCP with the `PLAYIT_READY` handshake (INV-C7).
+  INV-C3 satisfied by construction: the wire codec is reused from
+  `rlvgl_playit::protocol` (`parse_command`/`format_response`), the
+  executor only maps or rejects — `QB:/QE:` → accesskit label lookup
+  (§7.4 tags-are-labels), `T`/`T@`/`PD/PM/PU` → kittest pointer,
+  `KD:/KU:` → egui keys, `?` → step counters, `D` → wgpu region dump
+  in playit hex framing with documented `ERR: render-unavailable`
+  degradation when no GPU adapter exists (CI containers; accesskit
+  verbs unaffected), `MT`/`RS/RE/RD`/`C` → `ERR: unsupported`.
+  creator-cli smoke now builds
+  `creator,creator_ui,creator_ui_automation` from the staged package —
+  the §12 "creator_ui from packaged crates" proof — and runs
+  `consumers/creator-cli/test/creator-ui.test.js` through the
+  unmodified `playit/node` client.
+- **2026-06-10** — CRATES-CI-05 landed: Gate R.
+  `.github/workflows/gate-r.yml` (workflow_run after "Publish" success
+  + daily 16:30 UTC schedule offset from publish-continue + dispatch)
+  runs `GATE=r` lib-smoke and user-sim plus
+  `consumers/creator-cli/gate_r.sh` — the literal end-user path
+  (`cargo install rlvgl --features creator` from crates.io, then the
+  smoke round-trip). No `continue-on-error` anywhere (§12 no-silent-
+  skip). KNOWN RED until v0.2.2 publishes: "0.2" resolves to the
+  broken 0.2.1 simulator path (see CRATES-CI-02a entry); the red is
+  the truthful registry state and turns green at the next publish.
