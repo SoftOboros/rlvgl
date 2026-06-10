@@ -13,11 +13,33 @@ pub(crate) struct ScreenPreset {
 }
 
 /// Collection of built-in screen presets.
-pub(crate) const SCREEN_PRESETS: &[ScreenPreset] = &[ScreenPreset {
-    name: "stm32h7-480x272",
-    width: 480,
-    height: 272,
-}];
+pub(crate) const SCREEN_PRESETS: &[ScreenPreset] = &[
+    ScreenPreset {
+        name: "stm32h747i-disco-800x480",
+        width: 800,
+        height: 480,
+    },
+    ScreenPreset {
+        name: "stm32h7-480x272",
+        width: 480,
+        height: 272,
+    },
+    ScreenPreset {
+        name: "sim-480x320",
+        width: 480,
+        height: 320,
+    },
+    ScreenPreset {
+        name: "qvga-320x240",
+        width: 320,
+        height: 240,
+    },
+    ScreenPreset {
+        name: "ssd1306-128x64",
+        width: 128,
+        height: 64,
+    },
+];
 
 /// Node within the asset directory tree.
 #[derive(Default)]

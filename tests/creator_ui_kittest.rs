@@ -158,6 +158,35 @@ fn fonts_pack_dialog_opens_from_build_menu() {
     );
 }
 
+/// Layout editor: opens from the toolbar with a real, sized body — a
+/// screen-preset selector, zoom slider, and a canvas sized by the
+/// selected preset. Regression test for the original defect: the window
+/// contained only floating Areas (zero layout size) and collapsed to its
+/// title bar with nothing to resize.
+#[test]
+fn layout_editor_opens_with_screen_selector() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut harness = boot_harness(dir.path());
+
+    assert!(!harness.state().layout_open);
+    harness.get_by_label("Layout Editor").click();
+    harness.run();
+    assert!(harness.state().layout_open, "toolbar button should open it");
+
+    // Window chrome: screen selector + zoom control are present.
+    harness.get_by_label("Screen:");
+    harness.get_by_label("Zoom:");
+    assert!(
+        harness.query_all_by_label("Layout Editor").count() >= 2,
+        "window title and toolbar button should both be in the tree"
+    );
+
+    // Selecting a preset sizes the canvas and reports its dimensions.
+    harness.state_mut().screen_preset = Some(0); // stm32h747i-disco-800x480
+    harness.run();
+    harness.get_by_label("800x480 px");
+}
+
 /// (c) Snapshot: render the booted app offscreen via the wgpu test
 /// renderer and compare against the committed golden under
 /// `tests/snapshots/creator_ui_boot.png` with an explicit threshold

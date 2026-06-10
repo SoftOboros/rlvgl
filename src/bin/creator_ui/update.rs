@@ -816,24 +816,86 @@ impl App for CreatorApp {
 
         if self.layout_open {
             let mut open = self.layout_open;
+            // The canvas is sized by the selected screen preset (scaled by
+            // layout_zoom) so the window always has a real body to size
+            // against — previously it contained only floating Areas, which
+            // contribute zero layout size, so the window collapsed to its
+            // title bar with nothing to resize.
+            let preset_size = self.screen_preset.map(|i| {
+                Vec2::new(
+                    SCREEN_PRESETS[i].width as f32,
+                    SCREEN_PRESETS[i].height as f32,
+                )
+            });
             egui::Window::new("Layout Editor")
                 .open(&mut open)
+                .resizable(true)
+                .default_size(preset_size.map_or(Vec2::new(520.0, 360.0), |s| {
+                    s * self.layout_zoom + Vec2::new(24.0, 64.0)
+                }))
                 .show(ctx, |ui| {
-                    let origin = ui.max_rect().min;
-                    for i in 0..self.layout_items.len() {
-                        let idx = self.layout_items[i].idx;
-                        if self.thumbnails[idx].is_none() {
-                            let _ = self.load_thumbnail(ctx, idx);
+                    ui.horizontal(|ui| {
+                        ui.label("Screen:");
+                        let label = self
+                            .screen_preset
+                            .map(|i| SCREEN_PRESETS[i].name)
+                            .unwrap_or("None");
+                        egui::ComboBox::from_id_salt("layout_screen_preset")
+                            .selected_text(label)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.screen_preset, None, "None");
+                                for (i, preset) in SCREEN_PRESETS.iter().enumerate() {
+                                    ui.selectable_value(
+                                        &mut self.screen_preset,
+                                        Some(i),
+                                        preset.name,
+                                    );
+                                }
+                            });
+                        ui.separator();
+                        ui.label("Zoom:");
+                        ui.add(
+                            egui::Slider::new(&mut self.layout_zoom, 0.25..=4.0).logarithmic(true),
+                        );
+                        if let Some(s) = preset_size {
+                            ui.label(format!("{}x{} px", s.x as u32, s.y as u32));
                         }
-                        if let Some(tex) = &self.thumbnails[idx] {
-                            let area = egui::Area::new(egui::Id::new(format!("layout{}", idx)))
-                                .current_pos(origin + self.layout_items[i].pos)
-                                .show(ui.ctx(), |ui| {
-                                    ui.image((tex.id(), tex.size_vec2()));
-                                });
-                            self.layout_items[i].pos = area.response.rect.min - origin;
+                    });
+                    ui.separator();
+                    let zoom = self.layout_zoom;
+                    egui::ScrollArea::both().show(ui, |ui| {
+                        let canvas_size = preset_size.map_or(ui.available_size(), |s| s * zoom);
+                        let (response, painter) =
+                            ui.allocate_painter(canvas_size, egui::Sense::hover());
+                        let canvas = response.rect;
+                        painter.rect_filled(canvas, 0.0, egui::Color32::from_gray(24));
+                        if preset_size.is_some() {
+                            painter.rect_stroke(
+                                canvas,
+                                0.0,
+                                egui::Stroke::new(2.0, egui::Color32::GREEN),
+                                egui::StrokeKind::Inside,
+                            );
                         }
-                    }
+                        let origin = canvas.min;
+                        for i in 0..self.layout_items.len() {
+                            let idx = self.layout_items[i].idx;
+                            if self.thumbnails[idx].is_none() {
+                                let _ = self.load_thumbnail(ctx, idx);
+                            }
+                            if let Some(tex) = &self.thumbnails[idx] {
+                                // Item positions are stored in screen pixels;
+                                // render scaled by the canvas zoom.
+                                let area = egui::Area::new(egui::Id::new(format!("layout{}", idx)))
+                                    .current_pos(origin + self.layout_items[i].pos * zoom)
+                                    .constrain_to(canvas)
+                                    .show(ui.ctx(), |ui| {
+                                        ui.image((tex.id(), tex.size_vec2() * zoom));
+                                    });
+                                self.layout_items[i].pos = (area.response.rect.min - origin) / zoom;
+                            }
+                        }
+                    });
                 });
             self.layout_open = open;
         }

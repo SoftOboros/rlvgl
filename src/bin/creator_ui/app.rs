@@ -70,6 +70,8 @@ pub(crate) struct CreatorApp {
     pub(crate) layout_open: bool,
     /// Items placed in the layout editor.
     pub(crate) layout_items: Vec<LayoutItem>,
+    /// Zoom factor for the layout editor canvas.
+    pub(crate) layout_zoom: f32,
     /// Whether the About window is open.
     pub(crate) about_open: bool,
     /// Cached texture for the rlvgl logo in the About window.
@@ -284,6 +286,7 @@ impl CreatorApp {
             screen_preset: None,
             layout_open: false,
             layout_items: Vec::new(),
+            layout_zoom: 1.0,
             about_open: false,
             about_logo: None,
             bsp_open: false,
