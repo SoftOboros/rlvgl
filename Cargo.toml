@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -124,14 +124,23 @@ name = "creator_qt_strict_mode"
 path = "tests/creator_qt_strict_mode.rs"
 required-features = ["creator"]
 
+# CRATES-CI-03: kittest Layer K. Drives CreatorApp in-process via the
+# egui_kittest accesskit harness — no display server (INV-C5). The
+# snapshot under tests/snapshots/ is compared with an explicit
+# threshold, never bit-exact (INV-C4).
+[[test]]
+name = "creator_ui_kittest"
+path = "tests/creator_ui_kittest.rs"
+required-features = ["creator", "creator_ui"]
+
 [dependencies]
-rlvgl-core = { version = "0.2.1", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.2.1", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.2.1", path = "platform", default-features = false }
+rlvgl-core = { version = "0.2.2", path = "core", default-features = false }
+rlvgl-widgets = { version = "0.2.2", path = "widgets", default-features = false }
+rlvgl-platform = { version = "0.2.2", path = "platform", default-features = false }
 rlvgl-ui = { version = "0.2.0", path = "ui", default-features = false }
-rlvgl-i18n = { version = "0.2.1", path = "i18n" }
+rlvgl-i18n = { version = "0.2.2", path = "i18n" }
 rlvgl-app-demo = { version = "0.2.0", path = "examples/apps/demo", default-features = false, optional = true }
-rlvgl-app-disco-demo = { version = "0.2.1", path = "examples/apps/disco-demo", default-features = false, optional = true }
+rlvgl-app-disco-demo = { version = "0.2.2", path = "examples/apps/disco-demo", default-features = false, optional = true }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -157,13 +166,13 @@ default-features = false
 optional = true
 
 [dependencies.rlvgl-playit]
-version = "0.2.1"
+version = "0.2.2"
 path = "playit"
 default-features = false
 optional = true
 
 [dependencies.rlvgl-decomp]
-version = "0.2.1"
+version = "0.2.2"
 path = "rlvgl-decomp"
 optional = true
 
@@ -292,7 +301,7 @@ path = "chipdb/rlvgl-chips-silabs"
 optional = true
 
 [dependencies.rlvgl-chips-microchip]
-version = "0.2.1"
+version = "0.2.2"
 path = "chipdb/rlvgl-chips-microchip"
 optional = true
 
@@ -315,15 +324,30 @@ optional = true
 version = "0.4"
 optional = true
 
+# CRATES-CI-04: Layer W automation server (CRATES-CI-00 §7.2). The kittest
+# engine moves into [dependencies] (optional) so the shipped rlvgl-creator
+# binary can host CreatorApp headlessly behind `creator_ui_automation`.
+# The [dev-dependencies] entry below stays — tests/creator_ui_kittest.rs
+# (Layer K) is unaffected.
+[dependencies.egui_kittest]
+version = "0.33.3"
+features = ["eframe", "snapshot", "wgpu"]
+optional = true
+
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
+# CRATES-CI-03: Layer K kittest engine (egui 0.33 line, lockstep with the
+# eframe 0.33.3 GUI wrapper dep). `eframe` provides Harness::new_eframe for
+# eframe::App impls; `wgpu` is the offscreen renderer (works headless,
+# INV-C5); `snapshot` enables threshold-compared image snapshots (INV-C4).
+egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
 rlvgl-chips-stm = { version = "0.2.0", path = "chipdb/rlvgl-chips-stm" }
 rlvgl-chips-nrf = { version = "0.2.0", path = "chipdb/rlvgl-chips-nrf" }
 rlvgl-chips-esp = { version = "0.2.0", path = "chipdb/rlvgl-chips-esp" }
 rlvgl-chips-nxp = { version = "0.2.0", path = "chipdb/rlvgl-chips-nxp" }
 rlvgl-chips-silabs = { version = "0.2.0", path = "chipdb/rlvgl-chips-silabs" }
-rlvgl-chips-microchip = { version = "0.2.1", path = "chipdb/rlvgl-chips-microchip" }
+rlvgl-chips-microchip = { version = "0.2.2", path = "chipdb/rlvgl-chips-microchip" }
 rlvgl-chips-renesas = { version = "0.2.0", path = "chipdb/rlvgl-chips-renesas" }
 rlvgl-chips-ti = { version = "0.2.0", path = "chipdb/rlvgl-chips-ti" }
 rlvgl-chips-rp2040 = { version = "0.2.0", path = "chipdb/rlvgl-chips-rp2040" }
@@ -432,6 +456,17 @@ creator_ui = [
     "qrcode",
     "fontdue",
 ]
+# CRATES-CI-04: Layer W — `rlvgl-creator --automation-headless
+# --playit-port=<n>` serves the frozen playit verb set (INV-C3) over TCP,
+# executing each verb against an egui_kittest harness hosting CreatorApp.
+# No window / display server (INV-C5). Reuses the rlvgl-playit protocol
+# codec (`std` for the loopback TCP types' io plumbing).
+creator_ui_automation = [
+    "creator_ui",
+    "dep:egui_kittest",
+    "dep:rlvgl-playit",
+    "rlvgl-playit/std",
+]
  
 
 
@@ -485,4 +520,9 @@ exclude = [
     "examples/beetle-avr",
     "vendor/scjson",
     "examples/stm32h747i-disco/disco-demo-states",
+    # CRATES-CI-01: extracted staged packages under target/crates-ci/staged/
+    # are built in place by consumers/creator-cli/smoke.sh; a packaged
+    # manifest has no [workspace] table and would otherwise be claimed by
+    # this one ("current package believes it's in a workspace when it's not").
+    "target",
 ]

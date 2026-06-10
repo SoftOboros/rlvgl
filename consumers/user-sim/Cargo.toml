@@ -1,0 +1,42 @@
+# Empty [workspace] table so cargo treats this Consumer Project as
+# standalone — same detachment precedent as consumers/lib-smoke and the
+# CHIPS-*-06 example crates. Per CRATES-CI-00 §8 / INV-C2 this crate MUST
+# NOT be added to the parent workspace members list and MUST NOT carry
+# path/[patch] routes into the workspace: registry source only, with the
+# Gate P staged-package patch table injected at run time by gate_p.sh into
+# ./.cargo/config.toml (extracted package dirs under target/crates-ci/staged/
+# are explicitly allowed by INV-C2).
+[workspace]
+
+[package]
+name = "crates-ci-user-sim"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "CRATES-CI-02 Consumer Project: downstream-user custom simulator built from packaged rlvgl crates (docs/CUSTOM-SIMULATOR.md recipe + playit automation surface)"
+
+# semver req "0.2" (not "=0.2.2") so the same manifest works for Gate P
+# (staged, unpublished 0.2.x) and Gate R (real crates.io) without
+# per-release edits.
+[dependencies]
+# NOT the umbrella crate: `rlvgl = { features = ["simulator"] }` is
+# unbuildable from the packaged crate set as of 0.2.2 — the feature pulls
+# `dep:rlvgl-app-disco-demo`, whose package is missing the .rle icon assets
+# it include_bytes!()s from ../../../stm32h747i-disco/ (P-INCLUDE failure
+# found by this Gate P consumer, 2026-06-10). Direct layer deps are the
+# documented fallback (CRATES-CI-02 brief) and arguably more user-realistic:
+# a custom simulator needs exactly these three layers.
+rlvgl-core = { version = "0.2" }
+rlvgl-widgets = { version = "0.2" }
+# `fontdue` is required for visible Label/Button text: without it the
+# BlitterRenderer's draw_text is a stub (platform/src/blit.rs).
+rlvgl-platform = { version = "0.2", features = ["simulator", "fontdue"] }
+# The umbrella crate does NOT re-export rlvgl-playit (its `playit` feature
+# only links the dep without a `pub use`), so the playit TCP server is taken
+# directly — `std` enables TcpServerTransport. This is also what a real
+# downstream automation setup would write.
+rlvgl-playit = { version = "0.2", features = ["std"] }
+# Third-party (crates.io) PNG loader for the in-binary --golden-check mode.
+# Same major as the image version already in rlvgl-platform's simulator
+# dep tree, so it adds no new image-stack lineage to the build.
+image = { version = "0.25", default-features = false, features = ["png"] }

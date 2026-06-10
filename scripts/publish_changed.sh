@@ -1,6 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+chipdb_crates=(
+  rlvgl-chips-stm
+  rlvgl-chips-nrf
+  rlvgl-chips-esp
+  rlvgl-chips-nxp
+  rlvgl-chips-silabs
+  rlvgl-chips-microchip
+  rlvgl-chips-renesas
+  rlvgl-chips-ti
+  rlvgl-chips-rp2040
+)
+
+ordered_crates=(
+  rlvgl-chips-stm
+  rlvgl-chips-nrf
+  rlvgl-chips-esp
+  rlvgl-chips-nxp
+  rlvgl-chips-silabs
+  rlvgl-chips-microchip
+  rlvgl-chips-renesas
+  rlvgl-chips-ti
+  rlvgl-chips-rp2040
+  rlvgl-bsps-stm
+  disco-assets
+  rlvgl-api
+  rlvgl-core
+  rlvgl-decomp
+  rlvgl-i18n
+  rlvgl-playit
+  rlvgl-platform
+  rlvgl-audio-meters-core
+  rlvgl-widgets
+  rlvgl-ui
+  rlvgl-fs-sim
+  rlvgl-micropython
+  rlvgl-app-demo
+  rlvgl-app-disco-demo
+  rlvgl
+)
+
+if [[ "${1:-}" == "--print-order" ]]; then
+  printf '%s\n' "${ordered_crates[@]}"
+  exit 0
+fi
+
 BASE=${1:-origin/main}
 DRY_RUN=${DRY_RUN:-0}
 INDEX_WAIT_SECONDS=${INDEX_WAIT_SECONDS:-30}
@@ -156,45 +201,6 @@ if [[ -z "$DIFF_FILES" ]]; then
   exit 0
 fi
 
-chipdb_crates=(
-  rlvgl-chips-stm
-  rlvgl-chips-nrf
-  rlvgl-chips-esp
-  rlvgl-chips-nxp
-  rlvgl-chips-silabs
-  rlvgl-chips-microchip
-  rlvgl-chips-renesas
-  rlvgl-chips-ti
-  rlvgl-chips-rp2040
-)
-
-ordered_crates=(
-  rlvgl-chips-stm
-  rlvgl-chips-nrf
-  rlvgl-chips-esp
-  rlvgl-chips-nxp
-  rlvgl-chips-silabs
-  rlvgl-chips-microchip
-  rlvgl-chips-renesas
-  rlvgl-chips-ti
-  rlvgl-chips-rp2040
-  rlvgl-bsps-stm
-  disco-assets
-  rlvgl-api
-  rlvgl-core
-  rlvgl-decomp
-  rlvgl-i18n
-  rlvgl-playit
-  rlvgl-platform
-  rlvgl-widgets
-  rlvgl-ui
-  rlvgl-fs-sim
-  rlvgl-micropython
-  rlvgl-app-demo
-  rlvgl-app-disco-demo
-  rlvgl
-)
-
 for crate in "${chipdb_crates[@]}"; do
   if path_changed "^chipdb/${crate}/"; then
     append_unique "$crate"
@@ -224,6 +230,9 @@ if path_changed '^playit/'; then
 fi
 if path_changed '^platform/'; then
   append_unique "rlvgl-platform"
+fi
+if path_changed '^audio-meters-core/'; then
+  append_unique "rlvgl-audio-meters-core"
 fi
 if path_changed '^widgets/'; then
   append_unique "rlvgl-widgets"

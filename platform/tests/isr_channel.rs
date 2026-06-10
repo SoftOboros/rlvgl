@@ -9,6 +9,7 @@
 //! module.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use rlvgl_platform::{IsrChannel, IsrCounter, IsrFlag};
@@ -55,10 +56,15 @@ fn channel_transfers_all_items_between_threads() {
 #[test]
 fn flag_signals_across_threads() {
     let flag = Arc::new(IsrFlag::new());
+    let observed = Arc::new(AtomicBool::new(true));
     let setter = {
         let f = Arc::clone(&flag);
+        let seen = Arc::clone(&observed);
         thread::spawn(move || {
-            for _ in 0..1000 {
+            for _ in 0..50 {
+                while !seen.swap(false, Ordering::AcqRel) {
+                    thread::yield_now();
+                }
                 f.set();
                 thread::yield_now();
             }
@@ -66,11 +72,13 @@ fn flag_signals_across_threads() {
     };
     let watcher = {
         let f = Arc::clone(&flag);
+        let seen = Arc::clone(&observed);
         thread::spawn(move || {
             let mut takes = 0u32;
             while takes < 50 {
                 if f.take() {
                     takes += 1;
+                    seen.store(true, Ordering::Release);
                 }
                 thread::yield_now();
             }

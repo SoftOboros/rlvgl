@@ -517,9 +517,9 @@ unsafe fn setup_ltdc_layer2_a8(panel_w: u16, panel_h: u16) {
 
         // Layer 2 window covers only the text region (A8_Y_BASE
         // to A8_Y_BASE + A8_HEIGHT) of the full display.
-        let x0 = hsw + hbp + 1;
+        let x0 = hsw + hbp; // = BPCR.AHBP + 1
         let x1 = x0 + panel_w as u32 - 1;
-        let y0 = vsw + vbp + 1 + A8_Y_BASE;
+        let y0 = vsw + vbp + A8_Y_BASE; // = BPCR.AVBP + 1 + overlay offset
         let y1 = y0 + A8_HEIGHT - 1;
 
         LTDC_L2WHPCR.write_volatile((x1 << 16) | x0);
@@ -539,7 +539,7 @@ unsafe fn setup_ltdc_layer2_a8(panel_w: u16, panel_h: u16) {
         // ARGB8888 buffer in SDRAM
         LTDC_L2CFBAR.write_volatile(A8_L2_ADDR);
         let pitch = A8_WIDTH * 4; // 4 bytes per pixel for ARGB8888
-        LTDC_L2CFBLR.write_volatile((pitch << 16) | (pitch + 7));
+        LTDC_L2CFBLR.write_volatile((pitch << 16) | (pitch + 3));
         LTDC_L2CFBLNR.write_volatile(A8_HEIGHT);
 
         // Load CLUT: 256 entries. Entry[i] = alpha=i, yellow.

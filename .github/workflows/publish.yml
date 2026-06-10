@@ -16,7 +16,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # CRATES-CI-00 §9 INV-C1: publish MUST NOT run without Gate P green on the
+  # release ref. Same shape as the gate-p job in crates-ci.yml (duplicated
+  # deliberately so the gate that blocks publish is explicit in this file).
+  gate-p:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container:
+      image: docker.io/iraa/rlvgl:latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: bash scripts/setup-ci-env.sh
+      - name: Stage publishable crates
+        run: bash scripts/crates_ci_stage.sh
+      - name: Lib consumer smoke (Gate P)
+        run: bash consumers/lib-smoke/gate_p.sh
+      - name: Creator CLI smoke (Gate P)
+        run: bash consumers/creator-cli/smoke.sh
+      # CRATES-CI-02: user-sim consumer — golden-PNG check + playit/node
+      # automation test (kept in sync with crates-ci.yml).
+      - name: User sim consumer (Gate P)
+        run: bash consumers/user-sim/gate_p.sh
+
   publish:
+    needs: gate-p
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))

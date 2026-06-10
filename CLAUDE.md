@@ -623,7 +623,9 @@ Once a concepts doc is ratified (dated change-log entry), execution PRs:
   `CHIPS-<VENDOR>-NN[a-z]:` for per-vendor chipdb crates
   (e.g. `CHIPS-ESP-02b:`, `CHIPS-STM-04a:`),
   `AUDIO-NN[a-z]:` for the audio-subsystem initiative
-  (codec bring-up + SAI / DMA invariants).
+  (codec bring-up + SAI / DMA invariants),
+  `CRATES-CI-NN[a-z]:` for the crates-built headed-surface CI
+  initiative (`docs/crates-ci/`).
 - Name in the PR description which invariants (from the concepts doc's
   frozen-decisions sections) the change touches, and how each is
   preserved.
@@ -756,6 +758,10 @@ This discipline applies to:
   First chapter ratified 2026-05-19 (AUDIO-01 — WM8994 FLL1 lock + serializer
   arm ordering); first chapter of the family means full discipline applies as
   of the second chapter per the "convergence over time" rule below.
+- `docs/crates-ci/` (Crates-built headed-surface CI — Gate P/R packaged-crate
+  consumption, kittest + playit-over-kittest harnesses for the creator UI and
+  user-built simulators). Commit-subject prefix `CRATES-CI-NN[a-z]:`.
+  Concepts doc ratified 2026-06-10 (CRATES-CI-00).
 - Any future multi-chapter initiative with ≥3 phases.
 
 Single-doc TODOs, phase-1 prototypes, and one-off explorations MAY use

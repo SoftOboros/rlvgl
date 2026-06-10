@@ -213,7 +213,7 @@ pub fn encode_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<(Vec<u16>
     }
     // Pick top MAX_PALETTE colors
     let mut pairs: Vec<(u16, u32)> = hist.into_iter().collect();
-    pairs.sort_by(|a, b| b.1.cmp(&a.1));
+    pairs.sort_by_key(|pair| core::cmp::Reverse(pair.1));
     let take = core::cmp::min(pairs.len(), MAX_PALETTE);
     let palette: Vec<u16> = pairs.iter().take(take).map(|p| p.0).collect();
     if palette.len() > MAX_PALETTE {

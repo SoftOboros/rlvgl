@@ -1099,7 +1099,13 @@ impl Renderer for RotatedRenderer<'_> {
         // PPB region followed. Per-iteration capture of scratch.as_ptr()
         // confirmed the corruption point matched the icon pixel pattern
         // byte-for-byte.
-        #[unsafe(link_section = ".rlvgl_blit_scratch")]
+        // CRATES-CI-01: the ELF-style section name is only meaningful for
+        // the firmware linker script above; on Mach-O hosts (macOS dev
+        // boxes consuming rlvgl-platform from crates.io) it is rejected at
+        // LLVM codegen ("mach-o section specifier requires a segment").
+        // Gate the attribute to bare-metal targets so host builds place
+        // SCRATCH in .bss as usual.
+        #[cfg_attr(target_os = "none", unsafe(link_section = ".rlvgl_blit_scratch"))]
         static mut SCRATCH: [Color; SCRATCH_PIXELS] = [Color(0, 0, 0, 0); SCRATCH_PIXELS]; // rlvgl-discipline: allow(static_mut)
 
         let len = (width * height) as usize;

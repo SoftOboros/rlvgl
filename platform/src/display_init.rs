@@ -520,9 +520,9 @@ pub unsafe fn setup_ltdc_layer(
 ) {
     unsafe {
         let pitch = (width as u32) * 4; // ARGB8888
-        let x0 = (hsw as u32) + (hbp as u32) + 1;
+        let x0 = (hsw as u32) + (hbp as u32); // = BPCR.AHBP + 1
         let x1 = x0 + (width as u32) - 1;
-        let y0 = (vsw as u32) + (vbp as u32) + 1;
+        let y0 = (vsw as u32) + (vbp as u32); // = BPCR.AVBP + 1
         let y1 = y0 + (height as u32) - 1;
 
         LTDC_L1WHPCR.write_volatile((x1 << 16) | x0);
@@ -531,8 +531,8 @@ pub unsafe fn setup_ltdc_layer(
         LTDC_L1CACR.write_volatile(255); // alpha
         LTDC_L1BFCR.write_volatile(0x0405); // blending: PAxCA / 1-PAxCA
         LTDC_L1CFBAR.write_volatile(fb_addr);
-        // CFBLR: bits[28:16]=CFBP(pitch), bits[12:0]=CFBLL(line_len + 7)
-        LTDC_L1CFBLR.write_volatile((pitch << 16) | (pitch + 7));
+        // CFBLR: bits[28:16]=CFBP(pitch), bits[12:0]=CFBLL(line length + 3)
+        LTDC_L1CFBLR.write_volatile((pitch << 16) | (pitch + 3));
         LTDC_L1CFBLNR.write_volatile(height as u32);
         // CR.LEN = bit 0
         let cr = LTDC_L1CR.read_volatile();

@@ -1,0 +1,26 @@
+# Empty [workspace] table so cargo treats this Consumer Project as
+# standalone — same detachment precedent as the CHIPS-*-06 example crates
+# (see examples/launchxl-cc1352r1/Cargo.toml). Per CRATES-CI-00 §8 / INV-C2
+# this crate MUST NOT be added to the parent workspace members list and
+# MUST NOT carry path/[patch] routes into the workspace: registry source
+# only, with the Gate P staged-package patch table injected at run time by
+# gate_p.sh into ./.cargo/config.toml (extracted package dirs under
+# target/crates-ci/staged/ are explicitly allowed by INV-C2).
+[workspace]
+
+[package]
+name = "crates-ci-lib-smoke"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "CRATES-CI-01 Consumer Project: P-RESOLVE smoke for rlvgl-core/widgets built from packaged crates"
+
+# semver req "0.2" (not "=0.2.2") so the same manifest works for Gate P
+# (staged, unpublished 0.2.x) and Gate R (real crates.io) without
+# per-release edits.
+[dependencies]
+# `png` + `fontdue` together replay the 9bee2f9 P-RESOLVE failure class:
+# fontdue feature resolution in core/Cargo.toml only broke when resolved
+# OUTSIDE the workspace, from the packaged crate.
+rlvgl-core = { version = "0.2", features = ["png", "fontdue"] }
+rlvgl-widgets = { version = "0.2" }

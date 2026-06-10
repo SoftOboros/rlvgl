@@ -1,30 +1,25 @@
 //! Glyph rasterization using `fontdue`.
+extern crate std;
+
 use crate::widget::Color;
 use alloc::vec::Vec;
-#[cfg(not(target_os = "none"))]
 use blake3;
 use fontdue::{Font, FontResult, FontSettings};
 pub use fontdue::{LineMetrics, Metrics};
-#[cfg(not(target_os = "none"))]
 use once_cell::sync::OnceCell;
-#[cfg(not(target_os = "none"))]
 use std::collections::HashMap;
-#[cfg(not(target_os = "none"))]
 use std::sync::Mutex;
 
 /// Global font cache: hashed by blake3(font_data)
-#[cfg(not(target_os = "none"))]
 static FONT_CACHE: OnceCell<Mutex<HashMap<u64, Font>>> = OnceCell::new();
 
 /// Hash the font data into a u64 using blake3
-#[cfg(not(target_os = "none"))]
 fn hash_font_data(font_data: &[u8]) -> u64 {
     let key = blake3::hash(font_data);
     u64::from_le_bytes(key.as_bytes()[..8].try_into().unwrap())
 }
 
 /// Retrieve or insert a font into the cache
-#[cfg(not(target_os = "none"))]
 fn get_cached_font(font_data: &[u8]) -> Font {
     let key = hash_font_data(font_data);
     let cache = FONT_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
@@ -35,12 +30,6 @@ fn get_cached_font(font_data: &[u8]) -> Font {
             Font::from_bytes(font_data, FontSettings::default()).expect("valid font")
         })
         .clone()
-}
-
-/// Retrieve a font for rasterization on `no_std` targets.
-#[cfg(target_os = "none")]
-fn get_cached_font(font_data: &[u8]) -> Font {
-    Font::from_bytes(font_data, FontSettings::default()).expect("valid font")
 }
 
 /// Round an `f32` to the nearest pixel without relying on `std`.

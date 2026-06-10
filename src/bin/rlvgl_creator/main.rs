@@ -182,6 +182,25 @@ fn snake_case(input: &str) -> String {
 }
 
 fn main() -> Result<()> {
+    // CRATES-CI-04 Layer W: automation mode is detected BEFORE the CLI
+    // routing — `--automation-headless` would otherwise fall into
+    // cli::run's clap parse. A missing/invalid manifest in automation
+    // mode is an eprintln + nonzero exit, never an rfd dialog
+    // (CRATES-CI-00 §7.5).
+    if std::env::args().any(|arg| arg == "--automation-headless") {
+        #[cfg(feature = "creator_ui_automation")]
+        {
+            return ui::automation::run_from_args();
+        }
+        #[cfg(not(feature = "creator_ui_automation"))]
+        {
+            eprintln!(
+                "rlvgl-creator: --automation-headless requires building with \
+                 --features creator,creator_ui,creator_ui_automation"
+            );
+            std::process::exit(2);
+        }
+    }
     if std::env::args().len() > 1 {
         cli::run(bsp_gen_real)
     } else {
