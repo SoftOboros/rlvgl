@@ -85,6 +85,11 @@ mod app;
 // (tests/creator_ui_kittest.rs). Same-crate visibility only.
 pub(crate) use app::CreatorApp;
 
+// CRATES-CI-04: Layer W — playit TCP server over the kittest engine.
+// Compiled only with the additive `creator_ui_automation` feature.
+#[cfg(feature = "creator_ui_automation")]
+pub(crate) mod automation;
+
 mod commands;
 mod menus;
 mod presets;

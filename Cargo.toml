@@ -324,6 +324,16 @@ optional = true
 version = "0.4"
 optional = true
 
+# CRATES-CI-04: Layer W automation server (CRATES-CI-00 §7.2). The kittest
+# engine moves into [dependencies] (optional) so the shipped rlvgl-creator
+# binary can host CreatorApp headlessly behind `creator_ui_automation`.
+# The [dev-dependencies] entry below stays — tests/creator_ui_kittest.rs
+# (Layer K) is unaffected.
+[dependencies.egui_kittest]
+version = "0.33.3"
+features = ["eframe", "snapshot", "wgpu"]
+optional = true
+
 [dev-dependencies]
 insta = { version = "1", features = ["yaml"] }
 tempfile = "3"
@@ -445,6 +455,17 @@ creator_ui = [
     "gif",
     "qrcode",
     "fontdue",
+]
+# CRATES-CI-04: Layer W — `rlvgl-creator --automation-headless
+# --playit-port=<n>` serves the frozen playit verb set (INV-C3) over TCP,
+# executing each verb against an egui_kittest harness hosting CreatorApp.
+# No window / display server (INV-C5). Reuses the rlvgl-playit protocol
+# codec (`std` for the loopback TCP types' io plumbing).
+creator_ui_automation = [
+    "creator_ui",
+    "dep:egui_kittest",
+    "dep:rlvgl-playit",
+    "rlvgl-playit/std",
 ]
  
 

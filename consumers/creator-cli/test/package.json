@@ -1,0 +1,7 @@
+{
+  "name": "crates-ci-creator-ui-test",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ESM marker so creator-ui.test.js can import playit/node (type: module).",
+  "type": "module"
+}

@@ -7,8 +7,11 @@
 # minimal CLI round-trip (init -> scan -> convert -> sync, mirroring
 # .github/workflows/creator-e2e.yml's verb sequence) in a temp dir.
 #
-# Phase 01 scope is the `creator` CLI feature set only; CRATES-CI-04 adds
-# `creator,creator_ui` plus the Layer W playit handshake.
+# Phase 01 scope was the `creator` CLI feature set only; CRATES-CI-04 added
+# the Layer W section: a `creator,creator_ui,creator_ui_automation` build
+# from the same staged package (proving the creator_ui surface compiles
+# from packaged crates, CRATES-CI-00 §12) plus the playit/node automation
+# test against `--automation-headless` (INV-C3/C5/C7).
 #
 # Env:
 #   STAGE_DIR  staging root (default: <repo>/target/crates-ci, i.e.
@@ -146,3 +149,28 @@ if [ "$fail" -ne 0 ]; then
 fi
 
 echo "smoke.sh: PASS — creator CLI round-trip from packaged crates"
+
+# --- 6. CRATES-CI-04 Layer W: GUI wrapper + playit automation -----------------
+# Build the binary with the full headed-surface feature set from the SAME
+# staged package — this is the §12 "creator_ui builds from packaged crates"
+# proof — then drive it through playit/node UNMODIFIED (INV-C7). The
+# kittest engine runs headless (INV-C5); the D dump verb is allowed to
+# degrade to ERR: render-unavailable inside the node test.
+echo "smoke.sh: Layer W — building rlvgl-creator with creator_ui_automation"
+(cd "$PKG" && cargo build --bin rlvgl-creator \
+  --features creator,creator_ui,creator_ui_automation)
+UI_BIN="$PKG/target/debug/rlvgl-creator"
+if [ ! -x "$UI_BIN" ]; then
+  echo "smoke.sh: FAIL — automation binary not found at $UI_BIN" >&2
+  exit 1
+fi
+
+# No silent skip: a missing node runtime is a gate failure, not a soft
+# pass (mirrors consumers/user-sim/gate_p.sh).
+if ! command -v node >/dev/null 2>&1; then
+  echo "smoke.sh: FAIL — node is required to run the playit automation test" >&2
+  echo "smoke.sh: install Node.js >= 20 (the gate must not silently skip it)" >&2
+  exit 1
+fi
+RLVGL_CREATOR_BIN="$UI_BIN" node --test "$SCRIPT_DIR/test/creator-ui.test.js"
+echo "smoke.sh: PASS — Layer W playit automation from packaged crates"

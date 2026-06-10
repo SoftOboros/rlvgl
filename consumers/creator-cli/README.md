@@ -18,6 +18,24 @@ CLI round-trip mirroring `.github/workflows/creator-e2e.yml`:
 copied from the repo at run time, and asserts the expected outputs
 (`icons/rlvgl-logo.raw`, `out/features.toml`, `out/rlvgl_index.rs`).
 
-Phase 01 scope is the `creator` CLI feature set only. **CRATES-CI-04** adds
-`--features creator,creator_ui` plus the Layer W playit handshake
-(`--automation-headless --playit-port` per CRATES-CI-00 §7).
+Phase 01 scope was the `creator` CLI feature set only. **CRATES-CI-04**
+added the Layer W section: a second build from the same staged package with
+`--features creator,creator_ui,creator_ui_automation` (proving the GUI
+wrapper compiles from packaged crates), then `test/creator-ui.test.js`
+drives `rlvgl-creator --automation-headless --playit-port=0` through the
+**unmodified** `playit/node` client (CRATES-CI-00 §7, INV-C7): the
+`PLAYIT_READY tcp://127.0.0.1:<port>` handshake, `?` status advance,
+`QE:/QB:` accesskit lookups by label (tags ARE labels, §7.4), a `T@Build`
+tap that reveals the `Fonts Pack` menu entry, and one guarded `D` dump that
+may degrade to `ERR: render-unavailable` on GPU-less CI (INV-C5). The
+automation server executes each verb against an `egui_kittest` harness
+hosting `CreatorApp` (`src/bin/creator_ui/automation.rs`); the wire codec
+is reused from the `rlvgl-playit` crate so the verb vocabulary stays owned
+there (INV-C3). Automation-driven test flows must stick to rfd-free UI
+paths — menu entries that open native file/message dialogs
+(`src/bin/creator_ui/commands.rs`) block the harness thread if clicked.
+
+Env for the node test: `RLVGL_CREATOR_BIN` must point at a binary built
+with `creator,creator_ui,creator_ui_automation`; the test stages a tempdir
+containing a default `manifest.yml` and spawns the binary with that cwd
+(automation mode never opens a manifest dialog — §7.5).
