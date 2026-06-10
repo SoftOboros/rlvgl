@@ -394,3 +394,20 @@ upstream — the standard pre-publish mechanism.)*
   skip). KNOWN RED until v0.2.2 publishes: "0.2" resolves to the
   broken 0.2.1 simulator path (see CRATES-CI-02a entry); the red is
   the truthful registry state and turns green at the next publish.
+- **2026-06-10** — CRATES-CI-01a: two Gate P blind spots closed after
+  the first real publish attempt. (a) **P-META hard gate**:
+  `cargo package` only WARNS on missing `description`/`license` but
+  `cargo publish` hard-fails — disco-assets reached the publish step
+  with no `license` field. The staging script now promotes that
+  warning subset to errors. (b) **Version-drift gate**: a crate whose
+  version already exists on crates.io with DIFFERENT content is
+  silently skipped by the publish script's already-published check,
+  shipping stale code. Staging now compares each packaged archive
+  against the published one (member-content compare, ignoring
+  `.cargo_vcs_info.json` / normalized `Cargo.toml` / `Cargo.lock`)
+  and fails listing every drifted crate. First audit found real drift
+  in `rlvgl-micropython` 0.2.0 (bumped to 0.2.2) and disco-assets
+  0.2.0 (metadata fixed + bumped to 0.2.2). `SKIP_ASSET_PREP=1` local
+  runs skip the two asset-bearing crates' drift check loudly; CI
+  checks them for real. `CRATES_CI_OFFLINE=1` skips drift checks for
+  airgapped iteration.
