@@ -367,6 +367,76 @@ fn drag_recognizer_end_to_end_via_raw_pointer_commands() {
     );
 }
 
+/// WID-00 §12 end-to-end: playit `KD:`/`KU:` keystrokes edit the
+/// sim-owned `sim.input` field, assertable headless via D-dump equality.
+///
+/// Rendering is a pure function of the edit state (no caret blink —
+/// WID-00 §6.2), so typing "HI" then `Backspace` must render
+/// byte-identically to having typed just "H". `XI1`/`XI0` extension
+/// commands toggle key routing (`set_active`); an inactive field
+/// ignores keys at the pixel level.
+#[test]
+fn keyboard_types_into_sim_input_and_backspace_restores_h_render() {
+    let mut session = SimulatorSession::launch();
+
+    // The sim.input field sits at (84, 380, 240, 20); dump the leading
+    // glyph + caret region. Each dump rides the next present, which
+    // already includes any edit acknowledged before the D command.
+    let dump_field = |session: &mut SimulatorSession| -> Vec<String> {
+        session.send("D84,382,40,16,1");
+        assert_eq!(session.read_line(), "DUMP:queued");
+        assert_eq!(session.read_line(), "F");
+        let rows: Vec<String> = (0..16).map(|_| session.read_line()).collect();
+        assert_eq!(session.read_line(), "END");
+        rows
+    };
+    let key = |session: &mut SimulatorSession, name: &str| {
+        session.send(&format!("KD:{name}"));
+        assert_eq!(session.read_line(), "OK");
+        session.send(&format!("KU:{name}"));
+        assert_eq!(session.read_line(), "OK");
+    };
+
+    session.send("QE:sim.input");
+    assert_eq!(session.read_line(), "EXISTS:1");
+
+    let inactive_empty = dump_field(&mut session);
+
+    // Activate key routing: the caret appears (active state is visible).
+    session.send("XI1");
+    assert_eq!(session.read_line(), "OK");
+    let active_empty = dump_field(&mut session);
+    assert_ne!(inactive_empty, active_empty, "caret rendered once active");
+
+    // Type "H", then "I", then Backspace: the field must return to the
+    // exact "H" render (buffer AND caret position match).
+    key(&mut session, "H");
+    let h_render = dump_field(&mut session);
+    assert_ne!(active_empty, h_render, "'H' rendered");
+
+    key(&mut session, "I");
+    let hi_render = dump_field(&mut session);
+    assert_ne!(h_render, hi_render, "'HI' differs from 'H'");
+
+    key(&mut session, "Backspace");
+    let after_backspace = dump_field(&mut session);
+    assert_eq!(
+        h_render, after_backspace,
+        "backspace restores the byte-identical 'H' render (WID-00 §12)"
+    );
+
+    // Deactivate: keys are ignored at the pixel level.
+    session.send("XI0");
+    assert_eq!(session.read_line(), "OK");
+    let deactivated = dump_field(&mut session);
+    key(&mut session, "Z");
+    let after_ignored_key = dump_field(&mut session);
+    assert_eq!(
+        deactivated, after_ignored_key,
+        "inactive input ignores keys"
+    );
+}
+
 #[test]
 fn keyboard_opens_settings_wing() {
     let mut session = SimulatorSession::launch();

@@ -14,6 +14,7 @@ use rlvgl_playit::{
     EventPipeline, FramebufferReader, PlayitExecutor, PlayitTransport, StatusData,
     TcpServerTransport,
 };
+use rlvgl_ui::Input;
 use rlvgl_widgets::motion::{CrawlWindow, StarCrawl};
 use std::{
     cell::RefCell,
@@ -287,6 +288,12 @@ struct DiscoRuntime {
     /// after the widget tree draw, so the crawl naturally overlays
     /// the dashboard.
     active_crawl: Option<CrawlWindow<StarCrawl<'static>>>,
+    /// Sim-owned editable text field (WID-00 §8.4): a tagged
+    /// `sim.input` node pushed into the root tree at startup, inactive
+    /// until the `XI1` extension command activates it. Gives headless
+    /// harnesses a key→pixels surface without touching the demo app
+    /// (the `active_crawl` runtime-owned precedent).
+    sim_input: Rc<RefCell<Input>>,
 }
 
 impl DiscoRuntime {
@@ -297,6 +304,23 @@ impl DiscoRuntime {
         let frame_hz = screen.frame_hz.max(1);
         let controller = DiscoController::new(screen, DiscoCapabilities::simulator());
         let root = controller.root();
+        // Sim-owned editable field (WID-00 §8.4). White field on the
+        // dark backdrop, caret in the border color; nominal 8/16 char
+        // metrics match the fontdue backend's 16 px line.
+        let sim_input = Rc::new(RefCell::new(Input::new(
+            "",
+            rlvgl_core::widget::Rect {
+                x: 84,
+                y: 380,
+                width: 240,
+                height: 20,
+            },
+        )));
+        root.borrow_mut().children.push(WidgetNode {
+            widget: sim_input.clone(),
+            children: Vec::new(),
+            tag: Some("sim.input"),
+        });
         let mut runtime = Self {
             controller,
             root,
@@ -306,6 +330,7 @@ impl DiscoRuntime {
             tick_count: 0,
             frame_hz,
             active_crawl: None,
+            sim_input,
         };
         // DSIM-ERRATA-003: render once before any playit poll. step() polls
         // BEFORE rendering, so a `D` command that wins the race to the first
@@ -341,12 +366,21 @@ impl DiscoRuntime {
         let controller = &mut self.controller;
         let pipeline = &mut self.pipeline;
         let frame = &self.frame;
+        let sim_input = self.sim_input.clone();
         self.playit.poll_with_callback(
             &mut root_ref,
             &status,
             Some(frame),
             pipeline,
-            |_payload| {},
+            |payload| {
+                // Sim extension commands (WID-00 §8.4): `XI1` / `XI0`
+                // toggle the sim-owned editable field's key routing.
+                match payload {
+                    b"I1" => sim_input.borrow_mut().set_active(true),
+                    b"I0" => sim_input.borrow_mut().set_active(false),
+                    _ => {}
+                }
+            },
             |event| Self::post_dispatch(controller, event),
         );
     }

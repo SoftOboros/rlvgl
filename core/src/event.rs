@@ -152,6 +152,9 @@ pub enum Key {
     Enter,
     /// Spacebar key.
     Space,
+    /// Backspace key — editable fields delete the character before the
+    /// caret (WID-00 §5.3).
+    Backspace,
     /// Up arrow key.
     ArrowUp,
     /// Down arrow key.
