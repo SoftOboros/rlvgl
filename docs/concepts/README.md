@@ -158,6 +158,32 @@ disco-analyzer subrepo's first concepts doc).
     **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
     DPR-00 §12 is accepted or amended.
 
+### Wave-2 UI/runtime initiatives (2026-06-11)
+
+Single-phase, ticket-driven initiatives on the core/widgets/ui crates
+(not platform-scoped, but this directory is the established concepts
+ledger; each is a §0–§15 doc with its behaviour change landing as
+`<INIT>-01`):
+
+- **ANIM** — tick-driven tween/animation system in `rlvgl-core`
+  (`Tween` + `Animations` registry, deterministic, no wall clock).
+  - [ANIM-00-CONCEPTS.md](ANIM-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; ANIM-01 landed same day.
+- **REND** — parent-bounds child clipping (`ClipRenderer`) + generic
+  `ScrollView`. Critical path: a downstream consumer blocks a delivery
+  phase on its 0.2.x publish.
+  - [REND-00-CONCEPTS.md](REND-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; REND-01 landed same day.
+- **INPUT** — `DragRecognizer` gesture middleware in `rlvgl-platform`
+  with click-vs-drag suppression (chaining + `TapRecognizer::cancel`).
+  - [INPUT-00-CONCEPTS.md](INPUT-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; INPUT-01 landed same day.
+- **WID** — editable text `Input`/`Textarea` in `rlvgl-ui` (edit
+  buffer, caret, `set_active` key routing, `Key::Backspace`
+  vocabulary).
+  - [WID-00-CONCEPTS.md](WID-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; WID-01 landed same day.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem
