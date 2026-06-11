@@ -426,3 +426,16 @@ upstream — the standard pre-publish mechanism.)*
   crates.io the same day. The retrospective's §6 forward constraints
   (FC-1…FC-6) are normative for future initiatives. Initiative CLOSED;
   further work proceeds by §15 amendment + sub-letter phases.
+- **2026-06-10** — Post-close amendment (owner request): pre-publish
+  gauntlet (CLAUDE.md, the maintained phase list — no separate
+  /pre-publish skill file exists) gains **Phase 6.5**: cheap
+  `cargo check -p rlvgl-platform --features linux_fbdev` on
+  `aarch64-unknown-linux-gnu` and `armv7-unknown-linux-gnueabihf`
+  (BBB prong). Same defect class as the Mach-O `link_section` break
+  (§15 CRATES-CI-01 entry, retrospective divergence 3): host/arch
+  coverage gaps in published crates are invisible to x86-Linux-only
+  CI. Prerequisite documented (`rustup target add …`; check-only, no
+  cross-linker). Validated green on both targets before recording
+  (FC-1). Note: requested feature spelling `linux_evdev` does not
+  exist — `linux_fbdev` gates both the fbdev and evdev modules
+  (`platform/src/lib.rs:76-79`).

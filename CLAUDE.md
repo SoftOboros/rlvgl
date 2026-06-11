@@ -302,6 +302,16 @@ RUSTFLAGS="" cargo doc --workspace --no-deps
 # Phase 6: embedded target (full build + .hex/.bin)
 make build-disco
 
+# Phase 6.5: ARM Linux platform consumer cross-checks (CRATES-CI lineage:
+# the Mach-O link_section break proved host/arch coverage gaps ship as
+# broken crates — see CRATES-CI-00 §15 and the BBB Linux prong).
+# Prerequisite (one-time):
+#   rustup target add aarch64-unknown-linux-gnu armv7-unknown-linux-gnueabihf
+# cargo check only — no cross-linker needed. Note: linux_evdev has no
+# feature of its own; the linux_fbdev feature gates both modules.
+RUSTFLAGS="" cargo check -p rlvgl-platform --target aarch64-unknown-linux-gnu --features linux_fbdev
+RUSTFLAGS="" cargo check -p rlvgl-platform --target armv7-unknown-linux-gnueabihf --features linux_fbdev
+
 # Phase 7: publish dry run
 DRY_RUN=1 scripts/publish_changed.sh HEAD~1
 ```
