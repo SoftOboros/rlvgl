@@ -11,6 +11,14 @@
 //! The [`crate::gesture::DoubleTapRecognizer`] sits downstream of
 //! [`crate::gesture::TapRecognizer`] and detects two consecutive short taps,
 //! emitting `DoubleTap` instead of the second `PressRelease`.
+//!
+//! The [`crate::gesture::DragRecognizer`] sits **upstream** of
+//! [`crate::gesture::TapRecognizer`] (canonical chain: raw → Drag → Tap →
+//! DoubleTap, INPUT-00 §6.1), converting pointer movement past a start
+//! threshold into `DragStart`/`DragMove`/`DragEnd` and consuming the raw
+//! move/up stream while dragging so the tap chain never settles into a
+//! `PressRelease` — pipelines MUST also call [`TapRecognizer::cancel`]
+//! when a `DragStart` crosses the chain (click-vs-drag suppression).
 
 use rlvgl_core::event::Event;
 
@@ -32,6 +40,13 @@ pub const DOUBLE_TAP_WINDOW_MS: u32 = 400;
 /// Maximum spatial distance (Manhattan) between two taps for them to count
 /// as a double-tap. Prevents accidental double-taps on different list rows.
 pub const DOUBLE_TAP_MAX_DISTANCE: i32 = 20;
+
+/// Default drag start threshold: minimum Euclidean displacement (in pixels)
+/// from the press origin before a contact becomes a drag. Compared squared
+/// (`dx² + dy² ≥ t²`) — no sqrt, isotropic (INPUT-00 §5.1; deliberately not
+/// Manhattan like [`DOUBLE_TAP_MAX_DISTANCE`], which gates proximity, not
+/// motion).
+pub const DRAG_START_THRESHOLD_PX: i32 = 10;
 
 /// Convert a duration in milliseconds to tick counts at the given frame rate,
 /// rounding up so we never undercount.
@@ -152,6 +167,143 @@ impl TapRecognizer {
             }
         }
         None
+    }
+
+    /// Abandon the active contact: reset to `Idle`, dropping any pending
+    /// settle so no `PressRelease` is emitted for it.
+    ///
+    /// Pipelines MUST call this when a [`DragRecognizer`] upstream emits
+    /// `DragStart` (INPUT-00 §6.2) — the drag consumes the contact's
+    /// remaining `PointerMove`/`PointerUp` stream, so without the cancel
+    /// this recognizer would be stranded in its down state and corrupt the
+    /// next tap.
+    pub fn cancel(&mut self) {
+        self.state = TapState::Idle;
+        self.settle = 0;
+    }
+}
+
+// ── DragRecognizer ─────────────────────────────────────────────────────────
+
+/// Drag gesture recognizer (INPUT-00 §5).
+///
+/// Sits **upstream** of [`TapRecognizer`], consuming raw
+/// `PointerDown`/`PointerMove`/`PointerUp`. A contact that moves at least
+/// the start threshold (Euclidean, compared squared) away from its press
+/// origin becomes a drag: `DragStart { x, y, origin_x, origin_y }` is
+/// emitted once at the crossing, `DragMove { x, y }` for every subsequent
+/// move, and `DragEnd { x, y }` in place of the final `PointerUp`. While
+/// dragging, the raw move/up stream is consumed — combined with
+/// [`TapRecognizer::cancel`] at `DragStart`, a threshold-crossing contact
+/// can never also produce a `PressRelease`.
+///
+/// Sub-threshold contacts pass through untouched: taps with finger wander
+/// keep their existing debounce path. Non-pointer events always pass
+/// through unchanged.
+pub struct DragRecognizer {
+    state: DragState,
+    /// Press origin the displacement is measured from.
+    origin: (i32, i32),
+    /// Squared start threshold (`i64`: comfortably holds the worst-case
+    /// `dx² + dy²` of any plausible screen).
+    threshold_sq: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DragState {
+    /// No active contact.
+    Idle,
+    /// Contact active, displacement still below the threshold.
+    Armed,
+    /// Threshold crossed; `DragStart` already emitted.
+    Dragging,
+}
+
+impl DragRecognizer {
+    /// Create a recognizer with the default
+    /// [`DRAG_START_THRESHOLD_PX`] start threshold.
+    pub fn new() -> Self {
+        Self::with_threshold(DRAG_START_THRESHOLD_PX)
+    }
+
+    /// Create a recognizer with a custom start threshold in pixels.
+    /// A threshold of `0` makes the first `PointerMove` start the drag.
+    pub fn with_threshold(threshold_px: i32) -> Self {
+        let t = threshold_px.max(0) as i64;
+        Self {
+            state: DragState::Idle,
+            origin: (0, 0),
+            threshold_sq: t * t,
+        }
+    }
+
+    /// Whether a drag is currently in progress (`DragStart` emitted, no
+    /// `DragEnd` yet).
+    pub fn is_dragging(&self) -> bool {
+        self.state == DragState::Dragging
+    }
+
+    /// Process a raw input event. Returns the event to pass down the
+    /// chain — either a drag event (the raw event was consumed) or the
+    /// input itself (pass-through), `None` never escapes a pointer event
+    /// silently.
+    ///
+    /// Only `PointerDown`, `PointerMove`, and `PointerUp` participate;
+    /// everything else passes through unchanged.
+    pub fn process(&mut self, event: &Event) -> Option<Event> {
+        match event {
+            Event::PointerDown { x, y } => {
+                // Fresh contact (or lost-up glitch while dragging —
+                // re-arm defensively, INPUT-00 §5.5).
+                self.state = DragState::Armed;
+                self.origin = (*x, *y);
+                Some(event.clone())
+            }
+            Event::PointerMove { x, y } => match self.state {
+                DragState::Armed => {
+                    let dx = (*x - self.origin.0) as i64;
+                    let dy = (*y - self.origin.1) as i64;
+                    if dx * dx + dy * dy >= self.threshold_sq {
+                        self.state = DragState::Dragging;
+                        Some(Event::DragStart {
+                            x: *x,
+                            y: *y,
+                            origin_x: self.origin.0,
+                            origin_y: self.origin.1,
+                        })
+                    } else {
+                        Some(event.clone())
+                    }
+                }
+                DragState::Dragging => Some(Event::DragMove { x: *x, y: *y }),
+                DragState::Idle => Some(event.clone()),
+            },
+            Event::PointerUp { x, y } => match self.state {
+                DragState::Dragging => {
+                    self.state = DragState::Idle;
+                    Some(Event::DragEnd { x: *x, y: *y })
+                }
+                _ => {
+                    self.state = DragState::Idle;
+                    Some(event.clone())
+                }
+            },
+            // All other events pass through unchanged.
+            _ => Some(event.clone()),
+        }
+    }
+
+    /// Family-shape parity with the other recognizers. The drag state
+    /// machine has no timers in v1; this always returns `None` and
+    /// reserves the seam for long-press-to-drag (INPUT-00 §14).
+    pub fn tick(&mut self) -> Option<Event> {
+        None
+    }
+}
+
+impl Default for DragRecognizer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -445,5 +597,296 @@ mod tests {
         let far = DOUBLE_TAP_MAX_DISTANCE + 10;
         let events = short_tap(&mut dtap, 10 + far, 10, 1);
         assert!(!events.iter().any(|e| matches!(e, Event::DoubleTap { .. })));
+    }
+
+    // ── DragRecognizer tests (INPUT-00 §12) ────────────────────────────
+
+    /// The canonical two-stage chain (INPUT-00 §6.1/§6.4): raw → Drag →
+    /// Tap, with the mandatory `tap.cancel()` on `DragStart`. DoubleTap
+    /// is exercised separately in the coexistence test.
+    struct DragTapChain {
+        drag: DragRecognizer,
+        tap: TapRecognizer,
+    }
+
+    impl DragTapChain {
+        fn new() -> Self {
+            Self {
+                drag: DragRecognizer::new(),
+                tap: TapRecognizer::new(30),
+            }
+        }
+
+        fn feed(&mut self, event: &Event) -> Vec<Event> {
+            let mut out = Vec::new();
+            if let Some(stage) = self.drag.process(event) {
+                if matches!(stage, Event::DragStart { .. }) {
+                    self.tap.cancel();
+                }
+                if let Some(gesture) = self.tap.process(&stage) {
+                    out.push(gesture);
+                }
+            }
+            out
+        }
+
+        fn tick(&mut self) -> Vec<Event> {
+            let mut out = Vec::new();
+            if let Some(e) = self.tap.tick() {
+                out.push(e);
+            }
+            if let Some(e) = self.drag.tick() {
+                out.push(e);
+            }
+            out
+        }
+    }
+
+    fn is_drag(e: &Event) -> bool {
+        matches!(
+            e,
+            Event::DragStart { .. } | Event::DragMove { .. } | Event::DragEnd { .. }
+        )
+    }
+
+    #[test]
+    fn sub_threshold_wander_yields_press_release_and_no_drag() {
+        let mut chain = DragTapChain::new();
+        let mut events = Vec::new();
+
+        events.extend(chain.feed(&Event::PointerDown { x: 100, y: 100 }));
+        // Wander below 10 px Euclidean (max displacement 9 px on x).
+        for (x, y) in [(103, 102), (106, 104), (109, 100), (104, 103)] {
+            events.extend(chain.feed(&Event::PointerMove { x, y }));
+        }
+        events.extend(chain.feed(&Event::PointerUp { x: 104, y: 103 }));
+        for _ in 0..ms_to_ticks(SETTLE_MS, 30) {
+            events.extend(chain.tick());
+        }
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::PressRelease { .. })),
+            "wandering tap still releases: {events:?}"
+        );
+        assert!(
+            !events.iter().any(is_drag),
+            "no drag events below threshold: {events:?}"
+        );
+    }
+
+    #[test]
+    fn threshold_crossing_emits_drag_with_origin_and_no_press_release() {
+        let mut chain = DragTapChain::new();
+        let mut events = Vec::new();
+
+        events.extend(chain.feed(&Event::PointerDown { x: 100, y: 100 }));
+        events.extend(chain.feed(&Event::PointerMove { x: 105, y: 103 })); // 34 < 100
+        events.extend(chain.feed(&Event::PointerMove { x: 108, y: 106 })); // 100 >= 100
+        events.extend(chain.feed(&Event::PointerMove { x: 140, y: 90 }));
+        events.extend(chain.feed(&Event::PointerUp { x: 150, y: 80 }));
+        // Drain any pending tap settle — nothing may emerge.
+        for _ in 0..ms_to_ticks(SETTLE_MS, 30) + 2 {
+            events.extend(chain.tick());
+        }
+
+        let drags: Vec<&Event> = events.iter().filter(|e| is_drag(e)).collect();
+        assert_eq!(
+            drags,
+            vec![
+                &Event::DragStart {
+                    x: 108,
+                    y: 106,
+                    origin_x: 100,
+                    origin_y: 100
+                },
+                &Event::DragMove { x: 140, y: 90 },
+                &Event::DragEnd { x: 150, y: 80 },
+            ],
+            "start-at-origin / move / end sequencing"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::PressRelease { .. })),
+            "click-vs-drag suppression: no PressRelease: {events:?}"
+        );
+        // PressDown (visual feedback) is NOT suppressed (INPUT-00 §6.3).
+        assert!(
+            events.iter().any(|e| matches!(e, Event::PressDown { .. })),
+            "PressDown still emitted at contact"
+        );
+    }
+
+    #[test]
+    fn threshold_metric_is_euclidean_not_manhattan() {
+        // (7, 7): Manhattan 14 ≥ 10 but Euclidean² 98 < 100 — no drag.
+        let mut drag = DragRecognizer::new();
+        drag.process(&Event::PointerDown { x: 0, y: 0 });
+        let out = drag.process(&Event::PointerMove { x: 7, y: 7 });
+        assert_eq!(out, Some(Event::PointerMove { x: 7, y: 7 }));
+        assert!(!drag.is_dragging());
+        // (8, 7): 113 ≥ 100 — drag starts (and ≥ is inclusive: (6, 8) =
+        // 100 would too).
+        let out = drag.process(&Event::PointerMove { x: 8, y: 7 });
+        assert_eq!(
+            out,
+            Some(Event::DragStart {
+                x: 8,
+                y: 7,
+                origin_x: 0,
+                origin_y: 0
+            })
+        );
+        assert!(drag.is_dragging());
+    }
+
+    #[test]
+    fn custom_threshold_and_inclusive_boundary() {
+        let mut drag = DragRecognizer::with_threshold(5);
+        drag.process(&Event::PointerDown { x: 10, y: 10 });
+        let out = drag.process(&Event::PointerMove { x: 13, y: 14 }); // 9+16=25 == 5²
+        assert!(matches!(out, Some(Event::DragStart { .. })), "{out:?}");
+    }
+
+    #[test]
+    fn pointer_up_while_armed_passes_through_to_tap_path() {
+        let mut drag = DragRecognizer::new();
+        drag.process(&Event::PointerDown { x: 5, y: 5 });
+        let out = drag.process(&Event::PointerUp { x: 6, y: 6 });
+        assert_eq!(out, Some(Event::PointerUp { x: 6, y: 6 }));
+        assert!(!drag.is_dragging());
+    }
+
+    #[test]
+    fn pointer_down_while_dragging_rearms_defensively() {
+        let mut drag = DragRecognizer::new();
+        drag.process(&Event::PointerDown { x: 0, y: 0 });
+        drag.process(&Event::PointerMove { x: 20, y: 0 });
+        assert!(drag.is_dragging());
+        // Lost-up glitch: a fresh PointerDown re-arms at the new origin.
+        let out = drag.process(&Event::PointerDown { x: 50, y: 50 });
+        assert_eq!(out, Some(Event::PointerDown { x: 50, y: 50 }));
+        assert!(!drag.is_dragging());
+        let out = drag.process(&Event::PointerMove { x: 56, y: 58 }); // 36+64=100
+        assert_eq!(
+            out,
+            Some(Event::DragStart {
+                x: 56,
+                y: 58,
+                origin_x: 50,
+                origin_y: 50
+            })
+        );
+    }
+
+    #[test]
+    fn non_pointer_events_pass_through_drag_recognizer() {
+        let mut drag = DragRecognizer::new();
+        assert_eq!(drag.process(&Event::Tick), Some(Event::Tick));
+        assert_eq!(drag.tick(), None, "no timers in v1");
+    }
+
+    #[test]
+    fn multi_recognizer_coexistence_full_chain() {
+        // Full canonical chain: raw → Drag → Tap → DoubleTap.
+        let mut drag = DragRecognizer::new();
+        let mut tap = TapRecognizer::new(30);
+        let mut dtap = DoubleTapRecognizer::new(30);
+
+        let mut feed = |drag: &mut DragRecognizer,
+                        tap: &mut TapRecognizer,
+                        dtap: &mut DoubleTapRecognizer,
+                        event: &Event|
+         -> Vec<Event> {
+            let mut out = Vec::new();
+            if let Some(stage) = drag.process(event) {
+                if matches!(stage, Event::DragStart { .. }) {
+                    tap.cancel();
+                }
+                if let Some(gesture) = tap.process(&stage) {
+                    let (a, b) = dtap.process(&gesture);
+                    out.extend(a);
+                    out.extend(b);
+                }
+            }
+            out
+        };
+        let tick = |tap: &mut TapRecognizer, dtap: &mut DoubleTapRecognizer| -> Vec<Event> {
+            let mut out = Vec::new();
+            if let Some(gesture) = tap.tick() {
+                let (a, b) = dtap.process(&gesture);
+                out.extend(a);
+                out.extend(b);
+            }
+            out.extend(dtap.tick());
+            out
+        };
+
+        let mut events = Vec::new();
+
+        // 1) A drag: must produce only drag events.
+        events.extend(feed(
+            &mut drag,
+            &mut tap,
+            &mut dtap,
+            &Event::PointerDown { x: 10, y: 10 },
+        ));
+        events.extend(feed(
+            &mut drag,
+            &mut tap,
+            &mut dtap,
+            &Event::PointerMove { x: 40, y: 10 },
+        ));
+        events.extend(feed(
+            &mut drag,
+            &mut tap,
+            &mut dtap,
+            &Event::PointerUp { x: 60, y: 10 },
+        ));
+        for _ in 0..20 {
+            events.extend(tick(&mut tap, &mut dtap));
+        }
+        assert!(events.iter().any(|e| matches!(e, Event::DragEnd { .. })));
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::PressRelease { .. } | Event::DoubleTap { .. })),
+            "drag emitted tap-family events: {events:?}"
+        );
+
+        // 2) Two stationary short taps afterwards: double-tap still
+        //    recognizes — the drag (and its tap.cancel) did not corrupt
+        //    the downstream recognizers.
+        events.clear();
+        for _ in 0..2 {
+            events.extend(feed(
+                &mut drag,
+                &mut tap,
+                &mut dtap,
+                &Event::PointerDown { x: 100, y: 100 },
+            ));
+            events.extend(feed(
+                &mut drag,
+                &mut tap,
+                &mut dtap,
+                &Event::PointerUp { x: 100, y: 100 },
+            ));
+            // Settle the tap, stay inside the double-tap window.
+            for _ in 0..ms_to_ticks(SETTLE_MS, 30) {
+                events.extend(tick(&mut tap, &mut dtap));
+            }
+        }
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::DoubleTap { x: 100, y: 100 })),
+            "double-tap survives drag coexistence: {events:?}"
+        );
+        assert!(
+            !events.iter().any(is_drag),
+            "stationary taps emitted drag events"
+        );
     }
 }

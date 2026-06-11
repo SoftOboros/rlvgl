@@ -270,6 +270,103 @@ fn anim_pulse_border_dump_frames_differ_in_expected_direction() {
     }
 }
 
+/// INPUT-00 §12 end-to-end: raw playit `PD`/`PM`/`PU` streams drive the
+/// full recognizer chain (drag → tap → double-tap) in the sim.
+///
+/// Suppression observable: a drag that *starts on the settings icon* must
+/// NOT open the settings wing (the `PressRelease` that would open it is
+/// suppressed by the click-vs-drag contract), while drag activity itself
+/// is observable as a footer status change ("Drag end (x, y)"). A
+/// sub-threshold wander on the same icon then yields the `PressRelease`
+/// path: the wing opens.
+#[test]
+fn drag_recognizer_end_to_end_via_raw_pointer_commands() {
+    let mut session = SimulatorSession::launch();
+
+    // Footer text region (footer label at x=84, y=448, baseline 466 in
+    // the 800x480 layout): dump a strip covering the first glyphs.
+    let dump_footer = |session: &mut SimulatorSession| -> Vec<String> {
+        session.send("D84,452,40,10,1");
+        assert_eq!(session.read_line(), "DUMP:queued");
+        assert_eq!(session.read_line(), "F");
+        let rows: Vec<String> = (0..10).map(|_| session.read_line()).collect();
+        assert_eq!(session.read_line(), "END");
+        rows
+    };
+
+    // Recognizer timers count *ticks*, and the headless sim's effective
+    // frame rate is build-dependent (debug software rendering runs well
+    // below the nominal 60 Hz) — so wait for tick progression via STAT,
+    // not wall-clock sleeps. Tap debounce (200 ms = 12 ticks) +
+    // double-tap window (400 ms = 24 ticks) → 48 ticks is a generous
+    // horizon for any buffered PressRelease to emerge.
+    let wait_ticks = |session: &mut SimulatorSession, ticks: u32| {
+        session.send("?");
+        let (start, _) = parse_status(&session.read_line());
+        let deadline = std::time::Instant::now() + Duration::from_secs(90);
+        loop {
+            std::thread::sleep(Duration::from_millis(50));
+            session.send("?");
+            let (now, _) = parse_status(&session.read_line());
+            if now.wrapping_sub(start) >= ticks {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "sim ticks stalled: {now} after {start}"
+            );
+        }
+    };
+
+    let footer_before = dump_footer(&mut session);
+
+    // ── Case 1: drag starting on the settings icon (slot 0 ~ (760, 47)).
+    // Crossing displacement (6, 8): 36 + 64 = 100 >= 10². The wing MUST
+    // NOT open, and the footer must show drag activity.
+    session.send("PD760,47");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PM766,55");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PM700,200");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PU650,300");
+    assert_eq!(session.read_line(), "OK");
+
+    // If suppression were broken, the PressRelease would emerge within
+    // the debounce + double-tap horizon and open the wing.
+    wait_ticks(&mut session, 48);
+
+    session.send("QB:disco.settings.audio");
+    assert_eq!(
+        parse_bounds(&session.read_line()),
+        (0, 0, 0, 0),
+        "drag suppressed the PressRelease: settings wing stays closed"
+    );
+    let footer_after_drag = dump_footer(&mut session);
+    assert_ne!(
+        footer_before, footer_after_drag,
+        "drag status reached the footer (DragStart/DragEnd flowed end-to-end)"
+    );
+
+    // ── Case 2: sub-threshold wander on the same icon (max displacement
+    // (2, 2): 8 < 100) — the tap path stays intact and opens the wing.
+    session.send("PD760,47");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PM762,49");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PU762,49");
+    assert_eq!(session.read_line(), "OK");
+
+    wait_ticks(&mut session, 48);
+
+    session.send("QB:disco.settings.audio");
+    let (_, _, width, height) = parse_bounds(&session.read_line());
+    assert!(
+        width > 0 && height > 0,
+        "sub-threshold wander still taps: settings wing opened"
+    );
+}
+
 #[test]
 fn keyboard_opens_settings_wing() {
     let mut session = SimulatorSession::launch();

@@ -8,7 +8,7 @@ use rlvgl_core::{WidgetNode, event::Event, widget::Widget};
 use rlvgl_platform::{
     BlitRect, BlitterRenderer, ColorFormat, CpuBlitter, InputEvent, PixelFmt, Screen, Surface,
     WgpuDisplay,
-    gesture::{DoubleTapRecognizer, TapRecognizer},
+    gesture::{DoubleTapRecognizer, DragRecognizer, TapRecognizer},
 };
 use rlvgl_playit::{
     EventPipeline, FramebufferReader, PlayitExecutor, PlayitTransport, StatusData,
@@ -152,7 +152,14 @@ impl FramebufferReader for FrameMirror {
 }
 
 /// Shared gesture pipeline for simulator and playit inputs.
+///
+/// Canonical recognizer chain per INPUT-00 §6.1: raw → drag → tap →
+/// double-tap. The drag recognizer consumes the move/up stream while
+/// dragging, and the mandatory `tap.cancel()` on `DragStart` enforces
+/// click-vs-drag suppression (a threshold-crossing contact never also
+/// produces a `PressRelease`).
 struct DiscoGesturePipeline {
+    drag: DragRecognizer,
     tap: TapRecognizer,
     double_tap: DoubleTapRecognizer,
 }
@@ -160,6 +167,7 @@ struct DiscoGesturePipeline {
 impl DiscoGesturePipeline {
     fn new(frame_hz: u32) -> Self {
         Self {
+            drag: DragRecognizer::new(),
             tap: TapRecognizer::new(frame_hz),
             double_tap: DoubleTapRecognizer::new(frame_hz),
         }
@@ -176,7 +184,16 @@ impl DiscoGesturePipeline {
 
 impl EventPipeline for DiscoGesturePipeline {
     fn process(&mut self, event: Event) -> (Option<Event>, Option<Event>) {
-        match self.tap.process(&event) {
+        let Some(staged) = self.drag.process(&event) else {
+            return (None, None);
+        };
+        if matches!(staged, Event::DragStart { .. }) {
+            // INPUT-00 §6.2: the drag consumes this contact's remaining
+            // move/up stream — abandon the pending tap so it can neither
+            // settle into a PressRelease nor corrupt the next tap.
+            self.tap.cancel();
+        }
+        match self.tap.process(&staged) {
             Some(gesture) => self.double_tap.process(&gesture),
             None => (None, None),
         }

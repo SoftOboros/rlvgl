@@ -1354,6 +1354,18 @@ impl DiscoController {
             Event::PressRelease { x, y } if !state.capabilities.pointer => {
                 state.push_status(format!("Pointer input ignored at ({x}, {y})"));
             }
+            // Drag observability (INPUT-00 §7): surface drag activity
+            // through the shared status channel so headless harnesses can
+            // assert the recognizer chain end-to-end. Drop-target/reorder
+            // logic is application business and intentionally absent.
+            Event::DragStart {
+                origin_x, origin_y, ..
+            } => {
+                state.push_status(format!("Drag start ({origin_x}, {origin_y})"));
+            }
+            Event::DragEnd { x, y } => {
+                state.push_status(format!("Drag end ({x}, {y})"));
+            }
             _ => {}
         }
     }
@@ -2077,6 +2089,34 @@ mod tests {
             rerun.tick();
         }
         assert_eq!(border_colors(&rerun), at_trough);
+    }
+
+    #[test]
+    fn drag_events_surface_through_status_channel() {
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        controller.dispatch_event(&Event::DragStart {
+            x: 120,
+            y: 90,
+            origin_x: 100,
+            origin_y: 80,
+        });
+        controller.dispatch_event(&Event::DragEnd { x: 300, y: 200 });
+        let commands = controller.drain_commands();
+        assert!(
+            commands.iter().any(
+                |cmd| matches!(cmd, DiscoCommand::ShowStatus(s) if s == "Drag start (100, 80)")
+            ),
+            "{commands:?}"
+        );
+        assert!(
+            commands.iter().any(
+                |cmd| matches!(cmd, DiscoCommand::ShowStatus(s) if s == "Drag end (300, 200)")
+            ),
+            "{commands:?}"
+        );
     }
 
     #[test]

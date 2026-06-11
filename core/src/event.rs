@@ -101,6 +101,36 @@ pub enum Event {
         /// Vertical coordinate.
         y: i32,
     },
+    /// A drag gesture started: the pointer moved at least the start
+    /// threshold away from its press origin. Emitted once per drag by the
+    /// `DragRecognizer`. A contact that starts a drag will not also
+    /// produce a `PressRelease` (click-vs-drag suppression — INPUT-00 §6).
+    DragStart {
+        /// Horizontal coordinate of the move that crossed the threshold.
+        x: i32,
+        /// Vertical coordinate of the move that crossed the threshold.
+        y: i32,
+        /// Horizontal coordinate of the originating press.
+        origin_x: i32,
+        /// Vertical coordinate of the originating press.
+        origin_y: i32,
+    },
+    /// Pointer position update while a drag is in progress. Emitted by
+    /// the `DragRecognizer` for every `PointerMove` after `DragStart`.
+    DragMove {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
+    /// The dragged pointer lifted; drop position for resolution logic.
+    /// Emitted by the `DragRecognizer` in place of the raw `PointerUp`.
+    DragEnd {
+        /// Horizontal coordinate.
+        x: i32,
+        /// Vertical coordinate.
+        y: i32,
+    },
     /// A keyboard key was pressed.
     KeyDown {
         /// Key that was pressed.
