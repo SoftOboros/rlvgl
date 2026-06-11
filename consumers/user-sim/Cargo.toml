@@ -28,8 +28,10 @@ description = "CRATES-CI-02 Consumer Project: downstream-user custom simulator b
 # a custom simulator needs exactly these three layers.
 rlvgl-core = { version = "0.2" }
 rlvgl-widgets = { version = "0.2" }
-# `fontdue` is required for visible Label/Button text: without it the
-# BlitterRenderer's draw_text is a stub (platform/src/blit.rs).
+# `fontdue` is explicit for registry compatibility: rlvgl-platform
+# `simulator` implies `fontdue` only from 0.2.3 (DSIM-ERRATA-001
+# resolution); with "0.2" this consumer may resolve 0.2.2, where the
+# BlitterRenderer's draw_text is a stub without it.
 rlvgl-platform = { version = "0.2", features = ["simulator", "fontdue"] }
 # The umbrella crate does NOT re-export rlvgl-playit (its `playit` feature
 # only links the dep without a `pub use`), so the playit TCP server is taken

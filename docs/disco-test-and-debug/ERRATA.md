@@ -60,8 +60,13 @@ feature stanzas in `examples/disco-sim/Cargo.toml`.
 glyph runs starting row 32 col ≈87 (headline) plus 25 rows of glyphs
 outside the icon-strip columns (previously zero); background renders
 as the `.` floor; playit node suite 9/9 pass against the fixed binary.
-The `simulator`-should-imply-`fontdue` feature-graph question remains
-open (deliberately not taken here — size cost on text-free consumers).
+
+**Follow-up resolved (2026-06-10, owner decision):** `simulator` now
+implies `fontdue` in `platform/Cargo.toml` as of **rlvgl-platform
+0.2.3** — every known simulator consumer needs text, and the stub
+shipped two invisible-text binaries (disco-sim, user-sim) before
+anyone noticed. Consumers pinning registry versions ≤ 0.2.2 still
+need the explicit `fontdue` feature (as `consumers/user-sim` carries).
 
 ### DSIM-ERRATA-002 — 🟢 "Missing background fill" is the dark theme, not a defect
 
