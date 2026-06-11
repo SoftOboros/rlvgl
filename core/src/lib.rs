@@ -32,6 +32,8 @@ extern crate std;
 
 extern crate alloc;
 
+/// Tick-driven tween/animation system (deterministic, no wall clock).
+pub mod anim;
 pub mod animation;
 pub mod application;
 pub mod bitmap_font;

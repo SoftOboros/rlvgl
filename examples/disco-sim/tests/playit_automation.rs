@@ -185,6 +185,91 @@ fn automation_headless_emits_ready_status_and_dump_frames() {
     assert_eq!(session.read_line(), "END");
 }
 
+/// ANIM-00 §12 pulse driving case over the wire: D-dump the focus-border
+/// pulse at consecutive tick offsets and assert the frames differ in the
+/// expected direction.
+///
+/// The focus border pulses bright→dim→bright with half-period 32 ticks
+/// (`FOCUS_PULSE_HALF_PERIOD`), registered at controller construction, so
+/// pulse phase is a pure function of the sim tick count. A single
+/// `D…,4` capture emits one frame per present, and presents advance 1:1
+/// with ticks (`DiscoRuntime::step`), so the four frames sit at exactly
+/// consecutive tick offsets even though the sim free-runs. The `?` STAT
+/// anchor is only tick-approximate (the dump's first frame lands ~2
+/// presents later), so the test retries until the capture window sits
+/// well inside one monotonic half-cycle.
+#[test]
+fn anim_pulse_border_dump_frames_differ_in_expected_direction() {
+    let mut session = SimulatorSession::launch();
+
+    // Slot-0 focus border, top strip: x = 800 - STRIP_X_OFFSET(70),
+    // y = STRIP_MARGIN_TOP(17) in the default 800x480 layout.
+    const X: i32 = 730;
+    const Y: i32 = 17;
+    const HALF: u32 = 32; // assets::FOCUS_PULSE_HALF_PERIOD
+    const CYCLE: u32 = 64;
+
+    let mut attempts = 0;
+    let (greens, descending) = loop {
+        attempts += 1;
+        assert!(attempts < 80, "never observed a safe pulse phase window");
+
+        session.send("?");
+        let (tick, _) = parse_status(&session.read_line());
+        // First dumped frame lands ~2 ticks after the STAT sample; keep
+        // the whole ±2-tolerance window inside one half-cycle and away
+        // from the slow tail of the ease, where per-tick deltas round
+        // to zero.
+        let phase = (tick + 2) % CYCLE;
+        let segment = phase % HALF;
+        if !(2..=21).contains(&segment) {
+            std::thread::sleep(Duration::from_millis(60));
+            continue;
+        }
+
+        session.send(&format!("D{X},{Y},4,1,4"));
+        assert_eq!(session.read_line(), "DUMP:queued");
+        let mut greens = Vec::new();
+        for _ in 0..4 {
+            assert_eq!(session.read_line(), "F");
+            let row = session.read_line();
+            let first = row.split_whitespace().next().expect("missing pixel");
+            let argb = u32::from_str_radix(first, 16).expect("invalid hex pixel");
+            assert_eq!(argb & 0xFF00_0000, 0xFF00_0000, "border pixel is opaque");
+            assert_eq!(argb & 0x00FF_0000, 0, "red stays 0 across the cyan pulse");
+            greens.push(((argb >> 8) & 0xFF) as i32);
+        }
+        assert_eq!(session.read_line(), "END");
+        break (greens, phase < HALF);
+    };
+
+    // Every sample sits between the pulse endpoints
+    // (FOCUS_PULSE_DIM_COLOR green 54, FOCUS_HIGHLIGHT_COLOR green 180).
+    for green in &greens {
+        assert!(
+            (54..=180).contains(green),
+            "sample outside pulse palette: {greens:?}"
+        );
+    }
+
+    // Frames at consecutive tick offsets move monotonically in the
+    // direction the phase predicts, with real motion across the window.
+    let monotone = |ok: fn(i32) -> bool| greens.windows(2).all(|w| ok(w[1] - w[0]));
+    if descending {
+        assert!(monotone(|d| d <= 0), "expected dimming, got {greens:?}");
+        assert!(
+            greens[0] - greens[3] >= 3,
+            "expected visible dimming over 3 ticks: {greens:?}"
+        );
+    } else {
+        assert!(monotone(|d| d >= 0), "expected brightening, got {greens:?}");
+        assert!(
+            greens[3] - greens[0] >= 3,
+            "expected visible brightening over 3 ticks: {greens:?}"
+        );
+    }
+}
+
 #[test]
 fn keyboard_opens_settings_wing() {
     let mut session = SimulatorSession::launch();

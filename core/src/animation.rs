@@ -111,7 +111,10 @@ pub enum LoopMode {
 
 /// Compute the effective progress `t ∈ [0,1]` and whether the animation is
 /// finished, given elapsed time, duration, and loop mode.
-fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, bool) {
+///
+/// Unit-agnostic: callers in this module pass milliseconds; the tick-driven
+/// [`anim`](crate::anim) module passes ticks. The folding math is identical.
+pub(crate) fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, bool) {
     if duration_ms == 0 {
         return (1.0, true);
     }

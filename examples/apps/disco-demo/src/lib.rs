@@ -24,6 +24,7 @@ use hotspot::ActionHotspot;
 use icon_strip::{IconSlot, IconStrip};
 use rlvgl_core::{
     WidgetNode,
+    anim::{Animations, Easing},
     bitmap_font::FONT_6X10,
     event::{Event, Key},
     style::StyleBuilder,
@@ -305,6 +306,9 @@ struct ControllerState {
     tick_count: u64,
     backlight: u8,
     focus_dirty: bool,
+    /// Tick-driven animation registry (ANIM-00). Owns the focus-border
+    /// attention pulse; advanced once per `Event::Tick`.
+    anims: Animations,
     /// Info page currently rendered on the dashboard, if any.
     ///
     /// When set, the `Tick` handler re-renders the dashboard lines so
@@ -339,8 +343,30 @@ impl ControllerState {
             tick_count: 0,
             backlight: 75,
             focus_dirty: false,
+            anims: Animations::new(),
             active_info: None,
         };
+        // Focus-border attention pulse (ANIM-00 §8.1): ping-pong the
+        // highlight between bright and dim forever. Phase is a function
+        // of the controller tick count only, so headless harnesses can
+        // sample it frame-exactly.
+        let pulse_target = this.icon_strip.clone();
+        this.anims.pulse_color(
+            assets::FOCUS_HIGHLIGHT_COLOR,
+            assets::FOCUS_PULSE_DIM_COLOR,
+            assets::FOCUS_PULSE_HALF_PERIOD,
+            Easing::EaseOut,
+            alloc::boxed::Box::new(move |color| {
+                // try_borrow_mut mirrors sync_focus_highlights: if the
+                // strip is borrowed elsewhere this tick, skip the update
+                // (the next tick re-applies a fresh sample).
+                let Ok(mut strip) = pulse_target.try_borrow_mut() else {
+                    return None;
+                };
+                strip.set_focus_color(color);
+                strip.focused_bounds()
+            }),
+        );
         this.sync_focus_highlights();
         this
     }
@@ -1308,6 +1334,7 @@ impl DiscoController {
         match event {
             Event::Tick => {
                 state.tick_count = state.tick_count.wrapping_add(1);
+                state.anims.tick();
                 if state.tick_count.is_multiple_of(600) {
                     let tick_count = state.tick_count;
                     let backlight = state.backlight;
@@ -1955,5 +1982,113 @@ mod tests {
         let state = c.state.borrow();
         assert!(state.icon_strip.borrow().focused_slot().is_some());
         assert_eq!(state.settings_wing.borrow().focused_slot(), None);
+    }
+
+    /// Records `fill_rect` calls so a frame's border strips can be
+    /// inspected without rasterizing icons (ANIM-00 §12 pulse case).
+    struct FillCapture {
+        fills: Vec<(Rect, Color)>,
+    }
+
+    impl rlvgl_core::renderer::Renderer for FillCapture {
+        fn fill_rect(&mut self, rect: Rect, color: Color) {
+            self.fills.push((rect, color));
+        }
+        fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
+        fn draw_pixels(
+            &mut self,
+            _position: (i32, i32),
+            _pixels: &[Color],
+            _width: u32,
+            _height: u32,
+        ) {
+            // Icons are irrelevant to the border assertion; skip the
+            // per-pixel fill_rect fallback.
+        }
+    }
+
+    /// Draw the icon strip and return the set of border-strip colors
+    /// (fills exactly `FOCUS_BORDER_WIDTH` wide or tall).
+    fn border_colors(controller: &DiscoController) -> Vec<Color> {
+        use rlvgl_core::widget::Widget;
+        let state = controller.state.borrow();
+        let mut capture = FillCapture { fills: Vec::new() };
+        state.icon_strip.borrow().draw(&mut capture);
+        capture
+            .fills
+            .iter()
+            .filter(|(rect, _)| {
+                rect.width == assets::FOCUS_BORDER_WIDTH as i32
+                    || rect.height == assets::FOCUS_BORDER_WIDTH as i32
+            })
+            .map(|&(_, color)| color)
+            .collect()
+    }
+
+    #[test]
+    fn focus_border_pulses_deterministically_at_known_tick_offsets() {
+        use rlvgl_core::widget::Widget;
+
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+
+        // Tick to the pulse trough (half period): border exactly at the
+        // dim endpoint.
+        for _ in 0..assets::FOCUS_PULSE_HALF_PERIOD {
+            controller.tick();
+        }
+        let at_trough = border_colors(&controller);
+        assert!(!at_trough.is_empty(), "focused border is drawn");
+        assert!(
+            at_trough
+                .iter()
+                .all(|&c| c == assets::FOCUS_PULSE_DIM_COLOR),
+            "tick t=half_period samples the dim endpoint exactly: {at_trough:?}"
+        );
+
+        // Half a period later: back at the bright endpoint, and the two
+        // frames differ in the expected direction (dim -> bright).
+        for _ in 0..assets::FOCUS_PULSE_HALF_PERIOD {
+            controller.tick();
+        }
+        let at_peak = border_colors(&controller);
+        assert!(
+            at_peak.iter().all(|&c| c == assets::FOCUS_HIGHLIGHT_COLOR),
+            "tick t=2*half_period samples the bright endpoint exactly: {at_peak:?}"
+        );
+        assert_ne!(
+            at_trough[0], at_peak[0],
+            "frames half a period apart differ"
+        );
+        assert!(
+            at_peak[0].1 > at_trough[0].1 && at_peak[0].2 > at_trough[0].2,
+            "direction: green/blue channels brighten from trough to peak"
+        );
+
+        // Re-running the same tick schedule reproduces the same samples
+        // bit-identically (no wall clock anywhere in the path).
+        let mut rerun = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        for _ in 0..assets::FOCUS_PULSE_HALF_PERIOD {
+            rerun.tick();
+        }
+        assert_eq!(border_colors(&rerun), at_trough);
+    }
+
+    #[test]
+    fn pulse_reports_focused_bounds_as_dirty_rect() {
+        let controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        let mut state = controller.state.borrow_mut();
+        let expected = state.icon_strip.borrow().focused_bounds().unwrap();
+        state.anims.tick();
+        assert_eq!(state.anims.dirty_rects(), &[expected]);
+        assert!(state.anims.any_active(), "infinite pulse stays pending");
     }
 }

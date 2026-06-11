@@ -325,16 +325,7 @@ impl CommandList {
 }
 
 fn rect_union(a: Rect, b: Rect) -> Rect {
-    let x0 = a.x.min(b.x);
-    let y0 = a.y.min(b.y);
-    let x1 = (a.x + a.width).max(b.x + b.width);
-    let y1 = (a.y + a.height).max(b.y + b.height);
-    Rect {
-        x: x0,
-        y: y0,
-        width: x1 - x0,
-        height: y1 - y0,
-    }
+    a.union(b)
 }
 
 /// Backend trait for executing a [`CommandList`]. The blanket impl is

@@ -50,3 +50,11 @@ pub const FOCUS_HIGHLIGHT_COLOR: rlvgl_core::widget::Color =
     rlvgl_core::widget::Color(0, 180, 255, 255);
 /// Focus highlight border width in pixels.
 pub const FOCUS_BORDER_WIDTH: u8 = 2;
+/// Dim endpoint of the focus-border attention pulse (same cyan hue,
+/// reduced intensity). ANIM-00 §8.1.
+pub const FOCUS_PULSE_DIM_COLOR: rlvgl_core::widget::Color =
+    rlvgl_core::widget::Color(0, 54, 76, 255);
+/// Half-period of the focus-border attention pulse in ticks
+/// (`bright → dim` takes this many ticks; one full visual cycle is twice
+/// this). ANIM-00 §8.1 freezes this at 32 (~0.53 s per direction at 60 Hz).
+pub const FOCUS_PULSE_HALF_PERIOD: u32 = 32;
