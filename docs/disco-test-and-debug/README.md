@@ -55,6 +55,9 @@ All install details live in
 | [3](03-playit.md) | Playit automation | The wire protocol, how it attaches to TCP (sim), PL011+ConIn (UEFI), and ST-Link VCP (hardware); the Node.js test suite. |
 | [4](04-vscode-and-hardware.md) | VS Code + probe-rs + GDB | The checked-in `.vscode/launch.json` configurations, one-click build/flash/debug, GDB server via `make probe-rs-gdb`, SVD-backed register views. |
 
+Triaged defects for these surfaces live in the family
+[errata log](ERRATA.md) (GH Issues is the intake queue).
+
 ## Quick reference: runtime × action
 
 The full command grid; later chapters explain each row.
