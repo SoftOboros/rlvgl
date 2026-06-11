@@ -209,3 +209,190 @@ impl<R: Renderer + ?Sized> CoverageSink for RowBlendSink<'_, R> {
         self.r.blend_row(x, y, self.color, coverage);
     }
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// ClipRenderer (REND initiative)
+// ───────────────────────────────────────────────────────────────────────────
+
+/// Nominal line height (pixels above the baseline anchor) used to gate
+/// backend [`Renderer::draw_text`] calls against a clip region. See
+/// `docs/concepts/REND-00-CONCEPTS.md` §5.4 for the guarantee scope.
+pub const TEXT_NOMINAL_LINE_PX: i32 = 16;
+
+/// Translating, clipping [`Renderer`] adapter (REND-00 §5).
+///
+/// Wraps any renderer, shifts every draw by `(dx, dy)` (content space →
+/// screen space), and crops it to a screen-space clip rect before
+/// forwarding. Containers that render children clipped to their own
+/// bounds — [`ScrollView`] being the canonical example — construct one of
+/// these around the incoming renderer in their `draw()`; backends need no
+/// changes and cannot opt out by accident.
+///
+/// Per-method semantics (normative — REND-00 §5.4):
+///
+/// - [`fill_rect`](Renderer::fill_rect) / [`blend_rect`](Renderer::blend_rect):
+///   forwarded as the translated intersection with the clip; dropped when
+///   disjoint.
+/// - [`draw_pixels`](Renderer::draw_pixels): only the visible row segments
+///   are forwarded (per-row source slice) — cropping never reads outside
+///   the source buffer.
+/// - [`blend_row`](Renderer::blend_row): the coverage run is sliced to the
+///   clip's horizontal span; rows outside the vertical span are dropped.
+///   The AA primitives (`fill_obb_aa`, `fill_disc_aa`, `stroke_line_aa`,
+///   `fill_arc_aa`) and [`submit`](Renderer::submit) are deliberately NOT
+///   forwarded to the wrapped renderer: the trait defaults route them
+///   through this adapter's `blend_row`/per-cmd dispatch, which clips. A
+///   forwarding override would hand the call to a backend fast path that
+///   knows nothing of the clip.
+/// - [`draw_text`](Renderer::draw_text) (backend text — no extent
+///   information): forwarded iff the nominal line box
+///   ([`TEXT_NOMINAL_LINE_PX`] above the baseline) sits fully inside the
+///   clip's vertical span and the anchor is inside the horizontal span;
+///   otherwise dropped. No vertical bleed, but partially-visible lines
+///   vanish rather than crop, and horizontal overflow is not cropped.
+///   Per-pixel text (`bitmap_font` / `packed_font`) renders through
+///   `fill_rect` and clips exactly on both axes — prefer it for content
+///   that can straddle a viewport edge.
+///
+/// Nesting two `ClipRenderer`s composes by intersection with summed
+/// offsets (REND-00 §5.5).
+///
+/// `clip` is in *screen* (wrapped-renderer) coordinates. Construction with
+/// a degenerate clip is allowed; every draw is then dropped.
+pub struct ClipRenderer<'a> {
+    inner: &'a mut dyn Renderer,
+    /// Translation applied to incoming draws (content space → screen).
+    dx: i32,
+    dy: i32,
+    /// Screen-space clip region; `None` means degenerate (drop all).
+    clip: Option<Rect>,
+}
+
+impl<'a> ClipRenderer<'a> {
+    /// Wrap `inner`, clipping to the screen-space `clip` rect with no
+    /// translation.
+    pub fn new(inner: &'a mut dyn Renderer, clip: Rect) -> Self {
+        Self::with_offset(inner, clip, 0, 0)
+    }
+
+    /// Wrap `inner`, translating incoming draws by `(dx, dy)` and clipping
+    /// the result to the screen-space `clip` rect.
+    pub fn with_offset(inner: &'a mut dyn Renderer, clip: Rect, dx: i32, dy: i32) -> Self {
+        let clip = (clip.width > 0 && clip.height > 0).then_some(clip);
+        Self {
+            inner,
+            dx,
+            dy,
+            clip,
+        }
+    }
+
+    /// The screen-space clip rect, or `None` when degenerate.
+    pub fn clip(&self) -> Option<Rect> {
+        self.clip
+    }
+}
+
+impl Renderer for ClipRenderer<'_> {
+    fn fill_rect(&mut self, rect: Rect, color: Color) {
+        let Some(clip) = self.clip else { return };
+        let moved = Rect {
+            x: rect.x + self.dx,
+            y: rect.y + self.dy,
+            ..rect
+        };
+        if let Some(visible) = moved.intersect(clip) {
+            self.inner.fill_rect(visible, color);
+        }
+    }
+
+    fn blend_rect(&mut self, rect: Rect, color: Color) {
+        let Some(clip) = self.clip else { return };
+        let moved = Rect {
+            x: rect.x + self.dx,
+            y: rect.y + self.dy,
+            ..rect
+        };
+        if let Some(visible) = moved.intersect(clip) {
+            self.inner.blend_rect(visible, color);
+        }
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        let Some(clip) = self.clip else { return };
+        let (x, y) = (position.0 + self.dx, position.1 + self.dy);
+        // Nominal-line-box gating (REND-00 §5.4): vertical containment of
+        // the line above the baseline, horizontal containment of the
+        // anchor. Drop rather than bleed.
+        let line_top = y - TEXT_NOMINAL_LINE_PX;
+        let inside_v = line_top >= clip.y && y <= clip.y + clip.height;
+        let inside_h = x >= clip.x && x < clip.x + clip.width;
+        if inside_v && inside_h {
+            self.inner.draw_text((x, y), text, color);
+        }
+    }
+
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        let Some(clip) = self.clip else { return };
+        if width == 0 || height == 0 {
+            return;
+        }
+        let dest = Rect {
+            x: position.0 + self.dx,
+            y: position.1 + self.dy,
+            width: width as i32,
+            height: height as i32,
+        };
+        let Some(visible) = dest.intersect(clip) else {
+            return;
+        };
+        // Fast path: fully visible — forward unchanged.
+        if visible == dest {
+            self.inner
+                .draw_pixels((dest.x, dest.y), pixels, width, height);
+            return;
+        }
+        // Partial: forward each visible row's segment as a 1-row blit.
+        let col0 = (visible.x - dest.x) as u32;
+        let run = visible.width as u32;
+        for row in 0..visible.height {
+            let src_row = (visible.y - dest.y + row) as u32;
+            let start = (src_row * width + col0) as usize;
+            let Some(slice) = pixels.get(start..start + run as usize) else {
+                return;
+            };
+            self.inner
+                .draw_pixels((visible.x, visible.y + row), slice, run, 1);
+        }
+    }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        let Some(clip) = self.clip else { return };
+        let (x, y) = (x + self.dx, y + self.dy);
+        if y < clip.y || y >= clip.y + clip.height || coverage.is_empty() {
+            return;
+        }
+        let row = Rect {
+            x,
+            y,
+            width: coverage.len() as i32,
+            height: 1,
+        };
+        let Some(visible) = row.intersect(clip) else {
+            return;
+        };
+        let start = (visible.x - x) as usize;
+        self.inner.blend_row(
+            visible.x,
+            y,
+            color,
+            &coverage[start..start + visible.width as usize],
+        );
+    }
+
+    // fill_obb_aa / fill_disc_aa / stroke_line_aa / fill_arc_aa / submit:
+    // intentionally NOT overridden (REND-00 §5.3). The trait defaults
+    // funnel them through `blend_row` / per-cmd dispatch on *this*
+    // adapter, which clips. Forwarding them to `inner` would bypass the
+    // clip on backends with hardware fast paths.
+}

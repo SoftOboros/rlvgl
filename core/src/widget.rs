@@ -40,6 +40,28 @@ impl Rect {
         }
     }
 
+    /// Axis-aligned intersection of `self` and `other`, or `None` when the
+    /// rects are disjoint or the overlap is degenerate (zero/negative area).
+    ///
+    /// Companion to [`union`](Self::union); used by
+    /// [`ClipRenderer`](crate::renderer::ClipRenderer) to fold nested clip
+    /// regions and crop forwarded draws.
+    pub fn intersect(self, other: Rect) -> Option<Rect> {
+        let x0 = self.x.max(other.x);
+        let y0 = self.y.max(other.y);
+        let x1 = (self.x + self.width).min(other.x + other.width);
+        let y1 = (self.y + self.height).min(other.y + other.height);
+        if x1 <= x0 || y1 <= y0 {
+            return None;
+        }
+        Some(Rect {
+            x: x0,
+            y: y0,
+            width: x1 - x0,
+            height: y1 - y0,
+        })
+    }
+
     /// Integer linear interpolation from `self` toward `to` by `num / den`.
     ///
     /// Each field is interpolated as `a + (b - a) * num / den` using `i64`

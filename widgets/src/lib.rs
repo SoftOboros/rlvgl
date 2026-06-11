@@ -28,6 +28,8 @@ pub mod motion;
 pub mod progress;
 /// Radio button widget for mutually exclusive options.
 pub mod radio;
+/// Scrollable viewport container with parent-bounds child clipping.
+pub mod scroll_view;
 /// Slider widget for numeric input.
 pub mod slider;
 /// Binary on/off switch widget.
