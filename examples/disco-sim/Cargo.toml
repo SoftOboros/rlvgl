@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 rlvgl-core = { path = "../../core" }
-rlvgl-platform = { path = "../../platform", features = ["simulator"] }
+rlvgl-platform = { path = "../../platform", features = ["simulator", "fontdue"] }
 rlvgl-widgets = { path = "../../widgets" }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
 rlvgl-playit = { path = "../../playit", features = ["std"] }
@@ -19,4 +19,4 @@ rlvgl-playit = { path = "../../playit", features = ["std"] }
 # Host-side mock blitter for the typed DMA2D contract test.
 # Lives in dev-deps so the simulator binary doesn't pull mock symbols
 # into its release build.
-rlvgl-platform = { path = "../../platform", features = ["simulator", "mock_blitter"] }
+rlvgl-platform = { path = "../../platform", features = ["simulator", "fontdue", "mock_blitter"] }

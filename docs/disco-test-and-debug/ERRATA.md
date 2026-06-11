@@ -20,9 +20,9 @@ paths in `rlvgl-platform`).
 
 ## Entries
 
-### DSIM-ERRATA-001 — 🟡 No text in the disco-sim CPU mirror (all modes)
+### DSIM-ERRATA-001 — 🟢 No text in the disco-sim CPU mirror (all modes)
 
-*(filed 2026-06-10)*
+*(filed 2026-06-10; resolved 2026-06-10)*
 
 **Symptom (as reported):** `--headless=<path>` ASCII frames contain the
 right-edge icon strip only — headline/subtitle/footer text absent.
@@ -53,10 +53,15 @@ Consider whether `simulator` SHOULD imply `fontdue` for all consumers —
 that is a `platform/Cargo.toml` feature-graph decision with a size
 cost on text-free consumers; record under CRATES-CI/§15 if taken.
 
-**Verification (once landed):** `D` dump over the headline region
-returns non-background pixels; `--headless` ASCII shows the headline /
-subtitle / footer glyph blocks; the playit node suite's pixel-diff
-tests still pass.
+**Resolution (2026-06-10):** `"fontdue"` added to both `rlvgl-platform`
+feature stanzas in `examples/disco-sim/Cargo.toml`.
+
+**Verification evidence:** `--headless` ASCII now shows letterform
+glyph runs starting row 32 col ≈87 (headline) plus 25 rows of glyphs
+outside the icon-strip columns (previously zero); background renders
+as the `.` floor; playit node suite 9/9 pass against the fixed binary.
+The `simulator`-should-imply-`fontdue` feature-graph question remains
+open (deliberately not taken here — size cost on text-free consumers).
 
 ### DSIM-ERRATA-002 — 🟢 "Missing background fill" is the dark theme, not a defect
 
@@ -81,9 +86,9 @@ text, and text is DSIM-ERRATA-001.
 (e.g. `.`) for non-zero-but-dark pixels so "rendered dark" and
 "never rendered" are distinguishable at a glance.
 
-### DSIM-ERRATA-003 — 🟡 First-poll `D` dumps can capture an all-zero frame
+### DSIM-ERRATA-003 — 🟢 First-poll `D` dumps can capture an all-zero frame
 
-*(filed 2026-06-10)*
+*(filed 2026-06-10; resolved 2026-06-10)*
 
 **Symptom (as reported):** `D` dumps return rows of `00000000` under
 `--automation-headless`.
@@ -104,6 +109,11 @@ callback closure) to render before the initial poll. The
 `present_count` exposed via `?` should never be 0 while the transport
 is accepting commands.
 
-**Verification (once landed):** a `D` issued immediately after
-`PLAYIT_READY` (no status wait) returns background-colored rows;
-`?` reports `presentCount >= 1` on first query.
+**Resolution (2026-06-10):** `DiscoRuntime::new` renders one frame
+before returning (`render_frame()` at construction), so the mirror is
+populated before the transport serves its first poll.
+
+**Verification evidence:** `D 0,0,8,1` issued immediately after
+`PLAYIT_READY` (no status wait) returns `ff0d131e` background rows,
+not `00000000`; first `?` reports `presentCount: 1`; playit node
+suite 9/9 pass.

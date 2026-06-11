@@ -280,7 +280,7 @@ impl DiscoRuntime {
         let frame_hz = screen.frame_hz.max(1);
         let controller = DiscoController::new(screen, DiscoCapabilities::simulator());
         let root = controller.root();
-        Self {
+        let mut runtime = Self {
             controller,
             root,
             playit: PlayitExecutor::new(transport),
@@ -289,7 +289,13 @@ impl DiscoRuntime {
             tick_count: 0,
             frame_hz,
             active_crawl: None,
-        }
+        };
+        // DSIM-ERRATA-003: render once before any playit poll. step() polls
+        // BEFORE rendering, so a `D` command that wins the race to the first
+        // poll would otherwise capture the zero-initialized FrameMirror.
+        // present_count is never 0 while the transport accepts commands.
+        runtime.render_frame();
+        runtime
     }
 
     fn frame_hz(&self) -> u32 {
