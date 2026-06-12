@@ -3,7 +3,9 @@
 //! translation, nesting, and the AA-primitives-route-through-blend_row
 //! invariant.
 
+use rlvgl_core::draw::{GradientDesc, GradientKind, ShadowDesc};
 use rlvgl_core::font::{GlyphInfo, GlyphPlacement, ShapedText};
+use rlvgl_core::mask::RectMask;
 use rlvgl_core::raster::PointF;
 use rlvgl_core::renderer::{ClipRenderer, Renderer, TEXT_NOMINAL_LINE_PX};
 use rlvgl_core::widget::{Color, Rect};
@@ -328,6 +330,94 @@ fn blend_row_slices_coverage_to_horizontal_span() {
     let (x, y, ref cov) = inner.rows[1];
     assert_eq!((x, y), (100, 20));
     assert_eq!(cov, &(1..=10).collect::<Vec<u8>>());
+}
+
+#[test]
+fn fill_masked_routes_through_clipped_blend_row() {
+    let mask = RectMask::new(Rect {
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
+    });
+    let mut inner = Capture::default();
+    {
+        let mut clipped = ClipRenderer::new(&mut inner, CLIP);
+        clipped.fill_masked(
+            Rect {
+                x: 0,
+                y: 8,
+                width: 120,
+                height: 4,
+            },
+            WHITE,
+            &mask,
+        );
+    }
+
+    assert!(!inner.rows.is_empty());
+    for &(x, y, ref cov) in &inner.rows {
+        assert!(y >= CLIP.y && y < CLIP.y + CLIP.height);
+        assert!(x >= CLIP.x);
+        assert!(x + cov.len() as i32 <= CLIP.x + CLIP.width);
+    }
+}
+
+#[test]
+fn fill_gradient_is_clipped_by_fill_and_blend_rect_paths() {
+    let stops = [(0, Color(0, 0, 0, 255)), (255, Color(255, 0, 0, 128))];
+    let gradient = GradientDesc::new(GradientKind::Linear { angle_deg: 0 }, &stops);
+    let mut inner = Capture::default();
+    {
+        let mut clipped = ClipRenderer::new(&mut inner, CLIP);
+        clipped.fill_gradient(
+            Rect {
+                x: 8,
+                y: 8,
+                width: 5,
+                height: 5,
+            },
+            &gradient,
+        );
+    }
+
+    assert!(!inner.fills.is_empty() || !inner.blends.is_empty());
+    for rect in inner.fills.iter().chain(inner.blends.iter()) {
+        assert_eq!(rect.intersect(CLIP), Some(*rect));
+        assert_eq!(rect.width, 1);
+        assert_eq!(rect.height, 1);
+    }
+}
+
+#[test]
+fn draw_shadow_routes_through_clipped_mask_rows() {
+    let mut inner = Capture::default();
+    {
+        let mut clipped = ClipRenderer::new(&mut inner, CLIP);
+        clipped.draw_shadow(
+            Rect {
+                x: 0,
+                y: 8,
+                width: 20,
+                height: 10,
+            },
+            2,
+            &ShadowDesc {
+                offset_x: 0,
+                offset_y: 0,
+                spread: 1,
+                blur: 2,
+                color: WHITE,
+            },
+        );
+    }
+
+    assert!(!inner.rows.is_empty());
+    for &(x, y, ref cov) in &inner.rows {
+        assert!(y >= CLIP.y && y < CLIP.y + CLIP.height);
+        assert!(x >= CLIP.x);
+        assert!(x + cov.len() as i32 <= CLIP.x + CLIP.width);
+    }
 }
 
 #[test]

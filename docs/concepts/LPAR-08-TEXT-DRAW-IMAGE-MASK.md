@@ -737,61 +737,68 @@ with the text properties. Text-draw helpers receive the resolved `TextStyle`;
 
 LPAR-08 implementation is complete only when:
 
-- [ ] REND-00 §15 amendment filed, accepted, and merged before
+Status note (2026-06-12): checked items below have landed as substrate.
+Unchecked items remain LPAR-08 blockers or explicit deferrals. In particular,
+`draw_text_shaped` is currently an extent-based software fallback, not a real
+glyph-coverage renderer; the glyph adapter and `Label` migration are still
+open.
+
+- [x] REND-00 §15 amendment filed, accepted, and merged before
       `ClipRenderer::draw_text_shaped` implementation lands.
-- [ ] `FontMetrics` trait exists in `core/src/font.rs`; `GlyphInfo`,
+- [x] `FontMetrics` trait exists in `core/src/font.rs`; `GlyphInfo`,
       `FontLineMetrics`, `GlyphPlacement`, `ShapedText` defined.
-- [ ] `impl FontMetrics for PackedFont` compiles; existing
+- [x] `impl FontMetrics for PackedFont` compiles; existing
       `PackedFont::draw_str` / `measure` / `glyph` unchanged.
-- [ ] `impl FontMetrics for BitmapFont` compiles; existing `BitmapFont`
+- [x] `impl FontMetrics for BitmapFont` compiles; existing `BitmapFont`
       draw methods unchanged.
-- [ ] `impl FontMetrics for <fontdue-wrapper>` compiles behind `fontdue`
+- [x] `impl FontMetrics for <fontdue-wrapper>` compiles behind `fontdue`
       feature; existing fontdue functions unchanged.
-- [ ] `ShapedText::bidi_level` field present, initialized to `0` (LTR),
+- [x] `ShapedText::bidi_level` field present, initialized to `0` (LTR),
       with doc comment naming the RTL insertion boundary.
-- [ ] `Renderer::draw_text_shaped` method exists with a default body that
+- [x] `Renderer::draw_text_shaped` method exists with a default body that
       renders shaped glyphs through `fill_rect`/`blend_rect`.
-- [ ] `ClipRenderer::draw_text_shaped` clips per-glyph to the clip rect;
+- [x] `ClipRenderer::draw_text_shaped` clips per-glyph to the clip rect;
       glyphs straddling a boundary are rendered only within the visible rect.
-- [ ] `ClipRenderer::draw_text` (legacy backend) retains REND-00 §5.4
+- [x] `ClipRenderer::draw_text` (legacy backend) retains REND-00 §5.4
       nominal-box-drop behavior; `TEXT_NOMINAL_LINE_PX` unchanged.
-- [ ] `Renderer::fill_masked` exists with default body iterating `AlphaMask`
+- [x] `Renderer::fill_masked` exists with default body iterating `AlphaMask`
       rows through `blend_row`.
 - [ ] `AlphaMask` trait + `RectMask`, `RoundedRectMask`, `ArcMask`, `FadeMask`
-      implementations exist in `core/src/mask.rs`.
-- [ ] `IntersectMask` and `UnionMask` combinators exist.
-- [ ] `Renderer::fill_gradient` exists with default body; `GradientDesc` and
+      implementations exist in `core/src/mask.rs`. `AlphaMask`, `RectMask`,
+      and `FadeMask` have landed; `RoundedRectMask` and `ArcMask` remain open.
+- [x] `IntersectMask` and `UnionMask` combinators exist.
+- [x] `Renderer::fill_gradient` exists with default body; `GradientDesc` and
       `GradientKind` defined; software reference is deterministic (no RNG).
-- [ ] `Renderer::draw_shadow` exists with default body; `ShadowDesc` defined;
+- [x] `Renderer::draw_shadow` exists with default body; `ShadowDesc` defined;
       box-blur approximation is deterministic.
-- [ ] `ImageDescriptor`, `ImageData`, `PixelFormat`, `BlitOpts`, `CacheHandle`
+- [x] `ImageDescriptor`, `ImageData`, `PixelFormat`, `BlitOpts`, `CacheHandle`
       defined in `core/src/image.rs`; `ImageData` is `#[non_exhaustive]`.
 - [ ] `Renderer::blit_image` exists with default body; software-reference
       nearest-neighbor scale/rotate.
-- [ ] `ImageDescriptor::from_color_slice` bridge constructor exists.
-- [ ] A new resolved `TextStyle { text_color, font_id, letter_spacing,
+- [x] `ImageDescriptor::from_color_slice` bridge constructor exists.
+- [x] A new resolved `TextStyle { text_color, font_id, letter_spacing,
       line_spacing, text_align }` (with LPAR-07 §7.4 defaults) and matching
       `Option<_>` fields on `StylePatch` are added; the cascade resolves
       `TextStyle` alongside `Style`, threading the five (inheritable) text
       properties through the same top-down inherited context. The frozen
       5-field `core::style::Style` is UNCHANGED; existing consumers compile
       unmodified.
-- [ ] `FontId`, `TextAlign` defined; `FontId::DEFAULT = FontId(0)`;
+- [x] `FontId`, `TextAlign` defined; `FontId::DEFAULT = FontId(0)`;
       `TextAlign::Auto` present for RTL future-compatibility.
 - [ ] `widgets/src/label.rs` migrated to call `draw_text_shaped` through
       `&dyn FontMetrics`; `text_color` field deprecated-in-place.
-- [ ] Text wrapping algorithm exists: greedy line-break using
+- [x] Text wrapping algorithm exists: greedy line-break using
       `FontMetrics::measure_fp16`; break opportunities at SPACE, HYPHEN,
       hard newline.
 - [ ] Dirty rects from draw/image/text changes reported through LPAR-03
       `InvalidationList`; no second repaint path introduced.
-- [ ] All new `core/` types compile under `no_std + alloc`; no `std`
+- [x] All new `core/` types compile under `no_std + alloc`; no `std`
       dependency outside `fontdue` feature gate.
-- [ ] `PixelFormat` enum has Standards Action registration note; initial
+- [x] `PixelFormat` enum has Standards Action registration note; initial
       variants `Rgb565`, `Argb8888`, `L8`.
 - [ ] `cargo test --workspace`, `cargo fmt --all -- --check`, and
       `cargo clippy --workspace -- -D warnings` pass.
-- [ ] Public APIs in publishable crates have doc comments.
+- [x] Public APIs in publishable crates have doc comments.
 - [ ] LPAR-16 conformance fixtures for the driving cases: shaped-text
       clip in a `ScrollView` viewport (text straddling top and bottom
       edges), gradient fill determinism (same inputs → same pixels across
@@ -941,3 +948,20 @@ LPAR-08 implementation is complete only when:
   change). Open questions left for implementation: `BitmapFont` `bearing_y`
   approximation (baseline-sit), and the `Image<'a>`→`ImageDescriptor` bridge
   (reinterpret vs copy). Implementation unblocked.
+- **2026-06-12** — Implementation wave status recorded. Landed substrate:
+  `FontMetrics` plus `GlyphInfo`/`FontLineMetrics`/`GlyphPlacement`/
+  `ShapedText`, implementations for packed, bitmap, and `fontdue` wrapper
+  backends, greedy LTR wrapping, additive `TextStyle` cascade output over the
+  existing frozen `Style` bag, `ImageDescriptor`/`ImageData`/`PixelFormat`/
+  `BlitOpts`/`CacheHandle`, `ImageDescriptor::from_color_slice`,
+  `AlphaMask`/`RectMask`/`FadeMask` plus intersect/union combinators,
+  `Renderer::draw_text_shaped`, `ClipRenderer::draw_text_shaped`,
+  `Renderer::fill_masked`, `GradientDesc`/`GradientKind` with
+  `Renderer::fill_gradient`, and `ShadowDesc` with `Renderer::draw_shadow`.
+  Clarified that `draw_text_shaped` is a deterministic glyph-extent visualizer
+  today, not real glyph coverage; the glyph coverage adapter and
+  `widgets/src/label.rs` migration remain open. Also clarified that image work
+  is descriptor/option substrate only: `Renderer::blit_image`,
+  nearest-neighbor scale/rotate, and widget migration are not yet implemented.
+  `RoundedRectMask` and `ArcMask` also remain open. §12 now distinguishes
+  landed substrate from remaining acceptance blockers.

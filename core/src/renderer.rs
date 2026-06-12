@@ -4,7 +4,9 @@
 //! simulator windows.
 
 use crate::cmd::CommandList;
+use crate::draw::{GradientDesc, ShadowDesc};
 use crate::font::ShapedText;
+use crate::mask::AlphaMask;
 use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
 
@@ -98,6 +100,97 @@ pub trait Renderer {
                 Color(color.0, color.1, color.2, alpha),
             );
         }
+    }
+
+    /// Fill `rect` with `color` modulated by an alpha mask.
+    ///
+    /// The default implementation evaluates the mask in fixed-size row
+    /// chunks and emits coverage through [`blend_row`](Self::blend_row).
+    /// Backends with hardware mask support may override this method, but the
+    /// software path is the reference behavior.
+    fn fill_masked(&mut self, rect: Rect, color: Color, mask: &dyn AlphaMask) {
+        if rect.width <= 0 || rect.height <= 0 || color.3 == 0 {
+            return;
+        }
+        let mut coverage = [0u8; 64];
+        for y in rect.y..rect.y + rect.height {
+            let mut x = rect.x;
+            let end = rect.x + rect.width;
+            while x < end {
+                let run = (end - x).min(coverage.len() as i32) as usize;
+                let row = &mut coverage[..run];
+                mask.row(x, y, row);
+                self.blend_row(x, y, color, row);
+                x += run as i32;
+            }
+        }
+    }
+
+    /// Fill `rect` with a deterministic software gradient.
+    ///
+    /// The default path samples one pixel at a time using integer color
+    /// interpolation. Opaque samples use [`fill_rect`](Self::fill_rect);
+    /// translucent samples use [`blend_rect`](Self::blend_rect).
+    fn fill_gradient(&mut self, rect: Rect, gradient: &GradientDesc<'_>) {
+        if rect.width <= 0 || rect.height <= 0 {
+            return;
+        }
+        for y in rect.y..rect.y + rect.height {
+            for x in rect.x..rect.x + rect.width {
+                let Some(color) = gradient.color_at(rect, x, y) else {
+                    continue;
+                };
+                if color.3 == 0 {
+                    continue;
+                }
+                let pixel = Rect {
+                    x,
+                    y,
+                    width: 1,
+                    height: 1,
+                };
+                if color.3 == 255 {
+                    self.fill_rect(pixel, color);
+                } else {
+                    self.blend_rect(pixel, color);
+                }
+            }
+        }
+    }
+
+    /// Draw a deterministic software box shadow below `rect`.
+    ///
+    /// The v1 fallback uses a rounded-rect-compatible rectangular blur
+    /// approximation. It is intentionally conservative and routes through
+    /// [`fill_masked`](Self::fill_masked), so clipping adapters inherit the
+    /// behavior through [`blend_row`](Self::blend_row).
+    fn draw_shadow(&mut self, rect: Rect, radius: u8, shadow: &ShadowDesc) {
+        if rect.width <= 0 || rect.height <= 0 || shadow.color.3 == 0 {
+            return;
+        }
+        let spread = shadow.spread as i32;
+        let blur = shadow.blur as i32;
+        let base = Rect {
+            x: rect.x + shadow.offset_x as i32 - spread,
+            y: rect.y + shadow.offset_y as i32 - spread,
+            width: rect.width + spread * 2,
+            height: rect.height + spread * 2,
+        };
+        if base.width <= 0 || base.height <= 0 {
+            return;
+        }
+        let draw_rect = Rect {
+            x: base.x - blur,
+            y: base.y - blur,
+            width: base.width + blur * 2,
+            height: base.height + blur * 2,
+        };
+        let mask = ShadowMask {
+            base,
+            blur,
+            radius: radius as i32 + spread,
+        };
+        self.fill_masked(draw_rect, shadow.color, &mask);
     }
 
     /// Fill an oriented bounding box with anti-aliased coverage.
@@ -231,6 +324,86 @@ impl<R: Renderer + ?Sized> CoverageSink for RowBlendSink<'_, R> {
     }
 }
 
+struct ShadowMask {
+    base: Rect,
+    blur: i32,
+    radius: i32,
+}
+
+impl AlphaMask for ShadowMask {
+    fn row(&self, x: i32, y: i32, coverage: &mut [u8]) {
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let px = x.saturating_add(i32::try_from(offset).unwrap_or(i32::MAX));
+            *alpha = self.alpha(px, y);
+        }
+    }
+}
+
+impl ShadowMask {
+    fn alpha(&self, x: i32, y: i32) -> u8 {
+        let x0 = self.base.x;
+        let y0 = self.base.y;
+        let x1 = self.base.x + self.base.width - 1;
+        let y1 = self.base.y + self.base.height - 1;
+        let outside_dx = if x < x0 {
+            x0 - x
+        } else if x > x1 {
+            x - x1
+        } else {
+            0
+        };
+        let outside_dy = if y < y0 {
+            y0 - y
+        } else if y > y1 {
+            y - y1
+        } else {
+            0
+        };
+        let dist = outside_dx.max(outside_dy);
+        if dist > self.blur {
+            return 0;
+        }
+
+        let rect_alpha = if self.blur == 0 {
+            255
+        } else {
+            (((self.blur + 1 - dist) * 255) / (self.blur + 1)) as u8
+        };
+        rect_alpha.min(self.rounded_corner_alpha(x, y))
+    }
+
+    fn rounded_corner_alpha(&self, x: i32, y: i32) -> u8 {
+        let r = self
+            .radius
+            .max(0)
+            .min(self.base.width / 2)
+            .min(self.base.height / 2);
+        if r <= 0 {
+            return 255;
+        }
+
+        let cx = if x < self.base.x + r {
+            self.base.x + r
+        } else if x >= self.base.x + self.base.width - r {
+            self.base.x + self.base.width - r - 1
+        } else {
+            return 255;
+        };
+        let cy = if y < self.base.y + r {
+            self.base.y + r
+        } else if y >= self.base.y + self.base.height - r {
+            self.base.y + self.base.height - r - 1
+        } else {
+            return 255;
+        };
+        let dx = (x - cx).unsigned_abs();
+        let dy = (y - cy).unsigned_abs();
+        let dist_sq = dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy));
+        let r_sq = (r as u32).saturating_mul(r as u32);
+        if dist_sq <= r_sq { 255 } else { 0 }
+    }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // ClipRenderer (REND initiative)
 // ───────────────────────────────────────────────────────────────────────────
@@ -260,11 +433,13 @@ pub const TEXT_NOMINAL_LINE_PX: i32 = 16;
 /// - [`blend_row`](Renderer::blend_row): the coverage run is sliced to the
 ///   clip's horizontal span; rows outside the vertical span are dropped.
 ///   The AA primitives (`fill_obb_aa`, `fill_disc_aa`, `stroke_line_aa`,
-///   `fill_arc_aa`) and [`submit`](Renderer::submit) are deliberately NOT
-///   forwarded to the wrapped renderer: the trait defaults route them
-///   through this adapter's `blend_row`/per-cmd dispatch, which clips. A
-///   forwarding override would hand the call to a backend fast path that
-///   knows nothing of the clip.
+///   `fill_arc_aa`), [`fill_masked`](Renderer::fill_masked),
+///   [`fill_gradient`](Renderer::fill_gradient),
+///   [`draw_shadow`](Renderer::draw_shadow), and [`submit`](Renderer::submit)
+///   are deliberately NOT forwarded to the wrapped renderer: the trait
+///   defaults route them through this adapter's clipped primitives. A
+///   forwarding override would hand the call to a backend fast path that knows
+///   nothing of the clip.
 /// - [`draw_text`](Renderer::draw_text) (backend text — no extent
 ///   information): forwarded iff the nominal line box
 ///   ([`TEXT_NOMINAL_LINE_PX`] above the baseline) sits fully inside the
@@ -427,7 +602,8 @@ impl Renderer for ClipRenderer<'_> {
         );
     }
 
-    // fill_obb_aa / fill_disc_aa / stroke_line_aa / fill_arc_aa / submit:
+    // fill_obb_aa / fill_disc_aa / stroke_line_aa / fill_arc_aa /
+    // fill_masked / fill_gradient / draw_shadow / submit:
     // intentionally NOT overridden (REND-00 §5.3). The trait defaults
     // funnel them through `blend_row` / per-cmd dispatch on *this*
     // adapter, which clips. Forwarding them to `inner` would bypass the
