@@ -44,13 +44,19 @@ pub mod draw;
 pub mod event;
 /// Focus traversal and group policy for the LPAR-04 event/focus runtime.
 pub mod focus;
+/// Backend-neutral font metrics, shaping, and greedy wrapping.
+pub mod font;
 #[cfg(feature = "fs")]
 pub mod fs;
 /// 1-bit bitmap icons (folder, file) rendered at font height.
 pub mod icon_bitmap;
+/// Image descriptors, blit options, and cache handles.
+pub mod image;
 pub mod interface;
 /// Shared invalidation planner and present-plan types (LPAR-03).
 pub mod invalidation;
+/// LPAR-08 alpha mask primitives and coverage combinators.
+pub mod mask;
 /// LVGL-parity object metadata and tree helpers.
 pub mod object;
 /// Node-resident object animations; see [`object_anim::ObjectAnims`].

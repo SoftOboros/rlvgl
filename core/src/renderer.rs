@@ -4,6 +4,7 @@
 //! simulator windows.
 
 use crate::cmd::CommandList;
+use crate::font::ShapedText;
 use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
 
@@ -17,6 +18,26 @@ pub trait Renderer {
 
     /// Draw UTF‑8 text with its baseline anchored at the provided position using the color.
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color);
+
+    /// Draw a pre-shaped text run using glyph extent information.
+    ///
+    /// `origin` is an additional translation applied to every glyph placement
+    /// in `shaped`. Pass `(0, 0)` when the shaped glyph positions are already
+    /// in target coordinates. The default implementation is a deterministic
+    /// extent visualizer: each glyph extent is blended as a solid rectangle.
+    /// Backends or future font draw adapters can override this to render real
+    /// glyph coverage while preserving the same placement and clipping
+    /// contract.
+    fn draw_text_shaped(&mut self, shaped: &ShapedText, origin: (i32, i32), color: Color) {
+        for glyph in &shaped.glyphs {
+            let mut extent = glyph.extent();
+            extent.x += origin.0;
+            extent.y += origin.1;
+            if extent.width > 0 && extent.height > 0 {
+                self.blend_rect(extent, color);
+            }
+        }
+    }
 
     /// Blend a rectangle onto the target, honoring the alpha channel of `color`
     /// for source-over compositing.
@@ -253,6 +274,10 @@ pub const TEXT_NOMINAL_LINE_PX: i32 = 16;
 ///   Per-pixel text (`bitmap_font` / `packed_font`) renders through
 ///   `fill_rect` and clips exactly on both axes — prefer it for content
 ///   that can straddle a viewport edge.
+/// - [`draw_text_shaped`](Renderer::draw_text_shaped): translates each glyph
+///   extent and forwards only its visible intersection with the clip. The
+///   wrapped renderer's own shaped-text fast path is deliberately not
+///   forwarded, so clipping cannot be bypassed by an accelerated backend.
 ///
 /// Nesting two `ClipRenderer`s composes by intersection with summed
 /// offsets (REND-00 §5.5).
@@ -329,6 +354,18 @@ impl Renderer for ClipRenderer<'_> {
         let inside_h = x >= clip.x && x < clip.x + clip.width;
         if inside_v && inside_h {
             self.inner.draw_text((x, y), text, color);
+        }
+    }
+
+    fn draw_text_shaped(&mut self, shaped: &ShapedText, origin: (i32, i32), color: Color) {
+        let Some(clip) = self.clip else { return };
+        for glyph in &shaped.glyphs {
+            let mut extent = glyph.extent();
+            extent.x += origin.0 + self.dx;
+            extent.y += origin.1 + self.dy;
+            if let Some(visible) = extent.intersect(clip) {
+                self.inner.blend_rect(visible, color);
+            }
         }
     }
 

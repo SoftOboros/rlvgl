@@ -3,6 +3,7 @@
 //! translation, nesting, and the AA-primitives-route-through-blend_row
 //! invariant.
 
+use rlvgl_core::font::{GlyphInfo, GlyphPlacement, ShapedText};
 use rlvgl_core::raster::PointF;
 use rlvgl_core::renderer::{ClipRenderer, Renderer, TEXT_NOMINAL_LINE_PX};
 use rlvgl_core::widget::{Color, Rect};
@@ -15,6 +16,7 @@ struct Capture {
     fills: Vec<Rect>,
     blends: Vec<Rect>,
     texts: Vec<(i32, i32)>,
+    shaped_calls: usize,
     pixel_runs: Vec<(i32, i32, Vec<Color>, u32, u32)>,
     rows: Vec<(i32, i32, Vec<u8>)>,
 }
@@ -28,6 +30,9 @@ impl Renderer for Capture {
     }
     fn draw_text(&mut self, position: (i32, i32), _text: &str, _color: Color) {
         self.texts.push(position);
+    }
+    fn draw_text_shaped(&mut self, _shaped: &ShapedText, _origin: (i32, i32), _color: Color) {
+        self.shaped_calls += 1;
     }
     fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
         self.pixel_runs
@@ -44,6 +49,54 @@ const CLIP: Rect = Rect {
     width: 100,
     height: 50,
 };
+
+fn glyph(ch: char, x: i32, baseline: i32, width: u16, height: u16) -> GlyphPlacement {
+    GlyphPlacement {
+        ch,
+        info: GlyphInfo {
+            advance_fp16: width * 16,
+            bearing_x: 0,
+            bearing_y: height as i16,
+            width,
+            height,
+        },
+        x,
+        y: baseline,
+    }
+}
+
+fn shaped(glyphs: Vec<GlyphPlacement>) -> ShapedText {
+    let bounds = glyphs
+        .iter()
+        .map(GlyphPlacement::extent)
+        .reduce(Rect::union)
+        .unwrap_or(Rect {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+        });
+    let total_advance_fp16 = glyphs.iter().map(|g| g.info.advance_fp16 as i32).sum();
+    ShapedText {
+        glyphs,
+        total_advance_fp16,
+        bounds,
+        bidi_level: 0,
+    }
+}
+
+#[derive(Default)]
+struct DefaultShapeCapture {
+    blends: Vec<Rect>,
+}
+
+impl Renderer for DefaultShapeCapture {
+    fn fill_rect(&mut self, _rect: Rect, _color: Color) {}
+    fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
+    fn blend_rect(&mut self, rect: Rect, _color: Color) {
+        self.blends.push(rect);
+    }
+}
 
 #[test]
 fn fill_rect_crops_at_every_edge_and_drops_disjoint() {
@@ -320,6 +373,103 @@ fn draw_text_line_box_gating() {
 }
 
 #[test]
+fn draw_text_shaped_default_blends_glyph_extents() {
+    let run = shaped(vec![glyph('A', 5, 20, 10, 8), glyph('B', 20, 20, 6, 8)]);
+    let mut capture = DefaultShapeCapture::default();
+
+    capture.draw_text_shaped(&run, (3, 4), WHITE);
+
+    assert_eq!(
+        capture.blends,
+        vec![
+            Rect {
+                x: 8,
+                y: 16,
+                width: 10,
+                height: 8,
+            },
+            Rect {
+                x: 23,
+                y: 16,
+                width: 6,
+                height: 8,
+            },
+        ]
+    );
+}
+
+#[test]
+fn draw_text_shaped_crops_each_glyph_extent_and_does_not_forward_fast_path() {
+    let run = shaped(vec![
+        glyph('L', 5, 18, 10, 8),    // left edge
+        glyph('R', 105, 18, 10, 8),  // right edge
+        glyph('T', 40, 15, 10, 10),  // top edge
+        glyph('B', 55, 65, 10, 10),  // bottom edge
+        glyph('X', 200, 20, 10, 10), // outside
+    ]);
+    let mut inner = Capture::default();
+    {
+        let mut clipped = ClipRenderer::new(&mut inner, CLIP);
+        clipped.draw_text_shaped(&run, (0, 0), WHITE);
+    }
+
+    assert_eq!(
+        inner.shaped_calls, 0,
+        "ClipRenderer must not forward shaped text"
+    );
+    assert_eq!(
+        inner.blends,
+        vec![
+            Rect {
+                x: 10,
+                y: 10,
+                width: 5,
+                height: 8,
+            },
+            Rect {
+                x: 105,
+                y: 10,
+                width: 5,
+                height: 8,
+            },
+            Rect {
+                x: 40,
+                y: 10,
+                width: 10,
+                height: 5,
+            },
+            Rect {
+                x: 55,
+                y: 55,
+                width: 10,
+                height: 5,
+            },
+        ]
+    );
+}
+
+#[test]
+fn draw_text_shaped_applies_origin_and_cliprenderer_offset_before_clipping() {
+    let run = shaped(vec![glyph('A', 0, 10, 12, 10)]);
+    let mut inner = Capture::default();
+    {
+        let mut clipped = ClipRenderer::with_offset(&mut inner, CLIP, 4, 5);
+        clipped.draw_text_shaped(&run, (8, 5), WHITE);
+    }
+
+    assert_eq!(inner.shaped_calls, 0);
+    assert_eq!(
+        inner.blends,
+        vec![Rect {
+            x: 12,
+            y: 10,
+            width: 12,
+            height: 10,
+        }]
+    );
+}
+
+#[test]
 fn degenerate_clip_drops_everything() {
     let mut inner = Capture::default();
     {
@@ -343,9 +493,12 @@ fn degenerate_clip_drops_everything() {
             WHITE,
         );
         clipped.draw_text((0, 0), "x", WHITE);
+        clipped.draw_text_shaped(&shaped(vec![glyph('A', 0, 10, 10, 10)]), (0, 0), WHITE);
         clipped.blend_row(0, 0, WHITE, &[255]);
     }
     assert!(inner.fills.is_empty());
     assert!(inner.texts.is_empty());
+    assert_eq!(inner.shaped_calls, 0);
+    assert!(inner.blends.is_empty());
     assert!(inner.rows.is_empty());
 }

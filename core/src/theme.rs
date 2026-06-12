@@ -152,7 +152,7 @@ impl LparTheme for DefaultTheme {
                         border_color: Some(DEFAULT_PRIMARY),
                         border_width: Some(BUTTON_BORDER_WIDTH),
                         radius: Some(BUTTON_RADIUS),
-                        alpha: None,
+                        ..StylePatch::new()
                     },
                     sel,
                 );
@@ -164,9 +164,9 @@ impl LparTheme for DefaultTheme {
                     StylePatch {
                         bg_color: Some(TRANSPARENT),
                         alpha: Some(255),
-                        border_color: None,
                         border_width: Some(0),
                         radius: Some(0),
+                        ..StylePatch::new()
                     },
                     sel,
                 );
@@ -177,9 +177,9 @@ impl LparTheme for DefaultTheme {
                     StylePatch {
                         bg_color: Some(DEFAULT_SURFACE),
                         border_width: Some(0),
-                        border_color: None,
                         radius: Some(0),
                         alpha: Some(255),
+                        ..StylePatch::new()
                     },
                     sel,
                 );
@@ -190,9 +190,9 @@ impl LparTheme for DefaultTheme {
                     StylePatch {
                         bg_color: Some(DEFAULT_PRIMARY),
                         alpha: Some(255),
-                        border_color: None,
                         border_width: Some(0),
                         radius: Some(4),
+                        ..StylePatch::new()
                     },
                     sel,
                 );
@@ -206,6 +206,7 @@ impl LparTheme for DefaultTheme {
                         border_width: Some(1),
                         radius: Some(2),
                         alpha: Some(255),
+                        ..StylePatch::new()
                     },
                     sel,
                 );

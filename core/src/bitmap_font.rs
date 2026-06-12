@@ -5,6 +5,7 @@
 //! in a 6x10 pixel grid. The creator tool will later generate optimized font
 //! data to replace this stub.
 
+use crate::font::{FontLineMetrics, FontMetrics, GlyphInfo};
 use crate::renderer::Renderer;
 use crate::widget::{Color, Rect};
 
@@ -93,6 +94,33 @@ impl BitmapFont {
         for ch in text.chars() {
             self.draw_char(renderer, x, cy, ch, color);
             cy += advance;
+        }
+    }
+}
+
+impl FontMetrics for BitmapFont {
+    fn glyph_metrics(&self, ch: char) -> Option<GlyphInfo> {
+        if !(0x20..=0x7e).contains(&(ch as u32)) {
+            return None;
+        }
+        let width = self.scaled_width().max(0) as u16;
+        let height = self.scaled_height().max(0) as u16;
+        let advance_px = self.scaled_width() + self.scale as i32;
+        Some(GlyphInfo {
+            advance_fp16: (advance_px.max(0) * 16).min(u16::MAX as i32) as u16,
+            bearing_x: 0,
+            bearing_y: height.min(i16::MAX as u16) as i16,
+            width,
+            height,
+        })
+    }
+
+    fn line_metrics(&self) -> FontLineMetrics {
+        let height = self.scaled_height().max(0).min(u16::MAX as i32) as u16;
+        FontLineMetrics {
+            line_height: height,
+            ascent: height.min(i16::MAX as u16) as i16,
+            descent: 0,
         }
     }
 }

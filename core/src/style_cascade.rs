@@ -15,22 +15,25 @@
 //!    an active style transition via [`start_transition`].
 //! 1. **Local styles** — last-added wins among matching selectors.
 //! 2. **Added (shared) styles** — last-added wins among matching selectors.
-//! 3. For the inheritable `alpha` property only: take the value from the
-//!    [`InheritedContext`] propagated top-down from ancestors.
+//! 3. For inheritable properties (`alpha` plus LPAR-08 text properties), take
+//!    the value from the [`InheritedContext`] propagated top-down from
+//!    ancestors.
 //! 4. Property default value (from [`Style::default()`]).
 //!
 //! # Top-down inheritance (§7.3)
 //!
 //! Inheritance is propagated top-down during the resolve/draw traversal.
-//! Each parent node resolves its own `alpha` for `MAIN`; the resolved value
-//! becomes the [`InheritedContext`] handed to that node's children. No parent
-//! pointer, no ancestor slice — the caller threads the context down.
+//! Each parent node resolves its own `alpha` and [`TextStyle`] for `MAIN`; the
+//! resolved values become the [`InheritedContext`] handed to that node's
+//! children. No parent pointer, no ancestor slice — the caller threads the
+//! context down.
 
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use crate::anim::{ANIM_SCALE, Easing, Tween};
+use crate::font::FontId;
 use crate::object::ObjectStates;
 use crate::object_anim::{ObjectAnimId, ObjectAnims};
 use crate::style::Style;
@@ -161,6 +164,54 @@ impl Part {
 }
 
 // ---------------------------------------------------------------------------
+// TextAlign / TextStyle
+// ---------------------------------------------------------------------------
+
+/// Horizontal text alignment resolved by the style cascade.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TextAlign {
+    /// Align text to the left edge.
+    #[default]
+    Left,
+    /// Align text to the horizontal center.
+    Center,
+    /// Align text to the right edge.
+    Right,
+    /// Resolve automatically from paragraph direction; v1 maps this to left.
+    Auto,
+}
+
+/// Fully resolved inheritable text properties.
+///
+/// This is the LPAR-08 text companion to the existing visual [`Style`].
+/// Keeping it separate preserves the frozen public-field shape of [`Style`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextStyle {
+    /// Text color.
+    pub text_color: Color,
+    /// Font registry identifier resolved by the display/platform at draw time.
+    pub font_id: FontId,
+    /// Extra pixels inserted between shaped glyphs.
+    pub letter_spacing: i8,
+    /// Extra pixels inserted between wrapped lines.
+    pub line_spacing: i8,
+    /// Horizontal text alignment.
+    pub text_align: TextAlign,
+}
+
+impl Default for TextStyle {
+    fn default() -> Self {
+        Self {
+            text_color: Color(0, 0, 0, 255),
+            font_id: FontId::DEFAULT,
+            letter_spacing: 0,
+            line_spacing: 0,
+            text_align: TextAlign::Left,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Selector
 // ---------------------------------------------------------------------------
 
@@ -245,6 +296,16 @@ pub struct StylePatch {
     pub alpha: Option<u8>,
     /// Override for `Style::radius`.
     pub radius: Option<u8>,
+    /// Override for [`TextStyle::text_color`].
+    pub text_color: Option<Color>,
+    /// Override for [`TextStyle::font_id`].
+    pub font_id: Option<FontId>,
+    /// Override for [`TextStyle::letter_spacing`].
+    pub letter_spacing: Option<i8>,
+    /// Override for [`TextStyle::line_spacing`].
+    pub line_spacing: Option<i8>,
+    /// Override for [`TextStyle::text_align`].
+    pub text_align: Option<TextAlign>,
 }
 
 impl StylePatch {
@@ -256,6 +317,11 @@ impl StylePatch {
             border_width: None,
             alpha: None,
             radius: None,
+            text_color: None,
+            font_id: None,
+            letter_spacing: None,
+            line_spacing: None,
+            text_align: None,
         }
     }
 
@@ -305,6 +371,36 @@ impl StylePatchBuilder {
         self
     }
 
+    /// Set the text color override.
+    pub fn text_color(mut self, color: Color) -> Self {
+        self.0.text_color = Some(color);
+        self
+    }
+
+    /// Set the font registry identifier override.
+    pub fn font_id(mut self, font_id: FontId) -> Self {
+        self.0.font_id = Some(font_id);
+        self
+    }
+
+    /// Set the letter spacing override in pixels.
+    pub fn letter_spacing(mut self, spacing: i8) -> Self {
+        self.0.letter_spacing = Some(spacing);
+        self
+    }
+
+    /// Set the line spacing override in pixels.
+    pub fn line_spacing(mut self, spacing: i8) -> Self {
+        self.0.line_spacing = Some(spacing);
+        self
+    }
+
+    /// Set the text alignment override.
+    pub fn text_align(mut self, align: TextAlign) -> Self {
+        self.0.text_align = Some(align);
+        self
+    }
+
     /// Consume the builder and return the constructed [`StylePatch`].
     pub fn build(self) -> StylePatch {
         self.0
@@ -323,9 +419,8 @@ impl StylePatchBuilder {
 /// context* by calling [`InheritedContext::with_resolved`] and passes that
 /// to each child's resolver call.
 ///
-/// In v1, the only inheritable property is `alpha` (opacity). Additional
-/// inheritable properties (`text_color`, etc.) will be added by later LPAR
-/// phases.
+/// LPAR-08 extends the inherited set with text properties while preserving the
+/// existing visual [`Style`] shape.
 ///
 /// # No parent pointer
 ///
@@ -337,13 +432,30 @@ pub struct InheritedContext {
     /// Effective `alpha` from the nearest ancestor that resolved one, or `None`
     /// if no ancestor has set an alpha (falls to the §7.4 default `255`).
     pub alpha: Option<u8>,
+    /// Effective inherited text color.
+    pub text_color: Option<Color>,
+    /// Effective inherited font identifier.
+    pub font_id: Option<FontId>,
+    /// Effective inherited letter spacing.
+    pub letter_spacing: Option<i8>,
+    /// Effective inherited line spacing.
+    pub line_spacing: Option<i8>,
+    /// Effective inherited text alignment.
+    pub text_align: Option<TextAlign>,
 }
 
 impl InheritedContext {
     /// An empty context — no ancestor has supplied any inheritable value.
     ///
     /// Pass this as the root context in a top-down traversal.
-    pub const EMPTY: Self = Self { alpha: None };
+    pub const EMPTY: Self = Self {
+        alpha: None,
+        text_color: None,
+        font_id: None,
+        letter_spacing: None,
+        line_spacing: None,
+        text_align: None,
+    };
 
     /// Construct the context to pass to a node's children.
     ///
@@ -352,8 +464,26 @@ impl InheritedContext {
     /// or the §7.4 default). Children inherit this value if they carry no
     /// alpha override of their own.
     pub const fn with_resolved(resolved_alpha: u8) -> Self {
+        let text = TextStyle {
+            text_color: Color(0, 0, 0, 255),
+            font_id: FontId::DEFAULT,
+            letter_spacing: 0,
+            line_spacing: 0,
+            text_align: TextAlign::Left,
+        };
+        Self::with_resolved_styles(resolved_alpha, text)
+    }
+
+    /// Construct the context to pass to children after resolving both visual
+    /// and text properties for the current node.
+    pub const fn with_resolved_styles(resolved_alpha: u8, resolved_text: TextStyle) -> Self {
         Self {
             alpha: Some(resolved_alpha),
+            text_color: Some(resolved_text.text_color),
+            font_id: Some(resolved_text.font_id),
+            letter_spacing: Some(resolved_text.letter_spacing),
+            line_spacing: Some(resolved_text.line_spacing),
+            text_align: Some(resolved_text.text_align),
         }
     }
 }
@@ -499,193 +629,191 @@ pub fn remove_all_local(state: &mut StyleState) -> usize {
 }
 
 // ---------------------------------------------------------------------------
-// resolve — cascade resolution for (node-states, part, inherited_ctx)
+// resolve_styles / resolve — cascade resolution for (node-states, part, inherited_ctx)
 // ---------------------------------------------------------------------------
 
-/// Resolve the cascade for a given `(node_style, node_states, part)` query.
+/// Fully resolved visual and text styles for one cascade query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedStyles {
+    /// Fully materialized visual style for draw-time background/border use.
+    pub style: Style,
+    /// Fully materialized inheritable text style.
+    pub text: TextStyle,
+    /// Context to pass to this node's children during a top-down traversal.
+    pub child_context: InheritedContext,
+}
+
+#[derive(Debug, Default)]
+struct CascadeWinners {
+    bg_color: Option<Color>,
+    border_color: Option<Color>,
+    border_width: Option<u8>,
+    alpha: Option<u8>,
+    radius: Option<u8>,
+    text_color: Option<Color>,
+    font_id: Option<FontId>,
+    letter_spacing: Option<i8>,
+    line_spacing: Option<i8>,
+    text_align: Option<TextAlign>,
+}
+
+impl CascadeWinners {
+    fn fill_from_patch(&mut self, patch: &StylePatch) {
+        if self.bg_color.is_none() {
+            self.bg_color = patch.bg_color;
+        }
+        if self.border_color.is_none() {
+            self.border_color = patch.border_color;
+        }
+        if self.border_width.is_none() {
+            self.border_width = patch.border_width;
+        }
+        if self.alpha.is_none() {
+            self.alpha = patch.alpha;
+        }
+        if self.radius.is_none() {
+            self.radius = patch.radius;
+        }
+        if self.text_color.is_none() {
+            self.text_color = patch.text_color;
+        }
+        if self.font_id.is_none() {
+            self.font_id = patch.font_id;
+        }
+        if self.letter_spacing.is_none() {
+            self.letter_spacing = patch.letter_spacing;
+        }
+        if self.line_spacing.is_none() {
+            self.line_spacing = patch.line_spacing;
+        }
+        if self.text_align.is_none() {
+            self.text_align = patch.text_align;
+        }
+    }
+}
+
+/// Resolve visual [`Style`] and inheritable [`TextStyle`] for one query.
 ///
-/// Implements §7.2 (cascade precedence) and §7.3 (top-down alpha inheritance).
-///
-/// # Arguments
-///
-/// - `node_style` — the node's style slot; `None` means the node has no
-///   style entries at all.
-/// - `node_states` — the current [`ObjectStates`] of the node (from
-///   `node.states()`).
-/// - `part` — the [`Part`] being queried (usually `Part::MAIN` for draw).
-/// - `inherited` — the [`InheritedContext`] threaded down from the node's
-///   parent.
-///
-/// # Returns
-///
-/// A tuple `(resolved_style, child_context)`:
-///
-/// - `resolved_style` — the fully-materialized [`Style`] for this
-///   `(node, part)` query.
-/// - `child_context` — the [`InheritedContext`] to pass to this node's
-///   children during the same traversal (contains the resolved `alpha`).
-pub fn resolve(
+/// This is the LPAR-08 text-aware cascade entry point. It implements LPAR-07
+/// precedence for the existing visual properties and extends the same
+/// top-down inheritance model to text color, font id, spacing, and alignment.
+pub fn resolve_styles(
     node_style: Option<&StyleState>,
     node_states: ObjectStates,
     part: Part,
     inherited: &InheritedContext,
-) -> (Style, InheritedContext) {
+) -> ResolvedStyles {
     // Walk the tiers in precedence order (transition override first, then
     // local, then added), in reverse-registration order within each tier
     // (last added wins).  We collect the first `Some` for each property.
-
-    let mut bg_color: Option<Color> = None;
-    let mut border_color: Option<Color> = None;
-    let mut border_width: Option<u8> = None;
-    let mut alpha_val: Option<u8> = None;
-    let mut radius: Option<u8> = None;
+    let mut winners = CascadeWinners::default();
 
     if let Some(s) = node_style {
         // --- Tier 0: transition override (highest precedence) ---
         {
             let ov = s.transition_override.borrow();
             if ov.bg_color.is_some() {
-                bg_color = ov.bg_color;
+                winners.bg_color = ov.bg_color;
             }
             if ov.border_color.is_some() {
-                border_color = ov.border_color;
+                winners.border_color = ov.border_color;
             }
             if ov.border_width.is_some() {
-                border_width = ov.border_width;
+                winners.border_width = ov.border_width;
             }
             if ov.alpha.is_some() {
-                alpha_val = ov.alpha;
+                winners.alpha = ov.alpha;
             }
             if ov.radius.is_some() {
-                radius = ov.radius;
+                winners.radius = ov.radius;
             }
         }
 
         // --- Tier 1: local entries (reverse registration order = last added wins) ---
         for (sel, patch) in s.local.iter().rev() {
             if sel.matches(part, node_states) {
-                if bg_color.is_none() {
-                    bg_color = patch.bg_color;
-                }
-                if border_color.is_none() {
-                    border_color = patch.border_color;
-                }
-                if border_width.is_none() {
-                    border_width = patch.border_width;
-                }
-                if alpha_val.is_none() {
-                    alpha_val = patch.alpha;
-                }
-                if radius.is_none() {
-                    radius = patch.radius;
-                }
-                // Early-exit once all properties are resolved.
-                if bg_color.is_some()
-                    && border_color.is_some()
-                    && border_width.is_some()
-                    && alpha_val.is_some()
-                    && radius.is_some()
-                {
-                    break;
-                }
+                winners.fill_from_patch(patch);
             }
         }
 
         // --- Tier 2: added entries (reverse registration order) ---
-        if bg_color.is_none()
-            || border_color.is_none()
-            || border_width.is_none()
-            || alpha_val.is_none()
-            || radius.is_none()
-        {
-            for (sel, patch) in s.added.iter().rev() {
-                if sel.matches(part, node_states) {
-                    if bg_color.is_none() {
-                        bg_color = patch.bg_color;
-                    }
-                    if border_color.is_none() {
-                        border_color = patch.border_color;
-                    }
-                    if border_width.is_none() {
-                        border_width = patch.border_width;
-                    }
-                    if alpha_val.is_none() {
-                        alpha_val = patch.alpha;
-                    }
-                    if radius.is_none() {
-                        radius = patch.radius;
-                    }
-                    if bg_color.is_some()
-                        && border_color.is_some()
-                        && border_width.is_some()
-                        && alpha_val.is_some()
-                        && radius.is_some()
-                    {
-                        break;
-                    }
-                }
+        for (sel, patch) in s.added.iter().rev() {
+            if sel.matches(part, node_states) {
+                winners.fill_from_patch(patch);
             }
         }
 
         // --- Tier 3: default-theme entries (LPAR-07 §9.1, lowest style tier) ---
         // Consulted below local and added styles so widget/application styles
         // always win over the theme regardless of registration order.
-        if bg_color.is_none()
-            || border_color.is_none()
-            || border_width.is_none()
-            || alpha_val.is_none()
-            || radius.is_none()
-        {
-            for (sel, patch) in s.theme.iter().rev() {
-                if sel.matches(part, node_states) {
-                    if bg_color.is_none() {
-                        bg_color = patch.bg_color;
-                    }
-                    if border_color.is_none() {
-                        border_color = patch.border_color;
-                    }
-                    if border_width.is_none() {
-                        border_width = patch.border_width;
-                    }
-                    if alpha_val.is_none() {
-                        alpha_val = patch.alpha;
-                    }
-                    if radius.is_none() {
-                        radius = patch.radius;
-                    }
-                    if bg_color.is_some()
-                        && border_color.is_some()
-                        && border_width.is_some()
-                        && alpha_val.is_some()
-                        && radius.is_some()
-                    {
-                        break;
-                    }
-                }
+        for (sel, patch) in s.theme.iter().rev() {
+            if sel.matches(part, node_states) {
+                winners.fill_from_patch(patch);
             }
         }
     }
 
-    // --- Tier 4 (alpha only): take from inherited context ---
-    if alpha_val.is_none() {
-        alpha_val = inherited.alpha;
+    // --- Tier 4: take inheritable values from inherited context ---
+    if winners.alpha.is_none() {
+        winners.alpha = inherited.alpha;
+    }
+    if winners.text_color.is_none() {
+        winners.text_color = inherited.text_color;
+    }
+    if winners.font_id.is_none() {
+        winners.font_id = inherited.font_id;
+    }
+    if winners.letter_spacing.is_none() {
+        winners.letter_spacing = inherited.letter_spacing;
+    }
+    if winners.line_spacing.is_none() {
+        winners.line_spacing = inherited.line_spacing;
+    }
+    if winners.text_align.is_none() {
+        winners.text_align = inherited.text_align;
     }
 
     // --- Tier 5: property defaults (§7.4) ---
     let defaults = Style::default();
-    let resolved = Style {
-        bg_color: bg_color.unwrap_or(defaults.bg_color),
-        border_color: border_color.unwrap_or(defaults.border_color),
-        border_width: border_width.unwrap_or(defaults.border_width),
-        alpha: alpha_val.unwrap_or(defaults.alpha),
-        radius: radius.unwrap_or(defaults.radius),
+    let text_defaults = TextStyle::default();
+    let style = Style {
+        bg_color: winners.bg_color.unwrap_or(defaults.bg_color),
+        border_color: winners.border_color.unwrap_or(defaults.border_color),
+        border_width: winners.border_width.unwrap_or(defaults.border_width),
+        alpha: winners.alpha.unwrap_or(defaults.alpha),
+        radius: winners.radius.unwrap_or(defaults.radius),
+    };
+    let text = TextStyle {
+        text_color: winners.text_color.unwrap_or(text_defaults.text_color),
+        font_id: winners.font_id.unwrap_or(text_defaults.font_id),
+        letter_spacing: winners
+            .letter_spacing
+            .unwrap_or(text_defaults.letter_spacing),
+        line_spacing: winners.line_spacing.unwrap_or(text_defaults.line_spacing),
+        text_align: winners.text_align.unwrap_or(text_defaults.text_align),
     };
 
-    // Build the child context: children inherit the alpha we just resolved for
-    // MAIN. Non-inheritable properties are never written into the context.
-    let child_ctx = InheritedContext::with_resolved(resolved.alpha);
+    let child_context = InheritedContext::with_resolved_styles(style.alpha, text);
 
-    (resolved, child_ctx)
+    ResolvedStyles {
+        style,
+        text,
+        child_context,
+    }
+}
+
+/// Resolve the visual cascade for a given `(node_style, node_states, part)` query.
+///
+/// This compatibility wrapper preserves the LPAR-07 return shape for existing
+/// callers. New text-aware callers should use [`resolve_styles`].
+pub fn resolve(
+    node_style: Option<&StyleState>,
+    node_states: ObjectStates,
+    part: Part,
+    inherited: &InheritedContext,
+) -> (Style, InheritedContext) {
+    let resolved = resolve_styles(node_style, node_states, part, inherited);
+    (resolved.style, resolved.child_context)
 }
 
 // ---------------------------------------------------------------------------
@@ -874,6 +1002,32 @@ fn resolve_tree_inner<F>(
     }
 }
 
+/// Convenience top-down traversal that resolves visual and text styles.
+///
+/// This is the text-aware companion to [`resolve_tree`]. It threads the same
+/// inherited context through the tree but exposes both [`Style`] and
+/// [`TextStyle`] to the visitor.
+pub fn resolve_tree_with_text<F>(root: &crate::object::ObjectNode, visitor: &mut F)
+where
+    F: FnMut(&crate::object::ObjectNode, &Style, &TextStyle),
+{
+    resolve_tree_with_text_inner(root, &InheritedContext::EMPTY, visitor);
+}
+
+fn resolve_tree_with_text_inner<F>(
+    node: &crate::object::ObjectNode,
+    inherited: &InheritedContext,
+    visitor: &mut F,
+) where
+    F: FnMut(&crate::object::ObjectNode, &Style, &TextStyle),
+{
+    let resolved = resolve_styles(node.style.as_deref(), node.states(), Part::MAIN, inherited);
+    visitor(node, &resolved.style, &resolved.text);
+    for child in node.children() {
+        resolve_tree_with_text_inner(child, &resolved.child_context, visitor);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -976,6 +1130,11 @@ mod tests {
             border_width: None,
             alpha: None,
             radius: None,
+            text_color: None,
+            font_id: None,
+            letter_spacing: None,
+            line_spacing: None,
+            text_align: None,
         };
         node.add_style(&ADDED_PATCH, Selector::part(Part::MAIN));
 
@@ -1311,6 +1470,83 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // TextStyle cascade and inheritance
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn text_style_defaults_resolve_without_patches() {
+        let node = make_node();
+        let resolved = resolve_styles(
+            node.style.as_deref(),
+            node.states(),
+            Part::MAIN,
+            &InheritedContext::EMPTY,
+        );
+        assert_eq!(resolved.text, TextStyle::default());
+        assert_eq!(resolved.child_context.text_color, Some(Color(0, 0, 0, 255)));
+        assert_eq!(resolved.child_context.font_id, Some(FontId::DEFAULT));
+    }
+
+    #[test]
+    fn text_style_inherits_from_parent_context() {
+        let parent_text = TextStyle {
+            text_color: green(),
+            font_id: FontId(7),
+            letter_spacing: 2,
+            line_spacing: 3,
+            text_align: TextAlign::Center,
+        };
+        let parent_ctx = InheritedContext::with_resolved_styles(128, parent_text);
+        let child = make_node();
+
+        let resolved = resolve_styles(
+            child.style.as_deref(),
+            child.states(),
+            Part::MAIN,
+            &parent_ctx,
+        );
+
+        assert_eq!(resolved.text, parent_text);
+        assert_eq!(resolved.style.alpha, 128);
+    }
+
+    #[test]
+    fn local_text_patch_overrides_inherited_text() {
+        let parent_text = TextStyle {
+            text_color: green(),
+            font_id: FontId(7),
+            letter_spacing: 2,
+            line_spacing: 3,
+            text_align: TextAlign::Right,
+        };
+        let parent_ctx = InheritedContext::with_resolved_styles(255, parent_text);
+        let mut child = make_node();
+        child.add_local_style(
+            StylePatch::builder()
+                .text_color(red())
+                .font_id(FontId(9))
+                .letter_spacing(4)
+                .line_spacing(5)
+                .text_align(TextAlign::Center)
+                .build(),
+            Selector::part(Part::MAIN),
+        );
+
+        let resolved = resolve_styles(
+            child.style.as_deref(),
+            child.states(),
+            Part::MAIN,
+            &parent_ctx,
+        );
+
+        assert_eq!(resolved.text.text_color, red());
+        assert_eq!(resolved.text.font_id, FontId(9));
+        assert_eq!(resolved.text.letter_spacing, 4);
+        assert_eq!(resolved.text.line_spacing, 5);
+        assert_eq!(resolved.text.text_align, TextAlign::Center);
+    }
+
+    // -----------------------------------------------------------------------
     // resolve_tree threads context through the tree
     // -----------------------------------------------------------------------
 
@@ -1350,6 +1586,44 @@ mod tests {
             Some(&50),
             "child inherits root alpha"
         );
+    }
+
+    #[test]
+    fn resolve_tree_with_text_threads_text_context() {
+        use alloc::collections::BTreeMap;
+        use alloc::string::String;
+
+        let root_widget = Rc::new(RefCell::new(Dummy));
+        let child_widget = Rc::new(RefCell::new(Dummy));
+
+        let mut root = ObjectNode::new(root_widget).with_tag("root");
+        let child = ObjectNode::new(child_widget).with_tag("child");
+
+        root.add_local_style(
+            StylePatch::builder()
+                .text_color(blue())
+                .font_id(FontId(11))
+                .letter_spacing(1)
+                .line_spacing(2)
+                .text_align(TextAlign::Right)
+                .build(),
+            Selector::part(Part::MAIN),
+        );
+        root.append_child(child);
+
+        let mut text_colors: BTreeMap<String, Color> = BTreeMap::new();
+        let mut font_ids: BTreeMap<String, FontId> = BTreeMap::new();
+        resolve_tree_with_text(&root, &mut |node, _style, text| {
+            if let Some(tag) = node.tag() {
+                text_colors.insert(tag.to_string(), text.text_color);
+                font_ids.insert(tag.to_string(), text.font_id);
+            }
+        });
+
+        assert_eq!(text_colors.get("root"), Some(&blue()));
+        assert_eq!(text_colors.get("child"), Some(&blue()));
+        assert_eq!(font_ids.get("root"), Some(&FontId(11)));
+        assert_eq!(font_ids.get("child"), Some(&FontId(11)));
     }
 
     // -----------------------------------------------------------------------
@@ -1394,6 +1668,11 @@ mod tests {
             border_color: None,
             alpha: None,
             radius: None,
+            text_color: None,
+            font_id: None,
+            letter_spacing: None,
+            line_spacing: None,
+            text_align: None,
         };
         node.add_style(&SP, Selector::part(Part::MAIN));
 

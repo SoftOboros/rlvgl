@@ -8,6 +8,7 @@
 //! Supports Unicode characters beyond ASCII (accented Latin, etc.) via
 //! a glyph lookup table built at compile time or from embedded data.
 
+use crate::font::{FontLineMetrics, FontMetrics, GlyphInfo};
 use crate::renderer::Renderer;
 use crate::widget::{Color, Rect};
 
@@ -117,5 +118,41 @@ impl PackedFont {
                 }
             }
         }
+    }
+}
+
+impl FontMetrics for PackedFont {
+    fn glyph_metrics(&self, ch: char) -> Option<GlyphInfo> {
+        self.glyph(ch).map(|glyph| {
+            let bearing_y = glyph.ymin as i32 + glyph.height as i32;
+            GlyphInfo {
+                advance_fp16: glyph.advance_fp16,
+                bearing_x: 0,
+                bearing_y: bearing_y.clamp(i16::MIN as i32, i16::MAX as i32) as i16,
+                width: glyph.width,
+                height: glyph.height,
+            }
+        })
+    }
+
+    fn line_metrics(&self) -> FontLineMetrics {
+        let descent = self.height as i32 - self.ascent as i32;
+        FontLineMetrics {
+            line_height: self.height,
+            ascent: self.ascent,
+            descent: descent.max(0).min(i16::MAX as i32) as i16,
+        }
+    }
+
+    fn measure_fp16(&self, text: &str) -> i32 {
+        let mut width = 0i32;
+        for ch in text.chars() {
+            if let Some(glyph) = self.glyph(ch) {
+                width += glyph.advance_fp16 as i32;
+            } else {
+                width += (self.height as i32 / 2) * 16;
+            }
+        }
+        width
     }
 }
