@@ -1,4 +1,5 @@
 //! Tests for animation primitives.
+#![allow(deprecated)]
 use rlvgl_core::animation::{
     Easing, Fade, FadeTransition, KeyFade, LoopMode, Motion, Slide, Timeline,
 };

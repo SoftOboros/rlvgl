@@ -440,6 +440,205 @@ impl DoubleTapRecognizer {
     }
 }
 
+// ── LongPressRecognizer ────────────────────────────────────────────────────
+
+/// Nominal long-press threshold aligned with LVGL's default (400 ms).
+///
+/// At 30 Hz: 12 ticks ≈ 400 ms.
+/// At 60 Hz: 24 ticks ≈ 400 ms.
+///
+/// This is the *default* value; pass a custom `long_press_ticks` to
+/// [`LongPressConfig`] to override per instance.
+pub const LONG_PRESS_TICKS: u32 = 12;
+
+/// Nominal long-press repeat interval aligned with LVGL's default (100 ms).
+///
+/// At 30 Hz: 3 ticks ≈ 100 ms.
+/// At 60 Hz: 6 ticks ≈ 100 ms.
+///
+/// This is the *default* value; pass a custom `repeat_ticks` to
+/// [`LongPressConfig`] to override per instance.
+pub const LONG_PRESS_REPEAT_TICKS: u32 = 3;
+
+/// Configuration for a [`LongPressRecognizer`] instance.
+///
+/// All durations are in Tick counts (LPAR-04 §9.1 — no wall-clock APIs).
+/// Convert milliseconds to ticks at your loop edge if needed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LongPressConfig {
+    /// Number of ticks a contact must be held before `LongPress` is emitted.
+    /// Defaults to [`LONG_PRESS_TICKS`] (≈ 400 ms at 30 Hz).
+    pub long_press_ticks: u32,
+    /// Number of ticks between successive `LongPressRepeat` emissions after the
+    /// initial `LongPress`. Defaults to [`LONG_PRESS_REPEAT_TICKS`] (≈ 100 ms
+    /// at 30 Hz).
+    pub repeat_ticks: u32,
+}
+
+impl Default for LongPressConfig {
+    fn default() -> Self {
+        Self {
+            long_press_ticks: LONG_PRESS_TICKS,
+            repeat_ticks: LONG_PRESS_REPEAT_TICKS,
+        }
+    }
+}
+
+/// Long-press and repeat gesture recognizer (LPAR-04 §9).
+///
+/// Sits **between** [`DragRecognizer`] and [`TapRecognizer`] in the canonical
+/// chain (raw → Drag → **LongPress** → Tap → DoubleTap, LPAR-04 §8.3).
+///
+/// While a contact is held — armed on `PressDown` and updated by
+/// `PointerMove`/`DragMove` — each call to [`tick`](Self::tick) increments an
+/// internal counter. Once the counter reaches `long_press_ticks` the recognizer
+/// emits [`Event::LongPress`] exactly once. Every `repeat_ticks` thereafter it
+/// emits [`Event::LongPressRepeat`]. A [`DragStart`](Event::DragStart),
+/// [`PressRelease`](Event::PressRelease), [`PointerUp`](Event::PointerUp), or
+/// [`DragEnd`](Event::DragEnd) disarms the recognizer without emitting.
+///
+/// All events pass through unchanged — this recognizer is purely additive and
+/// does **not** suppress or rewrite any existing stream event (LPAR-04 §9.5).
+///
+/// # Determinism
+///
+/// Identical sequences of `process` and `tick` calls produce identical output
+/// sequences. There is no wall-clock dependency (LPAR-04 §9.1/§9.2).
+pub struct LongPressRecognizer {
+    state: LpState,
+    /// Last known contact position (updated by `PressDown`/`PointerMove`/
+    /// `DragMove` while armed).
+    pos: (i32, i32),
+    /// Tick counter since arming. Compared against `config.long_press_ticks`
+    /// and used to schedule repeats.
+    counter: u32,
+    /// Active configuration.
+    config: LongPressConfig,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LpState {
+    /// No active contact.
+    Idle,
+    /// Contact held; long press not yet fired.
+    Armed,
+    /// `LongPress` already emitted; tracking for `LongPressRepeat`.
+    Fired,
+}
+
+impl LongPressRecognizer {
+    /// Create a recognizer with default thresholds ([`LONG_PRESS_TICKS`] and
+    /// [`LONG_PRESS_REPEAT_TICKS`]).
+    pub fn new() -> Self {
+        Self::with_config(LongPressConfig::default())
+    }
+
+    /// Create a recognizer with custom thresholds.
+    ///
+    /// `config.repeat_ticks` MUST be at least 1; a value of 0 is clamped to 1
+    /// to prevent infinite repeat storms.
+    pub fn with_config(config: LongPressConfig) -> Self {
+        let config = LongPressConfig {
+            repeat_ticks: config.repeat_ticks.max(1),
+            ..config
+        };
+        Self {
+            state: LpState::Idle,
+            pos: (0, 0),
+            counter: 0,
+            config,
+        }
+    }
+
+    /// Process a stream event. All events pass through unchanged.
+    ///
+    /// The recognizer tracks contact state to arm/disarm the long-press timer:
+    /// - `PressDown` — arms the recognizer and records the press position.
+    /// - `PointerMove` / `DragMove` — updates the tracked position while armed
+    ///   or fired (so the `LongPress`/`LongPressRepeat` coordinates reflect the
+    ///   most recent contact position).
+    /// - `DragStart` — disarms (LPAR-04 §9.4).
+    /// - `PointerUp` / `PressRelease` / `DragEnd` — disarms.
+    ///
+    /// No event is ever `None`-d by this recognizer; it only *adds* output via
+    /// [`tick`](Self::tick).
+    pub fn process(&mut self, event: &Event) -> Option<Event> {
+        match event {
+            Event::PressDown { x, y } => {
+                self.state = LpState::Armed;
+                self.pos = (*x, *y);
+                self.counter = 0;
+            }
+            Event::PointerMove { x, y } | Event::DragMove { x, y }
+                if self.state != LpState::Idle =>
+            {
+                self.pos = (*x, *y);
+            }
+            Event::DragStart { .. }
+            | Event::PointerUp { .. }
+            | Event::PressRelease { .. }
+            | Event::DragEnd { .. } => {
+                self.cancel();
+            }
+            _ => {}
+        }
+        Some(event.clone())
+    }
+
+    /// Advance the long-press timer. Call once per [`Event::Tick`].
+    ///
+    /// Returns:
+    /// - `Some(Event::LongPress { x, y })` on the tick that crosses
+    ///   `long_press_ticks` (emitted exactly once per contact).
+    /// - `Some(Event::LongPressRepeat { x, y })` on every `repeat_ticks`
+    ///   tick after the initial long press.
+    /// - `None` otherwise.
+    pub fn tick(&mut self) -> Option<Event> {
+        match self.state {
+            LpState::Idle => None,
+            LpState::Armed => {
+                self.counter += 1;
+                if self.counter >= self.config.long_press_ticks {
+                    self.state = LpState::Fired;
+                    // Reset counter so the first repeat fires after `repeat_ticks`
+                    // more ticks, not immediately.
+                    self.counter = 0;
+                    let (x, y) = self.pos;
+                    Some(Event::LongPress { x, y })
+                } else {
+                    None
+                }
+            }
+            LpState::Fired => {
+                self.counter += 1;
+                if self.counter >= self.config.repeat_ticks {
+                    self.counter = 0;
+                    let (x, y) = self.pos;
+                    Some(Event::LongPressRepeat { x, y })
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Disarm the recognizer, dropping any pending long-press.
+    ///
+    /// Pipelines MUST call this when [`DragRecognizer`] upstream emits
+    /// `DragStart` (LPAR-04 §9.4) — the same chain-cancellation contract as
+    /// [`TapRecognizer::cancel`] (INPUT-00 §6.2).
+    pub fn cancel(&mut self) {
+        self.state = LpState::Idle;
+        self.counter = 0;
+    }
+}
+
+impl Default for LongPressRecognizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -888,5 +1087,198 @@ mod tests {
             !events.iter().any(is_drag),
             "stationary taps emitted drag events"
         );
+    }
+
+    // ── LongPressRecognizer tests (LPAR-04 §9) ────────────────────────
+
+    /// Drive a contact hold for `hold_ticks` ticks and collect all output.
+    ///
+    /// Sends `PressDown`, then calls `tick()` `hold_ticks` times, collecting
+    /// any `LongPress`/`LongPressRepeat` output along the way.
+    fn hold_contact(lp: &mut LongPressRecognizer, x: i32, y: i32, hold_ticks: u32) -> Vec<Event> {
+        let mut out = Vec::new();
+        lp.process(&Event::PressDown { x, y });
+        for _ in 0..hold_ticks {
+            if let Some(e) = lp.tick() {
+                out.push(e);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn long_press_fires_once_then_repeats() {
+        // Config: long_press after 5 ticks, repeat every 3 ticks.
+        let mut lp = LongPressRecognizer::with_config(LongPressConfig {
+            long_press_ticks: 5,
+            repeat_ticks: 3,
+        });
+        // Hold for 5 + 3 + 3 = 11 ticks → LongPress at tick 5, repeats at 8 and 11.
+        let events = hold_contact(&mut lp, 10, 20, 11);
+        assert_eq!(
+            events,
+            vec![
+                Event::LongPress { x: 10, y: 20 },
+                Event::LongPressRepeat { x: 10, y: 20 },
+                Event::LongPressRepeat { x: 10, y: 20 },
+            ],
+            "exact emission ticks: LongPress at threshold, repeats at each interval"
+        );
+    }
+
+    #[test]
+    fn release_before_threshold_emits_no_long_press() {
+        let mut lp = LongPressRecognizer::with_config(LongPressConfig {
+            long_press_ticks: 10,
+            repeat_ticks: 3,
+        });
+        // Hold for 9 ticks (one short of threshold), then release.
+        let events = hold_contact(&mut lp, 5, 5, 9);
+        lp.process(&Event::PressRelease { x: 5, y: 5 });
+        // No long press should have fired.
+        assert!(
+            events.is_empty(),
+            "release before threshold must not emit LongPress: {events:?}"
+        );
+        // No output after release either.
+        for _ in 0..5 {
+            assert_eq!(lp.tick(), None, "nothing after release");
+        }
+    }
+
+    #[test]
+    fn drag_start_cancels_long_press() {
+        let mut lp = LongPressRecognizer::with_config(LongPressConfig {
+            long_press_ticks: 5,
+            repeat_ticks: 3,
+        });
+        lp.process(&Event::PressDown { x: 0, y: 0 });
+        // Advance 3 ticks (below threshold).
+        for _ in 0..3 {
+            assert_eq!(lp.tick(), None);
+        }
+        // DragStart disarms.
+        lp.process(&Event::DragStart {
+            x: 20,
+            y: 0,
+            origin_x: 0,
+            origin_y: 0,
+        });
+        // Continue ticking past the threshold — must produce nothing.
+        for _ in 0..10 {
+            assert_eq!(
+                lp.tick(),
+                None,
+                "DragStart must disarm the long-press recognizer"
+            );
+        }
+    }
+
+    #[test]
+    fn determinism_identical_scripts_produce_identical_output() {
+        let config = LongPressConfig {
+            long_press_ticks: 4,
+            repeat_ticks: 2,
+        };
+
+        let run = || {
+            let mut lp = LongPressRecognizer::with_config(config);
+            let mut out = Vec::new();
+            lp.process(&Event::PressDown { x: 7, y: 8 });
+            for _ in 0..8 {
+                if let Some(e) = lp.tick() {
+                    out.push(e);
+                }
+            }
+            lp.process(&Event::PressRelease { x: 7, y: 8 });
+            for _ in 0..3 {
+                assert_eq!(lp.tick(), None);
+            }
+            out
+        };
+
+        let first = run();
+        let second = run();
+        assert_eq!(
+            first, second,
+            "identical input+tick sequences must produce identical output"
+        );
+    }
+
+    #[test]
+    fn long_press_does_not_emit_tap_events() {
+        // The long-press recognizer is purely additive: it must never emit
+        // PressRelease or any tap-family event (LPAR-04 §9.5).
+        let mut lp = LongPressRecognizer::with_config(LongPressConfig {
+            long_press_ticks: 3,
+            repeat_ticks: 2,
+        });
+        let events = hold_contact(&mut lp, 50, 60, 10);
+        lp.process(&Event::PointerUp { x: 50, y: 60 });
+        // process() always returns the event unchanged — check it passes PressRelease through.
+        let pass = lp.process(&Event::PressRelease { x: 50, y: 60 });
+        // After disarm, tick must return None.
+        for _ in 0..5 {
+            assert_eq!(lp.tick(), None);
+        }
+        // None of the long-press ticked outputs should be tap events.
+        for e in &events {
+            assert!(
+                matches!(e, Event::LongPress { .. } | Event::LongPressRepeat { .. }),
+                "recognizer emitted unexpected event from tick: {e:?}"
+            );
+        }
+        // process() must pass through PressRelease unmodified (purely additive).
+        assert_eq!(
+            pass,
+            Some(Event::PressRelease { x: 50, y: 60 }),
+            "process() must always pass events through"
+        );
+    }
+
+    #[test]
+    fn position_tracks_drag_move_while_armed() {
+        let mut lp = LongPressRecognizer::with_config(LongPressConfig {
+            long_press_ticks: 4,
+            repeat_ticks: 2,
+        });
+        // Arm at (0,0), then update position via DragMove (below drag threshold
+        // scenario is exercised by process passthrough; this tests tracking).
+        lp.process(&Event::PressDown { x: 0, y: 0 });
+        lp.process(&Event::DragMove { x: 3, y: 4 });
+        // Tick past threshold.
+        let mut out = Vec::new();
+        for _ in 0..4 {
+            if let Some(e) = lp.tick() {
+                out.push(e);
+            }
+        }
+        assert_eq!(
+            out,
+            vec![Event::LongPress { x: 3, y: 4 }],
+            "LongPress coordinates must reflect last DragMove position"
+        );
+    }
+
+    #[test]
+    fn pointer_up_disarms_recognizer() {
+        let mut lp = LongPressRecognizer::with_config(LongPressConfig {
+            long_press_ticks: 5,
+            repeat_ticks: 2,
+        });
+        lp.process(&Event::PressDown { x: 1, y: 2 });
+        for _ in 0..3 {
+            lp.tick();
+        }
+        lp.process(&Event::PointerUp { x: 1, y: 2 });
+        for _ in 0..10 {
+            assert_eq!(lp.tick(), None, "PointerUp must disarm");
+        }
+    }
+
+    #[test]
+    fn non_pointer_events_pass_through_long_press_recognizer() {
+        let mut lp = LongPressRecognizer::new();
+        assert_eq!(lp.process(&Event::Tick), Some(Event::Tick));
     }
 }

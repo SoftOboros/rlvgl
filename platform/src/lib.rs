@@ -73,6 +73,8 @@ pub mod gesture;
 pub mod hwcore;
 /// Input device abstractions.
 pub mod input;
+/// LPAR-04 §8 input-device adapters (Pointer, Keypad, Encoder, Button).
+pub mod input_device;
 #[cfg(feature = "linux_fbdev")]
 pub mod linux_evdev;
 #[cfg(feature = "linux_fbdev")]
@@ -99,6 +101,8 @@ pub mod nt35510;
 pub mod pdm_filter;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
+/// LPAR-03 display presenter: resolves a [`PresentPlan`] into flush calls.
+pub mod present;
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")

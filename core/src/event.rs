@@ -141,6 +141,31 @@ pub enum Event {
         /// Key that was released.
         key: Key,
     },
+    /// Rotary encoder rotation since the last read, in detent steps
+    /// (positive clockwise). Mirrors `lv_indev_data_t::enc_diff`. Emitted
+    /// by an encoder input device, not by raw hardware (LPAR-04 §5.5).
+    Encoder {
+        /// Net rotation steps since the previous read.
+        diff: i32,
+    },
+    /// A held contact reached the long-press threshold. Emitted once per
+    /// contact by the long-press recognizer (LPAR-04 §9). A pending long
+    /// press is disarmed by `DragStart`.
+    LongPress {
+        /// Horizontal coordinate of the held contact.
+        x: i32,
+        /// Vertical coordinate of the held contact.
+        y: i32,
+    },
+    /// A long-pressed contact crossed another repeat interval. Emitted
+    /// every repeat period after the initial `LongPress` by the long-press
+    /// recognizer (LPAR-04 §9).
+    LongPressRepeat {
+        /// Horizontal coordinate of the held contact.
+        x: i32,
+        /// Vertical coordinate of the held contact.
+        y: i32,
+    },
 }
 
 /// Identifiers for keyboard keys.

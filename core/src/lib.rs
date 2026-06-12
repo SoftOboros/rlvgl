@@ -42,11 +42,19 @@ pub mod cmd;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
 pub mod event;
+/// Focus traversal and group policy for the LPAR-04 event/focus runtime.
+pub mod focus;
 #[cfg(feature = "fs")]
 pub mod fs;
 /// 1-bit bitmap icons (folder, file) rendered at font height.
 pub mod icon_bitmap;
 pub mod interface;
+/// Shared invalidation planner and present-plan types (LPAR-03).
+pub mod invalidation;
+/// LVGL-parity object metadata and tree helpers.
+pub mod object;
+/// Node-resident object animations; see [`object_anim::ObjectAnims`].
+pub mod object_anim;
 /// Variable-width packed font renderer (grayscale anti-aliased).
 pub mod packed_font;
 pub mod plugins;
@@ -54,8 +62,12 @@ pub mod plugins;
 /// software and hardware-accelerated `Renderer` implementations.
 pub mod raster;
 pub mod renderer;
+/// LPAR-05 scroll runtime: scroll state, controller, and snap logic.
+pub mod scroll;
 pub mod style;
 pub mod theme;
+/// Tick-driven timer registry; see [`timer::Timers`].
+pub mod timer;
 pub mod widget;
 
 #[cfg(feature = "canvas")]
