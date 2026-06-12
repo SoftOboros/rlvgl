@@ -279,3 +279,17 @@ partial rows appear at both edges after a scroll). Required cases:
   automatic tree propagation — rationale in §5.1); ScrollView contract
   §6; text-clipping guarantee scope §5.4; driving-case test geometry
   §8.
+- **2026-06-12** — §5.4 / §14 amendment (prerequisite for LPAR-08, the
+  owner of glyph metrics and text clipping). The §14 deferred-Coupled
+  item "glyph-extent-aware `draw_text` cropping" is taken up by LPAR-08
+  (`docs/concepts/LPAR-08-TEXT-DRAW-IMAGE-MASK.md` §5.C). Resolution is
+  **additive and non-breaking**: the existing `Renderer::draw_text` path
+  and its §5.4 behavior (backend text has no extent information, so
+  partially-visible lines are dropped at the vertical clip rather than
+  cropped) are UNCHANGED. LPAR-08 adds a NEW glyph-extent-aware text path
+  (`draw_text_shaped` + a `ClipRenderer` extension that consumes glyph
+  extents) under which partially-visible lines are cropped at the clip
+  boundary. Widgets opt into exact clipping by drawing through the new
+  path; the legacy `draw_text` guarantee in §5.4 remains as written for
+  callers that do not. No existing `Renderer` or `ClipRenderer` consumer
+  changes behavior.

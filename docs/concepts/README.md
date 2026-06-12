@@ -246,6 +246,16 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     transitions (LPAR-06 seam), `LparTheme` default-theme chaining, and
     deprecate-in-place reconciliation of the overlapping `ui::style` /
     `ui::theme` surfaces.
+  - [LPAR-08-TEXT-DRAW-IMAGE-MASK.md](LPAR-08-TEXT-DRAW-IMAGE-MASK.md) —
+    **Ratified 2026-06-12.** Wave 2 text/draw/image/mask substrate:
+    defaulted `Renderer` capability methods (no implementer breaks), a
+    `FontMetrics` trait unifying the bitmap/packed/fontdue backends,
+    glyph-extent-aware text clipping (resolving the REND-00 §5.4
+    limitation via a new path — REND-00 amended), LTR wrapping with a
+    named RTL boundary, alpha masks / gradients / shadows over the raster
+    `CoverageSink`, `ImageDescriptor`/cache/recolor/transform, a
+    software-reference + hardware-tolerance rule, and a new resolved
+    `TextStyle` (the frozen `core::style::Style` stays untouched).
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
