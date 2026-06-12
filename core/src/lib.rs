@@ -65,6 +65,8 @@ pub mod renderer;
 /// LPAR-05 scroll runtime: scroll state, controller, and snap logic.
 pub mod scroll;
 pub mod style;
+/// LPAR-07 style cascade substrate: `Part`, `Selector`, `StylePatch`, `StyleState`, and resolution.
+pub mod style_cascade;
 pub mod theme;
 /// Tick-driven timer registry; see [`timer::Timers`].
 pub mod timer;

@@ -43,6 +43,7 @@ pub use layout::{BoxLayout, Grid, GridCalc, HStack, VStack};
 pub use modal::Modal;
 pub use radio::Radio;
 pub use rlvgl_widgets::button::Button;
+#[allow(deprecated)]
 pub use style::{Color, Part, State, Style, StyleBuilder};
 pub use switch::Switch;
 pub use tag::Tag;

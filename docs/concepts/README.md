@@ -233,6 +233,20 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     `core::animation` animators (keeping the shared `Easing`/`LoopMode`
     math). Completes the Wave 1 runtime substrate.
 
+### Wave 2 — style / draw / layout substrate
+
+- **LPAR** (continued — Wave 2)
+  - [LPAR-07-STYLE-THEME.md](LPAR-07-STYLE-THEME.md) —
+    **Ratified 2026-06-12; implementation landed same day**
+    (`core::style_cascade` + `core::theme` `LparTheme`; widget draw-path
+    wiring rides with LPAR-11+). Wave 2 style and theme substrate:
+    `(Part, ObjectStates)` selector cascade above the unchanged
+    `core::style::Style` property bag, tree-resident `StyleState` on the
+    node, top-down property inheritance, `bind_anim`-driven style
+    transitions (LPAR-06 seam), `LparTheme` default-theme chaining, and
+    deprecate-in-place reconciliation of the overlapping `ui::style` /
+    `ui::theme` surfaces.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem

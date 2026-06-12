@@ -592,6 +592,12 @@ pub struct ObjectNode {
     /// non-animated nodes. Lazily allocated by
     /// [`ObjectAnims::bind`](crate::object_anim::ObjectAnims::bind).
     pub(crate) anims: Option<Box<crate::object_anim::NodeAnimSet>>,
+    /// Optional LPAR-07 style slot holding local and shared style entries.
+    ///
+    /// `None` for nodes that carry no style overrides, keeping `ObjectNode`
+    /// small. Lazily allocated by [`ObjectNode::add_local_style`] or
+    /// [`ObjectNode::add_style`].
+    pub(crate) style: Option<Box<crate::style_cascade::StyleState>>,
 }
 
 impl ObjectNode {
@@ -607,6 +613,7 @@ impl ObjectNode {
             bubble_handlers: Vec::new(),
             scroll: None,
             anims: None,
+            style: None,
         }
     }
 
@@ -704,6 +711,123 @@ impl ObjectNode {
     /// Return a mutable reference to the scroll state, if any.
     pub fn scroll_state_mut(&mut self) -> Option<&mut crate::scroll::ScrollState> {
         self.scroll.as_deref_mut()
+    }
+
+    // -----------------------------------------------------------------------
+    // Style accessors (LPAR-07 §7.1)
+    // -----------------------------------------------------------------------
+
+    /// Add a locally owned style patch keyed by `selector`.
+    ///
+    /// Local style entries take priority over added (shared) entries in the
+    /// cascade. Within local entries, the last-added entry wins when multiple
+    /// selectors match (§7.2 reverse-registration-order rule).
+    ///
+    /// The style slot is lazily allocated on the first call.
+    pub fn add_local_style(
+        &mut self,
+        patch: crate::style_cascade::StylePatch,
+        selector: crate::style_cascade::Selector,
+    ) {
+        let slot = self
+            .style
+            .get_or_insert_with(|| Box::new(crate::style_cascade::StyleState::new()));
+        crate::style_cascade::push_local(slot, patch, selector);
+    }
+
+    /// Add a shared (added) style patch reference keyed by `selector`.
+    ///
+    /// Added entries have lower precedence than local entries. Within added
+    /// entries, the last-added entry wins when multiple selectors match (§7.2).
+    ///
+    /// The `'static` lifetime constraint is conservative in v1; see LPAR-07
+    /// §7.1 for the deferred object-lifetime-scoped extension.
+    ///
+    /// The style slot is lazily allocated on the first call.
+    pub fn add_style(
+        &mut self,
+        patch: &'static crate::style_cascade::StylePatch,
+        selector: crate::style_cascade::Selector,
+    ) {
+        let slot = self
+            .style
+            .get_or_insert_with(|| Box::new(crate::style_cascade::StyleState::new()));
+        crate::style_cascade::push_added(slot, patch, selector);
+    }
+
+    /// Add a default-theme style patch keyed by `selector` (LPAR-07 §9.1).
+    ///
+    /// Theme entries resolve at the **lowest** style precedence — below local
+    /// and added styles — so a widget or application style always wins over the
+    /// theme regardless of registration order. Themes write here via
+    /// [`LparTheme::apply_to_node`](crate::theme::LparTheme::apply_to_node).
+    ///
+    /// The style slot is lazily allocated on the first call.
+    pub fn add_theme_style(
+        &mut self,
+        patch: crate::style_cascade::StylePatch,
+        selector: crate::style_cascade::Selector,
+    ) {
+        let slot = self
+            .style
+            .get_or_insert_with(|| Box::new(crate::style_cascade::StyleState::new()));
+        crate::style_cascade::push_theme(slot, patch, selector);
+    }
+
+    /// Clear all default-theme style entries on this node (for theme re-apply).
+    ///
+    /// Returns the number of entries removed; `0` when the style slot is `None`.
+    pub fn clear_theme_styles(&mut self) -> usize {
+        match self.style.as_deref_mut() {
+            Some(slot) => crate::style_cascade::clear_theme(slot),
+            None => 0,
+        }
+    }
+
+    /// Remove local style entries whose selector matches `(part, states)`.
+    ///
+    /// A selector matches the `(part, states)` query when the selector's part
+    /// equals `part` and all state bits in `states` are present in the
+    /// selector's state mask (same predicate as cascade matching).
+    ///
+    /// Returns the number of entries removed. Returns `0` when the style slot
+    /// is `None`.
+    ///
+    /// To remove all local styles for a part regardless of state, call
+    /// [`remove_all_local_styles_by_part`](Self::remove_all_local_styles_by_part).
+    /// To clear everything, call [`remove_all_local_styles`](Self::remove_all_local_styles).
+    pub fn remove_local_styles(
+        &mut self,
+        part: crate::style_cascade::Part,
+        states: ObjectStates,
+    ) -> usize {
+        match self.style.as_deref_mut() {
+            Some(slot) => crate::style_cascade::remove_local_matching(slot, part, states),
+            None => 0,
+        }
+    }
+
+    /// Remove all local style entries for `part` regardless of state mask.
+    ///
+    /// This is the wildcard form described in §7.5 — removes every local entry
+    /// whose part equals `part`, regardless of its state selector.
+    ///
+    /// Returns the number of entries removed.
+    pub fn remove_all_local_styles_by_part(&mut self, part: crate::style_cascade::Part) -> usize {
+        match self.style.as_deref_mut() {
+            Some(slot) => crate::style_cascade::remove_all_local_by_part(slot, part),
+            None => 0,
+        }
+    }
+
+    /// Remove all local style entries from this node (unconditional clear).
+    ///
+    /// Returns the number of entries removed.
+    pub fn remove_all_local_styles(&mut self) -> usize {
+        match self.style.as_deref_mut() {
+            Some(slot) => crate::style_cascade::remove_all_local(slot),
+            None => 0,
+        }
     }
 
     // -----------------------------------------------------------------------

@@ -131,6 +131,15 @@ impl Theme {
     /// Apply the theme globally.
     ///
     /// Currently a placeholder until LVGL integration is implemented.
+    ///
+    /// # Deprecation (LPAR-07)
+    ///
+    /// **Deprecated.** Use [`rlvgl_core::theme::LparTheme::apply_to_node`]
+    /// instead. See LPAR-07 §9.4 for migration guidance.
+    #[deprecated(
+        since = "0.2.2",
+        note = "use LparTheme::apply_to_node; see LPAR-07 §9.4"
+    )]
     pub fn apply_global(&self) {
         // TODO: Bridge tokens to LVGL once available.
     }
