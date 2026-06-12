@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -137,7 +137,7 @@ required-features = ["creator", "creator_ui"]
 rlvgl-core = { version = "0.2.2", path = "core", default-features = false }
 rlvgl-widgets = { version = "0.2.2", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.2.2", path = "platform", default-features = false }
-rlvgl-ui = { version = "0.2.0", path = "ui", default-features = false }
+rlvgl-ui = { version = "0.2.2", path = "ui", default-features = false }
 rlvgl-i18n = { version = "0.2.2", path = "i18n" }
 rlvgl-app-demo = { version = "0.2.0", path = "examples/apps/demo", default-features = false, optional = true }
 rlvgl-app-disco-demo = { version = "0.2.2", path = "examples/apps/disco-demo", default-features = false, optional = true }
@@ -166,7 +166,7 @@ default-features = false
 optional = true
 
 [dependencies.rlvgl-playit]
-version = "0.2.2"
+version = "0.2.4"
 path = "playit"
 default-features = false
 optional = true
