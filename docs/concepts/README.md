@@ -184,6 +184,55 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
   - [WID-00-CONCEPTS.md](WID-00-CONCEPTS.md) — **Ratified
     2026-06-11**; WID-01 landed same day.
 
+### Multi-wave UI/runtime initiatives
+
+- **LPAR** — LVGL parity backlog across runtime substrate, style,
+  draw, layout, widget families, conformance fixtures, examples,
+  documentation, and release tracking.
+  - [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md) — **Ratified
+    2026-06-12.** Breaks the parity backlog into waves 0-6 and phases
+    LPAR-01 through LPAR-16, with dependency and conflict analysis.
+  - [LPAR-01-BASELINE.md](LPAR-01-BASELINE.md) — **Ratified
+    2026-06-12.** Pins `LVGL 9.4.0-dev @ 5a89ce8a`, defines source
+    baseline/config assumptions, naming policy, conformance levels,
+    runtime matrix, widget matrix, and Wave 0 conflict resolutions.
+  - [LPAR-02-OBJECT-SUBSTRATE.md](LPAR-02-OBJECT-SUBSTRATE.md) —
+    **Ratified 2026-06-12; implementation landed same day.** Wave 1 object substrate:
+    compatibility-first plan for object metadata, base flags/states,
+    sibling order, hit testing, and deletion lifecycle.
+  - [LPAR-03-INVALIDATION-DISPLAY.md](LPAR-03-INVALIDATION-DISPLAY.md) —
+    **Ratified 2026-06-12; implementation landed same day.** Wave 1
+    invalidation and display runtime: logical dirty rects, dirty-source
+    collection, present plans, target-buffer dirty retention, display
+    flush compatibility, and overflow-to-full-frame fallback
+    (`core::invalidation` + `platform::present`).
+  - [LPAR-04-EVENT-FOCUS-INPUT.md](LPAR-04-EVENT-FOCUS-INPUT.md) —
+    **Ratified 2026-06-12; core implementation landed same day.** Wave 1
+    event, focus, and input runtime: two-tier event vocabulary and
+    growth policy, trickle/bubble propagation on `ObjectNode`,
+    tree-resident focus groups, and tick-driven long-press/repeat
+    timing (`core::object` dispatch + `core::focus` +
+    `platform::gesture::LongPressRecognizer`). Input-device adapters
+    pending.
+  - [LPAR-05-SCROLL-RUNTIME.md](LPAR-05-SCROLL-RUNTIME.md) —
+    **Ratified 2026-06-12; implementation landed same day**
+    (`core::scroll` + `PointerDevice::with_scroll`; scrollbar pixel
+    rendering deferred to consuming widgets). Wave 1 scroll runtime:
+    `SCROLLABLE` flag
+    finalization, scroll `ObjectEvent` codes
+    (`ScrollBegin`/`Scroll`/`ScrollEnd`/`ScrollThrow`), drag→scroll
+    composition with inherited click/long-press suppression, tick-driven
+    throw/momentum via the ANIM `Tween` substrate, snapping, nested-scroll
+    chaining, scrollbar overlay, and additive `ScrollView` reconciliation.
+  - [LPAR-06-TIMERS-OBJECT-ANIM.md](LPAR-06-TIMERS-OBJECT-ANIM.md) —
+    **Ratified 2026-06-12.** Wave 1 timers and object animations:
+    tick-counted `Timers`/`TimerId`, tree-resident object-bound
+    animations (`ObjectNode::bind_anim` + `ObjectAnims` walker) with
+    detach-cancellation by construction, the LPAR-07 transition seam,
+    and deprecate-in-place reconciliation of the legacy wall-clock
+    `core::animation` animators (keeping the shared `Easing`/`LoopMode`
+    math). Completes the Wave 1 runtime substrate.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem
