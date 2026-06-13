@@ -15,7 +15,9 @@
 extern crate alloc;
 use libm::{cosf, sinf};
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
+use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::shape_text_ltr;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -207,10 +209,14 @@ impl NeedleVu {
             let label_x = (pivot_x as f32 + (r_outer + 4.0) * dx) as i32 - 8;
             let label_y = (pivot_y as f32 + (r_outer + 4.0) * dy) as i32 + 4;
             match scale.label_for_major(m) {
-                Some(s) => renderer.draw_text((label_x, label_y), s, text_col),
+                Some(s) => {
+                    let shaped = shape_text_ltr(&FONT_6X10, s, (label_x, label_y), 0);
+                    renderer.draw_text_shaped(&shaped, (0, 0), text_col);
+                }
                 None => {
                     let formatted = alloc::format!("{m:.0}");
-                    renderer.draw_text((label_x, label_y), &formatted, text_col);
+                    let shaped = shape_text_ltr(&FONT_6X10, &formatted, (label_x, label_y), 0);
+                    renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
             }
         }
@@ -282,6 +288,7 @@ mod tests {
     extern crate alloc;
     use alloc::string::String;
     use alloc::vec::Vec;
+    use rlvgl_core::font::ShapedText;
 
     struct TextRecorder {
         rect_count: usize,
@@ -292,10 +299,17 @@ mod tests {
         fn fill_rect(&mut self, _rect: Rect, _color: Color) {
             self.rect_count += 1;
         }
-        fn draw_text(&mut self, _pos: (i32, i32), text: &str, _color: Color) {
+        fn draw_text_shaped(
+            &mut self,
+            shaped: &ShapedText<'_>,
+            _origin: (i32, i32),
+            _color: Color,
+        ) {
             self.text_count += 1;
-            self.last_text.push(text.into());
+            self.last_text
+                .push(shaped.glyphs.iter().map(|glyph| glyph.ch).collect());
         }
+        fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
     }
 
     #[test]

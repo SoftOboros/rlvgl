@@ -17,7 +17,9 @@
 use alloc::format;
 
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
+use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::shape_text_ltr;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -173,9 +175,14 @@ impl Widget for LufsGauge {
         let s_text = format!("S  {s_lufs:>6.1} {units}");
         let m_text = format!("M  {m_lufs:>6.1} {units}");
 
-        renderer.draw_text((x, line1_y), &i_text, self.integrated_color());
-        renderer.draw_text((x, line2_y), &s_text, text_default);
-        renderer.draw_text((x, line3_y), &m_text, text_default);
+        let shaped = shape_text_ltr(&FONT_6X10, &i_text, (x, line1_y), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), self.integrated_color());
+
+        let shaped = shape_text_ltr(&FONT_6X10, &s_text, (x, line2_y), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), text_default);
+
+        let shaped = shape_text_ltr(&FONT_6X10, &m_text, (x, line3_y), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), text_default);
     }
 
     fn handle_event(&mut self, _event: &Event) -> bool {
@@ -191,6 +198,7 @@ mod tests {
     extern crate alloc;
     use alloc::string::String;
     use alloc::vec::Vec;
+    use rlvgl_core::font::ShapedText;
 
     struct Recorder {
         rects: usize,
@@ -200,9 +208,11 @@ mod tests {
         fn fill_rect(&mut self, _r: Rect, _c: Color) {
             self.rects += 1;
         }
-        fn draw_text(&mut self, _p: (i32, i32), text: &str, color: Color) {
+        fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, _origin: (i32, i32), color: Color) {
+            let text: String = shaped.glyphs.iter().map(|glyph| glyph.ch).collect();
             self.texts.push((text.into(), color));
         }
+        fn draw_text(&mut self, _p: (i32, i32), _text: &str, _color: Color) {}
     }
 
     #[test]

@@ -978,6 +978,12 @@ deterministic extent fallback.
   standalone `text_color` field in place. Remaining text-side boundary:
   resolved `TextStyle::font_id` still needs a registry lookup outside the
   default built-in font path.
+- **2026-06-13** — Meter and list migration slice landed: `widgets/src/list.rs`,
+  `widgets/src/meters/{bargraph,numeric,needle,lufs_gauge,lufs_gauge_strict}.rs`
+  now call `shape_text_ltr` + `draw_text_shaped` directly with
+  `FONT_6X10` so text rendering follows the new `FontMetrics` substrate path.
+  Updated widget tests now reconstruct text runs from `ShapedText` to validate
+  label and numeric meter output under `draw_text_shaped` dispatch.
 - **2026-06-12** — Rounded and arc mask slice landed. `core/src/mask.rs` now
   includes documented `RoundedRectMask` and `ArcMask` implementations using
   deterministic integer subpixel coverage with no allocation or floating

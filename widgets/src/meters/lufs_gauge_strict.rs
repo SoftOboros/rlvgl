@@ -25,7 +25,9 @@
 use alloc::format;
 
 use rlvgl_audio_meters_core::{Ballistic, BallisticState, RelativelyGatedLufsI};
+use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::shape_text_ltr;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -161,9 +163,14 @@ impl<const N: usize> Widget for LufsGaugeStrict<N> {
         let s_text = format!("S  {s_lufs:>6.1} {units}");
         let m_text = format!("M  {m_lufs:>6.1} {units}");
 
-        renderer.draw_text((x, line1_y), &i_text, self.integrated_color());
-        renderer.draw_text((x, line2_y), &s_text, text_default);
-        renderer.draw_text((x, line3_y), &m_text, text_default);
+        let shaped = shape_text_ltr(&FONT_6X10, &i_text, (x, line1_y), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), self.integrated_color());
+
+        let shaped = shape_text_ltr(&FONT_6X10, &s_text, (x, line2_y), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), text_default);
+
+        let shaped = shape_text_ltr(&FONT_6X10, &m_text, (x, line3_y), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), text_default);
     }
 
     fn handle_event(&mut self, _event: &Event) -> bool {
@@ -176,6 +183,7 @@ mod tests {
     use super::*;
     use crate::meters::lufs_gauge::LufsGauge;
     use crate::meters::presets::LUFS_EBU_R128_GAUGE;
+    use rlvgl_core::font::ShapedText;
 
     #[test]
     #[should_panic(expected = "meter_type = LufsGauge")]
@@ -279,9 +287,10 @@ mod tests {
             fn fill_rect(&mut self, _r: Rect, _c: Color) {
                 self.rects += 1;
             }
-            fn draw_text(&mut self, _p: (i32, i32), _t: &str, _c: Color) {
+            fn draw_text_shaped(&mut self, _shaped: &ShapedText<'_>, _o: (i32, i32), _c: Color) {
                 self.texts += 1;
             }
+            fn draw_text(&mut self, _p: (i32, i32), _t: &str, _c: Color) {}
         }
         let mut c = Counter { rects: 0, texts: 0 };
         g.draw(&mut c);

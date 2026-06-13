@@ -1,7 +1,9 @@
 //! Vertical scrolling list of selectable strings.
 use alloc::{string::String, vec::Vec};
+use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::shape_text_ltr;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -80,7 +82,8 @@ impl Widget for List {
             } else {
                 self.text_color
             };
-            renderer.draw_text(pos, item, color.with_alpha(a));
+            let shaped = shape_text_ltr(&FONT_6X10, item, pos, 0);
+            renderer.draw_text_shaped(&shaped, (0, 0), color.with_alpha(a));
         }
     }
 
