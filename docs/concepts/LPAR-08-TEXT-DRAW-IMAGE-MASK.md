@@ -799,7 +799,7 @@ deterministic extent fallback.
 - [ ] `cargo test --workspace`, `cargo fmt --all -- --check`, and
       `cargo clippy --workspace -- -D warnings` pass.
 - [x] Public APIs in publishable crates have doc comments.
-- [ ] LPAR-16 conformance fixtures for the driving cases: shaped-text
+- [x] LPAR-16 conformance fixtures for the driving cases: shaped-text
       clip in a `ScrollView` viewport (text straddling top and bottom
       edges), gradient fill determinism (same inputs → same pixels across
       runs), image blit with recolor (tint alpha sweep), shadow blur
@@ -984,6 +984,11 @@ deterministic extent fallback.
   `FONT_6X10` so text rendering follows the new `FontMetrics` substrate path.
   Updated widget tests now reconstruct text runs from `ShapedText` to validate
   label and numeric meter output under `draw_text_shaped` dispatch.
+- **2026-06-13** — LPAR-16 conformance fixtures for the driving cases are
+  now in place:
+  shaped-text clip in `ScrollView` (`widgets/tests/scroll_view.rs`),
+  gradient/shadow determinism (`core/tests/lpar16_conformance.rs`), and
+  recolor alpha sweep (`core/tests/image_blit.rs`).
 - **2026-06-12** — Rounded and arc mask slice landed. `core/src/mask.rs` now
   includes documented `RoundedRectMask` and `ArcMask` implementations using
   deterministic integer subpixel coverage with no allocation or floating

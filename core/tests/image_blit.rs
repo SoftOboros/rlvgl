@@ -131,6 +131,51 @@ fn blit_image_applies_recolor_after_sampling() {
 }
 
 #[test]
+fn blit_image_applies_recolor_alpha_sweep() {
+    let source = [Color(10, 20, 30, 255)];
+    let descriptor = ImageDescriptor::from_color_slice(&source, 1, 1);
+    let tint = Color(110, 120, 130, 255);
+
+    let actual: Vec<Color> = [0u8, 64, 128, 192, 255]
+        .into_iter()
+        .map(|alpha| {
+            let opts = BlitOpts {
+                recolor: Some(tint),
+                recolor_alpha: alpha,
+                ..BlitOpts::default()
+            };
+            render_to_buffer(1, 1, &descriptor, &opts)[0]
+        })
+        .collect();
+
+    let expected: Vec<Color> = [0u8, 64, 128, 192, 255]
+        .into_iter()
+        .map(|alpha| {
+            Color(
+                10 + (100 * u16::from(alpha) / 255) as u8,
+                20 + (100 * u16::from(alpha) / 255) as u8,
+                30 + (100 * u16::from(alpha) / 255) as u8,
+                255,
+            )
+        })
+        .collect();
+
+    assert_eq!(actual, expected);
+
+    let repeat = render_to_buffer(
+        1,
+        1,
+        &descriptor,
+        &BlitOpts {
+            recolor: Some(tint),
+            recolor_alpha: 128,
+            ..BlitOpts::default()
+        },
+    );
+    assert_eq!(repeat, vec![Color(60, 70, 80, 255)]);
+}
+
+#[test]
 fn blit_image_uses_nearest_neighbor_scale() {
     let pixels = [Color(1, 0, 0, 255), Color(2, 0, 0, 255)];
     let descriptor = ImageDescriptor::from_color_slice(&pixels, 2, 1);

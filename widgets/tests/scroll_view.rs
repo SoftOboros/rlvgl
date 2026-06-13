@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontLineMetrics, FontMetrics, GlyphInfo, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::StyleBuilder;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -73,6 +74,71 @@ fn row_color(row: i32) -> Color {
     Color(40 + row as u8 * 30, 80, 200 - row as u8 * 25, 255)
 }
 
+struct ProbeFont;
+
+impl FontMetrics for ProbeFont {
+    fn glyph_metrics(&self, ch: char) -> Option<GlyphInfo> {
+        (ch == 'G').then_some(GlyphInfo {
+            advance_fp16: 16,
+            bearing_x: 0,
+            bearing_y: 4,
+            width: 4,
+            height: 4,
+        })
+    }
+
+    fn line_metrics(&self) -> FontLineMetrics {
+        FontLineMetrics {
+            line_height: 4,
+            ascent: 4,
+            descent: 0,
+        }
+    }
+
+    fn glyph_coverage_row(&self, _ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        if row >= 4 {
+            return false;
+        }
+
+        for (idx, alpha) in coverage.iter_mut().enumerate() {
+            let x = x_offset + u16::try_from(idx).unwrap_or(u16::MAX);
+            *alpha = match x {
+                1 | 2 => 255,
+                _ => 0,
+            };
+        }
+        true
+    }
+}
+
+struct ShapedTextProbe {
+    bounds: Rect,
+    color: Color,
+}
+
+impl ShapedTextProbe {
+    fn new(bounds: Rect, color: Color) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self { bounds, color }))
+    }
+}
+
+impl Widget for ShapedTextProbe {
+    fn bounds(&self) -> Rect {
+        self.bounds
+    }
+
+    fn draw(&self, renderer: &mut dyn Renderer) {
+        let font = ProbeFont;
+        let baseline = self.bounds.y + font.line_metrics().ascent as i32;
+        let shaped = shape_text_ltr(&font, "G", (self.bounds.x, baseline), 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), self.color);
+    }
+
+    fn handle_event(&mut self, _event: &Event) -> bool {
+        false
+    }
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Spike (REND-00 §12, deliverable 1)
 // ───────────────────────────────────────────────────────────────────────────
@@ -110,6 +176,82 @@ fn spike_unclipped_tree_path_bleeds_past_parent_bounds() {
         frame.at(130, 320),
         Color(255, 0, 0, 255).to_argb8888(),
         "spike: child bleeds past the parent edge on the unclipped path"
+    );
+}
+
+#[test]
+fn text_coverage_is_clipped_by_scroll_viewport_at_top_and_bottom() {
+    let viewport = Rect {
+        x: 10,
+        y: 10,
+        width: 20,
+        height: 20,
+    };
+    let mut view = ScrollView::new(viewport, 100);
+    view.style = StyleBuilder::new().bg_color(Color(0, 0, 0, 255)).build();
+
+    // Text runs begin at y=-1 and y=19 in content space, each glyph is 4px tall.
+    // With the viewport origin at y=10 and no scroll offset, both glyphs
+    // cross viewport edges by one pixel.
+    view.add_child(ShapedTextProbe::new(
+        Rect {
+            x: 2,
+            y: -1,
+            width: 4,
+            height: 4,
+        },
+        Color(255, 0, 0, 255),
+    ));
+    view.add_child(ShapedTextProbe::new(
+        Rect {
+            x: 2,
+            y: 19,
+            width: 4,
+            height: 4,
+        },
+        Color(255, 0, 0, 255),
+    ));
+
+    let mut frame = Buffer::new();
+    view.draw(&mut frame);
+
+    let visible_red_x = viewport.x + 4;
+    // Above and below the viewport: no bleed from straddling glyph rows.
+    assert_eq!(
+        frame.at(viewport.x + 3, viewport.y - 1),
+        BG,
+        "top overhang is clipped to viewport"
+    );
+    assert_eq!(
+        frame.at(viewport.x + 3, viewport.y + viewport.height),
+        BG,
+        "bottom overhang is clipped to viewport"
+    );
+
+    // Interior clipping boundaries are honored and glyph coverage reaches both
+    // top and bottom edges.
+    let red = Color(255, 0, 0, 255);
+    let red_argb = red.to_argb8888();
+    let view_bg = Color(0, 0, 0, 255).to_argb8888();
+    assert_eq!(
+        frame.at(visible_red_x, viewport.y),
+        red_argb,
+        "top-straddling glyph contributes at first visible row"
+    );
+    assert_eq!(
+        frame.at(visible_red_x, viewport.y + viewport.height - 1),
+        red_argb,
+        "bottom-straddling glyph contributes at last visible row"
+    );
+    assert_eq!(
+        frame.at(visible_red_x - 2, viewport.y),
+        view_bg,
+        "coverage mask leaves first column untouched"
+    );
+    assert_eq!(
+        frame.at(visible_red_x + 2, viewport.y),
+        view_bg,
+        "coverage mask leaves last column untouched"
     );
 }
 
