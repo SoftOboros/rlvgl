@@ -1637,3 +1637,109 @@ color-cycle goal regardless of the peripheral-FSM mystery.
 - The /tmp/dfr_bringup/dfr0550_first_light reference source needs
   to be re-obtained from DFRobot or the original 2026-04-29 bench
   archive to compare bring-up order.
+
+## ERRATA-009 — DSI DPHY PLL never locks despite fully IDF-faithful config
+
+**Status:** 🔴 Open. **First seen:** 2026-06-13 (first time the DSI path
+ever executed on hardware — every prior boot hung at I2C wake, see
+ERRATA-008; the bit-bang transport work-around unblocked it).
+**Owning phase:** BEETLE-05 (DSI host PHY PLL + lane bring-up).
+**Hardware:** ESP32-P4 v1.3 on DFR1172 + DFR0550-V2.
+
+### Symptom
+
+After the bit-bang bridge wake succeeds (backlight ON), `run_bringup`
+reaches `dsi_host::init` and returns `DsiError::PllLock` (LED Morse
+primary `002`): `MIPI_DSI_HOST.phy_status.phy_lock` (bit 0) never asserts
+within a 1,000,000-iteration spin (~ms). Captured `phy_status` low byte =
+**0x28** = `phy_ulpsactivenotclk` (bit 3) + `phy_ulpsactivenot0lane`
+(bit 5) set; `phy_lock` (bit 0), `phy_stopstateclklane` (bit 2),
+`phy_stopstate0lane` (bit 4) all clear. I.e. the PHY is **powered and out
+of ULPS, but the PLL is not locked and the lanes never reach LP-11
+stop-state** (stop-state needs the byte clock the unlocked PLL can't
+produce).
+
+### Bench-verified-correct configuration (2026-06-13, ~7 flash rounds)
+
+Every layer was confirmed *on-chip* via read-back diagnostics emitted as
+ITU Morse on GPIO 5 (the bring-up emits 13 numbers; see
+`bsp_pac_main::morse_status_loop`). Confirmed values:
+
+| # | Diagnostic | Reading | Meaning |
+|---|---|---|---|
+| 1 | primary status | `002` | DsiError::PllLock |
+| 8 | `phy_status & 0xFF` | `040` (0x28) | PHY alive, PLL unlocked |
+| 9 | bootloader 20 MHz divider | `023` | correct (480/24 = 20 MHz) |
+| 10 | LDO_VO3 config read-back | `031` | all fields stuck (xpd/owner/tieh/dref/mul) |
+| 11 | eFuse-calibrated dref·10+mul | `124` | **dref 12 / mul 4** (this chip *is* calibrated; uncal 9/6 was the *wrong* voltage) |
+| 12 | PHY test reg 0x17 read-back | `003` | test interface works; M/N pokes landed (N−1 = 3) |
+| 13 | DPHY clock-gate read-back | `015` | ref_20m_en + cfg_clk + pll_refclk + src_sel=PLL_F20M all latched |
+
+Code paths confirmed faithful to IDF (line-by-line):
+`mipi_dsi_hal_configure_phy_pll` (M=150,N=4,hs_freq_sel=0x19 for
+1 lane @ 750 Mbps; byte-exact pokes 0x44/0x19/0x17/0x18/0x18),
+`mipi_dsi_hal_init` power/reset/enableclk/forcepll order (split into
+separate writes per `mipi_dsi_phy_ll`, since DesignWare samples
+enableclk/forcepll on the rstz edge), `mipi_dsi_ll_enable_bus_clock`
++ `reset_register`, `set_phy_clock_source` encoding (PLL_F20M = 0),
+`esp_lcd_new_dsi_bus` tail. LDO_VO3 slot confirmed: PAC `ext_ldo_p0_0p2a`
+= IDF `ext_ldo[1]` = unit 2 = LDO_VO3.
+
+### Eliminated hypotheses
+
+1. **LDO slot wrong** — NO. `ext_ldo_p0_0p2a` = `ext_ldo[1]` = LDO_VO3.
+2. **LDO config didn't land** — NO. Read-back `031` = all fields stuck.
+3. **DPHY voltage wrong (uncalibrated 9/6)** — was TRUE, now FIXED:
+   ported IDF's eFuse-calibrated `ldo_ll_voltage_to_dref_mul`
+   (LDO_VO3_K/VOS/C from `EFUSE.rd_mac_sys_3` bits[13:6]/[19:14]/[25:20]).
+   This chip calibrates to **12/4**, not 9/6 — so we *had* been at the
+   wrong voltage. Correcting it did **not** fix the lock.
+4. **20 MHz reference divider/gate wrong** — NO. Divider `023`, all
+   gates `015`; bootloader already had the divider correct.
+5. **20 MHz reference not oscillating** — NO. SPLL is up (we execute from
+   SPLL-fed MSPI flash), gate latched, divider correct.
+6. **PLL M/N pokes not reaching the PHY** — NO. Reg 0x17 reads back `003`.
+7. **PHY reset/enable write ordering collapsed** — fixed to IDF's
+   separate-writes order; no change.
+8. **Reference clock is the cause** — NO. **RC_FAST experiment**
+   (swap PHY ref to the always-on ~17.5 MHz RC oscillator): PLL still
+   did **not** lock (`002`/`040`). With *two* independent references
+   (one provably oscillating) both failing, the reference is exonerated.
+
+### Conclusion / remaining hypothesis space
+
+Everything reachable by matching the IDF HAL/driver is matched and
+verified on-chip; the PLL still won't lock. Remaining candidates:
+
+1. **A step IDF's *application* startup performs that our raw-PAC +
+   IDF-bootloader path skips** (clock/power-domain/analog bias set before
+   `app_main`, not in the DSI driver). **Most likely.**
+2. **ESP32-P4 v1.3 silicon quirk** not in the public TRM (the I2C0 FSM in
+   ERRATA-008 is a precedent on this same chip revision).
+3. **An undocumented DPHY analog config register** beyond the 5 PLL pokes.
+
+### Next-session plan
+
+**Register-diff against a known-working IDF binary.** Flash an IDF
+`esp_lcd` MIPI-DSI example (or re-obtain the 2026-04-29 first-light
+project) that locks on this exact board, then dump
+`MIPI_DSI_HOST` (esp. `phy_status`, `phy_rstz`, `phy_if_cfg`,
+`phy_tst_ctrl*`), `HP_SYS_CLKRST` (peri_clk_ctrl02/03, ref_clk_ctrl1/2,
+soc_clk_ctrl1), and `PMU.ext_ldo[1]` register state, and diff against
+our values. Because everything we *configure* is already correct, the
+delta must be a register/state we have not thought to read — that diff
+will surface it. Secondary: trace the IDF app-startup (`esp_system`
+clock/power init) for any DPHY-relevant bring-up the bootloader doesn't do.
+
+### Tracking
+
+- 2026-06-13: ~7 DSI flash rounds. Root-caused and fixed the LDO
+  eFuse-voltage-calibration bug (9/6 → 12/4) and added the upstream
+  20 MHz ref-clock gate (`ref_clk_ctrl2.ref_20m_clk_en`) + divider
+  enforcement — both correct fixes, neither resolved the lock. Added
+  on-chip read-back diagnostics for phy_status, ref-clock divider, LDO
+  config, calibrated dref/mul, PHY test-register read-back, and DPHY
+  clock gates (Morse numbers 8–13). RC_FAST reference experiment ruled
+  out the reference clock. Defect remains 🔴 open; reclassified from
+  "config" to "silicon / app-startup" class. ERRATA-005's diagnostic
+  technique and active-low-LED caveats apply.
