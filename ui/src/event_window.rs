@@ -10,6 +10,7 @@ use core::cell::Cell;
 
 use rlvgl_core::bitmap_font::BitmapFont;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontMetrics, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -230,8 +231,9 @@ impl Widget for EventWindow {
                 break;
             }
             let y = inner_y + i as i32 * line_h;
-            self.font
-                .draw_str(renderer, inner_x, y, &entry.text, self.text_color);
+            let baseline = y + self.font.line_metrics().ascent as i32;
+            let shaped = shape_text_ltr(self.font, &entry.text, (inner_x, baseline), 0);
+            renderer.draw_text_shaped(&shaped, (0, 0), self.text_color);
         }
     }
 

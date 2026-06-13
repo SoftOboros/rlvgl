@@ -8,6 +8,7 @@
 //! (see [`rlvgl_platform::screen::Screen`] and the display driver's
 //! `flush` implementation). This module is rotation-agnostic.
 
+use rlvgl_core::font::{FontMetrics, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
 
@@ -64,19 +65,18 @@ pub fn draw_panel_header(
 
     // Title
     let title_y = bounds.y + PANEL_PADDING + 20;
-    font.draw_str(
-        renderer,
-        bounds.x + PANEL_PADDING,
-        title_y,
-        title,
-        title_color,
-    );
+    let metrics = font.line_metrics();
+    let baseline = title_y + metrics.ascent as i32;
+    let shaped = shape_text_ltr(font, title, (bounds.x + PANEL_PADDING, baseline), 0);
+    renderer.draw_text_shaped(&shaped, (0, 0), title_color);
 
     // Close button "X" — text at right edge, hit area is CLOSE_SIZE square
     // BitmapFont chars are 6px wide at scale 1; approximate position.
     let close_text_x = bounds.x + bounds.width - PANEL_PADDING - 12;
     let close_text_y = bounds.y + PANEL_PADDING;
-    font.draw_str(renderer, close_text_x, close_text_y, "X", close_color);
+    let close_baseline = close_text_y + metrics.ascent as i32;
+    let shaped = shape_text_ltr(font, "X", (close_text_x, close_baseline), 0);
+    renderer.draw_text_shaped(&shaped, (0, 0), close_color);
 
     // Divider line
     let div_y = title_y + font.scaled_height() + 12;
