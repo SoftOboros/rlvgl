@@ -123,6 +123,40 @@ impl FontMetrics for BitmapFont {
             descent: 0,
         }
     }
+
+    fn glyph_coverage_row(&self, ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        if !(0x20..=0x7e).contains(&(ch as u32)) {
+            return false;
+        }
+
+        let scale = self.scale.max(1) as usize;
+        let source_row = row as usize / scale;
+        if source_row >= self.glyph_height as usize {
+            coverage.fill(0);
+            return true;
+        }
+
+        let glyph_idx = (ch as u32 - 0x20) as usize;
+        let bits_per_glyph = self.glyph_width as usize * self.glyph_height as usize;
+        let bit_offset = glyph_idx * bits_per_glyph;
+
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let source_col = (x_offset as usize + offset) / scale;
+            if source_col >= self.glyph_width as usize {
+                *alpha = 0;
+                continue;
+            }
+            let bit = bit_offset + source_row * self.glyph_width as usize + source_col;
+            let byte_idx = bit / 8;
+            let bit_idx = 7 - (bit % 8);
+            *alpha = if byte_idx < self.data.len() && (self.data[byte_idx] >> bit_idx) & 1 != 0 {
+                255
+            } else {
+                0
+            };
+        }
+        true
+    }
 }
 
 // ── Built-in 6×10 stub font ────────────────────────────────────────────────

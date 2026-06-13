@@ -26,16 +26,23 @@ static GLYPHS: [GlyphMetric; 3] = [
         width: 6,
         height: 7,
         advance_fp16: 96,
-        offset: 0,
+        offset: 35,
         ymin: 0,
     },
+];
+
+static PACKED_DATA: [u8; 77] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
+    113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
+    132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142,
 ];
 
 static PACKED: PackedFont = PackedFont {
     height: 10,
     ascent: 8,
     glyphs: &GLYPHS,
-    data: &[],
+    data: &PACKED_DATA,
 };
 
 #[test]
@@ -72,6 +79,7 @@ fn ltr_shape_tracks_advances_and_bounds() {
     assert_eq!(shaped.bounds.width, 11);
     assert_eq!(shaped.bounds.height, 7);
     assert_eq!(shaped.bidi_level, 0);
+    assert!(shaped.font.is_some());
 }
 
 #[test]
@@ -81,6 +89,31 @@ fn shape_and_measure_apply_letter_spacing_between_glyphs() {
     assert_eq!(measured, 176 + 32);
     assert_eq!(shaped.total_advance_fp16, measured);
     assert_eq!(shaped.glyphs[1].x, 7);
+}
+
+#[test]
+fn packed_font_exposes_glyph_coverage_rows() {
+    let mut coverage = [0u8; 3];
+
+    assert!(PACKED.glyph_coverage_row('A', 1, 2, &mut coverage));
+    assert_eq!(coverage, [8, 9, 10]);
+
+    assert!(PACKED.glyph_coverage_row('B', 0, 1, &mut coverage));
+    assert_eq!(coverage, [102, 103, 104]);
+}
+
+#[test]
+fn bitmap_font_exposes_scaled_glyph_coverage_rows() {
+    let info = FONT_6X10.glyph_metrics('A').expect("ASCII glyph");
+    let mut coverage = vec![0u8; info.width as usize];
+
+    let mut saw_covered_pixel = false;
+    for row in 0..info.height {
+        assert!(FONT_6X10.glyph_coverage_row('A', row, 0, &mut coverage));
+        assert!(coverage.iter().all(|&alpha| alpha == 0 || alpha == 255));
+        saw_covered_pixel |= coverage.iter().any(|&alpha| alpha == 255);
+    }
+    assert!(saw_covered_pixel);
 }
 
 #[test]

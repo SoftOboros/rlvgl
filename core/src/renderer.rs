@@ -25,19 +25,26 @@ pub trait Renderer {
     ///
     /// `origin` is an additional translation applied to every glyph placement
     /// in `shaped`. Pass `(0, 0)` when the shaped glyph positions are already
-    /// in target coordinates. The default implementation is a deterministic
-    /// extent visualizer: each glyph extent is blended as a solid rectangle.
-    /// Backends or future font draw adapters can override this to render real
-    /// glyph coverage while preserving the same placement and clipping
-    /// contract.
-    fn draw_text_shaped(&mut self, shaped: &ShapedText, origin: (i32, i32), color: Color) {
+    /// in target coordinates. The default implementation renders glyph
+    /// coverage when the shaped run carries a font reference; manually built
+    /// shaped runs without font coverage fall back to a deterministic extent
+    /// visualizer where each glyph extent is blended as a solid rectangle.
+    /// Backends can override this for hardware text acceleration while
+    /// preserving the same placement and clipping contract.
+    fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, origin: (i32, i32), color: Color) {
         for glyph in &shaped.glyphs {
             let mut extent = glyph.extent();
             extent.x += origin.0;
             extent.y += origin.1;
-            if extent.width > 0 && extent.height > 0 {
-                self.blend_rect(extent, color);
+            if extent.width <= 0 || extent.height <= 0 {
+                continue;
             }
+            if let Some(font) = shaped.font
+                && draw_glyph_coverage(self, font, glyph.ch, extent, color)
+            {
+                continue;
+            }
+            self.blend_rect(extent, color);
         }
     }
 
@@ -324,6 +331,36 @@ impl<R: Renderer + ?Sized> CoverageSink for RowBlendSink<'_, R> {
     }
 }
 
+fn draw_glyph_coverage<R: Renderer + ?Sized>(
+    renderer: &mut R,
+    font: &dyn crate::font::FontMetrics,
+    ch: char,
+    extent: Rect,
+    color: Color,
+) -> bool {
+    let mut coverage = [0u8; 64];
+    let height = extent.height.min(u16::MAX as i32) as u16;
+    let width = extent.width.min(u16::MAX as i32) as u16;
+    for row in 0..height {
+        let mut x_offset = 0u16;
+        while x_offset < width {
+            let run = (width - x_offset).min(coverage.len() as u16) as usize;
+            let row_coverage = &mut coverage[..run];
+            if !font.glyph_coverage_row(ch, row, x_offset, row_coverage) {
+                return false;
+            }
+            renderer.blend_row(
+                extent.x + i32::from(x_offset),
+                extent.y + i32::from(row),
+                color,
+                row_coverage,
+            );
+            x_offset += run as u16;
+        }
+    }
+    true
+}
+
 struct ShadowMask {
     base: Rect,
     blur: i32,
@@ -449,10 +486,12 @@ pub const TEXT_NOMINAL_LINE_PX: i32 = 16;
 ///   Per-pixel text (`bitmap_font` / `packed_font`) renders through
 ///   `fill_rect` and clips exactly on both axes — prefer it for content
 ///   that can straddle a viewport edge.
-/// - [`draw_text_shaped`](Renderer::draw_text_shaped): translates each glyph
-///   extent and forwards only its visible intersection with the clip. The
-///   wrapped renderer's own shaped-text fast path is deliberately not
-///   forwarded, so clipping cannot be bypassed by an accelerated backend.
+/// - [`draw_text_shaped`](Renderer::draw_text_shaped): routes through the
+///   default shaped-text renderer, so glyph coverage is clipped by
+///   [`blend_row`](Renderer::blend_row) and extent fallbacks are clipped by
+///   [`blend_rect`](Renderer::blend_rect). The wrapped renderer's own
+///   shaped-text fast path is deliberately not forwarded, so clipping cannot
+///   be bypassed by an accelerated backend.
 ///
 /// Nesting two `ClipRenderer`s composes by intersection with summed
 /// offsets (REND-00 §5.5).
@@ -529,18 +568,6 @@ impl Renderer for ClipRenderer<'_> {
         let inside_h = x >= clip.x && x < clip.x + clip.width;
         if inside_v && inside_h {
             self.inner.draw_text((x, y), text, color);
-        }
-    }
-
-    fn draw_text_shaped(&mut self, shaped: &ShapedText, origin: (i32, i32), color: Color) {
-        let Some(clip) = self.clip else { return };
-        for glyph in &shaped.glyphs {
-            let mut extent = glyph.extent();
-            extent.x += origin.0 + self.dx;
-            extent.y += origin.1 + self.dy;
-            if let Some(visible) = extent.intersect(clip) {
-                self.inner.blend_rect(visible, color);
-            }
         }
     }
 

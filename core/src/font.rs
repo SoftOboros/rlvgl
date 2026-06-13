@@ -5,6 +5,7 @@
 //! and shaping without tying widgets to a concrete font renderer.
 
 use alloc::vec::Vec;
+use core::fmt;
 
 use crate::widget::Rect;
 
@@ -70,8 +71,8 @@ impl GlyphPlacement {
 }
 
 /// Shaped text ready for measurement, wrapping, clipping, or drawing.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ShapedText {
+#[derive(Clone)]
+pub struct ShapedText<'a> {
     /// Glyph placements in visual draw order.
     pub glyphs: Vec<GlyphPlacement>,
     /// Total horizontal advance in 1/16 pixel units.
@@ -80,9 +81,39 @@ pub struct ShapedText {
     pub bounds: Rect,
     /// Paragraph bidi level. V1 shaping is LTR-only and sets this to `0`.
     pub bidi_level: u8,
+    /// Font that produced this shaped run, when available.
+    ///
+    /// [`Renderer::draw_text_shaped`](crate::renderer::Renderer::draw_text_shaped)
+    /// uses this reference to render glyph coverage. Manually constructed
+    /// shaped runs may leave this as `None`; renderers then fall back to the
+    /// deterministic glyph-extent visualizer.
+    pub font: Option<&'a dyn FontMetrics>,
 }
 
-impl ShapedText {
+impl fmt::Debug for ShapedText<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ShapedText")
+            .field("glyphs", &self.glyphs)
+            .field("total_advance_fp16", &self.total_advance_fp16)
+            .field("bounds", &self.bounds)
+            .field("bidi_level", &self.bidi_level)
+            .field("has_font", &self.font.is_some())
+            .finish()
+    }
+}
+
+impl PartialEq for ShapedText<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.glyphs == other.glyphs
+            && self.total_advance_fp16 == other.total_advance_fp16
+            && self.bounds == other.bounds
+            && self.bidi_level == other.bidi_level
+    }
+}
+
+impl Eq for ShapedText<'_> {}
+
+impl<'a> ShapedText<'a> {
     /// Return an empty shaped run anchored at `origin`.
     pub fn empty(origin: (i32, i32)) -> Self {
         Self {
@@ -95,6 +126,7 @@ impl ShapedText {
                 height: 0,
             },
             bidi_level: 0,
+            font: None,
         }
     }
 }
@@ -109,6 +141,23 @@ pub trait FontMetrics {
     /// Return font-level vertical metrics.
     fn line_metrics(&self) -> FontLineMetrics;
 
+    /// Fill one row of glyph coverage for `ch`.
+    ///
+    /// `row` and `x_offset` are in glyph bitmap coordinates, where row `0`
+    /// is the top row of [`GlyphPlacement::extent`]. Implementations must
+    /// overwrite every byte in `coverage` with `0..=255` alpha values.
+    /// Returning `false` means this backend has no coverage data for `ch`;
+    /// renderers then use their deterministic extent fallback.
+    fn glyph_coverage_row(
+        &self,
+        _ch: char,
+        _row: u16,
+        _x_offset: u16,
+        _coverage: &mut [u8],
+    ) -> bool {
+        false
+    }
+
     /// Measure the advance width of `text` in 1/16 pixel units.
     fn measure_fp16(&self, text: &str) -> i32 {
         measure_text_fp16(self, text, 0)
@@ -119,7 +168,10 @@ pub trait FontMetrics {
     /// `origin.1` is the baseline. The v1 shaper performs no bidi reordering;
     /// future RTL support is expected to reorder the returned glyph sequence
     /// and set [`ShapedText::bidi_level`].
-    fn shape(&self, text: &str, origin: (i32, i32)) -> ShapedText {
+    fn shape(&self, text: &str, origin: (i32, i32)) -> ShapedText<'_>
+    where
+        Self: Sized,
+    {
         shape_text_ltr(self, text, origin, 0)
     }
 }
@@ -170,13 +222,14 @@ pub fn measure_text_fp16<F: FontMetrics + ?Sized>(
 }
 
 /// Shape `text` in logical LTR order with optional letter spacing.
-pub fn shape_text_ltr<F: FontMetrics + ?Sized>(
-    font: &F,
+pub fn shape_text_ltr<'a>(
+    font: &'a dyn FontMetrics,
     text: &str,
     origin: (i32, i32),
     letter_spacing_px: i8,
-) -> ShapedText {
+) -> ShapedText<'a> {
     let mut shaped = ShapedText::empty(origin);
+    shaped.font = Some(font);
     let mut cursor_fp16 = 0i32;
     let mut has_bounds = false;
     let mut glyph_count = 0u32;

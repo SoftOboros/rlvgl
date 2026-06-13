@@ -171,6 +171,27 @@ impl FontMetrics for FontdueFont<'_> {
             descent,
         }
     }
+
+    fn glyph_coverage_row(&self, ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        let Ok((metrics, bitmap)) = rasterize_glyph(self.font_data, ch, self.px) else {
+            return false;
+        };
+        if row as usize >= metrics.height {
+            coverage.fill(0);
+            return true;
+        }
+
+        let row_start = row as usize * metrics.width;
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let col = x_offset as usize + offset;
+            *alpha = if col < metrics.width {
+                bitmap.get(row_start + col).copied().unwrap_or(0)
+            } else {
+                0
+            };
+        }
+        true
+    }
 }
 
 #[cfg(test)]

@@ -155,4 +155,26 @@ impl FontMetrics for PackedFont {
         }
         width
     }
+
+    fn glyph_coverage_row(&self, ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        let Some(glyph) = self.glyph(ch) else {
+            return false;
+        };
+        if row >= glyph.height {
+            coverage.fill(0);
+            return true;
+        }
+
+        let width = glyph.width as usize;
+        let row_start = glyph.offset as usize + row as usize * width;
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let col = x_offset as usize + offset;
+            *alpha = if col < width {
+                self.data.get(row_start + col).copied().unwrap_or(0)
+            } else {
+                0
+            };
+        }
+        true
+    }
 }

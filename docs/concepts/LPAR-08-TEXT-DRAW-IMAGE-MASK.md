@@ -737,11 +737,11 @@ with the text properties. Text-draw helpers receive the resolved `TextStyle`;
 
 LPAR-08 implementation is complete only when:
 
-Status note (2026-06-12): checked items below have landed as substrate.
-Unchecked items remain LPAR-08 blockers or explicit deferrals. In particular,
-`draw_text_shaped` is currently an extent-based software fallback, not a real
-glyph-coverage renderer; the glyph adapter and `Label` migration are still
-open.
+Status note (2026-06-12): checked items below have landed as substrate or
+implemented follow-on slices. Unchecked items remain LPAR-08 blockers or
+explicit deferrals. `draw_text_shaped` now renders glyph coverage when a shaped
+run carries a font reference, while manually constructed runs still use the
+deterministic extent fallback.
 
 - [x] REND-00 §15 amendment filed, accepted, and merged before
       `ClipRenderer::draw_text_shaped` implementation lands.
@@ -756,7 +756,8 @@ open.
 - [x] `ShapedText::bidi_level` field present, initialized to `0` (LTR),
       with doc comment naming the RTL insertion boundary.
 - [x] `Renderer::draw_text_shaped` method exists with a default body that
-      renders shaped glyphs through `fill_rect`/`blend_rect`.
+      renders font-backed glyph coverage through `blend_row`, with an extent
+      fallback through `blend_rect` for manually constructed shaped runs.
 - [x] `ClipRenderer::draw_text_shaped` clips per-glyph to the clip rect;
       glyphs straddling a boundary are rendered only within the visible rect.
 - [x] `ClipRenderer::draw_text` (legacy backend) retains REND-00 §5.4
@@ -785,7 +786,7 @@ open.
       unmodified.
 - [x] `FontId`, `TextAlign` defined; `FontId::DEFAULT = FontId(0)`;
       `TextAlign::Auto` present for RTL future-compatibility.
-- [ ] `widgets/src/label.rs` migrated to call `draw_text_shaped` through
+- [x] `widgets/src/label.rs` migrated to call `draw_text_shaped` through
       `&dyn FontMetrics`; `text_color` field deprecated-in-place.
 - [x] Text wrapping algorithm exists: greedy line-break using
       `FontMetrics::measure_fp16`; break opportunities at SPACE, HYPHEN,
@@ -965,3 +966,16 @@ open.
   nearest-neighbor scale/rotate, and widget migration are not yet implemented.
   `RoundedRectMask` and `ArcMask` also remain open. §12 now distinguishes
   landed substrate from remaining acceptance blockers.
+- **2026-06-12** — Glyph coverage and label migration slice landed.
+  `FontMetrics` now exposes an object-safe `glyph_coverage_row` hook for
+  bitmap, packed, and `fontdue` backends; `ShapedText` retains the font
+  reference that produced a run; and `Renderer::draw_text_shaped` renders
+  font-backed coverage through `blend_row`, preserving the extent visualizer
+  fallback for manually constructed shaped runs. `ClipRenderer` inherits the
+  default shaped-text path so real glyph coverage clips through
+  `blend_row`, while fallback extents clip through `blend_rect`, and it still
+  does not forward shaped text to the wrapped backend. `widgets/src/label.rs`
+  now draws via `draw_text_shaped` using `&dyn FontMetrics` and deprecates the
+  standalone `text_color` field in place. Remaining text-side boundary:
+  resolved `TextStyle::font_id` still needs a registry lookup outside the
+  default built-in font path.

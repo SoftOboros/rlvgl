@@ -4,7 +4,9 @@
 //! invariant.
 
 use rlvgl_core::draw::{GradientDesc, GradientKind, ShadowDesc};
-use rlvgl_core::font::{GlyphInfo, GlyphPlacement, ShapedText};
+use rlvgl_core::font::{
+    FontLineMetrics, FontMetrics, GlyphInfo, GlyphPlacement, ShapedText, shape_text_ltr,
+};
 use rlvgl_core::mask::RectMask;
 use rlvgl_core::raster::PointF;
 use rlvgl_core::renderer::{ClipRenderer, Renderer, TEXT_NOMINAL_LINE_PX};
@@ -33,7 +35,7 @@ impl Renderer for Capture {
     fn draw_text(&mut self, position: (i32, i32), _text: &str, _color: Color) {
         self.texts.push(position);
     }
-    fn draw_text_shaped(&mut self, _shaped: &ShapedText, _origin: (i32, i32), _color: Color) {
+    fn draw_text_shaped(&mut self, _shaped: &ShapedText<'_>, _origin: (i32, i32), _color: Color) {
         self.shaped_calls += 1;
     }
     fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
@@ -67,7 +69,7 @@ fn glyph(ch: char, x: i32, baseline: i32, width: u16, height: u16) -> GlyphPlace
     }
 }
 
-fn shaped(glyphs: Vec<GlyphPlacement>) -> ShapedText {
+fn shaped(glyphs: Vec<GlyphPlacement>) -> ShapedText<'static> {
     let bounds = glyphs
         .iter()
         .map(GlyphPlacement::extent)
@@ -84,6 +86,7 @@ fn shaped(glyphs: Vec<GlyphPlacement>) -> ShapedText {
         total_advance_fp16,
         bounds,
         bidi_level: 0,
+        font: None,
     }
 }
 
@@ -97,6 +100,56 @@ impl Renderer for DefaultShapeCapture {
     fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
     fn blend_rect(&mut self, rect: Rect, _color: Color) {
         self.blends.push(rect);
+    }
+}
+
+#[derive(Default)]
+struct RowShapeCapture {
+    blends: Vec<Rect>,
+    rows: Vec<(i32, i32, Vec<u8>)>,
+}
+
+impl Renderer for RowShapeCapture {
+    fn fill_rect(&mut self, _rect: Rect, _color: Color) {}
+    fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
+    fn blend_rect(&mut self, rect: Rect, _color: Color) {
+        self.blends.push(rect);
+    }
+    fn blend_row(&mut self, x: i32, y: i32, _color: Color, coverage: &[u8]) {
+        self.rows.push((x, y, coverage.to_vec()));
+    }
+}
+
+struct RowFont;
+
+impl FontMetrics for RowFont {
+    fn glyph_metrics(&self, ch: char) -> Option<GlyphInfo> {
+        (ch == 'A').then_some(GlyphInfo {
+            advance_fp16: 3 * 16,
+            bearing_x: 0,
+            bearing_y: 2,
+            width: 3,
+            height: 2,
+        })
+    }
+
+    fn line_metrics(&self) -> FontLineMetrics {
+        FontLineMetrics {
+            line_height: 2,
+            ascent: 2,
+            descent: 0,
+        }
+    }
+
+    fn glyph_coverage_row(&self, ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        if ch != 'A' {
+            return false;
+        }
+        let rows = [[0, 64, 255], [255, 128, 0]];
+        for (idx, alpha) in coverage.iter_mut().enumerate() {
+            *alpha = rows[row as usize][x_offset as usize + idx];
+        }
+        true
     }
 }
 
@@ -489,6 +542,21 @@ fn draw_text_shaped_default_blends_glyph_extents() {
 }
 
 #[test]
+fn draw_text_shaped_with_font_blends_glyph_coverage_rows() {
+    let font = RowFont;
+    let run = shape_text_ltr(&font, "A", (5, 20), 0);
+    let mut capture = RowShapeCapture::default();
+
+    capture.draw_text_shaped(&run, (3, 4), WHITE);
+
+    assert!(capture.blends.is_empty());
+    assert_eq!(
+        capture.rows,
+        vec![(8, 22, vec![0, 64, 255]), (8, 23, vec![255, 128, 0]),]
+    );
+}
+
+#[test]
 fn draw_text_shaped_crops_each_glyph_extent_and_does_not_forward_fast_path() {
     let run = shaped(vec![
         glyph('L', 5, 18, 10, 8),    // left edge
@@ -536,6 +604,24 @@ fn draw_text_shaped_crops_each_glyph_extent_and_does_not_forward_fast_path() {
             },
         ]
     );
+}
+
+#[test]
+fn draw_text_shaped_coverage_rows_clip_per_pixel_span() {
+    let font = RowFont;
+    let run = shape_text_ltr(&font, "A", (9, 12), 0);
+    let mut inner = Capture::default();
+    {
+        let mut clipped = ClipRenderer::new(&mut inner, CLIP);
+        clipped.draw_text_shaped(&run, (0, 0), WHITE);
+    }
+
+    assert_eq!(inner.shaped_calls, 0);
+    assert_eq!(
+        inner.rows,
+        vec![(10, 10, vec![64, 255]), (10, 11, vec![128, 0]),]
+    );
+    assert!(inner.blends.is_empty());
 }
 
 #[test]
