@@ -278,7 +278,7 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
 
 - **LPAR** (continued — Wave 3)
   - [LPAR-11-PRIMITIVE-WIDGETS.md](LPAR-11-PRIMITIVE-WIDGETS.md) —
-    **Drafted 2026-06-13; not ratified.** Primitive widget wave:
+    **Ratified 2026-06-13.** Primitive widget wave:
     additive `Arc`, `Bar`, `Led`, `Line`, `Spinner`, and `Scale` modules
     in `rlvgl-widgets`, preserving `ProgressBar` and audio-meter
     `Scale`/`LedBargraph` surfaces while consuming the settled style,

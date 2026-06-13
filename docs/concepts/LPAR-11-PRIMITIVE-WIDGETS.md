@@ -4,7 +4,8 @@ LPAR-11-PRIMITIVE-WIDGETS.md — LVGL parity primitive widget concepts.
 
 # LPAR-11 — Primitive Widget Wave
 
-**Status:** Drafted 2026-06-13. Not ratified.
+**Status:** Ratified 2026-06-13. Normative for LPAR-11 primitive widget
+implementation.
 
 Parent initiative: [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md). Baseline:
 [LPAR-01-BASELINE.md](LPAR-01-BASELINE.md). Event/focus:
@@ -485,3 +486,9 @@ LPAR-11 is complete only when:
   widget contract (§5.B), integer range mapping (§5.C), per-widget API/draw
   contracts (§5.D-§5.I), style integration boundary (§5.J), and reviewable
   implementation order (§5.K). Not ratified.
+- **2026-06-13** — Ratified by owner instruction ("proceed to next items").
+  The proposed freezes in §5 are accepted as normative for implementation.
+  LPAR-11b (`Bar` + `Led`) is unblocked first; `Line` and `Arc` may proceed in
+  parallel workers because their write sets are disjoint. `Spinner` remains
+  gated on `Arc`, and `Scale` remains last because it consumes line/arc geometry
+  plus shaped labels.
