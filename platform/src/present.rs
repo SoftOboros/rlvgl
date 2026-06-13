@@ -316,10 +316,10 @@ mod tests {
         assert_eq!(count, 2);
 
         // Flushed corners should have the right colours.
-        assert_eq!(disp.buffer[0 * w + 0], red());
-        assert_eq!(disp.buffer[0 * w + 1], red());
-        assert_eq!(disp.buffer[1 * w + 0], red());
-        assert_eq!(disp.buffer[1 * w + 1], red());
+        assert_eq!(disp.buffer[0], red());
+        assert_eq!(disp.buffer[1], red());
+        assert_eq!(disp.buffer[w], red());
+        assert_eq!(disp.buffer[w + 1], red());
 
         assert_eq!(disp.buffer[6 * w + 6], blue());
         assert_eq!(disp.buffer[6 * w + 7], blue());

@@ -715,7 +715,7 @@ mod tests {
     use rlvgl_core::focus::FocusGroup;
     use rlvgl_core::object::{Disposition, ObjectEvent, ObjectFlags, ObjectNode, ObjectStates};
     use rlvgl_core::renderer::Renderer;
-    use rlvgl_core::widget::{Color, Rect, Widget};
+    use rlvgl_core::widget::{Rect, Widget};
 
     // Renderer is used by the Widget impl, Color by draw_text signature.
     // They must remain in scope even though they appear "unused" in test bodies.

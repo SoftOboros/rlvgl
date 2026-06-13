@@ -15,6 +15,7 @@
 //! covered in `docs/audio-meters/10-integration.md`.
 
 use rlvgl_audio_meters_core::Ballistic;
+use rlvgl_core::font::ShapedText;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_widgets::meters::{
@@ -38,6 +39,11 @@ impl Renderer for Counter {
         self.rects += 1;
     }
     fn draw_text(&mut self, _p: (i32, i32), _t: &str, _c: Color) {
+        self.texts += 1;
+    }
+    // Meters migrated to the LPAR-08 shaped-text path; count those draws too
+    // so "did the widget draw text" stays accurate regardless of the path.
+    fn draw_text_shaped(&mut self, _shaped: &ShapedText<'_>, _o: (i32, i32), _c: Color) {
         self.texts += 1;
     }
 }

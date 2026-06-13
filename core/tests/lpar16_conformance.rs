@@ -117,7 +117,7 @@ impl Renderer for FrameBuffer {
             if cov == 0 {
                 continue;
             }
-            let alpha = ((src_alpha * u16::from(cov)) / 255) as u16;
+            let alpha = (src_alpha * u16::from(cov)) / 255;
             if alpha == 0 {
                 continue;
             }

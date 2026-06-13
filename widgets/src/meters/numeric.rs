@@ -205,7 +205,7 @@ mod tests {
         }
         fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, _origin: (i32, i32), color: Color) {
             let text: String = shaped.glyphs.iter().map(|glyph| glyph.ch).collect();
-            self.texts.push(((0, 0), text.into(), color));
+            self.texts.push(((0, 0), text, color));
         }
         fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
     }

@@ -111,7 +111,7 @@ fn bitmap_font_exposes_scaled_glyph_coverage_rows() {
     for row in 0..info.height {
         assert!(FONT_6X10.glyph_coverage_row('A', row, 0, &mut coverage));
         assert!(coverage.iter().all(|&alpha| alpha == 0 || alpha == 255));
-        saw_covered_pixel |= coverage.iter().any(|&alpha| alpha == 255);
+        saw_covered_pixel |= coverage.contains(&255);
     }
     assert!(saw_covered_pixel);
 }

@@ -98,8 +98,8 @@ fn rotation_is_symmetric_about_center() {
     let (buf, aabb) = capture(&obb);
     let stride = aabb.width as usize;
 
-    let cx = (60 - aabb.x) as i32;
-    let cy = (60 - aabb.y) as i32;
+    let cx = 60 - aabb.x;
+    let cy = 60 - aabb.y;
 
     let mut max_diff = 0i32;
     let mut samples = 0u32;

@@ -251,8 +251,8 @@ fn cmd_aabb_returns_drawn_pixels_envelope() {
     let direct_bb = Obb::axis_aligned(PointF::new(50.0, 50.0), 30.0, 4.0).aabb();
     assert_eq!(cmd_bb, direct_bb, "FillObb aabb must match Obb::aabb");
 
-    assert!(matches!(Cmd::Barrier.aabb(), None));
-    assert!(matches!(Cmd::SetClip { rect: None }.aabb(), None));
+    assert!(Cmd::Barrier.aabb().is_none());
+    assert!(Cmd::SetClip { rect: None }.aabb().is_none());
 }
 
 #[test]

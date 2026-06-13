@@ -994,10 +994,10 @@ mod tests {
         let mut tap = TapRecognizer::new(30);
         let mut dtap = DoubleTapRecognizer::new(30);
 
-        let mut feed = |drag: &mut DragRecognizer,
-                        tap: &mut TapRecognizer,
-                        dtap: &mut DoubleTapRecognizer,
-                        event: &Event|
+        let feed = |drag: &mut DragRecognizer,
+                    tap: &mut TapRecognizer,
+                    dtap: &mut DoubleTapRecognizer,
+                    event: &Event|
          -> Vec<Event> {
             let mut out = Vec::new();
             if let Some(stage) = drag.process(event) {

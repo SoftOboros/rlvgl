@@ -384,7 +384,7 @@ mod tests {
             "apply called with tween values"
         );
         assert!(
-            root.anims.as_ref().map_or(true, |s| s.entries.is_empty()),
+            root.anims.as_ref().is_none_or(|s| s.entries.is_empty()),
             "entry removed after completion"
         );
     }

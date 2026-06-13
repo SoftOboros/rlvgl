@@ -2,6 +2,11 @@
 //! Minimal rlvgl-ui style demo.
 //!
 //! Builds a style using tokens from a Material-like theme.
+//!
+//! This demo intentionally exercises the legacy `rlvgl_ui` style surface
+//! (`StyleBuilder`/`Style`), deprecated in LPAR-07 in favour of the
+//! `core::style_cascade` cascade but kept compiling for compatibility.
+#![allow(deprecated)]
 
 #[cfg(feature = "view")]
 use rlvgl_ui::view;

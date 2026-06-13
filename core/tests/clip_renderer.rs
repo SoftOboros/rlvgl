@@ -410,7 +410,7 @@ fn fill_masked_routes_through_clipped_blend_row() {
 
     assert!(!inner.rows.is_empty());
     for &(x, y, ref cov) in &inner.rows {
-        assert!(y >= CLIP.y && y < CLIP.y + CLIP.height);
+        assert!((CLIP.y..CLIP.y + CLIP.height).contains(&y));
         assert!(x >= CLIP.x);
         assert!(x + cov.len() as i32 <= CLIP.x + CLIP.width);
     }
@@ -467,7 +467,7 @@ fn draw_shadow_routes_through_clipped_mask_rows() {
 
     assert!(!inner.rows.is_empty());
     for &(x, y, ref cov) in &inner.rows {
-        assert!(y >= CLIP.y && y < CLIP.y + CLIP.height);
+        assert!((CLIP.y..CLIP.y + CLIP.height).contains(&y));
         assert!(x >= CLIP.x);
         assert!(x + cov.len() as i32 <= CLIP.x + CLIP.width);
     }
@@ -487,7 +487,7 @@ fn aa_primitives_route_through_the_adapters_clipped_blend_row() {
     assert!(!inner.rows.is_empty(), "part of the disc is visible");
     for &(x, y, ref cov) in &inner.rows {
         assert!(
-            y >= CLIP.y && y < CLIP.y + CLIP.height,
+            (CLIP.y..CLIP.y + CLIP.height).contains(&y),
             "row y={y} outside clip"
         );
         assert!(x >= CLIP.x, "row start x={x} outside clip");

@@ -2143,7 +2143,7 @@ mod tests {
         // x must be at right edge: vp.x + vp.width - SCROLLBAR_WIDTH - SCROLLBAR_MARGIN
         assert_eq!(
             thumb.x,
-            0 + 200 - SCROLLBAR_WIDTH - SCROLLBAR_MARGIN,
+            200 - SCROLLBAR_WIDTH - SCROLLBAR_MARGIN,
             "thumb must be on the right edge"
         );
         // thumb_h = (600² / 1200).clamp(8, 600) = 300
