@@ -304,14 +304,14 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     public `core::scroll::snap_offset_to_points` helper (one snap
     mechanism); overlay/text-binding/`ValueChanged` deferred.
   - [LPAR-14-DATA-RICH-WIDGETS.md](LPAR-14-DATA-RICH-WIDGETS.md) —
-    **Ratified 2026-06-13.** Data/rich-content wave: additive
+    **Ratified 2026-06-13; implementation landed same day.**
+    Data/rich-content wave: additive
     `widgets::textarea::Textarea` (reusing the WID-01 `EditCore`, promoted
     to `core` and re-exported from `ui` to avoid a crate cycle), `Chart`,
     `Table`, `Span`, `Calendar`, and `MessageBox` (reusing `ButtonMatrix`),
     coexisting with `ui::Input`/`Textarea`/`Modal`/`Alert`. Span/Table/
     Textarea wrapping reuses LPAR-08 `core::font` measurement (no fork); the
     LPAR-13 Keyboard→text binding is resolved via `apply_key_output`.
-    Implementation pending.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
