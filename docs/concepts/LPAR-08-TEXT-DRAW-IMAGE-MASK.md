@@ -764,9 +764,8 @@ deterministic extent fallback.
       nominal-box-drop behavior; `TEXT_NOMINAL_LINE_PX` unchanged.
 - [x] `Renderer::fill_masked` exists with default body iterating `AlphaMask`
       rows through `blend_row`.
-- [ ] `AlphaMask` trait + `RectMask`, `RoundedRectMask`, `ArcMask`, `FadeMask`
-      implementations exist in `core/src/mask.rs`. `AlphaMask`, `RectMask`,
-      and `FadeMask` have landed; `RoundedRectMask` and `ArcMask` remain open.
+- [x] `AlphaMask` trait + `RectMask`, `RoundedRectMask`, `ArcMask`, `FadeMask`
+      implementations exist in `core/src/mask.rs`.
 - [x] `IntersectMask` and `UnionMask` combinators exist.
 - [x] `Renderer::fill_gradient` exists with default body; `GradientDesc` and
       `GradientKind` defined; software reference is deterministic (no RNG).
@@ -979,3 +978,12 @@ deterministic extent fallback.
   standalone `text_color` field in place. Remaining text-side boundary:
   resolved `TextStyle::font_id` still needs a registry lookup outside the
   default built-in font path.
+- **2026-06-12** — Rounded and arc mask slice landed. `core/src/mask.rs` now
+  includes documented `RoundedRectMask` and `ArcMask` implementations using
+  deterministic integer subpixel coverage with no allocation or floating
+  point. Mask tests cover radius-zero parity with `RectMask`, rounded
+  rectangle interior/exterior/boundary coverage, arc annulus/pie-slice
+  inside/outside/boundary behavior, wrapped/full/empty sweep handling, and
+  compatibility with `IntersectMask`/`UnionMask`. Remaining mask-side work is
+  integration into higher-level widgets/styles, not the core mask primitive
+  acceptance item.
