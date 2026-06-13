@@ -36,6 +36,8 @@ pub mod motion;
 pub mod progress;
 /// Radio button widget for mutually exclusive options.
 pub mod radio;
+/// LVGL-parity tick and label scale widget.
+pub mod scale;
 /// Scrollable viewport container with parent-bounds child clipping.
 pub mod scroll_view;
 /// Slider widget for numeric input.

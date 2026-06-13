@@ -415,21 +415,21 @@ draw commands through capture renderers, following existing widget tests.
 LPAR-11 is complete only when:
 
 - [x] This document is ratified with a dated §15 entry.
-- [ ] `widgets/src/lib.rs` exports `arc`, `bar`, `led`, `line`, `spinner`, and
+- [x] `widgets/src/lib.rs` exports `arc`, `bar`, `led`, `line`, `spinner`, and
       `scale`.
 - [x] `Bar` implements mode/orientation/range/start-value behavior and tests.
 - [x] `Led` implements brightness/color/on/off/toggle behavior and tests.
 - [x] `Line` implements point drawing, y inversion, and tests.
 - [x] `Arc` implements value/range/angle/mode drawing and tests.
 - [x] `Spinner` implements deterministic tick animation and tests.
-- [ ] `Scale` implements base line/arc ticks, major labels, orientation modes,
+- [x] `Scale` implements base line/arc ticks, major labels, orientation modes,
       and tests.
-- [ ] Every new public item has a meaningful doc comment.
-- [ ] Every new source file has a descriptive file header.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo test -p rlvgl-widgets` passes.
-- [ ] `cargo test -p rlvgl-core` passes when touched.
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` is either clean
+- [x] Every new public item has a meaningful doc comment.
+- [x] Every new source file has a descriptive file header.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo test -p rlvgl-widgets` passes.
+- [x] `cargo test -p rlvgl-core` passes when touched.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` is either clean
       or any unrelated blocker is recorded in §15 with exact crate/error.
 
 ## 12. Files Cited
@@ -476,7 +476,7 @@ LPAR-11 is complete only when:
 - GPU-specialized arc/line drawing. Coupled to platform-specific renderer
   override policy and LPAR-16 conformance tolerances.
 
-## 14. Change Log
+## 15. Change Log
 
 - **2026-06-13** — LPAR-11 drafted from LPAR-00 Wave 3 plan, LPAR-01 widget
   matrix and conflict resolutions, LPAR-07 part/state policy, LPAR-08 draw/text
@@ -519,3 +519,22 @@ LPAR-11 is complete only when:
   `set_bounds` is supported. Unit tests cover phase wraparound, zero-period
   behavior, arc primitive dispatch, full-circle spans at nonzero phase, and
   bounds adoption. Remaining widget: `Scale`.
+- **2026-06-13** — LPAR-11f landed `widgets::scale::Scale`, preserving the
+  existing `widgets::meters::Scale` namespace. The base scale supports
+  horizontal, vertical, inner-round, and outer-round modes; range endpoints;
+  total tick count; major tick interval with `0` disabling majors and labels;
+  label visibility; round angle range and rotation; layout `set_bounds`; line
+  ticks through `stroke_line_aa`; round axes through `fill_arc_aa`; and numeric
+  labels through the LPAR-08 shaped-text path. Unit tests cover tick
+  classification, linear orientation sides, labels, major-disable behavior,
+  round tick direction, and bounds adoption. LPAR-11 widget implementation is
+  complete; final validation is recorded below.
+- **2026-06-13** — LPAR-11 final validation: `cargo fmt --all -- --check`,
+  `lychee --no-progress docs/concepts/README.md
+  docs/concepts/LPAR-11-PRIMITIVE-WIDGETS.md`, `cargo test -p rlvgl-widgets`,
+  `cargo test -p rlvgl-core`, and `cargo clippy -p rlvgl-widgets --all-targets
+  -- -D warnings` pass. Workspace clippy is blocked outside the LPAR-11 widget
+  surface by `rlvgl-decomp/src/lib.rs:799` (`clippy::identity_op`) and
+  `core/src/asset.rs:566`, `:574`, `:581` (`clippy::unnecessary_map_or`) plus
+  `core/src/asset.rs:632`, `:633`, `:657`, `:658`
+  (`clippy::unnecessary_cast`).

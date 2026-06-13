@@ -59,9 +59,11 @@ impl Arc {
     /// The initial value is the configured minimum. For reversed ranges, the
     /// minimum endpoint is still treated as fraction `0` of the visual span.
     pub fn new(bounds: Rect, min: i32, max: i32) -> Self {
-        let mut style = Style::default();
-        style.border_color = Color(192, 192, 192, 255);
-        style.border_width = 6;
+        let style = Style {
+            border_color: Color(192, 192, 192, 255),
+            border_width: 6,
+            ..Style::default()
+        };
 
         let mut arc = Self {
             bounds,
@@ -358,7 +360,7 @@ fn normalize_angle_i64(degrees: i64) -> i32 {
 
 fn sweep_degrees(start: i32, end: i32) -> i32 {
     let delta = end - start;
-    if delta >= 0 && delta <= 360 {
+    if (0..=360).contains(&delta) {
         delta
     } else {
         delta.rem_euclid(360)

@@ -28,9 +28,11 @@ pub struct Spinner {
 impl Spinner {
     /// Create a spinner with deterministic default animation parameters.
     pub fn new(bounds: Rect) -> Self {
-        let mut style = Style::default();
-        style.border_color = Color(192, 192, 192, 255);
-        style.border_width = 6;
+        let style = Style {
+            border_color: Color(192, 192, 192, 255),
+            border_width: 6,
+            ..Style::default()
+        };
         Self {
             bounds,
             period_ticks: 60,

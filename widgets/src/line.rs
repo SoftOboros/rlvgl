@@ -41,8 +41,10 @@ impl<'a> Line<'a> {
     /// The default stroke is one pixel wide using [`Style::default`]'s border
     /// color so a newly created line is visible without additional styling.
     pub fn new(bounds: Rect, points: &'a [Point]) -> Self {
-        let mut style = Style::default();
-        style.border_width = 1;
+        let style = Style {
+            border_width: 1,
+            ..Style::default()
+        };
         Self {
             bounds,
             points,
