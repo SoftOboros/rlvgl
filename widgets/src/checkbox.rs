@@ -1,8 +1,10 @@
 //! Binary checkbox widget.
 use alloc::string::String;
+use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
-use rlvgl_core::renderer::Renderer;
+use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -75,11 +77,19 @@ impl Widget for Checkbox {
         }
 
         // Draw label text to the right of the box with baseline at the bottom
-        let text_pos = (
+        let text_origin = (
             self.bounds.x + square_size + 4,
             self.bounds.y + self.bounds.height,
         );
-        renderer.draw_text(text_pos, &self.text, self.text_color.with_alpha(a));
+        let clip = Rect {
+            x: text_origin.0,
+            y: self.bounds.y,
+            width: self.bounds.width - (square_size + 4),
+            height: self.bounds.height,
+        };
+        let shaped = shape_text_ltr(&FONT_6X10, &self.text, text_origin, 0);
+        let mut clipped = ClipRenderer::new(renderer, clip);
+        clipped.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(a));
     }
 
     /// Toggle the checked state when clicked.

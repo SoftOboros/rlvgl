@@ -1007,3 +1007,6 @@ deterministic extent fallback.
   `ImageDescriptor` + `blit_image`. `Image` gained configurable `BlitOpts` so
   recolor/scale/rotation options can be used directly at widget level while
   preserving existing bounds/viewport clipping behavior.
+- **2026-06-12** — `Checkbox` and `Radio` widgets now draw labels via
+  shaped-text coverage through `ClipRenderer`/`draw_text_shaped` instead of
+  legacy `draw_text`, unifying text clipping/coverage behavior with `Label`.
