@@ -85,7 +85,7 @@ fn build_ui(width: i32, height: i32) -> WidgetNode {
         },
     );
     title.style.bg_color = Color(13, 19, 30, 255);
-    title.text_color = Color(235, 240, 245, 255);
+    title.set_text_color(Color(235, 240, 245, 255));
 
     let mut button = Button::new(
         "tap me",

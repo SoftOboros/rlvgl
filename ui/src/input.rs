@@ -221,7 +221,7 @@ impl EditCore {
             renderer.draw_text(
                 (bounds.x, bounds.y + (row as i32 + 1) * self.line_height),
                 line,
-                self.label.text_color.with_alpha(self.label.style.alpha),
+                self.label.text_color_with_alpha(self.label.style.alpha),
             );
         }
     }

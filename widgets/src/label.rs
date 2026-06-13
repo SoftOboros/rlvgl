@@ -41,6 +41,24 @@ impl Label {
         &self.text
     }
 
+    /// Update text color for this label.
+    ///
+    /// Prefer migrated `TextStyle` plumbing for future callers; this method
+    /// is the compatibility path while upstream migration continues.
+    #[allow(deprecated)]
+    pub fn set_text_color(&mut self, color: Color) {
+        self.text_color = color;
+    }
+
+    /// Return text color blended by widget alpha.
+    ///
+    /// Prefer `TextStyle` plumbing for long-lived callers; this helper keeps
+    /// existing widget implementations warning-free until migration completes.
+    #[allow(deprecated)]
+    pub fn text_color_with_alpha(&self, alpha: u8) -> Color {
+        self.text_color.with_alpha(alpha)
+    }
+
     /// Draw this label using an explicit font metrics backend.
     ///
     /// The shaped text path clips glyph coverage to the label bounds. This is

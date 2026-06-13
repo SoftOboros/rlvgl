@@ -1398,7 +1398,7 @@ fn themed_label(text: impl Into<String>, bounds: Rect, text_color: Color) -> Rc<
         .bg_color(Color(0, 0, 0, 0))
         .alpha(0)
         .build();
-    label.text_color = text_color;
+    label.set_text_color(text_color);
     Rc::new(RefCell::new(label))
 }
 
