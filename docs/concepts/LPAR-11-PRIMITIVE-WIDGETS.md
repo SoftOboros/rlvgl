@@ -414,11 +414,11 @@ draw commands through capture renderers, following existing widget tests.
 
 LPAR-11 is complete only when:
 
-- [ ] This document is ratified with a dated §15 entry.
+- [x] This document is ratified with a dated §15 entry.
 - [ ] `widgets/src/lib.rs` exports `arc`, `bar`, `led`, `line`, `spinner`, and
       `scale`.
-- [ ] `Bar` implements mode/orientation/range/start-value behavior and tests.
-- [ ] `Led` implements brightness/color/on/off/toggle behavior and tests.
+- [x] `Bar` implements mode/orientation/range/start-value behavior and tests.
+- [x] `Led` implements brightness/color/on/off/toggle behavior and tests.
 - [ ] `Line` implements point drawing, y inversion, and tests.
 - [ ] `Arc` implements value/range/angle/mode drawing and tests.
 - [ ] `Spinner` implements deterministic tick animation and tests.
@@ -492,3 +492,10 @@ LPAR-11 is complete only when:
   parallel workers because their write sets are disjoint. `Spinner` remains
   gated on `Arc`, and `Scale` remains last because it consumes line/arc geometry
   plus shaped labels.
+- **2026-06-13** — LPAR-11b landed the additive `widgets::bar::Bar` and
+  `widgets::led::Led` modules plus `widgets/src/lib.rs` exports. `Bar`
+  implements normal, symmetrical, and range modes; auto/horizontal/vertical
+  orientation; reversed ranges; start-value getter semantics; layout
+  `set_bounds`; and focused geometry tests. `Led` implements LVGL brightness
+  clamps, color modulation, on/off/toggle, layout `set_bounds`, and unit tests.
+  Remaining widgets: `Line`, `Arc`, `Spinner`, and `Scale`.

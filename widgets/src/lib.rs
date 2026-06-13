@@ -4,6 +4,8 @@
 
 extern crate alloc;
 
+/// LVGL-parity bar widget.
+pub mod bar;
 /// Clickable button widget.
 pub mod button;
 /// Checkbox widget for boolean options.
@@ -18,6 +20,8 @@ pub mod container;
 pub mod image;
 /// Text label widget.
 pub mod label;
+/// LVGL-parity LED indicator widget.
+pub mod led;
 /// Scrollable list widget.
 pub mod list;
 /// Audio-meter widgets (LED bargraph; needle and others to follow).
