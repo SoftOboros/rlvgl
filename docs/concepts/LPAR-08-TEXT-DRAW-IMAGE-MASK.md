@@ -798,6 +798,11 @@ deterministic extent fallback.
       variants `Rgb565`, `Argb8888`, `L8`.
 - [ ] `cargo test --workspace`, `cargo fmt --all -- --check`, and
       `cargo clippy --workspace -- -D warnings` pass.
+      Note: on this branch, these checks are currently blocked by pre-existing
+      non-LPAR-08 issues in `examples/stm32h747i-disco` (`embedded_alloc`/
+      `cortex_m` feature-gating and feature-configuration drift) and a known
+      `rlvgl-i18n` locale fixture mismatch. This status does not reflect the
+      core LPAR-08 acceptance behavior.
 - [x] Public APIs in publishable crates have doc comments.
 - [x] LPAR-16 conformance fixtures for the driving cases: shaped-text
       clip in a `ScrollView` viewport (text straddling top and bottom
