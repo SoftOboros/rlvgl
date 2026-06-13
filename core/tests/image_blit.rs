@@ -191,6 +191,26 @@ fn blit_image_uses_nearest_neighbor_scale() {
 }
 
 #[test]
+fn blit_image_scales_non_uniform_axes() {
+    let pixels = [Color(10, 11, 12, 255), Color(20, 21, 22, 255)];
+    let descriptor = ImageDescriptor::from_color_slice(&pixels, 1, 2);
+    let opts = BlitOpts {
+        scale_y: 512,
+        ..BlitOpts::default()
+    };
+
+    assert_eq!(
+        render_to_buffer(1, 4, &descriptor, &opts),
+        vec![
+            Color(10, 11, 12, 255),
+            Color(10, 11, 12, 255),
+            Color(20, 21, 22, 255),
+            Color(20, 21, 22, 255),
+        ]
+    );
+}
+
+#[test]
 fn blit_image_applies_cardinal_rotation_around_pivot() {
     let pixels = [
         Color(1, 0, 0, 255),
@@ -211,6 +231,78 @@ fn blit_image_applies_cardinal_rotation_around_pivot() {
         render_to_buffer(3, 2, &descriptor, &opts),
         vec![
             pixels[4], pixels[2], pixels[0], pixels[5], pixels[3], pixels[1]
+        ]
+    );
+}
+
+#[test]
+fn blit_image_applies_cardinal_rotation_180() {
+    let pixels = [
+        Color(1, 0, 0, 255),
+        Color(2, 0, 0, 255),
+        Color(3, 0, 0, 255),
+        Color(4, 0, 0, 255),
+        Color(5, 0, 0, 255),
+        Color(6, 0, 0, 255),
+        Color(7, 0, 0, 255),
+        Color(8, 0, 0, 255),
+        Color(9, 0, 0, 255),
+    ];
+    let descriptor = ImageDescriptor::from_color_slice(&pixels, 3, 3);
+    let opts = BlitOpts {
+        rotation_deg: 180,
+        pivot: (1, 1),
+        ..BlitOpts::default()
+    };
+
+    assert_eq!(
+        render_to_buffer(3, 3, &descriptor, &opts),
+        vec![
+            Color(9, 0, 0, 255),
+            Color(8, 0, 0, 255),
+            Color(7, 0, 0, 255),
+            Color(6, 0, 0, 255),
+            Color(5, 0, 0, 255),
+            Color(4, 0, 0, 255),
+            Color(3, 0, 0, 255),
+            Color(2, 0, 0, 255),
+            Color(1, 0, 0, 255),
+        ]
+    );
+}
+
+#[test]
+fn blit_image_applies_cardinal_rotation_270() {
+    let pixels = [
+        Color(1, 0, 0, 255),
+        Color(2, 0, 0, 255),
+        Color(3, 0, 0, 255),
+        Color(4, 0, 0, 255),
+        Color(5, 0, 0, 255),
+        Color(6, 0, 0, 255),
+        Color(7, 0, 0, 255),
+        Color(8, 0, 0, 255),
+        Color(9, 0, 0, 255),
+    ];
+    let descriptor = ImageDescriptor::from_color_slice(&pixels, 3, 3);
+    let opts = BlitOpts {
+        rotation_deg: 270,
+        pivot: (1, 1),
+        ..BlitOpts::default()
+    };
+
+    assert_eq!(
+        render_to_buffer(3, 3, &descriptor, &opts),
+        vec![
+            Color(3, 0, 0, 255),
+            Color(6, 0, 0, 255),
+            Color(9, 0, 0, 255),
+            Color(2, 0, 0, 255),
+            Color(5, 0, 0, 255),
+            Color(8, 0, 0, 255),
+            Color(1, 0, 0, 255),
+            Color(4, 0, 0, 255),
+            Color(7, 0, 0, 255),
         ]
     );
 }
