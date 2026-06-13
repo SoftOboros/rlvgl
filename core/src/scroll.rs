@@ -997,6 +997,52 @@ fn align_offset(child_top: i32, child_h: i32, viewport_h: i32, align: SnapAlign)
 }
 
 // ---------------------------------------------------------------------------
+// Public snap helper (LPAR-13 §5.F — shared snap-point math)
+// ---------------------------------------------------------------------------
+
+/// Find the nearest snap point to `offset` within the given `points` list.
+///
+/// This is the pure snap-attraction core factored out of the private
+/// `snap_endpoint` function.  The [`ScrollController`] drives the same math
+/// through `snap_endpoint`; widget-level snap consumers (e.g. `Roller`)
+/// call this helper directly so there is exactly one snap implementation.
+///
+/// # Parameters
+///
+/// - `offset` — the candidate scroll offset to be adjusted.
+/// - `points` — sorted or unsorted list of exact snap-point offsets.
+/// - `attraction_radius` — maximum distance within which a snap point attracts.
+///   Use [`DEFAULT_SNAP_ATTRACTION_RADIUS`] unless overriding.
+///
+/// # Returns
+///
+/// The nearest snap point if one is within `attraction_radius`; otherwise
+/// returns `offset` unchanged.
+///
+/// # Example
+///
+/// ```
+/// use rlvgl_core::scroll::{snap_offset_to_points, DEFAULT_SNAP_ATTRACTION_RADIUS};
+/// let points = [0, 40, 80, 120];
+/// // 45 is within 60 px of snap point 40 → returns 40.
+/// assert_eq!(snap_offset_to_points(45, &points, DEFAULT_SNAP_ATTRACTION_RADIUS), 40);
+/// // 200 is farther than 60 px from any snap point → unchanged.
+/// assert_eq!(snap_offset_to_points(200, &points, DEFAULT_SNAP_ATTRACTION_RADIUS), 200);
+/// ```
+pub fn snap_offset_to_points(offset: i32, points: &[i32], attraction_radius: i32) -> i32 {
+    let mut best = offset;
+    let mut best_dist = i32::MAX;
+    for &sp in points {
+        let dist = (offset - sp).abs();
+        if dist <= attraction_radius && dist < best_dist {
+            best_dist = dist;
+            best = sp;
+        }
+    }
+    best
+}
+
+// ---------------------------------------------------------------------------
 // Path dispatch helper (LPAR-05 §6.3)
 // ---------------------------------------------------------------------------
 

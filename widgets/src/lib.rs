@@ -20,10 +20,14 @@ pub mod click_area;
 pub mod clock;
 /// Container widget for layout grouping.
 pub mod container;
+/// Selection dropdown (closed trigger + open scrollable option list).
+pub mod dropdown;
 /// Image display widget.
 pub mod image;
 /// State-specific segmented image button.
 pub mod image_button;
+/// On-screen keyboard over an internal button matrix.
+pub mod keyboard;
 /// Text label widget.
 pub mod label;
 /// LVGL-parity LED indicator widget.
@@ -32,6 +36,8 @@ pub mod led;
 pub mod line;
 /// Scrollable list widget.
 pub mod list;
+/// Page-stack navigation menu.
+pub mod menu;
 /// Audio-meter widgets (LED bargraph; needle and others to follow).
 pub mod meters;
 /// UI motion components (crawls, scrollers, tickers).
@@ -40,6 +46,8 @@ pub mod motion;
 pub mod progress;
 /// Radio button widget for mutually exclusive options.
 pub mod radio;
+/// Snap-scrolling wheel selector.
+pub mod roller;
 /// LVGL-parity tick and label scale widget.
 pub mod scale;
 /// Scrollable viewport container with parent-bounds child clipping.
@@ -52,3 +60,9 @@ pub mod spinbox;
 pub mod spinner;
 /// Binary on/off switch widget.
 pub mod switch;
+/// Tabbed container with a tab bar and content pages.
+pub mod tabview;
+/// Two-dimensional snap-navigable tile grid.
+pub mod tileview;
+/// Title-bar + content-area window container.
+pub mod window;
