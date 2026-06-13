@@ -85,8 +85,8 @@ pub struct ShapedText<'a> {
     ///
     /// [`Renderer::draw_text_shaped`](crate::renderer::Renderer::draw_text_shaped)
     /// uses this reference to render glyph coverage. Manually constructed
-    /// shaped runs may leave this as `None`; renderers then fall back to the
-    /// deterministic glyph-extent visualizer.
+    /// shaped runs may leave this as `None`; renderers then use a
+    /// deterministic extent-only fallback.
     pub font: Option<&'a dyn FontMetrics>,
 }
 
@@ -147,7 +147,7 @@ pub trait FontMetrics {
     /// is the top row of [`GlyphPlacement::extent`]. Implementations must
     /// overwrite every byte in `coverage` with `0..=255` alpha values.
     /// Returning `false` means this backend has no coverage data for `ch`;
-    /// renderers then use their deterministic extent fallback.
+    /// renderers then use their deterministic extent-only fallback.
     fn glyph_coverage_row(
         &self,
         _ch: char,

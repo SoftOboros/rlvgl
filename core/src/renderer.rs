@@ -27,14 +27,14 @@ pub trait Renderer {
 
     /// Draw a pre-shaped text run using glyph extent information.
     ///
-    /// `origin` is an additional translation applied to every glyph placement
-    /// in `shaped`. Pass `(0, 0)` when the shaped glyph positions are already
-    /// in target coordinates. The default implementation renders glyph
-    /// coverage when the shaped run carries a font reference; manually built
-    /// shaped runs without font coverage fall back to a deterministic extent
-    /// visualizer where each glyph extent is blended as a solid rectangle.
-    /// Backends can override this for hardware text acceleration while
-    /// preserving the same placement and clipping contract.
+    /// `origin` is an additional translation applied to every glyph placement.
+    /// In `shaped`, pass `(0, 0)` when glyph positions are already target-space
+    /// coordinates. The default implementation renders glyph coverage when the
+    /// run carries a font reference; otherwise it falls back to deterministic
+    /// extent-only rectangles.
+    ///
+    /// Backends can override this for hardware text acceleration while preserving
+    /// the same placement and clipping contract.
     fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, origin: (i32, i32), color: Color) {
         for glyph in &shaped.glyphs {
             let mut extent = glyph.extent();

@@ -978,8 +978,8 @@ deterministic extent fallback.
   `FontMetrics` now exposes an object-safe `glyph_coverage_row` hook for
   bitmap, packed, and `fontdue` backends; `ShapedText` retains the font
   reference that produced a run; and `Renderer::draw_text_shaped` renders
-  font-backed coverage through `blend_row`, preserving the extent visualizer
-  fallback for manually constructed shaped runs. `ClipRenderer` inherits the
+  font-backed coverage through `blend_row`, preserving the extent-only
+  rectangle fallback for manually constructed shaped runs. `ClipRenderer` inherits the
   default shaped-text path so real glyph coverage clips through
   `blend_row`, while fallback extents clip through `blend_rect`, and it still
   does not forward shaped text to the wrapped backend. `widgets/src/label.rs`
