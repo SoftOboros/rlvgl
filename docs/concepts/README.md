@@ -263,8 +263,16 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     Simulator / Memory) replacing LVGL drive letters, an opaque
     `AssetHandle` registry token bridging to LPAR-08's
     `ImageData::Asset` variant (LPAR-08 amended), source-dispatched decode
-    via the existing plugins, and a bounded LRU cache. Implementation
-    pending.
+    via the existing plugins, and a bounded LRU cache.
+  - [LPAR-10-LAYOUT.md](LPAR-10-LAYOUT.md) — **Ratified 2026-06-12.**
+    Wave 2 layout substrate: object-managed bounds via a tree-resident
+    `LayoutState` slot + `effective_bounds()`/translation draw + an
+    additive `Widget::set_bounds` default-no-op (the static `ui::layout`
+    helpers stay unchanged), a `Dimension` sizing model (Px/Pct/Content +
+    min/max), flex and grid engines, a deterministic pre-draw layout pass
+    with old∪new invalidation, `SizeChanged`/`LayoutChanged` events
+    (LPAR-04 amended), and padding/gap via the cascade (frozen `Style`
+    untouched).
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

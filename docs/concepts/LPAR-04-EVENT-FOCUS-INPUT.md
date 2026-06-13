@@ -613,3 +613,12 @@ LPAR-04 implementation is complete only when:
   Click-vs-drag suppression (§9.5) is preserved: `DragStart` cancels the
   tap stage (suppressing `PressDown`, hence arming) and the long-press
   stage. No code rides on the unamended order — code and spec now agree.
+- **2026-06-12** — §5.3 `ObjectEvent` registration amendment (Specification
+  Required, requested by LPAR-10 §5.F). Two layout codes are added to the
+  `ObjectEvent` set: `SizeChanged` (delivered to a node whose effective bounds
+  changed) and `LayoutChanged` (delivered to a container after its children are
+  re-placed), mirroring LVGL `LV_EVENT_SIZE_CHANGED` / `LV_EVENT_LAYOUT_CHANGED`.
+  Additive to the `#[non_exhaustive]` enum; existing codes and consumers
+  unchanged. Owning section: `docs/concepts/LPAR-10-LAYOUT.md` §5.F. Emitted by
+  the layout pass post-mutation (outside dispatch), consistent with the
+  lifecycle-event rule (§6.6).
