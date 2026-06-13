@@ -14,7 +14,10 @@ Parent initiative: [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md). Baseline:
 sources: [LPAR-09-ASSET-FILESYSTEM.md](LPAR-09-ASSET-FILESYSTEM.md).
 Arc widget (geometry base for ArcLabel):
 [LPAR-11-PRIMITIVE-WIDGETS.md](LPAR-11-PRIMITIVE-WIDGETS.md). Conformance
-fixtures: [LPAR-16 (not yet drafted)].
+fixtures:
+[LPAR-16-CONFORMANCE-EXAMPLES-DOCS-RELEASE.md](LPAR-16-CONFORMANCE-EXAMPLES-DOCS-RELEASE.md)
+(drafted 2026-06-13; the Canvas/AnimImage/ArcLabel fixture row is tracked in
+LPAR-16 §6 and §12.B).
 
 ## 0. Authority Policy
 
