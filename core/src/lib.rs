@@ -36,6 +36,8 @@ extern crate alloc;
 pub mod anim;
 pub mod animation;
 pub mod application;
+#[cfg(feature = "fs")]
+pub mod asset;
 pub mod bitmap_font;
 /// Graphics-language layer: structured drawing commands as data.
 pub mod cmd;

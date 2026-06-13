@@ -43,6 +43,13 @@ pub trait BlockDevice {
 pub enum AssetError {
     /// Underlying filesystem error.
     Fs(FsError),
+    /// Asset bytes were retrieved but the decode step failed.
+    ///
+    /// The inner `String` contains a human-readable description of the failure.
+    /// This variant is produced by [`crate::asset::AssetRegistry::resolve_image`]
+    /// when a codec plugin returns an error after the source bytes were
+    /// successfully read.
+    Decode(alloc::string::String),
 }
 
 /// Reader trait for streaming asset data.
@@ -97,5 +104,30 @@ impl<S: AssetSource> AssetManager<S> {
     /// Open a raw asset stream at `path`.
     pub fn open(&self, path: &str) -> Result<Box<dyn AssetRead + '_>, AssetError> {
         self.source.open(path)
+    }
+
+    /// Load the raw bytes of the asset at `path` into a heap buffer.
+    ///
+    /// This is the foundation for typed loaders such as packed-font loading.
+    /// For a packed font (`PackedFont`) the caller must additionally map the
+    /// returned bytes into static storage because `PackedFont::data` requires a
+    /// `&'static [u8]`; that pattern is outside the scope of this helper.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AssetError::Fs`] when the source cannot open or read the asset.
+    pub fn load_bytes(&self, path: &str) -> Result<alloc::vec::Vec<u8>, AssetError> {
+        let mut reader = self.source.open(path)?;
+        let len = reader.len();
+        let mut buf = alloc::vec![0u8; len];
+        let mut offset = 0usize;
+        while offset < len {
+            let n = reader.read(&mut buf[offset..])?;
+            if n == 0 {
+                break;
+            }
+            offset += n;
+        }
+        Ok(buf)
     }
 }

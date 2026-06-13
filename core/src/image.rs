@@ -38,6 +38,19 @@ impl PixelFormat {
 /// The enum is non-exhaustive so future asset-handle sources can be added
 /// without breaking callers. Consumers should include a wildcard arm when
 /// matching.
+///
+/// # LPAR-09 addition
+///
+/// The [`ImageData::Asset`] variant bridges source-backed images (registered
+/// with an `AssetRegistry`) into the image pipeline. Decoded pixels may or
+/// may not be resident in the cache; callers MUST call
+/// `AssetRegistry::resolve_image` before blitting to ensure decoded data is
+/// present.
+///
+/// # Match exhaustiveness
+///
+/// Because `ImageData` is `#[non_exhaustive]`, external `match` expressions
+/// already require a wildcard arm. The addition of `Asset` is non-breaking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ImageData<'a> {
@@ -50,6 +63,17 @@ pub enum ImageData<'a> {
     BorrowedColors(&'a [Color]),
     /// Heap-resident encoded pixel bytes in the descriptor's [`PixelFormat`].
     Owned(Vec<u8>),
+    /// Source-backed image handle registered with an `AssetRegistry`.
+    ///
+    /// The decoded pixels may or may not be resident in the `SlotCache` at
+    /// any moment. Callers MUST call `AssetRegistry::resolve_image(handle)` to
+    /// obtain a descriptor with in-memory pixel data before blitting.
+    ///
+    /// Added by LPAR-09 (Standards Action; LPAR-08 §15 amendment filed
+    /// 2026-06-12). Ownership of the `AssetPath` behind this handle lives in
+    /// the `AssetRegistry`, enabling reload after cache eviction.
+    #[cfg(feature = "fs")]
+    Asset(crate::asset::AssetHandle),
 }
 
 impl<'a> ImageData<'a> {
@@ -57,6 +81,10 @@ impl<'a> ImageData<'a> {
     ///
     /// [`ImageData::BorrowedColors`] reports `colors.len() * 4` because each
     /// color is represented as one ARGB8888 pixel.
+    ///
+    /// [`ImageData::Asset`] returns `0` because decoded pixels are not
+    /// in-memory until `AssetRegistry::resolve_image` is called. This
+    /// follows LVGL's model where an unresolved source has zero in-memory size.
     pub fn byte_len(&self) -> usize {
         match self {
             ImageData::Borrowed(bytes) => bytes.len(),
@@ -64,6 +92,12 @@ impl<'a> ImageData<'a> {
                 colors.len() * PixelFormat::Argb8888.bytes_per_pixel() as usize
             }
             ImageData::Owned(bytes) => bytes.len(),
+            #[cfg(feature = "fs")]
+            ImageData::Asset(_) => 0,
+            // `ImageData` is #[non_exhaustive]; this arm satisfies the compiler
+            // when future variants are added outside the `fs` feature scope.
+            #[allow(unreachable_patterns)]
+            _ => 0,
         }
     }
 
@@ -74,14 +108,17 @@ impl<'a> ImageData<'a> {
 
     /// Return borrowed encoded bytes when this source is byte-addressable.
     ///
-    /// [`ImageData::BorrowedColors`] returns `None` because exposing its memory
-    /// as bytes would rely on a layout guarantee the `Color` type does not
-    /// currently make.
+    /// [`ImageData::BorrowedColors`] and [`ImageData::Asset`] return `None`
+    /// because neither exposes in-memory bytes directly.
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match self {
             ImageData::Borrowed(bytes) => Some(bytes),
             ImageData::Owned(bytes) => Some(bytes),
             ImageData::BorrowedColors(_) => None,
+            #[cfg(feature = "fs")]
+            ImageData::Asset(_) => None,
+            #[allow(unreachable_patterns)]
+            _ => None,
         }
     }
 
@@ -90,6 +127,10 @@ impl<'a> ImageData<'a> {
         match self {
             ImageData::BorrowedColors(colors) => Some(colors),
             ImageData::Borrowed(_) | ImageData::Owned(_) => None,
+            #[cfg(feature = "fs")]
+            ImageData::Asset(_) => None,
+            #[allow(unreachable_patterns)]
+            _ => None,
         }
     }
 }
