@@ -322,8 +322,7 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     frame phase), `core::property` (identity-free `Queryable`), and
     `core::observer` (`Subject<T>` value-binding, orthogonal to the LPAR-04
     event system — the §9 ownership conflict resolved). LPAR-Optional
-    (feature-gated): `ArcLabel`, `Lottie`/`DashLottie`, `Texture3d`.
-    Implementation pending.
+    (feature-gated): `ArcLabel` (landed), `Lottie`/`DashLottie`, `Texture3d` (deferred). Core + ArcLabel landed same day.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

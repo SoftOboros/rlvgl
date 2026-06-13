@@ -303,23 +303,35 @@ All LPAR-15 widgets MUST:
 - `pixels() -> Vec<Color>`
 - `to_png() -> Result<Vec<u8>, _>` (feature `png` only)
 
-`CanvasWidget` owns a `core::plugins::canvas::Canvas` instance and adds:
+**Buffer ownership — amended at implementation (see §15):** `CanvasWidget`
+owns a lightweight, crate-local `PixelBuffer` (a `Vec<Color>`-backed buffer with
+the same `draw_pixel`/`pixels`/`size`/`get_pixel` shape as the plugin's
+`Canvas`), NOT the plugin's `core::plugins::canvas::Canvas` directly. The reason
+is structural: the plugin's `Canvas` is `EcCanvas<Rgb888>` (`embedded-canvas`)
+behind core's `canvas` feature, which pulls `embedded-graphics` + `embedded-canvas`.
+For `widgets` to wrap it, the base widget crate would have to force those
+deps into every build — unacceptable for an LPAR-Core widget. The plugin is
+preserved unchanged and coexists (its `EcCanvas`/`to_png` path still serves the
+embedded-graphics export use case); `CanvasWidget` simply uses a trivial owned
+buffer instead. The functional contract is identical.
+
+`CanvasWidget` adds:
 
 1. A `bounds: Rect` for Widget placement.
-2. A `dirty: bool` flag that is set whenever a draw primitive mutates the
-   buffer, cleared after `draw` flushes to the renderer.
-3. A `draw` implementation that converts `pixels()` into an `ImageDescriptor`
-   (or draws directly via `blit_image` if the Renderer supports it) and paints
-   the buffer into the widget's bounds area. The `to_png` function remains in
-   the plugin and is not called from `draw`.
-4. Higher-level draw helpers on `CanvasWidget` that delegate to `draw_pixel`
-   on the inner canvas: `fill(color: Color)`, `fill_rect(rect: Rect, color:
-   Color)`, `draw_line(x0,y0,x1,y1, color, width)`. These are convenience
-   wrappers and do not add renderer dependencies.
+2. A `dirty: bool` flag set whenever a draw primitive mutates the buffer,
+   cleared after `draw` flushes to the renderer.
+3. A `draw` implementation that exposes the buffer as an `ImageDescriptor`
+   (`as_image_descriptor`) and paints it via `Renderer::blit_image` into the
+   widget's bounds (`draw_widget_bg` for `Part::MAIN`, the buffer for
+   `Part::INDICATOR`).
+4. Higher-level draw helpers writing into the owned buffer: `fill(color)`,
+   `fill_rect(rect, color)`, `draw_pixel(x, y, color)`, `draw_line(...)` — no
+   added renderer dependency.
 
-The widget does NOT expose `to_png` directly — callers that need PNG export
-call `canvas_widget.inner().to_png()` via a `pub fn inner(&self) ->
-&Canvas` accessor, or access it before constructing the widget.
+The buffer is reached via `pub fn inner(&self) -> &PixelBuffer` /
+`inner_mut(&mut self)`. Callers needing PNG export use the unchanged
+`core::plugins::canvas::Canvas::to_png` separately (e.g. by reading
+`inner().pixels()` into a plugin `Canvas`), not through `CanvasWidget`.
 
 **LVGL reference mapping:**
 
@@ -1183,3 +1195,21 @@ None at this phase.
   AnimImage / Property / Observer = LPAR-Core; ArcLabel / Lottie / 3DTexture =
   LPAR-Optional (feature-gated). Implementation unblocked (LPAR-Core slices
   first per §5.K).
+- **2026-06-13** — LPAR-Core implementation landed (+ ArcLabel). `core::property`
+  (`PropertyValue` `#[non_exhaustive]` + the identity-free `Queryable` trait,
+  default read-only `set_property`) and `core::observer` (`Subject<T>` with a
+  `notifying` reentrancy sentinel — the deferred-Safe guard was added since it
+  was trivial, so a re-entrant `notify` is safely skipped, no panic);
+  `widgets::canvas::CanvasWidget`, `widgets::anim_image::AnimImage` (mirrors the
+  Spinner tick-phase: local `frame_tick`, advance every `ticks_per_frame`,
+  `.max(1)`, no `ObjectAnims`/wall-clock), and `widgets::arc_label::ArcLabel`
+  (gated `lpar_arclabel`; per-glyph `Δθ = advance/radius` via the shared
+  `FontMetrics::glyph_metrics` — no fork). §5.C amended: `CanvasWidget` owns a
+  crate-local `PixelBuffer` rather than wrapping the plugin's
+  `EcCanvas<Rgb888>`, because wrapping would force `embedded-graphics`/
+  `embedded-canvas` into the base widget crate; the plugin is preserved
+  unchanged and coexists. Lottie/DashLottie/Texture3d (LPAR-Optional, external
+  deps) deferred to a later slice. Gates: fmt clean; clippy `-p rlvgl-core -p
+  rlvgl-widgets --all-targets -D warnings` clean (incl. `--features
+  lpar_arclabel`); `cargo test` core 364 / widgets 383 (390 with arc_label)
+  green; ui/platform build.

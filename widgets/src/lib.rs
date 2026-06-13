@@ -5,7 +5,12 @@
 extern crate alloc;
 
 /// LVGL-parity arc widget.
+/// Tick-driven animated image (frame sequence).
+pub mod anim_image;
 pub mod arc;
+/// Text laid along an arc (LPAR-Optional).
+#[cfg(feature = "lpar_arclabel")]
+pub mod arc_label;
 /// LVGL-parity bar widget.
 pub mod bar;
 /// Clickable button widget.
@@ -14,6 +19,8 @@ pub mod button;
 pub mod button_matrix;
 /// Month-grid calendar widget.
 pub mod calendar;
+/// Drawable pixel-buffer canvas widget.
+pub mod canvas;
 /// Data chart (line/bar/scatter series).
 pub mod chart;
 /// Checkbox widget for boolean options.

@@ -69,9 +69,13 @@ pub mod mask;
 pub mod object;
 /// Node-resident object animations; see [`object_anim::ObjectAnims`].
 pub mod object_anim;
+/// LPAR-15 value-binding `Subject<T>` — orthogonal to the LPAR-04 event system.
+pub mod observer;
 /// Variable-width packed font renderer (grayscale anti-aliased).
 pub mod packed_font;
 pub mod plugins;
+/// LPAR-15 typed property accessor: `PropertyValue` enum and the `Queryable` trait.
+pub mod property;
 /// Anti-aliased rasterization kernels (OBB and helpers) usable by both
 /// software and hardware-accelerated `Renderer` implementations.
 pub mod raster;
