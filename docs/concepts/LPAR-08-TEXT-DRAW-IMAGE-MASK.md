@@ -790,7 +790,7 @@ deterministic extent fallback.
 - [x] Text wrapping algorithm exists: greedy line-break using
       `FontMetrics::measure_fp16`; break opportunities at SPACE, HYPHEN,
       hard newline.
-- [ ] Dirty rects from draw/image/text changes reported through LPAR-03
+- [x] Dirty rects from draw/image/text changes reported through LPAR-03
       `InvalidationList`; no second repaint path introduced.
 - [x] All new `core/` types compile under `no_std + alloc`; no `std`
       dependency outside `fontdue` feature gate.
@@ -997,3 +997,9 @@ deterministic extent fallback.
   integration point. Remaining image work: widget migration, backend
   overrides, command-list representation, and any future arbitrary-angle
   rotation quality policy.
+- **2026-06-12** — LPAR-08 dirty-rect propagation slice landed.
+  `DirtyTrackingRenderer` now tracks draw/text/image mutations by pushing
+  conservative `Rect` deltas into `InvalidationList` while forwarding every
+  call to the wrapped renderer. Tracking includes AA span clipping (`blend_row`
+  non-zero runs), `blit_image` clip-aware destination area, and structured
+  command-list submissions via `CommandList::dirty_union`.

@@ -9,6 +9,7 @@ use crate::cmd::CommandList;
 use crate::draw::{GradientDesc, ShadowDesc};
 use crate::font::ShapedText;
 use crate::image::{BlitOpts, ImageDescriptor, PixelFormat};
+use crate::invalidation::InvalidationList;
 use crate::mask::AlphaMask;
 use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
@@ -382,6 +383,269 @@ struct RowBlendSink<'r, R: Renderer + ?Sized> {
 impl<R: Renderer + ?Sized> CoverageSink for RowBlendSink<'_, R> {
     fn row(&mut self, x: i32, y: i32, coverage: &[u8]) {
         self.r.blend_row(x, y, self.color, coverage);
+    }
+}
+
+/// Renderer adapter that pushes draw-time dirty rectangles into a shared
+/// [`InvalidationList`], while forwarding all drawing calls to `inner`.
+pub struct DirtyTrackingRenderer<'a, 'b, R: Renderer + ?Sized, const N: usize> {
+    /// Wrapped renderer.
+    inner: &'a mut R,
+    /// Shared invalidation sink.
+    invalidation: &'b mut InvalidationList<N>,
+    /// Optional clipping contract, in renderer coordinates.
+    clip: Option<Rect>,
+}
+
+impl<'a, 'b, R: Renderer + ?Sized, const N: usize> DirtyTrackingRenderer<'a, 'b, R, N> {
+    /// Wrap `inner` and collect draw-time dirty rects into `invalidation`.
+    ///
+    /// The wrapper does **not** impose a rendering clip by default; callers
+    /// can provide one with [`Self::with_clip`] when needed.
+    pub fn new(inner: &'a mut R, invalidation: &'b mut InvalidationList<N>) -> Self {
+        Self {
+            inner,
+            invalidation,
+            clip: None,
+        }
+    }
+
+    /// Wrap `inner` and additionally clip every reported dirty rect to `clip`.
+    /// Degenerate clips drop all subsequent tracking.
+    pub fn with_clip(
+        inner: &'a mut R,
+        invalidation: &'b mut InvalidationList<N>,
+        clip: Rect,
+    ) -> Self {
+        Self {
+            inner,
+            invalidation,
+            clip: (clip.width > 0 && clip.height > 0).then_some(clip),
+        }
+    }
+
+    /// Access the wrapped renderer.
+    pub fn inner(&self) -> &R {
+        self.inner
+    }
+
+    /// Access the wrapped renderer mutably.
+    pub fn inner_mut(&mut self) -> &mut R {
+        self.inner
+    }
+
+    fn push_rect(&mut self, rect: Rect) {
+        if rect.width <= 0 || rect.height <= 0 {
+            return;
+        }
+        if let Some(clip) = self.clip {
+            if let Some(visible) = rect.intersect(clip) {
+                self.invalidation.push(visible);
+            }
+        } else {
+            self.invalidation.push(rect);
+        }
+    }
+
+    fn push_blend_row(&mut self, x: i32, y: i32, coverage: &[u8]) {
+        let Some(start) = coverage.iter().position(|c| *c != 0) else {
+            return;
+        };
+        let Some(end) = coverage.iter().rposition(|c| *c != 0) else {
+            return;
+        };
+
+        let width = i32::try_from(end - start + 1).unwrap_or(i32::MAX);
+        let rect = Rect {
+            x: x + i32::try_from(start).unwrap_or(i32::MAX),
+            y,
+            width,
+            height: 1,
+        };
+        self.push_rect(rect);
+    }
+
+    fn push_text_estimate(&mut self, position: (i32, i32), text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        let glyph_count = text.len().min((i32::MAX as usize) / 8);
+        let width = (glyph_count as u32).saturating_mul(8) as i32;
+        self.push_rect(Rect {
+            x: position.0,
+            y: position.1 - TEXT_NOMINAL_LINE_PX,
+            width,
+            height: TEXT_NOMINAL_LINE_PX,
+        });
+    }
+}
+
+impl<R: Renderer + ?Sized, const N: usize> Renderer for DirtyTrackingRenderer<'_, '_, R, N> {
+    fn fill_rect(&mut self, rect: Rect, color: Color) {
+        self.push_rect(rect);
+        self.inner.fill_rect(rect, color);
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        self.push_text_estimate(position, text);
+        self.inner.draw_text(position, text, color);
+    }
+
+    fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, origin: (i32, i32), color: Color) {
+        let bounds = Rect {
+            x: shaped.bounds.x + origin.0,
+            y: shaped.bounds.y + origin.1,
+            width: shaped.bounds.width,
+            height: shaped.bounds.height,
+        };
+        self.push_rect(bounds);
+        self.inner.draw_text_shaped(shaped, origin, color);
+    }
+
+    fn blend_rect(&mut self, rect: Rect, color: Color) {
+        self.push_rect(rect);
+        self.inner.blend_rect(rect, color);
+    }
+
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        let width_i32 = i32::try_from(width).unwrap_or(i32::MAX);
+        let height_i32 = i32::try_from(height).unwrap_or(i32::MAX);
+        self.push_rect(Rect {
+            x: position.0,
+            y: position.1,
+            width: width_i32,
+            height: height_i32,
+        });
+        self.inner.draw_pixels(position, pixels, width, height);
+    }
+
+    fn blit_image(
+        &mut self,
+        dest: Rect,
+        descriptor: &crate::image::ImageDescriptor<'_>,
+        opts: &crate::image::BlitOpts,
+    ) {
+        if dest.width <= 0 || dest.height <= 0 {
+            return;
+        }
+        let output = Rect {
+            x: 0,
+            y: 0,
+            width: dest.width,
+            height: dest.height,
+        };
+        let visible = match opts.clip {
+            Some(clip) => output.intersect(clip),
+            None => Some(output),
+        };
+        let Some(visible) = visible else {
+            return;
+        };
+        self.push_rect(Rect {
+            x: dest.x + visible.x,
+            y: dest.y + visible.y,
+            width: visible.width,
+            height: visible.height,
+        });
+        self.inner.blit_image(dest, descriptor, opts);
+    }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        self.push_blend_row(x, y, coverage);
+        self.inner.blend_row(x, y, color, coverage);
+    }
+
+    fn fill_masked(&mut self, rect: Rect, color: Color, mask: &dyn crate::mask::AlphaMask) {
+        self.push_rect(rect);
+        self.inner.fill_masked(rect, color, mask);
+    }
+
+    fn fill_gradient(&mut self, rect: Rect, gradient: &crate::draw::GradientDesc<'_>) {
+        self.push_rect(rect);
+        self.inner.fill_gradient(rect, gradient);
+    }
+
+    fn draw_shadow(&mut self, rect: Rect, radius: u8, shadow: &crate::draw::ShadowDesc) {
+        let spread = shadow.spread as i32;
+        let blur = shadow.blur as i32;
+        let base = Rect {
+            x: rect.x + shadow.offset_x as i32 - spread,
+            y: rect.y + shadow.offset_y as i32 - spread,
+            width: rect.width + spread * 2,
+            height: rect.height + spread * 2,
+        };
+        let draw_rect = Rect {
+            x: base.x - blur,
+            y: base.y - blur,
+            width: base.width + blur * 2,
+            height: base.height + blur * 2,
+        };
+        self.push_rect(draw_rect);
+        self.inner.draw_shadow(rect, radius, shadow);
+    }
+
+    fn fill_obb_aa(&mut self, obb: crate::raster::Obb, color: Color) {
+        self.push_rect(obb.aabb());
+        self.inner.fill_obb_aa(obb, color);
+    }
+
+    fn fill_disc_aa(&mut self, center: crate::raster::PointF, radius: f32, color: Color) {
+        let pad = radius + 1.0;
+        self.push_rect(Rect {
+            x: (center.x - pad) as i32 - 1,
+            y: (center.y - pad) as i32 - 1,
+            width: (pad * 2.0) as i32 + 3,
+            height: (pad * 2.0) as i32 + 3,
+        });
+        self.inner.fill_disc_aa(center, radius, color);
+    }
+
+    fn stroke_line_aa(
+        &mut self,
+        a: crate::raster::PointF,
+        b: crate::raster::PointF,
+        width: f32,
+        color: Color,
+    ) {
+        let pad = width * 0.5 + 1.0;
+        self.push_rect(Rect {
+            x: (a.x.min(b.x) - pad) as i32 - 1,
+            y: (a.y.min(b.y) - pad) as i32 - 1,
+            width: ((a.x.max(b.x) + pad) as i32 - (a.x.min(b.x) - pad) as i32) + 2,
+            height: ((a.y.max(b.y) + pad) as i32 - (a.y.min(b.y) - pad) as i32) + 2,
+        });
+        self.inner.stroke_line_aa(a, b, width, color);
+    }
+
+    fn fill_arc_aa(
+        &mut self,
+        center: crate::raster::PointF,
+        r_outer: f32,
+        r_inner: f32,
+        start_cos: f32,
+        start_sin: f32,
+        end_cos: f32,
+        end_sin: f32,
+        extent: f32,
+        color: Color,
+    ) {
+        let pad = r_outer + 1.0;
+        self.push_rect(Rect {
+            x: (center.x - pad) as i32 - 1,
+            y: (center.y - pad) as i32 - 1,
+            width: (pad * 2.0) as i32 + 3,
+            height: (pad * 2.0) as i32 + 3,
+        });
+        self.inner.fill_arc_aa(
+            center, r_outer, r_inner, start_cos, start_sin, end_cos, end_sin, extent, color,
+        );
+    }
+
+    fn submit(&mut self, list: &crate::cmd::CommandList) {
+        if let Some(dirty) = list.dirty_union() {
+            self.push_rect(dirty);
+        }
+        self.inner.submit(list);
     }
 }
 
