@@ -274,6 +274,16 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     (LPAR-04 amended), and padding/gap via the cascade (frozen `Style`
     untouched).
 
+### Wave 3 — primitive and control widgets
+
+- **LPAR** (continued — Wave 3)
+  - [LPAR-11-PRIMITIVE-WIDGETS.md](LPAR-11-PRIMITIVE-WIDGETS.md) —
+    **Drafted 2026-06-13; not ratified.** Primitive widget wave:
+    additive `Arc`, `Bar`, `Led`, `Line`, `Spinner`, and `Scale` modules
+    in `rlvgl-widgets`, preserving `ProgressBar` and audio-meter
+    `Scale`/`LedBargraph` surfaces while consuming the settled style,
+    draw, text, layout, and animation substrate.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem
