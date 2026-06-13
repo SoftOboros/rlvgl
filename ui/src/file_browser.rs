@@ -7,8 +7,10 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::shape_text_ltr;
 use rlvgl_core::icon_bitmap::{ICON_FILE, ICON_FOLDER, IconBitmap};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -333,11 +335,9 @@ impl Widget for FileBrowser {
             );
 
             // Text (baseline positioned near bottom of row)
-            renderer.draw_text(
-                (text_x, row_y + ROW_HEIGHT - 4),
-                &entry.name,
-                self.text_color.with_alpha(alpha),
-            );
+            let shaped =
+                shape_text_ltr(&FONT_6X10, &entry.name, (text_x, row_y + ROW_HEIGHT - 4), 0);
+            renderer.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(alpha));
         }
     }
 

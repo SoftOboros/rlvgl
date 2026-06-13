@@ -22,7 +22,9 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use rlvgl_core::{
+    bitmap_font::FONT_6X10,
     event::{Event, Key},
+    font::shape_text_ltr,
     renderer::Renderer,
     widget::{Rect, Widget},
 };
@@ -209,8 +211,8 @@ impl EditCore {
         );
     }
 
-    /// Draw the buffer as `'\n'`-split lines (backend `draw_text` has
-    /// no newline semantics).
+    /// Draw the buffer as `'\n'`-split lines using shaped text so glyph coverage
+    /// uses `FontMetrics` and clipping follows glyph extents.
     fn draw_multi_line(&self, renderer: &mut dyn Renderer) {
         rlvgl_core::draw::draw_widget_bg(renderer, self.label.bounds(), &self.label.style);
         let bounds = self.label.bounds();
@@ -218,9 +220,11 @@ impl EditCore {
             if line.is_empty() {
                 continue;
             }
-            renderer.draw_text(
-                (bounds.x, bounds.y + (row as i32 + 1) * self.line_height),
-                line,
+            let baseline = bounds.y + (row as i32 + 1) * self.line_height;
+            let shaped = shape_text_ltr(&FONT_6X10, line, (bounds.x, baseline), 0);
+            renderer.draw_text_shaped(
+                &shaped,
+                (0, 0),
                 self.label.text_color_with_alpha(self.label.style.alpha),
             );
         }
