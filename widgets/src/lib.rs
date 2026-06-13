@@ -12,6 +12,10 @@ pub mod bar;
 pub mod button;
 /// Grid of labeled buttons arranged in rows.
 pub mod button_matrix;
+/// Month-grid calendar widget.
+pub mod calendar;
+/// Data chart (line/bar/scatter series).
+pub mod chart;
 /// Checkbox widget for boolean options.
 pub mod checkbox;
 /// Transparent click-area widget — rlvgl analogue of QML `MouseArea`.
@@ -38,6 +42,8 @@ pub mod line;
 pub mod list;
 /// Page-stack navigation menu.
 pub mod menu;
+/// Title + message + button-row dialog.
+pub mod message_box;
 /// Audio-meter widgets (LED bargraph; needle and others to follow).
 pub mod meters;
 /// UI motion components (crawls, scrollers, tickers).
@@ -54,14 +60,20 @@ pub mod scale;
 pub mod scroll_view;
 /// Slider widget for numeric input.
 pub mod slider;
+/// Rich-text block of styled spans.
+pub mod span;
 /// Numeric text spinbox with range, step, digit format, and rollover.
 pub mod spinbox;
 /// Deterministic tick-driven spinner widget.
 pub mod spinner;
 /// Binary on/off switch widget.
 pub mod switch;
+/// Row/column data table with shaped-text cells.
+pub mod table;
 /// Tabbed container with a tab bar and content pages.
 pub mod tabview;
+/// Multi-line editable text area (LVGL textarea v2).
+pub mod textarea;
 /// Two-dimensional snap-navigable tile grid.
 pub mod tileview;
 /// Title-bar + content-area window container.

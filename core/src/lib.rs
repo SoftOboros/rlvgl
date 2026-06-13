@@ -43,6 +43,10 @@ pub mod bitmap_font;
 pub mod cmd;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
+/// Shared edit-state machine (buffer, caret, mutation gates) promoted from
+/// `rlvgl-ui` so that `rlvgl-widgets` can depend on it without a crate cycle
+/// (LPAR-14 §5.C).
+pub mod edit;
 pub mod event;
 /// Focus traversal and group policy for the LPAR-04 event/focus runtime.
 pub mod focus;

@@ -18,11 +18,19 @@
 //! bitmap fonts, approximate for proportional backend fonts. The caret
 //! does not blink (WID-00 §6.2): rendering stays a pure function of the
 //! edit state, which headless D-dump tests rely on.
+//!
+//! # LPAR-14 §5.C — EditCore promotion
+//!
+//! [`EditCore`] has been moved to [`rlvgl_core::edit::EditCore`] to break the
+//! crate cycle that would arise if `rlvgl-widgets::textarea` depended on
+//! `rlvgl-ui`.  This module re-exports it as `pub use` so that all existing
+//! `ui::input::EditCore` paths continue to resolve unchanged (WID-01 path
+//! preserved).
 
 use alloc::boxed::Box;
-use alloc::string::String;
 use rlvgl_core::{
     bitmap_font::FONT_6X10,
+    edit::EditCore as CoreEditCore,
     event::{Event, Key},
     font::shape_text_ltr,
     renderer::Renderer,
@@ -30,134 +38,106 @@ use rlvgl_core::{
 };
 use rlvgl_widgets::label::Label;
 
-/// Callback type invoked when an input's text changes.
-type ChangeCallback = Box<dyn FnMut(&str)>;
+// ── Re-export so existing `ui::input::EditCore` paths keep working ────────────
+
+/// Re-export of [`rlvgl_core::edit::EditCore`] for backward compatibility.
+///
+/// Widgets and test code that previously used `rlvgl_ui::input::EditCore`
+/// continue to resolve here.  New code should import from
+/// [`rlvgl_core::edit`] directly.
+pub use rlvgl_core::edit::EditCore;
+
+/// Re-exported default char width constant (WID-00 §6.3).
+pub use rlvgl_core::edit::DEFAULT_CHAR_WIDTH;
+/// Re-exported default line height constant (WID-00 §6.3).
+pub use rlvgl_core::edit::DEFAULT_LINE_HEIGHT;
+
 /// Callback type invoked when a single-line input submits (Enter).
 type SubmitCallback = Box<dyn FnMut(&str)>;
-/// Accepted-charset predicate (runs after the printable-ASCII bound).
-type AcceptFn = Box<dyn Fn(char) -> bool>;
 
-/// Default nominal character advance for caret geometry (WID-00 §6.3).
-pub const DEFAULT_CHAR_WIDTH: i32 = 8;
-/// Default nominal line height for caret geometry (WID-00 §6.3).
-pub const DEFAULT_LINE_HEIGHT: i32 = 16;
 /// Caret thickness in pixels.
-const CARET_WIDTH: i32 = 2;
+const CARET_WIDTH: i32 = rlvgl_core::edit::CARET_WIDTH;
 
-/// Shared edit state machine for [`Input`] and [`Textarea`] (WID-00 §5).
-struct EditCore {
+// ── UiEditCore: ui-layer wrapper that also owns a Label ───────────────────────
+//
+// The promoted `CoreEditCore` (from `rlvgl_core::edit`) does not own a
+// `Label` — it holds only the buffer, caret, and mutation state.  The
+// ui-layer widgets still need a `Label` for rendering and style access, so
+// we keep a thin local wrapper struct `UiEditCore` that forwards all mutation
+// calls to the inner `CoreEditCore` while keeping the `Label` in sync.
+
+struct UiEditCore {
+    core: CoreEditCore,
     label: Label,
-    /// Edit buffer; ASCII-bounded for keyboard input, so byte index ==
-    /// char index. `set_text` may store anything (programmatic path).
-    buffer: String,
-    /// Caret position as a char index `0..=buffer.len()`.
-    caret: usize,
-    active: bool,
-    multi_line: bool,
-    max_len: Option<usize>,
-    accept: Option<AcceptFn>,
-    on_change: Option<ChangeCallback>,
-    char_width: i32,
-    line_height: i32,
 }
 
-impl EditCore {
+impl UiEditCore {
     fn new(text: &str, bounds: Rect, multi_line: bool) -> Self {
-        let buffer = String::from(text);
-        let caret = buffer.chars().count();
         Self {
+            core: CoreEditCore::new(text, bounds, multi_line),
             label: Label::new(text, bounds),
-            buffer,
-            caret,
-            active: false,
-            multi_line,
-            max_len: None,
-            accept: None,
-            on_change: None,
-            char_width: DEFAULT_CHAR_WIDTH,
-            line_height: DEFAULT_LINE_HEIGHT,
         }
     }
 
     fn set_text(&mut self, text: &str) {
-        self.buffer = String::from(text);
-        self.caret = self.caret.min(self.buffer.chars().count());
+        // CoreEditCore::set_text fires on_change; we also sync the label.
+        self.core.buffer = alloc::string::String::from(text);
+        self.core.caret = self.core.caret.min(self.core.buffer.chars().count());
         self.label.set_text(text);
-        if let Some(cb) = self.on_change.as_mut() {
-            cb(&self.buffer);
+        if let Some(cb) = self.core.on_change.as_mut() {
+            cb(&self.core.buffer);
         }
     }
 
-    /// Apply a successful edit: sync the label and fire `on_change`.
     fn committed(&mut self) {
-        self.label.set_text(self.buffer.clone());
-        if let Some(cb) = self.on_change.as_mut() {
-            cb(&self.buffer);
+        // Sync the label then fire on_change (mirrors original EditCore::committed).
+        self.label.set_text(self.core.buffer.clone());
+        if let Some(cb) = self.core.on_change.as_mut() {
+            cb(&self.core.buffer);
         }
     }
 
-    /// Char-index → byte-index (identical for ASCII; computed generally
-    /// so a programmatic non-ASCII `set_text` cannot corrupt edits).
-    fn byte_index(&self, char_index: usize) -> usize {
-        self.buffer
-            .char_indices()
-            .nth(char_index)
-            .map(|(i, _)| i)
-            .unwrap_or(self.buffer.len())
-    }
-
-    fn char_count(&self) -> usize {
-        self.buffer.chars().count()
-    }
-
-    /// Insert a character at the caret if every gate passes. Returns
-    /// `true` when the edit was applied (WID-00 §5.1: failed edits
-    /// leave buffer and caret untouched and fire no callback).
     fn try_insert(&mut self, c: char) -> bool {
-        // v1 ASCII bound (0x20..=0x7E) — newline is allowed only via
-        // the Enter path on multi-line fields.
+        // Delegate the gate logic to CoreEditCore but intercept the callback
+        // so we can also sync the label.
         let printable = ('\u{20}'..='\u{7e}').contains(&c);
-        if !(printable || (c == '\n' && self.multi_line)) {
+        if !(printable || (c == '\n' && self.core.multi_line)) {
             return false;
         }
         if c != '\n'
-            && let Some(accept) = self.accept.as_ref()
+            && let Some(accept) = self.core.accept.as_ref()
             && !accept(c)
         {
             return false;
         }
-        if let Some(max) = self.max_len
-            && self.char_count() >= max
+        if let Some(max) = self.core.max_len
+            && self.core.char_count() >= max
         {
             return false;
         }
-        let at = self.byte_index(self.caret);
-        self.buffer.insert(at, c);
-        self.caret += 1;
+        let at = self.core.byte_index(self.core.caret);
+        self.core.buffer.insert(at, c);
+        self.core.caret += 1;
         self.committed();
         true
     }
 
-    /// Delete the character before the caret. No-op at position 0.
     fn try_backspace(&mut self) -> bool {
-        if self.caret == 0 {
+        if self.core.caret == 0 {
             return false;
         }
-        let at = self.byte_index(self.caret - 1);
-        self.buffer.remove(at);
-        self.caret -= 1;
+        let at = self.core.byte_index(self.core.caret - 1);
+        self.core.buffer.remove(at);
+        self.core.caret -= 1;
         self.committed();
         true
     }
 
-    /// Handle a key while active. Returns `true` when consumed
-    /// (WID-00 §5.3) — `Enter` consumption is handled by the wrappers
-    /// since its meaning differs between Input and Textarea.
     fn handle_key(&mut self, key: &Key) -> bool {
         match key {
             Key::Character(c) => {
                 self.try_insert(*c);
-                true // consumed even when rejected: the key targeted us
+                true
             }
             Key::Space => {
                 self.try_insert(' ');
@@ -168,59 +148,46 @@ impl EditCore {
                 true
             }
             Key::ArrowLeft => {
-                self.caret = self.caret.saturating_sub(1);
+                self.core.caret = self.core.caret.saturating_sub(1);
                 true
             }
             Key::ArrowRight => {
-                self.caret = (self.caret + 1).min(self.char_count());
+                self.core.caret = (self.core.caret + 1).min(self.core.char_count());
                 true
             }
             _ => false,
         }
     }
 
-    /// Caret (row, col) against `'\n'`-split lines.
     fn caret_row_col(&self) -> (i32, i32) {
-        let mut row = 0;
-        let mut col = 0;
-        for c in self.buffer.chars().take(self.caret) {
-            if c == '\n' {
-                row += 1;
-                col = 0;
-            } else {
-                col += 1;
-            }
-        }
-        (row, col)
+        self.core.caret_row_col()
     }
 
     fn draw_caret(&self, renderer: &mut dyn Renderer) {
-        if !self.active {
+        if !self.core.active {
             return;
         }
         let bounds = self.label.bounds();
         let (row, col) = self.caret_row_col();
         renderer.fill_rect(
             Rect {
-                x: bounds.x + col * self.char_width,
-                y: bounds.y + row * self.line_height,
+                x: bounds.x + col * self.core.char_width,
+                y: bounds.y + row * self.core.line_height,
                 width: CARET_WIDTH,
-                height: self.line_height,
+                height: self.core.line_height,
             },
             self.label.style.border_color,
         );
     }
 
-    /// Draw the buffer as `'\n'`-split lines using shaped text so glyph coverage
-    /// uses `FontMetrics` and clipping follows glyph extents.
     fn draw_multi_line(&self, renderer: &mut dyn Renderer) {
         rlvgl_core::draw::draw_widget_bg(renderer, self.label.bounds(), &self.label.style);
         let bounds = self.label.bounds();
-        for (row, line) in self.buffer.split('\n').enumerate() {
+        for (row, line) in self.core.buffer.split('\n').enumerate() {
             if line.is_empty() {
                 continue;
             }
-            let baseline = bounds.y + (row as i32 + 1) * self.line_height;
+            let baseline = bounds.y + (row as i32 + 1) * self.core.line_height;
             let shaped = shape_text_ltr(&FONT_6X10, line, (bounds.x, baseline), 0);
             renderer.draw_text_shaped(
                 &shaped,
@@ -239,7 +206,7 @@ impl EditCore {
 /// the buffer).
 #[allow(clippy::type_complexity)]
 pub struct Input {
-    core: EditCore,
+    core: UiEditCore,
     on_submit: Option<SubmitCallback>,
 }
 
@@ -248,7 +215,7 @@ impl Input {
     /// The caret starts at the end of the initial text.
     pub fn new(text: &str, bounds: Rect) -> Self {
         Self {
-            core: EditCore::new(text, bounds, false),
+            core: UiEditCore::new(text, bounds, false),
             on_submit: None,
         }
     }
@@ -256,7 +223,7 @@ impl Input {
     /// Register a change handler invoked after every successful edit
     /// and on [`Self::set_text`].
     pub fn on_change<F: FnMut(&str) + 'static>(mut self, handler: F) -> Self {
-        self.core.on_change = Some(Box::new(handler));
+        self.core.core.on_change = Some(Box::new(handler));
         self
     }
 
@@ -271,13 +238,13 @@ impl Input {
     /// (evaluated after the printable-ASCII bound). Rejected characters
     /// leave buffer and caret untouched (WID-00 §8.2).
     pub fn with_accept<F: Fn(char) -> bool + 'static>(mut self, accept: F) -> Self {
-        self.core.accept = Some(Box::new(accept));
+        self.core.core.accept = Some(Box::new(accept));
         self
     }
 
     /// Cap the buffer at `max` characters (WID-00 §8.1).
     pub fn with_max_len(mut self, max: usize) -> Self {
-        self.core.max_len = Some(max);
+        self.core.core.max_len = Some(max);
         self
     }
 
@@ -285,25 +252,25 @@ impl Input {
     /// (WID-00 §6.3). Defaults: [`DEFAULT_CHAR_WIDTH`] /
     /// [`DEFAULT_LINE_HEIGHT`].
     pub fn with_char_metrics(mut self, char_width: i32, line_height: i32) -> Self {
-        self.core.char_width = char_width.max(1);
-        self.core.line_height = line_height.max(1);
+        self.core.core.char_width = char_width.max(1);
+        self.core.core.line_height = line_height.max(1);
         self
     }
 
     /// Whether this field currently consumes keys (WID-00 §7).
     pub fn is_active(&self) -> bool {
-        self.core.active
+        self.core.core.active
     }
 
     /// Toggle key consumption. Applications keep at most one field
     /// active; the framework does not track focus (WID-00 §7.1).
     pub fn set_active(&mut self, active: bool) {
-        self.core.active = active;
+        self.core.core.active = active;
     }
 
     /// Current caret position (char index, `0..=len`).
     pub fn caret(&self) -> usize {
-        self.core.caret
+        self.core.core.caret
     }
 
     /// Immutable access to the input style.
@@ -324,7 +291,7 @@ impl Input {
 
     /// Retrieve the current input text.
     pub fn text(&self) -> &str {
-        &self.core.buffer
+        &self.core.core.buffer
     }
 }
 
@@ -339,13 +306,13 @@ impl Widget for Input {
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if !self.core.active {
+        if !self.core.core.active {
             return false;
         }
         if let Event::KeyDown { key } = event {
             if *key == Key::Enter {
                 if let Some(cb) = self.on_submit.as_mut() {
-                    cb(&self.core.buffer);
+                    cb(&self.core.core.buffer);
                 }
                 return true;
             }
@@ -361,59 +328,59 @@ impl Widget for Input {
 /// (an ordinary edit) instead of submitting, and rendering draws each
 /// `'\n'`-split line separately.
 pub struct Textarea {
-    core: EditCore,
+    core: UiEditCore,
 }
 
 impl Textarea {
     /// Create a new textarea with the provided text and bounds.
     pub fn new(text: &str, bounds: Rect) -> Self {
         Self {
-            core: EditCore::new(text, bounds, true),
+            core: UiEditCore::new(text, bounds, true),
         }
     }
 
     /// Register a change handler invoked after every successful edit
     /// and on [`Self::set_text`].
     pub fn on_change<F: FnMut(&str) + 'static>(mut self, handler: F) -> Self {
-        self.core.on_change = Some(Box::new(handler));
+        self.core.core.on_change = Some(Box::new(handler));
         self
     }
 
     /// Restrict insertions to characters accepted by `accept`
     /// (newlines from Enter are exempt; WID-00 §8.2).
     pub fn with_accept<F: Fn(char) -> bool + 'static>(mut self, accept: F) -> Self {
-        self.core.accept = Some(Box::new(accept));
+        self.core.core.accept = Some(Box::new(accept));
         self
     }
 
     /// Cap the buffer at `max` characters (newlines count).
     pub fn with_max_len(mut self, max: usize) -> Self {
-        self.core.max_len = Some(max);
+        self.core.core.max_len = Some(max);
         self
     }
 
     /// Override the nominal char metrics used for caret geometry and
     /// line pitch (WID-00 §6.3).
     pub fn with_char_metrics(mut self, char_width: i32, line_height: i32) -> Self {
-        self.core.char_width = char_width.max(1);
-        self.core.line_height = line_height.max(1);
+        self.core.core.char_width = char_width.max(1);
+        self.core.core.line_height = line_height.max(1);
         self
     }
 
     /// Whether this field currently consumes keys (WID-00 §7).
     pub fn is_active(&self) -> bool {
-        self.core.active
+        self.core.core.active
     }
 
     /// Toggle key consumption (WID-00 §7.1).
     pub fn set_active(&mut self, active: bool) {
-        self.core.active = active;
+        self.core.core.active = active;
     }
 
     /// Current caret position (char index across the whole buffer;
     /// newlines count one).
     pub fn caret(&self) -> usize {
-        self.core.caret
+        self.core.core.caret
     }
 
     /// Immutable access to the textarea style.
@@ -433,7 +400,7 @@ impl Textarea {
 
     /// Retrieve the textarea content.
     pub fn text(&self) -> &str {
-        &self.core.buffer
+        &self.core.core.buffer
     }
 }
 
@@ -448,7 +415,7 @@ impl Widget for Textarea {
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
-        if !self.core.active {
+        if !self.core.core.active {
             return false;
         }
         if let Event::KeyDown { key } = event {
