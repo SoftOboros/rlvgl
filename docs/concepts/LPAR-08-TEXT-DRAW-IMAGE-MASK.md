@@ -890,6 +890,10 @@ deterministic extent fallback.
 - **Image animation** (frame sequencing, `AnimImage` pixel-sequence descriptor).
   LPAR-15 scope; `ImageDescriptor` is designed to be one element of an
   animation sequence.
+- **Arbitrary-angle image rotation quality** is deferred beyond LPAR-08; current
+  default rotation is cardinal snapped for deterministic software references and
+  exact clipping behavior. Bilinear/lanczos interpolation is tracked as future
+  quality policy.
 - **`material_light()` `LparTheme` consuming `ui::theme::Tokens`** — the
   token vocabulary in `ui/src/theme.rs` can inform a `text_color` /
   `font_id` mapping in the theme. Deferred to the theme-implementation wave.
@@ -958,13 +962,13 @@ deterministic extent fallback.
   `Renderer::draw_text_shaped`, `ClipRenderer::draw_text_shaped`,
   `Renderer::fill_masked`, `GradientDesc`/`GradientKind` with
   `Renderer::fill_gradient`, and `ShadowDesc` with `Renderer::draw_shadow`.
-  Clarified that `draw_text_shaped` is a deterministic glyph-extent visualizer
-  today, not real glyph coverage; the glyph coverage adapter and
-  `widgets/src/label.rs` migration remain open. Also clarified that image work
-  is descriptor/option substrate only: `Renderer::blit_image`,
-  nearest-neighbor scale/rotate, and widget migration are not yet implemented.
-  `RoundedRectMask` and `ArcMask` also remain open. §12 now distinguishes
-  landed substrate from remaining acceptance blockers.
+  Glyph coverage support is now wired for font-backed shaped runs via
+  `FontMetrics::glyph_coverage_row`, while manually constructed `ShapedText`
+  retains extent-based fallback as a deterministic rendering path for callers that
+  build runs without a font handle. `RoundedRectMask` and `ArcMask` are in place,
+  with remaining image/mask work now centered on backend overrides and widget-
+  composition callsites. §12 now distinguishes landed substrate from remaining
+  acceptance blockers.
 - **2026-06-12** — Glyph coverage and label migration slice landed.
   `FontMetrics` now exposes an object-safe `glyph_coverage_row` hook for
   bitmap, packed, and `fontdue` backends; `ShapedText` retains the font
@@ -989,6 +993,12 @@ deterministic extent fallback.
   shaped-text clip in `ScrollView` (`widgets/tests/scroll_view.rs`),
   gradient/shadow determinism (`core/tests/lpar16_conformance.rs`), and
   recolor alpha sweep (`core/tests/image_blit.rs`).
+- **2026-06-13** — UI and compatibility-wave migration landed:
+  `ui/src/input.rs` and `ui/src/file_browser.rs` now shape text through
+  `shape_text_ltr` and draw through `draw_text_shaped`; `Label`, `Radio`,
+  `Checkbox`, and `List` widgets are on the shaped-text path; and legacy text-
+ color stand-ins were shimmed in `widgets/src/label.rs` and callsites so LPAR-07
+  text cascade migration can continue without temporary regressions.
 - **2026-06-12** — Rounded and arc mask slice landed. `core/src/mask.rs` now
   includes documented `RoundedRectMask` and `ArcMask` implementations using
   deterministic integer subpixel coverage with no allocation or floating
@@ -1005,9 +1015,8 @@ deterministic extent fallback.
   snaps rotation to cardinal orientations around `BlitOpts::pivot`, honors
   `BlitOpts::clip`, and forwards one output row at a time through
   `draw_pixels` so `ClipRenderer` and backend pixel fast paths remain the
-  integration point. Remaining image work: widget migration, backend
-  overrides, command-list representation, and any future arbitrary-angle
-  rotation quality policy.
+  integration point. Remaining image work: backend overrides, command-list
+  representation, and any future arbitrary-angle interpolation/pixel filter policy.
 - **2026-06-12** — LPAR-08 dirty-rect propagation slice landed.
   `DirtyTrackingRenderer` now tracks draw/text/image mutations by pushing
   conservative `Rect` deltas into `InvalidationList` while forwarding every
