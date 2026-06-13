@@ -4,8 +4,8 @@ LPAR-12-CONTROL-WIDGETS.md — LVGL parity control widget concepts.
 
 # LPAR-12 — Control Widget Wave
 
-**Status:** Drafted 2026-06-13. Not ratified; implementation is blocked until
-owner ratification is recorded in §15.
+**Status:** Ratified 2026-06-13. Normative for LPAR-12 control widget wave
+implementation.
 
 Parent initiative: [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md). Baseline:
 [LPAR-01-BASELINE.md](LPAR-01-BASELINE.md). Event/focus:
@@ -292,10 +292,11 @@ Step and value contract:
 
 Event contract:
 
-- `ObjectEvent::Key(Key::Up)` increments and `ObjectEvent::Key(Key::Down)`
-  decrements when wired through object-level handlers.
-- `ObjectEvent::Key(Key::Right)` / `ObjectEvent::Key(Key::Left)` move the
-  selected digit in keypad mode.
+- `ObjectEvent::Key(Key::ArrowUp)` increments and
+  `ObjectEvent::Key(Key::ArrowDown)` decrements when wired through
+  object-level handlers.
+- `ObjectEvent::Key(Key::ArrowRight)` / `ObjectEvent::Key(Key::ArrowLeft)`
+  move the selected digit in keypad mode.
 - `ObjectEvent::Rotary { diff }` increments/decrements in encoder editing mode
   when object-level integration is added.
 - The standalone widget exposes helper methods for these transitions in v1;
@@ -468,3 +469,17 @@ LPAR-12 is complete only when:
   ButtonMatrix map/control/event contract (§5.C), ImageButton state/source
   fallback and draw contract (§5.D), Spinbox numeric formatting/step/event
   contract (§5.E), and implementation order (§5.F). Not ratified.
+- **2026-06-13** — Reviewer pass, then ratified by owner instruction
+  ("proceed with the next LPAR activities"). Review confirmed the draft needs
+  no cross-doc amendment: it uses the existing `ObjectEvent::Key`/`Rotary`
+  vocabulary, adds no `Renderer`/`core::style::Style`/`core::event::Event`
+  surface, and its new enums (`ButtonMatrixControl`/`ImageButtonState`/
+  `SpinboxDigitStepDirection`) are widget-local Specification Required. The
+  widget-vs-node key-delivery question is resolved internally: widgets expose
+  imperative helper methods (`increment`/`step_next`/`set_selected_button`,
+  …) wired to `ObjectEvent::Key` by the app via a node handler (the WID
+  `set_active` adapter pattern); automatic object-handler registration is a
+  named deferral pending a future LPAR-04 amendment. Tightening: §5.E key
+  references corrected from `Key::Up`/`Down`/`Left`/`Right` to the actual
+  `Key::ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight` variants. Implementation
+  unblocked (slices LPAR-12b ImageButton, 12c Spinbox, 12d ButtonMatrix).
