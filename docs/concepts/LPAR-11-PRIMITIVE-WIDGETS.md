@@ -419,7 +419,7 @@ LPAR-11 is complete only when:
       `scale`.
 - [x] `Bar` implements mode/orientation/range/start-value behavior and tests.
 - [x] `Led` implements brightness/color/on/off/toggle behavior and tests.
-- [ ] `Line` implements point drawing, y inversion, and tests.
+- [x] `Line` implements point drawing, y inversion, and tests.
 - [ ] `Arc` implements value/range/angle/mode drawing and tests.
 - [ ] `Spinner` implements deterministic tick animation and tests.
 - [ ] `Scale` implements base line/arc ticks, major labels, orientation modes,
@@ -499,3 +499,9 @@ LPAR-11 is complete only when:
   `set_bounds`; and focused geometry tests. `Led` implements LVGL brightness
   clamps, color modulation, on/off/toggle, layout `set_bounds`, and unit tests.
   Remaining widgets: `Line`, `Arc`, `Spinner`, and `Scale`.
+- **2026-06-13** — LPAR-11c landed `widgets::line::Line`, backed by a borrowed
+  point slice with concrete pixel offsets, optional y inversion, layout
+  `set_bounds`, and anti-aliased `stroke_line_aa` drawing. Unit tests cover
+  segment dispatch, style alpha/width propagation, y inversion, point
+  rebinding, bounds adoption, and no-op cases. Remaining widgets: `Arc`,
+  `Spinner`, and `Scale`.

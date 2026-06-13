@@ -22,6 +22,8 @@ pub mod image;
 pub mod label;
 /// LVGL-parity LED indicator widget.
 pub mod led;
+/// Borrowed-slice polyline widget.
+pub mod line;
 /// Scrollable list widget.
 pub mod list;
 /// Audio-meter widgets (LED bargraph; needle and others to follow).
