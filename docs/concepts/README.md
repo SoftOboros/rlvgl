@@ -283,6 +283,12 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     in `rlvgl-widgets`, preserving `ProgressBar` and audio-meter
     `Scale`/`LedBargraph` surfaces while consuming the settled style,
     draw, text, layout, and animation substrate.
+  - [LPAR-12-CONTROL-WIDGETS.md](LPAR-12-CONTROL-WIDGETS.md) —
+    **Drafted 2026-06-13; not ratified.** Control widget wave:
+    additive `ButtonMatrix`, `ImageButton`, and `Spinbox` modules over
+    the LPAR-04 event/focus, LPAR-08 text/image draw, LPAR-09 asset,
+    LPAR-10 layout, and LPAR-11 primitive-widget substrate. Implementation
+    remains blocked until §15 ratification.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
