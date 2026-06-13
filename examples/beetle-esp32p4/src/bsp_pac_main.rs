@@ -111,12 +111,17 @@ unsafe fn run_bringup_instrumented() -> u8 {
         return probe_code;
     }
 
-    // Bracket wake with the marker HIGH so the granular dips emitted by
-    // `write_reg_instrumented` are visible as LOW pulses inside the
-    // sustained-HIGH region on Saleae GPIO 5.
+    // Bracket wake with the marker HIGH so the Saleae trace shows exactly
+    // when the bit-bang wake transactions run (real 100 kHz I2C traffic is
+    // visible inside the sustained-HIGH region on GPIO 5).
     debug_marker_set(true);
-    // Phase 4 (now Phase 0): wake — moved BEFORE PSRAM/LDO/DSI.
-    let wake_result = unsafe { wake_instrumented() };
+    // ERRATA-008 work-around: drive the bridge wake over the bit-bang
+    // transport instead of the broken I2C0 master FSM. The bit-bang
+    // address probe already ACKs the bridge at 0x45, so this is the v0
+    // wake path; a success drives REG_PWM=255 (backlight on). The legacy
+    // `wake_instrumented()` peripheral path is retained (reachable from
+    // `run_bringup`) for continued ERRATA-008 FSM investigation.
+    let wake_result = unsafe { dfr0550::i2c_bridge::wake_bitbang() };
     debug_marker_set(false);
     use core::sync::atomic::Ordering;
     use dfr0550::i2c_bridge::BridgeError;

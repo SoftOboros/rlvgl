@@ -1373,3 +1373,227 @@ fn bitbang_quarter() {
         n = unsafe { core::ptr::read_volatile(&n) }.wrapping_sub(1);
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// Bit-bang I2C transport (ERRATA-008 work-around).
+//
+// The I2C0 master FSM is stuck in a silicon-errata-class defect
+// (BEETLE ERRATA-008): `trans_start` latches but `DET_START` never fires,
+// so the peripheral never completes a real transaction — exhaustive
+// IDF-parity on the i2c_ll register layer AND a desk trace of the
+// `i2c_acquire_bus_handle` → `periph_module_enable` composite both came
+// up empty, leaving v1.3 silicon / peripheral-domain coupling as the
+// only remaining hypotheses.
+//
+// The bit-bang address probe (`bitbang_address_probe`) already proved the
+// bus, internal pull-ups, and the DFR0550 STM32F072 bridge at 0x45 are
+// electrically healthy — a manual GPIO bit-bang of START + addr + ACK
+// reaches the slave (septenary=000). This transport extends that proven
+// path into full single-register write and read so the panel-bridge wake
+// sequence can run *without* the broken peripheral, unblocking BEETLE-06
+// (DPI panel) and the v0 color-cycle goal. Speed (~100 kHz, CPU-blocking)
+// is irrelevant: wake is three register writes plus one polled read, done
+// once at boot.
+//
+// Pre-conditions (satisfied by `route_pins`): pad_driver=1 (open-drain)
+// and IO_MUX fun_ie=1 / fun_wpu=1 on both GPIO 7 (SDA) and GPIO 8 (SCL).
+// Each transport call detaches the GPIO matrix from the I2C0 signal
+// (out_sel=256 → pure GPIO), drives the line via GPIO_OUT, and re-attaches
+// on exit. The (broken) peripheral stays idle between calls because the
+// bit-bang path never writes `trans_start`.
+// ─────────────────────────────────────────────────────────────────────
+
+const SCL_MASK: u32 = 1 << SCL_GPIO;
+const SDA_MASK: u32 = 1 << SDA_GPIO;
+
+/// Detach SCL/SDA from the I2C0 peripheral matrix signal and put both
+/// lines in the released (open-drain Hi-Z, pulled high) state so the
+/// bit-bang routines own the bus.
+unsafe fn bb_detach(p: &pac::Peripherals) {
+    // out_sel=256 → pad output value follows GPIO_OUT_REG (pure GPIO).
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(256) });
+    // Release both lines (GPIO.out=1 → open-drain Hi-Z), output-enabled.
+    p.GPIO
+        .out_w1ts()
+        .write(|w| unsafe { w.bits(SCL_MASK | SDA_MASK) });
+    p.GPIO
+        .enable_w1ts()
+        .write(|w| unsafe { w.bits(SCL_MASK | SDA_MASK) });
+}
+
+/// Re-attach SCL/SDA to the I2C0 peripheral matrix signals. Both lines
+/// are left released; the (broken) peripheral stays idle because the
+/// bit-bang path never writes `trans_start`.
+unsafe fn bb_attach(p: &pac::Peripherals) {
+    p.GPIO
+        .func_out_sel_cfg(SCL_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SCL_SIG) });
+    p.GPIO
+        .func_out_sel_cfg(SDA_GPIO as usize)
+        .modify(|_, w| unsafe { w.out_sel().bits(I2C0_SDA_SIG) });
+}
+
+#[inline]
+fn bb_scl_high(p: &pac::Peripherals) {
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(SCL_MASK) });
+}
+#[inline]
+fn bb_scl_low(p: &pac::Peripherals) {
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(SCL_MASK) });
+}
+#[inline]
+fn bb_sda_high(p: &pac::Peripherals) {
+    p.GPIO.out_w1ts().write(|w| unsafe { w.bits(SDA_MASK) });
+}
+#[inline]
+fn bb_sda_low(p: &pac::Peripherals) {
+    p.GPIO.out_w1tc().write(|w| unsafe { w.bits(SDA_MASK) });
+}
+#[inline]
+fn bb_sda_read(p: &pac::Peripherals) -> bool {
+    (p.GPIO.in_().read().bits() >> SDA_GPIO) & 1 != 0
+}
+
+/// START: SDA falls while SCL high, then SCL low for the clock phase.
+/// Assumes the bus is idle (both lines released high).
+fn bb_start(p: &pac::Peripherals) {
+    bb_sda_high(p);
+    bb_scl_high(p);
+    bitbang_quarter();
+    bb_sda_low(p);
+    bitbang_quarter();
+    bb_scl_low(p);
+    bitbang_quarter();
+}
+
+/// Repeated START: from the post-ACK state (SCL low), release SDA, raise
+/// SCL, then drop SDA while SCL is high to form the START transition.
+fn bb_rstart(p: &pac::Peripherals) {
+    bb_sda_high(p);
+    bitbang_quarter();
+    bb_scl_high(p);
+    bitbang_quarter();
+    bb_sda_low(p);
+    bitbang_quarter();
+    bb_scl_low(p);
+    bitbang_quarter();
+}
+
+/// STOP: from the post-ACK state (SCL low), drive SDA low, raise SCL,
+/// then release SDA while SCL is high to form the STOP transition.
+fn bb_stop(p: &pac::Peripherals) {
+    bb_sda_low(p);
+    bitbang_quarter();
+    bb_scl_high(p);
+    bitbang_quarter();
+    bb_sda_high(p);
+    bitbang_quarter();
+}
+
+/// Clock out one byte MSB-first, then sample the ACK bit. Returns true
+/// if the slave ACKed (pulled SDA low during the 9th clock).
+fn bb_write_byte(p: &pac::Peripherals, byte: u8) -> bool {
+    for i in (0..8).rev() {
+        if (byte >> i) & 1 != 0 {
+            bb_sda_high(p);
+        } else {
+            bb_sda_low(p);
+        }
+        bitbang_quarter();
+        bb_scl_high(p);
+        bitbang_quarter();
+        bitbang_quarter();
+        bb_scl_low(p);
+        bitbang_quarter();
+    }
+    // ACK clock: release SDA so the slave can drive it, clock SCL, sample.
+    bb_sda_high(p);
+    bitbang_quarter();
+    bb_scl_high(p);
+    bitbang_quarter();
+    let ack = !bb_sda_read(p); // SDA pulled low by slave = ACK
+    bitbang_quarter();
+    bb_scl_low(p);
+    bitbang_quarter();
+    ack
+}
+
+/// Read one byte MSB-first. `send_ack` drives the master's ACK (true) or
+/// NACK (false) on the 9th clock — NACK the final byte of a read.
+fn bb_read_byte(p: &pac::Peripherals, send_ack: bool) -> u8 {
+    let mut val: u8 = 0;
+    bb_sda_high(p); // release SDA so the slave drives the data bits
+    for _ in 0..8 {
+        bb_scl_high(p);
+        bitbang_quarter();
+        val = (val << 1) | (bb_sda_read(p) as u8);
+        bitbang_quarter();
+        bb_scl_low(p);
+        bitbang_quarter();
+    }
+    // Master ACK/NACK bit.
+    if send_ack {
+        bb_sda_low(p);
+    } else {
+        bb_sda_high(p);
+    }
+    bitbang_quarter();
+    bb_scl_high(p);
+    bitbang_quarter();
+    bitbang_quarter();
+    bb_scl_low(p);
+    bitbang_quarter();
+    val
+}
+
+/// Bit-bang `[reg, value]` to the slave at `addr` and STOP. Drop-in
+/// replacement for [`write_reg`] that bypasses the broken I2C0 master
+/// FSM (ERRATA-008). Returns `I2cError::Nack` if any byte is not ACKed.
+///
+/// # Safety
+/// Steals the PAC; requires `route_pins` to have configured pad_driver /
+/// pull-ups / input-enable on GPIO 7 + 8.
+pub fn write_reg_bitbang(addr: u8, reg: u8, value: u8) -> Result<(), I2cError> {
+    let p = unsafe { pac::Peripherals::steal() };
+    unsafe { bb_detach(&p) };
+    bitbang_quarter();
+
+    bb_start(&p);
+    let mut ok = bb_write_byte(&p, addr << 1);
+    ok &= bb_write_byte(&p, reg);
+    ok &= bb_write_byte(&p, value);
+    bb_stop(&p);
+
+    unsafe { bb_attach(&p) };
+    if ok { Ok(()) } else { Err(I2cError::Nack) }
+}
+
+/// Bit-bang a 1-byte register read: write `reg`, repeated-START, read one
+/// byte (NACKed) from `addr`. Drop-in replacement for [`read_reg`] that
+/// bypasses the broken I2C0 master FSM (ERRATA-008). Returns
+/// `I2cError::Nack` if any address/register byte is not ACKed.
+///
+/// # Safety
+/// Steals the PAC; requires `route_pins` to have configured pad_driver /
+/// pull-ups / input-enable on GPIO 7 + 8.
+pub fn read_reg_bitbang(addr: u8, reg: u8) -> Result<u8, I2cError> {
+    let p = unsafe { pac::Peripherals::steal() };
+    unsafe { bb_detach(&p) };
+    bitbang_quarter();
+
+    bb_start(&p);
+    let mut ok = bb_write_byte(&p, addr << 1); // write phase: addr + W
+    ok &= bb_write_byte(&p, reg);
+    bb_rstart(&p);
+    ok &= bb_write_byte(&p, (addr << 1) | 1); // read phase: addr + R
+    let val = bb_read_byte(&p, false); // single byte → NACK it
+    bb_stop(&p);
+
+    unsafe { bb_attach(&p) };
+    if ok { Ok(val) } else { Err(I2cError::Nack) }
+}

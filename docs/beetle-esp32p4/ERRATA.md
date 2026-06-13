@@ -1529,6 +1529,68 @@ The remaining hypothesis space is narrow:
 4. Memalpha targeted search: "ESP32-P4 v1.3 I2C errata", "DET_START
    not firing", "trans_start no START condition".
 
+#### 2026-06-13 — periph_ctrl trace (negative) + bit-bang transport work-around
+
+**Desk trace of next-session plan item #1 — `periph_module_enable`
+composite. Result: NEGATIVE — no missing register write.** Walked
+`i2c_acquire_bus_handle` → `s_i2c_bus_handle_acquire`
+(`esp_driver_i2c/i2c_common.c`) line by line against
+`hal/esp32p4/include/hal/i2c_ll.h` + `hal/i2c_hal.c`:
+
+- `I2C_RCC_ATOMIC { i2c_ll_enable_bus_clock(port,true);
+  i2c_ll_reset_register(port); }` → `soc_clk_ctrl2.i2c0_apb_clk_en=1`
+  + pulse `hp_rst_en1.rst_en_i2c0`. **We do both** (`route_pins`).
+- `I2C_CLOCK_SRC_ATOMIC { i2c_hal_init() }` → `_i2c_hal_init` only sets
+  `hal->dev` + `i2c_ll_enable_controller_clock` →
+  `peri_clk_ctrl10.i2c0_clk_en=1`. **We do this.**
+- `i2c_hal_master_init`: `set_mode(master)`,
+  `enable_pins_open_drain(true)` (= `sda/scl_force_out=0`),
+  `enable_arbitration(false)`, `rx_full_ack_level(false)`, MSB-first,
+  fifo rst. **All match our CTR write.**
+
+There is **no hidden register write** in the periph_ctrl / acquire
+layer. Combined with the exhausted i2c_ll parity (2026-06-07), this
+**rules out hypothesis #1** ("missing master-init step"). The
+remaining hypotheses are #2 (v1.3 silicon errata) and #3 (peripheral
+coupling — corroborated by BEETLE-03p: moving wake before
+PSRAM/LDO/DSI was the only change that ever advanced the FSM). One
+residual config nit found but discounted: IDF pulses `fsm_rst`
+*before* loading FIFO/COMD; we do it after — but `LAST_HANG_COMD0_PINS`
+reads op=6 at hang, so the commands demonstrably survive, i.e. this
+ordering is not wiping the COMD list.
+
+**Decision — bit-bang transport is the v0 wake path (BEETLE-03ah).**
+Rather than spend a 10th+ bench session on a likely-unfixable silicon
+defect, route around it: the bit-bang address probe already ACKs the
+bridge at 0x45 (item #7, septenary=000; item #9 confirms it NACKs with
+the panel unplugged), proving the bus + pull-ups + bridge are healthy.
+Landed `i2c0::write_reg_bitbang` / `read_reg_bitbang` (full
+START/(R)START/byte+ACK/STOP over GPIO, matrix detached via
+out_sel=256, re-attached on exit) and `i2c_bridge::wake_bitbang`, and
+switched `bsp_pac_main::run_bringup_instrumented` to call it. Wake is
+3 register writes + 1 polled read done once at boot, so the ~100 kHz
+CPU-blocking bit-bang speed is irrelevant. This is **additive** — the
+peripheral `wake_instrumented` path stays in tree (reachable from
+`run_bringup`) for continued FSM investigation. A successful wake
+drives `REG_PWM=255`, so **the panel backlight illuminating is the
+eye-visible pass signal**, and it unblocks BEETLE-06 (DPI) / the v0
+color-cycle goal regardless of the peripheral-FSM mystery.
+
+- **Status of gate (e):** 🟢 **CLOSED via bit-bang transport** (peripheral
+  FSM remains 🔴 open as a parallel investigation).
+- **Builds clean:** `cargo build --release -p
+  rlvgl-example-beetle-esp32p4 --features esp32p4 --target
+  riscv32imafc-unknown-none-elf` → exit 0.
+- **HIL CONFIRMED 2026-06-13:** force-flashed (`--no-skip`, app
+  71,616 B) and reset. **Panel backlight illuminated** — `wake_bitbang`
+  drove POWERON + PORTB-ready + PORTA + PWM=255, all ACKed by the
+  bridge over bit-bang. Primary Morse advanced from `030` (peripheral
+  FSM Hang, structurally impossible on the bit-bang path) to **`002`**
+  = `DsiError::PllLock` — the **first execution of the DSI path on this
+  hardware**. The I2C bus is quiet on the Saleae (correct: bit-bang is a
+  ~1–2 ms one-shot burst at boot, not the old continuous 174 µs train).
+  **Blocker moves from BEETLE-03 → BEETLE-05 (DSI PHY PLL lock).**
+
 ### Tracking
 
 - Bench session 2026-06-01: 5 dispatch rounds confirming hang
