@@ -1003,3 +1003,7 @@ deterministic extent fallback.
   call to the wrapped renderer. Tracking includes AA span clipping (`blend_row`
   non-zero runs), `blit_image` clip-aware destination area, and structured
   command-list submissions via `CommandList::dirty_union`.
+- **2026-06-12** — LPAR-08 image widget path now routes through
+  `ImageDescriptor` + `blit_image`. `Image` gained configurable `BlitOpts` so
+  recolor/scale/rotation options can be used directly at widget level while
+  preserving existing bounds/viewport clipping behavior.
