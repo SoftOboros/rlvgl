@@ -603,3 +603,44 @@ Open item the bench must still answer (F3 was undocumented): **does toggling R0x
 - disco-analyzer should **move its rlvgl pin onto an H0-containing ref** so the default build at least carries H0's partial DAC improvement (today's `main`/`bc69338` pin predates H0, so the default build ships a fully-broken DAC).
 
 Cross-ref: disco-analyzer `docs/concepts/ERRATA.md` ERRATA-009 (2026-06-07 bench chain) + ERRATA-004; memory `project_daa_adc_isolated_loopback_2026-06-07`.
+
+## R4 — disco-analyzer bench 2026-06-13 (bit-shift = N = amplitude scaling; transport ruled out)
+
+Two findings from the disco loopback rig that sharpen the target:
+
+1. **The "bit or two shift" IS the serializer N, and it manifests as amplitude scaling.**
+   Operator observation across power cycles: one boot came up half-scale, the
+   next full-scale, with "a bit or two shift" in the captured data. This is one
+   mechanism, not two: the AIF1ADC1 serializer arming N bit-clocks off LRCLK
+   shifts the 16-bit sample window by N bits, so the captured magnitude scales
+   by 2^±N (left-shift = ×2 = full scale; right-shift = ÷2 = half scale). The
+   boot-variable amplitude we kept chasing as a "gain/de-clip" issue was the
+   boot-variable N all along. So a clean acceptance gate is **not just N==0 but
+   unity scale** (captured amplitude == expected ±1 bit), which is cheaply
+   checkable against the known SINE_48 stimulus — this strengthens the
+   `detect_arm_phase` N-detector (R3.3): N is directly readable from the
+   power-of-2 amplitude error, not only from a cross-correlation.
+
+2. **The discontinuity is transport-independent → it's the serializer, confirming H2a is the lead.**
+   disco A/B (2026-06-13): the CM7 FFT/scope feed was moved off the lossy
+   cross-core pool (CM4→D3-SRAM4, the ERRATA-019 store-loss path) onto a
+   **direct read of the SAI1 RX bank** (every bank, ~190/s). Phase-discontinuity
+   was **~28%** direct vs ~18.6% pool — i.e. bypassing the entire transport did
+   NOT clean it up. So the on-screen bounce is upstream of any buffering: it is
+   the capture (serializer N varying/glitching), not the pool/DMA transport.
+   Corollary: the planned circular-DMA buffering rework is the wrong layer for
+   this bug and is parked until the capture is bit-clean.
+
+**R3.4 is now primed to run** (the gating measurement): with the codec in a
+known bit-shifted state, toggle R0x004 bits 9:8 off→on via the boot-window codec
+mailbox (`0x3800_2040`) and check whether the captured amplitude/alignment
+signature changes. Changed ⇒ enable-toggle re-rolls N ⇒ primitive (a) re-arm
+calibration loop is viable; unchanged ⇒ ERRATA-004's "reruns are deterministic"
+extends to enable-toggles ⇒ escalate to primitive (b) (SAI re-touch under the
+doctrine carve-out) or the MCLK1-unlocked **arm-before-frame-clock** ordering
+(now feasible: AIF1CLK←MCLK1 removes the BCLK-for-FLL dependency, so the codec
+serializer can be enabled before SAI BCLK/FS start and sync to the first frame
+edge — a deterministic-N candidate not available under the FLL-from-BCLK path).
+
+Cross-ref: disco `docs/concepts/ERRATA.md` ERRATA-004 (+ ERRATA-019 for the
+transport store-loss that R4#2 rules out as the bounce cause).
