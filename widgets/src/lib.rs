@@ -40,5 +40,7 @@ pub mod radio;
 pub mod scroll_view;
 /// Slider widget for numeric input.
 pub mod slider;
+/// Deterministic tick-driven spinner widget.
+pub mod spinner;
 /// Binary on/off switch widget.
 pub mod switch;

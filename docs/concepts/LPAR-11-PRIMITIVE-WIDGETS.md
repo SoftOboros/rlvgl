@@ -421,7 +421,7 @@ LPAR-11 is complete only when:
 - [x] `Led` implements brightness/color/on/off/toggle behavior and tests.
 - [x] `Line` implements point drawing, y inversion, and tests.
 - [x] `Arc` implements value/range/angle/mode drawing and tests.
-- [ ] `Spinner` implements deterministic tick animation and tests.
+- [x] `Spinner` implements deterministic tick animation and tests.
 - [ ] `Scale` implements base line/arc ticks, major labels, orientation modes,
       and tests.
 - [ ] Every new public item has a meaningful doc comment.
@@ -512,3 +512,10 @@ LPAR-11 is complete only when:
   rendering. Unit tests cover angle normalization, mode-derived spans, full
   circle spans, resize, draw geometry, and knob output. Remaining widgets:
   `Spinner` and `Scale`.
+- **2026-06-13** — LPAR-11e landed `widgets::spinner::Spinner`, a
+  deterministic tick-driven wrapper over the committed `Arc` drawing path.
+  `Event::Tick` advances local phase and returns `true`; `period_ticks == 0`
+  normalizes to a one-tick period; arc length is clamped to `0..=360`; layout
+  `set_bounds` is supported. Unit tests cover phase wraparound, zero-period
+  behavior, arc primitive dispatch, full-circle spans at nonzero phase, and
+  bounds adoption. Remaining widget: `Scale`.
