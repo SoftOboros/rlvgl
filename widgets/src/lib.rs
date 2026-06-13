@@ -4,6 +4,8 @@
 
 extern crate alloc;
 
+/// LVGL-parity arc widget.
+pub mod arc;
 /// LVGL-parity bar widget.
 pub mod bar;
 /// Clickable button widget.
