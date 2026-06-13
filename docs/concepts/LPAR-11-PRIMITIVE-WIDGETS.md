@@ -111,7 +111,7 @@ LPAR-11 adds these public modules:
 | `widgets::led` | `Led` | Rust-style acronym casing; docs use "LED". |
 | `widgets::line` | `Line` | New polyline widget. |
 | `widgets::spinner` | `Spinner` | Depends on `Arc` behavior but is a separate public widget. |
-| `widgets::scale` | `Scale` | New LVGL-parity scale. Audio-meter `widgets::meters::Scale` remains scoped to `meters`. |
+| `widgets::scale` | `Scale` | New LVGL-parity scale. Audio-meter `widgets::meters::skin::Scale` remains scoped to `meters`. |
 
 No existing public widget is renamed, deprecated, or re-exported under a new
 name in LPAR-11. Any compatibility alias is deferred until there is a concrete
@@ -291,7 +291,7 @@ Draw/event contract:
 ### 5.I — `Scale`
 
 `widgets::scale::Scale` implements LVGL scale tick/label drawing. It does not
-replace `widgets::meters::Scale`.
+replace `widgets::meters::skin::Scale`.
 
 Required public vocabulary:
 
@@ -356,7 +356,7 @@ ratification because they own disjoint files. `Spinner` depends on `Arc`.
 |---|---|
 | `widgets::progress::ProgressBar` | Preserved unchanged. |
 | `widgets::slider::Slider` | Preserved; LPAR-12 owns deeper LVGL slider parity. |
-| `widgets::meters::Scale` | Preserved under `meters`; no rename. |
+| `widgets::meters::skin::Scale` | Preserved under `meters`; no rename. |
 | `widgets::meters::LedBargraph` | Preserved; no API churn. |
 | `ui::layout` helpers | Unchanged; LPAR-11 widgets only consume layout through `Widget::set_bounds`. |
 | `Renderer` trait | No new methods. |
@@ -520,7 +520,7 @@ LPAR-11 is complete only when:
   behavior, arc primitive dispatch, full-circle spans at nonzero phase, and
   bounds adoption. Remaining widget: `Scale`.
 - **2026-06-13** — LPAR-11f landed `widgets::scale::Scale`, preserving the
-  existing `widgets::meters::Scale` namespace. The base scale supports
+  existing `widgets::meters::skin::Scale` namespace. The base scale supports
   horizontal, vertical, inner-round, and outer-round modes; range endpoints;
   total tick count; major tick interval with `0` disabling majors and labels;
   label visibility; round angle range and rotation; layout `set_bounds`; line
@@ -538,3 +538,7 @@ LPAR-11 is complete only when:
   `core/src/asset.rs:566`, `:574`, `:581` (`clippy::unnecessary_map_or`) plus
   `core/src/asset.rs:632`, `:633`, `:657`, `:658`
   (`clippy::unnecessary_cast`).
+- **2026-06-13** — Doc correction (post-implementation fidelity review): the
+  collision-target path for the audio-meter scale is `widgets::meters::skin::Scale`,
+  not `widgets::meters::Scale`. Corrected in §5.A/§5.I/§6/§13. No behavior change;
+  the implemented `widgets::scale::Scale` already avoids the collision correctly.
