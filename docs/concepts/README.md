@@ -256,6 +256,15 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     `CoverageSink`, `ImageDescriptor`/cache/recolor/transform, a
     software-reference + hardware-tolerance rule, and a new resolved
     `TextStyle` (the frozen `core::style::Style` stays untouched).
+  - [LPAR-09-ASSET-FILESYSTEM.md](LPAR-09-ASSET-FILESYSTEM.md) —
+    **Ratified 2026-06-12.** Wave 2 asset and filesystem sources:
+    extends the existing `core::fs` `AssetSource`/`AssetManager` (zero
+    consumers, safe), a typed `AssetPath` source model (Embedded / FATFS /
+    Simulator / Memory) replacing LVGL drive letters, an opaque
+    `AssetHandle` registry token bridging to LPAR-08's
+    `ImageData::Asset` variant (LPAR-08 amended), source-dispatched decode
+    via the existing plugins, and a bounded LRU cache. Implementation
+    pending.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

@@ -1035,3 +1035,14 @@ deterministic extent fallback.
 - **2026-06-12** — `Checkbox` and `Radio` widgets now draw labels via
   shaped-text coverage through `ClipRenderer`/`draw_text_shaped` instead of
   legacy `draw_text`, unifying text clipping/coverage behavior with `Label`.
+- **2026-06-12** — §5.G / `ImageData` amendment (Standards Action,
+  prerequisite for LPAR-09). LPAR-08 reserved `core::image::ImageData` as
+  `#[non_exhaustive]` for a source-backed variant; LPAR-09
+  (`docs/concepts/LPAR-09-ASSET-FILESYSTEM.md` §5.C) adds
+  `ImageData::Asset(AssetHandle)`, where `AssetHandle` is an opaque registry
+  token. This is additive and non-breaking — existing `Borrowed`/
+  `BorrowedColors`/`Owned` variants and all consumers are unchanged; the new
+  variant is constructed only by the LPAR-09 asset registry. The LPAR-08/09
+  boundary stands: LPAR-08 owns `ImageDescriptor`/`PixelFormat`/`BlitOpts`/
+  `CacheHandle` and the decode-target shape; LPAR-09 owns source lookup, the
+  registry, the cache implementation, and this variant.
