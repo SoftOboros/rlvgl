@@ -4,9 +4,9 @@
 
 extern crate alloc;
 
-/// LVGL-parity arc widget.
 /// Tick-driven animated image (frame sequence).
 pub mod anim_image;
+/// LVGL-parity arc widget.
 pub mod arc;
 /// Text laid along an arc (LPAR-Optional).
 #[cfg(feature = "lpar_arclabel")]

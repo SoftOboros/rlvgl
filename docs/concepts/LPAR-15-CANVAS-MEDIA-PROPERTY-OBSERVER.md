@@ -936,50 +936,73 @@ requires a LPAR-07 §15 Standards Action amendment first.
 
 ## 12. Acceptance Checklist
 
-LPAR-15 is complete only when:
+LPAR-15 conformance is split into two levels (per the CLAUDE.md
+"Conformance targets" discipline): **LPAR-Core** — the property/observer
+substrate plus `CanvasWidget`, `AnimImage`, and the feature-gated
+`ArcLabel` — which MUST land for the phase to be considered shipped; and
+**LPAR-Optional** — `LottiePlayer` and `Texture3d` — which MAY land later
+behind their own feature gates and external-renderer dependencies. The
+LPAR-16 fixture row is owned by LPAR-16 and tracked there.
 
-- [ ] This document is ratified with a dated §15 entry.
-- [ ] `core::property` (`PropertyValue`, `Queryable`) compiles under
+### 12.A LPAR-Core (required — landed 2026-06-13, commit `bc49857`)
+
+- [x] This document is ratified with a dated §15 entry.
+- [x] `core::property` (`PropertyValue`, `Queryable`) compiles under
       `no_std + alloc`; unit tests cover `get_property` for a mock widget.
-- [ ] `core::observer` (`Subject<T>`) compiles under `no_std + alloc`; unit
+- [x] `core::observer` (`Subject<T>`) compiles under `no_std + alloc`; unit
       tests cover subscribe, `set` (notification fires, `prev` updates), and
       `notify` without value change.
-- [ ] `widgets::canvas::CanvasWidget` implements `Widget` and `Queryable`;
+- [x] `widgets::canvas::CanvasWidget` implements `Widget` and `Queryable`;
       `set_bounds` is overridden; `fill`, `fill_rect`, `draw_pixel`,
       `inner`, `as_image_descriptor` work; `draw` blits to renderer; tests
       cover pixel round-trip and `set_bounds` adoption.
-- [ ] `widgets::anim_image::AnimImage` implements `Widget` and `Queryable`;
+- [x] `widgets::anim_image::AnimImage` implements `Widget` and `Queryable`;
       `set_bounds` is overridden; tick-phase frame advance is deterministic
       (mirror Spinner test pattern); `Once` mode fires `on_complete`;
       `Bounce` mode reverses; `Paused` stops advance; tests are colocated.
-- [ ] `widgets::arc_label::ArcLabel` (`lpar_arclabel` feature) implements
+- [x] `widgets::arc_label::ArcLabel` (`lpar_arclabel` feature) implements
       `Widget` and `Queryable`; `set_bounds` is overridden; per-glyph angular
       placement geometry is tested with a known radius and font; alignment
       modes (`Leading`, `Center`, `Trailing`) produce expected start angles.
-- [ ] `widgets::lottie::LottiePlayer` (`dash_lottie` and/or `lottie` features)
-      compiles under their respective gates; `Widget` is implemented; the
-      widget is absent when neither gate is enabled.
-- [ ] `widgets::texture3d::Texture3d` (`texture3d` feature) compiles; `draw`
-      is a no-op; `texture_handle()` returns the stored value.
-- [ ] `widgets/src/lib.rs` exports `canvas` (CanvasWidget), `anim_image`, and
-      (when features enabled) `arc_label`, `lottie`, `texture3d`.
-- [ ] No new `Renderer` method, `Part` constant, `Event` variant, or
+- [x] `widgets/src/lib.rs` exports `canvas` (CanvasWidget), `anim_image`, and
+      (when `lpar_arclabel` is enabled) `arc_label`. The `lottie` /
+      `texture3d` exports are part of 12.B and remain absent.
+- [x] No new `Renderer` method, `Part` constant, `Event` variant, or
       `ObjectEvent` code is introduced without a prior amendment.
-- [ ] `core::plugins::canvas::Canvas` is unmodified.
-- [ ] All Core surfaces (`PropertyValue`, `Queryable`, `Subject<T>`,
+- [x] `core::plugins::canvas::Canvas` is unmodified.
+- [x] All Core surfaces (`PropertyValue`, `Queryable`, `Subject<T>`,
       `CanvasWidget`, `AnimImage`) compile with `RUSTFLAGS="" cargo check
       --target thumbv7em-none-eabihf -p rlvgl-core` and
       `cargo check -p rlvgl-widgets`.
-- [ ] Every new public item has a meaningful doc comment.
-- [ ] Every new source file has a descriptive file header.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `RUSTFLAGS="" cargo test -p rlvgl-core` and
+- [x] Every new public item has a meaningful doc comment.
+- [x] Every new source file has a descriptive file header.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `RUSTFLAGS="" cargo test -p rlvgl-core` and
       `cargo test -p rlvgl-widgets` pass.
-- [ ] `cargo clippy -p rlvgl-core --all-targets -- -D warnings` and
+- [x] `cargo clippy -p rlvgl-core --all-targets -- -D warnings` and
       `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` pass.
+
+### 12.B LPAR-Optional (deferred — external-renderer dependencies)
+
+These rows are intentionally unchecked. They are NOT a regression in the
+LPAR-Core ship; they gate a separate, optional conformance level that MAY
+land in a follow-up slice once the external-renderer dependencies are
+vendored. Resurrection note: do not re-derive these as "missing Core work."
+
+- [ ] `widgets::lottie::LottiePlayer` (`dash_lottie` and/or `lottie` features)
+      compiles under their respective gates; `Widget` is implemented; the
+      widget is absent when neither gate is enabled. *(deferred-Optional —
+      depends on the rlottie / dash-lottie backend wiring.)*
+- [ ] `widgets::texture3d::Texture3d` (`texture3d` feature) compiles; `draw`
+      is a no-op; `texture_handle()` returns the stored value.
+      *(deferred-Optional — external 3D renderer handle.)*
+
+### 12.C Owned by LPAR-16
+
 - [ ] LPAR-16 golden / geometry fixtures exist for `CanvasWidget`,
       `AnimImage`, and `ArcLabel` (at least one deterministic tick-count
-      fixture per widget).
+      fixture per widget). *(deferred to LPAR-16 — conformance-fixture phase
+      owns this row; tracked in LPAR-16 §12, not here.)*
 
 ## 13. Files Cited
 
@@ -1213,3 +1236,12 @@ None at this phase.
   rlvgl-widgets --all-targets -D warnings` clean (incl. `--features
   lpar_arclabel`); `cargo test` core 364 / widgets 383 (390 with arc_label)
   green; ui/platform build.
+- **2026-06-13** — §12 reconciliation slice. The acceptance checklist was
+  shaped as a single flat list reading like full completion while LPAR-Optional
+  (`LottiePlayer`, `Texture3d`) and the LPAR-16 fixture row were genuinely
+  deferred. Split into §12.A LPAR-Core (required — all boxes checked, landed in
+  `bc49857`), §12.B LPAR-Optional (`lottie`/`texture3d` left unchecked with
+  `deferred-Optional` annotations + a resurrection note so a future agent does
+  not re-file them as missing Core work), and §12.C the LPAR-16-owned fixture
+  row (unchecked, tracked in LPAR-16 §12). No behaviour change; ledger
+  alignment only, addressing the drift-report P2 finding.

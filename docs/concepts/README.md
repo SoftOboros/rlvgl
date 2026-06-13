@@ -317,12 +317,16 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
 
 - **LPAR** (continued — Wave 5)
   - [LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md](LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md) —
-    **Ratified 2026-06-13.** LPAR-Core: a `Canvas` widget (wrapping
-    `core::plugins::canvas`), tick-driven `AnimImage` (Spinner-pattern
-    frame phase), `core::property` (identity-free `Queryable`), and
-    `core::observer` (`Subject<T>` value-binding, orthogonal to the LPAR-04
-    event system — the §9 ownership conflict resolved). LPAR-Optional
-    (feature-gated): `ArcLabel` (landed), `Lottie`/`DashLottie`, `Texture3d` (deferred). Core + ArcLabel landed same day.
+    **Ratified 2026-06-13; LPAR-Core + ArcLabel landed same day.**
+    LPAR-Core: a `Canvas` widget (owns a lightweight local `PixelBuffer`;
+    the `core::plugins::canvas` plugin coexists unchanged but is NOT
+    wrapped — it is feature-gated and pulls `embedded-graphics`, see
+    LPAR-15 §5.C), tick-driven `AnimImage` (Spinner-pattern frame phase),
+    `core::property` (identity-free `Queryable`), and `core::observer`
+    (`Subject<T>` value-binding, orthogonal to the LPAR-04 event system —
+    the §9 ownership conflict resolved). LPAR-Optional (feature-gated):
+    `ArcLabel` (landed); `Lottie`/`DashLottie`/`Texture3d` deferred
+    (external-renderer deps).
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

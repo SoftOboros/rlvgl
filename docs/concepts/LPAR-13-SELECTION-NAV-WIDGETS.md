@@ -796,33 +796,33 @@ None of these types requires `std`, threads, async, or wall-clock APIs.
 
 LPAR-13 is complete only when:
 
-- [ ] This document is ratified with a dated §15 entry.
-- [ ] `widgets/src/lib.rs` exports `dropdown`, `keyboard`, `menu`, `roller`,
+- [x] This document is ratified with a dated §15 entry.
+- [x] `widgets/src/lib.rs` exports `dropdown`, `keyboard`, `menu`, `roller`,
       `tabview`, `tileview`, and `window`.
-- [ ] `Dropdown` implements options, selected, open/close, navigate/activate
+- [x] `Dropdown` implements options, selected, open/close, navigate/activate
       helpers, draw, event, and resize behavior, with tests.
-- [ ] `Keyboard` wraps `ButtonMatrix`, implements mode switching, key-output
+- [x] `Keyboard` wraps `ButtonMatrix`, implements mode switching, key-output
       hook, poll slot, and all helpers, with tests.
-- [ ] `Menu` implements page creation, item addition, page-stack navigation,
+- [x] `Menu` implements page creation, item addition, page-stack navigation,
       back, header mode, and draw, with tests.
-- [ ] `Roller` implements options, selected, visible-row count, finite and
+- [x] `Roller` implements options, selected, visible-row count, finite and
       infinite modes, item-boundary snap, center-highlight draw, and helpers,
       with tests.
-- [ ] `Tabview` implements add/rename/set_active tabs, tab bar position, layout
+- [x] `Tabview` implements add/rename/set_active tabs, tab bar position, layout
       container `set_bounds`, draw, and helpers, with tests.
-- [ ] `Tileview` implements add_tile, active tile, nav direction constraints,
+- [x] `Tileview` implements add_tile, active tile, nav direction constraints,
       snap-to-tile, and helpers, with tests.
-- [ ] `Window` implements title, header buttons, content bounds, layout
+- [x] `Window` implements title, header buttons, content bounds, layout
       container `set_bounds`, and draw, with tests.
-- [ ] None of `ui::Drawer`, `ui::Modal`, `ui::EventWindow` is modified.
-- [ ] No new `Renderer` method, `Part` constant, `Event` variant, or
+- [x] None of `ui::Drawer`, `ui::Modal`, `ui::EventWindow` is modified.
+- [x] No new `Renderer` method, `Part` constant, `Event` variant, or
       `ObjectEvent` code is introduced without a prior amendment.
-- [ ] Every new public item has a meaningful doc comment.
-- [ ] Every new source file has a descriptive file header.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo test -p rlvgl-widgets` passes.
-- [ ] `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` passes.
-- [ ] Workspace clippy is either clean or unrelated blockers are recorded in
+- [x] Every new public item has a meaningful doc comment.
+- [x] Every new source file has a descriptive file header.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo test -p rlvgl-widgets` passes.
+- [x] `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` passes.
+- [x] Workspace clippy is either clean or unrelated blockers are recorded in
       §15 with exact crate/error.
 
 ## 13. Files Cited
@@ -947,3 +947,15 @@ LPAR-13 is complete only when:
   output via a caller `FnMut(KeyOutput)`/poll hook pending LPAR-14 Textarea v2;
   `ValueChanged` via `selected()` polling rather than a new `ObjectEvent` code).
   Implementation unblocked (slices per §5.L).
+- **2026-06-13** — Implementation landed. `widgets::{dropdown, keyboard, menu,
+  roller, tabview, tileview, window}` shipped per §5: Dropdown (List-backed
+  option list, open/close, navigate/activate), Keyboard (owns a ButtonMatrix,
+  mode maps, KeyOutput hook/poll), Menu (page-stack), Roller (snap reuses the
+  shared `core::scroll::snap_offset_to_points` — the §5.F fix, one snap
+  mechanism), Tabview/Tileview/Window (layout containers; Tileview exact
+  tile positioning). All implement Widget + override set_bounds; no_std+alloc;
+  no unsafe; shaped text; helper-method keys; no new Renderer/Style/Event/
+  ObjectEvent surface; ui::Drawer/Modal/EventWindow untouched. §12 acceptance
+  checked. Gates: fmt/clippy --all-targets -D warnings clean; cargo test
+  -p rlvgl-widgets green. Workspace-clippy blocker = pre-existing embedded
+  rlvgl-example-disco host build (LPAR-08 §15), unrelated.

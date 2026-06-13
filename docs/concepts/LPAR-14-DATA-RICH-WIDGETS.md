@@ -895,38 +895,38 @@ None of these types requires `std`, threads, async, or wall-clock APIs.
 
 LPAR-14 is complete only when:
 
-- [ ] This document is ratified with a dated §15 entry.
-- [ ] `EditCore` is promoted to a public path (e.g. `core::edit_core::EditCore`)
+- [x] This document is ratified with a dated §15 entry.
+- [x] `EditCore` is promoted to a public path (e.g. `core::edit_core::EditCore`)
       without altering any `ui::input` public API or test behavior.
-- [ ] `widgets/src/lib.rs` exports `textarea`, `chart`, `table`, `span`,
+- [x] `widgets/src/lib.rs` exports `textarea`, `chart`, `table`, `span`,
       `calendar`, and `message_box`.
-- [ ] `Textarea` implements: promoted-`EditCore`-backed buffer/caret, multi-line
+- [x] `Textarea` implements: promoted-`EditCore`-backed buffer/caret, multi-line
       wrapping via `wrap_greedy_ltr`, vertical scroll for overflow,
       placeholder text, password mode, one-line mode, `apply_key_output`, and
       key-event routing via `EditCore::handle_key` when active — with tests.
-- [ ] `Chart` implements: series add/set/get, point count, axis range, div
+- [x] `Chart` implements: series add/set/get, point count, axis range, div
       lines, `Line`/`Bar`/`Scatter` draw, point cursor, navigate helpers — with
       tests.
-- [ ] `Table` implements: row/col/cell set/get, column widths, selected cell,
+- [x] `Table` implements: row/col/cell set/get, column widths, selected cell,
       `CellCtrl`, `CellAlign`, navigate helpers, draw — with tests.
-- [ ] `Spangroup` implements: span add/remove/set, overflow, inline-flow layout
+- [x] `Spangroup` implements: span add/remove/set, overflow, inline-flow layout
       via `wrap_greedy_ltr` on concatenated text + byte-range-to-span mapping,
       draw — with tests.
-- [ ] `Calendar` implements: today/selected/highlighted-date set/get, displayed
+- [x] `Calendar` implements: today/selected/highlighted-date set/get, displayed
       month, day names, internal `ButtonMatrix` day grid, navigate helpers,
       draw — with tests.
-- [ ] `MessageBox` implements: title, content text, add/navigate/activate buttons
+- [x] `MessageBox` implements: title, content text, add/navigate/activate buttons
       via internal `ButtonMatrix`, `close()`, draw — with tests.
-- [ ] None of `ui::input::Input`, `ui::input::Textarea`, `ui::modal::Modal`,
+- [x] None of `ui::input::Input`, `ui::input::Textarea`, `ui::modal::Modal`,
       `ui::alert::Alert` is modified.
-- [ ] No new `Renderer` method, `Part` constant, `Event` variant, or
+- [x] No new `Renderer` method, `Part` constant, `Event` variant, or
       `ObjectEvent` code is introduced without a prior amendment.
-- [ ] Every new public item has a meaningful doc comment.
-- [ ] Every new source file has a descriptive file header.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo test -p rlvgl-widgets` passes.
-- [ ] `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` passes.
-- [ ] Workspace clippy is either clean or unrelated blockers are recorded in
+- [x] Every new public item has a meaningful doc comment.
+- [x] Every new source file has a descriptive file header.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo test -p rlvgl-widgets` passes.
+- [x] `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` passes.
+- [x] Workspace clippy is either clean or unrelated blockers are recorded in
       §15 with exact crate/error.
 
 ## 13. Files Cited
@@ -1098,3 +1098,16 @@ None at this phase.
   per-span advance arithmetic. MessageBox backdrop/z-order stays
   deferred-Coupled (same root as the LPAR-13 Dropdown overlay). Implementation
   unblocked (slices per §5).
+- **2026-06-13** — Implementation landed. `EditCore` promoted from private
+  `ui::input` to `pub core::edit::EditCore`, re-exported by `ui::input` (WID-01
+  ui tests pass unchanged). `widgets::{textarea, message_box, chart, table,
+  span, calendar}` shipped per §5: Textarea (EditCore reuse + apply_key_output
+  resolving the LPAR-13 Keyboard binding, wrapping/scroll/placeholder/password/
+  one-line), MessageBox (owns a ButtonMatrix; coexists with ui::Modal/Alert),
+  Chart/Table/Calendar, and Span (concat-and-wrap-once via the shared LPAR-08
+  measurement — the §5.F no-fork rule, regression-tested). All implement Widget
+  + override set_bounds; no_std+alloc; no unsafe; no new Renderer/Style/Event/
+  ObjectEvent surface; ui::Input/Textarea/Modal/Alert untouched. §12 acceptance
+  checked. Gates: fmt/clippy --all-targets -D warnings clean; cargo test core/
+  ui/widgets green (ui = WID-01 preserved). Workspace-clippy blocker pre-existing
+  (LPAR-08 §15).

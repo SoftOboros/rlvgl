@@ -396,21 +396,21 @@ capture renderers and event dispatch tests.
 
 LPAR-12 is complete only when:
 
-- [ ] This document is ratified with a dated §15 entry.
-- [ ] `widgets/src/lib.rs` exports `button_matrix`, `image_button`, and
+- [x] This document is ratified with a dated §15 entry.
+- [x] `widgets/src/lib.rs` exports `button_matrix`, `image_button`, and
       `spinbox`.
-- [ ] `ImageButton` implements state-specific source selection, fallback, draw,
+- [x] `ImageButton` implements state-specific source selection, fallback, draw,
       event, resize behavior, and tests.
-- [ ] `Spinbox` implements value/range/format/step/rollover/event behavior and
+- [x] `Spinbox` implements value/range/format/step/rollover/event behavior and
       tests.
-- [ ] `ButtonMatrix` implements map/control/layout/selection/check behavior and
+- [x] `ButtonMatrix` implements map/control/layout/selection/check behavior and
       tests.
-- [ ] Every new public item has a meaningful doc comment.
-- [ ] Every new source file has a descriptive file header.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo test -p rlvgl-widgets` passes.
-- [ ] `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` passes.
-- [ ] Workspace clippy is either clean or unrelated blockers are recorded in
+- [x] Every new public item has a meaningful doc comment.
+- [x] Every new source file has a descriptive file header.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo test -p rlvgl-widgets` passes.
+- [x] `cargo clippy -p rlvgl-widgets --all-targets -- -D warnings` passes.
+- [x] Workspace clippy is either clean or unrelated blockers are recorded in
       §15 with exact crate/error.
 
 ## 12. Files Cited
@@ -483,3 +483,15 @@ LPAR-12 is complete only when:
   references corrected from `Key::Up`/`Down`/`Left`/`Right` to the actual
   `Key::ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight` variants. Implementation
   unblocked (slices LPAR-12b ImageButton, 12c Spinbox, 12d ButtonMatrix).
+- **2026-06-13** — Implementation landed (slices 12b/12c/12d). `widgets::{image_button,
+  spinbox, button_matrix}` shipped per §5: ImageButton (6 states + LVGL fallback
+  chains + segmented blit), Spinbox (range/step/digit-format/rollover/zero-crossing
+  + on_arrow_* helpers), ButtonMatrix (owned map, 11-flag controls, one-checked,
+  proportional widths, geometry hit, navigate/activate helpers). All implement
+  Widget + override set_bounds; shaped text; helper-method key nav; no new
+  Renderer/Style/Event/ObjectEvent surface; no unsafe. §11 acceptance checked.
+  Gates: fmt/clippy --all-targets -D warnings clean; cargo test -p rlvgl-widgets
+  green. Workspace clippy blocker (host build of the embedded rlvgl-example-disco
+  crate: cortex_m/embedded_alloc unresolved) is pre-existing and unrelated — see
+  LPAR-08 §15.
+
