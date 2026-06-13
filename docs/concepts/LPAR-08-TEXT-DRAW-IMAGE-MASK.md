@@ -773,8 +773,8 @@ deterministic extent fallback.
       box-blur approximation is deterministic.
 - [x] `ImageDescriptor`, `ImageData`, `PixelFormat`, `BlitOpts`, `CacheHandle`
       defined in `core/src/image.rs`; `ImageData` is `#[non_exhaustive]`.
-- [ ] `Renderer::blit_image` exists with default body; software-reference
-      nearest-neighbor scale/rotate.
+- [x] `Renderer::blit_image` exists with default body; software-reference
+      nearest-neighbor scale and cardinal rotate.
 - [x] `ImageDescriptor::from_color_slice` bridge constructor exists.
 - [x] A new resolved `TextStyle { text_color, font_id, letter_spacing,
       line_spacing, text_align }` (with LPAR-07 §7.4 defaults) and matching
@@ -987,3 +987,13 @@ deterministic extent fallback.
   compatibility with `IntersectMask`/`UnionMask`. Remaining mask-side work is
   integration into higher-level widgets/styles, not the core mask primitive
   acceptance item.
+- **2026-06-12** — Image blit software reference slice landed.
+  `Renderer::blit_image` now decodes `ImageDescriptor` rows for `Rgb565`,
+  little-endian packed `Argb8888`, `L8`, and `BorrowedColors`, applies
+  recolor after sampling, supports nearest-neighbor fixed-point scaling,
+  snaps rotation to cardinal orientations around `BlitOpts::pivot`, honors
+  `BlitOpts::clip`, and forwards one output row at a time through
+  `draw_pixels` so `ClipRenderer` and backend pixel fast paths remain the
+  integration point. Remaining image work: widget migration, backend
+  overrides, command-list representation, and any future arbitrary-angle
+  rotation quality policy.

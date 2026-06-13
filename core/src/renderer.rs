@@ -3,9 +3,12 @@
 //! Implementors of this trait can target displays, off-screen buffers or
 //! simulator windows.
 
+use alloc::vec::Vec;
+
 use crate::cmd::CommandList;
 use crate::draw::{GradientDesc, ShadowDesc};
 use crate::font::ShapedText;
+use crate::image::{BlitOpts, ImageDescriptor, PixelFormat};
 use crate::mask::AlphaMask;
 use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
@@ -78,6 +81,57 @@ pub trait Renderer {
                     );
                 }
             }
+        }
+    }
+
+    /// Blit an [`ImageDescriptor`] into `dest` using deterministic software sampling.
+    ///
+    /// `dest` is the output rectangle in framebuffer coordinates. Scaling
+    /// controls nearest-neighbor source sampling inside that output rectangle;
+    /// callers choose the destination dimensions they want to draw. Rotation
+    /// is snapped to the nearest cardinal orientation. The default software
+    /// path decodes one output row at a time and forwards it through
+    /// [`draw_pixels`](Self::draw_pixels), so clipping adapters and backend
+    /// pixel fast paths continue to apply.
+    fn blit_image(&mut self, dest: Rect, descriptor: &ImageDescriptor<'_>, opts: &BlitOpts) {
+        if dest.width <= 0
+            || dest.height <= 0
+            || descriptor.width == 0
+            || descriptor.height == 0
+            || opts.scale_x == 0
+            || opts.scale_y == 0
+        {
+            return;
+        }
+
+        let output = Rect {
+            x: 0,
+            y: 0,
+            width: dest.width,
+            height: dest.height,
+        };
+        let visible = match opts.clip {
+            Some(clip) => output.intersect(clip),
+            None => Some(output),
+        };
+        let Some(visible) = visible else {
+            return;
+        };
+
+        let mut row = Vec::new();
+        row.resize(visible.width as usize, Color(0, 0, 0, 0));
+        for local_y in visible.y..visible.y + visible.height {
+            for local_x in visible.x..visible.x + visible.width {
+                let out_idx = (local_x - visible.x) as usize;
+                row[out_idx] = sample_image_pixel(descriptor, opts, local_x, local_y)
+                    .unwrap_or(Color(0, 0, 0, 0));
+            }
+            self.draw_pixels(
+                (dest.x + visible.x, dest.y + local_y),
+                &row,
+                visible.width as u32,
+                1,
+            );
         }
     }
 
@@ -359,6 +413,104 @@ fn draw_glyph_coverage<R: Renderer + ?Sized>(
         }
     }
     true
+}
+
+fn sample_image_pixel(
+    descriptor: &ImageDescriptor<'_>,
+    opts: &BlitOpts,
+    local_x: i32,
+    local_y: i32,
+) -> Option<Color> {
+    let (pre_x, pre_y) = inverse_cardinal_transform(local_x, local_y, opts);
+    if pre_x < 0 || pre_y < 0 {
+        return None;
+    }
+
+    let src_x = (i64::from(pre_x) * 256 / i64::from(opts.scale_x)) as u32;
+    let src_y = (i64::from(pre_y) * 256 / i64::from(opts.scale_y)) as u32;
+    if src_x >= u32::from(descriptor.width) || src_y >= u32::from(descriptor.height) {
+        return None;
+    }
+
+    decode_image_pixel(descriptor, src_x as usize, src_y as usize)
+        .map(|color| recolor_image_pixel(color, opts.recolor, opts.recolor_alpha))
+}
+
+fn inverse_cardinal_transform(local_x: i32, local_y: i32, opts: &BlitOpts) -> (i32, i32) {
+    let pivot_x = i32::from(opts.pivot.0);
+    let pivot_y = i32::from(opts.pivot.1);
+    let x = local_x - pivot_x;
+    let y = local_y - pivot_y;
+    let (x, y) = match nearest_cardinal_rotation(opts.rotation_deg) {
+        0 => (x, y),
+        90 => (y, -x),
+        180 => (-x, -y),
+        _ => (-y, x),
+    };
+    (x + pivot_x, y + pivot_y)
+}
+
+fn nearest_cardinal_rotation(degrees: i16) -> i16 {
+    let degrees = i32::from(degrees).rem_euclid(360);
+    (((degrees + 45) / 90 * 90) % 360) as i16
+}
+
+fn decode_image_pixel(descriptor: &ImageDescriptor<'_>, x: usize, y: usize) -> Option<Color> {
+    if let Some(colors) = descriptor.data.as_color_slice() {
+        return colors
+            .get(y.checked_mul(descriptor.width as usize)?.checked_add(x)?)
+            .copied();
+    }
+
+    let bytes = descriptor.data.as_bytes()?;
+    let stride = descriptor.stride_bytes() as usize;
+    let offset = y
+        .checked_mul(stride)?
+        .checked_add(x.checked_mul(descriptor.format.bytes_per_pixel() as usize)?)?;
+    match descriptor.format {
+        PixelFormat::Rgb565 => {
+            let raw = u16::from_le_bytes([*bytes.get(offset)?, *bytes.get(offset + 1)?]);
+            let r = (((raw >> 11) & 0x1f) as u32 * 255 / 31) as u8;
+            let g = (((raw >> 5) & 0x3f) as u32 * 255 / 63) as u8;
+            let b = ((raw & 0x1f) as u32 * 255 / 31) as u8;
+            Some(Color(r, g, b, 255))
+        }
+        PixelFormat::Argb8888 => {
+            let raw = u32::from_le_bytes([
+                *bytes.get(offset)?,
+                *bytes.get(offset + 1)?,
+                *bytes.get(offset + 2)?,
+                *bytes.get(offset + 3)?,
+            ]);
+            Some(Color(
+                ((raw >> 16) & 0xff) as u8,
+                ((raw >> 8) & 0xff) as u8,
+                (raw & 0xff) as u8,
+                ((raw >> 24) & 0xff) as u8,
+            ))
+        }
+        PixelFormat::L8 => bytes.get(offset).map(|&luma| Color(luma, luma, luma, 255)),
+    }
+}
+
+fn recolor_image_pixel(color: Color, recolor: Option<Color>, alpha: u8) -> Color {
+    let Some(tint) = recolor else {
+        return color;
+    };
+    if alpha == 0 {
+        return color;
+    }
+    Color(
+        lerp_channel(color.0, tint.0, alpha),
+        lerp_channel(color.1, tint.1, alpha),
+        lerp_channel(color.2, tint.2, alpha),
+        color.3,
+    )
+}
+
+fn lerp_channel(from: u8, to: u8, alpha: u8) -> u8 {
+    let value = i32::from(from) + (i32::from(to) - i32::from(from)) * i32::from(alpha) / 255;
+    value.clamp(0, 255) as u8
 }
 
 struct ShadowMask {
