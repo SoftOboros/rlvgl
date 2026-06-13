@@ -313,6 +313,18 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     Textarea wrapping reuses LPAR-08 `core::font` measurement (no fork); the
     LPAR-13 Keyboard→text binding is resolved via `apply_key_output`.
 
+### Wave 5 — canvas / media / property / observer
+
+- **LPAR** (continued — Wave 5)
+  - [LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md](LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md) —
+    **Ratified 2026-06-13.** LPAR-Core: a `Canvas` widget (wrapping
+    `core::plugins::canvas`), tick-driven `AnimImage` (Spinner-pattern
+    frame phase), `core::property` (identity-free `Queryable`), and
+    `core::observer` (`Subject<T>` value-binding, orthogonal to the LPAR-04
+    event system — the §9 ownership conflict resolved). LPAR-Optional
+    (feature-gated): `ArcLabel`, `Lottie`/`DashLottie`, `Texture3d`.
+    Implementation pending.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem
