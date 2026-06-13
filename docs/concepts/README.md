@@ -296,12 +296,13 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
 
 - **LPAR** (continued — Wave 4)
   - [LPAR-13-SELECTION-NAV-WIDGETS.md](LPAR-13-SELECTION-NAV-WIDGETS.md) —
-    **Ratified 2026-06-13.** Selection/navigation wave: additive
-    `Dropdown`, `Keyboard`, `Menu`, `Roller`, `Tabview`, `Tileview`, and
-    `Window` modules reusing `List`/`ButtonMatrix`/scroll/snap, coexisting
-    with (not renaming) the adjacent `ui::Drawer`/`Modal`/`EventWindow`.
-    Roller snap reuses a shared `core::scroll` helper (one snap mechanism);
-    overlay/text-binding/`ValueChanged` deferred. Implementation pending.
+    **Ratified 2026-06-13; implementation landed same day.**
+    Selection/navigation wave: additive `Dropdown`, `Keyboard`, `Menu`,
+    `Roller`, `Tabview`, `Tileview`, and `Window` modules reusing
+    `List`/`ButtonMatrix`/scroll/snap, coexisting with (not renaming) the
+    adjacent `ui::Drawer`/`Modal`/`EventWindow`. Roller snap reuses the
+    public `core::scroll::snap_offset_to_points` helper (one snap
+    mechanism); overlay/text-binding/`ValueChanged` deferred.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
