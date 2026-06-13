@@ -57,6 +57,8 @@ pub mod image;
 pub mod interface;
 /// Shared invalidation planner and present-plan types (LPAR-03).
 pub mod invalidation;
+/// LPAR-10 layout substrate: `Dimension`, flex/grid engines, `LayoutState`, and layout pass.
+pub mod layout;
 /// LPAR-08 alpha mask primitives and coverage combinators.
 pub mod mask;
 /// LVGL-parity object metadata and tree helpers.

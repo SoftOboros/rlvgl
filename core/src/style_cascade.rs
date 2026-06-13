@@ -280,6 +280,17 @@ impl Selector {
 /// [`Style`] (in `core::style`) is the *resolved*, fully-materialised property
 /// bag used at draw time. `StylePatch` is the sparse "intent" stored in the
 /// cascade; it is resolved into a [`Style`] by [`resolve`].
+///
+/// # LPAR-10 layout fields (§5.G)
+///
+/// The `padding_*`, `margin_*`, `gap_row`, and `gap_col` fields are additive
+/// extensions for layout-related style properties.  They are resolved into a
+/// [`crate::layout::LayoutStyle`] resolved struct by
+/// [`crate::layout::resolve_layout_style`].  The frozen 5-field
+/// [`crate::style::Style`] is **NOT** extended by LPAR-10.
+///
+/// Registration policy for new named layout properties: **Standards Action**
+/// (cross-phase style contracts).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct StylePatch {
     /// Override for `Style::bg_color`.
@@ -306,6 +317,28 @@ pub struct StylePatch {
     pub line_spacing: Option<i8>,
     /// Override for [`TextStyle::text_align`].
     pub text_align: Option<TextAlign>,
+
+    // --- LPAR-10 layout properties (§5.G) ---
+    /// Top padding in pixels (resolves to `0` when `None`).
+    pub padding_top: Option<i32>,
+    /// Bottom padding in pixels (resolves to `0` when `None`).
+    pub padding_bottom: Option<i32>,
+    /// Left padding in pixels (resolves to `0` when `None`).
+    pub padding_left: Option<i32>,
+    /// Right padding in pixels (resolves to `0` when `None`).
+    pub padding_right: Option<i32>,
+    /// Top margin in pixels (resolves to `0` when `None`).
+    pub margin_top: Option<i32>,
+    /// Bottom margin in pixels (resolves to `0` when `None`).
+    pub margin_bottom: Option<i32>,
+    /// Left margin in pixels (resolves to `0` when `None`).
+    pub margin_left: Option<i32>,
+    /// Right margin in pixels (resolves to `0` when `None`).
+    pub margin_right: Option<i32>,
+    /// Row gap (spacing between rows / cross-axis tracks) in pixels.
+    pub gap_row: Option<i32>,
+    /// Column gap (spacing between columns / main-axis items) in pixels.
+    pub gap_col: Option<i32>,
 }
 
 impl StylePatch {
@@ -322,6 +355,16 @@ impl StylePatch {
             letter_spacing: None,
             line_spacing: None,
             text_align: None,
+            padding_top: None,
+            padding_bottom: None,
+            padding_left: None,
+            padding_right: None,
+            margin_top: None,
+            margin_bottom: None,
+            margin_left: None,
+            margin_right: None,
+            gap_row: None,
+            gap_col: None,
         }
     }
 
@@ -545,6 +588,26 @@ impl StyleState {
     /// without holding a borrow on the [`crate::object::ObjectNode`].
     pub fn transition_override_handle(&self) -> Rc<RefCell<TransitionOverride>> {
         Rc::clone(&self.transition_override)
+    }
+
+    // -----------------------------------------------------------------------
+    // LPAR-10: read-only accessors for layout cascade resolution
+    // -----------------------------------------------------------------------
+
+    /// Return the local style entries as a `(Selector, StylePatch)` slice.
+    ///
+    /// Used by [`crate::layout::resolve_layout_style`] to iterate local entries
+    /// in precedence order.
+    pub fn local_entries(&self) -> &[(Selector, StylePatch)] {
+        &self.local
+    }
+
+    /// Return the added (shared) style entries as a `(Selector, &StylePatch)` slice.
+    ///
+    /// Used by [`crate::layout::resolve_layout_style`] to iterate added entries
+    /// in precedence order.
+    pub fn added_entries(&self) -> &[(Selector, &'static StylePatch)] {
+        &self.added
     }
 }
 
@@ -1135,6 +1198,16 @@ mod tests {
             letter_spacing: None,
             line_spacing: None,
             text_align: None,
+            padding_top: None,
+            padding_bottom: None,
+            padding_left: None,
+            padding_right: None,
+            margin_top: None,
+            margin_bottom: None,
+            margin_left: None,
+            margin_right: None,
+            gap_row: None,
+            gap_col: None,
         };
         node.add_style(&ADDED_PATCH, Selector::part(Part::MAIN));
 
@@ -1673,6 +1746,16 @@ mod tests {
             letter_spacing: None,
             line_spacing: None,
             text_align: None,
+            padding_top: None,
+            padding_bottom: None,
+            padding_left: None,
+            padding_right: None,
+            margin_top: None,
+            margin_bottom: None,
+            margin_left: None,
+            margin_right: None,
+            gap_row: None,
+            gap_col: None,
         };
         node.add_style(&SP, Selector::part(Part::MAIN));
 

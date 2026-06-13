@@ -28,7 +28,8 @@ use core::cell::RefCell;
 
 use crate::WidgetNode;
 use crate::event::{Event, Key};
-use crate::renderer::Renderer;
+use crate::layout::LayoutState;
+use crate::renderer::{ClipRenderer, Renderer};
 use crate::widget::{Rect, Widget};
 
 // ---------------------------------------------------------------------------
@@ -243,6 +244,28 @@ pub enum ObjectEvent {
         /// Estimated throw velocity in logical pixels per tick.
         vel_y: i32,
     },
+
+    // -----------------------------------------------------------------------
+    // LPAR-10 layout events (§5.F — registered via Specification Required)
+    // -----------------------------------------------------------------------
+    /// This node's effective bounds changed as a result of a layout pass.
+    ///
+    /// Delivered to the node whose computed rect was updated.  Does **not**
+    /// bubble by default.  Widgets that maintain internal layout caches (e.g.
+    /// a label that wraps text at its container width) SHOULD listen for this
+    /// and invalidate their caches.
+    ///
+    /// LVGL analogue: `LV_EVENT_SIZE_CHANGED`.
+    SizeChanged,
+
+    /// All children of this layout container have been re-placed.
+    ///
+    /// Delivered to the container node after [`run_layout`](crate::layout::run_layout)
+    /// completes placing all children for this container.  Does **not** bubble
+    /// by default.
+    ///
+    /// LVGL analogue: `LV_EVENT_LAYOUT_CHANGED`.
+    LayoutChanged,
 }
 
 // ---------------------------------------------------------------------------
@@ -598,6 +621,15 @@ pub struct ObjectNode {
     /// small. Lazily allocated by [`ObjectNode::add_local_style`] or
     /// [`ObjectNode::add_style`].
     pub(crate) style: Option<Box<crate::style_cascade::StyleState>>,
+    /// Optional LPAR-10 layout state: role (container/item/none), layout-computed
+    /// bounds override, and dirty flag.
+    ///
+    /// `None` for nodes that are not involved in object-managed layout, keeping
+    /// `ObjectNode` small. Lazily allocated by
+    /// [`set_layout_flex`](Self::set_layout_flex),
+    /// [`set_layout_grid`](Self::set_layout_grid), or
+    /// [`set_item_hints`](Self::set_item_hints).
+    pub(crate) layout: Option<Box<LayoutState>>,
 }
 
 impl ObjectNode {
@@ -614,6 +646,7 @@ impl ObjectNode {
             scroll: None,
             anims: None,
             style: None,
+            layout: None,
         }
     }
 
@@ -827,6 +860,69 @@ impl ObjectNode {
         match self.style.as_deref_mut() {
             Some(slot) => crate::style_cascade::remove_all_local(slot),
             None => 0,
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Layout state accessors (LPAR-10 §5.A)
+    // -----------------------------------------------------------------------
+
+    /// Return the node's layout-computed bounds override if present, otherwise
+    /// the widget's intrinsic bounds (`Widget::bounds()`).
+    ///
+    /// This is the canonical bounds query for hit-testing and draw positioning.
+    /// Code that needs layout-aware placement MUST call this rather than
+    /// `widget.borrow().bounds()` directly.
+    pub fn effective_bounds(&self) -> Rect {
+        if let Some(ls) = self.layout.as_deref()
+            && let Some(computed) = ls.computed
+        {
+            return computed;
+        }
+        self.widget.borrow().bounds()
+    }
+
+    /// Configure this node as a flex layout container.
+    ///
+    /// Lazily allocates the `LayoutState` slot, sets the role to
+    /// `Container(Flex(config))`, and marks the node dirty.
+    pub fn set_layout_flex(&mut self, config: crate::layout::FlexConfig) {
+        let slot = self
+            .layout
+            .get_or_insert_with(|| Box::new(LayoutState::default()));
+        slot.role = crate::layout::LayoutRole::Container(crate::layout::EngineConfig::Flex(config));
+        slot.layout_dirty = true;
+    }
+
+    /// Configure this node as a grid layout container.
+    ///
+    /// Lazily allocates the `LayoutState` slot, sets the role to
+    /// `Container(Grid(config))`, and marks the node dirty.
+    pub fn set_layout_grid(&mut self, config: crate::layout::GridConfig) {
+        let slot = self
+            .layout
+            .get_or_insert_with(|| Box::new(LayoutState::default()));
+        slot.role = crate::layout::LayoutRole::Container(crate::layout::EngineConfig::Grid(config));
+        slot.layout_dirty = true;
+    }
+
+    /// Set the layout item hints for this node.
+    ///
+    /// Lazily allocates the `LayoutState` slot, sets the role to
+    /// `Item(hints)`, and marks the node dirty.
+    pub fn set_item_hints(&mut self, hints: crate::layout::ItemHints) {
+        let slot = self
+            .layout
+            .get_or_insert_with(|| Box::new(LayoutState::default()));
+        slot.role = crate::layout::LayoutRole::Item(hints);
+        slot.layout_dirty = true;
+    }
+
+    /// Mark this node's layout as dirty, triggering a re-layout on the next
+    /// [`run_layout`](crate::layout::run_layout) call.
+    pub fn mark_layout_dirty(&mut self) {
+        if let Some(ls) = self.layout.as_deref_mut() {
+            ls.layout_dirty = true;
         }
     }
 
@@ -1050,11 +1146,39 @@ impl ObjectNode {
     ///
     /// Hidden or detached subtrees are skipped. Visible nodes draw parent first
     /// and then children in sibling order.
+    ///
+    /// # LPAR-10 translation mechanism (§5.A)
+    ///
+    /// When a node has a layout-computed rect that differs from its widget's
+    /// intrinsic bounds, drawing is routed through a
+    /// [`ClipRenderer`](crate::renderer::ClipRenderer) that translates by
+    /// `(effective_bounds.origin − widget.bounds().origin)` and clips to
+    /// `effective_bounds`.  This repositions the widget's drawing to its
+    /// computed origin without requiring the widget to know its external
+    /// position.
+    ///
+    /// For resize-aware widgets that override `set_bounds`, the widget's own
+    /// `bounds()` equals `effective_bounds` so the translation is zero and no
+    /// `ClipRenderer` is interposed.
     pub fn draw(&self, renderer: &mut dyn Renderer) {
         if self.is_hidden_or_detached() {
             return;
         }
-        self.widget.borrow().draw(renderer);
+
+        let intrinsic = self.widget.borrow().bounds();
+        let effective = self.effective_bounds();
+
+        if intrinsic.x != effective.x || intrinsic.y != effective.y {
+            // Translation needed: widget draws at intrinsic origin, but must
+            // appear at effective origin.
+            let dx = effective.x - intrinsic.x;
+            let dy = effective.y - intrinsic.y;
+            let mut clip_r = ClipRenderer::with_offset(renderer, effective, dx, dy);
+            self.widget.borrow().draw(&mut clip_r);
+        } else {
+            self.widget.borrow().draw(renderer);
+        }
+
         for child in &self.children {
             child.draw(renderer);
         }
@@ -1102,7 +1226,9 @@ impl ObjectNode {
         if self.is_hidden_or_detached() {
             return None;
         }
-        let bounds = self.widget.borrow().bounds();
+        // Use effective_bounds so layout-managed nodes contribute their
+        // computed extent, not their intrinsic (possibly (0,0)) bounds.
+        let bounds = self.effective_bounds();
         let mut extent = if bounds.width > 0 && bounds.height > 0 {
             Some(bounds)
         } else {
@@ -1143,7 +1269,7 @@ impl ObjectNode {
         let flags = self.flags();
         flags.contains(ObjectFlags::CLICKABLE)
             && !flags.contains(ObjectFlags::DISABLED)
-            && rect_contains(self.widget.borrow().bounds(), x, y)
+            && rect_contains(self.effective_bounds(), x, y)
     }
 }
 

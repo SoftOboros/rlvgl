@@ -163,4 +163,21 @@ pub trait Widget {
     fn clear_region(&mut self) -> Option<Rect> {
         None
     }
+
+    /// Called by the LPAR-10 layout pass to notify this widget of its
+    /// layout-computed bounds.
+    ///
+    /// The **default implementation is a no-op**: existing widgets are
+    /// repositioned at draw time by the object layer's translation mechanism
+    /// without any change to the widget's own `bounds()` return value.
+    ///
+    /// **Resize-aware widgets** that want the layout pass to also control
+    /// their *size* (not just position) SHOULD override this method to adopt
+    /// the computed rect: store `bounds` and return it from `Widget::bounds()`.
+    /// When this is done, `widget.bounds() == effective_bounds` and the object
+    /// layer's draw translation auto-zeroes.
+    ///
+    /// This is additive (a default no-op body) and MUST NOT break any existing
+    /// `Widget` implementer (LPAR-02 §5 additive-first rule; LPAR-10 §5.A).
+    fn set_bounds(&mut self, _bounds: Rect) {}
 }
