@@ -1130,7 +1130,7 @@ mod tests {
     use crate::event::Event;
     use crate::object::{ObjectEvent, ObjectFlags, ObjectNode};
     use crate::renderer::Renderer;
-    use crate::widget::{Color, Rect, Widget};
+    use crate::widget::{Rect, Widget};
 
     // -----------------------------------------------------------------------
     // Minimal test widget
@@ -1154,12 +1154,6 @@ mod tests {
         fn handle_event(&mut self, _event: &Event) -> bool {
             false
         }
-    }
-
-    struct NullRenderer;
-    impl Renderer for NullRenderer {
-        fn fill_rect(&mut self, _: Rect, _: Color) {}
-        fn draw_text(&mut self, _: (i32, i32), _: &str, _: Color) {}
     }
 
     /// Build: root(400x600) → container(400x600, SCROLLABLE, content 400x1200) → child(400x1200)
