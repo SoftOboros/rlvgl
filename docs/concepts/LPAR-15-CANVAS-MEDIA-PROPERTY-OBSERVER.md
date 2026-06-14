@@ -1002,10 +1002,12 @@ vendored. Resurrection note: do not re-derive these as "missing Core work."
 
 ### 12.C Owned by LPAR-16
 
-- [ ] LPAR-16 golden / geometry fixtures exist for `CanvasWidget`,
+- [x] LPAR-16 golden / geometry fixtures exist for `CanvasWidget`,
       `AnimImage`, and `ArcLabel` (at least one deterministic tick-count
-      fixture per widget). *(deferred to LPAR-16 — conformance-fixture phase
-      owns this row; tracked in LPAR-16 §12, not here.)*
+      fixture per widget). *Landed 2026-06-14 under the ratified LPAR-16 §5/§6
+      contract: `widgets/tests/lpar16_canvas_anim.rs` +
+      `widgets/tests/lpar16_arc_label_geometry.rs` (LPAR-16 §6 ledger,
+      §12.B).*
 
 ## 13. Files Cited
 
@@ -1248,3 +1250,8 @@ None at this phase.
   not re-file them as missing Core work), and §12.C the LPAR-16-owned fixture
   row (unchecked, tracked in LPAR-16 §12). No behaviour change; ledger
   alignment only, addressing the drift-report P2 finding.
+- **2026-06-14** — §12.C closed: the Canvas/AnimImage/ArcLabel conformance
+  fixtures landed under the now-ratified LPAR-16 §5/§6 contract
+  (`widgets/tests/lpar16_canvas_anim.rs`,
+  `widgets/tests/lpar16_arc_label_geometry.rs`). Canonical record is LPAR-16
+  §6 ledger + §15; this entry tracks the cross-reference only.

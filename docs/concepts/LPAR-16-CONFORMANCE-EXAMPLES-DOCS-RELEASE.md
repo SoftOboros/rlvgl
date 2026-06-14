@@ -5,9 +5,10 @@ fixtures, examples, documentation, no-std gates, and release tracking.
 
 # LPAR-16 — Conformance, Examples, Docs, and Release
 
-**Status:** Drafted 2026-06-13. Not ratified. Normative for the LPAR
-conformance-fixture contract, example/doc requirements, no-std gates, and
-release tracking once a dated §15 ratification entry is recorded.
+**Status:** §5 (fixture contract) and §6 (per-phase fixture ledger) ratified
+2026-06-14; §10 rule 1 (version policy) decided 2026-06-13. §7–§9 remain
+drafted policy. Normative for the LPAR conformance-fixture contract and the
+per-phase fixture obligations; fixture execution is unblocked.
 
 Parent initiative: [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md). Baseline:
 [LPAR-01-BASELINE.md](LPAR-01-BASELINE.md). Every implementation phase
@@ -245,7 +246,7 @@ remains canonical for its own invariant.
 | LPAR-12 | Pixel goldens / event-dispatch fixtures for ButtonMatrix, ImageButton, Spinbox | Pixel + Behavioral | LPAR-08 §5.H | Open |
 | LPAR-13 | Pixel/geometry goldens for Dropdown, Keyboard, Menu, Roller, Tabview, Tileview, Window (Roller snap geometry; Tileview tile positions) | Pixel + Geometry | LPAR-05 snap (`snap_offset_to_points`); LPAR-08 §5.H | Open |
 | LPAR-14 | Fixtures for Calendar, Chart, Span, Table, Textarea v2, MessageBox | Pixel + Geometry + Behavioral | LPAR-08 text metrics; §5.H | Open |
-| LPAR-15 | ≥1 deterministic tick-count fixture each for CanvasWidget, AnimImage, ArcLabel (ArcLabel = geometry) | Determinism + Geometry | LPAR-06 tick model; ArcLabel `Δθ=advance/radius` | Open |
+| LPAR-15 | ≥1 deterministic tick-count fixture each for CanvasWidget, AnimImage, ArcLabel (ArcLabel = geometry) | Determinism + Geometry | LPAR-06 tick model; ArcLabel `Δθ=advance/radius` | **Landed** (`widgets/tests/lpar16_canvas_anim.rs`, `widgets/tests/lpar16_arc_label_geometry.rs`) |
 
 **Closure rule.** A phase row moves to Landed only when its fixtures (a) exist
 under §5.C locations, (b) are exactly one §5.B kind each, (c) cite their §6
@@ -350,8 +351,9 @@ LPAR-16 is **conformance-complete** when:
 
 ### 12.A Fixture contract (this document)
 
-- [ ] This document is ratified with a dated §15 entry.
-- [ ] The four fixture kinds (§5.B), the location/naming convention (§5.C),
+- [x] §5 (fixture contract) and §6 (ledger) ratified with a dated §15 entry
+      (2026-06-14). §7–§9 remain drafted policy; §10 rule 1 decided.
+- [x] The four fixture kinds (§5.B), the location/naming convention (§5.C),
       the software-reference oracle rule (§5.D), and the inherited-determinism
       rule (§5.E) are stable and referenced by at least the LPAR-08 landed
       fixtures.
@@ -372,8 +374,9 @@ LPAR-16 is **conformance-complete** when:
       Tileview (tile positions), Window fixtures.
 - [ ] LPAR-14 — Calendar, Chart, Span, Table, Textarea v2, MessageBox
       fixtures.
-- [ ] LPAR-15 — CanvasWidget, AnimImage, ArcLabel tick-count/geometry
-      fixtures (≥1 each).
+- [x] LPAR-15 — CanvasWidget (draw-sequence determinism), AnimImage
+      (tick-stream determinism), ArcLabel (exact arc geometry, gated
+      `lpar_arclabel`). Landed 2026-06-14.
 
 ### 12.C No-std / feature gates (§7)
 
@@ -467,6 +470,25 @@ LPAR-16 is **conformance-complete** when:
   §7 no-std enforcement via embedded compile gate, §10 SemVer policy. Not
   ratified; fixture/release execution is blocked until owner ratification is
   recorded here.
+- **2026-06-14** — LPAR-15 fixture row Landed (first slice under the ratified
+  contract). `widgets/tests/lpar16_canvas_anim.rs` (CanvasWidget
+  draw-sequence determinism + concrete pixel values; AnimImage 12-tick-stream
+  determinism + concrete frame sequence `[1,2,3,0]×3`) and
+  `widgets/tests/lpar16_arc_label_geometry.rs` (gated `lpar_arclabel`; exact
+  per-glyph arc origins `[(250,150),(248,165),(244,181)]` for radius 100 /
+  16 px advance / 0° CW — libm `cosf`/`sinf` truncations are host-stable).
+  Each fixture is exactly one §5.B kind and cites its §6 invariant. §6 ledger
+  + §12.B updated; LPAR-15 §12.C closed. Gates: fmt clean; clippy
+  `-p rlvgl-widgets --all-targets` clean both with and without
+  `lpar_arclabel`; widgets suite green both feature sets.
+- **2026-06-14** — §5 (fixture contract) and §6 (per-phase fixture ledger)
+  ratified by owner instruction ("5&6 ratified"). Fixture execution is
+  unblocked. The four fixture kinds, location/naming convention, software-
+  reference oracle, inherited-determinism rule, and the per-phase ledger
+  (LPAR-08 Landed; the rest Open with their owning invariants cited) are now
+  normative. §7–§9 (no-std gates, examples, docs) remain drafted policy and
+  §10 awaits its remaining rows; these do not block fixture work. First slice:
+  LPAR-15 Canvas/AnimImage/ArcLabel tick-count/geometry fixtures.
 - **2026-06-13** — §10 version decision recorded (owner): the LPAR release
   continues the `0.2.x` line targeting `0.2.4`; no `0.3.0`. `core`/`widgets`
   (0.2.3) and `ui` (0.2.2) bump to `0.2.4`; `playit` already `0.2.4`;
