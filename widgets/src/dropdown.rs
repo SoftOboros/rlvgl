@@ -20,10 +20,9 @@
 //! ```
 
 use alloc::{string::String, vec::Vec};
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -67,6 +66,9 @@ pub struct Dropdown {
     pub selected_color: Color,
     /// Text color for option labels.
     pub text_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Dropdown {
@@ -88,7 +90,14 @@ impl Dropdown {
             },
             selected_color: Color(160, 200, 240, 255),
             text_color: Color(30, 30, 30, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     // ── Options ───────────────────────────────────────────────────────────
@@ -278,6 +287,7 @@ impl Widget for Dropdown {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
+        let font = self.font.resolve();
 
         // ── Trigger ───────────────────────────────────────────────────────
         let tr = self.trigger_rect();
@@ -287,13 +297,13 @@ impl Widget for Dropdown {
         let text = self.selected_text();
         let baseline = tr.y + 14; // approximate descent below top
         let text_pos = (tr.x + 4, baseline);
-        let shaped = shape_text_ltr(&FONT_6X10, text, text_pos, 0);
+        let shaped = shape_text_ltr(font, text, text_pos, 0);
         renderer.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(a));
 
         // Optional indicator symbol at right edge
         if let Some(sym) = self.symbol.as_deref() {
             let sym_x = tr.x + tr.width - 14;
-            let shaped_sym = shape_text_ltr(&FONT_6X10, sym, (sym_x, baseline), 0);
+            let shaped_sym = shape_text_ltr(font, sym, (sym_x, baseline), 0);
             renderer.draw_text_shaped(&shaped_sym, (0, 0), self.text_color.with_alpha(a));
         } else {
             // Draw a simple down-arrow triangle using fill_rect primitives.
@@ -354,7 +364,7 @@ impl Widget for Dropdown {
             // Item text
             let baseline = row_y + ROW_HEIGHT - 2;
             let opt_pos = (lr.x + 4, baseline);
-            let shaped_opt = shape_text_ltr(&FONT_6X10, option, opt_pos, 0);
+            let shaped_opt = shape_text_ltr(font, option, opt_pos, 0);
             renderer.draw_text_shaped(&shaped_opt, (0, 0), self.text_color.with_alpha(item_a));
         }
     }

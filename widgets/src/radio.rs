@@ -2,10 +2,9 @@
 //! Radio button widget for mutually exclusive selections.
 
 use alloc::string::String;
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -21,6 +20,9 @@ pub struct Radio {
     /// Color of the inner dot when selected.
     pub dot_color: Color,
     selected: bool,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Radio {
@@ -33,6 +35,7 @@ impl Radio {
             text_color: Color(0, 0, 0, 255),
             dot_color: Color(0, 0, 0, 255),
             selected: false,
+            font: WidgetFont::new(),
         }
     }
 
@@ -44,6 +47,12 @@ impl Radio {
     /// Set the selected state programmatically.
     pub fn set_selected(&mut self, value: bool) {
         self.selected = value;
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 }
 
@@ -95,7 +104,8 @@ impl Widget for Radio {
             width: self.bounds.width - (size + 4),
             height: self.bounds.height,
         };
-        let shaped = shape_text_ltr(&FONT_6X10, &self.text, text_origin, 0);
+        let font = self.font.resolve();
+        let shaped = shape_text_ltr(font, &self.text, text_origin, 0);
         let mut clipped = ClipRenderer::new(renderer, clip);
         clipped.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(a));
     }

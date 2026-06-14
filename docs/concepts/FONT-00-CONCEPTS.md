@@ -362,16 +362,23 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 ### 12.A FONT-01 — Font selection (§5)
 
 - [x] This document is ratified with a dated §15 entry (2026-06-14).
-- [ ] `WidgetFont` newtype + `resolve()` land with the `FONT_6X10` fallback.
-- [ ] Every text widget in `widgets/src/` (and the `ui/` text widgets) gains
+- [x] `WidgetFont` newtype + `resolve()` land with the `FONT_6X10` fallback
+      (`core::font::WidgetFont`, commit `da29917`).
+- [x] Every text widget in `widgets/src/` (and the `ui/` text widgets) gains
       `set_font` and draws via `self.font.resolve()`; no constructor or
       `Widget`-trait signature changes. **Exception:** `ArcLabel`'s `WidgetFont`
       adoption lands in FONT-03, not here — its font also drives advance
       geometry and has a no-font 8 px fallback, so adopting `WidgetFont`
       (no-font → `FONT_6X10` metrics) is a behavior change best done atomically
-      with its render migration. FONT-01 stays purely additive.
-- [ ] Existing widget goldens still pass unchanged (default = `FONT_6X10`).
-- [ ] `cargo fmt`, per-crate `clippy -D warnings`, and widget/ui tests pass.
+      with its render migration. FONT-01 stays purely additive. *Landed: 21
+      `widgets/src/` widgets + `ui::Input`/`Textarea` (via the inner `Label`)
+      + `ui::FileBrowser`. `CrawlWindow` skipped (its `Renderer::draw` is a
+      no-op; text goes through the separate crawl A8 path).
+      `ui::EventWindow` and `draw_panel_header` already take a font at
+      construction / as a parameter, so they are already font-selectable;
+      converting them to `WidgetFont` is deferred-Safe polish.*
+- [x] Existing widget goldens still pass unchanged (default = `FONT_6X10`).
+- [x] `cargo fmt`, per-crate `clippy -D warnings`, and widget/ui tests pass.
 
 ### 12.B FONT-02 — AA text + conformance fixture (§6, §9)
 
@@ -488,3 +495,12 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   adopting `WidgetFont` (no-font → `FONT_6X10`) is a behavior change that
   belongs atomically with its render migration, keeping FONT-01 purely
   additive. No change to the frozen §5 mechanism or §7 contract.
+- **2026-06-14** — FONT-01 complete (§12.A all boxed). `WidgetFont` +
+  `set_font` landed across 21 `widgets/src/` widgets and `ui::Input` /
+  `Textarea` / `FileBrowser`; `Label` gained `resolved_font()` so `Input`/
+  `Textarea` draw their multi-line text through the inner label's font (single
+  source). `CrawlWindow` skipped (no-op `Renderer::draw`); `EventWindow` /
+  `draw_panel_header` left as already-selectable (construction/param font),
+  WidgetFont conversion deferred-Safe. Purely additive; all existing goldens
+  pass; fmt/clippy/tests green across core+widgets+ui. FONT-02 (AA + fixture),
+  FONT-03 (ArcLabel), FONT-04 (rotated throughput) remain.

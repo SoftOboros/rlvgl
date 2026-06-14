@@ -15,10 +15,9 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::{FontMetrics, shape_text_ltr};
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -162,6 +161,9 @@ pub struct ButtonMatrix {
     pub checked_color: Color,
     /// Color used when a button is disabled or inactive.
     pub disabled_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl ButtonMatrix {
@@ -181,7 +183,14 @@ impl ButtonMatrix {
             pressed_color: Color(150, 150, 220, 255),
             checked_color: Color(100, 160, 230, 255),
             disabled_color: Color(180, 180, 180, 128),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Populate the button grid from a flat string slice.
@@ -542,7 +551,7 @@ impl Widget for ButtonMatrix {
     fn draw(&self, renderer: &mut dyn Renderer) {
         draw_widget_bg(renderer, self.bounds, &self.style);
 
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font = self.font.resolve();
         let metrics = font.line_metrics();
 
         let mut global_idx: u16 = 0;

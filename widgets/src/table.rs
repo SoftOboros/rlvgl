@@ -23,10 +23,9 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::{FontMetrics, shape_text_ltr, wrap_greedy_ltr};
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr, wrap_greedy_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -122,6 +121,9 @@ pub struct Table {
     pub text_color: Color,
     /// Grid line color.
     pub grid_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Table {
@@ -142,7 +144,14 @@ impl Table {
             selected_color: Color(100, 160, 230, 255),
             text_color: Color(30, 30, 30, 255),
             grid_color: Color(180, 180, 180, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     // ── Dimensions ────────────────────────────────────────────────────────
@@ -290,7 +299,7 @@ impl Table {
     /// Each row's height is the maximum wrapped height across all cells in that
     /// row. This is the load-bearing use of the shared font measurement.
     fn recompute_row_heights(&mut self) {
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font: &dyn FontMetrics = self.font.resolve();
         let metrics = font.line_metrics();
         let col_widths = self.resolved_col_widths();
 
@@ -429,7 +438,7 @@ impl Table {
     // ── Internal draw helpers ─────────────────────────────────────────────
 
     fn draw_cells(&self, renderer: &mut dyn Renderer) {
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font: &dyn FontMetrics = self.font.resolve();
         let metrics = font.line_metrics();
         let col_widths = self.resolved_col_widths();
 

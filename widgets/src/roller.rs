@@ -22,10 +22,9 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::scroll::{DEFAULT_SNAP_ATTRACTION_RADIUS, snap_offset_to_points};
 use rlvgl_core::style::Style;
@@ -90,6 +89,9 @@ pub struct Roller {
     pub items_text_color: Color,
     /// Text color for the selected row.
     pub selected_text_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Roller {
@@ -107,6 +109,7 @@ impl Roller {
             selected_color: Color(60, 120, 200, 255),
             items_text_color: Color(100, 100, 100, 255),
             selected_text_color: Color(255, 255, 255, 255),
+            font: WidgetFont::new(),
         }
     }
 
@@ -237,6 +240,12 @@ impl Roller {
         }
     }
 
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
+    }
+
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
@@ -304,7 +313,7 @@ impl Roller {
             self.items_text_color
         };
         if text_color.3 > 0 {
-            let font = &FONT_6X10;
+            let font = self.font.resolve();
             let metrics = rlvgl_core::font::FontMetrics::line_metrics(font);
             let baseline = screen_y + metrics.ascent as i32 + (rh - metrics.line_height as i32) / 2;
             let shaped = shape_text_ltr(font, text, (self.bounds.x + ROW_PAD_X, baseline), 0);

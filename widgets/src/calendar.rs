@@ -22,10 +22,9 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::{FontMetrics, shape_text_ltr};
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -117,6 +116,9 @@ pub struct Calendar {
     pub header_text_color: Color,
     /// Color for overflow (non-displayed-month) day numbers (dimmed).
     pub overflow_text_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Calendar {
@@ -153,7 +155,14 @@ impl Calendar {
             text_color: Color(30, 30, 30, 255),
             header_text_color: Color(80, 80, 80, 255),
             overflow_text_color: Color(180, 180, 180, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     // ── Date setters / getters ────────────────────────────────────────────
@@ -327,7 +336,7 @@ impl Calendar {
 
     /// Return `(header_h, cell_w, cell_h, grid_y)`.
     fn layout(&self) -> (i32, i32, i32, i32) {
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font: &dyn FontMetrics = self.font.resolve();
         let metrics = font.line_metrics();
         let header_h = metrics.line_height as i32 + 4;
         let name_row_h = metrics.line_height as i32 + 4;
@@ -352,7 +361,7 @@ impl Widget for Calendar {
         // Part::MAIN — background
         draw_widget_bg(renderer, self.bounds, &self.style);
 
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font = self.font.resolve();
         let metrics = font.line_metrics();
 
         let (header_h, cell_w, cell_h, grid_y) = self.layout();

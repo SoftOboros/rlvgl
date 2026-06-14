@@ -29,10 +29,9 @@
 
 use alloc::boxed::Box;
 use rlvgl_core::{
-    bitmap_font::FONT_6X10,
     edit::EditCore as CoreEditCore,
     event::{Event, Key},
-    font::shape_text_ltr,
+    font::{FontMetrics, shape_text_ltr},
     renderer::Renderer,
     widget::{Rect, Widget},
 };
@@ -77,6 +76,10 @@ impl UiEditCore {
             core: CoreEditCore::new(text, bounds, multi_line),
             label: Label::new(text, bounds),
         }
+    }
+
+    fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.label.set_font(font);
     }
 
     fn set_text(&mut self, text: &str) {
@@ -188,7 +191,7 @@ impl UiEditCore {
                 continue;
             }
             let baseline = bounds.y + (row as i32 + 1) * self.core.line_height;
-            let shaped = shape_text_ltr(&FONT_6X10, line, (bounds.x, baseline), 0);
+            let shaped = shape_text_ltr(self.label.resolved_font(), line, (bounds.x, baseline), 0);
             renderer.draw_text_shaped(
                 &shaped,
                 (0, 0),
@@ -218,6 +221,12 @@ impl Input {
             core: UiEditCore::new(text, bounds, false),
             on_submit: None,
         }
+    }
+
+    /// Assign the font used to render this input (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.core.set_font(font);
     }
 
     /// Register a change handler invoked after every successful edit
@@ -337,6 +346,12 @@ impl Textarea {
         Self {
             core: UiEditCore::new(text, bounds, true),
         }
+    }
+
+    /// Assign the font used to render this textarea (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.core.set_font(font);
     }
 
     /// Register a change handler invoked after every successful edit

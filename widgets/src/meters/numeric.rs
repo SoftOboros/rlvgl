@@ -15,9 +15,8 @@
 use alloc::format;
 
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -42,6 +41,9 @@ pub struct NumericPeak {
     reading_db: f32,
     peak_db: f32,
     peak_age_s: f32,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl NumericPeak {
@@ -61,7 +63,14 @@ impl NumericPeak {
             reading_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_age_s: 0.0,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Replace the ballistic kind. New ballistic + peak hold start at floor.
@@ -168,10 +177,11 @@ impl Widget for NumericPeak {
             self.bounds.x + pad,
             self.bounds.y + self.bounds.height - pad,
         );
-        let shaped = shape_text_ltr(&FONT_6X10, &reading_text, top, 0);
+        let font = self.font.resolve();
+        let shaped = shape_text_ltr(font, &reading_text, top, 0);
         renderer.draw_text_shaped(&shaped, (0, 0), reading_col);
 
-        let shaped = shape_text_ltr(&FONT_6X10, &peak_text, bot, 0);
+        let shaped = shape_text_ltr(font, &peak_text, bot, 0);
         renderer.draw_text_shaped(&shaped, (0, 0), peak_col);
 
         // Suppress unused warnings on MeterColorId — referenced via

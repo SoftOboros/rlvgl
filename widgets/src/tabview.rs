@@ -22,10 +22,9 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -111,6 +110,9 @@ pub struct Tabview {
     pub tab_text_color: Color,
     /// Text color for the active tab.
     pub active_tab_text_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Tabview {
@@ -134,7 +136,14 @@ impl Tabview {
             active_tab_color: Color(60, 120, 200, 255),
             tab_text_color: Color(200, 200, 200, 255),
             active_tab_text_color: Color(255, 255, 255, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Append a tab with the given name and return its [`TabId`].
@@ -355,7 +364,7 @@ impl Tabview {
                 self.tab_text_color
             };
             if text_color.3 > 0 {
-                let font = &FONT_6X10;
+                let font = self.font.resolve();
                 let metrics = rlvgl_core::font::FontMetrics::line_metrics(font);
                 let baseline =
                     ty + metrics.ascent as i32 + (tab_h - metrics.line_height as i32) / 2;

@@ -20,10 +20,9 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::{FontId, FontMetrics, shape_text_ltr, wrap_greedy_ltr};
+use rlvgl_core::font::{FontId, FontMetrics, WidgetFont, shape_text_ltr, wrap_greedy_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -119,6 +118,9 @@ pub struct Spangroup {
     overflow: SpanOverflow,
     /// Background and border style.
     pub style: Style,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Spangroup {
@@ -130,6 +132,7 @@ impl Spangroup {
             next_id: 0,
             overflow: SpanOverflow::default(),
             style: Style::default(),
+            font: WidgetFont::new(),
         }
     }
 
@@ -192,13 +195,19 @@ impl Spangroup {
         self.overflow
     }
 
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
+    }
+
     // ── Content height query ──────────────────────────────────────────────
 
     /// Return the total height of the laid-out content using the default font.
     ///
     /// Useful for sizing the widget before placement.
     pub fn content_height(&self) -> i32 {
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font = self.font.resolve();
         let concat = self.concat_text();
         let wrapped = wrap_greedy_ltr(font, &concat, self.bounds.width.max(1), 0, 0);
         wrapped.used_height
@@ -272,7 +281,7 @@ impl Widget for Spangroup {
             return;
         }
 
-        let font: &dyn FontMetrics = &FONT_6X10;
+        let font = self.font.resolve();
         let metrics = font.line_metrics();
 
         // Step 1: Concatenate all segment texts once, recording start offsets.
@@ -351,6 +360,7 @@ impl Widget for Spangroup {
 mod tests {
     use super::*;
     use alloc::vec;
+    use rlvgl_core::bitmap_font::FONT_6X10;
 
     fn r(x: i32, y: i32, w: i32, h: i32) -> Rect {
         Rect {

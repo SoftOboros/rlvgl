@@ -6,9 +6,8 @@
 //! those features can be added without changing the `ScaleMode` vocabulary.
 
 use libm::{cosf, sinf};
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::raster::PointF;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -67,6 +66,9 @@ pub struct Scale {
     pub minor_tick_color: Color,
     /// Color used for generated numeric labels.
     pub label_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 #[derive(Clone, Copy)]
@@ -108,7 +110,14 @@ impl Scale {
             major_tick_color: Color(0, 0, 0, 255),
             minor_tick_color: Color(96, 96, 96, 255),
             label_color: Color(0, 0, 0, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Set the scale placement mode.
@@ -380,7 +389,8 @@ impl Scale {
     }
 
     fn draw_label_text(&self, renderer: &mut dyn Renderer, text: &str, origin: (i32, i32)) {
-        let shaped = shape_text_ltr(&FONT_6X10, text, origin, 0);
+        let font = self.font.resolve();
+        let shaped = shape_text_ltr(font, text, origin, 0);
         renderer.draw_text_shaped(
             &shaped,
             (0, 0),

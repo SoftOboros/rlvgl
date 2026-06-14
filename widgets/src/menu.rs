@@ -25,10 +25,9 @@
 //! ```
 
 use alloc::{string::String, vec::Vec};
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -140,6 +139,9 @@ pub struct Menu {
     pub text_color: Color,
     /// Color for separator rules.
     pub separator_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Menu {
@@ -162,7 +164,14 @@ impl Menu {
             header_color: Color(80, 80, 180, 255),
             text_color: Color(20, 20, 20, 255),
             separator_color: Color(180, 180, 180, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     // ── Page management ───────────────────────────────────────────────────
@@ -423,6 +432,7 @@ impl Widget for Menu {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
+        let font = self.font.resolve();
 
         // ── Widget background (Part::MAIN) ────────────────────────────────
         draw_widget_bg(renderer, self.bounds, &self.style);
@@ -437,7 +447,7 @@ impl Widget for Menu {
                 && (*self.stack.last().unwrap() != self.root_page || self.show_root_back_button);
             let is_at_root = !can_go_back;
             let title_x_offset = if !is_at_root {
-                let back_shaped = shape_text_ltr(&FONT_6X10, "<", (hdr.x + 4, hdr.y + 15), 0);
+                let back_shaped = shape_text_ltr(font, "<", (hdr.x + 4, hdr.y + 15), 0);
                 renderer.draw_text_shaped(
                     &back_shaped,
                     (0, 0),
@@ -450,12 +460,8 @@ impl Widget for Menu {
 
             // Page title
             if let Some(page) = self.current_page_ref() {
-                let shaped = shape_text_ltr(
-                    &FONT_6X10,
-                    &page.title,
-                    (hdr.x + title_x_offset, hdr.y + 15),
-                    0,
-                );
+                let shaped =
+                    shape_text_ltr(font, &page.title, (hdr.x + title_x_offset, hdr.y + 15), 0);
                 renderer.draw_text_shaped(&shaped, (0, 0), Color(255, 255, 255, 255).with_alpha(a));
             }
         }
@@ -503,7 +509,7 @@ impl Widget for Menu {
 
                     // Item text
                     let baseline = y + rh - 2;
-                    let shaped = shape_text_ltr(&FONT_6X10, text, (lr.x + 6, baseline), 0);
+                    let shaped = shape_text_ltr(font, text, (lr.x + 6, baseline), 0);
                     renderer.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(item_a));
 
                     // Sub-page arrow indicator

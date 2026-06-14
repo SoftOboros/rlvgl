@@ -22,10 +22,9 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -92,6 +91,9 @@ pub struct Window {
     pub button_color: Color,
     /// Header button icon text color.
     pub button_text_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Window {
@@ -112,6 +114,7 @@ impl Window {
             title_color: Color(240, 240, 240, 255),
             button_color: Color(70, 70, 100, 255),
             button_text_color: Color(240, 240, 240, 255),
+            font: WidgetFont::new(),
         }
     }
 
@@ -167,6 +170,12 @@ impl Window {
         }
     }
 
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
+    }
+
     /// Update the header height and recompute content bounds.
     pub fn set_header_height(&mut self, h: i32) {
         self.header_height = h.max(0);
@@ -192,7 +201,7 @@ impl Window {
 
         // Title shaped text.
         if !self.title.is_empty() && title_w > 0 && self.title_color.3 > 0 {
-            let font = &FONT_6X10;
+            let font = self.font.resolve();
             let metrics = rlvgl_core::font::FontMetrics::line_metrics(font);
             let baseline =
                 header.y + metrics.ascent as i32 + (header.height - metrics.line_height as i32) / 2;
@@ -216,7 +225,7 @@ impl Window {
             if let Some(icon) = &btn.icon
                 && self.button_text_color.3 > 0
             {
-                let font = &FONT_6X10;
+                let font = self.font.resolve();
                 let metrics = rlvgl_core::font::FontMetrics::line_metrics(font);
                 let baseline = header.y
                     + metrics.ascent as i32

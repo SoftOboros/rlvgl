@@ -29,11 +29,12 @@
 
 use alloc::boxed::Box;
 use alloc::string::String;
+#[cfg(test)]
 use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::edit::{AcceptFn, CARET_WIDTH, ChangeCallback, EditCore};
 use rlvgl_core::event::{Event, Key};
-use rlvgl_core::font::{FontMetrics, shape_text_ltr, wrap_greedy_ltr};
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr, wrap_greedy_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -87,6 +88,9 @@ pub struct Textarea {
     pub style: Style,
     /// Text colour.
     pub text_color: Color,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Textarea {
@@ -102,6 +106,7 @@ impl Textarea {
             on_submit: None,
             style: Style::default(),
             text_color: Color(0, 0, 0, 255),
+            font: WidgetFont::new(),
         }
     }
 
@@ -201,6 +206,12 @@ impl Textarea {
     /// Mutable access to the widget style.
     pub fn widget_style_mut(&mut self) -> &mut Style {
         &mut self.style
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     // ── Mutation gates ────────────────────────────────────────────────────────
@@ -319,7 +330,8 @@ impl Textarea {
         if line.is_empty() {
             return;
         }
-        let shaped = shape_text_ltr(&FONT_6X10, line, (self.bounds.x, baseline), 0);
+        let font = self.font.resolve();
+        let shaped = shape_text_ltr(font, line, (self.bounds.x, baseline), 0);
         let mut clip_r = ClipRenderer::new(renderer, clip);
         clip_r.draw_text_shaped(&shaped, (0, 0), self.text_color);
     }
@@ -365,6 +377,7 @@ impl Widget for Textarea {
 
         let clip = self.bounds;
         let buf = self.display_text();
+        let font = self.font.resolve();
 
         // Placeholder path: show placeholder when buffer is empty and inactive.
         if buf.is_empty() && !self.core.active {
@@ -375,9 +388,9 @@ impl Widget for Textarea {
                     self.text_color.2,
                     self.text_color.3 / 2,
                 );
-                let lm = FONT_6X10.line_metrics();
+                let lm = font.line_metrics();
                 let baseline = self.bounds.y + lm.ascent as i32 - self.scroll_offset_y;
-                let shaped = shape_text_ltr(&FONT_6X10, ph, (self.bounds.x, baseline), 0);
+                let shaped = shape_text_ltr(font, ph, (self.bounds.x, baseline), 0);
                 let mut clip_r = ClipRenderer::new(renderer, clip);
                 clip_r.draw_text_shaped(&shaped, (0, 0), ph_color);
             }
@@ -386,14 +399,14 @@ impl Widget for Textarea {
 
         if self.one_line {
             // Single-line: draw the buffer as one unwrapped line.
-            let lm = FONT_6X10.line_metrics();
+            let lm = font.line_metrics();
             let baseline = self.bounds.y + lm.ascent as i32 - self.scroll_offset_y;
             self.draw_line(renderer, &buf, baseline, clip);
         } else {
             // Multi-line: use the LPAR-08 greedy wrap.
-            let lm = FONT_6X10.line_metrics();
+            let lm = font.line_metrics();
             let line_h = lm.line_height as i32;
-            let wrapped = wrap_greedy_ltr(&FONT_6X10, &buf, self.bounds.width, 0, 0);
+            let wrapped = wrap_greedy_ltr(font, &buf, self.bounds.width, 0, 0);
             for (i, wl) in wrapped.lines.iter().enumerate() {
                 let top = i as i32 * line_h - self.scroll_offset_y;
                 // Skip lines that are entirely outside the visible area.

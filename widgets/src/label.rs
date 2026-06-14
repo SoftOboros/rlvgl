@@ -43,6 +43,14 @@ impl Label {
         self.font.set(font);
     }
 
+    /// Resolve this label's font handle — the assigned font, or `FONT_6X10`.
+    ///
+    /// Lets a containing widget (e.g. `ui::Input`/`Textarea`) draw extra text
+    /// with the same font this label resolves, without duplicating the slot.
+    pub fn resolved_font(&self) -> &'static dyn FontMetrics {
+        self.font.resolve()
+    }
+
     /// Update the text displayed by the label.
     pub fn set_text(&mut self, text: impl Into<String>) {
         self.text = text.into();

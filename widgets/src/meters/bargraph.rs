@@ -10,9 +10,8 @@
 //! schema.
 
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -54,6 +53,9 @@ pub struct LedBargraph {
     /// `BARGRAPH_TICK_STRIP_PX`-wide strip on the right side of the
     /// widget. Default `false` so callers opt in.
     pub show_ticks: bool,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl LedBargraph {
@@ -74,7 +76,14 @@ impl LedBargraph {
             peak_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_age_s: 0.0,
             show_ticks: false,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Builder-style helper: enable tick + label rendering in the
@@ -267,14 +276,15 @@ impl LedBargraph {
             // Lift the baseline slightly so a typical 12-px font sits
             // beside the tick mark.
             let lbl_y = y + 4;
+            let font = self.font.resolve();
             match scale.label_for_major(m) {
                 Some(s) => {
-                    let shaped = shape_text_ltr(&FONT_6X10, s, (lbl_x, lbl_y), 0);
+                    let shaped = shape_text_ltr(font, s, (lbl_x, lbl_y), 0);
                     renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
                 None => {
                     let formatted = format!("{m:.0}");
-                    let shaped = shape_text_ltr(&FONT_6X10, &formatted, (lbl_x, lbl_y), 0);
+                    let shaped = shape_text_ltr(font, &formatted, (lbl_x, lbl_y), 0);
                     renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
             }

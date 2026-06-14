@@ -15,9 +15,8 @@
 extern crate alloc;
 use libm::{cosf, sinf};
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::shape_text_ltr;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -54,6 +53,9 @@ pub struct NeedleVu {
     /// When `true`, paint major-tick marks and labels along the arc.
     /// Default `false` so callers opt in.
     pub show_ticks: bool,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl NeedleVu {
@@ -72,7 +74,14 @@ impl NeedleVu {
             ballistic: BallisticState::new(skin.default_ballistic),
             reading_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             show_ticks: false,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Builder-style helper: enable tick + label rendering and return self.
@@ -210,12 +219,14 @@ impl NeedleVu {
             let label_y = (pivot_y as f32 + (r_outer + 4.0) * dy) as i32 + 4;
             match scale.label_for_major(m) {
                 Some(s) => {
-                    let shaped = shape_text_ltr(&FONT_6X10, s, (label_x, label_y), 0);
+                    let font = self.font.resolve();
+                    let shaped = shape_text_ltr(font, s, (label_x, label_y), 0);
                     renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
                 None => {
+                    let font = self.font.resolve();
                     let formatted = alloc::format!("{m:.0}");
-                    let shaped = shape_text_ltr(&FONT_6X10, &formatted, (label_x, label_y), 0);
+                    let shaped = shape_text_ltr(font, &formatted, (label_x, label_y), 0);
                     renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
             }
