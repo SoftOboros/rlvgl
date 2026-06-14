@@ -242,10 +242,10 @@ remains canonical for its own invariant.
 | LPAR-08 | Shaped-text clip in ScrollView; gradient determinism; shadow-blur determinism; image recolor alpha sweep | Determinism + Pixel | LPAR-08 §5.F oracle, §5.H tolerance | **Landed** (`core/tests/lpar16_conformance.rs`, `widgets/tests/scroll_view.rs`, `core/tests/image_blit.rs`) |
 | LPAR-09 | Embedded source lookup (hit+miss); `SlotCache<N>` LRU eviction sequence; `ImageData::Asset` round-trip via `resolve_image` + `MemoryAssetSource` | Determinism + Behavioral | LPAR-09 §5.D (monotonic-u32 LRU; fresh cache per fixture) | **Landed** (`core/tests/lpar16_asset_cache.rs`, `--features fs`). FATFS-over-`SimBlockDevice` prong stays Open (needs `FatfsAssetSource` + std-only `rlvgl-fs-sim`; see §14). |
 | LPAR-10 | Identical input geometry + dirty-flag state → identical computed bounds (flex + grid) | Geometry | LPAR-10 §4 (integer-only, no wall clock) | **Landed** (`core/tests/lpar16_layout_geometry.rs`) |
-| LPAR-11 | Pixel goldens for Arc, Bar, LED, Line, Spinner, Scale | Pixel + Geometry | LPAR-08 §5.H tolerance | Open |
-| LPAR-12 | Pixel goldens / event-dispatch fixtures for ButtonMatrix, ImageButton, Spinbox | Pixel + Behavioral | LPAR-08 §5.H | Open |
-| LPAR-13 | Pixel/geometry goldens for Dropdown, Keyboard, Menu, Roller, Tabview, Tileview, Window (Roller snap geometry; Tileview tile positions) | Pixel + Geometry | LPAR-05 snap (`snap_offset_to_points`); LPAR-08 §5.H | Open |
-| LPAR-14 | Fixtures for Calendar, Chart, Span, Table, Textarea v2, MessageBox | Pixel + Geometry + Behavioral | LPAR-08 text metrics; §5.H | Open |
+| LPAR-11 | Pixel goldens for Arc, Bar, LED, Line, Spinner, Scale | Pixel + Geometry | LPAR-08 §5.H tolerance | **Landed** (`widgets/tests/lpar16_lpar11_goldens.rs`) |
+| LPAR-12 | Pixel goldens / event-dispatch fixtures for ButtonMatrix, ImageButton, Spinbox | Pixel + Behavioral | LPAR-08 §5.H | **Landed** (`widgets/tests/lpar16_lpar12_goldens.rs`) |
+| LPAR-13 | Pixel/geometry goldens for Dropdown, Keyboard, Menu, Roller, Tabview, Tileview, Window (Roller snap geometry; Tileview tile positions) | Pixel + Geometry | LPAR-05 snap (`snap_offset_to_points`); LPAR-08 §5.H | **Landed** (`widgets/tests/lpar16_lpar13_goldens.rs`) |
+| LPAR-14 | Fixtures for Calendar, Chart, Span, Table, Textarea v2, MessageBox | Pixel + Geometry + Behavioral | LPAR-08 text metrics; §5.H | **Landed** (`widgets/tests/lpar16_lpar14_goldens.rs`) |
 | LPAR-15 | ≥1 deterministic tick-count fixture each for CanvasWidget, AnimImage, ArcLabel (ArcLabel = geometry) | Determinism + Geometry | LPAR-06 tick model; ArcLabel `Δθ=advance/radius` | **Landed** (`widgets/tests/lpar16_canvas_anim.rs`, `widgets/tests/lpar16_arc_label_geometry.rs`) |
 
 **Closure rule.** A phase row moves to Landed only when its fixtures (a) exist
@@ -370,12 +370,12 @@ LPAR-16 is **conformance-complete** when:
       prong still Open (needs `FatfsAssetSource` + std-only `rlvgl-fs-sim`; §14).
 - [x] LPAR-10 — flex + grid computed-bounds geometry assertions.
       Landed 2026-06-14.
-- [ ] LPAR-11 — Arc, Bar, LED, Line, Spinner, Scale goldens.
-- [ ] LPAR-12 — ButtonMatrix, ImageButton, Spinbox fixtures.
-- [ ] LPAR-13 — Dropdown, Keyboard, Menu, Roller (snap geometry), Tabview,
-      Tileview (tile positions), Window fixtures.
-- [ ] LPAR-14 — Calendar, Chart, Span, Table, Textarea v2, MessageBox
-      fixtures.
+- [x] LPAR-11 — Arc, Bar, LED, Line, Spinner, Scale goldens. Landed 2026-06-14.
+- [x] LPAR-12 — ButtonMatrix, ImageButton, Spinbox fixtures. Landed 2026-06-14.
+- [x] LPAR-13 — Dropdown, Keyboard, Menu, Roller (snap geometry), Tabview,
+      Tileview (tile positions), Window fixtures. Landed 2026-06-14.
+- [x] LPAR-14 — Calendar, Chart, Span, Table, Textarea v2, MessageBox
+      fixtures. Landed 2026-06-14.
 - [x] LPAR-15 — CanvasWidget (draw-sequence determinism), AnimImage
       (tick-stream determinism), ArcLabel (exact arc geometry, gated
       `lpar_arclabel`). Landed 2026-06-14.
@@ -472,6 +472,22 @@ LPAR-16 is **conformance-complete** when:
   §7 no-std enforcement via embedded compile gate, §10 SemVer policy. Not
   ratified; fixture/release execution is blocked until owner ratification is
   recorded here.
+- **2026-06-14** — Widget pixel-golden wave: LPAR-11/12/13/14 rows Landed
+  (exhaustive — one §5.B kind-3 golden per widget, 22 widgets total).
+  `widgets/tests/lpar16_lpar11_goldens.rs` (Arc, Bar, LED, Line, Spinner,
+  Scale), `…lpar12_goldens.rs` (ButtonMatrix, ImageButton, Spinbox),
+  `…lpar13_goldens.rs` (Dropdown, Keyboard, Menu, Roller, Tabview, Tileview,
+  Window), `…lpar14_goldens.rs` (Calendar, Chart, Span, Table, Textarea,
+  MessageBox). Each renders through a `BufferDisplay`-backed software renderer
+  (the §5.D oracle; capability methods — `fill_arc_aa`, `stroke_line_aa`,
+  `blit_image`, `blend_rect` — routed into the buffer where a widget's visible
+  output flows through them), asserts render-twice determinism, a concrete
+  expected pixel/color anchor, and non-triviality. Built via four parallel
+  workers (one per phase, disjoint files). Gates: fmt clean; clippy
+  `-p rlvgl-widgets --all-targets` clean; full widgets suite green (0
+  failures across all test binaries). §6 ledger + §12.B updated. With this
+  wave every §6 row is Landed except the deferred-Coupled LPAR-09
+  FATFS-over-`SimBlockDevice` prong (§14).
 - **2026-06-14** — Substrate fixture wave: LPAR-05, LPAR-06, LPAR-10 rows
   Landed and LPAR-09 partially Landed. `core/tests/lpar16_timer_anim.rs`
   (timer fire sequence `[31,50,100,150]`; frozen linear/easeout Tween tables;
