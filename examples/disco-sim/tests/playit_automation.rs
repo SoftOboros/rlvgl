@@ -5,12 +5,14 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
 struct SimulatorSession {
     child: Child,
     reader: BufReader<TcpStream>,
     writer: TcpStream,
+    stderr: Receiver<String>,
 }
 
 impl SimulatorSession {
@@ -40,6 +42,20 @@ impl SimulatorSession {
             .expect("failed to spawn disco simulator");
 
         let stdout = child.stdout.take().expect("missing simulator stdout");
+        let stderr = child.stderr.take().expect("missing simulator stderr");
+        let (stderr_tx, stderr_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let stderr = BufReader::new(stderr);
+            for line in stderr.lines() {
+                let Ok(line) = line else {
+                    break;
+                };
+                if stderr_tx.send(line).is_err() {
+                    break;
+                }
+            }
+        });
+
         let mut stdout = BufReader::new(stdout);
         let mut ready = String::new();
         stdout
@@ -68,6 +84,7 @@ impl SimulatorSession {
             child,
             reader,
             writer,
+            stderr: stderr_rx,
         }
     }
 
@@ -88,6 +105,32 @@ impl SimulatorSession {
             .expect("failed to read playit response");
         assert!(!line.is_empty(), "playit connection closed unexpectedly");
         line.trim_end_matches(['\r', '\n']).to_string()
+    }
+
+    fn wait_for_stderr(&self, needle: &str, timeout: Duration) {
+        let deadline = std::time::Instant::now() + timeout;
+        let mut seen = Vec::new();
+        loop {
+            let now = std::time::Instant::now();
+            assert!(
+                now < deadline,
+                "timed out waiting for stderr line containing {needle:?}; seen: {seen:?}"
+            );
+            match self.stderr.recv_timeout(deadline - now) {
+                Ok(line) if line.contains(needle) => return,
+                Ok(line) => seen.push(line),
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    panic!(
+                        "timed out waiting for stderr line containing {needle:?}; seen: {seen:?}"
+                    )
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    panic!(
+                        "simulator stderr closed before line containing {needle:?}; seen: {seen:?}"
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -283,17 +326,6 @@ fn anim_pulse_border_dump_frames_differ_in_expected_direction() {
 fn drag_recognizer_end_to_end_via_raw_pointer_commands() {
     let mut session = SimulatorSession::launch();
 
-    // Footer text region (footer label at x=84, y=448, baseline 466 in
-    // the 800x480 layout): dump a strip covering the first glyphs.
-    let dump_footer = |session: &mut SimulatorSession| -> Vec<String> {
-        session.send("D84,452,40,10,1");
-        assert_eq!(session.read_line(), "DUMP:queued");
-        assert_eq!(session.read_line(), "F");
-        let rows: Vec<String> = (0..10).map(|_| session.read_line()).collect();
-        assert_eq!(session.read_line(), "END");
-        rows
-    };
-
     // Recognizer timers count *ticks*, and the headless sim's effective
     // frame rate is build-dependent (debug software rendering runs well
     // below the nominal 60 Hz) — so wait for tick progression via STAT,
@@ -318,11 +350,9 @@ fn drag_recognizer_end_to_end_via_raw_pointer_commands() {
         }
     };
 
-    let footer_before = dump_footer(&mut session);
-
     // ── Case 1: drag starting on the settings icon (slot 0 ~ (760, 47)).
     // Crossing displacement (6, 8): 36 + 64 = 100 >= 10². The wing MUST
-    // NOT open, and the footer must show drag activity.
+    // NOT open, and the status channel must show drag activity.
     session.send("PD760,47");
     assert_eq!(session.read_line(), "OK");
     session.send("PM766,55");
@@ -335,17 +365,14 @@ fn drag_recognizer_end_to_end_via_raw_pointer_commands() {
     // If suppression were broken, the PressRelease would emerge within
     // the debounce + double-tap horizon and open the wing.
     wait_ticks(&mut session, 48);
+    session.wait_for_stderr("sim status: Drag start (760, 47)", Duration::from_secs(3));
+    session.wait_for_stderr("sim status: Drag end (650, 300)", Duration::from_secs(3));
 
     session.send("QB:disco.settings.audio");
     assert_eq!(
         parse_bounds(&session.read_line()),
         (0, 0, 0, 0),
         "drag suppressed the PressRelease: settings wing stays closed"
-    );
-    let footer_after_drag = dump_footer(&mut session);
-    assert_ne!(
-        footer_before, footer_after_drag,
-        "drag status reached the footer (DragStart/DragEnd flowed end-to-end)"
     );
 
     // ── Case 2: sub-threshold wander on the same icon (max displacement

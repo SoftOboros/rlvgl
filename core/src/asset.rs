@@ -563,7 +563,7 @@ fn decode_bytes(path: &str, bytes: Vec<u8>) -> Result<ImageDescriptor<'static>, 
 
     // PNG: by extension or magic.
     #[cfg(all(feature = "png", not(target_os = "none")))]
-    if lower.ends_with(".png") || bytes.get(..8).map_or(false, |h| h.starts_with(b"\x89PNG")) {
+    if lower.ends_with(".png") || bytes.get(..8).is_some_and(|h| h.starts_with(b"\x89PNG")) {
         return decode_png(bytes);
     }
 
@@ -571,14 +571,14 @@ fn decode_bytes(path: &str, bytes: Vec<u8>) -> Result<ImageDescriptor<'static>, 
     #[cfg(all(feature = "jpeg", not(target_os = "none")))]
     if lower.ends_with(".jpg")
         || lower.ends_with(".jpeg")
-        || bytes.get(..2).map_or(false, |h| h == b"\xff\xd8")
+        || bytes.get(..2).is_some_and(|h| h == b"\xff\xd8")
     {
         return decode_jpeg(bytes);
     }
 
     // GIF: by extension or magic.
     #[cfg(feature = "gif")]
-    if lower.ends_with(".gif") || bytes.get(..4).map_or(false, |h| h == b"GIF8") {
+    if lower.ends_with(".gif") || bytes.get(..4).is_some_and(|h| h == b"GIF8") {
         return decode_gif(bytes);
     }
 
@@ -629,8 +629,8 @@ fn decode_jpeg(bytes: Vec<u8>) -> Result<ImageDescriptor<'static>, AssetError> {
     }
     Ok(ImageDescriptor {
         format: PixelFormat::Argb8888,
-        width: w as u16,
-        height: h as u16,
+        width: w,
+        height: h,
         data: crate::image::ImageData::Owned(pixels),
         stride: None,
     })
@@ -654,8 +654,8 @@ fn decode_gif(bytes: Vec<u8>) -> Result<ImageDescriptor<'static>, AssetError> {
     }
     Ok(ImageDescriptor {
         format: PixelFormat::Argb8888,
-        width: w as u16,
-        height: h as u16,
+        width: w,
+        height: h,
         data: crate::image::ImageData::Owned(pixels),
         stride: None,
     })

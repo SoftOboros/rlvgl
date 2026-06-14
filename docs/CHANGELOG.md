@@ -7,6 +7,32 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## v0.2.4
+
+LPAR parity substrate and widget-family release.
+
+### Added - LVGL parity waves
+- LPAR-02 through LPAR-10: object/event/focus/input, invalidation,
+  scroll, timers/object animations, style cascade, text/draw/image/mask,
+  asset/filesystem, and layout substrate.
+- LPAR-11 through LPAR-15: primitive, control, navigation/selection,
+  data-rich, canvas/media/property/observer widget families.
+- LPAR-16 conformance fixtures across deterministic runtime behavior,
+  geometry, pixel goldens, and feature-gated surfaces.
+
+### Release notes
+- `rlvgl-core`, `rlvgl-platform`, `rlvgl-widgets`, `rlvgl-ui`,
+  `rlvgl-fs-sim`, `rlvgl-app-demo`, and `rlvgl-app-disco-demo` are aligned
+  to `0.2.4` with matching internal dependency constraints.
+- Deferred conformance item: LPAR-09 FATFS-over-`SimBlockDevice` remains
+  coupled to the unimplemented `FatfsAssetSource` + std-only `rlvgl-fs-sim`
+  bridge.
+- Deferred optional media widgets: Lottie, DashLottie, and Texture3d remain
+  outside the LPAR-16 pixel-golden set until their runtime surfaces land.
+- Known validation debt: `cargo doc --workspace --no-deps` passes, but the
+  rustdoc run still reports broken/private intra-doc links that should be
+  cleaned before tightening docs to warnings-as-errors.
+
 ## v0.2.2
 
 Quality release — makes the crates.io distribution work and adds the CI

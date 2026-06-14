@@ -2039,8 +2039,6 @@ mod tests {
 
     #[test]
     fn focus_border_pulses_deterministically_at_known_tick_offsets() {
-        use rlvgl_core::widget::Widget;
-
         let mut controller = DiscoController::new(
             rlvgl_platform::Screen::landscape(800, 480),
             DiscoCapabilities::simulator(),

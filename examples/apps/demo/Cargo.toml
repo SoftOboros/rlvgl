@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-app-demo"
-version = "0.2.0"
+version = "0.2.4"
 edition = "2024"
 license = "MIT"
 description = "Demo application for rlvgl showcasing core widgets and plugin features."
@@ -16,8 +16,8 @@ publish = true
 crate-type = ["rlib"]
 
 [dependencies]
-rlvgl-core = { path = "../../../core", version = "0.2.0", default-features = false }
-rlvgl-widgets = { path = "../../../widgets", version = "0.2.0", default-features = false }
+rlvgl-core = { path = "../../../core", version = "0.2.4", default-features = false }
+rlvgl-widgets = { path = "../../../widgets", version = "0.2.4", default-features = false }
 rlvgl-i18n = { path = "../../../i18n", version = "0.2.0" }
 
 [features]

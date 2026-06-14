@@ -3,7 +3,7 @@
 
 [package]
 name = "rlvgl-ui"
-version = "0.2.2"
+version = "0.2.4"
 edition = "2024"
 license = "MIT"
 description = "High-level UI components and theming for rlvgl."
@@ -13,8 +13,8 @@ homepage = "https://github.com/softoboros/rlvgl"
 documentation = "https://docs.rs/rlvgl-ui"
 
 [dependencies]
-rlvgl-core = { path = "../core", version = "0.2.0", default-features = false }
-rlvgl-widgets = { path = "../widgets", version = "0.2.0", default-features = false }
+rlvgl-core = { path = "../core", version = "0.2.4", default-features = false }
+rlvgl-widgets = { path = "../widgets", version = "0.2.4", default-features = false }
 
 [features]
 view = []

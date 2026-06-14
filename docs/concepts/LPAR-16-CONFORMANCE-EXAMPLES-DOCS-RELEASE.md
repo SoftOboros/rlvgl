@@ -382,34 +382,42 @@ LPAR-16 is **conformance-complete** when:
 
 ### 12.C No-std / feature gates (§7)
 
-- [ ] `core` + `widgets` (default features) build for
+- [x] `core` + `widgets` (default features) build for
       `thumbv7em-none-eabihf` without `std`.
-- [ ] `cargo test -p rlvgl-widgets --no-default-features` passes.
-- [ ] Each feature-gated surface is exercised both on and off
-      (`lpar_arclabel` confirmed; GIF/APNG/`png`/Lottie/3D as they apply).
+- [x] `cargo test -p rlvgl-widgets --no-default-features` passes.
+- [x] Each feature-gated surface is exercised both on and off as applicable:
+      default/off gates plus `rlvgl-core --all-features` for PNG/JPEG/GIF/APNG/
+      canvas/fatfs/fs/nes/fontdue/qrcode and `rlvgl-widgets
+      --features lpar_arclabel` for ArcLabel. Lottie runtime backends and 3D
+      media remain deferred-Optional per §14.
 
 ### 12.D Examples (§8)
 
-- [ ] At least one host-simulator example composes a representative subset of
+- [x] At least one host-simulator example composes a representative subset of
       the new parity widgets and builds in the example test phase.
 
 ### 12.E Docs (§9)
 
-- [ ] `cargo doc --workspace --no-deps` passes for the LPAR surface.
-- [ ] `docs/concepts/README.md` lists LPAR-16 and reflects per-phase
+- [x] `cargo doc --workspace --no-deps` passes for the LPAR surface.
+- [x] `docs/concepts/README.md` lists LPAR-16 and reflects per-phase
       conformance status.
 
 ### 12.F Release (§10)
 
-- [ ] SemVer bump applied: `core`/`widgets`/`ui` → `0.2.4` (stay on `0.2.x`
+- [x] SemVer bump applied: `core`/`widgets`/`ui` → `0.2.4` (stay on `0.2.x`
       per §10 rule 1); `platform` → `0.2.4` only if its surface moved.
-- [ ] `docs/CHANGELOG.md` entry written, naming any conformance-deferred phase
+- [x] `docs/CHANGELOG.md` entry written, naming any conformance-deferred phase
       with its open §6 row.
-- [ ] `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` is green.
+- [ ] `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` is green for the final
+      cleanup commit that will be published.
+      Note: the command passed on 2026-06-14 for committed `d3d0c4d`
+      (`HEAD~1..HEAD`, changed crate `rlvgl-widgets` only), but this
+      validation cleanup was still uncommitted and therefore unseen by the
+      commit-diff script.
 
 ### 12.G Initiative retrospective
 
-- [ ] `docs/concepts/LPAR-RETROSPECTIVE.md` is written per the CLAUDE.md
+- [x] `docs/concepts/LPAR-RETROSPECTIVE.md` is written per the CLAUDE.md
       Initiative-Retrospective discipline (§1–§8 shape) at initiative
       completion.
 
@@ -457,6 +465,24 @@ LPAR-16 is **conformance-complete** when:
 
 ## 15. Change Log
 
+- **2026-06-14** — Validation cleanup slice. Fixed release-gate regressions
+  found by `/pre-publish`: `core::asset` clippy simplifications, host-vs-
+  embedded cfg gating in the STM32H747I-DISCO crate, Playit drag validation
+  using simulator stderr status instead of stale footer pixels, and the
+  generic simulator QR toggle baseline. Added
+  `rlvgl_app_demo::build_lpar_parity_demo` plus a simulator test so §8 is a
+  concrete LPAR widget composition rather than a legacy-demo build. Aligned
+  publishable LPAR crates and demo app dependencies to `0.2.4`
+  (`core`/`platform`/`widgets`/`ui`/`fs-sim`/`app-demo`/`app-disco-demo`;
+  `playit` dependency constraint updated). Gates run: fmt, clippy workspace,
+  workspace tests, Playit std/no-std/package checks, simulator build/tests,
+  creator feature tests, core/widget feature gates, docs, `make build-disco`,
+  and `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` for the committed
+  LPAR head (`d3d0c4d`, changed crate `rlvgl-widgets`). Residual drift: docs
+  pass but rustdoc emits broken/private intra-doc-link warnings; embedded build
+  passes but remains warning-heavy; the publish dry-run must be rerun after the
+  validation cleanup is committed so the commit-diff script sees the cleanup
+  itself.
 - **2026-06-13** — LPAR-16 drafted. Defines the conformance-fixture contract
   (§5: four fixture kinds, location/naming, software-reference oracle,
   inherited-determinism rule, optional C-reference vectors), the per-phase

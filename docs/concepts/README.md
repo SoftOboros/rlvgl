@@ -332,17 +332,17 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
 
 - **LPAR** (continued — Wave 6)
   - [LPAR-16-CONFORMANCE-EXAMPLES-DOCS-RELEASE.md](LPAR-16-CONFORMANCE-EXAMPLES-DOCS-RELEASE.md) —
-    **Drafted 2026-06-13; not yet ratified.** The capstone conformance phase
-    every prior phase feeds. Defines one fixture-contract shape (four kinds:
-    determinism, geometry, pixel-golden, behavioral/trace; software-reference
-    oracle; LPAR-08 §5.H tolerance) and a per-phase fixture ledger (§6) —
-    LPAR-08 fixtures Landed, LPAR-05/06/09/10/11/12/13/14/15 Open. Separates
-    *implemented* from *conformance-complete* (§5.A) so already-landed widget
-    waves are not retroactively blocked. Also owns the no-std/feature compile
-    gates (§7), one demonstrative simulator example (§8), the `cargo doc` gate
-    (§9), and release readiness (§10: minor SemVer bump for core/widgets/ui,
-    `docs/CHANGELOG.md` entry, publish dry-run). The initiative retrospective
-    (`LPAR-RETROSPECTIVE.md`) lands at completion per §12.G.
+    **Ratified 2026-06-14; validation cleanup in progress.** The capstone
+    conformance phase every prior phase feeds. Defines one fixture-contract
+    shape (four kinds: determinism, geometry, pixel-golden, behavioral/trace;
+    software-reference oracle; LPAR-08 §5.H tolerance) and a per-phase fixture
+    ledger (§6). LPAR-05/06/08/10/11/12/13/14/15 are Landed; LPAR-09 is
+    substrate-complete with the FATFS-over-`SimBlockDevice` prong deferred to
+    `FatfsAssetSource` + `rlvgl-fs-sim`. Separates *implemented* from
+    *conformance-complete* (§5.A), owns no-std/feature gates (§7), the
+    simulator parity example (§8), the `cargo doc` gate (§9), release
+    readiness (§10), and the initiative retrospective
+    ([LPAR-RETROSPECTIVE.md](LPAR-RETROSPECTIVE.md)).
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
