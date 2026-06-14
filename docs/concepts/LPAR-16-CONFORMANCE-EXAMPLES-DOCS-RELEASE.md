@@ -408,12 +408,14 @@ LPAR-16 is **conformance-complete** when:
       per §10 rule 1); `platform` → `0.2.4` only if its surface moved.
 - [x] `docs/CHANGELOG.md` entry written, naming any conformance-deferred phase
       with its open §6 row.
-- [ ] `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` is green for the final
-      cleanup commit that will be published.
-      Note: the command passed on 2026-06-14 for committed `d3d0c4d`
-      (`HEAD~1..HEAD`, changed crate `rlvgl-widgets` only), but this
-      validation cleanup was still uncommitted and therefore unseen by the
-      commit-diff script.
+- [x] `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` is green for the committed
+      cleanup. Reran 2026-06-14 against commit `e5b8956`: the commit-diff
+      script resolved the full changed-crate set in publish order — `core`,
+      `playit`, `platform`, `widgets`, `ui`, `fs-sim`, `app-demo`,
+      `app-disco-demo`, `rlvgl` — and exited 0. (The `DRY_RUN=1` path resolves
+      diff + ordering and skips actual `cargo package`/`publish`; a real
+      release run does the packaging, and `playit` packaging is independently
+      covered by Pre-Publish Phase 3.)
 
 ### 12.G Initiative retrospective
 
@@ -465,6 +467,15 @@ LPAR-16 is **conformance-complete** when:
 
 ## 15. Change Log
 
+- **2026-06-14** — LPAR-16 closeout. The validation cleanup slice was committed
+  (`e5b8956`) and `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` reran green
+  against it (full changed-crate set resolved in publish order, exit 0),
+  closing the last open §12.F box. Every §12 acceptance box is now checked
+  except the deferred-Coupled LPAR-09 FATFS-over-`SimBlockDevice` prong
+  (§12.B `[~]`, §14). LPAR-16 is **conformance-complete** at the §5.A bar:
+  every phase is *implemented*, and every phase is *conformance-complete*
+  except LPAR-09's explicitly-deferred FATFS prong. The LPAR initiative is
+  closed; the retrospective is `LPAR-RETROSPECTIVE.md`.
 - **2026-06-14** — Validation cleanup slice. Fixed release-gate regressions
   found by `/pre-publish`: `core::asset` clippy simplifications, host-vs-
   embedded cfg gating in the STM32H747I-DISCO crate, Playit drag validation
