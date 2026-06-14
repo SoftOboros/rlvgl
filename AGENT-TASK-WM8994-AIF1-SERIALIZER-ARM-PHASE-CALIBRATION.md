@@ -644,3 +644,45 @@ edge — a deterministic-N candidate not available under the FLL-from-BCLK path)
 
 Cross-ref: disco `docs/concepts/ERRATA.md` ERRATA-004 (+ ERRATA-019 for the
 transport store-loss that R4#2 rules out as the bounce cause).
+
+## R5 — H1 (arm-before-frame-clock via LRCLK_DIR defer) lands + bench result (2026-06-14)
+
+**Implemented + committed** (`platform/src/wm8994.rs`, rlvgl v0.2.4 `bd5b3cb`). H1 is
+the missing complement to H0: H0 deferred the serializer ENABLE (R0x004/005 b9:8)
+to Step 14b but left LRCLK_DIR=1 (reception ON) at Step 13, so the serializer still
+armed mid-frame against an already-running LRCLK1. H1 **also defers LRCLK_DIR=1**:
+
+- Step 13 → `R0x304/305 = 0x0020` (RATE=32, **LRCLK_DIR=0** — codec ignores the
+  running LRCLK1; AIF1 framing held off).
+- Step 14b → serializer enable (unchanged).
+- **NEW Step 14c → `R0x304/305 = 0x0820`** (LRCLK_DIR=1) — the already-enabled
+  serializers sync to the FIRST received LRCLK1 frame edge.
+
+**Bench (disco-analyzer, 10 probe-rs resets, 96-sample captures):** EVERY boot
+smooth (adjacent-jump count = 0), zero byte-stuck/wrap/bimodal corruption —
+a complete elimination of the pre-H1 chaos (the boot lottery of 2×/byte-stuck/
+bimodal/silent). **The N≠0 *corruption* family is gone.** This answers F4/§0:
+arm-before-frame-clock is the deterministic-cleanliness fix; an explicit resync
+register was confirmed absent (memalpha WM8994 datasheet query 2026-06-14).
+
+**Residual (NOT corruption):** a 2-state amplitude — captures cluster at ~26% FS
+or ~3% FS (a clean 3-bit right-shift), both smooth + corruption-free. So H1 pins
+*cleanliness* (no torn/stuck bits) but not yet *unity scale*; N still has a small
+clean residual (right-shift, two states). Candidate follow-ons: (i) a further
+ordering tweak to pin scale, (ii) the R3.3 detector's unity-scale check + a 1-shot
+software normalize (the capture is clean, just scaled), (iii) accept it (clean
+display at boot-variable gain).
+
+**Methodology correction (supersedes R4#2's "bounce is transport-independent →
+codec"):** with H1 making the codec capture smooth, the disco CM7 *direct-feed*
+still shows ~30% **time-domain** phase-discont over 20 s — but that is the
+**direct-feed's own DBM bank-handoff loss** (CM7 misses ~30% of banks; the 2-bank
+DBM keep-up/dedup limit), NOT the codec (96-sample captures are smooth). So the
+bounce has TWO layers: codec (H1-fixed) + transport (pool store-loss / direct-DBM
+miss). The DAA-04-G circular-DMA + NDTR-drain **un-parks** — it is the correct fix
+for the transport layer now that the codec confound is removed.
+
+**Still pending:** ≥10 COLD power cycles (rails drained) to confirm H1 holds
+cold (resets retain analog/VMID state). Both-direction (DAC) check.
+
+Cross-ref: disco `docs/concepts/ERRATA.md` ERRATA-004/-009; DAA-04-G (transport).
