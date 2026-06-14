@@ -344,6 +344,23 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     readiness (§10), and the initiative retrospective
     ([LPAR-RETROSPECTIVE.md](LPAR-RETROSPECTIVE.md)).
 
+### FONT — font selection & anti-aliased widget text
+
+Builds on the LPAR-08 text substrate. The glyph pipeline
+(`draw_text_shaped` → coverage → `blend_row`) was already wired and
+`Label`/~all widgets already render real 1-bit coverage; FONT closes the
+remaining gaps — font *selection* and anti-aliasing.
+
+- [FONT-00-CONCEPTS.md](FONT-00-CONCEPTS.md) — **Ratified 2026-06-14.**
+  Freezes the `WidgetFont`/`set_font` per-widget selection model (default
+  `FONT_6X10`; no global registry in v1 — deferred-Coupled on theming),
+  AA-by-font-choice (feed a `PackedFont` for 8-bit AA; `FONT_6X10` stays the
+  1-bit default), the `ArcLabel` coverage migration (the lone legacy
+  `draw_text` widget), rotated-renderer glyph throughput
+  (rotate-bitmap-then-blit, mirroring `Dma2dOverlayCtx`), and the AA
+  conformance fixture (assert partial-alpha through a real
+  `blend_row`-overriding renderer). Phases FONT-01..04 in §12.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem

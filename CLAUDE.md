@@ -635,7 +635,9 @@ Once a concepts doc is ratified (dated change-log entry), execution PRs:
   `AUDIO-NN[a-z]:` for the audio-subsystem initiative
   (codec bring-up + SAI / DMA invariants),
   `CRATES-CI-NN[a-z]:` for the crates-built headed-surface CI
-  initiative (`docs/crates-ci/`).
+  initiative (`docs/crates-ci/`),
+  `FONT-NN[a-z]:` for the font-selection + anti-aliased-text initiative
+  (`docs/concepts/FONT-*`).
 - Name in the PR description which invariants (from the concepts doc's
   frozen-decisions sections) the change touches, and how each is
   preserved.
@@ -772,6 +774,11 @@ This discipline applies to:
   consumption, kittest + playit-over-kittest harnesses for the creator UI and
   user-built simulators). Commit-subject prefix `CRATES-CI-NN[a-z]:`.
   Concepts doc ratified 2026-06-10 (CRATES-CI-00).
+- `docs/concepts/FONT-*` (Font selection + anti-aliased widget text — the
+  `WidgetFont`/`set_font` selection model, AA-by-font-choice, the ArcLabel
+  coverage migration, rotated-renderer glyph throughput, and the AA
+  conformance fixture). Commit-subject prefix `FONT-NN[a-z]:`. Concepts doc
+  ratified 2026-06-14 (FONT-00). Builds on the LPAR-08 text substrate.
 - Any future multi-chapter initiative with ≥3 phases.
 
 Single-doc TODOs, phase-1 prototypes, and one-off explorations MAY use

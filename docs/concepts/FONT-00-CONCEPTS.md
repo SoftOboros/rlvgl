@@ -4,10 +4,10 @@ FONT-00-CONCEPTS.md — Font selection and anti-aliased widget text initiative.
 
 # FONT-00 — Font Selection and Anti-Aliased Widget Text
 
-**Status:** Drafted 2026-06-14. Not ratified. Normative for the FONT
-initiative (font-handle selection model, AA-coverage contract, ArcLabel
-shaped migration, rotated-renderer glyph throughput, and the AA conformance
-fixture) once a dated §15 ratification entry is recorded.
+**Status:** Ratified 2026-06-14. Normative for the FONT initiative
+(font-handle selection model, AA-coverage contract, ArcLabel shaped
+migration, rotated-renderer glyph throughput, and the AA conformance
+fixture). Implementation unblocked; phases FONT-01..04 per §12.
 
 Text substrate this builds on:
 [LPAR-08-TEXT-DRAW-IMAGE-MASK.md](LPAR-08-TEXT-DRAW-IMAGE-MASK.md) (shaped
@@ -352,7 +352,7 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 
 ### 12.A FONT-01 — Font selection (§5)
 
-- [ ] This document is ratified with a dated §15 entry.
+- [x] This document is ratified with a dated §15 entry (2026-06-14).
 - [ ] `WidgetFont` newtype + `resolve()` land with the `FONT_6X10` fallback.
 - [ ] Every text widget in `widgets/src/` (and the `ui/` text widgets) gains
       `set_font` and draws via `self.font.resolve()`; no constructor or
@@ -446,5 +446,11 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   `Dma2dOverlayCtx`; `blend_row`-only forwarding explicitly rejected), and the
   AA conformance-fixture contract (§9, must use a real `blend_row`-overriding
   renderer and assert partial-alpha). Phases FONT-01..04 + initiative close in
-  §12. Not ratified; implementation is blocked until owner ratification is
-  recorded here.
+  §12.
+- **2026-06-14** — Ratified by owner ("draft ratified along with runbook
+  changes"). §5–§9 frozen decisions are normative; implementation unblocked,
+  FONT-01 first. The CLAUDE.md Spec-Before-Code applicability list and
+  execution-discipline commit-prefix list gained the `FONT-NN[a-z]:` entry in
+  the same change (§12.E). No scope changes from the draft: the `FontId`
+  registry/theming layer stays deferred-Coupled (§5.C) and `FONT_6X10` stays
+  the 1-bit default (§6.B).
