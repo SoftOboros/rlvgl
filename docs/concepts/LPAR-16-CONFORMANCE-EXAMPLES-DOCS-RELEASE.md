@@ -237,11 +237,11 @@ remains canonical for its own invariant.
 | Phase | Obligation | Kind | Invariant (owning §) | Status |
 |---|---|---|---|---|
 | LPAR-01 | Parity claims measured against the pinned LVGL commit | n/a (policy) | LPAR-01 §2 pin | Landed (pin exists) |
-| LPAR-05 | Scroll throw/momentum trajectory reproducible for golden-dependent widgets | Determinism | LPAR-05 §8.1 (tick-only px/tick; Tween deceleration) | Open |
-| LPAR-06 | Timer fire sequence + object-animation value samples bit-identical over a synthetic tick stream | Determinism | LPAR-06 §7.2 (LPAR-16-binding) | Open |
+| LPAR-05 | Scroll throw/momentum trajectory reproducible for golden-dependent widgets | Determinism | LPAR-05 §8.1 (tick-only px/tick; Tween deceleration) | **Landed** (`core/tests/lpar16_scroll_throw.rs`) |
+| LPAR-06 | Timer fire sequence + object-animation value samples bit-identical over a synthetic tick stream | Determinism | LPAR-06 §7.2 (LPAR-16-binding) | **Landed** (`core/tests/lpar16_timer_anim.rs`) |
 | LPAR-08 | Shaped-text clip in ScrollView; gradient determinism; shadow-blur determinism; image recolor alpha sweep | Determinism + Pixel | LPAR-08 §5.F oracle, §5.H tolerance | **Landed** (`core/tests/lpar16_conformance.rs`, `widgets/tests/scroll_view.rs`, `core/tests/image_blit.rs`) |
-| LPAR-09 | Embedded source lookup (hit+miss); FATFS open over a `SimBlockDevice` FAT image; `SlotCache<N>` LRU eviction sequence; `ImageData::Asset` round-trip via `resolve_image` + `MemoryAssetSource` | Determinism + Behavioral | LPAR-09 §5.D (monotonic-u32 LRU; fresh cache per fixture) | Open |
-| LPAR-10 | Identical input geometry + dirty-flag state → identical computed bounds (flex + grid) | Geometry | LPAR-10 §4 (integer-only, no wall clock) | Open |
+| LPAR-09 | Embedded source lookup (hit+miss); `SlotCache<N>` LRU eviction sequence; `ImageData::Asset` round-trip via `resolve_image` + `MemoryAssetSource` | Determinism + Behavioral | LPAR-09 §5.D (monotonic-u32 LRU; fresh cache per fixture) | **Landed** (`core/tests/lpar16_asset_cache.rs`, `--features fs`). FATFS-over-`SimBlockDevice` prong stays Open (needs `FatfsAssetSource` + std-only `rlvgl-fs-sim`; see §14). |
+| LPAR-10 | Identical input geometry + dirty-flag state → identical computed bounds (flex + grid) | Geometry | LPAR-10 §4 (integer-only, no wall clock) | **Landed** (`core/tests/lpar16_layout_geometry.rs`) |
 | LPAR-11 | Pixel goldens for Arc, Bar, LED, Line, Spinner, Scale | Pixel + Geometry | LPAR-08 §5.H tolerance | Open |
 | LPAR-12 | Pixel goldens / event-dispatch fixtures for ButtonMatrix, ImageButton, Spinbox | Pixel + Behavioral | LPAR-08 §5.H | Open |
 | LPAR-13 | Pixel/geometry goldens for Dropdown, Keyboard, Menu, Roller, Tabview, Tileview, Window (Roller snap geometry; Tileview tile positions) | Pixel + Geometry | LPAR-05 snap (`snap_offset_to_points`); LPAR-08 §5.H | Open |
@@ -362,12 +362,14 @@ LPAR-16 is **conformance-complete** when:
 
 - [x] LPAR-08 — shaped-text clip, gradient/shadow determinism, recolor sweep
       (already Landed; recorded for completeness).
-- [ ] LPAR-05 — scroll trajectory determinism fixture.
-- [ ] LPAR-06 — timer + object-animation determinism over a synthetic tick
-      stream.
-- [ ] LPAR-09 — embedded lookup, FATFS open, SlotCache LRU sequence,
-      `ImageData::Asset` round-trip.
-- [ ] LPAR-10 — flex + grid computed-bounds geometry assertions.
+- [x] LPAR-05 — scroll trajectory determinism fixture. Landed 2026-06-14.
+- [x] LPAR-06 — timer + object-animation determinism over a synthetic tick
+      stream. Landed 2026-06-14.
+- [~] LPAR-09 — embedded lookup, SlotCache LRU sequence, `ImageData::Asset`
+      round-trip Landed 2026-06-14 (`--features fs`). FATFS-over-`SimBlockDevice`
+      prong still Open (needs `FatfsAssetSource` + std-only `rlvgl-fs-sim`; §14).
+- [x] LPAR-10 — flex + grid computed-bounds geometry assertions.
+      Landed 2026-06-14.
 - [ ] LPAR-11 — Arc, Bar, LED, Line, Spinner, Scale goldens.
 - [ ] LPAR-12 — ButtonMatrix, ImageButton, Spinbox fixtures.
 - [ ] LPAR-13 — Dropdown, Keyboard, Menu, Roller (snap geometry), Tabview,
@@ -470,6 +472,27 @@ LPAR-16 is **conformance-complete** when:
   §7 no-std enforcement via embedded compile gate, §10 SemVer policy. Not
   ratified; fixture/release execution is blocked until owner ratification is
   recorded here.
+- **2026-06-14** — Substrate fixture wave: LPAR-05, LPAR-06, LPAR-10 rows
+  Landed and LPAR-09 partially Landed. `core/tests/lpar16_timer_anim.rs`
+  (timer fire sequence `[31,50,100,150]`; frozen linear/easeout Tween tables;
+  object-anim applied sequence `[10,20,…,100]` — all replayed for
+  determinism, LPAR-06 §7.2). `core/tests/lpar16_scroll_throw.rs` (a fixed
+  drag-then-fling script replays bit-identical; monotonic EaseOut momentum
+  settling exactly at the `1800` max-scroll clamp, LPAR-05 §8.1).
+  `core/tests/lpar16_layout_geometry.rs` (exact flex row-gap-grow
+  `[80|gap10|210]` and grid `1fr/2fr → [100|200]` rects, re-run for
+  determinism, LPAR-10 §5.F integer-only). `core/tests/lpar16_asset_cache.rs`
+  (gated `#![cfg(feature = "fs")]`: embedded hit+miss, `SlotCache<2>` LRU
+  eviction, `MemoryAssetSource` round-trip — LPAR-09 §5.D). The
+  FATFS-over-`SimBlockDevice` prong stays Open (deferred-Coupled on an
+  unimplemented `FatfsAssetSource` + the std-only `rlvgl-fs-sim` crate; §14).
+  Each fixture is exactly one §5.B kind and cites its §6 invariant.
+  **Release-gate note (feeds §7/§10):** the `fs`-gated fixture needs a
+  `cargo test -p rlvgl-core --features fs` run in addition to the default
+  `cargo test -p rlvgl-core`; default-feature runs compile it empty. Gates:
+  fmt clean; clippy `-p rlvgl-core --all-targets` clean both default and
+  `--features fs`; full core suite green both feature sets. §6 ledger +
+  §12.B updated.
 - **2026-06-14** — LPAR-15 fixture row Landed (first slice under the ratified
   contract). `widgets/tests/lpar16_canvas_anim.rs` (CanvasWidget
   draw-sequence determinism + concrete pixel values; AnimImage 12-tick-stream
