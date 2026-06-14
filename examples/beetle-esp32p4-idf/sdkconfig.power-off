@@ -1,0 +1,2 @@
+# Power-off-after-wake override for the DFR0550 ESP-IDF comparison app.
+CONFIG_DFR0550_POWER_OFF_AFTER_WAKE=y

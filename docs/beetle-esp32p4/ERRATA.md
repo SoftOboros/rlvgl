@@ -1731,6 +1731,328 @@ delta must be a register/state we have not thought to read — that diff
 will surface it. Secondary: trace the IDF app-startup (`esp_system`
 clock/power init) for any DPHY-relevant bring-up the bootloader doesn't do.
 
+### 2026-06-14 — register-diff DONE: root cause corrected (BEETLE-06)
+
+The next-session register-diff was executed and **overturns the
+"silicon / app-startup wall" framing. The DPHY PLL is not a silicon
+limit: a stock IDF `esp_lcd` MIPI-DSI example flashed to this exact
+board locks the PLL** — `MIPI_DSI_HOST.phy_status.phy_lock` (bit 0) = 1,
+read directly over the built-in USB-JTAG (`0x500A00B0` = `0x15bd`).
+**It is our raw-PAC port that fails** (same register reads `0x1528`,
+bit 0 clear). This is also corroborated by the 2026-04-29 first-light
+recipe (memory `project_dfr1237_dfr0550v2`) which lit this panel under
+full IDF at the identical 1 lane / 750 Mbps / LDO_VO3 2500 mV config.
+
+Method: built + flashed IDF v5.3.5
+`examples/peripherals/lcd/mipi_dsi` (default EK79007, 2 lanes @
+1000 Mbps — PLL lock is **panel-independent**, it happens inside
+`esp_lcd_new_dsi_bus` before any panel command), then read registers
+over JTAG with `openocd -f board/esp32p4-builtin.cfg -c "init; reset
+run; sleep …; halt; mdw <addr>"`. Flashed our firmware and read the
+same addresses. (Caveat: our boot runs `wake_bitbang` + `led_blink`
+for several seconds before DSI init — wait ≥13 s after reset, then
+confirm `phy_rstz` reads `0x0f` before trusting `phy_status`.)
+
+**Empirical register diff (IDF-locked vs ours-not-locked):**
+
+| Register | addr | IDF (lock) | Ours (no lock) | Verdict |
+|---|---|---|---|---|
+| `phy_status` | 0x500A00B0 | `0x15bd` (bit0=1) | `0x1528` (bit0=0) | the defect |
+| `phy_rstz` | 0x500A00A0 | `0x0f` | `0x0f` | identical |
+| `PMU_EXT_LDO_VO3` ANA | 0x501151C4 | `0xc6000000` | `0xc6000000` | **identical → LDO exonerated** |
+| `PMU_EXT_LDO_VO3` CTRL | 0x501151C0 | `0x40200180` | `0x40200180` | identical |
+| `REF_CLK_CTRL1` (20 MHz div) | 0x500E6028 | `0x58170503` | `0x58170503` | **identical → ref clock exonerated** |
+| `REF_CLK_CTRL2` (20 MHz gate) | 0x500E602C | `0x00000115` | `0x00000115` | identical |
+| `SOC_CLK_CTRL0/1/2` | 0x500E6014.. | `e6dfb7ff`/`7e7f107f`/`20f81ffe` | same | identical |
+| `ROOT_CLK_CTRL0` | 0x500E6004 | `0x00000000` | `0x00000060` | **differs (clock tree)** |
+| `ROOT_CLK_CTRL1` | 0x500E6008 | `0x00000001` | `0x00000000` | **differs** |
+| `ROOT_CLK_CTRL2` | 0x500E600C | `0x00010000` | `0x00000000` | **differs** |
+| `PMU_HP_REGULATOR0` | 0x50115028 | `0xb0403ff0` | `0xb0407ff0` | **differs (bit 14)** |
+
+(`PERI_CLK_CTRL03` differs only in the DPI-clock divider — expected,
+different pixel clock — not a lock factor.) With LDO_VO3, the 20 MHz
+reference, the PHY reset bits, and the DSI bus clocks all byte-identical,
+the **only** differences are **clock-tree root registers and the PMU
+HP-active analog dbias** — system init IDF's bootloader + `esp_system`
+startup performs that our bare `esp-riscv-rt` app (under espflash's
+minimal bootloader) does not. The DPHY PLL is analog and depends on this
+system state.
+
+**BEETLE-06 attempt — analog BIAS (eliminated).** Hypothesis: IDF's
+`rtc_clk_init` clears the `I2C_BIAS` `FORCE_XPD_{CK,REF_OUT_BUF,IPH,
+VGATE_BUF}` fields (global analog bias generator) over the internal
+REGI2C bus, which our boot skips. Ported a raw-PAC REGI2C primitive
+(faithful to `esp_rom_regi2c_esp32p4.c`) + `dphy_analog_bias_init()`
+(`examples/beetle-esp32p4/src/dfr0550/regi2c.rs`), called at boot.
+Result: **no lock.** Verified over JTAG (scripted REGI2C read) that
+BIAS register 4 already reads `0x00` in our firmware — the fields were
+already cleared by the bootloader/default, so the write is a no-op and
+BIAS is not the cause. Also confirmed the DPHY PLL is **not** a
+REGI2C-configured block (REGI2C PLLs are CPU/SYS/SDIO/PLLA only), so
+REGI2C is not the DPHY config path. BIAS conclusively eliminated; the
+REGI2C primitive is retained as verified infrastructure for any future
+analog-bus need.
+
+**Remaining suspects (narrowed):** `ROOT_CLK_CTRL0/1/2` (CPU/MEM/SYS
+clock-tree config — does the DPHY `cfg_clk`, which clocks the PLL lock
+FSM, track a differing root clock?) and `PMU_HP_REGULATOR0` analog dbias
+(bit 14). Next: (a) determine the `mipi_dsi_dphy_cfg_clk` source and
+whether it depends on a differing root clock, and/or (b) port the IDF
+app-stage clock-tree + PMU HP-regulator dbias/DCDC init (`rtc_clk_init`
+lines 57–74) and retest. The OpenOCD `phy_status` read-over-JTAG is now
+the fast inner-loop check (no Morse round-trip needed).
+
+### 2026-06-14 — full-block register diff: register parity PROVEN, cause is NOT register state (BEETLE-06)
+
+The targeted 4-register diff above was widened to a **full-block diff**
+of the entire `MIPI_DSI_HOST` (0x500A0000, 64 words) and `HP_SYS_CLKRST`
+(0x500E6000, 48 words) + `PMU` (0x50115000, 16 words) regions, captured
+over USB-JTAG from both the locked IDF binary and our no-lock firmware.
+(JTAG read harness note: this OpenOCD build does **not** emit `mdw`/`reg`
+output to stdout — only `echo` reaches the captured channel. Use
+`mem2array arr 32 <base> <n>` then `echo [format ...]` per word. See
+`~/p4dump.tcl`.)
+
+**Every differing register was classified and exonerated:**
+
+- **DSI host diffs (0x500a00xx)** — config artifacts, not lock factors.
+  IDF's example runs 2-lane @ 1000 Mbps with full video timing + a real
+  panel; ours is 1-lane @ 750 Mbps. The diffs are `MODE_CFG`, `VID_*`
+  timing, `DPI_COLOR_CODING`, `PHY_TST_CTRL1` (M/N poke residue), etc.
+  Critically, **`CLKMGR_CFG` (0x08) and `PHY_IF_CFG.stop_wait` (0xa4)
+  read 0 in ours only because `init()` returns `Err(PllLock)` at
+  `dsi_host.rs:499` — BEFORE the post-lock host-setup block (lines
+  525–606) that writes them.** They are consequences of the early
+  return, not missing pre-lock writes.
+- **Clock-tree (`ROOT_CLK_CTRL0/1/2`)** — decode: `CPU_CLK_DIV_NUM`
+  ours=3 / IDF=0, `MEM_CLK_DIV_NUM` 0/1, `APB_CLK_DIV_NUM` 0/1. IDF runs
+  a full-speed CPU operating point with matching MEM/APB dividers; our
+  espflash-bootloader boot stays at a slow default profile. IDF source
+  (`mipi_dsi_ll.h`, `clk_tree_ll.h`) confirms the DPHY **`cfg_clk`**
+  (PLL-lock-FSM clock) derives from `PLL_F20M = SPLL/24` via fixed
+  dividers — **independent** of the CPU/MEM/APB root tree. So these are
+  almost certainly incidental.
+- **PMU dig-core regulator (`0x18` `DCM_VSET`, `0x28` bit14
+  `DIG_REGULATOR0_DBIAS_SEL`)** — decode: ours `DCM_VSET`=31(max) /
+  IDF=27; dbias value [31:27]=24 in **both**; bit14 ours=1(fw control) /
+  IDF=0(PVT/hw). **Our core voltage is HIGHER than IDF's**, not lower —
+  IDF *lowers* the DCDC setpoint (`rtc_clk_init.c:57–74`). Under-volting
+  is therefore not the story; **PMU regulator exonerated.**
+
+**PLL config + power sequence confirmed byte-identical to IDF
+line-for-line.** Read the real IDF source (not the prior claim):
+`mipi_dsi_hal_configure_phy_pll` (`mipi_dsi_hal.c:39–88`) pokes EXACTLY
+five test codes for 750 Mbps/1-lane — `0x44=0x32, 0x19=0x30, 0x17=0x03,
+0x18=0x15, 0x18=0x84` — and **no** charge-pump/VCO/GMP/int/prop analog
+pokes (the `soc_mipi_dsi_phy_pll_ranges[]` table supplies only
+`hs_freq_range_sel`). `mipi_dsi_hal_init` (`mipi_dsi_hal.c:15–28`) does
+`set_data_lane_number → host_power_on → phy_power_on → reset(rstz 0→1) →
+enable_clock_lane → force_pll`, then `configure_phy_pll`, then poll —
+identical to `dsi_host.rs:459–492`. `esp_lcd_mipi_dsi_bus.c:20–96`
+confirms the top-level order (bus clk → phy clk src/cfg/ref → hal_init →
+configure_phy_pll → poll) matches our boot.
+
+**Conclusion — the defect is NOT in register state.** Every register
+that can affect DPHY PLL lock is byte-identical to a locking IDF binary,
+and every write-sequence matches IDF. The remaining differences are:
+(1) the **system clock operating point** (CPU full-speed + MEM/APB
+divided vs our slow default) — present when IDF locks, absent when we
+don't, *despite* the source analysis saying `cfg_clk` is independent of
+it (a residual coupling — e.g. the APB-clocked host↔PHY lock-detect
+handshake — cannot be ruled out from registers alone); and (2) anything
+that registers cannot capture — **timing/sequencing**, or a register
+block not yet dumped (`MIPI_DSI_BRG`, or a system reg outside
+`HP_SYS_CLKRST`/`PMU`). Next experiment: port IDF's
+`rtc_clk_cpu_freq_set` operating point (full-speed CPU + MEM/APB
+dividers, glitch-free `soc_clk_div_update` commit) early in boot and
+retest — moderate risk (mid-boot clock-tree reconfigure) but recoverable
+by reflash, and our higher core voltage gives margin. If that fails, the
+cause is sequencing/timing or an undumped block, and the investigation
+shifts to a logic-analyzer capture of the PHY test/reset lines or a
+bridge-register dump.
+
+### 2026-06-14 — operating-point port: hypothesis ELIMINATED (BEETLE-06)
+
+Ported IDF's `rtc_clk_cpu_freq_to_cpll_mhz(360)` upscale sequence to raw
+PAC (`examples/beetle-esp32p4/src/dfr0550/clk_init.rs`,
+`set_cpu_cpll_360mhz`): APB→SYS→MEM→CPU divider writes each committed via
+`soc_clk_div_update`, source mux left untouched (already CPLL). Called
+after the bit-bang wake (whose busy-waits are CPU-clock-calibrated) and
+before DSI bring-up (`bsp_pac_main.rs`). Verified over JTAG: the operating
+point now **byte-matches IDF** — `root_clk_ctrl0/1/2 = 0x0 / 0x1 /
+0x10000` (CPU 360 / MEM 180 / SYS 180 / APB 90, up from CPLL÷4 90/90/90).
+
+**Result: `phy_status` still `0x1528` (bit0=0, no lock) — UNCHANGED.**
+The operating-point hypothesis is **eliminated**, empirically confirming
+the IDF-source finding that the DPHY `cfg_clk` (PLL-lock FSM clock,
+SPLL/24) is independent of the CPU/MEM/APB root tree. `clk_init.rs` is
+retained (it is correct and harmless — it simply matches IDF's operating
+point) but is **not** the fix.
+
+**State after this round:** our firmware now matches the locking IDF
+binary on *every* register dumped — DSI host pre-lock state, the full
+clock tree (incl. the operating point), DSI cfg/ref clock enables + src,
+LDO_VO3, PHY reset bits, and the M/N/hsfreqrange test pokes — and the PLL
+still will not lock. Register state and clock operating point are both
+fully exonerated. The defect is therefore in one of: (1) **timing /
+sequencing** not visible in final register state (e.g. a required
+inter-step settle delay, or a `testclr` test-interface reset the DW
+databook specifies but neither IDF nor we currently issue, that the P4
+integration needs from our specific pre-DSI state); (2) an **undumped
+register block** — `MIPI_DSI_BRG`, `LP_AON_CLKRST`, or an analog block
+reached via REGI2C `DIG_REG`; or (3) a **bootloader-environment**
+difference (espflash minimal stub vs IDF 2nd-stage) that leaves some
+peripheral/analog state our register dumps don't cover. Next:
+zero-risk `MIPI_DSI_BRG` + `LP_AON_CLKRST` JTAG dump-and-diff, then a
+logic-analyzer capture of the PHY test/reset/refclk lines.
+
+### 2026-06-14 — code path fully exonerated; cause is physical/analog (BEETLE-06)
+
+A battery of isolation experiments, each JTAG-verified (`phy_status` @
+`0x500A00B0`), all returning `0x1528` (no lock):
+
+1. **`MIPI_DSI_BRG` + `LP_AON_CLKRST` dump-diff.** `LP_AON_CLKRST`
+   byte-identical (CPU clock source mux confirmed already correct — the
+   `set_cpu_cpll_360mhz` skip-source decision was right). All `MIPI_DSI_BRG`
+   diffs are video config (IDF 1024×600 EK79007 vs our 800×480: e.g.
+   `0x500a0830` ours `0x01e0020d`/480-line vs IDF `0x02580277`/600-line) or
+   post-lock enables we never reach (early return). The bridge is the
+   post-link DPI→DSI pixel path and plays no role in PLL lock.
+2. **Boot our app under the IDF 2nd-stage bootloader.** Flashed IDF
+   `bootloader.bin`@0x2000 + IDF partition table + *our* app image@0x10000
+   (`espflash save-image`). `phy_rstz=0x0f` confirms our app ran to DSI
+   init; **still no lock.** The full IDF bootloader hardware/analog init
+   does NOT fix it → not a missing-bootloader-init problem.
+3. **Minimal-boot.** Stripped ALL pre-DSI app code (bit-bang wake, GPIO
+   routing, REGI2C BIAS, PSRAM, early DPI clock) — DSI-only bring-up.
+   Still no lock → not a pre-DSI disturbance.
+4. **Config-vs-code.** Ran our code at the EXACT 2-lane @ 1000 Mbps config
+   the IDF binary locks with on this board. Still no lock → defect is
+   config-independent (not our 750/1-lane M/N or hs_freq_sel).
+5. **LDO settle.** Added ~80 ms after `acquire_dphy` before the PHY
+   power-up. Still no lock → not LDO_VO3 output-ramp time.
+
+**Bit-level source verification (no flash):** our `dsi_host::init`,
+`clocks::enable_bus_and_reset`/`enable_phy_clocks`, and
+`phy_write_register` are confirmed identical to IDF's `mipi_dsi_hal_init`
+(`mipi_dsi_hal.c:15`), the `mipi_dsi_phy_ll_*` primitives (`n_lanes =
+lane-1`; `pwr_up.shutdownz`; `phy_rstz` `rstz` 0→1; `enableclk`;
+`forcepll` — same bits, same order; C bitfield writes are RMW like our
+`.modify()`), `mipi_dsi_ll_enable_bus_clock`/`reset_register`
+(`soc_clk_ctrl1.dsi_sys_clk_en`; `rst_en_dsi_brg` 1→0), and the
+test-interface protocol (`ctrl0=clk<<1|clr`, `ctrl1=(1<<16)|addr`, same
+7-write poke; readback `0x17=3` proves bit positions correct). IDF's DSI
+path issues **no** `testclr` (only the CSI HAL does) — so neither do we,
+correctly.
+
+**Conclusion.** Every register, the operating point, the bootloader
+environment, the pre-DSI code, the DSI config, and the bit-level init
+sequence are all proven identical to a locking IDF binary on the same
+board — and the DPHY PLL still will not lock. The defect is therefore
+**physical/analog and invisible to register inspection**: the actual
+presence/frequency of the PHY `refclk` or `cfg_clk` at the PHY, the
+LDO_VO3 output *voltage* (not its register state), or SPLL analog state
+configured via REGI2C (`DIG_REG`/PLL blocks, not memory-mapped). This
+exhausts the register/code-level investigation. **Next phase requires
+instrumentation, not more register-poking:** a logic-analyzer/scope on
+the PHY refclk + reset lines and a DMM on the LDO_VO3 rail during the
+lock attempt, and/or REGI2C reads of the SPLL/PLLA analog blocks compared
+against an IDF capture. `clk_init.rs` (operating-point port) is retained
+in the normal boot — correct and IDF-matching, though not the fix.
+
+### 2026-06-14 — visible color-cycle control: NOT evidence of Rust scanout (BEETLE-06)
+
+After the register/code investigation above, the panel was visually
+observed to keep cycling colors even when the Rust firmware was flashed.
+This looked like a contradiction because the Rust image was also visibly
+running its Morse/error path, and the Rust DPI panel path cannot yet drive
+a framebuffer color cycle: `DpiPanel::init` still returns before the
+`run_color_cycle` path can execute. The following IDF/Rust comparison
+controls were run to isolate what the eye-visible cycling actually proves.
+
+**Normal ESP-IDF control app.** Added a standalone ESP-IDF comparison
+harness at `examples/beetle-esp32p4-idf/` using Espressif's normal
+drivers: IDF I2C bridge wake on GPIO7/GPIO8, `esp_ldo_acquire_channel`
+for LDO_VO3, `esp_lcd_new_dsi_bus`, `esp_lcd_new_panel_dpi`, and a
+RGB888 framebuffer fill loop. On the same board this locked and cycled
+colors:
+
+- bridge wake: `PORTB=0x85`
+- DSI PHY: `MIPI_DSI_HOST.phy_status=0x0000153d` (`phy_lock` bit0 set)
+- framebuffer: `0x48001180`, 1,152,000 bytes
+- visible/logged cycle: red → green → blue → white → black
+
+**Rust reflash after IDF control.** Reflashed the current Rust raw-PAC
+firmware and confirmed by flash read-back that the app image was Rust
+(`rlvgl-beetle-esp32p4` string present). The board showed the Rust-only
+Morse/error signal, while JTAG readback showed:
+
+- `phy_rstz=0x0000000f`
+- `phy_status=0x00001528` (`phy_lock` bit0 clear)
+- `host_mode_cfg=0x00000001` (command mode / video path not enabled)
+- DSI bridge video-enable bit cleared later by explicit JTAG write, with
+  no visual change reported
+
+This proves the Rust image was running and still did **not** lock the
+DPHY PLL, but it does **not** prove Rust was generating the visible color
+cycle.
+
+**JTAG DPI-output kill.** While the visible cycle was present, the ESP32-P4
+DSI bridge DPI output was disabled directly over JTAG
+(`0x500A0840 = 0`, update strobe `0x500A0844 = 1`). The relevant DSI_BRG
+enable register changed from `0x000019d0` to `0x00000000`. The panel
+continued cycling unchanged. Therefore the visible cycle was not being
+driven by the ESP32-P4 DPI bridge scanout path at that time.
+
+**Wake-only IDF isolation.** Built and flashed the IDF harness with
+`CONFIG_DFR0550_WAKE_ONLY=y`. Runtime log confirmed it only initialized
+I2C and woke the DFR0550 bridge:
+
+- `Bridge ready, PORTB=0x85`
+- `Wake-only mode active: DSI/DPI/framebuffer init is skipped`
+
+No DSI bus, DPI panel, framebuffer, or color-fill loop was created.
+
+**Power-off-after-wake IDF isolation.** Built and flashed
+`CONFIG_DFR0550_POWER_OFF_AFTER_WAKE=y`. Runtime log confirmed it woke
+the bridge, then sent the Linux-compatible off controls, and still skipped
+the entire MIPI/display path:
+
+- `Bridge ready, PORTB=0x85`
+- `Command DFR0550 PWM=0 and POWERON=0 over IDF I2C`
+- `After power-off command, PORTB=0x85`
+- `Power-off-after-wake mode active: DSI/DPI/framebuffer init is skipped`
+
+Visual observation: the panel continued cycling unchanged.
+
+**No-touch IDF isolation.** Built and flashed
+`CONFIG_DFR0550_NO_TOUCH=y`. Runtime log confirmed the application did
+not touch the display stack at all:
+
+- `No-touch mode active: I2C, DSI, DPI, framebuffer, and LDO init are skipped`
+
+This image exits before bridge I2C setup, before LDO_VO3 acquisition, and
+before any MIPI DSI/DPI/framebuffer operation. It was left running as the
+final board state for this checkpoint.
+
+**Conclusion.** There are two separate phenomena:
+
+1. The **Rust DPHY PLL lock failure remains real**: Rust repeatedly reads
+   `phy_status=0x1528`, while normal IDF reads a locking `0x153d` on the
+   same board.
+2. The **visible color cycle is not evidence of Rust framebuffer scanout,
+   nor of ESP32-P4 DSI/DPI scanout at all**. It persisted after JTAG
+   disabled the DSI bridge DPI output, after an IDF image skipped all
+   DSI/DPI/framebuffer init, after an IDF image wrote `PWM=0` and
+   `POWERON=0`, and finally after an IDF image booted and idled without
+   touching I2C, LDO, DSI, DPI, or framebuffer.
+
+The color cycle must therefore be treated as retained or autonomous
+panel/bridge-side behavior until a full panel power-removal test proves
+otherwise. It is no longer a valid pass/fail signal for host framebuffer
+ownership. The reliable lock/debug signals remain JTAG `phy_status`,
+`phy_rstz`, `host_mode_cfg`, and explicit firmware logs.
+
 ### Tracking
 
 - 2026-06-13: ~7 DSI flash rounds. Root-caused and fixed the LDO
@@ -1743,3 +2065,20 @@ clock/power init) for any DPHY-relevant bring-up the bootloader doesn't do.
   out the reference clock. Defect remains 🔴 open; reclassified from
   "config" to "silicon / app-startup" class. ERRATA-005's diagnostic
   technique and active-low-LED caveats apply.
+- 2026-06-14 (BEETLE-06): register-diff against a known-good IDF binary
+  over USB-JTAG **falsified the silicon framing** — IDF locks the PLL on
+  this exact board (`phy_lock`=1); ours does not. Empirically exonerated
+  LDO_VO3, the 20 MHz reference, and the analog BIAS generator (all
+  byte-identical / already-correct in the non-locking state). Remaining
+  diffs: `ROOT_CLK_CTRL0/1/2` + `PMU_HP_REGULATOR0` (app-stage system
+  init our bare boot skips). Ported a verified raw-PAC REGI2C primitive
+  (`dfr0550/regi2c.rs`); BIAS write confirmed no-op. Reclassified
+  "silicon / app-startup" → **"our bug: missing app-stage system init"**.
+  Next inner-loop check: OpenOCD `mdw 0x500A00B0` (`phy_status`) over
+  JTAG. See the 2026-06-14 section above for the full diff table.
+- 2026-06-14 (BEETLE-06 visual-control update): normal IDF locks and
+  cycles colors (`phy_status=0x153d`), but the visible color cycle
+  persists after Rust no-lock (`0x1528`), JTAG DPI-output disable,
+  IDF wake-only, IDF `PWM=0`/`POWERON=0`, and IDF no-touch boot. The
+  color cycle is therefore not a valid proof of host scanout; use JTAG
+  lock state and logs as the source of truth.

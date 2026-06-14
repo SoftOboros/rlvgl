@@ -1,0 +1,5 @@
+# Build output for the ESP-IDF DFR0550 comparison app.
+build/
+build-*/
+sdkconfig
+sdkconfig.old
