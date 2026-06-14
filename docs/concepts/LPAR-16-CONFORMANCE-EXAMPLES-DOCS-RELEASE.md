@@ -306,16 +306,18 @@ a discipline violation.
 
 ## 10. Frozen Decisions — Changelog, Version, Release
 
-1. **SemVer bump reflects additive surface.** LPAR-11 through LPAR-15 added a
-   large *additive* public API (new modules, `core::property`,
-   `core::observer`, `core::edit::EditCore`) with no removals or breaking
-   changes to landed APIs. The honest SemVer call is a **minor** bump for the
-   crates that gained surface: `core`, `widgets`, and `ui`. `platform` and
-   `playit` bump only if their surface changed. The exact target version
-   (e.g. `0.3.0` vs continuing the `0.2.x` line for a pre-1.0 additive wave)
-   is a **ratification decision** — this row is frozen as "minor bump for
-   core/widgets/ui; patch or none for platform/playit unless surface changed",
-   with the concrete number recorded in the §15 ratification entry.
+1. **SemVer bump reflects additive surface; stay on the `0.2.x` line.**
+   LPAR-11 through LPAR-15 added a large *additive* public API (new modules,
+   `core::property`, `core::observer`, `core::edit::EditCore`) with no removals
+   or breaking changes to landed APIs. **Decision (owner, 2026-06-13): the LPAR
+   release continues the `0.2.x` line targeting `0.2.4`; no `0.3.0`.** Pre-1.0,
+   additive surface rides a patch-level bump. Concretely: the crates that
+   gained LPAR surface — `core` (0.2.3 → 0.2.4), `widgets` (0.2.3 → 0.2.4), and
+   `ui` (0.2.2 → 0.2.4) — bump to `0.2.4`. `playit` is already `0.2.4`.
+   `platform` (0.2.3) bumps to `0.2.4` only if its surface changed in the LPAR
+   waves; otherwise it stays. "Minor semver bumps where needed" — only the
+   crates whose public surface actually moved get bumped; untouched crates are
+   left alone.
 2. **One `docs/CHANGELOG.md` entry for the LPAR widget waves.** The entry
    enumerates the new widget modules and core surfaces by phase, names any
    phase that ships *implemented but not conformance-complete* (§5.A) with its
@@ -394,8 +396,8 @@ LPAR-16 is **conformance-complete** when:
 
 ### 12.F Release (§10)
 
-- [ ] SemVer bump ratified and applied (minor for core/widgets/ui; record the
-      number in §15).
+- [ ] SemVer bump applied: `core`/`widgets`/`ui` → `0.2.4` (stay on `0.2.x`
+      per §10 rule 1); `platform` → `0.2.4` only if its surface moved.
 - [ ] `docs/CHANGELOG.md` entry written, naming any conformance-deferred phase
       with its open §6 row.
 - [ ] `DRY_RUN=1 scripts/publish_changed.sh HEAD~1` is green.
@@ -465,3 +467,11 @@ LPAR-16 is **conformance-complete** when:
   §7 no-std enforcement via embedded compile gate, §10 SemVer policy. Not
   ratified; fixture/release execution is blocked until owner ratification is
   recorded here.
+- **2026-06-13** — §10 version decision recorded (owner): the LPAR release
+  continues the `0.2.x` line targeting `0.2.4`; no `0.3.0`. `core`/`widgets`
+  (0.2.3) and `ui` (0.2.2) bump to `0.2.4`; `playit` already `0.2.4`;
+  `platform` bumps only if its surface moved. "Minor semver bumps where
+  needed" — untouched crates are left alone. This settles the §10 rule 1
+  ratification decision; the rest of the document remains drafted-not-ratified
+  (the fixture contract §5/§6 still awaits an owner ratification entry before
+  fixture execution begins).
