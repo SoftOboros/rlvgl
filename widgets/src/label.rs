@@ -1,9 +1,8 @@
 //! Basic text label.
 use alloc::string::String;
-use rlvgl_core::bitmap_font::FONT_6X10;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::{FontMetrics, shape_text_ltr};
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -17,6 +16,9 @@ pub struct Label {
     /// Color used to render the text.
     #[deprecated(note = "use the resolved TextStyle text_color cascade when drawing labels")]
     pub text_color: Color,
+    /// Font assignment for this label (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Label {
@@ -28,7 +30,17 @@ impl Label {
             text: text.into(),
             style: Style::default(),
             text_color: Color(0, 0, 0, 255),
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this label (FONT-00 §5).
+    ///
+    /// Pass any process-lifetime [`FontMetrics`] — e.g. a `PackedFont` for
+    /// anti-aliased text. With no assignment the label renders with the
+    /// built-in `FONT_6X10`.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Update the text displayed by the label.
@@ -61,9 +73,10 @@ impl Label {
 
     /// Draw this label using an explicit font metrics backend.
     ///
-    /// The shaped text path clips glyph coverage to the label bounds. This is
-    /// the insertion point for future font-registry lookup by resolved
-    /// [`FontId`](rlvgl_core::font::FontId).
+    /// The shaped text path clips glyph coverage to the label bounds. The
+    /// `Widget::draw` impl calls this with the [`set_font`](Self::set_font)
+    /// assignment resolved via `WidgetFont` (FONT-00 §5); callers may also
+    /// invoke it directly with any `&dyn FontMetrics`.
     #[allow(deprecated)]
     pub fn draw_with_font(&self, renderer: &mut dyn Renderer, font: &dyn FontMetrics) {
         draw_widget_bg(renderer, self.bounds, &self.style);
@@ -85,8 +98,7 @@ impl Widget for Label {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        let font: &dyn FontMetrics = &FONT_6X10;
-        self.draw_with_font(renderer, font);
+        self.draw_with_font(renderer, self.font.resolve());
     }
 
     fn handle_event(&mut self, _event: &Event) -> bool {

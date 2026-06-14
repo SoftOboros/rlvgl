@@ -169,13 +169,19 @@ is one field + one method + one call-site change. `ArcLabel`'s existing
 
 ### 5.C No global font registry in v1 — deferred, not designed-out
 
-A `FontId`-keyed registry / theming layer (one place to swap all widget fonts,
-semantic roles like Body/Heading/Mono) is **deferred-Coupled** on a theming
-decision (LPAR-07 style cascade). v1 ships explicit per-widget assignment only.
-The `WidgetFont` seam is registry-ready: a later registry resolves a `FontId`
-to a handle and the app calls `set_font`. Naming a `FontId` enum now would
-freeze a cross-cutting contract before the theming owner exists — deferred per
-§11.
+`FontId` already exists (`core/src/font.rs:15`, `FontId(pub u16)`) and is
+already a field on the resolved style cascade (`core/src/style_cascade.rs`:
+`ResolvedStyle.font_id`, `TextStyle.font_id`, `FontId::DEFAULT`). What is
+**absent** — and **deferred-Coupled** on a theming decision (the LPAR-07 style
+owner) — is the *registry that maps a `FontId` to a `&'static dyn FontMetrics`
+handle* and any widget actually *honoring* `resolved_style.font_id` when
+choosing its font. v1 ships explicit per-widget assignment (`WidgetFont` +
+`set_font`) only; no widget reads `font_id`, and no `FontId → handle` map is
+built. The two font-identity channels reconcile when the registry lands (§10):
+a registry resolves the cascade's `font_id` to a handle and feeds it through
+`set_font` — `WidgetFont` is the handle slot that resolution targets. Building
+that registry now would require the theming owner that does not yet exist
+(§11).
 
 ### 5.D `set_font` is additive and backward-compatible
 
@@ -247,10 +253,12 @@ each glyph is filled (coverage vs opaque), not *where*.
 ### 7.D The no-font fallback is removed or made coverage-based
 
 ArcLabel's current `font: None` path (8-px fixed advance + `draw_text`) is
-replaced: with a resolved `WidgetFont`, ArcLabel always has at least
-`FONT_6X10` and renders coverage. The legacy `draw_text` call site is deleted.
-`config_menu.rs:608` (example) is migrated in the same phase or explicitly
-noted as an example-level deferral.
+replaced: ArcLabel adopts `WidgetFont` here in FONT-03 (moved from FONT-01 —
+see §12), so with a resolved handle it always has at least `FONT_6X10` and
+renders coverage. The 8-px no-font advance fallback and the legacy `draw_text`
+call site are both deleted; the colocated advance test is updated to the
+`FONT_6X10` metrics. `config_menu.rs:608` (example) is migrated in the same
+phase or explicitly noted as an example-level deferral.
 
 ## 8. Frozen Decisions — Rotated-Renderer Glyph Throughput
 
@@ -319,6 +327,7 @@ reference oracle path, and cites this section. It does not depend on hardware.
 
 | Primitive | Relationship |
 |---|---|
+| `FontId` + style cascade (`core/src/font.rs:15`, `style_cascade.rs`) | `FontId(pub u16)` and `ResolvedStyle.font_id` already exist but are **inert for font selection** — no registry resolves a `FontId` to a handle and no widget reads `font_id`. FONT v1 does NOT wire `WidgetFont` to the cascade. The two channels reconcile later (§5.C): a deferred `FontId → &dyn FontMetrics` registry resolves `resolved_style.font_id` and feeds the result through `set_font`. v1 must not silently make widgets honor `font_id` (that is the theming owner's call). |
 | `ArcLabel::set_font` / `font: Option<...>` (`arc_label.rs`) | The pattern §5 generalizes. ArcLabel is refactored onto `WidgetFont`; its public `set_font` signature is preserved. |
 | `Label::draw_with_font` (`label.rs:65`) | The pre-existing selection seam. `draw_with_font` stays; `Label::draw` resolves `WidgetFont` instead of hard-coding `FONT_6X10`. |
 | `FONT_6X10` (`bitmap_font.rs`) | Unchanged. Remains the default and the `WidgetFont::resolve` fallback. |
@@ -356,8 +365,11 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 - [ ] `WidgetFont` newtype + `resolve()` land with the `FONT_6X10` fallback.
 - [ ] Every text widget in `widgets/src/` (and the `ui/` text widgets) gains
       `set_font` and draws via `self.font.resolve()`; no constructor or
-      `Widget`-trait signature changes; `ArcLabel` refactored onto `WidgetFont`
-      (public `set_font` unchanged).
+      `Widget`-trait signature changes. **Exception:** `ArcLabel`'s `WidgetFont`
+      adoption lands in FONT-03, not here — its font also drives advance
+      geometry and has a no-font 8 px fallback, so adopting `WidgetFont`
+      (no-font → `FONT_6X10` metrics) is a behavior change best done atomically
+      with its render migration. FONT-01 stays purely additive.
 - [ ] Existing widget goldens still pass unchanged (default = `FONT_6X10`).
 - [ ] `cargo fmt`, per-crate `clippy -D warnings`, and widget/ui tests pass.
 
@@ -372,6 +384,11 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 
 ### 12.C FONT-03 — ArcLabel migration (§7)
 
+- [ ] `ArcLabel` adopts `WidgetFont`/`set_font` (moved here from FONT-01): its
+      `font: Option<...>` field becomes `WidgetFont`, the no-font 8 px advance
+      fallback is replaced by the resolved `FONT_6X10`, and the colocated
+      advance test is updated to the new metrics. Public `set_font` signature
+      unchanged.
 - [ ] `ArcLabel::draw` renders glyph coverage at each arc origin via the §7.B
       public glyph helper; the `renderer.draw_text` call is removed.
 - [ ] The §7.B helper is a defaulted/free addition breaking no existing
@@ -454,3 +471,20 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   the same change (§12.E). No scope changes from the draft: the `FontId`
   registry/theming layer stays deferred-Coupled (§5.C) and `FONT_6X10` stays
   the 1-bit default (§6.B).
+- **2026-06-14** — §5.C / §10 accuracy correction during FONT-01. The draft
+  implied `FontId` did not yet exist; in fact `FontId(pub u16)`
+  (`core/src/font.rs:15`) and `ResolvedStyle.font_id`
+  (`core/src/style_cascade.rs`) already exist but are inert for font selection
+  (no `FontId → handle` registry, no widget reads `font_id`). Corrected §5.C
+  and added a §10 reconciliation row: v1 keeps `WidgetFont`/`set_font` as the
+  sole selection channel and must NOT wire widgets to `font_id`; the two
+  channels reconcile when the deferred theming registry lands. No change to the
+  frozen v1 mechanism. (Also: the stale `[FontId](…)` intra-doc link in
+  `widgets/src/label.rs` was repointed to the real mechanism, trimming one of
+  the rustdoc-warning-debt links the LPAR retrospective flagged.)
+- **2026-06-14** — §12 sequencing refinement during FONT-01. `ArcLabel`'s
+  `WidgetFont` adoption moved from FONT-01 (§12.A) to FONT-03 (§12.C, §7.D):
+  ArcLabel's font drives advance geometry and has a no-font 8 px fallback, so
+  adopting `WidgetFont` (no-font → `FONT_6X10`) is a behavior change that
+  belongs atomically with its render migration, keeping FONT-01 purely
+  additive. No change to the frozen §5 mechanism or §7 contract.

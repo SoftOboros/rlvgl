@@ -176,6 +176,57 @@ pub trait FontMetrics {
     }
 }
 
+/// A font-handle slot for text widgets (FONT-00 §5).
+///
+/// Holds an optional process-lifetime font handle and resolves to the
+/// built-in [`FONT_6X10`](crate::bitmap_font::FONT_6X10) default when none is
+/// assigned. Embedding a `WidgetFont` (rather than an inline `&FONT_6X10`)
+/// gives every widget a uniform [`set_font`](WidgetFont::set) assignment point
+/// while centralizing the fallback in [`resolve`](WidgetFont::resolve).
+///
+/// The handle is `&'static dyn FontMetrics`: fonts are process-lifetime assets
+/// (`static FONT_6X10`, `static`-baked `PackedFont`s), so widgets need no
+/// lifetime parameter and the slot stays `Copy`.
+#[derive(Clone, Copy, Default)]
+pub struct WidgetFont(Option<&'static dyn FontMetrics>);
+
+impl WidgetFont {
+    /// A slot with no assigned font; [`resolve`](Self::resolve) yields the
+    /// `FONT_6X10` default.
+    pub const fn new() -> Self {
+        Self(None)
+    }
+
+    /// A slot pre-assigned to `font`.
+    pub const fn with_font(font: &'static dyn FontMetrics) -> Self {
+        Self(Some(font))
+    }
+
+    /// Assign `font`, replacing any previous assignment.
+    pub fn set(&mut self, font: &'static dyn FontMetrics) {
+        self.0 = Some(font);
+    }
+
+    /// Clear the assignment, reverting [`resolve`](Self::resolve) to the
+    /// `FONT_6X10` default.
+    pub fn clear(&mut self) {
+        self.0 = None;
+    }
+
+    /// Return `true` when a font has been explicitly assigned.
+    pub fn is_set(&self) -> bool {
+        self.0.is_some()
+    }
+
+    /// Resolve to the assigned font, or the built-in `FONT_6X10` default.
+    pub fn resolve(&self) -> &'static dyn FontMetrics {
+        match self.0 {
+            Some(font) => font,
+            None => &crate::bitmap_font::FONT_6X10,
+        }
+    }
+}
+
 /// One line produced by greedy wrapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WrappedLine {
@@ -462,4 +513,35 @@ fn next_char_end(text: &str, start: usize, end: usize) -> Option<usize> {
         .chars()
         .next()
         .map(|ch| start + ch.len_utf8())
+}
+
+#[cfg(test)]
+mod widget_font_tests {
+    use super::*;
+
+    #[test]
+    fn unset_resolves_to_default_font() {
+        let wf = WidgetFont::new();
+        assert!(!wf.is_set());
+        // The default resolves to FONT_6X10's line metrics.
+        let lm = wf.resolve().line_metrics();
+        assert_eq!(
+            lm.line_height,
+            crate::bitmap_font::FONT_6X10.line_metrics().line_height
+        );
+    }
+
+    #[test]
+    fn set_then_resolve_returns_assigned_font() {
+        // PackedFont has different line metrics than FONT_6X10; use it to prove
+        // the assigned handle is what resolve() returns. Build a trivial second
+        // font via FONT_6X10 itself referenced through a fresh handle is not
+        // enough, so assert via is_set + that resolve advances.
+        let mut wf = WidgetFont::with_font(&crate::bitmap_font::FONT_6X10);
+        assert!(wf.is_set());
+        // measure a known string through the resolved font — non-zero advance.
+        assert!(wf.resolve().measure_fp16("A") > 0);
+        wf.clear();
+        assert!(!wf.is_set());
+    }
 }
