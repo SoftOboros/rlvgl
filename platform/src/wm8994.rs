@@ -793,9 +793,19 @@ where
         // RATE field MUST be updated to match. A parameterizable
         // version of `init_record` is future work — see AUDIO-NN
         // chapter pipeline.
-        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0820; // bit 11 (LRCLK_DIR) + RATE=32
-        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
-        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
+        // AUDIO-01-d-H1 (arm-before-frame-clock, 2026-06-14): set RATE=32 but
+        // leave LRCLK_DIR (bit 11) = 0 here, so the codec does NOT yet receive
+        // LRCLK1 — its AIF1 framing is held off while the serializers are
+        // enabled (Step 14b). The LRCLK_DIR 0→1 edge is deferred to Step 14c
+        // (after the serializer-enable), so an already-enabled serializer syncs
+        // to the FIRST received LRCLK1 frame edge → deterministic N=0 arm,
+        // instead of arming mid-frame against an already-running LRCLK1 (the
+        // ERRATA-004/009 arm-phase race that H0's enable-defer alone did not fix
+        // on the ADC side — disco bench 2026-06-13). RATE field is unchanged
+        // (bits 10:0 = 0x020 = BCLK1/LRCLK1 = 32).
+        const AIF1_RATE32_DIR_OFF: u16 = 0x0020; // RATE=32, LRCLK_DIR=0 (held off)
+        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_RATE32_DIR_OFF)?;
+        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_RATE32_DIR_OFF)?;
 
         // R0x210 AIF1 Rate. Per WM8994_Rev4.6.pdf p.194 Tables 105+106:
         //   bits 7:4 AIF1_SR — sample-rate code (0x0=8k..0xA=96k)
@@ -886,6 +896,18 @@ where
         self.write_reg(REG_PWR_MGMT_4, pm4 | (1 << 9) | (1 << 8))?;
         let pm5 = self.read_reg(REG_PWR_MGMT_5)?;
         self.write_reg(REG_PWR_MGMT_5, pm5 | (1 << 9) | (1 << 8))?;
+
+        // Step 14c — AUDIO-01-d-H1: NOW enable LRCLK1 reception (LRCLK_DIR=1).
+        // The serializers were enabled at Step 14b with framing held off
+        // (Step 13 LRCLK_DIR=0), so THIS 0→1 edge starts the codec's AIF1
+        // framing and the already-armed serializers sync to the FIRST LRCLK1
+        // frame edge — the deterministic-N=0 hypothesis. Performing the order
+        // as enable-then-frame (rather than frame-then-enable) is the H1 delta
+        // over H0. R0x305 (DAC) symmetric for AIF1DAC1 (ERRATA-009). The Step
+        // 14b settle below now also covers this first-frame sync.
+        const AIF1_RATE32_DIR_ON: u16 = 0x0820; // RATE=32 + LRCLK_DIR=1 (reception on)
+        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_RATE32_DIR_ON)?;
+        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_RATE32_DIR_ON)?;
 
         // Step 14b settle — let the freshly-armed serializers lock to the
         // LRCLK1 frame and the digital-core FIFO flush before the path is
