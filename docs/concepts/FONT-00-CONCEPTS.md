@@ -187,9 +187,22 @@ that registry now would require the theming owner that does not yet exist
 ### 5.D `set_font` is additive and backward-compatible
 
 Adding `set_font` + `WidgetFont` MUST NOT change any existing widget
-constructor signature or the `Widget` trait. A widget with no `set_font` call
-renders exactly as today (`FONT_6X10`). This is a pure additive surface; no
-existing test changes behavior except where it opts into a new font.
+constructor signature, MUST NOT add a *required* `Widget`-trait method, and
+MUST NOT change any existing `Widget`-trait method signature. A widget with no
+`set_font` call renders exactly as today (`FONT_6X10`). This is a pure additive
+surface; no existing test changes behavior except where it opts into a new
+font.
+
+> **Amended 2026-06-15 (FONT-05 reopen, ratified).** The original §5.D read
+> "MUST NOT change … the `Widget` trait." FONT-05 (the deferred `FontId →
+> handle` registry, §5.C) adds **one *defaulted*** `Widget` method — the font
+> sink `widget_font_mut` — so the resolution pass can reach a widget's
+> `WidgetFont` slot generically. A defaulted method breaks no existing `Widget`
+> impl and adds no behavior to widgets that do not override it (the trait
+> already defaults `clear_region`/`set_bounds`), so it preserves §5.D's intent.
+> §5.D is narrowed to forbid only *required* methods and signature changes —
+> matching the FONT-00 §11 Renderer non-goal. See
+> [FONT-05-FONT-REGISTRY.md](FONT-05-FONT-REGISTRY.md) §5.B / §10.
 
 ## 6. Frozen Decisions — Anti-Aliased Text
 
@@ -643,3 +656,17 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   carry-forward is the `FontId → handle` theming registry (deferred-Coupled on
   the LPAR-07 style owner, §5.C / FC2); the rotated `Label` clip path (D5) and a
   core AA font are deferred-Safe.
+- **2026-06-15** — **FONT-05 reopen, ratified.** The deferred `FontId → handle`
+  registry (§5.C / §11 / §14 / FC2) is un-deferred: its coupling — "the theming
+  owner that does not yet exist" — is discharged now that LPAR-07 shipped
+  `core/src/theme.rs` (`LparTheme`/`DefaultTheme`) and
+  `core/src/style_cascade.rs` (`TextStyle.font_id` + `resolve_tree_with_text`).
+  §5.D amended (above) to permit FONT-05's one *defaulted* `Widget` method (the
+  `widget_font_mut` font sink) — owner-ratified 2026-06-15. The registry +
+  cascade→widget font bridge are specified in
+  [FONT-05-FONT-REGISTRY.md](FONT-05-FONT-REGISTRY.md) (FontRegistry §5.A,
+  font sink §5.B, resolution pass over `resolve_tree_with_text` §5.C,
+  cascade-overrides-else-preserve precedence §5.D, app-owned no-global §5.E).
+  §11 "no global font registry … in v1" and §14 "Deferred — Coupled: the
+  `FontId` registry" are superseded by FONT-05 for the registry specifically;
+  broader `ResolvedStyle` consumption stays deferred-Coupled to LPAR-07.

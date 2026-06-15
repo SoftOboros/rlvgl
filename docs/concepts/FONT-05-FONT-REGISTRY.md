@@ -6,11 +6,13 @@ now that the LPAR-07 theming owner exists.
 
 # FONT-05 — Font Registry and Cascade→Widget Font Bridge
 
-**Status:** **DRAFT — awaiting ratification (2026-06-15).** Reopens the FONT
-initiative from its closed state ([FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md)
-§5 / §6 FC2): the `FontId → &'static dyn FontMetrics` registry that FONT-00
-§5.C/§11/§14 deferred-Coupled on the LPAR-07 style/theme owner. That owner now
-exists (`core/src/theme.rs` `LparTheme`/`DefaultTheme`; `core/src/style_cascade.rs`
+**Status:** **Ratified 2026-06-15** (owner: "proposed amendment allowing new
+defaulted methods is ratified — proceed"). §5 frozen decisions are normative;
+implementation unblocked. Reopens the FONT initiative from its closed state
+([FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md) §5 / §6 FC2): the
+`FontId → &'static dyn FontMetrics` registry that FONT-00 §5.C/§11/§14
+deferred-Coupled on the LPAR-07 style/theme owner. That owner now exists
+(`core/src/theme.rs` `LparTheme`/`DefaultTheme`; `core/src/style_cascade.rs`
 `TextStyle.font_id` + `resolve_tree_with_text`), so the coupling is discharged
 and this phase is unblocked.
 
@@ -295,3 +297,7 @@ revisited if a theming use case demands it, via a §15 amendment.)
   driving (§5.E). The one cross-doc touch — a defaulted `Widget` method vs
   FONT-00 §5.D — is reconciled in §10 (amend §5.D to "no *required* method /
   no signature change"). Awaiting ratification.
+- **2026-06-15** — Ratified by owner ("proposed amendment allowing new defaulted
+  methods is ratified — proceed"). FONT-00 §5.D amended in the same change to
+  permit one defaulted `Widget` method (the §5.B font sink), with a FONT-00 §15
+  reopen entry. §5.A–§5.E frozen; implementation begins.
