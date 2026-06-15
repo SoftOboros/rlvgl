@@ -405,12 +405,17 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 
 ### 12.B FONT-02 — AA text + conformance fixture (§6, §9)
 
-- [ ] A widget fed a `PackedFont` via `set_font` renders 8-bit AA coverage.
-- [ ] The §9.A AA fixture asserts a partial-alpha glyph pixel through a real
+- [x] A widget fed a `PackedFont` via `set_font` renders 8-bit AA coverage.
+      *`Label::set_font(&AA_FONT)` → partial-alpha glyph pixels
+      `(128,128,128,255)` / `(64,…)` / `(192,…)` asserted.*
+- [x] The §9.A AA fixture asserts a partial-alpha glyph pixel through a real
       `blend_row`-overriding renderer, rendered twice for determinism.
-- [ ] The §9.B 1-bit-vs-AA contrast fixture proves font selection changes the
-      coverage.
-- [ ] Fixture cites §9; runs host-only; gates green.
+      *`widgets/tests/font_aa_conformance.rs::aa_font_renders_partial_alpha_through_widget_pipeline`.*
+- [x] The §9.B 1-bit-vs-AA contrast fixture proves font selection changes the
+      coverage. *`…::aa_font_produces_grays_the_1bit_default_does_not` — AA
+      grays `{64,128,192}` vs the 1-bit default's empty intermediate-gray set.*
+- [x] Fixture cites §9; runs host-only; gates green. *fmt + `clippy -D warnings`
+      + test pass.*
 
 ### 12.C FONT-03 — ArcLabel migration (§7)
 
@@ -539,3 +544,15 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   asserted to produce a partial-alpha glyph pixel through a real
   `blend_row`-overriding renderer, rendered twice for determinism) or to §6.B
   (`FONT_6X10` stays the 1-bit default); DejaVu remains the example AA font.
+- **2026-06-15** — FONT-02 complete (§12.B all boxed). The AA conformance
+  fixture landed at `widgets/tests/font_aa_conformance.rs`: a `Label` is fed a
+  synthetic AA `PackedFont` via `set_font` and rendered through a test-local
+  true-source-over ARGB canvas (`blend_row` override). `§9.A` asserts concrete
+  partial-alpha glyph pixels (`(128,128,128,255)`, `(64,…)`, `(192,…)` — white
+  ink over black bg, so output channel = coverage byte) rendered twice
+  bit-identically; `§9.B` asserts the AA font produces intermediate grays
+  `{64,128,192}` that the 1-bit `FONT_6X10` default does not, proving font
+  *selection* (not just advance) changed the rendered coverage. Proves AA
+  survives the real widget path `Label::draw → ClipRenderer → draw_text_shaped
+  → draw_glyph_coverage → blend_row`; no new rasterization (§6.A). FONT-03
+  (ArcLabel) and FONT-04 (rotated throughput) remain.
