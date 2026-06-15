@@ -262,6 +262,10 @@ impl Widget for ArcLabel {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     /// Draw the arc-label widget.
     ///
     /// `Part::MAIN` — widget background.

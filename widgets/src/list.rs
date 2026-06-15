@@ -79,6 +79,10 @@ impl Widget for List {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
         draw_widget_bg(renderer, self.bounds, &self.style);

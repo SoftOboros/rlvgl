@@ -361,6 +361,10 @@ impl Widget for Spinbox {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn set_bounds(&mut self, bounds: Rect) {
         self.bounds = bounds;
     }

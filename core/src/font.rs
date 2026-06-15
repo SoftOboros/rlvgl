@@ -227,6 +227,87 @@ impl WidgetFont {
     }
 }
 
+/// A `FontId → &'static dyn FontMetrics` lookup (FONT-05 §5.A).
+///
+/// Bridges the LPAR-07 style cascade's [`FontId`] identity
+/// ([`TextStyle::font_id`](crate::style_cascade::TextStyle::font_id)) to the
+/// FONT-00 [`WidgetFont`] handle slot. Immutable, borrow-backed, `no_std`-clean,
+/// and **not** a global singleton: the application owns a `FontRegistry` value
+/// and passes it to [`apply_font_registry`]. Handles are `'static`
+/// (`static FONT_6X10`, `static`-baked `PackedFont`s), so the registry needs no
+/// lifetime parameter.
+#[derive(Clone, Copy)]
+pub struct FontRegistry<'a> {
+    entries: &'a [(FontId, &'static dyn FontMetrics)],
+}
+
+impl<'a> FontRegistry<'a> {
+    /// Wrap a table of `(FontId, handle)` entries.
+    ///
+    /// The handles are `'static`; the table itself is borrowed for `'a` (see
+    /// the FONT-05 §5.A rationale — `&dyn FontMetrics` is `!Sync`, so a `static`
+    /// table is rejected and rvalue promotion is blocked by the `dyn`
+    /// coercion). Keep the application's entry array in scope and build this
+    /// `Copy` registry from `&entries`. `FontId::DEFAULT` entries are ignored
+    /// by [`resolve`](Self::resolve); keep the table small (lookup is a linear
+    /// scan).
+    pub const fn new(entries: &'a [(FontId, &'static dyn FontMetrics)]) -> Self {
+        Self { entries }
+    }
+
+    /// Resolve `id` to a registered handle.
+    ///
+    /// Returns `None` for [`FontId::DEFAULT`] and for any unregistered id —
+    /// signalling "no registry override" so the widget keeps its explicit
+    /// [`set`](WidgetFont::set) assignment or the `FONT_6X10` default
+    /// (FONT-05 §5.D).
+    pub fn resolve(&self, id: FontId) -> Option<&'static dyn FontMetrics> {
+        if id == FontId::DEFAULT {
+            return None;
+        }
+        self.entries
+            .iter()
+            .find(|(fid, _)| *fid == id)
+            .map(|(_, handle)| *handle)
+    }
+}
+
+impl FontRegistry<'static> {
+    /// An empty registry: [`resolve`](Self::resolve) yields `None` for every
+    /// id, so the pass leaves every widget's explicit/default font untouched.
+    pub const EMPTY: Self = Self { entries: &[] };
+}
+
+/// Resolve each node's cascade `font_id` through `registry` and write the
+/// mapped handle into the node's [`WidgetFont`] slot (FONT-05 §5.C).
+///
+/// Walks `root` top-down via
+/// [`resolve_tree_with_text`](crate::style_cascade::resolve_tree_with_text),
+/// reusing the cascade's inheritance — so a child with no own `font_id`
+/// inherits its parent's. For each node whose resolved `font_id` the registry
+/// maps, the widget's font is set via
+/// [`Widget::widget_font_mut`](crate::widget::Widget::widget_font_mut). Nodes
+/// whose `font_id` is `DEFAULT`/unregistered, or whose widget exposes no font
+/// slot, are **left untouched** — preserving explicit
+/// [`set_font`](WidgetFont::set) assignments and the `FONT_6X10` default
+/// (FONT-05 §5.D). Idempotent for a stable tree + registry.
+///
+/// The application owns `registry` and calls this after building/mutating the
+/// tree and on any change that affects font resolution (theme swap, locale
+/// remap, registry edit). It is not on the per-frame draw path (FONT-05 §5.E).
+pub fn apply_font_registry(root: &crate::object::ObjectNode, registry: &FontRegistry<'_>) {
+    crate::style_cascade::resolve_tree_with_text(root, &mut |node, _style, text| {
+        let Some(handle) = registry.resolve(text.font_id) else {
+            return;
+        };
+        let widget = node.widget();
+        let mut w = widget.borrow_mut();
+        if let Some(slot) = w.widget_font_mut() {
+            slot.set(handle);
+        }
+    });
+}
+
 /// One line produced by greedy wrapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WrappedLine {

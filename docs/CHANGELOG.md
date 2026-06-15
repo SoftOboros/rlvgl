@@ -38,6 +38,13 @@ LPAR parity substrate and widget-family release.
   each glyph's coverage once and blit physical rows via `inner.blend_row`
   instead of per-pixel dispatch, with zero-drift parity against the software
   reference (FONT-04).
+- `core::font::FontRegistry` (`FontId → &'static dyn FontMetrics`) + a
+  defaulted `Widget::widget_font_mut` font sink + `apply_font_registry`, which
+  walks the object tree (via `resolve_tree_with_text`), resolves each node's
+  cascade `font_id`, and writes the mapped handle into the widget's
+  `WidgetFont` slot — so the LPAR-07 style cascade / theme / locale can select
+  widget fonts. A registered `font_id` overrides; `DEFAULT`/unmapped preserves
+  an explicit `set_font`; default-`font_id` trees render identically (FONT-05).
 
 ### Release notes
 - `rlvgl-core`, `rlvgl-platform`, `rlvgl-widgets`, `rlvgl-ui`,

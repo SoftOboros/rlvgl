@@ -159,6 +159,10 @@ impl Widget for LedBargraph {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
         let off = self.skin.secondary.led_off.unwrap_or(DEFAULT_LED_OFF);

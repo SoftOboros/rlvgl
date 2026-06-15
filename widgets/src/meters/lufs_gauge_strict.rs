@@ -149,6 +149,10 @@ impl<const N: usize> Widget for LufsGaugeStrict<N> {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
         let text_default = self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);

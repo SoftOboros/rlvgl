@@ -138,6 +138,10 @@ impl Widget for NeedleVu {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
         let needle_col = self.skin.secondary.needle.unwrap_or(DEFAULT_NEEDLE);

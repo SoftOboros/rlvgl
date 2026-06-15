@@ -243,6 +243,10 @@ impl Widget for Window {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn set_bounds(&mut self, bounds: Rect) {
         self.bounds = bounds;
         // header_bounds and content_bounds are computed lazily from the fields;

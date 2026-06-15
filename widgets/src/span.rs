@@ -267,6 +267,10 @@ impl Widget for Spangroup {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn set_bounds(&mut self, bounds: Rect) {
         // Re-wrap is implicit on the next draw call since we compute layout
         // each draw from the current bounds.

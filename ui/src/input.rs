@@ -31,7 +31,7 @@ use alloc::boxed::Box;
 use rlvgl_core::{
     edit::EditCore as CoreEditCore,
     event::{Event, Key},
-    font::{FontMetrics, shape_text_ltr},
+    font::{FontMetrics, WidgetFont, shape_text_ltr},
     renderer::Renderer,
     widget::{Rect, Widget},
 };
@@ -80,6 +80,10 @@ impl UiEditCore {
 
     fn set_font(&mut self, font: &'static dyn FontMetrics) {
         self.label.set_font(font);
+    }
+
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        self.label.widget_font_mut()
     }
 
     fn set_text(&mut self, text: &str) {
@@ -309,6 +313,10 @@ impl Widget for Input {
         self.core.label.bounds()
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        self.core.widget_font_mut()
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         self.core.label.draw(renderer);
         self.core.draw_caret(renderer);
@@ -422,6 +430,10 @@ impl Textarea {
 impl Widget for Textarea {
     fn bounds(&self) -> Rect {
         self.core.label.bounds()
+    }
+
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        self.core.widget_font_mut()
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {

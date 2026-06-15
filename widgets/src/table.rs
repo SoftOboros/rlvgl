@@ -557,6 +557,10 @@ impl Widget for Table {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn set_bounds(&mut self, bounds: Rect) {
         self.bounds = bounds;
         self.recompute_row_heights();

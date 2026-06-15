@@ -540,6 +540,10 @@ impl Widget for Scale {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         if self.bounds.width <= 0 || self.bounds.height <= 0 || self.style.alpha == 0 {
             return;

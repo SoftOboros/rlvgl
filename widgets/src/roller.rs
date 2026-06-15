@@ -327,6 +327,10 @@ impl Widget for Roller {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn set_bounds(&mut self, bounds: Rect) {
         self.bounds = bounds;
         // Re-anchor offset so selected item stays centered.

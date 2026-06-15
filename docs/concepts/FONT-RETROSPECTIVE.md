@@ -309,3 +309,24 @@ Outcome → issue → fix → evidence, one hop:
   (FONT-01..04 landed; FONT-00 §12.A–§12.D boxed). Captures D1–D5 divergences,
   RP1–RP3 refactor points, MP1–MP5 mitigation patterns, the Safe/Coupled/
   Abandoned deferred reclassification, and forward constraints FC1–FC4.
+- **2026-06-15 (FONT-05 reopen — discharges the §5 Coupled carry-forward / FC2).**
+  The initiative resumed from its closed state to land the deferred
+  `FontId → handle` registry — the one item §5 classified **Coupled** (on the
+  LPAR-07 theming owner) and FC2 constrained. The coupling was satisfied
+  (LPAR-07 shipped `theme.rs` + `style_cascade.rs` `font_id` +
+  `resolve_tree_with_text`), so FONT-05 was drafted, ratified, and completed in
+  one phase. Per the CLAUDE.md retrospective discipline this is recorded as a
+  §8 amendment (single-phase reopen), not a separate retrospective.
+  Spec: [FONT-05-FONT-REGISTRY.md](FONT-05-FONT-REGISTRY.md). Commits: `ecbc31b`
+  (draft), `ab0bdec` (ratify + FONT-00 §5.D amendment), plus the implementation
+  commit. **Reclassification update:** §5 "Coupled — `FontId` registry" → now
+  **shipped** (the broader `ResolvedStyle` consumption remains Coupled to
+  LPAR-07). Residual risk **R2** ("`font_id` silently inert") is **retired** —
+  `font_id` now drives font selection through `apply_font_registry`.
+  **New lesson (extends MP-series): a "no lifetime parameter" claim on a type
+  holding `&dyn Trait` handles is suspect** — `&dyn Trait` is `!Sync` (blocks a
+  module-level `static` table) and the `dyn` unsizing coercion blocks rvalue
+  static promotion, so a `&'static` entry slice is impractical; borrow the table
+  for `'a` and keep only the handles `'static` (FONT-05 §5.A / §15
+  2026-06-15). FC2 is **discharged**; a future `FONT-06+` consuming the rest of
+  `ResolvedStyle` would be a new LPAR-07-coupled effort, not a FONT reopen.

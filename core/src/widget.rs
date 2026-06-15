@@ -180,4 +180,21 @@ pub trait Widget {
     /// This is additive (a default no-op body) and MUST NOT break any existing
     /// `Widget` implementer (LPAR-02 §5 additive-first rule; LPAR-10 §5.A).
     fn set_bounds(&mut self, _bounds: Rect) {}
+
+    /// Expose this widget's font slot for cascade-driven font resolution
+    /// (FONT-05 §5.B).
+    ///
+    /// The **default returns `None`**: a widget with no text font is opaque to
+    /// the font registry. Text widgets that hold a
+    /// [`WidgetFont`](crate::font::WidgetFont) override this to return
+    /// `Some(&mut self.font)`, so
+    /// [`apply_font_registry`](crate::font::apply_font_registry) can write a
+    /// registry-resolved handle into the slot without per-widget dispatch.
+    ///
+    /// Defaulted, so it adds no obligation to existing `Widget` implementers
+    /// (FONT-00 §5.D as amended 2026-06-15) and changes no behavior for widgets
+    /// that do not override it.
+    fn widget_font_mut(&mut self) -> Option<&mut crate::font::WidgetFont> {
+        None
+    }
 }

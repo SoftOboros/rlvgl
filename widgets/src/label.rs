@@ -105,6 +105,10 @@ impl Widget for Label {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         self.draw_with_font(renderer, self.font.resolve());
     }

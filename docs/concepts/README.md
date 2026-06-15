@@ -362,6 +362,15 @@ remaining gaps — font *selection* and anti-aliasing.
   `blend_row`-overriding renderer). Phases FONT-01..04 in §12.
   **FONT-01..04 all complete 2026-06-15 (§12.A–§12.D boxed);** see the §15
   change log for the per-phase landing record.
+- [FONT-05-FONT-REGISTRY.md](FONT-05-FONT-REGISTRY.md) — **Ratified + complete
+  2026-06-15.** Reopens the FONT initiative's deferred `FontId → handle`
+  registry now that the LPAR-07 theming owner exists. Adds an immutable
+  borrow-backed `FontRegistry<'a>`, a defaulted `Widget::widget_font_mut` font
+  sink, and an `apply_font_registry` pass over `resolve_tree_with_text` that
+  resolves each node's cascade `font_id` and feeds the mapped handle into the
+  widget's `WidgetFont` slot — bridging cascade/theme/locale font identity to
+  the FONT-00 selection model. Cascade-overrides-else-preserve precedence;
+  default-`font_id` trees render identically.
   - [FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md) — initiative-completion
     retrospective (2026-06-15). Captures the stale-premise divergence (the
     "Label migration" was already done before the initiative began), the

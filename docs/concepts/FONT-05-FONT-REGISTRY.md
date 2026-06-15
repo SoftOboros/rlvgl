@@ -89,7 +89,7 @@ text widget (FONT-00 §5.B). There is no trait-level way to reach the
 | Term | Meaning | Owner |
 |---|---|---|
 | **Font registry** | An immutable `FontId → &'static dyn FontMetrics` lookup, holding `'static` font handles. No interior mutability, no global. | FONT-05 §5.A |
-| **`FontRegistry`** | The concrete type: a thin wrapper over `&'static [(FontId, &'static dyn FontMetrics)]` with `resolve(FontId) -> Option<&'static dyn FontMetrics>`. | FONT-05 §5.A |
+| **`FontRegistry<'a>`** | The concrete type: a thin wrapper over `&'a [(FontId, &'static dyn FontMetrics)]` with `resolve(FontId) -> Option<&'static dyn FontMetrics>`. Handles are `'static`; the entry table is borrowed for `'a` (§5.A rationale). | FONT-05 §5.A |
 | **Font sink** | The defaulted `Widget` method `widget_font_mut(&mut self) -> Option<&mut WidgetFont>` that exposes a widget's `WidgetFont` slot to the resolution pass; `None` for non-text widgets. | FONT-05 §5.B |
 | **Font resolution pass** | The tree walk (built on `resolve_tree_with_text`) that maps each node's resolved `font_id` through the registry and writes the handle into the node's font sink. | FONT-05 §5.C |
 | **Explicit assignment** | A direct `widget.set_font(handle)` call (FONT-00). The fallback when the cascade `font_id` is `DEFAULT`/unmapped. | FONT-00 §5 |
@@ -111,26 +111,37 @@ text widget (FONT-00 §5.B). There is no trait-level way to reach the
 ### 5.A `FontRegistry` is an immutable, borrow-backed `FontId → handle` map
 
 ```rust
-pub struct FontRegistry {
-    entries: &'static [(FontId, &'static dyn FontMetrics)],
+pub struct FontRegistry<'a> {
+    entries: &'a [(FontId, &'static dyn FontMetrics)],
 }
-impl FontRegistry {
-    pub const fn new(entries: &'static [(FontId, &'static dyn FontMetrics)]) -> Self;
+impl<'a> FontRegistry<'a> {
+    pub const fn new(entries: &'a [(FontId, &'static dyn FontMetrics)]) -> Self;
     pub fn resolve(&self, id: FontId) -> Option<&'static dyn FontMetrics>;
+}
+impl FontRegistry<'static> {
+    pub const EMPTY: Self; // = FontRegistry { entries: &[] }
 }
 ```
 
 - `no_std`-clean; no allocation; no interior mutability; **no global singleton**
   (consistent with FONT-00 §5.A — "no global mutable singletons"). The
-  application owns the `FontRegistry` value.
+  application owns the `FontRegistry` value (and the entry table it borrows).
 - `resolve` returns `None` for `FontId::DEFAULT` and for any unregistered id.
   `None` means "no registry override" — the widget keeps its explicit/default
   font (§5.D). Lookup is a linear scan over a small table (font counts are tiny;
   no need for a sorted/binary-search contract in v1, but entries SHOULD be kept
   small).
-- Entries are `'static` handles (`static FONT_6X10`, `static`-baked
-  `PackedFont`s), so the registry needs no lifetime parameter — matching the
-  `WidgetFont` handle decision (FONT-00 §5.A).
+- The font **handles** are `&'static dyn FontMetrics` (`static FONT_6X10`,
+  `static`-baked `PackedFont`s), matching the `WidgetFont` handle decision
+  (FONT-00 §5.A). The **entry table** is borrowed for a lifetime `'a` rather
+  than required `&'static` (a refinement of the draft, see §15): `&dyn
+  FontMetrics` is `!Sync`, so a module-level `static` entry table is rejected by
+  the `Sync` requirement on `static` items, and the `dyn` unsizing coercion
+  blocks rvalue static promotion — making a `&'static` entry slice impractical
+  to construct ergonomically. A borrowed `'a` table (the app keeps a
+  `let entries = [(id, handle), …]` array in scope per §5.E and constructs the
+  `Copy` registry from `&entries`) sidesteps both while keeping the handles
+  `'static`. `FontRegistry::EMPTY` is the `'static` empty table.
 
 ### 5.B A defaulted `Widget` font sink exposes the `WidgetFont` slot
 
@@ -237,25 +248,35 @@ revisited if a theming use case demands it, via a §15 amendment.)
 
 ## 12. Acceptance Checklist (FONT-05)
 
-- [ ] FONT-00 §5.D amended (defaulted-`Widget`-method carve-out) + §5.C/§11/§14
+- [x] FONT-00 §5.D amended (defaulted-`Widget`-method carve-out) + §5.C/§11/§14
       reopen note + §15 entry; this doc ratified with a dated §15 entry.
-- [ ] `FontRegistry` (§5.A) lands in `core` with `resolve` returning `None` for
+      *Commit `ab0bdec`.*
+- [x] `FontRegistry` (§5.A) lands in `core` with `resolve` returning `None` for
       `DEFAULT`/unmapped; unit test for hit / miss / default.
-- [ ] `Widget::widget_font_mut` defaulted method (§5.B) lands; every text widget
+      *`core/src/font.rs` `FontRegistry<'a>`; `registry_resolves_hit_miss_and_default`.*
+- [x] `Widget::widget_font_mut` defaulted method (§5.B) lands; every text widget
       holding a `WidgetFont` overrides it; non-text widgets keep the `None`
       default. No `Widget` signature change; existing widget goldens unchanged.
-- [ ] `apply_font_registry` (§5.C) lands over `resolve_tree_with_text`; a test
+      *`core/src/widget.rs`; 23 `widgets::` + `ui::Input`/`Textarea` (via inner
+      `Label`)/`FileBrowser` overrides; all goldens pass unchanged.*
+- [x] `apply_font_registry` (§5.C) lands over `resolve_tree_with_text`; a test
       builds a small tree with a non-default `font_id` (via theme/local
       `StylePatch.font_id`) and asserts the mapped handle reaches the widget's
       resolved font (e.g. line metrics change from `FONT_6X10`).
-- [ ] Precedence + idempotency test (§5.D): registered `font_id` overrides;
+      *`core/src/font.rs::apply_font_registry`;
+      `apply_sets_widget_font_from_cascade_font_id` (line_height 20 → 10).*
+- [x] Precedence + idempotency test (§5.D): registered `font_id` overrides;
       `DEFAULT`/unmapped preserves a prior explicit `set_font`; re-running the
-      pass is stable.
-- [ ] Inheritance test: a child with no own `font_id` inherits the parent's
+      pass is stable. *`default_font_id_preserves_explicit_set_font`,
+      `unmapped_font_id_preserves_explicit_set_font`, `apply_is_idempotent`.*
+- [x] Inheritance test: a child with no own `font_id` inherits the parent's
       registered font through the pass (reusing the cascade's inheritance).
-- [ ] `cargo fmt`, per-crate `clippy -D warnings`, core/widgets/ui tests pass;
+      *`child_inherits_registered_font_via_cascade`.*
+- [x] `cargo fmt`, per-crate `clippy -D warnings`, core/widgets/ui tests pass;
       widget goldens unchanged (default-`font_id` trees render identically).
-- [ ] FONT-00 §15 + concepts README updated; FONT retrospective §8 amended (this
+      *`untouched_tree_keeps_default_font` pins the no-`font_id` path at
+      `FONT_6X10`.*
+- [x] FONT-00 §15 + concepts README updated; FONT retrospective §8 amended (this
       is the FC2 reopen the retrospective anticipated) or a FONT-05 close note
       added at completion.
 
@@ -301,3 +322,24 @@ revisited if a theming use case demands it, via a §15 amendment.)
   methods is ratified — proceed"). FONT-00 §5.D amended in the same change to
   permit one defaulted `Widget` method (the §5.B font sink), with a FONT-00 §15
   reopen entry. §5.A–§5.E frozen; implementation begins.
+- **2026-06-15** — §5.A refinement during implementation: `FontRegistry` gains a
+  lifetime `'a` on its borrowed entry table (`FontRegistry<'a>`); the draft said
+  "needs no lifetime parameter." Forced by the type system, not preference:
+  `&dyn FontMetrics` is `!Sync` so a module-level `static` entry table is
+  rejected, and the `dyn` unsizing coercion blocks rvalue static promotion of an
+  inline `&[…]`, so a `&'static` entry slice cannot be constructed ergonomically.
+  Borrowing the table for `'a` (handles stay `&'static dyn FontMetrics`) fixes
+  both. No change to `resolve`'s return, the §5.B sink, the §5.C pass, or §5.D
+  precedence; the app still owns the registry + table (§5.E). `EMPTY` is
+  `FontRegistry<'static>`.
+- **2026-06-15** — FONT-05 complete (§12 all boxed). Landed `FontRegistry<'a>` +
+  `apply_font_registry` (`core/src/font.rs`), the defaulted
+  `Widget::widget_font_mut` sink (`core/src/widget.rs`), overrides on 23
+  `widgets::` widgets + `ui::Input`/`Textarea`/`FileBrowser`, and 7
+  conformance tests (`core/tests/font_registry.rs`): registry hit/miss/default,
+  cascade→widget bridge (line height 20→10), DEFAULT/unmapped precedence,
+  idempotency, cascade inheritance, and the untouched-tree backward-compat pin.
+  fmt + clippy(`-D warnings`, core/widgets/ui all-targets) + core/widgets/ui
+  tests green; widget goldens unchanged. The FONT initiative's last
+  deferred-Coupled carry-forward (FONT-00 §5.C / retrospective FC2) is
+  discharged; broader `ResolvedStyle` consumption remains LPAR-07 territory.

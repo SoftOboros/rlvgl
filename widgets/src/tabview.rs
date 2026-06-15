@@ -380,6 +380,10 @@ impl Widget for Tabview {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn set_bounds(&mut self, bounds: Rect) {
         self.bounds = bounds;
         // Geometry is derived lazily from bounds + bar_pos + bar_thickness.

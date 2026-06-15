@@ -59,6 +59,10 @@ impl Widget for Checkbox {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
         let r = self.style.radius;
