@@ -446,13 +446,25 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 
 ### 12.D FONT-04 — Rotated-renderer throughput (§8)
 
-- [ ] `RotatedRenderer` blits glyph coverage via rotate-bitmap-then-blit
-      (§8.B), not per-pixel dispatch.
-- [ ] A parity check asserts the rotated path matches the software reference
-      within LPAR-08 §5.H tolerance.
-- [ ] Bounded scratch, no render-loop heap (§8.C); `platform` discipline
-      scanner green (§8.D).
-- [ ] `make build-disco` builds; per-crate `clippy`/tests green.
+- [x] `RotatedRenderer` blits glyph coverage via rotate-bitmap-then-blit
+      (§8.B), not per-pixel dispatch. *`RotatedRenderer::draw_glyph` +
+      `draw_text_shaped` overrides route through a private
+      `blit_glyph_coverage_rotated` that rotates the A8 coverage once (mirroring
+      `draw_pixels` / the DMA2D `draw_glyph_rotated` formula) and emits physical
+      rows via `inner.blend_row`. Mechanism test asserts 3 rows / 0
+      `blend_rect`.*
+- [x] A parity check asserts the rotated path matches the software reference
+      within LPAR-08 §5.H tolerance. *`platform/tests/font_rotated_glyph.rs::rotated_glyph_matches_software_reference_exactly`
+      — drift is **zero** (exact byte equality after un-rotation), well inside
+      §5.H.*
+- [x] Bounded scratch, no render-loop heap (§8.C); `platform` discipline
+      scanner green (§8.D). *4 KiB `static SCRATCH_COV` in `.rlvgl_blit_scratch`
+      (sibling to the Color `SCRATCH`), `// rlvgl-discipline: allow(static_mut)`
+      + SAFETY note; oversize glyphs fall back to the correct per-pixel path.
+      `cargo test -p rlvgl-platform --test discipline` green.*
+- [x] `make build-disco` builds; per-crate `clippy`/tests green. *ELF/hex/bin
+      emitted; `clippy -p rlvgl-platform --all-targets -D warnings` +
+      platform/core/widgets/ui tests green.*
 
 ### 12.E Initiative
 
@@ -590,3 +602,28 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   `cargo check` green. fmt + per-crate `clippy -D warnings` + core/widgets/ui/
   platform tests all green; pre-existing widget goldens unchanged. FONT-04
   (rotated-renderer throughput) is the last phase.
+- **2026-06-15** — FONT-04 complete (§12.D all boxed). `RotatedRenderer` now
+  overrides `draw_glyph` and `draw_text_shaped` to rotate each glyph's A8
+  coverage once into a bounded scratch and emit physical rows through
+  `inner.blend_row`, instead of dispatching every coverage pixel as a 1×1
+  `blend_rect` through the rotation layer (§8.B). The shared private
+  `blit_glyph_coverage_rotated` mirrors the existing `draw_pixels` rotate-then-
+  blit and the DMA2D `draw_glyph_rotated` reference: landscape `(col,row)` →
+  `scratch[col*h + (h-1-row)]`, placed at `(fb_width - extent.y - h, extent.x)`.
+  Scratch is a 4 KiB `static SCRATCH_COV` in `.rlvgl_blit_scratch` (sibling to
+  the Color `SCRATCH`, kept off the MSP stack-growth path per disco ERRATA-005),
+  marked `allow(static_mut)` with a SAFETY note (§8.C); glyphs exceeding 64×64
+  fall back to the correct per-pixel path. Because `inner.blend_row` performs
+  the same source-over the per-pixel path would, output is **identical** — the
+  parity fixture (`platform/tests/font_rotated_glyph.rs`) asserts zero-drift
+  byte equality against the software reference after un-rotation, and the
+  mechanism fixture asserts the row-blit dispatch (3 rows / 0 `blend_rect`).
+  Discipline scanner green (§8.D); `make build-disco` builds; clippy/tests
+  green. **Known limitation (deferred-Safe):** clip-wrapped widgets (e.g.
+  `Label` via its internal `ClipRenderer`) still funnel glyph coverage through
+  `ClipRenderer::blend_row` → `RotatedRenderer::blend_row` (per-pixel, row→column
+  forbids forwarding per §8.B), so the override accelerates direct
+  `draw_glyph`/`draw_text_shaped` callers (`ArcLabel`, `config_menu`) but not
+  the clipped `Label` path. A clip-aware rotated coverage path is orthogonal
+  future work. FONT v1 phases FONT-01..04 are all complete; §12.E initiative
+  close (CHANGELOG / concepts README / retrospective) remains.

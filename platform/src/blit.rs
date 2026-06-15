@@ -21,6 +21,7 @@ use alloc::{collections::BTreeMap, vec};
 use bitflags::bitflags;
 use heapless::Vec as HVec;
 use rlvgl_core::cmd::{BlendMode, Cmd, CommandList};
+use rlvgl_core::font::{FontMetrics, ShapedText};
 #[cfg(feature = "fontdue")]
 use rlvgl_core::fontdue::{Metrics, line_metrics, rasterize_glyph};
 use rlvgl_core::renderer::Renderer;
@@ -940,6 +941,96 @@ impl<'a> RotatedRenderer<'a> {
             fb_width: fb_width as i32,
         }
     }
+
+    /// FONT-04 §8.B: rotate a glyph's A8 coverage once into a bounded scratch
+    /// buffer and emit it as physical (portrait) rows through
+    /// `inner.blend_row`, instead of dispatching every coverage pixel through
+    /// the rotation as a 1×1 `blend_rect`.
+    ///
+    /// `extent` is the glyph's tight bitmap rect in *landscape* coordinates.
+    /// The rotation mirrors [`Self::draw_pixels`] / the DMA2D
+    /// `draw_glyph_rotated` reference: landscape `(col,row)` →
+    /// `scratch[col*h + (h-1-row)]`, physical size `h` wide × `w` tall, placed
+    /// at `(fb_width - extent.y - h, extent.x)`. Because `inner.blend_row`
+    /// performs the same per-pixel source-over (`alpha = color.a·cov/255`) the
+    /// per-pixel path would, the rendered pixels are identical — this is a
+    /// throughput change only (§8.A).
+    ///
+    /// Returns `false` when `font` has no coverage for `ch` (the caller falls
+    /// back to an extent rect), matching the core `draw_glyph` contract.
+    fn blit_glyph_coverage_rotated(
+        &mut self,
+        font: &dyn FontMetrics,
+        ch: char,
+        extent: WidgetRect,
+        color: Color,
+    ) -> bool {
+        let w = extent.width;
+        let h = extent.height;
+        if w <= 0 || h <= 0 {
+            return true; // zero-area glyph (e.g. space) — nothing to draw
+        }
+        let (wu, hu) = (w as usize, h as usize);
+
+        // Bounded scratch (§8.C): no per-glyph heap in the render loop.
+        const BOUND: usize = 64 * 64;
+        if wu <= 64 && hu <= 64 && wu * hu <= BOUND {
+            // 2026-06-15 (FONT-04): A8 coverage scratch, sibling to the Color
+            // SCRATCH in `draw_pixels`. Same `.rlvgl_blit_scratch` placement so
+            // consumers' linker scripts keep it off the MSP stack-growth path
+            // (see the draw_pixels SCRATCH comment + disco ERRATA-005).
+            #[cfg_attr(target_os = "none", unsafe(link_section = ".rlvgl_blit_scratch"))]
+            static mut SCRATCH_COV: [u8; BOUND] = [0u8; BOUND]; // rlvgl-discipline: allow(static_mut)
+
+            // SAFETY: single-core, single-threaded — `RotatedRenderer` is used
+            // only from the main render loop, never an ISR. The scratch is
+            // unique to this call site, not borrowed across calls; we fully
+            // write the `[..wu*hu]` prefix before reading it back below.
+            let scratch = unsafe { &mut SCRATCH_COV[..wu * hu] };
+
+            // Gather each landscape coverage row and scatter it into the
+            // rotated (portrait) layout in one pass.
+            let mut row_buf = [0u8; 64];
+            for row in 0..hu {
+                let cov_row = &mut row_buf[..wu];
+                if !font.glyph_coverage_row(ch, row as u16, 0, cov_row) {
+                    return false;
+                }
+                for (col, &cov) in cov_row.iter().enumerate() {
+                    scratch[col * hu + (hu - 1 - row)] = cov;
+                }
+            }
+
+            // Physical placement mirrors `fill_rect`/`draw_pixels`.
+            let fb_x = self.fb_width - extent.y - h;
+            let fb_y = extent.x;
+            // Emit `w` physical rows of `h` coverage bytes each; inner clips x
+            // and blends source-over (preserving cov-0 holes).
+            for py in 0..wu {
+                let run = &scratch[py * hu..py * hu + hu];
+                self.inner.blend_row(fb_x, fb_y + py as i32, color, run);
+            }
+            true
+        } else {
+            // Oversize fallback: the correct per-pixel rotated path
+            // (`self.blend_row` default → rotated 1×1 `blend_rect`). Rare — the
+            // disco widget path draws no glyphs this large.
+            let mut chunk = [0u8; 64];
+            for row in 0..hu {
+                let mut x_off = 0usize;
+                while x_off < wu {
+                    let n = (wu - x_off).min(chunk.len());
+                    let part = &mut chunk[..n];
+                    if !font.glyph_coverage_row(ch, row as u16, x_off as u16, part) {
+                        return false;
+                    }
+                    self.blend_row(extent.x + x_off as i32, extent.y + row as i32, color, part);
+                    x_off += n;
+                }
+            }
+            true
+        }
+    }
 }
 
 impl Renderer for RotatedRenderer<'_> {
@@ -1013,6 +1104,55 @@ impl Renderer for RotatedRenderer<'_> {
         let fx = self.fb_width - 1 - position.1;
         if fx >= 0 {
             self.inner.draw_text((fx, position.0), text, color);
+        }
+    }
+
+    fn draw_glyph(&mut self, font: &dyn FontMetrics, ch: char, origin: (i32, i32), color: Color) {
+        // FONT-04 §8.B: rotate the glyph's coverage once and blit rows through
+        // `inner.blend_row`, rather than the per-pixel `blend_rect` the
+        // trait-default `draw_glyph` → `blend_row` would dispatch on this
+        // rotated wrapper. `origin` is the baseline pen position (same anchor
+        // as the core default); derive the landscape extent from the metrics.
+        let Some(info) = font.glyph_metrics(ch) else {
+            return;
+        };
+        let extent = WidgetRect {
+            x: origin.0 + info.bearing_x as i32,
+            y: origin.1 - info.bearing_y as i32,
+            width: info.width as i32,
+            height: info.height as i32,
+        };
+        if extent.width <= 0 || extent.height <= 0 {
+            return;
+        }
+        if !self.blit_glyph_coverage_rotated(font, ch, extent, color) {
+            // No coverage for this glyph: deterministic extent rect (rotated),
+            // matching the core `draw_glyph` fallback.
+            self.blend_rect(extent, color);
+        }
+    }
+
+    fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, origin: (i32, i32), color: Color) {
+        // Mirror the core default's per-glyph structure, but route coverage
+        // through the rotate-then-blit helper (FONT-04 §8.B). Reached by
+        // callers that draw onto the rotated renderer without an intervening
+        // clip wrapper; clip-wrapped widgets (e.g. `Label`) still funnel
+        // through `blend_row` and are unaffected.
+        let font = shaped.font;
+        for glyph in &shaped.glyphs {
+            let mut extent = glyph.extent();
+            extent.x += origin.0;
+            extent.y += origin.1;
+            if extent.width <= 0 || extent.height <= 0 {
+                continue;
+            }
+            let drawn = match font {
+                Some(font) => self.blit_glyph_coverage_rotated(font, glyph.ch, extent, color),
+                None => false,
+            };
+            if !drawn {
+                self.blend_rect(extent, color);
+            }
         }
     }
 
