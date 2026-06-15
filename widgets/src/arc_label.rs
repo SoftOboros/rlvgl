@@ -21,8 +21,10 @@
 //! ## Drawing
 //!
 //! `Part::MAIN` — widget background.  Per-glyph calls go through
-//! [`Renderer::draw_text`] at each computed (x, y) position so they compose
-//! correctly with clip adapters and the `no_std` reference renderer.
+//! [`Renderer::draw_glyph`] at each computed (x, y) position, which renders the
+//! glyph's coverage through the shared `glyph_coverage_row` → `blend_row` path
+//! (FONT-00 §7).  The resolved font (assigned via [`ArcLabel::set_font`], or
+//! `FONT_6X10` when unset) supplies both advance metrics and coverage.
 //!
 //! ## `no_std`
 //!
@@ -44,7 +46,7 @@ use libm::{cosf, sinf};
 
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
-use rlvgl_core::font::FontMetrics;
+use rlvgl_core::font::{FontMetrics, WidgetFont};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -96,10 +98,10 @@ pub struct ArcLabel {
     angle_size: f32,
     dir: ArcLabelDir,
     align: ArcLabelAlign,
-    /// Optional font providing glyph metrics.  When `None`, each character is
-    /// drawn via [`Renderer::draw_text`] at 8 px column spacing (deterministic
-    /// fallback; no `FontMetrics` needed).
-    font: Option<&'static dyn FontMetrics>,
+    /// Font selection (FONT-00 §5/§7).  Resolves to the built-in `FONT_6X10`
+    /// when unset, so every glyph has real metrics and coverage — there is no
+    /// font-less fallback advance.
+    font: WidgetFont,
 }
 
 impl ArcLabel {
@@ -118,7 +120,7 @@ impl ArcLabel {
             angle_size: 360.0,
             dir: ArcLabelDir::Clockwise,
             align: ArcLabelAlign::Leading,
-            font: None,
+            font: WidgetFont::new(),
         }
     }
 
@@ -192,12 +194,14 @@ impl ArcLabel {
 
     // ── font ──────────────────────────────────────────────────────────────
 
-    /// Assign a `FontMetrics` implementation for per-glyph advance measurement.
+    /// Assign the font used for per-glyph advance measurement *and* glyph
+    /// coverage (FONT-00 §5/§7).
     ///
     /// The reference must have `'static` lifetime so that `ArcLabel` can be
-    /// stored in a `Widget` tree without lifetime parameters.
+    /// stored in a `Widget` tree without lifetime parameters. With no
+    /// assignment the arc renders with the built-in `FONT_6X10`.
     pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
-        self.font = Some(font);
+        self.font.set(font);
     }
 
     // ── geometry helpers ──────────────────────────────────────────────────
@@ -222,23 +226,21 @@ impl ArcLabel {
     }
 
     /// Return the angular advance (in radians) for `ch` using
-    /// `FontMetrics::glyph_metrics` when a font is configured, or a 8 px
-    /// fixed fallback otherwise.
+    /// `FontMetrics::glyph_metrics` on the resolved font (FONT-00 §7.D — the
+    /// font-less 8 px fallback is gone; an unset font resolves to `FONT_6X10`).
+    /// Glyphs with no metrics fall back to half the line height.
     ///
     /// This is the normative LPAR-15 §5.E formula:
     /// `Δθ = advance_px / radius`
     fn glyph_delta_theta(&self, ch: char, radius: f32) -> f32 {
-        let advance_px = match self.font {
-            Some(font) => match font.glyph_metrics(ch) {
-                Some(info) => info.advance_fp16 as f32 / 16.0,
-                None => {
-                    // Fall back to half the line height.
-                    let lm = font.line_metrics();
-                    (lm.line_height as f32 + 1.0) / 2.0
-                }
-            },
-            // No font: use a fixed 8 px advance for each character.
-            None => 8.0,
+        let font = self.font.resolve();
+        let advance_px = match font.glyph_metrics(ch) {
+            Some(info) => info.advance_fp16 as f32 / 16.0,
+            None => {
+                // Glyph absent from the font: fall back to half the line height.
+                let lm = font.line_metrics();
+                (lm.line_height as f32 + 1.0) / 2.0
+            }
         };
         if radius <= 0.0 {
             0.0
@@ -264,7 +266,9 @@ impl Widget for ArcLabel {
     ///
     /// `Part::MAIN` — widget background.
     /// Per-glyph — each character is placed at its computed arc position and
-    /// drawn via [`Renderer::draw_text`].
+    /// drawn via [`Renderer::draw_glyph`], which renders the glyph's coverage
+    /// (FONT-00 §7.A) at the arc origin (treated as the glyph baseline pen
+    /// position). Glyphs stay upright (§7.C).
     fn draw(&self, renderer: &mut dyn Renderer) {
         draw_widget_bg(renderer, self.bounds, &self.style);
 
@@ -272,6 +276,7 @@ impl Widget for ArcLabel {
             return;
         }
 
+        let font = self.font.resolve();
         let radius = self.effective_radius();
         let (cx, cy) = self.center();
         let dir_sign: f32 = match self.dir {
@@ -315,14 +320,12 @@ impl Widget for ArcLabel {
                 break;
             }
 
-            // Place the glyph at (cx + r·cos(θ), cy + r·sin(θ)).
+            // Place the glyph at (cx + r·cos(θ), cy + r·sin(θ)). The arc origin
+            // is the glyph's baseline pen position; `draw_glyph` derives the
+            // bitmap extent from the font metrics and renders coverage there.
             let gx = cx + radius * cosf(cursor_rad);
             let gy = cy + radius * sinf(cursor_rad);
-
-            // Build a one-character string slice on the stack via a small buffer.
-            let mut buf = [0u8; 4];
-            let s = ch.encode_utf8(&mut buf);
-            renderer.draw_text((gx as i32, gy as i32), s, self.text_color);
+            renderer.draw_glyph(font, ch, (gx as i32, gy as i32), self.text_color);
 
             cursor_rad += dir_sign * delta;
             accumulated_span += delta;
@@ -387,12 +390,15 @@ mod tests {
         }
     }
 
-    /// Collect draw_text calls.
-    struct TextRecorder {
-        calls: alloc::vec::Vec<(i32, i32, String)>,
+    /// Collect per-glyph `draw_glyph` calls (origin + char). Overriding the
+    /// defaulted `draw_glyph` records the glyph placement without invoking the
+    /// coverage path, so the geometry assertions stay glyph-granular after the
+    /// FONT-03 migration off `draw_text`.
+    struct GlyphRecorder {
+        calls: alloc::vec::Vec<(i32, i32, char)>,
     }
 
-    impl TextRecorder {
+    impl GlyphRecorder {
         fn new() -> Self {
             Self {
                 calls: alloc::vec::Vec::new(),
@@ -400,11 +406,17 @@ mod tests {
         }
     }
 
-    impl Renderer for TextRecorder {
+    impl Renderer for GlyphRecorder {
         fn fill_rect(&mut self, _r: Rect, _c: Color) {}
-        fn draw_text(&mut self, pos: (i32, i32), text: &str, _color: Color) {
-            self.calls
-                .push((pos.0, pos.1, alloc::string::String::from(text)));
+        fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
+        fn draw_glyph(
+            &mut self,
+            _font: &dyn FontMetrics,
+            ch: char,
+            origin: (i32, i32),
+            _color: Color,
+        ) {
+            self.calls.push((origin.0, origin.1, ch));
         }
     }
 
@@ -417,7 +429,7 @@ mod tests {
         al.set_font(&FIXED_FONT);
         al.set_radius(50);
         al.set_angle_size(360.0);
-        let mut r = TextRecorder::new();
+        let mut r = GlyphRecorder::new();
         al.draw(&mut r);
         // 3 text draws (one per character) plus potentially a bg fill rect.
         assert_eq!(r.calls.len(), 3, "one draw_text call per glyph (3 chars)");
@@ -432,10 +444,11 @@ mod tests {
         let radius = 100.0_f32;
         let al = ArcLabel::new(rect(0, 0, 300, 300));
         let delta = al.glyph_delta_theta('A', radius);
-        // The font is not set, so the no-font fallback (8 px) is used.
+        // No font set → resolves to FONT_6X10 (FONT-00 §7.D, no font-less
+        // fallback). FONT_6X10 'A' advance is 14 px (advance_fp16 = 14*16).
         assert!(
-            (delta - 8.0 / 100.0).abs() < 1e-4,
-            "fallback Δθ = advance/r"
+            (delta - 14.0 / 100.0).abs() < 1e-4,
+            "default-font Δθ = FONT_6X10 advance/r"
         );
 
         let mut al2 = ArcLabel::new(rect(0, 0, 300, 300));
@@ -459,7 +472,7 @@ mod tests {
         al.set_radius(80);
         al.set_angle_start(0.0);
         al.set_dir(ArcLabelDir::Clockwise);
-        let mut r = TextRecorder::new();
+        let mut r = GlyphRecorder::new();
         al.draw(&mut r);
         assert_eq!(r.calls.len(), 2);
         let (x0, _, _) = r.calls[0];
@@ -485,7 +498,7 @@ mod tests {
         al_cw.set_radius(80);
         al_cw.set_angle_start(0.0);
         al_cw.set_dir(ArcLabelDir::Clockwise);
-        let mut r_cw = TextRecorder::new();
+        let mut r_cw = GlyphRecorder::new();
         al_cw.draw(&mut r_cw);
 
         let mut al_ccw = ArcLabel::new(rect(0, 0, 200, 200));
@@ -494,7 +507,7 @@ mod tests {
         al_ccw.set_radius(80);
         al_ccw.set_angle_start(0.0);
         al_ccw.set_dir(ArcLabelDir::CounterClockwise);
-        let mut r_ccw = TextRecorder::new();
+        let mut r_ccw = GlyphRecorder::new();
         al_ccw.draw(&mut r_ccw);
 
         // The first glyph of both sits at angle_start=0 (same position);
@@ -532,7 +545,7 @@ mod tests {
             al.set_angle_size(360.0);
             al.set_dir(ArcLabelDir::Clockwise);
             al.set_align(align);
-            let mut rec = TextRecorder::new();
+            let mut rec = GlyphRecorder::new();
             al.draw(&mut rec);
             rec.calls[0].0 // x of first glyph
         };
@@ -564,7 +577,7 @@ mod tests {
         // Allow only 0.5 rad ≈ 28.6°; that fits about 3 glyphs (3×0.16=0.48).
         al.set_angle_size(28.6);
         al.set_dir(ArcLabelDir::Clockwise);
-        let mut r = TextRecorder::new();
+        let mut r = GlyphRecorder::new();
         al.draw(&mut r);
         // Should have truncated before all 8 chars.
         assert!(

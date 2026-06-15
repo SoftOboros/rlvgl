@@ -52,6 +52,47 @@ pub trait Renderer {
         }
     }
 
+    /// Draw a single glyph's coverage with its pen origin on the baseline at
+    /// `origin` (the same anchor convention as [`draw_text`](Self::draw_text)).
+    ///
+    /// The glyph's tight bitmap extent is derived from `font`'s metrics for
+    /// `ch` (bearing + width/height), and coverage flows through
+    /// [`blend_row`](Self::blend_row) — identical to the per-glyph path inside
+    /// [`draw_text_shaped`](Self::draw_text_shaped). When `font` provides no
+    /// coverage for `ch`, the default falls back to a deterministic extent
+    /// rectangle via [`blend_rect`](Self::blend_rect); a glyph with no metrics
+    /// (or a zero-area extent, e.g. a space) draws nothing.
+    ///
+    /// This is a defaulted convenience for widgets that place glyphs
+    /// individually rather than along one baseline — e.g.
+    /// [`ArcLabel`](https://docs.rs/rlvgl-widgets) (FONT-00 §7.B). Shaped runs
+    /// should use [`draw_text_shaped`](Self::draw_text_shaped). Backends MAY
+    /// override this for glyph-blit acceleration (FONT-00 §8.B).
+    fn draw_glyph(
+        &mut self,
+        font: &dyn crate::font::FontMetrics,
+        ch: char,
+        origin: (i32, i32),
+        color: Color,
+    ) {
+        let Some(info) = font.glyph_metrics(ch) else {
+            return;
+        };
+        let extent = Rect {
+            x: origin.0 + info.bearing_x as i32,
+            y: origin.1 - info.bearing_y as i32,
+            width: info.width as i32,
+            height: info.height as i32,
+        };
+        if extent.width <= 0 || extent.height <= 0 {
+            return;
+        }
+        if draw_glyph_coverage(self, font, ch, extent, color) {
+            return;
+        }
+        self.blend_rect(extent, color);
+    }
+
     /// Blend a rectangle onto the target, honoring the alpha channel of `color`
     /// for source-over compositing.
     ///

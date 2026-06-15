@@ -44,15 +44,25 @@ impl FontMetrics for FixedFont {
 
 static FIXED_FONT: FixedFont = FixedFont;
 
-/// Records the integer `(x, y)` origin of each `draw_text` call.
+/// Records the integer `(x, y)` baseline origin of each per-glyph
+/// `draw_glyph` call (FONT-03 migrated `ArcLabel` off `draw_text`). Overriding
+/// the defaulted `draw_glyph` captures the placement without running the
+/// coverage path, keeping the geometry assertion glyph-granular.
 struct PositionRecorder {
     calls: Vec<(i32, i32)>,
 }
 
 impl Renderer for PositionRecorder {
     fn fill_rect(&mut self, _r: Rect, _c: Color) {}
-    fn draw_text(&mut self, pos: (i32, i32), _text: &str, _color: Color) {
-        self.calls.push(pos);
+    fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
+    fn draw_glyph(
+        &mut self,
+        _font: &dyn FontMetrics,
+        _ch: char,
+        origin: (i32, i32),
+        _color: Color,
+    ) {
+        self.calls.push(origin);
     }
 }
 

@@ -419,18 +419,30 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 
 ### 12.C FONT-03 — ArcLabel migration (§7)
 
-- [ ] `ArcLabel` adopts `WidgetFont`/`set_font` (moved here from FONT-01): its
+- [x] `ArcLabel` adopts `WidgetFont`/`set_font` (moved here from FONT-01): its
       `font: Option<...>` field becomes `WidgetFont`, the no-font 8 px advance
       fallback is replaced by the resolved `FONT_6X10`, and the colocated
       advance test is updated to the new metrics. Public `set_font` signature
-      unchanged.
-- [ ] `ArcLabel::draw` renders glyph coverage at each arc origin via the §7.B
+      unchanged. *`glyph_delta_theta` now resolves through `WidgetFont`; the
+      `angular_spacing_uses_shared_font_metric` test asserts the `FONT_6X10`
+      'A' advance (14 px) for an unset font.*
+- [x] `ArcLabel::draw` renders glyph coverage at each arc origin via the §7.B
       public glyph helper; the `renderer.draw_text` call is removed.
-- [ ] The §7.B helper is a defaulted/free addition breaking no existing
+      *`renderer.draw_glyph(font, ch, (gx,gy), color)` per glyph.*
+- [x] The §7.B helper is a defaulted/free addition breaking no existing
       `Renderer` impl, reusing `glyph_coverage_row` → `blend_row`.
-- [ ] An ArcLabel coverage fixture asserts real glyph pixels (not opaque
+      *`Renderer::draw_glyph` defaulted method (`core/src/renderer.rs`), routes
+      to the existing private `draw_glyph_coverage`; baseline pen-origin anchor,
+      extent-rect fallback when the font lacks coverage. ClipRenderer needs no
+      override (the default routes through its own clipped `blend_row`).*
+- [x] An ArcLabel coverage fixture asserts real glyph pixels (not opaque
       extent rects) at expected arc positions.
-- [ ] `config_menu.rs:608` migrated or noted as an explicit example deferral.
+      *`widgets/tests/font_arc_label_coverage.rs` — partial-alpha at the
+      computed arc origin + cov-0 holes keeping the bg (the anti-extent-rect
+      anchor).*
+- [x] `config_menu.rs:608` migrated. *Close-"X" fallback now uses
+      `renderer.draw_glyph(self.font, 'X', …)`; disco `cargo check`
+      (`thumbv7em-none-eabihf`, `cm7,splash,desktop,dma2d`) green.*
 
 ### 12.D FONT-04 — Rotated-renderer throughput (§8)
 
@@ -556,3 +568,25 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   survives the real widget path `Label::draw → ClipRenderer → draw_text_shaped
   → draw_glyph_coverage → blend_row`; no new rasterization (§6.A). FONT-03
   (ArcLabel) and FONT-04 (rotated throughput) remain.
+- **2026-06-15** — FONT-03 complete (§12.C all boxed). Closed the last
+  legacy-`draw_text` widget. (1) Added the §7.B single-glyph helper as a
+  defaulted `Renderer::draw_glyph(font, ch, origin, color)` method
+  (`core/src/renderer.rs`) — baseline pen-origin anchor, derives the bitmap
+  extent from `glyph_metrics` and routes coverage through the existing private
+  `draw_glyph_coverage` → `blend_row`, with an extent-rect fallback when the
+  font lacks coverage; breaks no existing `Renderer` impl (`ClipRenderer` needs
+  no override since the default routes through its own clipped `blend_row`).
+  (2) `ArcLabel` adopted `WidgetFont` (field `Option<…>` → `WidgetFont`,
+  `set_font` forwards, public signature unchanged); the no-font 8 px advance
+  fallback was deleted — an unset font resolves to `FONT_6X10`, so every glyph
+  has real metrics + coverage (§7.D). (3) `ArcLabel::draw` now calls
+  `renderer.draw_glyph` per glyph at the arc origin instead of `draw_text`
+  (§7.A); glyphs stay upright (§7.C). (4) Colocated tests migrated to record
+  `draw_glyph` (origins unchanged); the advance test asserts the `FONT_6X10`
+  'A' advance. (5) New fixture `widgets/tests/font_arc_label_coverage.rs`
+  asserts real coverage at the computed arc origin (partial-alpha pixels +
+  cov-0 holes keeping the background — the anti-extent-rect anchor). (6) Example
+  `config_menu.rs:608` close-"X" fallback migrated to `draw_glyph`; disco
+  `cargo check` green. fmt + per-crate `clippy -D warnings` + core/widgets/ui/
+  platform tests all green; pre-existing widget goldens unchanged. FONT-04
+  (rotated-renderer throughput) is the last phase.
