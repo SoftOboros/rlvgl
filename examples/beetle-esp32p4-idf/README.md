@@ -19,6 +19,33 @@ It is intentionally separate from the raw-PAC Rust example in
 - continuously fill the RGB888 framebuffer with red, green, blue, white,
   and black frames.
 
+## rlvgl Hybrid (BEETLE M1)
+
+By default this app no longer cycles solid colors — it renders an **rlvgl
+widget tree** into the DPI framebuffer. The split is deliberate:
+
+- **C owns the hardware.** `main/dfr0550_idf_compare.c` keeps the full,
+  known-locking IDF bring-up (PSRAM, LDO_VO3, I2C bridge wake,
+  `esp_lcd_new_dsi_bus`, `esp_lcd_new_panel_dpi`). None of the DSI/DPHY
+  path changed, so ERRATA-009 is side-stepped rather than fought.
+- **Rust owns the pixels.** `components/rlvgl_app/` builds a no_std Rust
+  staticlib (`librlvgl_app.a`, target `riscv32imafc-unknown-none-elf`,
+  ilp32f to match the IDF toolchain) that exposes one C ABI entry point,
+  `rlvgl_app_render(fb, w, h)` (see `components/rlvgl_app/include/rlvgl_app.h`).
+  It draws a real `rlvgl-core` + `rlvgl-widgets` tree through a small
+  self-contained RGB888 software renderer, straight into the DPI
+  framebuffer. The C loop calls it each refill iteration (the bridge needs
+  a continuous re-fill; a one-shot paint desyncs it) and then runs the
+  same `esp_cache_msync(..., C2M)` writeback the color fill used.
+
+The component's `CMakeLists.txt` runs `cargo build` via `ExternalProject`
+and imports the archive, so a normal `idf.py build` builds the Rust payload
+too. Prerequisites: `cargo` on `PATH` and
+`rustup target add riscv32imafc-unknown-none-elf`.
+
+To run the original solid-color control loop instead, enable
+`CONFIG_DFR0550_COLOR_CYCLE` (under "DFR0550 comparison" in `menuconfig`).
+
 ## Build And Flash
 
 ```sh

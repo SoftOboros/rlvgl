@@ -20,6 +20,8 @@
 #include "soc/mipi_dsi_host_reg.h"
 #include "soc/soc.h"
 
+#include "rlvgl_app.h"
+
 static const char *TAG = "dfr0550_idf";
 
 enum {
@@ -122,7 +124,7 @@ static void dphy_power_on(void)
     ESP_LOGI(TAG, "MIPI DSI PHY powered from LDO_VO3 at 2500 mV");
 }
 
-static esp_lcd_panel_handle_t panel_init(void **framebuffer)
+static esp_lcd_panel_handle_t panel_init(void **fb0, void **fb1)
 {
     esp_lcd_dsi_bus_handle_t dsi_bus = NULL;
     esp_lcd_dsi_bus_config_t bus_config = {
@@ -144,7 +146,7 @@ static esp_lcd_panel_handle_t panel_init(void **framebuffer)
         .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB888,
         .in_color_format = LCD_COLOR_FMT_RGB888,
         .out_color_format = LCD_COLOR_FMT_RGB888,
-        .num_fbs = 1,
+        .num_fbs = 2,   /* double-buffered: render off-screen, flip tear-free */
         .video_timing = {
             .h_size = DFR0550_H_RES,
             .v_size = DFR0550_V_RES,
@@ -163,8 +165,8 @@ static esp_lcd_panel_handle_t panel_init(void **framebuffer)
 
     ESP_ERROR_CHECK(esp_lcd_new_panel_dpi(dsi_bus, &dpi_config, &dpi_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(dpi_panel));
-    ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(dpi_panel, 1, framebuffer));
-    ESP_LOGI(TAG, "DPI framebuffer at %p (%u bytes)", *framebuffer, DFR0550_FB_BYTES);
+    ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(dpi_panel, 2, fb0, fb1));
+    ESP_LOGI(TAG, "DPI framebuffers at %p / %p (%u bytes each)", *fb0, *fb1, DFR0550_FB_BYTES);
     return dpi_panel;
 }
 
@@ -187,6 +189,7 @@ static void bridge_power_off(i2c_master_dev_handle_t bridge)
 }
 #endif
 
+#if CONFIG_DFR0550_COLOR_CYCLE
 static void fill_rgb888(void *framebuffer, uint8_t r, uint8_t g, uint8_t b)
 {
     uint8_t *fb = (uint8_t *)framebuffer;
@@ -198,6 +201,17 @@ static void fill_rgb888(void *framebuffer, uint8_t r, uint8_t g, uint8_t b)
     ESP_ERROR_CHECK(esp_cache_msync(framebuffer, DFR0550_FB_BYTES,
                                     ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED));
 }
+#endif
+
+#if !CONFIG_DFR0550_COLOR_CYCLE
+/* BEETLE M1: hand the framebuffer to the Rust rlvgl payload, then writeback. */
+static void render_rlvgl(void *framebuffer)
+{
+    rlvgl_app_render((uint8_t *)framebuffer, DFR0550_H_RES, DFR0550_V_RES);
+    ESP_ERROR_CHECK(esp_cache_msync(framebuffer, DFR0550_FB_BYTES,
+                                    ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED));
+}
+#endif
 
 void app_main(void)
 {
@@ -230,9 +244,10 @@ void app_main(void)
 
     dphy_power_on();
 
-    void *framebuffer = NULL;
-    (void)panel_init(&framebuffer);
+    void *fb[2] = {NULL, NULL};
+    esp_lcd_panel_handle_t panel = panel_init(&fb[0], &fb[1]);
 
+#if CONFIG_DFR0550_COLOR_CYCLE
     const uint8_t colors[][3] = {
         {255, 0, 0},
         {0, 255, 0},
@@ -242,10 +257,30 @@ void app_main(void)
     };
     const char *names[] = {"red", "green", "blue", "white", "black"};
 
+    (void)panel; /* color cycle writes the active buffer directly, no flip */
     for (size_t frame = 0;; frame++) {
         size_t idx = frame % (sizeof(colors) / sizeof(colors[0]));
         ESP_LOGI(TAG, "Fill %s", names[idx]);
-        fill_rgb888(framebuffer, colors[idx][0], colors[idx][1], colors[idx][2]);
+        fill_rgb888(fb[0], colors[idx][0], colors[idx][1], colors[idx][2]);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+#else
+    /*
+     * BEETLE M1: the Rust rlvgl payload owns the pixels. Double-buffered to
+     * avoid tearing — each iteration renders into the off-screen buffer, then
+     * esp_lcd_panel_draw_bitmap() flips it in on the panel's vertical blank.
+     * The continuous flip also satisfies the bridge's need for steady refresh
+     * activity (a one-shot paint desyncs it). esp_panel_init() leaves fb[0]
+     * active, so render starts on fb[1].
+     */
+    ESP_LOGI(TAG, "Rendering rlvgl widget tree (M1, double-buffered)");
+    int back = 1;
+    for (size_t frame = 0;; frame++) {
+        render_rlvgl(fb[back]);
+        ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel, 0, 0, DFR0550_H_RES,
+                                                  DFR0550_V_RES, fb[back]));
+        back ^= 1;
+        vTaskDelay(pdMS_TO_TICKS(33)); /* ~30 Hz refresh */
+    }
+#endif
 }

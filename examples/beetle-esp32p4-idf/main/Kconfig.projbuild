@@ -20,6 +20,15 @@ config DFR0550_POWER_OFF_AFTER_WAKE
         whether the visible cycling follows the DFR0550 I2C power/backlight
         path without using the ESP32-P4 MIPI-DSI host.
 
+config DFR0550_COLOR_CYCLE
+    bool "Cycle solid R/G/B/W/K fills instead of rendering rlvgl"
+    default n
+    help
+        Drive the original solid-color fill loop (the BEETLE-06 control
+        case) rather than the Rust rlvgl payload. Leave disabled to run
+        the M1 rlvgl-over-IDF path: librlvgl_app.a draws a widget tree
+        into the DPI framebuffer each refill iteration.
+
 config DFR0550_NO_TOUCH
     bool "Boot without touching the DFR0550 bridge or DSI host"
     default n
