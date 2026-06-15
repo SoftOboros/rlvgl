@@ -211,8 +211,23 @@ pixels of every existing widget/golden silently. AA is opt-in via `set_font`.
 Shipping a baked AA `PackedFont` inside `core` (so AA is available with zero
 external assets) is desirable but **deferred-Safe**: it requires choosing a
 font, a size, and a license-clean `.bin`, and it grows `core`. v1 selects the
-existing DejaVu `PackedFont` assets (disco example) for the AA fixture and any
-example. If a small core AA font lands later it is purely additive.
+existing DejaVu `PackedFont` assets (disco example) for **examples** that need
+real-world glyphs.
+
+The **AA conformance fixture** (§9), however, runs host-only under
+`widgets/tests/`, where the disco example's generated DejaVu glyph table
+(`crate::fonts::DEJAVU_SANS_24_GLYPHS`) is not reachable (it lives in the
+example crate, the wrong dependency direction). It therefore uses a
+**synthetic-but-real `PackedFont`** — a hand-authored `static PackedFont`
+whose glyph table carries deliberately multi-valued (intermediate-alpha)
+coverage data, the established host-test idiom
+(`core/tests/font_metrics.rs`, `widgets/src/motion/crawl/text.rs`). A synthetic
+`PackedFont` is a real `PackedFont` exercising the real `glyph_coverage_row` →
+`blend_row` path — it is an *AA font* per §3 (coverage spans `0..=255`) — so it
+satisfies §9.A's "real AA font" requirement while staying deterministic,
+license-free, and asset-free. Copying a DejaVu `.bin` + glyph table into
+`widgets/tests` is rejected as unnecessary weight. If a small core AA font
+lands later it is purely additive.
 
 ### 6.D AA coverage is sRGB-naive, matching the existing pipeline
 
@@ -322,6 +337,14 @@ rendered coverage, not just the advance.
 Per LPAR-16 §5.C/§5.D, the fixture lives under `widgets/tests/` (or
 `platform/tests/` if it needs `BlitterRenderer`), renders through the software-
 reference oracle path, and cites this section. It does not depend on hardware.
+The AA font is the synthetic `PackedFont` per §6.C. The `blend_row`-overriding
+renderer is a test-local true-source-over ARGB canvas: §9.A names
+`BlitterRenderer`/`PixelsRenderer` as equivalents, but a test-local canvas
+keeps the fixture in `widgets/tests` with no `platform` dependency and the same
+source-over contract (`out = src·a + dst·(1−a)`, `a = color.a·cov/255`). The
+fixture drives the font through `Label::set_font` so the assertion exercises the
+§5 selection mechanism end-to-end (`Label::draw` → `ClipRenderer` →
+`draw_text_shaped` → `draw_glyph_coverage` → `blend_row`).
 
 ## 10. Reconciliation vs Adjacent Repo Primitives
 
@@ -504,3 +527,15 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   WidgetFont conversion deferred-Safe. Purely additive; all existing goldens
   pass; fmt/clippy/tests green across core+widgets+ui. FONT-02 (AA + fixture),
   FONT-03 (ArcLabel), FONT-04 (rotated throughput) remain.
+- **2026-06-15** — FONT-02a §6.C / §9.C clarification, ahead of implementing the
+  AA conformance fixture. Froze that the host-only fixture uses a
+  **synthetic-but-real `PackedFont`** (hand-authored intermediate-alpha glyph
+  table, the `core/tests/font_metrics.rs` idiom) and a **test-local
+  true-source-over ARGB canvas** renderer, both under `widgets/tests/`, rather
+  than the disco example's DejaVu assets — whose generated glyph table
+  (`crate::fonts::DEJAVU_SANS_24_GLYPHS`) is unreachable from `widgets/tests`
+  (wrong dependency direction) — and rather than copying a `.bin` + glyph table
+  in. No change to the §9.A binding requirement (a real `PackedFont` AA font
+  asserted to produce a partial-alpha glyph pixel through a real
+  `blend_row`-overriding renderer, rendered twice for determinism) or to §6.B
+  (`FONT_6X10` stays the 1-bit default); DejaVu remains the example AA font.
