@@ -360,6 +360,15 @@ remaining gaps — font *selection* and anti-aliasing.
   (rotate-bitmap-then-blit, mirroring `Dma2dOverlayCtx`), and the AA
   conformance fixture (assert partial-alpha through a real
   `blend_row`-overriding renderer). Phases FONT-01..04 in §12.
+  **FONT-01..04 all complete 2026-06-15 (§12.A–§12.D boxed);** see the §15
+  change log for the per-phase landing record.
+  - [FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md) — initiative-completion
+    retrospective (2026-06-15). Captures the stale-premise divergence (the
+    "Label migration" was already done before the initiative began), the
+    synthetic-`PackedFont`-vs-DejaVu fixture refactor, the `ClipRenderer`
+    interception limitation on the rotated glyph fast path, deferred-work
+    reclassification, and forward constraints for the deferred `FontId`
+    theming-registry work.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

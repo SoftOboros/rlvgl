@@ -4,10 +4,11 @@ FONT-00-CONCEPTS.md — Font selection and anti-aliased widget text initiative.
 
 # FONT-00 — Font Selection and Anti-Aliased Widget Text
 
-**Status:** Ratified 2026-06-14. Normative for the FONT initiative
-(font-handle selection model, AA-coverage contract, ArcLabel shaped
-migration, rotated-renderer glyph throughput, and the AA conformance
-fixture). Implementation unblocked; phases FONT-01..04 per §12.
+**Status:** Ratified 2026-06-14; **all phases complete 2026-06-15**
+(FONT-01..04, §12.A–§12.E boxed; retrospective at
+[FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md)). Normative for the FONT
+initiative (font-handle selection model, AA-coverage contract, ArcLabel shaped
+migration, rotated-renderer glyph throughput, and the AA conformance fixture).
 
 Text substrate this builds on:
 [LPAR-08-TEXT-DRAW-IMAGE-MASK.md](LPAR-08-TEXT-DRAW-IMAGE-MASK.md) (shaped
@@ -468,11 +469,14 @@ independently conformant; FONT-01 is the prerequisite for the rest.
 
 ### 12.E Initiative
 
-- [ ] `docs/CHANGELOG.md` notes the FONT surface; `docs/concepts/README.md`
-      lists the FONT family.
-- [ ] `CLAUDE.md` Spec-Before-Code applicability + commit-prefix lists gain
+- [x] `docs/CHANGELOG.md` notes the FONT surface; `docs/concepts/README.md`
+      lists the FONT family. *CHANGELOG v0.2.4 "Added - FONT" subsection;
+      concepts README FONT section marked complete + retrospective linked.*
+- [x] `CLAUDE.md` Spec-Before-Code applicability + commit-prefix lists gain
       `FONT-NN[a-z]:` (this is itself a frozen-list edit; lands with §15).
-- [ ] FONT retrospective at completion per the CLAUDE.md discipline.
+      *Landed at ratification (`5cca5e4`); CLAUDE.md lines ~639/777.*
+- [x] FONT retrospective at completion per the CLAUDE.md discipline.
+      *[FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md) — §1–§7 + §8 change log.*
 
 ## 13. Files Cited
 
@@ -627,3 +631,15 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   the clipped `Label` path. A clip-aware rotated coverage path is orthogonal
   future work. FONT v1 phases FONT-01..04 are all complete; §12.E initiative
   close (CHANGELOG / concepts README / retrospective) remains.
+- **2026-06-15** — FONT initiative closed (§12.E all boxed). `docs/CHANGELOG.md`
+  gained an "Added - FONT" subsection under v0.2.4; `docs/concepts/README.md`
+  marks the FONT family FONT-01..04-complete and links the retrospective;
+  CLAUDE.md already carried the `FONT-NN[a-z]:` prefix + applicability entries
+  from ratification (`5cca5e4`). The initiative retrospective landed at
+  [FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md) (§1 outcome / §2 divergences
+  D1–D5 / §3 refactors RP1–RP3 / §4 patterns MP1–MP5 / §5 deferred
+  reclassification / §6 forward constraints FC1–FC4 / §7 provenance / §8 log).
+  All four phases shipped; no phase closed-with-deferral. The one named
+  carry-forward is the `FontId → handle` theming registry (deferred-Coupled on
+  the LPAR-07 style owner, §5.C / FC2); the rotated `Label` clip path (D5) and a
+  core AA font are deferred-Safe.

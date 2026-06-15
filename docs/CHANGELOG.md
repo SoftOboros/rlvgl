@@ -20,6 +20,25 @@ LPAR parity substrate and widget-family release.
 - LPAR-16 conformance fixtures across deterministic runtime behavior,
   geometry, pixel goldens, and feature-gated surfaces.
 
+### Added - FONT (font selection & anti-aliased widget text)
+- `core::font::WidgetFont` + a uniform `set_font(&'static dyn FontMetrics)`
+  on every text widget (`Label`, `ui::Input`/`Textarea`/`FileBrowser`, and
+  21 `widgets::` widgets), defaulting to the built-in `FONT_6X10`. Purely
+  additive — no constructor or `Widget`-trait signature changed (FONT-01).
+- Anti-aliased widget text by font choice: feeding a `PackedFont` (8-bit
+  coverage) through the existing shaped-text pipeline yields AA; `FONT_6X10`
+  stays the 1-bit default. A conformance fixture asserts partial-alpha glyph
+  pixels survive the widget pipeline through a real `blend_row`-overriding
+  renderer (FONT-02).
+- `Renderer::draw_glyph(font, ch, origin, color)` — a defaulted single-glyph
+  coverage helper. `ArcLabel` migrated off the backend-opaque `draw_text` to
+  render real glyph coverage along the arc (the last legacy-`draw_text`
+  widget) and adopts `WidgetFont` (FONT-03).
+- `RotatedRenderer` glyph throughput: `draw_glyph`/`draw_text_shaped` rotate
+  each glyph's coverage once and blit physical rows via `inner.blend_row`
+  instead of per-pixel dispatch, with zero-drift parity against the software
+  reference (FONT-04).
+
 ### Release notes
 - `rlvgl-core`, `rlvgl-platform`, `rlvgl-widgets`, `rlvgl-ui`,
   `rlvgl-fs-sim`, `rlvgl-app-demo`, and `rlvgl-app-disco-demo` are aligned
