@@ -8,9 +8,11 @@ use alloc::{boxed::Box, string::String};
 use rlvgl_core::{
     event::Event,
     renderer::Renderer,
-    widget::{Rect, Widget},
+    widget::{Color, Rect, Widget},
 };
 use rlvgl_widgets::radio::Radio as BaseRadio;
+
+use crate::theme::{ColorScheme, ComponentSize, Theme, Variant};
 
 /// Radio button with optional change callback.
 pub struct Radio {
@@ -33,6 +35,12 @@ impl Radio {
         self
     }
 
+    /// Set the selected state and return the widget.
+    pub fn selected(mut self, value: bool) -> Self {
+        self.inner.set_selected(value);
+        self
+    }
+
     /// Query whether the radio is currently selected.
     pub fn is_selected(&self) -> bool {
         self.inner.is_selected()
@@ -41,6 +49,53 @@ impl Radio {
     /// Programmatically set the selected state.
     pub fn set_selected(&mut self, value: bool) {
         self.inner.set_selected(value);
+    }
+
+    /// Set label text color and return the widget.
+    pub fn text_color(mut self, color: Color) -> Self {
+        self.inner.text_color = color;
+        self
+    }
+
+    /// Return the label text color.
+    pub fn text_color_value(&self) -> Color {
+        self.inner.text_color
+    }
+
+    /// Set label text color.
+    pub fn set_text_color(&mut self, color: Color) {
+        self.inner.text_color = color;
+    }
+
+    /// Set selected-dot color and return the widget.
+    pub fn dot_color(mut self, color: Color) -> Self {
+        self.inner.dot_color = color;
+        self
+    }
+
+    /// Return the selected-dot color.
+    pub fn dot_color_value(&self) -> Color {
+        self.inner.dot_color
+    }
+
+    /// Set selected-dot color.
+    pub fn set_dot_color(&mut self, color: Color) {
+        self.inner.dot_color = color;
+    }
+
+    /// Apply a themed style, text color, and selected-dot color.
+    pub fn themed(
+        mut self,
+        theme: &Theme,
+        scheme: ColorScheme,
+        variant: Variant,
+        size: ComponentSize,
+    ) -> Self {
+        let resolved = theme.component_style(scheme, variant, size);
+        self.inner.style = resolved.style;
+        self.inner.text_color = resolved.text_color;
+        self.inner.dot_color = resolved.accent_color;
+        self
     }
 
     /// Immutable access to the radio style.
@@ -97,5 +152,28 @@ mod tests {
         let event = Event::PressRelease { x: 5, y: 5 };
         radio.handle_event(&event);
         assert!(state.get());
+    }
+
+    #[test]
+    fn radio_themed_sets_text_and_dot_colors() {
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 20,
+        };
+        let theme = Theme::material_light();
+        let radio = Radio::new("A", bounds).themed(
+            &theme,
+            ColorScheme::Info,
+            Variant::Outline,
+            ComponentSize::Md,
+        );
+
+        assert_eq!(
+            radio.dot_color_value(),
+            theme.scheme(ColorScheme::Info).solid
+        );
+        assert_eq!(radio.style().radius, theme.tokens.radii.md);
     }
 }

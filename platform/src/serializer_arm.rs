@@ -156,7 +156,11 @@ mod tests {
         assert_eq!(o.left_shift_bits, 0, "clean tone is LSB-aligned");
         assert_eq!(o.adjacent_jumps, 0, "clean tone has no wraps");
         assert!(o.low_byte_stuck_pct < 5, "stuck {}", o.low_byte_stuck_pct);
-        assert!(o.signal_bin_permille > 800, "permille {}", o.signal_bin_permille);
+        assert!(
+            o.signal_bin_permille > 800,
+            "permille {}",
+            o.signal_bin_permille
+        );
         assert!(o.accepted, "{o:?}");
     }
 
@@ -212,7 +216,10 @@ mod tests {
         ];
         let o = detect_arm_phase(&v, COEFF_500);
         assert!(o.adjacent_jumps >= 1, "must catch the discontinuity: {o:?}");
-        assert!(!o.accepted, "real bit-shifted/clipped capture must be rejected: {o:?}");
+        assert!(
+            !o.accepted,
+            "real bit-shifted/clipped capture must be rejected: {o:?}"
+        );
     }
 
     #[test]

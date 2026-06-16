@@ -124,9 +124,6 @@ pub mod sai;
 ))]
 /// SAI4 PDM interface driver for onboard MP34DT05-A MEMS digital microphone.
 pub mod sai4_pdm;
-/// AIF1ADC serializer arm-phase detector (AUDIO-01-d §3 / R3.3): host-testable
-/// classification of a captured SAI RX buffer to gate the re-arm calibration.
-pub mod serializer_arm;
 /// Display geometry abstraction: logical dimensions + scan rotation.
 pub mod screen;
 #[cfg(all(
@@ -143,6 +140,9 @@ pub mod sd_emmc_adapter;
 ))]
 /// No-std FATFS adapter to mount and list assets on SDMMC-backed block devices.
 pub mod sd_fatfs_adapter;
+/// AIF1ADC serializer arm-phase detector (AUDIO-01-d §3 / R3.3): host-testable
+/// classification of a captured SAI RX buffer to gate the re-arm calibration.
+pub mod serializer_arm;
 #[cfg(feature = "simulator")]
 pub mod simulator;
 #[cfg(feature = "ssd1306")]

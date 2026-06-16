@@ -247,6 +247,12 @@ impl Input {
         self
     }
 
+    /// Set whether this input consumes key events and return the widget.
+    pub fn active(mut self, active: bool) -> Self {
+        self.core.core.active = active;
+        self
+    }
+
     /// Restrict insertions to characters accepted by `accept`
     /// (evaluated after the printable-ASCII bound). Rejected characters
     /// leave buffer and caret untouched (WID-00 §8.2).
@@ -366,6 +372,12 @@ impl Textarea {
     /// and on [`Self::set_text`].
     pub fn on_change<F: FnMut(&str) + 'static>(mut self, handler: F) -> Self {
         self.core.core.on_change = Some(Box::new(handler));
+        self
+    }
+
+    /// Set whether this textarea consumes key events and return the widget.
+    pub fn active(mut self, active: bool) -> Self {
+        self.core.core.active = active;
         self
     }
 

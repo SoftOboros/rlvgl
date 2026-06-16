@@ -13,6 +13,134 @@ use rlvgl_core::{
 };
 use rlvgl_widgets::container::Container;
 
+/// Construct a [`Rect`] from `(x, y, width, height)`.
+///
+/// This keeps application code terse when building UI trees:
+///
+/// ```
+/// # use rlvgl_core::widget::Rect;
+/// # use rlvgl_ui::rect;
+/// assert_eq!(rect(1, 2, 3, 4), Rect { x: 1, y: 2, width: 3, height: 4 });
+/// ```
+pub const fn rect(x: i32, y: i32, width: i32, height: i32) -> Rect {
+    Rect {
+        x,
+        y,
+        width,
+        height,
+    }
+}
+
+/// Construct a [`Rect`] at origin `(0, 0)`.
+pub const fn origin_rect(width: i32, height: i32) -> Rect {
+    rect(0, 0, width, height)
+}
+
+/// Fluent geometry helpers for [`Rect`].
+pub trait RectProps: Sized {
+    /// Set the top-left origin.
+    fn at(self, x: i32, y: i32) -> Rect;
+
+    /// Set the X coordinate.
+    fn x(self, x: i32) -> Rect;
+
+    /// Set the Y coordinate.
+    fn y(self, y: i32) -> Rect;
+
+    /// Set width and height.
+    fn size(self, width: i32, height: i32) -> Rect;
+
+    /// Set the width.
+    fn width(self, width: i32) -> Rect;
+
+    /// Set the height.
+    fn height(self, height: i32) -> Rect;
+
+    /// Translate the rectangle by `(dx, dy)`.
+    fn translate(self, dx: i32, dy: i32) -> Rect;
+
+    /// Inset all sides by `amount`.
+    fn inset(self, amount: i32) -> Rect;
+
+    /// Inset horizontal and vertical sides separately.
+    fn inset_xy(self, x: i32, y: i32) -> Rect;
+
+    /// Clamp the rectangle width to at least `width`.
+    fn min_width(self, width: i32) -> Rect;
+
+    /// Clamp the rectangle height to at least `height`.
+    fn min_height(self, height: i32) -> Rect;
+
+    /// Clamp width and height to at least the provided values.
+    fn min_size(self, width: i32, height: i32) -> Rect;
+}
+
+impl RectProps for Rect {
+    fn at(mut self, x: i32, y: i32) -> Rect {
+        self.x = x;
+        self.y = y;
+        self
+    }
+
+    fn x(mut self, x: i32) -> Rect {
+        self.x = x;
+        self
+    }
+
+    fn y(mut self, y: i32) -> Rect {
+        self.y = y;
+        self
+    }
+
+    fn size(mut self, width: i32, height: i32) -> Rect {
+        self.width = width;
+        self.height = height;
+        self
+    }
+
+    fn width(mut self, width: i32) -> Rect {
+        self.width = width;
+        self
+    }
+
+    fn height(mut self, height: i32) -> Rect {
+        self.height = height;
+        self
+    }
+
+    fn translate(mut self, dx: i32, dy: i32) -> Rect {
+        self.x += dx;
+        self.y += dy;
+        self
+    }
+
+    fn inset(self, amount: i32) -> Rect {
+        self.inset_xy(amount, amount)
+    }
+
+    fn inset_xy(mut self, x: i32, y: i32) -> Rect {
+        self.x += x;
+        self.y += y;
+        self.width = (self.width - x * 2).max(0);
+        self.height = (self.height - y * 2).max(0);
+        self
+    }
+
+    fn min_width(mut self, width: i32) -> Rect {
+        self.width = self.width.max(width);
+        self
+    }
+
+    fn min_height(mut self, height: i32) -> Rect {
+        self.height = self.height.max(height);
+        self
+    }
+
+    fn min_size(self, width: i32, height: i32) -> Rect {
+        self.min_width(width).min_height(height)
+    }
+}
+
 /// Container that positions children vertically.
 ///
 /// Accepts any [`Widget`] from [`rlvgl_widgets`] and arranges them
@@ -44,6 +172,11 @@ impl VStack {
     pub fn spacing(mut self, spacing: i32) -> Self {
         self.spacing = spacing;
         self
+    }
+
+    /// Set the gap between stacked children.
+    pub fn gap(self, gap: i32) -> Self {
+        self.spacing(gap)
     }
 
     /// Add a child of the given height, created by the supplied builder.
@@ -117,6 +250,11 @@ impl HStack {
     pub fn spacing(mut self, spacing: i32) -> Self {
         self.spacing = spacing;
         self
+    }
+
+    /// Set the gap between stacked children.
+    pub fn gap(self, gap: i32) -> Self {
+        self.spacing(gap)
     }
 
     /// Add a child of the given width, created by the supplied builder.
@@ -193,6 +331,11 @@ impl Grid {
     pub fn spacing(mut self, spacing: i32) -> Self {
         self.spacing = spacing;
         self
+    }
+
+    /// Set the gap between grid cells.
+    pub fn gap(self, gap: i32) -> Self {
+        self.spacing(gap)
     }
 
     /// Add a child placed in the next grid cell.
@@ -378,6 +521,33 @@ impl GridCalc {
 mod tests {
     use super::*;
     use rlvgl_widgets::label::Label;
+
+    #[test]
+    fn rect_helpers_construct_and_transform_rects() {
+        let r = origin_rect(10, 20)
+            .at(2, 3)
+            .width(30)
+            .height(40)
+            .translate(5, -1)
+            .inset(2)
+            .min_size(40, 50);
+
+        assert_eq!(
+            r,
+            Rect {
+                x: 9,
+                y: 4,
+                width: 40,
+                height: 50
+            }
+        );
+    }
+
+    #[test]
+    fn rect_inset_clamps_to_zero_size() {
+        assert_eq!(rect(0, 0, 3, 3).inset(4).width, 0);
+        assert_eq!(rect(0, 0, 3, 3).inset(4).height, 0);
+    }
 
     #[test]
     fn vstack_stacks_vertically() {

@@ -39,6 +39,14 @@ impl List {
         self.items.push(text.into());
     }
 
+    /// Replace all list items and clear the current selection.
+    pub fn set_items(&mut self, items: &[impl AsRef<str>]) {
+        self.items.clear();
+        self.items
+            .extend(items.iter().map(|item| String::from(item.as_ref())));
+        self.selected = None;
+    }
+
     /// Return a slice of all list items.
     pub fn items(&self) -> &[String] {
         &self.items
@@ -117,5 +125,29 @@ impl Widget for List {
 
         self.selected = Some(idx);
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_items_replaces_values_and_clears_selection() {
+        let mut list = List::new(Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 48,
+        });
+        list.add_item("A");
+        list.add_item("B");
+        assert!(list.handle_event(&Event::PressRelease { x: 5, y: 20 }));
+        assert_eq!(list.selected(), Some(1));
+
+        list.set_items(&["C"]);
+
+        assert_eq!(list.items(), &["C"]);
+        assert_eq!(list.selected(), None);
     }
 }

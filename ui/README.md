@@ -11,12 +11,53 @@ layout helpers, style builders, and overlay utilities for application code.
 
 ## What It Provides
 
-- ready-to-use components such as `Alert`, `Badge`, `Button`, `Checkbox`,
-  `Drawer`, `Input`, `Modal`, `Radio`, `Switch`, `Tag`, `Text`, and `Toast`
+- ready-to-use components such as `Alert`, `Badge`, `Bar`, `Button`,
+  `ButtonMatrix`, `Checkbox`, `Drawer`, `Input`, `Led`, `List`, `Modal`,
+  `Progress`, `Radio`, `Select`, `Spinner`, `Switch`, `Tabs`, `Tag`, `Text`,
+  and `Toast`
+- direct access to mature LVGL-parity widgets such as `Calendar`,
+  `MessageBox`, `Spinbox`, `Table`, and `Window`
 - layout helpers including `HStack`, `VStack`, `Grid`, and `BoxLayout`
-- a theme/token layer with `Theme`, `Tokens`, `Style`, and `StyleBuilder`
+- geometry helpers including `rect`, `origin_rect`, `RectProps`, and
+  `Theme::control_rect`
+- a theme/token layer with `Theme`, `Tokens`, `Style`, `StyleBuilder`, and
+  fluent `StyleProps` / `ThemeProps`
 - overlay and transient UI helpers such as `EventWindow`
 - an optional `view` feature for view-oriented helpers
+
+## Naming and Props
+
+The UI crate uses canonical Rust names with Chakra-inspired vocabulary:
+
+- app-facing wrappers use common component names where they clarify intent,
+  such as `Select` over the lower-level dropdown and `Progress` over the
+  progress bar
+- LVGL-specific controls keep their LVGL-oriented names, such as `Bar`,
+  `ButtonMatrix`, `Led`, and `Spinbox`
+- type names use `PascalCase`; methods use `snake_case`
+- fluent style props use short names such as `bg`, `rounded`,
+  `border_width`, and `opacity`
+- themed props use `ColorScheme`, `Variant`, and `ComponentSize`; variants
+  include `Solid`, `Subtle`, `Outline`, and `Ghost`
+- state builders use `with_*` when the natural name is already the getter,
+  such as `with_value`, `with_options`, and `with_active_tab`
+- `BoxLayout` remains the layout box name to avoid conflicting with
+  `alloc::boxed::Box`
+
+For components with accent parts, such as `Progress`, `Bar`, `Spinner`,
+`Led`, `Select`, `Tabs`, and `ButtonMatrix`, the inherent `themed(...)` method
+maps the same resolved theme style onto fills, indicators, selected rows, or
+tab states. For simpler components, importing `ThemeProps` provides a generic
+`themed(...)` style-only prop.
+
+Rect construction follows the same compact style:
+
+- use `rect(x, y, width, height)` for explicit geometry
+- use `origin_rect(width, height)` for origin-based children
+- import `RectProps` for fluent adjustments such as `at`, `size`, `height`,
+  `translate`, `inset`, and `min_size`
+- use `Theme::control_rect(x, y, width, size)` when a component should use the
+  theme's recommended minimum height for a `ComponentSize`
 
 ## How It Fits
 
