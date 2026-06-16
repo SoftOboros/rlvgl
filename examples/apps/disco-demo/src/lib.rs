@@ -11,6 +11,7 @@
 extern crate alloc;
 
 pub mod assets;
+mod backlight_panel;
 mod dashboard_panel;
 mod hotspot;
 pub mod icon_strip;
@@ -19,6 +20,7 @@ pub mod wing;
 use alloc::{format, rc::Rc, string::String, vec, vec::Vec};
 use core::cell::RefCell;
 
+use backlight_panel::BacklightPanel;
 use dashboard_panel::DashboardPanel;
 use hotspot::ActionHotspot;
 use icon_strip::{IconSlot, IconStrip};
@@ -296,6 +298,7 @@ struct ControllerState {
     capabilities: DiscoCapabilities,
     commands: Vec<DiscoCommand>,
     dashboard: Rc<RefCell<DashboardPanel>>,
+    backlight_panel: Rc<RefCell<BacklightPanel>>,
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
     event_window: Rc<RefCell<EventWindow>>,
@@ -322,6 +325,7 @@ impl ControllerState {
     fn new(
         capabilities: DiscoCapabilities,
         dashboard: Rc<RefCell<DashboardPanel>>,
+        backlight_panel: Rc<RefCell<BacklightPanel>>,
         subtitle: Rc<RefCell<Label>>,
         footer: Rc<RefCell<Label>>,
         event_window: Rc<RefCell<EventWindow>>,
@@ -333,6 +337,7 @@ impl ControllerState {
             capabilities,
             commands: Vec::new(),
             dashboard,
+            backlight_panel,
             subtitle,
             footer,
             event_window,
@@ -515,6 +520,7 @@ impl ControllerState {
     fn close_wings(&mut self) {
         self.active_info = None;
         self.dashboard.borrow_mut().hide();
+        self.backlight_panel.borrow_mut().hide();
         self.settings_wing.borrow_mut().close();
         self.info_wing.borrow_mut().close();
         let focus_index = match self.focus {
@@ -613,6 +619,7 @@ impl ControllerState {
     }
 
     fn activate_main(&mut self, slot: MainSlot) {
+        self.backlight_panel.borrow_mut().hide();
         self.focus = FocusState::Main(slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -632,6 +639,8 @@ impl ControllerState {
 
     fn activate_settings(&mut self, slot: SettingsSlot) {
         self.active_info = None;
+        // Dismiss the backlight slider by default; the Backlight arm re-shows it.
+        self.backlight_panel.borrow_mut().hide();
         self.focus = FocusState::Wing(WingKind::Settings, slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -666,15 +675,22 @@ impl ControllerState {
                 ));
             }
             SettingsSlot::Backlight => {
-                self.backlight = match self.backlight {
-                    100 => 25,
-                    75 => 100,
-                    50 => 75,
-                    25 => 50,
-                    _ => 75,
-                };
-                self.push_status(format!("Backlight {}%", self.backlight));
-                self.queue(DiscoCommand::SetBacklight(self.backlight));
+                if self.capabilities.pointer {
+                    // Pointer platforms get the slider panel for continuous
+                    // control; the slider emits SetBacklight as it is moved
+                    // (see DiscoController::handle_event).
+                    self.dashboard.borrow_mut().hide();
+                    self.active_info = None;
+                    self.backlight_panel
+                        .borrow_mut()
+                        .set_value(self.backlight as i32);
+                    self.backlight_panel.borrow_mut().show();
+                    self.push_status(format!("Backlight {}%", self.backlight));
+                } else {
+                    // Keyboard / headless platforms can't operate a slider, so
+                    // keep the discrete level step.
+                    self.cycle_backlight();
+                }
             }
             SettingsSlot::About => {
                 self.show_about();
@@ -682,7 +698,23 @@ impl ControllerState {
         }
     }
 
+    /// Step the backlight through the discrete 25/50/75/100 levels and emit a
+    /// `SetBacklight` command. Used by the `b` hotkey and by pointerless
+    /// platforms where the slider panel can't be operated.
+    fn cycle_backlight(&mut self) {
+        self.backlight = match self.backlight {
+            100 => 25,
+            75 => 100,
+            50 => 75,
+            25 => 50,
+            _ => 75,
+        };
+        self.push_status(format!("Backlight {}%", self.backlight));
+        self.queue(DiscoCommand::SetBacklight(self.backlight));
+    }
+
     fn activate_info(&mut self, slot: InfoSlot) {
+        self.backlight_panel.borrow_mut().hide();
         self.focus = FocusState::Wing(WingKind::Info, slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -854,9 +886,7 @@ impl ControllerState {
             Key::Character('s') | Key::Character('S') => self.activate_main(MainSlot::Settings),
             Key::Character('f') | Key::Character('F') => self.activate_main(MainSlot::Files),
             Key::Character('i') | Key::Character('I') => self.activate_main(MainSlot::Info),
-            Key::Character('b') | Key::Character('B') => {
-                self.activate_settings(SettingsSlot::Backlight)
-            }
+            Key::Character('b') | Key::Character('B') => self.cycle_backlight(),
             _ => {}
         }
     }
@@ -944,6 +974,19 @@ impl DiscoController {
             "rlvgl demo application",
         )));
 
+        // Backlight slider panel, centered; hidden until Settings → Backlight
+        // is activated on a pointer-capable platform. Initial value matches the
+        // controller's 75% default backlight.
+        let backlight_panel = Rc::new(RefCell::new(BacklightPanel::new(
+            Rect {
+                x: (width - 480).max(0) / 2,
+                y: height / 2 - 70,
+                width: 480.min(width - 40),
+                height: 140,
+            },
+            75,
+        )));
+
         let event_window = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10)
                 .width(420)
@@ -1009,6 +1052,7 @@ impl DiscoController {
         let state = Rc::new(RefCell::new(ControllerState::new(
             capabilities,
             dashboard.clone(),
+            backlight_panel.clone(),
             subtitle.clone(),
             footer.clone(),
             event_window.clone(),
@@ -1093,6 +1137,11 @@ impl DiscoController {
                 widget: dashboard,
                 children: Vec::new(),
                 tag: Some("disco.dashboard"),
+            });
+            r.children.push(WidgetNode {
+                widget: backlight_panel,
+                children: Vec::new(),
+                tag: Some("disco.backlight"),
             });
             r.children.push(WidgetNode {
                 widget: footer.clone(),
@@ -1330,6 +1379,16 @@ impl DiscoController {
         let mut state = self.state.borrow_mut();
         if state.focus_dirty {
             state.sync_focus_highlights();
+        }
+        // Backlight slider → command bridge: if a PressRelease moved the slider
+        // during widget dispatch this event, surface the new level as a
+        // SetBacklight command (and reflect it in the status line).
+        let pending_backlight = state.backlight_panel.borrow_mut().take_pending();
+        if let Some(value) = pending_backlight {
+            let level = value.clamp(0, 100) as u8;
+            state.backlight = level;
+            state.push_status(format!("Backlight {level}%"));
+            state.queue(DiscoCommand::SetBacklight(level));
         }
         match event {
             Event::Tick => {
@@ -1786,6 +1845,85 @@ mod tests {
             commands
                 .iter()
                 .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(75)))
+        );
+    }
+
+    #[test]
+    fn backlight_item_shows_slider_panel_on_pointer_platform() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        // Open the settings wing and activate the Backlight item (index 4).
+        key_down(&mut c, Key::Enter);
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+
+        let root = c.root();
+        let root = root.borrow();
+        let panel = find_node(&root, "disco.backlight").unwrap();
+        assert!(
+            panel.widget.borrow().bounds().width > 0,
+            "backlight slider panel should be visible after activation"
+        );
+    }
+
+    #[test]
+    fn backlight_slider_tap_emits_set_backlight() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Enter);
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+        let _ = c.drain_commands(); // discard activation/status noise
+
+        // Track spans x in [180, 620) at this screen size; the midpoint maps to
+        // ~50%. Tap it and assert a SetBacklight command is produced.
+        c.dispatch_event(&Event::PressRelease { x: 400, y: 250 });
+        let commands = c.drain_commands();
+        let level = commands.iter().find_map(|cmd| match cmd {
+            DiscoCommand::SetBacklight(v) => Some(*v),
+            _ => None,
+        });
+        assert!(
+            matches!(level, Some(v) if (40..=60).contains(&v)),
+            "expected SetBacklight near 50%, got {commands:?}"
+        );
+    }
+
+    #[test]
+    fn backlight_item_cycles_on_pointerless_platform() {
+        // UEFI has no pointer, so the Backlight item keeps the discrete cycle
+        // instead of showing an unoperable slider.
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::uefi(),
+        );
+        key_down(&mut c, Key::Enter); // open settings wing
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown); // focus Backlight (index 4)
+        }
+        key_down(&mut c, Key::Enter); // activate → cycle 75 -> 100
+        let commands = c.drain_commands();
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(100))),
+            "pointerless platform should cycle, got {commands:?}"
+        );
+        let root = c.root();
+        let root = root.borrow();
+        let panel = find_node(&root, "disco.backlight").unwrap();
+        assert_eq!(
+            panel.widget.borrow().bounds().width,
+            0,
+            "slider panel must stay hidden without a pointer"
         );
     }
 
