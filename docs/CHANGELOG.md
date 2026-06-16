@@ -46,6 +46,20 @@ LPAR parity substrate and widget-family release.
   widget fonts. A registered `font_id` overrides; `DEFAULT`/unmapped preserves
   an explicit `set_font`; default-`font_id` trees render identically (FONT-05).
 
+### Added - LVGL image converter & C/Rust array output
+- `rlvgl-creator lvgl <in> <out>` converts any image (or `.raw`) to an LVGL v9
+  binary image (`.bin`): `--cf rgb565|rgb888|argb8888|xrgb8888` (default
+  `rgb565`) and optional `--rle` (LVGL run-length, `lv_image_compressed_t`).
+  The v9 codec lives in the new `rlvgl-decomp::lvgl` module — header layout,
+  per-format byte order, and the `lv_rle` grammar verified against upstream
+  `LVGLImage.py`, with a `decode_bin` round-trip path.
+- `--emit bin|c|rust` on `compress` and `lvgl` embeds the image directly in the
+  binary — the cheapest path on all-RAM SoCs with no filesystem. `compress`
+  emits the RLEC blob as a `uint8_t[]` / `[u8; N]`; `lvgl` emits a ready-to-use
+  C `lv_image_dsc_t` (+ pixel map) or a Rust pixel map with width/height/format/
+  stride constants.
+- `rlvgl-decomp` bumped to `0.2.3` for the additive `lvgl` module.
+
 ### Release notes
 - `rlvgl-core`, `rlvgl-platform`, `rlvgl-widgets`, `rlvgl-ui`,
   `rlvgl-fs-sim`, `rlvgl-app-demo`, and `rlvgl-app-disco-demo` are aligned

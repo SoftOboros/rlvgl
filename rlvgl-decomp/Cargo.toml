@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-decomp"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT"
 description = "Core compressed image (RLE) codec for rlvgl: mirror of example splashscreen RLE with RGBA pipeline."

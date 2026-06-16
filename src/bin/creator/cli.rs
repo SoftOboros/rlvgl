@@ -20,6 +20,7 @@ pub mod chakra;
 pub mod check;
 pub mod compress;
 pub mod convert;
+pub mod emit;
 pub mod fonts;
 pub mod gen_lib;
 pub mod init;
@@ -62,6 +63,52 @@ enum CoreSel {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum RunTarget {
     Sim,
+}
+
+/// Output container for `compress` / `lvgl`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum OutKindArg {
+    /// Raw binary blob (default).
+    Bin,
+    /// C source byte array (`lv_image_dsc_t` for the LVGL path).
+    C,
+    /// Rust source `[u8; N]` array.
+    Rust,
+}
+
+impl From<OutKindArg> for emit::OutKind {
+    fn from(k: OutKindArg) -> Self {
+        match k {
+            OutKindArg::Bin => emit::OutKind::Bin,
+            OutKindArg::C => emit::OutKind::C,
+            OutKindArg::Rust => emit::OutKind::Rust,
+        }
+    }
+}
+
+/// LVGL color format for the `lvgl` converter.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum LvglCfArg {
+    /// 16-bit RGB565 (most compact opaque format).
+    Rgb565,
+    /// 24-bit RGB888.
+    Rgb888,
+    /// 32-bit ARGB8888 (keeps the alpha channel).
+    Argb8888,
+    /// 32-bit XRGB8888 (alpha forced opaque).
+    Xrgb8888,
+}
+
+impl From<LvglCfArg> for rlvgl_decomp::lvgl::LvglCf {
+    fn from(c: LvglCfArg) -> Self {
+        use rlvgl_decomp::lvgl::LvglCf;
+        match c {
+            LvglCfArg::Rgb565 => LvglCf::Rgb565,
+            LvglCfArg::Rgb888 => LvglCf::Rgb888,
+            LvglCfArg::Argb8888 => LvglCf::Argb8888,
+            LvglCfArg::Xrgb8888 => LvglCf::Xrgb8888,
+        }
+    }
 }
 
 /// CLI arguments for rlgvl-creator.
@@ -168,8 +215,34 @@ enum Command {
     Compress {
         /// Input image (PNG, BMP, etc.) or RLVGLRAW .raw file
         input: PathBuf,
-        /// Output .rle file
+        /// Output file (.rle blob, or .c/.rs source with `--emit`)
         output: PathBuf,
+        /// Output container: a raw blob, or a C / Rust byte array
+        #[arg(long, value_enum, default_value_t = OutKindArg::Bin)]
+        emit: OutKindArg,
+        /// Symbol name for `--emit c|rust` (defaults to the output file stem)
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// Convert an image to an LVGL v9 binary image (`.bin`) or compiled-in
+    /// C / Rust source for handoff to an LVGL build
+    Lvgl {
+        /// Input image (PNG, BMP, etc.) or RLVGLRAW .raw file
+        input: PathBuf,
+        /// Output file (.bin, or .c/.rs source with `--emit`)
+        output: PathBuf,
+        /// LVGL color format of the emitted image
+        #[arg(long, value_enum, default_value_t = LvglCfArg::Rgb565)]
+        cf: LvglCfArg,
+        /// Compress the `.bin` with LVGL RLE (ignored for `--emit c|rust`)
+        #[arg(long)]
+        rle: bool,
+        /// Output container: an LVGL `.bin`, or a C / Rust array
+        #[arg(long, value_enum, default_value_t = OutKindArg::Bin)]
+        emit: OutKindArg,
+        /// Symbol name for `--emit c|rust` (defaults to the output file stem)
+        #[arg(long)]
+        name: Option<String>,
     },
     /// Decompress an RLEC .rle blob back to a PNG image
     Decompress {
@@ -813,7 +886,27 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
             vendor::run(&path, &cli.manifest, &out, &allow, &deny)?
         }
         Command::Convert { path, force } => convert::run(&path, &cli.manifest, force)?,
-        Command::Compress { input, output } => compress::run(&input, &output)?,
+        Command::Compress {
+            input,
+            output,
+            emit,
+            name,
+        } => compress::run(&input, &output, emit.into(), name.as_deref())?,
+        Command::Lvgl {
+            input,
+            output,
+            cf,
+            rle,
+            emit,
+            name,
+        } => compress::lvgl(
+            &input,
+            &output,
+            cf.into(),
+            rle,
+            emit.into(),
+            name.as_deref(),
+        )?,
         Command::Decompress { input, output } => compress::decompress(&input, &output)?,
         Command::Preview { path } => preview::run(&path, &cli.manifest)?,
         Command::AddTarget { name, vendor_dir } => {

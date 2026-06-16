@@ -172,7 +172,7 @@ default-features = false
 optional = true
 
 [dependencies.rlvgl-decomp]
-version = "0.2.2"
+version = "0.2.3"
 path = "rlvgl-decomp"
 optional = true
 

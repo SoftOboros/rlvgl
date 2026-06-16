@@ -23,6 +23,8 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
+pub mod lvgl;
+
 /// Encoding constants
 pub mod consts {
     pub const ENCODE_KEY_SINGLE_INLINE_PIXEL: u8 = 0xFF;
@@ -49,6 +51,8 @@ pub enum Error {
     PaletteTooLarge,
     /// Invalid or missing blob magic
     BadMagic,
+    /// Color format or compression method not supported by this codec
+    Unsupported,
 }
 
 /// Memory orientation for decoding a compressed asset into a destination
@@ -87,7 +91,7 @@ pub enum Orientation {
     Rot180,
 }
 
-fn rgb565_to_rgba(c: u16) -> [u8; 4] {
+pub(crate) fn rgb565_to_rgba(c: u16) -> [u8; 4] {
     let r5 = ((c >> 11) & 0x1F) as u8;
     let g6 = ((c >> 5) & 0x3F) as u8;
     let b5 = (c & 0x1F) as u8;
@@ -108,7 +112,7 @@ fn rgb565_to_argb_u32(c: u16) -> u32 {
     0xFF_00_00_00 | (r << 16) | (g << 8) | b
 }
 
-fn rgba_to_rgb565(px: &[u8]) -> u16 {
+pub(crate) fn rgba_to_rgb565(px: &[u8]) -> u16 {
     let r = px[0] as u16;
     let g = px[1] as u16;
     let b = px[2] as u16;
@@ -796,7 +800,7 @@ mod tests {
         // Fetch source corner colour from the ORIGINAL rgba, then compare to
         // the pixel at the expected destination corner.
         let src_px = pixel_at(&rgba, src_w, src_corner.0, src_corner.1);
-        let src_rgba_r = (src_px >> 0) & 0xFF;
+        let src_rgba_r = src_px & 0xFF;
         let src_rgba_g = (src_px >> 8) & 0xFF;
         let src_rgba_b = (src_px >> 16) & 0xFF;
         let dst_px = pixel_at(&out, dst_w, dst_corner.0, dst_corner.1);
