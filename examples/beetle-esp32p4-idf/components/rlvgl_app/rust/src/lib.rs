@@ -23,17 +23,15 @@
 extern crate alloc;
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::cell::RefCell;
 use core::ffi::c_void;
 use core::panic::PanicInfo;
+use core::ptr::addr_of_mut;
 
-use alloc::rc::Rc;
-
-use rlvgl_core::WidgetNode;
+use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoController};
+use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
-use rlvgl_widgets::container::Container;
-use rlvgl_widgets::label::Label;
+use rlvgl_platform::Screen;
 
 // ---------------------------------------------------------------------------
 // Runtime glue: allocator + panic handler over the IDF C runtime.
@@ -190,133 +188,109 @@ impl<'a> Renderer for Rgb888Renderer<'a> {
             self.blend(x + i as i32, y, Color(color.0, color.1, color.2, a));
         }
     }
+
+    /// Alpha-aware pixel span. The trait default writes each pixel through
+    /// `fill_rect` (opaque `put`), which would paint the RLE icons' fully
+    /// transparent pixels as solid black boxes. Route through `blend` so
+    /// per-pixel alpha (and the BGR swap) is honored — this is the path
+    /// `blit_image` uses to composite the disco demo's icons.
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        for y in 0..height as i32 {
+            for x in 0..width as i32 {
+                let idx = (y as u32 * width + x as u32) as usize;
+                if let Some(&c) = pixels.get(idx) {
+                    self.blend(position.0 + x, position.1 + y, c);
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Widget tree.
+// Persistent application state (M4).
 // ---------------------------------------------------------------------------
 
-/// Build the M1 static screen: a dark background, one filled card (proves
-/// `fill_rect`), and two `FONT_6X10` labels (prove glyph-coverage text).
-#[allow(deprecated)] // set_text_color predates the TextStyle cascade; fine for M1.
-fn build_screen(width: i32, height: i32) -> Rc<RefCell<WidgetNode>> {
-    let mut bg = Container::new(Rect { x: 0, y: 0, width, height });
-    bg.style.bg_color = Color(16, 20, 32, 255);
+/// The shared `rlvgl-app-disco-demo` controller plus the touch edge-detection
+/// state needed to turn the C refill loop's per-frame touch sample into rlvgl
+/// input events.
+///
+/// Held in a process-global `static mut` (see [`APP`]) because the IDF host
+/// calls [`rlvgl_app_render`] serially from a single FreeRTOS task — there is
+/// no concurrent access to synchronize. The controller owns `Rc<RefCell<…>>`
+/// graphs (not `Sync`), so a plain `static` is not an option.
+/// Consecutive no-touch frames required to confirm a finger lift. At the C
+/// loop's ~30 Hz refresh this is ~100 ms. Capacitive panels routinely drop a
+/// contact for a single frame mid-press; debouncing the release collapses that
+/// jitter so one physical tap dispatches exactly one `PressRelease` (a raw
+/// edge-per-frame would fragment a tap into several toggles).
+const RELEASE_DEBOUNCE_FRAMES: i32 = 3;
 
-    let root = Rc::new(RefCell::new(WidgetNode::new(Rc::new(RefCell::new(bg)))));
-
-    let mut card = Container::new(Rect {
-        x: 40,
-        y: 40,
-        width: width - 80,
-        height: 120,
-    });
-    card.style.bg_color = Color(40, 90, 200, 255);
-    card.style.radius = 8;
-    root.borrow_mut()
-        .children
-        .push(WidgetNode::new(Rc::new(RefCell::new(card))));
-
-    // Labels default to an opaque white Style background, which would hide the
-    // text under a white bar. Zero the background alpha (style.alpha stays 255,
-    // so text remains opaque) to draw transparent-background text on the card.
-    let mut title = Label::new(
-        "rlvgl on ESP32-P4",
-        Rect {
-            x: 64,
-            y: 70,
-            width: width - 120,
-            height: 20,
-        },
-    );
-    title.style.bg_color = Color(0, 0, 0, 0);
-    title.set_text_color(Color(255, 255, 255, 255));
-    root.borrow_mut()
-        .children
-        .push(WidgetNode::new(Rc::new(RefCell::new(title))));
-
-    let mut sub = Label::new(
-        "IDF owns DSI/DPI - Rust draws the UI",
-        Rect {
-            x: 64,
-            y: 100,
-            width: width - 120,
-            height: 20,
-        },
-    );
-    sub.style.bg_color = Color(0, 0, 0, 0);
-    sub.set_text_color(Color(230, 240, 255, 255));
-    root.borrow_mut()
-        .children
-        .push(WidgetNode::new(Rc::new(RefCell::new(sub))));
-
-    root
+struct AppState {
+    controller: DiscoController,
+    /// Debounced contact state: true once a finger is down, cleared only after
+    /// `RELEASE_DEBOUNCE_FRAMES` consecutive no-touch frames.
+    in_contact: bool,
+    /// Consecutive no-touch frames seen while `in_contact` (release debounce).
+    idle_frames: i32,
+    /// Last in-contact coordinate; the confirmed lift fires a `PressRelease`
+    /// here, since the lift frame itself reports no coordinate.
+    last_x: i32,
+    last_y: i32,
 }
+
+impl AppState {
+    fn new(width: i32, height: i32) -> Self {
+        // ESP32-P4 + DFR0550-V2 capabilities: capacitive touch (pointer), but
+        // no audio codec or storage wired on this hybrid yet. Effects stay on
+        // so the info wing's star-crawl item still queues its command (the
+        // host simply doesn't run a crawl renderer).
+        let capabilities = DiscoCapabilities {
+            audio: false,
+            storage: false,
+            diagnostics: true,
+            effects: true,
+            pointer: true,
+            platform: "ESP32-P4 ESP-IDF",
+        };
+        let screen = Screen::landscape(width as u32, height as u32);
+        Self {
+            controller: DiscoController::new(screen, capabilities),
+            in_contact: false,
+            idle_frames: 0,
+            last_x: 0,
+            last_y: 0,
+        }
+    }
+}
+
+/// Process-global controller. `None` until the first [`rlvgl_app_render`] call
+/// learns the framebuffer dimensions, then built once and reused every frame.
+static mut APP: Option<AppState> = None;
 
 // ---------------------------------------------------------------------------
 // C ABI surface.
 // ---------------------------------------------------------------------------
 
-/// Draw a touch crosshair + live coordinate readout over the rendered tree.
+/// Advance and draw the shared disco-demo UI into a 24-bit RGB framebuffer,
+/// dispatching touch taps as rlvgl input.
 ///
-/// M3 touch validation: a bright magenta crosshair (full-width/height lines
-/// plus a centered box) marks the reported touch point, and a yellow label
-/// echoes the raw `(x, y)` so the screen↔touch coordinate mapping can be
-/// checked by eye against where the finger actually is.
-fn draw_touch_marker(r: &mut Rgb888Renderer<'_>, width: i32, height: i32, x: i32, y: i32) {
-    let cross = Color(255, 0, 255, 255);
-    // Vertical + horizontal lines through the touch point.
-    r.fill_rect(
-        Rect {
-            x: x - 1,
-            y: 0,
-            width: 3,
-            height,
-        },
-        cross,
-    );
-    r.fill_rect(
-        Rect {
-            x: 0,
-            y: y - 1,
-            width,
-            height: 3,
-        },
-        cross,
-    );
-    // Centered box at the touch point.
-    r.fill_rect(
-        Rect {
-            x: x - 8,
-            y: y - 8,
-            width: 16,
-            height: 16,
-        },
-        cross,
-    );
-    // Live coordinate readout (inside the card, under the subtitle line).
-    let label = alloc::format!("touch {},{}", x, y);
-    r.draw_text((64, 128), &label, Color(255, 255, 0, 255));
-}
-
-/// Build and draw one rlvgl screen into a 24-bit RGB framebuffer, optionally
-/// overlaying a touch marker.
+/// `fb` must point at `width * height * 3` writable bytes (B,G,R packed — see
+/// [`Rgb888Renderer`]). The caller owns cache coherency: invoke
+/// `esp_cache_msync(..., C2M)` after this returns.
 ///
-/// `fb` must point at `width * height * 3` writable bytes (R,G,B packed). The
-/// caller owns cache coherency: invoke `esp_cache_msync(..., C2M)` after this
-/// returns, exactly as the original color-fill loop did. This function only
-/// touches the CPU-visible buffer and never blocks.
+/// Per call this ticks the controller (driving animations + live info pages),
+/// converts the C loop's touch sample into a `PressRelease` on the lift edge
+/// (which the demo's `ActionHotspot`s consume), drains the platform command
+/// queue, then draws the controller's widget tree. A small magenta dot marks
+/// the live contact point for press feedback.
 ///
-/// When `touch_active != 0`, a crosshair + coordinate readout is drawn at
-/// `(touch_x, touch_y)` (M3 touch validation). Pass `touch_active == 0` to
-/// render the static screen alone.
-///
-/// Re-builds the widget tree on each call for M1 simplicity; animation (M2)
-/// will hoist the tree into persistent state.
+/// The controller is built once (lazily, on the first call) and persists in
+/// [`APP`] across frames, so animation and navigation state carry over.
 ///
 /// # Safety
 /// `fb` must be valid for `width * height * 3` writable bytes for the duration
-/// of the call and must not alias memory Rust accesses concurrently.
+/// of the call and must not alias memory Rust accesses concurrently. Must be
+/// called from a single thread (the IDF render task); `APP` is unsynchronized.
 #[no_mangle]
 pub unsafe extern "C" fn rlvgl_app_render(
     fb: *mut u8,
@@ -334,11 +308,66 @@ pub unsafe extern "C" fn rlvgl_app_render(
     // non-aliasing for the call; the slice borrow ends before return.
     let frame = unsafe { core::slice::from_raw_parts_mut(fb, len) };
 
-    let tree = build_screen(width, height);
-    let mut renderer = Rgb888Renderer::new(frame, width, height);
-    tree.borrow().draw(&mut renderer);
+    // SAFETY: single-threaded access from the IDF render task (see APP docs).
+    let app = unsafe { &mut *addr_of_mut!(APP) };
+    if app.is_none() {
+        *app = Some(AppState::new(width, height));
+    }
+    let state = app.as_mut().unwrap();
 
-    if touch_active != 0 {
-        draw_touch_marker(&mut renderer, width, height, touch_x, touch_y);
+    // Advance animations, live info pages, and the focus-pulse engine.
+    state.controller.tick();
+
+    // Debounce the touch sample into a single tap per physical contact. A
+    // finger-down (re)arms the contact and records the point; a confirmed lift
+    // (RELEASE_DEBOUNCE_FRAMES of no-touch) fires one PressRelease at the last
+    // in-contact point, since the lift frame itself carries no coordinate.
+    let active = touch_active != 0;
+    if active {
+        state.last_x = touch_x;
+        state.last_y = touch_y;
+        state.idle_frames = 0;
+        state.in_contact = true;
+    } else if state.in_contact {
+        state.idle_frames += 1;
+        if state.idle_frames >= RELEASE_DEBOUNCE_FRAMES {
+            state.in_contact = false;
+            let (x, y) = (state.last_x, state.last_y);
+            state.controller.dispatch_event(&Event::PressRelease { x, y });
+        }
+    }
+
+    // Drain platform commands so the controller's queue doesn't grow unbounded.
+    // (Backlight/effect actions aren't wired back to the C host yet — M5.)
+    let _ = state.controller.drain_commands();
+
+    // Clear the framebuffer first. The disco-demo root container is
+    // deliberately transparent (it composites over a desktop/splash layer on
+    // the STM32 host), so without an explicit clear every frame paints over
+    // the last — stale wing pixels and feedback dots would accumulate. The
+    // double buffers ping-pong, so each must be cleared on the frame it draws.
+    let mut renderer = Rgb888Renderer::new(frame, width, height);
+    renderer.fill_rect(
+        Rect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        },
+        Color(16, 20, 32, 255),
+    );
+
+    // Draw the widget tree, then a press-feedback dot at the live contact.
+    state.controller.root().borrow().draw(&mut renderer);
+    if active {
+        renderer.fill_rect(
+            Rect {
+                x: touch_x - 4,
+                y: touch_y - 4,
+                width: 8,
+                height: 8,
+            },
+            Color(255, 0, 255, 255),
+        );
     }
 }

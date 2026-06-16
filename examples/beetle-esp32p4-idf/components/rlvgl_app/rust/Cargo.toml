@@ -18,7 +18,8 @@ crate-type = ["staticlib"]
 
 [dependencies]
 rlvgl-core = { path = "../../../../../core", default-features = false }
-rlvgl-widgets = { path = "../../../../../widgets", default-features = false }
+rlvgl-platform = { path = "../../../../../platform", default-features = false }
+rlvgl-app-disco-demo = { path = "../../../../apps/disco-demo", default-features = false }
 
 [profile.release]
 opt-level = "s"
