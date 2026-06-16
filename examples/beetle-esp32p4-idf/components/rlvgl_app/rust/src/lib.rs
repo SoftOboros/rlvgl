@@ -27,7 +27,7 @@ use core::ffi::c_void;
 use core::panic::PanicInfo;
 use core::ptr::addr_of_mut;
 
-use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoController};
+use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
@@ -41,6 +41,11 @@ extern "C" {
     fn malloc(size: usize) -> *mut c_void;
     fn free(ptr: *mut c_void);
     fn abort() -> !;
+
+    /// Host hook: apply an abstract `0..=100` backlight level. Implemented in
+    /// `dfr0550_idf_compare.c`, which maps it to the DFR0550 bridge's PWM
+    /// register over the same I2C bus the C host already owns.
+    fn rlvgl_host_set_backlight(level: u8);
 }
 
 /// Global allocator backed by the IDF/newlib heap.
@@ -337,9 +342,17 @@ pub unsafe extern "C" fn rlvgl_app_render(
         }
     }
 
-    // Drain platform commands so the controller's queue doesn't grow unbounded.
-    // (Backlight/effect actions aren't wired back to the C host yet — M5.)
-    let _ = state.controller.drain_commands();
+    // Apply the platform commands the controller emitted this frame.
+    // SetBacklight drives the DFR0550 bridge PWM through the host hook;
+    // effect/status commands have no P4 runtime yet and are dropped (draining
+    // them still keeps the controller's queue from growing unbounded).
+    for command in state.controller.drain_commands() {
+        if let DiscoCommand::SetBacklight(level) = command {
+            // SAFETY: FFI to the host backlight hook — a plain byte, no
+            // aliasing. Runs on the render task, same as all bridge I2C.
+            unsafe { rlvgl_host_set_backlight(level) };
+        }
+    }
 
     // Clear the framebuffer first. The disco-demo root container is
     // deliberately transparent (it composites over a desktop/splash layer on

@@ -63,6 +63,7 @@ enum {
 
 static esp_ldo_channel_handle_t s_dphy_ldo;
 static i2c_master_bus_handle_t s_i2c_bus;
+static i2c_master_dev_handle_t s_bridge;
 
 static void bridge_write(i2c_master_dev_handle_t bridge, uint8_t reg, uint8_t value)
 {
@@ -174,6 +175,25 @@ static bool touch_read(i2c_master_dev_handle_t touch, int *x, int *y)
     *x = (DFR0550_H_RES - 1) - raw_x;
     *y = (DFR0550_V_RES - 1) - raw_y;
     return true;
+}
+
+/*
+ * Host hook called by the Rust rlvgl payload when the disco controller asks
+ * for a backlight change (DiscoCommand::SetBacklight). Maps the abstract
+ * 0..100 level to the DFR0550 bridge's 0..255 PWM register. Non-static so the
+ * Rust staticlib resolves it at link. Runs on the render task, same as every
+ * other bridge I2C access, so no extra synchronization is needed.
+ */
+void rlvgl_host_set_backlight(uint8_t level)
+{
+    if (level > 100) {
+        level = 100;
+    }
+    uint8_t pwm = (uint8_t)((uint32_t)level * 255u / 100u);
+    if (s_bridge != NULL) {
+        bridge_write(s_bridge, DFR0550_REG_PWM, pwm);
+        ESP_LOGI(TAG, "Backlight %u%% -> PWM %u", level, pwm);
+    }
 }
 
 static void dphy_power_on(void)
@@ -289,6 +309,7 @@ void app_main(void)
 #endif
 
     i2c_master_dev_handle_t bridge = bridge_i2c_init();
+    s_bridge = bridge; /* expose to the Rust backlight hook (M5) */
     bridge_wake(bridge);
 
 #if CONFIG_DFR0550_POWER_OFF_AFTER_WAKE
