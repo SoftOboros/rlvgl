@@ -3,6 +3,7 @@
  */
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +49,20 @@ enum {
     DFR0550_PORTA_KERNEL_DEFAULT = 0x04,
 };
 
+enum {
+    /*
+     * FocalTech FT5x06/FT6x36 capacitive touch, on the SAME FFC I2C bus as the
+     * 0x45 bridge (SDA=GPIO7, SCL=GPIO8). 5-point; we read point 1 only here.
+     * Register map: 0x02 = TD_STATUS (low nibble = #points); each point is six
+     * bytes from 0x03: XH[evt:2|.. |x_hi:4], XL, YH[id:4|y_hi:4], YL, weight,
+     * misc. Event flag (XH>>6): 0=down 1=up 2=contact 3=no-event.
+     */
+    FT5X06_I2C_ADDR = 0x38,
+    FT5X06_REG_TD_STATUS = 0x02,
+};
+
 static esp_ldo_channel_handle_t s_dphy_ldo;
+static i2c_master_bus_handle_t s_i2c_bus;
 
 static void bridge_write(i2c_master_dev_handle_t bridge, uint8_t reg, uint8_t value)
 {
@@ -77,6 +91,7 @@ static i2c_master_dev_handle_t bridge_i2c_init(void)
         },
     };
     ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus));
+    s_i2c_bus = bus;
 
     i2c_master_dev_handle_t bridge = NULL;
     i2c_device_config_t device_config = {
@@ -112,6 +127,53 @@ static void bridge_wake(i2c_master_dev_handle_t bridge)
 
     ESP_LOGE(TAG, "DFR0550 bridge never reported ready");
     abort();
+}
+
+static i2c_master_dev_handle_t touch_i2c_init(void)
+{
+    i2c_master_dev_handle_t touch = NULL;
+    i2c_device_config_t device_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = FT5X06_I2C_ADDR,
+        .scl_speed_hz = 100000,
+        .scl_wait_us = 0,
+    };
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(s_i2c_bus, &device_config, &touch));
+    ESP_LOGI(TAG, "FT5x06 touch attached at I2C 0x%02x", FT5X06_I2C_ADDR);
+    return touch;
+}
+
+/*
+ * Read touch point 1 from the FT5x06. Returns true with x and y set when a
+ * finger is down (event flag down/contact); false on no-touch, lift, or error.
+ */
+static bool touch_read(i2c_master_dev_handle_t touch, int *x, int *y)
+{
+    uint8_t reg = FT5X06_REG_TD_STATUS;
+    uint8_t buf[5] = {0};
+    esp_err_t err = i2c_master_transmit_receive(touch, &reg, 1, buf, sizeof(buf), 100);
+    if (err != ESP_OK) {
+        return false;
+    }
+    uint8_t points = buf[0] & 0x0f;
+    if (points == 0 || points > 5) {
+        return false;
+    }
+    uint8_t event = buf[1] >> 6; /* 0=down 1=up 2=contact 3=no-event */
+    if (event == 1 || event == 3) {
+        return false;
+    }
+    int raw_x = ((buf[1] & 0x0f) << 8) | buf[2];
+    int raw_y = ((buf[3] & 0x0f) << 8) | buf[4];
+    /*
+     * The FT5x06 frame is point-reflected through center relative to the DSI
+     * scanout (center hits, but motion runs opposite on both axes), i.e. the
+     * panel is mounted 180 degrees from the touch panel's native origin.
+     * Flip both axes into screen space (verified on hardware 2026-06-15).
+     */
+    *x = (DFR0550_H_RES - 1) - raw_x;
+    *y = (DFR0550_V_RES - 1) - raw_y;
+    return true;
 }
 
 static void dphy_power_on(void)
@@ -204,10 +266,12 @@ static void fill_rgb888(void *framebuffer, uint8_t r, uint8_t g, uint8_t b)
 #endif
 
 #if !CONFIG_DFR0550_COLOR_CYCLE
-/* BEETLE M1: hand the framebuffer to the Rust rlvgl payload, then writeback. */
-static void render_rlvgl(void *framebuffer)
+/* BEETLE M1/M3: hand the framebuffer to the Rust rlvgl payload (with the latest
+ * touch point, if any), then writeback. */
+static void render_rlvgl(void *framebuffer, int touch_x, int touch_y, int touch_active)
 {
-    rlvgl_app_render((uint8_t *)framebuffer, DFR0550_H_RES, DFR0550_V_RES);
+    rlvgl_app_render((uint8_t *)framebuffer, DFR0550_H_RES, DFR0550_V_RES,
+                     touch_x, touch_y, touch_active);
     ESP_ERROR_CHECK(esp_cache_msync(framebuffer, DFR0550_FB_BYTES,
                                     ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED));
 }
@@ -274,9 +338,29 @@ void app_main(void)
      * active, so render starts on fb[1].
      */
     ESP_LOGI(TAG, "Rendering rlvgl widget tree (M1, double-buffered)");
+    i2c_master_dev_handle_t touch = touch_i2c_init();
     int back = 1;
+    int last_x = 0, last_y = 0, last_active = 0;
     for (size_t frame = 0;; frame++) {
-        render_rlvgl(fb[back]);
+        int tx = 0, ty = 0;
+        int active = touch_read(touch, &tx, &ty) ? 1 : 0;
+
+        /* Serial trace for position validation: rising/falling edges always,
+         * plus a throttled trace while held so drag motion is visible. */
+        if (active && !last_active) {
+            ESP_LOGI(TAG, "touch down  %d,%d", tx, ty);
+        } else if (!active && last_active) {
+            ESP_LOGI(TAG, "touch up    %d,%d", last_x, last_y);
+        } else if (active && (frame % 8 == 0)) {
+            ESP_LOGI(TAG, "touch move  %d,%d", tx, ty);
+        }
+        last_active = active;
+        if (active) {
+            last_x = tx;
+            last_y = ty;
+        }
+
+        render_rlvgl(fb[back], tx, ty, active);
         ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel, 0, 0, DFR0550_H_RES,
                                                   DFR0550_V_RES, fb[back]));
         back ^= 1;

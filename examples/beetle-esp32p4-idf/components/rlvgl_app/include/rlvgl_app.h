@@ -15,17 +15,22 @@ extern "C" {
 #endif
 
 /*
- * Build and draw one rlvgl screen into a 24-bit packed RGB framebuffer.
+ * Build and draw one rlvgl screen into a 24-bit packed RGB framebuffer,
+ * optionally overlaying a touch crosshair + coordinate readout.
  *
- *   fb      - pointer to width * height * 3 writable bytes (R,G,B per pixel)
- *   width   - framebuffer width in pixels
- *   height  - framebuffer height in pixels
+ *   fb            - pointer to width * height * 3 writable bytes (R,G,B/pixel)
+ *   width         - framebuffer width in pixels
+ *   height        - framebuffer height in pixels
+ *   touch_x       - touch X in framebuffer pixels (ignored if !touch_active)
+ *   touch_y       - touch Y in framebuffer pixels (ignored if !touch_active)
+ *   touch_active  - nonzero to draw the touch marker at (touch_x, touch_y)
  *
  * The caller owns cache coherency: call esp_cache_msync(fb, ..., C2M) after
  * this returns, exactly as the original solid-color fill did. The call does
  * not block and does no hardware access of its own.
  */
-void rlvgl_app_render(uint8_t *fb, int32_t width, int32_t height);
+void rlvgl_app_render(uint8_t *fb, int32_t width, int32_t height,
+                      int32_t touch_x, int32_t touch_y, int32_t touch_active);
 
 #ifdef __cplusplus
 }

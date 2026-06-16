@@ -257,12 +257,59 @@ fn build_screen(width: i32, height: i32) -> Rc<RefCell<WidgetNode>> {
 // C ABI surface.
 // ---------------------------------------------------------------------------
 
-/// Build and draw one static rlvgl screen into a 24-bit RGB framebuffer.
+/// Draw a touch crosshair + live coordinate readout over the rendered tree.
+///
+/// M3 touch validation: a bright magenta crosshair (full-width/height lines
+/// plus a centered box) marks the reported touch point, and a yellow label
+/// echoes the raw `(x, y)` so the screen↔touch coordinate mapping can be
+/// checked by eye against where the finger actually is.
+fn draw_touch_marker(r: &mut Rgb888Renderer<'_>, width: i32, height: i32, x: i32, y: i32) {
+    let cross = Color(255, 0, 255, 255);
+    // Vertical + horizontal lines through the touch point.
+    r.fill_rect(
+        Rect {
+            x: x - 1,
+            y: 0,
+            width: 3,
+            height,
+        },
+        cross,
+    );
+    r.fill_rect(
+        Rect {
+            x: 0,
+            y: y - 1,
+            width,
+            height: 3,
+        },
+        cross,
+    );
+    // Centered box at the touch point.
+    r.fill_rect(
+        Rect {
+            x: x - 8,
+            y: y - 8,
+            width: 16,
+            height: 16,
+        },
+        cross,
+    );
+    // Live coordinate readout (inside the card, under the subtitle line).
+    let label = alloc::format!("touch {},{}", x, y);
+    r.draw_text((64, 128), &label, Color(255, 255, 0, 255));
+}
+
+/// Build and draw one rlvgl screen into a 24-bit RGB framebuffer, optionally
+/// overlaying a touch marker.
 ///
 /// `fb` must point at `width * height * 3` writable bytes (R,G,B packed). The
 /// caller owns cache coherency: invoke `esp_cache_msync(..., C2M)` after this
 /// returns, exactly as the original color-fill loop did. This function only
 /// touches the CPU-visible buffer and never blocks.
+///
+/// When `touch_active != 0`, a crosshair + coordinate readout is drawn at
+/// `(touch_x, touch_y)` (M3 touch validation). Pass `touch_active == 0` to
+/// render the static screen alone.
 ///
 /// Re-builds the widget tree on each call for M1 simplicity; animation (M2)
 /// will hoist the tree into persistent state.
@@ -271,7 +318,14 @@ fn build_screen(width: i32, height: i32) -> Rc<RefCell<WidgetNode>> {
 /// `fb` must be valid for `width * height * 3` writable bytes for the duration
 /// of the call and must not alias memory Rust accesses concurrently.
 #[no_mangle]
-pub unsafe extern "C" fn rlvgl_app_render(fb: *mut u8, width: i32, height: i32) {
+pub unsafe extern "C" fn rlvgl_app_render(
+    fb: *mut u8,
+    width: i32,
+    height: i32,
+    touch_x: i32,
+    touch_y: i32,
+    touch_active: i32,
+) {
     if fb.is_null() || width <= 0 || height <= 0 {
         return;
     }
@@ -283,4 +337,8 @@ pub unsafe extern "C" fn rlvgl_app_render(fb: *mut u8, width: i32, height: i32) 
     let tree = build_screen(width, height);
     let mut renderer = Rgb888Renderer::new(frame, width, height);
     tree.borrow().draw(&mut renderer);
+
+    if touch_active != 0 {
+        draw_touch_marker(&mut renderer, width, height, touch_x, touch_y);
+    }
 }
