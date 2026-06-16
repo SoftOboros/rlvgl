@@ -17,10 +17,13 @@ use crate::theme::{ColorScheme, ComponentSize, Theme, Variant};
 
 pub use rlvgl_widgets::dropdown::DropdownDir as SelectDirection;
 
+/// Callback invoked when the selection changes, receiving `(index, text)`.
+type ChangeHandler = dyn FnMut(usize, &str);
+
 /// Closed-trigger + open-list select control.
 pub struct Select {
     inner: Dropdown,
-    on_change: Option<Box<dyn FnMut(usize, &str)>>,
+    on_change: Option<Box<ChangeHandler>>,
 }
 
 impl Select {

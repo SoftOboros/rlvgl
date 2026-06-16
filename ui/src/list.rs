@@ -15,10 +15,13 @@ use rlvgl_widgets::list::List as BaseList;
 
 use crate::theme::{ColorScheme, ComponentSize, Theme, Variant};
 
+/// Callback invoked when the selected item changes, receiving `(index, text)`.
+type SelectHandler = dyn FnMut(usize, &str);
+
 /// Vertical list of selectable text items.
 pub struct List {
     inner: BaseList,
-    on_select: Option<Box<dyn FnMut(usize, &str)>>,
+    on_select: Option<Box<SelectHandler>>,
 }
 
 impl List {

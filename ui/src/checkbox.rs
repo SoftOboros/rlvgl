@@ -8,6 +8,7 @@
 use alloc::{boxed::Box, string::String};
 use rlvgl_core::{
     event::Event,
+    font::{FontMetrics, WidgetFont},
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
@@ -99,6 +100,11 @@ impl Checkbox {
         self
     }
 
+    /// Assign the font used to render the label.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.inner.set_font(font);
+    }
+
     /// Immutable access to the checkbox style.
     pub fn style(&self) -> &rlvgl_core::style::Style {
         &self.inner.style
@@ -113,6 +119,10 @@ impl Checkbox {
 impl Widget for Checkbox {
     fn bounds(&self) -> Rect {
         self.inner.bounds()
+    }
+
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        self.inner.widget_font_mut()
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
@@ -176,5 +186,19 @@ mod tests {
             theme.scheme(ColorScheme::Success).solid
         );
         assert_eq!(checkbox.style().radius, theme.tokens.radii.sm);
+    }
+
+    #[test]
+    fn checkbox_exposes_font_slot_for_registry() {
+        // Regression: the wrapper dropped `widget_font_mut`, so the FONT-05
+        // font registry could not reach the label font through it.
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 20,
+        };
+        let mut cb = Checkbox::new("Accept", bounds);
+        assert!(cb.widget_font_mut().is_some());
     }
 }

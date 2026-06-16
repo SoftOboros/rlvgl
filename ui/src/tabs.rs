@@ -150,7 +150,7 @@ impl Tabs {
         let resolved = theme.component_style(scheme, variant, size);
         let colors = theme.scheme(scheme);
         self.inner.style = resolved.style;
-        self.inner.active_tab_color = resolved.style.bg_color;
+        self.inner.active_tab_color = resolved.accent_color;
         self.inner.active_tab_text_color = resolved.text_color;
         self.inner.tab_color = colors.subtle;
         self.inner.tab_text_color = colors.solid;
@@ -235,6 +235,31 @@ mod tests {
             tabs.inner.tab_color,
             theme.scheme(ColorScheme::Primary).subtle
         );
+    }
+
+    #[test]
+    fn tabs_themed_active_distinct_from_inactive_in_non_solid_variant() {
+        // Regression: `active_tab_color` was sourced from `style.bg_color`,
+        // which equals the inactive `tab_color` (subtle) under `Subtle` and is
+        // transparent under `Outline`/`Ghost`, collapsing the active-tab
+        // indicator. It must track `accent_color` instead.
+        let theme = Theme::material_light();
+        for variant in [Variant::Subtle, Variant::Outline, Variant::Ghost] {
+            let tabs = Tabs::new(rect(0, 0, 200, 100), TabBarPos::Top).themed(
+                &theme,
+                ColorScheme::Primary,
+                variant,
+                ComponentSize::Md,
+            );
+            assert_ne!(
+                tabs.inner.active_tab_color, tabs.inner.tab_color,
+                "active tab must stay distinct from inactive ({variant:?})"
+            );
+            assert_ne!(
+                tabs.inner.active_tab_color.3, 0,
+                "active tab must not be transparent ({variant:?})"
+            );
+        }
     }
 
     fn rect(x: i32, y: i32, width: i32, height: i32) -> Rect {

@@ -17,10 +17,13 @@ use crate::theme::{ColorScheme, ComponentSize, Theme, Variant};
 
 pub use rlvgl_widgets::button_matrix::{BUTTON_NONE, ButtonId, ButtonMatrixControl};
 
+/// Callback invoked when a button activates, receiving `(id, label)`.
+type ActivateHandler = dyn FnMut(ButtonId, &str);
+
 /// Grid of labeled buttons arranged in rows.
 pub struct ButtonMatrix {
     inner: BaseButtonMatrix,
-    on_activate: Option<Box<dyn FnMut(ButtonId, &str)>>,
+    on_activate: Option<Box<ActivateHandler>>,
 }
 
 impl ButtonMatrix {

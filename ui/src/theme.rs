@@ -7,9 +7,10 @@ use rlvgl_core::style::Style;
 use rlvgl_core::widget::Rect;
 
 /// Named color scheme used by themed component variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ColorScheme {
     /// Primary brand color.
+    #[default]
     Primary,
     /// Neutral grayscale color.
     Neutral,
@@ -23,16 +24,11 @@ pub enum ColorScheme {
     Danger,
 }
 
-impl Default for ColorScheme {
-    fn default() -> Self {
-        Self::Primary
-    }
-}
-
 /// Visual treatment for a themed component.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Variant {
     /// Filled background using the scheme color.
+    #[default]
     Solid,
     /// Low-emphasis filled background derived from the scheme color.
     Subtle,
@@ -42,29 +38,18 @@ pub enum Variant {
     Ghost,
 }
 
-impl Default for Variant {
-    fn default() -> Self {
-        Self::Solid
-    }
-}
-
 /// Component sizing tier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ComponentSize {
     /// Extra-small controls.
     Xs,
     /// Small controls.
     Sm,
     /// Medium controls.
+    #[default]
     Md,
     /// Large controls.
     Lg,
-}
-
-impl Default for ComponentSize {
-    fn default() -> Self {
-        Self::Md
-    }
 }
 
 /// Resolved colors for a [`ColorScheme`].

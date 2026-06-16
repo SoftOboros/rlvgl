@@ -344,8 +344,12 @@ impl Grid {
         W: Widget + 'static,
         F: FnOnce(Rect) -> W,
     {
-        let col = self.next % self.cols;
-        let row = self.next / self.cols;
+        // Guard a misconfigured zero/negative column count: degenerate to a
+        // single column instead of panicking on `% 0` / `/ 0`. Mirrors the
+        // `cols == 0` tolerance in `GridCalc`.
+        let cols = self.cols.max(1);
+        let col = self.next % cols;
+        let row = self.next / cols;
         let x = col * (self.cell_w + self.spacing);
         let y = row * (self.cell_h + self.spacing);
         let rect = Rect {
@@ -576,6 +580,16 @@ mod tests {
             .child(|r| Label::new("c", r));
         assert_eq!(grid.bounds().height, 11);
         assert_eq!(grid.bounds().width, 11);
+    }
+
+    #[test]
+    fn grid_zero_cols_does_not_panic() {
+        // Regression: `Grid::child` divided/modulo'd by `self.cols`, panicking
+        // on a zero-column grid. It now degenerates to a single column.
+        let grid = Grid::new(0, 5, 5)
+            .child(|r| Label::new("a", r))
+            .child(|r| Label::new("b", r));
+        assert_eq!(grid.bounds().height, 10);
     }
 
     #[test]
