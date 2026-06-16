@@ -12,9 +12,9 @@ layout helpers, style builders, and overlay utilities for application code.
 ## What It Provides
 
 - ready-to-use components such as `Alert`, `Badge`, `Bar`, `Button`,
-  `ButtonMatrix`, `Checkbox`, `Drawer`, `Input`, `Led`, `List`, `Modal`,
-  `Progress`, `Radio`, `Select`, `Spinner`, `Switch`, `Tabs`, `Tag`, `Text`,
-  and `Toast`
+  `ButtonMatrix`, `Checkbox`, `Divider`, `Drawer`, `Input`, `Led`, `List`,
+  `Modal`, `Progress`, `Radio`, `Select`, `Spinner`, `Spacer`, `Switch`,
+  `Tabs`, `Tag`, `Text`, and `Toast`
 - direct access to mature LVGL-parity widgets such as `Calendar`,
   `MessageBox`, `Spinbox`, `Table`, and `Window`
 - layout helpers including `HStack`, `VStack`, `Grid`, and `BoxLayout`
@@ -22,6 +22,8 @@ layout helpers, style builders, and overlay utilities for application code.
   `Theme::control_rect`
 - a theme/token layer with `Theme`, `Tokens`, `Style`, `StyleBuilder`, and
   fluent `StyleProps` / `ThemeProps`
+- direct-widget part theming through `ThemedPartsProps` for `Calendar`,
+  `MessageBox`, `Spinbox`, `Table`, and `Window`
 - overlay and transient UI helpers such as `EventWindow`
 - an optional `view` feature for view-oriented helpers
 
@@ -48,7 +50,9 @@ For components with accent parts, such as `Progress`, `Bar`, `Spinner`,
 `Led`, `Select`, `Tabs`, and `ButtonMatrix`, the inherent `themed(...)` method
 maps the same resolved theme style onto fills, indicators, selected rows, or
 tab states. For simpler components, importing `ThemeProps` provides a generic
-`themed(...)` style-only prop.
+`themed(...)` style-only prop. Direct LVGL-parity widgets use
+`themed_parts(...)` when their header, cursor, selected-cell, or button colors
+should also follow the theme.
 
 Rect construction follows the same compact style:
 

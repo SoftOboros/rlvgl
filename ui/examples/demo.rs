@@ -11,9 +11,10 @@
 #[cfg(feature = "view")]
 use rlvgl_ui::view;
 use rlvgl_ui::{
-    Alert, Badge, Bar, BarMode, Button, ButtonMatrix, Checkbox, ColorScheme, ComponentSize, Drawer,
-    Heading, Icon, IconButton, Input, Led, List, Modal, OnClick, Progress, Radio, RectProps,
-    Select, Spinner, StyleBuilder, StyleProps, Switch, TabBarPos, Tabs, Tag, Text, Textarea, Theme,
+    Alert, Badge, Bar, BarMode, Button, ButtonMatrix, Calendar, Checkbox, ColorScheme,
+    ComponentSize, Divider, DividerOrientation, Drawer, Heading, Icon, IconButton, Input, Led,
+    List, Modal, OnClick, Progress, Radio, RectProps, Select, Spacer, Spinner, StyleBuilder,
+    StyleProps, Switch, TabBarPos, Table, Tabs, Tag, Text, Textarea, Theme, ThemedPartsProps,
     Toast, VStack, Variant, rect,
 };
 
@@ -106,6 +107,25 @@ fn main() {
             &theme,
             ColorScheme::Neutral,
             Variant::Subtle,
+            ComponentSize::Sm,
+        ),
+        Divider::new(rect(0, 328, 100, 8), DividerOrientation::Horizontal).themed(
+            &theme,
+            ColorScheme::Neutral,
+            Variant::Outline,
+            ComponentSize::Sm,
+        ),
+        Spacer::height(theme.component_size(ComponentSize::Md).gap),
+        Table::new(rect(0, 342, 120, 48)).themed_parts(
+            &theme,
+            ColorScheme::Info,
+            Variant::Subtle,
+            ComponentSize::Sm,
+        ),
+        Calendar::new(rect(0, 396, 140, 96)).themed_parts(
+            &theme,
+            ColorScheme::Primary,
+            Variant::Outline,
             ComponentSize::Sm,
         ),
     );

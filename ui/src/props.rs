@@ -147,6 +147,7 @@ impl_style_props_via_method!(
     crate::button::IconButton,
     crate::button_matrix::ButtonMatrix,
     crate::checkbox::Checkbox,
+    crate::divider::Divider,
     crate::drawer::Drawer,
     crate::event::Slider,
     crate::input::Input,
