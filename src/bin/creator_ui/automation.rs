@@ -487,6 +487,7 @@ fn map_key(key: KeySpec) -> Option<egui::Key> {
         KeySpec::Escape => Some(egui::Key::Escape),
         KeySpec::Enter => Some(egui::Key::Enter),
         KeySpec::Space => Some(egui::Key::Space),
+        KeySpec::Backspace => Some(egui::Key::Backspace),
         KeySpec::ArrowUp => Some(egui::Key::ArrowUp),
         KeySpec::ArrowDown => Some(egui::Key::ArrowDown),
         KeySpec::ArrowLeft => Some(egui::Key::ArrowLeft),
