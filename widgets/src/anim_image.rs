@@ -282,26 +282,24 @@ impl AnimImage {
                     }
                 }
             }
+        } else if self.frame_index > 0 {
+            self.frame_index -= 1;
         } else {
-            if self.frame_index > 0 {
-                self.frame_index -= 1;
-            } else {
-                // Reached frame 0 going backward.
-                match self.loop_mode {
-                    AnimImageLoopMode::Loop => {
-                        self.frame_index = count - 1;
+            // Reached frame 0 going backward.
+            match self.loop_mode {
+                AnimImageLoopMode::Loop => {
+                    self.frame_index = count - 1;
+                }
+                AnimImageLoopMode::Once => {
+                    self.play_state = AnimPlayState::Paused;
+                    if let Some(cb) = &mut self.on_complete {
+                        cb();
                     }
-                    AnimImageLoopMode::Once => {
-                        self.play_state = AnimPlayState::Paused;
-                        if let Some(cb) = &mut self.on_complete {
-                            cb();
-                        }
-                    }
-                    AnimImageLoopMode::Bounce => {
-                        self.bounce_forward = true;
-                        if count >= 2 {
-                            self.frame_index = 1;
-                        }
+                }
+                AnimImageLoopMode::Bounce => {
+                    self.bounce_forward = true;
+                    if count >= 2 {
+                        self.frame_index = 1;
                     }
                 }
             }
