@@ -145,9 +145,15 @@ pub fn encode_pixels(
 
 /// Build the 12-byte `lv_image_header_t`.
 pub fn header_bytes(width: u16, height: u16, cf: LvglCf, flags: u16, stride: u16) -> [u8; 12] {
+    header_bytes_raw(width, height, cf.code(), flags, stride)
+}
+
+/// Build the 12-byte `lv_image_header_t` from a raw `lv_color_format_t` code.
+/// Used by the alpha-only path, whose formats live in [`LvglAlphaCf`].
+pub fn header_bytes_raw(width: u16, height: u16, cf_code: u8, flags: u16, stride: u16) -> [u8; 12] {
     let mut h = [0u8; 12];
     h[0] = LV_IMAGE_HEADER_MAGIC;
-    h[1] = cf.code();
+    h[1] = cf_code;
     h[2..4].copy_from_slice(&flags.to_le_bytes());
     h[4..6].copy_from_slice(&width.to_le_bytes());
     h[6..8].copy_from_slice(&height.to_le_bytes());
@@ -365,6 +371,324 @@ fn decode_pixels(pixels: &[u8], count: usize, cf: LvglCf) -> Vec<u8> {
     rgba
 }
 
+// ---------------------------------------------------------------------------
+// Alpha-only ("coverage") formats — A8 / A4.
+//
+// These store a single coverage channel; the fill color is applied at draw
+// time (LVGL's image-recolor style, or rlvgl's `blend_alpha_bin_into_argb`).
+// Ideal for monochrome line-art icons: one asset retints to any color at a
+// fraction of an `ARGB8888` asset's size.
+// ---------------------------------------------------------------------------
+
+/// Where an alpha-only encode derives its coverage channel from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CoverageSource {
+    /// Source alpha if the image has real transparency, else luminance.
+    Auto,
+    /// Always the source alpha channel (transparent-background icons).
+    Alpha,
+    /// Always luminance (`white-on-black` opaque mask art; white = ink).
+    Luminance,
+}
+
+/// LVGL alpha-only color formats. The stored byte(s) are coverage; color is
+/// applied when drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LvglAlphaCf {
+    /// 8-bit alpha (`0x0E`), 1 byte/px — smooth, no dithering needed.
+    A8,
+    /// 4-bit alpha (`0x0D`), 2 px/byte (pixel 0 = high nibble), nibble `n`
+    /// expands to `n * 17`. Floyd–Steinberg dithered to approximate the ramp.
+    A4,
+}
+
+impl LvglAlphaCf {
+    /// Upstream `lv_color_format_t` code written to header byte 1.
+    pub fn code(self) -> u8 {
+        match self {
+            LvglAlphaCf::A8 => 0x0E,
+            LvglAlphaCf::A4 => 0x0D,
+        }
+    }
+
+    /// Bits per pixel in the packed data section.
+    pub fn bits_per_pixel(self) -> usize {
+        match self {
+            LvglAlphaCf::A8 => 8,
+            LvglAlphaCf::A4 => 4,
+        }
+    }
+
+    /// Row stride in bytes: `width * bpp` rounded up to a byte boundary.
+    pub fn stride(self, width: usize) -> usize {
+        (width * self.bits_per_pixel()).div_ceil(8)
+    }
+
+    /// Upstream C enum name, for generated `lv_image_dsc_t` descriptors.
+    pub fn lv_name(self) -> &'static str {
+        match self {
+            LvglAlphaCf::A8 => "LV_COLOR_FORMAT_A8",
+            LvglAlphaCf::A4 => "LV_COLOR_FORMAT_A4",
+        }
+    }
+}
+
+/// Rec. 601 luma of an RGBA pixel: `(77R + 150G + 29B) >> 8`. Deterministic.
+fn luma(px: &[u8]) -> u8 {
+    ((77 * px[0] as u32 + 150 * px[1] as u32 + 29 * px[2] as u32) >> 8) as u8
+}
+
+/// Resolve [`CoverageSource::Auto`] for a frame: alpha if any pixel is
+/// non-opaque, else luminance.
+fn resolve_coverage(rgba: &[u8], count: usize, src: CoverageSource) -> CoverageSource {
+    match src {
+        CoverageSource::Auto => {
+            if (0..count).any(|i| rgba[i * 4 + 3] != 0xFF) {
+                CoverageSource::Alpha
+            } else {
+                CoverageSource::Luminance
+            }
+        }
+        other => other,
+    }
+}
+
+/// 8-bit coverage of one pixel under a resolved (non-`Auto`) source.
+fn coverage_at(px: &[u8], src: CoverageSource) -> u8 {
+    match src {
+        CoverageSource::Luminance => luma(px),
+        // Alpha, or an unresolved Auto (treated as alpha) — px[3].
+        _ => px[3],
+    }
+}
+
+/// Floyd–Steinberg dither an 8-bit coverage plane to 4-bit values (`0..=15`),
+/// one per pixel in raster order. Deterministic (no RNG).
+fn dither_a4(width: usize, height: usize, cover: &[u8]) -> Vec<u8> {
+    let mut work: Vec<i32> = cover.iter().map(|&c| c as i32).collect();
+    let mut out = alloc::vec![0u8; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let idx = y * width + x;
+            let old = work[idx].clamp(0, 255);
+            let q = (old * 15 + 127) / 255; // nearest of 16 levels
+            out[idx] = q as u8;
+            let err = old - q * 17; // q*17 is the reconstructed 8-bit value
+            let mut diffuse = |xx: i32, yy: i32, num: i32| {
+                if xx >= 0 && (xx as usize) < width && (yy as usize) < height {
+                    work[yy as usize * width + xx as usize] += err * num / 16;
+                }
+            };
+            diffuse(x as i32 + 1, y as i32, 7);
+            diffuse(x as i32 - 1, y as i32 + 1, 3);
+            diffuse(x as i32, y as i32 + 1, 5);
+            diffuse(x as i32 + 1, y as i32 + 1, 1);
+        }
+    }
+    out
+}
+
+/// Pack 4-bit values (pixel 0 in the high nibble) into byte-aligned rows.
+fn pack_a4(width: usize, height: usize, q4: &[u8]) -> Vec<u8> {
+    let stride = LvglAlphaCf::A4.stride(width);
+    let mut out = alloc::vec![0u8; stride * height];
+    for y in 0..height {
+        for x in 0..width {
+            let n = q4[y * width + x] & 0x0F;
+            let byte = y * stride + x / 2;
+            if x % 2 == 0 {
+                out[byte] |= n << 4;
+            } else {
+                out[byte] |= n;
+            }
+        }
+    }
+    out
+}
+
+/// Encode an alpha-only pixel data section (no header) from an RGBA frame.
+pub fn encode_alpha_pixels(
+    width: usize,
+    height: usize,
+    rgba: &[u8],
+    cf: LvglAlphaCf,
+    src: CoverageSource,
+) -> Result<Vec<u8>, Error> {
+    let count = width * height;
+    if rgba.len() < count * 4 {
+        return Err(Error::SizeMismatch);
+    }
+    let src = resolve_coverage(rgba, count, src);
+    let cover: Vec<u8> = (0..count)
+        .map(|i| coverage_at(&rgba[i * 4..i * 4 + 4], src))
+        .collect();
+    match cf {
+        // A8: stride == width, so raster-order coverage is the data section.
+        LvglAlphaCf::A8 => Ok(cover),
+        LvglAlphaCf::A4 => {
+            let q4 = dither_a4(width, height, &cover);
+            Ok(pack_a4(width, height, &q4))
+        }
+    }
+}
+
+/// Encode an alpha-only LVGL v9 `.bin` (optionally RLE-compressed).
+pub fn encode_alpha_bin(
+    width: usize,
+    height: usize,
+    rgba: &[u8],
+    cf: LvglAlphaCf,
+    src: CoverageSource,
+    rle: bool,
+) -> Result<Vec<u8>, Error> {
+    let pixels = encode_alpha_pixels(width, height, rgba, cf, src)?;
+    let stride = cf.stride(width) as u16;
+    let mut out = Vec::new();
+    if rle {
+        // LVGL RLE block size for sub-byte formats is ceil(bpp/8) == 1 byte.
+        let compressed = rle_compress(&pixels, 1);
+        out.extend_from_slice(&header_bytes_raw(
+            width as u16,
+            height as u16,
+            cf.code(),
+            LV_IMAGE_FLAGS_COMPRESSED,
+            stride,
+        ));
+        out.extend_from_slice(&LvglCompress::Rle.code().to_le_bytes());
+        out.extend_from_slice(&(compressed.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(pixels.len() as u32).to_le_bytes());
+        out.extend_from_slice(&compressed);
+    } else {
+        out.extend_from_slice(&header_bytes_raw(
+            width as u16,
+            height as u16,
+            cf.code(),
+            0,
+            stride,
+        ));
+        out.extend_from_slice(&pixels);
+    }
+    Ok(out)
+}
+
+/// A decoded alpha-only `.bin`: `(width, height, format, 8-bit coverage plane)`.
+pub type DecodedAlpha = (u16, u16, LvglAlphaCf, Vec<u8>);
+
+/// Parse + decode an alpha-only LVGL `.bin` (A8/A4, uncompressed or RLE) into
+/// an 8-bit coverage plane in raster order (A4 nibbles expanded `n * 17`).
+pub fn decode_alpha_bin(data: &[u8]) -> Result<DecodedAlpha, Error> {
+    if data.len() < LV_IMAGE_HEADER_SIZE {
+        return Err(Error::Truncated);
+    }
+    if data[0] != LV_IMAGE_HEADER_MAGIC {
+        return Err(Error::BadMagic);
+    }
+    let cf = match data[1] {
+        0x0E => LvglAlphaCf::A8,
+        0x0D => LvglAlphaCf::A4,
+        _ => return Err(Error::Unsupported),
+    };
+    let flags = u16::from_le_bytes([data[2], data[3]]);
+    let width = u16::from_le_bytes([data[4], data[5]]);
+    let height = u16::from_le_bytes([data[6], data[7]]);
+    let (w, h) = (width as usize, height as usize);
+    let stride = cf.stride(w);
+    let data_len = stride * h;
+
+    let packed = if flags & LV_IMAGE_FLAGS_COMPRESSED != 0 {
+        let base = LV_IMAGE_HEADER_SIZE;
+        if data.len() < base + LV_IMAGE_COMPRESSED_HEADER_SIZE {
+            return Err(Error::Truncated);
+        }
+        let method =
+            u32::from_le_bytes([data[base], data[base + 1], data[base + 2], data[base + 3]]);
+        if method != LvglCompress::Rle.code() {
+            return Err(Error::Unsupported);
+        }
+        let clen = u32::from_le_bytes([
+            data[base + 4],
+            data[base + 5],
+            data[base + 6],
+            data[base + 7],
+        ]) as usize;
+        let start = base + LV_IMAGE_COMPRESSED_HEADER_SIZE;
+        if data.len() < start + clen {
+            return Err(Error::Truncated);
+        }
+        rle_decompress(&data[start..start + clen], 1, data_len)?
+    } else {
+        if data.len() < LV_IMAGE_HEADER_SIZE + data_len {
+            return Err(Error::Truncated);
+        }
+        data[LV_IMAGE_HEADER_SIZE..LV_IMAGE_HEADER_SIZE + data_len].to_vec()
+    };
+    if packed.len() < data_len {
+        return Err(Error::Truncated);
+    }
+
+    let mut cover = alloc::vec![0u8; w * h];
+    match cf {
+        LvglAlphaCf::A8 => {
+            for y in 0..h {
+                cover[y * w..y * w + w].copy_from_slice(&packed[y * stride..y * stride + w]);
+            }
+        }
+        LvglAlphaCf::A4 => {
+            for y in 0..h {
+                for x in 0..w {
+                    let byte = packed[y * stride + x / 2];
+                    let nib = if x % 2 == 0 { byte >> 4 } else { byte & 0x0F };
+                    cover[y * w + x] = nib * 17;
+                }
+            }
+        }
+    }
+    Ok((width, height, cf, cover))
+}
+
+/// Source-over composite a `fill` color through an 8-bit `coverage` plane onto
+/// an ARGB8888 destination buffer.
+///
+/// `dst` byte order is `[B, G, R, A]` per pixel (little-endian ARGB8888 —
+/// rlvgl's framebuffer layout). This is the rlvgl coverage+tint draw path:
+/// the icon stores only coverage; the caller supplies the fill color at draw
+/// time. Destination alpha is left fully opaque.
+pub fn blend_coverage_into_argb(
+    width: usize,
+    height: usize,
+    coverage: &[u8],
+    fill: (u8, u8, u8),
+    dst: &mut [u8],
+) -> Result<(), Error> {
+    let count = width * height;
+    if coverage.len() < count || dst.len() < count * 4 {
+        return Err(Error::SizeMismatch);
+    }
+    let (fr, fg, fb) = (fill.0 as u32, fill.1 as u32, fill.2 as u32);
+    for i in 0..count {
+        let a = coverage[i] as u32;
+        let ia = 255 - a;
+        let d = &mut dst[i * 4..i * 4 + 4];
+        d[0] = ((fb * a + d[0] as u32 * ia + 127) / 255) as u8;
+        d[1] = ((fg * a + d[1] as u32 * ia + 127) / 255) as u8;
+        d[2] = ((fr * a + d[2] as u32 * ia + 127) / 255) as u8;
+        d[3] = 0xFF;
+    }
+    Ok(())
+}
+
+/// Parse an alpha-only LVGL `.bin` and composite it onto an ARGB8888 buffer
+/// with `fill`. Returns the image dimensions. See [`blend_coverage_into_argb`].
+pub fn blend_alpha_bin_into_argb(
+    bin: &[u8],
+    fill: (u8, u8, u8),
+    dst: &mut [u8],
+) -> Result<(u16, u16), Error> {
+    let (w, h, _cf, cover) = decode_alpha_bin(bin)?;
+    blend_coverage_into_argb(w as usize, h as usize, &cover, fill, dst)?;
+    Ok((w, h))
+}
+
 #[cfg(test)]
 mod tests {
     extern crate alloc;
@@ -465,5 +789,118 @@ mod tests {
         let mut bin = encode_bin(2, 2, &solid(2, 2, 1, 2, 3, 4), LvglCf::Rgb565).unwrap();
         bin[0] = 0x00;
         assert_eq!(decode_bin(&bin), Err(Error::BadMagic));
+    }
+
+    // --- alpha-only (A8 / A4) coverage formats ---
+
+    /// Build an RGBA frame from a per-pixel `(r,g,b,a)` closure.
+    fn make_rgba(w: usize, h: usize, f: impl Fn(usize, usize) -> (u8, u8, u8, u8)) -> Vec<u8> {
+        let mut v = vec![0u8; w * h * 4];
+        for y in 0..h {
+            for x in 0..w {
+                let (r, g, b, a) = f(x, y);
+                let o = (y * w + x) * 4;
+                v[o..o + 4].copy_from_slice(&[r, g, b, a]);
+            }
+        }
+        v
+    }
+
+    #[test]
+    fn a8_coverage_auto_uses_alpha_when_transparent() {
+        // Distinct alpha per column; RGB constant. Auto must pick the alpha.
+        let alphas = [0u8, 0x80, 0xC0, 0xFF];
+        let rgba = make_rgba(4, 1, |x, _| (10, 20, 30, alphas[x]));
+        let px = encode_alpha_pixels(4, 1, &rgba, LvglAlphaCf::A8, CoverageSource::Auto).unwrap();
+        assert_eq!(px, alphas);
+    }
+
+    #[test]
+    fn a8_coverage_auto_falls_back_to_luminance_when_opaque() {
+        // Fully opaque white pixel -> luminance 255; black -> 0.
+        let rgba = make_rgba(2, 1, |x, _| {
+            if x == 0 {
+                (255, 255, 255, 255)
+            } else {
+                (0, 0, 0, 255)
+            }
+        });
+        let px = encode_alpha_pixels(2, 1, &rgba, LvglAlphaCf::A8, CoverageSource::Auto).unwrap();
+        assert_eq!(px[0], 255);
+        assert_eq!(px[1], 0);
+    }
+
+    #[test]
+    fn a4_packs_pixel0_in_high_nibble() {
+        // coverage [255, 0] -> 4-bit [15, 0] -> 0xF0; stride = (2*4+7)/8 = 1.
+        let rgba = make_rgba(2, 1, |x, _| (0, 0, 0, if x == 0 { 255 } else { 0 }));
+        let px = encode_alpha_pixels(2, 1, &rgba, LvglAlphaCf::A4, CoverageSource::Alpha).unwrap();
+        assert_eq!(px.len(), 1);
+        assert_eq!(px[0], 0xF0);
+    }
+
+    #[test]
+    fn a8_bin_round_trips_coverage_exactly() {
+        let rgba = make_rgba(8, 4, |x, y| (0, 0, 0, ((x + y * 8) * 7 % 256) as u8));
+        let bin =
+            encode_alpha_bin(8, 4, &rgba, LvglAlphaCf::A8, CoverageSource::Alpha, false).unwrap();
+        assert_eq!(bin[1], 0x0E); // A8 cf code
+        assert_eq!(u16::from_le_bytes([bin[8], bin[9]]), 8); // stride == width
+        let (w, h, cf, cover) = decode_alpha_bin(&bin).unwrap();
+        assert_eq!((w, h, cf), (8, 4, LvglAlphaCf::A8));
+        let expect: Vec<u8> = (0..32).map(|i| (i * 7 % 256) as u8).collect();
+        assert_eq!(cover, expect);
+    }
+
+    #[test]
+    fn a4_rle_round_trips_and_sets_flags() {
+        // Vertical alpha ramp -> dither produces runs the RLE can shrink.
+        let (w, h) = (16, 16);
+        let rgba = make_rgba(w, h, |_, y| (0, 0, 0, (y * 17) as u8));
+        let bin =
+            encode_alpha_bin(w, h, &rgba, LvglAlphaCf::A4, CoverageSource::Alpha, true).unwrap();
+        assert_eq!(bin[1], 0x0D); // A4
+        assert_ne!(
+            u16::from_le_bytes([bin[2], bin[3]]) & LV_IMAGE_FLAGS_COMPRESSED,
+            0
+        );
+        let plain =
+            encode_alpha_bin(w, h, &rgba, LvglAlphaCf::A4, CoverageSource::Alpha, false).unwrap();
+        // RLE vs uncompressed decode to identical coverage.
+        let (_, _, _, a) = decode_alpha_bin(&bin).unwrap();
+        let (_, _, _, b) = decode_alpha_bin(&plain).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn blend_coverage_is_source_over_with_fill() {
+        // dst starts black; fill is pure red. coverage 0 -> black, 255 -> red,
+        // 128 -> ~half.
+        let mut dst = vec![0u8; 3 * 4]; // 3 px ARGB8888 [B,G,R,A]
+        let cover = [0u8, 128, 255];
+        blend_coverage_into_argb(3, 1, &cover, (255, 0, 0), &mut dst).unwrap();
+        // px0: untouched black
+        assert_eq!(&dst[0..4], &[0, 0, 0, 0xFF]);
+        // px1: ~half red in the R byte (index 2)
+        assert!((dst[6] as i32 - 128).abs() <= 1, "got R={}", dst[6]);
+        assert_eq!(dst[4], 0); // B
+        assert_eq!(dst[5], 0); // G
+                               // px2: full red
+        assert_eq!(&dst[8..12], &[0, 0, 255, 0xFF]);
+    }
+
+    #[test]
+    fn blend_alpha_bin_tints_a_decoded_icon() {
+        // A8 bin: left opaque, right transparent. Tint green over white bg.
+        let rgba = make_rgba(2, 1, |x, _| (0, 0, 0, if x == 0 { 255 } else { 0 }));
+        let bin =
+            encode_alpha_bin(2, 1, &rgba, LvglAlphaCf::A8, CoverageSource::Alpha, false).unwrap();
+        let mut dst = vec![0xFFu8; 2 * 4]; // white bg
+        let (w, h) = blend_alpha_bin_into_argb(&bin, (0, 255, 0), &mut dst).unwrap();
+        assert_eq!((w, h), (2, 1));
+        // px0 fully covered -> green [B,G,R,A] = [0,255,0,255]
+        assert_eq!(&dst[0..4], &[0, 255, 0, 0xFF]);
+        // px1 zero coverage -> background white preserved
+        assert_eq!(&dst[4..8], &[0xFF, 0xFF, 0xFF, 0xFF]);
     }
 }

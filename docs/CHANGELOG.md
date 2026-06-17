@@ -58,6 +58,13 @@ LPAR parity substrate and widget-family release.
   emits the RLEC blob as a `uint8_t[]` / `[u8; N]`; `lvgl` emits a ready-to-use
   C `lv_image_dsc_t` (+ pixel map) or a Rust pixel map with width/height/format/
   stride constants.
+- Alpha-only icon formats `--cf a8|a4` (LVGL `A8`/`A4`): store a single coverage
+  channel (color applied at draw time via recolor), with `--coverage
+  auto|alpha|luminance` derivation and Floyd–Steinberg dithering for `a4`. Far
+  smaller than `argb8888` for monochrome line-art icons and freely retintable. A
+  matching rlvgl coverage+tint draw path
+  (`rlvgl_decomp::lvgl::blend_alpha_bin_into_argb`) composites the icon onto an
+  ARGB8888 buffer with a runtime fill color.
 - `rlvgl-decomp` bumped to `0.2.3` for the additive `lvgl` module.
 
 ### Release notes

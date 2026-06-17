@@ -86,10 +86,10 @@ impl From<OutKindArg> for emit::OutKind {
     }
 }
 
-/// LVGL color format for the `lvgl` converter.
+/// LVGL color/alpha format for the `lvgl` converter.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum LvglCfArg {
-    /// 16-bit RGB565 (most compact opaque format).
+    /// 16-bit RGB565 (most compact opaque color format).
     Rgb565,
     /// 24-bit RGB888.
     Rgb888,
@@ -97,16 +97,47 @@ enum LvglCfArg {
     Argb8888,
     /// 32-bit XRGB8888 (alpha forced opaque).
     Xrgb8888,
+    /// 8-bit alpha-only coverage; fill color applied at draw time.
+    A8,
+    /// 4-bit dithered alpha-only coverage (half the size of A8).
+    A4,
 }
 
-impl From<LvglCfArg> for rlvgl_decomp::lvgl::LvglCf {
-    fn from(c: LvglCfArg) -> Self {
-        use rlvgl_decomp::lvgl::LvglCf;
+/// Coverage source for the alpha-only formats (`a8`/`a4`).
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum CoverageSourceArg {
+    /// Source alpha if the image is transparent anywhere, else luminance.
+    Auto,
+    /// Always the source alpha channel.
+    Alpha,
+    /// Always luminance (white-on-black mask art).
+    Luminance,
+}
+
+impl From<CoverageSourceArg> for rlvgl_decomp::lvgl::CoverageSource {
+    fn from(c: CoverageSourceArg) -> Self {
+        use rlvgl_decomp::lvgl::CoverageSource;
         match c {
-            LvglCfArg::Rgb565 => LvglCf::Rgb565,
-            LvglCfArg::Rgb888 => LvglCf::Rgb888,
-            LvglCfArg::Argb8888 => LvglCf::Argb8888,
-            LvglCfArg::Xrgb8888 => LvglCf::Xrgb8888,
+            CoverageSourceArg::Auto => CoverageSource::Auto,
+            CoverageSourceArg::Alpha => CoverageSource::Alpha,
+            CoverageSourceArg::Luminance => CoverageSource::Luminance,
+        }
+    }
+}
+
+impl LvglCfArg {
+    /// Resolve to the encoder target, attaching the coverage source for the
+    /// alpha-only formats.
+    fn to_target(self, coverage: CoverageSourceArg) -> compress::LvglTarget {
+        use compress::LvglTarget;
+        use rlvgl_decomp::lvgl::{LvglAlphaCf, LvglCf};
+        match self {
+            LvglCfArg::Rgb565 => LvglTarget::Color(LvglCf::Rgb565),
+            LvglCfArg::Rgb888 => LvglTarget::Color(LvglCf::Rgb888),
+            LvglCfArg::Argb8888 => LvglTarget::Color(LvglCf::Argb8888),
+            LvglCfArg::Xrgb8888 => LvglTarget::Color(LvglCf::Xrgb8888),
+            LvglCfArg::A8 => LvglTarget::Alpha(LvglAlphaCf::A8, coverage.into()),
+            LvglCfArg::A4 => LvglTarget::Alpha(LvglAlphaCf::A4, coverage.into()),
         }
     }
 }
@@ -231,9 +262,12 @@ enum Command {
         input: PathBuf,
         /// Output file (.bin, or .c/.rs source with `--emit`)
         output: PathBuf,
-        /// LVGL color format of the emitted image
+        /// LVGL color/alpha format of the emitted image
         #[arg(long, value_enum, default_value_t = LvglCfArg::Rgb565)]
         cf: LvglCfArg,
+        /// Coverage source for `--cf a8|a4` (alpha-only formats)
+        #[arg(long, value_enum, default_value_t = CoverageSourceArg::Auto)]
+        coverage: CoverageSourceArg,
         /// Compress the `.bin` with LVGL RLE (ignored for `--emit c|rust`)
         #[arg(long)]
         rle: bool,
@@ -896,13 +930,14 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
             input,
             output,
             cf,
+            coverage,
             rle,
             emit,
             name,
         } => compress::lvgl(
             &input,
             &output,
-            cf.into(),
+            cf.to_target(coverage),
             rle,
             emit.into(),
             name.as_deref(),

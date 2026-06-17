@@ -142,3 +142,61 @@ fn lvgl_emit_c_writes_image_descriptor() {
     assert!(src.contains(".header.w = 60,"));
     assert!(src.contains(".header.stride = 120,")); // 60px * 2 bytes (RGB565)
 }
+
+/// Write a 4×2 RGBA PNG: left half opaque white, right half transparent.
+fn transparent_png(path: &std::path::Path) {
+    let mut img = image::RgbaImage::new(4, 2);
+    for y in 0..2 {
+        for x in 0..4 {
+            let a = if x < 2 { 255 } else { 0 };
+            img.put_pixel(x, y, image::Rgba([255, 255, 255, a]));
+        }
+    }
+    img.save(path).unwrap();
+}
+
+#[test]
+fn lvgl_a8_coverage_round_trips_from_alpha() {
+    let tmp = tempfile::tempdir().unwrap();
+    let png = tmp.path().join("mask.png");
+    transparent_png(&png);
+    let out = tmp.path().join("mask.bin");
+    run(&[
+        "lvgl",
+        png.to_str().unwrap(),
+        out.to_str().unwrap(),
+        "--cf",
+        "a8",
+    ]);
+
+    let data = std::fs::read(&out).unwrap();
+    assert_eq!(data[1], 0x0E); // A8 cf code
+    let (w, h, cf, cover) = lvgl::decode_alpha_bin(&data).expect("decode A8");
+    assert_eq!((w, h, cf), (4, 2, lvgl::LvglAlphaCf::A8));
+    // Auto picks alpha (image is transparent): left opaque, right clear.
+    assert_eq!(cover, vec![255, 255, 0, 0, 255, 255, 0, 0]);
+}
+
+#[test]
+fn lvgl_a8_tints_with_fill_over_background() {
+    let tmp = tempfile::tempdir().unwrap();
+    let png = tmp.path().join("mask.png");
+    transparent_png(&png);
+    let out = tmp.path().join("mask.bin");
+    run(&[
+        "lvgl",
+        png.to_str().unwrap(),
+        out.to_str().unwrap(),
+        "--cf",
+        "a8",
+    ]);
+
+    // Composite a green fill over a black 4×2 ARGB8888 background.
+    let data = std::fs::read(&out).unwrap();
+    let mut dst = vec![0u8; 4 * 2 * 4]; // [B,G,R,A] black, A=0
+    let (w, h) = lvgl::blend_alpha_bin_into_argb(&data, (0, 255, 0), &mut dst).unwrap();
+    assert_eq!((w, h), (4, 2));
+    // px0 covered -> green [B,G,R,A]=[0,255,0,255]; px2 clear -> stays black.
+    assert_eq!(&dst[0..4], &[0, 255, 0, 0xFF]);
+    assert_eq!(&dst[8..12], &[0, 0, 0, 0xFF]);
+}

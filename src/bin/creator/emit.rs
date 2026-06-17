@@ -15,7 +15,7 @@
 //! All output is deterministic (fixed 16-bytes-per-line formatting, no
 //! timestamps) so it is reproducible and diff-friendly.
 
-use rlvgl_decomp::lvgl::{LV_IMAGE_HEADER_MAGIC, LvglCf};
+use rlvgl_decomp::lvgl::LV_IMAGE_HEADER_MAGIC;
 
 /// Output container for an emitted image blob.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,9 +109,18 @@ pub fn emit_bytes(kind: OutKind, name: &str, bytes: &[u8]) -> String {
 /// Rust pixel-map array with dimension/format constants.
 ///
 /// `map` is the uncompressed pixel-data section in LVGL stored byte order.
-pub fn emit_lvgl(kind: OutKind, name: &str, w: u16, h: u16, cf: LvglCf, map: &[u8]) -> String {
+#[allow(clippy::too_many_arguments)]
+pub fn emit_lvgl(
+    kind: OutKind,
+    name: &str,
+    w: u16,
+    h: u16,
+    cf_name: &str,
+    cf_code: u8,
+    stride: usize,
+    map: &[u8],
+) -> String {
     let id = sanitize_ident(name);
-    let stride = (w as usize) * cf.bytes_per_pixel();
     match kind {
         OutKind::C => {
             format!(
@@ -132,7 +141,7 @@ pub fn emit_lvgl(kind: OutKind, name: &str, w: u16, h: u16, cf: LvglCf, map: &[u
                  \x20   .data_size = sizeof({id}_map),\n\
                  }};\n",
                 id = id,
-                cf = cf.lv_name(),
+                cf = cf_name,
                 w = w,
                 h = h,
                 stride = stride,
@@ -157,8 +166,8 @@ pub fn emit_lvgl(kind: OutKind, name: &str, w: u16, h: u16, cf: LvglCf, map: &[u
                 up = up,
                 w = w,
                 h = h,
-                cf_name = cf.lv_name(),
-                cf_code = cf.code(),
+                cf_name = cf_name,
+                cf_code = cf_code,
                 stride = stride,
                 n = map.len(),
                 magic = LV_IMAGE_HEADER_MAGIC,
@@ -202,7 +211,9 @@ mod tests {
             "icon",
             2,
             1,
-            LvglCf::Rgb565,
+            "LV_COLOR_FORMAT_RGB565",
+            0x12,
+            4,
             &[0, 0xF8, 0, 0xF8],
         );
         assert!(s.contains("static const LV_ATTRIBUTE_MEM_ALIGN uint8_t icon_map[] = {"));
@@ -215,10 +226,35 @@ mod tests {
 
     #[test]
     fn lvgl_rust_emits_dim_and_cf_constants() {
-        let s = emit_lvgl(OutKind::Rust, "icon", 2, 1, LvglCf::Argb8888, &[0; 8]);
+        let s = emit_lvgl(
+            OutKind::Rust,
+            "icon",
+            2,
+            1,
+            "LV_COLOR_FORMAT_ARGB8888",
+            0x10,
+            8,
+            &[0; 8],
+        );
         assert!(s.contains("pub const ICON_WIDTH: u16 = 2;"));
         assert!(s.contains("pub const ICON_CF: u8 = 0x10;")); // ARGB8888
         assert!(s.contains("pub const ICON_STRIDE: u16 = 8;")); // 2px * 4 bytes
         assert!(s.contains("pub static ICON_MAP: [u8; 8] = ["));
+    }
+
+    #[test]
+    fn lvgl_c_descriptor_for_a8_alpha() {
+        let s = emit_lvgl(
+            OutKind::C,
+            "ic",
+            4,
+            2,
+            "LV_COLOR_FORMAT_A8",
+            0x0E,
+            4,
+            &[0; 8],
+        );
+        assert!(s.contains(".header.cf = LV_COLOR_FORMAT_A8,"));
+        assert!(s.contains(".header.stride = 4,")); // A8: width bytes
     }
 }
