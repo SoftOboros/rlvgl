@@ -56,12 +56,13 @@ impl BacklightPanel {
         };
         let mut slider = Slider::new(track, 0, 100);
         slider.set_value(initial);
-        let mut style = Style::default();
-        style.bg_color = Color(0, 0, 0, 0); // transparent — panel draws the bg
-        style.border_color = TRACK_COLOR;
-        style.radius = 4;
-        style.alpha = 255;
-        slider.style = style;
+        slider.style = Style {
+            bg_color: Color(0, 0, 0, 0), // transparent — panel draws the bg
+            border_color: TRACK_COLOR,
+            radius: 4,
+            alpha: 255,
+            ..Default::default()
+        };
         slider.knob_color = KNOB_COLOR;
         Self {
             bounds,
@@ -132,8 +133,10 @@ impl Widget for BacklightPanel {
         );
         let pct = format!("{}%", self.slider.value());
         let advance = (self.font.scaled_width() + self.font.scale as i32).max(1);
-        let label_x = self.bounds.x + self.bounds.width - PANEL_PADDING - pct.len() as i32 * advance;
-        self.font.draw_str(renderer, label_x, header_y, &pct, TITLE_COLOR);
+        let label_x =
+            self.bounds.x + self.bounds.width - PANEL_PADDING - pct.len() as i32 * advance;
+        self.font
+            .draw_str(renderer, label_x, header_y, &pct, TITLE_COLOR);
 
         self.slider.draw(renderer);
     }
