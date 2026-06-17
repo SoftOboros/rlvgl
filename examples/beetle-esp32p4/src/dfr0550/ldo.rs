@@ -147,7 +147,10 @@ impl LdoChannel {
         // voltage, the prime suspect for the PHY PLL not locking.
         let efuse_raw = p.EFUSE.rd_mac_sys_3().read().bits();
         let (dref, mul) = calibrated_dref_mul(efuse_raw, DPHY_MV);
-        LAST_LDO_DREFMUL.store(dref.saturating_mul(10).saturating_add(mul), Ordering::Relaxed);
+        LAST_LDO_DREFMUL.store(
+            dref.saturating_mul(10).saturating_add(mul),
+            Ordering::Relaxed,
+        );
 
         // ldo_ll_set_owner(unit=2, OWNER_SW): force_tieh_sel=1, tieh_sel=0.
         // ldo_ll_adjust_voltage(unit=2, dref, mul, use_rail_voltage=false):

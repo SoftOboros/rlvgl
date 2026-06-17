@@ -935,8 +935,9 @@ fn morse_status_loop(status: u8) -> ! {
     // BEETLE-05: low byte of MIPI_DSI_HOST.phy_status captured when DSI
     // init gave up (PllLock / LaneCal). 000 = PHY dead (LDO/clock infra);
     // non-zero = PHY alive but PLL/lanes didn't come up.
-    let phy_status =
-        (dfr0550::dsi_host::LAST_PHY_STATUS.load(core::sync::atomic::Ordering::Relaxed) & 0xFF) as u8;
+    let phy_status = (dfr0550::dsi_host::LAST_PHY_STATUS
+        .load(core::sync::atomic::Ordering::Relaxed)
+        & 0xFF) as u8;
     // BEETLE-05: bootloader's PLL_F20M divider (div_num). 023 = correct
     // (480/24 = 20 MHz); anything else = the 20 MHz reference was wrong.
     let ref20m_div = dfr0550::dsi_host::LAST_REF20M_DIV.load(core::sync::atomic::Ordering::Relaxed);
@@ -954,7 +955,8 @@ fn morse_status_loop(status: u8) -> ! {
     // BEETLE-05: DPHY clock-gate read-back. 015 = all gates latched
     // (ref_20m_en/cfg_clk/pll_refclk/src_sel); less = a gate didn't stick
     // (bit0 = the "Reserved"-marked ref_20m_clk_en is the prime suspect).
-    let dphy_clk = dfr0550::dsi_host::LAST_DPHY_CLK_VERIFY.load(core::sync::atomic::Ordering::Relaxed);
+    let dphy_clk =
+        dfr0550::dsi_host::LAST_DPHY_CLK_VERIFY.load(core::sync::atomic::Ordering::Relaxed);
     // Derive a compact 6-bit summary of `LAST_HANG_INT_RAW` for the
     // bench Morse readout. Picks the diagnostic-bearing event bits:
     //   bit 0 ← TIMEOUT       (int_raw bit 8)  — internal timeout fired
