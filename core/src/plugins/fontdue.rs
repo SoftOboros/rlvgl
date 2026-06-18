@@ -141,7 +141,7 @@ impl FontMetrics for FontdueFont<'_> {
         let font = get_cached_font(self.font_data);
         let metrics = font.metrics(ch, self.px);
         let advance_fp16 = round_to_i32(metrics.advance_width * 16.0).clamp(0, u16::MAX as i32);
-        let bearing_y = metrics.ymin as i32 + metrics.height as i32;
+        let bearing_y = metrics.ymin + metrics.height as i32;
         Some(GlyphInfo {
             advance_fp16: advance_fp16 as u16,
             bearing_x: metrics.xmin.clamp(i16::MIN as i32, i16::MAX as i32) as i16,

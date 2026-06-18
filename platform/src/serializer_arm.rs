@@ -140,9 +140,9 @@ mod tests {
         if buf.len() > 1 {
             buf[1] = s1 as i16;
         }
-        for i in 2..buf.len() {
+        for slot in buf.iter_mut().skip(2) {
             let s = COEFF_1K * s1 - s2;
-            buf[i] = s as i16;
+            *slot = s as i16;
             s2 = s1;
             s1 = s;
         }

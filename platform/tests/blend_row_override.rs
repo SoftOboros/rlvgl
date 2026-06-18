@@ -57,7 +57,7 @@ fn blend_row_matches_source_over_math() {
         let expected_r = cov;
         let actual_r = buf[px];
         assert!(
-            (actual_r as i32 - expected_r as i32).abs() <= 1,
+            (actual_r as i32 - expected_r).abs() <= 1,
             "pixel {i} cov={cov}: expected R~{expected_r}, got {actual_r}"
         );
         assert_eq!(buf[px + 1], 0, "G should remain 0");

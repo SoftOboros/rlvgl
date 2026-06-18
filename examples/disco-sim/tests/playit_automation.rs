@@ -820,7 +820,7 @@ fn star_crawl_activates_and_scrolls() {
     let before = sample_screen_grid(&mut session);
     let starfield_bg: (u8, u8, u8) = (10, 10, 32);
     assert!(
-        !before.iter().any(|p| *p == starfield_bg),
+        !before.contains(&starfield_bg),
         "pre-activation screen unexpectedly contains starfield bg pixels"
     );
 

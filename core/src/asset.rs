@@ -480,14 +480,9 @@ impl<const CACHE_SLOTS: usize> AssetRegistry<CACHE_SLOTS> {
         let final_cache_handle: CacheHandle;
 
         // Check whether we already have a valid cache entry for this asset.
-        let existing_cache_handle: Option<CacheHandle> =
-            self.handles[record_idx].cache_handle.and_then(|ch| {
-                if self.cache.slots.iter().flatten().any(|e| e.handle == ch) {
-                    Some(ch)
-                } else {
-                    None
-                }
-            });
+        let existing_cache_handle: Option<CacheHandle> = self.handles[record_idx]
+            .cache_handle
+            .filter(|&ch| self.cache.slots.iter().flatten().any(|e| e.handle == ch));
 
         if let Some(ch) = existing_cache_handle {
             // Cache hit — update the LRU timestamp.

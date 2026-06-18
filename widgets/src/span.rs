@@ -255,9 +255,8 @@ impl Spangroup {
         }
         // lo is one past the owning span index.
         let idx = lo.saturating_sub(1);
-        // Clamp to valid range.
+        // Clamp to valid range (`idx` is `usize`, so a `.max(0)` is a no-op).
         idx.min(offsets.len().saturating_sub(1))
-            .max(0)
             .min(if total_len == 0 { 0 } else { offsets.len() - 1 })
     }
 }
