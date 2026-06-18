@@ -1,0 +1,33 @@
+# BEETLE M1 — Rust staticlib payload linked into the ESP32-P4 IDF host app.
+#
+# Detached from the parent rlvgl workspace (empty [workspace] stanza) so it
+# builds standalone for the riscv32imafc-unknown-none-elf target without
+# dragging in the workspace's host-only members. Path deps still reach the
+# in-tree rlvgl crates.
+[package]
+name = "rlvgl-p4-idf-glue"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "C-ABI rlvgl staticlib payload for the ESP32-P4 ESP-IDF host (BEETLE M1)."
+
+[lib]
+# Output: librlvgl_app.a — imported by components/rlvgl_app/CMakeLists.txt.
+name = "rlvgl_app"
+crate-type = ["staticlib"]
+
+[dependencies]
+rlvgl-core = { path = "../../../../../core", default-features = false }
+rlvgl-platform = { path = "../../../../../platform", default-features = false }
+rlvgl-app-disco-demo = { path = "../../../../apps/disco-demo", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
+
+# Detach from the parent workspace.
+[workspace]

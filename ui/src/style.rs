@@ -1,42 +1,34 @@
 // SPDX-License-Identifier: MIT
 //! Builder utilities for constructing styles consumed by
 //! [`rlvgl_core::widget::Widget`] implementations across [`rlvgl_widgets`].
+//!
+//! **Deprecation notice (LPAR-07):** [`Style`], [`State`], and [`StyleBuilder`]
+//! are deprecated. Use `rlvgl_core::style_cascade` types instead.
+//! [`Part`] is now a re-export of [`rlvgl_core::style_cascade::Part`] and is
+//! *not* deprecated.
 
 pub use rlvgl_core::widget::Color;
 
+// `Part` is promoted to a re-export of the cascade's canonical type.
+pub use rlvgl_core::style_cascade::Part;
+
 use core::ops::BitOr;
 
-/// Identifier for a widget sub-part used when applying styles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Part(pub u32);
-
-impl Part {
-    /// The main body of a widget.
-    pub const MAIN: Self = Self(0);
-    /// Scrollbar area.
-    pub const SCROLLBAR: Self = Self(1);
-    /// Indicator or progress area.
-    pub const INDICATOR: Self = Self(2);
-    /// Draggable knob.
-    pub const KNOB: Self = Self(3);
-    /// Selected region or item.
-    pub const SELECTED: Self = Self(4);
-    /// Generic item collection.
-    pub const ITEMS: Self = Self(5);
-    /// Create a custom part with a raw identifier.
-    pub const fn custom(id: u32) -> Self {
-        Self(id)
-    }
-    /// Return the raw identifier value.
-    pub const fn bits(self) -> u32 {
-        self.0
-    }
-}
-
 /// State flags describing widget interaction state.
+///
+/// # Deprecation (LPAR-07)
+///
+/// **Deprecated.** Use [`rlvgl_core::object::ObjectStates`] instead.
+/// Note that the bit positions differ from this type — see LPAR-07 §6.2
+/// before migrating.
+#[deprecated(
+    since = "0.2.2",
+    note = "use rlvgl_core::object::ObjectStates; bit positions differ — see LPAR-07 §6.2"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct State(u32);
 
+#[allow(deprecated)]
 impl State {
     /// Default state with no flags.
     pub const DEFAULT: Self = Self(0);
@@ -55,6 +47,7 @@ impl State {
     }
 }
 
+#[allow(deprecated)]
 impl BitOr for State {
     type Output = Self;
 
@@ -63,6 +56,7 @@ impl BitOr for State {
     }
 }
 
+#[allow(deprecated)]
 impl Default for State {
     fn default() -> Self {
         State::DEFAULT
@@ -73,6 +67,16 @@ impl Default for State {
 ///
 /// Styles mirror those in [`rlvgl_core::style`], enabling a common appearance
 /// for components in [`rlvgl_widgets`].
+///
+/// # Deprecation (LPAR-07)
+///
+/// **Deprecated.** Use [`rlvgl_core::style::Style`] together with the
+/// `rlvgl_core::style_cascade` selectors for cascade-aware style application.
+/// See LPAR-07 for migration guidance.
+#[deprecated(
+    since = "0.2.2",
+    note = "superseded by the LPAR-07 cascade: use rlvgl_core::style::Style + core::style_cascade selectors; see LPAR-07"
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
     /// Background color.
@@ -91,6 +95,7 @@ pub struct Style {
     pub margin: u8,
 }
 
+#[allow(deprecated)]
 impl Default for Style {
     fn default() -> Self {
         Self {
@@ -109,11 +114,22 @@ impl Default for Style {
 ///
 /// Produces styles consumable by any [`rlvgl_core::widget::Widget`] in
 /// [`rlvgl_widgets`].
+///
+/// # Deprecation (LPAR-07)
+///
+/// **Deprecated.** Use [`rlvgl_core::style::StyleBuilder`] instead.
+/// See LPAR-07 for migration guidance.
+#[allow(deprecated)]
+#[deprecated(
+    since = "0.2.2",
+    note = "use rlvgl_core::style::StyleBuilder; see LPAR-07"
+)]
 #[derive(Debug, Default)]
 pub struct StyleBuilder {
     style: Style,
 }
 
+#[allow(deprecated)]
 impl StyleBuilder {
     /// Create a new builder with default values.
     pub fn new() -> Self {
@@ -171,6 +187,7 @@ impl StyleBuilder {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 

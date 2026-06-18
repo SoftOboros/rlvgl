@@ -159,8 +159,9 @@ fn inflight_lifecycle_returns_borrow_for_reuse() {
         },
         0xFF00_0000,
     );
-    let released = inflight.into_borrow();
-    drop(released);
+    // Release the BackBuffer borrow (the token is non-`Drop`, so a `let _ =`
+    // ends it at this statement rather than a no-op `drop`).
+    let _ = inflight.into_borrow();
 
     // Second submission requires the BackBuffer borrow back; this only
     // type-checks because the InFlight from the first submission is

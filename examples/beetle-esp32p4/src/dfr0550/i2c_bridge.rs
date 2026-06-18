@@ -68,6 +68,49 @@ pub unsafe fn wake() -> Result<(), BridgeError> {
     Ok(())
 }
 
+/// Bit-bang variant of [`wake`] — identical protocol, but every I2C
+/// transaction goes through the GPIO bit-bang transport
+/// ([`i2c0::write_reg_bitbang`] / [`i2c0::read_reg_bitbang`]) instead of
+/// the I2C0 master peripheral. This is the v0 wake path while the
+/// peripheral FSM remains blocked on ERRATA-008 (the bit-bang address
+/// probe is already confirmed to ACK the bridge at 0x45). A successful
+/// wake drives `REG_PWM = 255`, so the panel backlight illuminating is
+/// the eye-visible confirmation that the bridge powered on.
+///
+/// # Safety
+/// Pins must already be routed via [`super::i2c0::route_pins`] (sets
+/// pad_driver / pull-ups / input-enable on GPIO 7 + 8).
+pub unsafe fn wake_bitbang() -> Result<(), BridgeError> {
+    // 1. Power on the panel.
+    i2c0::write_reg_bitbang(BRIDGE_ADDR, REG_POWERON, 1)?;
+
+    // 2. Coarse ~20 ms settle (hot spin — no ticker yet).
+    delay_loops(7_200_000);
+
+    // 3. Poll PORTB until the bridge reports ready (bit 0 = panel powered).
+    let mut tries = 100;
+    loop {
+        match i2c0::read_reg_bitbang(BRIDGE_ADDR, REG_PORTB) {
+            Ok(pb) if pb & 0x01 != 0 => break,
+            Ok(_) => {}
+            Err(I2cError::Nack) => {
+                // Bridge not on the bus yet — keep retrying.
+            }
+            Err(e) => return Err(BridgeError::I2c(e)),
+        }
+        tries -= 1;
+        if tries == 0 {
+            return Err(BridgeError::NotReady);
+        }
+        delay_loops(3_600_000); // ~10 ms
+    }
+
+    // 4. Set orientation flag, full backlight.
+    i2c0::write_reg_bitbang(BRIDGE_ADDR, REG_PORTA, PORTA_KERNEL_DEFAULT)?;
+    i2c0::write_reg_bitbang(BRIDGE_ADDR, REG_PWM, 255)?;
+    Ok(())
+}
+
 fn delay_loops(n: u32) {
     for _ in 0..n {
         unsafe { core::arch::asm!("nop") };

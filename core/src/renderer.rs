@@ -3,7 +3,14 @@
 //! Implementors of this trait can target displays, off-screen buffers or
 //! simulator windows.
 
+use alloc::vec::Vec;
+
 use crate::cmd::CommandList;
+use crate::draw::{GradientDesc, ShadowDesc};
+use crate::font::ShapedText;
+use crate::image::{BlitOpts, ImageDescriptor, PixelFormat};
+use crate::invalidation::InvalidationList;
+use crate::mask::AlphaMask;
 use crate::raster::{self, CoverageSink, Obb};
 use crate::widget::{Color, Rect};
 
@@ -17,6 +24,74 @@ pub trait Renderer {
 
     /// Draw UTF‑8 text with its baseline anchored at the provided position using the color.
     fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color);
+
+    /// Draw a pre-shaped text run using glyph extent information.
+    ///
+    /// `origin` is an additional translation applied to every glyph placement.
+    /// In `shaped`, pass `(0, 0)` when glyph positions are already target-space
+    /// coordinates. The default implementation renders glyph coverage when the
+    /// run carries a font reference; otherwise it falls back to deterministic
+    /// extent-only rectangles.
+    ///
+    /// Backends can override this for hardware text acceleration while preserving
+    /// the same placement and clipping contract.
+    fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, origin: (i32, i32), color: Color) {
+        for glyph in &shaped.glyphs {
+            let mut extent = glyph.extent();
+            extent.x += origin.0;
+            extent.y += origin.1;
+            if extent.width <= 0 || extent.height <= 0 {
+                continue;
+            }
+            if let Some(font) = shaped.font
+                && draw_glyph_coverage(self, font, glyph.ch, extent, color)
+            {
+                continue;
+            }
+            self.blend_rect(extent, color);
+        }
+    }
+
+    /// Draw a single glyph's coverage with its pen origin on the baseline at
+    /// `origin` (the same anchor convention as [`draw_text`](Self::draw_text)).
+    ///
+    /// The glyph's tight bitmap extent is derived from `font`'s metrics for
+    /// `ch` (bearing + width/height), and coverage flows through
+    /// [`blend_row`](Self::blend_row) — identical to the per-glyph path inside
+    /// [`draw_text_shaped`](Self::draw_text_shaped). When `font` provides no
+    /// coverage for `ch`, the default falls back to a deterministic extent
+    /// rectangle via [`blend_rect`](Self::blend_rect); a glyph with no metrics
+    /// (or a zero-area extent, e.g. a space) draws nothing.
+    ///
+    /// This is a defaulted convenience for widgets that place glyphs
+    /// individually rather than along one baseline — e.g.
+    /// [`ArcLabel`](https://docs.rs/rlvgl-widgets) (FONT-00 §7.B). Shaped runs
+    /// should use [`draw_text_shaped`](Self::draw_text_shaped). Backends MAY
+    /// override this for glyph-blit acceleration (FONT-00 §8.B).
+    fn draw_glyph(
+        &mut self,
+        font: &dyn crate::font::FontMetrics,
+        ch: char,
+        origin: (i32, i32),
+        color: Color,
+    ) {
+        let Some(info) = font.glyph_metrics(ch) else {
+            return;
+        };
+        let extent = Rect {
+            x: origin.0 + info.bearing_x as i32,
+            y: origin.1 - info.bearing_y as i32,
+            width: info.width as i32,
+            height: info.height as i32,
+        };
+        if extent.width <= 0 || extent.height <= 0 {
+            return;
+        }
+        if draw_glyph_coverage(self, font, ch, extent, color) {
+            return;
+        }
+        self.blend_rect(extent, color);
+    }
 
     /// Blend a rectangle onto the target, honoring the alpha channel of `color`
     /// for source-over compositing.
@@ -51,6 +126,57 @@ pub trait Renderer {
         }
     }
 
+    /// Blit an [`ImageDescriptor`] into `dest` using deterministic software sampling.
+    ///
+    /// `dest` is the output rectangle in framebuffer coordinates. Scaling
+    /// controls nearest-neighbor source sampling inside that output rectangle;
+    /// callers choose the destination dimensions they want to draw. Rotation
+    /// is snapped to the nearest cardinal orientation. The default software
+    /// path decodes one output row at a time and forwards it through
+    /// [`draw_pixels`](Self::draw_pixels), so clipping adapters and backend
+    /// pixel fast paths continue to apply.
+    fn blit_image(&mut self, dest: Rect, descriptor: &ImageDescriptor<'_>, opts: &BlitOpts) {
+        if dest.width <= 0
+            || dest.height <= 0
+            || descriptor.width == 0
+            || descriptor.height == 0
+            || opts.scale_x == 0
+            || opts.scale_y == 0
+        {
+            return;
+        }
+
+        let output = Rect {
+            x: 0,
+            y: 0,
+            width: dest.width,
+            height: dest.height,
+        };
+        let visible = match opts.clip {
+            Some(clip) => output.intersect(clip),
+            None => Some(output),
+        };
+        let Some(visible) = visible else {
+            return;
+        };
+
+        let mut row = Vec::new();
+        row.resize(visible.width as usize, Color(0, 0, 0, 0));
+        for local_y in visible.y..visible.y + visible.height {
+            for local_x in visible.x..visible.x + visible.width {
+                let out_idx = (local_x - visible.x) as usize;
+                row[out_idx] = sample_image_pixel(descriptor, opts, local_x, local_y)
+                    .unwrap_or(Color(0, 0, 0, 0));
+            }
+            self.draw_pixels(
+                (dest.x + visible.x, dest.y + local_y),
+                &row,
+                visible.width as u32,
+                1,
+            );
+        }
+    }
+
     /// Blend a horizontal run of pixels with per-pixel anti-aliased coverage.
     ///
     /// `coverage[i]` modulates `color`'s alpha for the pixel at
@@ -77,6 +203,97 @@ pub trait Renderer {
                 Color(color.0, color.1, color.2, alpha),
             );
         }
+    }
+
+    /// Fill `rect` with `color` modulated by an alpha mask.
+    ///
+    /// The default implementation evaluates the mask in fixed-size row
+    /// chunks and emits coverage through [`blend_row`](Self::blend_row).
+    /// Backends with hardware mask support may override this method, but the
+    /// software path is the reference behavior.
+    fn fill_masked(&mut self, rect: Rect, color: Color, mask: &dyn AlphaMask) {
+        if rect.width <= 0 || rect.height <= 0 || color.3 == 0 {
+            return;
+        }
+        let mut coverage = [0u8; 64];
+        for y in rect.y..rect.y + rect.height {
+            let mut x = rect.x;
+            let end = rect.x + rect.width;
+            while x < end {
+                let run = (end - x).min(coverage.len() as i32) as usize;
+                let row = &mut coverage[..run];
+                mask.row(x, y, row);
+                self.blend_row(x, y, color, row);
+                x += run as i32;
+            }
+        }
+    }
+
+    /// Fill `rect` with a deterministic software gradient.
+    ///
+    /// The default path samples one pixel at a time using integer color
+    /// interpolation. Opaque samples use [`fill_rect`](Self::fill_rect);
+    /// translucent samples use [`blend_rect`](Self::blend_rect).
+    fn fill_gradient(&mut self, rect: Rect, gradient: &GradientDesc<'_>) {
+        if rect.width <= 0 || rect.height <= 0 {
+            return;
+        }
+        for y in rect.y..rect.y + rect.height {
+            for x in rect.x..rect.x + rect.width {
+                let Some(color) = gradient.color_at(rect, x, y) else {
+                    continue;
+                };
+                if color.3 == 0 {
+                    continue;
+                }
+                let pixel = Rect {
+                    x,
+                    y,
+                    width: 1,
+                    height: 1,
+                };
+                if color.3 == 255 {
+                    self.fill_rect(pixel, color);
+                } else {
+                    self.blend_rect(pixel, color);
+                }
+            }
+        }
+    }
+
+    /// Draw a deterministic software box shadow below `rect`.
+    ///
+    /// The v1 fallback uses a rounded-rect-compatible rectangular blur
+    /// approximation. It is intentionally conservative and routes through
+    /// [`fill_masked`](Self::fill_masked), so clipping adapters inherit the
+    /// behavior through [`blend_row`](Self::blend_row).
+    fn draw_shadow(&mut self, rect: Rect, radius: u8, shadow: &ShadowDesc) {
+        if rect.width <= 0 || rect.height <= 0 || shadow.color.3 == 0 {
+            return;
+        }
+        let spread = shadow.spread as i32;
+        let blur = shadow.blur as i32;
+        let base = Rect {
+            x: rect.x + shadow.offset_x as i32 - spread,
+            y: rect.y + shadow.offset_y as i32 - spread,
+            width: rect.width + spread * 2,
+            height: rect.height + spread * 2,
+        };
+        if base.width <= 0 || base.height <= 0 {
+            return;
+        }
+        let draw_rect = Rect {
+            x: base.x - blur,
+            y: base.y - blur,
+            width: base.width + blur * 2,
+            height: base.height + blur * 2,
+        };
+        let mask = ShadowMask {
+            base,
+            blur,
+            radius: radius as i32 + spread,
+        };
+        self.fill_masked(draw_rect, shadow.color, &mask);
     }
 
     /// Fill an oriented bounding box with anti-aliased coverage.
@@ -208,4 +425,671 @@ impl<R: Renderer + ?Sized> CoverageSink for RowBlendSink<'_, R> {
     fn row(&mut self, x: i32, y: i32, coverage: &[u8]) {
         self.r.blend_row(x, y, self.color, coverage);
     }
+}
+
+/// Renderer adapter that pushes draw-time dirty rectangles into a shared
+/// [`InvalidationList`], while forwarding all drawing calls to `inner`.
+pub struct DirtyTrackingRenderer<'a, 'b, R: Renderer + ?Sized, const N: usize> {
+    /// Wrapped renderer.
+    inner: &'a mut R,
+    /// Shared invalidation sink.
+    invalidation: &'b mut InvalidationList<N>,
+    /// Optional clipping contract, in renderer coordinates.
+    clip: Option<Rect>,
+}
+
+impl<'a, 'b, R: Renderer + ?Sized, const N: usize> DirtyTrackingRenderer<'a, 'b, R, N> {
+    /// Wrap `inner` and collect draw-time dirty rects into `invalidation`.
+    ///
+    /// The wrapper does **not** impose a rendering clip by default; callers
+    /// can provide one with [`Self::with_clip`] when needed.
+    pub fn new(inner: &'a mut R, invalidation: &'b mut InvalidationList<N>) -> Self {
+        Self {
+            inner,
+            invalidation,
+            clip: None,
+        }
+    }
+
+    /// Wrap `inner` and additionally clip every reported dirty rect to `clip`.
+    /// Degenerate clips drop all subsequent tracking.
+    pub fn with_clip(
+        inner: &'a mut R,
+        invalidation: &'b mut InvalidationList<N>,
+        clip: Rect,
+    ) -> Self {
+        Self {
+            inner,
+            invalidation,
+            clip: (clip.width > 0 && clip.height > 0).then_some(clip),
+        }
+    }
+
+    /// Access the wrapped renderer.
+    pub fn inner(&self) -> &R {
+        self.inner
+    }
+
+    /// Access the wrapped renderer mutably.
+    pub fn inner_mut(&mut self) -> &mut R {
+        self.inner
+    }
+
+    fn push_rect(&mut self, rect: Rect) {
+        if rect.width <= 0 || rect.height <= 0 {
+            return;
+        }
+        if let Some(clip) = self.clip {
+            if let Some(visible) = rect.intersect(clip) {
+                self.invalidation.push(visible);
+            }
+        } else {
+            self.invalidation.push(rect);
+        }
+    }
+
+    fn push_blend_row(&mut self, x: i32, y: i32, coverage: &[u8]) {
+        let Some(start) = coverage.iter().position(|c| *c != 0) else {
+            return;
+        };
+        let Some(end) = coverage.iter().rposition(|c| *c != 0) else {
+            return;
+        };
+
+        let width = i32::try_from(end - start + 1).unwrap_or(i32::MAX);
+        let rect = Rect {
+            x: x + i32::try_from(start).unwrap_or(i32::MAX),
+            y,
+            width,
+            height: 1,
+        };
+        self.push_rect(rect);
+    }
+
+    fn push_text_estimate(&mut self, position: (i32, i32), text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        let glyph_count = text.len().min((i32::MAX as usize) / 8);
+        let width = (glyph_count as u32).saturating_mul(8) as i32;
+        self.push_rect(Rect {
+            x: position.0,
+            y: position.1 - TEXT_NOMINAL_LINE_PX,
+            width,
+            height: TEXT_NOMINAL_LINE_PX,
+        });
+    }
+}
+
+impl<R: Renderer + ?Sized, const N: usize> Renderer for DirtyTrackingRenderer<'_, '_, R, N> {
+    fn fill_rect(&mut self, rect: Rect, color: Color) {
+        self.push_rect(rect);
+        self.inner.fill_rect(rect, color);
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        self.push_text_estimate(position, text);
+        self.inner.draw_text(position, text, color);
+    }
+
+    fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, origin: (i32, i32), color: Color) {
+        let bounds = Rect {
+            x: shaped.bounds.x + origin.0,
+            y: shaped.bounds.y + origin.1,
+            width: shaped.bounds.width,
+            height: shaped.bounds.height,
+        };
+        self.push_rect(bounds);
+        self.inner.draw_text_shaped(shaped, origin, color);
+    }
+
+    fn blend_rect(&mut self, rect: Rect, color: Color) {
+        self.push_rect(rect);
+        self.inner.blend_rect(rect, color);
+    }
+
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        let width_i32 = i32::try_from(width).unwrap_or(i32::MAX);
+        let height_i32 = i32::try_from(height).unwrap_or(i32::MAX);
+        self.push_rect(Rect {
+            x: position.0,
+            y: position.1,
+            width: width_i32,
+            height: height_i32,
+        });
+        self.inner.draw_pixels(position, pixels, width, height);
+    }
+
+    fn blit_image(
+        &mut self,
+        dest: Rect,
+        descriptor: &crate::image::ImageDescriptor<'_>,
+        opts: &crate::image::BlitOpts,
+    ) {
+        if dest.width <= 0 || dest.height <= 0 {
+            return;
+        }
+        let output = Rect {
+            x: 0,
+            y: 0,
+            width: dest.width,
+            height: dest.height,
+        };
+        let visible = match opts.clip {
+            Some(clip) => output.intersect(clip),
+            None => Some(output),
+        };
+        let Some(visible) = visible else {
+            return;
+        };
+        self.push_rect(Rect {
+            x: dest.x + visible.x,
+            y: dest.y + visible.y,
+            width: visible.width,
+            height: visible.height,
+        });
+        self.inner.blit_image(dest, descriptor, opts);
+    }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        self.push_blend_row(x, y, coverage);
+        self.inner.blend_row(x, y, color, coverage);
+    }
+
+    fn fill_masked(&mut self, rect: Rect, color: Color, mask: &dyn crate::mask::AlphaMask) {
+        self.push_rect(rect);
+        self.inner.fill_masked(rect, color, mask);
+    }
+
+    fn fill_gradient(&mut self, rect: Rect, gradient: &crate::draw::GradientDesc<'_>) {
+        self.push_rect(rect);
+        self.inner.fill_gradient(rect, gradient);
+    }
+
+    fn draw_shadow(&mut self, rect: Rect, radius: u8, shadow: &crate::draw::ShadowDesc) {
+        let spread = shadow.spread as i32;
+        let blur = shadow.blur as i32;
+        let base = Rect {
+            x: rect.x + shadow.offset_x as i32 - spread,
+            y: rect.y + shadow.offset_y as i32 - spread,
+            width: rect.width + spread * 2,
+            height: rect.height + spread * 2,
+        };
+        let draw_rect = Rect {
+            x: base.x - blur,
+            y: base.y - blur,
+            width: base.width + blur * 2,
+            height: base.height + blur * 2,
+        };
+        self.push_rect(draw_rect);
+        self.inner.draw_shadow(rect, radius, shadow);
+    }
+
+    fn fill_obb_aa(&mut self, obb: crate::raster::Obb, color: Color) {
+        self.push_rect(obb.aabb());
+        self.inner.fill_obb_aa(obb, color);
+    }
+
+    fn fill_disc_aa(&mut self, center: crate::raster::PointF, radius: f32, color: Color) {
+        let pad = radius + 1.0;
+        self.push_rect(Rect {
+            x: (center.x - pad) as i32 - 1,
+            y: (center.y - pad) as i32 - 1,
+            width: (pad * 2.0) as i32 + 3,
+            height: (pad * 2.0) as i32 + 3,
+        });
+        self.inner.fill_disc_aa(center, radius, color);
+    }
+
+    fn stroke_line_aa(
+        &mut self,
+        a: crate::raster::PointF,
+        b: crate::raster::PointF,
+        width: f32,
+        color: Color,
+    ) {
+        let pad = width * 0.5 + 1.0;
+        self.push_rect(Rect {
+            x: (a.x.min(b.x) - pad) as i32 - 1,
+            y: (a.y.min(b.y) - pad) as i32 - 1,
+            width: ((a.x.max(b.x) + pad) as i32 - (a.x.min(b.x) - pad) as i32) + 2,
+            height: ((a.y.max(b.y) + pad) as i32 - (a.y.min(b.y) - pad) as i32) + 2,
+        });
+        self.inner.stroke_line_aa(a, b, width, color);
+    }
+
+    fn fill_arc_aa(
+        &mut self,
+        center: crate::raster::PointF,
+        r_outer: f32,
+        r_inner: f32,
+        start_cos: f32,
+        start_sin: f32,
+        end_cos: f32,
+        end_sin: f32,
+        extent: f32,
+        color: Color,
+    ) {
+        let pad = r_outer + 1.0;
+        self.push_rect(Rect {
+            x: (center.x - pad) as i32 - 1,
+            y: (center.y - pad) as i32 - 1,
+            width: (pad * 2.0) as i32 + 3,
+            height: (pad * 2.0) as i32 + 3,
+        });
+        self.inner.fill_arc_aa(
+            center, r_outer, r_inner, start_cos, start_sin, end_cos, end_sin, extent, color,
+        );
+    }
+
+    fn submit(&mut self, list: &crate::cmd::CommandList) {
+        if let Some(dirty) = list.dirty_union() {
+            self.push_rect(dirty);
+        }
+        self.inner.submit(list);
+    }
+}
+
+fn draw_glyph_coverage<R: Renderer + ?Sized>(
+    renderer: &mut R,
+    font: &dyn crate::font::FontMetrics,
+    ch: char,
+    extent: Rect,
+    color: Color,
+) -> bool {
+    let mut coverage = [0u8; 64];
+    let height = extent.height.min(u16::MAX as i32) as u16;
+    let width = extent.width.min(u16::MAX as i32) as u16;
+    for row in 0..height {
+        let mut x_offset = 0u16;
+        while x_offset < width {
+            let run = (width - x_offset).min(coverage.len() as u16) as usize;
+            let row_coverage = &mut coverage[..run];
+            if !font.glyph_coverage_row(ch, row, x_offset, row_coverage) {
+                return false;
+            }
+            renderer.blend_row(
+                extent.x + i32::from(x_offset),
+                extent.y + i32::from(row),
+                color,
+                row_coverage,
+            );
+            x_offset += run as u16;
+        }
+    }
+    true
+}
+
+fn sample_image_pixel(
+    descriptor: &ImageDescriptor<'_>,
+    opts: &BlitOpts,
+    local_x: i32,
+    local_y: i32,
+) -> Option<Color> {
+    let (pre_x, pre_y) = inverse_cardinal_transform(local_x, local_y, opts);
+    if pre_x < 0 || pre_y < 0 {
+        return None;
+    }
+
+    let src_x = (i64::from(pre_x) * 256 / i64::from(opts.scale_x)) as u32;
+    let src_y = (i64::from(pre_y) * 256 / i64::from(opts.scale_y)) as u32;
+    if src_x >= u32::from(descriptor.width) || src_y >= u32::from(descriptor.height) {
+        return None;
+    }
+
+    decode_image_pixel(descriptor, src_x as usize, src_y as usize)
+        .map(|color| recolor_image_pixel(color, opts.recolor, opts.recolor_alpha))
+}
+
+fn inverse_cardinal_transform(local_x: i32, local_y: i32, opts: &BlitOpts) -> (i32, i32) {
+    let pivot_x = i32::from(opts.pivot.0);
+    let pivot_y = i32::from(opts.pivot.1);
+    let x = local_x - pivot_x;
+    let y = local_y - pivot_y;
+    let (x, y) = match nearest_cardinal_rotation(opts.rotation_deg) {
+        0 => (x, y),
+        90 => (y, -x),
+        180 => (-x, -y),
+        _ => (-y, x),
+    };
+    (x + pivot_x, y + pivot_y)
+}
+
+fn nearest_cardinal_rotation(degrees: i16) -> i16 {
+    let degrees = i32::from(degrees).rem_euclid(360);
+    (((degrees + 45) / 90 * 90) % 360) as i16
+}
+
+fn decode_image_pixel(descriptor: &ImageDescriptor<'_>, x: usize, y: usize) -> Option<Color> {
+    if let Some(colors) = descriptor.data.as_color_slice() {
+        return colors
+            .get(y.checked_mul(descriptor.width as usize)?.checked_add(x)?)
+            .copied();
+    }
+
+    let bytes = descriptor.data.as_bytes()?;
+    let stride = descriptor.stride_bytes() as usize;
+    let offset = y
+        .checked_mul(stride)?
+        .checked_add(x.checked_mul(descriptor.format.bytes_per_pixel() as usize)?)?;
+    match descriptor.format {
+        PixelFormat::Rgb565 => {
+            let raw = u16::from_le_bytes([*bytes.get(offset)?, *bytes.get(offset + 1)?]);
+            let r = (((raw >> 11) & 0x1f) as u32 * 255 / 31) as u8;
+            let g = (((raw >> 5) & 0x3f) as u32 * 255 / 63) as u8;
+            let b = ((raw & 0x1f) as u32 * 255 / 31) as u8;
+            Some(Color(r, g, b, 255))
+        }
+        PixelFormat::Argb8888 => {
+            let raw = u32::from_le_bytes([
+                *bytes.get(offset)?,
+                *bytes.get(offset + 1)?,
+                *bytes.get(offset + 2)?,
+                *bytes.get(offset + 3)?,
+            ]);
+            Some(Color(
+                ((raw >> 16) & 0xff) as u8,
+                ((raw >> 8) & 0xff) as u8,
+                (raw & 0xff) as u8,
+                ((raw >> 24) & 0xff) as u8,
+            ))
+        }
+        PixelFormat::L8 => bytes.get(offset).map(|&luma| Color(luma, luma, luma, 255)),
+    }
+}
+
+fn recolor_image_pixel(color: Color, recolor: Option<Color>, alpha: u8) -> Color {
+    let Some(tint) = recolor else {
+        return color;
+    };
+    if alpha == 0 {
+        return color;
+    }
+    Color(
+        lerp_channel(color.0, tint.0, alpha),
+        lerp_channel(color.1, tint.1, alpha),
+        lerp_channel(color.2, tint.2, alpha),
+        color.3,
+    )
+}
+
+fn lerp_channel(from: u8, to: u8, alpha: u8) -> u8 {
+    let value = i32::from(from) + (i32::from(to) - i32::from(from)) * i32::from(alpha) / 255;
+    value.clamp(0, 255) as u8
+}
+
+struct ShadowMask {
+    base: Rect,
+    blur: i32,
+    radius: i32,
+}
+
+impl AlphaMask for ShadowMask {
+    fn row(&self, x: i32, y: i32, coverage: &mut [u8]) {
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let px = x.saturating_add(i32::try_from(offset).unwrap_or(i32::MAX));
+            *alpha = self.alpha(px, y);
+        }
+    }
+}
+
+impl ShadowMask {
+    fn alpha(&self, x: i32, y: i32) -> u8 {
+        let x0 = self.base.x;
+        let y0 = self.base.y;
+        let x1 = self.base.x + self.base.width - 1;
+        let y1 = self.base.y + self.base.height - 1;
+        let outside_dx = if x < x0 {
+            x0 - x
+        } else if x > x1 {
+            x - x1
+        } else {
+            0
+        };
+        let outside_dy = if y < y0 {
+            y0 - y
+        } else if y > y1 {
+            y - y1
+        } else {
+            0
+        };
+        let dist = outside_dx.max(outside_dy);
+        if dist > self.blur {
+            return 0;
+        }
+
+        let rect_alpha = if self.blur == 0 {
+            255
+        } else {
+            (((self.blur + 1 - dist) * 255) / (self.blur + 1)) as u8
+        };
+        rect_alpha.min(self.rounded_corner_alpha(x, y))
+    }
+
+    fn rounded_corner_alpha(&self, x: i32, y: i32) -> u8 {
+        let r = self
+            .radius
+            .max(0)
+            .min(self.base.width / 2)
+            .min(self.base.height / 2);
+        if r <= 0 {
+            return 255;
+        }
+
+        let cx = if x < self.base.x + r {
+            self.base.x + r
+        } else if x >= self.base.x + self.base.width - r {
+            self.base.x + self.base.width - r - 1
+        } else {
+            return 255;
+        };
+        let cy = if y < self.base.y + r {
+            self.base.y + r
+        } else if y >= self.base.y + self.base.height - r {
+            self.base.y + self.base.height - r - 1
+        } else {
+            return 255;
+        };
+        let dx = (x - cx).unsigned_abs();
+        let dy = (y - cy).unsigned_abs();
+        let dist_sq = dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy));
+        let r_sq = (r as u32).saturating_mul(r as u32);
+        if dist_sq <= r_sq { 255 } else { 0 }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// ClipRenderer (REND initiative)
+// ───────────────────────────────────────────────────────────────────────────
+
+/// Nominal line height (pixels above the baseline anchor) used to gate
+/// backend [`Renderer::draw_text`] calls against a clip region. See
+/// `docs/concepts/REND-00-CONCEPTS.md` §5.4 for the guarantee scope.
+pub const TEXT_NOMINAL_LINE_PX: i32 = 16;
+
+/// Translating, clipping [`Renderer`] adapter (REND-00 §5).
+///
+/// Wraps any renderer, shifts every draw by `(dx, dy)` (content space →
+/// screen space), and crops it to a screen-space clip rect before
+/// forwarding. Containers that render children clipped to their own
+/// bounds — [`ScrollView`] being the canonical example — construct one of
+/// these around the incoming renderer in their `draw()`; backends need no
+/// changes and cannot opt out by accident.
+///
+/// Per-method semantics (normative — REND-00 §5.4):
+///
+/// - [`fill_rect`](Renderer::fill_rect) / [`blend_rect`](Renderer::blend_rect):
+///   forwarded as the translated intersection with the clip; dropped when
+///   disjoint.
+/// - [`draw_pixels`](Renderer::draw_pixels): only the visible row segments
+///   are forwarded (per-row source slice) — cropping never reads outside
+///   the source buffer.
+/// - [`blend_row`](Renderer::blend_row): the coverage run is sliced to the
+///   clip's horizontal span; rows outside the vertical span are dropped.
+///   The AA primitives (`fill_obb_aa`, `fill_disc_aa`, `stroke_line_aa`,
+///   `fill_arc_aa`), [`fill_masked`](Renderer::fill_masked),
+///   [`fill_gradient`](Renderer::fill_gradient),
+///   [`draw_shadow`](Renderer::draw_shadow), and [`submit`](Renderer::submit)
+///   are deliberately NOT forwarded to the wrapped renderer: the trait
+///   defaults route them through this adapter's clipped primitives. A
+///   forwarding override would hand the call to a backend fast path that knows
+///   nothing of the clip.
+/// - [`draw_text`](Renderer::draw_text) (backend text — no extent
+///   information): forwarded iff the nominal line box
+///   ([`TEXT_NOMINAL_LINE_PX`] above the baseline) sits fully inside the
+///   clip's vertical span and the anchor is inside the horizontal span;
+///   otherwise dropped. No vertical bleed, but partially-visible lines
+///   vanish rather than crop, and horizontal overflow is not cropped.
+///   Per-pixel text (`bitmap_font` / `packed_font`) renders through
+///   `fill_rect` and clips exactly on both axes — prefer it for content
+///   that can straddle a viewport edge.
+/// - [`draw_text_shaped`](Renderer::draw_text_shaped): routes through the
+///   default shaped-text renderer, so glyph coverage is clipped by
+///   [`blend_row`](Renderer::blend_row) and extent fallbacks are clipped by
+///   [`blend_rect`](Renderer::blend_rect). The wrapped renderer's own
+///   shaped-text fast path is deliberately not forwarded, so clipping cannot
+///   be bypassed by an accelerated backend.
+///
+/// Nesting two `ClipRenderer`s composes by intersection with summed
+/// offsets (REND-00 §5.5).
+///
+/// `clip` is in *screen* (wrapped-renderer) coordinates. Construction with
+/// a degenerate clip is allowed; every draw is then dropped.
+pub struct ClipRenderer<'a> {
+    inner: &'a mut dyn Renderer,
+    /// Translation applied to incoming draws (content space → screen).
+    dx: i32,
+    dy: i32,
+    /// Screen-space clip region; `None` means degenerate (drop all).
+    clip: Option<Rect>,
+}
+
+impl<'a> ClipRenderer<'a> {
+    /// Wrap `inner`, clipping to the screen-space `clip` rect with no
+    /// translation.
+    pub fn new(inner: &'a mut dyn Renderer, clip: Rect) -> Self {
+        Self::with_offset(inner, clip, 0, 0)
+    }
+
+    /// Wrap `inner`, translating incoming draws by `(dx, dy)` and clipping
+    /// the result to the screen-space `clip` rect.
+    pub fn with_offset(inner: &'a mut dyn Renderer, clip: Rect, dx: i32, dy: i32) -> Self {
+        let clip = (clip.width > 0 && clip.height > 0).then_some(clip);
+        Self {
+            inner,
+            dx,
+            dy,
+            clip,
+        }
+    }
+
+    /// The screen-space clip rect, or `None` when degenerate.
+    pub fn clip(&self) -> Option<Rect> {
+        self.clip
+    }
+}
+
+impl Renderer for ClipRenderer<'_> {
+    fn fill_rect(&mut self, rect: Rect, color: Color) {
+        let Some(clip) = self.clip else { return };
+        let moved = Rect {
+            x: rect.x + self.dx,
+            y: rect.y + self.dy,
+            ..rect
+        };
+        if let Some(visible) = moved.intersect(clip) {
+            self.inner.fill_rect(visible, color);
+        }
+    }
+
+    fn blend_rect(&mut self, rect: Rect, color: Color) {
+        let Some(clip) = self.clip else { return };
+        let moved = Rect {
+            x: rect.x + self.dx,
+            y: rect.y + self.dy,
+            ..rect
+        };
+        if let Some(visible) = moved.intersect(clip) {
+            self.inner.blend_rect(visible, color);
+        }
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        let Some(clip) = self.clip else { return };
+        let (x, y) = (position.0 + self.dx, position.1 + self.dy);
+        // Nominal-line-box gating (REND-00 §5.4): vertical containment of
+        // the line above the baseline, horizontal containment of the
+        // anchor. Drop rather than bleed.
+        let line_top = y - TEXT_NOMINAL_LINE_PX;
+        let inside_v = line_top >= clip.y && y <= clip.y + clip.height;
+        let inside_h = x >= clip.x && x < clip.x + clip.width;
+        if inside_v && inside_h {
+            self.inner.draw_text((x, y), text, color);
+        }
+    }
+
+    fn draw_pixels(&mut self, position: (i32, i32), pixels: &[Color], width: u32, height: u32) {
+        let Some(clip) = self.clip else { return };
+        if width == 0 || height == 0 {
+            return;
+        }
+        let dest = Rect {
+            x: position.0 + self.dx,
+            y: position.1 + self.dy,
+            width: width as i32,
+            height: height as i32,
+        };
+        let Some(visible) = dest.intersect(clip) else {
+            return;
+        };
+        // Fast path: fully visible — forward unchanged.
+        if visible == dest {
+            self.inner
+                .draw_pixels((dest.x, dest.y), pixels, width, height);
+            return;
+        }
+        // Partial: forward each visible row's segment as a 1-row blit.
+        let col0 = (visible.x - dest.x) as u32;
+        let run = visible.width as u32;
+        for row in 0..visible.height {
+            let src_row = (visible.y - dest.y + row) as u32;
+            let start = (src_row * width + col0) as usize;
+            let Some(slice) = pixels.get(start..start + run as usize) else {
+                return;
+            };
+            self.inner
+                .draw_pixels((visible.x, visible.y + row), slice, run, 1);
+        }
+    }
+
+    fn blend_row(&mut self, x: i32, y: i32, color: Color, coverage: &[u8]) {
+        let Some(clip) = self.clip else { return };
+        let (x, y) = (x + self.dx, y + self.dy);
+        if y < clip.y || y >= clip.y + clip.height || coverage.is_empty() {
+            return;
+        }
+        let row = Rect {
+            x,
+            y,
+            width: coverage.len() as i32,
+            height: 1,
+        };
+        let Some(visible) = row.intersect(clip) else {
+            return;
+        };
+        let start = (visible.x - x) as usize;
+        self.inner.blend_row(
+            visible.x,
+            y,
+            color,
+            &coverage[start..start + visible.width as usize],
+        );
+    }
+
+    // fill_obb_aa / fill_disc_aa / stroke_line_aa / fill_arc_aa /
+    // fill_masked / fill_gradient / draw_shadow / submit:
+    // intentionally NOT overridden (REND-00 §5.3). The trait defaults
+    // funnel them through `blend_row` / per-cmd dispatch on *this*
+    // adapter, which clips. Forwarding them to `inner` would bypass the
+    // clip on backends with hardware fast paths.
 }

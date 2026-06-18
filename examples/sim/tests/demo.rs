@@ -67,6 +67,16 @@ fn demo_draws_widgets() {
 }
 
 #[test]
+fn lpar_parity_demo_draws_representative_widgets() {
+    let node = rlvgl_app_demo::build_lpar_parity_demo(320, 240);
+    assert_eq!(node.children.len(), 6);
+
+    let mut renderer = CountRenderer(0);
+    node.draw(&mut renderer);
+    assert!(renderer.0 > 6);
+}
+
+#[test]
 fn button_click_dispatches() {
     let (mut app, root) = setup_demo();
     root.borrow_mut()
@@ -151,16 +161,26 @@ fn qr_button_toggles_qrcode() {
     root.borrow_mut()
         .dispatch_event(&Event::PressRelease { x: 110, y: 50 });
     app.after_event(&root, &Event::PressRelease { x: 110, y: 50 });
+
+    let baseline_children = root.borrow().children.len();
+    let mut baseline = FramebufferRenderer::new(320, 240);
+    root.borrow().draw(&mut baseline);
+
     root.borrow_mut()
         .dispatch_event(&Event::PressRelease { x: 30, y: 90 });
     app.after_event(&root, &Event::PressRelease { x: 30, y: 90 });
+    assert_eq!(root.borrow().children.len(), baseline_children + 1);
+
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
-    assert!(fb.buf.iter().any(|&p| p != Color(255, 255, 255, 255)));
+    assert_ne!(fb.buf, baseline.buf);
+
     root.borrow_mut()
         .dispatch_event(&Event::PressRelease { x: 30, y: 90 });
     app.after_event(&root, &Event::PressRelease { x: 30, y: 90 });
+    assert_eq!(root.borrow().children.len(), baseline_children);
+
     let mut fb = FramebufferRenderer::new(320, 240);
     root.borrow().draw(&mut fb);
-    assert!(fb.buf.iter().all(|&p| p == Color(255, 255, 255, 255)));
+    assert_eq!(fb.buf, baseline.buf);
 }

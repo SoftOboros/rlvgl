@@ -1,6 +1,7 @@
 //! Simple pixel-buffer image widget.
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
+use rlvgl_core::image::{BlitOpts, ImageDescriptor};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -10,9 +11,11 @@ pub struct Image<'a> {
     bounds: Rect,
     /// Styling for the image background.
     pub style: Style,
+    /// Source image width and height in pixels.
     width: i32,
     height: i32,
     pixels: &'a [Color],
+    blit_opts: BlitOpts,
 }
 
 impl<'a> Image<'a> {
@@ -24,7 +27,14 @@ impl<'a> Image<'a> {
             width,
             height,
             pixels,
+            blit_opts: BlitOpts::default(),
         }
+    }
+
+    /// Configure low-level blit options for this image instance.
+    pub fn with_blit_opts(mut self, blit_opts: BlitOpts) -> Self {
+        self.blit_opts = blit_opts;
+        self
     }
 }
 
@@ -35,12 +45,14 @@ impl<'a> Widget for Image<'a> {
 
     fn draw(&self, renderer: &mut dyn Renderer) {
         draw_widget_bg(renderer, self.bounds, &self.style);
-        renderer.draw_pixels(
-            (self.bounds.x, self.bounds.y),
-            self.pixels,
-            self.width as u32,
-            self.height as u32,
-        );
+        let Some(width) = u16::try_from(self.width).ok() else {
+            return;
+        };
+        let Some(height) = u16::try_from(self.height).ok() else {
+            return;
+        };
+        let descriptor = ImageDescriptor::from_color_slice(self.pixels, width, height);
+        renderer.blit_image(self.bounds, &descriptor, &self.blit_opts);
     }
 
     /// Images are purely visual and do not handle events.

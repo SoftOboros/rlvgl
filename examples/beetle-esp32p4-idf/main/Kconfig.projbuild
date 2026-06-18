@@ -1,0 +1,42 @@
+# Kconfig options for the DFR0550 ESP-IDF comparison app.
+
+menu "DFR0550 comparison"
+
+config DFR0550_WAKE_ONLY
+    bool "Wake DFR0550 bridge without creating a DSI bus"
+    default n
+    help
+        Power on the DFR0550 bridge and backlight over I2C, then idle
+        without configuring the ESP32-P4 MIPI-DSI PHY, DSI host, DPI
+        bridge, DMA, or framebuffer. This isolates the panel bridge's
+        own no-link behavior from ESP32-driven scanout.
+
+config DFR0550_POWER_OFF_AFTER_WAKE
+    bool "Wake DFR0550 bridge, then turn panel power and PWM off"
+    default n
+    help
+        Power on the DFR0550 bridge over I2C, wait for the bridge ready
+        bit, then command PWM=0 and POWERON=0 before idling. This checks
+        whether the visible cycling follows the DFR0550 I2C power/backlight
+        path without using the ESP32-P4 MIPI-DSI host.
+
+config DFR0550_COLOR_CYCLE
+    bool "Cycle solid R/G/B/W/K fills instead of rendering rlvgl"
+    default n
+    help
+        Drive the original solid-color fill loop (the BEETLE-06 control
+        case) rather than the Rust rlvgl payload. Leave disabled to run
+        the M1 rlvgl-over-IDF path: librlvgl_app.a draws a widget tree
+        into the DPI framebuffer each refill iteration.
+
+config DFR0550_NO_TOUCH
+    bool "Boot without touching the DFR0550 bridge or DSI host"
+    default n
+    help
+        Idle immediately after boot. This mode does not initialize I2C,
+        does not write the DFR0550 bridge, does not power LDO_VO3, and
+        does not configure the ESP32-P4 MIPI-DSI host. It isolates panel
+        activity that persists across an ESP32 reset from all app-level
+        display control paths.
+
+endmenu

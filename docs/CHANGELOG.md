@@ -7,6 +7,79 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## v0.2.4
+
+LPAR parity substrate and widget-family release.
+
+### Added - LVGL parity waves
+- LPAR-02 through LPAR-10: object/event/focus/input, invalidation,
+  scroll, timers/object animations, style cascade, text/draw/image/mask,
+  asset/filesystem, and layout substrate.
+- LPAR-11 through LPAR-15: primitive, control, navigation/selection,
+  data-rich, canvas/media/property/observer widget families.
+- LPAR-16 conformance fixtures across deterministic runtime behavior,
+  geometry, pixel goldens, and feature-gated surfaces.
+
+### Added - FONT (font selection & anti-aliased widget text)
+- `core::font::WidgetFont` + a uniform `set_font(&'static dyn FontMetrics)`
+  on every text widget (`Label`, `ui::Input`/`Textarea`/`FileBrowser`, and
+  21 `widgets::` widgets), defaulting to the built-in `FONT_6X10`. Purely
+  additive — no constructor or `Widget`-trait signature changed (FONT-01).
+- Anti-aliased widget text by font choice: feeding a `PackedFont` (8-bit
+  coverage) through the existing shaped-text pipeline yields AA; `FONT_6X10`
+  stays the 1-bit default. A conformance fixture asserts partial-alpha glyph
+  pixels survive the widget pipeline through a real `blend_row`-overriding
+  renderer (FONT-02).
+- `Renderer::draw_glyph(font, ch, origin, color)` — a defaulted single-glyph
+  coverage helper. `ArcLabel` migrated off the backend-opaque `draw_text` to
+  render real glyph coverage along the arc (the last legacy-`draw_text`
+  widget) and adopts `WidgetFont` (FONT-03).
+- `RotatedRenderer` glyph throughput: `draw_glyph`/`draw_text_shaped` rotate
+  each glyph's coverage once and blit physical rows via `inner.blend_row`
+  instead of per-pixel dispatch, with zero-drift parity against the software
+  reference (FONT-04).
+- `core::font::FontRegistry` (`FontId → &'static dyn FontMetrics`) + a
+  defaulted `Widget::widget_font_mut` font sink + `apply_font_registry`, which
+  walks the object tree (via `resolve_tree_with_text`), resolves each node's
+  cascade `font_id`, and writes the mapped handle into the widget's
+  `WidgetFont` slot — so the LPAR-07 style cascade / theme / locale can select
+  widget fonts. A registered `font_id` overrides; `DEFAULT`/unmapped preserves
+  an explicit `set_font`; default-`font_id` trees render identically (FONT-05).
+
+### Added - LVGL image converter & C/Rust array output
+- `rlvgl-creator lvgl <in> <out>` converts any image (or `.raw`) to an LVGL v9
+  binary image (`.bin`): `--cf rgb565|rgb888|argb8888|xrgb8888` (default
+  `rgb565`) and optional `--rle` (LVGL run-length, `lv_image_compressed_t`).
+  The v9 codec lives in the new `rlvgl-decomp::lvgl` module — header layout,
+  per-format byte order, and the `lv_rle` grammar verified against upstream
+  `LVGLImage.py`, with a `decode_bin` round-trip path.
+- `--emit bin|c|rust` on `compress` and `lvgl` embeds the image directly in the
+  binary — the cheapest path on all-RAM SoCs with no filesystem. `compress`
+  emits the RLEC blob as a `uint8_t[]` / `[u8; N]`; `lvgl` emits a ready-to-use
+  C `lv_image_dsc_t` (+ pixel map) or a Rust pixel map with width/height/format/
+  stride constants.
+- Alpha-only icon formats `--cf a8|a4` (LVGL `A8`/`A4`): store a single coverage
+  channel (color applied at draw time via recolor), with `--coverage
+  auto|alpha|luminance` derivation and Floyd–Steinberg dithering for `a4`. Far
+  smaller than `argb8888` for monochrome line-art icons and freely retintable. A
+  matching rlvgl coverage+tint draw path
+  (`rlvgl_decomp::lvgl::blend_alpha_bin_into_argb`) composites the icon onto an
+  ARGB8888 buffer with a runtime fill color.
+- `rlvgl-decomp` bumped to `0.2.3` for the additive `lvgl` module.
+
+### Release notes
+- `rlvgl-core`, `rlvgl-platform`, `rlvgl-widgets`, `rlvgl-ui`,
+  `rlvgl-fs-sim`, `rlvgl-app-demo`, and `rlvgl-app-disco-demo` are aligned
+  to `0.2.4` with matching internal dependency constraints.
+- Deferred conformance item: LPAR-09 FATFS-over-`SimBlockDevice` remains
+  coupled to the unimplemented `FatfsAssetSource` + std-only `rlvgl-fs-sim`
+  bridge.
+- Deferred optional media widgets: Lottie, DashLottie, and Texture3d remain
+  outside the LPAR-16 pixel-golden set until their runtime surfaces land.
+- Known validation debt: `cargo doc --workspace --no-deps` passes, but the
+  rustdoc run still reports broken/private intra-doc links that should be
+  cleaned before tightening docs to warnings-as-errors.
+
 ## v0.2.2
 
 Quality release — makes the crates.io distribution work and adds the CI

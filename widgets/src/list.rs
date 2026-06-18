@@ -2,6 +2,7 @@
 use alloc::{string::String, vec::Vec};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -15,6 +16,9 @@ pub struct List {
     pub text_color: Color,
     items: Vec<String>,
     selected: Option<usize>,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl List {
@@ -26,12 +30,21 @@ impl List {
             text_color: Color(0, 0, 0, 255),
             items: Vec::new(),
             selected: None,
+            font: WidgetFont::new(),
         }
     }
 
     /// Append an item to the end of the list.
     pub fn add_item(&mut self, text: impl Into<String>) {
         self.items.push(text.into());
+    }
+
+    /// Replace all list items and clear the current selection.
+    pub fn set_items(&mut self, items: &[impl AsRef<str>]) {
+        self.items.clear();
+        self.items
+            .extend(items.iter().map(|item| String::from(item.as_ref())));
+        self.selected = None;
     }
 
     /// Return a slice of all list items.
@@ -42,6 +55,12 @@ impl List {
     /// Index of the currently selected item, if any.
     pub fn selected(&self) -> Option<usize> {
         self.selected
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Translate a y coordinate into a list index.
@@ -68,9 +87,14 @@ impl Widget for List {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let a = self.style.alpha;
         draw_widget_bg(renderer, self.bounds, &self.style);
+        let font = self.font.resolve();
         let row_height = 16;
         for (i, item) in self.items.iter().enumerate() {
             let y = self.bounds.y + (i as i32 * row_height);
@@ -80,7 +104,8 @@ impl Widget for List {
             } else {
                 self.text_color
             };
-            renderer.draw_text(pos, item, color.with_alpha(a));
+            let shaped = shape_text_ltr(font, item, pos, 0);
+            renderer.draw_text_shaped(&shaped, (0, 0), color.with_alpha(a));
         }
     }
 
@@ -100,5 +125,29 @@ impl Widget for List {
 
         self.selected = Some(idx);
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_items_replaces_values_and_clears_selection() {
+        let mut list = List::new(Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 48,
+        });
+        list.add_item("A");
+        list.add_item("B");
+        assert!(list.handle_event(&Event::PressRelease { x: 5, y: 20 }));
+        assert_eq!(list.selected(), Some(1));
+
+        list.set_items(&["C"]);
+
+        assert_eq!(list.items(), &["C"]);
+        assert_eq!(list.selected(), None);
     }
 }

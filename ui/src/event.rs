@@ -12,6 +12,8 @@ use rlvgl_core::{
 };
 use rlvgl_widgets::{button::Button as BaseButton, slider::Slider as BaseSlider};
 
+use crate::theme::{ColorScheme, ComponentSize, Theme, Variant};
+
 /// Extension trait adding a fluent `on_click` method to widgets.
 pub trait OnClick {
     /// Attach a click handler executed when the widget is released.
@@ -44,6 +46,42 @@ impl Slider {
     /// Register a callback invoked whenever the slider value changes.
     pub fn on_change<F: FnMut(i32) + 'static>(mut self, handler: F) -> Self {
         self.on_change = Some(Box::new(handler));
+        self
+    }
+
+    /// Set the current slider value and return the widget.
+    pub fn with_value(mut self, val: i32) -> Self {
+        self.inner.set_value(val);
+        self
+    }
+
+    /// Set the knob color and return the widget.
+    pub fn knob_color(mut self, color: rlvgl_core::widget::Color) -> Self {
+        self.inner.knob_color = color;
+        self
+    }
+
+    /// Return the knob color.
+    pub fn knob_color_value(&self) -> rlvgl_core::widget::Color {
+        self.inner.knob_color
+    }
+
+    /// Set the knob color.
+    pub fn set_knob_color(&mut self, color: rlvgl_core::widget::Color) {
+        self.inner.knob_color = color;
+    }
+
+    /// Apply a themed style and knob color.
+    pub fn themed(
+        mut self,
+        theme: &Theme,
+        scheme: ColorScheme,
+        variant: Variant,
+        size: ComponentSize,
+    ) -> Self {
+        let resolved = theme.component_style(scheme, variant, size);
+        self.inner.style = resolved.style;
+        self.inner.knob_color = resolved.accent_color;
         self
     }
 
@@ -129,5 +167,32 @@ mod tests {
         let event = Event::PressRelease { x: 50, y: 5 };
         slider.handle_event(&event);
         assert_ne!(value.get(), 0);
+    }
+
+    #[test]
+    fn slider_themed_sets_style_and_knob() {
+        let theme = Theme::material_light();
+        let slider = Slider::new(
+            Rect {
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 10,
+            },
+            0,
+            10,
+        )
+        .themed(
+            &theme,
+            ColorScheme::Primary,
+            Variant::Outline,
+            ComponentSize::Lg,
+        );
+
+        assert_eq!(
+            slider.knob_color_value(),
+            theme.scheme(ColorScheme::Primary).solid
+        );
+        assert_eq!(slider.style().border_width, 2);
     }
 }

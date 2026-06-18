@@ -1,4 +1,5 @@
 //! Golden tests for list widget rendering.
+use rlvgl_core::font::ShapedText;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_platform::display::{BufferDisplay, DisplayDriver};
@@ -15,6 +16,10 @@ impl<'a> Renderer for DisplayRenderer<'a> {
     }
 
     fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
+    // List migrated to the shaped-text path (LPAR-08); this golden only checks
+    // the background fill, so no-op shaped text too rather than letting the
+    // default extent-visualizer paint glyph boxes.
+    fn draw_text_shaped(&mut self, _shaped: &ShapedText<'_>, _o: (i32, i32), _c: Color) {}
 }
 
 #[test]

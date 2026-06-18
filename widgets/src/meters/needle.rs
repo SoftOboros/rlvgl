@@ -16,6 +16,7 @@ extern crate alloc;
 use libm::{cosf, sinf};
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -52,6 +53,9 @@ pub struct NeedleVu {
     /// When `true`, paint major-tick marks and labels along the arc.
     /// Default `false` so callers opt in.
     pub show_ticks: bool,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl NeedleVu {
@@ -70,7 +74,14 @@ impl NeedleVu {
             ballistic: BallisticState::new(skin.default_ballistic),
             reading_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             show_ticks: false,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Builder-style helper: enable tick + label rendering and return self.
@@ -125,6 +136,10 @@ impl NeedleVu {
 impl Widget for NeedleVu {
     fn bounds(&self) -> Rect {
         self.bounds
+    }
+
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
@@ -207,10 +222,16 @@ impl NeedleVu {
             let label_x = (pivot_x as f32 + (r_outer + 4.0) * dx) as i32 - 8;
             let label_y = (pivot_y as f32 + (r_outer + 4.0) * dy) as i32 + 4;
             match scale.label_for_major(m) {
-                Some(s) => renderer.draw_text((label_x, label_y), s, text_col),
+                Some(s) => {
+                    let font = self.font.resolve();
+                    let shaped = shape_text_ltr(font, s, (label_x, label_y), 0);
+                    renderer.draw_text_shaped(&shaped, (0, 0), text_col);
+                }
                 None => {
+                    let font = self.font.resolve();
                     let formatted = alloc::format!("{m:.0}");
-                    renderer.draw_text((label_x, label_y), &formatted, text_col);
+                    let shaped = shape_text_ltr(font, &formatted, (label_x, label_y), 0);
+                    renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
             }
         }
@@ -282,6 +303,7 @@ mod tests {
     extern crate alloc;
     use alloc::string::String;
     use alloc::vec::Vec;
+    use rlvgl_core::font::ShapedText;
 
     struct TextRecorder {
         rect_count: usize,
@@ -292,10 +314,17 @@ mod tests {
         fn fill_rect(&mut self, _rect: Rect, _color: Color) {
             self.rect_count += 1;
         }
-        fn draw_text(&mut self, _pos: (i32, i32), text: &str, _color: Color) {
+        fn draw_text_shaped(
+            &mut self,
+            shaped: &ShapedText<'_>,
+            _origin: (i32, i32),
+            _color: Color,
+        ) {
             self.text_count += 1;
-            self.last_text.push(text.into());
+            self.last_text
+                .push(shaped.glyphs.iter().map(|glyph| glyph.ch).collect());
         }
+        fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
     }
 
     #[test]

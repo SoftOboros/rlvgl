@@ -2,7 +2,8 @@
 use alloc::string::String;
 use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
-use rlvgl_core::renderer::Renderer;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
+use rlvgl_core::renderer::{ClipRenderer, Renderer};
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -17,6 +18,9 @@ pub struct Checkbox {
     /// Color of the check mark when selected.
     pub check_color: Color,
     checked: bool,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl Checkbox {
@@ -29,6 +33,7 @@ impl Checkbox {
             text_color: Color(0, 0, 0, 255),
             check_color: Color(0, 0, 0, 255),
             checked: false,
+            font: WidgetFont::new(),
         }
     }
 
@@ -41,11 +46,21 @@ impl Checkbox {
     pub fn set_checked(&mut self, value: bool) {
         self.checked = value;
     }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
+    }
 }
 
 impl Widget for Checkbox {
     fn bounds(&self) -> Rect {
         self.bounds
+    }
+
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
@@ -75,11 +90,20 @@ impl Widget for Checkbox {
         }
 
         // Draw label text to the right of the box with baseline at the bottom
-        let text_pos = (
+        let text_origin = (
             self.bounds.x + square_size + 4,
             self.bounds.y + self.bounds.height,
         );
-        renderer.draw_text(text_pos, &self.text, self.text_color.with_alpha(a));
+        let clip = Rect {
+            x: text_origin.0,
+            y: self.bounds.y,
+            width: self.bounds.width - (square_size + 4),
+            height: self.bounds.height,
+        };
+        let font = self.font.resolve();
+        let shaped = shape_text_ltr(font, &self.text, text_origin, 0);
+        let mut clipped = ClipRenderer::new(renderer, clip);
+        clipped.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(a));
     }
 
     /// Toggle the checked state when clicked.

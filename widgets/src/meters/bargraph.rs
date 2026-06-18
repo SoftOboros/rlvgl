@@ -11,6 +11,7 @@
 
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -52,6 +53,9 @@ pub struct LedBargraph {
     /// `BARGRAPH_TICK_STRIP_PX`-wide strip on the right side of the
     /// widget. Default `false` so callers opt in.
     pub show_ticks: bool,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl LedBargraph {
@@ -72,7 +76,14 @@ impl LedBargraph {
             peak_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_age_s: 0.0,
             show_ticks: false,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Builder-style helper: enable tick + label rendering in the
@@ -146,6 +157,10 @@ impl LedBargraph {
 impl Widget for LedBargraph {
     fn bounds(&self) -> Rect {
         self.bounds
+    }
+
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
@@ -265,11 +280,16 @@ impl LedBargraph {
             // Lift the baseline slightly so a typical 12-px font sits
             // beside the tick mark.
             let lbl_y = y + 4;
+            let font = self.font.resolve();
             match scale.label_for_major(m) {
-                Some(s) => renderer.draw_text((lbl_x, lbl_y), s, text_col),
+                Some(s) => {
+                    let shaped = shape_text_ltr(font, s, (lbl_x, lbl_y), 0);
+                    renderer.draw_text_shaped(&shaped, (0, 0), text_col);
+                }
                 None => {
                     let formatted = format!("{m:.0}");
-                    renderer.draw_text((lbl_x, lbl_y), &formatted, text_col);
+                    let shaped = shape_text_ltr(font, &formatted, (lbl_x, lbl_y), 0);
+                    renderer.draw_text_shaped(&shaped, (0, 0), text_col);
                 }
             }
         }
@@ -319,6 +339,7 @@ mod tests {
     use super::*;
     use crate::meters::presets::BROADCAST_CLASSIC_BARGRAPH;
     use rlvgl_audio_meters_core::Ballistic;
+    use rlvgl_core::font::ShapedText;
     use rlvgl_core::renderer::Renderer;
 
     /// Records every fill_rect call so we can assert geometry without
@@ -331,6 +352,13 @@ mod tests {
             self.ops.push((rect, color));
         }
         fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
+        fn draw_text_shaped(
+            &mut self,
+            _shaped: &ShapedText<'_>,
+            _origin: (i32, i32),
+            _color: Color,
+        ) {
+        }
     }
 
     #[test]
@@ -422,10 +450,17 @@ mod tests {
         }
         impl Renderer for Counter {
             fn fill_rect(&mut self, _r: Rect, _c: Color) {}
-            fn draw_text(&mut self, _p: (i32, i32), text: &str, _c: Color) {
+            fn draw_text_shaped(
+                &mut self,
+                shaped: &ShapedText<'_>,
+                _origin: (i32, i32),
+                _color: Color,
+            ) {
                 self.text_count += 1;
-                self.label_set.push(text.into());
+                self.label_set
+                    .push(shaped.glyphs.iter().map(|glyph| glyph.ch).collect());
             }
+            fn draw_text(&mut self, _p: (i32, i32), _text: &str, _c: Color) {}
         }
         let mut c = Counter {
             text_count: 0,
@@ -458,9 +493,15 @@ mod tests {
         }
         impl Renderer for Counter {
             fn fill_rect(&mut self, _r: Rect, _c: Color) {}
-            fn draw_text(&mut self, _p: (i32, i32), _t: &str, _c: Color) {
+            fn draw_text_shaped(
+                &mut self,
+                _shaped: &ShapedText<'_>,
+                _origin: (i32, i32),
+                _color: Color,
+            ) {
                 self.text_count += 1;
             }
+            fn draw_text(&mut self, _p: (i32, i32), _t: &str, _c: Color) {}
         }
         let mut c = Counter { text_count: 0 };
         bar.draw(&mut c);

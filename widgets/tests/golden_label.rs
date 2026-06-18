@@ -24,7 +24,7 @@ fn label_background_render() {
         display: &mut display,
     };
     let mut label = Label::new(
-        "hi",
+        "",
         Rect {
             x: 0,
             y: 0,

@@ -8,6 +8,101 @@ use crate::renderer::Renderer;
 use crate::style::Style;
 use crate::widget::{Color, Rect};
 
+/// Maximum number of stops honored by [`GradientDesc`].
+pub const GRADIENT_MAX_STOPS: usize = 4;
+
+/// Shape of a gradient fill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GradientKind {
+    /// Linear gradient. Cardinal and diagonal angles are snapped to the
+    /// nearest 45-degree direction for deterministic integer sampling.
+    Linear {
+        /// Clockwise angle in degrees; `0` is left-to-right and `90` is
+        /// top-to-bottom.
+        angle_deg: i16,
+    },
+    /// Radial gradient from a center point expressed as fractions of `rect`.
+    Radial {
+        /// Center x coordinate as `0..=255` fraction of the target rect.
+        cx_frac: u8,
+        /// Center y coordinate as `0..=255` fraction of the target rect.
+        cy_frac: u8,
+    },
+}
+
+/// Linear or radial gradient descriptor.
+///
+/// Stops are `(position, color)` pairs where `position` is `0..=255`.
+/// At most [`GRADIENT_MAX_STOPS`] stops are considered; extra stops are
+/// ignored by the software reference path. Stops do not need to be sorted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GradientDesc<'a> {
+    /// Gradient geometry.
+    pub kind: GradientKind,
+    /// Color stops in `0..=255` position space.
+    pub stops: &'a [(u8, Color)],
+}
+
+impl<'a> GradientDesc<'a> {
+    /// Create a gradient descriptor.
+    pub const fn new(kind: GradientKind, stops: &'a [(u8, Color)]) -> Self {
+        Self { kind, stops }
+    }
+
+    /// Return the sampled color at an absolute pixel coordinate.
+    pub fn color_at(&self, rect: Rect, x: i32, y: i32) -> Option<Color> {
+        if rect.width <= 0 || rect.height <= 0 || self.stops.is_empty() {
+            return None;
+        }
+        Some(self.color_at_fraction(gradient_position(self.kind, rect, x, y)))
+    }
+
+    fn color_at_fraction(&self, t: u8) -> Color {
+        let stops = &self.stops[..self.stops.len().min(GRADIENT_MAX_STOPS)];
+        if stops.len() == 1 {
+            return stops[0].1;
+        }
+
+        let mut lower: Option<(u8, Color)> = None;
+        let mut upper: Option<(u8, Color)> = None;
+
+        for &(pos, color) in stops {
+            if pos <= t && lower.is_none_or(|(best, _)| pos >= best) {
+                lower = Some((pos, color));
+            }
+            if pos >= t && upper.is_none_or(|(best, _)| pos <= best) {
+                upper = Some((pos, color));
+            }
+        }
+
+        match (lower, upper) {
+            (Some((lp, lc)), Some((up, uc))) if up != lp => {
+                let num = i32::from(t.saturating_sub(lp));
+                let den = i32::from(up - lp);
+                lc.lerp(uc, num, den)
+            }
+            (Some((_, c)), _) => c,
+            (_, Some((_, c))) => c,
+            (None, None) => Color(0, 0, 0, 0),
+        }
+    }
+}
+
+/// Box-shadow descriptor consumed by [`Renderer::draw_shadow`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShadowDesc {
+    /// Horizontal shadow displacement.
+    pub offset_x: i16,
+    /// Vertical shadow displacement.
+    pub offset_y: i16,
+    /// Expansion beyond the source rect before blur.
+    pub spread: u8,
+    /// Approximate blur radius in pixels.
+    pub blur: u8,
+    /// Shadow color.
+    pub color: Color,
+}
+
 /// Integer square root (floor).
 fn isqrt(n: u32) -> u32 {
     if n == 0 {
@@ -20,6 +115,78 @@ fn isqrt(n: u32) -> u32 {
         y = (x + n / x) / 2;
     }
     x
+}
+
+fn gradient_position(kind: GradientKind, rect: Rect, x: i32, y: i32) -> u8 {
+    match kind {
+        GradientKind::Linear { angle_deg } => linear_gradient_position(angle_deg, rect, x, y),
+        GradientKind::Radial { cx_frac, cy_frac } => {
+            radial_gradient_position(cx_frac, cy_frac, rect, x, y)
+        }
+    }
+}
+
+fn linear_gradient_position(angle_deg: i16, rect: Rect, x: i32, y: i32) -> u8 {
+    let xf = axis_fraction(x - rect.x, rect.width);
+    let yf = axis_fraction(y - rect.y, rect.height);
+    match snapped_octant(angle_deg) {
+        0 => xf,
+        1 => avg_u8(xf, yf),
+        2 => yf,
+        3 => avg_u8(255u8.saturating_sub(xf), yf),
+        4 => 255u8.saturating_sub(xf),
+        5 => avg_u8(255u8.saturating_sub(xf), 255u8.saturating_sub(yf)),
+        6 => 255u8.saturating_sub(yf),
+        _ => avg_u8(xf, 255u8.saturating_sub(yf)),
+    }
+}
+
+fn radial_gradient_position(cx_frac: u8, cy_frac: u8, rect: Rect, x: i32, y: i32) -> u8 {
+    let cx = rect.x + fraction_to_axis(cx_frac, rect.width);
+    let cy = rect.y + fraction_to_axis(cy_frac, rect.height);
+    let dx = (x - cx).unsigned_abs();
+    let dy = (y - cy).unsigned_abs();
+    let dist = isqrt(dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy)));
+
+    let corners = [
+        (rect.x, rect.y),
+        (rect.x + rect.width - 1, rect.y),
+        (rect.x, rect.y + rect.height - 1),
+        (rect.x + rect.width - 1, rect.y + rect.height - 1),
+    ];
+    let mut max_dist = 1u32;
+    for &(corner_x, corner_y) in &corners {
+        let dx = (corner_x - cx).unsigned_abs();
+        let dy = (corner_y - cy).unsigned_abs();
+        max_dist = max_dist.max(isqrt(
+            dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy)),
+        ));
+    }
+
+    ((dist.min(max_dist) * 255) / max_dist) as u8
+}
+
+fn snapped_octant(angle_deg: i16) -> u8 {
+    let angle = i32::from(angle_deg).rem_euclid(360);
+    (((angle + 22) / 45) % 8) as u8
+}
+
+fn axis_fraction(pos: i32, len: i32) -> u8 {
+    if len <= 1 {
+        return 255;
+    }
+    ((pos.clamp(0, len - 1) * 255) / (len - 1)) as u8
+}
+
+fn fraction_to_axis(frac: u8, len: i32) -> i32 {
+    if len <= 1 {
+        return 0;
+    }
+    (i32::from(frac) * (len - 1)) / 255
+}
+
+fn avg_u8(a: u8, b: u8) -> u8 {
+    ((u16::from(a) + u16::from(b)) / 2) as u8
 }
 
 /// Compute the arc x-extent at row `dy` for radius `r`, returning the integer
@@ -638,5 +805,58 @@ mod tests {
         };
         draw_widget_bg(&mut r, rect, &style);
         assert!(r.fills > 1);
+    }
+
+    #[test]
+    fn linear_gradient_samples_cardinal_axis() {
+        let stops = [(0, Color(0, 0, 0, 255)), (255, Color(255, 0, 0, 255))];
+        let gradient = GradientDesc::new(GradientKind::Linear { angle_deg: 0 }, &stops);
+        let rect = Rect {
+            x: 10,
+            y: 20,
+            width: 3,
+            height: 2,
+        };
+
+        assert_eq!(gradient.color_at(rect, 10, 20), Some(Color(0, 0, 0, 255)));
+        assert_eq!(gradient.color_at(rect, 11, 20), Some(Color(127, 0, 0, 255)));
+        assert_eq!(gradient.color_at(rect, 12, 20), Some(Color(255, 0, 0, 255)));
+    }
+
+    #[test]
+    fn gradient_stops_do_not_need_sorting() {
+        let stops = [(255, Color(255, 0, 0, 255)), (0, Color(0, 0, 0, 255))];
+        let gradient = GradientDesc::new(GradientKind::Linear { angle_deg: 90 }, &stops);
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 2,
+            height: 3,
+        };
+
+        assert_eq!(gradient.color_at(rect, 0, 0), Some(Color(0, 0, 0, 255)));
+        assert_eq!(gradient.color_at(rect, 0, 1), Some(Color(127, 0, 0, 255)));
+        assert_eq!(gradient.color_at(rect, 0, 2), Some(Color(255, 0, 0, 255)));
+    }
+
+    #[test]
+    fn radial_gradient_reaches_outer_stop_at_corner() {
+        let stops = [(0, Color(0, 0, 0, 255)), (255, Color(0, 0, 255, 255))];
+        let gradient = GradientDesc::new(
+            GradientKind::Radial {
+                cx_frac: 128,
+                cy_frac: 128,
+            },
+            &stops,
+        );
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            width: 5,
+            height: 5,
+        };
+
+        assert_eq!(gradient.color_at(rect, 2, 2), Some(Color(0, 0, 0, 255)));
+        assert_eq!(gradient.color_at(rect, 0, 0), Some(Color(0, 0, 255, 255)));
     }
 }

@@ -32,28 +32,62 @@ extern crate std;
 
 extern crate alloc;
 
+/// Tick-driven tween/animation system (deterministic, no wall clock).
+pub mod anim;
 pub mod animation;
 pub mod application;
+#[cfg(feature = "fs")]
+pub mod asset;
 pub mod bitmap_font;
 /// Graphics-language layer: structured drawing commands as data.
 pub mod cmd;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
+/// Shared edit-state machine (buffer, caret, mutation gates) promoted from
+/// `rlvgl-ui` so that `rlvgl-widgets` can depend on it without a crate cycle
+/// (LPAR-14 §5.C).
+pub mod edit;
 pub mod event;
+/// Focus traversal and group policy for the LPAR-04 event/focus runtime.
+pub mod focus;
+/// Backend-neutral font metrics, shaping, and greedy wrapping.
+pub mod font;
 #[cfg(feature = "fs")]
 pub mod fs;
 /// 1-bit bitmap icons (folder, file) rendered at font height.
 pub mod icon_bitmap;
+/// Image descriptors, blit options, and cache handles.
+pub mod image;
 pub mod interface;
+/// Shared invalidation planner and present-plan types (LPAR-03).
+pub mod invalidation;
+/// LPAR-10 layout substrate: `Dimension`, flex/grid engines, `LayoutState`, and layout pass.
+pub mod layout;
+/// LPAR-08 alpha mask primitives and coverage combinators.
+pub mod mask;
+/// LVGL-parity object metadata and tree helpers.
+pub mod object;
+/// Node-resident object animations; see [`object_anim::ObjectAnims`].
+pub mod object_anim;
+/// LPAR-15 value-binding `Subject<T>` — orthogonal to the LPAR-04 event system.
+pub mod observer;
 /// Variable-width packed font renderer (grayscale anti-aliased).
 pub mod packed_font;
 pub mod plugins;
+/// LPAR-15 typed property accessor: `PropertyValue` enum and the `Queryable` trait.
+pub mod property;
 /// Anti-aliased rasterization kernels (OBB and helpers) usable by both
 /// software and hardware-accelerated `Renderer` implementations.
 pub mod raster;
 pub mod renderer;
+/// LPAR-05 scroll runtime: scroll state, controller, and snap logic.
+pub mod scroll;
 pub mod style;
+/// LPAR-07 style cascade substrate: `Part`, `Selector`, `StylePatch`, `StyleState`, and resolution.
+pub mod style_cascade;
 pub mod theme;
+/// Tick-driven timer registry; see [`timer::Timers`].
+pub mod timer;
 pub mod widget;
 
 #[cfg(feature = "canvas")]

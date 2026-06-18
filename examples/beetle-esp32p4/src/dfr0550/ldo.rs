@@ -41,8 +41,90 @@
 
 #![allow(dead_code)]
 
-const DREF_FOR_2500MV: u8 = 9;
-const MUL_FOR_2500MV: u8 = 6;
+use core::sync::atomic::{AtomicU8, Ordering};
+
+/// BEETLE-05 diagnostic: packed read-back of the LDO_VO3 config after
+/// `acquire_dphy`, so the Morse loop can confirm our PMU writes actually
+/// landed (the DPHY rail being mis-configured is the prime suspect for the
+/// PHY-alive-but-PLL-won't-lock state). All five bits set (value 031) means
+/// the rail is configured exactly as intended:
+///   bit 0 — `xpd` == 1            (LDO output enabled)
+///   bit 1 — `force_tieh_sel` == 1 (software-owned)
+///   bit 2 — `tieh` == 0           (output = Vref*Mul, not 3.3 V)
+///   bit 3 — `dref` == 9           (Vref = 1.0 V)
+///   bit 4 — `mul` == 6            (Vout = 2.5 V)
+/// Sentinel 0xFF = acquire_dphy never ran.
+pub static LAST_LDO_VERIFY: AtomicU8 = AtomicU8::new(0xFF);
+
+/// BEETLE-05 diagnostic: the eFuse-calibrated `(dref * 10 + mul)` actually
+/// programmed into LDO_VO3. `096` means calibration resolved to the
+/// uncalibrated 9/6 tap (so the DPHY voltage was never the problem);
+/// anything else means this chip's eFuse trim shifted the dref/mul to hit
+/// a true 2500 mV — and our previous hardcoded 9/6 was at the wrong
+/// voltage, which is the prime suspect for the PLL refusing to lock.
+pub static LAST_LDO_DREFMUL: AtomicU8 = AtomicU8::new(0xFF);
+
+/// Target DPHY rail voltage (LDO_VO3) in millivolts.
+const DPHY_MV: i32 = 2500;
+
+/// Port of IDF `ldo_ll_voltage_to_dref_mul` for LDO_VO3 (unit 2): pick the
+/// `(dref, mul)` pair that lands closest to `target_mv`, applying this
+/// chip's eFuse calibration. `efuse_raw` is `EFUSE.rd_mac_sys_3` (BLK1
+/// word 3): LDO_VO3_K = bits[13:6], LDO_VO3_VOS = bits[19:14],
+/// LDO_VO3_C = bits[25:20]. Unprogrammed (0) fields fall back to the
+/// uncalibrated constants, reproducing the 9/6 = 2500 mV default. All math
+/// is i32 fixed-point (constants ×1000) to avoid the FPU — same as IDF.
+fn calibrated_dref_mul(efuse_raw: u32, target_mv: i32) -> (u8, u8) {
+    let efuse_k = ((efuse_raw >> 6) & 0xFF) as i32;
+    let efuse_vos = ((efuse_raw >> 14) & 0x3F) as i32;
+    let efuse_c = ((efuse_raw >> 20) & 0x3F) as i32;
+
+    let mut k_1000: i32 = 1000;
+    let mut vos_1000: i32 = 0;
+    let mut c_1000: i32 = 1000;
+    if efuse_k != 0 {
+        k_1000 = if efuse_k & 0x80 != 0 {
+            -(efuse_k & 0x7F) + 975
+        } else {
+            efuse_k + 975
+        };
+    }
+    if efuse_vos != 0 {
+        vos_1000 = if efuse_vos & 0x20 != 0 {
+            -(efuse_vos & 0x1F) - 3
+        } else {
+            efuse_vos - 3
+        };
+    }
+    if efuse_c != 0 {
+        c_1000 = if efuse_c & 0x20 != 0 {
+            -(efuse_c & 0x1F) + 990
+        } else {
+            efuse_c + 990
+        };
+    }
+
+    let mut min_diff: i32 = 400_000_000;
+    let mut best_dref: u8 = 9;
+    let mut best_mul: u8 = 6;
+    for dref_val in 0..16i32 {
+        let vref_20 = if dref_val < 9 {
+            10 + dref_val
+        } else {
+            20 + (dref_val - 9) * 2
+        };
+        for mul_val in 0..8i32 {
+            let vout = (vref_20 * k_1000 + 20 * vos_1000) * (4000 + mul_val * c_1000);
+            let diff = (target_mv * 80_000 - vout).abs();
+            if diff < min_diff {
+                min_diff = diff;
+                best_dref = dref_val as u8;
+                best_mul = mul_val as u8;
+            }
+        }
+    }
+    (best_dref, best_mul)
+}
 
 pub struct LdoChannel {
     chan_id: u8,
@@ -59,8 +141,19 @@ impl LdoChannel {
         use esp32p4 as pac;
         let p = unsafe { pac::Peripherals::steal() };
 
+        // BEETLE-05: resolve the eFuse-calibrated dref/mul for 2500 mV on
+        // THIS chip. On a calibrated part (efuse trim programmed) this is
+        // NOT 9/6 — and the previous hardcoded 9/6 sat at the wrong DPHY
+        // voltage, the prime suspect for the PHY PLL not locking.
+        let efuse_raw = p.EFUSE.rd_mac_sys_3().read().bits();
+        let (dref, mul) = calibrated_dref_mul(efuse_raw, DPHY_MV);
+        LAST_LDO_DREFMUL.store(
+            dref.saturating_mul(10).saturating_add(mul),
+            Ordering::Relaxed,
+        );
+
         // ldo_ll_set_owner(unit=2, OWNER_SW): force_tieh_sel=1, tieh_sel=0.
-        // ldo_ll_adjust_voltage(unit=2, dref=9, mul=6, use_rail_voltage=false):
+        // ldo_ll_adjust_voltage(unit=2, dref, mul, use_rail_voltage=false):
         // tieh=0 in CTRL; dref/mul in ANA.
         p.PMU.ext_ldo_p0_0p2a().modify(|_, w| {
             w._0p2a_force_tieh_sel_0().set_bit();
@@ -70,8 +163,8 @@ impl LdoChannel {
         });
         p.PMU.ext_ldo_p0_0p2a_ana().modify(|_, w| {
             unsafe {
-                w.ana_0p2a_dref_0().bits(DREF_FOR_2500MV);
-                w.ana_0p2a_mul_0().bits(MUL_FOR_2500MV);
+                w.ana_0p2a_dref_0().bits(dref);
+                w.ana_0p2a_mul_0().bits(mul);
             }
             // ldo_ll_enable_ripple_suppression(unit=2, true): en_vdet=1.
             // IDF calls this immediately before xpd=1; without it the
@@ -91,6 +184,27 @@ impl LdoChannel {
         for _ in 0..5_000 {
             core::hint::spin_loop();
         }
+
+        // BEETLE-05 diagnostic: confirm every field we wrote actually stuck.
+        let ctrl = p.PMU.ext_ldo_p0_0p2a().read();
+        let ana = p.PMU.ext_ldo_p0_0p2a_ana().read();
+        let mut verify: u8 = 0;
+        if ctrl._0p2a_xpd_0().bit_is_set() {
+            verify |= 1 << 0;
+        }
+        if ctrl._0p2a_force_tieh_sel_0().bit_is_set() {
+            verify |= 1 << 1;
+        }
+        if ctrl._0p2a_tieh_0().bit_is_clear() {
+            verify |= 1 << 2;
+        }
+        if ana.ana_0p2a_dref_0().bits() == dref {
+            verify |= 1 << 3;
+        }
+        if ana.ana_0p2a_mul_0().bits() == mul {
+            verify |= 1 << 4;
+        }
+        LAST_LDO_VERIFY.store(verify, Ordering::Relaxed);
 
         Self {
             chan_id: super::DPHY_LDO_CHAN,

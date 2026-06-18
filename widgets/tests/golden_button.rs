@@ -25,7 +25,7 @@ fn button_background_render() {
     };
 
     let mut button = Button::new(
-        "ok",
+        "",
         Rect {
             x: 0,
             y: 0,

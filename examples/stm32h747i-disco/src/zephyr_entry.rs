@@ -702,7 +702,6 @@ pub unsafe extern "C" fn rlvgl_init(
             let mut star_crawl = crate::crawl_buffers::build_star_crawl_window(fb_w, fb_h, 30);
             #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             let mut crawl_dma2d: Option<rlvgl_platform::dma2d::Dma2dBlitter> = None;
-            #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
             let mut crawl_active = false;
 
             // After first present, LTDC displays back buffer (now front).

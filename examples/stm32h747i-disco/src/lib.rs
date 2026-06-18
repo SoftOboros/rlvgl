@@ -8,13 +8,13 @@
 //! The bare-metal binary target (`main.rs`) is the primary entry point
 //! for non-Zephyr builds and shares all the same application modules.
 
-#![no_std]
+#![cfg_attr(target_os = "none", no_std)]
 #![allow(dead_code)]
 
 extern crate alloc;
 
 // Panic handler for the static library.
-#[cfg(all(not(doc), any(target_arch = "arm", target_arch = "aarch64")))]
+#[cfg(all(not(doc), target_os = "none"))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {
@@ -23,10 +23,10 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 // Heap allocator - same as main.rs.
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+#[cfg(target_os = "none")]
 use embedded_alloc::Heap;
 
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+#[cfg(target_os = "none")]
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
@@ -40,7 +40,7 @@ pub(crate) static SPLASH_RLE: &[u8] = include_bytes!("../assets/media/splash.rle
 #[cfg(feature = "cm7")]
 #[path = "bsp/cm7/pac.rs"]
 mod bsp_pac;
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+#[cfg(target_os = "none")]
 mod scope_probe;
 
 mod file_browser_panel;
@@ -58,7 +58,7 @@ mod readme_crawl;
 mod star_crawl;
 
 // ── Zephyr-specific modules ──────────────────────────────────────────────────
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+#[cfg(target_os = "none")]
 mod zephyr_entry;
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+#[cfg(target_os = "none")]
 mod zephyr_sync;

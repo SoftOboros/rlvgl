@@ -17,7 +17,7 @@ fn main() {
     };
     let mut label = Label::new("crates-ci", bounds);
     label.style = Style::default();
-    label.text_color = Color(255, 255, 255, 255);
+    label.set_text_color(Color(255, 255, 255, 255));
     assert_eq!(label.text(), "crates-ci");
 
     let button = Button::new(

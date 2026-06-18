@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-fs-sim"
-version = "0.2.2"
+version = "0.2.4"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -9,7 +9,7 @@ repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"
 
 [dependencies]
-rlvgl-core = { path = "../core", version = "0.2.2", default-features = false, features = ["fs"] }
+rlvgl-core = { path = "../core", version = "0.2.4", default-features = false, features = ["fs"] }
 memmap2 = { version = "0.9", optional = true }
 fatfs = { version = "0.3", default-features = false, features = ["std", "alloc"] }
 walkdir = "2"

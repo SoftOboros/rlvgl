@@ -132,7 +132,7 @@ Commands are single lines terminated by `\n` or `\r\n`.
 | Pointer up | `PU<x>,<y>` | Inject `PointerUp` |
 | Pointer move | `PM<x>,<y>` | Inject `PointerMove` |
 | Multi-touch | `MT<n>:<id>,<s>,<x>,<y>;...` | Inject `Touch` (s=D/U/C) |
-| Key down | `KD:<key>` | Inject `KeyDown` (Enter, Escape, a, F5, ...) |
+| Key down | `KD:<key>` | Inject `KeyDown` (Enter, Escape, Backspace/BS, a, F5, ...) |
 | Key up | `KU:<key>` | Inject `KeyUp` |
 | Tagged tap | `T@<tag>:<x>,<y>` | Inject `PressRelease` to tagged widget |
 | Dump pixels | `D<x>,<y>,<w>,<h>[,<frames>]` | Dump ARGB hex from framebuffer |

@@ -75,10 +75,55 @@ produced by the `svg` command. The output can be loaded at runtime via
 `rlvgl-decomp`.
 
 ```
-rlvgl-creator compress <input> <output>
+rlvgl-creator compress <input> <output> [--emit bin|c|rust] [--name SYM]
 ```
 * `input` – source image or `.raw` file.
-* `output` – path for the RLEC `.rle` blob.
+* `output` – path for the RLEC `.rle` blob (or `.c`/`.rs` source with `--emit`).
+* `--emit` – output container. `bin` (default) writes the raw blob; `c` writes
+  `const uint8_t SYM[N]` + `const size_t SYM_len`; `rust` writes
+  `pub static SYM: [u8; N]` + `pub const SYM_LEN`. The array path embeds the
+  blob directly in the binary — cheapest on all-RAM SoCs where there is no
+  filesystem. Firmware calls `rlvgl_decomp::parse_rle_blob` on the array.
+* `--name` – symbol name for `--emit c|rust` (defaults to the output file stem,
+  sanitized to a valid identifier).
+
+### lvgl
+Converts an image to an [LVGL v9](https://docs.lvgl.io) binary image (`.bin`)
+for handoff to an LVGL build, or to compiled-in C / Rust source. This is a
+distinct, interoperable format from the crate-native RLEC blob (see the
+`compress` command); the two share no bytes.
+
+```
+rlvgl-creator lvgl <input> <output> [--cf rgb565|rgb888|argb8888|xrgb8888|a8|a4]
+                                    [--coverage auto|alpha|luminance]
+                                    [--rle] [--emit bin|c|rust] [--name SYM]
+```
+* `input` – source image or `.raw` file.
+* `output` – path for the LVGL `.bin` (or `.c`/`.rs` source with `--emit`).
+* `--cf` – LVGL format (default `rgb565`).
+  * Color: `argb8888` preserves alpha; `xrgb8888` forces alpha opaque; `rgb888`
+    is 24-bit; `rgb565` is the most compact opaque format.
+  * Alpha-only (coverage): `a8` (8-bit) and `a4` (4-bit, Floyd–Steinberg
+    dithered) store a single coverage channel with **no color** — the fill
+    color is applied at draw time (LVGL's image-recolor style). Ideal for
+    monochrome line-art icons: one asset retints to any color at a fraction of
+    an `argb8888` asset's size (a 60×60 icon: `argb8888` 14.4 KB → `a8` 3.6 KB →
+    `a4` 1.8 KB, before RLE).
+* `--coverage` – for `a8`/`a4`, where the coverage comes from (default `auto`):
+  `auto` uses the source alpha if the image is transparent anywhere, else
+  luminance; `alpha` always uses the alpha channel; `luminance` always derives
+  from brightness (white-on-black mask art).
+* `--rle` – compress the `.bin` data section with LVGL run-length encoding
+  (sets the compressed header flag + `lv_image_compressed_t`). Ignored for
+  `--emit c|rust`, which embed uncompressed pixels for zero-runtime-decode use.
+* `--emit` – output container. `bin` (default) writes the `.bin`; `c` writes a
+  ready-to-use `lv_image_dsc_t` descriptor plus a pixel-data array; `rust`
+  writes the pixel-data array with width/height/format/stride constants.
+* `--name` – symbol name for `--emit c|rust` (defaults to the output file stem).
+
+rlvgl can also render the alpha-only `.bin` itself via the codec's coverage+tint
+draw path: `rlvgl_decomp::lvgl::blend_alpha_bin_into_argb(bin, (r,g,b), dst)`
+composites the icon onto an ARGB8888 buffer with a runtime fill color.
 
 ### decompress
 Decodes an RLEC `.rle` blob back to a PNG image. Useful for inspecting

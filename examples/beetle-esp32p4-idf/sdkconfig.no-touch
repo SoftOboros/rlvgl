@@ -1,0 +1,2 @@
+# No-touch override for the DFR0550 ESP-IDF comparison app.
+CONFIG_DFR0550_NO_TOUCH=y

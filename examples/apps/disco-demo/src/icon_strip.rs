@@ -52,6 +52,10 @@ pub struct IconStrip {
     gap: i32,
     icon_size: i32,
     focused_slot: Option<usize>,
+    /// Current focus-border color. Defaults to [`FOCUS_HIGHLIGHT_COLOR`];
+    /// the controller's attention-pulse animation (ANIM-00 §8.1) retargets
+    /// it every tick via [`set_focus_color`](Self::set_focus_color).
+    focus_color: Color,
 }
 
 impl IconStrip {
@@ -65,6 +69,7 @@ impl IconStrip {
             gap,
             icon_size,
             focused_slot: None,
+            focus_color: FOCUS_HIGHLIGHT_COLOR,
         }
     }
 
@@ -91,6 +96,23 @@ impl IconStrip {
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn focused_slot(&self) -> Option<usize> {
         self.focused_slot
+    }
+
+    /// Set the focus-border color (driven by the attention pulse).
+    pub fn set_focus_color(&mut self, color: Color) {
+        self.focus_color = color;
+    }
+
+    /// Returns the current focus-border color.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn focus_color(&self) -> Color {
+        self.focus_color
+    }
+
+    /// Bounds of the currently focused slot's highlight border, if any.
+    /// Used as the pulse animation's dirty rect.
+    pub fn focused_bounds(&self) -> Option<Rect> {
+        self.focused_slot.map(|index| self.slot_bounds(index))
     }
 
     fn slot_bounds(&self, index: usize) -> Rect {
@@ -172,12 +194,7 @@ impl Widget for IconStrip {
                 }
                 if self.focused_slot == Some(index) {
                     let bounds = self.slot_bounds(index);
-                    draw_border_straight(
-                        renderer,
-                        bounds,
-                        FOCUS_HIGHLIGHT_COLOR,
-                        FOCUS_BORDER_WIDTH,
-                    );
+                    draw_border_straight(renderer, bounds, self.focus_color, FOCUS_BORDER_WIDTH);
                 }
             }
         }

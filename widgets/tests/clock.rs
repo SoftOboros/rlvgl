@@ -408,7 +408,7 @@ fn union_expands_to_cover_full_face_when_hand_crosses_tick() {
     // Its bbox must be fully inside the reported union.
     let cx = FACE.x + FACE.width / 2;
     let cy = FACE.y + FACE.height / 2;
-    let r = (FACE.width.min(FACE.height) / 2) as i32;
+    let r = FACE.width.min(FACE.height) / 2;
     let tick_outer_x = cx + (r * 95) / 100;
     assert!(
         union.x + union.width > tick_outer_x,
@@ -531,7 +531,7 @@ fn subsecond_dot_dirty_grows_with_motion() {
     });
     let dirty = clock.clear_region().expect("non-empty after motion");
     // Union must span at least the orbit chord (orbit_radius * face_radius).
-    let face_r = (FACE.width.min(FACE.height) / 2) as i32;
+    let face_r = FACE.width.min(FACE.height) / 2;
     let orbit_r = (face_r * 65) / 100; // matches SubsecondDot::standard.orbit_radius
     assert!(
         dirty.width >= orbit_r || dirty.height >= orbit_r,

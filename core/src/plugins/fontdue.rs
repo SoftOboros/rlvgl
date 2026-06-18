@@ -1,6 +1,7 @@
-//! Glyph rasterization using `fontdue`.
+//! Glyph rasterization and metrics adaptation using `fontdue`.
 extern crate std;
 
+use crate::font::{FontLineMetrics, FontMetrics, GlyphInfo};
 use crate::widget::Color;
 use alloc::vec::Vec;
 use blake3;
@@ -40,6 +41,26 @@ fn round_to_i32(value: f32) -> i32 {
         (value + 0.5) as i32
     } else {
         (value - 0.5) as i32
+    }
+}
+
+/// A `fontdue`-backed font at a fixed pixel size.
+///
+/// This wrapper adapts dynamic TrueType/OpenType font data to the
+/// [`FontMetrics`] trait while preserving the existing free functions in this
+/// module for callers that need rasterized glyph bitmaps.
+#[derive(Debug, Clone, Copy)]
+pub struct FontdueFont<'a> {
+    /// Raw font bytes.
+    pub font_data: &'a [u8],
+    /// Pixel size used for metrics and shaping.
+    pub px: f32,
+}
+
+impl<'a> FontdueFont<'a> {
+    /// Construct a wrapper over `font_data` at pixel size `px`.
+    pub const fn new(font_data: &'a [u8], px: f32) -> Self {
+        Self { font_data, px }
     }
 }
 
@@ -115,9 +136,68 @@ pub fn render_text<R: FontdueRenderTarget>(
     Ok(())
 }
 
+impl FontMetrics for FontdueFont<'_> {
+    fn glyph_metrics(&self, ch: char) -> Option<GlyphInfo> {
+        let font = get_cached_font(self.font_data);
+        let metrics = font.metrics(ch, self.px);
+        let advance_fp16 = round_to_i32(metrics.advance_width * 16.0).clamp(0, u16::MAX as i32);
+        let bearing_y = metrics.ymin + metrics.height as i32;
+        Some(GlyphInfo {
+            advance_fp16: advance_fp16 as u16,
+            bearing_x: metrics.xmin.clamp(i16::MIN as i32, i16::MAX as i32) as i16,
+            bearing_y: bearing_y.clamp(i16::MIN as i32, i16::MAX as i32) as i16,
+            width: metrics.width.min(u16::MAX as usize) as u16,
+            height: metrics.height.min(u16::MAX as usize) as u16,
+        })
+    }
+
+    fn line_metrics(&self) -> FontLineMetrics {
+        let Ok(metrics) = line_metrics(self.font_data, self.px) else {
+            let px = round_to_i32(self.px).max(0).min(u16::MAX as i32) as u16;
+            return FontLineMetrics {
+                line_height: px,
+                ascent: px.min(i16::MAX as u16) as i16,
+                descent: 0,
+            };
+        };
+        let line_height = round_to_i32(metrics.new_line_size)
+            .max(0)
+            .min(u16::MAX as i32) as u16;
+        let ascent = round_to_i32(metrics.ascent).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+        let descent = round_to_i32(-metrics.descent).max(0).min(i16::MAX as i32) as i16;
+        FontLineMetrics {
+            line_height,
+            ascent,
+            descent,
+        }
+    }
+
+    fn glyph_coverage_row(&self, ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        let Ok((metrics, bitmap)) = rasterize_glyph(self.font_data, ch, self.px) else {
+            return false;
+        };
+        if row as usize >= metrics.height {
+            coverage.fill(0);
+            return true;
+        }
+
+        let row_start = row as usize * metrics.width;
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let col = x_offset as usize + offset;
+            *alpha = if col < metrics.width {
+                bitmap.get(row_start + col).copied().unwrap_or(0)
+            } else {
+                0
+            };
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::font::FontMetrics;
 
     const FONT_DATA: &[u8] = include_bytes!("../../../assets/fonts/DejaVuSans.ttf");
 
@@ -132,6 +212,22 @@ mod tests {
     fn line_metrics_present() {
         let vm = line_metrics(FONT_DATA, 16.0).unwrap();
         assert!(vm.ascent > 0.0 && vm.descent < 0.0);
+    }
+
+    #[test]
+    fn fontdue_font_implements_font_metrics() {
+        let font = FontdueFont::new(FONT_DATA, 16.0);
+        let info = font.glyph_metrics('A').unwrap();
+        assert!(info.advance_fp16 > 0);
+        assert!(info.width > 0 && info.height > 0);
+
+        let line = font.line_metrics();
+        assert!(line.line_height > 0);
+        assert!(line.ascent > 0);
+
+        let shaped = font.shape("A", (0, line.ascent as i32));
+        assert_eq!(shaped.glyphs.len(), 1);
+        assert_eq!(shaped.bidi_level, 0);
     }
 
     struct Surface {

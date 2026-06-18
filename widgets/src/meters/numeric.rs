@@ -16,6 +16,7 @@ use alloc::format;
 
 use rlvgl_audio_meters_core::{Ballistic, BallisticState};
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect, Widget};
 
@@ -40,6 +41,9 @@ pub struct NumericPeak {
     reading_db: f32,
     peak_db: f32,
     peak_age_s: f32,
+    /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
+    /// when unset.
+    font: WidgetFont,
 }
 
 impl NumericPeak {
@@ -59,7 +63,14 @@ impl NumericPeak {
             reading_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_db: rlvgl_audio_meters_core::NEG_INFINITY_FLOOR_DB,
             peak_age_s: 0.0,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render this widget (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Replace the ballistic kind. New ballistic + peak hold start at floor.
@@ -122,6 +133,10 @@ impl Widget for NumericPeak {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         let bg = self.skin.secondary.background.unwrap_or(DEFAULT_BACKGROUND);
         let text_default = self.skin.secondary.scale_text.unwrap_or(DEFAULT_TEXT);
@@ -166,8 +181,12 @@ impl Widget for NumericPeak {
             self.bounds.x + pad,
             self.bounds.y + self.bounds.height - pad,
         );
-        renderer.draw_text(top, &reading_text, reading_col);
-        renderer.draw_text(bot, &peak_text, peak_col);
+        let font = self.font.resolve();
+        let shaped = shape_text_ltr(font, &reading_text, top, 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), reading_col);
+
+        let shaped = shape_text_ltr(font, &peak_text, bot, 0);
+        renderer.draw_text_shaped(&shaped, (0, 0), peak_col);
 
         // Suppress unused warnings on MeterColorId — referenced via
         // zone_color_for above.
@@ -187,6 +206,7 @@ mod tests {
     extern crate alloc;
     use alloc::string::String;
     use alloc::vec::Vec;
+    use rlvgl_core::font::ShapedText;
 
     /// Records every renderer call so we can assert the draw model.
     struct Recorder {
@@ -197,9 +217,11 @@ mod tests {
         fn fill_rect(&mut self, rect: Rect, color: Color) {
             self.rects.push((rect, color));
         }
-        fn draw_text(&mut self, pos: (i32, i32), text: &str, color: Color) {
-            self.texts.push((pos, text.into(), color));
+        fn draw_text_shaped(&mut self, shaped: &ShapedText<'_>, _origin: (i32, i32), color: Color) {
+            let text: String = shaped.glyphs.iter().map(|glyph| glyph.ch).collect();
+            self.texts.push(((0, 0), text, color));
         }
+        fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
     }
 
     #[test]

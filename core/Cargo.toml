@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.2.2"
+version = "0.2.4"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -50,7 +50,13 @@ apng = ["dep:image"]
 fs = []
 
 [dev-dependencies]
-rlvgl-widgets = { version = "0.2.0", path = "../widgets" }
+# Path-only (no version): rlvgl-core dev-depends on rlvgl-widgets for the theme
+# integration test, but widgets depends on core — a dev-dependency cycle. A
+# versioned dev-dep makes `cargo package` (Gate P) try to resolve an
+# unpublished rlvgl-widgets 0.2.4 from crates.io and fail; path-only dev-deps
+# are stripped at package time, breaking the cycle. The path still resolves
+# in-workspace so `cargo test` is unaffected.
+rlvgl-widgets = { path = "../widgets" }
 doc-comment = "0.3"
 base64 = "0.22"
 apng = "0.3"

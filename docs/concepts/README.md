@@ -158,6 +158,227 @@ disco-analyzer subrepo's first concepts doc).
     **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
     DPR-00 §12 is accepted or amended.
 
+### Wave-2 UI/runtime initiatives (2026-06-11)
+
+Single-phase, ticket-driven initiatives on the core/widgets/ui crates
+(not platform-scoped, but this directory is the established concepts
+ledger; each is a §0–§15 doc with its behaviour change landing as
+`<INIT>-01`):
+
+- **ANIM** — tick-driven tween/animation system in `rlvgl-core`
+  (`Tween` + `Animations` registry, deterministic, no wall clock).
+  - [ANIM-00-CONCEPTS.md](ANIM-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; ANIM-01 landed same day.
+- **REND** — parent-bounds child clipping (`ClipRenderer`) + generic
+  `ScrollView`. Critical path: a downstream consumer blocks a delivery
+  phase on its 0.2.x publish.
+  - [REND-00-CONCEPTS.md](REND-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; REND-01 landed same day.
+- **INPUT** — `DragRecognizer` gesture middleware in `rlvgl-platform`
+  with click-vs-drag suppression (chaining + `TapRecognizer::cancel`).
+  - [INPUT-00-CONCEPTS.md](INPUT-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; INPUT-01 landed same day.
+- **WID** — editable text `Input`/`Textarea` in `rlvgl-ui` (edit
+  buffer, caret, `set_active` key routing, `Key::Backspace`
+  vocabulary).
+  - [WID-00-CONCEPTS.md](WID-00-CONCEPTS.md) — **Ratified
+    2026-06-11**; WID-01 landed same day.
+
+### Multi-wave UI/runtime initiatives
+
+- **LPAR** — LVGL parity backlog across runtime substrate, style,
+  draw, layout, widget families, conformance fixtures, examples,
+  documentation, and release tracking.
+  - [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md) — **Ratified
+    2026-06-12.** Breaks the parity backlog into waves 0-6 and phases
+    LPAR-01 through LPAR-16, with dependency and conflict analysis.
+  - [LPAR-01-BASELINE.md](LPAR-01-BASELINE.md) — **Ratified
+    2026-06-12.** Pins `LVGL 9.4.0-dev @ 5a89ce8a`, defines source
+    baseline/config assumptions, naming policy, conformance levels,
+    runtime matrix, widget matrix, and Wave 0 conflict resolutions.
+  - [LPAR-02-OBJECT-SUBSTRATE.md](LPAR-02-OBJECT-SUBSTRATE.md) —
+    **Ratified 2026-06-12; implementation landed same day.** Wave 1 object substrate:
+    compatibility-first plan for object metadata, base flags/states,
+    sibling order, hit testing, and deletion lifecycle.
+  - [LPAR-03-INVALIDATION-DISPLAY.md](LPAR-03-INVALIDATION-DISPLAY.md) —
+    **Ratified 2026-06-12; implementation landed same day.** Wave 1
+    invalidation and display runtime: logical dirty rects, dirty-source
+    collection, present plans, target-buffer dirty retention, display
+    flush compatibility, and overflow-to-full-frame fallback
+    (`core::invalidation` + `platform::present`).
+  - [LPAR-04-EVENT-FOCUS-INPUT.md](LPAR-04-EVENT-FOCUS-INPUT.md) —
+    **Ratified 2026-06-12; core implementation landed same day.** Wave 1
+    event, focus, and input runtime: two-tier event vocabulary and
+    growth policy, trickle/bubble propagation on `ObjectNode`,
+    tree-resident focus groups, and tick-driven long-press/repeat
+    timing (`core::object` dispatch + `core::focus` +
+    `platform::gesture::LongPressRecognizer`). Input-device adapters
+    pending.
+  - [LPAR-05-SCROLL-RUNTIME.md](LPAR-05-SCROLL-RUNTIME.md) —
+    **Ratified 2026-06-12; implementation landed same day**
+    (`core::scroll` + `PointerDevice::with_scroll`; scrollbar pixel
+    rendering deferred to consuming widgets). Wave 1 scroll runtime:
+    `SCROLLABLE` flag
+    finalization, scroll `ObjectEvent` codes
+    (`ScrollBegin`/`Scroll`/`ScrollEnd`/`ScrollThrow`), drag→scroll
+    composition with inherited click/long-press suppression, tick-driven
+    throw/momentum via the ANIM `Tween` substrate, snapping, nested-scroll
+    chaining, scrollbar overlay, and additive `ScrollView` reconciliation.
+  - [LPAR-06-TIMERS-OBJECT-ANIM.md](LPAR-06-TIMERS-OBJECT-ANIM.md) —
+    **Ratified 2026-06-12.** Wave 1 timers and object animations:
+    tick-counted `Timers`/`TimerId`, tree-resident object-bound
+    animations (`ObjectNode::bind_anim` + `ObjectAnims` walker) with
+    detach-cancellation by construction, the LPAR-07 transition seam,
+    and deprecate-in-place reconciliation of the legacy wall-clock
+    `core::animation` animators (keeping the shared `Easing`/`LoopMode`
+    math). Completes the Wave 1 runtime substrate.
+
+### Wave 2 — style / draw / layout substrate
+
+- **LPAR** (continued — Wave 2)
+  - [LPAR-07-STYLE-THEME.md](LPAR-07-STYLE-THEME.md) —
+    **Ratified 2026-06-12; implementation landed same day**
+    (`core::style_cascade` + `core::theme` `LparTheme`; widget draw-path
+    wiring rides with LPAR-11+). Wave 2 style and theme substrate:
+    `(Part, ObjectStates)` selector cascade above the unchanged
+    `core::style::Style` property bag, tree-resident `StyleState` on the
+    node, top-down property inheritance, `bind_anim`-driven style
+    transitions (LPAR-06 seam), `LparTheme` default-theme chaining, and
+    deprecate-in-place reconciliation of the overlapping `ui::style` /
+    `ui::theme` surfaces.
+  - [LPAR-08-TEXT-DRAW-IMAGE-MASK.md](LPAR-08-TEXT-DRAW-IMAGE-MASK.md) —
+    **Ratified 2026-06-12.** Wave 2 text/draw/image/mask substrate:
+    defaulted `Renderer` capability methods (no implementer breaks), a
+    `FontMetrics` trait unifying the bitmap/packed/fontdue backends,
+    glyph-extent-aware text clipping (resolving the REND-00 §5.4
+    limitation via a new path — REND-00 amended), LTR wrapping with a
+    named RTL boundary, alpha masks / gradients / shadows over the raster
+    `CoverageSink`, `ImageDescriptor`/cache/recolor/transform, a
+    software-reference + hardware-tolerance rule, and a new resolved
+    `TextStyle` (the frozen `core::style::Style` stays untouched).
+  - [LPAR-09-ASSET-FILESYSTEM.md](LPAR-09-ASSET-FILESYSTEM.md) —
+    **Ratified 2026-06-12.** Wave 2 asset and filesystem sources:
+    extends the existing `core::fs` `AssetSource`/`AssetManager` (zero
+    consumers, safe), a typed `AssetPath` source model (Embedded / FATFS /
+    Simulator / Memory) replacing LVGL drive letters, an opaque
+    `AssetHandle` registry token bridging to LPAR-08's
+    `ImageData::Asset` variant (LPAR-08 amended), source-dispatched decode
+    via the existing plugins, and a bounded LRU cache.
+  - [LPAR-10-LAYOUT.md](LPAR-10-LAYOUT.md) — **Ratified 2026-06-12.**
+    Wave 2 layout substrate: object-managed bounds via a tree-resident
+    `LayoutState` slot + `effective_bounds()`/translation draw + an
+    additive `Widget::set_bounds` default-no-op (the static `ui::layout`
+    helpers stay unchanged), a `Dimension` sizing model (Px/Pct/Content +
+    min/max), flex and grid engines, a deterministic pre-draw layout pass
+    with old∪new invalidation, `SizeChanged`/`LayoutChanged` events
+    (LPAR-04 amended), and padding/gap via the cascade (frozen `Style`
+    untouched).
+
+### Wave 3 — primitive and control widgets
+
+- **LPAR** (continued — Wave 3)
+  - [LPAR-11-PRIMITIVE-WIDGETS.md](LPAR-11-PRIMITIVE-WIDGETS.md) —
+    **Ratified 2026-06-13.** Primitive widget wave:
+    additive `Arc`, `Bar`, `Led`, `Line`, `Spinner`, and `Scale` modules
+    in `rlvgl-widgets`, preserving `ProgressBar` and audio-meter
+    `Scale`/`LedBargraph` surfaces while consuming the settled style,
+    draw, text, layout, and animation substrate.
+  - [LPAR-12-CONTROL-WIDGETS.md](LPAR-12-CONTROL-WIDGETS.md) —
+    **Ratified 2026-06-13; implementation landed same day.** Control
+    widget wave: additive `ButtonMatrix`, `ImageButton`, and `Spinbox`
+    modules over the LPAR-04 event/focus, LPAR-08 text/image draw,
+    LPAR-09 asset, LPAR-10 layout, and LPAR-11 primitive-widget
+    substrate. Key navigation via imperative helper methods (app wires
+    `ObjectEvent::Key`); no new `Renderer`/`Style`/`Event` surface;
+    widgets own their data (no borrowed-map hazards).
+
+### Wave 4 — selection / navigation / data widgets
+
+- **LPAR** (continued — Wave 4)
+  - [LPAR-13-SELECTION-NAV-WIDGETS.md](LPAR-13-SELECTION-NAV-WIDGETS.md) —
+    **Ratified 2026-06-13; implementation landed same day.**
+    Selection/navigation wave: additive `Dropdown`, `Keyboard`, `Menu`,
+    `Roller`, `Tabview`, `Tileview`, and `Window` modules reusing
+    `List`/`ButtonMatrix`/scroll/snap, coexisting with (not renaming) the
+    adjacent `ui::Drawer`/`Modal`/`EventWindow`. Roller snap reuses the
+    public `core::scroll::snap_offset_to_points` helper (one snap
+    mechanism); overlay/text-binding/`ValueChanged` deferred.
+  - [LPAR-14-DATA-RICH-WIDGETS.md](LPAR-14-DATA-RICH-WIDGETS.md) —
+    **Ratified 2026-06-13; implementation landed same day.**
+    Data/rich-content wave: additive
+    `widgets::textarea::Textarea` (reusing the WID-01 `EditCore`, promoted
+    to `core` and re-exported from `ui` to avoid a crate cycle), `Chart`,
+    `Table`, `Span`, `Calendar`, and `MessageBox` (reusing `ButtonMatrix`),
+    coexisting with `ui::Input`/`Textarea`/`Modal`/`Alert`. Span/Table/
+    Textarea wrapping reuses LPAR-08 `core::font` measurement (no fork); the
+    LPAR-13 Keyboard→text binding is resolved via `apply_key_output`.
+
+### Wave 5 — canvas / media / property / observer
+
+- **LPAR** (continued — Wave 5)
+  - [LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md](LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md) —
+    **Ratified 2026-06-13; LPAR-Core + ArcLabel landed same day.**
+    LPAR-Core: a `Canvas` widget (owns a lightweight local `PixelBuffer`;
+    the `core::plugins::canvas` plugin coexists unchanged but is NOT
+    wrapped — it is feature-gated and pulls `embedded-graphics`, see
+    LPAR-15 §5.C), tick-driven `AnimImage` (Spinner-pattern frame phase),
+    `core::property` (identity-free `Queryable`), and `core::observer`
+    (`Subject<T>` value-binding, orthogonal to the LPAR-04 event system —
+    the §9 ownership conflict resolved). LPAR-Optional (feature-gated):
+    `ArcLabel` (landed); `Lottie`/`DashLottie`/`Texture3d` deferred
+    (external-renderer deps).
+
+### Wave 6 — conformance / examples / docs / release
+
+- **LPAR** (continued — Wave 6)
+  - [LPAR-16-CONFORMANCE-EXAMPLES-DOCS-RELEASE.md](LPAR-16-CONFORMANCE-EXAMPLES-DOCS-RELEASE.md) —
+    **Ratified 2026-06-14; validation cleanup in progress.** The capstone
+    conformance phase every prior phase feeds. Defines one fixture-contract
+    shape (four kinds: determinism, geometry, pixel-golden, behavioral/trace;
+    software-reference oracle; LPAR-08 §5.H tolerance) and a per-phase fixture
+    ledger (§6). LPAR-05/06/08/10/11/12/13/14/15 are Landed; LPAR-09 is
+    substrate-complete with the FATFS-over-`SimBlockDevice` prong deferred to
+    `FatfsAssetSource` + `rlvgl-fs-sim`. Separates *implemented* from
+    *conformance-complete* (§5.A), owns no-std/feature gates (§7), the
+    simulator parity example (§8), the `cargo doc` gate (§9), release
+    readiness (§10), and the initiative retrospective
+    ([LPAR-RETROSPECTIVE.md](LPAR-RETROSPECTIVE.md)).
+
+### FONT — font selection & anti-aliased widget text
+
+Builds on the LPAR-08 text substrate. The glyph pipeline
+(`draw_text_shaped` → coverage → `blend_row`) was already wired and
+`Label`/~all widgets already render real 1-bit coverage; FONT closes the
+remaining gaps — font *selection* and anti-aliasing.
+
+- [FONT-00-CONCEPTS.md](FONT-00-CONCEPTS.md) — **Ratified 2026-06-14.**
+  Freezes the `WidgetFont`/`set_font` per-widget selection model (default
+  `FONT_6X10`; no global registry in v1 — deferred-Coupled on theming),
+  AA-by-font-choice (feed a `PackedFont` for 8-bit AA; `FONT_6X10` stays the
+  1-bit default), the `ArcLabel` coverage migration (the lone legacy
+  `draw_text` widget), rotated-renderer glyph throughput
+  (rotate-bitmap-then-blit, mirroring `Dma2dOverlayCtx`), and the AA
+  conformance fixture (assert partial-alpha through a real
+  `blend_row`-overriding renderer). Phases FONT-01..04 in §12.
+  **FONT-01..04 all complete 2026-06-15 (§12.A–§12.D boxed);** see the §15
+  change log for the per-phase landing record.
+- [FONT-05-FONT-REGISTRY.md](FONT-05-FONT-REGISTRY.md) — **Ratified + complete
+  2026-06-15.** Reopens the FONT initiative's deferred `FontId → handle`
+  registry now that the LPAR-07 theming owner exists. Adds an immutable
+  borrow-backed `FontRegistry<'a>`, a defaulted `Widget::widget_font_mut` font
+  sink, and an `apply_font_registry` pass over `resolve_tree_with_text` that
+  resolves each node's cascade `font_id` and feeds the mapped handle into the
+  widget's `WidgetFont` slot — bridging cascade/theme/locale font identity to
+  the FONT-00 selection model. Cascade-overrides-else-preserve precedence;
+  default-`font_id` trees render identically.
+  - [FONT-RETROSPECTIVE.md](FONT-RETROSPECTIVE.md) — initiative-completion
+    retrospective (2026-06-15). Captures the stale-premise divergence (the
+    "Label migration" was already done before the initiative began), the
+    synthetic-`PackedFont`-vs-DejaVu fixture refactor, the `ClipRenderer`
+    interception limitation on the rotated glyph fast path, deferred-work
+    reclassification, and forward constraints for the deferred `FontId`
+    theming-registry work.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem

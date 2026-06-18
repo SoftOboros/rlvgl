@@ -1,8 +1,35 @@
-//! Animation primitives: easing, looping, motion, fade, and keyframe transitions.
+//! Animation primitives: easing, looping, and legacy wall-clock animators.
 //!
-//! These helpers provide non-linear motion and alpha animation for `no_std`
-//! targets. All easing functions use polynomial/piecewise math with no `libm`
-//! dependency.
+//! # Pure-math utilities (not deprecated)
+//!
+//! These types are the shared mathematical vocabulary reused by both this
+//! module and the tick-driven [`crate::anim`] substrate (ANIM-00). They are
+//! **not deprecated** and will not be removed:
+//!
+//! - [`Easing`] — easing curve enum (re-exported by `crate::anim`).
+//! - [`LoopMode`] — loop/repeat/ping-pong enum (re-exported by `crate::anim`).
+//! - [`loop_progress`] — internal `(t, finished)` helper used by both surfaces.
+//!
+//! All easing functions use polynomial/piecewise math with no `libm` dependency
+//! and are safe for `no_std` targets.
+//!
+//! # Deprecated wall-clock animators
+//!
+//! The following types advance animations via `tick(delta_ms: u32)` and
+//! capture raw `*mut` pointers to their targets. They are **deprecated** as of
+//! LPAR-06 and will be removed in a future release. New code MUST use the
+//! tick-driven [`crate::anim`] types instead (see ANIM-00 concepts doc).
+//!
+//! - [`Fade`] — background color fade via `*mut Style`.
+//! - [`Slide`] — rect slide via `*mut Rect`.
+//! - [`Motion`] — position/size motion via `*mut Rect`.
+//! - [`FadeTransition`] — two-point alpha transition via `*mut u8`.
+//! - [`KeyFade`] — multi-keyframe alpha animation via `*mut u8`.
+//! - [`Timeline`] — multi-animation container for the above types.
+//!
+//! Existing consumers (e.g. `core/tests/animation.rs`) may use
+//! `#[allow(deprecated)]` to continue compiling. Removal is deferred-Coupled
+//! to a SemVer major/minor release plan.
 
 use crate::style::Style;
 use crate::widget::{Color, Rect};
@@ -111,7 +138,10 @@ pub enum LoopMode {
 
 /// Compute the effective progress `t ∈ [0,1]` and whether the animation is
 /// finished, given elapsed time, duration, and loop mode.
-fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, bool) {
+///
+/// Unit-agnostic: callers in this module pass milliseconds; the tick-driven
+/// [`anim`](crate::anim) module passes ticks. The folding math is identical.
+pub(crate) fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, bool) {
     if duration_ms == 0 {
         return (1.0, true);
     }
@@ -162,6 +192,7 @@ fn loop_progress(elapsed: u32, duration_ms: u32, loop_mode: LoopMode) -> (f32, b
 /// The animation owns a mutable pointer to the [`Style`] being modified. This
 /// keeps the API lightweight for `no_std` targets at the cost of requiring
 /// unsafe access internally.
+#[deprecated(note = "ms/wall-clock animation is superseded by tick-driven core::anim; see LPAR-06")]
 pub struct Fade {
     style: *mut Style,
     start: Color,
@@ -172,6 +203,7 @@ pub struct Fade {
     loop_mode: LoopMode,
 }
 
+#[allow(deprecated)]
 impl Fade {
     /// Create a new fade animation.
     pub fn new(style: &mut Style, start: Color, end: Color, duration_ms: u32) -> Self {
@@ -226,6 +258,7 @@ impl Fade {
 // ---------------------------------------------------------------------------
 
 /// Linear (or eased) slide animation for a [`Rect`].
+#[deprecated(note = "ms/wall-clock animation is superseded by tick-driven core::anim; see LPAR-06")]
 pub struct Slide {
     rect: *mut Rect,
     start: Rect,
@@ -236,6 +269,7 @@ pub struct Slide {
     loop_mode: LoopMode,
 }
 
+#[allow(deprecated)]
 impl Slide {
     /// Create a new slide animation.
     pub fn new(rect: &mut Rect, start: Rect, end: Rect, duration_ms: u32) -> Self {
@@ -293,6 +327,7 @@ impl Slide {
 ///
 /// This is the primary way to move widgets across the screen, including
 /// off-screen positions and oversized dimensions.
+#[deprecated(note = "ms/wall-clock animation is superseded by tick-driven core::anim; see LPAR-06")]
 pub struct Motion {
     rect: *mut Rect,
     start: Rect,
@@ -303,6 +338,7 @@ pub struct Motion {
     loop_mode: LoopMode,
 }
 
+#[allow(deprecated)]
 impl Motion {
     /// Create a new motion animation.
     pub fn new(rect: &mut Rect, start: Rect, end: Rect, duration_ms: u32) -> Self {
@@ -360,6 +396,7 @@ impl Motion {
 ///
 /// Interpolates alpha from `start` to `end` over `duration_ms` with optional
 /// easing and looping.
+#[deprecated(note = "ms/wall-clock animation is superseded by tick-driven core::anim; see LPAR-06")]
 pub struct FadeTransition {
     alpha: *mut u8,
     start: u8,
@@ -370,6 +407,7 @@ pub struct FadeTransition {
     loop_mode: LoopMode,
 }
 
+#[allow(deprecated)]
 impl FadeTransition {
     /// Create a new fade transition targeting the given alpha value.
     pub fn new(alpha: &mut u8, start: u8, end: u8, duration_ms: u32) -> Self {
@@ -434,6 +472,7 @@ pub struct AlphaKey {
 /// A `KeyFade` with two keyframes is equivalent to a [`FadeTransition`].
 /// With more keyframes you can create complex fade sequences such as
 /// pulse, flash, or staged reveal effects.
+#[deprecated(note = "ms/wall-clock animation is superseded by tick-driven core::anim; see LPAR-06")]
 pub struct KeyFade {
     alpha: *mut u8,
     keys: alloc::vec::Vec<AlphaKey>,
@@ -442,6 +481,7 @@ pub struct KeyFade {
     loop_mode: LoopMode,
 }
 
+#[allow(deprecated)]
 impl KeyFade {
     /// Start building a keyframe alpha animation targeting the given value.
     ///
@@ -533,6 +573,8 @@ impl KeyFade {
 // ---------------------------------------------------------------------------
 
 /// Animation timeline that updates multiple animations at once.
+#[allow(deprecated)]
+#[deprecated(note = "ms/wall-clock animation is superseded by tick-driven core::anim; see LPAR-06")]
 pub struct Timeline {
     fades: alloc::vec::Vec<Fade>,
     slides: alloc::vec::Vec<Slide>,
@@ -541,6 +583,7 @@ pub struct Timeline {
     key_fades: alloc::vec::Vec<KeyFade>,
 }
 
+#[allow(deprecated)]
 impl Timeline {
     /// Create an empty timeline.
     pub fn new() -> Self {
@@ -612,6 +655,7 @@ impl Timeline {
     }
 }
 
+#[allow(deprecated)]
 impl Default for Timeline {
     fn default() -> Self {
         Self::new()

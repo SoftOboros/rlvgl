@@ -9,6 +9,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
+use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
 use rlvgl_core::icon_bitmap::{ICON_FILE, ICON_FOLDER, IconBitmap};
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
@@ -135,6 +136,7 @@ pub struct FileBrowser {
     level: BrowseLevel,
     pending_nav: Option<BrowseLevel>,
     on_file_selected: Option<Box<FileSelectedCallback>>,
+    font: WidgetFont,
 }
 
 impl FileBrowser {
@@ -153,7 +155,14 @@ impl FileBrowser {
             level: BrowseLevel::DeviceList,
             pending_nav: Some(BrowseLevel::DeviceList),
             on_file_selected: None,
+            font: WidgetFont::new(),
         }
+    }
+
+    /// Assign the font used to render entry names (FONT-00 §5); resolves to
+    /// `FONT_6X10` when unset.
+    pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
+        self.font.set(font);
     }
 
     /// Set the callback invoked when a `.wav` file is double-tapped.
@@ -288,6 +297,10 @@ impl Widget for FileBrowser {
         self.bounds
     }
 
+    fn widget_font_mut(&mut self) -> Option<&mut WidgetFont> {
+        Some(&mut self.font)
+    }
+
     fn draw(&self, renderer: &mut dyn Renderer) {
         draw_widget_bg(renderer, self.bounds, &self.style);
 
@@ -333,11 +346,13 @@ impl Widget for FileBrowser {
             );
 
             // Text (baseline positioned near bottom of row)
-            renderer.draw_text(
-                (text_x, row_y + ROW_HEIGHT - 4),
+            let shaped = shape_text_ltr(
+                self.font.resolve(),
                 &entry.name,
-                self.text_color.with_alpha(alpha),
+                (text_x, row_y + ROW_HEIGHT - 4),
+                0,
             );
+            renderer.draw_text_shaped(&shaped, (0, 0), self.text_color.with_alpha(alpha));
         }
     }
 

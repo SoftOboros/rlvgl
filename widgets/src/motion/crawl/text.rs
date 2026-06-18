@@ -817,9 +817,7 @@ mod tests {
         let mut jumbo = vec![0u8; 8 * 8 * 4];
         let mut text = vec![0u8; 4 * 4];
         let mut scanline = vec![0u8; 32];
-        for byte in &mut text {
-            *byte = 0xFF;
-        }
+        text.fill(0xFF);
         let jumbo_view = JumboBuffer::new(
             jumbo.as_mut_slice(),
             8 * 4,

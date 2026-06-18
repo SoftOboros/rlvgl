@@ -5,6 +5,7 @@
 //! in a 6x10 pixel grid. The creator tool will later generate optimized font
 //! data to replace this stub.
 
+use crate::font::{FontLineMetrics, FontMetrics, GlyphInfo};
 use crate::renderer::Renderer;
 use crate::widget::{Color, Rect};
 
@@ -94,6 +95,67 @@ impl BitmapFont {
             self.draw_char(renderer, x, cy, ch, color);
             cy += advance;
         }
+    }
+}
+
+impl FontMetrics for BitmapFont {
+    fn glyph_metrics(&self, ch: char) -> Option<GlyphInfo> {
+        if !(0x20..=0x7e).contains(&(ch as u32)) {
+            return None;
+        }
+        let width = self.scaled_width().max(0) as u16;
+        let height = self.scaled_height().max(0) as u16;
+        let advance_px = self.scaled_width() + self.scale as i32;
+        Some(GlyphInfo {
+            advance_fp16: (advance_px.max(0) * 16).min(u16::MAX as i32) as u16,
+            bearing_x: 0,
+            bearing_y: height.min(i16::MAX as u16) as i16,
+            width,
+            height,
+        })
+    }
+
+    fn line_metrics(&self) -> FontLineMetrics {
+        let height = self.scaled_height().max(0).min(u16::MAX as i32) as u16;
+        FontLineMetrics {
+            line_height: height,
+            ascent: height.min(i16::MAX as u16) as i16,
+            descent: 0,
+        }
+    }
+
+    fn glyph_coverage_row(&self, ch: char, row: u16, x_offset: u16, coverage: &mut [u8]) -> bool {
+        if !(0x20..=0x7e).contains(&(ch as u32)) {
+            return false;
+        }
+
+        let scale = self.scale.max(1) as usize;
+        let source_row = row as usize / scale;
+        if source_row >= self.glyph_height as usize {
+            coverage.fill(0);
+            return true;
+        }
+
+        let glyph_idx = (ch as u32 - 0x20) as usize;
+        let bits_per_glyph = self.glyph_width as usize * self.glyph_height as usize;
+        let bit_offset = glyph_idx * bits_per_glyph;
+
+        for (offset, alpha) in coverage.iter_mut().enumerate() {
+            let source_col = (x_offset as usize + offset) / scale;
+            if source_col >= self.glyph_width as usize {
+                *alpha = 0;
+                continue;
+            }
+            let bit = bit_offset + source_row * self.glyph_width as usize + source_col;
+            let byte_idx = bit / 8;
+            let bit_idx = 7 - (bit % 8);
+            *alpha = if byte_idx < self.data.len() && (self.data[byte_idx] >> bit_idx) & 1 != 0 {
+                255
+            } else {
+                0
+            };
+        }
+        true
     }
 }
 

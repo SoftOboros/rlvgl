@@ -29,11 +29,6 @@ use rlvgl_core::png;
 #[cfg(all(feature = "qrcode", not(target_os = "none")))]
 use rlvgl_core::qrcode;
 
-#[cfg(any(
-    all(feature = "png", not(target_os = "none")),
-    all(feature = "jpeg", not(target_os = "none")),
-    feature = "gif"
-))]
 use rlvgl_core::widget::Color;
 use rlvgl_core::{
     WidgetNode,
@@ -47,7 +42,17 @@ use rlvgl_core::{
     feature = "gif"
 ))]
 use rlvgl_widgets::image::Image;
-use rlvgl_widgets::{button::Button, container::Container, label::Label};
+use rlvgl_widgets::{
+    arc::Arc,
+    bar::Bar,
+    button::Button,
+    button_matrix::ButtonMatrix,
+    chart::{Chart, ChartAxis},
+    container::Container,
+    label::Label,
+    led::Led,
+    table::Table,
+};
 
 use rlvgl_i18n::t;
 
@@ -427,6 +432,121 @@ impl Application for DemoApp {
 /// Create a new demo application as a boxed trait object.
 pub fn create_app() -> Box<dyn Application> {
     Box::new(DemoApp::new())
+}
+
+/// Build a small host-simulator parity gallery covering representative LPAR
+/// widgets from the primitive, control, and data-rich waves.
+pub fn build_lpar_parity_demo(root_w: u32, root_h: u32) -> WidgetNode {
+    let root = Rect {
+        x: 0,
+        y: 0,
+        width: root_w as i32,
+        height: root_h as i32,
+    };
+
+    let mut arc = Arc::new(
+        Rect {
+            x: 12,
+            y: 14,
+            width: 72,
+            height: 72,
+        },
+        0,
+        100,
+    );
+    arc.set_value(68);
+
+    let mut bar = Bar::new(
+        Rect {
+            x: 96,
+            y: 20,
+            width: 138,
+            height: 20,
+        },
+        0,
+        100,
+    );
+    bar.set_value(72);
+    bar.indicator_color = Color(0, 150, 110, 255);
+
+    let mut led = Led::new(Rect {
+        x: 248,
+        y: 14,
+        width: 46,
+        height: 46,
+    });
+    led.set_color(Color(0, 190, 80, 255));
+    led.set_brightness(220);
+
+    let mut buttons = ButtonMatrix::new(Rect {
+        x: 96,
+        y: 54,
+        width: 198,
+        height: 54,
+    });
+    buttons.set_map(&["One", "Two", "\n", "Three", "Four"]);
+
+    let mut chart = Chart::new(Rect {
+        x: 12,
+        y: 118,
+        width: 138,
+        height: 92,
+    });
+    let series = chart.add_series(Color(20, 110, 230, 255), ChartAxis::Primary);
+    chart.set_points(series, &[12, 55, 38, 80, 64, 92, 42, 70]);
+
+    let mut table = Table::new(Rect {
+        x: 164,
+        y: 118,
+        width: 130,
+        height: 92,
+    });
+    table.set_column_count(2);
+    table.set_row_count(3);
+    table.set_column_width(0, 54);
+    table.set_cell_value(0, 0, "LPAR");
+    table.set_cell_value(0, 1, "OK");
+    table.set_cell_value(1, 0, "Draw");
+    table.set_cell_value(1, 1, "6");
+    table.set_cell_value(2, 0, "Gate");
+    table.set_cell_value(2, 1, "Sim");
+
+    WidgetNode {
+        widget: Rc::new(RefCell::new(Container::new(root))),
+        children: alloc::vec![
+            WidgetNode {
+                widget: Rc::new(RefCell::new(arc)),
+                children: Vec::new(),
+                tag: None,
+            },
+            WidgetNode {
+                widget: Rc::new(RefCell::new(bar)),
+                children: Vec::new(),
+                tag: None,
+            },
+            WidgetNode {
+                widget: Rc::new(RefCell::new(led)),
+                children: Vec::new(),
+                tag: None,
+            },
+            WidgetNode {
+                widget: Rc::new(RefCell::new(buttons)),
+                children: Vec::new(),
+                tag: None,
+            },
+            WidgetNode {
+                widget: Rc::new(RefCell::new(chart)),
+                children: Vec::new(),
+                tag: None,
+            },
+            WidgetNode {
+                widget: Rc::new(RefCell::new(table)),
+                children: Vec::new(),
+                tag: None,
+            },
+        ],
+        tag: None,
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ use core::cell::RefCell;
 
 use crate::WidgetNode;
 use crate::event::Event;
+use crate::object::ObjectNode;
 
 /// Metadata describing an application.
 pub struct AppInfo {
@@ -55,8 +56,105 @@ pub trait Application {
     fn destroy(&mut self) {}
 }
 
+/// Extension helpers for legacy [`Application`] implementations.
+///
+/// This is the compatibility bridge from the public-field [`WidgetNode`]
+/// carrier to the LPAR object substrate. New runtime phases should target
+/// [`ObjectNode`] while existing applications can still build their legacy
+/// root and adopt it at the runtime boundary.
+pub trait ApplicationObjectExt: Application {
+    /// Build this application and adopt the returned [`WidgetNode`] root into
+    /// an [`ObjectNode`] tree.
+    fn build_object_root(&mut self, width: u32, height: u32) -> ObjectNode {
+        ObjectNode::adopt(self.build(width, height))
+    }
+}
+
+impl<T: Application + ?Sized> ApplicationObjectExt for T {}
+
+/// Trait implemented by applications that natively build an [`ObjectNode`] tree.
+///
+/// This is the forward runtime carrier for LPAR phases. The legacy
+/// [`Application`] trait remains source-compatible; runtimes that need object
+/// metadata, invalidation, bubbling, focus, or scroll semantics should prefer
+/// this trait when available.
+pub trait ObjectApplication {
+    /// Return metadata about this application.
+    fn info(&self) -> AppInfo;
+
+    /// Construct the initial object tree for the given display dimensions.
+    fn build_object(&mut self, width: u32, height: u32) -> ObjectNode;
+
+    /// Called after each event has been dispatched through the object tree.
+    fn after_object_event(&mut self, _root: &Rc<RefCell<ObjectNode>>, _event: &Event) {}
+
+    /// Called once per frame for animations or deferred work.
+    fn tick_object(&mut self, _root: &Rc<RefCell<ObjectNode>>) {}
+
+    /// Called before the application is unloaded.
+    fn destroy(&mut self) {}
+}
+
 /// Symbol name used to locate the `create_app` entry point in a cdylib.
 pub const CREATE_APP_SYMBOL: &[u8] = b"rlvgl_create_app";
 
 /// Symbol name used to locate the `destroy_app` entry point in a cdylib.
 pub const DESTROY_APP_SYMBOL: &[u8] = b"rlvgl_destroy_app";
+
+#[cfg(test)]
+mod tests {
+    use alloc::rc::Rc;
+    use core::cell::RefCell;
+
+    use super::*;
+    use crate::event::Event;
+    use crate::renderer::Renderer;
+    use crate::widget::{Rect, Widget};
+
+    struct TestWidget;
+
+    impl Widget for TestWidget {
+        fn bounds(&self) -> Rect {
+            Rect {
+                x: 0,
+                y: 0,
+                width: 10,
+                height: 10,
+            }
+        }
+
+        fn draw(&self, _renderer: &mut dyn Renderer) {}
+
+        fn handle_event(&mut self, _event: &Event) -> bool {
+            false
+        }
+    }
+
+    struct TestApp;
+
+    impl Application for TestApp {
+        fn info(&self) -> AppInfo {
+            AppInfo {
+                name: "test",
+                version: "0.0.0",
+                preferred_width: 10,
+                preferred_height: 10,
+            }
+        }
+
+        fn build(&mut self, _width: u32, _height: u32) -> WidgetNode {
+            WidgetNode::new(Rc::new(RefCell::new(TestWidget))).with_tag("root")
+        }
+
+        fn after_event(&mut self, _root: &Rc<RefCell<WidgetNode>>, _event: &Event) {}
+    }
+
+    #[test]
+    fn legacy_application_can_build_object_root() {
+        let mut app = TestApp;
+        let root = app.build_object_root(10, 10);
+
+        assert_eq!(root.tag(), Some("root"));
+        assert_eq!(root.widget().borrow().bounds().width, 10);
+    }
+}

@@ -1,0 +1,2 @@
+# Baseline sdkconfig defaults for the DFR0550 ESP-IDF comparison app.
+CONFIG_IDF_EXPERIMENTAL_FEATURES=y

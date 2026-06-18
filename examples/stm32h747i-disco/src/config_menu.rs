@@ -605,7 +605,15 @@ impl Widget for ConfigMenu {
             let cy = cb.y + (cb.height - ch as i32) / 2;
             renderer.draw_pixels((cx, cy), &self.close_pixels, cw, ch);
         } else {
-            renderer.draw_text((cb.x + 8, cb.y + CLOSE_SIZE - 6), "X", CLOSE_COLOR);
+            // FONT-03 §7.B/§12.C: render the close glyph's coverage via the
+            // shared draw_glyph helper (baseline pen origin) instead of the
+            // backend-opaque draw_text. self.font is a PackedFont → AA coverage.
+            renderer.draw_glyph(
+                self.font,
+                'X',
+                (cb.x + 8, cb.y + CLOSE_SIZE - 6),
+                CLOSE_COLOR,
+            );
         }
 
         // Language checkboxes

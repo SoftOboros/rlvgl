@@ -203,6 +203,7 @@ const REG_DAC1R_MIXER: u16 = 0x0602;
 // AIF1 ADC1 mixer routing (record path)
 const REG_AIF1_ADC1L_MIXER: u16 = 0x0606;
 const REG_AIF1_ADC1R_MIXER: u16 = 0x0607;
+const REG_OVERSAMPLING: u16 = 0x0620;
 
 // DAC volume
 const REG_DAC1_LEFT_VOL: u16 = 0x0610;
@@ -687,35 +688,55 @@ where
         // downstream AIF1 register write was silently rejected
         // (bench-confirmed via codec readback 2026-04-30).
         let _ = sample_rate;
-        self.write_reg(REG_FLL1_CTRL_5, 0x0003)?; // REFCLK_SRC=BCLK1, REFCLK_DIV=÷1
-        self.write_reg(REG_FLL1_CTRL_4, 0x0800)?; // N=64
-        self.write_reg(REG_FLL1_CTRL_3, 0x0000)?; // K=0
-        self.write_reg(REG_FLL1_CTRL_2, 7u16 << 8)?; // OUTDIV-1=7, FRATIO=0
 
-        // Enable FLL1 and poll R0x731 bit 5 (FLL1_LOCK_EINT) for lock
-        // acquisition before any post-FLL register writes land. Per
-        // `docs/audio/01-codec-bringup.md` AUDIO-01 §9 INV-AUDIO-01-1:
-        // FLL1 lock MUST be confirmed before the AIF1ADC1 serializer
-        // arms, otherwise the serializer latches a wrong bit-clock
-        // phase relative to LRCLK1 and produces the L/R digital-capture
-        // asymmetry symptoms documented in AUDIO-01 §2 (0x0000/0x8000
-        // bimodal on one slot, or an 11+5 bit-split across both slots,
-        // depending on which phase offset N the metastable arm picked).
+        // ── AUDIO-01-d open-loop fix (ERRATA-004/009): source AIF1CLK
+        //    from the coherent MCLK1, NOT FLL1-locked-to-BCLK1. ───────
         //
-        // The earlier static `delay_busy(20_000)` covered the
-        // worst-case 30–50 ms WM8994 FLL lock time only on average,
-        // not under cold-boot conditions where BCLK1 is just coming
-        // up from a power-removed state. The poll-and-retry path
-        // makes the post-FLL state deterministic across boots.
+        // Root cause of the serializer bit-clock-phase race: with
+        // AIF1CLK_SRC=FLL1, the FLL VCO locks to BCLK1 at a phase that
+        // is RANDOM at each cold power-up and latched for the session.
+        // The decimator output (AIF1CLK domain) is then handed to the
+        // BCLK1-domain ADC serializer at that random phase, slipping the
+        // sample by ±1+ BCLK → the N≠0 wrap / byte-stuck captures. The
+        // serializer itself frame-syncs to LRCLK (datasheet p.174), so
+        // it is NOT the source of the varying N — the FLL VCO phase is.
+        // No firmware delay or rerun can make an analog VCO phase
+        // deterministic, so the only OPEN-LOOP fix is to remove the FLL.
         //
-        // On `FllLockOutcome::Failed`, return immediately — the
-        // codec is in an undefined state and the remainder of
-        // init_record (AIF1 framing, ADC enables, mixer routing,
-        // HP output stage) MUST NOT proceed (AUDIO-01 §12 (d) + (f)).
-        let lock_outcome = self.fll1_enable_and_wait_lock_bclk1()?;
-        if matches!(lock_outcome, FllLockOutcome::Failed) {
-            return Ok(lock_outcome);
-        }
+        // On boards that route a clean MCLK = 256·Fs to the codec MCLK1
+        // pin (STM32H747I-DISCO: SAI1_MCLK_A on PG7 → CN15 → MCLK1,
+        // phase-coherent with BCLK1 because both come from the MCU's one
+        // SAI1 master / PLL3 clock tree), selecting MCLK1 as AIF1CLK
+        // removes the VCO entirely → the AIF1CLK↔BCLK1 phase is fixed by
+        // construction → deterministic N. Datasheet R0x200 p.193: "if
+        // MCLK1 is selected as the AIF1CLK source, the FLL(s) are not
+        // required to be enabled." AIF1CLK_RATE stays 256× (R0x210).
+        //
+        // Const-gated: a board WITHOUT a coherent codec MCLK must keep
+        // the FLL-from-BCLK path (set false). MCLK1 is the default.
+        const AIF1CLK_FROM_MCLK1: bool = true;
+
+        let lock_outcome = if AIF1CLK_FROM_MCLK1 {
+            // No FLL. AIF1CLK is sourced from MCLK1 at the R0x200 write
+            // below; the caller must already be driving MCLK1 (256·Fs).
+            FllLockOutcome::LockedFirstTry
+        } else {
+            // Step 12 — FLL1 ← BCLK1, F_OUT = 12.5 MHz (256·Fs). See the
+            // F_VCO/OUTDIV math above. Enable FLL1 and poll R0x731 bit 5
+            // (FLL1_LOCK_EINT) for lock before any post-FLL write lands
+            // (AUDIO-01 §9 INV-AUDIO-01-1). On Failed, return early — the
+            // codec is in an undefined state and the rest of init_record
+            // MUST NOT proceed (AUDIO-01 §12 (d)+(f)).
+            self.write_reg(REG_FLL1_CTRL_5, 0x0003)?; // REFCLK_SRC=BCLK1, REFCLK_DIV=÷1
+            self.write_reg(REG_FLL1_CTRL_4, 0x0800)?; // N=64
+            self.write_reg(REG_FLL1_CTRL_3, 0x0000)?; // K=0
+            self.write_reg(REG_FLL1_CTRL_2, 7u16 << 8)?; // OUTDIV-1=7, FRATIO=0
+            let o = self.fll1_enable_and_wait_lock_bclk1()?;
+            if matches!(o, FllLockOutcome::Failed) {
+                return Ok(o);
+            }
+            o
+        };
 
         // Step 13 — AIF1 format BEFORE clocks (Cube order). R0x300:
         //   bits 4:3 AIF1_FMT = 0b10 (I²S)
@@ -772,9 +793,19 @@ where
         // RATE field MUST be updated to match. A parameterizable
         // version of `init_record` is future work — see AUDIO-NN
         // chapter pipeline.
-        const AIF1_LRCLK_SLAVE_ENA: u16 = 0x0820; // bit 11 (LRCLK_DIR) + RATE=32
-        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
-        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_LRCLK_SLAVE_ENA)?;
+        // AUDIO-01-d-H1 (arm-before-frame-clock, 2026-06-14): set RATE=32 but
+        // leave LRCLK_DIR (bit 11) = 0 here, so the codec does NOT yet receive
+        // LRCLK1 — its AIF1 framing is held off while the serializers are
+        // enabled (Step 14b). The LRCLK_DIR 0→1 edge is deferred to Step 14c
+        // (after the serializer-enable), so an already-enabled serializer syncs
+        // to the FIRST received LRCLK1 frame edge → deterministic N=0 arm,
+        // instead of arming mid-frame against an already-running LRCLK1 (the
+        // ERRATA-004/009 arm-phase race that H0's enable-defer alone did not fix
+        // on the ADC side — disco bench 2026-06-13). RATE field is unchanged
+        // (bits 10:0 = 0x020 = BCLK1/LRCLK1 = 32).
+        const AIF1_RATE32_DIR_OFF: u16 = 0x0020; // RATE=32, LRCLK_DIR=0 (held off)
+        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_RATE32_DIR_OFF)?;
+        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_RATE32_DIR_OFF)?;
 
         // R0x210 AIF1 Rate. Per WM8994_Rev4.6.pdf p.194 Tables 105+106:
         //   bits 7:4 AIF1_SR — sample-rate code (0x0=8k..0xA=96k)
@@ -807,11 +838,14 @@ where
         //   bit 0 SYSCLK_SRC     = 0 (SYSCLK from AIF1CLK)
         self.write_reg(REG_CLOCKING_1, 0x000A)?;
 
-        // R0x200 AIF1CLK: SRC=FLL1 (bits 4:3=0b10), ENA=1 (bit 0).
-        // Written LAST in the clock chain so format/rate are already
-        // in place when AIF1CLK starts running — registers like R0x300
-        // / R0x410 require AIF1CLK live for writes to take effect.
-        self.write_reg(REG_AIF1_CLOCKING_1, 0x0011)?;
+        // R0x200 AIF1CLK: ENA=1 (bit 0) + SRC (bits 4:3). Written LAST in
+        // the clock chain so format/rate are already in place when
+        // AIF1CLK starts running — R0x300/R0x410 require AIF1CLK live for
+        // writes to take effect. Datasheet p.193 SRC encoding:
+        //   MCLK1 path → SRC=00 → 0x0001 (AUDIO-01-d open-loop fix)
+        //   FLL1  path → SRC=10 → 0x0011 (legacy FLL-from-BCLK)
+        let aif1clk = if AIF1CLK_FROM_MCLK1 { 0x0001 } else { 0x0011 };
+        self.write_reg(REG_AIF1_CLOCKING_1, aif1clk)?;
         delay_busy(5_000); // AIF1CLK detector settle
 
         // ADC startup settle. After AIF1CLK_ENA latches the ADC's
@@ -819,6 +853,30 @@ where
         // cycles to flush stale state. ~50 ms is the canonical Cube
         // BSP value; shorter waits cause first-frame glitches.
         delay_busy(50_000);
+
+        // ADC digital-chain pre-arm setup (bench 2026-06-12).
+        //
+        // The lever here is ORDERING, not register values. Datasheet
+        // (WM8994 Rev 4.6 pp.61/238/357) requires every clock + signal-path
+        // register to be live before the ADC / AIF1ADC enable edges. Program
+        // the ADC digital volume + filter state here, before the
+        // AIF1ADC1L/R_ENA arm edge below, so the digital chain is in its
+        // intended state when the serializer starts (ERRATA-004/009
+        // serializer bit-clock-phase race).
+        self.write_reg(REG_AIF1_ADC1_L_VOL, 0x01C0)?;
+        self.write_reg(REG_AIF1_ADC1_R_VOL, 0x01C0)?;
+        // HPF enabled on both channels, hi-fi cutoff mode.
+        self.write_reg(REG_AIF1_ADC1_FILTERS, 0x1800)?;
+        // R0x620 (Oversampling): per datasheet p.200, bit 1 = ADC_OSR128
+        // (default 1 = high-perf 128x), bit 0 = DAC_OSR128 (default 0).
+        // NOTE: an earlier bench note had these bits SWAPPED and claimed the
+        // observed 0x0002 left the ADC in 64x low-power mode — that was
+        // wrong. 0x0002 already has the ADC at 128x; 0x0003 only additionally
+        // raises the DAC to 128x. This write is therefore a DAC-side touch,
+        // NOT the ADC-phase fix — the ADC OSR value was never the lever. Kept
+        // for symmetry within the pre-arm ordering block.
+        self.write_reg(REG_OVERSAMPLING, 0x0003)?;
+        delay_busy(5_000);
 
         // Step 14b — Arm the AIF1 serializers (AUDIO-01-d H0).
         // Only now — FLL1 locked (Step 12), codec in slave LRCLK mode
@@ -839,6 +897,18 @@ where
         let pm5 = self.read_reg(REG_PWR_MGMT_5)?;
         self.write_reg(REG_PWR_MGMT_5, pm5 | (1 << 9) | (1 << 8))?;
 
+        // Step 14c — AUDIO-01-d-H1: NOW enable LRCLK1 reception (LRCLK_DIR=1).
+        // The serializers were enabled at Step 14b with framing held off
+        // (Step 13 LRCLK_DIR=0), so THIS 0→1 edge starts the codec's AIF1
+        // framing and the already-armed serializers sync to the FIRST LRCLK1
+        // frame edge — the deterministic-N=0 hypothesis. Performing the order
+        // as enable-then-frame (rather than frame-then-enable) is the H1 delta
+        // over H0. R0x305 (DAC) symmetric for AIF1DAC1 (ERRATA-009). The Step
+        // 14b settle below now also covers this first-frame sync.
+        const AIF1_RATE32_DIR_ON: u16 = 0x0820; // RATE=32 + LRCLK_DIR=1 (reception on)
+        self.write_reg(REG_AIF1_ADC_LRCLK, AIF1_RATE32_DIR_ON)?;
+        self.write_reg(REG_AIF1_DAC_LRCLK, AIF1_RATE32_DIR_ON)?;
+
         // Step 14b settle — let the freshly-armed serializers lock to the
         // LRCLK1 frame and the digital-core FIFO flush before the path is
         // exercised. The arm 0→1 edge needs a few LRCLK frames (~20 µs each
@@ -857,9 +927,10 @@ where
         //   bits 7:0 AIF1ADC1L_VOL — 0xC0 = 0 dB.
         self.write_reg(REG_AIF1_ADC1_L_VOL, 0x01C0)?;
         self.write_reg(REG_AIF1_ADC1_R_VOL, 0x01C0)?;
-        // R0x410 default: HPF disabled, hi-fi mode. An HPF would notch
-        // out low-frequency content for spectrum analysis.
-        self.write_reg(REG_AIF1_ADC1_FILTERS, 0x0000)?;
+        // Keep the pre-arm ADC filter state. A prior post-init DAA-side
+        // override wrote this value after init_record returned; writing it
+        // here keeps the driver state and serializer arm edge aligned.
+        self.write_reg(REG_AIF1_ADC1_FILTERS, 0x1800)?;
 
         // ── Output staging for live record monitor at CN11 ─────────
         // Configure the codec's analog output path so the HP/line-out

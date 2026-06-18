@@ -11,6 +11,7 @@
 extern crate alloc;
 
 pub mod assets;
+mod backlight_panel;
 mod dashboard_panel;
 mod hotspot;
 pub mod icon_strip;
@@ -19,11 +20,13 @@ pub mod wing;
 use alloc::{format, rc::Rc, string::String, vec, vec::Vec};
 use core::cell::RefCell;
 
+use backlight_panel::BacklightPanel;
 use dashboard_panel::DashboardPanel;
 use hotspot::ActionHotspot;
 use icon_strip::{IconSlot, IconStrip};
 use rlvgl_core::{
     WidgetNode,
+    anim::{Animations, Easing},
     bitmap_font::FONT_6X10,
     event::{Event, Key},
     style::StyleBuilder,
@@ -295,6 +298,7 @@ struct ControllerState {
     capabilities: DiscoCapabilities,
     commands: Vec<DiscoCommand>,
     dashboard: Rc<RefCell<DashboardPanel>>,
+    backlight_panel: Rc<RefCell<BacklightPanel>>,
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
     event_window: Rc<RefCell<EventWindow>>,
@@ -305,6 +309,9 @@ struct ControllerState {
     tick_count: u64,
     backlight: u8,
     focus_dirty: bool,
+    /// Tick-driven animation registry (ANIM-00). Owns the focus-border
+    /// attention pulse; advanced once per `Event::Tick`.
+    anims: Animations,
     /// Info page currently rendered on the dashboard, if any.
     ///
     /// When set, the `Tick` handler re-renders the dashboard lines so
@@ -318,6 +325,7 @@ impl ControllerState {
     fn new(
         capabilities: DiscoCapabilities,
         dashboard: Rc<RefCell<DashboardPanel>>,
+        backlight_panel: Rc<RefCell<BacklightPanel>>,
         subtitle: Rc<RefCell<Label>>,
         footer: Rc<RefCell<Label>>,
         event_window: Rc<RefCell<EventWindow>>,
@@ -329,6 +337,7 @@ impl ControllerState {
             capabilities,
             commands: Vec::new(),
             dashboard,
+            backlight_panel,
             subtitle,
             footer,
             event_window,
@@ -339,8 +348,30 @@ impl ControllerState {
             tick_count: 0,
             backlight: 75,
             focus_dirty: false,
+            anims: Animations::new(),
             active_info: None,
         };
+        // Focus-border attention pulse (ANIM-00 §8.1): ping-pong the
+        // highlight between bright and dim forever. Phase is a function
+        // of the controller tick count only, so headless harnesses can
+        // sample it frame-exactly.
+        let pulse_target = this.icon_strip.clone();
+        this.anims.pulse_color(
+            assets::FOCUS_HIGHLIGHT_COLOR,
+            assets::FOCUS_PULSE_DIM_COLOR,
+            assets::FOCUS_PULSE_HALF_PERIOD,
+            Easing::EaseOut,
+            alloc::boxed::Box::new(move |color| {
+                // try_borrow_mut mirrors sync_focus_highlights: if the
+                // strip is borrowed elsewhere this tick, skip the update
+                // (the next tick re-applies a fresh sample).
+                let Ok(mut strip) = pulse_target.try_borrow_mut() else {
+                    return None;
+                };
+                strip.set_focus_color(color);
+                strip.focused_bounds()
+            }),
+        );
         this.sync_focus_highlights();
         this
     }
@@ -489,6 +520,7 @@ impl ControllerState {
     fn close_wings(&mut self) {
         self.active_info = None;
         self.dashboard.borrow_mut().hide();
+        self.backlight_panel.borrow_mut().hide();
         self.settings_wing.borrow_mut().close();
         self.info_wing.borrow_mut().close();
         let focus_index = match self.focus {
@@ -587,6 +619,7 @@ impl ControllerState {
     }
 
     fn activate_main(&mut self, slot: MainSlot) {
+        self.backlight_panel.borrow_mut().hide();
         self.focus = FocusState::Main(slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -606,6 +639,8 @@ impl ControllerState {
 
     fn activate_settings(&mut self, slot: SettingsSlot) {
         self.active_info = None;
+        // Dismiss the backlight slider by default; the Backlight arm re-shows it.
+        self.backlight_panel.borrow_mut().hide();
         self.focus = FocusState::Wing(WingKind::Settings, slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -640,15 +675,22 @@ impl ControllerState {
                 ));
             }
             SettingsSlot::Backlight => {
-                self.backlight = match self.backlight {
-                    100 => 25,
-                    75 => 100,
-                    50 => 75,
-                    25 => 50,
-                    _ => 75,
-                };
-                self.push_status(format!("Backlight {}%", self.backlight));
-                self.queue(DiscoCommand::SetBacklight(self.backlight));
+                if self.capabilities.pointer {
+                    // Pointer platforms get the slider panel for continuous
+                    // control; the slider emits SetBacklight as it is moved
+                    // (see DiscoController::handle_event).
+                    self.dashboard.borrow_mut().hide();
+                    self.active_info = None;
+                    self.backlight_panel
+                        .borrow_mut()
+                        .set_value(self.backlight as i32);
+                    self.backlight_panel.borrow_mut().show();
+                    self.push_status(format!("Backlight {}%", self.backlight));
+                } else {
+                    // Keyboard / headless platforms can't operate a slider, so
+                    // keep the discrete level step.
+                    self.cycle_backlight();
+                }
             }
             SettingsSlot::About => {
                 self.show_about();
@@ -656,7 +698,23 @@ impl ControllerState {
         }
     }
 
+    /// Step the backlight through the discrete 25/50/75/100 levels and emit a
+    /// `SetBacklight` command. Used by the `b` hotkey and by pointerless
+    /// platforms where the slider panel can't be operated.
+    fn cycle_backlight(&mut self) {
+        self.backlight = match self.backlight {
+            100 => 25,
+            75 => 100,
+            50 => 75,
+            25 => 50,
+            _ => 75,
+        };
+        self.push_status(format!("Backlight {}%", self.backlight));
+        self.queue(DiscoCommand::SetBacklight(self.backlight));
+    }
+
     fn activate_info(&mut self, slot: InfoSlot) {
+        self.backlight_panel.borrow_mut().hide();
         self.focus = FocusState::Wing(WingKind::Info, slot as usize);
         self.sync_focus_highlights();
         match slot {
@@ -828,9 +886,7 @@ impl ControllerState {
             Key::Character('s') | Key::Character('S') => self.activate_main(MainSlot::Settings),
             Key::Character('f') | Key::Character('F') => self.activate_main(MainSlot::Files),
             Key::Character('i') | Key::Character('I') => self.activate_main(MainSlot::Info),
-            Key::Character('b') | Key::Character('B') => {
-                self.activate_settings(SettingsSlot::Backlight)
-            }
+            Key::Character('b') | Key::Character('B') => self.cycle_backlight(),
             _ => {}
         }
     }
@@ -918,6 +974,19 @@ impl DiscoController {
             "rlvgl demo application",
         )));
 
+        // Backlight slider panel, centered; hidden until Settings → Backlight
+        // is activated on a pointer-capable platform. Initial value matches the
+        // controller's 75% default backlight.
+        let backlight_panel = Rc::new(RefCell::new(BacklightPanel::new(
+            Rect {
+                x: (width - 480).max(0) / 2,
+                y: height / 2 - 70,
+                width: 480.min(width - 40),
+                height: 140,
+            },
+            75,
+        )));
+
         let event_window = Rc::new(RefCell::new(
             EventWindowBuilder::new(&FONT_6X10)
                 .width(420)
@@ -983,6 +1052,7 @@ impl DiscoController {
         let state = Rc::new(RefCell::new(ControllerState::new(
             capabilities,
             dashboard.clone(),
+            backlight_panel.clone(),
             subtitle.clone(),
             footer.clone(),
             event_window.clone(),
@@ -1067,6 +1137,11 @@ impl DiscoController {
                 widget: dashboard,
                 children: Vec::new(),
                 tag: Some("disco.dashboard"),
+            });
+            r.children.push(WidgetNode {
+                widget: backlight_panel,
+                children: Vec::new(),
+                tag: Some("disco.backlight"),
             });
             r.children.push(WidgetNode {
                 widget: footer.clone(),
@@ -1305,9 +1380,20 @@ impl DiscoController {
         if state.focus_dirty {
             state.sync_focus_highlights();
         }
+        // Backlight slider → command bridge: if a PressRelease moved the slider
+        // during widget dispatch this event, surface the new level as a
+        // SetBacklight command (and reflect it in the status line).
+        let pending_backlight = state.backlight_panel.borrow_mut().take_pending();
+        if let Some(value) = pending_backlight {
+            let level = value.clamp(0, 100) as u8;
+            state.backlight = level;
+            state.push_status(format!("Backlight {level}%"));
+            state.queue(DiscoCommand::SetBacklight(level));
+        }
         match event {
             Event::Tick => {
                 state.tick_count = state.tick_count.wrapping_add(1);
+                state.anims.tick();
                 if state.tick_count.is_multiple_of(600) {
                     let tick_count = state.tick_count;
                     let backlight = state.backlight;
@@ -1326,6 +1412,18 @@ impl DiscoController {
             Event::KeyDown { key } => state.handle_key(key),
             Event::PressRelease { x, y } if !state.capabilities.pointer => {
                 state.push_status(format!("Pointer input ignored at ({x}, {y})"));
+            }
+            // Drag observability (INPUT-00 §7): surface drag activity
+            // through the shared status channel so headless harnesses can
+            // assert the recognizer chain end-to-end. Drop-target/reorder
+            // logic is application business and intentionally absent.
+            Event::DragStart {
+                origin_x, origin_y, ..
+            } => {
+                state.push_status(format!("Drag start ({origin_x}, {origin_y})"));
+            }
+            Event::DragEnd { x, y } => {
+                state.push_status(format!("Drag end ({x}, {y})"));
             }
             _ => {}
         }
@@ -1359,7 +1457,7 @@ fn themed_label(text: impl Into<String>, bounds: Rect, text_color: Color) -> Rc<
         .bg_color(Color(0, 0, 0, 0))
         .alpha(0)
         .build();
-    label.text_color = text_color;
+    label.set_text_color(text_color);
     Rc::new(RefCell::new(label))
 }
 
@@ -1751,6 +1849,85 @@ mod tests {
     }
 
     #[test]
+    fn backlight_item_shows_slider_panel_on_pointer_platform() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        // Open the settings wing and activate the Backlight item (index 4).
+        key_down(&mut c, Key::Enter);
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+
+        let root = c.root();
+        let root = root.borrow();
+        let panel = find_node(&root, "disco.backlight").unwrap();
+        assert!(
+            panel.widget.borrow().bounds().width > 0,
+            "backlight slider panel should be visible after activation"
+        );
+    }
+
+    #[test]
+    fn backlight_slider_tap_emits_set_backlight() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Enter);
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown);
+        }
+        key_down(&mut c, Key::Enter);
+        let _ = c.drain_commands(); // discard activation/status noise
+
+        // Track spans x in [180, 620) at this screen size; the midpoint maps to
+        // ~50%. Tap it and assert a SetBacklight command is produced.
+        c.dispatch_event(&Event::PressRelease { x: 400, y: 250 });
+        let commands = c.drain_commands();
+        let level = commands.iter().find_map(|cmd| match cmd {
+            DiscoCommand::SetBacklight(v) => Some(*v),
+            _ => None,
+        });
+        assert!(
+            matches!(level, Some(v) if (40..=60).contains(&v)),
+            "expected SetBacklight near 50%, got {commands:?}"
+        );
+    }
+
+    #[test]
+    fn backlight_item_cycles_on_pointerless_platform() {
+        // UEFI has no pointer, so the Backlight item keeps the discrete cycle
+        // instead of showing an unoperable slider.
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::uefi(),
+        );
+        key_down(&mut c, Key::Enter); // open settings wing
+        for _ in 0..4 {
+            key_down(&mut c, Key::ArrowDown); // focus Backlight (index 4)
+        }
+        key_down(&mut c, Key::Enter); // activate → cycle 75 -> 100
+        let commands = c.drain_commands();
+        assert!(
+            commands
+                .iter()
+                .any(|cmd| matches!(cmd, DiscoCommand::SetBacklight(100))),
+            "pointerless platform should cycle, got {commands:?}"
+        );
+        let root = c.root();
+        let root = root.borrow();
+        let panel = find_node(&root, "disco.backlight").unwrap();
+        assert_eq!(
+            panel.widget.borrow().bounds().width,
+            0,
+            "slider panel must stay hidden without a pointer"
+        );
+    }
+
+    #[test]
     fn audio_on_capable_platform_emits_start_effect() {
         let mut c = DiscoController::new(
             rlvgl_platform::Screen::landscape(800, 480),
@@ -1955,5 +2132,139 @@ mod tests {
         let state = c.state.borrow();
         assert!(state.icon_strip.borrow().focused_slot().is_some());
         assert_eq!(state.settings_wing.borrow().focused_slot(), None);
+    }
+
+    /// Records `fill_rect` calls so a frame's border strips can be
+    /// inspected without rasterizing icons (ANIM-00 §12 pulse case).
+    struct FillCapture {
+        fills: Vec<(Rect, Color)>,
+    }
+
+    impl rlvgl_core::renderer::Renderer for FillCapture {
+        fn fill_rect(&mut self, rect: Rect, color: Color) {
+            self.fills.push((rect, color));
+        }
+        fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
+        fn draw_pixels(
+            &mut self,
+            _position: (i32, i32),
+            _pixels: &[Color],
+            _width: u32,
+            _height: u32,
+        ) {
+            // Icons are irrelevant to the border assertion; skip the
+            // per-pixel fill_rect fallback.
+        }
+    }
+
+    /// Draw the icon strip and return the set of border-strip colors
+    /// (fills exactly `FOCUS_BORDER_WIDTH` wide or tall).
+    fn border_colors(controller: &DiscoController) -> Vec<Color> {
+        use rlvgl_core::widget::Widget;
+        let state = controller.state.borrow();
+        let mut capture = FillCapture { fills: Vec::new() };
+        state.icon_strip.borrow().draw(&mut capture);
+        capture
+            .fills
+            .iter()
+            .filter(|(rect, _)| {
+                rect.width == assets::FOCUS_BORDER_WIDTH as i32
+                    || rect.height == assets::FOCUS_BORDER_WIDTH as i32
+            })
+            .map(|&(_, color)| color)
+            .collect()
+    }
+
+    #[test]
+    fn focus_border_pulses_deterministically_at_known_tick_offsets() {
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+
+        // Tick to the pulse trough (half period): border exactly at the
+        // dim endpoint.
+        for _ in 0..assets::FOCUS_PULSE_HALF_PERIOD {
+            controller.tick();
+        }
+        let at_trough = border_colors(&controller);
+        assert!(!at_trough.is_empty(), "focused border is drawn");
+        assert!(
+            at_trough
+                .iter()
+                .all(|&c| c == assets::FOCUS_PULSE_DIM_COLOR),
+            "tick t=half_period samples the dim endpoint exactly: {at_trough:?}"
+        );
+
+        // Half a period later: back at the bright endpoint, and the two
+        // frames differ in the expected direction (dim -> bright).
+        for _ in 0..assets::FOCUS_PULSE_HALF_PERIOD {
+            controller.tick();
+        }
+        let at_peak = border_colors(&controller);
+        assert!(
+            at_peak.iter().all(|&c| c == assets::FOCUS_HIGHLIGHT_COLOR),
+            "tick t=2*half_period samples the bright endpoint exactly: {at_peak:?}"
+        );
+        assert_ne!(
+            at_trough[0], at_peak[0],
+            "frames half a period apart differ"
+        );
+        assert!(
+            at_peak[0].1 > at_trough[0].1 && at_peak[0].2 > at_trough[0].2,
+            "direction: green/blue channels brighten from trough to peak"
+        );
+
+        // Re-running the same tick schedule reproduces the same samples
+        // bit-identically (no wall clock anywhere in the path).
+        let mut rerun = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        for _ in 0..assets::FOCUS_PULSE_HALF_PERIOD {
+            rerun.tick();
+        }
+        assert_eq!(border_colors(&rerun), at_trough);
+    }
+
+    #[test]
+    fn drag_events_surface_through_status_channel() {
+        let mut controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        controller.dispatch_event(&Event::DragStart {
+            x: 120,
+            y: 90,
+            origin_x: 100,
+            origin_y: 80,
+        });
+        controller.dispatch_event(&Event::DragEnd { x: 300, y: 200 });
+        let commands = controller.drain_commands();
+        assert!(
+            commands.iter().any(
+                |cmd| matches!(cmd, DiscoCommand::ShowStatus(s) if s == "Drag start (100, 80)")
+            ),
+            "{commands:?}"
+        );
+        assert!(
+            commands.iter().any(
+                |cmd| matches!(cmd, DiscoCommand::ShowStatus(s) if s == "Drag end (300, 200)")
+            ),
+            "{commands:?}"
+        );
+    }
+
+    #[test]
+    fn pulse_reports_focused_bounds_as_dirty_rect() {
+        let controller = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        let mut state = controller.state.borrow_mut();
+        let expected = state.icon_strip.borrow().focused_bounds().unwrap();
+        state.anims.tick();
+        assert_eq!(state.anims.dirty_rects(), &[expected]);
+        assert!(state.anims.any_active(), "infinite pulse stays pending");
     }
 }

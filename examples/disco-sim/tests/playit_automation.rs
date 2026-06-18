@@ -5,12 +5,14 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
 struct SimulatorSession {
     child: Child,
     reader: BufReader<TcpStream>,
     writer: TcpStream,
+    stderr: Receiver<String>,
 }
 
 impl SimulatorSession {
@@ -40,6 +42,20 @@ impl SimulatorSession {
             .expect("failed to spawn disco simulator");
 
         let stdout = child.stdout.take().expect("missing simulator stdout");
+        let stderr = child.stderr.take().expect("missing simulator stderr");
+        let (stderr_tx, stderr_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let stderr = BufReader::new(stderr);
+            for line in stderr.lines() {
+                let Ok(line) = line else {
+                    break;
+                };
+                if stderr_tx.send(line).is_err() {
+                    break;
+                }
+            }
+        });
+
         let mut stdout = BufReader::new(stdout);
         let mut ready = String::new();
         stdout
@@ -68,6 +84,7 @@ impl SimulatorSession {
             child,
             reader,
             writer,
+            stderr: stderr_rx,
         }
     }
 
@@ -88,6 +105,32 @@ impl SimulatorSession {
             .expect("failed to read playit response");
         assert!(!line.is_empty(), "playit connection closed unexpectedly");
         line.trim_end_matches(['\r', '\n']).to_string()
+    }
+
+    fn wait_for_stderr(&self, needle: &str, timeout: Duration) {
+        let deadline = std::time::Instant::now() + timeout;
+        let mut seen = Vec::new();
+        loop {
+            let now = std::time::Instant::now();
+            assert!(
+                now < deadline,
+                "timed out waiting for stderr line containing {needle:?}; seen: {seen:?}"
+            );
+            match self.stderr.recv_timeout(deadline - now) {
+                Ok(line) if line.contains(needle) => return,
+                Ok(line) => seen.push(line),
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    panic!(
+                        "timed out waiting for stderr line containing {needle:?}; seen: {seen:?}"
+                    )
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    panic!(
+                        "simulator stderr closed before line containing {needle:?}; seen: {seen:?}"
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -183,6 +226,242 @@ fn automation_headless_emits_ready_status_and_dump_frames() {
         "frame dump was unexpectedly blank"
     );
     assert_eq!(session.read_line(), "END");
+}
+
+/// ANIM-00 §12 pulse driving case over the wire: D-dump the focus-border
+/// pulse at consecutive tick offsets and assert the frames differ in the
+/// expected direction.
+///
+/// The focus border pulses bright→dim→bright with half-period 32 ticks
+/// (`FOCUS_PULSE_HALF_PERIOD`), registered at controller construction, so
+/// pulse phase is a pure function of the sim tick count. A single
+/// `D…,4` capture emits one frame per present, and presents advance 1:1
+/// with ticks (`DiscoRuntime::step`), so the four frames sit at exactly
+/// consecutive tick offsets even though the sim free-runs. The `?` STAT
+/// anchor is only tick-approximate (the dump's first frame lands ~2
+/// presents later), so the test retries until the capture window sits
+/// well inside one monotonic half-cycle.
+#[test]
+fn anim_pulse_border_dump_frames_differ_in_expected_direction() {
+    let mut session = SimulatorSession::launch();
+
+    // Slot-0 focus border, top strip: x = 800 - STRIP_X_OFFSET(70),
+    // y = STRIP_MARGIN_TOP(17) in the default 800x480 layout.
+    const X: i32 = 730;
+    const Y: i32 = 17;
+    const HALF: u32 = 32; // assets::FOCUS_PULSE_HALF_PERIOD
+    const CYCLE: u32 = 64;
+
+    let mut attempts = 0;
+    let (greens, descending) = loop {
+        attempts += 1;
+        assert!(attempts < 80, "never observed a safe pulse phase window");
+
+        session.send("?");
+        let (tick, _) = parse_status(&session.read_line());
+        // First dumped frame lands ~2 ticks after the STAT sample; keep
+        // the whole ±2-tolerance window inside one half-cycle and away
+        // from the slow tail of the ease, where per-tick deltas round
+        // to zero.
+        let phase = (tick + 2) % CYCLE;
+        let segment = phase % HALF;
+        if !(2..=21).contains(&segment) {
+            std::thread::sleep(Duration::from_millis(60));
+            continue;
+        }
+
+        session.send(&format!("D{X},{Y},4,1,4"));
+        assert_eq!(session.read_line(), "DUMP:queued");
+        let mut greens = Vec::new();
+        for _ in 0..4 {
+            assert_eq!(session.read_line(), "F");
+            let row = session.read_line();
+            let first = row.split_whitespace().next().expect("missing pixel");
+            let argb = u32::from_str_radix(first, 16).expect("invalid hex pixel");
+            assert_eq!(argb & 0xFF00_0000, 0xFF00_0000, "border pixel is opaque");
+            assert_eq!(argb & 0x00FF_0000, 0, "red stays 0 across the cyan pulse");
+            greens.push(((argb >> 8) & 0xFF) as i32);
+        }
+        assert_eq!(session.read_line(), "END");
+        break (greens, phase < HALF);
+    };
+
+    // Every sample sits between the pulse endpoints
+    // (FOCUS_PULSE_DIM_COLOR green 54, FOCUS_HIGHLIGHT_COLOR green 180).
+    for green in &greens {
+        assert!(
+            (54..=180).contains(green),
+            "sample outside pulse palette: {greens:?}"
+        );
+    }
+
+    // Frames at consecutive tick offsets move monotonically in the
+    // direction the phase predicts, with real motion across the window.
+    let monotone = |ok: fn(i32) -> bool| greens.windows(2).all(|w| ok(w[1] - w[0]));
+    if descending {
+        assert!(monotone(|d| d <= 0), "expected dimming, got {greens:?}");
+        assert!(
+            greens[0] - greens[3] >= 3,
+            "expected visible dimming over 3 ticks: {greens:?}"
+        );
+    } else {
+        assert!(monotone(|d| d >= 0), "expected brightening, got {greens:?}");
+        assert!(
+            greens[3] - greens[0] >= 3,
+            "expected visible brightening over 3 ticks: {greens:?}"
+        );
+    }
+}
+
+/// INPUT-00 §12 end-to-end: raw playit `PD`/`PM`/`PU` streams drive the
+/// full recognizer chain (drag → tap → double-tap) in the sim.
+///
+/// Suppression observable: a drag that *starts on the settings icon* must
+/// NOT open the settings wing (the `PressRelease` that would open it is
+/// suppressed by the click-vs-drag contract), while drag activity itself
+/// is observable as a footer status change ("Drag end (x, y)"). A
+/// sub-threshold wander on the same icon then yields the `PressRelease`
+/// path: the wing opens.
+#[test]
+fn drag_recognizer_end_to_end_via_raw_pointer_commands() {
+    let mut session = SimulatorSession::launch();
+
+    // Recognizer timers count *ticks*, and the headless sim's effective
+    // frame rate is build-dependent (debug software rendering runs well
+    // below the nominal 60 Hz) — so wait for tick progression via STAT,
+    // not wall-clock sleeps. Tap debounce (200 ms = 12 ticks) +
+    // double-tap window (400 ms = 24 ticks) → 48 ticks is a generous
+    // horizon for any buffered PressRelease to emerge.
+    let wait_ticks = |session: &mut SimulatorSession, ticks: u32| {
+        session.send("?");
+        let (start, _) = parse_status(&session.read_line());
+        let deadline = std::time::Instant::now() + Duration::from_secs(90);
+        loop {
+            std::thread::sleep(Duration::from_millis(50));
+            session.send("?");
+            let (now, _) = parse_status(&session.read_line());
+            if now.wrapping_sub(start) >= ticks {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "sim ticks stalled: {now} after {start}"
+            );
+        }
+    };
+
+    // ── Case 1: drag starting on the settings icon (slot 0 ~ (760, 47)).
+    // Crossing displacement (6, 8): 36 + 64 = 100 >= 10². The wing MUST
+    // NOT open, and the status channel must show drag activity.
+    session.send("PD760,47");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PM766,55");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PM700,200");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PU650,300");
+    assert_eq!(session.read_line(), "OK");
+
+    // If suppression were broken, the PressRelease would emerge within
+    // the debounce + double-tap horizon and open the wing.
+    wait_ticks(&mut session, 48);
+    session.wait_for_stderr("sim status: Drag start (760, 47)", Duration::from_secs(3));
+    session.wait_for_stderr("sim status: Drag end (650, 300)", Duration::from_secs(3));
+
+    session.send("QB:disco.settings.audio");
+    assert_eq!(
+        parse_bounds(&session.read_line()),
+        (0, 0, 0, 0),
+        "drag suppressed the PressRelease: settings wing stays closed"
+    );
+
+    // ── Case 2: sub-threshold wander on the same icon (max displacement
+    // (2, 2): 8 < 100) — the tap path stays intact and opens the wing.
+    session.send("PD760,47");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PM762,49");
+    assert_eq!(session.read_line(), "OK");
+    session.send("PU762,49");
+    assert_eq!(session.read_line(), "OK");
+
+    wait_ticks(&mut session, 48);
+
+    session.send("QB:disco.settings.audio");
+    let (_, _, width, height) = parse_bounds(&session.read_line());
+    assert!(
+        width > 0 && height > 0,
+        "sub-threshold wander still taps: settings wing opened"
+    );
+}
+
+/// WID-00 §12 end-to-end: playit `KD:`/`KU:` keystrokes edit the
+/// sim-owned `sim.input` field, assertable headless via D-dump equality.
+///
+/// Rendering is a pure function of the edit state (no caret blink —
+/// WID-00 §6.2), so typing "HI" then `Backspace` must render
+/// byte-identically to having typed just "H". `XI1`/`XI0` extension
+/// commands toggle key routing (`set_active`); an inactive field
+/// ignores keys at the pixel level.
+#[test]
+fn keyboard_types_into_sim_input_and_backspace_restores_h_render() {
+    let mut session = SimulatorSession::launch();
+
+    // The sim.input field sits at (84, 380, 240, 20); dump the leading
+    // glyph + caret region. Each dump rides the next present, which
+    // already includes any edit acknowledged before the D command.
+    let dump_field = |session: &mut SimulatorSession| -> Vec<String> {
+        session.send("D84,382,40,16,1");
+        assert_eq!(session.read_line(), "DUMP:queued");
+        assert_eq!(session.read_line(), "F");
+        let rows: Vec<String> = (0..16).map(|_| session.read_line()).collect();
+        assert_eq!(session.read_line(), "END");
+        rows
+    };
+    let key = |session: &mut SimulatorSession, name: &str| {
+        session.send(&format!("KD:{name}"));
+        assert_eq!(session.read_line(), "OK");
+        session.send(&format!("KU:{name}"));
+        assert_eq!(session.read_line(), "OK");
+    };
+
+    session.send("QE:sim.input");
+    assert_eq!(session.read_line(), "EXISTS:1");
+
+    let inactive_empty = dump_field(&mut session);
+
+    // Activate key routing: the caret appears (active state is visible).
+    session.send("XI1");
+    assert_eq!(session.read_line(), "OK");
+    let active_empty = dump_field(&mut session);
+    assert_ne!(inactive_empty, active_empty, "caret rendered once active");
+
+    // Type "H", then "I", then Backspace: the field must return to the
+    // exact "H" render (buffer AND caret position match).
+    key(&mut session, "H");
+    let h_render = dump_field(&mut session);
+    assert_ne!(active_empty, h_render, "'H' rendered");
+
+    key(&mut session, "I");
+    let hi_render = dump_field(&mut session);
+    assert_ne!(h_render, hi_render, "'HI' differs from 'H'");
+
+    key(&mut session, "Backspace");
+    let after_backspace = dump_field(&mut session);
+    assert_eq!(
+        h_render, after_backspace,
+        "backspace restores the byte-identical 'H' render (WID-00 §12)"
+    );
+
+    // Deactivate: keys are ignored at the pixel level.
+    session.send("XI0");
+    assert_eq!(session.read_line(), "OK");
+    let deactivated = dump_field(&mut session);
+    key(&mut session, "Z");
+    let after_ignored_key = dump_field(&mut session);
+    assert_eq!(
+        deactivated, after_ignored_key,
+        "inactive input ignores keys"
+    );
 }
 
 #[test]
@@ -541,7 +820,7 @@ fn star_crawl_activates_and_scrolls() {
     let before = sample_screen_grid(&mut session);
     let starfield_bg: (u8, u8, u8) = (10, 10, 32);
     assert!(
-        !before.iter().any(|p| *p == starfield_bg),
+        !before.contains(&starfield_bg),
         "pre-activation screen unexpectedly contains starfield bg pixels"
     );
 

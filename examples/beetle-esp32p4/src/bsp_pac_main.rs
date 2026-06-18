@@ -111,12 +111,17 @@ unsafe fn run_bringup_instrumented() -> u8 {
         return probe_code;
     }
 
-    // Bracket wake with the marker HIGH so the granular dips emitted by
-    // `write_reg_instrumented` are visible as LOW pulses inside the
-    // sustained-HIGH region on Saleae GPIO 5.
+    // Bracket wake with the marker HIGH so the Saleae trace shows exactly
+    // when the bit-bang wake transactions run (real 100 kHz I2C traffic is
+    // visible inside the sustained-HIGH region on GPIO 5).
     debug_marker_set(true);
-    // Phase 4 (now Phase 0): wake — moved BEFORE PSRAM/LDO/DSI.
-    let wake_result = unsafe { wake_instrumented() };
+    // ERRATA-008 work-around: drive the bridge wake over the bit-bang
+    // transport instead of the broken I2C0 master FSM. The bit-bang
+    // address probe already ACKs the bridge at 0x45, so this is the v0
+    // wake path; a success drives REG_PWM=255 (backlight on). The legacy
+    // `wake_instrumented()` peripheral path is retained (reachable from
+    // `run_bringup`) for continued ERRATA-008 FSM investigation.
+    let wake_result = unsafe { dfr0550::i2c_bridge::wake_bitbang() };
     debug_marker_set(false);
     use core::sync::atomic::Ordering;
     use dfr0550::i2c_bridge::BridgeError;
@@ -151,6 +156,9 @@ unsafe fn run_bringup_instrumented() -> u8 {
     let _dphy_ldo = dfr0550::ldo::LdoChannel::acquire_dphy();
     unsafe { dfr0550::dsi_host::clocks::enable_bus_and_reset() };
     unsafe {
+        // PLL_F20M is the production reference. (BEETLE-05 2026-06-13: a
+        // RC_FAST experiment here did NOT lock either, ruling out the
+        // reference clock as the cause of the PLL-lock failure.)
         dfr0550::dsi_host::clocks::enable_phy_clocks(
             dfr0550::dsi_host::clocks::PhyClockSource::PllF20m,
         );
@@ -924,6 +932,31 @@ fn morse_status_loop(status: u8) -> ! {
         dfr0550::i2c0::LAST_HANG_COMD0_PINS.load(core::sync::atomic::Ordering::Relaxed);
     let recovery = dfr0550::i2c0::LAST_RECOVERY_CLOCKS.load(core::sync::atomic::Ordering::Relaxed);
     let bitbang = dfr0550::i2c0::LAST_BITBANG_ACK.load(core::sync::atomic::Ordering::Relaxed);
+    // BEETLE-05: low byte of MIPI_DSI_HOST.phy_status captured when DSI
+    // init gave up (PllLock / LaneCal). 000 = PHY dead (LDO/clock infra);
+    // non-zero = PHY alive but PLL/lanes didn't come up.
+    let phy_status = (dfr0550::dsi_host::LAST_PHY_STATUS
+        .load(core::sync::atomic::Ordering::Relaxed)
+        & 0xFF) as u8;
+    // BEETLE-05: bootloader's PLL_F20M divider (div_num). 023 = correct
+    // (480/24 = 20 MHz); anything else = the 20 MHz reference was wrong.
+    let ref20m_div = dfr0550::dsi_host::LAST_REF20M_DIV.load(core::sync::atomic::Ordering::Relaxed);
+    // BEETLE-05: LDO_VO3 config read-back. 031 = all fields stuck (rail
+    // configured as intended); less = a PMU write didn't land.
+    let ldo_verify = dfr0550::ldo::LAST_LDO_VERIFY.load(core::sync::atomic::Ordering::Relaxed);
+    // BEETLE-05: eFuse-calibrated dref*10+mul programmed into LDO_VO3.
+    // 096 = resolved to uncalibrated 9/6 (voltage was never the issue);
+    // other = calibration shifted the tap to hit a true 2500 mV.
+    let ldo_drefmul = dfr0550::ldo::LAST_LDO_DREFMUL.load(core::sync::atomic::Ordering::Relaxed);
+    // BEETLE-05: PHY test reg 0x17 (N-1) read back. 003 = test interface +
+    // config clock work and the M/N pokes landed; 000/other = pokes never
+    // reached the PHY (config-clock/test-interface dead) = root cause.
+    let phy_reg17 = dfr0550::dsi_host::LAST_PHY_REG17.load(core::sync::atomic::Ordering::Relaxed);
+    // BEETLE-05: DPHY clock-gate read-back. 015 = all gates latched
+    // (ref_20m_en/cfg_clk/pll_refclk/src_sel); less = a gate didn't stick
+    // (bit0 = the "Reserved"-marked ref_20m_clk_en is the prime suspect).
+    let dphy_clk =
+        dfr0550::dsi_host::LAST_DPHY_CLK_VERIFY.load(core::sync::atomic::Ordering::Relaxed);
     // Derive a compact 6-bit summary of `LAST_HANG_INT_RAW` for the
     // bench Morse readout. Picks the diagnostic-bearing event bits:
     //   bit 0 ← TIMEOUT       (int_raw bit 8)  — internal timeout fired
@@ -1041,6 +1074,47 @@ fn morse_status_loop(status: u8) -> ! {
         //   4/5/6= one or both lines stuck low at probe entry
         //   255  = probe never ran
         morse_marker_number(&p, marker_mask, bitbang);
+        morse_fast_delay(6); // word gap
+
+        // Octonary 3 digits (BEETLE-05 DSI phy_status low byte):
+        //   000   = PHY reported nothing at DSI-init failure — DPHY rail
+        //           (LDO_VO3) dead/off-target or PHY config clock missing.
+        //   non-0 = PHY alive; bit 0 (value & 1) = PLL lock, bits 2/4/7 =
+        //           clk/data0/data1 lane stop-state. See LAST_PHY_STATUS.
+        //   255   = DSI init never reached the PLL-lock wait (status < 2).
+        morse_marker_number(&p, marker_mask, phy_status);
+        morse_fast_delay(6); // word gap
+
+        // Nonary 3 digits (BEETLE-05 bootloader PLL_F20M divider):
+        //   023   = correct (480/24 = 20 MHz reference).
+        //   other = bootloader never set the 20 MHz tap; the DPHY PLL
+        //           reference was wrong → lock impossible. See LAST_REF20M_DIV.
+        morse_marker_number(&p, marker_mask, ref20m_div);
+        morse_fast_delay(6); // word gap
+
+        // Denary 3 digits (BEETLE-05 LDO_VO3 config read-back):
+        //   031 = all fields stuck (xpd/owner/tieh/dref/mul as intended).
+        //   less = a PMU write didn't land — see LAST_LDO_VERIFY bit map.
+        morse_marker_number(&p, marker_mask, ldo_verify);
+        morse_fast_delay(6); // word gap
+
+        // Undecary 3 digits (BEETLE-05 calibrated dref*10+mul):
+        //   096 = calibration resolved to 9/6 (DPHY voltage was correct).
+        //   other = eFuse trim moved the tap to hit a true 2500 mV.
+        morse_marker_number(&p, marker_mask, ldo_drefmul);
+        morse_fast_delay(6); // word gap
+
+        // Duodecary 3 digits (BEETLE-05 PHY reg 0x17 read-back):
+        //   003 = test interface works, M/N pokes landed (no-lock is elsewhere).
+        //   000/other = pokes never reached the PHY = root cause.
+        morse_marker_number(&p, marker_mask, phy_reg17);
+        morse_fast_delay(6); // word gap
+
+        // Tredecary 3 digits (BEETLE-05 DPHY clock-gate read-back):
+        //   015 = all gates latched. less = a gate didn't stick;
+        //   bit0 (value & 1) == 0 means ref_20m_clk_en never enabled →
+        //   no 20 MHz reference reaches the PLL = root cause.
+        morse_marker_number(&p, marker_mask, dphy_clk);
 
         // Long inter-message silence (~1 s) — gives a clean gap so the
         // next preamble reads as a fresh repeat.

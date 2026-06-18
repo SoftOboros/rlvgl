@@ -8,12 +8,13 @@ use rlvgl_core::{WidgetNode, event::Event, widget::Widget};
 use rlvgl_platform::{
     BlitRect, BlitterRenderer, ColorFormat, CpuBlitter, InputEvent, PixelFmt, Screen, Surface,
     WgpuDisplay,
-    gesture::{DoubleTapRecognizer, TapRecognizer},
+    gesture::{DoubleTapRecognizer, DragRecognizer, TapRecognizer},
 };
 use rlvgl_playit::{
     EventPipeline, FramebufferReader, PlayitExecutor, PlayitTransport, StatusData,
     TcpServerTransport,
 };
+use rlvgl_ui::Input;
 use rlvgl_widgets::motion::{CrawlWindow, StarCrawl};
 use std::{
     cell::RefCell,
@@ -152,7 +153,14 @@ impl FramebufferReader for FrameMirror {
 }
 
 /// Shared gesture pipeline for simulator and playit inputs.
+///
+/// Canonical recognizer chain per INPUT-00 §6.1: raw → drag → tap →
+/// double-tap. The drag recognizer consumes the move/up stream while
+/// dragging, and the mandatory `tap.cancel()` on `DragStart` enforces
+/// click-vs-drag suppression (a threshold-crossing contact never also
+/// produces a `PressRelease`).
 struct DiscoGesturePipeline {
+    drag: DragRecognizer,
     tap: TapRecognizer,
     double_tap: DoubleTapRecognizer,
 }
@@ -160,6 +168,7 @@ struct DiscoGesturePipeline {
 impl DiscoGesturePipeline {
     fn new(frame_hz: u32) -> Self {
         Self {
+            drag: DragRecognizer::new(),
             tap: TapRecognizer::new(frame_hz),
             double_tap: DoubleTapRecognizer::new(frame_hz),
         }
@@ -176,7 +185,16 @@ impl DiscoGesturePipeline {
 
 impl EventPipeline for DiscoGesturePipeline {
     fn process(&mut self, event: Event) -> (Option<Event>, Option<Event>) {
-        match self.tap.process(&event) {
+        let Some(staged) = self.drag.process(&event) else {
+            return (None, None);
+        };
+        if matches!(staged, Event::DragStart { .. }) {
+            // INPUT-00 §6.2: the drag consumes this contact's remaining
+            // move/up stream — abandon the pending tap so it can neither
+            // settle into a PressRelease nor corrupt the next tap.
+            self.tap.cancel();
+        }
+        match self.tap.process(&staged) {
             Some(gesture) => self.double_tap.process(&gesture),
             None => (None, None),
         }
@@ -270,6 +288,12 @@ struct DiscoRuntime {
     /// after the widget tree draw, so the crawl naturally overlays
     /// the dashboard.
     active_crawl: Option<CrawlWindow<StarCrawl<'static>>>,
+    /// Sim-owned editable text field (WID-00 §8.4): a tagged
+    /// `sim.input` node pushed into the root tree at startup, inactive
+    /// until the `XI1` extension command activates it. Gives headless
+    /// harnesses a key→pixels surface without touching the demo app
+    /// (the `active_crawl` runtime-owned precedent).
+    sim_input: Rc<RefCell<Input>>,
 }
 
 impl DiscoRuntime {
@@ -280,6 +304,23 @@ impl DiscoRuntime {
         let frame_hz = screen.frame_hz.max(1);
         let controller = DiscoController::new(screen, DiscoCapabilities::simulator());
         let root = controller.root();
+        // Sim-owned editable field (WID-00 §8.4). White field on the
+        // dark backdrop, caret in the border color; nominal 8/16 char
+        // metrics match the fontdue backend's 16 px line.
+        let sim_input = Rc::new(RefCell::new(Input::new(
+            "",
+            rlvgl_core::widget::Rect {
+                x: 84,
+                y: 380,
+                width: 240,
+                height: 20,
+            },
+        )));
+        root.borrow_mut().children.push(WidgetNode {
+            widget: sim_input.clone(),
+            children: Vec::new(),
+            tag: Some("sim.input"),
+        });
         let mut runtime = Self {
             controller,
             root,
@@ -289,6 +330,7 @@ impl DiscoRuntime {
             tick_count: 0,
             frame_hz,
             active_crawl: None,
+            sim_input,
         };
         // DSIM-ERRATA-003: render once before any playit poll. step() polls
         // BEFORE rendering, so a `D` command that wins the race to the first
@@ -324,12 +366,21 @@ impl DiscoRuntime {
         let controller = &mut self.controller;
         let pipeline = &mut self.pipeline;
         let frame = &self.frame;
+        let sim_input = self.sim_input.clone();
         self.playit.poll_with_callback(
             &mut root_ref,
             &status,
             Some(frame),
             pipeline,
-            |_payload| {},
+            |payload| {
+                // Sim extension commands (WID-00 §8.4): `XI1` / `XI0`
+                // toggle the sim-owned editable field's key routing.
+                match payload {
+                    b"I1" => sim_input.borrow_mut().set_active(true),
+                    b"I0" => sim_input.borrow_mut().set_active(false),
+                    _ => {}
+                }
+            },
             |event| Self::post_dispatch(controller, event),
         );
     }
