@@ -1,0 +1,13 @@
+# Golden trace for test_philosopher_full_eat_cycle_with_fork_arbiter.
+# Regenerate by running: cargo test test_philosopher_full_eat_cycle_with_fork_arbiter -- --nocapture
+# Two runs are compared byte-for-byte inside the test to prove determinism.
+START   parent=P5_Thinking timers=1
+START   child_ID_P_5=Thinking
+TIMER   TIMER t=1000ms seq=0 event=Do.Timer.Hungry machine=ID_P_5 content=undefined
+AFTER_T1 parent=P5_Hungry child_P5=LeftWaiting
+INJECT  event=taken.5 data=5
+AFTER_TAKEN5 parent=P5_Hungry child_P5=RightWaiting
+INJECT  event=taken.4 data=5
+AFTER_TAKEN4 parent=P5_Eating child_P5=LeftTaken1
+TIMER2  TIMER t=2000ms seq=1 event=Do.Timer.Think machine=parent content=undefined
+AFTER_THINK parent=P5_Eating child_P5=LeftTaken1

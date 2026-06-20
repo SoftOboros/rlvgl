@@ -497,7 +497,7 @@ objc2-app-kit = "0.3.1"
 [workspace]
 members = [
     "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
-    "examples/apps/demo", "examples/apps/disco-demo",
+    "examples/apps/demo", "examples/apps/disco-demo", "examples/apps/sctd-demo",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
     "examples/beetle-esp32p4",
@@ -520,6 +520,14 @@ exclude = [
     "examples/beetle-avr",
     "vendor/scjson",
     "examples/stm32h747i-disco/disco-demo-states",
+    # dining-philosophers is an iState-MCP-generated crate with non-idiomatic
+    # codegen style; excluded from workspace clippy per SCTD-00 §9.4. Run its
+    # vector tests directly via --manifest-path.
+    "examples/apps/sctd-demo/machines/dining-philosophers",
+    # media-player is an iState-MCP-generated crate (same rationale as
+    # dining-philosophers above). Excluded from workspace clippy; run tests
+    # via --manifest-path or through the sctd-demo workspace member.
+    "examples/apps/sctd-demo/machines/media-player",
     # CRATES-CI-01: extracted staged packages under target/crates-ci/staged/
     # are built in place by consumers/creator-cli/smoke.sh; a packaged
     # manifest has no [workspace] table and would otherwise be claimed by
