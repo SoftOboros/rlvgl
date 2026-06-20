@@ -166,9 +166,21 @@ disco-analyzer subrepo's first concepts doc).
 
   - [SCTD-00-CONCEPTS.md](SCTD-00-CONCEPTS.md) — admission set, iState
     MCP generation boundary, selector/icon policy, target portability,
-    and acceptance gates. **Drafted 2026-06-19; not ratified.** SCTD
-    implementation remains blocked until SCTD-00 §12 is accepted or
-    amended.
+    and acceptance gates. **Ratified 2026-06-19.** Foundational frozen
+    decisions §5–§9.
+  - **SCTD-01** (no separate concepts doc — executed under SCTD-00 §14).
+    **Landed 2026-06-20** (`c2f7d39`): the target-neutral
+    `examples/apps/sctd-demo` app with Dining Philosophers (faithful) +
+    Media Player (normalized) live over iState-generated machine crates;
+    host/sim/`thumbv7em`/UEFI build gates green. FreeRTOS-on-STM32 mount
+    deferred as a ratified exception (SCTD-00 §15).
+  - [SCTD-02-FIREBEETLE-P4-INTERACTIVE.md](SCTD-02-FIREBEETLE-P4-INTERACTIVE.md)
+    — FireBeetle 2 ESP32-P4 + DFR0550-V2 ESP-IDF interactive mount:
+    Interactive Dining Philosophers (arrive/depart/panic/reset lifecycle
+    inputs), on-screen touch controls + host pause/speed, and the
+    compose-then-flip / decoupled-logical-tick cadence (INV-SCTD02-1/-2).
+    **Ratified 2026-06-20** (amends SCTD-00 §5/§7 — see SCTD-00 §15).
+    SCTD-02 execution unblocked.
 
 ### Wave-2 UI/runtime initiatives (2026-06-11)
 
