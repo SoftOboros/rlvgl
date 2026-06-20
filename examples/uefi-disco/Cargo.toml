@@ -8,9 +8,18 @@ publish = false
 name = "rlvgl-uefi-disco"
 path = "src/main.rs"
 
+# SCTD-00 §7.2 — UEFI disco wrapper mounting the SCTD tutorial demo app.
+# Build gate (aarch64-unknown-uefi target):
+#   cargo build -p rlvgl-example-uefi-disco --bin rlvgl-uefi-sctd \
+#     --target aarch64-unknown-uefi
+[[bin]]
+name = "rlvgl-uefi-sctd"
+path = "src/sctd_main.rs"
+
 [dependencies]
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", features = ["uefi"] }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+rlvgl-app-sctd-demo = { path = "../apps/sctd-demo" }
 rlvgl-playit = { path = "../../playit", default-features = false }
 uefi = { version = "0.36.1", features = ["alloc", "global_allocator", "panic_handler"] }

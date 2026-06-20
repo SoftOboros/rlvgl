@@ -16,6 +16,18 @@ name = "rlvgl-stm32h747i-disco"
 path = "src/main.rs"
 required-features = ["cm7"]
 
+# SCTD-00 §7.2 — bare-metal DISCO wrapper mounting the SCTD tutorial demo app.
+# Build gate (cargo check only; hardware flashing not required per §7.3):
+#   RUSTFLAGS="-C target-cpu=cortex-m7" cargo check \
+#     --target thumbv7em-none-eabihf \
+#     -p rlvgl-example-disco \
+#     --bin rlvgl-stm32h747i-sctd \
+#     --features cm7,sctd,dma2d
+[[bin]]
+name = "rlvgl-stm32h747i-sctd"
+path = "src/sctd_main.rs"
+required-features = ["cm7", "sctd"]
+
 [[bin]]
 name = "rlvgl-stm32h747i-disco-cm4"
 path = "src/cm4_main.rs"
@@ -53,6 +65,7 @@ bsp_log = []
 zephyr = []
 adapted_cmd = []  # DSI adapted command mode (enables DMA2D M2M for star crawl)
 freertos = ["rlvgl-platform/freertos"]  # FreeRTOS kernel linked in-tree; preemptive present/render/touch tasks
+sctd = ["dep:rlvgl-app-sctd-demo"]    # SCTD-00 §7.2 — mount Tutorial Demo App (target-neutral payload swap)
 
 [dependencies]
 rlvgl-core = { path = "../../core", default-features = false }
@@ -62,6 +75,7 @@ rlvgl-ui = { path = "../../ui", default-features = false }
 rlvgl-i18n = { path = "../../i18n" }
 rlvgl-app-demo = { path = "../apps/demo", default-features = false, optional = true }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo", default-features = false }
+rlvgl-app-sctd-demo = { path = "../apps/sctd-demo", default-features = false, optional = true }
 rlvgl-decomp = { path = "../../rlvgl-decomp" }
 rlvgl-playit = { path = "../../playit", default-features = false }
 rlvgl-bsps-stm = { path = "../../chips/stm/bsps", optional = true }
