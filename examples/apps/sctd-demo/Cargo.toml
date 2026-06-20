@@ -20,6 +20,7 @@ rlvgl-platform = { path = "../../../platform", version = "0.2.4", default-featur
 rlvgl-decomp = { path = "../../../rlvgl-decomp", version = "0.2.3" }
 dining-philosophers = { path = "machines/dining-philosophers", default-features = false, features = [] }
 media-player = { path = "machines/media-player", default-features = false, features = [] }
+dining-philosophers-interactive = { path = "machines/dining-philosophers-interactive", default-features = false, features = [] }
 
 [features]
 default = []

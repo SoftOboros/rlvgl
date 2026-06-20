@@ -17,8 +17,9 @@ use rlvgl_ui::draw_helpers::draw_border_straight;
 
 use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR, ICON_DP, ICON_MEDIA};
 
-/// Number of selector entries (Dining Philosophers + Media Player [+ Info]).
-pub const MACHINE_COUNT: usize = 2;
+/// Number of selector entries (Dining Philosophers + Media Player +
+/// Interactive Philosophers).
+pub const MACHINE_COUNT: usize = 3;
 
 // ---------------------------------------------------------------------------
 // Icon cache
@@ -58,7 +59,9 @@ impl MachineSelector {
             margin_top,
             gap,
             selected: 0,
-            icons: [ICON_DP, ICON_MEDIA],
+            // Interactive Philosophers reuses the DP glyph (tutorial-asset icon
+            // transcoding deferred per SCTD-00 §6.4).
+            icons: [ICON_DP, ICON_MEDIA, ICON_DP],
             on_tap: [const { None }; MACHINE_COUNT],
             decoded: RefCell::new([const { None }; MACHINE_COUNT]),
         }

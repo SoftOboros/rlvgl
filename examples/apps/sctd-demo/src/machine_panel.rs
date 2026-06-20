@@ -7,7 +7,8 @@
 //! generated public API; the adapter layer supplies the state summary and
 //! available event list.
 
-use alloc::{string::String, vec, vec::Vec};
+use alloc::{boxed::Box, string::String, vec, vec::Vec};
+use core::cell::RefCell;
 
 use rlvgl_core::{
     bitmap_font::{BitmapFont, FONT_6X10},
@@ -37,6 +38,11 @@ pub struct MachinePanel {
     events: Vec<&'static str>,
     event_focus: usize,
     font: &'static BitmapFont,
+    /// Per-event clickable rects, recorded during `draw` for tap hit-testing
+    /// (SCTD-02 §6.2 on-screen touch targets). Index i = events[i].
+    button_rects: RefCell<Vec<Rect>>,
+    /// Tap callback: invoked with the tapped event index.
+    on_event_tap: Option<Box<dyn FnMut(usize)>>,
 }
 
 impl MachinePanel {
@@ -49,7 +55,14 @@ impl MachinePanel {
             events: Vec::new(),
             event_focus: 0,
             font: &FONT_6X10,
+            button_rects: RefCell::new(Vec::new()),
+            on_event_tap: None,
         }
+    }
+
+    /// Register a tap callback fired with the index of the tapped event button.
+    pub fn set_on_event_tap(&mut self, cb: Box<dyn FnMut(usize)>) {
+        self.on_event_tap = Some(cb);
     }
 
     /// Update the panel content.
@@ -122,7 +135,11 @@ impl Widget for MachinePanel {
         self.draw_text_line(renderer, "Events (Enter/D to dispatch):", inner_x, y, BODY_COLOR);
         y += lh;
 
-        // Event list with focus highlight.
+        // Event list with focus highlight. Record each button's clickable rect
+        // for tap hit-testing (SCTD-02 §6.2).
+        let mut rects = self.button_rects.borrow_mut();
+        rects.clear();
+        let btn_w = (self.bounds.width - PADDING * 2).max(0);
         for (i, &event) in self.events.iter().enumerate() {
             let color = if i == self.event_focus {
                 FOCUSED_EVENT_COLOR
@@ -132,6 +149,7 @@ impl Widget for MachinePanel {
             let prefix = if i == self.event_focus { "> " } else { "  " };
             let line = alloc::format!("{}{}", prefix, event);
             self.draw_text_line(renderer, &line, inner_x + 4, y, color);
+            rects.push(Rect { x: inner_x, y: y - 2, width: btn_w, height: lh });
             y += lh;
             if y > self.bounds.y + self.bounds.height - PADDING {
                 break;
@@ -139,8 +157,19 @@ impl Widget for MachinePanel {
         }
     }
 
-    fn handle_event(&mut self, _event: &Event) -> bool {
-        // The panel is display-only; event routing goes through the controller.
+    fn handle_event(&mut self, event: &Event) -> bool {
+        // Tap an event button to dispatch it (SCTD-02 §6.2 on-screen controls).
+        if let Event::PressRelease { x, y } = event {
+            let hit = self.button_rects.borrow().iter().position(|r| {
+                *x >= r.x && *x < r.x + r.width && *y >= r.y && *y < r.y + r.height
+            });
+            if let Some(idx) = hit {
+                if let Some(cb) = self.on_event_tap.as_mut() {
+                    cb(idx);
+                }
+                return true;
+            }
+        }
         false
     }
 }

@@ -44,7 +44,7 @@ pub mod assets;
 mod machine_panel;
 mod selector;
 
-use alloc::{boxed::Box, format, rc::Rc, string::String, vec, vec::Vec};
+use alloc::{boxed::Box, format, rc::Rc, string::{String, ToString}, vec, vec::Vec};
 use core::cell::RefCell;
 
 use machine_panel::MachinePanel;
@@ -316,6 +316,184 @@ impl MachineAdapter for MediaPlayerAdapter {
 }
 
 // ---------------------------------------------------------------------------
+// Interactive Dining Philosophers adapter (SCTD-02 §5/§6)
+// ---------------------------------------------------------------------------
+
+/// Refills per machine logical-step at each speed setting (x0.5 / x1 / x2).
+/// At a ~30 Hz refill, x1 ≈ one philosopher event every ~1.5 s — human-watchable
+/// (SCTD-02 INV-SCTD02-2). The machine's logical clock is thereby decoupled from
+/// the framebuffer refill rate; only the cadence is shown, never frame-accurate.
+const IDP_SPEED_THRESHOLDS: [u32; 3] = [90, 45, 22];
+/// Display labels for the three speed settings.
+const IDP_SPEED_LABELS: [&str; 3] = ["x0.5", "x1", "x2"];
+
+/// Adapter for the SCTD-02 Interactive Dining Philosophers machine.
+///
+/// The generated `dining_philosophers_interactive` machine is a true `<parallel>`
+/// of five philosopher regions. The emitter advances one transition per region
+/// per event, so the host computes the target seat and dispatches the per-seat
+/// events the machine listens for: `arrive.N` (seat the lowest-empty chair),
+/// `depart.N` (remove the highest-seated), `break.N` (panic: release N's forks),
+/// `poke.N` (let a waiting philosopher re-attempt a freed fork). Pause/Speed are
+/// host-side simulation controls (SCTD-02 §6.4): they gate the logical tick, not
+/// the machine. Reset re-instantiates the machine (SCTD-02 §5.7).
+///
+/// Uses only the generated public API: `Machine::new/start/step/run/get_var`.
+pub struct InteractiveDiningPhilosophersAdapter {
+    machine: dining_philosophers_interactive::Machine,
+    paused: bool,
+    speed_idx: usize,
+    accum: u32,
+}
+
+impl InteractiveDiningPhilosophersAdapter {
+    /// Create and start the Interactive Dining Philosophers machine.
+    pub fn new() -> Self {
+        let mut machine = dining_philosophers_interactive::Machine::new();
+        machine.start();
+        Self {
+            machine,
+            paused: false,
+            speed_idx: 1,
+            accum: 0,
+        }
+    }
+
+    /// Read an integer seat field (`t_SEATED` / `t_FORKS`) for seat `k`.
+    fn seat_int(&self, var: &str, k: i64) -> i64 {
+        if let dining_philosophers_interactive::Value::Map(m) = self.machine.get_var(var) {
+            if let Some(dining_philosophers_interactive::Value::Int(v)) =
+                m.get(k.to_string().as_str())
+            {
+                return *v;
+            }
+        }
+        0
+    }
+
+    /// Read the phase string for seat `k` from `t_PHASE`.
+    fn phase(&self, k: i64) -> &'static str {
+        let raw = if let dining_philosophers_interactive::Value::Map(m) =
+            self.machine.get_var("t_PHASE")
+        {
+            match m.get(k.to_string().as_str()) {
+                Some(dining_philosophers_interactive::Value::Str(s)) => s.clone(),
+                _ => String::new(),
+            }
+        } else {
+            String::new()
+        };
+        match raw.as_str() {
+            "thinking" => "thk",
+            "hungry" => "hun",
+            "waiting" => "wai",
+            "eating" => "EAT",
+            _ => "--",
+        }
+    }
+
+    fn seated(&self, k: i64) -> bool {
+        self.seat_int("t_SEATED", k) == 1
+    }
+    fn lowest_empty(&self) -> i64 {
+        (1..=5).find(|&k| !self.seated(k)).unwrap_or(0)
+    }
+    fn highest_seated(&self) -> i64 {
+        (1..=5).rev().find(|&k| self.seated(k)).unwrap_or(0)
+    }
+
+    fn step_named(&mut self, ev: alloc::string::String) {
+        self.machine
+            .step(&ev, dining_philosophers_interactive::Value::Undefined);
+    }
+}
+
+impl Default for InteractiveDiningPhilosophersAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MachineAdapter for InteractiveDiningPhilosophersAdapter {
+    fn name(&self) -> &'static str {
+        "Interactive Philosophers"
+    }
+
+    fn state_summary(&self) -> String {
+        let seats = (1..=5)
+            .map(|k| format!("{}:{}", k, self.phase(k)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!(
+            "{} | speed {} {}",
+            seats,
+            IDP_SPEED_LABELS[self.speed_idx],
+            if self.paused { "PAUSED" } else { "running" },
+        )
+    }
+
+    fn available_events(&self) -> &[&'static str] {
+        // On-screen control surface (SCTD-02 §6.2). These are host-side controls
+        // translated to per-seat SCXML events / harness actions by `dispatch_event`.
+        &["Arrive", "Depart", "Panic", "Reset", "Pause", "Speed"]
+    }
+
+    fn dispatch_event(&mut self, event_name: &str) {
+        match event_name {
+            "Arrive" => {
+                let k = self.lowest_empty();
+                if k > 0 {
+                    self.step_named(format!("arrive.{k}"));
+                }
+            }
+            "Depart" => {
+                let k = self.highest_seated();
+                if k > 0 {
+                    self.step_named(format!("depart.{k}"));
+                }
+            }
+            "Panic" => {
+                for k in 1..=5 {
+                    if self.seated(k) {
+                        self.step_named(format!("break.{k}"));
+                    }
+                }
+            }
+            "Reset" => {
+                let mut m = dining_philosophers_interactive::Machine::new();
+                m.start();
+                self.machine = m;
+                self.accum = 0;
+            }
+            "Pause" => self.paused = !self.paused,
+            "Speed" => self.speed_idx = (self.speed_idx + 1) % IDP_SPEED_LABELS.len(),
+            _ => {}
+        }
+    }
+
+    fn tick(&mut self) {
+        if self.paused {
+            return;
+        }
+        // Decoupled logical-tick cadence (INV-SCTD02-2): advance the machine one
+        // logical step every N refills, paced for human reaction time and scaled
+        // by the speed setting. Between timer fires, poke seated philosophers so a
+        // contended one re-attempts forks once a neighbour frees one.
+        self.accum += 1;
+        if self.accum < IDP_SPEED_THRESHOLDS[self.speed_idx] {
+            return;
+        }
+        self.accum = 0;
+        let _ = self.machine.run(1);
+        for k in 1..=5 {
+            if self.seated(k) {
+                self.step_named(format!("poke.{k}"));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tutorial Demo Controller
 // ---------------------------------------------------------------------------
 
@@ -341,6 +519,7 @@ impl ControllerState {
         let adapters: Vec<Box<dyn MachineAdapter>> = vec![
             alloc::boxed::Box::new(DiningPhilosophersAdapter::new()),
             alloc::boxed::Box::new(MediaPlayerAdapter::new()),
+            alloc::boxed::Box::new(InteractiveDiningPhilosophersAdapter::new()),
         ];
         let mut this = Self {
             selector,
@@ -408,6 +587,27 @@ impl ControllerState {
         }
     }
 
+    /// Dispatch the event/control at `idx` for the selected machine. Used by the
+    /// panel's on-screen tap callback. Does NOT touch the panel widget (it is
+    /// borrowed during the tap); the panel refreshes on the next `Tick`.
+    fn dispatch_event_index(&mut self, idx: usize) {
+        let events: Vec<&'static str> = self.adapters[self.selected]
+            .available_events()
+            .to_vec();
+        if let Some(&event_name) = events.get(idx) {
+            self.event_focus = idx;
+            self.adapters[self.selected].dispatch_event(event_name);
+            let name = self.adapters[self.selected].name();
+            self.footer
+                .borrow_mut()
+                .set_text(format!("Dispatched: {}", event_name));
+            self.commands.push(SctdCommand::EventDispatched {
+                machine: name,
+                event: event_name,
+            });
+        }
+    }
+
     fn cycle_event_focus(&mut self, delta: i32) {
         let count = self.adapters[self.selected].available_events().len();
         if count == 0 {
@@ -436,6 +636,7 @@ impl ControllerState {
             Key::Enter | Key::Space => self.dispatch_focused_event(),
             Key::Character('1') => self.select_machine(0),
             Key::Character('2') => self.select_machine(1),
+            Key::Character('3') => self.select_machine(2),
             Key::Character('d') | Key::Character('D') => self.dispatch_focused_event(),
             _ => {}
         }
@@ -550,6 +751,15 @@ impl SctdController {
             let state1 = state.clone();
             selector.borrow_mut().set_on_tap(1, alloc::boxed::Box::new(move |_| {
                 state1.borrow_mut().select_machine(1);
+            }));
+            let state2 = state.clone();
+            selector.borrow_mut().set_on_tap(2, alloc::boxed::Box::new(move |_| {
+                state2.borrow_mut().select_machine(2);
+            }));
+            // Wire on-screen event-button taps (SCTD-02 §6.2).
+            let state_panel = state.clone();
+            panel.borrow_mut().set_on_event_tap(alloc::boxed::Box::new(move |idx| {
+                state_panel.borrow_mut().dispatch_event_index(idx);
             }));
         }
 
@@ -672,16 +882,18 @@ mod tests {
         None
     }
 
-    /// SCTD-00 §9.2 — selector order: Dining Philosophers is index 0, Media Player is index 1.
+    /// SCTD-00 §9.2 / SCTD-02 §6.7 — selector order: Dining Philosophers (0),
+    /// Media Player (1), Interactive Philosophers (2).
     #[test]
     fn selector_order_dp_then_media_player() {
         let ctrl = make_controller();
         // Initial selection must be index 0 (Dining Philosophers).
         assert_eq!(ctrl.selected_machine(), 0);
-        assert_eq!(ctrl.machine_count(), 2);
+        assert_eq!(ctrl.machine_count(), 3);
         let state = ctrl.state.borrow();
         assert_eq!(state.adapters[0].name(), "Dining Philosophers");
         assert_eq!(state.adapters[1].name(), "Media Player");
+        assert_eq!(state.adapters[2].name(), "Interactive Philosophers");
     }
 
     /// SCTD-00 §9.2 — selected-machine switching via keyboard.
@@ -690,21 +902,50 @@ mod tests {
         let mut ctrl = make_controller();
         assert_eq!(ctrl.selected_machine(), 0);
 
-        // Arrow right switches to index 1 (Media Player).
+        // Arrow right cycles 0 -> 1 -> 2 -> 0 across the three machines.
         ctrl.dispatch_event(&Event::KeyDown { key: Key::ArrowRight });
         assert_eq!(ctrl.selected_machine(), 1);
-
-        // Arrow right again wraps back to index 0.
+        ctrl.dispatch_event(&Event::KeyDown { key: Key::ArrowRight });
+        assert_eq!(ctrl.selected_machine(), 2);
         ctrl.dispatch_event(&Event::KeyDown { key: Key::ArrowRight });
         assert_eq!(ctrl.selected_machine(), 0);
 
-        // '2' key selects index 1 directly.
+        // Number keys select directly.
         ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('2') });
         assert_eq!(ctrl.selected_machine(), 1);
-
-        // '1' key selects index 0 directly.
+        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') });
+        assert_eq!(ctrl.selected_machine(), 2);
         ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('1') });
         assert_eq!(ctrl.selected_machine(), 0);
+    }
+
+    /// SCTD-02 §5/§6 — the Interactive Philosophers control surface drives the
+    /// machine: Arrive seats the lowest-empty chair, Depart removes the
+    /// highest-seated, Reset empties the table, Speed/Pause are host controls.
+    #[test]
+    fn interactive_philosophers_controls() {
+        let mut ctrl = make_controller();
+        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') });
+        assert_eq!(ctrl.selected_machine(), 2);
+        let dispatch = |c: &SctdController, idx: usize| c.state.borrow_mut().dispatch_event_index(idx);
+
+        assert!(ctrl.current_state_summary().contains("1:-- 2:-- 3:-- 4:-- 5:--"));
+        dispatch(&ctrl, 0); // Arrive -> seat 1
+        assert!(ctrl.current_state_summary().contains("1:thk"));
+        dispatch(&ctrl, 0); // Arrive -> seat 2
+        assert!(ctrl.current_state_summary().contains("2:thk"));
+        dispatch(&ctrl, 1); // Depart -> highest seated (2) leaves
+        let s = ctrl.current_state_summary();
+        assert!(s.contains("1:thk") && s.contains("2:--"), "after depart: {}", s);
+        dispatch(&ctrl, 3); // Reset -> empty table
+        assert!(ctrl.current_state_summary().contains("1:-- 2:-- 3:-- 4:-- 5:--"));
+
+        // Host controls: Speed cycles label, Pause toggles run state.
+        assert!(ctrl.current_state_summary().contains("speed x1 running"));
+        dispatch(&ctrl, 5); // Speed
+        assert!(ctrl.current_state_summary().contains("speed x2"));
+        dispatch(&ctrl, 4); // Pause
+        assert!(ctrl.current_state_summary().contains("PAUSED"));
     }
 
     /// SCTD-00 §9.2 — event dispatch: dispatching "Do.Timer.Hungry" reaches

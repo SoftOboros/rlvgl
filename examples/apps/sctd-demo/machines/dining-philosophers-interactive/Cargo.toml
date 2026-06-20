@@ -27,9 +27,9 @@ no_std = []
 
 [dev-dependencies]
 
-# Empty [workspace] table: iState-generated detached crate (same pattern as
-# examples/beetle-esp32p4-idf/components/rlvgl_app/rust). Consumed by
-# examples/apps/sctd-demo as a path dependency. Run vectors standalone via
+# No [workspace] table: this crate is a path dependency of the workspace member
+# rlvgl-app-sctd-demo and is listed in the root Cargo.toml `workspace.exclude`
+# (same pattern as the dining-philosophers / media-player machine crates), so it
+# is built/tested through the parent workspace. Run its vectors via
 #   cargo test --manifest-path \
 #     examples/apps/sctd-demo/machines/dining-philosophers-interactive/Cargo.toml
-[workspace]
