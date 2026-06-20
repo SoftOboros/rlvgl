@@ -158,6 +158,18 @@ disco-analyzer subrepo's first concepts doc).
     **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
     DPR-00 §12 is accepted or amended.
 
+- **SCTD** — *SCXML Tutorial Demo*. Target-neutral state-chart demo app
+  for the Alex Z SCXML tutorial examples vendored through scjson. The
+  first planned machines are Dining Philosophers and the Skoda Bolero
+  media-player example, selected from a right-edge icon strip matching
+  the disco demo's position.
+
+  - [SCTD-00-CONCEPTS.md](SCTD-00-CONCEPTS.md) — admission set, iState
+    MCP generation boundary, selector/icon policy, target portability,
+    and acceptance gates. **Drafted 2026-06-19; not ratified.** SCTD
+    implementation remains blocked until SCTD-00 §12 is accepted or
+    amended.
+
 ### Wave-2 UI/runtime initiatives (2026-06-11)
 
 Single-phase, ticket-driven initiatives on the core/widgets/ui crates
