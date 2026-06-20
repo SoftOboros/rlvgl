@@ -18,35 +18,53 @@
 //! pointers and ints; no floats cross the boundary, so the renderer's internal
 //! f32 raster math is ABI-isolated from the host.
 
-#![no_std]
+// no_std on the target; under `cargo test` the std test harness owns the
+// panic handler + allocator, so the bare-metal runtime glue below is gated out
+// and the crawl's pure layout math is host-testable (BEETLE-IDF-05 §12 (f)).
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
 
+#[cfg(not(test))]
 use core::alloc::{GlobalAlloc, Layout};
+#[cfg(not(test))]
 use core::ffi::c_void;
+#[cfg(not(test))]
 use core::panic::PanicInfo;
 use core::ptr::addr_of_mut;
 
-use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
+use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
 use rlvgl_platform::Screen;
 
+mod star_crawl;
+use star_crawl::StarCrawl;
+
 // ---------------------------------------------------------------------------
 // Runtime glue: allocator + panic handler over the IDF C runtime.
 // ---------------------------------------------------------------------------
 
+#[cfg(not(test))]
 extern "C" {
     fn malloc(size: usize) -> *mut c_void;
     fn free(ptr: *mut c_void);
     fn abort() -> !;
+}
 
-    /// Host hook: apply an abstract `0..=100` backlight level. Implemented in
-    /// `dfr0550_idf_compare.c`, which maps it to the DFR0550 bridge's PWM
-    /// register over the same I2C bus the C host already owns.
+// Host hook: apply an abstract `0..=100` backlight level. Implemented in
+// `dfr0550_idf_compare.c`, which maps it to the DFR0550 bridge's PWM register
+// over the same I2C bus the C host already owns. Under `cargo test` there is no
+// C host, so a no-op stub stands in (the backlight path is not exercised by the
+// host-side crawl tests).
+#[cfg(not(test))]
+extern "C" {
     fn rlvgl_host_set_backlight(level: u8);
 }
+
+#[cfg(test)]
+unsafe fn rlvgl_host_set_backlight(_level: u8) {}
 
 /// Global allocator backed by the IDF/newlib heap.
 ///
@@ -54,8 +72,10 @@ extern "C" {
 /// alignment never exceeds the pointer width (4 on rv32), which IDF `malloc`
 /// already satisfies. Over-aligned requests are not expected on this path; if
 /// that ever changes this must grow an aligned-alloc shim.
+#[cfg(not(test))]
 struct IdfAlloc;
 
+#[cfg(not(test))]
 unsafe impl GlobalAlloc for IdfAlloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // SAFETY: FFI call into the host malloc; size is the Rust layout size.
@@ -70,9 +90,11 @@ unsafe impl GlobalAlloc for IdfAlloc {
     }
 }
 
+#[cfg(not(test))]
 #[global_allocator]
 static ALLOC: IdfAlloc = IdfAlloc;
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     // SAFETY: host abort() never returns and has nothing to unwind here.
@@ -241,14 +263,17 @@ struct AppState {
     /// here, since the lift frame itself reports no coordinate.
     last_x: i32,
     last_y: i32,
+    /// Software star crawl (BEETLE-IDF-05). Owns the whole framebuffer while
+    /// active; suppresses the widget tree and touch dispatch until dismissed.
+    crawl: StarCrawl,
 }
 
 impl AppState {
     fn new(width: i32, height: i32) -> Self {
         // ESP32-P4 + DFR0550-V2 capabilities: capacitive touch (pointer), but
         // no audio codec or storage wired on this hybrid yet. Effects stay on
-        // so the info wing's star-crawl item still queues its command (the
-        // host simply doesn't run a crawl renderer).
+        // so the info wing's star-crawl item queues its command, which the
+        // payload now runs via the software crawl (BEETLE-IDF-05).
         let capabilities = DiscoCapabilities {
             audio: false,
             storage: false,
@@ -264,6 +289,7 @@ impl AppState {
             idle_frames: 0,
             last_x: 0,
             last_y: 0,
+            crawl: StarCrawl::new(),
         }
     }
 }
@@ -323,35 +349,65 @@ pub unsafe extern "C" fn rlvgl_app_render(
     // Advance animations, live info pages, and the focus-pulse engine.
     state.controller.tick();
 
-    // Debounce the touch sample into a single tap per physical contact. A
-    // finger-down (re)arms the contact and records the point; a confirmed lift
-    // (RELEASE_DEBOUNCE_FRAMES of no-touch) fires one PressRelease at the last
-    // in-contact point, since the lift frame itself carries no coordinate.
     let active = touch_active != 0;
-    if active {
-        state.last_x = touch_x;
-        state.last_y = touch_y;
-        state.idle_frames = 0;
-        state.in_contact = true;
-    } else if state.in_contact {
-        state.idle_frames += 1;
-        if state.idle_frames >= RELEASE_DEBOUNCE_FRAMES {
+
+    // Touch routing depends on whether the star crawl owns the screen
+    // (BEETLE-IDF-05, INV-BEETLE-IDF-5-2). While the crawl is active a fresh
+    // contact dismisses it and is NOT dispatched to the widget tree; the
+    // debounce state is cleared so the dismiss tap's eventual lift fires no
+    // stray `PressRelease`.
+    if state.crawl.is_active() {
+        if active {
+            state.crawl.stop();
             state.in_contact = false;
-            let (x, y) = (state.last_x, state.last_y);
-            state.controller.dispatch_event(&Event::PressRelease { x, y });
+            state.idle_frames = 0;
+        }
+    } else {
+        // Debounce the touch sample into a single tap per physical contact. A
+        // finger-down (re)arms the contact and records the point; a confirmed
+        // lift (RELEASE_DEBOUNCE_FRAMES of no-touch) fires one PressRelease at
+        // the last in-contact point, since the lift frame carries no coordinate.
+        if active {
+            state.last_x = touch_x;
+            state.last_y = touch_y;
+            state.idle_frames = 0;
+            state.in_contact = true;
+        } else if state.in_contact {
+            state.idle_frames += 1;
+            if state.idle_frames >= RELEASE_DEBOUNCE_FRAMES {
+                state.in_contact = false;
+                let (x, y) = (state.last_x, state.last_y);
+                state.controller.dispatch_event(&Event::PressRelease { x, y });
+            }
         }
     }
 
     // Apply the platform commands the controller emitted this frame.
     // SetBacklight drives the DFR0550 bridge PWM through the host hook;
-    // effect/status commands have no P4 runtime yet and are dropped (draining
-    // them still keeps the controller's queue from growing unbounded).
+    // StartEffect(StarCrawl) activates the software crawl (BEETLE-IDF-05);
+    // other effect/status commands have no P4 runtime yet and are dropped
+    // (draining them still keeps the controller's queue from growing unbounded).
     for command in state.controller.drain_commands() {
-        if let DiscoCommand::SetBacklight(level) = command {
-            // SAFETY: FFI to the host backlight hook — a plain byte, no
-            // aliasing. Runs on the render task, same as all bridge I2C.
-            unsafe { rlvgl_host_set_backlight(level) };
+        match command {
+            DiscoCommand::SetBacklight(level) => {
+                // SAFETY: FFI to the host backlight hook — a plain byte, no
+                // aliasing. Runs on the render task, same as all bridge I2C.
+                unsafe { rlvgl_host_set_backlight(level) };
+            }
+            DiscoCommand::StartEffect(DiscoEffect::StarCrawl) => {
+                state.crawl.start(width, height);
+            }
+            _ => {}
         }
+    }
+
+    let mut renderer = Rgb888Renderer::new(frame, width, height);
+
+    // The crawl owns the whole framebuffer while active (it clears to
+    // space-black itself, satisfying INV-BEETLE-IDF-3 for the frames it draws).
+    // When it finishes mid-frame, fall through to the widget tree this frame.
+    if state.crawl.is_active() && state.crawl.render(&mut renderer, width, height) {
+        return;
     }
 
     // Clear the framebuffer first. The disco-demo root container is
@@ -359,7 +415,6 @@ pub unsafe extern "C" fn rlvgl_app_render(
     // the STM32 host), so without an explicit clear every frame paints over
     // the last — stale wing pixels and feedback dots would accumulate. The
     // double buffers ping-pong, so each must be cleared on the frame it draws.
-    let mut renderer = Rgb888Renderer::new(frame, width, height);
     renderer.fill_rect(
         Rect {
             x: 0,
