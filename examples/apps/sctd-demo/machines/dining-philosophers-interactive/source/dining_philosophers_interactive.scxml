@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interactive Dining Philosophers (SCTD-02). NORMALIZED variant.
+  Provenance: scjson tutorial Examples/StateCharts/DiningPhilosphersProblem/
+  machine_dining_philosphers.flat.scxml (faithful = SCTD-01 dining-philosophers).
+  Single-level parallel. The emitter fires one transition per event (first
+  matching region), so -- like the faithful machine's think.N/eat.N -- each
+  philosopher region listens for DISTINCT per-seat events and the HOST fans out:
+    arrive.N  seat N (host picks lowest-empty)         depart.N  remove seat N (host picks highest-seated)
+    break.N   release N's forks + rethink (panic)      poke.N    re-attempt forks when a neighbour frees one
+  Internal timers hungry.N/full.N drive the think/eat durations. Pending-depart
+  is implicit: the only depart-to-Empty path is in Thinking, so a depart.N
+  received mid-cycle (recorded in t_DEPART_REQ) is honoured after eating.
+  SIMULATION_RESET is host-side (re-instantiate the machine, SCTD-02 §5.7).
+  Admitted M1P6 subset only; no In() (scjson ERRATA-003). t_PHASE mirrors each
+  seat phase for the panel. See SCTD-02 §5.
+-->
+<scxml datamodel="ecmascript" name="ScxmlInteractiveDiningPhilosophers" version="1.0" xmlns="http://www.w3.org/2005/07/scxml">
+  <parallel id="InteractiveDiningPhilosophers">
+    <datamodel>
+      <data expr="{ '1':0, '2':0, '3':0, '4':0, '5':0 }" id="t_FORKS"/>
+      <data expr="{ '1':0, '2':0, '3':0, '4':0, '5':0 }" id="t_SEATED"/>
+      <data expr="{ '1':0, '2':0, '3':0, '4':0, '5':0 }" id="t_DEPART_REQ"/>
+      <data expr="{ '1':'empty', '2':'empty', '3':'empty', '4':'empty', '5':'empty' }" id="t_PHASE"/>
+      <data expr="1000" id="i_DELAY"/>
+    </datamodel>
+    <state id="P1" initial="P1_Empty">
+      <transition event="break.1" cond="t_SEATED['1']==1" target="P1_Recover"/>
+      <state id="P1_Empty">
+        <onentry><assign location="t_PHASE['1']" expr="'empty'"/></onentry>
+        <transition event="arrive.1" target="P1_Thinking"><assign location="t_SEATED['1']" expr="1"/></transition>
+      </state>
+      <state id="P1_Thinking">
+        <onentry><assign location="t_PHASE['1']" expr="'thinking'"/><send event="hungry.1" id="tmrH1" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit><cancel sendid="tmrH1"/></onexit>
+        <transition event="depart.1" target="P1_Empty">
+          <assign location="t_SEATED['1']" expr="0"/><assign location="t_DEPART_REQ['1']" expr="0"/>
+        </transition>
+        <transition cond="t_DEPART_REQ['1']==1" target="P1_Empty">
+          <assign location="t_SEATED['1']" expr="0"/><assign location="t_DEPART_REQ['1']" expr="0"/>
+        </transition>
+        <transition event="hungry.1" target="P1_Hungry"/>
+      </state>
+      <state id="P1_Hungry">
+        <onentry><assign location="t_PHASE['1']" expr="'hungry'"/></onentry>
+        <transition event="depart.1"><assign location="t_DEPART_REQ['1']" expr="1"/></transition>
+        <transition cond="t_FORKS['1']==0" target="P1_HasLeft"><assign location="t_FORKS['1']" expr="1"/></transition>
+        <transition event="poke.1" cond="t_FORKS['1']==0" target="P1_HasLeft"><assign location="t_FORKS['1']" expr="1"/></transition>
+      </state>
+      <state id="P1_HasLeft">
+        <onentry><assign location="t_PHASE['1']" expr="'waiting'"/></onentry>
+        <transition event="depart.1"><assign location="t_DEPART_REQ['1']" expr="1"/></transition>
+        <transition cond="t_FORKS['5']==0" target="P1_Eating"><assign location="t_FORKS['5']" expr="1"/></transition>
+        <transition event="poke.1" cond="t_FORKS['5']==0" target="P1_Eating"><assign location="t_FORKS['5']" expr="1"/></transition>
+      </state>
+      <state id="P1_Eating">
+        <onentry><assign location="t_PHASE['1']" expr="'eating'"/><send event="full.1" id="tmrE1" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit>
+          <assign location="t_FORKS['1']" expr="0"/><assign location="t_FORKS['5']" expr="0"/><cancel sendid="tmrE1"/>
+        </onexit>
+        <transition event="depart.1"><assign location="t_DEPART_REQ['1']" expr="1"/></transition>
+        <transition event="full.1" target="P1_Thinking"/>
+      </state>
+      <state id="P1_Recover">
+        <onentry><assign location="t_PHASE['1']" expr="'thinking'"/><assign location="t_FORKS['1']" expr="0"/><assign location="t_FORKS['5']" expr="0"/></onentry>
+        <transition target="P1_Thinking"/>
+      </state>
+    </state>
+    <state id="P2" initial="P2_Empty">
+      <transition event="break.2" cond="t_SEATED['2']==1" target="P2_Recover"/>
+      <state id="P2_Empty">
+        <onentry><assign location="t_PHASE['2']" expr="'empty'"/></onentry>
+        <transition event="arrive.2" target="P2_Thinking"><assign location="t_SEATED['2']" expr="1"/></transition>
+      </state>
+      <state id="P2_Thinking">
+        <onentry><assign location="t_PHASE['2']" expr="'thinking'"/><send event="hungry.2" id="tmrH2" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit><cancel sendid="tmrH2"/></onexit>
+        <transition event="depart.2" target="P2_Empty">
+          <assign location="t_SEATED['2']" expr="0"/><assign location="t_DEPART_REQ['2']" expr="0"/>
+        </transition>
+        <transition cond="t_DEPART_REQ['2']==1" target="P2_Empty">
+          <assign location="t_SEATED['2']" expr="0"/><assign location="t_DEPART_REQ['2']" expr="0"/>
+        </transition>
+        <transition event="hungry.2" target="P2_Hungry"/>
+      </state>
+      <state id="P2_Hungry">
+        <onentry><assign location="t_PHASE['2']" expr="'hungry'"/></onentry>
+        <transition event="depart.2"><assign location="t_DEPART_REQ['2']" expr="1"/></transition>
+        <transition cond="t_FORKS['2']==0" target="P2_HasLeft"><assign location="t_FORKS['2']" expr="2"/></transition>
+        <transition event="poke.2" cond="t_FORKS['2']==0" target="P2_HasLeft"><assign location="t_FORKS['2']" expr="2"/></transition>
+      </state>
+      <state id="P2_HasLeft">
+        <onentry><assign location="t_PHASE['2']" expr="'waiting'"/></onentry>
+        <transition event="depart.2"><assign location="t_DEPART_REQ['2']" expr="1"/></transition>
+        <transition cond="t_FORKS['1']==0" target="P2_Eating"><assign location="t_FORKS['1']" expr="2"/></transition>
+        <transition event="poke.2" cond="t_FORKS['1']==0" target="P2_Eating"><assign location="t_FORKS['1']" expr="2"/></transition>
+      </state>
+      <state id="P2_Eating">
+        <onentry><assign location="t_PHASE['2']" expr="'eating'"/><send event="full.2" id="tmrE2" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit>
+          <assign location="t_FORKS['2']" expr="0"/><assign location="t_FORKS['1']" expr="0"/><cancel sendid="tmrE2"/>
+        </onexit>
+        <transition event="depart.2"><assign location="t_DEPART_REQ['2']" expr="1"/></transition>
+        <transition event="full.2" target="P2_Thinking"/>
+      </state>
+      <state id="P2_Recover">
+        <onentry><assign location="t_PHASE['2']" expr="'thinking'"/><assign location="t_FORKS['2']" expr="0"/><assign location="t_FORKS['1']" expr="0"/></onentry>
+        <transition target="P2_Thinking"/>
+      </state>
+    </state>
+    <state id="P3" initial="P3_Empty">
+      <transition event="break.3" cond="t_SEATED['3']==1" target="P3_Recover"/>
+      <state id="P3_Empty">
+        <onentry><assign location="t_PHASE['3']" expr="'empty'"/></onentry>
+        <transition event="arrive.3" target="P3_Thinking"><assign location="t_SEATED['3']" expr="1"/></transition>
+      </state>
+      <state id="P3_Thinking">
+        <onentry><assign location="t_PHASE['3']" expr="'thinking'"/><send event="hungry.3" id="tmrH3" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit><cancel sendid="tmrH3"/></onexit>
+        <transition event="depart.3" target="P3_Empty">
+          <assign location="t_SEATED['3']" expr="0"/><assign location="t_DEPART_REQ['3']" expr="0"/>
+        </transition>
+        <transition cond="t_DEPART_REQ['3']==1" target="P3_Empty">
+          <assign location="t_SEATED['3']" expr="0"/><assign location="t_DEPART_REQ['3']" expr="0"/>
+        </transition>
+        <transition event="hungry.3" target="P3_Hungry"/>
+      </state>
+      <state id="P3_Hungry">
+        <onentry><assign location="t_PHASE['3']" expr="'hungry'"/></onentry>
+        <transition event="depart.3"><assign location="t_DEPART_REQ['3']" expr="1"/></transition>
+        <transition cond="t_FORKS['3']==0" target="P3_HasLeft"><assign location="t_FORKS['3']" expr="3"/></transition>
+        <transition event="poke.3" cond="t_FORKS['3']==0" target="P3_HasLeft"><assign location="t_FORKS['3']" expr="3"/></transition>
+      </state>
+      <state id="P3_HasLeft">
+        <onentry><assign location="t_PHASE['3']" expr="'waiting'"/></onentry>
+        <transition event="depart.3"><assign location="t_DEPART_REQ['3']" expr="1"/></transition>
+        <transition cond="t_FORKS['2']==0" target="P3_Eating"><assign location="t_FORKS['2']" expr="3"/></transition>
+        <transition event="poke.3" cond="t_FORKS['2']==0" target="P3_Eating"><assign location="t_FORKS['2']" expr="3"/></transition>
+      </state>
+      <state id="P3_Eating">
+        <onentry><assign location="t_PHASE['3']" expr="'eating'"/><send event="full.3" id="tmrE3" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit>
+          <assign location="t_FORKS['3']" expr="0"/><assign location="t_FORKS['2']" expr="0"/><cancel sendid="tmrE3"/>
+        </onexit>
+        <transition event="depart.3"><assign location="t_DEPART_REQ['3']" expr="1"/></transition>
+        <transition event="full.3" target="P3_Thinking"/>
+      </state>
+      <state id="P3_Recover">
+        <onentry><assign location="t_PHASE['3']" expr="'thinking'"/><assign location="t_FORKS['3']" expr="0"/><assign location="t_FORKS['2']" expr="0"/></onentry>
+        <transition target="P3_Thinking"/>
+      </state>
+    </state>
+    <state id="P4" initial="P4_Empty">
+      <transition event="break.4" cond="t_SEATED['4']==1" target="P4_Recover"/>
+      <state id="P4_Empty">
+        <onentry><assign location="t_PHASE['4']" expr="'empty'"/></onentry>
+        <transition event="arrive.4" target="P4_Thinking"><assign location="t_SEATED['4']" expr="1"/></transition>
+      </state>
+      <state id="P4_Thinking">
+        <onentry><assign location="t_PHASE['4']" expr="'thinking'"/><send event="hungry.4" id="tmrH4" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit><cancel sendid="tmrH4"/></onexit>
+        <transition event="depart.4" target="P4_Empty">
+          <assign location="t_SEATED['4']" expr="0"/><assign location="t_DEPART_REQ['4']" expr="0"/>
+        </transition>
+        <transition cond="t_DEPART_REQ['4']==1" target="P4_Empty">
+          <assign location="t_SEATED['4']" expr="0"/><assign location="t_DEPART_REQ['4']" expr="0"/>
+        </transition>
+        <transition event="hungry.4" target="P4_Hungry"/>
+      </state>
+      <state id="P4_Hungry">
+        <onentry><assign location="t_PHASE['4']" expr="'hungry'"/></onentry>
+        <transition event="depart.4"><assign location="t_DEPART_REQ['4']" expr="1"/></transition>
+        <transition cond="t_FORKS['4']==0" target="P4_HasLeft"><assign location="t_FORKS['4']" expr="4"/></transition>
+        <transition event="poke.4" cond="t_FORKS['4']==0" target="P4_HasLeft"><assign location="t_FORKS['4']" expr="4"/></transition>
+      </state>
+      <state id="P4_HasLeft">
+        <onentry><assign location="t_PHASE['4']" expr="'waiting'"/></onentry>
+        <transition event="depart.4"><assign location="t_DEPART_REQ['4']" expr="1"/></transition>
+        <transition cond="t_FORKS['3']==0" target="P4_Eating"><assign location="t_FORKS['3']" expr="4"/></transition>
+        <transition event="poke.4" cond="t_FORKS['3']==0" target="P4_Eating"><assign location="t_FORKS['3']" expr="4"/></transition>
+      </state>
+      <state id="P4_Eating">
+        <onentry><assign location="t_PHASE['4']" expr="'eating'"/><send event="full.4" id="tmrE4" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit>
+          <assign location="t_FORKS['4']" expr="0"/><assign location="t_FORKS['3']" expr="0"/><cancel sendid="tmrE4"/>
+        </onexit>
+        <transition event="depart.4"><assign location="t_DEPART_REQ['4']" expr="1"/></transition>
+        <transition event="full.4" target="P4_Thinking"/>
+      </state>
+      <state id="P4_Recover">
+        <onentry><assign location="t_PHASE['4']" expr="'thinking'"/><assign location="t_FORKS['4']" expr="0"/><assign location="t_FORKS['3']" expr="0"/></onentry>
+        <transition target="P4_Thinking"/>
+      </state>
+    </state>
+    <state id="P5" initial="P5_Empty">
+      <transition event="break.5" cond="t_SEATED['5']==1" target="P5_Recover"/>
+      <state id="P5_Empty">
+        <onentry><assign location="t_PHASE['5']" expr="'empty'"/></onentry>
+        <transition event="arrive.5" target="P5_Thinking"><assign location="t_SEATED['5']" expr="1"/></transition>
+      </state>
+      <state id="P5_Thinking">
+        <onentry><assign location="t_PHASE['5']" expr="'thinking'"/><send event="hungry.5" id="tmrH5" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit><cancel sendid="tmrH5"/></onexit>
+        <transition event="depart.5" target="P5_Empty">
+          <assign location="t_SEATED['5']" expr="0"/><assign location="t_DEPART_REQ['5']" expr="0"/>
+        </transition>
+        <transition cond="t_DEPART_REQ['5']==1" target="P5_Empty">
+          <assign location="t_SEATED['5']" expr="0"/><assign location="t_DEPART_REQ['5']" expr="0"/>
+        </transition>
+        <transition event="hungry.5" target="P5_Hungry"/>
+      </state>
+      <state id="P5_Hungry">
+        <onentry><assign location="t_PHASE['5']" expr="'hungry'"/></onentry>
+        <transition event="depart.5"><assign location="t_DEPART_REQ['5']" expr="1"/></transition>
+        <transition cond="t_FORKS['5']==0" target="P5_HasLeft"><assign location="t_FORKS['5']" expr="5"/></transition>
+        <transition event="poke.5" cond="t_FORKS['5']==0" target="P5_HasLeft"><assign location="t_FORKS['5']" expr="5"/></transition>
+      </state>
+      <state id="P5_HasLeft">
+        <onentry><assign location="t_PHASE['5']" expr="'waiting'"/></onentry>
+        <transition event="depart.5"><assign location="t_DEPART_REQ['5']" expr="1"/></transition>
+        <transition cond="t_FORKS['4']==0" target="P5_Eating"><assign location="t_FORKS['4']" expr="5"/></transition>
+        <transition event="poke.5" cond="t_FORKS['4']==0" target="P5_Eating"><assign location="t_FORKS['4']" expr="5"/></transition>
+      </state>
+      <state id="P5_Eating">
+        <onentry><assign location="t_PHASE['5']" expr="'eating'"/><send event="full.5" id="tmrE5" delayexpr="i_DELAY + 'ms'"/></onentry>
+        <onexit>
+          <assign location="t_FORKS['5']" expr="0"/><assign location="t_FORKS['4']" expr="0"/><cancel sendid="tmrE5"/>
+        </onexit>
+        <transition event="depart.5"><assign location="t_DEPART_REQ['5']" expr="1"/></transition>
+        <transition event="full.5" target="P5_Thinking"/>
+      </state>
+      <state id="P5_Recover">
+        <onentry><assign location="t_PHASE['5']" expr="'thinking'"/><assign location="t_FORKS['5']" expr="0"/><assign location="t_FORKS['4']" expr="0"/></onentry>
+        <transition target="P5_Thinking"/>
+      </state>
+    </state>
+  </parallel>
+</scxml>

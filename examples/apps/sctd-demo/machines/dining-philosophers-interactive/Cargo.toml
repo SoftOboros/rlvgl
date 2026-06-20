@@ -1,0 +1,35 @@
+[package]
+name = "dining-philosophers-interactive"
+version = "0.1.0"
+edition = "2021"
+description = "Generated SCXML state machine crate (Interactive Dining Philosophers, SCTD-02)"
+license = "BSD-1-Clause"
+
+# Provenance:
+#   Source:    examples/apps/sctd-demo/machines/dining-philosophers-interactive/
+#              source/dining_philosophers_interactive.scxml
+#              (NORMALIZED variant; provenance to the SCTD-01 faithful DP, in turn
+#               vendor/scjson/tutorial/.../machine_dining_philosphers.flat.scxml)
+#   Generator: Softoboros iState codegen (scjson exec_ir.lower_document +
+#              istate.codegen.rust_ir_emitter.emit_rust_crate)
+#   Spec:      docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md §5
+# lib.rs + vectors/ are regenerated from the .scxml source; this Cargo.toml is
+# hand-maintained post-emit (the emitter rewrites a bare default otherwise).
+
+[lib]
+name = "dining_philosophers_interactive"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+no_std = []
+
+[dev-dependencies]
+
+# Empty [workspace] table: iState-generated detached crate (same pattern as
+# examples/beetle-esp32p4-idf/components/rlvgl_app/rust). Consumed by
+# examples/apps/sctd-demo as a path dependency. Run vectors standalone via
+#   cargo test --manifest-path \
+#     examples/apps/sctd-demo/machines/dining-philosophers-interactive/Cargo.toml
+[workspace]

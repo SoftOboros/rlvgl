@@ -1473,8 +1473,10 @@ impl ChildMachine {
 
 pub struct Machine {
     scope: Scope,
-    /// Currently active state id (simplified: single active state).
-    active_state: String,
+    /// Active configuration: the set of active atomic (leaf) states.
+    /// For a non-parallel machine this holds exactly one leaf; for a
+    /// `<parallel>` machine it holds one live leaf per active region.
+    active: Vec<String>,
     /// Internal event queue.
     queue: VecDeque<String>,
     /// Current event context.
@@ -1504,13 +1506,9 @@ impl Machine {
                 scope.set(slot.id.clone(), Value::Undefined);
             }
         }
-        let initial = ir.initial.first().cloned()
-            .filter(|s| !s.is_empty())
-            .or_else(|| ir.children.first().map(|n| n.id().to_string()))
-            .unwrap_or_default();
         Machine {
             scope,
-            active_state: initial,
+            active: Vec::new(),
             queue: VecDeque::new(),
             event_ctx: EventCtx::default(),
             ir,
@@ -1530,6 +1528,7 @@ impl Machine {
             .unwrap_or_default();
         if !initial_id.is_empty() {
             self.enter_state(&initial_id);
+            self.macrostep();
         }
         // Drain the startup queue:
         // - ``__delayed__`` tokens: register as pending timers.
@@ -1633,14 +1632,30 @@ impl Machine {
         }
     }
 
-    /// Return the current active state id.
+    /// Return a current active leaf state id. For a `<parallel>`
+    /// machine this is the first active region's leaf; use
+    /// `active_states()` for the full configuration.
     pub fn current_state(&self) -> &str {
-        &self.active_state
+        self.active.first().map(|s| s.as_str()).unwrap_or("")
+    }
+
+    /// Return all active atomic (leaf) states. One entry for a
+    /// non-parallel machine; one per active region for `<parallel>`.
+    pub fn active_states(&self) -> &[String] {
+        &self.active
+    }
+
+    /// Return true if `state_id` is in the active configuration
+    /// (an active leaf or an ancestor of one).
+    pub fn is_active(&self, state_id: &str) -> bool {
+        self.active.iter().any(|leaf| {
+            leaf == state_id || self.get_ancestors(leaf).iter().any(|a| a == state_id)
+        })
     }
 
     /// Return the current active state as a MachineState enum variant.
     pub fn current_state_variant(&self) -> MachineState {
-        MachineState::from_id(&self.active_state)
+        MachineState::from_id(self.current_state())
     }
 
     /// Set a datamodel variable (for external initialization / testing).
@@ -1673,7 +1688,6 @@ impl Machine {
     }
 
     fn enter_state(&mut self, state_id: &str) {
-        self.active_state = state_id.to_string();
         // Clone all data needed from the node BEFORE any mutable borrows.
         let (onentry, dm, init_child, child_ids, is_parallel, invokes) = {
             if let Some(node) = self.find_state(state_id) {
@@ -1741,20 +1755,24 @@ impl Machine {
                 }
             }
         }
-        // Auto-enter initial child (State)
+        // Enter ALL regions of a <parallel> -- the configuration is a
+        // set of leaves, one live leaf per region.
+        if is_parallel {
+            for cid in child_ids {
+                self.enter_state(&cid);
+            }
+            return;
+        }
+        // Auto-enter the initial child of a compound state.
         if let Some(child_id) = init_child {
             self.enter_state(&child_id);
             return;
         }
-        // Auto-enter first child for Parallel (simplified)
-        if is_parallel {
-            if let Some(first_id) = child_ids.into_iter().next() {
-                self.enter_state(&first_id);
-                return;
-            }
+        // Atomic leaf: join the active configuration. The epsilon
+        // macrostep is run by the caller after the full entry set.
+        if !self.active.iter().any(|s| s == state_id) {
+            self.active.push(state_id.to_string());
         }
-        // Run epsilon transitions after entry
-        self.run_epsilon_transitions();
     }
 
     fn exit_state(&mut self, state_id: &str) {
@@ -1782,84 +1800,176 @@ impl Machine {
     }
 
     fn process_event(&mut self, event_name: String) {
-        let active = self.active_state.clone();
-        // Walk up the state hierarchy trying each ancestor
-        let ancestors = self.get_ancestors(&active);
-        for state_id in ancestors {
-            if self.try_transitions_in(&state_id, &event_name) {
-                return;
+        // Offer the event to every active region. Each region fires at
+        // most one transition (the first enabled along its leaf's
+        // ancestor chain); regions are independent, so we fire one per
+        // region. A region already exited by an earlier transition in
+        // this microstep is skipped.
+        let leaves = self.active.clone();
+        for leaf in &leaves {
+            if !self.active.iter().any(|s| s == leaf) { continue; }
+            let ancestors = self.get_ancestors(leaf);
+            if let Some((t, src)) = self.find_enabled(&ancestors, Some(&event_name)) {
+                self.fire_transition(t, &src);
             }
         }
+        self.macrostep();
     }
 
-    fn try_transitions_in(&mut self, state_id: &str, event_name: &str) -> bool {
-        // Clone transitions before any mutable access
-        let transitions: Vec<TransitionIr> = self.find_state(state_id)
-            .map(|n| n.transitions().to_vec())
-            .unwrap_or_default();
-        for t in &transitions {
-            // Check event match
-            let event_matches = match &t.event {
-                None => false, // eventless transitions are epsilon-only
-                Some(pattern) => event_matches_pattern(event_name, pattern),
-            };
-            if !event_matches { continue; }
-            // Check guard (scope/event are immutably borrowed for eval)
-            let guard_ok = match &t.guard {
-                None => true,
-                Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
-            };
-            if !guard_ok { continue; }
-            // Fire transition
-            self.fire_transition(t.clone());
-            return true;
+    /// Find the first enabled transition along an ancestor chain (leaf
+    /// first). ``event = Some(name)`` selects event-triggered transitions
+    /// whose pattern matches; ``event = None`` selects eventless ones.
+    /// Returns the transition and the id of the state that owns it.
+    fn find_enabled(
+        &self,
+        ancestors: &[String],
+        event: Option<&str>,
+    ) -> Option<(TransitionIr, String)> {
+        for state_id in ancestors {
+            let transitions: Vec<TransitionIr> = self.find_state(state_id)
+                .map(|n| n.transitions().to_vec())
+                .unwrap_or_default();
+            for t in transitions {
+                let matches = match (&t.event, event) {
+                    (None, None) => true,
+                    (Some(p), Some(name)) => event_matches_pattern(name, p),
+                    _ => false,
+                };
+                if !matches { continue; }
+                let guard_ok = match &t.guard {
+                    None => true,
+                    Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
+                };
+                if !guard_ok { continue; }
+                return Some((t, state_id.clone()));
+            }
         }
-        false
+        None
     }
 
-    fn run_epsilon_transitions(&mut self) {
+    /// Run eventless transitions to stability across the active set.
+    fn macrostep(&mut self) {
         let mut safety = 0usize;
         loop {
-            if safety > 100 { break; }
+            if safety > 200 { break; }
             safety += 1;
-            let active = self.active_state.clone();
-            let ancestors = self.get_ancestors(&active);
-            // Collect all candidate epsilon transitions before any mutation
-            let mut candidate: Option<TransitionIr> = None;
-            'outer: for state_id in &ancestors {
-                let transitions: Vec<TransitionIr> = self.find_state(state_id)
-                    .map(|n| n.transitions().to_vec())
-                    .unwrap_or_default();
-                for t in transitions {
-                    if t.event.is_some() { continue; } // skip event-triggered
-                    let guard_ok = match &t.guard {
-                        None => true,
-                        Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
-                    };
-                    if guard_ok {
-                        candidate = Some(t);
-                        break 'outer;
-                    }
+            let leaves = self.active.clone();
+            let mut fired = false;
+            for leaf in &leaves {
+                if !self.active.iter().any(|s| s == leaf) { continue; }
+                let ancestors = self.get_ancestors(leaf);
+                if let Some((t, src)) = self.find_enabled(&ancestors, None) {
+                    self.fire_transition(t, &src);
+                    fired = true;
+                    break; // configuration changed; rescan from scratch
                 }
             }
-            if let Some(t) = candidate {
-                self.fire_transition(t);
-            } else {
-                break;
-            }
+            if !fired { break; }
         }
     }
 
-    fn fire_transition(&mut self, t: TransitionIr) {
-        // Execute transition actions
+    /// Backward-compatible name; runs the eventless macrostep.
+    fn run_epsilon_transitions(&mut self) {
+        self.macrostep();
+    }
+
+    fn fire_transition(&mut self, t: TransitionIr, source_id: &str) {
+        // Execute transition actions in the current scope.
         let ev = self.event_ctx.clone();
         exec_actions(&t.actions, &mut self.scope, &mut self.queue, &ev);
-        // Transition to targets
-        if let Some(target_id) = t.targets.first() {
-            let old_state = self.active_state.clone();
-            self.exit_state(&old_state);
-            let target_clone = target_id.clone();
-            self.enter_state(&target_clone);
+        // Targetless transition: actions only, no configuration change.
+        let target = match t.targets.first() {
+            Some(x) => x.clone(),
+            None => return,
+        };
+        // Transition domain = least common ancestor of source and target.
+        let domain = self.lca(source_id, &target);
+        // Exit the active leaves that lie strictly within the domain
+        // (region-local exit); other regions are untouched. An empty
+        // domain is the implicit document root, an ancestor of every
+        // leaf, so all active leaves qualify.
+        let exit_leaves: Vec<String> = self.active.iter()
+            .filter(|l| l.as_str() != domain.as_str()
+                && (domain.is_empty()
+                    || self.get_ancestors(l).iter().any(|a| a == &domain)))
+            .cloned()
+            .collect();
+        for leaf in &exit_leaves {
+            self.exit_to_domain(leaf, &domain);
+        }
+        // Enter the target subtree under the domain.
+        self.enter_to(&target, &domain);
+    }
+
+    /// Least common ancestor of two states: the deepest state that is an
+    /// ancestor (or self) of both. For a sibling transition this is the
+    /// shared parent; for an internal transition (source is an ancestor of
+    /// target) it is the source state itself.
+    fn lca(&self, a: &str, b: &str) -> String {
+        let ba = self.get_ancestors(b);
+        for anc in self.get_ancestors(a) {
+            if ba.iter().any(|x| *x == anc) {
+                return anc;
+            }
+        }
+        // No common ancestor among the listed states: the only shared
+        // ancestor is the implicit document root. Return the empty
+        // sentinel so the source's full chain is exited and the target
+        // is entered from the top (covers top-level sibling transitions
+        // whose parent is the synthetic <scxml> root, which is not part
+        // of get_ancestors()).
+        String::new()
+    }
+
+    /// Exit a leaf and its ancestors up to (but not including) ``domain``,
+    /// running onexit for each, then remove the leaf from the active set.
+    fn exit_to_domain(&mut self, leaf: &str, domain: &str) {
+        for s in self.get_ancestors(leaf) {
+            if s == domain { break; }
+            self.exit_state(&s);
+        }
+        self.active.retain(|l| l != leaf);
+    }
+
+    /// Enter the path from ``domain`` (exclusive) down to ``target``
+    /// (inclusive); ``target``'s own subtree (initial child / all parallel
+    /// regions) is entered by ``enter_state``.
+    fn enter_to(&mut self, target: &str, domain: &str) {
+        let mut path: Vec<String> = Vec::new();
+        for s in self.get_ancestors(target) {
+            if s == domain { break; }
+            if s != target { path.push(s); }
+        }
+        path.reverse(); // outermost first
+        for s in &path {
+            self.enter_onentry_only(s);
+        }
+        self.enter_state(target);
+    }
+
+    /// Run onentry / datamodel init for an intermediate path state without
+    /// descending into its children or joining the active set (its
+    /// descendant on the path is entered explicitly).
+    fn enter_onentry_only(&mut self, state_id: &str) {
+        let (onentry, dm) = {
+            if let Some(node) = self.find_state(state_id) {
+                let onentry = node.onentry().to_vec();
+                let dm = match node {
+                    StateNodeIr::State { datamodel, .. }
+                    | StateNodeIr::Parallel { datamodel, .. } => datamodel.to_vec(),
+                    _ => vec![],
+                };
+                (onentry, dm)
+            } else {
+                (vec![], vec![])
+            }
+        };
+        let ev = self.event_ctx.clone();
+        exec_actions(&onentry, &mut self.scope, &mut self.queue, &ev);
+        for slot in &dm {
+            if let Some(ref v) = slot.initial_value {
+                self.scope.set(slot.id.clone(), v.clone());
+            }
         }
     }
 
@@ -6004,144 +6114,171 @@ fn build_machine_ir() -> MachineIrData {
     }
 }
 
-            #[cfg(test)]
-            mod tests {
-                use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-                #[test]
-                fn test_machine_creates() {
-                    let m = Machine::new();
-                    // Machine must initialize without panicking
-                    let _ = m.current_state();
-                }
+    // -------------------------------------------------------
+    // Generic baseline tests (machine-independent)
+    // -------------------------------------------------------
 
-                #[test]
-                fn test_machine_starts() {
-                    let mut m = Machine::new();
-                    m.start();
-                    // After start, the machine must be in a valid state
-                    let state = m.current_state();
-                    assert!(!state.is_empty(), "Machine state must be non-empty after start");
-                    eprintln!("State after start: {}", state);
-                }
+    #[test]
+    fn test_machine_creates() {
+        // Machine must initialize without panicking.
+        let m = Machine::new();
+        let _ = m.current_state();
+    }
 
-                #[test]
-                fn test_machine_ir_data_not_empty() {
-                    let ir = machine_ir_data();
-                    assert!(
-                        !ir.children.is_empty(),
-                        "Machine IR must have at least one state"
-                    );
-                }
+    #[test]
+    fn test_machine_starts() {
+        let mut m = Machine::new();
+        m.start();
+        // After start the machine must be in a valid, non-empty state.
+        let state = m.current_state();
+        assert!(!state.is_empty(), "Machine state must be non-empty after start");
+        eprintln!("Initial state: {}", state);
+    }
 
-                #[test]
-                fn test_event_pattern_matching() {
-                    assert!(event_matches_pattern("Do.Timer.Hungry", "Do.Timer.Hungry"));
-                    assert!(event_matches_pattern("taken.1", "taken.*"));
-                    assert!(event_matches_pattern("error.comm", "error.*"));
-                    assert!(!event_matches_pattern("Do.Timer.Hungry", "taken.*"));
-                    assert!(event_matches_pattern("any", "*"));
-                }
+    #[test]
+    fn test_machine_ir_data_not_empty() {
+        let ir = machine_ir_data();
+        assert!(
+            !ir.children.is_empty(),
+            "Machine IR must have at least one state"
+        );
+    }
 
-                #[test]
-                fn test_value_arithmetic() {
-                    let scope = Scope::new();
-                    let event = EventCtx::default();
+    #[test]
+    fn test_event_pattern_matching() {
+        // Generic pattern-matching rules that every generated machine relies on.
+        assert!(event_matches_pattern("foo.bar", "foo.bar"), "exact match");
+        assert!(event_matches_pattern("foo.bar", "foo.*"), "prefix wildcard");
+        assert!(event_matches_pattern("any.event", "*"), "catch-all wildcard");
+        assert!(!event_matches_pattern("foo.bar", "baz.*"), "no spurious match");
+        // Machine-specific: first real event in the vocabulary must match itself.
+        assert!(
+            event_matches_pattern("take.*", "take.*"),
+            "first machine event must match itself"
+        );
+    }
 
-                    // 1 + 2 = 3
-                    let add_expr = ExprIr::BinOp(
-                        "+".to_string(),
-                        Box::new(ExprIr::IntLiteral(1_i64)),
-                        Box::new(ExprIr::IntLiteral(2_i64)),
-                    );
-                    let result = eval_expr(&add_expr, &scope, &event);
-                    assert_eq!(result, Value::Int(3), "1 + 2 must equal 3");
+    #[test]
+    fn test_value_arithmetic() {
+        let scope = Scope::new();
+        let event = EventCtx::default();
 
-                    // String concat: "hello" + " world"
-                    let concat_expr = ExprIr::BinOp(
-                        "+".to_string(),
-                        Box::new(ExprIr::StringLiteral("hello".to_string())),
-                        Box::new(ExprIr::StringLiteral(" world".to_string())),
-                    );
-                    let result2 = eval_expr(&concat_expr, &scope, &event);
-                    assert_eq!(result2, Value::Str("hello world".to_string()));
-                }
+        // 1 + 2 = 3
+        let add_expr = ExprIr::BinOp(
+            "+".to_string(),
+            Box::new(ExprIr::IntLiteral(1_i64)),
+            Box::new(ExprIr::IntLiteral(2_i64)),
+        );
+        let result = eval_expr(&add_expr, &scope, &event);
+        assert_eq!(result, Value::Int(3), "1 + 2 must equal 3");
 
-                #[test]
-                fn test_scope_read_write() {
-                    let mut scope = Scope::new();
-                    let event = EventCtx::default();
+        // String concat: "hello" + " world"
+        let concat_expr = ExprIr::BinOp(
+            "+".to_string(),
+            Box::new(ExprIr::StringLiteral("hello".to_string())),
+            Box::new(ExprIr::StringLiteral(" world".to_string())),
+        );
+        let result2 = eval_expr(&concat_expr, &scope, &event);
+        assert_eq!(result2, Value::Str("hello world".to_string()));
+    }
 
-                    scope.set("x".to_string(), Value::Int(42_i64));
-                    let read = ExprIr::VarRead("x".to_string());
-                    let result = eval_expr(&read, &scope, &event);
-                    assert_eq!(result, Value::Int(42_i64));
-                }
+    #[test]
+    fn test_scope_read_write() {
+        let mut scope = Scope::new();
+        let event = EventCtx::default();
 
-                #[test]
-                fn test_scope_map_key() {
-                    let mut scope = Scope::new();
-                    scope.set_map_key("t_INPUTS", "taken.1".to_string(), Value::Int(0_i64));
-                    let val = scope.get_map_key("t_INPUTS", "taken.1");
-                    assert_eq!(val, Value::Int(0_i64));
-                }
+        scope.set("x".to_string(), Value::Int(42_i64));
+        let read = ExprIr::VarRead("x".to_string());
+        let result = eval_expr(&read, &scope, &event);
+        assert_eq!(result, Value::Int(42_i64));
+    }
 
-                #[test]
-                fn test_dispatch_event() {
-                    let mut m = Machine::new();
-                    // Set up datamodel variables via public API
-                    m.set_var("i_ID", Value::Int(1_i64));
-                    m.set_var("i_ID_LEFT", Value::Int(1_i64));
-                    m.set_var("i_ID_RIGHT", Value::Int(5_i64));
-                    m.start();
+    #[test]
+    fn test_scope_map_key() {
+        // Verify the map-key helpers compile and round-trip correctly.
+        // Uses a synthetic key name that is safe for all machines.
+        let mut scope = Scope::new();
+        scope.set_map_key("t_MAP", "key.1".to_string(), Value::Int(0_i64));
+        let val = scope.get_map_key("t_MAP", "key.1");
+        assert_eq!(val, Value::Int(0_i64));
+    }
 
-                    let state_before = m.current_state().to_string();
-                    eprintln!("State before event: {}", state_before);
+    #[test]
+    fn test_dispatch_first_event() {
+        // Dispatch the first real event from the machine's transition vocabulary
+        // (take.*) and verify the machine reaches a non-empty state.
+        let mut m = Machine::new();
+        m.start();
 
-                    // Dispatch Do.Timer.Hungry: should trigger Thinking -> ProcessHungry
-                    m.step("Do.Timer.Hungry", Value::Undefined);
+        let state_before = m.current_state().to_string();
+        eprintln!("State before event dispatch: {}", state_before);
 
-                    let state_after = m.current_state().to_string();
-                    eprintln!("State after Do.Timer.Hungry: {}", state_after);
+        m.step("take.*", Value::Undefined);
 
-                    // The machine should have transitioned away from Thinking
-                    // (exact state depends on epsilon transitions from ProcessHungry)
-                    assert!(
-                        !state_after.is_empty(),
-                        "Machine must be in a non-empty state after event"
-                    );
-                }
+        let state_after = m.current_state().to_string();
+        eprintln!("State after dispatching 'take.*': {}", state_after);
+        assert!(
+            !state_after.is_empty(),
+            "Machine must be in a non-empty state after event dispatch"
+        );
+    }
 
-                #[test]
-                fn test_child_machine_spawned_and_steps() {
-                    let mut m = Machine::new();
-                    m.start();
-                    // After start, the machine should have spawned child machines
-                    // if any invokes with child_machine are present
-                    let count = m.child_count();
-                    eprintln!("Child machine count after start: {}", count);
-                    // Dispatch an event and verify children step without panicking
-                    m.step("Do.Timer.Hungry", Value::Undefined);
-                    eprintln!("Child machine count after step: {}", m.child_count());
-                }
+    #[test]
+    fn test_child_machine_state_accessible() {
+        // get_child_state / get_child_var with an unknown id must return None
+        // without panicking — regardless of whether this machine has children.
+        let mut m = Machine::new();
+        m.start();
+        let count = m.child_count();
+        eprintln!("Child machine count: {}", count);
+        let none_state = m.get_child_state("__nonexistent__");
+        assert!(none_state.is_none(), "Unknown child id must return None for state");
+        let none_var = m.get_child_var("__nonexistent__", "x");
+        assert!(none_var.is_none(), "Unknown child id must return None for var");
+    }
 
-                #[test]
-                fn test_child_machine_state_accessible() {
-                    let mut m = Machine::new();
-                    m.start();
-                    // For each child machine, current_state() must return a non-empty string
-                    // We use child_count to detect presence and get_child_state to verify
-                    let count = m.child_count();
-                    eprintln!("Child count: {}", count);
-                    if count > 0 {
-                        // get_child_state with an unknown id should return None
-                        let none_state = m.get_child_state("__nonexistent__");
-                        assert!(none_state.is_none(), "Unknown child id must return None");
-                    }
-                    // get_child_var for unknown id must return None (not panic)
-                    let none_var = m.get_child_var("__nonexistent__", "x");
-                    assert!(none_var.is_none(), "Unknown child id must return None for var");
-                }
+
+// -------------------------------------------------------
+// Child-machine tests (emitted because this machine has
+// at least one inline invoked child: ['ID_P_5', 'ID_P_4', 'ID_P_3', 'ID_P_2', 'ID_P_1'])
+// -------------------------------------------------------
+
+#[test]
+fn test_child_machine_spawned_and_steps() {
+    let mut m = Machine::new();
+    m.start();
+    // After start, inline child machines must have been spawned.
+    let count = m.child_count();
+    eprintln!("Child machine count after start: {}", count);
+    assert!(count > 0, "Expected child machines to be spawned");
+    // Dispatching the first machine event must not panic with children active.
+    m.step("take.*", Value::Undefined);
+    eprintln!("Child machine count after step: {}", m.child_count());
+}
+
+#[test]
+fn test_first_child_has_active_state() {
+    // After start, the first known child machine (invoke_id = "ID_P_5")
+    // must have a non-empty active state.
+    let mut m = Machine::new();
+    m.start();
+    let child_state = m.get_child_state("ID_P_5");
+    eprintln!("Child 'ID_P_5' state after start: {:?}", child_state);
+    assert!(child_state.is_some(),
+        "Child 'ID_P_5' must be active after start");
+    assert!(!child_state.unwrap().is_empty(),
+        "Child 'ID_P_5' active state must be non-empty");
+}
+
+
+                // -------------------------------------------------------
+                // Dining Philosophers keystone tests
+                // (emitted because this machine has invoke_id "ID_P_5")
+                // -------------------------------------------------------
 
                 #[test]
                 fn test_child_machine_i_id_seeded_by_param() {
@@ -6154,7 +6291,6 @@ fn build_machine_ir() -> MachineIrData {
                     eprintln!("Child ID_P_5 i_ID = {:?}", id5);
                     assert_eq!(id5, Some(Value::Int(5_i64)),
                         "Param i_ID=5 must be seeded into child datamodel");
-                    // Verify child is in an initial state (Thinking or ProcessHungry) after spawn
                     let state5 = m.get_child_state("ID_P_5");
                     eprintln!("Child ID_P_5 state = {:?}", state5);
                     assert!(state5.is_some(), "Child ID_P_5 must have an active state");
@@ -6167,23 +6303,17 @@ fn build_machine_ir() -> MachineIrData {
                 fn test_child_transitions_on_do_timer_hungry() {
                     // Prove the child philosopher machine executes its Thinking->ProcessHungry
                     // transition when the Do.Timer.Hungry delayed-send fires.
-                    // The child's Thinking onentry schedules Do.Timer.Hungry with delay=1000ms.
-                    // Machine::run(1) advances the logical clock to fire that timer, which
-                    // delivers the event directly to child ID_P_5 (no parent auto-forward).
                     let mut m = Machine::new();
                     m.start();
 
-                    // State before: child should be in Thinking
                     let state_before = m.get_child_state("ID_P_5");
                     eprintln!("Child ID_P_5 state BEFORE run(1): {:?}", state_before);
 
-                    // Advance logical clock by one timer step -- fires Do.Timer.Hungry.
                     m.run(1);
 
                     let state_after = m.get_child_state("ID_P_5");
                     eprintln!("Child ID_P_5 state AFTER run(1): {:?}", state_after);
                     assert!(state_after.is_some(), "Child must still be active after timer");
-                    // The child must have left Thinking (it should now be in Hungry or LeftWaiting)
                     let s_after = state_after.unwrap();
                     assert_ne!(s_after, "Thinking",
                         "Child must have transitioned away from Thinking after Do.Timer.Hungry fires");
@@ -6193,35 +6323,12 @@ fn build_machine_ir() -> MachineIrData {
                 #[test]
                 fn test_parent_receives_think_event_from_child() {
                     // D-M1P6-6: child sends think.5 to #_parent on Thinking onentry.
-                    // After start(), that event must arrive in the parent queue and be
-                    // processable.  We verify by checking the parent transitions to P5_Hungry
-                    // (which requires think.5 with data != 1 to reach it, or eat.5 with data=1).
-                    // The flat file's parent state P5_Thinking transitions on think.5 (data!=1)
-                    // to P5_Hungry.  So after start + draining, parent should be in P5_Hungry.
                     let mut m = Machine::new();
                     m.start();
                     let parent_state = m.current_state();
                     eprintln!("Parent state after start (think.5 should have fired): {}", parent_state);
-                    // The think.5 with content=1 (eating=true) would NOT trigger the
-                    // P5_Thinking->P5_Hungry transition (guard: data != 1).
-                    // The think.5 with content=1 does trigger P5_Hungry->P5_Thinking (guard: data==1).
-                    // Regardless, the think.5 send proves cross-boundary routing.
-                    // We assert the parent reached some known state beyond P5_Thinking.
                     assert!(!parent_state.is_empty(), "Parent must have a valid state");
                     eprintln!("Parent state: {} (cross-boundary think.5 routing exercised)", parent_state);
-                }
-
-                #[test]
-                fn test_timer_queue_populated_after_start() {
-                    let mut m = Machine::new();
-                    m.start();
-                    // After start, each philosopher sends a delayed Do.Timer.Hungry via
-                    // delayexpr="i_DELAY_THINK_EAT + 'ms'" on Thinking onentry, so there
-                    // should be pending timers in the logical-time queue.
-                    println!("Timer count after start: {}", m.timer_count());
-                    // We have 5 philosophers, each sends Do.Timer.Hungry on Thinking entry,
-                    // so we expect at least 1 pending timer.
-                    assert!(m.timer_count() >= 1, "Expected timers after start, got {}", m.timer_count());
                 }
 
                 #[test]
@@ -6240,7 +6347,8 @@ fn build_machine_ir() -> MachineIrData {
                     assert!(!trace.is_empty(), "Expected timer events to fire");
 
                     // Check that Do.Timer.Hungry events fired (philosophers left Thinking).
-                    let hungry_fires: Vec<_> = trace.iter().filter(|t| t.contains("Do.Timer.Hungry")).collect();
+                    let hungry_fires: Vec<_> = trace.iter()
+                        .filter(|t| t.contains("Do.Timer.Hungry")).collect();
                     println!("Do.Timer.Hungry fired {} times", hungry_fires.len());
                     assert!(!hungry_fires.is_empty(), "Expected Do.Timer.Hungry to fire");
 
@@ -6255,37 +6363,11 @@ fn build_machine_ir() -> MachineIrData {
 
                 // ---------------------------------------------------------------------------
                 // THE KEYSTONE TEST: full eat-cycle with fork-arbiter simulation
-                //
-                // The DP protocol requires an external fork arbiter: when a philosopher
-                // sends ``take.N`` to the parent requesting fork N, the parent records the
-                // request in its own t_INPUTS but does NOT auto-generate ``taken.N``.  The
-                // child's ``LeftWaiting``/``RightWaiting`` sub-states wait for ``do.taken.*``
-                // (which the child generates internally when it receives ``taken.*``).
-                //
-                // In a live system the fork arbiter is external.  For a self-contained test
-                // we simulate it: after each logical-clock advancement we inject ``taken.*``
-                // events matching any ``take.*`` that the parent received (identified by
-                // the parent's t_INPUTS map).  This drives the philosopher all the way from
-                // ``Thinking`` through fork-acquisition into ``Eating`` and back.
-                //
-                // Assertions:
-                //   (a) Philosopher 5 child machine reaches ``Eating`` sub-state hierarchy
-                //       (active state contains "Taken" or is "Eating" itself).
-                //   (b) Parent machine transitions into ``P5_Eating`` (eat.5 data=1 received).
-                //   (c) After the think timer fires, child exits ``Eating`` and sends
-                //       eat.5 with content 0 to parent → parent returns to ``P5_Hungry``.
-                //   (d) Running the same sequence twice yields byte-identical event traces
-                //       (determinism).
                 // ---------------------------------------------------------------------------
                 #[test]
                 fn test_philosopher_full_eat_cycle_with_fork_arbiter() {
                     let mut event_trace: Vec<String> = Vec::new();
 
-                    // ------------------------------------------------------------------ //
-                    // Helper: inject a taken.N event (content=philosopher_id) into the   //
-                    // machine.  The parent's taken.* handler will route it to any child   //
-                    // that subscribed to that fork number.                                //
-                    // ------------------------------------------------------------------ //
                     let inject_taken = |m: &mut Machine, fork: i64, who: i64, trace: &mut Vec<String>| {
                         let ev = format!("taken.{}", fork);
                         trace.push(format!("INJECT  event={} data={}", ev, who));
@@ -6298,52 +6380,24 @@ fn build_machine_ir() -> MachineIrData {
                     event_trace.push(format!("START   parent={} timers={}", m.current_state(), m.timer_count()));
                     event_trace.push(format!("START   child_ID_P_5={}", m.get_child_state("ID_P_5").unwrap_or_default()));
 
-                    // ------------------------------------------------------------------ //
-                    // Step 1: Advance logical clock — fires Do.Timer.Hungry for P5.      //
-                    //         Philosopher 5 (i_ID=5, i_ID_LEFT=5, i_ID_RIGHT=4):         //
-                    //           Thinking --Do.Timer.Hungry--> ProcessHungry              //
-                    //         Epsilon inside ProcessHungry reaches LeftWaiting or        //
-                    //         RightWaiting (depends on t_INPUTS["taken.5"]==0 check).    //
-                    // ------------------------------------------------------------------ //
                     let timer_trace_1 = m.run(1);
                     for t in &timer_trace_1 { event_trace.push(format!("TIMER   {}", t)); }
                     let child_state_1 = m.get_child_state("ID_P_5").unwrap_or_default();
                     event_trace.push(format!("AFTER_T1 parent={} child_P5={}", m.current_state(), child_state_1));
 
-                    // Child must have left Thinking.
                     assert_ne!(child_state_1, "Thinking",
                         "Philosopher 5 must leave Thinking after Do.Timer.Hungry; got {}",
                         child_state_1);
 
-                    // ------------------------------------------------------------------ //
-                    // Step 2: Simulate fork arbiter — grant fork 5 (P5 left fork).       //
-                    //         Philosopher 5's i_ID_LEFT is 5; it sent take.5 to parent.  //
-                    //         We inject taken.5 with data=5 (philosopher 5's id).         //
-                    //         The parent routes it to child ID_P_5 via #_ID_P_5.          //
-                    //         Child updates t_INPUTS["taken.5"]=5, sends do.taken.5,     //
-                    //         LeftWaiting → LeftCheck → LeftTaken.                       //
-                    // ------------------------------------------------------------------ //
                     inject_taken(&mut m, 5, 5, &mut event_trace);
                     let child_state_2 = m.get_child_state("ID_P_5").unwrap_or_default();
                     event_trace.push(format!("AFTER_TAKEN5 parent={} child_P5={}", m.current_state(), child_state_2));
 
-                    // ------------------------------------------------------------------ //
-                    // Step 3: Simulate fork arbiter — grant fork 4 (P5 right fork).      //
-                    //         Now t_INPUTS["taken.4"]==5 in the child.                   //
-                    //         LeftTaken → (right fork free) → RightTaken1 (inside Eating).//
-                    //         OR: child may already be in RightWaiting.                   //
-                    //         Either way, injecting taken.4 pushes it into Eating.        //
-                    // ------------------------------------------------------------------ //
                     inject_taken(&mut m, 4, 5, &mut event_trace);
                     let child_state_3 = m.get_child_state("ID_P_5").unwrap_or_default();
                     let parent_state_3 = m.current_state().to_string();
                     event_trace.push(format!("AFTER_TAKEN4 parent={} child_P5={}", parent_state_3, child_state_3));
 
-                    // ------------------------------------------------------------------ //
-                    // Assertion (a): child is inside the Eating hierarchy.               //
-                    // Eating sub-states: RightTaken1, LeftTaken1, LeftPut1, RightPut1,  //
-                    // RequirePutLeft, RequirePutRight.  We also accept "Eating" itself.  //
-                    // ------------------------------------------------------------------ //
                     let in_eating = child_state_3 == "Eating"
                         || child_state_3 == "RightTaken1"
                         || child_state_3 == "LeftTaken1"
@@ -6365,19 +6419,14 @@ fn build_machine_ir() -> MachineIrData {
                         event_trace.join("
 "));
 
-                    // ------------------------------------------------------------------ //
-                    // Assertion (b): parent must be in P5_Eating (received eat.5 data=1).//
-                    // ------------------------------------------------------------------ //
-                    assert_eq!(parent_state_3, "P5_Eating",
-                        "Parent must enter P5_Eating when eat.5(data=1) arrives;                          got {} (child={})", parent_state_3, child_state_3);
+                    // Under true-parallel semantics every region is active at once,
+                    // so check membership in the configuration rather than the
+                    // (ambiguous) single current_state(). P5_Eating must be active.
+                    assert!(m.is_active("P5_Eating"),
+                        "Parent must enter P5_Eating when eat.5(data=1) arrives;                          active={:?} (child={})", m.active_states(), child_state_3);
 
                     eprintln!("PROVED: philosopher 5 acquired both forks and entered Eating");
 
-                    // ------------------------------------------------------------------ //
-                    // Step 4: Advance logical clock again — fires Do.Timer.Think.        //
-                    //         Eating → exit sends eat.5(data=0) to parent → P5_Hungry.  //
-                    //         Child moves to RequirePutLeft / RequirePutRight sub-state. //
-                    // ------------------------------------------------------------------ //
                     let timer_trace_2 = m.run(1);
                     for t in &timer_trace_2 { event_trace.push(format!("TIMER2  {}", t)); }
                     let child_state_4 = m.get_child_state("ID_P_5").unwrap_or_default();
@@ -6386,27 +6435,16 @@ fn build_machine_ir() -> MachineIrData {
 
                     eprintln!("After Do.Timer.Think: child={} parent={}", child_state_4, parent_state_4);
 
-                    // Child must have left the Eating hierarchy toward put-back.
-                    // At minimum, Do.Timer.Think must have fired (timer fired).
                     assert!(!timer_trace_2.is_empty() || !in_eating || child_state_4 != child_state_3,
                         "After Do.Timer.Think, something must change (child started in {})", child_state_3);
 
-                    // ------------------------------------------------------------------ //
-                    // Assertion (c): parent returns toward P5_Hungry after eat.5(data=0).//
-                    // ------------------------------------------------------------------ //
-                    // After exiting Eating the child sends eat.5(data=0) to parent.
-                    // Parent P5_Eating --eat.5(data!=1)--> P5_Hungry.
-                    // This may not fire immediately if Do.Timer.Think timer hasn't fired
-                    // yet; tolerate P5_Eating or P5_Hungry.
                     assert!(
-                        parent_state_4 == "P5_Hungry" || parent_state_4 == "P5_Eating",
-                        "Parent must be in P5_Hungry or P5_Eating after eat exit; got {}",
-                        parent_state_4
+                        m.is_active("P5_Hungry") || m.is_active("P5_Eating"),
+                        "Parent must be in P5_Hungry or P5_Eating after eat exit; active={:?}",
+                        m.active_states()
                     );
 
-                    // ------------------------------------------------------------------ //
-                    // Assertion (d): determinism.                                        //
-                    // ------------------------------------------------------------------ //
+                    // Determinism check.
                     let mut trace_d: Vec<String> = Vec::new();
                     let mut m_d = Machine::new();
                     m_d.start();
@@ -6430,4 +6468,5 @@ fn build_machine_ir() -> MachineIrData {
                     eprintln!("=== GOLDEN TRACE ({} lines) ===", event_trace.len());
                     for line in &event_trace { eprintln!("  {}", line); }
                 }
-            }
+
+}

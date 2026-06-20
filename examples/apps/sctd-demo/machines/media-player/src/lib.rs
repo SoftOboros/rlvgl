@@ -1361,8 +1361,10 @@ impl ChildMachine {
 
 pub struct Machine {
     scope: Scope,
-    /// Currently active state id (simplified: single active state).
-    active_state: String,
+    /// Active configuration: the set of active atomic (leaf) states.
+    /// For a non-parallel machine this holds exactly one leaf; for a
+    /// `<parallel>` machine it holds one live leaf per active region.
+    active: Vec<String>,
     /// Internal event queue.
     queue: VecDeque<String>,
     /// Current event context.
@@ -1392,13 +1394,9 @@ impl Machine {
                 scope.set(slot.id.clone(), Value::Undefined);
             }
         }
-        let initial = ir.initial.first().cloned()
-            .filter(|s| !s.is_empty())
-            .or_else(|| ir.children.first().map(|n| n.id().to_string()))
-            .unwrap_or_default();
         Machine {
             scope,
-            active_state: initial,
+            active: Vec::new(),
             queue: VecDeque::new(),
             event_ctx: EventCtx::default(),
             ir,
@@ -1418,6 +1416,7 @@ impl Machine {
             .unwrap_or_default();
         if !initial_id.is_empty() {
             self.enter_state(&initial_id);
+            self.macrostep();
         }
         // Drain the startup queue:
         // - ``__delayed__`` tokens: register as pending timers.
@@ -1521,14 +1520,30 @@ impl Machine {
         }
     }
 
-    /// Return the current active state id.
+    /// Return a current active leaf state id. For a `<parallel>`
+    /// machine this is the first active region's leaf; use
+    /// `active_states()` for the full configuration.
     pub fn current_state(&self) -> &str {
-        &self.active_state
+        self.active.first().map(|s| s.as_str()).unwrap_or("")
+    }
+
+    /// Return all active atomic (leaf) states. One entry for a
+    /// non-parallel machine; one per active region for `<parallel>`.
+    pub fn active_states(&self) -> &[String] {
+        &self.active
+    }
+
+    /// Return true if `state_id` is in the active configuration
+    /// (an active leaf or an ancestor of one).
+    pub fn is_active(&self, state_id: &str) -> bool {
+        self.active.iter().any(|leaf| {
+            leaf == state_id || self.get_ancestors(leaf).iter().any(|a| a == state_id)
+        })
     }
 
     /// Return the current active state as a MachineState enum variant.
     pub fn current_state_variant(&self) -> MachineState {
-        MachineState::from_id(&self.active_state)
+        MachineState::from_id(self.current_state())
     }
 
     /// Set a datamodel variable (for external initialization / testing).
@@ -1561,7 +1576,6 @@ impl Machine {
     }
 
     fn enter_state(&mut self, state_id: &str) {
-        self.active_state = state_id.to_string();
         // Clone all data needed from the node BEFORE any mutable borrows.
         let (onentry, dm, init_child, child_ids, is_parallel, invokes) = {
             if let Some(node) = self.find_state(state_id) {
@@ -1629,20 +1643,24 @@ impl Machine {
                 }
             }
         }
-        // Auto-enter initial child (State)
+        // Enter ALL regions of a <parallel> -- the configuration is a
+        // set of leaves, one live leaf per region.
+        if is_parallel {
+            for cid in child_ids {
+                self.enter_state(&cid);
+            }
+            return;
+        }
+        // Auto-enter the initial child of a compound state.
         if let Some(child_id) = init_child {
             self.enter_state(&child_id);
             return;
         }
-        // Auto-enter first child for Parallel (simplified)
-        if is_parallel {
-            if let Some(first_id) = child_ids.into_iter().next() {
-                self.enter_state(&first_id);
-                return;
-            }
+        // Atomic leaf: join the active configuration. The epsilon
+        // macrostep is run by the caller after the full entry set.
+        if !self.active.iter().any(|s| s == state_id) {
+            self.active.push(state_id.to_string());
         }
-        // Run epsilon transitions after entry
-        self.run_epsilon_transitions();
     }
 
     fn exit_state(&mut self, state_id: &str) {
@@ -1670,84 +1688,176 @@ impl Machine {
     }
 
     fn process_event(&mut self, event_name: String) {
-        let active = self.active_state.clone();
-        // Walk up the state hierarchy trying each ancestor
-        let ancestors = self.get_ancestors(&active);
-        for state_id in ancestors {
-            if self.try_transitions_in(&state_id, &event_name) {
-                return;
+        // Offer the event to every active region. Each region fires at
+        // most one transition (the first enabled along its leaf's
+        // ancestor chain); regions are independent, so we fire one per
+        // region. A region already exited by an earlier transition in
+        // this microstep is skipped.
+        let leaves = self.active.clone();
+        for leaf in &leaves {
+            if !self.active.iter().any(|s| s == leaf) { continue; }
+            let ancestors = self.get_ancestors(leaf);
+            if let Some((t, src)) = self.find_enabled(&ancestors, Some(&event_name)) {
+                self.fire_transition(t, &src);
             }
         }
+        self.macrostep();
     }
 
-    fn try_transitions_in(&mut self, state_id: &str, event_name: &str) -> bool {
-        // Clone transitions before any mutable access
-        let transitions: Vec<TransitionIr> = self.find_state(state_id)
-            .map(|n| n.transitions().to_vec())
-            .unwrap_or_default();
-        for t in &transitions {
-            // Check event match
-            let event_matches = match &t.event {
-                None => false, // eventless transitions are epsilon-only
-                Some(pattern) => event_matches_pattern(event_name, pattern),
-            };
-            if !event_matches { continue; }
-            // Check guard (scope/event are immutably borrowed for eval)
-            let guard_ok = match &t.guard {
-                None => true,
-                Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
-            };
-            if !guard_ok { continue; }
-            // Fire transition
-            self.fire_transition(t.clone());
-            return true;
+    /// Find the first enabled transition along an ancestor chain (leaf
+    /// first). ``event = Some(name)`` selects event-triggered transitions
+    /// whose pattern matches; ``event = None`` selects eventless ones.
+    /// Returns the transition and the id of the state that owns it.
+    fn find_enabled(
+        &self,
+        ancestors: &[String],
+        event: Option<&str>,
+    ) -> Option<(TransitionIr, String)> {
+        for state_id in ancestors {
+            let transitions: Vec<TransitionIr> = self.find_state(state_id)
+                .map(|n| n.transitions().to_vec())
+                .unwrap_or_default();
+            for t in transitions {
+                let matches = match (&t.event, event) {
+                    (None, None) => true,
+                    (Some(p), Some(name)) => event_matches_pattern(name, p),
+                    _ => false,
+                };
+                if !matches { continue; }
+                let guard_ok = match &t.guard {
+                    None => true,
+                    Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
+                };
+                if !guard_ok { continue; }
+                return Some((t, state_id.clone()));
+            }
         }
-        false
+        None
     }
 
-    fn run_epsilon_transitions(&mut self) {
+    /// Run eventless transitions to stability across the active set.
+    fn macrostep(&mut self) {
         let mut safety = 0usize;
         loop {
-            if safety > 100 { break; }
+            if safety > 200 { break; }
             safety += 1;
-            let active = self.active_state.clone();
-            let ancestors = self.get_ancestors(&active);
-            // Collect all candidate epsilon transitions before any mutation
-            let mut candidate: Option<TransitionIr> = None;
-            'outer: for state_id in &ancestors {
-                let transitions: Vec<TransitionIr> = self.find_state(state_id)
-                    .map(|n| n.transitions().to_vec())
-                    .unwrap_or_default();
-                for t in transitions {
-                    if t.event.is_some() { continue; } // skip event-triggered
-                    let guard_ok = match &t.guard {
-                        None => true,
-                        Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
-                    };
-                    if guard_ok {
-                        candidate = Some(t);
-                        break 'outer;
-                    }
+            let leaves = self.active.clone();
+            let mut fired = false;
+            for leaf in &leaves {
+                if !self.active.iter().any(|s| s == leaf) { continue; }
+                let ancestors = self.get_ancestors(leaf);
+                if let Some((t, src)) = self.find_enabled(&ancestors, None) {
+                    self.fire_transition(t, &src);
+                    fired = true;
+                    break; // configuration changed; rescan from scratch
                 }
             }
-            if let Some(t) = candidate {
-                self.fire_transition(t);
-            } else {
-                break;
-            }
+            if !fired { break; }
         }
     }
 
-    fn fire_transition(&mut self, t: TransitionIr) {
-        // Execute transition actions
+    /// Backward-compatible name; runs the eventless macrostep.
+    fn run_epsilon_transitions(&mut self) {
+        self.macrostep();
+    }
+
+    fn fire_transition(&mut self, t: TransitionIr, source_id: &str) {
+        // Execute transition actions in the current scope.
         let ev = self.event_ctx.clone();
         exec_actions(&t.actions, &mut self.scope, &mut self.queue, &ev);
-        // Transition to targets
-        if let Some(target_id) = t.targets.first() {
-            let old_state = self.active_state.clone();
-            self.exit_state(&old_state);
-            let target_clone = target_id.clone();
-            self.enter_state(&target_clone);
+        // Targetless transition: actions only, no configuration change.
+        let target = match t.targets.first() {
+            Some(x) => x.clone(),
+            None => return,
+        };
+        // Transition domain = least common ancestor of source and target.
+        let domain = self.lca(source_id, &target);
+        // Exit the active leaves that lie strictly within the domain
+        // (region-local exit); other regions are untouched. An empty
+        // domain is the implicit document root, an ancestor of every
+        // leaf, so all active leaves qualify.
+        let exit_leaves: Vec<String> = self.active.iter()
+            .filter(|l| l.as_str() != domain.as_str()
+                && (domain.is_empty()
+                    || self.get_ancestors(l).iter().any(|a| a == &domain)))
+            .cloned()
+            .collect();
+        for leaf in &exit_leaves {
+            self.exit_to_domain(leaf, &domain);
+        }
+        // Enter the target subtree under the domain.
+        self.enter_to(&target, &domain);
+    }
+
+    /// Least common ancestor of two states: the deepest state that is an
+    /// ancestor (or self) of both. For a sibling transition this is the
+    /// shared parent; for an internal transition (source is an ancestor of
+    /// target) it is the source state itself.
+    fn lca(&self, a: &str, b: &str) -> String {
+        let ba = self.get_ancestors(b);
+        for anc in self.get_ancestors(a) {
+            if ba.iter().any(|x| *x == anc) {
+                return anc;
+            }
+        }
+        // No common ancestor among the listed states: the only shared
+        // ancestor is the implicit document root. Return the empty
+        // sentinel so the source's full chain is exited and the target
+        // is entered from the top (covers top-level sibling transitions
+        // whose parent is the synthetic <scxml> root, which is not part
+        // of get_ancestors()).
+        String::new()
+    }
+
+    /// Exit a leaf and its ancestors up to (but not including) ``domain``,
+    /// running onexit for each, then remove the leaf from the active set.
+    fn exit_to_domain(&mut self, leaf: &str, domain: &str) {
+        for s in self.get_ancestors(leaf) {
+            if s == domain { break; }
+            self.exit_state(&s);
+        }
+        self.active.retain(|l| l != leaf);
+    }
+
+    /// Enter the path from ``domain`` (exclusive) down to ``target``
+    /// (inclusive); ``target``'s own subtree (initial child / all parallel
+    /// regions) is entered by ``enter_state``.
+    fn enter_to(&mut self, target: &str, domain: &str) {
+        let mut path: Vec<String> = Vec::new();
+        for s in self.get_ancestors(target) {
+            if s == domain { break; }
+            if s != target { path.push(s); }
+        }
+        path.reverse(); // outermost first
+        for s in &path {
+            self.enter_onentry_only(s);
+        }
+        self.enter_state(target);
+    }
+
+    /// Run onentry / datamodel init for an intermediate path state without
+    /// descending into its children or joining the active set (its
+    /// descendant on the path is entered explicitly).
+    fn enter_onentry_only(&mut self, state_id: &str) {
+        let (onentry, dm) = {
+            if let Some(node) = self.find_state(state_id) {
+                let onentry = node.onentry().to_vec();
+                let dm = match node {
+                    StateNodeIr::State { datamodel, .. }
+                    | StateNodeIr::Parallel { datamodel, .. } => datamodel.to_vec(),
+                    _ => vec![],
+                };
+                (onentry, dm)
+            } else {
+                (vec![], vec![])
+            }
+        };
+        let ev = self.event_ctx.clone();
+        exec_actions(&onentry, &mut self.scope, &mut self.queue, &ev);
+        for slot in &dm {
+            if let Some(ref v) = slot.initial_value {
+                self.scope.set(slot.id.clone(), v.clone());
+            }
         }
     }
 

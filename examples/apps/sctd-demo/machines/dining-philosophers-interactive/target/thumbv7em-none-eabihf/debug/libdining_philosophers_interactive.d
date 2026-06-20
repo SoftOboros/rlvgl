@@ -1,0 +1,1 @@
+/Users/iraabbott/softoboros/ops/packer/submodules/rlvgl/examples/apps/sctd-demo/machines/dining-philosophers-interactive/target/thumbv7em-none-eabihf/debug/libdining_philosophers_interactive.rlib: /Users/iraabbott/softoboros/ops/packer/submodules/rlvgl/examples/apps/sctd-demo/machines/dining-philosophers-interactive/src/lib.rs

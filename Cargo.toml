@@ -528,6 +528,10 @@ exclude = [
     # dining-philosophers above). Excluded from workspace clippy; run tests
     # via --manifest-path or through the sctd-demo workspace member.
     "examples/apps/sctd-demo/machines/media-player",
+    # dining-philosophers-interactive is the SCTD-02 normalized interactive
+    # variant (iState-MCP-generated, same rationale as the faithful crate
+    # above). Excluded from workspace clippy; run vectors via --manifest-path.
+    "examples/apps/sctd-demo/machines/dining-philosophers-interactive",
     # CRATES-CI-01: extracted staged packages under target/crates-ci/staged/
     # are built in place by consumers/creator-cli/smoke.sh; a packaged
     # manifest has no [workspace] table and would otherwise be claimed by
