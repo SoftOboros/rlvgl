@@ -1,2 +1,10 @@
 # Baseline sdkconfig defaults for the DFR0550 ESP-IDF comparison app.
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y
+
+# The Rust rlvgl payload runs on the main task. The SCTD payload builds three
+# tutorial machines (the faithful Dining Philosophers carries five invoked child
+# machines) and the configuration-set evaluator + widget-tree draw recurse, so
+# the IDF default 3584-byte main-task stack overflows (Guru Meditation: stack
+# protection fault on the first rlvgl_app_render). 64 KiB gives ample headroom
+# (ESP32-P4 has 768 KiB internal SRAM).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=65536
