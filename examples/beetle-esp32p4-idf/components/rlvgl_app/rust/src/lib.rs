@@ -25,13 +25,107 @@ extern crate alloc;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_void;
 use core::panic::PanicInfo;
+use core::cell::RefCell;
 use core::ptr::addr_of_mut;
 
-use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
+use alloc::rc::Rc;
+use rlvgl_core::WidgetNode;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
 use rlvgl_platform::Screen;
+
+// ---------------------------------------------------------------------------
+// Build-time payload selection (SCTD-02 PCDN-02-01)
+// ---------------------------------------------------------------------------
+//
+// The IDF host loop is payload-agnostic: it drives a uniform `App` that wraps
+// whichever tutorial controller is selected at build time. Default is the SCTD
+// interactive tutorial demo (`app_sctd`); `--features app_disco` restores the
+// original disco-demo widget tree. Exactly one feature is active.
+
+/// SCTD interactive tutorial demo payload.
+#[cfg(feature = "app_sctd")]
+mod app {
+    use super::{Event, RefCell, Rc, Screen, WidgetNode};
+    use rlvgl_app_sctd_demo::SctdController;
+
+    /// Uniform app wrapper over the SCTD controller.
+    pub struct App {
+        controller: SctdController,
+    }
+
+    impl App {
+        pub fn new(width: i32, height: i32) -> Self {
+            Self {
+                controller: SctdController::new(Screen::landscape(width as u32, height as u32)),
+            }
+        }
+        pub fn tick(&mut self) {
+            self.controller.handle_event(&Event::Tick);
+        }
+        pub fn dispatch_press(&mut self, x: i32, y: i32) {
+            self.controller.dispatch_event(&Event::PressRelease { x, y });
+        }
+        pub fn drain(&mut self) {
+            let _ = self.controller.drain_commands();
+        }
+        pub fn root(&self) -> Rc<RefCell<WidgetNode>> {
+            self.controller.root()
+        }
+    }
+}
+
+/// Original disco-demo widget-tree payload.
+#[cfg(feature = "app_disco")]
+mod app {
+    use super::{Event, RefCell, Rc, Screen, WidgetNode, rlvgl_host_set_backlight};
+    use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController};
+
+    /// Uniform app wrapper over the disco-demo controller.
+    pub struct App {
+        controller: DiscoController,
+    }
+
+    impl App {
+        pub fn new(width: i32, height: i32) -> Self {
+            let capabilities = DiscoCapabilities {
+                audio: false,
+                storage: false,
+                diagnostics: true,
+                effects: true,
+                pointer: true,
+                platform: "ESP32-P4 ESP-IDF",
+            };
+            Self {
+                controller: DiscoController::new(
+                    Screen::landscape(width as u32, height as u32),
+                    capabilities,
+                ),
+            }
+        }
+        pub fn tick(&mut self) {
+            self.controller.tick();
+        }
+        pub fn dispatch_press(&mut self, x: i32, y: i32) {
+            self.controller.dispatch_event(&Event::PressRelease { x, y });
+        }
+        pub fn drain(&mut self) {
+            for command in self.controller.drain_commands() {
+                if let DiscoCommand::SetBacklight(level) = command {
+                    // SAFETY: FFI to the host backlight hook -- a plain byte, no
+                    // aliasing. Runs on the render task, same as all bridge I2C.
+                    unsafe { rlvgl_host_set_backlight(level) };
+                }
+            }
+        }
+        pub fn root(&self) -> Rc<RefCell<WidgetNode>> {
+            self.controller.root()
+        }
+    }
+}
+
+use app::App;
 
 // ---------------------------------------------------------------------------
 // Runtime glue: allocator + panic handler over the IDF C runtime.
@@ -231,7 +325,7 @@ impl<'a> Renderer for Rgb888Renderer<'a> {
 const RELEASE_DEBOUNCE_FRAMES: i32 = 3;
 
 struct AppState {
-    controller: DiscoController,
+    app: App,
     /// Debounced contact state: true once a finger is down, cleared only after
     /// `RELEASE_DEBOUNCE_FRAMES` consecutive no-touch frames.
     in_contact: bool,
@@ -245,21 +339,8 @@ struct AppState {
 
 impl AppState {
     fn new(width: i32, height: i32) -> Self {
-        // ESP32-P4 + DFR0550-V2 capabilities: capacitive touch (pointer), but
-        // no audio codec or storage wired on this hybrid yet. Effects stay on
-        // so the info wing's star-crawl item still queues its command (the
-        // host simply doesn't run a crawl renderer).
-        let capabilities = DiscoCapabilities {
-            audio: false,
-            storage: false,
-            diagnostics: true,
-            effects: true,
-            pointer: true,
-            platform: "ESP32-P4 ESP-IDF",
-        };
-        let screen = Screen::landscape(width as u32, height as u32);
         Self {
-            controller: DiscoController::new(screen, capabilities),
+            app: App::new(width, height),
             in_contact: false,
             idle_frames: 0,
             last_x: 0,
@@ -320,8 +401,8 @@ pub unsafe extern "C" fn rlvgl_app_render(
     }
     let state = app.as_mut().unwrap();
 
-    // Advance animations, live info pages, and the focus-pulse engine.
-    state.controller.tick();
+    // Advance the selected payload by one host tick.
+    state.app.tick();
 
     // Debounce the touch sample into a single tap per physical contact. A
     // finger-down (re)arms the contact and records the point; a confirmed lift
@@ -338,21 +419,14 @@ pub unsafe extern "C" fn rlvgl_app_render(
         if state.idle_frames >= RELEASE_DEBOUNCE_FRAMES {
             state.in_contact = false;
             let (x, y) = (state.last_x, state.last_y);
-            state.controller.dispatch_event(&Event::PressRelease { x, y });
+            state.app.dispatch_press(x, y);
         }
     }
 
-    // Apply the platform commands the controller emitted this frame.
-    // SetBacklight drives the DFR0550 bridge PWM through the host hook;
-    // effect/status commands have no P4 runtime yet and are dropped (draining
-    // them still keeps the controller's queue from growing unbounded).
-    for command in state.controller.drain_commands() {
-        if let DiscoCommand::SetBacklight(level) = command {
-            // SAFETY: FFI to the host backlight hook — a plain byte, no
-            // aliasing. Runs on the render task, same as all bridge I2C.
-            unsafe { rlvgl_host_set_backlight(level) };
-        }
-    }
+    // Apply the platform commands the payload emitted this frame (disco-demo
+    // maps SetBacklight to the DFR0550 bridge PWM; SCTD just drains). Draining
+    // keeps the controller's command queue from growing unbounded.
+    state.app.drain();
 
     // Clear the framebuffer first. The disco-demo root container is
     // deliberately transparent (it composites over a desktop/splash layer on
@@ -371,7 +445,7 @@ pub unsafe extern "C" fn rlvgl_app_render(
     );
 
     // Draw the widget tree, then a press-feedback dot at the live contact.
-    state.controller.root().borrow().draw(&mut renderer);
+    state.app.root().borrow().draw(&mut renderer);
     if active {
         renderer.fill_rect(
             Rect {

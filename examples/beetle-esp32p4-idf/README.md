@@ -22,7 +22,12 @@ It is intentionally separate from the raw-PAC Rust example in
 ## rlvgl Hybrid (BEETLE M1)
 
 By default this app no longer cycles solid colors — it renders an **rlvgl
-widget tree** into the DPI framebuffer. The split is deliberate:
+widget tree** into the DPI framebuffer. The default payload is the **SCTD
+interactive SCXML tutorial demo** (Dining Philosophers + Media Player +
+Interactive Philosophers with on-screen arrive/depart/panic/reset + pause/speed
+touch controls); build `idf.py -DRLVGL_PAYLOAD=disco build` to render the
+original disco-demo widget tree instead (SCTD-02 PCDN-02-01). The split is
+deliberate:
 
 - **C owns the hardware.** `main/dfr0550_idf_compare.c` keeps the full,
   known-locking IDF bring-up (PSRAM, LDO_VO3, I2C bridge wake,
