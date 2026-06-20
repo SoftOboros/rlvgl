@@ -124,6 +124,16 @@ the app remains portable.
 5. **Verification vectors required.** Each admitted Tutorial Machine
    MUST carry at least one deterministic vector test before it can appear
    in the app selector.
+6. **Interactive Dining Philosophers (SCTD-02 amendment, 2026-06-20).**
+   An **Interactive Dining Philosophers** machine is admitted as a
+   distinct Tutorial Machine — a normalized variant with provenance to the
+   SCTD-01 faithful DP (per item 3), adding host-injected lifecycle events
+   (`PHILOSOPHER_ARRIVE` / `PHILOSOPHER_DEPART` / `DEADLOCK_BREAK` /
+   `SIMULATION_RESET`). The faithful DP machine (item 1) is unchanged. The
+   interactive variant's contract is owned by
+   [`SCTD-02-FIREBEETLE-P4-INTERACTIVE.md`](SCTD-02-FIREBEETLE-P4-INTERACTIVE.md)
+   §5; its lifecycle event enum carries the **Specification Required**
+   registration policy defined there.
 
 ## 6. Frozen Decisions - App Surface
 
@@ -175,6 +185,14 @@ the app remains portable.
    host simulator, disco simulator, STM32H747I-DISCO bare-metal,
    STM32H747I-DISCO FreeRTOS, and UEFI disco where the existing build
    profile supports app payloads.
+   **SCTD-02 amendment (2026-06-20):** the supported-target set additionally
+   includes **FireBeetle 2 ESP32-P4 + DFR0550-V2, via
+   `examples/beetle-esp32p4-idf` (ESP-IDF)**. That target rides an
+   already-brought-up hardware path (the BEETLE family + C host own
+   DSI/DPI/PSRAM/cache/touch/double-buffer); SCTD owns only the Rust pixel
+   payload + logical-tick cadence. Contract owned by
+   [`SCTD-02-FIREBEETLE-P4-INTERACTIVE.md`](SCTD-02-FIREBEETLE-P4-INTERACTIVE.md)
+   §7. The raw-PAC `examples/beetle-esp32p4` port remains out of scope.
 3. **Build gate.** SCTD implementation MUST add build checks for the
    Tutorial Demo App on host plus at least the same embedded target
    triples exercised by the existing disco demo gates. Hardware flashing
@@ -296,3 +314,4 @@ SCTD-01 implementation is complete when:
 | 2026-06-19 | RATIFIED | Owner accepted SCTD-00 and directed implementation to proceed. SCTD-01 execution MAY now cite this document for the iState MCP generation boundary, tutorial-asset-first policy, right-edge selector contract, initial Dining Philosophers / Media Player admission set, and target-portability gates. |
 | 2026-06-20 | GENERATION-AUTHORITY DEPENDENCY RECORDED | The iState-over-MCP codegen probe proved the §8 generation authority cannot yet compile the faithful tutorial machines: a trivial null-datamodel machine generates in ≤14 s, but the Dining Philosophers machine (`datamodel="ecmascript"`, root `<parallel>`, nested inline-`<content>` `<invoke>`, `<foreach>`, dynamic `<send>`) hangs indefinitely; Bolero is heavier still. Per owner direction, the generator is being extended (not the machines normalized) via constrained-ECMAScript lowering on the ratified scjson M1 Executable IR, specced and ratified upstream as `docs/todo/scjson/TODO-SCJSON-SCRIPT-M1P6.md` (gate **G6** names SCTD-01 as the conformance consumer; `M0-D21` admits the ECMAScript subset), with companions: scjson `SCJSON-EXEC-00` §EXEC-E (vector-search bound; resolves the hang), `SCJSON-SCRIPT-M3-TYPE-BINDINGS` (`no_std`+alloc Rust profile satisfying §7.4), and parent `ISTATE-05` §14 (context builder consumes the IR + codegen watchdog). Evidence: scjson `docs/concepts/ERRATA.md` ERRATA-002 + parent `docs/todo/istate/ERRATA.md` ERRATA-006. **SCTD-01 implementation is therefore gated on that upstream generator wave landing**; the §12 SCTD-01 completion gates are unchanged, only re-sequenced behind it. No SCTD-00 normative decision (§5–§9) is amended. |
 | 2026-06-20 | SCTD-01 IMPLEMENTED | Generator wave landed; SCTD-01 built. The app `examples/apps/sctd-demo` (`rlvgl-app-sctd-demo`, target-neutral, `no_std`) has both required machines live via `MachineAdapter`s over iState-IR-generated crates vendored under `machines/`: Dining Philosophers (faithful) + Media Player (a normalized media-player with provenance to `bolero.scxml` per §5.3 — real Bolero's media core needs un-admitted `In()` predicates, scjson ERRATA-003). Selector matches disco-demo geometry (§6.2); 7/7 app + 16/16 DP + 9/9 MP tests; both machine crates compile `thumbv7em` `no_std` (§7.4). **§7 multi-target mount** via parallel sibling binaries (disco-demo mounts untouched): host (tests), disco-simulator (`rlvgl-sctd-sim`), STM32H747I-DISCO bare-metal `thumbv7em` (`rlvgl-stm32h747i-sctd`, `--features cm7,sctd,dma2d`, cargo-check gate), and UEFI disco (`rlvgl-uefi-sctd`) all BUILD. **§7.2/§12 ratified exception:** STM32H747I-DISCO **FreeRTOS** is deferred — `freertos_entry.rs` hardcodes `DiscoController` (static + task + ISR plumbing), so mounting SCTD is a wrapper-architecture change, not the payload swap §7.2 scopes; deferred to a follow-up SCTD phase. Remaining tail: scjson 0.4.2 publish + backend pin bump → live codegen-task wiring + `menu_gen` retirement; `In()` admission for real Bolero (ERRATA-003); tutorial-asset icon transcoding (§6.4); FreeRTOS mount. No SCTD-00 normative decision (§5–§9) amended. |
+| 2026-06-20 | §5/§7 AMENDMENT (SCTD-02) | Owner ratified SCTD-02. §5 admission set gains an **Interactive Dining Philosophers** machine (new item 6; normalized variant, provenance to the SCTD-01 faithful DP which is unchanged; adds `PHILOSOPHER_ARRIVE`/`PHILOSOPHER_DEPART`/`DEADLOCK_BREAK`/`SIMULATION_RESET` lifecycle events). §7.2 supported-target set gains **FireBeetle 2 ESP32-P4 + DFR0550-V2 via `examples/beetle-esp32p4-idf` (ESP-IDF)**. Both amendments' normative contracts are owned by [`SCTD-02-FIREBEETLE-P4-INTERACTIVE.md`](SCTD-02-FIREBEETLE-P4-INTERACTIVE.md) (§5/§7); this entry is the required §15 amendment landing before SCTD-02 behaviour code. No other §5–§9 decision changed. |
