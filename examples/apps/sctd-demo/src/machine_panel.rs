@@ -122,7 +122,15 @@ impl Widget for MachinePanel {
 
         // Divider line.
         let dw = (self.bounds.width - PADDING * 2).max(0);
-        renderer.fill_rect(Rect { x: inner_x, y, width: dw, height: 1 }, PANEL_BORDER);
+        renderer.fill_rect(
+            Rect {
+                x: inner_x,
+                y,
+                width: dw,
+                height: 1,
+            },
+            PANEL_BORDER,
+        );
         y += 6;
 
         // "Active state:" header.
@@ -139,7 +147,13 @@ impl Widget for MachinePanel {
         y += 6;
 
         // "Events:" header.
-        self.draw_text_line(renderer, "Events (tap to dispatch):", inner_x, y, BODY_COLOR);
+        self.draw_text_line(
+            renderer,
+            "Events (tap to dispatch):",
+            inner_x,
+            y,
+            BODY_COLOR,
+        );
         y += lh;
 
         // Event list rendered as tappable buttons. Each is a filled rounded rect
@@ -158,12 +172,22 @@ impl Widget for MachinePanel {
             } else {
                 (Color(30, 38, 52, 255), EVENT_COLOR)
             };
-            let face = Rect { x: inner_x, y, width: btn_w, height: btn_h - 4 };
+            let face = Rect {
+                x: inner_x,
+                y,
+                width: btn_w,
+                height: btn_h - 4,
+            };
             fill_rounded_rect(renderer, face, bg, 4);
             self.draw_text_line(renderer, event, inner_x + 10, y + 5, fg);
             // Hit rect spans the full row (including the inter-button gap) for
             // forgiving capacitive taps.
-            rects.push(Rect { x: inner_x, y, width: btn_w, height: btn_h });
+            rects.push(Rect {
+                x: inner_x,
+                y,
+                width: btn_w,
+                height: btn_h,
+            });
             y += btn_h;
         }
     }
@@ -171,9 +195,10 @@ impl Widget for MachinePanel {
     fn handle_event(&mut self, event: &Event) -> bool {
         // Tap an event button to dispatch it (SCTD-02 §6.2 on-screen controls).
         if let Event::PressRelease { x, y } = event {
-            let hit = self.button_rects.borrow().iter().position(|r| {
-                *x >= r.x && *x < r.x + r.width && *y >= r.y && *y < r.y + r.height
-            });
+            let hit =
+                self.button_rects.borrow().iter().position(|r| {
+                    *x >= r.x && *x < r.x + r.width && *y >= r.y && *y < r.y + r.height
+                });
             if let Some(idx) = hit {
                 if let Some(cb) = self.on_event_tap.as_mut() {
                     cb(idx);
