@@ -26,8 +26,10 @@
 /// the tutorial table illustration scaled to the 60 px selector strip.
 pub static ICON_DP: &[u8] = include_bytes!("../assets/icons/dp_table_60.rle");
 
-/// Hero illustration for the Dining Philosophers machines: the tutorial table
-/// illustration at 150 px, shown in the gap beside the Machine Panel.
+/// Backdrop for the live Philosophers Table: the tutorial table illustration
+/// at 150 px. The table overlays per-seat state discs on it (see
+/// [`crate::philosophers`]); the disc centers are the philosopher coordinates
+/// from this same SVG, so the overlay registers exactly on the art.
 pub static HERO_DP: &[u8] = include_bytes!("../assets/icons/dp_table_150.rle");
 
 /// Selector icon for Media Player stub (play48 glyph — supplemental Lucide).

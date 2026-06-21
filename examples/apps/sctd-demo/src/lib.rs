@@ -28,12 +28,13 @@
 //! `Machine::get_var()`.
 //!
 //! # Icon assets
-//! The Dining Philosophers selector icon and the hero illustration are the
-//! authentic tutorial table image (`Qt/DiningPhilosophers/Images/`
+//! The Dining Philosophers selector icon and the Philosophers Table backdrop
+//! are the authentic tutorial table image (`Qt/DiningPhilosophers/Images/`
 //! `dininig_philosophers.svg`) transcoded to RLE via `rlvgl-creator` per
 //! SCTD-00 §6.4 — see [`assets`] for the provenance and the exact pipeline.
-//! The Media Player glyph stays Lucide-derived (SCTD-00 §6.6 allows Lucide
-//! for gaps when tutorial assets are absent or unsuitable).
+//! The table overlays live per-seat state discs on that backdrop (see
+//! [`philosophers`]). The Media Player glyph stays Lucide-derived (SCTD-00
+//! §6.6 allows Lucide for gaps when tutorial assets are absent or unsuitable).
 
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
@@ -41,8 +42,8 @@
 extern crate alloc;
 
 pub mod assets;
-mod hero;
 mod machine_panel;
+mod philosophers;
 mod selector;
 
 use alloc::{
@@ -55,8 +56,8 @@ use alloc::{
 };
 use core::cell::RefCell;
 
-use hero::HeroImage;
 use machine_panel::MachinePanel;
+use philosophers::{PhilosophersTable, SeatState};
 use selector::MachineSelector;
 
 use rlvgl_core::{
@@ -123,6 +124,31 @@ pub trait MachineAdapter {
     /// Called once per UI tick. Implementations that do not use a timer
     /// may leave this as a no-op.
     fn tick(&mut self) {}
+
+    /// Per-seat states for the live Philosophers Table visualization.
+    ///
+    /// Dining Philosophers machines return `Some([_; 5])` (one entry per
+    /// philosopher); machines with no philosophers (e.g. the Media Player)
+    /// return `None`, which hides the table. The default is `None`.
+    fn seat_states(&self) -> Option<[SeatState; 5]> {
+        None
+    }
+}
+
+/// Map a faithful-DP child-state name to a [`SeatState`]. Faithful philosophers
+/// are always seated, so this never yields `Empty`.
+fn seat_state_from_name(name: &str) -> SeatState {
+    // Faithful DP child states: Thinking, Hungry, ProcessHungry, LeftWaiting,
+    // RightWaiting, Eating. Match on substrings so renames stay tolerated.
+    if name.contains("Eat") || name.contains("eat") {
+        SeatState::Eating
+    } else if name.contains("Wait") || name.contains("wait") {
+        SeatState::Waiting
+    } else if name.contains("Hung") || name.contains("hung") {
+        SeatState::Hungry
+    } else {
+        SeatState::Thinking
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +247,21 @@ impl MachineAdapter for DiningPhilosophersAdapter {
         // internal events. For the Dining Philosophers machine this advances
         // the timer queue so hungry/eating transitions fire over time.
         let _ = self.machine.run(1);
+    }
+
+    fn seat_states(&self) -> Option<[SeatState; 5]> {
+        // Faithful philosophers are always seated; map each child-machine leaf
+        // state to a SeatState. Uses only `get_child_state` (SCTD-00 §6.9).
+        let mut out = [SeatState::Thinking; 5];
+        for (i, item) in out.iter_mut().enumerate() {
+            let id = format!("ID_P_{}", i + 1);
+            let name = self
+                .machine
+                .get_child_state(&id)
+                .unwrap_or_else(|| "Thinking".into());
+            *item = seat_state_from_name(&name);
+        }
+        Some(out)
     }
 }
 
@@ -501,6 +542,24 @@ impl MachineAdapter for InteractiveDiningPhilosophersAdapter {
             }
         }
     }
+
+    fn seat_states(&self) -> Option<[SeatState; 5]> {
+        // Unoccupied chairs read Empty; seated chairs map their phase string.
+        let mut out = [SeatState::Empty; 5];
+        for (i, item) in out.iter_mut().enumerate() {
+            let k = (i + 1) as i64;
+            if !self.seated(k) {
+                continue;
+            }
+            *item = match self.phase(k) {
+                "EAT" => SeatState::Eating,
+                "wai" => SeatState::Waiting,
+                "hun" => SeatState::Hungry,
+                _ => SeatState::Thinking,
+            };
+        }
+        Some(out)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +569,7 @@ impl MachineAdapter for InteractiveDiningPhilosophersAdapter {
 struct ControllerState {
     selector: Rc<RefCell<MachineSelector>>,
     panel: Rc<RefCell<MachinePanel>>,
-    hero: Rc<RefCell<HeroImage>>,
+    table: Rc<RefCell<PhilosophersTable>>,
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
     adapters: Vec<Box<dyn MachineAdapter>>,
@@ -524,7 +583,7 @@ impl ControllerState {
     fn new(
         selector: Rc<RefCell<MachineSelector>>,
         panel: Rc<RefCell<MachinePanel>>,
-        hero: Rc<RefCell<HeroImage>>,
+        table: Rc<RefCell<PhilosophersTable>>,
         subtitle: Rc<RefCell<Label>>,
         footer: Rc<RefCell<Label>>,
     ) -> Self {
@@ -536,7 +595,7 @@ impl ControllerState {
         let mut this = Self {
             selector,
             panel,
-            hero,
+            table,
             subtitle,
             footer,
             adapters,
@@ -544,16 +603,16 @@ impl ControllerState {
             event_focus: 0,
             commands: Vec::new(),
         };
-        this.sync_hero();
+        this.sync_table();
         this.sync_panel();
         this
     }
 
-    /// Show the DP table hero only while a Dining Philosophers machine is
-    /// selected (the table illustration is meaningless for the Media Player).
-    fn sync_hero(&mut self) {
-        let dp = self.adapters[self.selected].name().contains("Philosophers");
-        self.hero.borrow_mut().set_visible(dp);
+    /// Push the selected machine's live seat states to the Philosophers Table.
+    /// `seat_states()` returns `None` for non-DP machines, which hides it.
+    fn sync_table(&mut self) {
+        let states = self.adapters[self.selected].seat_states();
+        self.table.borrow_mut().set_states(states);
     }
 
     fn sync_panel(&mut self) {
@@ -584,7 +643,7 @@ impl ControllerState {
             if let Ok(mut sel) = self.selector.try_borrow_mut() {
                 sel.set_selected(index);
             }
-            self.sync_hero();
+            self.sync_table();
             self.sync_panel();
             self.footer
                 .borrow_mut()
@@ -613,7 +672,9 @@ impl ControllerState {
 
     /// Dispatch the event/control at `idx` for the selected machine. Used by the
     /// panel's on-screen tap callback. Does NOT touch the panel widget (it is
-    /// borrowed during the tap); the panel refreshes on the next `Tick`.
+    /// borrowed during the tap); the panel refreshes on the next `Tick`. The
+    /// Philosophers Table is a different widget (not borrowed during the tap),
+    /// so it is refreshed here for immediate occupancy/state feedback.
     fn dispatch_event_index(&mut self, idx: usize) {
         let events: Vec<&'static str> = self.adapters[self.selected].available_events().to_vec();
         if let Some(&event_name) = events.get(idx) {
@@ -627,6 +688,7 @@ impl ControllerState {
                 machine: name,
                 event: event_name,
             });
+            self.sync_table();
         }
     }
 
@@ -665,6 +727,7 @@ impl ControllerState {
 
     fn tick(&mut self) {
         self.adapters[self.selected].tick();
+        self.sync_table();
         self.sync_panel();
     }
 }
@@ -765,14 +828,15 @@ impl SctdController {
             height: panel_h,
         })));
 
-        // Hero Illustration — the tutorial DP table, centered in the gap between
-        // the panel's right edge and the selector strip (SCTD-00 §6.4).
+        // Philosophers Table — the tutorial DP illustration as a backdrop with
+        // live per-seat state discs overlaid, centered in the gap between the
+        // panel's right edge and the selector strip (SCTD-00 §6.4).
         const HERO_SIZE: i32 = 150;
         let gap_left = PANEL_X + panel_w;
         let gap_right = width - STRIP_X_OFFSET;
         let hero_x = gap_left + ((gap_right - gap_left - HERO_SIZE) / 2).max(0);
         let hero_y = PANEL_Y + ((panel_h - HERO_SIZE) / 2).max(0);
-        let hero = Rc::new(RefCell::new(HeroImage::new(
+        let table = Rc::new(RefCell::new(PhilosophersTable::new(
             Rect {
                 x: hero_x,
                 y: hero_y,
@@ -801,7 +865,7 @@ impl SctdController {
         let state = Rc::new(RefCell::new(ControllerState::new(
             selector.clone(),
             panel.clone(),
-            hero.clone(),
+            table.clone(),
             subtitle.clone(),
             footer.clone(),
         )));
@@ -856,9 +920,9 @@ impl SctdController {
                 tag: Some("sctd.panel"),
             });
             r.children.push(WidgetNode {
-                widget: hero.clone(),
+                widget: table.clone(),
                 children: Vec::new(),
-                tag: Some("sctd.hero"),
+                tag: Some("sctd.table"),
             });
             r.children.push(WidgetNode {
                 widget: selector.clone(),
@@ -1049,37 +1113,91 @@ mod tests {
         assert!(ctrl.current_state_summary().contains("PAUSED"));
     }
 
-    /// SCTD-00 §6.4 — the DP hero illustration is the authentic tutorial table
-    /// asset and must decode cleanly from its compiled-in RLE blob (150×150).
+    /// SCTD-00 §6.4 — the Philosophers Table backdrop is the authentic tutorial
+    /// illustration and must decode cleanly from its compiled-in RLE (150×150).
     #[test]
-    fn hero_decodes_tutorial_table() {
+    fn table_backdrop_decodes_tutorial_art() {
         let ctrl = make_controller();
-        let sz = ctrl.state.borrow().hero.borrow().debug_decoded_size();
-        assert_eq!(sz, Some((150, 150)), "DP hero RLE must decode to 150x150");
+        let sz = ctrl.state.borrow().table.borrow().debug_backdrop_size();
+        assert_eq!(
+            sz,
+            Some((150, 150)),
+            "DP table backdrop must decode to 150x150"
+        );
     }
 
-    /// SCTD-00 §6.4 — the hero is shown for both Dining Philosophers machines
+    /// SCTD-00 §6.4 — the table is shown for both Dining Philosophers machines
     /// (faithful + interactive) and hidden for the Media Player.
     #[test]
-    fn hero_visible_for_dp_machines_only() {
+    fn table_visible_for_dp_machines_only() {
         let mut ctrl = make_controller();
-        let vis = |c: &SctdController| c.state.borrow().hero.borrow().is_visible();
-        assert!(vis(&ctrl), "faithful DP selected initially -> hero shown");
+        let vis = |c: &SctdController| c.state.borrow().table.borrow().is_visible();
+        assert!(vis(&ctrl), "faithful DP selected initially -> table shown");
         ctrl.dispatch_event(&Event::KeyDown {
             key: Key::Character('2'),
         });
-        assert!(!vis(&ctrl), "Media Player selected -> hero hidden");
+        assert!(!vis(&ctrl), "Media Player selected -> table hidden");
         ctrl.dispatch_event(&Event::KeyDown {
             key: Key::Character('3'),
         });
         assert!(
             vis(&ctrl),
-            "Interactive Philosophers selected -> hero shown"
+            "Interactive Philosophers selected -> table shown"
         );
         ctrl.dispatch_event(&Event::KeyDown {
             key: Key::Character('1'),
         });
-        assert!(vis(&ctrl), "faithful DP re-selected -> hero shown");
+        assert!(vis(&ctrl), "faithful DP re-selected -> table shown");
+    }
+
+    /// The live table reflects machine state: the faithful DP seats 5
+    /// philosophers (never Empty); the interactive DP starts all-Empty and an
+    /// Arrive tap seats the first chair (no longer Empty).
+    #[test]
+    fn table_reflects_machine_state() {
+        // Faithful DP: 5 seated philosophers, none Empty.
+        let faithful = DiningPhilosophersAdapter::new();
+        let s = faithful.seat_states().expect("faithful DP exposes seats");
+        assert!(
+            s.iter().all(|x| *x != SeatState::Empty),
+            "faithful philosophers are always seated: {:?}",
+            s
+        );
+
+        // Media Player: no seats.
+        assert!(
+            MediaPlayerAdapter::new().seat_states().is_none(),
+            "Media Player exposes no philosopher seats"
+        );
+
+        // Interactive DP: starts empty, Arrive seats seat 1.
+        let mut inter = InteractiveDiningPhilosophersAdapter::new();
+        let s0 = inter.seat_states().expect("interactive DP exposes seats");
+        assert!(
+            s0.iter().all(|x| *x == SeatState::Empty),
+            "interactive table starts all-empty: {:?}",
+            s0
+        );
+        inter.dispatch_event("Arrive");
+        let s1 = inter.seat_states().expect("interactive DP exposes seats");
+        assert_ne!(s1[0], SeatState::Empty, "Arrive seats the first chair");
+    }
+
+    /// The controller wires live states into the table, and the table paints
+    /// its overlay through the full draw path without panicking (exercises
+    /// `fill_disc` / `isqrt` over a real seat layout).
+    #[test]
+    fn table_draws_overlay_without_panic() {
+        let ctrl = make_controller(); // faithful DP selected -> table visible
+        // The controller pushed the faithful adapter's seat states (all seated).
+        let pushed = ctrl.state.borrow().table.borrow().debug_states();
+        assert!(
+            pushed.iter().all(|s| *s != SeatState::Empty),
+            "faithful seats pushed to table: {:?}",
+            pushed
+        );
+        ctrl.root().borrow().draw(&mut NullRenderer);
+        assert!(ctrl.state.borrow().table.borrow().is_visible());
     }
 
     /// A renderer that draws nothing — used to run a layout pass so the panel
