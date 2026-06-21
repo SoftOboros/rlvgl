@@ -40,9 +40,11 @@ pub static ICON_INFO: &[u8] = include_bytes!("../assets/icons/info.rle");
 
 /// Selector icon for the Setup screen (slot 0 — ⚙ gear).
 ///
-/// The 60px Lucide "settings" gear shared with the disco demo
-/// (`assets/icons/rle/settings_60.rle`, vendored here as `gear_60.rle`) — the
-/// same glyph the disco demo places at the top of its main strip.
+/// The 60×60 Lucide "settings" gear vendored from the repo's `60px` icon set
+/// (`assets/icons/60/rle/settings.rle`, copied here as `gear_60.rle`) so it
+/// fills the 60 px selector slot like the DP icon. (An earlier copy pulled the
+/// 24×24 `assets/icons/rle/settings_60.rle` by mistake — the name is
+/// misleading — which rendered tiny in the slot.)
 pub static ICON_SETUP: &[u8] = include_bytes!("../assets/icons/gear_60.rle");
 
 /// Focus highlight border color.
