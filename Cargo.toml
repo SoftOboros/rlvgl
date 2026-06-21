@@ -520,17 +520,14 @@ exclude = [
     "examples/beetle-avr",
     "vendor/scjson",
     "examples/stm32h747i-disco/disco-demo-states",
-    # dining-philosophers is an iState-MCP-generated crate with non-idiomatic
-    # codegen style; excluded from workspace clippy per SCTD-00 §9.4. Run its
-    # vector tests directly via --manifest-path.
-    "examples/apps/sctd-demo/machines/dining-philosophers",
-    # media-player is an iState-MCP-generated crate (same rationale as
-    # dining-philosophers above). Excluded from workspace clippy; run tests
-    # via --manifest-path or through the sctd-demo workspace member.
+    # media-player is an iState-MCP-generated crate with non-idiomatic codegen
+    # style; excluded from workspace clippy per SCTD-00 §9.4. Run tests via
+    # --manifest-path or through the sctd-demo workspace member.
     "examples/apps/sctd-demo/machines/media-player",
     # dining-philosophers-interactive is the SCTD-02 normalized interactive
-    # variant (iState-MCP-generated, same rationale as the faithful crate
-    # above). Excluded from workspace clippy; run vectors via --manifest-path.
+    # variant (iState-MCP-generated, same rationale as media-player above; it is
+    # the sole DP machine since SCTD-03 folded the faithful auto-run into Auto
+    # mode). Excluded from workspace clippy; run vectors via --manifest-path.
     "examples/apps/sctd-demo/machines/dining-philosophers-interactive",
     # CRATES-CI-01: extracted staged packages under target/crates-ci/staged/
     # are built in place by consumers/creator-cli/smoke.sh; a packaged
