@@ -43,6 +43,14 @@ fn main() -> ! {
     // BSP-managed clocks, IO MUX, peripheral init.
     bsp_generated::init();
 
+    // BEETLE-06: IDF system-init parity — clear the analog BIAS generator's
+    // FORCE_XPD_* fields over the internal REGI2C bus, as IDF's rtc_clk_init
+    // does. Investigated as the DSI-DPHY-PLL-lock cause and eliminated (the
+    // fields already read 0 on this board); kept for fidelity. The real
+    // lock gap is app-stage clock-tree / PMU init — see
+    // docs/beetle-esp32p4/ERRATA.md ERRATA-009.
+    unsafe { dfr0550::regi2c::dphy_analog_bias_init() };
+
     // Set up GPIO 5 (marker) as a Saleae debug output. GPIO 5 carries
     // *all* phase information: short ~150 µs pulses before each long
     // bracket (one per phase boundary), then sustained HIGH for wake()
@@ -150,6 +158,14 @@ unsafe fn run_bringup_instrumented() -> u8 {
 
     // Checkpoint B: 4 slow blinks = "wake() succeeded, about to DSI".
     led_blink_simple(4);
+
+    // BEETLE-06 (ERRATA-009): raise the HP system to IDF's CPLL÷1 operating
+    // point (CPU 360 / MEM 180 / APB 90) — the last config-independent
+    // system-state difference vs the locking IDF binary. Done HERE (after
+    // the CPU-clock-calibrated bit-bang wake, before DSI) so the bit-bang
+    // timing is unaffected. If the DPHY PLL now locks, the operating point
+    // was the missing piece; if not, the cause is sequencing/timing.
+    unsafe { dfr0550::clk_init::set_cpu_cpll_360mhz() };
 
     // wake() succeeded — NOW do PSRAM/LDO/DSI clock setup.
     let _ = unsafe { dfr0550::psram::init() };
