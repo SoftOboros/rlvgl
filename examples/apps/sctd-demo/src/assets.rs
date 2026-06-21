@@ -38,6 +38,13 @@ pub static ICON_MEDIA: &[u8] = include_bytes!("../assets/icons/media48.rle");
 /// Info/about icon (info glyph — supplemental Lucide).
 pub static ICON_INFO: &[u8] = include_bytes!("../assets/icons/info.rle");
 
+/// Selector icon for the Setup screen (slot 0 — ⚙ gear).
+///
+/// The 60px Lucide "settings" gear shared with the disco demo
+/// (`assets/icons/rle/settings_60.rle`, vendored here as `gear_60.rle`) — the
+/// same glyph the disco demo places at the top of its main strip.
+pub static ICON_SETUP: &[u8] = include_bytes!("../assets/icons/gear_60.rle");
+
 /// Focus highlight border color.
 pub const FOCUS_HIGHLIGHT_COLOR: rlvgl_core::widget::Color =
     rlvgl_core::widget::Color(0, 180, 255, 255);

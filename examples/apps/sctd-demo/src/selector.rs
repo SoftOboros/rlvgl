@@ -15,11 +15,19 @@ use rlvgl_core::{
 };
 use rlvgl_ui::draw_helpers::draw_border_straight;
 
-use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR, ICON_DP, ICON_MEDIA};
+use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR, ICON_DP, ICON_MEDIA, ICON_SETUP};
 
-/// Number of selector entries (Dining Philosophers + Media Player +
-/// Interactive Philosophers).
+/// Number of selector slots (Setup screen + Dining Philosophers + Media Player).
+///
+/// Slot 0 = Setup screen (⚙), slot 1 = DP run view, slot 2 = MP run view.
+/// This constant stays 3 (SCTD-03 §5).
 pub const MACHINE_COUNT: usize = 3;
+
+/// Slot index for each selector entry (SCTD-03 §5).
+pub const SLOT_SETUP: usize = 0;
+pub const SLOT_DP: usize = 1;
+#[allow(dead_code)] // used in lib.rs tests and SlotView::to_slot
+pub const SLOT_MP: usize = 2;
 
 // ---------------------------------------------------------------------------
 // Icon cache
@@ -35,6 +43,9 @@ struct DecodedIcon {
 // MachineSelector widget
 // ---------------------------------------------------------------------------
 
+/// Tap callback type for a selector slot.
+type TapCb = Option<Box<dyn FnMut(usize)>>;
+
 /// Right-edge icon strip that selects the active Tutorial Machine.
 ///
 /// Uses the same geometry as the disco demo's `IconStrip`; the `on_tap`
@@ -46,7 +57,7 @@ pub struct MachineSelector {
     gap: i32,
     selected: usize,
     icons: [&'static [u8]; MACHINE_COUNT],
-    on_tap: [Option<Box<dyn FnMut(usize)>>; MACHINE_COUNT],
+    on_tap: [TapCb; MACHINE_COUNT],
     decoded: RefCell<[Option<DecodedIcon>; MACHINE_COUNT]>,
 }
 
@@ -59,11 +70,9 @@ impl MachineSelector {
             margin_top,
             gap,
             selected: 0,
-            // Both Dining Philosophers machines (faithful slot 0, interactive
-            // slot 2) share the authentic tutorial table illustration `ICON_DP`
-            // (SCTD-00 §6.4); they are distinguished by the selector highlight,
-            // the subtitle, and the panel content rather than the glyph.
-            icons: [ICON_DP, ICON_MEDIA, ICON_DP],
+            // Slot 0 = ⚙ Setup (ICON_SETUP placeholder), slot 1 = DP (ICON_DP),
+            // slot 2 = MP (ICON_MEDIA) — SCTD-03 §5 composition.
+            icons: [ICON_SETUP, ICON_DP, ICON_MEDIA],
             on_tap: [const { None }; MACHINE_COUNT],
             decoded: RefCell::new([const { None }; MACHINE_COUNT]),
         }
@@ -77,7 +86,7 @@ impl MachineSelector {
     }
 
     /// Return the currently selected slot index.
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[allow(dead_code)]
     pub fn selected(&self) -> usize {
         self.selected
     }

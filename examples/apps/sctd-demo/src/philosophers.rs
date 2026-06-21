@@ -105,6 +105,7 @@ impl PhilosophersTable {
 
     /// Test-only: the seat states last pushed.
     #[cfg(test)]
+    #[allow(dead_code)]
     pub fn debug_states(&self) -> [SeatState; 5] {
         self.states
     }

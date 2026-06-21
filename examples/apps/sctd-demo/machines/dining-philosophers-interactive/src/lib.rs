@@ -15,6 +15,11 @@
 //! `// BLOCKED: <diagnostic>` comments and safe placeholders.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+// Machine-generated source: blanket-allow lints inherent to emitted code
+// rather than hand-written style (see rust_ir_emitter._emit_no_std_preamble).
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(clippy::all)]
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
