@@ -172,6 +172,10 @@ impl Widget for MachineSelector {
                     self.margin_top + (index as i32 + 1) * step - self.gap / 2
                 };
                 if *x >= self.x && *y >= cell_top && *y < cell_bottom {
+                    // Update our own highlight here (we hold &mut self): the
+                    // on_tap callback's select_machine() deliberately does NOT
+                    // touch the selector to avoid re-borrowing it mid-dispatch.
+                    self.selected = index;
                     if let Some(cb) = self.on_tap[index].as_mut() {
                         cb(index);
                     }

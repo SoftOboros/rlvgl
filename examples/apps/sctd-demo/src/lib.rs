@@ -554,7 +554,15 @@ impl ControllerState {
         if index < self.adapters.len() {
             self.selected = index;
             self.event_focus = 0;
-            self.selector.borrow_mut().set_selected(index);
+            // Use try_borrow_mut: when this is reached from a selector TAP, the
+            // selector widget is already borrowed by the widget-tree dispatch
+            // running the on_tap callback (and the selector has already updated
+            // its own highlight in handle_event), so we must not borrow it again
+            // — a plain borrow_mut would panic (BorrowMutError -> abort/reboot on
+            // the FireBeetle). From the keyboard path the selector is free.
+            if let Ok(mut sel) = self.selector.try_borrow_mut() {
+                sel.set_selected(index);
+            }
             self.sync_panel();
             self.footer.borrow_mut().set_text(format!(
                 "Selected: {}",
@@ -986,6 +994,49 @@ mod tests {
             "tapping Arrive must seat philosopher 1; got {}",
             ctrl.current_state_summary()
         );
+    }
+
+    /// SCTD-02 §6.2 — tapping a selector icon through the widget tree must switch
+    /// machines without re-borrowing the selector mid-dispatch (bench: tapping
+    /// the 3rd icon reset the board via a BorrowMutError -> abort).
+    #[test]
+    fn tapping_selector_icon_switches_machine() {
+        let mut ctrl = make_controller(); // 800x480
+        assert_eq!(ctrl.selected_machine(), 0);
+        // 3rd icon: x >= width-STRIP_X_OFFSET (730), slot-2 y in [152, 227].
+        ctrl.dispatch_event(&Event::PressRelease { x: 750, y: 190 });
+        assert_eq!(
+            ctrl.selected_machine(),
+            2,
+            "tapping the 3rd selector icon selects the Interactive machine"
+        );
+    }
+
+    /// SCTD-02 — selecting + running the Interactive machine under repeated
+    /// draw/tick must not panic (bench: selecting the 3rd icon reset the board).
+    #[test]
+    fn interactive_machine_survives_select_draw_tick() {
+        let mut ctrl = make_controller();
+        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') });
+        assert_eq!(ctrl.selected_machine(), 2);
+        // Idle frames on the empty table.
+        for _ in 0..120 {
+            ctrl.dispatch_event(&Event::Tick);
+            ctrl.root().borrow().draw(&mut NullRenderer);
+        }
+        // Seat all five, then run many frames so they cycle thinking->eating.
+        for _ in 0..6 {
+            ctrl.state.borrow_mut().dispatch_event_index(0); // Arrive
+        }
+        for _ in 0..600 {
+            ctrl.dispatch_event(&Event::Tick);
+            ctrl.root().borrow().draw(&mut NullRenderer);
+        }
+        // Exercise every control with a draw between each.
+        for idx in [1usize, 2, 3, 4, 5, 0] {
+            ctrl.state.borrow_mut().dispatch_event_index(idx);
+            ctrl.root().borrow().draw(&mut NullRenderer);
+        }
     }
 
     /// SCTD-00 §9.2 — event dispatch: dispatching "Do.Timer.Hungry" reaches
