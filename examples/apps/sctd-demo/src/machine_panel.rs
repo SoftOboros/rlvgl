@@ -65,6 +65,13 @@ impl MachinePanel {
         self.on_event_tap = Some(cb);
     }
 
+    /// Test-only: the recorded clickable rect for event button `idx` (populated
+    /// during `draw`).
+    #[cfg(test)]
+    pub fn debug_button_rect(&self, idx: usize) -> Option<Rect> {
+        self.button_rects.borrow().get(idx).copied()
+    }
+
     /// Update the panel content.
     pub fn update(
         &mut self,
@@ -132,28 +139,32 @@ impl Widget for MachinePanel {
         y += 6;
 
         // "Events:" header.
-        self.draw_text_line(renderer, "Events (Enter/D to dispatch):", inner_x, y, BODY_COLOR);
+        self.draw_text_line(renderer, "Events (tap to dispatch):", inner_x, y, BODY_COLOR);
         y += lh;
 
-        // Event list with focus highlight. Record each button's clickable rect
-        // for tap hit-testing (SCTD-02 §6.2).
+        // Event list rendered as tappable buttons. Each is a filled rounded rect
+        // ~26 px tall (a finger-sized touch target, not a single text line), with
+        // the hit rect recorded for PressRelease hit-testing (SCTD-02 §6.2).
         let mut rects = self.button_rects.borrow_mut();
         rects.clear();
         let btn_w = (self.bounds.width - PADDING * 2).max(0);
+        let btn_h = lh + 12;
         for (i, &event) in self.events.iter().enumerate() {
-            let color = if i == self.event_focus {
-                FOCUSED_EVENT_COLOR
-            } else {
-                EVENT_COLOR
-            };
-            let prefix = if i == self.event_focus { "> " } else { "  " };
-            let line = alloc::format!("{}{}", prefix, event);
-            self.draw_text_line(renderer, &line, inner_x + 4, y, color);
-            rects.push(Rect { x: inner_x, y: y - 2, width: btn_w, height: lh });
-            y += lh;
-            if y > self.bounds.y + self.bounds.height - PADDING {
+            if y + btn_h > self.bounds.y + self.bounds.height - PADDING {
                 break;
             }
+            let (bg, fg) = if i == self.event_focus {
+                (Color(52, 66, 92, 255), FOCUSED_EVENT_COLOR)
+            } else {
+                (Color(30, 38, 52, 255), EVENT_COLOR)
+            };
+            let face = Rect { x: inner_x, y, width: btn_w, height: btn_h - 4 };
+            fill_rounded_rect(renderer, face, bg, 4);
+            self.draw_text_line(renderer, event, inner_x + 10, y + 5, fg);
+            // Hit rect spans the full row (including the inter-button gap) for
+            // forgiving capacitive taps.
+            rects.push(Rect { x: inner_x, y, width: btn_w, height: btn_h });
+            y += btn_h;
         }
     }
 

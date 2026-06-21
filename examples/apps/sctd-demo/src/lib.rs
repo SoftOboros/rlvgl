@@ -948,6 +948,46 @@ mod tests {
         assert!(ctrl.current_state_summary().contains("PAUSED"));
     }
 
+    /// A renderer that draws nothing — used to run a layout pass so the panel
+    /// records its event-button hit rects without a real framebuffer.
+    struct NullRenderer;
+    impl rlvgl_core::renderer::Renderer for NullRenderer {
+        fn fill_rect(&mut self, _rect: Rect, _color: Color) {}
+        fn draw_text(&mut self, _pos: (i32, i32), _text: &str, _color: Color) {}
+    }
+
+    /// SCTD-02 §6.2 — tapping an on-screen event button must DISPATCH it (not
+    /// merely move the focus highlight). Exercises the full touch path:
+    /// draw → button rects recorded → PressRelease hit-test → on_event_tap.
+    #[test]
+    fn tapping_event_button_dispatches() {
+        let mut ctrl = make_controller();
+        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') }); // interactive
+        assert_eq!(ctrl.selected_machine(), 2);
+        // Layout pass so the panel records its button rects.
+        ctrl.root().borrow().draw(&mut NullRenderer);
+        let rect = ctrl
+            .state
+            .borrow()
+            .panel
+            .borrow()
+            .debug_button_rect(0)
+            .expect("button 0 (Arrive) rect must be recorded after draw");
+        // Tap the center of the "Arrive" button.
+        let (cx, cy) = (rect.x + rect.width / 2, rect.y + rect.height / 2);
+        ctrl.dispatch_event(&Event::PressRelease { x: cx, y: cy });
+
+        // The tap must have dispatched: a command is queued AND the interactive
+        // machine seated philosopher 1.
+        let cmds = ctrl.drain_commands();
+        assert!(!cmds.is_empty(), "tap must emit an EventDispatched command");
+        assert!(
+            ctrl.current_state_summary().contains("1:thk"),
+            "tapping Arrive must seat philosopher 1; got {}",
+            ctrl.current_state_summary()
+        );
+    }
+
     /// SCTD-00 §9.2 — event dispatch: dispatching "Do.Timer.Hungry" reaches
     /// the Dining Philosophers machine and produces an `EventDispatched` command.
     #[test]
