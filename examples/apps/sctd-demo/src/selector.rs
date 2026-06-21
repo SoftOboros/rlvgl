@@ -59,8 +59,10 @@ impl MachineSelector {
             margin_top,
             gap,
             selected: 0,
-            // Interactive Philosophers reuses the DP glyph (tutorial-asset icon
-            // transcoding deferred per SCTD-00 §6.4).
+            // Both Dining Philosophers machines (faithful slot 0, interactive
+            // slot 2) share the authentic tutorial table illustration `ICON_DP`
+            // (SCTD-00 §6.4); they are distinguished by the selector highlight,
+            // the subtitle, and the panel content rather than the glyph.
             icons: [ICON_DP, ICON_MEDIA, ICON_DP],
             on_tap: [const { None }; MACHINE_COUNT],
             decoded: RefCell::new([const { None }; MACHINE_COUNT]),
@@ -98,21 +100,15 @@ impl MachineSelector {
     }
 
     fn decode_rle(rle: &[u8], buf: &mut alloc::vec::Vec<Color>) -> Option<(u32, u32)> {
-        let (width, height, palette_bytes, stream) =
-            rlvgl_decomp::parse_rle_blob(rle).ok()?;
+        let (width, height, palette_bytes, stream) = rlvgl_decomp::parse_rle_blob(rle).ok()?;
         let palette_len = palette_bytes.len() / 2;
         let mut palette = alloc::vec![0u16; palette_len];
         for i in 0..palette_len {
-            palette[i] =
-                u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);
+            palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);
         }
         let rgba =
-            rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream)
-                .ok()?;
-        buf.extend(
-            rgba.chunks_exact(4)
-                .map(|c| Color(c[0], c[1], c[2], c[3])),
-        );
+            rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
+        buf.extend(rgba.chunks_exact(4).map(|c| Color(c[0], c[1], c[2], c[3])));
         Some((width as u32, height as u32))
     }
 }
@@ -136,7 +132,11 @@ impl Widget for MachineSelector {
             if decoded[index].is_none() {
                 let mut pixels: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
                 if let Some((w, h)) = Self::decode_rle(rle, &mut pixels) {
-                    decoded[index] = Some(DecodedIcon { pixels, width: w, height: h });
+                    decoded[index] = Some(DecodedIcon {
+                        pixels,
+                        width: w,
+                        height: h,
+                    });
                 }
             }
             if let Some(entry) = decoded[index].as_ref() {
@@ -147,12 +147,7 @@ impl Widget for MachineSelector {
             }
             if self.selected == index {
                 let bounds = self.slot_bounds(index);
-                draw_border_straight(
-                    renderer,
-                    bounds,
-                    FOCUS_HIGHLIGHT_COLOR,
-                    FOCUS_BORDER_WIDTH,
-                );
+                draw_border_straight(renderer, bounds, FOCUS_HIGHLIGHT_COLOR, FOCUS_BORDER_WIDTH);
             }
         }
     }

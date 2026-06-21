@@ -28,12 +28,12 @@
 //! `Machine::get_var()`.
 //!
 //! # Icon assets
-//! Icons are Lucide-derived supplemental glyphs reused from the disco-demo
-//! crate (SCTD-00 §6.6 allows Lucide for gaps when tutorial assets are
-//! absent). The dp48 glyph represents Dining Philosophers; media48 represents
-//! the Media Player. Tutorial-asset icons (from Qt/DiningPhilosophers/
-//! Images/ and Qt/SkodaBoleroInfotainment/Qml/Images/) require transcoding to
-//! RLE and are deferred to a follow-up per SCTD-00 §6.4.
+//! The Dining Philosophers selector icon and the hero illustration are the
+//! authentic tutorial table image (`Qt/DiningPhilosophers/Images/`
+//! `dininig_philosophers.svg`) transcoded to RLE via `rlvgl-creator` per
+//! SCTD-00 §6.4 — see [`assets`] for the provenance and the exact pipeline.
+//! The Media Player glyph stays Lucide-derived (SCTD-00 §6.6 allows Lucide
+//! for gaps when tutorial assets are absent or unsuitable).
 
 #![cfg_attr(not(test), no_std)]
 #![deny(missing_docs)]
@@ -41,12 +41,21 @@
 extern crate alloc;
 
 pub mod assets;
+mod hero;
 mod machine_panel;
 mod selector;
 
-use alloc::{boxed::Box, format, rc::Rc, string::{String, ToString}, vec, vec::Vec};
+use alloc::{
+    boxed::Box,
+    format,
+    rc::Rc,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use core::cell::RefCell;
 
+use hero::HeroImage;
 use machine_panel::MachinePanel;
 use selector::MachineSelector;
 
@@ -311,7 +320,8 @@ impl MachineAdapter for MediaPlayerAdapter {
         // Delegates directly to the generated machine's public `step` method.
         // Uses `Value::Undefined` as event data — all MP transitions are
         // triggered by event name only (no data payload guards in the normalized SCXML).
-        self.machine.step(event_name, media_player::Value::Undefined);
+        self.machine
+            .step(event_name, media_player::Value::Undefined);
     }
 }
 
@@ -500,6 +510,7 @@ impl MachineAdapter for InteractiveDiningPhilosophersAdapter {
 struct ControllerState {
     selector: Rc<RefCell<MachineSelector>>,
     panel: Rc<RefCell<MachinePanel>>,
+    hero: Rc<RefCell<HeroImage>>,
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
     adapters: Vec<Box<dyn MachineAdapter>>,
@@ -513,6 +524,7 @@ impl ControllerState {
     fn new(
         selector: Rc<RefCell<MachineSelector>>,
         panel: Rc<RefCell<MachinePanel>>,
+        hero: Rc<RefCell<HeroImage>>,
         subtitle: Rc<RefCell<Label>>,
         footer: Rc<RefCell<Label>>,
     ) -> Self {
@@ -524,6 +536,7 @@ impl ControllerState {
         let mut this = Self {
             selector,
             panel,
+            hero,
             subtitle,
             footer,
             adapters,
@@ -531,8 +544,16 @@ impl ControllerState {
             event_focus: 0,
             commands: Vec::new(),
         };
+        this.sync_hero();
         this.sync_panel();
         this
+    }
+
+    /// Show the DP table hero only while a Dining Philosophers machine is
+    /// selected (the table illustration is meaningless for the Media Player).
+    fn sync_hero(&mut self) {
+        let dp = self.adapters[self.selected].name().contains("Philosophers");
+        self.hero.borrow_mut().set_visible(dp);
     }
 
     fn sync_panel(&mut self) {
@@ -563,28 +584,23 @@ impl ControllerState {
             if let Ok(mut sel) = self.selector.try_borrow_mut() {
                 sel.set_selected(index);
             }
+            self.sync_hero();
             self.sync_panel();
-            self.footer.borrow_mut().set_text(format!(
-                "Selected: {}",
-                self.adapters[index].name()
-            ));
+            self.footer
+                .borrow_mut()
+                .set_text(format!("Selected: {}", self.adapters[index].name()));
         }
     }
 
     fn dispatch_focused_event(&mut self) {
-        let events: Vec<&'static str> = self.adapters[self.selected]
-            .available_events()
-            .to_vec();
+        let events: Vec<&'static str> = self.adapters[self.selected].available_events().to_vec();
         if let Some(&event_name) = events.get(self.event_focus) {
             self.adapters[self.selected].dispatch_event(event_name);
             let summary = self.adapters[self.selected].state_summary();
             let name = self.adapters[self.selected].name();
-            self.panel.borrow_mut().update(
-                name,
-                &summary,
-                &events,
-                self.event_focus,
-            );
+            self.panel
+                .borrow_mut()
+                .update(name, &summary, &events, self.event_focus);
             self.footer
                 .borrow_mut()
                 .set_text(format!("Dispatched: {}", event_name));
@@ -599,9 +615,7 @@ impl ControllerState {
     /// panel's on-screen tap callback. Does NOT touch the panel widget (it is
     /// borrowed during the tap); the panel refreshes on the next `Tick`.
     fn dispatch_event_index(&mut self, idx: usize) {
-        let events: Vec<&'static str> = self.adapters[self.selected]
-            .available_events()
-            .to_vec();
+        let events: Vec<&'static str> = self.adapters[self.selected].available_events().to_vec();
         if let Some(&event_name) = events.get(idx) {
             self.event_focus = idx;
             self.adapters[self.selected].dispatch_event(event_name);
@@ -621,8 +635,7 @@ impl ControllerState {
         if count == 0 {
             return;
         }
-        self.event_focus =
-            (self.event_focus as i32 + delta).rem_euclid(count as i32) as usize;
+        self.event_focus = (self.event_focus as i32 + delta).rem_euclid(count as i32) as usize;
         self.sync_panel();
     }
 
@@ -687,8 +700,16 @@ impl SctdController {
     /// Build the Tutorial Demo controller for the given screen dimensions.
     pub fn new(screen: rlvgl_platform::Screen) -> Self {
         let (logical_w, logical_h) = screen.logical_size();
-        let width = if logical_w == 0 { 800 } else { logical_w as i32 };
-        let height = if logical_h == 0 { 480 } else { logical_h as i32 };
+        let width = if logical_w == 0 {
+            800
+        } else {
+            logical_w as i32
+        };
+        let height = if logical_h == 0 {
+            480
+        } else {
+            logical_h as i32
+        };
 
         let mut root_container = Container::new(Rect {
             x: 0,
@@ -705,27 +726,61 @@ impl SctdController {
 
         let title = themed_label(
             "SCXML Tutorial Demo",
-            Rect { x: PANEL_X, y: 24, width: 500, height: 18 },
+            Rect {
+                x: PANEL_X,
+                y: 24,
+                width: 500,
+                height: 18,
+            },
             Color(248, 249, 250, 255),
         );
         let subtitle = themed_label(
             "Machine: Dining Philosophers",
-            Rect { x: PANEL_X, y: 48, width: 500, height: 18 },
+            Rect {
+                x: PANEL_X,
+                y: 48,
+                width: 500,
+                height: 18,
+            },
             Color(148, 162, 184, 255),
         );
         let footer = themed_label(
             "Use arrow keys / 1 / 2 to select; Enter or D to dispatch",
-            Rect { x: PANEL_X, y: height - 32, width: 700, height: 18 },
+            Rect {
+                x: PANEL_X,
+                y: height - 32,
+                width: 700,
+                height: 18,
+            },
             Color(192, 203, 215, 255),
         );
 
         // Machine Panel — shows state summary and event buttons.
+        let panel_w = PANEL_WIDTH.min(width - STRIP_X_OFFSET - PANEL_X - 10);
+        let panel_h = PANEL_HEIGHT.min(height - PANEL_Y - 50);
         let panel = Rc::new(RefCell::new(MachinePanel::new(Rect {
             x: PANEL_X,
             y: PANEL_Y,
-            width: PANEL_WIDTH.min(width - STRIP_X_OFFSET - PANEL_X - 10),
-            height: PANEL_HEIGHT.min(height - PANEL_Y - 50),
+            width: panel_w,
+            height: panel_h,
         })));
+
+        // Hero Illustration — the tutorial DP table, centered in the gap between
+        // the panel's right edge and the selector strip (SCTD-00 §6.4).
+        const HERO_SIZE: i32 = 150;
+        let gap_left = PANEL_X + panel_w;
+        let gap_right = width - STRIP_X_OFFSET;
+        let hero_x = gap_left + ((gap_right - gap_left - HERO_SIZE) / 2).max(0);
+        let hero_y = PANEL_Y + ((panel_h - HERO_SIZE) / 2).max(0);
+        let hero = Rc::new(RefCell::new(HeroImage::new(
+            Rect {
+                x: hero_x,
+                y: hero_y,
+                width: HERO_SIZE,
+                height: HERO_SIZE,
+            },
+            assets::HERO_DP,
+        )));
 
         // Machine Selector — right-edge icon strip matching disco-demo position.
         let selector = Rc::new(RefCell::new(MachineSelector::new(
@@ -746,6 +801,7 @@ impl SctdController {
         let state = Rc::new(RefCell::new(ControllerState::new(
             selector.clone(),
             panel.clone(),
+            hero.clone(),
             subtitle.clone(),
             footer.clone(),
         )));
@@ -753,22 +809,33 @@ impl SctdController {
         // Wire selector tap callbacks.
         {
             let state0 = state.clone();
-            selector.borrow_mut().set_on_tap(0, alloc::boxed::Box::new(move |_| {
-                state0.borrow_mut().select_machine(0);
-            }));
+            selector.borrow_mut().set_on_tap(
+                0,
+                alloc::boxed::Box::new(move |_| {
+                    state0.borrow_mut().select_machine(0);
+                }),
+            );
             let state1 = state.clone();
-            selector.borrow_mut().set_on_tap(1, alloc::boxed::Box::new(move |_| {
-                state1.borrow_mut().select_machine(1);
-            }));
+            selector.borrow_mut().set_on_tap(
+                1,
+                alloc::boxed::Box::new(move |_| {
+                    state1.borrow_mut().select_machine(1);
+                }),
+            );
             let state2 = state.clone();
-            selector.borrow_mut().set_on_tap(2, alloc::boxed::Box::new(move |_| {
-                state2.borrow_mut().select_machine(2);
-            }));
+            selector.borrow_mut().set_on_tap(
+                2,
+                alloc::boxed::Box::new(move |_| {
+                    state2.borrow_mut().select_machine(2);
+                }),
+            );
             // Wire on-screen event-button taps (SCTD-02 §6.2).
             let state_panel = state.clone();
-            panel.borrow_mut().set_on_event_tap(alloc::boxed::Box::new(move |idx| {
-                state_panel.borrow_mut().dispatch_event_index(idx);
-            }));
+            panel
+                .borrow_mut()
+                .set_on_event_tap(alloc::boxed::Box::new(move |idx| {
+                    state_panel.borrow_mut().dispatch_event_index(idx);
+                }));
         }
 
         {
@@ -787,6 +854,11 @@ impl SctdController {
                 widget: panel.clone(),
                 children: Vec::new(),
                 tag: Some("sctd.panel"),
+            });
+            r.children.push(WidgetNode {
+                widget: hero.clone(),
+                children: Vec::new(),
+                tag: Some("sctd.hero"),
             });
             r.children.push(WidgetNode {
                 widget: selector.clone(),
@@ -852,11 +924,7 @@ impl SctdController {
     }
 }
 
-fn themed_label(
-    text: impl Into<String>,
-    bounds: Rect,
-    text_color: Color,
-) -> Rc<RefCell<Label>> {
+fn themed_label(text: impl Into<String>, bounds: Rect, text_color: Color) -> Rc<RefCell<Label>> {
     let mut label = Label::new(text, bounds);
     label.style = StyleBuilder::new()
         .bg_color(Color(0, 0, 0, 0))
@@ -911,19 +979,31 @@ mod tests {
         assert_eq!(ctrl.selected_machine(), 0);
 
         // Arrow right cycles 0 -> 1 -> 2 -> 0 across the three machines.
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::ArrowRight });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::ArrowRight,
+        });
         assert_eq!(ctrl.selected_machine(), 1);
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::ArrowRight });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::ArrowRight,
+        });
         assert_eq!(ctrl.selected_machine(), 2);
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::ArrowRight });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::ArrowRight,
+        });
         assert_eq!(ctrl.selected_machine(), 0);
 
         // Number keys select directly.
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('2') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('2'),
+        });
         assert_eq!(ctrl.selected_machine(), 1);
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('3'),
+        });
         assert_eq!(ctrl.selected_machine(), 2);
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('1') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('1'),
+        });
         assert_eq!(ctrl.selected_machine(), 0);
     }
 
@@ -933,20 +1013,33 @@ mod tests {
     #[test]
     fn interactive_philosophers_controls() {
         let mut ctrl = make_controller();
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('3'),
+        });
         assert_eq!(ctrl.selected_machine(), 2);
-        let dispatch = |c: &SctdController, idx: usize| c.state.borrow_mut().dispatch_event_index(idx);
+        let dispatch =
+            |c: &SctdController, idx: usize| c.state.borrow_mut().dispatch_event_index(idx);
 
-        assert!(ctrl.current_state_summary().contains("1:-- 2:-- 3:-- 4:-- 5:--"));
+        assert!(
+            ctrl.current_state_summary()
+                .contains("1:-- 2:-- 3:-- 4:-- 5:--")
+        );
         dispatch(&ctrl, 0); // Arrive -> seat 1
         assert!(ctrl.current_state_summary().contains("1:thk"));
         dispatch(&ctrl, 0); // Arrive -> seat 2
         assert!(ctrl.current_state_summary().contains("2:thk"));
         dispatch(&ctrl, 1); // Depart -> highest seated (2) leaves
         let s = ctrl.current_state_summary();
-        assert!(s.contains("1:thk") && s.contains("2:--"), "after depart: {}", s);
+        assert!(
+            s.contains("1:thk") && s.contains("2:--"),
+            "after depart: {}",
+            s
+        );
         dispatch(&ctrl, 3); // Reset -> empty table
-        assert!(ctrl.current_state_summary().contains("1:-- 2:-- 3:-- 4:-- 5:--"));
+        assert!(
+            ctrl.current_state_summary()
+                .contains("1:-- 2:-- 3:-- 4:-- 5:--")
+        );
 
         // Host controls: Speed cycles label, Pause toggles run state.
         assert!(ctrl.current_state_summary().contains("speed x1 running"));
@@ -954,6 +1047,39 @@ mod tests {
         assert!(ctrl.current_state_summary().contains("speed x2"));
         dispatch(&ctrl, 4); // Pause
         assert!(ctrl.current_state_summary().contains("PAUSED"));
+    }
+
+    /// SCTD-00 §6.4 — the DP hero illustration is the authentic tutorial table
+    /// asset and must decode cleanly from its compiled-in RLE blob (150×150).
+    #[test]
+    fn hero_decodes_tutorial_table() {
+        let ctrl = make_controller();
+        let sz = ctrl.state.borrow().hero.borrow().debug_decoded_size();
+        assert_eq!(sz, Some((150, 150)), "DP hero RLE must decode to 150x150");
+    }
+
+    /// SCTD-00 §6.4 — the hero is shown for both Dining Philosophers machines
+    /// (faithful + interactive) and hidden for the Media Player.
+    #[test]
+    fn hero_visible_for_dp_machines_only() {
+        let mut ctrl = make_controller();
+        let vis = |c: &SctdController| c.state.borrow().hero.borrow().is_visible();
+        assert!(vis(&ctrl), "faithful DP selected initially -> hero shown");
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('2'),
+        });
+        assert!(!vis(&ctrl), "Media Player selected -> hero hidden");
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('3'),
+        });
+        assert!(
+            vis(&ctrl),
+            "Interactive Philosophers selected -> hero shown"
+        );
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('1'),
+        });
+        assert!(vis(&ctrl), "faithful DP re-selected -> hero shown");
     }
 
     /// A renderer that draws nothing — used to run a layout pass so the panel
@@ -970,7 +1096,9 @@ mod tests {
     #[test]
     fn tapping_event_button_dispatches() {
         let mut ctrl = make_controller();
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') }); // interactive
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('3'),
+        }); // interactive
         assert_eq!(ctrl.selected_machine(), 2);
         // Layout pass so the panel records its button rects.
         ctrl.root().borrow().draw(&mut NullRenderer);
@@ -1017,7 +1145,9 @@ mod tests {
     #[test]
     fn interactive_machine_survives_select_draw_tick() {
         let mut ctrl = make_controller();
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('3') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('3'),
+        });
         assert_eq!(ctrl.selected_machine(), 2);
         // Idle frames on the empty table.
         for _ in 0..120 {
@@ -1074,7 +1204,10 @@ mod tests {
         ctrl.dispatch_event(&Event::KeyDown { key: Key::Enter });
         let after = ctrl.current_state_summary();
 
-        assert!(!after.is_empty(), "state summary must be non-empty after dispatch");
+        assert!(
+            !after.is_empty(),
+            "state summary must be non-empty after dispatch"
+        );
         // The summary always includes the parent state name "DiningPhilosophers"
         // or a philosopher substates annotation.
         // We accept either the same or a changed value — the important property
@@ -1107,7 +1240,9 @@ mod tests {
     #[test]
     fn event_dispatch_reaches_media_player_machine() {
         let mut ctrl = make_controller();
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('2') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('2'),
+        });
         assert_eq!(ctrl.selected_machine(), 1);
 
         // Event focus 0 = "Inp.Media.Ready" (first in MediaPlayerAdapter::available_events).
@@ -1128,21 +1263,38 @@ mod tests {
     #[test]
     fn media_player_state_summary_format() {
         let mut ctrl = make_controller();
-        ctrl.dispatch_event(&Event::KeyDown { key: Key::Character('2') });
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('2'),
+        });
         assert_eq!(ctrl.selected_machine(), 1);
 
         let summary = ctrl.current_state_summary();
         assert!(!summary.is_empty(), "MP state summary must be non-empty");
         // Verify the summary format contains the expected datamodel fields.
-        assert!(summary.contains("src:"), "summary must contain src: field; got: {}", summary);
-        assert!(summary.contains("mute:"), "summary must contain mute: field; got: {}", summary);
-        assert!(summary.contains("repeat:"), "summary must contain repeat: field; got: {}", summary);
+        assert!(
+            summary.contains("src:"),
+            "summary must contain src: field; got: {}",
+            summary
+        );
+        assert!(
+            summary.contains("mute:"),
+            "summary must contain mute: field; got: {}",
+            summary
+        );
+        assert!(
+            summary.contains("repeat:"),
+            "summary must contain repeat: field; got: {}",
+            summary
+        );
 
         // After dispatching Inp.Media.Ready, the machine should transition from
         // mediaPlayerIdle to mediaPlayerRun (specifically mediaPlayerSourceSelect).
         ctrl.dispatch_event(&Event::KeyDown { key: Key::Enter }); // dispatch "Inp.Media.Ready"
         let summary_after = ctrl.current_state_summary();
-        assert!(!summary_after.is_empty(), "MP state summary after Ready must be non-empty");
+        assert!(
+            !summary_after.is_empty(),
+            "MP state summary after Ready must be non-empty"
+        );
         // The leaf state after Inp.Media.Ready must NOT be "mediaPlayerIdle".
         assert!(
             !summary_after.starts_with("mediaPlayerIdle"),
