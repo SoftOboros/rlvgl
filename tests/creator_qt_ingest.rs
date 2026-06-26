@@ -320,6 +320,42 @@ fn qt_corners_fixture_data_emit_matches_golden() {
     );
 }
 
+/// QT-03c §5 amendment #3 fixture coverage: siblings.qml exercises the
+/// sibling-relative box-model anchor solver — children anchored to other
+/// children (`<id>.<edge>`), axial fills (`left+right`, `top+bottom`), and
+/// topological declaration ordering of the emitted `cb_<i>` Rects.
+#[test]
+fn qt_siblings_fixture_rlvgl_emit_matches_golden() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let golden = manifest_dir.join("tests/fixtures/qt/siblings.rlvgl.rs");
+    let canonical = std::fs::read_to_string(&golden)
+        .unwrap_or_else(|e| panic!("missing golden at {} ({e})", golden.display()));
+
+    let out = tempdir().unwrap();
+    let status = Command::new(env!("CARGO_BIN_EXE_rlvgl-creator"))
+        .arg("--silent")
+        .arg("qt")
+        .arg("emit")
+        .arg("tests/fixtures/qt/siblings.qml")
+        .arg(out.path())
+        .current_dir(&manifest_dir)
+        .status()
+        .expect("failed to run rlvgl-creator");
+    assert!(status.success(), "qt emit (rlvgl default) failed");
+    let produced = std::fs::read_to_string(out.path().join("siblings.rlvgl.rs")).unwrap();
+
+    if canonical.trim_end() != produced.trim_end() {
+        panic!(
+            "qt emit (rlvgl) output drifted from tests/fixtures/qt/siblings.rlvgl.rs.\n\
+             Regenerate with:\n  \
+             cargo run --features creator --bin rlvgl-creator -- \
+             qt emit tests/fixtures/qt/siblings.qml tests/fixtures/qt\n\
+             Verify the diff is intentional under the QT-03c §5 amendment #3 \
+             (docs/qt-support/03c-anchor-resolver.md) before committing."
+        );
+    }
+}
+
 #[test]
 fn qt_corners_fixture_rlvgl_emit_matches_golden() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

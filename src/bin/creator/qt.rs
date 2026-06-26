@@ -765,13 +765,21 @@ pub fn walk_asset_refs(item: &UiItem) -> AssetInventory {
 fn visit_for_assets(item: &UiItem, inv: &mut AssetInventory) {
     let stripped_type = item.type_name.rsplit('.').next().unwrap_or(&item.type_name);
 
-    // Images: any item whose stripped type is `Image` and which has
-    // a literal `source: "<path>"` assignment.
-    if stripped_type == "Image"
+    // Images: any item whose stripped type is `Image` / `BorderImage` /
+    // `AnimatedImage` with a `source:` assignment. A literal `source: "<path>"`
+    // is captured directly; a state-bound `source:` (e.g. a ternary choosing
+    // between artwork files) has every quoted image-path literal harvested so
+    // designer-authored conditional artwork still vendors.
+    if matches!(stripped_type, "Image" | "BorderImage" | "AnimatedImage")
         && let Some(raw_source) = lookup_assignment(item, "source")
-        && let Some(s) = parse_string_literal(raw_source)
     {
-        inv.images.insert(strip_qrc_prefix(&s).to_string());
+        if let Some(s) = parse_string_literal(raw_source) {
+            inv.images.insert(strip_qrc_prefix(&s).to_string());
+        } else {
+            for s in extract_asset_literals(raw_source) {
+                inv.images.insert(strip_qrc_prefix(&s).to_string());
+            }
+        }
     }
 
     // Standalone Font { family: "<name>" } blocks.
@@ -809,6 +817,88 @@ fn visit_for_assets(item: &UiItem, inv: &mut AssetInventory) {
     for child in &item.children {
         visit_for_assets(child, inv);
     }
+}
+
+/// Resolve an `Image { source: … }` to the single asset the emitter should
+/// blit: a literal `source: "path"` directly, or the first artwork branch of a
+/// state-bound ternary. Returns `None` when no image-path literal is present.
+fn pick_image_source(item: &UiItem) -> Option<AssetRef> {
+    let raw = lookup_assignment(item, "source")?;
+    let path = parse_string_literal(raw)
+        .filter(|s| {
+            let l = s.to_ascii_lowercase();
+            l.starts_with("qrc:") || is_image_path(&l)
+        })
+        .or_else(|| extract_asset_literals(raw).into_iter().next())?;
+    let stripped = strip_qrc_prefix(&path).to_string();
+    Some(AssetRef {
+        symbol: asset_symbol(&stripped),
+        path: stripped,
+    })
+}
+
+/// Whether a path looks like a supported raster/vector image by extension.
+fn is_image_path(lower: &str) -> bool {
+    const IMAGE_EXTS: [&str; 7] = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".webp"];
+    IMAGE_EXTS.iter().any(|e| lower.ends_with(e))
+}
+
+/// Derive a stable `qt_assets` module symbol from an image path: the file stem
+/// uppercased with every non-alphanumeric byte folded to `_`, prefixed `IMG_`.
+/// e.g. `Qml/Images/ImgPlay_48.png` → `IMG_IMGPLAY_48`.
+fn asset_symbol(path: &str) -> String {
+    let stem = path
+        .rsplit('/')
+        .next()
+        .unwrap_or(path)
+        .rsplit_once('.')
+        .map(|(s, _)| s)
+        .unwrap_or(path);
+    let mut sym = String::from("IMG_");
+    for ch in stem.chars() {
+        if ch.is_ascii_alphanumeric() {
+            sym.extend(ch.to_uppercase());
+        } else {
+            sym.push('_');
+        }
+    }
+    sym
+}
+
+/// Harvest quoted string literals that look like asset paths from a binding
+/// expression (e.g. the branches of a state-bound `source:` ternary). A
+/// literal qualifies if it carries a known image extension or a `qrc:` prefix.
+fn extract_asset_literals(expr: &str) -> Vec<String> {
+    let bytes = expr.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let q = bytes[i];
+        if q == b'"' || q == b'\'' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && bytes[j] != q {
+                // Honour simple backslash escapes so an escaped quote does not
+                // terminate the literal early.
+                if bytes[j] == b'\\' && j + 1 < bytes.len() {
+                    j += 2;
+                    continue;
+                }
+                j += 1;
+            }
+            if j <= bytes.len() {
+                let lit = &expr[start..j.min(expr.len())];
+                let lower = lit.to_ascii_lowercase();
+                if lower.starts_with("qrc:") || is_image_path(&lower) {
+                    out.push(lit.to_string());
+                }
+            }
+            i = j + 1;
+        } else {
+            i += 1;
+        }
+    }
+    out
 }
 
 /// QT-07 §5 — strip `qrc:/` and `qrc:///` prefixes verbatim. Any
@@ -1974,7 +2064,7 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// bumped to `11` by QT-04e when reactive Label-text bindings
 /// shipped (`docs/qt-support/04e-reactive-bindings.md` §8). Closes
 /// out the QT-04 family.
-pub const QT_EMIT_VERSION_RLVGL: u32 = 13;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 14;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2021,6 +2111,16 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
     // QT-05a: link sibling .scjson side-file (silent fall-through if absent).
     attach_scjson_side_file(&mut module, input)?;
 
+    // Cross-component instantiation (rlvgl target): inline user-defined
+    // component children (`<Type>.qml`) so the full composed widget tree —
+    // including leaf artwork inside reusable components — reaches the emitter.
+    if matches!(target, EmitTarget::Rlvgl) {
+        let root_dir = component_search_root(input);
+        let mut stack = Vec::new();
+        let mut cache = std::collections::HashMap::new();
+        expand_components_in(&mut module.root, &root_dir, &mut stack, &mut cache);
+    }
+
     let stem = input
         .file_stem()
         .and_then(|s| s.to_str())
@@ -2032,6 +2132,147 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
     };
     fs::write(&out_path, rust).with_context(|| format!("writing {}", out_path.display()))?;
     Ok(())
+}
+
+/// Pick the directory to resolve user-component `.qml` files against: the
+/// nearest ancestor directory named `Qml` (the conventional QML source root),
+/// else the input file's own directory.
+fn component_search_root(input: &Path) -> PathBuf {
+    let mut cur = input.parent();
+    let fallback = cur
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    while let Some(d) = cur {
+        if d.file_name().and_then(|s| s.to_str()) == Some("Qml") {
+            return d.to_path_buf();
+        }
+        cur = d.parent();
+    }
+    fallback
+}
+
+/// Find `<type_name>.qml` under `root` via a bounded recursive search.
+fn find_component_file(root: &Path, type_name: &str) -> Option<PathBuf> {
+    fn walk(dir: &Path, target: &str, depth: u32) -> Option<PathBuf> {
+        if depth > 6 {
+            return None;
+        }
+        let entries = fs::read_dir(dir).ok()?;
+        let mut subdirs = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                subdirs.push(path);
+            } else if path.file_name().and_then(|s| s.to_str()) == Some(target) {
+                return Some(path);
+            }
+        }
+        for sub in subdirs {
+            if let Some(hit) = walk(&sub, target, depth + 1) {
+                return Some(hit);
+            }
+        }
+        None
+    }
+    let target = format!("{type_name}.qml");
+    walk(root, &target, 0)
+}
+
+/// Load and parse a component `.qml` root item, cached by type name. Returns
+/// `None` (cached) when the file is absent or fails to parse — the instance is
+/// then left as a fallback container.
+fn load_component(
+    type_name: &str,
+    root_dir: &Path,
+    cache: &mut std::collections::HashMap<String, Option<UiItem>>,
+) -> Option<UiItem> {
+    if let Some(hit) = cache.get(type_name) {
+        return hit.clone();
+    }
+    let resolved = find_component_file(root_dir, type_name).and_then(|path| {
+        let src = fs::read_to_string(&path).ok()?;
+        parse_module(&src, &path).ok().map(|m| m.root)
+    });
+    cache.insert(type_name.to_string(), resolved.clone());
+    resolved
+}
+
+/// Merge a component definition's root into an instance node: the node renders
+/// as the component root's type with the component body prepended to any
+/// instance-provided children, instance assignments overriding component
+/// defaults (so the parent's anchors win), and the instance `id` preserved.
+fn merge_component_into_instance(instance: &mut UiItem, def: UiItem) {
+    instance.type_name = def.type_name;
+    // Component body first, then instance-supplied extra children.
+    let mut children = def.children;
+    children.append(&mut instance.children);
+    instance.children = children;
+    // Assignments: component defaults, then instance overrides by target.
+    let mut merged = def.assignments;
+    for asn in std::mem::take(&mut instance.assignments) {
+        if let Some(slot) = merged.iter_mut().find(|a| a.target == asn.target) {
+            *slot = asn;
+        } else {
+            merged.push(asn);
+        }
+    }
+    instance.assignments = merged;
+    // Handlers / declarations: component then instance.
+    let mut handlers = def.handlers;
+    handlers.append(&mut instance.handlers);
+    instance.handlers = handlers;
+    let mut props = def.properties;
+    props.append(&mut instance.properties);
+    instance.properties = props;
+    let mut signals = def.signals;
+    signals.append(&mut instance.signals);
+    instance.signals = signals;
+}
+
+/// Recursively inline user-defined component children of `item`. `stack` guards
+/// against component-reference cycles; `cache` memoises parsed component roots.
+fn expand_components_in(
+    item: &mut UiItem,
+    root_dir: &Path,
+    stack: &mut Vec<String>,
+    cache: &mut std::collections::HashMap<String, Option<UiItem>>,
+) {
+    // Expand this node if it instantiates a user-defined component: an
+    // uppercase type that the widget table doesn't map and that resolves to a
+    // sibling `.qml`, and isn't already being expanded (cycle guard).
+    // Chase the component base-type chain: each merge may retype the node to
+    // another user component (e.g. MediaRepeatButton → SelectButton →
+    // FocusButton → Rectangle), so loop until the node is a mapped widget, a
+    // framework type with no `.qml`, or a cycle is detected.
+    let mut pushed = 0usize;
+    loop {
+        let stripped = item
+            .type_name
+            .rsplit('.')
+            .next()
+            .unwrap_or(&item.type_name)
+            .to_string();
+        if !(starts_uppercase(&stripped)
+            && matches!(map_qml_type(&stripped), WidgetKind::Fallback)
+            && !stack.contains(&stripped))
+        {
+            break;
+        }
+        let Some(def) = load_component(&stripped, root_dir, cache) else {
+            break;
+        };
+        stack.push(stripped);
+        pushed += 1;
+        merge_component_into_instance(item, def);
+    }
+
+    for child in &mut item.children {
+        expand_components_in(child, root_dir, stack, cache);
+    }
+
+    for _ in 0..pushed {
+        stack.pop();
+    }
 }
 
 /// Render a [`UiModule`] as the canonical QT-03 Rust emit-shape.
@@ -2248,6 +2489,8 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     let root_body = ctx.emit_helper(&module.root, &root_fn, true);
     let has_sm = sm_id.is_some();
     let used_dm_fields = ctx.used_dm_fields.clone();
+    let used_assets = ctx.used_assets.clone();
+    let has_images = !used_assets.is_empty();
 
     let mut out = String::new();
     out.push_str("// SPDX-License-Identifier: MIT\n");
@@ -2287,6 +2530,14 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     out.push('\n');
     out.push_str("extern crate alloc;\n");
     out.push('\n');
+    if has_images {
+        // Image-bearing modules reference the generated `qt_assets` module
+        // (one `&[u8]` RLE blob per symbol). Emitted first — `crate` sorts
+        // ahead of external crates under rustfmt, so the output stays
+        // idempotent under `cargo fmt`. The integrator provides
+        // `crate::qt_assets` (hand-written or vendored).
+        out.push_str("use crate::qt_assets;\n");
+    }
     out.push_str("use alloc::rc::Rc;\n");
     out.push_str("use alloc::string::String;\n");
     out.push_str("use alloc::vec::Vec;\n");
@@ -2301,6 +2552,10 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     out.push_str("use rlvgl_widgets::button::Button;\n");
     out.push_str("use rlvgl_widgets::click_area::ClickArea;\n");
     out.push_str("use rlvgl_widgets::container::Container;\n");
+    if has_images {
+        // `image` sorts between `container` and `label` — fmt-stable.
+        out.push_str("use rlvgl_widgets::image::Image;\n");
+    }
     out.push_str("use rlvgl_widgets::label::Label;\n");
     // QT-05b §6: import the istate-codegen 6-symbol linkage surface
     // (the ones we actually reference at this phase: `Event` for
@@ -2410,6 +2665,10 @@ pub fn render_rlvgl(module: &UiModule) -> String {
                  dm.{field}.to_string()\n}}\n\n"
         ));
     }
+    if has_images {
+        emit_qt_image_helper(&used_assets, &mut out);
+    }
+
     out.push_str(&root_body);
 
     // Trim the trailing blank line that comes from the last helper's
@@ -2417,6 +2676,43 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     // with a single newline. Keeps the emit byte-stable under
     // `cargo fmt`, which strips trailing blank lines.
     format!("{}\n", out.trim_end())
+}
+
+/// Emit the `qt_image` decode helper plus a `qt_assets` symbol manifest. The
+/// helper decodes a vendored RLE blob into an owned, leaked pixel buffer and
+/// wraps it in an [`rlvgl_widgets::image::Image`]; leaking is acceptable because
+/// demo artwork is allocated once at startup and lives for the program.
+///
+/// The manifest lists every `qt_assets::<SYMBOL>` the module references. The
+/// integrator provides a `qt_assets` module (hand-written or generated by
+/// `rlvgl-creator` vendoring) exposing one `pub static <SYMBOL>: &[u8]` RLE blob
+/// per entry. Decode mirrors the sctd-demo philosophers-table pipeline.
+fn emit_qt_image_helper(used_assets: &[AssetRef], out: &mut String) {
+    out.push_str("// Required `qt_assets` symbols (one RLE `&[u8]` blob each):\n");
+    for a in used_assets {
+        out.push_str(&format!("//   qt_assets::{}  ←  {}\n", a.symbol, a.path));
+    }
+    out.push_str(
+        "/// Decode a vendored RLE asset into an owned, leaked pixel buffer and\n\
+         /// wrap it in an `Image` widget (see emit-time docs above).\n\
+         #[rustfmt::skip]\n\
+         fn qt_image(bounds: Rect, rle: &'static [u8]) -> Rc<RefCell<dyn Widget>> {\n    \
+             let (w, h, palette_bytes, stream) =\n        \
+                 rlvgl_decomp::parse_rle_blob(rle).expect(\"qt_image: malformed RLE asset\");\n    \
+             let palette_len = palette_bytes.len() / 2;\n    \
+             let mut palette = alloc::vec![0u16; palette_len];\n    \
+             for i in 0..palette_len {\n        \
+                 palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);\n    \
+             }\n    \
+             let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)\n        \
+                 .expect(\"qt_image: RLE decode failed\");\n    \
+             let pixels: Vec<Color> = rgba\n        \
+                 .chunks_exact(4)\n        \
+                 .map(|c| Color(c[0], c[1], c[2], c[3]))\n        \
+                 .collect();\n    \
+             let pixels: &'static [Color] = Vec::leak(pixels);\n    \
+             Rc::new(RefCell::new(Image::new(bounds, w as i32, h as i32, pixels)))\n}\n\n",
+    );
 }
 
 /// Per-emit context carrying the linear node index counter and the
@@ -2441,6 +2737,23 @@ struct RlvglEmitCtx {
     /// free functions at the tail of `render_rlvgl` so the function
     /// definition order is byte-stable.
     used_dm_fields: Vec<String>,
+    /// Helper-function names already emitted, to de-duplicate `build_<id>`
+    /// collisions produced by inlining multiple instances of a component.
+    used_fn_names: std::collections::HashSet<String>,
+    /// Image assets referenced by emitted `Image` widgets, in first-use
+    /// order. Each entry is `(symbol, qrc_stripped_path)`. Drives the
+    /// conditional `qt_image` helper / import emission and the companion
+    /// `qt_assets` module reference list.
+    used_assets: Vec<AssetRef>,
+}
+
+/// One image asset referenced by the emitted widget tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AssetRef {
+    /// `qt_assets` module symbol, e.g. `IMG_IMGPLAY_48`.
+    symbol: String,
+    /// `qrc:`-stripped source path, e.g. `Qml/Images/ImgPlay_48.png`.
+    path: String,
 }
 
 impl RlvglEmitCtx {
@@ -2451,6 +2764,8 @@ impl RlvglEmitCtx {
             sm_id: None,
             dm_field_ids: Vec::new(),
             used_dm_fields: Vec::new(),
+            used_assets: Vec::new(),
+            used_fn_names: std::collections::HashSet::new(),
         }
     }
 
@@ -2471,12 +2786,24 @@ impl RlvglEmitCtx {
 
     /// Allocate a helper-function name per QT-03b §8.
     fn alloc_fn_name(&mut self, item: &UiItem) -> String {
-        let name = match &item.id {
-            Some(id) => format!("build_{}", sanitize_ident(id)),
-            None => format!("build_node_{}", self.node_index),
-        };
+        let idx = self.node_index;
         self.node_index += 1;
-        name
+        let base = match &item.id {
+            Some(id) => format!("build_{}", sanitize_ident(id)),
+            // Index-keyed names are already unique.
+            None => return format!("build_node_{idx}"),
+        };
+        // Component instantiation can inline several instances that share a QML
+        // `id`, which would collide as `build_<id>`. Suffix collisions with the
+        // node index so they stay unique. Non-colliding ids keep the bare form,
+        // preserving the byte-stable emit shape for single-instance modules.
+        if self.used_fn_names.insert(base.clone()) {
+            base
+        } else {
+            let unique = format!("{base}_{idx}");
+            self.used_fn_names.insert(unique.clone());
+            unique
+        }
     }
 
     /// Recursively emit one helper function for `item` and all its
@@ -2534,6 +2861,7 @@ impl RlvglEmitCtx {
             self.sm_id.as_deref(),
             &self.dm_field_ids,
             &mut self.used_dm_fields,
+            &mut self.used_assets,
             &mut out,
         );
         emit_skipped_summary(item, is_root, &self.state_fields, &mut out);
@@ -2547,19 +2875,42 @@ impl RlvglEmitCtx {
              widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }};\n"
         ));
 
-        for (child_name, child) in &child_fns {
-            emit_child_bounds(child, &mut out);
-            // QT-05b/05c: thread `Rc::clone(&machine)` and the
-            // sealed `Vec<Binding>` into the child call when a state
-            // machine is attached.
-            if self.has_sm() {
-                out.push_str(&format!(
-                    "    node.children.push({child_name}(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));\n"
-                ));
-            } else {
-                out.push_str(&format!(
-                    "    node.children.push({child_name}(child_bounds, Rc::clone(&state), label_bindings));\n"
-                ));
+        // QT-03c sibling-relative extension: if any child anchors to a
+        // sibling (`<id>.<edge>`), switch to the layout-solver path — resolve
+        // each child's bounds into a uniquely-named `cb_<i>` Rect in dependency
+        // order so later siblings can reference earlier ones, then push the
+        // children in source (z) order. Parents with no sibling anchors keep
+        // the legacy per-child `child_bounds` path verbatim (byte-stable
+        // goldens).
+        let needs_solver = item.children.iter().any(child_has_sibling_anchor);
+        if needs_solver {
+            emit_solved_child_bounds(&child_fns, &mut out);
+            for (i, (child_name, _child)) in child_fns.iter().enumerate() {
+                if self.has_sm() {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(cb_{i}, Rc::clone(&state), Rc::clone(&machine), bindings));\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(cb_{i}, Rc::clone(&state), label_bindings));\n"
+                    ));
+                }
+            }
+        } else {
+            for (child_name, child) in &child_fns {
+                emit_child_bounds(child, &mut out);
+                // QT-05b/05c: thread `Rc::clone(&machine)` and the
+                // sealed `Vec<Binding>` into the child call when a state
+                // machine is attached.
+                if self.has_sm() {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(child_bounds, Rc::clone(&state), label_bindings));\n"
+                    ));
+                }
             }
         }
 
@@ -2587,6 +2938,14 @@ enum WidgetKind {
     /// region) with optional `set_on_click` wiring. See
     /// `docs/qt-support/04d-mousearea.md` §5.
     ClickArea,
+    /// Lowers QML `Image` / `AnimatedImage` to
+    /// [`rlvgl_widgets::image::Image`] backed by a vendored RLE asset
+    /// (runtime-decoded to an owned, leaked pixel buffer). The asset is
+    /// referenced through the generated `qt_assets` module by a symbol
+    /// derived from the `source:` path. State-bound `source:` ternaries
+    /// default to the first artwork branch (reactive swapping is wired by
+    /// the integrator via the returned image handle).
+    Image,
     Fallback,
 }
 
@@ -2608,6 +2967,10 @@ fn map_qml_type(name: &str) -> WidgetKind {
         // to a typed ClickArea mapping with handler support.
         "MouseArea" => WidgetKind::ClickArea,
 
+        // Image family → rlvgl Image widget backed by a vendored asset.
+        // `BorderImage` (9-slice) is approximated as a plain Image for now.
+        "Image" | "AnimatedImage" | "BorderImage" => WidgetKind::Image,
+
         // QT-03b §5: Column/Row remain Container fallbacks at
         // QT-03b initial implementation; `VStack`/`HStack`
         // lowering is deferred (per-child-height constructor needs
@@ -2628,6 +2991,7 @@ fn emit_widget_construction(
     sm_id: Option<&str>,
     dm_field_ids: &[String],
     used_dm_fields: &mut Vec<String>,
+    used_assets: &mut Vec<AssetRef>,
     out: &mut String,
 ) {
     match kind {
@@ -2781,6 +3145,38 @@ fn emit_widget_construction(
                  Rc::new(RefCell::new(click_area));\n",
             );
         }
+        WidgetKind::Image => {
+            // Resolve the `source:` to a single vendored asset. A literal
+            // path maps directly; a state-bound ternary uses its first
+            // artwork branch as the static default (the integrator can swap
+            // the image at runtime via the node's tagged handle).
+            match pick_image_source(item) {
+                Some(asset) => {
+                    if !used_assets.iter().any(|a| a.symbol == asset.symbol) {
+                        used_assets.push(asset.clone());
+                    }
+                    out.push_str(&format!(
+                        "    // QT-IMG: Image source → qt_assets::{} ({})\n",
+                        asset.symbol, asset.path
+                    ));
+                    out.push_str(&format!(
+                        "    let widget: Rc<RefCell<dyn Widget>> = \
+                         qt_image(bounds, qt_assets::{});\n",
+                        asset.symbol
+                    ));
+                }
+                None => {
+                    out.push_str(
+                        "    // QT-IMG: Image with no resolvable source literal; \
+                         emitting an empty container\n",
+                    );
+                    out.push_str(
+                        "    let widget: Rc<RefCell<dyn Widget>> =\n        \
+                         Rc::new(RefCell::new(Container::new(bounds)));\n",
+                    );
+                }
+            }
+        }
         WidgetKind::Fallback => {
             out.push_str(&format!(
                 "    // emitter-fallback (QT-03b): unmapped QML type `{}`\n",
@@ -2864,6 +3260,285 @@ fn emit_skipped_summary(
     if skipped_handlers > 0 {
         out.push_str(&format!(
             "    // emitter-skipped (QT-04+): {skipped_handlers} signal handler(s)\n",
+        ));
+    }
+}
+
+/// Resolved child geometry as Rust expression strings (absolute, i.e. each
+/// already includes the parent's `bounds.x`/`bounds.y` offset).
+struct ResolvedBounds {
+    x: String,
+    y: String,
+    w: String,
+    h: String,
+}
+
+/// An anchor value of the form `<obj>.<edge>` where `<obj>` is a sibling id
+/// (not `parent`). Drives the layout-solver activation and dependency sort.
+fn anchor_sibling_target(value: &str) -> Option<&str> {
+    let v = value.trim();
+    let (obj, edge) = v.split_once('.')?;
+    let edge_ok = matches!(
+        edge,
+        "left" | "right" | "top" | "bottom" | "horizontalCenter" | "verticalCenter"
+    );
+    if edge_ok && obj != "parent" && is_ident_str(obj) {
+        Some(obj)
+    } else {
+        None
+    }
+}
+
+/// Whether `s` is a plain identifier (no dots, ident chars only).
+fn is_ident_str(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes().next().map(is_ident_start).unwrap_or(false)
+        && s.bytes().all(is_ident_cont)
+}
+
+/// Does any of this child's `anchors.*` assignments reference a sibling
+/// (`<id>.<edge>`)? Such parents need the sibling-aware layout solver.
+fn child_has_sibling_anchor(child: &UiItem) -> bool {
+    child.assignments.iter().any(|a| {
+        a.target.starts_with("anchors.")
+            && matches!(&a.value, UiAssignmentValue::Expression { text }
+                if anchor_sibling_target(text).is_some())
+    })
+}
+
+/// Sibling ids this child's anchors depend on (deduplicated, source order).
+fn child_anchor_deps(child: &UiItem) -> Vec<String> {
+    let mut deps = Vec::new();
+    for a in &child.assignments {
+        if !a.target.starts_with("anchors.") {
+            continue;
+        }
+        if let UiAssignmentValue::Expression { text } = &a.value
+            && let Some(obj) = anchor_sibling_target(text)
+            && !deps.iter().any(|d| d == obj)
+        {
+            deps.push(obj.to_string());
+        }
+    }
+    deps
+}
+
+/// Resolve an anchor edge value (`parent.left`, `imageSource.bottom`, …) to an
+/// absolute Rust expression. `base_of` maps a sibling id to its emitted Rect
+/// variable name; `parent` maps to `bounds`. Returns `None` for unresolvable
+/// references (unknown sibling), so the caller can fall back.
+fn anchor_edge_expr(value: &str, base_of: &dyn Fn(&str) -> Option<String>) -> Option<String> {
+    let v = value.trim();
+    let (obj, edge) = v.split_once('.')?;
+    let base = if obj == "parent" {
+        "bounds".to_string()
+    } else {
+        base_of(obj)?
+    };
+    let expr = match edge {
+        "left" => format!("{base}.x"),
+        "right" => format!("({base}.x + {base}.width)"),
+        "top" => format!("{base}.y"),
+        "bottom" => format!("({base}.y + {base}.height)"),
+        "horizontalCenter" => format!("({base}.x + {base}.width / 2)"),
+        "verticalCenter" => format!("({base}.y + {base}.height / 2)"),
+        _ => return None,
+    };
+    Some(expr)
+}
+
+/// Read a literal-int margin (`anchors.<name>`), defaulting to 0 when absent or
+/// non-literal (e.g. a JS-constant margin the emitter can't evaluate).
+fn lit_margin(child: &UiItem, name: &str) -> i32 {
+    lookup_assignment(child, name)
+        .and_then(parse_int_literal)
+        .unwrap_or(0)
+}
+
+/// Full QML anchor box-model solver: resolves a child's `x/y/w/h` from its
+/// `anchors.*` (fill / centerIn / per-edge, parent- or sibling-relative) plus
+/// per-edge margins and literal `x/y/width/height`. Sibling references resolve
+/// through `base_of`. This is the QT-03c sibling-relative extension.
+fn solve_child_bounds(child: &UiItem, base_of: &dyn Fn(&str) -> Option<String>) -> ResolvedBounds {
+    // anchors.fill: parent expands to all four parent edges.
+    let fill = lookup_assignment(child, "anchors.fill")
+        .map(|s| s.trim() == "parent")
+        .unwrap_or(false);
+    let center_in = lookup_assignment(child, "anchors.centerIn")
+        .map(|s| s.trim() == "parent")
+        .unwrap_or(false);
+    let all_margin = lookup_assignment(child, "anchors.margins").and_then(parse_int_literal);
+
+    // Per-edge anchor values, fill/centerIn synthesised into edges.
+    let edge = |name: &str, fill_val: Option<&str>| -> Option<String> {
+        if let Some(v) = lookup_assignment(child, name) {
+            Some(v.trim().to_string())
+        } else {
+            fill_val.map(|s| s.to_string())
+        }
+    };
+    let a_left = edge("anchors.left", fill.then_some("parent.left"));
+    let a_right = edge("anchors.right", fill.then_some("parent.right"));
+    let a_top = edge("anchors.top", fill.then_some("parent.top"));
+    let a_bottom = edge("anchors.bottom", fill.then_some("parent.bottom"));
+    let a_hcenter = lookup_assignment(child, "anchors.horizontalCenter")
+        .map(|s| s.trim().to_string())
+        .or_else(|| center_in.then(|| "parent.horizontalCenter".to_string()));
+    let a_vcenter = lookup_assignment(child, "anchors.verticalCenter")
+        .map(|s| s.trim().to_string())
+        .or_else(|| center_in.then(|| "parent.verticalCenter".to_string()));
+
+    let x_lit = lookup_assignment(child, "x").and_then(parse_int_literal);
+    let y_lit = lookup_assignment(child, "y").and_then(parse_int_literal);
+    let w_lit = lookup_assignment(child, "width").and_then(parse_int_literal);
+    let h_lit = lookup_assignment(child, "height").and_then(parse_int_literal);
+
+    let lm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.leftMargin"));
+    let rm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.rightMargin"));
+    let tm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.topMargin"));
+    let bm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.bottomMargin"));
+
+    let add_margin = |expr: String, m: i32| -> String {
+        if m == 0 {
+            expr
+        } else {
+            format!("({expr} + {m})")
+        }
+    };
+    let sub_margin = |expr: String, m: i32| -> String {
+        if m == 0 {
+            expr
+        } else {
+            format!("({expr} - {m})")
+        }
+    };
+    let default_w = || match w_lit {
+        Some(n) => format!("{n}"),
+        None => "bounds.width".to_string(),
+    };
+    let default_h = || match h_lit {
+        Some(n) => format!("{n}"),
+        None => "bounds.height".to_string(),
+    };
+
+    // ---- X axis ----
+    let left_e = a_left
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| add_margin(e, lm));
+    let right_e = a_right
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| sub_margin(e, rm));
+    let hcenter_e = a_hcenter
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of));
+
+    let (x, w) = match (left_e, right_e, hcenter_e) {
+        (Some(l), Some(r), _) => {
+            let w = format!("(({r}) - ({l}))");
+            (l, w)
+        }
+        (Some(l), None, _) => (l, default_w()),
+        (None, Some(r), _) => {
+            let w = default_w();
+            (format!("(({r}) - ({w}))"), w)
+        }
+        (None, None, Some(c)) => {
+            let w = default_w();
+            (format!("(({c}) - ({w}) / 2)"), w)
+        }
+        (None, None, None) => (format!("bounds.x + {}", x_lit.unwrap_or(0)), default_w()),
+    };
+
+    // ---- Y axis ----
+    let top_e = a_top
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| add_margin(e, tm));
+    let bottom_e = a_bottom
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| sub_margin(e, bm));
+    let vcenter_e = a_vcenter
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of));
+
+    let (y, h) = match (top_e, bottom_e, vcenter_e) {
+        (Some(t), Some(b), _) => {
+            let h = format!("(({b}) - ({t}))");
+            (t, h)
+        }
+        (Some(t), None, _) => (t, default_h()),
+        (None, Some(b), _) => {
+            let h = default_h();
+            (format!("(({b}) - ({h}))"), h)
+        }
+        (None, None, Some(c)) => {
+            let h = default_h();
+            (format!("(({c}) - ({h}) / 2)"), h)
+        }
+        (None, None, None) => (format!("bounds.y + {}", y_lit.unwrap_or(0)), default_h()),
+    };
+
+    ResolvedBounds { x, y, w, h }
+}
+
+/// Emit one `let cb_<i> = Rect { … };` per child (source-indexed names) using
+/// the sibling-aware [`solve_child_bounds`], ordered so a child is declared
+/// after every sibling it anchors to. Children are pushed in source order by
+/// the caller; only the *declaration* order is topologically sorted here.
+fn emit_solved_child_bounds(child_fns: &[(String, &UiItem)], out: &mut String) {
+    use std::collections::BTreeMap;
+    let n = child_fns.len();
+
+    // Sibling id → source index.
+    let mut id_to_idx: BTreeMap<String, usize> = BTreeMap::new();
+    for (i, (_name, child)) in child_fns.iter().enumerate() {
+        if let Some(id) = &child.id {
+            id_to_idx.insert(id.clone(), i);
+        }
+    }
+    let base_of = |id: &str| -> Option<String> { id_to_idx.get(id).map(|i| format!("cb_{i}")) };
+
+    // Dependency edges to known siblings only.
+    let mut deps: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for (i, (_name, child)) in child_fns.iter().enumerate() {
+        for dep_id in child_anchor_deps(child) {
+            if let Some(&j) = id_to_idx.get(&dep_id)
+                && j != i
+            {
+                deps[i].push(j);
+            }
+        }
+    }
+
+    // DFS topological order; stable by source index and cycle-tolerant
+    // (a back-edge into an in-progress node is skipped rather than looped).
+    fn visit(i: usize, deps: &[Vec<usize>], st: &mut [u8], order: &mut Vec<usize>) {
+        if st[i] != 0 {
+            return;
+        }
+        st[i] = 1;
+        for &j in &deps[i] {
+            visit(j, deps, st, order);
+        }
+        st[i] = 2;
+        order.push(i);
+    }
+    let mut order = Vec::with_capacity(n);
+    let mut st = vec![0u8; n];
+    for i in 0..n {
+        visit(i, &deps, &mut st, &mut order);
+    }
+
+    for &i in &order {
+        let (_name, child) = &child_fns[i];
+        let rb = solve_child_bounds(child, &base_of);
+        out.push_str(&format!(
+            "    let cb_{i} = Rect {{\n        x: {},\n        y: {},\n        \
+             width: {},\n        height: {},\n    }};\n",
+            rb.x, rb.y, rb.w, rb.h
         ));
     }
 }
@@ -4436,6 +5111,31 @@ impl<'a> Parser<'a> {
             item.signals.push(sig);
             return Ok(());
         }
+        if self.match_keyword("enum") {
+            // QML enum declaration: `enum Name { A, B = 2, C }`. Enums are
+            // referenced only inside opaque expression text, so the structural
+            // emit doesn't need them — parse and discard.
+            let _name = self.read_ident().context("enum name")?;
+            self.skip_trivia();
+            let _body = self.read_balanced(b'{', b'}')?;
+            return Ok(());
+        }
+        if self.match_keyword("required") {
+            // `required property <ty> <name>` (optionally combined with
+            // `default`/`readonly`), or a bare `required <inheritedName>` that
+            // marks an inherited property as required (no value follows).
+            if self.match_keyword("default") {
+                return self.finish_property_decl(item, true, false);
+            }
+            if self.match_keyword("readonly") {
+                return self.finish_property_decl(item, false, true);
+            }
+            if self.match_keyword("property") {
+                return self.finish_property_decl(item, false, false);
+            }
+            let _name = self.read_ident().context("required property name")?;
+            return Ok(());
+        }
         if self.match_keyword("function") {
             // Capture as a special handler with name `function:<name>`. Body
             // is balanced-brace text. Out of scope for structural emit but
@@ -4463,6 +5163,15 @@ impl<'a> Parser<'a> {
         // member we have based on what follows.
         let lead = self.read_dotted_ident()?;
         self.skip_trivia();
+        // `<Type> on <property> { ... }` — a property value source (Behavior,
+        // NumberAnimation on x, …). Non-visual; consume and discard so the
+        // structural emit isn't tripped by animation primitives.
+        if starts_uppercase(&lead) && self.match_keyword("on") {
+            let _prop = self.read_dotted_ident().context("`on` target property")?;
+            self.skip_trivia();
+            let _body = self.read_balanced(b'{', b'}')?;
+            return Ok(());
+        }
         match self.peek() {
             Some(b':') => {
                 self.pos += 1;
@@ -4710,10 +5419,19 @@ impl<'a> Parser<'a> {
         let mut paren = 0i32;
         let mut bracket = 0i32;
         let mut brace = 0i32;
+        // Last two significant (non-whitespace) bytes consumed, newest first.
+        // Used to decide whether a bare newline continues the expression onto
+        // the next line (multi-line bindings, e.g. chained ternaries).
+        let mut last_sig: Option<u8> = None;
+        let mut last_sig2: Option<u8> = None;
         while let Some(b) = self.peek() {
             match b {
                 b'"' | b'\'' => {
                     self.skip_string();
+                    // A string literal is a complete operand; record the
+                    // closing quote so a trailing-operator check sees it.
+                    last_sig2 = last_sig;
+                    last_sig = Some(b'"');
                     continue;
                 }
                 b'/' if self.peek_at(1) == Some(b'/') => {
@@ -4743,8 +5461,19 @@ impl<'a> Parser<'a> {
                     brace -= 1;
                 }
                 b';' if paren == 0 && bracket == 0 && brace == 0 => break,
-                b'\n' if paren == 0 && bracket == 0 && brace == 0 => break,
+                b'\n' if paren == 0 && bracket == 0 && brace == 0 => {
+                    // A newline ends the binding unless the expression is
+                    // syntactically incomplete (QML/JS line continuation).
+                    if !self.expr_newline_continues(last_sig, last_sig2) {
+                        break;
+                    }
+                    // Continuation: fall through to consume the newline.
+                }
                 _ => {}
+            }
+            if !matches!(b, b' ' | b'\t' | b'\n' | b'\r') {
+                last_sig2 = last_sig;
+                last_sig = Some(b);
             }
             self.pos += 1;
         }
@@ -4757,6 +5486,89 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
         text
+    }
+
+    /// Decide whether a depth-0 newline continues the current binding
+    /// expression onto the next line, mirroring JS/QML automatic-semicolon
+    /// rules closely enough for designer-authored bindings.
+    ///
+    /// Continues when either the line's last significant byte demands a right
+    /// operand (`a +`, `cond ?`, `x :`) — guarding against postfix `++`/`--` —
+    /// or the next line begins with a binary/ternary operator that can never
+    /// start a new QML member (`. + - * / ? :` …).
+    fn expr_newline_continues(&self, last_sig: Option<u8>, last_sig2: Option<u8>) -> bool {
+        if let Some(b) = last_sig {
+            let trailing = matches!(
+                b,
+                b'?' | b':'
+                    | b','
+                    | b'.'
+                    | b'+'
+                    | b'-'
+                    | b'*'
+                    | b'/'
+                    | b'%'
+                    | b'&'
+                    | b'|'
+                    | b'^'
+                    | b'='
+                    | b'<'
+                    | b'>'
+                    | b'~'
+            );
+            if trailing {
+                let postfix = matches!((last_sig2, b), (Some(b'+'), b'+') | (Some(b'-'), b'-'));
+                if !postfix {
+                    return true;
+                }
+            }
+        }
+        match self.peek_next_significant() {
+            Some(b) => matches!(
+                b,
+                b'?' | b':'
+                    | b','
+                    | b'.'
+                    | b'+'
+                    | b'-'
+                    | b'*'
+                    | b'/'
+                    | b'%'
+                    | b'&'
+                    | b'|'
+                    | b'^'
+                    | b'='
+                    | b'<'
+                    | b'>'
+            ),
+            None => false,
+        }
+    }
+
+    /// Peek the next non-whitespace, non-comment byte from the current position
+    /// without consuming anything.
+    fn peek_next_significant(&self) -> Option<u8> {
+        let mut i = self.pos;
+        while i < self.src.len() {
+            let b = self.src[i];
+            if matches!(b, b' ' | b'\t' | b'\n' | b'\r') {
+                i += 1;
+            } else if b == b'/' && self.src.get(i + 1) == Some(&b'/') {
+                i += 2;
+                while i < self.src.len() && self.src[i] != b'\n' {
+                    i += 1;
+                }
+            } else if b == b'/' && self.src.get(i + 1) == Some(&b'*') {
+                i += 2;
+                while i + 1 < self.src.len() && !(self.src[i] == b'*' && self.src[i + 1] == b'/') {
+                    i += 1;
+                }
+                i += 2;
+            } else {
+                return Some(b);
+            }
+        }
+        None
     }
 
     /// Variant of `read_expression_text` used inside list literals: stops at

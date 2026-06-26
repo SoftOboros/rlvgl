@@ -41,7 +41,12 @@ extern crate alloc;
 
 pub mod assets;
 mod machine_panel;
+/// rlvgl-creator `qt emit`-generated, Bolero-composed media-player widget tree.
+mod media_player_gen;
+mod media_player_skin;
 mod philosophers;
+/// Vendored Bolero artwork (RLE) referenced by [`media_player_gen`].
+mod qt_assets;
 mod selector;
 mod setup_screen;
 
@@ -55,6 +60,7 @@ use alloc::{
 use core::cell::RefCell;
 
 use machine_panel::MachinePanel;
+use media_player_skin::MediaPlayerSkin;
 use philosophers::{PhilosophersTable, SeatState};
 #[cfg(test)]
 use selector::SLOT_MP;
@@ -566,6 +572,8 @@ struct ControllerState {
     panel: Rc<RefCell<MachinePanel>>,
     setup: Rc<RefCell<SetupScreen>>,
     table: Rc<RefCell<PhilosophersTable>>,
+    /// Skinned media player (emitted Bolero tree) shown for the MP slot.
+    skin: Rc<RefCell<MediaPlayerSkin>>,
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
     /// DP machine adapter (concrete type — no unsafe downcast needed).
@@ -585,6 +593,7 @@ impl ControllerState {
         panel: Rc<RefCell<MachinePanel>>,
         setup: Rc<RefCell<SetupScreen>>,
         table: Rc<RefCell<PhilosophersTable>>,
+        skin: Rc<RefCell<MediaPlayerSkin>>,
         subtitle: Rc<RefCell<Label>>,
         footer: Rc<RefCell<Label>>,
     ) -> Self {
@@ -593,6 +602,7 @@ impl ControllerState {
             panel,
             setup,
             table,
+            skin,
             subtitle,
             footer,
             dp: InteractiveDiningPhilosophersAdapter::new(),
@@ -639,25 +649,30 @@ impl ControllerState {
 
     /// Show/hide the panel, setup screen, and table based on the current slot.
     ///
-    /// Visibility rules (SCTD-03 §5):
-    /// * **Setup view** (slot 0): SetupScreen visible; MachinePanel hidden; table hidden.
-    /// * **DP run view** (slot 1): MachinePanel visible; table visible; SetupScreen hidden.
-    /// * **MP run view** (slot 2): MachinePanel visible; table hidden; SetupScreen hidden.
+    /// Visibility rules (SCTD-03 §5, amended for the media-player skin):
+    /// * **Setup view** (slot 0): SetupScreen visible; MachinePanel hidden; table hidden; skin hidden.
+    /// * **DP run view** (slot 1): MachinePanel visible; table visible; SetupScreen hidden; skin hidden.
+    /// * **MP run view** (slot 2): media-player skin visible; MachinePanel hidden; table hidden; SetupScreen hidden.
     fn sync_visibility(&mut self) {
         match self.current_view() {
             SlotView::Setup => {
                 self.panel.borrow_mut().set_visible(false);
                 self.setup.borrow_mut().set_visible(true);
+                self.skin.borrow_mut().set_visible(false);
                 // Table hidden — sync_table will call set_states(None).
             }
             SlotView::Dp => {
                 self.panel.borrow_mut().set_visible(true);
                 self.setup.borrow_mut().set_visible(false);
+                self.skin.borrow_mut().set_visible(false);
                 // Table shown — sync_table will call set_states(Some(_)).
             }
             SlotView::Mp => {
-                self.panel.borrow_mut().set_visible(true);
+                // The skinned Bolero media player replaces the generic Machine
+                // Panel for the MP slot.
+                self.panel.borrow_mut().set_visible(false);
                 self.setup.borrow_mut().set_visible(false);
+                self.skin.borrow_mut().set_visible(true);
                 // Table hidden — sync_table will call set_states(None).
             }
         }
@@ -943,6 +958,16 @@ impl SctdController {
             assets::HERO_DP,
         )));
 
+        // Media-player skin — the rlvgl-creator-emitted Bolero media player,
+        // laid out across the content area (720×480, left of the selector
+        // strip). Shown only for the MP slot.
+        let skin = Rc::new(RefCell::new(MediaPlayerSkin::new(Rect {
+            x: 0,
+            y: 0,
+            width: width - STRIP_X_OFFSET,
+            height,
+        })));
+
         // Machine Selector — right-edge icon strip matching disco-demo position.
         let selector = Rc::new(RefCell::new(MachineSelector::new(
             width - STRIP_X_OFFSET,
@@ -964,6 +989,7 @@ impl SctdController {
             panel.clone(),
             setup.clone(),
             table.clone(),
+            skin.clone(),
             subtitle.clone(),
             footer.clone(),
         )));
@@ -1039,6 +1065,11 @@ impl SctdController {
                 widget: setup.clone(),
                 children: Vec::new(),
                 tag: Some("sctd.setup"),
+            });
+            r.children.push(WidgetNode {
+                widget: skin.clone(),
+                children: Vec::new(),
+                tag: Some("sctd.mp_skin"),
             });
             r.children.push(WidgetNode {
                 widget: table.clone(),
@@ -1260,12 +1291,20 @@ mod tests {
         assert!(!panel_vis(&ctrl), "Setup view: panel must be hidden");
         assert!(setup_vis(&ctrl), "Setup view: setup screen must be visible");
 
-        // Switch to MP (slot 2): panel shown, setup hidden.
+        // Switch to MP (slot 2): media-player skin shown, panel + setup hidden.
+        let skin_vis = |c: &SctdController| c.state.borrow().skin.borrow().is_visible();
         ctrl.dispatch_event(&Event::KeyDown {
             key: Key::Character('3'),
         });
         assert_eq!(ctrl.selected_machine(), SLOT_MP);
-        assert!(panel_vis(&ctrl), "MP view: panel must be visible");
+        assert!(
+            !panel_vis(&ctrl),
+            "MP view: panel must be hidden (skin replaces it)"
+        );
+        assert!(
+            skin_vis(&ctrl),
+            "MP view: media-player skin must be visible"
+        );
         assert!(!setup_vis(&ctrl), "MP view: setup must be hidden");
 
         // Back to Setup via selector tap.
@@ -1560,6 +1599,25 @@ mod tests {
         }
         ctrl.root().borrow().draw(&mut NullRenderer);
         assert!(ctrl.state.borrow().table.borrow().is_visible());
+    }
+
+    /// The rlvgl-creator-emitted, Bolero-composed media-player skin builds and
+    /// draws without panic when the MP slot is selected — exercising the
+    /// `qt_image` RLE decode + blit of the vendored Bolero artwork end-to-end.
+    #[test]
+    fn media_player_skin_draws_when_mp_selected() {
+        let mut ctrl = make_controller();
+        ctrl.dispatch_event(&Event::KeyDown {
+            key: Key::Character('3'),
+        });
+        assert_eq!(ctrl.selected_machine(), SLOT_MP);
+        assert!(
+            ctrl.state.borrow().skin.borrow().is_visible(),
+            "MP slot selected -> skin visible"
+        );
+        // Draw the whole tree (skin visible): decodes + blits the vendored
+        // Bolero RLE assets through the emitted `qt_image` helper.
+        ctrl.root().borrow().draw(&mut NullRenderer);
     }
 
     /// SCTD-00 §9.2 — selected-machine switching via keyboard (updated for new slot model).
