@@ -18,7 +18,7 @@ fn generated_centered_module_centers_child_bounds() {
         height: 200,
     };
     let (node, _state, _bindings) = generated_centered::build_screen(bounds);
-    assert_eq!(generated_centered::QT_EMIT_VERSION, 14);
+    assert_eq!(generated_centered::QT_EMIT_VERSION, 17);
     assert_eq!(node.tag, Some("root"));
     assert_eq!(node.children.len(), 1);
 

@@ -2064,7 +2064,14 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// bumped to `11` by QT-04e when reactive Label-text bindings
 /// shipped (`docs/qt-support/04e-reactive-bindings.md` §8). Closes
 /// out the QT-04 family.
-pub const QT_EMIT_VERSION_RLVGL: u32 = 14;
+/// Bumped to `15` (QT-03b §15 2026-06-26): structural QML nodes
+/// (`Item`/`Row`/`Column`) now emit a transparent Container background
+/// instead of inheriting the opaque-white `Style::default()`, and
+/// `qt_image` emits a transparent image background plus QML-default
+/// `Image.Stretch` scaling (source→dest). Without this the emitted
+/// tree rendered all-white on real hardware (opaque structural
+/// containers buried the artwork; 1:1 blit never filled the slots).
+pub const QT_EMIT_VERSION_RLVGL: u32 = 17;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2119,6 +2126,10 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
         let mut stack = Vec::new();
         let mut cache = std::collections::HashMap::new();
         expand_components_in(&mut module.root, &root_dir, &mut stack, &mut cache);
+        // QT-Repeater: turn `Repeater { model: [...] }` arrays into positioned
+        // icon children (runs after component inlining so the model literals are
+        // present and stable).
+        expand_repeaters_in(&mut module.root, 0, 0);
     }
 
     let stem = input
@@ -2128,7 +2139,15 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
 
     let (out_path, rust) = match target {
         EmitTarget::Data => (out.join(format!("{stem}.rs")), render_rs(&module)),
-        EmitTarget::Rlvgl => (out.join(format!("{stem}.rlvgl.rs")), render_rlvgl(&module)),
+        EmitTarget::Rlvgl => {
+            // QT-03c: build the dimension resolver (JS constants + root-property
+            // defaults) so the anchor solver can evaluate non-literal extents.
+            let resolver = DimResolver::from_qml(input, &module.root);
+            (
+                out.join(format!("{stem}.rlvgl.rs")),
+                render_rlvgl_with_resolver(&module, &resolver),
+            )
+        }
     };
     fs::write(&out_path, rust).with_context(|| format!("writing {}", out_path.display()))?;
     Ok(())
@@ -2273,6 +2292,118 @@ fn expand_components_in(
     for _ in 0..pushed {
         stack.pop();
     }
+}
+
+/// QT-Repeater: expand a `Repeater { model: [ {…}, … ] }` whose model is a
+/// literal array into one positioned `Image` child per model entry's
+/// `imageKeySource`. The delegate's button frame is intentionally dropped (it
+/// lowers to a transparent background); the visible artwork is the per-item
+/// icon. Icons are laid out left-to-right and centred as a group across the
+/// containing layout's width via sibling anchors (so the anchor solver, which
+/// already handles `verticalCenter` + `<id>.right` chains, does the placement).
+///
+/// `layout_w` / `spacing` are the containing Row/RowLayout's `width:` /
+/// `spacing:` (0 when unknown — the Repeater is then left untouched).
+fn expand_repeaters_in(item: &mut UiItem, layout_w: i32, spacing: i32) {
+    // A Repeater nested directly in this node uses this node's width/spacing.
+    let my_w = lookup_assignment(item, "width")
+        .and_then(parse_int_literal)
+        .unwrap_or(layout_w);
+    let my_spacing = lookup_assignment(item, "spacing")
+        .and_then(parse_int_literal)
+        .unwrap_or(spacing);
+    for child in &mut item.children {
+        if child.type_name == "Repeater" && my_w > 0 {
+            expand_one_repeater(child, my_w, my_spacing);
+        }
+        expand_repeaters_in(child, my_w, my_spacing);
+    }
+}
+
+fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32) {
+    let items: Vec<String> = match rep.assignments.iter().find(|a| a.target == "model") {
+        Some(UiAssignment {
+            value: UiAssignmentValue::List { items },
+            ..
+        }) => items
+            .iter()
+            .filter_map(|v| match v {
+                UiAssignmentValue::Expression { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => return,
+    };
+    let sources: Vec<String> = items
+        .iter()
+        .filter_map(|t| extract_image_key_source(t))
+        .collect();
+    let n = sources.len() as i32;
+    if n == 0 {
+        return;
+    }
+    // The model-driven transport icons in this corpus are 48px square.
+    let icon = 48;
+    let group_w = n * icon + (n - 1) * spacing.max(0);
+    let start = ((layout_w - group_w) / 2).max(0);
+    let mut kids = Vec::new();
+    for (i, src) in sources.iter().enumerate() {
+        let id = format!("__rep_btn_{i}");
+        let mut a: Vec<UiAssignment> = vec![
+            ui_assign("source", src.clone()),
+            ui_assign("width", format!("{icon}")),
+            ui_assign("height", format!("{icon}")),
+            ui_assign(
+                "anchors.verticalCenter",
+                "parent.verticalCenter".to_string(),
+            ),
+        ];
+        if i == 0 {
+            a.push(ui_assign("anchors.left", "parent.left".to_string()));
+            a.push(ui_assign("anchors.leftMargin", format!("{start}")));
+        } else {
+            a.push(ui_assign(
+                "anchors.left",
+                format!("__rep_btn_{}.right", i - 1),
+            ));
+            a.push(ui_assign(
+                "anchors.leftMargin",
+                format!("{}", spacing.max(0)),
+            ));
+        }
+        kids.push(UiItem {
+            type_name: "Image".to_string(),
+            id: Some(id),
+            properties: Vec::new(),
+            assignments: a,
+            signals: Vec::new(),
+            handlers: Vec::new(),
+            children: Vec::new(),
+        });
+    }
+    rep.children = kids;
+}
+
+/// Build an `Expression`-valued assignment.
+fn ui_assign(target: &str, text: String) -> UiAssignment {
+    UiAssignment {
+        target: target.to_string(),
+        value: UiAssignmentValue::Expression { text },
+    }
+}
+
+/// Pull the first asset literal out of a model entry's `imageKeySource:` value,
+/// re-quoted as a string literal for `pick_image_source`. Handles ternary
+/// sources by taking the first branch (reactive state swap is a follow-up).
+fn extract_image_key_source(obj_text: &str) -> Option<String> {
+    let idx = obj_text.find("imageKeySource")?;
+    let after = obj_text[idx + "imageKeySource".len()..].trim_start();
+    let after = after.strip_prefix(':')?;
+    // For a `cond ? A : B` source, the else-branch (B, the last literal) is the
+    // resting-state icon (`mediaPlaying ? Pause : Play` → Play at rest). For a
+    // single-literal source, last == only. (Reactive state swap is a follow-up.)
+    let lit = extract_asset_literals(after).into_iter().last()?;
+    Some(format!("\"{lit}\""))
 }
 
 /// Render a [`UiModule`] as the canonical QT-03 Rust emit-shape.
@@ -2475,6 +2606,12 @@ fn rust_str_lit(s: &str) -> String {
 /// Public so the schema-drift test can compare in-memory output against
 /// `tests/fixtures/qt/hello.rlvgl.rs` without going through a tempdir.
 pub fn render_rlvgl(module: &UiModule) -> String {
+    render_rlvgl_with_resolver(module, &DimResolver::default())
+}
+
+/// As [`render_rlvgl`], but with a pre-built [`DimResolver`] so the anchor
+/// solver can evaluate JS-constant / root-property dimension expressions.
+fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> String {
     let state_fields = collect_state_fields(&module.root);
     let sm_id = module.state_machine.as_ref().map(|sm| sm.id.clone());
     let dm_field_ids: Vec<String> = module
@@ -2483,6 +2620,7 @@ pub fn render_rlvgl(module: &UiModule) -> String {
         .map(|sm| sm.datamodel.iter().map(|f| f.id.clone()).collect())
         .unwrap_or_default();
     let mut ctx = RlvglEmitCtx::new_with_fields(state_fields.clone())
+        .with_resolver(resolver.clone())
         .with_sm(sm_id.clone())
         .with_dm_fields(dm_field_ids);
     let root_fn = ctx.alloc_fn_name(&module.root);
@@ -2548,6 +2686,13 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     // modules), so the generated file stays idempotent under
     // `cargo fmt`.
     out.push_str("use rlvgl_core::WidgetNode;\n");
+    if has_images {
+        // `image` sorts after `WidgetNode` and before `widget` within the
+        // `rlvgl_core::*` group (uppercase item, then lowercase modules
+        // alphabetically) — fmt-stable. `BlitOpts` drives the `qt_image`
+        // Stretch scaling below.
+        out.push_str("use rlvgl_core::image::BlitOpts;\n");
+    }
     out.push_str("use rlvgl_core::widget::{Color, Rect, Widget};\n");
     out.push_str("use rlvgl_widgets::button::Button;\n");
     out.push_str("use rlvgl_widgets::click_area::ClickArea;\n");
@@ -2668,6 +2813,19 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     if has_images {
         emit_qt_image_helper(&used_assets, &mut out);
     }
+    if root_body.contains("qt_label(") {
+        // QML `Text`/`Label` items have no background; emit a constructor that
+        // clears the opaque-white `Style::default()` so text never sits on an
+        // opaque white box that buries content drawn beneath it.
+        out.push_str(
+            "/// Construct a `Label` with a transparent background (QML text has\n\
+             /// no fill), so it does not paint the opaque-white default `Style`.\n\
+             fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {\n    \
+                 let mut l = Label::new(text, bounds);\n    \
+                 l.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                 l\n}\n\n",
+        );
+    }
 
     out.push_str(&root_body);
 
@@ -2708,10 +2866,29 @@ fn emit_qt_image_helper(used_assets: &[AssetRef], out: &mut String) {
                  .expect(\"qt_image: RLE decode failed\");\n    \
              let pixels: Vec<Color> = rgba\n        \
                  .chunks_exact(4)\n        \
-                 .map(|c| Color(c[0], c[1], c[2], c[3]))\n        \
+                 .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {\n            \
+                     Color(0x00, 0x00, 0x00, 0x00) // magenta sentinel → transparent (RGB565 has no alpha)\n        \
+                 } else {\n            \
+                     Color(c[0], c[1], c[2], c[3])\n        \
+                 })\n        \
                  .collect();\n    \
              let pixels: &'static [Color] = Vec::leak(pixels);\n    \
-             Rc::new(RefCell::new(Image::new(bounds, w as i32, h as i32, pixels)))\n}\n\n",
+             let mut img = Image::new(bounds, w as i32, h as i32, pixels);\n    \
+             // An Image paints its own pixels; the widget background MUST be\n    \
+             // transparent so the default opaque-white `Style` does not bury\n    \
+             // the artwork (and content drawn behind it).\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             // QML's default `fillMode` is `Image.Stretch`: scale the source to\n    \
+             // fill the destination bounds. `scale` is 8.8 fixed-point, so 256 =\n    \
+             // 1:1; dest/src * 256 stretches source pixels across `bounds`.\n    \
+             let scale_x = if w > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / w as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if h > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / h as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             Rc::new(RefCell::new(img))\n}\n\n",
     );
 }
 
@@ -2745,6 +2922,9 @@ struct RlvglEmitCtx {
     /// conditional `qt_image` helper / import emission and the companion
     /// `qt_assets` module reference list.
     used_assets: Vec<AssetRef>,
+    /// QT-03c dimension resolver (JS constants + root-property defaults) used
+    /// by the anchor solver to evaluate non-literal `width`/`height`/margins.
+    resolver: DimResolver,
 }
 
 /// One image asset referenced by the emitted widget tree.
@@ -2766,7 +2946,13 @@ impl RlvglEmitCtx {
             used_dm_fields: Vec::new(),
             used_assets: Vec::new(),
             used_fn_names: std::collections::HashSet::new(),
+            resolver: DimResolver::default(),
         }
+    }
+
+    fn with_resolver(mut self, resolver: DimResolver) -> Self {
+        self.resolver = resolver;
+        self
     }
 
     fn with_sm(mut self, sm_id: Option<String>) -> Self {
@@ -2884,7 +3070,7 @@ impl RlvglEmitCtx {
         // goldens).
         let needs_solver = item.children.iter().any(child_has_sibling_anchor);
         if needs_solver {
-            emit_solved_child_bounds(&child_fns, &mut out);
+            emit_solved_child_bounds(&child_fns, &self.resolver, &mut out);
             for (i, (child_name, _child)) in child_fns.iter().enumerate() {
                 if self.has_sm() {
                     out.push_str(&format!(
@@ -3004,15 +3190,34 @@ fn emit_widget_construction(
                         "    w.style.bg_color = Color({r:#04x}, {g:#04x}, {b:#04x}, {a:#04x});\n"
                     ));
                 } else {
+                    // Non-literal `color:` (theme ref / gradient / binding)
+                    // that QT-04e cannot resolve to an RGBA literal yet. Default
+                    // to a transparent background rather than inheriting the
+                    // opaque-white `Style::default()` — a full-bounds node whose
+                    // real fill we could not determine MUST NOT bury content
+                    // beneath an arbitrary white rectangle.
                     out.push_str("    // TODO QT-04e: bind color (non-literal QML expression)\n");
+                    out.push_str("    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n");
                 }
                 out.push_str(
                     "    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
                 );
             } else {
+                // Every container we cannot resolve to a literal fill — pure
+                // structural nodes (`Item`, `Row`, `Column`, layouts) and
+                // `Rectangle`s whose fill is a theme ref / `gradient:` we cannot
+                // yet evaluate — defaults to a TRANSPARENT background. The
+                // opaque-white `Style::default()` actively buries content drawn
+                // beneath (root background image, sibling artwork), so only a
+                // resolved literal `color:` (the branch above) paints opaque.
+                // Faithful gradient/theme resolution is a separate follow-up;
+                // until then transparent is strictly safer than an arbitrary
+                // white rectangle. A truly bare `Rectangle {}` (QML default
+                // white) is rare and accepted as transparent here.
                 out.push_str(
-                    "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                     Rc::new(RefCell::new(Container::new(bounds)));\n",
+                    "    let mut w = Container::new(bounds);\n    \
+                     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
                 );
             }
         }
@@ -3022,7 +3227,7 @@ fn emit_widget_construction(
             if let Some(text) = text_lit {
                 out.push_str(&format!(
                     "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                     Rc::new(RefCell::new(Label::new({}, bounds)));\n",
+                     Rc::new(RefCell::new(qt_label({}, bounds)));\n",
                     rust_str_lit(&text)
                 ));
             } else if sm_id.is_some()
@@ -3046,7 +3251,7 @@ fn emit_widget_construction(
                 ));
                 out.push_str(&format!(
                     "    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(\n        \
-                     Label::new(\n            \
+                     qt_label(\n            \
                          {{ let m = machine.borrow(); format_dm_{field}(&m.dm) }},\n        \
                          bounds,\n    ),\n    ));\n"
                 ));
@@ -3065,7 +3270,7 @@ fn emit_widget_construction(
                 out.push_str(&format!("    // QT-04c bound: text → state.{field}\n"));
                 out.push_str(&format!(
                     "    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(\n        \
-                     Label::new(state.borrow().{field}.clone(), bounds),\n    ));\n"
+                     qt_label(state.borrow().{field}.clone(), bounds),\n    ));\n"
                 ));
                 out.push_str("    let widget: Rc<RefCell<dyn Widget>> = label_handle.clone();\n");
                 out.push_str(&format!(
@@ -3093,7 +3298,7 @@ fn emit_widget_construction(
                 );
                 out.push_str(
                     "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                     Rc::new(RefCell::new(Label::new(\"\", bounds)));\n",
+                     Rc::new(RefCell::new(qt_label(\"\", bounds)));\n",
                 );
             }
         }
@@ -3121,6 +3326,13 @@ fn emit_widget_construction(
             out.push_str(&format!(
                 "    let mut button = Button::new({ctor_arg}, bounds);\n"
             ));
+            // rlvgl's `Button` paints its internal `Label`'s background, which
+            // defaults to opaque white — so a themed QML button (whose real
+            // `background:` is a translucent/gradient `Rectangle`) renders as a
+            // solid white box. Clear it to transparent; the button's visual is
+            // its child content (icon/text) over the dark UI. (Faithful
+            // gradient/theme-colour fills are a separate follow-up.)
+            out.push_str("    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);\n");
             for handler in item.handlers.iter().filter(|h| h.signal == "onClicked") {
                 emit_qt04b_or_qt04_handler(&handler.body, state_fields, sm_id, out);
             }
@@ -3168,11 +3380,14 @@ fn emit_widget_construction(
                 None => {
                     out.push_str(
                         "    // QT-IMG: Image with no resolvable source literal; \
-                         emitting an empty container\n",
+                         emitting an empty transparent container\n",
                     );
+                    // A QML `Image` with no source draws nothing; the placeholder
+                    // MUST be transparent, not the opaque-white `Style::default()`.
                     out.push_str(
-                        "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                         Rc::new(RefCell::new(Container::new(bounds)));\n",
+                        "    let mut w = Container::new(bounds);\n    \
+                         w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                         let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
                     );
                 }
             }
@@ -3182,9 +3397,15 @@ fn emit_widget_construction(
                 "    // emitter-fallback (QT-03b): unmapped QML type `{}`\n",
                 item.type_name
             ));
+            // A fallback is a transparent placeholder for an unmapped type: it
+            // only carries its children. It MUST NOT paint the opaque-white
+            // `Style::default()` background, or an unmapped layout node that
+            // receives full parent bounds (e.g. anchor-fallback `RowLayout` /
+            // `Repeater`) buries everything drawn beneath it.
             out.push_str(
-                "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                 Rc::new(RefCell::new(Container::new(bounds)));\n",
+                "    let mut w = Container::new(bounds);\n    \
+                 w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                 let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
             );
         }
     }
@@ -3349,17 +3570,456 @@ fn anchor_edge_expr(value: &str, base_of: &dyn Fn(&str) -> Option<String>) -> Op
 
 /// Read a literal-int margin (`anchors.<name>`), defaulting to 0 when absent or
 /// non-literal (e.g. a JS-constant margin the emitter can't evaluate).
-fn lit_margin(child: &UiItem, name: &str) -> i32 {
-    lookup_assignment(child, name)
-        .and_then(parse_int_literal)
-        .unwrap_or(0)
+/// QT-03c dimension resolver: evaluates QML width/height/margin expressions
+/// that reference imported JS numeric constants (`AppConstants.js`, exposed via
+/// `import "…" as AppConsts`) and root-scope property defaults
+/// (e.g. `panelHeight: height / 6 - AppConsts.i_DISPLAY_PADDING`). Without this
+/// such dimensions fell back to `bounds.width`/`bounds.height`, collapsing the
+/// layout (an anchored sibling computed against the wrong full-parent extent
+/// got zero/negative height). Fail-closed: anything it cannot resolve returns
+/// `None`, preserving the prior fallback behaviour.
+#[derive(Default, Clone)]
+struct DimResolver {
+    /// `i_DISPLAY_PADDING` → 8.0, parsed from `AppConstants.js`.
+    consts: std::collections::HashMap<String, f64>,
+    /// Root-scope QML property name → its raw default expression
+    /// (e.g. `panelHeight` → `height / 6 - AppConsts.i_DISPLAY_PADDING`).
+    root_props: std::collections::HashMap<String, String>,
+    /// The root item's `id:` (e.g. `pane`), so root-property references written
+    /// `pane.panelHeight` resolve the same as the bare `panelHeight` form.
+    root_id: Option<String>,
+    /// Directory the `qrc:`-stripped asset paths resolve against (the QML
+    /// project root — the parent of the nearest ancestor `Qml/` dir). Used to
+    /// read an `Image` source's natural pixel size for content-sizing.
+    asset_root: Option<PathBuf>,
+    /// The nearest ancestor `Qml/` directory — a second candidate root for
+    /// component-relative `source:` paths (`Images/Foo.png` declared inside a
+    /// `Qml/`-rooted component), plus the base for a basename fallback search.
+    qml_root: Option<PathBuf>,
+}
+
+impl DimResolver {
+    /// Build a resolver for `qml_path`: ingest the nearest `AppConstants.js`
+    /// numeric `var` constants and capture every root-scope property's default
+    /// expression (so dimension references to them resolve recursively).
+    fn from_qml(qml_path: &Path, root: &UiItem) -> Self {
+        let consts = parse_js_numeric_constants(qml_path);
+        let mut root_props = std::collections::HashMap::new();
+        for p in &root.properties {
+            if let Some(d) = &p.default_value {
+                root_props.insert(p.name.clone(), d.clone());
+            }
+        }
+        // `qrc:/Qml/Images/Foo.png` → file `<projectRoot>/Qml/Images/Foo.png`,
+        // where `<projectRoot>` is the parent of the nearest ancestor `Qml/`.
+        let qml_root = component_search_root(qml_path);
+        let asset_root = qml_root.parent().map(|p| p.to_path_buf());
+        Self {
+            consts,
+            root_props,
+            root_id: root.id.clone(),
+            asset_root,
+            qml_root: Some(qml_root),
+        }
+    }
+
+    /// Natural pixel size of an `Image` item's source asset, read from the PNG
+    /// header at emit time. `None` when the source is non-literal, the file is
+    /// absent/unreadable, or not a PNG. Tries the project root and the `Qml/`
+    /// root (component-relative paths lose their source dir during inlining),
+    /// then a basename search under `Qml/`.
+    fn image_natural_size(&self, item: &UiItem) -> Option<(i32, i32)> {
+        let asset = pick_image_source(item)?;
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Some(root) = &self.asset_root {
+            candidates.push(root.join(&asset.path));
+        }
+        if let Some(root) = &self.qml_root {
+            candidates.push(root.join(&asset.path));
+        }
+        if let Some(hit) = candidates.into_iter().find(|p| p.exists()) {
+            return png_dimensions(&hit);
+        }
+        // Fallback: locate the file by basename anywhere under the `Qml/` root.
+        let base = asset.path.rsplit('/').next()?;
+        let found = self
+            .qml_root
+            .as_ref()
+            .and_then(|r| find_file_by_name(r, base, 0))?;
+        png_dimensions(&found)
+    }
+
+    /// Resolve a width/height expression into a Rust `i32` expression in terms
+    /// of `bounds`, or `None` if any term is unresolvable.
+    fn resolve_dim(&self, expr: &str) -> Option<String> {
+        let toks = tokenize_expr(expr)?;
+        let mut p = ExprParser {
+            toks: &toks,
+            pos: 0,
+            res: self,
+            depth: 0,
+        };
+        let out = p.parse_expr()?;
+        if p.pos == p.toks.len() {
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    /// Resolve a margin expression to a constant `i32` (literal or a pure
+    /// numeric expression over JS constants — no `bounds` reference). Returns
+    /// `None` if it references layout extents or is otherwise unresolvable.
+    fn resolve_margin_i32(&self, expr: &str) -> Option<i32> {
+        if let Some(n) = parse_int_literal(expr) {
+            return Some(n);
+        }
+        let rust = self.resolve_dim(expr)?;
+        // Only accept pure-constant results (no runtime `bounds` reference).
+        if rust.contains("bounds") {
+            return None;
+        }
+        // The constant path emits plain integer arithmetic; evaluate it.
+        eval_const_int_rust(&rust)
+    }
+}
+
+/// Recursive-descent evaluator producing Rust `i32` expressions. Grammar:
+/// `expr := term (('+'|'-') term)*`, `term := factor (('*'|'/') factor)*`,
+/// `factor := NUMBER | IDENT('.'IDENT)? | '(' expr ')'`.
+struct ExprParser<'a> {
+    toks: &'a [String],
+    pos: usize,
+    res: &'a DimResolver,
+    depth: usize,
+}
+
+impl ExprParser<'_> {
+    fn peek(&self) -> Option<&str> {
+        self.toks.get(self.pos).map(|s| s.as_str())
+    }
+    fn bump(&mut self) -> Option<String> {
+        let t = self.toks.get(self.pos).cloned();
+        if t.is_some() {
+            self.pos += 1;
+        }
+        t
+    }
+    fn parse_expr(&mut self) -> Option<String> {
+        let mut lhs = self.parse_term()?;
+        while let Some(op) = self.peek()
+            && (op == "+" || op == "-")
+        {
+            let op = self.bump().unwrap();
+            let rhs = self.parse_term()?;
+            lhs = format!("({lhs} {op} {rhs})");
+        }
+        Some(lhs)
+    }
+    fn parse_term(&mut self) -> Option<String> {
+        let mut lhs = self.parse_factor()?;
+        while let Some(op) = self.peek()
+            && (op == "*" || op == "/")
+        {
+            let op = self.bump().unwrap();
+            let rhs = self.parse_factor()?;
+            lhs = format!("({lhs} {op} {rhs})");
+        }
+        Some(lhs)
+    }
+    fn parse_factor(&mut self) -> Option<String> {
+        let t = self.bump()?;
+        if t == "(" {
+            let e = self.parse_expr()?;
+            if self.bump().as_deref() != Some(")") {
+                return None;
+            }
+            return Some(format!("({e})"));
+        }
+        if let Ok(n) = t.parse::<f64>() {
+            return Some(format!("{}", n.round() as i64));
+        }
+        // Identifier, optionally `<a>.<b>`.
+        let (head, member) = if self.peek() == Some(".") {
+            self.bump(); // '.'
+            let m = self.bump()?;
+            (t, Some(m))
+        } else {
+            (t, None)
+        };
+        self.resolve_ident(&head, member.as_deref())
+    }
+    fn resolve_ident(&mut self, head: &str, member: Option<&str>) -> Option<String> {
+        match (head, member) {
+            // `parent.width` / `parent.height` → local bounds.
+            ("parent", Some("width")) => Some("bounds.width".to_string()),
+            ("parent", Some("height")) => Some("bounds.height".to_string()),
+            // `<rootId>.<prop>` (e.g. `pane.panelHeight`) → recurse the root
+            // property's default expression, same as the bare form. NOTE: the
+            // expression evaluates against the *local* `bounds` at the use site,
+            // an approximation when the property derives from the root extent
+            // and is referenced from a non-root-sized parent (acceptable: it
+            // keeps the layout from collapsing; full root-extent threading is a
+            // follow-up).
+            (id, Some(name))
+                if self.res.root_id.as_deref() == Some(id)
+                    && self.res.root_props.contains_key(name) =>
+            {
+                self.recurse_root_prop(name)
+            }
+            // `AppConsts.<NAME>` → ingested numeric constant.
+            (_, Some(name)) => self
+                .res
+                .consts
+                .get(name)
+                .map(|v| format!("{}", v.round() as i64)),
+            // Bare `width` / `height` (appear inside a root-property default,
+            // referring to the root's own extent → local bounds at the use site).
+            ("width", None) => Some("bounds.width".to_string()),
+            ("height", None) => Some("bounds.height".to_string()),
+            // Bare identifier: a JS constant, or a root property to recurse into.
+            (id, None) => {
+                if let Some(v) = self.res.consts.get(id) {
+                    return Some(format!("{}", v.round() as i64));
+                }
+                self.recurse_root_prop(id)
+            }
+        }
+    }
+
+    /// Resolve a root property name by evaluating its default expression
+    /// (recursion-guarded). Returns a parenthesised Rust expression.
+    fn recurse_root_prop(&self, name: &str) -> Option<String> {
+        if self.depth >= 8 {
+            return None;
+        }
+        let expr = self.res.root_props.get(name).cloned()?;
+        let toks = tokenize_expr(&expr)?;
+        let mut sub = ExprParser {
+            toks: &toks,
+            pos: 0,
+            res: self.res,
+            depth: self.depth + 1,
+        };
+        let out = sub.parse_expr()?;
+        if sub.pos == sub.toks.len() {
+            Some(format!("({out})"))
+        } else {
+            None
+        }
+    }
+}
+
+/// Tokenize a QML numeric expression into numbers, identifiers, `.`, operators,
+/// and parens. Returns `None` on any unexpected character (fail-closed).
+fn tokenize_expr(s: &str) -> Option<Vec<String>> {
+    let mut out = Vec::new();
+    let mut chars = s.chars().peekable();
+    while let Some(&c) = chars.peek() {
+        if c.is_whitespace() {
+            chars.next();
+        } else if c.is_ascii_digit() {
+            let mut num = String::new();
+            while let Some(&d) = chars.peek() {
+                if d.is_ascii_digit() || d == '.' {
+                    num.push(d);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            out.push(num);
+        } else if c.is_alphabetic() || c == '_' {
+            let mut id = String::new();
+            while let Some(&d) = chars.peek() {
+                if d.is_alphanumeric() || d == '_' {
+                    id.push(d);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            out.push(id);
+        } else if "+-*/().".contains(c) {
+            out.push(c.to_string());
+            chars.next();
+        } else {
+            return None;
+        }
+    }
+    Some(out)
+}
+
+/// Evaluate a Rust integer-arithmetic expression string (only digits, spaces,
+/// `+ - * /`, parens — as emitted by the constant path) into an `i32`.
+fn eval_const_int_rust(s: &str) -> Option<i32> {
+    let toks = tokenize_expr(s)?;
+    // Reuse the parser with an empty resolver, then fold the all-numeric output.
+    let empty = DimResolver::default();
+    let mut p = ExprParser {
+        toks: &toks,
+        pos: 0,
+        res: &empty,
+        depth: 0,
+    };
+    let folded = p.parse_expr()?;
+    if p.pos != p.toks.len() || folded.contains("bounds") {
+        return None;
+    }
+    fold_int_expr(&folded)
+}
+
+/// Fold a fully-numeric Rust arithmetic expression to an `i32` (integer math,
+/// matching the emitted runtime semantics).
+fn fold_int_expr(s: &str) -> Option<i32> {
+    let toks = tokenize_expr(s)?;
+    fn expr(t: &[String], i: &mut usize) -> Option<i64> {
+        let mut v = term(t, i)?;
+        while let Some(op) = t.get(*i) {
+            if op == "+" || op == "-" {
+                *i += 1;
+                let r = term(t, i)?;
+                v = if op == "+" { v + r } else { v - r };
+            } else {
+                break;
+            }
+        }
+        Some(v)
+    }
+    fn term(t: &[String], i: &mut usize) -> Option<i64> {
+        let mut v = factor(t, i)?;
+        while let Some(op) = t.get(*i) {
+            if op == "*" || op == "/" {
+                *i += 1;
+                let r = factor(t, i)?;
+                if op == "*" {
+                    v *= r;
+                } else {
+                    if r == 0 {
+                        return None;
+                    }
+                    v /= r;
+                }
+            } else {
+                break;
+            }
+        }
+        Some(v)
+    }
+    fn factor(t: &[String], i: &mut usize) -> Option<i64> {
+        let tok = t.get(*i)?;
+        if tok == "(" {
+            *i += 1;
+            let v = expr(t, i)?;
+            if t.get(*i).map(|s| s.as_str()) != Some(")") {
+                return None;
+            }
+            *i += 1;
+            return Some(v);
+        }
+        *i += 1;
+        tok.parse::<i64>().ok()
+    }
+    let mut i = 0;
+    let v = expr(&toks, &mut i)?;
+    if i == toks.len() {
+        i32::try_from(v).ok()
+    } else {
+        None
+    }
+}
+
+/// Parse numeric `var NAME = <number>` declarations from the nearest
+/// `AppConstants.js` (searched in the same `Qml/` root used for component
+/// resolution, then the QML file's own directory). Non-numeric `var`s and
+/// anything else are ignored. Missing file → empty map.
+fn parse_js_numeric_constants(qml_path: &Path) -> std::collections::HashMap<String, f64> {
+    let mut out = std::collections::HashMap::new();
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    let root = component_search_root(qml_path);
+    candidates.push(root.join("AppConstants.js"));
+    if let Some(parent) = qml_path.parent() {
+        candidates.push(parent.join("AppConstants.js"));
+    }
+    let Some(path) = candidates.into_iter().find(|p| p.exists()) else {
+        return out;
+    };
+    let Ok(text) = fs::read_to_string(&path) else {
+        return out;
+    };
+    for line in text.lines() {
+        let line = line.trim();
+        let Some(rest) = line.strip_prefix("var ") else {
+            continue;
+        };
+        let Some((name, val)) = rest.split_once('=') else {
+            continue;
+        };
+        let name = name.trim();
+        // strip trailing `;` / comment from the value
+        let val = val.split([';', '/']).next().unwrap_or("").trim();
+        if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            continue;
+        }
+        if let Ok(n) = val.parse::<f64>() {
+            out.insert(name.to_string(), n);
+        }
+    }
+    out
+}
+
+/// Read a PNG's pixel dimensions from its IHDR chunk (width at byte offset 16,
+/// height at 20, both big-endian u32). Returns `None` if the file is missing,
+/// too short, or lacks the PNG signature.
+fn png_dimensions(path: &Path) -> Option<(i32, i32)> {
+    let bytes = fs::read(path).ok()?;
+    if bytes.len() < 24 || &bytes[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return None;
+    }
+    let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+    let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+    Some((i32::try_from(w).ok()?, i32::try_from(h).ok()?))
+}
+
+/// Bounded recursive search for a file named `name` under `dir` (depth ≤ 6).
+fn find_file_by_name(dir: &Path, name: &str, depth: usize) -> Option<PathBuf> {
+    if depth > 6 {
+        return None;
+    }
+    let entries = fs::read_dir(dir).ok()?;
+    let mut subdirs = Vec::new();
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            subdirs.push(p);
+        } else if p.file_name().and_then(|n| n.to_str()) == Some(name) {
+            return Some(p);
+        }
+    }
+    for d in subdirs {
+        if let Some(hit) = find_file_by_name(&d, name, depth + 1) {
+            return Some(hit);
+        }
+    }
+    None
+}
+
+fn lit_margin(child: &UiItem, name: &str, resolver: &DimResolver) -> i32 {
+    let Some(raw) = lookup_assignment(child, name) else {
+        return 0;
+    };
+    resolver.resolve_margin_i32(raw.trim()).unwrap_or(0)
 }
 
 /// Full QML anchor box-model solver: resolves a child's `x/y/w/h` from its
 /// `anchors.*` (fill / centerIn / per-edge, parent- or sibling-relative) plus
 /// per-edge margins and literal `x/y/width/height`. Sibling references resolve
 /// through `base_of`. This is the QT-03c sibling-relative extension.
-fn solve_child_bounds(child: &UiItem, base_of: &dyn Fn(&str) -> Option<String>) -> ResolvedBounds {
+fn solve_child_bounds(
+    child: &UiItem,
+    base_of: &dyn Fn(&str) -> Option<String>,
+    resolver: &DimResolver,
+) -> ResolvedBounds {
     // anchors.fill: parent expands to all four parent edges.
     let fill = lookup_assignment(child, "anchors.fill")
         .map(|s| s.trim() == "parent")
@@ -3367,7 +4027,8 @@ fn solve_child_bounds(child: &UiItem, base_of: &dyn Fn(&str) -> Option<String>) 
     let center_in = lookup_assignment(child, "anchors.centerIn")
         .map(|s| s.trim() == "parent")
         .unwrap_or(false);
-    let all_margin = lookup_assignment(child, "anchors.margins").and_then(parse_int_literal);
+    let all_margin = lookup_assignment(child, "anchors.margins")
+        .and_then(|raw| resolver.resolve_margin_i32(raw.trim()));
 
     // Per-edge anchor values, fill/centerIn synthesised into edges.
     let edge = |name: &str, fill_val: Option<&str>| -> Option<String> {
@@ -3390,13 +4051,20 @@ fn solve_child_bounds(child: &UiItem, base_of: &dyn Fn(&str) -> Option<String>) 
 
     let x_lit = lookup_assignment(child, "x").and_then(parse_int_literal);
     let y_lit = lookup_assignment(child, "y").and_then(parse_int_literal);
-    let w_lit = lookup_assignment(child, "width").and_then(parse_int_literal);
-    let h_lit = lookup_assignment(child, "height").and_then(parse_int_literal);
+    // `implicitWidth`/`implicitHeight` are QML's content-size hints, used when
+    // `width`/`height` are unset — honour them as a dimension fallback so a
+    // button declaring only `implicitWidth: 65` is 65px wide, not full-parent.
+    let w_lit = lookup_assignment(child, "width")
+        .or_else(|| lookup_assignment(child, "implicitWidth"))
+        .and_then(parse_int_literal);
+    let h_lit = lookup_assignment(child, "height")
+        .or_else(|| lookup_assignment(child, "implicitHeight"))
+        .and_then(parse_int_literal);
 
-    let lm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.leftMargin"));
-    let rm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.rightMargin"));
-    let tm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.topMargin"));
-    let bm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.bottomMargin"));
+    let lm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.leftMargin", resolver));
+    let rm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.rightMargin", resolver));
+    let tm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.topMargin", resolver));
+    let bm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.bottomMargin", resolver));
 
     let add_margin = |expr: String, m: i32| -> String {
         if m == 0 {
@@ -3412,13 +4080,32 @@ fn solve_child_bounds(child: &UiItem, base_of: &dyn Fn(&str) -> Option<String>) 
             format!("({expr} - {m})")
         }
     };
+    // Non-literal `width:` / `height:` (e.g. `height: panelHeight`,
+    // `parent.width / 2 - AppConsts.i_DISPLAY_PADDING`) resolve through the
+    // DimResolver into a Rust expression over `bounds`; an `Image` with no
+    // explicit extent falls back to its source's natural pixel size (QML sizes
+    // an Image to its `sourceSize`, not the parent); only a genuinely
+    // unresolvable extent falls back to the full parent dimension.
+    let w_expr = lookup_assignment(child, "width");
+    let h_expr = lookup_assignment(child, "height");
+    let img_natural = if matches!(map_qml_type(&child.type_name), WidgetKind::Image) {
+        resolver.image_natural_size(child)
+    } else {
+        None
+    };
     let default_w = || match w_lit {
         Some(n) => format!("{n}"),
-        None => "bounds.width".to_string(),
+        None => w_expr
+            .and_then(|e| resolver.resolve_dim(e.trim()))
+            .or_else(|| img_natural.map(|(w, _)| format!("{w}")))
+            .unwrap_or_else(|| "bounds.width".to_string()),
     };
     let default_h = || match h_lit {
         Some(n) => format!("{n}"),
-        None => "bounds.height".to_string(),
+        None => h_expr
+            .and_then(|e| resolver.resolve_dim(e.trim()))
+            .or_else(|| img_natural.map(|(_, h)| format!("{h}")))
+            .unwrap_or_else(|| "bounds.height".to_string()),
     };
 
     // ---- X axis ----
@@ -3488,7 +4175,11 @@ fn solve_child_bounds(child: &UiItem, base_of: &dyn Fn(&str) -> Option<String>) 
 /// the sibling-aware [`solve_child_bounds`], ordered so a child is declared
 /// after every sibling it anchors to. Children are pushed in source order by
 /// the caller; only the *declaration* order is topologically sorted here.
-fn emit_solved_child_bounds(child_fns: &[(String, &UiItem)], out: &mut String) {
+fn emit_solved_child_bounds(
+    child_fns: &[(String, &UiItem)],
+    resolver: &DimResolver,
+    out: &mut String,
+) {
     use std::collections::BTreeMap;
     let n = child_fns.len();
 
@@ -3534,7 +4225,7 @@ fn emit_solved_child_bounds(child_fns: &[(String, &UiItem)], out: &mut String) {
 
     for &i in &order {
         let (_name, child) = &child_fns[i];
-        let rb = solve_child_bounds(child, &base_of);
+        let rb = solve_child_bounds(child, &base_of, resolver);
         out.push_str(&format!(
             "    let cb_{i} = Rect {{\n        x: {},\n        y: {},\n        \
              width: {},\n        height: {},\n    }};\n",
@@ -3623,8 +4314,15 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
 
     let x_lit = lookup_assignment(child, "x").and_then(parse_int_literal);
     let y_lit = lookup_assignment(child, "y").and_then(parse_int_literal);
-    let w_lit = lookup_assignment(child, "width").and_then(parse_int_literal);
-    let h_lit = lookup_assignment(child, "height").and_then(parse_int_literal);
+    // `implicitWidth`/`implicitHeight` are QML's content-size hints, used when
+    // `width`/`height` are unset — honour them as a dimension fallback so a
+    // button declaring only `implicitWidth: 65` is 65px wide, not full-parent.
+    let w_lit = lookup_assignment(child, "width")
+        .or_else(|| lookup_assignment(child, "implicitWidth"))
+        .and_then(parse_int_literal);
+    let h_lit = lookup_assignment(child, "height")
+        .or_else(|| lookup_assignment(child, "implicitHeight"))
+        .and_then(parse_int_literal);
 
     // QT-03c §7 step 2: anchors.centerIn with literal width+height.
     if center_in {

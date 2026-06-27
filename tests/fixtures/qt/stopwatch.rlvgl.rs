@@ -42,7 +42,7 @@ use stopwatch_gen::{DataModel, Event, Machine};
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 14;
+pub const QT_EMIT_VERSION: u32 = 17;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -149,6 +149,14 @@ fn format_dm_elapsed(dm: &DataModel) -> String {
     dm.elapsed.to_string()
 }
 
+/// Construct a `Label` with a transparent background (QML text has
+/// no fill), so it does not paint the opaque-white default `Style`.
+fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
+    let mut l = Label::new(text, bounds);
+    l.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    l
+}
+
 // QML type: `Item` (id: `root`)
 #[rustfmt::skip]
 fn build_root(
@@ -157,8 +165,9 @@ fn build_root(
     machine: Rc<RefCell<Machine>>,
     bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -212,7 +221,7 @@ fn build_display(
 ) -> WidgetNode {
     // QT-04c bound: text → state.title
     let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
-        Label::new(state.borrow().title.clone(), bounds),
+        qt_label(state.borrow().title.clone(), bounds),
     ));
     let widget: Rc<RefCell<dyn Widget>> = label_handle.clone();
     // QT-04e bound: refresh state.title → label.set_text
@@ -238,7 +247,7 @@ fn build_counter(
 ) -> WidgetNode {
     // QT-05c machine-bound: text → sm.dm.elapsed
     let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
-        Label::new(
+        qt_label(
             { let m = machine.borrow(); format_dm_elapsed(&m.dm) },
         bounds,
     ),
@@ -265,6 +274,7 @@ fn build_startBtn(
     bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut button = Button::new("Start", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     {
         let machine = Rc::clone(&machine);
         button.set_on_click(move |_b| {
@@ -291,6 +301,7 @@ fn build_stopBtn(
     bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut button = Button::new("Stop", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     {
         let machine = Rc::clone(&machine);
         button.set_on_click(move |_b| {
@@ -317,6 +328,7 @@ fn build_resetBtn(
     bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut button = Button::new("Reset", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     {
         let machine = Rc::clone(&machine);
         button.set_on_click(move |_b| {

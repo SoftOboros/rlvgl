@@ -19,7 +19,7 @@ fn generated_clickable_module_links_handler() {
     };
     let (node, _state, _bindings) = generated_clickable::build_screen(bounds);
     assert!(node.children.is_empty());
-    assert_eq!(generated_clickable::QT_EMIT_VERSION, 14);
+    assert_eq!(generated_clickable::QT_EMIT_VERSION, 17);
 
     // The widget the generated module installs must be a Button —
     // QT-04's only handler-supported widget per §5. We verify by

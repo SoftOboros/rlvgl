@@ -210,7 +210,7 @@ fn qt10_strict_version_const_pinned_in_source() {
     // even when the constant name is unchanged).
     for (name, expected) in [
         ("QT_IR_VERSION", 2),
-        ("QT_EMIT_VERSION_RLVGL", 14),
+        ("QT_EMIT_VERSION_RLVGL", 17),
         ("QT_EMIT_VERSION_DATA", 1),
     ] {
         let needle = format!("pub const {name}: u32 = {expected}");

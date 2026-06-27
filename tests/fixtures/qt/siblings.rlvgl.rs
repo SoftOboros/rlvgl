@@ -41,7 +41,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 14;
+pub const QT_EMIT_VERSION: u32 = 17;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -100,6 +100,14 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, bindings: &[LabelBindi
     }
 }
 
+/// Construct a `Label` with a transparent background (QML text has
+/// no fill), so it does not paint the opaque-white default `Style`.
+fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
+    let mut l = Label::new(text, bounds);
+    l.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    l
+}
+
 // QML type: `Item`
 #[rustfmt::skip]
 fn build_node_0(
@@ -107,8 +115,9 @@ fn build_node_0(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -152,8 +161,9 @@ fn build_header(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -169,8 +179,9 @@ fn build_art(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -188,7 +199,7 @@ fn build_title(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -204,8 +215,9 @@ fn build_footer(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let node = WidgetNode {
         widget,
         children: Vec::new(),

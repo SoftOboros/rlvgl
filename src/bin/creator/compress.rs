@@ -51,9 +51,34 @@ fn default_name(output: &Path) -> String {
 
 /// Run the compress subcommand: load `input`, RLE-encode via `rlvgl-decomp`,
 /// and write an `RLEC` blob — or a C / Rust byte array of that blob.
-pub fn run(input: &Path, output: &Path, emit: OutKind, name: Option<&str>) -> Result<()> {
-    let (w, h, rgba) = load_rgba(input)?;
+pub fn run(
+    input: &Path,
+    output: &Path,
+    emit: OutKind,
+    name: Option<&str>,
+    transparent_key: bool,
+) -> Result<()> {
+    let (w, h, mut rgba) = load_rgba(input)?;
     eprintln!("compress: {}x{} ({} bytes raw RGBA)", w, h, rgba.len());
+
+    if transparent_key {
+        // RLEC is RGB565 (no alpha). Fold ≤1-bit transparency into a magenta
+        // (#FF00FF) sentinel that consumers key back to transparent. Encode
+        // mostly-transparent pixels as magenta; everything else keeps its RGB.
+        let mut keyed = 0usize;
+        for px in rgba.chunks_exact_mut(4) {
+            if px[3] < 128 {
+                px[0] = 0xFF;
+                px[1] = 0x00;
+                px[2] = 0xFF;
+                px[3] = 0xFF;
+                keyed += 1;
+            } else {
+                px[3] = 0xFF;
+            }
+        }
+        eprintln!("compress: transparent-key applied to {keyed} pixels (magenta sentinel)");
+    }
 
     let (palette, stream) = rlvgl_decomp::encode_rgba(w as usize, h as usize, &rgba)
         .map_err(|e| anyhow!("RLE encode failed: {:?}", e))?;

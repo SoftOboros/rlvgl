@@ -254,6 +254,12 @@ enum Command {
         /// Symbol name for `--emit c|rust` (defaults to the output file stem)
         #[arg(long)]
         name: Option<String>,
+        /// Map source pixels with alpha < 128 to a magenta (#FF00FF) sentinel.
+        /// The RLEC format is RGB565 (no alpha); consumers that key magenta
+        /// back to transparent (e.g. the QML `qt_image` helper) thereby
+        /// recover 1-bit transparency for icons with alpha edges.
+        #[arg(long)]
+        transparent_key: bool,
     },
     /// Convert an image to an LVGL v9 binary image (`.bin`) or compiled-in
     /// C / Rust source for handoff to an LVGL build
@@ -925,7 +931,14 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
             output,
             emit,
             name,
-        } => compress::run(&input, &output, emit.into(), name.as_deref())?,
+            transparent_key,
+        } => compress::run(
+            &input,
+            &output,
+            emit.into(),
+            name.as_deref(),
+            transparent_key,
+        )?,
         Command::Lvgl {
             input,
             output,

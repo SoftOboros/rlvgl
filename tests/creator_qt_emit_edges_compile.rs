@@ -19,7 +19,7 @@ fn generated_edges_module_anchors_each_edge_correctly() {
         height: 200,
     };
     let (node, _state, _bindings) = generated_edges::build_screen(bounds);
-    assert_eq!(generated_edges::QT_EMIT_VERSION, 14);
+    assert_eq!(generated_edges::QT_EMIT_VERSION, 17);
     assert_eq!(node.children.len(), 4);
 
     // anchors.left: parent.left → x = 0; explicit height: 30; width

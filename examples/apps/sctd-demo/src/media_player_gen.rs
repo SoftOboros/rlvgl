@@ -34,6 +34,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use rlvgl_core::WidgetNode;
+use rlvgl_core::image::BlitOpts;
 use rlvgl_core::widget::{Color, Rect, Widget};
 use rlvgl_widgets::button::Button;
 use rlvgl_widgets::click_area::ClickArea;
@@ -43,7 +44,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 14;
+pub const QT_EMIT_VERSION: u32 = 17;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -124,6 +125,9 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, bindings: &[LabelBindi
 // Required `qt_assets` symbols (one RLE `&[u8]` blob each):
 //   qt_assets::IMG_IMGBOLEROBACKGROUND  ←  Images/ImgBoleroBackground.png
 //   qt_assets::IMG_IMGMUTE  ←  Images/ImgMute.png
+//   qt_assets::IMG_IMGREWINDBACK_48  ←  Qml/Images/ImgRewindBack_48.png
+//   qt_assets::IMG_IMGPLAY_48  ←  Qml/Images/ImgPlay_48.png
+//   qt_assets::IMG_IMGREWINDFORWARD_48  ←  Qml/Images/ImgRewindForward_48.png
 //   qt_assets::IMG_IMGMEDIATRACKREPEAT_48  ←  Qml/Images/ImgMediaTrackRepeat_48.png
 //   qt_assets::IMG_IMGSHUFFLEON_48  ←  Qml/Images/ImgShuffleOn_48.png
 /// Decode a vendored RLE asset into an owned, leaked pixel buffer and
@@ -141,10 +145,37 @@ fn qt_image(bounds: Rect, rle: &'static [u8]) -> Rc<RefCell<dyn Widget>> {
         .expect("qt_image: RLE decode failed");
     let pixels: Vec<Color> = rgba
         .chunks_exact(4)
-        .map(|c| Color(c[0], c[1], c[2], c[3]))
+        .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {
+            Color(0x00, 0x00, 0x00, 0x00) // magenta sentinel → transparent (RGB565 has no alpha)
+        } else {
+            Color(c[0], c[1], c[2], c[3])
+        })
         .collect();
     let pixels: &'static [Color] = Vec::leak(pixels);
-    Rc::new(RefCell::new(Image::new(bounds, w as i32, h as i32, pixels)))
+    let mut img = Image::new(bounds, w as i32, h as i32, pixels);
+    // An Image paints its own pixels; the widget background MUST be
+    // transparent so the default opaque-white `Style` does not bury
+    // the artwork (and content drawn behind it).
+    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    // QML's default `fillMode` is `Image.Stretch`: scale the source to
+    // fill the destination bounds. `scale` is 8.8 fixed-point, so 256 =
+    // 1:1; dest/src * 256 stretches source pixels across `bounds`.
+    let scale_x = if w > 0 {
+        ((bounds.width.max(0) as i64 * 256 / w as i64).clamp(1, 0xffff)) as u16
+    } else { 256 };
+    let scale_y = if h > 0 {
+        ((bounds.height.max(0) as i64 * 256 / h as i64).clamp(1, 0xffff)) as u16
+    } else { 256 };
+    let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
+    Rc::new(RefCell::new(img))
+}
+
+/// Construct a `Label` with a transparent background (QML text has
+/// no fill), so it does not paint the opaque-white default `Style`.
+fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
+    let mut l = Label::new(text, bounds);
+    l.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    l
 }
 
 // QML type: `Image` (id: `pane`)
@@ -183,16 +214,16 @@ fn build_paneMouseArea(
         tag: Some("paneMouseArea"),
     };
     let cb_2 = Rect {
-        x: bounds.x,
-        y: (((bounds.y + bounds.height)) - (bounds.height)),
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: bounds.height,
+        x: (bounds.x + 8),
+        y: ((((bounds.y + bounds.height) - 8)) - ((((bounds.height / 6) - 8)))),
+        width: ((((bounds.x + bounds.width) - 8)) - ((bounds.x + 8))),
+        height: (((bounds.height / 6) - 8)),
     };
     let cb_0 = Rect {
-        x: bounds.x,
-        y: bounds.y,
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: ((cb_2.y) - (bounds.y)),
+        x: (bounds.x + 8),
+        y: (bounds.y + 8),
+        width: ((((bounds.x + bounds.width) - 8)) - ((bounds.x + 8))),
+        height: ((cb_2.y) - ((bounds.y + 8))),
     };
     let cb_1 = Rect {
         x: bounds.x,
@@ -213,8 +244,9 @@ fn build_contentPaddingItem(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -224,13 +256,13 @@ fn build_contentPaddingItem(
         x: bounds.x,
         y: bounds.y,
         width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: bounds.height,
+        height: 36,
     };
     let cb_1 = Rect {
         x: bounds.x,
-        y: ((((bounds.y + bounds.height) - 10)) - (bounds.height)),
+        y: ((((bounds.y + bounds.height) - 10)) - ((((bounds.height / 6) - 8)))),
         width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: bounds.height,
+        height: (((bounds.height / 6) - 8)),
     };
     let cb_3 = Rect {
         x: (((bounds.x + bounds.width)) - (160)),
@@ -272,8 +304,9 @@ fn build_headerPanel(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -292,10 +325,10 @@ fn build_headerPanel(
         height: bounds.height,
     };
     let cb_2 = Rect {
-        x: ((cb_0.x) - (bounds.width)),
-        y: (((bounds.y + bounds.height / 2)) - (bounds.height) / 2),
-        width: bounds.width,
-        height: bounds.height,
+        x: ((cb_0.x) - (32)),
+        y: (((bounds.y + bounds.height / 2)) - (32) / 2),
+        width: 32,
+        height: 32,
     };
     let cb_3 = Rect {
         x: (((bounds.x + bounds.width)) - (bounds.width)),
@@ -319,7 +352,7 @@ fn build_textTime(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -336,8 +369,9 @@ fn build_timer(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Timer`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
@@ -372,7 +406,7 @@ fn build_textTemperature(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("15 °C", bounds)));
+        Rc::new(RefCell::new(qt_label("15 °C", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -388,8 +422,9 @@ fn build_functionKeys(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -404,19 +439,19 @@ fn build_functionKeys(
     let cb_1 = Rect {
         x: bounds.x,
         y: bounds.y,
-        width: bounds.width,
+        width: 65,
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
     let cb_2 = Rect {
         x: ((cb_1.x + cb_1.width) + 3),
         y: bounds.y,
-        width: bounds.width,
+        width: 65,
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
     let cb_3 = Rect {
-        x: (((bounds.x + bounds.width)) - (bounds.width)),
+        x: (((bounds.x + bounds.width)) - (65)),
         y: bounds.y,
-        width: bounds.width,
+        width: 65,
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
     node.children.push(build_rowButtons(cb_0, Rc::clone(&state), label_bindings));
@@ -434,8 +469,9 @@ fn build_rowButtons(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `RowLayout`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -459,12 +495,85 @@ fn build_repeaterButtons(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Repeater`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
-    let node = WidgetNode {
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
+    let mut node = WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("repeaterButtons"),
+    };
+    let cb_0 = Rect {
+        x: (bounds.x + 75),
+        y: (((bounds.y + bounds.height / 2)) - (48) / 2),
+        width: 48,
+        height: 48,
+    };
+    let cb_1 = Rect {
+        x: ((cb_0.x + cb_0.width) + 3),
+        y: (((bounds.y + bounds.height / 2)) - (48) / 2),
+        width: 48,
+        height: 48,
+    };
+    let cb_2 = Rect {
+        x: ((cb_1.x + cb_1.width) + 3),
+        y: (((bounds.y + bounds.height / 2)) - (48) / 2),
+        width: 48,
+        height: 48,
+    };
+    node.children.push(build___rep_btn_0(cb_0, Rc::clone(&state), label_bindings));
+    node.children.push(build___rep_btn_1(cb_1, Rc::clone(&state), label_bindings));
+    node.children.push(build___rep_btn_2(cb_2, Rc::clone(&state), label_bindings));
+    node
+}
+
+// QML type: `Image` (id: `__rep_btn_0`)
+#[rustfmt::skip]
+fn build___rep_btn_0(
+    bounds: Rect,
+    state: Rc<RefCell<ScreenState>>,
+    label_bindings: &mut Vec<LabelBinding>,
+) -> WidgetNode {
+    // QT-IMG: Image source → qt_assets::IMG_IMGREWINDBACK_48 (Qml/Images/ImgRewindBack_48.png)
+    let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDBACK_48);
+    let node = WidgetNode {
+        widget,
+        children: Vec::new(),
+        tag: Some("__rep_btn_0"),
+    };
+    node
+}
+
+// QML type: `Image` (id: `__rep_btn_1`)
+#[rustfmt::skip]
+fn build___rep_btn_1(
+    bounds: Rect,
+    state: Rc<RefCell<ScreenState>>,
+    label_bindings: &mut Vec<LabelBinding>,
+) -> WidgetNode {
+    // QT-IMG: Image source → qt_assets::IMG_IMGPLAY_48 (Qml/Images/ImgPlay_48.png)
+    let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGPLAY_48);
+    let node = WidgetNode {
+        widget,
+        children: Vec::new(),
+        tag: Some("__rep_btn_1"),
+    };
+    node
+}
+
+// QML type: `Image` (id: `__rep_btn_2`)
+#[rustfmt::skip]
+fn build___rep_btn_2(
+    bounds: Rect,
+    state: Rc<RefCell<ScreenState>>,
+    label_bindings: &mut Vec<LabelBinding>,
+) -> WidgetNode {
+    // QT-IMG: Image source → qt_assets::IMG_IMGREWINDFORWARD_48 (Qml/Images/ImgRewindForward_48.png)
+    let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDFORWARD_48);
+    let node = WidgetNode {
+        widget,
+        children: Vec::new(),
+        tag: Some("__rep_btn_2"),
     };
     node
 }
@@ -478,6 +587,7 @@ fn build_repeatBtn(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let mut node = WidgetNode {
@@ -492,13 +602,13 @@ fn build_repeatBtn(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_node_20(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_23(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `Image`
 #[rustfmt::skip]
-fn build_node_20(
+fn build_node_23(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
@@ -522,6 +632,7 @@ fn build_node_17(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
     // emitter-skipped (QT-04c+): 4 property declaration(s)
     // emitter-skipped (QT-04+): 1 signal handler(s)
@@ -533,7 +644,7 @@ fn build_node_17(
     let child_bounds = bounds;
     node.children.push(build_shape(child_bounds, Rc::clone(&state), label_bindings));
     let child_bounds = bounds;
-    node.children.push(build_node_22(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_25(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
@@ -545,8 +656,9 @@ fn build_shape(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Shape`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -570,8 +682,9 @@ fn build_shapePath(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `ShapePath`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -583,20 +696,21 @@ fn build_shapePath(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_node_24(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_27(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `PathLine`
 #[rustfmt::skip]
-fn build_node_24(
+fn build_node_27(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `PathLine`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -607,14 +721,14 @@ fn build_node_24(
 
 // QML type: `Text`
 #[rustfmt::skip]
-fn build_node_22(
+fn build_node_25(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -632,6 +746,7 @@ fn build_node_18(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
     // emitter-skipped (QT-04c+): 4 property declaration(s)
     // emitter-skipped (QT-04+): 1 signal handler(s)
@@ -647,13 +762,13 @@ fn build_node_18(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_node_25(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_28(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `Image`
 #[rustfmt::skip]
-fn build_node_25(
+fn build_node_28(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
@@ -675,8 +790,9 @@ fn build_timeline(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let mut node = WidgetNode {
         widget,
@@ -690,9 +806,9 @@ fn build_timeline(
         height: bounds.height,
     };
     let cb_1 = Rect {
-        x: (((bounds.x + bounds.width / 2)) - (bounds.width) / 2),
+        x: (((bounds.x + bounds.width / 2)) - ((bounds.width * 1)) / 2),
         y: bounds.y,
-        width: bounds.width,
+        width: (bounds.width * 1),
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
     let cb_2 = Rect {
@@ -707,7 +823,7 @@ fn build_timeline(
         width: (((bounds.x + bounds.width)) - (((cb_1.x + cb_1.width) + 5))),
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
-    node.children.push(build_node_26(cb_0, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_29(cb_0, Rc::clone(&state), label_bindings));
     node.children.push(build_timeSlider(cb_1, Rc::clone(&state), label_bindings));
     node.children.push(build_textPosition(cb_2, Rc::clone(&state), label_bindings));
     node.children.push(build_textElapsed(cb_3, Rc::clone(&state), label_bindings));
@@ -716,14 +832,15 @@ fn build_timeline(
 
 // QML type: `Connections`
 #[rustfmt::skip]
-fn build_node_26(
+fn build_node_29(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Connections`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
@@ -741,8 +858,9 @@ fn build_timeSlider(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Slider`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
@@ -761,7 +879,7 @@ fn build_textPosition(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -779,7 +897,7 @@ fn build_textElapsed(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
@@ -796,8 +914,9 @@ fn build_imageSource(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -836,9 +955,10 @@ fn build_image(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    // QT-IMG: Image with no resolvable source literal; emitting an empty container
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    // QT-IMG: Image with no resolvable source literal; emitting an empty transparent container
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
@@ -857,7 +977,7 @@ fn build_textCaption(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
@@ -876,7 +996,7 @@ fn build_textSource(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -892,8 +1012,9 @@ fn build_warningPanel(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let mut node = WidgetNode {
         widget,
@@ -925,8 +1046,9 @@ fn build_busyIndicator(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `BusyIndicator`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -944,7 +1066,7 @@ fn build_textWarning(
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Label::new("", bounds)));
+        Rc::new(RefCell::new(qt_label("", bounds)));
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -962,6 +1084,7 @@ fn build_node_3(
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     // TODO QT-04e: bind color (non-literal QML expression)
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
@@ -969,13 +1092,13 @@ fn build_node_3(
         tag: None,
     };
     let child_bounds = bounds;
-    node.children.push(build_node_34(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_37(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `MouseArea`
 #[rustfmt::skip]
-fn build_node_34(
+fn build_node_37(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
@@ -1001,28 +1124,30 @@ fn build_bottomPanel(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("bottomPanel"),
     };
     let child_bounds = bounds;
-    node.children.push(build_rowButtons_35(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_rowButtons_38(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `RowLayout` (id: `rowButtons`)
 #[rustfmt::skip]
-fn build_rowButtons_35(
+fn build_rowButtons_38(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `RowLayout`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -1034,20 +1159,21 @@ fn build_rowButtons_35(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_repeaterButtons_36(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_repeaterButtons_39(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `Repeater` (id: `repeaterButtons`)
 #[rustfmt::skip]
-fn build_repeaterButtons_36(
+fn build_repeaterButtons_39(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Repeater`
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,

@@ -41,7 +41,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 14;
+pub const QT_EMIT_VERSION: u32 = 17;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -110,6 +110,7 @@ fn build_root(
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
     let mut button = Button::new("Press me", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     {
         let state = Rc::clone(&state);
         button.set_on_click(move |_b| {
