@@ -24,15 +24,22 @@ use rlvgl_core::widget::{Rect, Widget};
 
 use crate::media_player_gen::{self, Binding, ScreenState};
 
-/// The QML transport Play button's synthesised id (QT-Repeater expansion):
-/// the second model item (`MediaFunc.Play`). Its node carries this tag, so the
-/// skin can locate its bounds to route a tap into the machine.
-const PLAY_BUTTON_TAG: &str = "__rep_btn_1";
-
-/// The single machine event the Play button dispatches. The machine owns the
-/// play↔pause decision (QT-05g; see `media_player_normalized.scxml`), so the
-/// skin sends one toggle event — no predicate branch in glue.
-const PLAY_PAUSE_EVENT: &str = "Inp.Media.PlayPause";
+/// Tap-routable controls in the emitted tree: `(node tag, machine event)`.
+/// Each tagged button forwards a tap as its single machine event; the machine
+/// owns the resulting state change (QT-05g/05i) and the emitted predicate /
+/// chain bindings swap the artwork on `refresh_bindings` — no predicate branch
+/// in glue. The `__rep_btn_1` tag is the transport Play button's synthesised id
+/// (QT-Repeater expansion, model item `MediaFunc.Play`); `repeatBtn` is the
+/// repeat-mode button's QML `id:`.
+///
+/// Controls whose QML carries no `id:` (the shuffle button) are not tap-routable
+/// here — their bindings are still reactive (driven whenever the machine enters
+/// the state by any path); real shuffle-tap wiring is deferred (QT-05i §9: the
+/// `MediaShuffleButton` instance is untagged upstream).
+const TAP_CONTROLS: &[(&str, &str)] = &[
+    ("__rep_btn_1", "Inp.Media.PlayPause"),
+    ("repeatBtn", "Inp.Media.Repeat"),
+];
 
 /// Visibility-gated wrapper around the emitted media-player widget tree, wired
 /// to its istate (linkage-v2) `media_player::Machine` (QT-05g).
@@ -50,11 +57,12 @@ pub struct MediaPlayerSkin {
     state: Rc<RefCell<ScreenState>>,
     /// The istate (linkage-v2) machine driving the reactive artwork.
     machine: Rc<RefCell<media_player::Machine>>,
-    /// Reactive bindings (QT-05g `Binding::Predicate` + any labels).
+    /// Reactive bindings (QT-05g `Binding::Predicate` / QT-05i `Binding::Chain`
+    /// / QT-05h `Binding::Visibility` + any labels).
     bindings: Vec<Binding>,
-    /// Bounds of the Play button (tag [`PLAY_BUTTON_TAG`]), resolved once from
-    /// the built tree; `None` if the tag is absent.
-    play_bounds: Option<Rect>,
+    /// Resolved tap targets: `(button bounds, machine event)` for every
+    /// [`TAP_CONTROLS`] entry whose tag is present in the built tree.
+    tap_targets: Vec<(Rect, &'static str)>,
     /// Whether the skin is currently shown (MP slot selected).
     visible: bool,
 }
@@ -78,7 +86,10 @@ impl MediaPlayerSkin {
         // anchor solver. `build_screen` constructs + `start()`s the machine
         // (linkage v2) and returns the reactive bindings; the skin owns them.
         let (node, state, machine, bindings) = media_player_gen::build_screen(bounds);
-        let play_bounds = find_bounds_by_tag(&node, PLAY_BUTTON_TAG);
+        let tap_targets: Vec<(Rect, &'static str)> = TAP_CONTROLS
+            .iter()
+            .filter_map(|(tag, ev)| find_bounds_by_tag(&node, tag).map(|b| (b, *ev)))
+            .collect();
         // `build_screen` constructs + `start()`s the machine, leaving it in
         // `mediaPlayerIdle`. Seed it past idle to the transport state
         // (`mediaStopped`) so the Play button is live — mirrors the
@@ -97,7 +108,7 @@ impl MediaPlayerSkin {
             state,
             machine,
             bindings,
-            play_bounds,
+            tap_targets,
             visible: false,
         }
     }
@@ -113,19 +124,15 @@ impl MediaPlayerSkin {
         self.visible
     }
 
-    /// Toggle the machine's transport (Play↔Pause) and re-apply the reactive
-    /// bindings, so the Play button's artwork tracks `is_active("mediaPlaying")`.
-    fn toggle_play_pause(&self) {
+    /// Step the machine with one event and re-apply the reactive bindings, so
+    /// the bound artwork tracks the new machine state (QT-05g `is_active` swap,
+    /// QT-05i chained swap, QT-05h hide/show). The machine owns every decision;
+    /// the skin only forwards the event and refreshes.
+    fn step_event(&self, event: &str) {
         self.machine
             .borrow_mut()
-            .step(PLAY_PAUSE_EVENT, media_player::Value::Undefined);
+            .step(event, media_player::Value::Undefined);
         media_player_gen::refresh_bindings(&self.state, &self.machine, &self.bindings);
-    }
-
-    /// Bounds of the Play button (for the pixel gate).
-    #[cfg(test)]
-    fn play_bounds(&self) -> Option<Rect> {
-        self.play_bounds
     }
 
     /// Bounds of a tagged node in the emitted tree (for the pixel gate).
@@ -135,14 +142,11 @@ impl MediaPlayerSkin {
     }
 
     /// Step the machine with a raw event and re-apply the bindings — used by
-    /// the pixel gate to exercise display-only states (e.g. mute) that have no
-    /// on-screen tap target. Mirrors `toggle_play_pause`'s mechanism.
+    /// the pixel gate to exercise display-only states (e.g. mute, shuffle) that
+    /// have no tap target wired here. Same mechanism as a real tap.
     #[cfg(test)]
     fn test_step(&self, event: &str) {
-        self.machine
-            .borrow_mut()
-            .step(event, media_player::Value::Undefined);
-        media_player_gen::refresh_bindings(&self.state, &self.machine, &self.bindings);
+        self.step_event(event);
     }
 }
 
@@ -161,18 +165,16 @@ impl Widget for MediaPlayerSkin {
         if !self.visible {
             return false;
         }
-        // A tap in the Play-button region toggles the machine (which swaps the
-        // icon via the predicate binding). `PressRelease` is the committed tap
-        // trigger (see rlvgl CLAUDE.md runtime protocol).
-        if let Event::PressRelease { x, y } | Event::PointerUp { x, y } = *event
-            && let Some(pb) = self.play_bounds
-            && x >= pb.x
-            && x < pb.x + pb.width
-            && y >= pb.y
-            && y < pb.y + pb.height
-        {
-            self.toggle_play_pause();
-            return true;
+        // A tap in any wired control region steps the machine (which swaps the
+        // icon via the predicate / chain binding). `PressRelease` is the
+        // committed tap trigger (see rlvgl CLAUDE.md runtime protocol).
+        if let Event::PressRelease { x, y } | Event::PointerUp { x, y } = *event {
+            for (b, ev) in &self.tap_targets {
+                if x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height {
+                    self.step_event(ev);
+                    return true;
+                }
+            }
         }
         // Other taps still forward into the emitted tree (ClickArea regions).
         self.node.borrow_mut().dispatch_event(event)
@@ -330,7 +332,7 @@ mod pixel_gate {
         let mut skin = MediaPlayerSkin::new(bounds);
         skin.set_visible(true);
         let pb = skin
-            .play_bounds()
+            .tagged_bounds("__rep_btn_1")
             .expect("Play button (__rep_btn_1) must be present in the emitted tree");
 
         // Frame 1: at rest (machine stopped → Play icon).
@@ -417,6 +419,118 @@ mod pixel_gate {
             region_diff(&fb_off, &fb_off2, mb),
             0,
             "the two muteOff renders must be identical in the imgMute region (complete hide)"
+        );
+    }
+
+    /// QT-05i chained-predicate gate: tapping the repeat button cycles the
+    /// machine through `mediaRepeatOff` → `Track` → `Folder` → `Off`, and the
+    /// `Binding::Chain` swaps the repeat icon between NoRepeat / TrackRepeat /
+    /// FolderRepeat artwork. Each of the three taps MUST change the repeatBtn
+    /// region, and after three taps the artwork returns to the resting NoRepeat
+    /// frame (identical to the start).
+    #[test]
+    fn repeat_button_artwork_cycles_on_tap() {
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 720,
+            height: 480,
+        };
+        let mut skin = MediaPlayerSkin::new(bounds);
+        skin.set_visible(true);
+        let rb = skin
+            .tagged_bounds("repeatBtn")
+            .expect("repeatBtn must be present in the emitted tree");
+
+        // Frame 0: at rest (mediaRepeatOff → NoRepeat icon).
+        let mut fb0 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb0);
+
+        let tap = |skin: &mut MediaPlayerSkin| {
+            let consumed = skin.handle_event(&Event::PressRelease {
+                x: rb.x + rb.width / 2,
+                y: rb.y + rb.height / 2,
+            });
+            assert!(consumed, "tap in the repeatBtn region must be consumed");
+        };
+
+        // Tap 1: Off → Track. Tap 2: Track → Folder. Each must change the icon.
+        tap(&mut skin);
+        let mut fb1 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb1);
+        assert!(
+            region_diff(&fb0, &fb1, rb) > 0,
+            "repeat Off→Track did not change the icon — the chain binding is inert"
+        );
+
+        tap(&mut skin);
+        let mut fb2 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb2);
+        assert!(
+            region_diff(&fb1, &fb2, rb) > 0,
+            "repeat Track→Folder did not change the icon — the chain binding is inert"
+        );
+
+        // Tap 3: Folder → Off. The icon must change again AND return to the
+        // resting NoRepeat frame (chain default), proving the full cycle.
+        tap(&mut skin);
+        let mut fb3 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb3);
+        assert!(
+            region_diff(&fb2, &fb3, rb) > 0,
+            "repeat Folder→Off did not change the icon — the chain binding is inert"
+        );
+        assert_eq!(
+            region_diff(&fb0, &fb3, rb),
+            0,
+            "after a full Off→Track→Folder→Off cycle the repeat icon must match \
+             the resting NoRepeat frame (chain default)"
+        );
+    }
+
+    /// QT-05i / QT-05g binary gate: toggling shuffle (`Inp.Media.Shuffle`)
+    /// enters `mediaPlayMixModeOn` and the `Binding::Predicate` swaps the
+    /// shuffle icon Off→On. The shuffle button is untagged upstream, so it has
+    /// no tap target; the only visual a bare Shuffle event can change is the
+    /// shuffle icon, so a frame-level diff proves the binding is live, and
+    /// toggling back returns the frame to the resting state.
+    #[test]
+    fn shuffle_icon_swaps_when_toggled() {
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 720,
+            height: 480,
+        };
+        let full = bounds;
+        let mut skin = MediaPlayerSkin::new(bounds);
+        skin.set_visible(true);
+
+        // At rest: mediaPlayMixModeOff → ShuffleOff icon.
+        let mut fb_off = Framebuffer::new(720, 480);
+        skin.draw(&mut fb_off);
+
+        // Toggle shuffle on → ShuffleOn icon: the frame must change.
+        skin.test_step("Inp.Media.Shuffle");
+        let mut fb_on = Framebuffer::new(720, 480);
+        skin.draw(&mut fb_on);
+        assert!(
+            region_diff(&fb_off, &fb_on, full) > 0,
+            "toggling shuffle on must swap the shuffle icon — the predicate binding is inert"
+        );
+
+        // Toggle back off → resting frame again, identical to the start.
+        skin.test_step("Inp.Media.Shuffle");
+        let mut fb_off2 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb_off2);
+        assert!(
+            region_diff(&fb_on, &fb_off2, full) > 0,
+            "toggling shuffle off must swap the icon back"
+        );
+        assert_eq!(
+            region_diff(&fb_off, &fb_off2, full),
+            0,
+            "the two shuffle-off renders must be identical (clean toggle)"
         );
     }
 }

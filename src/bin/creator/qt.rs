@@ -2071,7 +2071,7 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// `Image.Stretch` scaling (source→dest). Without this the emitted
 /// tree rendered all-white on real hardware (opaque structural
 /// containers buried the artwork; 1:1 blit never filled the slots).
-pub const QT_EMIT_VERSION_RLVGL: u32 = 19;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 20;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2534,6 +2534,45 @@ fn parse_predicate_source(expr: &str, ctx: &str) -> Option<(String, String, Stri
     ))
 }
 
+/// QT-05i: parse a chained predicate `source:` of the form
+/// `<ctx>.<s1> ? "A" : <ctx>.<s2> ? "B" : … : "Z"` into ordered first-true-wins
+/// arms `[(state_id, asset_path), …]` plus the final else asset (`"Z"`, the
+/// resting icon). For the declared context `ctx`. Returns `None` for a plain
+/// single (non-chained) ternary — that is `parse_predicate_source`'s job and is
+/// tried first — a non-matching context, a then-branch that is itself a ternary,
+/// or a branch that is not a single asset literal. qrc prefixes are stripped.
+fn parse_chained_predicate_source(
+    expr: &str,
+    ctx: &str,
+) -> Option<(Vec<(String, String)>, String)> {
+    let mut arms: Vec<(String, String)> = Vec::new();
+    let mut cur = expr.trim();
+    loop {
+        let (cond, then_b, else_b) = split_ternary(cur)?;
+        if then_b.contains('?') {
+            return None; // a then-branch must be a single asset literal
+        }
+        let state = cond.strip_prefix(ctx)?.strip_prefix('.')?.trim();
+        if state.is_empty() || !state.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return None;
+        }
+        let on = extract_asset_literals(then_b).into_iter().next()?;
+        arms.push((state.to_string(), strip_qrc_prefix(&on).to_string()));
+        let else_b = else_b.trim();
+        if split_ternary(else_b).is_some() {
+            cur = else_b; // the else is itself a ternary — continue the chain
+            continue;
+        }
+        // Final else: the resting asset literal. Require ≥2 arms so a binary
+        // ternary (handled by `parse_predicate_source`) never reaches here.
+        if arms.len() < 2 {
+            return None;
+        }
+        let default = extract_asset_literals(else_b).into_iter().next()?;
+        return Some((arms, strip_qrc_prefix(&default).to_string()));
+    }
+}
+
 /// QT-05h: parse a bare visibility predicate `<ctx>.<state>` into `state_id`
 /// for the declared context `ctx`. Returns `None` for a non-matching context
 /// or a non-bare-predicate expression (negation / boolean / literal), which
@@ -2783,6 +2822,7 @@ fn render_rlvgl_with_resolver(
     let has_sm = sm_id.is_some();
     let used_predicate = ctx.used_predicate;
     let used_visibility = ctx.used_visibility;
+    let used_predicate_chain = ctx.used_predicate_chain;
     let used_dm_fields = ctx.used_dm_fields.clone();
     let used_assets = ctx.used_assets.clone();
     let has_images = !used_assets.is_empty();
@@ -2924,7 +2964,7 @@ fn render_rlvgl_with_resolver(
     emit_label_binding_struct(&mut out);
     if has_sm {
         if v2 {
-            if used_predicate || used_visibility {
+            if used_predicate || used_visibility || used_predicate_chain {
                 emit_image_art_struct(&mut out);
             }
             if used_predicate {
@@ -2933,7 +2973,15 @@ fn render_rlvgl_with_resolver(
             if used_visibility {
                 emit_visibility_binding_struct(&mut out);
             }
-            emit_binding_enum_v2(&mut out, used_predicate, used_visibility);
+            if used_predicate_chain {
+                emit_predicate_chain_binding_struct(&mut out);
+            }
+            emit_binding_enum_v2(
+                &mut out,
+                used_predicate,
+                used_visibility,
+                used_predicate_chain,
+            );
         } else {
             emit_machine_binding_struct(&mut out);
             emit_binding_enum(&mut out);
@@ -3004,7 +3052,14 @@ fn render_rlvgl_with_resolver(
              (node, state, label_bindings)\n}}\n\n"
         ));
     }
-    emit_refresh_bindings_fn(&mut out, has_sm, v2, used_predicate, used_visibility);
+    emit_refresh_bindings_fn(
+        &mut out,
+        has_sm,
+        v2,
+        used_predicate,
+        used_visibility,
+        used_predicate_chain,
+    );
     // QT-05c §6: per-field `format_dm_<field>` free functions —
     // one per used DM field, emitted in first-use order. The
     // `f64::to_string()` representation is chosen for determinism;
@@ -3021,7 +3076,7 @@ fn render_rlvgl_with_resolver(
     if has_images {
         emit_qt_image_helper(&used_assets, &mut out);
     }
-    if used_predicate || used_visibility {
+    if used_predicate || used_visibility || used_predicate_chain {
         emit_qt_image_art_helper(&mut out);
     }
     if used_predicate {
@@ -3029,6 +3084,9 @@ fn render_rlvgl_with_resolver(
     }
     if used_visibility {
         emit_qt_visibility_image_helper(&mut out);
+    }
+    if used_predicate_chain {
+        emit_qt_predicate_chain_image_helper(&mut out);
     }
     if root_body.contains("qt_label(") {
         // QML `Text`/`Label` items have no background; emit a constructor that
@@ -3200,6 +3258,46 @@ fn emit_qt_visibility_image_helper(out: &mut String) {
     );
 }
 
+/// QT-05i: build a chained-predicate Image — decodes every arm asset plus the
+/// default, builds the concrete `Rc<RefCell<Image>>` at the machine-driven arm
+/// (first active wins, else default), and returns it as a `dyn Widget` plus the
+/// `Binding::Chain` that swaps it on refresh.
+fn emit_qt_predicate_chain_image_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05i: build a chained-predicate Image. Decodes every arm + the\n\
+         /// default, builds the Image at the machine-driven arm (first active\n\
+         /// wins, else default), and returns it as a `dyn Widget` plus the\n\
+         /// `Binding::Chain` that swaps it on refresh.\n\
+         #[rustfmt::skip]\n\
+         fn qt_predicate_chain_image(\n    \
+             bounds: Rect,\n    arms: &[(&'static [u8], &'static str)],\n    \
+             default_rle: &'static [u8],\n    machine: &Machine,\n) -> (Rc<RefCell<dyn Widget>>, Binding) {\n    \
+             let decoded: Vec<PredicateArm> = arms\n        \
+                 .iter()\n        \
+                 .map(|(rle, state_id)| PredicateArm { state_id, art: qt_image_art(rle) })\n        \
+                 .collect();\n    \
+             let default = qt_image_art(default_rle);\n    \
+             let cur = decoded\n        \
+                 .iter()\n        \
+                 .find(|a| machine.is_active(a.state_id))\n        \
+                 .map(|a| a.art)\n        \
+                 .unwrap_or(default);\n    \
+             let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).\n    \
+             let scale_x = if cur.width > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if cur.height > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             let image = Rc::new(RefCell::new(img));\n    \
+             let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
+             (widget, Binding::Chain(PredicateChainBinding { image, arms: decoded, default }))\n}\n\n",
+    );
+}
+
 /// Per-emit context carrying the linear node index counter and the
 /// accumulated helper bodies.
 struct RlvglEmitCtx {
@@ -3246,6 +3344,10 @@ struct RlvglEmitCtx {
     /// QT-05h: set once at least one `Binding::Visibility` is emitted, so the
     /// `qt_visibility_image` helper + `VisibilityBinding` type are emitted.
     used_visibility: bool,
+    /// QT-05i: set once at least one `Binding::Chain` is emitted, so the
+    /// `qt_predicate_chain_image` helper + `PredicateChainBinding`/`PredicateArm`
+    /// types are emitted.
+    used_predicate_chain: bool,
 }
 
 /// One image asset referenced by the emitted widget tree.
@@ -3272,6 +3374,7 @@ impl RlvglEmitCtx {
             sm_context: None,
             used_predicate: false,
             used_visibility: false,
+            used_predicate_chain: false,
         }
     }
 
@@ -3385,6 +3488,7 @@ impl RlvglEmitCtx {
             self.linkage_v2,
             &mut self.used_predicate,
             &mut self.used_visibility,
+            &mut self.used_predicate_chain,
             &mut out,
         );
         emit_skipped_summary(item, is_root, &self.state_fields, &mut out);
@@ -3520,6 +3624,7 @@ fn emit_widget_construction(
     v2: bool,
     used_predicate: &mut bool,
     used_visibility: &mut bool,
+    used_predicate_chain: &mut bool,
     out: &mut String,
 ) {
     match kind {
@@ -3741,6 +3846,72 @@ fn emit_widget_construction(
                     state_lit = rust_str_lit(&state),
                     on_sym = on.symbol,
                     off_sym = off.symbol,
+                ));
+                return;
+            }
+            // QT-05i: a chained predicate `source:`
+            // `<ctx>.<s1> ? "A" : <ctx>.<s2> ? "B" : "C"` (the repeat-mode icon)
+            // lowers to a `Binding::Chain` — first active arm wins, else the
+            // resting default — driven by `machine.is_active(<state>)`.
+            let chain = if v2 {
+                sm_context
+                    .zip(lookup_assignment(item, "source"))
+                    .and_then(|(ctx, raw)| parse_chained_predicate_source(raw, ctx))
+            } else {
+                None
+            };
+            if let Some((arms, default_path)) = chain {
+                let arm_refs: Vec<(AssetRef, String)> = arms
+                    .into_iter()
+                    .map(|(state, path)| {
+                        (
+                            AssetRef {
+                                symbol: asset_symbol(&path),
+                                path,
+                            },
+                            state,
+                        )
+                    })
+                    .collect();
+                let default_ref = AssetRef {
+                    symbol: asset_symbol(&default_path),
+                    path: default_path,
+                };
+                for a in arm_refs
+                    .iter()
+                    .map(|(r, _)| r)
+                    .chain(core::iter::once(&default_ref))
+                {
+                    if !used_assets.iter().any(|x| x.symbol == a.symbol) {
+                        used_assets.push(a.clone());
+                    }
+                }
+                *used_predicate_chain = true;
+                out.push_str(&format!(
+                    "    // QT-05i predicate-chain-bound: source → {ctx} chain \
+                     [{arms}] default={def_sym}\n",
+                    ctx = sm_context.unwrap_or(""),
+                    arms = arm_refs
+                        .iter()
+                        .map(|(r, s)| format!("{s}→{}", r.symbol))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    def_sym = default_ref.symbol,
+                ));
+                out.push_str("    let __arms: &[(&'static [u8], &'static str)] = &[\n");
+                for (r, state) in &arm_refs {
+                    out.push_str(&format!(
+                        "        (qt_assets::{}, {}),\n",
+                        r.symbol,
+                        rust_str_lit(state),
+                    ));
+                }
+                out.push_str("    ];\n");
+                out.push_str(&format!(
+                    "    let (widget, __pcb): (Rc<RefCell<dyn Widget>>, Binding) =\n        \
+                         qt_predicate_chain_image(bounds, __arms, qt_assets::{def_sym}, &machine.borrow());\n    \
+                     bindings.push(__pcb);\n",
+                    def_sym = default_ref.symbol,
                 ));
                 return;
             }
@@ -5393,13 +5564,55 @@ fn emit_visibility_binding_struct(out: &mut String) {
     );
 }
 
-/// QT-05g §3 / QT-05h §3 — sealed binding enum for linkage-v2 modules:
-/// `Label` always; `Predicate` (state-driven artwork) and `Visibility`
-/// (state-driven hide/show) when those bindings are present.
-fn emit_binding_enum_v2(out: &mut String, used_predicate: bool, used_visibility: bool) {
+/// QT-05i §3 — reactive `Image`-source binding over a CHAIN of predicates:
+/// the first `arm` whose `state_id` is active wins; if none are active the
+/// `default` (resting) artwork shows. Models the repeat-mode icon
+/// (`mediaRepeatTrack ? … : mediaRepeatFolder ? … : NoRepeat`).
+fn emit_predicate_chain_binding_struct(out: &mut String) {
     out.push_str(
-        "/// QT-05g §3 / QT-05h §3 — sealed enum over the binding sources\n\
-         /// reactive `refresh_bindings` knows how to drive.\n\
+        "/// QT-05i §3 — one arm of a chained predicate binding: the artwork\n\
+         /// shown when `state_id` is the first active arm.\n\
+         pub struct PredicateArm {\n    \
+             pub state_id: &'static str,\n    \
+             pub art: ImageArt,\n}\n\n\
+         /// QT-05i §3 — reactive `Image`-source binding driven by a chain of\n\
+         /// `Machine::is_active` checks (first-true wins; `default` is the\n\
+         /// resting else). Each `state_id` is the QML predicate passed through\n\
+         /// verbatim (authority: derive).\n\
+         pub struct PredicateChainBinding {\n    \
+             pub image: Rc<RefCell<Image<'static>>>,\n    \
+             pub arms: Vec<PredicateArm>,\n    \
+             pub default: ImageArt,\n}\n\n\
+         impl PredicateChainBinding {\n    \
+             /// Re-apply this binding: show the first active arm's artwork,\n    \
+             /// else the resting default.\n    \
+             pub fn refresh(&self, machine: &Machine) {\n        \
+                 let art = self\n            \
+                     .arms\n            \
+                     .iter()\n            \
+                     .find(|a| machine.is_active(a.state_id))\n            \
+                     .map(|a| &a.art)\n            \
+                     .unwrap_or(&self.default);\n        \
+                 self.image\n            \
+                     .borrow_mut()\n            \
+                     .set_pixels(art.width, art.height, art.pixels);\n    \
+             }\n}\n\n",
+    );
+}
+
+/// QT-05g §3 / QT-05h §3 / QT-05i §3 — sealed binding enum for linkage-v2
+/// modules: `Label` always; `Predicate` (state-driven artwork), `Visibility`
+/// (state-driven hide/show), and `Chain` (chained-predicate artwork) when those
+/// bindings are present.
+fn emit_binding_enum_v2(
+    out: &mut String,
+    used_predicate: bool,
+    used_visibility: bool,
+    used_predicate_chain: bool,
+) {
+    out.push_str(
+        "/// QT-05g §3 / QT-05h §3 / QT-05i §3 — sealed enum over the binding\n\
+         /// sources reactive `refresh_bindings` knows how to drive.\n\
          pub enum Binding {\n    \
              Label(LabelBinding),\n",
     );
@@ -5408,6 +5621,9 @@ fn emit_binding_enum_v2(out: &mut String, used_predicate: bool, used_visibility:
     }
     if used_visibility {
         out.push_str("    Visibility(VisibilityBinding),\n");
+    }
+    if used_predicate_chain {
+        out.push_str("    Chain(PredicateChainBinding),\n");
     }
     out.push_str("}\n\n");
 }
@@ -5421,6 +5637,7 @@ fn emit_refresh_bindings_fn(
     v2: bool,
     used_predicate: bool,
     used_visibility: bool,
+    used_predicate_chain: bool,
 ) {
     if has_sm && v2 {
         let mut arms =
@@ -5430,6 +5647,9 @@ fn emit_refresh_bindings_fn(
         }
         if used_visibility {
             arms.push_str("                         Binding::Visibility(vb) => vb.refresh(&m),\n");
+        }
+        if used_predicate_chain {
+            arms.push_str("                         Binding::Chain(cb) => cb.refresh(&m),\n");
         }
         out.push_str(&format!(
             "/// Re-apply every QT-04e / QT-05g / QT-05h binding from the\n\
