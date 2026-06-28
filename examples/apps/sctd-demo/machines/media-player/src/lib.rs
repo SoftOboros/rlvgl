@@ -1005,6 +1005,20 @@ pub enum MachineState {
     muteOff,
     /// State `muteOn`.
     muteOn,
+    /// State `shuffleRegion`.
+    shuffleRegion,
+    /// State `mediaPlayMixModeOff`.
+    mediaPlayMixModeOff,
+    /// State `mediaPlayMixModeOn`.
+    mediaPlayMixModeOn,
+    /// State `repeatRegion`.
+    repeatRegion,
+    /// State `mediaRepeatOff`.
+    mediaRepeatOff,
+    /// State `mediaRepeatTrack`.
+    mediaRepeatTrack,
+    /// State `mediaRepeatFolder`.
+    mediaRepeatFolder,
     /// State `mediaPlayerError`.
     mediaPlayerError,
     /// Unknown / initial sentinel.
@@ -1027,6 +1041,13 @@ impl MachineState {
             MachineState::muteRegion => "muteRegion",
             MachineState::muteOff => "muteOff",
             MachineState::muteOn => "muteOn",
+            MachineState::shuffleRegion => "shuffleRegion",
+            MachineState::mediaPlayMixModeOff => "mediaPlayMixModeOff",
+            MachineState::mediaPlayMixModeOn => "mediaPlayMixModeOn",
+            MachineState::repeatRegion => "repeatRegion",
+            MachineState::mediaRepeatOff => "mediaRepeatOff",
+            MachineState::mediaRepeatTrack => "mediaRepeatTrack",
+            MachineState::mediaRepeatFolder => "mediaRepeatFolder",
             MachineState::mediaPlayerError => "mediaPlayerError",
             MachineState::Unknown => "Unknown",
         }
@@ -1047,6 +1068,13 @@ impl MachineState {
             "muteRegion" => MachineState::muteRegion,
             "muteOff" => MachineState::muteOff,
             "muteOn" => MachineState::muteOn,
+            "shuffleRegion" => MachineState::shuffleRegion,
+            "mediaPlayMixModeOff" => MachineState::mediaPlayMixModeOff,
+            "mediaPlayMixModeOn" => MachineState::mediaPlayMixModeOn,
+            "repeatRegion" => MachineState::repeatRegion,
+            "mediaRepeatOff" => MachineState::mediaRepeatOff,
+            "mediaRepeatTrack" => MachineState::mediaRepeatTrack,
+            "mediaRepeatFolder" => MachineState::mediaRepeatFolder,
             "mediaPlayerError" => MachineState::mediaPlayerError,
             _ => MachineState::Unknown,
         }
@@ -2332,48 +2360,6 @@ fn build_machine_ir() -> MachineIrData {
                                 ],
                             },
                             TransitionIr {
-                                event: Some("Inp.Media.Repeat".to_string()),
-                                targets: vec![],
-                                guard: None,
-                                actions: vec![
-                                    ActionIr::If {
-                                        branches: vec![
-                                            IfBranchIr {
-                                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::VarRead("s_repeat".to_string())), Box::new(ExprIr::StringLiteral("none".to_string())))),
-                                                body: vec![
-                                                    ActionIr::Assign {
-                                                        loc: "s_repeat".to_string(),
-                                                        key_expr: None,
-                                                        expr: ExprIr::StringLiteral("track".to_string()),
-                                                        op: "set".to_string(),
-                                                    },
-                                                    ActionIr::Assign {
-                                                        loc: "s_repeat".to_string(),
-                                                        key_expr: None,
-                                                        expr: ExprIr::StringLiteral("folder".to_string()),
-                                                        op: "set".to_string(),
-                                                    },
-                                                    ActionIr::Assign {
-                                                        loc: "s_repeat".to_string(),
-                                                        key_expr: None,
-                                                        expr: ExprIr::StringLiteral("none".to_string()),
-                                                        op: "set".to_string(),
-                                                    },
-                                                ],
-                                            },
-                                            IfBranchIr {
-                                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::VarRead("s_repeat".to_string())), Box::new(ExprIr::StringLiteral("track".to_string())))),
-                                                body: vec![],
-                                            },
-                                            IfBranchIr {
-                                                guard: None,
-                                                body: vec![],
-                                            },
-                                        ],
-                                    },
-                                ],
-                            },
-                            TransitionIr {
                                 event: Some("Inp.Media.Next".to_string()),
                                 targets: vec![],
                                 guard: None,
@@ -2716,6 +2702,134 @@ fn build_machine_ir() -> MachineIrData {
                                                                 loc: "s_mute".to_string(),
                                                                 key_expr: None,
                                                                 expr: ExprIr::BoolLiteral(false),
+                                                                op: "set".to_string(),
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                        ],
+                                        invokes: vec![],
+                                    },
+                                    StateNodeIr::State {
+                                        id: "shuffleRegion".to_string(),
+                                        initial: Some("mediaPlayMixModeOff".to_string()),
+                                        datamodel: vec![],
+                                        onentry: vec![],
+                                        onexit: vec![],
+                                        transitions: vec![],
+                                        children: vec![
+                                            StateNodeIr::State {
+                                                id: "mediaPlayMixModeOff".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Shuffle".to_string()),
+                                                        targets: vec!["mediaPlayMixModeOn".to_string()],
+                                                        guard: None,
+                                                        actions: vec![],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                            StateNodeIr::State {
+                                                id: "mediaPlayMixModeOn".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Shuffle".to_string()),
+                                                        targets: vec!["mediaPlayMixModeOff".to_string()],
+                                                        guard: None,
+                                                        actions: vec![],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                        ],
+                                        invokes: vec![],
+                                    },
+                                    StateNodeIr::State {
+                                        id: "repeatRegion".to_string(),
+                                        initial: Some("mediaRepeatOff".to_string()),
+                                        datamodel: vec![],
+                                        onentry: vec![],
+                                        onexit: vec![],
+                                        transitions: vec![],
+                                        children: vec![
+                                            StateNodeIr::State {
+                                                id: "mediaRepeatOff".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Repeat".to_string()),
+                                                        targets: vec!["mediaRepeatTrack".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Assign {
+                                                                loc: "s_repeat".to_string(),
+                                                                key_expr: None,
+                                                                expr: ExprIr::StringLiteral("track".to_string()),
+                                                                op: "set".to_string(),
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                            StateNodeIr::State {
+                                                id: "mediaRepeatTrack".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Repeat".to_string()),
+                                                        targets: vec!["mediaRepeatFolder".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Assign {
+                                                                loc: "s_repeat".to_string(),
+                                                                key_expr: None,
+                                                                expr: ExprIr::StringLiteral("folder".to_string()),
+                                                                op: "set".to_string(),
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                            StateNodeIr::State {
+                                                id: "mediaRepeatFolder".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Repeat".to_string()),
+                                                        targets: vec!["mediaRepeatOff".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Assign {
+                                                                loc: "s_repeat".to_string(),
+                                                                key_expr: None,
+                                                                expr: ExprIr::StringLiteral("none".to_string()),
                                                                 op: "set".to_string(),
                                                             },
                                                         ],

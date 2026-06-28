@@ -16,8 +16,13 @@
                      D-M1P6-7 (faithful-vs-blocked contract).
     States preserved: mediaPlayer -> mediaPlayerIdle -> mediaPlayerRun ->
                       mediaStopped -> mediaPlaying -> mediaPaused hierarchy.
-    Orthogonal regions removed: muteType, displaySoundHandler, bandType.
-    These are replaced by s_mute and s_source datamodel variables.
+    Orthogonal regions: displaySoundHandler and bandType removed (replaced by the
+    s_source datamodel variable). muteType (QT-05h), the shuffle/play-mix region
+    (QT-05i), and the repeat region (QT-05i) are re-modeled as REAL parallel
+    regions the Bolero UI reads via is_active(); the s_mute / s_repeat datamodel
+    variables are retained and kept in sync by those regions' own transitions so
+    the transport guards (cond="!s_mute", the mediaStopped onentry s_repeat check)
+    keep working WITHOUT cross-region In() guards (PCDN-05g-1).
 
   Events (inputs):
     Inp.Media.Ready         -- media input is connected and ready
@@ -32,6 +37,7 @@
     Inp.Media.Source.SD     -- select SD source
     Inp.Media.Source.AUX    -- select AUX source
     Inp.Media.Mute          -- toggle mute
+    Inp.Media.Shuffle       -- toggle shuffle / play-mix mode (QT-05i)
     Inp.Media.Repeat        -- cycle repeat mode (none / track / folder)
     Inp.Media.Error         -- error from host media layer
 
@@ -113,16 +119,10 @@
         <send event="Out.Media.Source.New"/>
       </transition>
 
-      <!-- Repeat mode cycle: none -> track -> folder -> none -->
-      <transition event="Inp.Media.Repeat">
-        <if cond="s_repeat === &quot;none&quot;">
-          <assign location="s_repeat" expr="&quot;track&quot;"/>
-          <elseif cond="s_repeat === &quot;track&quot;"/>
-          <assign location="s_repeat" expr="&quot;folder&quot;"/>
-          <else/>
-          <assign location="s_repeat" expr="&quot;none&quot;"/>
-        </if>
-      </transition>
+      <!-- Repeat mode cycle (none -> track -> folder -> none) is owned by the
+           repeatRegion parallel region below (QT-05i); the region's transitions
+           keep the s_repeat datamodel var in sync for the mediaStopped onentry
+           check. No transport-level Repeat transition remains. -->
 
       <!-- Next / Previous track -->
       <transition event="Inp.Media.Next">
@@ -211,6 +211,41 @@
           <state id="muteOn">
             <transition event="Inp.Media.Mute" target="muteOff">
               <assign location="s_mute" expr="false"/>
+            </transition>
+          </state>
+        </state>
+
+        <!-- ---- Shuffle / play-mix region: mediaPlayMixModeOff / On (QT-05i) ----
+             The UI reads `is_active("mediaPlayMixModeOn")` (binary predicate).
+             Toggled by Inp.Media.Shuffle. -->
+        <state id="shuffleRegion" initial="mediaPlayMixModeOff">
+          <state id="mediaPlayMixModeOff">
+            <transition event="Inp.Media.Shuffle" target="mediaPlayMixModeOn"/>
+          </state>
+          <state id="mediaPlayMixModeOn">
+            <transition event="Inp.Media.Shuffle" target="mediaPlayMixModeOff"/>
+          </state>
+        </state>
+
+        <!-- ---- Repeat region: mediaRepeatOff / Track / Folder (QT-05i) ----
+             The UI reads a CHAINED predicate
+             (`is_active("mediaRepeatTrack")` then `is_active("mediaRepeatFolder")`
+             then the resting Off icon). Cycled none -> track -> folder -> none by
+             Inp.Media.Repeat; each transition keeps s_repeat in sync. -->
+        <state id="repeatRegion" initial="mediaRepeatOff">
+          <state id="mediaRepeatOff">
+            <transition event="Inp.Media.Repeat" target="mediaRepeatTrack">
+              <assign location="s_repeat" expr="&quot;track&quot;"/>
+            </transition>
+          </state>
+          <state id="mediaRepeatTrack">
+            <transition event="Inp.Media.Repeat" target="mediaRepeatFolder">
+              <assign location="s_repeat" expr="&quot;folder&quot;"/>
+            </transition>
+          </state>
+          <state id="mediaRepeatFolder">
+            <transition event="Inp.Media.Repeat" target="mediaRepeatOff">
+              <assign location="s_repeat" expr="&quot;none&quot;"/>
             </transition>
           </state>
         </state>
