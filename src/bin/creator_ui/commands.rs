@@ -424,8 +424,9 @@ impl CreatorApp {
             && let Some(out) = FileDialog::new().pick_folder()
         {
             // QT-09 §5: UI defaults to the rlvgl target. Advanced
-            // users use the CLI for `--target data`.
-            let res = qt::emit(&input, &out, qt::EmitTarget::Rlvgl);
+            // users use the CLI for `--target data`. QT-05g
+            // `--scxml-context` linkage is CLI-only for now.
+            let res = qt::emit(&input, &out, qt::EmitTarget::Rlvgl, None);
             self.show_feedback("Qt Emit", res);
         }
     }

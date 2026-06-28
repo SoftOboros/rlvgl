@@ -2071,7 +2071,7 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// `Image.Stretch` scaling (source→dest). Without this the emitted
 /// tree rendered all-white on real hardware (opaque structural
 /// containers buried the artwork; 1:1 blit never filled the slots).
-pub const QT_EMIT_VERSION_RLVGL: u32 = 17;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 18;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2099,18 +2099,66 @@ pub enum EmitTarget {
 ///
 /// The emit-shape contracts are owned by QT-03 (data) and QT-03b
 /// (rlvgl); see the canonical goldens at `tests/fixtures/qt/`.
-pub(crate) fn emit(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
+pub(crate) fn emit(
+    input: &Path,
+    out: &Path,
+    target: EmitTarget,
+    scxml_context: Option<String>,
+) -> Result<()> {
     fs::create_dir_all(out).with_context(|| format!("creating output dir {}", out.display()))?;
+    // QT-05g: an externally-injected SCXML context object linked to a
+    // machine crate, as `--scxml-context <ctx>=<crate>`.
+    let ctx = scxml_context
+        .as_deref()
+        .map(parse_scxml_context)
+        .transpose()?;
     if input.is_dir() {
         for qml in qt08_collect_qml_files(input)? {
-            emit_one_file(&qml, out, target)?;
+            emit_one_file(&qml, out, target, ctx.as_ref())?;
         }
         return Ok(());
     }
-    emit_one_file(input, out, target)
+    emit_one_file(input, out, target, ctx.as_ref())
 }
 
-fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
+/// QT-05g: the `--scxml-context <ctx>=<crate>` linkage — declares that QML
+/// predicates qualified by context object `<ctx>` resolve against
+/// `<crate>::Machine` via the istate M1P6 (linkage-v2) surface.
+#[derive(Debug, Clone)]
+pub(crate) struct ScxmlContext {
+    /// The QML context-object id, e.g. `scxmlBolero`.
+    pub context: String,
+    /// The machine crate name, e.g. `media_player`.
+    pub krate: String,
+}
+
+/// Parse `--scxml-context <ctx>=<crate>` into a [`ScxmlContext`]. Both sides
+/// must be non-empty Rust-ident-shaped tokens.
+fn parse_scxml_context(s: &str) -> Result<ScxmlContext> {
+    let (ctx, krate) = s
+        .split_once('=')
+        .ok_or_else(|| anyhow::anyhow!("--scxml-context expects `<ctx>=<crate>`, got {s:?}"))?;
+    let (ctx, krate) = (ctx.trim(), krate.trim());
+    let ident_ok = |t: &str| {
+        !t.is_empty()
+            && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && !t.chars().next().unwrap().is_ascii_digit()
+    };
+    if !ident_ok(ctx) || !ident_ok(krate) {
+        anyhow::bail!("--scxml-context `<ctx>=<crate>` parts must be identifiers, got {s:?}");
+    }
+    Ok(ScxmlContext {
+        context: ctx.to_string(),
+        krate: krate.to_string(),
+    })
+}
+
+fn emit_one_file(
+    input: &Path,
+    out: &Path,
+    target: EmitTarget,
+    scxml_context: Option<&ScxmlContext>,
+) -> Result<()> {
     let source =
         fs::read_to_string(input).with_context(|| format!("reading {}", input.display()))?;
     let mut module =
@@ -2128,8 +2176,11 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
         expand_components_in(&mut module.root, &root_dir, &mut stack, &mut cache);
         // QT-Repeater: turn `Repeater { model: [...] }` arrays into positioned
         // icon children (runs after component inlining so the model literals are
-        // present and stable).
-        expand_repeaters_in(&mut module.root, 0, 0);
+        // present and stable). When a state-machine context is linked
+        // (QT-05g), a model item's `imageKeySource:` predicate ternary is
+        // preserved verbatim so the Image arm can lower it to a reactive
+        // binding; otherwise the resting else-branch literal is used.
+        expand_repeaters_in(&mut module.root, 0, 0, scxml_context.is_some());
     }
 
     let stem = input
@@ -2145,7 +2196,7 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
             let resolver = DimResolver::from_qml(input, &module.root);
             (
                 out.join(format!("{stem}.rlvgl.rs")),
-                render_rlvgl_with_resolver(&module, &resolver),
+                render_rlvgl_with_resolver(&module, &resolver, scxml_context),
             )
         }
     };
@@ -2304,7 +2355,7 @@ fn expand_components_in(
 ///
 /// `layout_w` / `spacing` are the containing Row/RowLayout's `width:` /
 /// `spacing:` (0 when unknown — the Repeater is then left untouched).
-fn expand_repeaters_in(item: &mut UiItem, layout_w: i32, spacing: i32) {
+fn expand_repeaters_in(item: &mut UiItem, layout_w: i32, spacing: i32, preserve_ternary: bool) {
     // A Repeater nested directly in this node uses this node's width/spacing.
     let my_w = lookup_assignment(item, "width")
         .and_then(parse_int_literal)
@@ -2314,13 +2365,13 @@ fn expand_repeaters_in(item: &mut UiItem, layout_w: i32, spacing: i32) {
         .unwrap_or(spacing);
     for child in &mut item.children {
         if child.type_name == "Repeater" && my_w > 0 {
-            expand_one_repeater(child, my_w, my_spacing);
+            expand_one_repeater(child, my_w, my_spacing, preserve_ternary);
         }
-        expand_repeaters_in(child, my_w, my_spacing);
+        expand_repeaters_in(child, my_w, my_spacing, preserve_ternary);
     }
 }
 
-fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32) {
+fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32, preserve_ternary: bool) {
     let items: Vec<String> = match rep.assignments.iter().find(|a| a.target == "model") {
         Some(UiAssignment {
             value: UiAssignmentValue::List { items },
@@ -2336,7 +2387,7 @@ fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32) {
     };
     let sources: Vec<String> = items
         .iter()
-        .filter_map(|t| extract_image_key_source(t))
+        .filter_map(|t| extract_image_key_source(t, preserve_ternary))
         .collect();
     let n = sources.len() as i32;
     if n == 0 {
@@ -2392,18 +2443,95 @@ fn ui_assign(target: &str, text: String) -> UiAssignment {
     }
 }
 
-/// Pull the first asset literal out of a model entry's `imageKeySource:` value,
-/// re-quoted as a string literal for `pick_image_source`. Handles ternary
-/// sources by taking the first branch (reactive state swap is a follow-up).
-fn extract_image_key_source(obj_text: &str) -> Option<String> {
+/// Pull the `imageKeySource:` value out of a model entry. When
+/// `preserve_ternary` is set (QT-05g: a state-machine context is linked) and
+/// the value is a predicate ternary (`<ctx>.<state> ? "A" : "B"`), the full
+/// ternary expression is returned verbatim so the Image arm can lower it to a
+/// reactive `Binding::Predicate`. Otherwise — no context linked, or a plain
+/// single-literal source — the resting else-branch literal is returned,
+/// re-quoted as a string literal for `pick_image_source`.
+fn extract_image_key_source(obj_text: &str, preserve_ternary: bool) -> Option<String> {
     let idx = obj_text.find("imageKeySource")?;
     let after = obj_text[idx + "imageKeySource".len()..].trim_start();
     let after = after.strip_prefix(':')?;
+    // `imageKeySource` is the last property in the model object literal; trim
+    // the closing `}` of the object so only the value expression remains.
+    let expr = after
+        .rsplit_once('}')
+        .map(|(e, _)| e)
+        .unwrap_or(after)
+        .trim();
+    if preserve_ternary && split_ternary(expr).is_some() {
+        // Preserve the full predicate ternary; the Image arm lowers it.
+        return Some(expr.to_string());
+    }
     // For a `cond ? A : B` source, the else-branch (B, the last literal) is the
     // resting-state icon (`mediaPlaying ? Pause : Play` → Play at rest). For a
-    // single-literal source, last == only. (Reactive state swap is a follow-up.)
-    let lit = extract_asset_literals(after).into_iter().last()?;
+    // single-literal source, last == only.
+    let lit = extract_asset_literals(expr).into_iter().last()?;
     Some(format!("\"{lit}\""))
+}
+
+/// Quote-aware split of a `cond ? then : else` ternary into its three parts.
+/// The scan tracks string-literal state so a `:` inside a `qrc:/…` path does
+/// not masquerade as the ternary colon. Returns `None` if `expr` is not a
+/// single top-level ternary. Chained ternaries (an `else` that is itself a
+/// ternary) are detected by the caller via a `?` in the returned `else` part.
+fn split_ternary(expr: &str) -> Option<(&str, &str, &str)> {
+    let bytes = expr.as_bytes();
+    let mut in_q = 0u8;
+    let mut qpos = None;
+    let mut cpos = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_q != 0 {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == in_q {
+                in_q = 0;
+            }
+        } else if b == b'"' || b == b'\'' {
+            in_q = b;
+        } else if b == b'?' && qpos.is_none() {
+            qpos = Some(i);
+        } else if b == b':' && qpos.is_some() && cpos.is_none() {
+            cpos = Some(i);
+            break;
+        }
+        i += 1;
+    }
+    let (q, c) = (qpos?, cpos?);
+    Some((
+        expr[..q].trim(),
+        expr[q + 1..c].trim(),
+        expr[c + 1..].trim(),
+    ))
+}
+
+/// QT-05g: parse a predicate-bound `source:` ternary `<ctx>.<state> ? "A" : "B"`
+/// into `(state_id, on_path, off_path)` (qrc-stripped), for the declared
+/// context `ctx`. Returns `None` for a non-ternary, a non-matching context, a
+/// chained ternary (deferred — `then`/`else` carry a nested `?`), or a branch
+/// that is not a single asset literal.
+fn parse_predicate_source(expr: &str, ctx: &str) -> Option<(String, String, String)> {
+    let (cond, then_b, else_b) = split_ternary(expr)?;
+    if then_b.contains('?') || else_b.contains('?') {
+        return None; // chained ternary deferred (QT-05g §5)
+    }
+    let state = cond.strip_prefix(ctx)?.strip_prefix('.')?.trim();
+    if state.is_empty() || !state.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    let on = extract_asset_literals(then_b).into_iter().next()?;
+    let off = extract_asset_literals(else_b).into_iter().next()?;
+    Some((
+        state.to_string(),
+        strip_qrc_prefix(&on).to_string(),
+        strip_qrc_prefix(&off).to_string(),
+    ))
 }
 
 /// Render a [`UiModule`] as the canonical QT-03 Rust emit-shape.
@@ -2606,14 +2734,28 @@ fn rust_str_lit(s: &str) -> String {
 /// Public so the schema-drift test can compare in-memory output against
 /// `tests/fixtures/qt/hello.rlvgl.rs` without going through a tempdir.
 pub fn render_rlvgl(module: &UiModule) -> String {
-    render_rlvgl_with_resolver(module, &DimResolver::default())
+    render_rlvgl_with_resolver(module, &DimResolver::default(), None)
 }
 
 /// As [`render_rlvgl`], but with a pre-built [`DimResolver`] so the anchor
-/// solver can evaluate JS-constant / root-property dimension expressions.
-fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> String {
+/// solver can evaluate JS-constant / root-property dimension expressions, and
+/// an optional QT-05g `--scxml-context` linkage that attaches an istate
+/// linkage-v2 machine for state-predicate Image bindings.
+fn render_rlvgl_with_resolver(
+    module: &UiModule,
+    resolver: &DimResolver,
+    scxml_context: Option<&ScxmlContext>,
+) -> String {
     let state_fields = collect_state_fields(&module.root);
-    let sm_id = module.state_machine.as_ref().map(|sm| sm.id.clone());
+    // QT-05g: linkage v2 attaches via `--scxml-context` when there is no
+    // `.scjson` side-file (v1). The two are mutually exclusive here; a v1 SM
+    // takes precedence if both are somehow present.
+    let v1_sm_id = module.state_machine.as_ref().map(|sm| sm.id.clone());
+    let v2 = v1_sm_id.is_none() && scxml_context.is_some();
+    let sm_id = v1_sm_id
+        .clone()
+        .or_else(|| scxml_context.map(|c| c.krate.clone()));
+    let sm_context = scxml_context.map(|c| c.context.clone());
     let dm_field_ids: Vec<String> = module
         .state_machine
         .as_ref()
@@ -2622,10 +2764,12 @@ fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> Stri
     let mut ctx = RlvglEmitCtx::new_with_fields(state_fields.clone())
         .with_resolver(resolver.clone())
         .with_sm(sm_id.clone())
-        .with_dm_fields(dm_field_ids);
+        .with_dm_fields(dm_field_ids)
+        .with_v2(v2, sm_context.clone());
     let root_fn = ctx.alloc_fn_name(&module.root);
     let root_body = ctx.emit_helper(&module.root, &root_fn, true);
     let has_sm = sm_id.is_some();
+    let used_predicate = ctx.used_predicate;
     let used_dm_fields = ctx.used_dm_fields.clone();
     let used_assets = ctx.used_assets.clone();
     let has_images = !used_assets.is_empty();
@@ -2707,13 +2851,21 @@ fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> Stri
     // dispatch lowering, `Machine` for the threading parameter).
     // `State`/`DataModel`/`Externals` join when QT-05c/e land.
     if let Some(id) = &sm_id {
-        // QT-05c §3 / §6: SM-attached modules import the full v1
-        // linkage surface trio that QT-05b/05c reference — `Event`
-        // for dispatch lowering, `Machine` for the threading
-        // parameter, `DataModel` for QT-05c MachineBinding accessors.
-        // The file's `#![allow(unused_imports)]` covers fixtures
-        // that have an SM but no DM bindings.
-        out.push_str(&format!("use {id}_gen::{{DataModel, Event, Machine}};\n"));
+        if v2 {
+            // QT-05g: istate linkage v2 imports the M1P6 machine type from the
+            // `--scxml-context` crate directly (no `_gen` suffix, no `Event`/
+            // `DataModel` enums — events/vars are dynamic strings). `is_active`
+            // is read off `Machine`.
+            out.push_str(&format!("use {id}::Machine;\n"));
+        } else {
+            // QT-05c §3 / §6: SM-attached modules import the full v1
+            // linkage surface trio that QT-05b/05c reference — `Event`
+            // for dispatch lowering, `Machine` for the threading
+            // parameter, `DataModel` for QT-05c MachineBinding accessors.
+            // The file's `#![allow(unused_imports)]` covers fixtures
+            // that have an SM but no DM bindings.
+            out.push_str(&format!("use {id}_gen::{{DataModel, Event, Machine}};\n"));
+        }
     }
     out.push('\n');
     out.push_str(&format!(
@@ -2736,14 +2888,22 @@ fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> Stri
     // and SM name as `pub const`s so reviewers can confirm what
     // istate template their module is built against.
     if let Some(id) = &sm_id {
-        out.push_str(
-            "/// QT-05 §6 linkage version. v1 pins the istate Rust\n\
-             /// template's std-profile shape (VecDeque + Box<dyn Externals>).\n\
-             pub const ISTATE_LINKAGE_VERSION: u32 = 1;\n\n",
-        );
+        if v2 {
+            out.push_str(
+                "/// QT-05 §6 linkage version. v2 is the istate M1P6 dynamic-string\n\
+                 /// surface (`step`/`is_active`/`get_var`), linked via `--scxml-context`.\n\
+                 pub const ISTATE_LINKAGE_VERSION: u32 = 2;\n\n",
+            );
+        } else {
+            out.push_str(
+                "/// QT-05 §6 linkage version. v1 pins the istate Rust\n\
+                 /// template's std-profile shape (VecDeque + Box<dyn Externals>).\n\
+                 pub const ISTATE_LINKAGE_VERSION: u32 = 1;\n\n",
+            );
+        }
         out.push_str(&format!(
             "/// QT-05a §8 derived state-machine ID; matches the\n\
-             /// `<sm>_gen` crate name stem.\n\
+             /// `<sm>_gen` crate name stem (v1) or the `--scxml-context` crate (v2).\n\
              pub const QT_SM_NAME: &str = {};\n\n",
             rust_str_lit(id)
         ));
@@ -2752,26 +2912,55 @@ fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> Stri
     emit_screen_state_struct(&state_fields, &mut out);
     emit_label_binding_struct(&mut out);
     if has_sm {
-        emit_machine_binding_struct(&mut out);
-        emit_binding_enum(&mut out);
+        if v2 {
+            emit_predicate_binding_struct(&mut out);
+            emit_binding_enum_v2(&mut out);
+        } else {
+            emit_machine_binding_struct(&mut out);
+            emit_binding_enum(&mut out);
+        }
     }
 
     if has_sm {
-        out.push_str(
-            "/// Build the screen widget tree at `bounds` and return it\n\
-             /// alongside the `ScreenState` handle (QT-04b §3), the\n\
-             /// `Rc<RefCell<Machine>>` istate-codegen handle (QT-05b §3),\n\
-             /// and the `Vec<Binding>` of reactive bindings (QT-04e §3,\n\
-             /// QT-05c §3). Callers may dispatch external events via\n\
-             /// `machine.borrow_mut().dispatch(Event::…)` — the QML-side\n\
-             /// `dispatch(\"…\")` handlers route through this same machine.\n\
-             #[rustfmt::skip]\n\
-             pub fn build_screen(\n    \
-                 bounds: Rect,\n) \
-             -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {\n",
-        );
+        if v2 {
+            out.push_str(
+                "/// Build the screen widget tree at `bounds` and return it\n\
+                 /// alongside the `ScreenState` handle (QT-04b §3), the\n\
+                 /// `Rc<RefCell<Machine>>` istate (linkage v2) handle, and the\n\
+                 /// `Vec<Binding>` of reactive bindings (QT-05g §3). Callers\n\
+                 /// drive the machine via `machine.borrow_mut().step(\"…\", …)`\n\
+                 /// and call `refresh_bindings` to re-apply state-predicate\n\
+                 /// artwork (e.g. Play↔Pause via `is_active`).\n\
+                 #[rustfmt::skip]\n\
+                 pub fn build_screen(\n    \
+                     bounds: Rect,\n) \
+                 -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {\n",
+            );
+        } else {
+            out.push_str(
+                "/// Build the screen widget tree at `bounds` and return it\n\
+                 /// alongside the `ScreenState` handle (QT-04b §3), the\n\
+                 /// `Rc<RefCell<Machine>>` istate-codegen handle (QT-05b §3),\n\
+                 /// and the `Vec<Binding>` of reactive bindings (QT-04e §3,\n\
+                 /// QT-05c §3). Callers may dispatch external events via\n\
+                 /// `machine.borrow_mut().dispatch(Event::…)` — the QML-side\n\
+                 /// `dispatch(\"…\")` handlers route through this same machine.\n\
+                 #[rustfmt::skip]\n\
+                 pub fn build_screen(\n    \
+                     bounds: Rect,\n) \
+                 -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {\n",
+            );
+        }
         emit_screen_state_init(&state_fields, &mut out);
-        out.push_str("    let machine = Rc::new(RefCell::new(Machine::new()));\n");
+        if v2 {
+            // Linkage v2: the M1P6 machine must be `start()`ed to enter its
+            // initial configuration before `is_active` is meaningful.
+            out.push_str(
+                "    let machine = Rc::new(RefCell::new({ let mut m = Machine::new(); m.start(); m }));\n",
+            );
+        } else {
+            out.push_str("    let machine = Rc::new(RefCell::new(Machine::new()));\n");
+        }
         out.push_str("    let mut bindings: Vec<Binding> = Vec::new();\n");
         out.push_str(&format!(
             "    let node = {root_fn}(bounds, Rc::clone(&state), Rc::clone(&machine), &mut bindings);\n    \
@@ -2796,7 +2985,7 @@ fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> Stri
              (node, state, label_bindings)\n}}\n\n"
         ));
     }
-    emit_refresh_bindings_fn(&mut out, has_sm);
+    emit_refresh_bindings_fn(&mut out, has_sm, v2);
     // QT-05c §6: per-field `format_dm_<field>` free functions —
     // one per used DM field, emitted in first-use order. The
     // `f64::to_string()` representation is chosen for determinism;
@@ -2812,6 +3001,9 @@ fn render_rlvgl_with_resolver(module: &UiModule, resolver: &DimResolver) -> Stri
     }
     if has_images {
         emit_qt_image_helper(&used_assets, &mut out);
+    }
+    if used_predicate {
+        emit_qt_predicate_image_helper(&mut out);
     }
     if root_body.contains("qt_label(") {
         // QML `Text`/`Label` items have no background; emit a constructor that
@@ -2892,6 +3084,64 @@ fn emit_qt_image_helper(used_assets: &[AssetRef], out: &mut String) {
     );
 }
 
+/// QT-05g: emit the `qt_image_art` decoder + `qt_predicate_image` constructor.
+/// `qt_image_art` decodes one RLE asset to a leaked `ImageArt`; the predicate
+/// constructor decodes both branches once, builds the concrete
+/// `Rc<RefCell<Image>>` initialised to the machine-driven branch, and returns
+/// it as a `dyn Widget` alongside the `Binding::Predicate` that swaps it.
+fn emit_qt_predicate_image_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05g: decode one vendored RLE asset into a leaked `ImageArt`\n\
+         /// (magenta-keyed → transparent, RGB565 has no alpha).\n\
+         #[rustfmt::skip]\n\
+         fn qt_image_art(rle: &'static [u8]) -> ImageArt {\n    \
+             let (w, h, palette_bytes, stream) =\n        \
+                 rlvgl_decomp::parse_rle_blob(rle).expect(\"qt_image_art: malformed RLE asset\");\n    \
+             let palette_len = palette_bytes.len() / 2;\n    \
+             let mut palette = alloc::vec![0u16; palette_len];\n    \
+             for i in 0..palette_len {\n        \
+                 palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);\n    \
+             }\n    \
+             let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)\n        \
+                 .expect(\"qt_image_art: RLE decode failed\");\n    \
+             let pixels: Vec<Color> = rgba\n        \
+                 .chunks_exact(4)\n        \
+                 .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {\n            \
+                     Color(0x00, 0x00, 0x00, 0x00)\n        \
+                 } else {\n            \
+                     Color(c[0], c[1], c[2], c[3])\n        \
+                 })\n        \
+                 .collect();\n    \
+             let pixels: &'static [Color] = Vec::leak(pixels);\n    \
+             ImageArt { width: w as i32, height: h as i32, pixels }\n}\n\n",
+    );
+    out.push_str(
+        "/// QT-05g: build a predicate-bound Image. Decodes both branches, builds\n\
+         /// the Image at the machine-driven branch, and returns it as a\n\
+         /// `dyn Widget` plus the `Binding::Predicate` that swaps it on refresh.\n\
+         #[rustfmt::skip]\n\
+         fn qt_predicate_image(\n    \
+             bounds: Rect,\n    on_rle: &'static [u8],\n    off_rle: &'static [u8],\n    \
+             state_id: &'static str,\n    active: bool,\n) -> (Rc<RefCell<dyn Widget>>, Binding) {\n    \
+             let on = qt_image_art(on_rle);\n    \
+             let off = qt_image_art(off_rle);\n    \
+             let cur = if active { on } else { off };\n    \
+             let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).\n    \
+             let scale_x = if cur.width > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if cur.height > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             let image = Rc::new(RefCell::new(img));\n    \
+             let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
+             (widget, Binding::Predicate(PredicateBinding { image, state_id, on, off }))\n}\n\n",
+    );
+}
+
 /// Per-emit context carrying the linear node index counter and the
 /// accumulated helper bodies.
 struct RlvglEmitCtx {
@@ -2925,6 +3175,16 @@ struct RlvglEmitCtx {
     /// QT-03c dimension resolver (JS constants + root-property defaults) used
     /// by the anchor solver to evaluate non-literal `width`/`height`/margins.
     resolver: DimResolver,
+    /// QT-05g: istate linkage v2 (M1P6 `step`/`is_active`/`get_var` surface)
+    /// rather than v1 (`dispatch(Event)`/`dm.<f64>`). Set when attachment came
+    /// from `--scxml-context` rather than a `.scjson` side-file.
+    linkage_v2: bool,
+    /// QT-05g: the QML context-object id (`scxmlBolero`) whose `<ctx>.<state>`
+    /// predicates lower to `machine.is_active("<state>")`. Set with `linkage_v2`.
+    sm_context: Option<String>,
+    /// QT-05g: set once at least one `Binding::Predicate` is emitted, so the
+    /// `qt_image_art` / `qt_predicate_image` helpers are emitted at the tail.
+    used_predicate: bool,
 }
 
 /// One image asset referenced by the emitted widget tree.
@@ -2947,6 +3207,9 @@ impl RlvglEmitCtx {
             used_assets: Vec::new(),
             used_fn_names: std::collections::HashSet::new(),
             resolver: DimResolver::default(),
+            linkage_v2: false,
+            sm_context: None,
+            used_predicate: false,
         }
     }
 
@@ -2957,6 +3220,14 @@ impl RlvglEmitCtx {
 
     fn with_sm(mut self, sm_id: Option<String>) -> Self {
         self.sm_id = sm_id;
+        self
+    }
+
+    /// QT-05g: mark this emit as istate linkage v2 with the given QML
+    /// context-object id (`scxmlBolero`).
+    fn with_v2(mut self, v2: bool, sm_context: Option<String>) -> Self {
+        self.linkage_v2 = v2;
+        self.sm_context = sm_context;
         self
     }
 
@@ -3048,6 +3319,9 @@ impl RlvglEmitCtx {
             &self.dm_field_ids,
             &mut self.used_dm_fields,
             &mut self.used_assets,
+            self.sm_context.as_deref(),
+            self.linkage_v2,
+            &mut self.used_predicate,
             &mut out,
         );
         emit_skipped_summary(item, is_root, &self.state_fields, &mut out);
@@ -3170,6 +3444,7 @@ fn map_qml_type(name: &str) -> WidgetKind {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_widget_construction(
     kind: &WidgetKind,
     item: &UiItem,
@@ -3178,6 +3453,9 @@ fn emit_widget_construction(
     dm_field_ids: &[String],
     used_dm_fields: &mut Vec<String>,
     used_assets: &mut Vec<AssetRef>,
+    sm_context: Option<&str>,
+    v2: bool,
+    used_predicate: &mut bool,
     out: &mut String,
 ) {
     match kind {
@@ -3358,6 +3636,50 @@ fn emit_widget_construction(
             );
         }
         WidgetKind::Image => {
+            // QT-05g: when a state-machine context is linked (`--scxml-context`)
+            // and the `source:` is a predicate ternary `<ctx>.<state> ? "A" : "B"`,
+            // lower it to a reactive `Binding::Predicate` driven by
+            // `machine.is_active("<state>")` rather than a static asset.
+            let predicate = if v2 {
+                sm_context
+                    .zip(lookup_assignment(item, "source"))
+                    .and_then(|(ctx, raw)| parse_predicate_source(raw, ctx))
+            } else {
+                None
+            };
+            if let Some((state, on_path, off_path)) = predicate {
+                let on = AssetRef {
+                    symbol: asset_symbol(&on_path),
+                    path: on_path,
+                };
+                let off = AssetRef {
+                    symbol: asset_symbol(&off_path),
+                    path: off_path,
+                };
+                for a in [&on, &off] {
+                    if !used_assets.iter().any(|x| x.symbol == a.symbol) {
+                        used_assets.push(a.clone());
+                    }
+                }
+                *used_predicate = true;
+                out.push_str(&format!(
+                    "    // QT-05g predicate-bound: source → {ctx}.{state} ? \
+                     on={on_sym} : off={off_sym}\n",
+                    ctx = sm_context.unwrap_or(""),
+                    on_sym = on.symbol,
+                    off_sym = off.symbol,
+                ));
+                out.push_str(&format!(
+                    "    let active = machine.borrow().is_active({state_lit});\n    \
+                     let (widget, __pb): (Rc<RefCell<dyn Widget>>, Binding) =\n        \
+                         qt_predicate_image(bounds, qt_assets::{on_sym}, qt_assets::{off_sym}, {state_lit}, active);\n    \
+                     bindings.push(__pb);\n",
+                    state_lit = rust_str_lit(&state),
+                    on_sym = on.symbol,
+                    off_sym = off.symbol,
+                ));
+                return;
+            }
             // Resolve the `source:` to a single vendored asset. A literal
             // path maps directly; a state-bound ternary uses its first
             // artwork branch as the static default (the integrator can swap
@@ -4912,11 +5234,71 @@ fn emit_binding_enum(out: &mut String) {
     );
 }
 
-/// Emit the QT-04e §7 / QT-05c §7 `pub fn refresh_bindings` free
-/// function. Signature varies by SM presence; single-line per branch
-/// to stay rustfmt-idempotent.
-fn emit_refresh_bindings_fn(out: &mut String, has_sm: bool) {
-    if has_sm {
+/// QT-05g §3 — `pub struct PredicateBinding` + `pub struct ImageArt`:
+/// a reactive `Image`-artwork binding driven by `machine.is_active(state_id)`
+/// (istate linkage v2). Both branches' pixels are decoded once at build time;
+/// `refresh` is a pointer swap.
+fn emit_predicate_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05g §3 — a decoded, magenta-keyed, `'static`-leaked artwork\n\
+         /// buffer plus its natural dimensions.\n\
+         #[derive(Clone, Copy)]\n\
+         pub struct ImageArt {\n    \
+             pub width: i32,\n    \
+             pub height: i32,\n    \
+             pub pixels: &'static [Color],\n}\n\n\
+         /// QT-05g §3 — reactive `Image`-source binding. Shows `on` when the\n\
+         /// bound state is active, else `off`. `state_id` is the QML predicate\n\
+         /// passed through verbatim to `Machine::is_active` (authority: derive).\n\
+         pub struct PredicateBinding {\n    \
+             pub image: Rc<RefCell<Image<'static>>>,\n    \
+             pub state_id: &'static str,\n    \
+             pub on: ImageArt,\n    \
+             pub off: ImageArt,\n}\n\n\
+         impl PredicateBinding {\n    \
+             /// Re-apply this binding from the supplied machine.\n    \
+             pub fn refresh(&self, machine: &Machine) {\n        \
+                 let art = if machine.is_active(self.state_id) { &self.on } else { &self.off };\n        \
+                 self.image.borrow_mut().set_pixels(art.width, art.height, art.pixels);\n    \
+             }\n}\n\n",
+    );
+}
+
+/// QT-05g §3 — sealed binding enum for linkage-v2 modules: `Label`
+/// (ScreenState text) + `Predicate` (state-driven Image artwork).
+fn emit_binding_enum_v2(out: &mut String) {
+    out.push_str(
+        "/// QT-05g §3 — sealed enum over the binding sources reactive\n\
+         /// `refresh_bindings` knows how to drive. `Label` reads from\n\
+         /// `ScreenState`; `Predicate` swaps `Image` artwork via\n\
+         /// `Machine::is_active`.\n\
+         pub enum Binding {\n    \
+             Label(LabelBinding),\n    \
+             Predicate(PredicateBinding),\n}\n\n",
+    );
+}
+
+/// Emit the QT-04e §7 / QT-05c §7 / QT-05g §7 `pub fn refresh_bindings`
+/// free function. Signature varies by SM presence + linkage version;
+/// single-line per branch to stay rustfmt-idempotent.
+fn emit_refresh_bindings_fn(out: &mut String, has_sm: bool, v2: bool) {
+    if has_sm && v2 {
+        out.push_str(
+            "/// Re-apply every QT-04e / QT-05g binding from the current\n\
+             /// state and machine. Idempotent; safe to call after any\n\
+             /// `machine.step(…)`. No-op when `bindings` is empty.\n\
+             #[rustfmt::skip]\n\
+             pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<Machine>>, bindings: &[Binding]) {\n    \
+                 let s = state.borrow();\n    \
+                 let m = machine.borrow();\n    \
+                 for b in bindings {\n        \
+                     match b {\n            \
+                         Binding::Label(lb) => lb.refresh(&s),\n            \
+                         Binding::Predicate(pb) => pb.refresh(&m),\n        \
+                     }\n    \
+                 }\n}\n\n",
+        );
+    } else if has_sm {
         // `#[rustfmt::skip]` on the SM-attached form because the
         // signature exceeds rustfmt's wrap threshold; keeping the
         // emit on one line keeps the output byte-stable across

@@ -42,7 +42,7 @@ use stopwatch_gen::{DataModel, Event, Machine};
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 17;
+pub const QT_EMIT_VERSION: u32 = 18;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -55,7 +55,7 @@ pub const QT_SOURCE: &str = "tests/fixtures/qt/stopwatch.qml";
 pub const ISTATE_LINKAGE_VERSION: u32 = 1;
 
 /// QT-05a §8 derived state-machine ID; matches the
-/// `<sm>_gen` crate name stem.
+/// `<sm>_gen` crate name stem (v1) or the `--scxml-context` crate (v2).
 pub const QT_SM_NAME: &str = "stopwatch";
 
 /// State threaded through every helper. One field per

@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// QT-10 §5: the canonical chapter file set under `docs/qt-support/`.
-/// 24 entries (incl. `10-release.md`).
+/// 25 entries (incl. `10-release.md` and the QT-05g predicate-bindings chapter).
 const QT_CHAPTERS: &[&str] = &[
     "00-concepts.md",
     "02-ir-schema.md",
@@ -40,6 +40,7 @@ const QT_CHAPTERS: &[&str] = &[
     "05c-machine-bindings.md",
     "05d-emit-scjson.md",
     "05e-externals-stubs.md",
+    "05g-state-predicate-bindings.md",
     "06-theme-tokens.md",
     "07-asset-handoff.md",
     "08-multi-file-cli.md",
@@ -82,10 +83,15 @@ fn qt10_chapter_set_matches_filesystem() {
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;
         };
-        if name == "README.md" {
+        if !name.ends_with(".md") {
             continue;
         }
-        if !name.ends_with(".md") {
+        // Chapters are digit-prefixed (`NN[a-z]?-*.md`). Non-chapter docs —
+        // `README.md`, `QT-MEDIA-PLAYER-RETROSPECTIVE.md`, future `ERRATA.md` —
+        // are not part of the QT-10 §5 chapter set and are skipped. (The
+        // retrospective is an institutional-memory artifact, not a normative
+        // chapter — see CLAUDE.md "Initiative retrospective".)
+        if !name.chars().next().is_some_and(|c| c.is_ascii_digit()) {
             continue;
         }
         actual.insert(name.to_string());
@@ -210,7 +216,7 @@ fn qt10_strict_version_const_pinned_in_source() {
     // even when the constant name is unchanged).
     for (name, expected) in [
         ("QT_IR_VERSION", 2),
-        ("QT_EMIT_VERSION_RLVGL", 17),
+        ("QT_EMIT_VERSION_RLVGL", 18),
         ("QT_EMIT_VERSION_DATA", 1),
     ] {
         let needle = format!("pub const {name}: u32 = {expected}");

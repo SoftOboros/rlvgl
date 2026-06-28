@@ -20,7 +20,7 @@ fn generated_counter_module_lowers_handler_to_state_mutation() {
         height: 80,
     };
     let (node, state, _bindings) = generated_counter::build_screen(bounds);
-    assert_eq!(generated_counter::QT_EMIT_VERSION, 17);
+    assert_eq!(generated_counter::QT_EMIT_VERSION, 18);
     assert_eq!(state.borrow().count, 0);
 
     // Fire a synthetic click inside the Button's bounds. The

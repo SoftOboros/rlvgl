@@ -41,7 +41,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 14;
+pub const QT_EMIT_VERSION: u32 = 18;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -107,8 +107,9 @@ fn build_b(
     state: Rc<RefCell<ScreenState>>,
     label_bindings: &mut Vec<LabelBinding>,
 ) -> WidgetNode {
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(Container::new(bounds)));
+    let mut w = Container::new(bounds);
+    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     let node = WidgetNode {
         widget,
         children: Vec::new(),

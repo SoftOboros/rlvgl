@@ -530,6 +530,12 @@ enum QtCommand {
         /// Emit target shape
         #[arg(long, value_enum, default_value_t = QtEmitTarget::Rlvgl)]
         target: QtEmitTarget,
+        /// QT-05g: link an externally-injected SCXML context object to a
+        /// machine crate, as `<ctx>=<crate>` (e.g. `scxmlBolero=media_player`).
+        /// QML predicates `<ctx>.<state>` then lower to reactive
+        /// `machine.is_active("<state>")` Image bindings (istate linkage v2).
+        #[arg(long)]
+        scxml_context: Option<String>,
     },
     /// QT-05d: walk a `.qml` file's inline `states:`/`transitions:`
     /// blocks and write a sibling `.scjson` document. Directory
@@ -1639,7 +1645,12 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
             QtCommand::Ingest { input, out } => qt::ingest(&input, &out)?,
             QtCommand::Check { input } => qt::check(&input)?,
             QtCommand::Schema { out } => qt::schema(out.as_deref())?,
-            QtCommand::Emit { input, out, target } => qt::emit(&input, &out, target.into())?,
+            QtCommand::Emit {
+                input,
+                out,
+                target,
+                scxml_context,
+            } => qt::emit(&input, &out, target.into(), scxml_context)?,
             QtCommand::EmitScjson { input, out } => qt::emit_scjson(&input, out.as_deref())?,
             QtCommand::EmitExternals { input, out } => qt::emit_externals(&input, out.as_deref())?,
             QtCommand::EmitTokens { input, out } => qt::emit_tokens(&input, out.as_deref())?,

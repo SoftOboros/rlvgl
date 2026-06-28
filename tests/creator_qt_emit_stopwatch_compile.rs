@@ -53,7 +53,7 @@ fn generated_stopwatch_module_lowers_dispatch_glue() {
     let (node, state, machine, _bindings) = generated_stopwatch::build_screen(bounds);
 
     // QT-05b §3 / §7: emit-shape constants are present.
-    assert_eq!(generated_stopwatch::QT_EMIT_VERSION, 17);
+    assert_eq!(generated_stopwatch::QT_EMIT_VERSION, 18);
     assert_eq!(generated_stopwatch::QT_IR_VERSION, 2);
     assert_eq!(generated_stopwatch::ISTATE_LINKAGE_VERSION, 1);
     assert_eq!(generated_stopwatch::QT_SM_NAME, "stopwatch");
