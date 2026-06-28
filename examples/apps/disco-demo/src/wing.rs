@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Vertical popup wing widget for the shared 747-style disco demo.
 
-use alloc::{boxed::Box, vec::Vec};
-use core::cell::RefCell;
+use alloc::boxed::Box;
 
 use rlvgl_core::{
     event::Event,
@@ -18,31 +17,14 @@ const ICON_SIZE: i32 = 60;
 const GAP: i32 = 10;
 const MARGIN_TOP: i32 = 17;
 const WING_X: i32 = 10;
+const HIT_PAD_X: i32 = 24;
 const RADIUS: u8 = 18;
 const CLEAR_FRAMES: u8 = 3;
 const BG_COLOR: Color = Color(30, 30, 30, 240);
 const BORDER_COLOR: Color = Color(80, 80, 80, 255);
 const BORDER_WIDTH: u8 = 2;
 
-/// Maximum icon pixel count we will decode. Demo icons are 48-60
-/// pixels per side; 64×64 = 4096 fits comfortably alongside the
-/// IconStrip cache in the 64 KiB heap.
-const MAX_ICON_PIXELS: u32 = 64 * 64;
-
-/// Maximum palette byte count we will allocate. A WM8994-style RLE
-/// palette is at most 256 entries × 2 bytes = 512 bytes. Bench-9
-/// wave-3 round-10 caught a wing slot whose `parse_rle_blob` returned
-/// a palette slice ~1.5 MiB long, which then crashed the `alloc::vec!
-/// [0u16; palette_len]` allocation with `capacity_overflow` before
-/// even reaching the pixel-count check below.
-const MAX_PALETTE_BYTES: usize = 512;
-
-/// One slot's decoded RLE → `Vec<Color>` plus dimensions.
-struct DecodedIcon {
-    pixels: Vec<Color>,
-    width: u32,
-    height: u32,
-}
+const MAX_ICON_EDGE: usize = 64;
 
 /// A single wing slot with icon data and optional callback.
 pub struct WingSlot {
@@ -57,12 +39,6 @@ pub struct WingSlot {
 /// Left-edge wing shown when a main-strip icon expands.
 pub struct Wing {
     slots: [Option<WingSlot>; MAX_SLOTS],
-    /// Lazily-decoded icon cache; populated on first draw, then reused.
-    /// Avoids the ~30 KiB of transient heap churn per slot per frame
-    /// that previously fragmented the 64 KiB heap and panicked on
-    /// every wing-open. `RefCell` lets `draw(&self)` populate without
-    /// changing the `Widget::draw` signature.
-    decoded: RefCell<[Option<DecodedIcon>; MAX_SLOTS]>,
     slot_count: usize,
     visible: bool,
     bounds: Rect,
@@ -86,7 +62,6 @@ impl Wing {
         }
         Self {
             slots,
-            decoded: RefCell::new([const { None }; MAX_SLOTS]),
             slot_count: count,
             visible: false,
             bounds: Rect {
@@ -148,47 +123,175 @@ impl Wing {
         }
     }
 
-    fn decode_into(rle: &[u8], buf: &mut Vec<Color>) -> Option<(u32, u32)> {
+    fn draw_rle_icon(
+        renderer: &mut dyn Renderer,
+        rle: &[u8],
+        bounds: Rect,
+        enabled: bool,
+    ) -> Option<()> {
         let (width, height, palette_bytes, stream) = rlvgl_decomp::parse_rle_blob(rle).ok()?;
-        // Reject pathological sizes BEFORE ANY allocation. Bench-9-snapshot
-        // wave-3 round-10 (2026-05-17) caught a slot where `parse_rle_blob`
-        // returned `palette_bytes.len() ≈ 1.5 MiB` — the `alloc::vec![0u16;
-        // palette_len]` allocation panicked with `capacity_overflow` before
-        // reaching the pixel-count check that the prior round had added.
-        // Three independent caps now bracket the decode:
-        //   1. palette byte count (≤ 512 — datasheet-bounded for 256-entry
-        //      u16 palette)
-        //   2. pixel count (≤ 64×64 — comfortably fits alongside IconStrip
-        //      cache in the 64 KiB heap)
-        //   3. fallible reserve (if either of the above is wrong, the
-        //      reserve_exact request stays bounded)
-        if palette_bytes.len() > MAX_PALETTE_BYTES {
-            return None;
-        }
-        let pixels = (width as u32).saturating_mul(height as u32);
-        if pixels == 0 || pixels > MAX_ICON_PIXELS {
-            return None;
-        }
         let palette_len = palette_bytes.len() / 2;
-        let mut palette = alloc::vec![0u16; palette_len];
+        if width as usize > MAX_ICON_EDGE
+            || height as usize > MAX_ICON_EDGE
+            || palette_len > rlvgl_decomp::consts::MAX_PALETTE
+        {
+            return None;
+        }
+        let mut palette = [0u16; rlvgl_decomp::consts::MAX_PALETTE];
         for index in 0..palette_len {
             palette[index] =
                 u16::from_le_bytes([palette_bytes[index * 2], palette_bytes[index * 2 + 1]]);
         }
-        let rgba =
-            rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
-        // rgba should be width*height*4 bytes; if decode_rgba returned
-        // something pathological, refuse rather than push 1.5 MiB into buf.
-        if rgba.len() != (pixels as usize) * 4 {
-            return None;
+        let mut row = [Color(0, 0, 0, 0); MAX_ICON_EDGE];
+        let mut stream_i = 0usize;
+        let mut x = 0usize;
+        let mut y = 0usize;
+        let mut recent_idx = 0usize;
+        while stream_i < stream.len() && y < height as usize {
+            let b = stream[stream_i];
+            stream_i += 1;
+            match b {
+                rlvgl_decomp::consts::ENCODE_KEY_SINGLE_INLINE_PIXEL => {
+                    if stream_i + 1 >= stream.len() {
+                        return None;
+                    }
+                    let c = ((stream[stream_i] as u16) << 8) | stream[stream_i + 1] as u16;
+                    stream_i += 2;
+                    Self::emit_icon_pixel(
+                        renderer,
+                        bounds,
+                        enabled,
+                        width,
+                        height,
+                        rgb565_color(c),
+                        &mut row,
+                        &mut x,
+                        &mut y,
+                    );
+                }
+                rlvgl_decomp::consts::ENCODE_KEY_DOUBLE_INLINE_PIXEL => {
+                    if stream_i + 1 >= stream.len() {
+                        return None;
+                    }
+                    let c = ((stream[stream_i] as u16) << 8) | stream[stream_i + 1] as u16;
+                    stream_i += 2;
+                    for _ in 0..2 {
+                        Self::emit_icon_pixel(
+                            renderer,
+                            bounds,
+                            enabled,
+                            width,
+                            height,
+                            rgb565_color(c),
+                            &mut row,
+                            &mut x,
+                            &mut y,
+                        );
+                    }
+                }
+                rlvgl_decomp::consts::ENCODE_KEY_LONG_REPEAT => {
+                    if stream_i >= stream.len() || recent_idx >= palette_len {
+                        return None;
+                    }
+                    let count = rlvgl_decomp::consts::SHORT_REPEAT_MAX as usize
+                        + 1
+                        + stream[stream_i] as usize;
+                    stream_i += 1;
+                    for _ in 0..count {
+                        Self::emit_icon_pixel(
+                            renderer,
+                            bounds,
+                            enabled,
+                            width,
+                            height,
+                            rgb565_color(palette[recent_idx]),
+                            &mut row,
+                            &mut x,
+                            &mut y,
+                        );
+                    }
+                }
+                data => {
+                    let data = data as usize;
+                    if data < palette_len {
+                        recent_idx = data;
+                        Self::emit_icon_pixel(
+                            renderer,
+                            bounds,
+                            enabled,
+                            width,
+                            height,
+                            rgb565_color(palette[data]),
+                            &mut row,
+                            &mut x,
+                            &mut y,
+                        );
+                    } else {
+                        if recent_idx >= palette_len {
+                            return None;
+                        }
+                        let count = data.saturating_sub(palette_len).saturating_add(1);
+                        for _ in 0..count {
+                            Self::emit_icon_pixel(
+                                renderer,
+                                bounds,
+                                enabled,
+                                width,
+                                height,
+                                rgb565_color(palette[recent_idx]),
+                                &mut row,
+                                &mut x,
+                                &mut y,
+                            );
+                        }
+                    }
+                }
+            }
         }
-        buf.reserve_exact(pixels as usize);
-        buf.extend(
-            rgba.chunks_exact(4)
-                .map(|chunk| Color(chunk[0], chunk[1], chunk[2], chunk[3])),
-        );
-        Some((width as u32, height as u32))
+        Some(())
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn emit_icon_pixel(
+        renderer: &mut dyn Renderer,
+        bounds: Rect,
+        enabled: bool,
+        width: u16,
+        height: u16,
+        color: Color,
+        row: &mut [Color; MAX_ICON_EDGE],
+        x: &mut usize,
+        y: &mut usize,
+    ) {
+        if *x >= width as usize || *y >= height as usize {
+            return;
+        }
+        row[*x] = if enabled {
+            color
+        } else {
+            Color(color.0 / 2, color.1 / 2, color.2 / 2, color.3)
+        };
+        *x += 1;
+        if *x == width as usize {
+            let draw_x = bounds.x + (bounds.width - width as i32) / 2;
+            let draw_y = bounds.y + (bounds.height - height as i32) / 2 + *y as i32;
+            renderer.draw_pixels((draw_x, draw_y), &row[..width as usize], width as u32, 1);
+            *x = 0;
+            *y += 1;
+        }
+    }
+}
+
+fn rgb565_color(c: u16) -> Color {
+    let r5 = ((c >> 11) & 0x1F) as u8;
+    let g6 = ((c >> 5) & 0x3F) as u8;
+    let b5 = (c & 0x1F) as u8;
+    Color(
+        (r5 << 3) | (r5 >> 2),
+        (g6 << 2) | (g6 >> 4),
+        (b5 << 3) | (b5 >> 2),
+        0xFF,
+    )
 }
 
 impl Widget for Wing {
@@ -210,43 +313,11 @@ impl Widget for Wing {
         fill_rounded_rect(renderer, bg_rect, BG_COLOR, RADIUS);
         draw_rounded_border(renderer, bg_rect, BORDER_COLOR, BORDER_WIDTH, RADIUS);
 
-        // 2026-05-17: decode each slot's RLE ONCE on first draw, cache
-        // the resulting `Vec<Color>` + dimensions in `self.decoded`.
-        // Subsequent draws skip the parse_rle_blob + decode_rgba +
-        // chunks-to-Color extend chain entirely. Matches the IconStrip
-        // cache pattern in icon_strip.rs.
-        let mut decoded = self.decoded.borrow_mut();
-        let mut dim_scratch: Vec<Color> = Vec::new();
         for index in 0..self.slot_count {
             if let Some(slot) = &self.slots[index] {
-                if decoded[index].is_none() {
-                    let mut pixels: Vec<Color> = Vec::new();
-                    if let Some((width, height)) = Self::decode_into(slot.rle, &mut pixels) {
-                        decoded[index] = Some(DecodedIcon {
-                            pixels,
-                            width,
-                            height,
-                        });
-                    }
-                }
-                if let Some(entry) = decoded[index].as_ref() {
-                    let rect = self.icon_rect(index);
-                    let x = rect.x + (rect.width - entry.width as i32) / 2;
-                    let y = rect.y + (rect.height - entry.height as i32) / 2;
-                    let pixels: &[Color] = if slot.enabled {
-                        &entry.pixels
-                    } else {
-                        dim_scratch.clear();
-                        dim_scratch.reserve(entry.pixels.len());
-                        for color in &entry.pixels {
-                            dim_scratch.push(Color(color.0 / 2, color.1 / 2, color.2 / 2, color.3));
-                        }
-                        &dim_scratch
-                    };
-                    renderer.draw_pixels((x, y), pixels, entry.width, entry.height);
-                }
+                let rect = self.icon_rect(index);
+                let _ = Self::draw_rle_icon(renderer, slot.rle, rect, slot.enabled);
                 if self.focused_slot == Some(index) {
-                    let rect = self.icon_rect(index);
                     draw_border_straight(renderer, rect, FOCUS_HIGHLIGHT_COLOR, FOCUS_BORDER_WIDTH);
                 }
             }
@@ -271,7 +342,11 @@ impl Widget for Wing {
                 } else {
                     MARGIN_TOP + (index as i32 + 1) * step - GAP / 2
                 };
-                if *x <= WING_X + ICON_SIZE && *y >= cell_top && *y < cell_bottom {
+                if *x >= WING_X - HIT_PAD_X
+                    && *x < WING_X + ICON_SIZE + HIT_PAD_X
+                    && *y >= cell_top
+                    && *y < cell_bottom
+                {
                     if let Some(slot) = &mut self.slots[index]
                         && slot.enabled
                     {

@@ -37,6 +37,7 @@ const PDMDLY: u32 = 0x48;
 const CR1_SAIEN: u32 = 1 << 16;
 const CR1_DMAEN: u32 = 1 << 17;
 const CR1_NODIV: u32 = 1 << 19;
+const SAIEN_DISABLE_TIMEOUT: u32 = 100_000;
 
 // MODE[1:0] bits 0-1
 const CR1_MODE_MASTER_RX: u32 = 0b01;
@@ -146,7 +147,10 @@ impl Sai4Pdm {
             // Disable sub-block A
             let acr1 = self.reg(ACR1);
             acr1.write_volatile(acr1.read_volatile() & !CR1_SAIEN);
-            while acr1.read_volatile() & CR1_SAIEN != 0 {}
+            let mut guard = SAIEN_DISABLE_TIMEOUT;
+            while acr1.read_volatile() & CR1_SAIEN != 0 && guard > 0 {
+                guard -= 1;
+            }
 
             // Flush FIFO
             let acr2 = self.reg(ACR2);
@@ -203,7 +207,10 @@ impl Sai4Pdm {
         unsafe {
             let acr1 = self.reg(ACR1);
             acr1.write_volatile(acr1.read_volatile() & !CR1_SAIEN);
-            while acr1.read_volatile() & CR1_SAIEN != 0 {}
+            let mut guard = SAIEN_DISABLE_TIMEOUT;
+            while acr1.read_volatile() & CR1_SAIEN != 0 && guard > 0 {
+                guard -= 1;
+            }
         }
     }
 

@@ -15,6 +15,10 @@ mod backlight_panel;
 mod dashboard_panel;
 mod hotspot;
 pub mod icon_strip;
+mod media_player;
+mod media_player_gen;
+mod media_player_skin;
+mod qt_assets;
 pub mod wing;
 
 use alloc::{format, rc::Rc, string::String, vec, vec::Vec};
@@ -24,6 +28,7 @@ use backlight_panel::BacklightPanel;
 use dashboard_panel::DashboardPanel;
 use hotspot::ActionHotspot;
 use icon_strip::{IconSlot, IconStrip};
+pub use media_player_skin::MediaPlayerSkin;
 use rlvgl_core::{
     WidgetNode,
     anim::{Animations, Easing},
@@ -180,14 +185,16 @@ enum FocusState {
 enum MainSlot {
     Settings = 0,
     Files = 1,
-    Info = 2,
+    Player = 2,
+    Info = 3,
 }
 
 impl MainSlot {
     fn from_index(index: usize) -> Self {
         match index {
             1 => Self::Files,
-            2 => Self::Info,
+            2 => Self::Player,
+            3 => Self::Info,
             _ => Self::Settings,
         }
     }
@@ -196,6 +203,7 @@ impl MainSlot {
         match self {
             Self::Settings => "Settings",
             Self::Files => "Storage",
+            Self::Player => "Player",
             Self::Info => "Info",
         }
     }
@@ -237,6 +245,8 @@ const STRIP_ICON_SIZE: i32 = 60;
 const STRIP_MARGIN_TOP: i32 = 17;
 const STRIP_GAP: i32 = 10;
 const STRIP_X_OFFSET: i32 = 70;
+const MAIN_SLOT_COUNT: usize = icon_strip::SLOT_COUNT;
+const STRIP_TOUCH_LEFT: i32 = 700;
 const WING_X: i32 = 10;
 const WING_ICON_SIZE: i32 = 60;
 const WING_MARGIN_TOP: i32 = 17;
@@ -303,6 +313,7 @@ struct ControllerState {
     footer: Rc<RefCell<Label>>,
     event_window: Rc<RefCell<EventWindow>>,
     icon_strip: Rc<RefCell<IconStrip>>,
+    media_player_skin: Rc<RefCell<MediaPlayerSkin>>,
     settings_wing: Rc<RefCell<Wing>>,
     info_wing: Rc<RefCell<Wing>>,
     focus: FocusState,
@@ -330,6 +341,7 @@ impl ControllerState {
         footer: Rc<RefCell<Label>>,
         event_window: Rc<RefCell<EventWindow>>,
         icon_strip: Rc<RefCell<IconStrip>>,
+        media_player_skin: Rc<RefCell<MediaPlayerSkin>>,
         settings_wing: Rc<RefCell<Wing>>,
         info_wing: Rc<RefCell<Wing>>,
     ) -> Self {
@@ -342,6 +354,7 @@ impl ControllerState {
             footer,
             event_window,
             icon_strip,
+            media_player_skin,
             settings_wing,
             info_wing,
             focus: FocusState::Main(0),
@@ -396,6 +409,7 @@ impl ControllerState {
     }
 
     fn show_about(&mut self) {
+        self.media_player_skin.borrow_mut().set_visible(false);
         self.active_info = None;
         self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title("About");
@@ -443,6 +457,7 @@ impl ControllerState {
     }
 
     fn show_home(&mut self) {
+        self.media_player_skin.borrow_mut().set_visible(false);
         self.active_info = None;
         self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title("About");
@@ -488,6 +503,7 @@ impl ControllerState {
 
     #[allow(dead_code)]
     fn show_storage(&mut self) {
+        self.media_player_skin.borrow_mut().set_visible(false);
         self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title("Storage Browser");
         self.dashboard
@@ -510,6 +526,7 @@ impl ControllerState {
     }
 
     fn show_info(&mut self, title: &str, caption: &str, accent: Color, lines: Vec<String>) {
+        self.media_player_skin.borrow_mut().set_visible(false);
         self.dashboard.borrow_mut().show();
         self.dashboard.borrow_mut().set_title(title);
         self.dashboard.borrow_mut().set_caption(caption);
@@ -521,17 +538,22 @@ impl ControllerState {
         self.active_info = None;
         self.dashboard.borrow_mut().hide();
         self.backlight_panel.borrow_mut().hide();
+        self.media_player_skin.borrow_mut().set_visible(false);
         self.settings_wing.borrow_mut().close();
         self.info_wing.borrow_mut().close();
         let focus_index = match self.focus {
             FocusState::Main(index) | FocusState::Wing(_, index) => index,
         };
-        self.focus = FocusState::Main(focus_index.min(2));
+        self.focus = FocusState::Main(focus_index.min(MAIN_SLOT_COUNT - 1));
         self.refresh_focus_hint();
         self.sync_focus_highlights();
     }
 
     fn open_settings(&mut self) {
+        self.active_info = None;
+        self.media_player_skin.borrow_mut().set_visible(false);
+        self.dashboard.borrow_mut().hide();
+        self.backlight_panel.borrow_mut().hide();
         self.info_wing.borrow_mut().close();
         self.settings_wing.borrow_mut().toggle_visible();
         let next_focus = if self.settings_wing.borrow().is_visible() {
@@ -545,6 +567,10 @@ impl ControllerState {
     }
 
     fn open_info(&mut self) {
+        self.active_info = None;
+        self.media_player_skin.borrow_mut().set_visible(false);
+        self.dashboard.borrow_mut().hide();
+        self.backlight_panel.borrow_mut().hide();
         self.settings_wing.borrow_mut().close();
         self.info_wing.borrow_mut().toggle_visible();
         let next_focus = if self.info_wing.borrow().is_visible() {
@@ -555,6 +581,30 @@ impl ControllerState {
         self.focus = next_focus;
         self.refresh_focus_hint();
         self.sync_focus_highlights();
+    }
+
+    fn reconcile_self_closed_widgets(&mut self) {
+        if self.active_info.is_some() && !self.dashboard.borrow().is_visible() {
+            self.active_info = None;
+        }
+
+        let focus = self.focus;
+        match focus {
+            FocusState::Wing(WingKind::Settings, _)
+                if !self.settings_wing.borrow().is_visible() =>
+            {
+                self.backlight_panel.borrow_mut().hide();
+                self.focus = FocusState::Main(MainSlot::Settings as usize);
+                self.refresh_focus_hint();
+                self.sync_focus_highlights();
+            }
+            FocusState::Wing(WingKind::Info, _) if !self.info_wing.borrow().is_visible() => {
+                self.focus = FocusState::Main(MainSlot::Info as usize);
+                self.refresh_focus_hint();
+                self.sync_focus_highlights();
+            }
+            _ => {}
+        }
     }
 
     fn refresh_focus_hint(&mut self) {
@@ -596,7 +646,7 @@ impl ControllerState {
             FocusState::Main(index) => index as i32,
             FocusState::Wing(_, _) => return,
         };
-        let next = (current + delta).rem_euclid(3) as usize;
+        let next = (current + delta).rem_euclid(MAIN_SLOT_COUNT as i32) as usize;
         self.focus = FocusState::Main(next);
         self.refresh_focus_hint();
         self.sync_focus_highlights();
@@ -633,7 +683,26 @@ impl ControllerState {
                     self.push_status("Storage: not available");
                 }
             }
+            MainSlot::Player => self.toggle_media_player(),
             MainSlot::Info => self.open_info(),
+        }
+    }
+
+    fn toggle_media_player(&mut self) {
+        self.active_info = None;
+        self.dashboard.borrow_mut().hide();
+        self.backlight_panel.borrow_mut().hide();
+        self.settings_wing.borrow_mut().close();
+        self.info_wing.borrow_mut().close();
+        let was_visible = self.media_player_skin.borrow().is_visible();
+        self.media_player_skin
+            .borrow_mut()
+            .set_visible(!was_visible);
+        self.set_subtitle("Focus: main Player");
+        if was_visible {
+            self.push_status("Media player closed");
+        } else {
+            self.push_status("Media player");
         }
     }
 
@@ -885,6 +954,7 @@ impl ControllerState {
             Key::Escape => self.close_wings(),
             Key::Character('s') | Key::Character('S') => self.activate_main(MainSlot::Settings),
             Key::Character('f') | Key::Character('F') => self.activate_main(MainSlot::Files),
+            Key::Character('p') | Key::Character('P') => self.activate_main(MainSlot::Player),
             Key::Character('i') | Key::Character('I') => self.activate_main(MainSlot::Info),
             Key::Character('b') | Key::Character('B') => self.cycle_backlight(),
             _ => {}
@@ -995,6 +1065,13 @@ impl DiscoController {
                 .build(),
         ));
 
+        let media_player_skin = Rc::new(RefCell::new(MediaPlayerSkin::new(Rect {
+            x: 0,
+            y: 0,
+            width: STRIP_TOUCH_LEFT.min(width),
+            height,
+        })));
+
         let settings_wing = Rc::new(RefCell::new(Wing::new(&[
             (assets::ICON_AUDIO_48, capabilities.audio),
             (assets::ICON_CAMERA_48, false),
@@ -1041,6 +1118,14 @@ impl DiscoController {
             strip.set_slot(
                 2,
                 IconSlot {
+                    rle: assets::ICON_PLAY_48,
+                    enabled: true,
+                    on_tap: None,
+                },
+            );
+            strip.set_slot(
+                3,
+                IconSlot {
                     rle: assets::ICON_INFO,
                     enabled: true,
                     on_tap: None,
@@ -1057,6 +1142,7 @@ impl DiscoController {
             footer.clone(),
             event_window.clone(),
             icon_strip.clone(),
+            media_player_skin.clone(),
             settings_wing.clone(),
             info_wing.clone(),
         )));
@@ -1083,6 +1169,13 @@ impl DiscoController {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                state_for_info.borrow_mut().activate_main(MainSlot::Player);
+            }));
+            let state_for_info = state.clone();
+            icon_strip.borrow_mut().slots_mut()[3]
+                .as_mut()
+                .unwrap()
+                .on_tap = Some(alloc::boxed::Box::new(move |_| {
                 state_for_info.borrow_mut().activate_main(MainSlot::Info);
             }));
         }
@@ -1099,7 +1192,7 @@ impl DiscoController {
             }));
         }
 
-        for index in 0..4 {
+        for index in 0..5 {
             let shared_state = state.clone();
             info_wing.borrow_mut().slots_mut()[index]
                 .as_mut()
@@ -1142,6 +1235,11 @@ impl DiscoController {
                 widget: backlight_panel,
                 children: Vec::new(),
                 tag: Some("disco.backlight"),
+            });
+            r.children.push(WidgetNode {
+                widget: media_player_skin.clone(),
+                children: Vec::new(),
+                tag: Some("disco.media_player"),
             });
             r.children.push(WidgetNode {
                 widget: footer.clone(),
@@ -1195,6 +1293,17 @@ impl DiscoController {
         root.borrow_mut().children.push(WidgetNode {
             widget: Rc::new(RefCell::new(ActionHotspot::new(
                 strip_slot_bounds(width, 2),
+                {
+                    let state = state.clone();
+                    move || state.borrow_mut().activate_main(MainSlot::Player)
+                },
+            ))),
+            children: Vec::new(),
+            tag: Some("disco.main.player"),
+        });
+        root.borrow_mut().children.push(WidgetNode {
+            widget: Rc::new(RefCell::new(ActionHotspot::new(
+                strip_slot_bounds(width, 3),
                 {
                     let state = state.clone();
                     move || state.borrow_mut().activate_main(MainSlot::Info)
@@ -1390,6 +1499,7 @@ impl DiscoController {
             state.push_status(format!("Backlight {level}%"));
             state.queue(DiscoCommand::SetBacklight(level));
         }
+        state.reconcile_self_closed_widgets();
         match event {
             Event::Tick => {
                 state.tick_count = state.tick_count.wrapping_add(1);
@@ -1406,7 +1516,11 @@ impl DiscoController {
                 // are currently refreshable — effects clear active_info
                 // when they activate.
                 if let Some(slot) = state.active_info {
-                    state.render_info_page(slot);
+                    if state.dashboard.borrow().is_visible() {
+                        state.render_info_page(slot);
+                    } else {
+                        state.active_info = None;
+                    }
                 }
             }
             Event::KeyDown { key } => state.handle_key(key),
@@ -1512,7 +1626,9 @@ mod tests {
             "disco.events",
             "disco.main.settings",
             "disco.main.files",
+            "disco.main.player",
             "disco.main.info",
+            "disco.media_player",
             "disco.settings.audio",
             "disco.settings.camera",
             "disco.settings.display",
@@ -1591,7 +1707,11 @@ mod tests {
         {
             let mut root = root.borrow_mut();
             let hotspot = find_node_mut(&mut root, "disco.main.files").unwrap();
-            assert!(hotspot.dispatch_event(&Event::PressRelease { x: 0, y: 0 }));
+            let bounds = hotspot.widget.borrow().bounds();
+            assert!(hotspot.dispatch_event(&Event::PressRelease {
+                x: bounds.x + 1,
+                y: bounds.y + 1,
+            }));
         }
 
         let commands = controller.drain_commands();
@@ -1644,10 +1764,7 @@ mod tests {
             DiscoCapabilities::stm32h747i_disco(),
         );
         controller.dispatch_event(&Event::KeyDown {
-            key: Key::ArrowDown,
-        });
-        controller.dispatch_event(&Event::KeyDown {
-            key: Key::ArrowDown,
+            key: Key::Character('i'),
         });
         controller.dispatch_event(&Event::KeyDown { key: Key::Enter });
         controller.dispatch_event(&Event::KeyDown {
@@ -1687,6 +1804,8 @@ mod tests {
         key_down(&mut c, Key::ArrowDown);
         assert_eq!(focus(&c), FocusState::Main(2));
         key_down(&mut c, Key::ArrowDown);
+        assert_eq!(focus(&c), FocusState::Main(3));
+        key_down(&mut c, Key::ArrowDown);
         assert_eq!(focus(&c), FocusState::Main(0));
     }
 
@@ -1698,7 +1817,7 @@ mod tests {
         );
         assert_eq!(focus(&c), FocusState::Main(0));
         key_down(&mut c, Key::ArrowUp);
-        assert_eq!(focus(&c), FocusState::Main(2));
+        assert_eq!(focus(&c), FocusState::Main(3));
     }
 
     #[test]
@@ -1806,6 +1925,63 @@ mod tests {
         let root = root.borrow();
         let diag = find_node(&root, "disco.info.diagnostics").unwrap();
         assert!(diag.widget.borrow().bounds().width > 0);
+    }
+
+    #[test]
+    fn hotkey_p_activates_media_player() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Character('p'));
+        assert!(c.state.borrow().media_player_skin.borrow().is_visible());
+        assert_eq!(focus(&c), FocusState::Main(MainSlot::Player as usize));
+    }
+
+    #[test]
+    fn play_hotspot_toggles_media_player() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        c.dispatch_event(&Event::PressRelease { x: 760, y: 187 });
+        assert!(c.state.borrow().media_player_skin.borrow().is_visible());
+
+        c.dispatch_event(&Event::PressRelease { x: 760, y: 187 });
+        assert!(!c.state.borrow().media_player_skin.borrow().is_visible());
+        assert_eq!(focus(&c), FocusState::Main(MainSlot::Player as usize));
+    }
+
+    #[test]
+    fn opening_settings_hides_media_player() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Character('p'));
+        key_down(&mut c, Key::Character('s'));
+        assert!(!c.state.borrow().media_player_skin.borrow().is_visible());
+        assert!(c.state.borrow().settings_wing.borrow().is_visible());
+    }
+
+    #[test]
+    fn closing_live_stats_panel_clears_active_info() {
+        let mut c = DiscoController::new(
+            rlvgl_platform::Screen::landscape(800, 480),
+            DiscoCapabilities::simulator(),
+        );
+        key_down(&mut c, Key::Character('i'));
+        key_down(&mut c, Key::ArrowDown);
+        key_down(&mut c, Key::Enter);
+        assert!(c.state.borrow().dashboard.borrow().is_visible());
+        assert_eq!(c.state.borrow().active_info, Some(InfoSlot::LiveStats));
+
+        c.dispatch_event(&Event::PressRelease { x: 680, y: 100 });
+        assert!(!c.state.borrow().dashboard.borrow().is_visible());
+        assert_eq!(c.state.borrow().active_info, None);
+
+        c.tick();
+        assert!(!c.state.borrow().dashboard.borrow().is_visible());
     }
 
     #[test]

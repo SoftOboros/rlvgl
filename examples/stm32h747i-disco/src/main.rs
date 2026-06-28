@@ -2690,7 +2690,7 @@ fn main() -> ! {
         unsafe {
             (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
-        // ── Icon strip (right edge, 3 slots) + wings ────────────────────
+        // ── Icon strip (right edge, 4 slots) + wings ────────────────────
         // Shared crawl toggle flag — set by info wing favicon callback.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         let crawl_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
@@ -2701,14 +2701,15 @@ fn main() -> ! {
         // Audio scope toggle flag — set by settings wing audio icon callback.
         #[cfg(feature = "audio")]
         let scope_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
+        let stop_effects_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
 
         // Wings are created first so icon strip callbacks can reference them.
         let settings_wing = {
             use rlvgl_app_disco_demo::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
                 (include_bytes!("../assets/icons/48/audio48.rle"), true),
-                (include_bytes!("../assets/icons/48/camera48.rle"), false),
-                (include_bytes!("../assets/icons/48/monitor48.rle"), false),
+                (include_bytes!("../assets/icons/48/camera48.rle"), true),
+                (include_bytes!("../assets/icons/48/monitor48.rle"), true),
                 (include_bytes!("../assets/icons/48/globe48.rle"), true),
                 (include_bytes!("../assets/icons/48/bug48.rle"), true),
             ])))
@@ -2758,32 +2759,21 @@ fn main() -> ! {
 
         // Wire settings wing callbacks
         {
-            // Audio (slot 0): toggle audio scope
-            #[cfg(feature = "audio")]
-            {
-                let sf = scope_flag.clone();
-                settings_wing.borrow_mut().slots_mut()[0]
+            // Setup items should stay in setup. The audio scope is available
+            // from the Info wing; all Setup wing entries open the config panel.
+            for index in 0..5 {
+                let cm = config_menu.clone();
+                settings_wing.borrow_mut().slots_mut()[index]
                     .as_mut()
                     .unwrap()
-                    .on_tap = Some(alloc::boxed::Box::new(move |_| {
-                    sf.set(true);
+                    .on_tap = Some(alloc::boxed::Box::new(move |slot| {
+                    unsafe {
+                        let p = 0x3800_06B4u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        p.write_volatile(0x5E00_0000 | slot as u32);
+                    }
+                    cm.borrow_mut().toggle_visible();
                 }));
             }
-            // Globe (slot 3) + Bug (slot 4): both toggle the config menu
-            let cm1 = config_menu.clone();
-            settings_wing.borrow_mut().slots_mut()[3]
-                .as_mut()
-                .unwrap()
-                .on_tap = Some(alloc::boxed::Box::new(move |_| {
-                cm1.borrow_mut().toggle_visible();
-            }));
-            let cm2 = config_menu.clone();
-            settings_wing.borrow_mut().slots_mut()[4]
-                .as_mut()
-                .unwrap()
-                .on_tap = Some(alloc::boxed::Box::new(move |_| {
-                cm2.borrow_mut().toggle_visible();
-            }));
         }
 
         // ADC3 temp init deferred — calibration hangs without further debug
@@ -2830,6 +2820,15 @@ fn main() -> ! {
             ))
         };
 
+        let media_player_skin = Rc::new(RefCell::new(rlvgl_app_disco_demo::MediaPlayerSkin::new(
+            rlvgl_core::widget::Rect {
+                x: 0,
+                y: 0,
+                width: ICON_STRIP_X,
+                height: 480,
+            },
+        )));
+
         // Wire info wing callbacks
         // Slot 0 (cpu): toggle chip info panel
         {
@@ -2838,6 +2837,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0000);
+                }
                 cip.borrow_mut().toggle();
             }));
         }
@@ -2848,6 +2851,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0001);
+                }
                 lsp.borrow_mut().toggle();
             }));
         }
@@ -2859,6 +2866,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0002);
+                }
                 cf.set(true);
             }));
         }
@@ -2870,6 +2881,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0003);
+                }
                 sf.set(true);
             }));
         }
@@ -2916,9 +2931,10 @@ fn main() -> ! {
                 ICON_STRIP_GAP,
             );
 
-            let icons: [(&[u8], bool); 3] = [
+            let icons: [(&[u8], bool); 4] = [
                 (include_bytes!("../assets/icons/settings.rle"), true),
                 (include_bytes!("../assets/icons/file.rle"), true),
+                (include_bytes!("../assets/icons/48/play48.rle"), true),
                 (include_bytes!("../assets/icons/info.rle"), true),
             ];
 
@@ -2936,8 +2952,14 @@ fn main() -> ! {
             // Settings tap (slot 0) → close info wing, toggle settings wing
             let sw = settings_wing.clone();
             let iw = info_wing.clone();
+            let fbp = file_browser_panel.clone();
+            let mp = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
             strip.slots_mut()[0].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    mp.borrow_mut().set_visible(false);
+                    fbp.borrow_mut().hide();
                     iw.borrow_mut().close();
                     let vis = sw.borrow_mut().toggle_visible();
                     unsafe {
@@ -2948,16 +2970,46 @@ fn main() -> ! {
 
             // File tap (slot 1) → toggle file browser panel
             let fbp = file_browser_panel.clone();
+            let sw = settings_wing.clone();
+            let iw = info_wing.clone();
+            let mp = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
             strip.slots_mut()[1].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    mp.borrow_mut().set_visible(false);
+                    sw.borrow_mut().close();
+                    iw.borrow_mut().close();
                     fbp.borrow_mut().toggle();
                 }));
 
-            // Info tap (slot 2) → close settings wing, toggle info wing
+            // Play tap (slot 2) → show/hide the Bolero media-player skin.
             let sw2 = settings_wing.clone();
             let iw2 = info_wing.clone();
+            let fbp2 = file_browser_panel.clone();
+            let mp2 = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
             strip.slots_mut()[2].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    sw2.borrow_mut().close();
+                    iw2.borrow_mut().close();
+                    fbp2.borrow_mut().hide();
+                    let next = !mp2.borrow().is_visible();
+                    mp2.borrow_mut().set_visible(next);
+                }));
+
+            // Info tap (slot 3) → close settings wing, toggle info wing
+            let sw2 = settings_wing.clone();
+            let iw2 = info_wing.clone();
+            let fbp3 = file_browser_panel.clone();
+            let mp3 = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
+            strip.slots_mut()[3].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    mp3.borrow_mut().set_visible(false);
+                    fbp3.borrow_mut().hide();
                     sw2.borrow_mut().close();
                     let vis = iw2.borrow_mut().toggle_visible();
                     unsafe {
@@ -2998,6 +3050,11 @@ fn main() -> ! {
             });
             root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: info_wing.clone(),
+                children: alloc::vec![],
+                tag: None,
+            });
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
+                widget: media_player_skin.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
@@ -3214,11 +3271,22 @@ fn main() -> ! {
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         #[allow(unused_imports)]
         use crate::crawl_buffers::LegacyCrawlApi;
-        // Bare-metal runs the NT35510 in adapted-command portrait mode,
-        // so the framebuffer is 480 × 800. Zephyr's video-mode path
-        // passes (800, 480) to the same builder.
+        // Bare-metal's desktop coordinates are landscape (800 x 480),
+        // while the NT35510 adapted-command scanout is portrait
+        // (480 x 800). Render the widgets-side crawl in desktop space;
+        // the paint path below rotates the finished scratch frame into
+        // the physical framebuffer.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        let mut star_crawl = crawl_buffers::build_star_crawl_window(480, 800, FRAME_HZ);
+        let mut star_crawl = {
+            // The current bare-metal widgets path renders a full
+            // landscape scratch frame, then CPU-rotates it into the
+            // portrait scanout buffer. Measured frame time is about
+            // 200 ms, so the crawl's frame-based scroll accumulator
+            // must use the effective crawl cadence, not the 30 Hz UI
+            // SysTick cadence, to preserve wall-clock speed.
+            const CRAWL_FRAME_HZ: u32 = 5;
+            crawl_buffers::build_star_crawl_window(800, 480, CRAWL_FRAME_HZ)
+        };
 
         // Audio read cursor: tracks position in SDRAM PCM buffer.
         // Pre-fill consumed the first 2 * buf_size bytes.
@@ -3707,7 +3775,7 @@ fn main() -> ! {
                         }
                         (AppFocus::InfoWing(_), Key::ArrowLeft | Key::ArrowRight) => {
                             info_wing.borrow_mut().close();
-                            app_focus = AppFocus::Main(2);
+                            app_focus = AppFocus::Main(3);
                         }
                         (AppFocus::Main(idx), Key::Enter) => {
                             // Synthesize PressRelease at icon strip slot's center.
@@ -3745,7 +3813,7 @@ fn main() -> ! {
                             let press = Event::PressRelease { x: cx, y: cy };
                             root.borrow_mut().dispatch_event(&press);
                             if !info_wing.borrow().is_visible() {
-                                app_focus = AppFocus::Main(2);
+                                app_focus = AppFocus::Main(3);
                             }
                         }
                         _ => {}
@@ -3943,6 +4011,23 @@ fn main() -> ! {
                         dirty_frames = dirty_frames.max(2);
                     }
                 }
+                // Track media player visibility
+                {
+                    let vis = media_player_skin.borrow().is_visible();
+                    static mut MP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
+                    if vis != unsafe { MP_WAS_VIS } {
+                        dirty_frames = 4;
+                        if !vis {
+                            compositor.mark_pristine_restore(media_player_skin.borrow().bounds());
+                        }
+                        unsafe {
+                            MP_WAS_VIS = vis;
+                        }
+                    }
+                    if vis {
+                        dirty_frames = dirty_frames.max(2);
+                    }
+                }
                 // Live stats refresh (~2 Hz) — skip first frame after becoming visible
                 {
                     let lsp_now = live_stats_panel.borrow().is_visible();
@@ -4017,6 +4102,36 @@ fn main() -> ! {
                 // Keep rendering while restores are pending
                 if compositor.has_pending() {
                     dirty_frames = dirty_frames.max(2);
+                }
+
+                // ── Full-screen effect stop latch ───────────────────────
+                if stop_effects_flag.get() {
+                    stop_effects_flag.set(false);
+                    let mut stopped = false;
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    if star_crawl.is_active() {
+                        star_crawl.deactivate();
+                        stopped = true;
+                    }
+                    #[cfg(feature = "audio")]
+                    if audio_scope.is_active() {
+                        audio_scope.deactivate();
+                        mic_capture.stop();
+                        stopped = true;
+                    }
+                    if stopped {
+                        let (cw, ch) = display.dimensions();
+                        compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                            x: 0,
+                            y: 0,
+                            width: ch as i32,
+                            height: cw as i32,
+                        });
+                        dirty_frames = 4;
+                    }
                 }
 
                 // ── Star crawl toggle + render override ─────────────────
@@ -4348,29 +4463,19 @@ fn main() -> ! {
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            let back_bytes = unsafe {
-                                core::slice::from_raw_parts_mut(
-                                    back as *mut u8,
-                                    (w as usize) * (h as usize) * 4,
-                                )
-                            };
-                            let mut dst = rlvgl_platform::Surface::new(
-                                back_bytes,
-                                w as usize * 4,
-                                rlvgl_platform::PixelFmt::Argb8888,
-                                w,
-                                h,
-                            );
+                            let mut dst = crate::crawl_buffers::frame_scratch_surface(h, w);
                             let painted = star_crawl.paint_frame(&mut blitter, &mut dst);
                             display.return_dma2d_raw(blitter.into_inner());
                             let _ = sync; // retained for future cooperative path
-                            if painted {
-                                frame_ready = true;
-                            } else {
-                                render_active = false;
-                            }
                             if !star_crawl.is_active() {
-                                render_active = false;
+                                // Completion can coincide with a painted
+                                // terminal frame. Do not present that frame
+                                // and then wait for a new ERIF; adapted-cmd
+                                // mode may have no scan in flight. Keep the
+                                // current ERIF window and immediately run the
+                                // normal restore render on the next loop.
+                                render_active = true;
+                                frame_ready = false;
                                 serial_puts("CRAWL:done\r\n");
                                 let (w, h) = display.dimensions();
                                 compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
@@ -4380,6 +4485,15 @@ fn main() -> ! {
                                     height: h as i32,
                                 });
                                 dirty_frames = 4;
+                            } else if painted {
+                                crate::crawl_buffers::rotate_frame_to_portrait(
+                                    &dst,
+                                    back as *mut u8,
+                                    w,
+                                );
+                                frame_ready = true;
+                            } else {
+                                render_active = false;
                             }
                         }
                         let _ = keep_rendering; // single-blocking paint: no cooperative yield
@@ -4543,9 +4657,12 @@ fn main() -> ! {
             // before TE+1 (~19ms after ERIF). Ensures every frame
             // catches the same TE slot → constant frame period.
             const PRESENT_HOLDOFF: u32 = 6_000_000; // 15ms at 400MHz
-            if buffer_ready && cycles_since_erif() >= PRESENT_HOLDOFF && take_erif() {
+            let first_present = present_count == 0;
+            if buffer_ready
+                && (first_present || (cycles_since_erif() >= PRESENT_HOLDOFF && take_erif()))
+            {
                 // Update ERIF-to-ERIF period estimate (EMA, α=1/8).
-                {
+                if !first_present {
                     let now_cyc = ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire);
                     let delta = now_cyc.wrapping_sub(prev_erif_cyc);
                     // Sanity: 8ms..80ms at 400MHz (3.2M..32M cycles)
@@ -4586,6 +4703,17 @@ fn main() -> ! {
                     ))]
                     if crawl_running {
                         star_crawl.advance_scroll();
+                        if !star_crawl.is_active() {
+                            serial_puts("CRAWL:done\r\n");
+                            let (cw, ch) = display.dimensions();
+                            compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                x: 0,
+                                y: 0,
+                                width: ch as i32,
+                                height: cw as i32,
+                            });
+                            dirty_frames = 4;
+                        }
                     }
                     render_active = true;
                 } else if dirty_frames > 0 {
@@ -4600,10 +4728,10 @@ fn main() -> ! {
 
             // ── Pipeline stage: GATE RENDER ON ERIF ──────────────────────
             // Start rendering only after LTDC scan completes (ERIF set).
-            // IMPORTANT: Only consume ERIF when there's a pending render.
-            // In adapted command mode, ERIF fires only after present().
-            // Consuming it when nothing is pending creates a deadlock:
-            // no render → no present → no ERIF → no render.
+            // Leave ERIF latched for the present stage. Adapted command
+            // mode produces one ERIF per present; if render consumes it,
+            // the completed back buffer waits forever for a second ERIF
+            // that cannot arrive until the next present.
             if !render_active && !buffer_ready {
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
@@ -4618,7 +4746,7 @@ fn main() -> ! {
                 let scope_running = false;
 
                 let wants_render = crawl_running || scope_running || normal_render_pending;
-                if wants_render && take_erif() {
+                if wants_render && ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire) {
                     render_active = true;
                     if normal_render_pending {
                         normal_render_pending = false;

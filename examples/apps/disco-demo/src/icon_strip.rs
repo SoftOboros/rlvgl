@@ -2,7 +2,6 @@
 //! Vertical icon strip widget for the shared 747-style disco demo.
 
 use alloc::boxed::Box;
-use core::cell::RefCell;
 
 use rlvgl_core::{
     event::Event,
@@ -14,7 +13,8 @@ use rlvgl_ui::draw_helpers::draw_border_straight;
 use crate::assets::{FOCUS_BORDER_WIDTH, FOCUS_HIGHLIGHT_COLOR};
 
 /// Number of icon slots in the strip.
-pub const SLOT_COUNT: usize = 3;
+pub const SLOT_COUNT: usize = 4;
+const MAX_ICON_EDGE: usize = 64;
 
 /// A single icon slot with RLE-compressed icon data.
 pub struct IconSlot {
@@ -26,27 +26,9 @@ pub struct IconSlot {
     pub on_tap: Option<Box<dyn FnMut(usize)>>,
 }
 
-/// One slot's RLE blob decoded into a `Vec<Color>` plus its dimensions.
-/// Populated on the first `draw()` and reused thereafter (2026-05-17 —
-/// PC-sampling on disco-analyzer showed 35% of CM7 wall-time inside
-/// `decode_into` re-running every render, allocating ~30 KiB of
-/// transient heap per slot per frame; caching collapses that to a
-/// one-time cost at boot).
-struct DecodedIcon {
-    pixels: alloc::vec::Vec<Color>,
-    width: u32,
-    height: u32,
-}
-
 /// Right-edge icon strip that mirrors the STM32H747I-DISCO demo layout.
 pub struct IconStrip {
     slots: [Option<IconSlot>; SLOT_COUNT],
-    /// One-time-decoded pixels for each slot. Lazily filled from
-    /// `slot.rle` on the first draw and never rebuilt unless the slot
-    /// is replaced via `set_slot` (which clears the cached entry).
-    /// `RefCell` lets `draw(&self)` populate the cache without forcing
-    /// the Widget trait to switch to `&mut self`.
-    decoded: RefCell<[Option<DecodedIcon>; SLOT_COUNT]>,
     x: i32,
     margin_top: i32,
     gap: i32,
@@ -63,7 +45,6 @@ impl IconStrip {
     pub fn new(x: i32, icon_size: i32, margin_top: i32, gap: i32) -> Self {
         Self {
             slots: [const { None }; SLOT_COUNT],
-            decoded: RefCell::new([const { None }; SLOT_COUNT]),
             x,
             margin_top,
             gap,
@@ -78,12 +59,10 @@ impl IconStrip {
         &mut self.slots
     }
 
-    /// Set the slot contents at `index`. Invalidates the decoded-icon
-    /// cache for that index so the new RLE is decoded on the next draw.
+    /// Set the slot contents at `index`.
     pub fn set_slot(&mut self, index: usize, slot: IconSlot) {
         if index < SLOT_COUNT {
             self.slots[index] = Some(slot);
-            self.decoded.borrow_mut()[index] = None;
         }
     }
 
@@ -125,22 +104,175 @@ impl IconStrip {
         }
     }
 
-    fn decode_into(rle: &[u8], buf: &mut alloc::vec::Vec<Color>) -> Option<(u32, u32)> {
+    fn draw_rle_icon(
+        renderer: &mut dyn Renderer,
+        rle: &[u8],
+        bounds: Rect,
+        enabled: bool,
+    ) -> Option<()> {
         let (width, height, palette_bytes, stream) = rlvgl_decomp::parse_rle_blob(rle).ok()?;
         let palette_len = palette_bytes.len() / 2;
-        let mut palette = alloc::vec![0u16; palette_len];
+        if width as usize > MAX_ICON_EDGE
+            || height as usize > MAX_ICON_EDGE
+            || palette_len > rlvgl_decomp::consts::MAX_PALETTE
+        {
+            return None;
+        }
+        let mut palette = [0u16; rlvgl_decomp::consts::MAX_PALETTE];
         for index in 0..palette_len {
             palette[index] =
                 u16::from_le_bytes([palette_bytes[index * 2], palette_bytes[index * 2 + 1]]);
         }
-        let rgba =
-            rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
-        buf.extend(
-            rgba.chunks_exact(4)
-                .map(|chunk| Color(chunk[0], chunk[1], chunk[2], chunk[3])),
-        );
-        Some((width as u32, height as u32))
+        let mut row = [Color(0, 0, 0, 0); MAX_ICON_EDGE];
+        let mut stream_i = 0usize;
+        let mut x = 0usize;
+        let mut y = 0usize;
+        let mut recent_idx = 0usize;
+        while stream_i < stream.len() && y < height as usize {
+            let b = stream[stream_i];
+            stream_i += 1;
+            match b {
+                rlvgl_decomp::consts::ENCODE_KEY_SINGLE_INLINE_PIXEL => {
+                    if stream_i + 1 >= stream.len() {
+                        return None;
+                    }
+                    let c = ((stream[stream_i] as u16) << 8) | stream[stream_i + 1] as u16;
+                    stream_i += 2;
+                    Self::emit_icon_pixel(
+                        renderer,
+                        bounds,
+                        enabled,
+                        width,
+                        height,
+                        rgb565_color(c),
+                        &mut row,
+                        &mut x,
+                        &mut y,
+                    );
+                }
+                rlvgl_decomp::consts::ENCODE_KEY_DOUBLE_INLINE_PIXEL => {
+                    if stream_i + 1 >= stream.len() {
+                        return None;
+                    }
+                    let c = ((stream[stream_i] as u16) << 8) | stream[stream_i + 1] as u16;
+                    stream_i += 2;
+                    for _ in 0..2 {
+                        Self::emit_icon_pixel(
+                            renderer,
+                            bounds,
+                            enabled,
+                            width,
+                            height,
+                            rgb565_color(c),
+                            &mut row,
+                            &mut x,
+                            &mut y,
+                        );
+                    }
+                }
+                rlvgl_decomp::consts::ENCODE_KEY_LONG_REPEAT => {
+                    if stream_i >= stream.len() || recent_idx >= palette_len {
+                        return None;
+                    }
+                    let count = rlvgl_decomp::consts::SHORT_REPEAT_MAX as usize
+                        + 1
+                        + stream[stream_i] as usize;
+                    stream_i += 1;
+                    for _ in 0..count {
+                        Self::emit_icon_pixel(
+                            renderer,
+                            bounds,
+                            enabled,
+                            width,
+                            height,
+                            rgb565_color(palette[recent_idx]),
+                            &mut row,
+                            &mut x,
+                            &mut y,
+                        );
+                    }
+                }
+                data => {
+                    let data = data as usize;
+                    if data < palette_len {
+                        recent_idx = data;
+                        Self::emit_icon_pixel(
+                            renderer,
+                            bounds,
+                            enabled,
+                            width,
+                            height,
+                            rgb565_color(palette[data]),
+                            &mut row,
+                            &mut x,
+                            &mut y,
+                        );
+                    } else {
+                        if recent_idx >= palette_len {
+                            return None;
+                        }
+                        let count = data.saturating_sub(palette_len).saturating_add(1);
+                        for _ in 0..count {
+                            Self::emit_icon_pixel(
+                                renderer,
+                                bounds,
+                                enabled,
+                                width,
+                                height,
+                                rgb565_color(palette[recent_idx]),
+                                &mut row,
+                                &mut x,
+                                &mut y,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Some(())
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn emit_icon_pixel(
+        renderer: &mut dyn Renderer,
+        bounds: Rect,
+        enabled: bool,
+        width: u16,
+        height: u16,
+        color: Color,
+        row: &mut [Color; MAX_ICON_EDGE],
+        x: &mut usize,
+        y: &mut usize,
+    ) {
+        if *x >= width as usize || *y >= height as usize {
+            return;
+        }
+        row[*x] = if enabled {
+            color
+        } else {
+            Color(color.0 / 2, color.1 / 2, color.2 / 2, color.3)
+        };
+        *x += 1;
+        if *x == width as usize {
+            let draw_x = bounds.x + (bounds.width - width as i32) / 2;
+            let draw_y = bounds.y + (bounds.height - height as i32) / 2 + *y as i32;
+            renderer.draw_pixels((draw_x, draw_y), &row[..width as usize], width as u32, 1);
+            *x = 0;
+            *y += 1;
+        }
+    }
+}
+
+fn rgb565_color(c: u16) -> Color {
+    let r5 = ((c >> 11) & 0x1F) as u8;
+    let g6 = ((c >> 5) & 0x3F) as u8;
+    let b5 = (c & 0x1F) as u8;
+    Color(
+        (r5 << 3) | (r5 >> 2),
+        (g6 << 2) | (g6 >> 4),
+        (b5 << 3) | (b5 >> 2),
+        0xFF,
+    )
 }
 
 impl Widget for IconStrip {
@@ -157,43 +289,11 @@ impl Widget for IconStrip {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
-        // 2026-05-17: decode each slot's RLE ONCE on the first draw,
-        // cache the resulting `Vec<Color>` + dimensions in `self.decoded`.
-        // Subsequent draws skip the parse_rle_blob + decode_rgba +
-        // chunks-to-Color extend chain entirely. The disabled-slot
-        // dim variant uses a small scratch Vec built from the cache.
-        let mut decoded = self.decoded.borrow_mut();
-        let mut dim_scratch: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
         for (index, slot) in self.slots.iter().enumerate() {
             if let Some(slot) = slot {
-                if decoded[index].is_none() {
-                    let mut pixels: alloc::vec::Vec<Color> = alloc::vec::Vec::new();
-                    if let Some((width, height)) = Self::decode_into(slot.rle, &mut pixels) {
-                        decoded[index] = Some(DecodedIcon {
-                            pixels,
-                            width,
-                            height,
-                        });
-                    }
-                }
-                if let Some(entry) = decoded[index].as_ref() {
-                    let bounds = self.slot_bounds(index);
-                    let x = bounds.x + (bounds.width - entry.width as i32) / 2;
-                    let y = bounds.y + (bounds.height - entry.height as i32) / 2;
-                    let pixels: &[Color] = if slot.enabled {
-                        &entry.pixels
-                    } else {
-                        dim_scratch.clear();
-                        dim_scratch.reserve(entry.pixels.len());
-                        for color in &entry.pixels {
-                            dim_scratch.push(Color(color.0 / 2, color.1 / 2, color.2 / 2, color.3));
-                        }
-                        &dim_scratch
-                    };
-                    renderer.draw_pixels((x, y), pixels, entry.width, entry.height);
-                }
+                let bounds = self.slot_bounds(index);
+                let _ = Self::draw_rle_icon(renderer, slot.rle, bounds, slot.enabled);
                 if self.focused_slot == Some(index) {
-                    let bounds = self.slot_bounds(index);
                     draw_border_straight(renderer, bounds, self.focus_color, FOCUS_BORDER_WIDTH);
                 }
             }
@@ -218,7 +318,11 @@ impl Widget for IconStrip {
                     } else {
                         self.margin_top + (index as i32 + 1) * step - self.gap / 2
                     };
-                    if *x >= self.x && *y >= cell_top && *y < cell_bottom {
+                    if *x >= self.x
+                        && *x < self.x + self.icon_size
+                        && *y >= cell_top
+                        && *y < cell_bottom
+                    {
                         if let Some(callback) = slot.on_tap.as_mut() {
                             callback(index);
                         }

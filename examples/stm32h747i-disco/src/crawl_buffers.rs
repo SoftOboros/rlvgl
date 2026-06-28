@@ -13,11 +13,12 @@
 //! The retired `crate::star_crawl` hardware engine rendered a
 //! *landscape* text column (800 × 480) and rotated it 90° via DMA2D
 //! into whichever orientation the DSI scan was running. Widgets'
-//! [`TextCrawl`] doesn't rotate, so this builder takes the viewport
-//! `(visible_w, visible_h)` directly and the crawl renders native to
-//! that orientation. Callers pick:
+//! [`TextCrawl`] doesn't rotate internally, so this builder takes the
+//! viewport `(visible_w, visible_h)` directly and the crawl renders
+//! native to that orientation. Callers pick:
 //!
-//! - Bare-metal NT35510 (DSI adapted-cmd portrait) → `(480, 800)`
+//! - Bare-metal NT35510 desktop coordinates → `(800, 480)`, then the
+//!   host rotates the finished frame into the portrait scanout buffer.
 //! - Zephyr video-mode scan (landscape) → `(800, 480)`
 //! - Zephyr adapted-cmd scan (portrait) → `(480, 800)`
 //!
@@ -83,6 +84,12 @@ const JUMBO_BYTES: usize = MAX_VIEWPORT_LONG_AXIS as usize
 const TEXT_BYTES: usize = TEXT_WIDTH_PX as usize * TEXT_HEIGHT_PX as usize;
 /// Byte size of the scanline scratch (one destination row of ARGB).
 const SCANLINE_BYTES: usize = MAX_VIEWPORT_LONG_AXIS as usize * ARGB_BPP;
+/// Byte size of one logical landscape/portrait frame scratch.
+const FRAME_SCRATCH_BYTES: usize =
+    MAX_VIEWPORT_LONG_AXIS as usize * MAX_VIEWPORT_SHORT_AXIS as usize * ARGB_BPP;
+/// Scratch surface used by bare-metal adapted-command mode to render
+/// the crawl in logical landscape before rotating into the portrait FB.
+const FRAME_SCRATCH_BASE: usize = CRAWL_BASE + JUMBO_BYTES + TEXT_BYTES + SCANLINE_BYTES;
 
 /// Font data — DejaVuSans-Bold-32, the same bold 32 px font the retired
 /// hardware engine used. Shared with the broader STM32 binary so the
@@ -124,10 +131,11 @@ fn crawl_params(visible_w: u32, visible_h: u32, frame_hz: u32) -> CrawlParams {
 /// covers both orientations because the product `visible_w ×
 /// visible_h × JUMBO_SCALE × BPP` is 3.072 MiB either way.
 ///
-/// `frame_hz` must match the caller's render-loop cadence (30 Hz on
-/// this board's ERIF-paced bare-metal pipeline, matching the Zephyr
-/// thread's 33 ms k_sleep) so the sub-pixel rate model produces the
-/// disco-preset 40 px/s scroll on the wall-clock.
+/// `frame_hz` must match the caller's effective crawl present cadence
+/// so the sub-pixel rate model produces the disco-preset 40 px/s
+/// scroll on the wall-clock. Zephyr's thread is near 30 Hz; the
+/// current bare-metal adapted-command path is slower because it
+/// renders landscape then rotates into the portrait scanout buffer.
 ///
 /// Safety: the three SDRAM regions (`CRAWL_BASE` + offsets) are
 /// exclusively owned by the returned crawl window for the duration of
@@ -180,7 +188,7 @@ pub fn build_star_crawl_window(
     // starfield pattern on activate; scanline is overwritten per row.
     text_slice.fill(0);
 
-    let jumbo_stride = visible_w as usize * JUMBO_SCALE as usize * ARGB_BPP;
+    let jumbo_stride = visible_w as usize * ARGB_BPP;
     let jumbo = JumboBuffer::new(
         jumbo_slice,
         jumbo_stride,
@@ -215,6 +223,63 @@ pub fn build_star_crawl_window(
         height: visible_h as i32,
     };
     CrawlWindow::new(bounds, crawl)
+}
+
+/// Return a temporary ARGB8888 frame surface for the crawl host.
+///
+/// Bare-metal adapted-command mode renders the widgets-side crawl in
+/// logical landscape coordinates first, then rotates this surface into
+/// the physical portrait framebuffer. The scratch lives after the
+/// crawl's jumbo/text/scanline regions in AXI SDRAM.
+pub fn frame_scratch_surface(visible_w: u32, visible_h: u32) -> Surface<'static> {
+    let bytes = (visible_w as usize)
+        .saturating_mul(visible_h as usize)
+        .saturating_mul(ARGB_BPP);
+    assert!(
+        bytes <= FRAME_SCRATCH_BYTES,
+        "crawl_buffers: viewport exceeds reserved frame scratch"
+    );
+    let slice: &'static mut [u8] = // rlvgl-discipline: allow(static_mut)
+        unsafe { core::slice::from_raw_parts_mut(FRAME_SCRATCH_BASE as *mut u8, bytes) };
+    Surface::new(
+        slice,
+        visible_w as usize * ARGB_BPP,
+        PixelFmt::Argb8888,
+        visible_w,
+        visible_h,
+    )
+}
+
+/// Rotate a logical landscape ARGB frame into the portrait scanout FB.
+///
+/// This mirrors [`rlvgl_platform::blit::RotatedRenderer`]'s transform:
+/// logical `(x, y)` maps to physical `(fb_w - 1 - y, x)`.
+pub fn rotate_frame_to_portrait(src: &Surface<'_>, dst: *mut u8, fb_w: u32) {
+    if src.format != PixelFmt::Argb8888 || dst.is_null() || fb_w == 0 {
+        return;
+    }
+    let src_w = src.width as usize;
+    let src_h = src.height as usize;
+    let dst_stride = fb_w as usize * ARGB_BPP;
+    for lx in 0..src_w {
+        for ly in 0..src_h {
+            let dst_col = fb_w as usize - 1 - ly;
+            let src_offset = ly * src.stride + lx * ARGB_BPP;
+            let dst_offset = lx * dst_stride + dst_col * ARGB_BPP;
+            if src_offset + ARGB_BPP > src.buf.len() {
+                continue;
+            }
+            unsafe {
+                let pixel = src
+                    .buf
+                    .as_ptr()
+                    .add(src_offset)
+                    .cast::<u32>()
+                    .read_volatile();
+                dst.add(dst_offset).cast::<u32>().write_volatile(pixel);
+            }
+        }
+    }
 }
 
 /// Compatibility shim — adapts the widgets-side [`CrawlWindow`] API to

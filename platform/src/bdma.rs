@@ -73,6 +73,7 @@ const ISR_HTIF1: u32 = 1 << 6;
 const ISR_TEIF1: u32 = 1 << 7;
 /// All flags for channel 1.
 const IFCR_ALL_CH1: u32 = ISR_GIF1 | ISR_TCIF1 | ISR_HTIF1 | ISR_TEIF1;
+const BDMA_DISABLE_TIMEOUT: u32 = 100_000;
 
 // ---------------------------------------------------------------------------
 // DMAMUX2 request ID for SAI4_A
@@ -120,7 +121,11 @@ impl BdmaSai4Rx {
             // Disable channel
             let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() & !CCR_EN);
-            while (ccr as *const u32).read_volatile() & CCR_EN != 0 {} // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let mut guard = BDMA_DISABLE_TIMEOUT;
+            while (ccr as *const u32).read_volatile() & CCR_EN != 0 && guard > 0 {
+                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                guard -= 1;
+            }
 
             // Clear all flags for channel 1
             (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
@@ -167,7 +172,11 @@ impl BdmaSai4Rx {
         unsafe {
             let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() & !CCR_EN);
-            while (ccr as *const u32).read_volatile() & CCR_EN != 0 {} // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            let mut guard = BDMA_DISABLE_TIMEOUT;
+            while (ccr as *const u32).read_volatile() & CCR_EN != 0 && guard > 0 {
+                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                guard -= 1;
+            }
             (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
     }
