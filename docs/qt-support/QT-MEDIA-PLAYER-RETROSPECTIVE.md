@@ -135,13 +135,22 @@ plus a handful of QML-semantics gaps.
 
 ## §5 — Deferred work reclassification
 
-- **Coupled (revisit with state-machine context) — the next initiative:**
-  reactive icon swap (Play/Pause, repeat/shuffle/mute modes), track-title /
-  time / temperature text, album art. These read `scxmlBolero.*` predicates and
-  a track datamodel; they are **binding**, not layout, and MUST be done by
-  wiring real machine state (scxml→istate→rlvgl), not by hardcoding branches.
-  The current static choices (first-/else-branch icon, `15 °C` placeholder) are
-  scaffolding to be *replaced*, not extended.
+- **Coupled (revisit with state-machine context) — the next initiative.**
+  *Status: partially RESOLVED 2026-06-27 by QT-05g + QT-05h (see §8).* Reactive
+  icon swap and visibility were the binding (not layout) work this section
+  flagged; they were done by wiring real machine state, never by hardcoding
+  branches:
+  - **Play/Pause `source:` swap — DONE (QT-05g).** `is_active("mediaPlaying")`
+    drives the icon via an emitted `Binding::Predicate`; the static
+    else-branch scaffolding was *replaced*.
+  - **Mute `visible:` — DONE (QT-05h).** `is_active("muteOn")` drives the icon
+    via `Binding::Visibility`; the always-painted scaffolding was *replaced*.
+  - **Still coupled:** shuffle (needs a tap-wired `Inp.Media.Shuffle` event —
+    its `source:` binding already lowers); repeat (needs the chained-predicate
+    `source:` form, QT-05g §5 deferred); track-title / time text (reads the
+    `audioPlayer.*` media object, not the SM — needs a QT-05e externals bridge);
+    album art (same). The `15 °C` header stays a literal (it is genuinely
+    static in the QML — not a binding).
 - **Coupled (needs a colour model):** gradient/theme-colour fills
   (`AppConsts.cl_*`, `#AARRGGBB`). The translucent-white panel intent is
   currently approximated as transparent.
@@ -189,6 +198,82 @@ plus a handful of QML-semantics gaps.
 | Date       | Change                                                        |
 | ---------- | ------------------------------------------------------------- |
 | 2026-06-27 | Drafted at the close of the QML media-player ingest effort (emit v13→17), ahead of the scxml→istate→rlvgl integration initiative. |
+| 2026-06-27 | **Second completion event — scxml→istate→rlvgl reactive integration (QT-05g + QT-05h, emit v17→19).** Per the rlvgl-CLAUDE.md retrospective discipline, the initiative resumed from a closed state and reached a structurally distinct second completion; this entry amends the original rather than spawning a separate file. See the mini-retrospective below. |
+
+### §8.1 — Second completion: QT-05g / QT-05h (mini-retrospective)
+
+**Outcome.** Two reactive bindings now run end-to-end on the ESP32-P4: the
+Play/Pause icon swaps from `is_active("mediaPlaying")` (QT-05g, flashed
+`g24db512`) and the mute icon hides/shows from `is_active("muteOn")` (QT-05h,
+flashed `ge47b6a7`). `QT_EMIT_VERSION_RLVGL` advanced `17 → 19`. New emit
+surface: `--scxml-context <ctx>=<crate>`, `Binding::{Predicate,Visibility}`,
+`qt_image_art` / `qt_predicate_image` / `qt_visibility_image`,
+`Image::set_pixels` / `set_hidden`. New spec chapters
+`05g-state-predicate-bindings.md` + `05h-visibility-bindings.md`, and a QT-05
+§6 **linkage-v2** amendment.
+
+**Divergences (the §2-shaped finding for this completion).**
+
+1. *Assumption:* QT-05 §6's frozen linkage surface (v1: `dispatch(Event)`,
+   `State` enum, `DataModel { f64 }`) described the machine the demo runs.
+   *Symptom:* the binding could not be expressed against the SCTD media
+   machine. *Root cause:* the SCTD machine is the istate **M1P6** output
+   (`rust_ir_emitter.py`: `step(&str, Value)` / `is_active` / `get_var`), a
+   different surface than the older Jinja template QT-05 was written against.
+   *Detection gap:* QT-05b/c/e shipped against a v1 *mock* crate
+   (`stopwatch_gen`), so no test ever exercised the linkage against the real
+   M1P6 machine. *Resolution:* added linkage **v2** under Standards Action; the
+   string-keyed `is_active("<qml-state-id>")` is what makes the QML predicate a
+   verbatim pass-through (authority **derive**).
+2. *Assumption:* `build_screen` leaves the machine ready to drive. *Symptom:*
+   the Play tap did nothing; the icon never swapped. *Root cause:* generated
+   `build_screen` does `Machine::new() + start()`, leaving the machine in
+   `mediaPlayerIdle`; `Inp.Media.PlayPause` is a no-op there. *Resolution:* the
+   **consumer** seeds the machine past idle (`Ready` + `ValidSource` →
+   `mediaStopped`), mirroring the adapter's SCTD-03 §8 config seeding — machine
+   *initialisation*, not a predicate branch.
+3. *Assumption:* the pre-existing strict-mode chapter-set test excluded
+   non-chapter docs. *Symptom:* `qt10_chapter_set_matches_filesystem` failed.
+   *Root cause:* this very retrospective `.md`, added at the first completion,
+   was never excluded (the test only skipped `README.md`). *Resolution:* the
+   test now skips non-digit-prefixed docs (README / RETROSPECTIVE / future
+   ERRATA) — a pre-existing latent failure fixed in passing.
+
+**Were the §6 forward constraints honored?** Yes, all four, and they paid off:
+(1) *Work through, not around* — every gap (linkage mismatch, repeater ternary
+collapse, idle machine, RGB565 swap) was fixed in the emitter / machine /
+declared seeding, never by hand-editing `media_player_gen.rs` or branching in
+glue; the `Inp.Media.PlayPause` toggle was added to the SCXML so even the tap
+maps 1:1. (2) *Replace the scaffolding* — both the else-branch icon and the
+always-painted mute icon were removed, not layered over. (3) *Pixel gate before
+extending* — the committed `pixel_gate` histogram (and its reactive-swap /
+hidden-shown extensions) landed first and caught the real "binding inert" and
+"machine idle" failures on host before the bench. (4) *Asset-transparency
+invariant* — held; no new icons needed, and the magenta sentinel stayed absent.
+
+**Mitigation pattern to carry forward (the §4-shaped lesson).** *When a frozen
+cross-phase contract (here, QT-05 §6 linkage) is validated only against a mock,
+it can silently diverge from the real producer.* Before building on such a
+contract, confirm the live artifact matches it — or add an amendment that
+re-pins it to reality (linkage v2) **first**. A mock that never sees the real
+machine is the spec analogue of the §2 "renderer that produces no pixels."
+
+**Still deferred (updated §5).** Shuffle (tap wiring + `Inp.Media.Shuffle`),
+repeat (chained-predicate `source:`), track/time text (QT-05e externals bridge
+for `audioPlayer.*`), album art, theme/gradient colour. The next slice adds the
+`mediaPlayMixMode` / `mediaRepeat` `<parallel>` regions by the same pattern the
+mute region established.
+
+**Provenance.** Commits `c69f94a`..`24db512` (QT-05g) and `4b87a53`..`e47b6a7`
+(QT-05h) on branch `v0.2.5`. Emitter: `src/bin/creator/qt.rs` (the
+`--scxml-context` path, `parse_predicate_source` / `parse_visible_predicate`,
+the `WidgetKind::Image` predicate/visibility arms, `emit_*_binding_struct`,
+`emit_qt_{image_art,predicate_image,visibility_image}_helper`). Widget:
+`widgets/src/image.rs`. Machine: `examples/apps/sctd-demo/machines/media-player/`
+(SCXML `<parallel>` mute remodel + `Inp.Media.PlayPause`). Consumer:
+`examples/apps/sctd-demo/src/{media_player_gen.rs,media_player_skin.rs}`
+(`mod pixel_gate`). Spec: `05g-state-predicate-bindings.md`,
+`05h-visibility-bindings.md`, `05-state-machines.md` §6/§15.
 
 ---
 
