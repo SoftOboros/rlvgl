@@ -36,6 +36,27 @@ impl<'a> Image<'a> {
         self.blit_opts = blit_opts;
         self
     }
+
+    /// Replace the displayed pixel buffer and its dimensions at runtime.
+    ///
+    /// The widget's pixel buffer was previously construction-only. This
+    /// setter exists so generated reactive bindings (QT-05g
+    /// `PredicateBinding`) can swap artwork as a state machine's
+    /// predicates change, without rebuilding the widget tree. The blit
+    /// options (e.g. a stretch scale) are left unchanged — callers that
+    /// swap to a differently-sized buffer and need a different scale must
+    /// also call [`set_blit_opts`](Self::set_blit_opts).
+    pub fn set_pixels(&mut self, width: i32, height: i32, pixels: &'a [Color]) {
+        self.width = width;
+        self.height = height;
+        self.pixels = pixels;
+    }
+
+    /// Replace the low-level blit options at runtime (companion to
+    /// [`set_pixels`](Self::set_pixels) when the new buffer differs in size).
+    pub fn set_blit_opts(&mut self, blit_opts: BlitOpts) {
+        self.blit_opts = blit_opts;
+    }
 }
 
 impl<'a> Widget for Image<'a> {
@@ -58,5 +79,38 @@ impl<'a> Widget for Image<'a> {
     /// Images are purely visual and do not handle events.
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_pixels_swaps_buffer_and_dims() {
+        let off = [Color(1, 2, 3, 255)];
+        let on = [Color(4, 5, 6, 255), Color(7, 8, 9, 255)];
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 48,
+            height: 48,
+        };
+        let mut img = Image::new(bounds, 1, 1, &off);
+        assert_eq!(img.width, 1);
+        assert_eq!(img.height, 1);
+        assert_eq!(img.pixels.len(), 1);
+
+        // Swap to the "on" artwork (QT-05g PredicateBinding refresh path).
+        img.set_pixels(2, 1, &on);
+        assert_eq!(img.width, 2);
+        assert_eq!(img.height, 1);
+        assert_eq!(img.pixels.len(), 2);
+        assert_eq!(img.pixels[0].0, 4);
+
+        // Swap back.
+        img.set_pixels(1, 1, &off);
+        assert_eq!(img.pixels.len(), 1);
+        assert_eq!(img.pixels[0].0, 1);
     }
 }
