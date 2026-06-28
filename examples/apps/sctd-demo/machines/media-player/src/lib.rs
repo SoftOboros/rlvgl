@@ -15,8 +15,14 @@
 //! `// BLOCKED: <diagnostic>` comments and safe placeholders.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-// Machine-generated source: blanket-allow lints inherent to emitted code
-// rather than hand-written style (see rust_ir_emitter._emit_no_std_preamble).
+// Machine-generated source: blanket-allow lints inherent to emitted
+// code rather than hand-written style. `dead_code` covers helpers a
+// given machine shape never calls (e.g. run_epsilon_transitions on a
+// machine with no eventless transitions); `unused_variables` covers
+// diagnostic bindings that compile out under the no_std no-op
+// `eprintln!`; `clippy::all` covers codegen-shaped expressions
+// (single-arm matches, manual strips, large IR enums). Do not hand
+// edit — regenerate via `rust_ir_emitter`.
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(clippy::all)]
@@ -2471,6 +2477,24 @@ fn build_machine_ir() -> MachineIrData {
                                         guard: Some(ExprIr::VarRead("s_mute".to_string())),
                                         actions: vec![],
                                     },
+                                    TransitionIr {
+                                        event: Some("Inp.Media.PlayPause".to_string()),
+                                        targets: vec!["mediaPlaying".to_string()],
+                                        guard: None,
+                                        actions: vec![
+                                            ActionIr::Send {
+                                                event: Some("Out.Media.Play".to_string()),
+                                                eventexpr: None,
+                                                target: None,
+                                                targetexpr: None,
+                                                delay: Some("0s".to_string()),
+                                                delayexpr: None,
+                                                send_id: None,
+                                                content_expr: None,
+                                                params: vec![],
+                                            },
+                                        ],
+                                    },
                                 ],
                                 children: vec![],
                                 invokes: vec![],
@@ -2491,6 +2515,24 @@ fn build_machine_ir() -> MachineIrData {
                                 transitions: vec![
                                     TransitionIr {
                                         event: Some("Inp.Media.Pause".to_string()),
+                                        targets: vec!["mediaPaused".to_string()],
+                                        guard: None,
+                                        actions: vec![
+                                            ActionIr::Send {
+                                                event: Some("Out.Media.Pause".to_string()),
+                                                eventexpr: None,
+                                                target: None,
+                                                targetexpr: None,
+                                                delay: Some("0s".to_string()),
+                                                delayexpr: None,
+                                                send_id: None,
+                                                content_expr: None,
+                                                params: vec![],
+                                            },
+                                        ],
+                                    },
+                                    TransitionIr {
+                                        event: Some("Inp.Media.PlayPause".to_string()),
                                         targets: vec!["mediaPaused".to_string()],
                                         guard: None,
                                         actions: vec![
@@ -2547,6 +2589,24 @@ fn build_machine_ir() -> MachineIrData {
                                         event: Some("Inp.Media.Play".to_string()),
                                         targets: vec!["mediaPlaying".to_string()],
                                         guard: Some(ExprIr::UnaryOp("not".to_string(), Box::new(ExprIr::VarRead("s_mute".to_string())))),
+                                        actions: vec![
+                                            ActionIr::Send {
+                                                event: Some("Out.Media.Play".to_string()),
+                                                eventexpr: None,
+                                                target: None,
+                                                targetexpr: None,
+                                                delay: Some("0s".to_string()),
+                                                delayexpr: None,
+                                                send_id: None,
+                                                content_expr: None,
+                                                params: vec![],
+                                            },
+                                        ],
+                                    },
+                                    TransitionIr {
+                                        event: Some("Inp.Media.PlayPause".to_string()),
+                                        targets: vec!["mediaPlaying".to_string()],
+                                        guard: None,
                                         actions: vec![
                                             ActionIr::Send {
                                                 event: Some("Out.Media.Play".to_string()),

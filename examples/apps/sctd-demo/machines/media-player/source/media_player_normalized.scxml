@@ -24,6 +24,7 @@
     Inp.Media.ValidSource   -- valid playback source selected
     Inp.Media.Play          -- user pressed play
     Inp.Media.Pause         -- user pressed pause
+    Inp.Media.PlayPause     -- single toggle (QT-05g): machine owns play/pause decision
     Inp.Media.Stop          -- track ended or user stopped
     Inp.Media.Next          -- forward / next track
     Inp.Media.Prev          -- reverse / prev track
@@ -151,6 +152,12 @@
           <send event="Out.Media.Play"/>
         </transition>
         <transition event="Inp.Media.Play" cond="s_mute" target="mediaPaused"/>
+        <!-- QT-05g: single toggle event so the UI Play button maps 1:1; the
+             machine owns the play/pause decision (not glue). From stopped a
+             toggle starts playback. -->
+        <transition event="Inp.Media.PlayPause" target="mediaPlaying">
+          <send event="Out.Media.Play"/>
+        </transition>
       </state>
 
       <!-- ---- Playing ---- -->
@@ -159,6 +166,10 @@
           <assign location="i_player_state" expr="1"/>
         </onentry>
         <transition event="Inp.Media.Pause" target="mediaPaused">
+          <send event="Out.Media.Pause"/>
+        </transition>
+        <!-- QT-05g: toggle while playing → pause. -->
+        <transition event="Inp.Media.PlayPause" target="mediaPaused">
           <send event="Out.Media.Pause"/>
         </transition>
         <transition event="Inp.Media.Stop" target="mediaStopped">
@@ -172,6 +183,10 @@
           <assign location="i_player_state" expr="2"/>
         </onentry>
         <transition event="Inp.Media.Play" cond="!s_mute" target="mediaPlaying">
+          <send event="Out.Media.Play"/>
+        </transition>
+        <!-- QT-05g: toggle while paused → resume playback. -->
+        <transition event="Inp.Media.PlayPause" target="mediaPlaying">
           <send event="Out.Media.Play"/>
         </transition>
         <transition event="Inp.Media.Stop" target="mediaStopped">
