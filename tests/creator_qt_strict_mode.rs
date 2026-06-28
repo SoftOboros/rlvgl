@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// QT-10 §5: the canonical chapter file set under `docs/qt-support/`.
-/// 25 entries (incl. `10-release.md` and the QT-05g predicate-bindings chapter).
+/// 26 entries (incl. `10-release.md` and the QT-05g/05h binding chapters).
 const QT_CHAPTERS: &[&str] = &[
     "00-concepts.md",
     "02-ir-schema.md",
@@ -41,6 +41,7 @@ const QT_CHAPTERS: &[&str] = &[
     "05d-emit-scjson.md",
     "05e-externals-stubs.md",
     "05g-state-predicate-bindings.md",
+    "05h-visibility-bindings.md",
     "06-theme-tokens.md",
     "07-asset-handoff.md",
     "08-multi-file-cli.md",
