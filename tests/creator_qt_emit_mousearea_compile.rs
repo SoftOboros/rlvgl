@@ -20,7 +20,7 @@ fn generated_mousearea_module_links_clickarea_handler() {
         height: 100,
     };
     let (node, state, _bindings) = generated_mousearea::build_screen(bounds);
-    assert_eq!(generated_mousearea::QT_EMIT_VERSION, 20);
+    assert_eq!(generated_mousearea::QT_EMIT_VERSION, 21);
     assert_eq!(state.borrow().taps, 0);
 
     // The MouseArea is the only child of the root Item. It anchors

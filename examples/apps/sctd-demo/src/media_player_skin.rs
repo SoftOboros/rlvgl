@@ -24,21 +24,21 @@ use rlvgl_core::widget::{Rect, Widget};
 
 use crate::media_player_gen::{self, Binding, ScreenState};
 
-/// Tap-routable controls in the emitted tree: `(node tag, machine event)`.
-/// Each tagged button forwards a tap as its single machine event; the machine
-/// owns the resulting state change (QT-05g/05i) and the emitted predicate /
-/// chain bindings swap the artwork on `refresh_bindings` — no predicate branch
-/// in glue. The `__rep_btn_1` tag is the transport Play button's synthesised id
-/// (QT-Repeater expansion, model item `MediaFunc.Play`); `repeatBtn` is the
-/// repeat-mode button's QML `id:`.
-///
-/// Controls whose QML carries no `id:` (the shuffle button) are not tap-routable
-/// here — their bindings are still reactive (driven whenever the machine enters
-/// the state by any path); real shuffle-tap wiring is deferred (QT-05i §9: the
-/// `MediaShuffleButton` instance is untagged upstream).
-const TAP_CONTROLS: &[(&str, &str)] = &[
-    ("__rep_btn_1", "Inp.Media.PlayPause"),
-    ("repeatBtn", "Inp.Media.Repeat"),
+/// QT-05j — the QML-button-event → SCXML-input vocabulary map. The emitter
+/// surfaces each tap target as `(node tag, raw QML "MediaFunc.*" event)` in
+/// [`media_player_gen::BUTTON_TAP_EVENTS`] (lowered from the buttons'
+/// `submitBtnSetupEvent("…")` handlers); this table — owned by the skin, the
+/// role Bolero's C++ `submitBtnSetupEvent` plays — maps each QML event to the
+/// machine input the SCXML consumes. `MediaFunc.Play` maps to the single
+/// `Inp.Media.PlayPause` toggle (the machine owns the play↔pause decision,
+/// QT-05g). Buttons with no entry here (e.g. `MediaFunc.Scan`, unmodelled) are
+/// surfaced by the emitter but ignored — they dispatch nothing.
+const MEDIA_FUNC_MAP: &[(&str, &str)] = &[
+    ("MediaFunc.Play", "Inp.Media.PlayPause"),
+    ("MediaFunc.Repeat", "Inp.Media.Repeat"),
+    ("MediaFunc.Shuffle", "Inp.Media.Shuffle"),
+    ("MediaFunc.Reverse", "Inp.Media.Prev"),
+    ("MediaFunc.Forward", "Inp.Media.Next"),
 ];
 
 /// Visibility-gated wrapper around the emitted media-player widget tree, wired
@@ -86,9 +86,20 @@ impl MediaPlayerSkin {
         // anchor solver. `build_screen` constructs + `start()`s the machine
         // (linkage v2) and returns the reactive bindings; the skin owns them.
         let (node, state, machine, bindings) = media_player_gen::build_screen(bounds);
-        let tap_targets: Vec<(Rect, &'static str)> = TAP_CONTROLS
+        // QT-05j: resolve each emitted tap target (tag → raw QML event) to
+        // (bounds, machine event) by joining against MEDIA_FUNC_MAP. Buttons the
+        // map doesn't cover (e.g. MediaFunc.Scan) or tags absent from the tree
+        // are dropped.
+        let tap_targets: Vec<(Rect, &'static str)> = media_player_gen::BUTTON_TAP_EVENTS
             .iter()
-            .filter_map(|(tag, ev)| find_bounds_by_tag(&node, tag).map(|b| (b, *ev)))
+            .filter_map(|(tag, qml_event)| {
+                let bounds = find_bounds_by_tag(&node, tag)?;
+                let machine_event = MEDIA_FUNC_MAP
+                    .iter()
+                    .find(|(q, _)| q == qml_event)
+                    .map(|(_, ev)| *ev)?;
+                Some((bounds, machine_event))
+            })
             .collect();
         // `build_screen` constructs + `start()`s the machine, leaving it in
         // `mediaPlayerIdle`. Seed it past idle to the transport state
@@ -531,6 +542,45 @@ mod pixel_gate {
             region_diff(&fb_off, &fb_off2, full),
             0,
             "the two shuffle-off renders must be identical (clean toggle)"
+        );
+    }
+
+    /// QT-05j end-to-end gate: a TAP on the shuffle button (now tap-wired via
+    /// the emitted `BUTTON_TAP_EVENTS` + `MEDIA_FUNC_MAP`, where before it was
+    /// inert) steps the machine into `mediaPlayMixModeOn` and the predicate
+    /// binding swaps the shuffle icon. The button's synthetic tag is
+    /// `__btn_mediafunc_shuffle` (no QML `id:` upstream).
+    #[test]
+    fn shuffle_button_artwork_swaps_on_tap() {
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 720,
+            height: 480,
+        };
+        let mut skin = MediaPlayerSkin::new(bounds);
+        skin.set_visible(true);
+        let sb = skin
+            .tagged_bounds("__btn_mediafunc_shuffle")
+            .expect("shuffle button must carry the synthetic QT-05j tap tag");
+
+        let mut fb1 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb1);
+
+        let consumed = skin.handle_event(&Event::PressRelease {
+            x: sb.x + sb.width / 2,
+            y: sb.y + sb.height / 2,
+        });
+        assert!(
+            consumed,
+            "tap in the shuffle-button region must be consumed"
+        );
+
+        let mut fb2 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb2);
+        assert!(
+            region_diff(&fb1, &fb2, sb) > 0,
+            "tapping shuffle must swap its icon — the QT-05j tap wiring is inert"
         );
     }
 }

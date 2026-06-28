@@ -45,7 +45,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 20;
+pub const QT_EMIT_VERSION: u32 = 21;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -61,6 +61,18 @@ pub const ISTATE_LINKAGE_VERSION: u32 = 2;
 /// `<sm>_gen` crate name stem (v1) or the `--scxml-context` crate (v2).
 pub const QT_SM_NAME: &str = "media_player";
 
+/// QT-05j — tap targets lowered from `submitBtnSetupEvent("…")` button
+/// handlers: `(node tag, raw QML button-event)`. The consumer maps each
+/// QML event to a machine event via `machine.step(…)`.
+pub const BUTTON_TAP_EVENTS: &[(&str, &str)] = &[
+    ("__rep_btn_0", "MediaFunc.Reverse"),
+    ("__rep_btn_1", "MediaFunc.Play"),
+    ("__rep_btn_2", "MediaFunc.Forward"),
+    ("repeatBtn", "MediaFunc.Repeat"),
+    ("__btn_mediafunc_scan", "MediaFunc.Scan"),
+    ("__btn_mediafunc_shuffle", "MediaFunc.Shuffle"),
+];
+
 /// State threaded through every helper. One field per
 /// QT-04b §5-supported property declared on the QML root.
 /// `#[rustfmt::skip]` so the field order matches QT-01a's IR
@@ -74,7 +86,15 @@ pub struct ScreenState {
     pub repeatBtn_topBorderVisible: bool,
     pub repeatBtn_highlightBackgroundWhenSelected: bool,
     pub repeatBtn_gradientColor: String,
+    pub __btn_mediafunc_scan_itemSelected: bool,
+    pub __btn_mediafunc_scan_topBorderVisible: bool,
+    pub __btn_mediafunc_scan_highlightBackgroundWhenSelected: bool,
+    pub __btn_mediafunc_scan_gradientColor: String,
     pub shapePath_iOffset: i32,
+    pub __btn_mediafunc_shuffle_itemSelected: bool,
+    pub __btn_mediafunc_shuffle_topBorderVisible: bool,
+    pub __btn_mediafunc_shuffle_highlightBackgroundWhenSelected: bool,
+    pub __btn_mediafunc_shuffle_gradientColor: String,
     pub warningPanel_code: i32,
 }
 
@@ -206,7 +226,17 @@ pub fn build_screen(
         repeatBtn_highlightBackgroundWhenSelected: false,
         // QT-04b: non-literal default for `gradientColor`: AppConsts.cl_ITEM_COLOR
         repeatBtn_gradientColor: String::new(),
+        __btn_mediafunc_scan_itemSelected: false,
+        __btn_mediafunc_scan_topBorderVisible: true,
+        __btn_mediafunc_scan_highlightBackgroundWhenSelected: false,
+        // QT-04b: non-literal default for `gradientColor`: AppConsts.cl_ITEM_COLOR
+        __btn_mediafunc_scan_gradientColor: String::new(),
         shapePath_iOffset: 7,
+        __btn_mediafunc_shuffle_itemSelected: false,
+        __btn_mediafunc_shuffle_topBorderVisible: true,
+        __btn_mediafunc_shuffle_highlightBackgroundWhenSelected: false,
+        // QT-04b: non-literal default for `gradientColor`: AppConsts.cl_ITEM_COLOR
+        __btn_mediafunc_shuffle_gradientColor: String::new(),
         // QT-04b: non-literal default for `code`: getCode()
         warningPanel_code: 0,
     }));
@@ -699,8 +729,8 @@ fn build_functionKeys(
     };
     node.children.push(build_rowButtons(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
     node.children.push(build_repeatBtn(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_node_17(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_node_18(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build___btn_mediafunc_scan(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build___btn_mediafunc_shuffle(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -782,6 +812,7 @@ fn build___rep_btn_0(
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGREWINDBACK_48 (Qml/Images/ImgRewindBack_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDBACK_48);
+    // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -803,6 +834,7 @@ fn build___rep_btn_1(
     let (widget, __pb): (Rc<RefCell<dyn Widget>>, Binding) =
         qt_predicate_image(bounds, qt_assets::IMG_IMGPAUSE_48, qt_assets::IMG_IMGPLAY_48, "mediaPlaying", active);
     bindings.push(__pb);
+    // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -821,6 +853,7 @@ fn build___rep_btn_2(
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGREWINDFORWARD_48 (Qml/Images/ImgRewindForward_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDFORWARD_48);
+    // emitter-skipped (QT-04+): 1 signal handler(s)
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -882,9 +915,9 @@ fn build_node_23(
     node
 }
 
-// QML type: `Button`
+// QML type: `Button` (id: `__btn_mediafunc_scan`)
 #[rustfmt::skip]
-fn build_node_17(
+fn build___btn_mediafunc_scan(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
@@ -894,12 +927,11 @@ fn build_node_17(
     let mut button = Button::new("", bounds);
     button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
-    // emitter-skipped (QT-04c+): 4 property declaration(s)
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
-        tag: None,
+        tag: Some("__btn_mediafunc_scan"),
     };
     let child_bounds = bounds;
     node.children.push(build_shape(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
@@ -1001,9 +1033,9 @@ fn build_node_25(
     node
 }
 
-// QML type: `Button`
+// QML type: `Button` (id: `__btn_mediafunc_shuffle`)
 #[rustfmt::skip]
-fn build_node_18(
+fn build___btn_mediafunc_shuffle(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
@@ -1013,12 +1045,11 @@ fn build_node_18(
     let mut button = Button::new("", bounds);
     button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
-    // emitter-skipped (QT-04c+): 4 property declaration(s)
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let mut node = WidgetNode {
         widget,
         children: Vec::new(),
-        tag: None,
+        tag: Some("__btn_mediafunc_shuffle"),
     };
     // QT-03c centerIn: parent (no explicit size — defaulted to parent bounds)
     let child_bounds = Rect {

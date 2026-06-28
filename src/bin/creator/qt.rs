@@ -2071,7 +2071,7 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// `Image.Stretch` scaling (source→dest). Without this the emitted
 /// tree rendered all-white on real hardware (opaque structural
 /// containers buried the artwork; 1:1 blit never filled the slots).
-pub const QT_EMIT_VERSION_RLVGL: u32 = 20;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 21;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2181,6 +2181,12 @@ fn emit_one_file(
         // preserved verbatim so the Image arm can lower it to a reactive
         // binding; otherwise the resting else-branch literal is used.
         expand_repeaters_in(&mut module.root, 0, 0, scxml_context.is_some());
+        // QT-05j: when a state-machine context is linked, give every untagged
+        // button that dispatches a `submitBtnSetupEvent("…")` a synthetic tag so
+        // the emitted `BUTTON_TAP_EVENTS` table can name it for the consumer.
+        if scxml_context.is_some() {
+            synthesize_button_tap_tags(&mut module.root);
+        }
     }
 
     let stem = input
@@ -2385,11 +2391,16 @@ fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32, preserve_t
             .collect(),
         _ => return,
     };
-    let sources: Vec<String> = items
+    // Each model entry contributes its `imageKeySource` (the icon) and, when
+    // present, its `eventName` (the QT-05j button event the delegate dispatches
+    // via `submitBtnSetupEvent(eventName, …)`).
+    let entries: Vec<(String, Option<String>)> = items
         .iter()
-        .filter_map(|t| extract_image_key_source(t, preserve_ternary))
+        .filter_map(|t| {
+            extract_image_key_source(t, preserve_ternary).map(|s| (s, extract_model_event_name(t)))
+        })
         .collect();
-    let n = sources.len() as i32;
+    let n = entries.len() as i32;
     if n == 0 {
         return;
     }
@@ -2398,7 +2409,7 @@ fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32, preserve_t
     let group_w = n * icon + (n - 1) * spacing.max(0);
     let start = ((layout_w - group_w) / 2).max(0);
     let mut kids = Vec::new();
-    for (i, src) in sources.iter().enumerate() {
+    for (i, (src, event)) in entries.iter().enumerate() {
         let id = format!("__rep_btn_{i}");
         let mut a: Vec<UiAssignment> = vec![
             ui_assign("source", src.clone()),
@@ -2422,13 +2433,24 @@ fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32, preserve_t
                 format!("{}", spacing.max(0)),
             ));
         }
+        // QT-05j: carry the model item's `eventName` as a resolved
+        // `submitBtnSetupEvent("<EVENT>")` handler on the synthesized icon node
+        // (the delegate button frame is dropped), so the button-event walker
+        // wires this tap target like any literal-arg button.
+        let handlers = match event {
+            Some(ev) => vec![UiHandler {
+                signal: "onReleased".to_string(),
+                body: format!("submitBtnSetupEvent(\"{ev}\")"),
+            }],
+            None => Vec::new(),
+        };
         kids.push(UiItem {
             type_name: "Image".to_string(),
             id: Some(id),
             properties: Vec::new(),
             assignments: a,
             signals: Vec::new(),
-            handlers: Vec::new(),
+            handlers,
             children: Vec::new(),
         });
     }
@@ -2440,6 +2462,68 @@ fn ui_assign(target: &str, text: String) -> UiAssignment {
     UiAssignment {
         target: target.to_string(),
         value: UiAssignmentValue::Expression { text },
+    }
+}
+
+/// QT-05j: parse the first `submitBtnSetupEvent("<EVENT>"…)` call out of a
+/// handler body, returning the QML button-event name `<EVENT>` (the first
+/// string-literal argument). Returns `None` when the call is absent or its
+/// first argument is a bare identifier (the Repeater delegate's
+/// `submitBtnSetupEvent(eventName, 1)` form — resolved during expansion).
+fn parse_submit_btn_event(body: &str) -> Option<String> {
+    let idx = body.find("submitBtnSetupEvent")?;
+    let args = &body[idx + "submitBtnSetupEvent".len()..];
+    let args = args.trim_start().strip_prefix('(')?;
+    // The first argument must be a string literal (`"MediaFunc.X"`); a bare
+    // identifier before the first quote (e.g. a `,`-separated later arg) means
+    // the event name is dynamic and not lowerable here.
+    let q1 = args.find('"')?;
+    if args[..q1].contains(',') {
+        return None;
+    }
+    let rest = &args[q1 + 1..];
+    let q2 = rest.find('"')?;
+    Some(rest[..q2].to_string())
+}
+
+/// QT-05j: the QML button-event name a node's handlers dispatch via
+/// `submitBtnSetupEvent("…")`, if any.
+fn extract_submit_btn_event(item: &UiItem) -> Option<String> {
+    item.handlers
+        .iter()
+        .find_map(|h| parse_submit_btn_event(&h.body))
+}
+
+/// QT-05j: pull the `eventName: "<EVENT>"` literal out of a Repeater model
+/// entry (the per-item button event the delegate dispatches via
+/// `submitBtnSetupEvent(eventName, …)`).
+fn extract_model_event_name(obj_text: &str) -> Option<String> {
+    let idx = obj_text.find("eventName")?;
+    let after = obj_text[idx + "eventName".len()..]
+        .trim_start()
+        .strip_prefix(':')?;
+    let q1 = after.find('"')?;
+    let rest = &after[q1 + 1..];
+    let q2 = rest.find('"')?;
+    Some(rest[..q2].to_string())
+}
+
+/// QT-05j: give every untagged button that dispatches a
+/// `submitBtnSetupEvent("…")` a synthetic, deterministic `id` (hence a node
+/// tag) so the consumer can resolve its bounds to route a tap. Tagged buttons
+/// (a real QML `id:`, e.g. `repeatBtn`) keep their tag. Runs after component +
+/// Repeater expansion so synthesized delegate handlers are present.
+fn synthesize_button_tap_tags(item: &mut UiItem) {
+    if item.id.is_none()
+        && let Some(ev) = extract_submit_btn_event(item)
+    {
+        item.id = Some(format!(
+            "__btn_{}",
+            sanitize_ident(&ev.to_ascii_lowercase())
+        ));
+    }
+    for child in &mut item.children {
+        synthesize_button_tap_tags(child);
     }
 }
 
@@ -2823,6 +2907,7 @@ fn render_rlvgl_with_resolver(
     let used_predicate = ctx.used_predicate;
     let used_visibility = ctx.used_visibility;
     let used_predicate_chain = ctx.used_predicate_chain;
+    let button_tap_events = ctx.button_tap_events.clone();
     let used_dm_fields = ctx.used_dm_fields.clone();
     let used_assets = ctx.used_assets.clone();
     let has_images = !used_assets.is_empty();
@@ -2958,6 +3043,28 @@ fn render_rlvgl_with_resolver(
              pub const QT_SM_NAME: &str = {};\n\n",
             rust_str_lit(id)
         ));
+    }
+
+    // QT-05j: tap-target table lowered from `<ctx>.submitBtnSetupEvent("…")`
+    // button handlers. Each entry is `(node tag, raw QML button-event)`; the
+    // QML event string round-trips verbatim (authority: derive). The consumer
+    // owns the QML-event → machine-event vocabulary map (the role Bolero's C++
+    // `submitBtnSetupEvent` plays), so this table is deliberately app-agnostic.
+    if !button_tap_events.is_empty() {
+        out.push_str(
+            "/// QT-05j — tap targets lowered from `submitBtnSetupEvent(\"…\")` button\n\
+             /// handlers: `(node tag, raw QML button-event)`. The consumer maps each\n\
+             /// QML event to a machine event via `machine.step(…)`.\n\
+             pub const BUTTON_TAP_EVENTS: &[(&str, &str)] = &[\n",
+        );
+        for (tag, ev) in &button_tap_events {
+            out.push_str(&format!(
+                "    ({}, {}),\n",
+                rust_str_lit(tag),
+                rust_str_lit(ev)
+            ));
+        }
+        out.push_str("];\n\n");
     }
 
     emit_screen_state_struct(&state_fields, &mut out);
@@ -3348,6 +3455,10 @@ struct RlvglEmitCtx {
     /// `qt_predicate_chain_image` helper + `PredicateChainBinding`/`PredicateArm`
     /// types are emitted.
     used_predicate_chain: bool,
+    /// QT-05j: `(node tag, raw QML button-event)` for every button whose
+    /// handlers dispatch `<ctx>.submitBtnSetupEvent("…")`, in emit order. Drives
+    /// the emitted `BUTTON_TAP_EVENTS` table.
+    button_tap_events: Vec<(String, String)>,
 }
 
 /// One image asset referenced by the emitted widget tree.
@@ -3375,6 +3486,7 @@ impl RlvglEmitCtx {
             used_predicate: false,
             used_visibility: false,
             used_predicate_chain: false,
+            button_tap_events: Vec::new(),
         }
     }
 
@@ -3497,6 +3609,15 @@ impl RlvglEmitCtx {
             Some(id) => format!("Some({})", rust_str_lit(id)),
             None => "None".to_string(),
         };
+        // QT-05j: record this node as a tap target when it dispatches a
+        // `submitBtnSetupEvent("…")` and the module is SM-attached. The tag is
+        // guaranteed present (`synthesize_button_tap_tags` ran in the pre-pass).
+        if self.sm_context.is_some()
+            && let Some(id) = &item.id
+            && let Some(ev) = extract_submit_btn_event(item)
+        {
+            self.button_tap_events.push((id.clone(), ev));
+        }
         out.push_str(&format!(
             "    let {mut_kw}node = WidgetNode {{\n        \
              widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }};\n"
