@@ -3,7 +3,7 @@
 widget visibility bindings (`visible: <ctx>.<state>` → is_active hide/show).
 -->
 
-**[← Prev](05g-state-predicate-bindings.md) · [Index](README.md) · [Next →](#)**
+**[← Prev](05g-state-predicate-bindings.md) · [Index](README.md) · [Next →](05i-chained-predicate-bindings.md)**
 
 # Chapter QT-05h — Visibility Bindings (`visible:` ↔ `is_active`)
 
@@ -266,10 +266,11 @@ QT-05h is **shipped** when (implementation gate, own commits):
 
 Ratifying QT-05h unblocks:
 
-- The shuffle/repeat slice: their regions follow the same `<parallel>` pattern
-  as the mute region; shuffle's `source:` predicate binding (already lowered by
-  QT-05g) lights up once backed + tap-wired; repeat needs the chained-predicate
-  `source:` form (QT-05g §5 deferred).
+- The shuffle/repeat slice — shipped as
+  **[QT-05i](./05i-chained-predicate-bindings.md)**: their regions follow the
+  same `<parallel>` pattern as the mute region; shuffle's `source:` predicate
+  binding (already lowered by QT-05g) lit up once backed; repeat uses the new
+  chained-predicate `source:` form.
 - General per-node visibility (non-Image) as a future §5 promotion.
 
 ## §14 — Files Cited

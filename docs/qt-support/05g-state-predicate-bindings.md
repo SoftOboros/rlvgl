@@ -3,7 +3,7 @@
 Image-source and visibility bindings against the istate M1P6 linkage surface.
 -->
 
-**[← Prev](05e-externals-stubs.md) · [Index](README.md) · [Next →](#)**
+**[← Prev](05e-externals-stubs.md) · [Index](README.md) · [Next →](05h-visibility-bindings.md)**
 
 # Chapter QT-05g — State-Predicate Bindings (Image Source ↔ `is_active`)
 
@@ -209,7 +209,7 @@ Registration policy: **Specification Required**.
 | QML form | Status |
 | -------- | ------ |
 | `source: <ctx>.<state> ? "A" : "B"` on an `Image` (incl. a Repeater model item's `imageKeySource`) | **shipped** — lowers to `Binding::Predicate` per §6, `state_id = "<state>"`. |
-| `source: <ctx>.<s1> ? "A" : <ctx>.<s2> ? "B" : "C"` (chained predicate ternary; repeat-mode icon) | **shipped** — lowers to a chain of `is_active` checks (first-true wins; final else is the resting asset). Reserved here, exercised when the repeat slice lands. |
+| `source: <ctx>.<s1> ? "A" : <ctx>.<s2> ? "B" : "C"` (chained predicate ternary; repeat-mode icon) | grammar **reserved here**; lowered to a chain of `is_active` checks (first-true wins; final else is the resting asset) by **[QT-05i](./05i-chained-predicate-bindings.md)** (the repeat slice). |
 | `source: "literal.png"` (no predicate) | unchanged — QT-07 static blit; no binding. |
 | `visible: <ctx>.<state>` | **deferred** to QT-05h (mute icon). A `// TODO QT-05g: bind visibility` line is emitted in its place. |
 | `source: <ctx>.<state> ? A : B` where the machine cannot answer `is_active("<state>")` | **emit-time error**. The walker requires `--scxml-context` to be set; the state-id is otherwise unverifiable. When `--scxml-context` names a crate, the id is passed through verbatim (the machine answers `false` for an unknown id at runtime — see §9 residual risk). |
@@ -422,8 +422,9 @@ Ratifying QT-05g unblocks:
 - **QT-05h** (visibility-from-state): the mute icon
   (`visible: scxmlBolero.muteOn`) — a §5 promotion away once the
   `muteType` region is re-modeled.
-- The repeat-mode and shuffle slices (chained-predicate source already
-  reserved in §5).
+- The repeat-mode and shuffle slices — shipped as
+  **[QT-05i](./05i-chained-predicate-bindings.md)** (chained-predicate `source:`
+  lowering, reserved in §5).
 - The track-title / time text bridge (a QT-05e externals follow-up).
 
 ## §14 — Files Cited

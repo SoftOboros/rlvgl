@@ -208,7 +208,8 @@ initiative owner.
 | `QT-05d`  | QML `States {}` → scjson emit               | [`05d-emit-scjson.md`](./05d-emit-scjson.md) — ratified + shipped |
 | `QT-05e`  | Externals stub emission (closes QT-05)      | [`05e-externals-stubs.md`](./05e-externals-stubs.md) — ratified + shipped — closes the QT-05 family |
 | `QT-05g`  | rlvgl emit — state-predicate → Image bindings; istate linkage v2 | [`05g-state-predicate-bindings.md`](./05g-state-predicate-bindings.md) — ratified + shipped (Play/Pause live on ESP32-P4; `QT-05f` reserved for stateful-externals) |
-| `QT-05h`  | rlvgl emit — state-predicate → widget visibility; mute region remodel | [`05h-visibility-bindings.md`](./05h-visibility-bindings.md) — ratified (concepts); implementation in progress |
+| `QT-05h`  | rlvgl emit — state-predicate → widget visibility; mute region remodel | [`05h-visibility-bindings.md`](./05h-visibility-bindings.md) — ratified + shipped (mute visibility live on ESP32-P4) |
+| `QT-05i`  | rlvgl emit — chained state-predicate → Image bindings (repeat icon); shuffle/repeat region remodel | [`05i-chained-predicate-bindings.md`](./05i-chained-predicate-bindings.md) — ratified + shipped (host-verified) |
 | `QT-06`   | Theme-token reconciliation                  | [`06-theme-tokens.md`](./06-theme-tokens.md) — ratified + shipped |
 | `QT-07`   | Asset-crate handoff                         | [`07-asset-handoff.md`](./07-asset-handoff.md) — ratified + shipped |
 | `QT-08`   | CLI surface (`creator qt …`)                | [`08-multi-file-cli.md`](./08-multi-file-cli.md) — directory-mode shipped; `.qmldir` (`QT-08b`) and `.qrc` (`QT-08c`) deferred |
