@@ -2825,6 +2825,13 @@ fn render_rlvgl_with_resolver(
     out.push_str("use alloc::vec::Vec;\n");
     out.push_str("use core::cell::RefCell;\n");
     out.push('\n');
+    // QT-05g: the linkage-v2 machine crate (`--scxml-context`) is an external
+    // crate sorting before `rlvgl_*` — emit it here so the file stays
+    // fmt-idempotent. (v1's `<sm>_gen` sorts after `rlvgl_widgets`; emitted
+    // below.)
+    if v2 && let Some(id) = &sm_id {
+        out.push_str(&format!("use {id}::Machine;\n"));
+    }
     // Emit order matches rustfmt's preferred sort within the
     // `rlvgl_core::*` group (uppercase items before lowercase
     // modules), so the generated file stays idempotent under
@@ -2850,22 +2857,13 @@ fn render_rlvgl_with_resolver(
     // (the ones we actually reference at this phase: `Event` for
     // dispatch lowering, `Machine` for the threading parameter).
     // `State`/`DataModel`/`Externals` join when QT-05c/e land.
-    if let Some(id) = &sm_id {
-        if v2 {
-            // QT-05g: istate linkage v2 imports the M1P6 machine type from the
-            // `--scxml-context` crate directly (no `_gen` suffix, no `Event`/
-            // `DataModel` enums — events/vars are dynamic strings). `is_active`
-            // is read off `Machine`.
-            out.push_str(&format!("use {id}::Machine;\n"));
-        } else {
-            // QT-05c §3 / §6: SM-attached modules import the full v1
-            // linkage surface trio that QT-05b/05c reference — `Event`
-            // for dispatch lowering, `Machine` for the threading
-            // parameter, `DataModel` for QT-05c MachineBinding accessors.
-            // The file's `#![allow(unused_imports)]` covers fixtures
-            // that have an SM but no DM bindings.
-            out.push_str(&format!("use {id}_gen::{{DataModel, Event, Machine}};\n"));
-        }
+    // QT-05c §3 / §6: SM-attached (linkage v1) modules import the full
+    // linkage surface trio — `Event` for dispatch lowering, `Machine` for
+    // the threading parameter, `DataModel` for MachineBinding accessors.
+    // `<sm>_gen` sorts after `rlvgl_widgets`. (v2 imports `Machine` from the
+    // `--scxml-context` crate above, where it sorts before `rlvgl_*`.)
+    if !v2 && let Some(id) = &sm_id {
+        out.push_str(&format!("use {id}_gen::{{DataModel, Event, Machine}};\n"));
     }
     out.push('\n');
     out.push_str(&format!(
@@ -5258,8 +5256,14 @@ fn emit_predicate_binding_struct(out: &mut String) {
          impl PredicateBinding {\n    \
              /// Re-apply this binding from the supplied machine.\n    \
              pub fn refresh(&self, machine: &Machine) {\n        \
-                 let art = if machine.is_active(self.state_id) { &self.on } else { &self.off };\n        \
-                 self.image.borrow_mut().set_pixels(art.width, art.height, art.pixels);\n    \
+                 let art = if machine.is_active(self.state_id) {\n            \
+                     &self.on\n        \
+                 } else {\n            \
+                     &self.off\n        \
+                 };\n        \
+                 self.image\n            \
+                     .borrow_mut()\n            \
+                     .set_pixels(art.width, art.height, art.pixels);\n    \
              }\n}\n\n",
     );
 }

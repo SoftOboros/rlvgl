@@ -33,6 +33,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
+use media_player::Machine;
 use rlvgl_core::WidgetNode;
 use rlvgl_core::image::BlitOpts;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -44,13 +45,21 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 17;
+pub const QT_EMIT_VERSION: u32 = 18;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
 pub const QT_SOURCE: &str = "/Users/iraabbott/softoboros/ops/packer/submodules/scjson/tutorial/Examples/Qt/SkodaBoleroInfotainment/Qml/Media/FrameMedia.qml";
+
+/// QT-05 §6 linkage version. v2 is the istate M1P6 dynamic-string
+/// surface (`step`/`is_active`/`get_var`), linked via `--scxml-context`.
+pub const ISTATE_LINKAGE_VERSION: u32 = 2;
+
+/// QT-05a §8 derived state-machine ID; matches the
+/// `<sm>_gen` crate name stem (v1) or the `--scxml-context` crate (v2).
+pub const QT_SM_NAME: &str = "media_player";
 
 /// State threaded through every helper. One field per
 /// QT-04b §5-supported property declared on the QML root.
@@ -85,15 +94,59 @@ impl LabelBinding {
     }
 }
 
+/// QT-05g §3 — a decoded, magenta-keyed, `'static`-leaked artwork
+/// buffer plus its natural dimensions.
+#[derive(Clone, Copy)]
+pub struct ImageArt {
+    pub width: i32,
+    pub height: i32,
+    pub pixels: &'static [Color],
+}
+
+/// QT-05g §3 — reactive `Image`-source binding. Shows `on` when the
+/// bound state is active, else `off`. `state_id` is the QML predicate
+/// passed through verbatim to `Machine::is_active` (authority: derive).
+pub struct PredicateBinding {
+    pub image: Rc<RefCell<Image<'static>>>,
+    pub state_id: &'static str,
+    pub on: ImageArt,
+    pub off: ImageArt,
+}
+
+impl PredicateBinding {
+    /// Re-apply this binding from the supplied machine.
+    pub fn refresh(&self, machine: &Machine) {
+        let art = if machine.is_active(self.state_id) {
+            &self.on
+        } else {
+            &self.off
+        };
+        self.image
+            .borrow_mut()
+            .set_pixels(art.width, art.height, art.pixels);
+    }
+}
+
+/// QT-05g §3 — sealed enum over the binding sources reactive
+/// `refresh_bindings` knows how to drive. `Label` reads from
+/// `ScreenState`; `Predicate` swaps `Image` artwork via
+/// `Machine::is_active`.
+pub enum Binding {
+    Label(LabelBinding),
+    Predicate(PredicateBinding),
+}
+
 /// Build the screen widget tree at `bounds` and return it
-/// alongside the `ScreenState` handle (QT-04b) and the
-/// `Vec<LabelBinding>` of reactive bindings (QT-04e §3).
-/// Callers ignore the third element with a `_` if reactivity
-/// is not needed.
+/// alongside the `ScreenState` handle (QT-04b §3), the
+/// `Rc<RefCell<Machine>>` istate (linkage v2) handle, and the
+/// `Vec<Binding>` of reactive bindings (QT-05g §3). Callers
+/// drive the machine via `machine.borrow_mut().step("…", …)`
+/// and call `refresh_bindings` to re-apply state-predicate
+/// artwork (e.g. Play↔Pause via `is_active`).
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {
+) -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {
     let state = Rc::new(RefCell::new(ScreenState {
         i_ROW_SPACING: 3,
         // QT-04b: non-literal default for `panelHeight`: height / 6 - AppConsts.i_DISPLAY_PADDING
@@ -107,18 +160,24 @@ pub fn build_screen(
         // QT-04b: non-literal default for `code`: getCode()
         warningPanel_code: 0,
     }));
-    let mut label_bindings: Vec<LabelBinding> = Vec::new();
-    let node = build_pane(bounds, Rc::clone(&state), &mut label_bindings);
-    (node, state, label_bindings)
+    let machine = Rc::new(RefCell::new({ let mut m = Machine::new(); m.start(); m }));
+    let mut bindings: Vec<Binding> = Vec::new();
+    let node = build_pane(bounds, Rc::clone(&state), Rc::clone(&machine), &mut bindings);
+    (node, state, machine, bindings)
 }
 
-/// Re-apply every QT-04e binding from the current state.
-/// Idempotent; safe to call after every `state.borrow_mut()`
-/// mutation. No-op when `bindings` is empty.
-pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, bindings: &[LabelBinding]) {
+/// Re-apply every QT-04e / QT-05g binding from the current
+/// state and machine. Idempotent; safe to call after any
+/// `machine.step(…)`. No-op when `bindings` is empty.
+#[rustfmt::skip]
+pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<Machine>>, bindings: &[Binding]) {
     let s = state.borrow();
+    let m = machine.borrow();
     for b in bindings {
-        b.refresh(&s);
+        match b {
+            Binding::Label(lb) => lb.refresh(&s),
+            Binding::Predicate(pb) => pb.refresh(&m),
+        }
     }
 }
 
@@ -126,10 +185,12 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, bindings: &[LabelBindi
 //   qt_assets::IMG_IMGBOLEROBACKGROUND  ←  Images/ImgBoleroBackground.png
 //   qt_assets::IMG_IMGMUTE  ←  Images/ImgMute.png
 //   qt_assets::IMG_IMGREWINDBACK_48  ←  Qml/Images/ImgRewindBack_48.png
+//   qt_assets::IMG_IMGPAUSE_48  ←  Qml/Images/ImgPause_48.png
 //   qt_assets::IMG_IMGPLAY_48  ←  Qml/Images/ImgPlay_48.png
 //   qt_assets::IMG_IMGREWINDFORWARD_48  ←  Qml/Images/ImgRewindForward_48.png
 //   qt_assets::IMG_IMGMEDIATRACKREPEAT_48  ←  Qml/Images/ImgMediaTrackRepeat_48.png
 //   qt_assets::IMG_IMGSHUFFLEON_48  ←  Qml/Images/ImgShuffleOn_48.png
+//   qt_assets::IMG_IMGSHUFFLEOFF_48  ←  Qml/Images/ImgShuffleOff_48.png
 /// Decode a vendored RLE asset into an owned, leaked pixel buffer and
 /// wrap it in an `Image` widget (see emit-time docs above).
 #[rustfmt::skip]
@@ -170,6 +231,60 @@ fn qt_image(bounds: Rect, rle: &'static [u8]) -> Rc<RefCell<dyn Widget>> {
     Rc::new(RefCell::new(img))
 }
 
+/// QT-05g: decode one vendored RLE asset into a leaked `ImageArt`
+/// (magenta-keyed → transparent, RGB565 has no alpha).
+#[rustfmt::skip]
+fn qt_image_art(rle: &'static [u8]) -> ImageArt {
+    let (w, h, palette_bytes, stream) =
+        rlvgl_decomp::parse_rle_blob(rle).expect("qt_image_art: malformed RLE asset");
+    let palette_len = palette_bytes.len() / 2;
+    let mut palette = alloc::vec![0u16; palette_len];
+    for i in 0..palette_len {
+        palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);
+    }
+    let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
+        .expect("qt_image_art: RLE decode failed");
+    let pixels: Vec<Color> = rgba
+        .chunks_exact(4)
+        .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {
+            Color(0x00, 0x00, 0x00, 0x00)
+        } else {
+            Color(c[0], c[1], c[2], c[3])
+        })
+        .collect();
+    let pixels: &'static [Color] = Vec::leak(pixels);
+    ImageArt { width: w as i32, height: h as i32, pixels }
+}
+
+/// QT-05g: build a predicate-bound Image. Decodes both branches, builds
+/// the Image at the machine-driven branch, and returns it as a
+/// `dyn Widget` plus the `Binding::Predicate` that swaps it on refresh.
+#[rustfmt::skip]
+fn qt_predicate_image(
+    bounds: Rect,
+    on_rle: &'static [u8],
+    off_rle: &'static [u8],
+    state_id: &'static str,
+    active: bool,
+) -> (Rc<RefCell<dyn Widget>>, Binding) {
+    let on = qt_image_art(on_rle);
+    let off = qt_image_art(off_rle);
+    let cur = if active { on } else { off };
+    let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);
+    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).
+    let scale_x = if cur.width > 0 {
+        ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16
+    } else { 256 };
+    let scale_y = if cur.height > 0 {
+        ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16
+    } else { 256 };
+    let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
+    let image = Rc::new(RefCell::new(img));
+    let widget: Rc<RefCell<dyn Widget>> = image.clone();
+    (widget, Binding::Predicate(PredicateBinding { image, state_id, on, off }))
+}
+
 /// Construct a `Label` with a transparent background (QML text has
 /// no fill), so it does not paint the opaque-white default `Style`.
 fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
@@ -183,7 +298,8 @@ fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
 fn build_pane(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGBOLEROBACKGROUND (Images/ImgBoleroBackground.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGBOLEROBACKGROUND);
@@ -194,7 +310,7 @@ fn build_pane(
         tag: Some("pane"),
     };
     let child_bounds = bounds;
-    node.children.push(build_paneMouseArea(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_paneMouseArea(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -203,7 +319,8 @@ fn build_pane(
 fn build_paneMouseArea(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut click_area = ClickArea::new(bounds);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(click_area));
@@ -231,9 +348,9 @@ fn build_paneMouseArea(
         width: (((bounds.x + bounds.width)) - (bounds.x)),
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
-    node.children.push(build_contentPaddingItem(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build_node_3(cb_1, Rc::clone(&state), label_bindings));
-    node.children.push(build_bottomPanel(cb_2, Rc::clone(&state), label_bindings));
+    node.children.push(build_contentPaddingItem(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_node_3(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_bottomPanel(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -242,7 +359,8 @@ fn build_paneMouseArea(
 fn build_contentPaddingItem(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -288,12 +406,12 @@ fn build_contentPaddingItem(
         width: ((cb_3.x) - (bounds.x)),
         height: ((cb_2.y) - ((cb_0.y + cb_0.height))),
     };
-    node.children.push(build_headerPanel(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build_functionKeys(cb_1, Rc::clone(&state), label_bindings));
-    node.children.push(build_timeline(cb_2, Rc::clone(&state), label_bindings));
-    node.children.push(build_imageSource(cb_3, Rc::clone(&state), label_bindings));
-    node.children.push(build_textSource(cb_4, Rc::clone(&state), label_bindings));
-    node.children.push(build_warningPanel(cb_5, Rc::clone(&state), label_bindings));
+    node.children.push(build_headerPanel(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_functionKeys(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_timeline(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_imageSource(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_textSource(cb_4, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_warningPanel(cb_5, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -302,7 +420,8 @@ fn build_contentPaddingItem(
 fn build_headerPanel(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -336,10 +455,10 @@ fn build_headerPanel(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_textTime(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build_timer(cb_1, Rc::clone(&state), label_bindings));
-    node.children.push(build_imgMute(cb_2, Rc::clone(&state), label_bindings));
-    node.children.push(build_textTemperature(cb_3, Rc::clone(&state), label_bindings));
+    node.children.push(build_textTime(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_timer(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_imgMute(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_textTemperature(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -348,7 +467,8 @@ fn build_headerPanel(
 fn build_textTime(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -366,7 +486,8 @@ fn build_textTime(
 fn build_timer(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Timer`
     let mut w = Container::new(bounds);
@@ -386,7 +507,8 @@ fn build_timer(
 fn build_imgMute(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGMUTE (Images/ImgMute.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGMUTE);
@@ -403,7 +525,8 @@ fn build_imgMute(
 fn build_textTemperature(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("15 °C", bounds)));
@@ -420,7 +543,8 @@ fn build_textTemperature(
 fn build_functionKeys(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -454,10 +578,10 @@ fn build_functionKeys(
         width: 65,
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
-    node.children.push(build_rowButtons(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build_repeatBtn(cb_1, Rc::clone(&state), label_bindings));
-    node.children.push(build_node_17(cb_2, Rc::clone(&state), label_bindings));
-    node.children.push(build_node_18(cb_3, Rc::clone(&state), label_bindings));
+    node.children.push(build_rowButtons(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_repeatBtn(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_node_17(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_node_18(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -466,7 +590,8 @@ fn build_functionKeys(
 fn build_rowButtons(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `RowLayout`
     let mut w = Container::new(bounds);
@@ -483,7 +608,7 @@ fn build_rowButtons(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_repeaterButtons(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_repeaterButtons(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -492,7 +617,8 @@ fn build_rowButtons(
 fn build_repeaterButtons(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Repeater`
     let mut w = Container::new(bounds);
@@ -521,9 +647,9 @@ fn build_repeaterButtons(
         width: 48,
         height: 48,
     };
-    node.children.push(build___rep_btn_0(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build___rep_btn_1(cb_1, Rc::clone(&state), label_bindings));
-    node.children.push(build___rep_btn_2(cb_2, Rc::clone(&state), label_bindings));
+    node.children.push(build___rep_btn_0(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build___rep_btn_1(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build___rep_btn_2(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -532,7 +658,8 @@ fn build_repeaterButtons(
 fn build___rep_btn_0(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGREWINDBACK_48 (Qml/Images/ImgRewindBack_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDBACK_48);
@@ -549,10 +676,14 @@ fn build___rep_btn_0(
 fn build___rep_btn_1(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
-    // QT-IMG: Image source → qt_assets::IMG_IMGPLAY_48 (Qml/Images/ImgPlay_48.png)
-    let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGPLAY_48);
+    // QT-05g predicate-bound: source → scxmlBolero.mediaPlaying ? on=IMG_IMGPAUSE_48 : off=IMG_IMGPLAY_48
+    let active = machine.borrow().is_active("mediaPlaying");
+    let (widget, __pb): (Rc<RefCell<dyn Widget>>, Binding) =
+        qt_predicate_image(bounds, qt_assets::IMG_IMGPAUSE_48, qt_assets::IMG_IMGPLAY_48, "mediaPlaying", active);
+    bindings.push(__pb);
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -566,7 +697,8 @@ fn build___rep_btn_1(
 fn build___rep_btn_2(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGREWINDFORWARD_48 (Qml/Images/ImgRewindForward_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDFORWARD_48);
@@ -583,7 +715,8 @@ fn build___rep_btn_2(
 fn build_repeatBtn(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
@@ -602,7 +735,7 @@ fn build_repeatBtn(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_node_23(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_23(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -611,7 +744,8 @@ fn build_repeatBtn(
 fn build_node_23(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGMEDIATRACKREPEAT_48 (Qml/Images/ImgMediaTrackRepeat_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGMEDIATRACKREPEAT_48);
@@ -628,7 +762,8 @@ fn build_node_23(
 fn build_node_17(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
@@ -642,9 +777,9 @@ fn build_node_17(
         tag: None,
     };
     let child_bounds = bounds;
-    node.children.push(build_shape(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_shape(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     let child_bounds = bounds;
-    node.children.push(build_node_25(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_25(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -653,7 +788,8 @@ fn build_node_17(
 fn build_shape(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Shape`
     let mut w = Container::new(bounds);
@@ -670,7 +806,7 @@ fn build_shape(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_shapePath(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_shapePath(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -679,7 +815,8 @@ fn build_shape(
 fn build_shapePath(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `ShapePath`
     let mut w = Container::new(bounds);
@@ -696,7 +833,7 @@ fn build_shapePath(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_node_27(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_27(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -705,7 +842,8 @@ fn build_shapePath(
 fn build_node_27(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `PathLine`
     let mut w = Container::new(bounds);
@@ -724,7 +862,8 @@ fn build_node_27(
 fn build_node_25(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -742,7 +881,8 @@ fn build_node_25(
 fn build_node_18(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
@@ -762,7 +902,7 @@ fn build_node_18(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_node_28(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_28(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -771,10 +911,14 @@ fn build_node_18(
 fn build_node_28(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
-    // QT-IMG: Image source → qt_assets::IMG_IMGSHUFFLEON_48 (Qml/Images/ImgShuffleOn_48.png)
-    let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGSHUFFLEON_48);
+    // QT-05g predicate-bound: source → scxmlBolero.mediaPlayMixModeOn ? on=IMG_IMGSHUFFLEON_48 : off=IMG_IMGSHUFFLEOFF_48
+    let active = machine.borrow().is_active("mediaPlayMixModeOn");
+    let (widget, __pb): (Rc<RefCell<dyn Widget>>, Binding) =
+        qt_predicate_image(bounds, qt_assets::IMG_IMGSHUFFLEON_48, qt_assets::IMG_IMGSHUFFLEOFF_48, "mediaPlayMixModeOn", active);
+    bindings.push(__pb);
     let node = WidgetNode {
         widget,
         children: Vec::new(),
@@ -788,7 +932,8 @@ fn build_node_28(
 fn build_timeline(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -823,10 +968,10 @@ fn build_timeline(
         width: (((bounds.x + bounds.width)) - (((cb_1.x + cb_1.width) + 5))),
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
-    node.children.push(build_node_29(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build_timeSlider(cb_1, Rc::clone(&state), label_bindings));
-    node.children.push(build_textPosition(cb_2, Rc::clone(&state), label_bindings));
-    node.children.push(build_textElapsed(cb_3, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_29(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_timeSlider(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_textPosition(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_textElapsed(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -835,7 +980,8 @@ fn build_timeline(
 fn build_node_29(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Connections`
     let mut w = Container::new(bounds);
@@ -855,7 +1001,8 @@ fn build_node_29(
 fn build_timeSlider(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Slider`
     let mut w = Container::new(bounds);
@@ -875,7 +1022,8 @@ fn build_timeSlider(
 fn build_textPosition(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -893,7 +1041,8 @@ fn build_textPosition(
 fn build_textElapsed(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -912,7 +1061,8 @@ fn build_textElapsed(
 fn build_imageSource(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -932,7 +1082,7 @@ fn build_imageSource(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_image(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_image(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     // emitter-skipped (QT-03c+): anchors.left: parent.left
     // emitter-skipped (QT-03c+): anchors.leftMargin: 10
     // emitter-skipped (QT-03c+): anchors.right: parent.right
@@ -944,7 +1094,7 @@ fn build_imageSource(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_textCaption(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_textCaption(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -953,7 +1103,8 @@ fn build_imageSource(
 fn build_image(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image with no resolvable source literal; emitting an empty transparent container
     let mut w = Container::new(bounds);
@@ -973,7 +1124,8 @@ fn build_image(
 fn build_textCaption(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -992,7 +1144,8 @@ fn build_textCaption(
 fn build_textSource(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -1010,7 +1163,8 @@ fn build_textSource(
 fn build_warningPanel(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -1033,8 +1187,8 @@ fn build_warningPanel(
         width: ((((bounds.x + bounds.width) - 10)) - (((cb_0.x + cb_0.width) + 20))),
         height: (((bounds.y + bounds.height)) - (bounds.y)),
     };
-    node.children.push(build_busyIndicator(cb_0, Rc::clone(&state), label_bindings));
-    node.children.push(build_textWarning(cb_1, Rc::clone(&state), label_bindings));
+    node.children.push(build_busyIndicator(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_textWarning(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -1043,7 +1197,8 @@ fn build_warningPanel(
 fn build_busyIndicator(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `BusyIndicator`
     let mut w = Container::new(bounds);
@@ -1062,7 +1217,8 @@ fn build_busyIndicator(
 fn build_textWarning(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
@@ -1080,7 +1236,8 @@ fn build_textWarning(
 fn build_node_3(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     // TODO QT-04e: bind color (non-literal QML expression)
@@ -1092,7 +1249,7 @@ fn build_node_3(
         tag: None,
     };
     let child_bounds = bounds;
-    node.children.push(build_node_37(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_node_37(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -1101,7 +1258,8 @@ fn build_node_3(
 fn build_node_37(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut click_area = ClickArea::new(bounds);
     // QT-04 body: scxmlBolero.submitEvent("Inp.App.Media.ModalOverlay.Clicked")
@@ -1122,7 +1280,8 @@ fn build_node_37(
 fn build_bottomPanel(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -1133,7 +1292,7 @@ fn build_bottomPanel(
         tag: Some("bottomPanel"),
     };
     let child_bounds = bounds;
-    node.children.push(build_rowButtons_38(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_rowButtons_38(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -1142,7 +1301,8 @@ fn build_bottomPanel(
 fn build_rowButtons_38(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `RowLayout`
     let mut w = Container::new(bounds);
@@ -1159,7 +1319,7 @@ fn build_rowButtons_38(
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_repeaterButtons_39(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_repeaterButtons_39(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -1168,7 +1328,8 @@ fn build_rowButtons_38(
 fn build_repeaterButtons_39(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    machine: Rc<RefCell<Machine>>,
+    bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Repeater`
     let mut w = Container::new(bounds);
