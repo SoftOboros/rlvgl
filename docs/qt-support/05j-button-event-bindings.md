@@ -273,7 +273,8 @@ QT-05j is **shipped** when (implementation gate, own commits):
 - [x] All rlvgl-target goldens regenerated for the version bump (byte-equal
       otherwise); compile-gate asserts + QT-10 strict-mode chapter set (28) +
       source pin updated.
-- [ ] ESP32-P4 reflash: shuffle responds to an on-panel tap (operator visual).
+- [x] ESP32-P4 reflash: shuffle responds to an on-panel tap (operator visual,
+      confirmed 2026-06-28 on app `v0.2.4-39-g6bb1b5a`).
 
 ## §12 — Files Cited
 
