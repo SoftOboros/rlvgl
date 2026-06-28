@@ -211,6 +211,7 @@ initiative owner.
 | `QT-05h`  | rlvgl emit — state-predicate → widget visibility; mute region remodel | [`05h-visibility-bindings.md`](./05h-visibility-bindings.md) — ratified + shipped (mute visibility live on ESP32-P4) |
 | `QT-05i`  | rlvgl emit — chained state-predicate → Image bindings (repeat icon); shuffle/repeat region remodel | [`05i-chained-predicate-bindings.md`](./05i-chained-predicate-bindings.md) — ratified + shipped (repeat live on ESP32-P4) |
 | `QT-05j`  | rlvgl emit — `submitBtnSetupEvent` → tap-target table (shuffle tap wired; consumer owns the QML→machine map) | [`05j-button-event-bindings.md`](./05j-button-event-bindings.md) — ratified + shipped (host-verified) |
+| `QT-05k`  | rlvgl emit — `text: <obj>.<prop>` external-object Label text → `Binding::ExternalText` + `apply_external_text` (consumer owns the key→value resolver) | [`05k-external-text-bindings.md`](./05k-external-text-bindings.md) — ratified + shipped (host-verified; P4 caption pending bench round) |
 | `QT-06`   | Theme-token reconciliation                  | [`06-theme-tokens.md`](./06-theme-tokens.md) — ratified + shipped |
 | `QT-07`   | Asset-crate handoff                         | [`07-asset-handoff.md`](./07-asset-handoff.md) — ratified + shipped |
 | `QT-08`   | CLI surface (`creator qt …`)                | [`08-multi-file-cli.md`](./08-multi-file-cli.md) — directory-mode shipped; `.qmldir` (`QT-08b`) and `.qrc` (`QT-08c`) deferred |

@@ -4,7 +4,7 @@
 dispatches a machine event (the consumer owns the QML-event → machine-event map).
 -->
 
-**[← Prev](05i-chained-predicate-bindings.md) · [Index](README.md) · [Next →](#)**
+**[← Prev](05i-chained-predicate-bindings.md) · [Index](README.md) · [Next →](05k-external-text-bindings.md)**
 
 # Chapter QT-05j — Button-Event Bindings (`submitBtnSetupEvent` → tap dispatch)
 

@@ -20,7 +20,7 @@ fn generated_hello_rlvgl_module_is_consumable() {
     let (node, state, bindings) = generated_hello_rlvgl::build_screen(bounds);
     assert_eq!(node.tag, Some("root"));
     assert_eq!(node.children.len(), 3);
-    assert_eq!(generated_hello_rlvgl::QT_EMIT_VERSION, 21);
+    assert_eq!(generated_hello_rlvgl::QT_EMIT_VERSION, 22);
     assert_eq!(generated_hello_rlvgl::QT_IR_VERSION, 2);
     // hello.qml's root declares `title: string`, `count: int`,
     // `ratio: real` — all QT-04b §5-supported. ScreenState carries

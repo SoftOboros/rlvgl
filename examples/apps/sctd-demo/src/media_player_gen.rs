@@ -45,7 +45,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 21;
+pub const QT_EMIT_VERSION: u32 = 22;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -71,6 +71,14 @@ pub const BUTTON_TAP_EVENTS: &[(&str, &str)] = &[
     ("repeatBtn", "MediaFunc.Repeat"),
     ("__btn_mediafunc_scan", "MediaFunc.Scan"),
     ("__btn_mediafunc_shuffle", "MediaFunc.Shuffle"),
+];
+
+/// QT-05k — external-text targets lowered from Label `text: <obj>.<prop>`
+/// sources: `(node tag, verbatim external key)`. The consumer resolves
+/// each key to a string via `apply_external_text`.
+#[rustfmt::skip]
+pub const EXTERNAL_TEXT_BINDINGS: &[(&str, &str)] = &[
+    ("textSource", "audioPlayer.currentPlayUrlFileName"),
 ];
 
 /// State threaded through every helper. One field per
@@ -197,6 +205,17 @@ impl PredicateChainBinding {
     }
 }
 
+/// QT-05k §3 — reactive Label-text binding sourced from an external
+/// object property (e.g. `audioPlayer.currentPlayUrlFileName`). `key`
+/// is the QML expression passed through verbatim (authority: derive);
+/// the string value is supplied by a consumer resolver via
+/// [`apply_external_text`]. The matching `(node tag, key)` pair is also
+/// surfaced in [`EXTERNAL_TEXT_BINDINGS`] for tag-keyed consumers.
+pub struct ExternalTextBinding {
+    pub label: Rc<RefCell<Label>>,
+    pub key: &'static str,
+}
+
 /// QT-05g §3 / QT-05h §3 / QT-05i §3 — sealed enum over the binding
 /// sources reactive `refresh_bindings` knows how to drive.
 pub enum Binding {
@@ -204,6 +223,7 @@ pub enum Binding {
     Predicate(PredicateBinding),
     Visibility(VisibilityBinding),
     Chain(PredicateChainBinding),
+    ExternalText(ExternalTextBinding),
 }
 
 /// Build the screen widget tree at `bounds` and return it
@@ -259,7 +279,24 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<M
                          Binding::Predicate(pb) => pb.refresh(&m),
                          Binding::Visibility(vb) => vb.refresh(&m),
                          Binding::Chain(cb) => cb.refresh(&m),
+                         Binding::ExternalText(_) => {}
     }
+    }
+}
+
+/// QT-05k §6 — apply a consumer-owned resolver to every external-text
+/// binding. `resolve(key)` returns the current value for the verbatim
+/// QML key (e.g. `"audioPlayer.currentPlayUrlFileName"`); `None` leaves
+/// the Label unchanged. Call whenever the external source may have
+/// changed (every frame, or on a data-change signal). No-op when there
+/// are no external-text bindings.
+pub fn apply_external_text(bindings: &[Binding], resolve: impl Fn(&str) -> Option<String>) {
+    for b in bindings {
+        if let Binding::ExternalText(t) = b
+            && let Some(v) = resolve(t.key)
+        {
+            t.label.borrow_mut().set_text(v);
+        }
     }
 }
 
@@ -1303,9 +1340,15 @@ fn build_textSource(
     machine: Rc<RefCell<Machine>>,
     bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
-    // TODO QT-04e: reactive bind text (non-literal QML expression)
-    let widget: Rc<RefCell<dyn Widget>> =
-        Rc::new(RefCell::new(qt_label("", bounds)));
+    // QT-05k external-text: text → audioPlayer.currentPlayUrlFileName (consumer-resolved, tag `textSource`)
+    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
+        qt_label("", bounds),
+    ));
+    let widget: Rc<RefCell<dyn Widget>> = label_handle.clone();
+    bindings.push(Binding::ExternalText(ExternalTextBinding {
+        label: Rc::clone(&label_handle),
+        key: "audioPlayer.currentPlayUrlFileName",
+    }));
     let node = WidgetNode {
         widget,
         children: Vec::new(),

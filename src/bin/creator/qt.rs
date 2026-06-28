@@ -2071,7 +2071,7 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// `Image.Stretch` scaling (source→dest). Without this the emitted
 /// tree rendered all-white on real hardware (opaque structural
 /// containers buried the artwork; 1:1 blit never filled the slots).
-pub const QT_EMIT_VERSION_RLVGL: u32 = 21;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 22;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2908,6 +2908,8 @@ fn render_rlvgl_with_resolver(
     let used_visibility = ctx.used_visibility;
     let used_predicate_chain = ctx.used_predicate_chain;
     let button_tap_events = ctx.button_tap_events.clone();
+    let used_external_text = ctx.used_external_text;
+    let external_text_bindings = ctx.external_text_bindings.clone();
     let used_dm_fields = ctx.used_dm_fields.clone();
     let used_assets = ctx.used_assets.clone();
     let has_images = !used_assets.is_empty();
@@ -3067,6 +3069,29 @@ fn render_rlvgl_with_resolver(
         out.push_str("];\n\n");
     }
 
+    // QT-05k: external-text table lowered from Label `text: <obj>.<prop>`
+    // sources. Each entry is `(node tag, verbatim external key)`; the key
+    // round-trips verbatim (authority: derive). The consumer owns the
+    // key → value resolver supplied to `apply_external_text`, so this table is
+    // deliberately app-agnostic — it only declares which tags carry which keys.
+    if !external_text_bindings.is_empty() {
+        out.push_str(
+            "/// QT-05k — external-text targets lowered from Label `text: <obj>.<prop>`\n\
+             /// sources: `(node tag, verbatim external key)`. The consumer resolves\n\
+             /// each key to a string via `apply_external_text`.\n\
+             #[rustfmt::skip]\n\
+             pub const EXTERNAL_TEXT_BINDINGS: &[(&str, &str)] = &[\n",
+        );
+        for (tag, key) in &external_text_bindings {
+            out.push_str(&format!(
+                "    ({}, {}),\n",
+                rust_str_lit(tag),
+                rust_str_lit(key)
+            ));
+        }
+        out.push_str("];\n\n");
+    }
+
     emit_screen_state_struct(&state_fields, &mut out);
     emit_label_binding_struct(&mut out);
     if has_sm {
@@ -3083,11 +3108,15 @@ fn render_rlvgl_with_resolver(
             if used_predicate_chain {
                 emit_predicate_chain_binding_struct(&mut out);
             }
+            if used_external_text {
+                emit_external_text_binding_struct(&mut out);
+            }
             emit_binding_enum_v2(
                 &mut out,
                 used_predicate,
                 used_visibility,
                 used_predicate_chain,
+                used_external_text,
             );
         } else {
             emit_machine_binding_struct(&mut out);
@@ -3166,7 +3195,11 @@ fn render_rlvgl_with_resolver(
         used_predicate,
         used_visibility,
         used_predicate_chain,
+        used_external_text,
     );
+    if used_external_text {
+        emit_apply_external_text_fn(&mut out);
+    }
     // QT-05c §6: per-field `format_dm_<field>` free functions —
     // one per used DM field, emitted in first-use order. The
     // `f64::to_string()` representation is chosen for determinism;
@@ -3459,6 +3492,13 @@ struct RlvglEmitCtx {
     /// handlers dispatch `<ctx>.submitBtnSetupEvent("…")`, in emit order. Drives
     /// the emitted `BUTTON_TAP_EVENTS` table.
     button_tap_events: Vec<(String, String)>,
+    /// QT-05k: set once at least one `Binding::ExternalText` is emitted, so the
+    /// `ExternalTextBinding` type + `apply_external_text` fn are emitted.
+    used_external_text: bool,
+    /// QT-05k: `(node tag, verbatim external key)` for every Label whose `text:`
+    /// is a direct external-object property, in emit order. Drives the emitted
+    /// `EXTERNAL_TEXT_BINDINGS` table.
+    external_text_bindings: Vec<(String, String)>,
 }
 
 /// One image asset referenced by the emitted widget tree.
@@ -3487,6 +3527,8 @@ impl RlvglEmitCtx {
             used_visibility: false,
             used_predicate_chain: false,
             button_tap_events: Vec::new(),
+            used_external_text: false,
+            external_text_bindings: Vec::new(),
         }
     }
 
@@ -3601,6 +3643,8 @@ impl RlvglEmitCtx {
             &mut self.used_predicate,
             &mut self.used_visibility,
             &mut self.used_predicate_chain,
+            &mut self.used_external_text,
+            &mut self.external_text_bindings,
             &mut out,
         );
         emit_skipped_summary(item, is_root, &self.state_fields, &mut out);
@@ -3746,6 +3790,8 @@ fn emit_widget_construction(
     used_predicate: &mut bool,
     used_visibility: &mut bool,
     used_predicate_chain: &mut bool,
+    used_external_text: &mut bool,
+    external_text: &mut Vec<(String, String)>,
     out: &mut String,
 ) {
     match kind {
@@ -3860,6 +3906,33 @@ fn emit_widget_construction(
                          accessor: |s| s.{field}.clone(),\n    }});\n"
                     ));
                 }
+            } else if v2
+                && let Some(id) = &item.id
+                && let Some(key) = raw_text.and_then(|e| parse_external_text_ref(e, sm_context))
+            {
+                // QT-05k §5/§6: `text: <obj>.<prop>` rooted at a non-context
+                // object lowers to a `Binding::ExternalText`. The Label is built
+                // empty; the value comes from a consumer resolver applied via
+                // `apply_external_text` (authority: derive — the emitter owns
+                // neither the external object nor the string). The node's tag
+                // (`id`) + key are also recorded for the `EXTERNAL_TEXT_BINDINGS`
+                // table so tag-keyed consumers can find it.
+                out.push_str(&format!(
+                    "    // QT-05k external-text: text → {key} (consumer-resolved, tag `{id}`)\n"
+                ));
+                out.push_str(
+                    "    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(\n        \
+                     qt_label(\"\", bounds),\n    ));\n",
+                );
+                out.push_str("    let widget: Rc<RefCell<dyn Widget>> = label_handle.clone();\n");
+                out.push_str(&format!(
+                    "    bindings.push(Binding::ExternalText(ExternalTextBinding {{\n        \
+                     label: Rc::clone(&label_handle),\n        \
+                     key: {},\n    }}));\n",
+                    rust_str_lit(&key)
+                ));
+                *used_external_text = true;
+                external_text.push((id.clone(), key));
             } else {
                 out.push_str(
                     "    // TODO QT-04e: reactive bind text (non-literal QML expression)\n",
@@ -4225,6 +4298,42 @@ fn is_ident_str(s: &str) -> bool {
     !s.is_empty()
         && s.bytes().next().map(is_ident_start).unwrap_or(false)
         && s.bytes().all(is_ident_cont)
+}
+
+/// QT-05k §5: detect a direct external-object text source — a `text:` whose
+/// value is a pure dotted-identifier path `<obj>.<prop>(.<prop>)*` rooted at a
+/// bare identifier that is NOT the scxml context (state belongs to QT-05c /
+/// QT-05h, not external text). Returns the verbatim expression as the external
+/// *key*; the string value is supplied at runtime by a consumer-owned resolver
+/// (authority: derive — input is the upstream external object, output is local).
+///
+/// Rejects anything that is not a plain dotted-identifier path: function calls
+/// (`getWarningCodeText(warningPanel.code)`), ternaries, binary expressions, and
+/// string/number literals all return `None`, deferring them to a later phase.
+/// A single bare identifier (no dot) is a QT-04c state field, not external text.
+fn parse_external_text_ref(expr: &str, ctx: Option<&str>) -> Option<String> {
+    let e = expr.trim();
+    let mut parts = e.split('.');
+    let head = parts.next()?;
+    if !is_ident_str(head) {
+        return None;
+    }
+    if Some(head) == ctx {
+        // `<ctx>.<…>` is state, owned by QT-05c/05h, not external text.
+        return None;
+    }
+    let mut count = 1usize;
+    for p in parts {
+        if !is_ident_str(p) {
+            return None;
+        }
+        count += 1;
+    }
+    if count < 2 {
+        // A bare identifier is a QT-04c state field, not an external property.
+        return None;
+    }
+    Some(e.to_string())
 }
 
 /// Does any of this child's `anchors.*` assignments reference a sibling
@@ -5589,6 +5698,26 @@ fn emit_label_binding_struct(out: &mut String) {
     );
 }
 
+/// QT-05k §3 — `pub struct ExternalTextBinding`: a Label whose text is sourced
+/// from an external object property (`audioPlayer.currentPlayUrlFileName`), NOT
+/// from machine state. The binding carries the Label handle plus the verbatim
+/// external `key`; the value is supplied by a consumer-owned resolver applied
+/// via [`apply_external_text`] (authority: derive — the emitter owns neither the
+/// external object nor the string value).
+fn emit_external_text_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05k §3 — reactive Label-text binding sourced from an external\n\
+         /// object property (e.g. `audioPlayer.currentPlayUrlFileName`). `key`\n\
+         /// is the QML expression passed through verbatim (authority: derive);\n\
+         /// the string value is supplied by a consumer resolver via\n\
+         /// [`apply_external_text`]. The matching `(node tag, key)` pair is also\n\
+         /// surfaced in [`EXTERNAL_TEXT_BINDINGS`] for tag-keyed consumers.\n\
+         pub struct ExternalTextBinding {\n    \
+             pub label: Rc<RefCell<Label>>,\n    \
+             pub key: &'static str,\n}\n\n",
+    );
+}
+
 /// QT-05c §3 — `pub struct MachineBinding` + `pub enum Binding`
 /// emitted on SM-attached modules. Mirrors the `LabelBinding` shape
 /// with `DataModel` as the accessor source.
@@ -5730,6 +5859,7 @@ fn emit_binding_enum_v2(
     used_predicate: bool,
     used_visibility: bool,
     used_predicate_chain: bool,
+    used_external_text: bool,
 ) {
     out.push_str(
         "/// QT-05g §3 / QT-05h §3 / QT-05i §3 — sealed enum over the binding\n\
@@ -5746,7 +5876,36 @@ fn emit_binding_enum_v2(
     if used_predicate_chain {
         out.push_str("    Chain(PredicateChainBinding),\n");
     }
+    if used_external_text {
+        // QT-05k §3 — externally-sourced Label text. Driven by the consumer
+        // resolver (`apply_external_text`), NOT by `refresh_bindings`.
+        out.push_str("    ExternalText(ExternalTextBinding),\n");
+    }
     out.push_str("}\n\n");
+}
+
+/// QT-05k §6 — emit the `apply_external_text` consumer entry point. The consumer
+/// supplies a `key → Option<String>` resolver; each `Binding::ExternalText`
+/// whose key resolves has its Label text set. Kept separate from
+/// `refresh_bindings` (which is machine/state-driven and takes no resolver) so
+/// the external-data refresh cadence is the consumer's to choose.
+fn emit_apply_external_text_fn(out: &mut String) {
+    out.push_str(
+        "/// QT-05k §6 — apply a consumer-owned resolver to every external-text\n\
+         /// binding. `resolve(key)` returns the current value for the verbatim\n\
+         /// QML key (e.g. `\"audioPlayer.currentPlayUrlFileName\"`); `None` leaves\n\
+         /// the Label unchanged. Call whenever the external source may have\n\
+         /// changed (every frame, or on a data-change signal). No-op when there\n\
+         /// are no external-text bindings.\n\
+         pub fn apply_external_text(bindings: &[Binding], resolve: impl Fn(&str) -> Option<String>) {\n    \
+             for b in bindings {\n        \
+                 if let Binding::ExternalText(t) = b\n            \
+                     && let Some(v) = resolve(t.key)\n        \
+                 {\n            \
+                     t.label.borrow_mut().set_text(v);\n        \
+                 }\n    \
+             }\n}\n\n",
+    );
 }
 
 /// Emit the QT-04e §7 / QT-05c §7 / QT-05g §7 / QT-05h §7 `pub fn
@@ -5759,6 +5918,7 @@ fn emit_refresh_bindings_fn(
     used_predicate: bool,
     used_visibility: bool,
     used_predicate_chain: bool,
+    used_external_text: bool,
 ) {
     if has_sm && v2 {
         let mut arms =
@@ -5771,6 +5931,12 @@ fn emit_refresh_bindings_fn(
         }
         if used_predicate_chain {
             arms.push_str("                         Binding::Chain(cb) => cb.refresh(&m),\n");
+        }
+        if used_external_text {
+            // QT-05k: external-text bindings are driven by the consumer resolver
+            // (`apply_external_text`), NOT by machine/state — a no-op here, but
+            // named so the match stays exhaustive.
+            arms.push_str("                         Binding::ExternalText(_) => {}\n");
         }
         out.push_str(&format!(
             "/// Re-apply every QT-04e / QT-05g / QT-05h binding from the\n\

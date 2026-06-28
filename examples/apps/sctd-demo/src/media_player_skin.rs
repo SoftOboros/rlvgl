@@ -41,6 +41,27 @@ const MEDIA_FUNC_MAP: &[(&str, &str)] = &[
     ("MediaFunc.Forward", "Inp.Media.Next"),
 ];
 
+/// QT-05k — the external-object text sources. The emitter surfaces each reactive
+/// Label whose `text:` reads an external object property (e.g.
+/// `audioPlayer.currentPlayUrlFileName`) as a `Binding::ExternalText` carrying
+/// the verbatim key, plus a `(tag, key)` entry in
+/// [`media_player_gen::EXTERNAL_TEXT_BINDINGS`]. This map — owned by the skin,
+/// the role Bolero's C++ `audioPlayer` object plays — resolves each key to its
+/// current value. The SCTD demo has no live media engine, so it supplies a fixed
+/// representative now-playing caption; a real consumer would read its player.
+const EXTERNAL_TEXT_SOURCES: &[(&str, &str)] =
+    &[("audioPlayer.currentPlayUrlFileName", "Bolero - Ravel.mp3")];
+
+/// Resolve one external-text key to its current value (QT-05k consumer resolver).
+/// Returns `None` for an unknown key, leaving that Label unchanged.
+fn resolve_external_text(key: &str) -> Option<alloc::string::String> {
+    use alloc::string::ToString;
+    EXTERNAL_TEXT_SOURCES
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, v)| v.to_string())
+}
+
 /// Visibility-gated wrapper around the emitted media-player widget tree, wired
 /// to its istate (linkage-v2) `media_player::Machine` (QT-05g).
 ///
@@ -58,7 +79,8 @@ pub struct MediaPlayerSkin {
     /// The istate (linkage-v2) machine driving the reactive artwork.
     machine: Rc<RefCell<media_player::Machine>>,
     /// Reactive bindings (QT-05g `Binding::Predicate` / QT-05i `Binding::Chain`
-    /// / QT-05h `Binding::Visibility` + any labels).
+    /// / QT-05h `Binding::Visibility` / QT-05k `Binding::ExternalText` + any
+    /// labels).
     bindings: Vec<Binding>,
     /// Resolved tap targets: `(button bounds, machine event)` for every
     /// [`TAP_CONTROLS`] entry whose tag is present in the built tree.
@@ -113,6 +135,12 @@ impl MediaPlayerSkin {
         }
         // Apply the initial machine-driven artwork (Play at rest — stopped).
         media_player_gen::refresh_bindings(&state, &machine, &bindings);
+        // QT-05k: apply the consumer-owned resolver to the external-text
+        // bindings (the source caption reads `audioPlayer.currentPlayUrlFileName`,
+        // an external object — not machine state). A live consumer would re-apply
+        // this whenever its player signals a track change; the demo's source is
+        // fixed, so once at construction suffices.
+        media_player_gen::apply_external_text(&bindings, resolve_external_text);
         Self {
             bounds,
             node: RefCell::new(node),
@@ -158,6 +186,18 @@ impl MediaPlayerSkin {
     #[cfg(test)]
     fn test_step(&self, event: &str) {
         self.step_event(event);
+    }
+
+    /// Read the current text of the external-text Label bound to `key` (QT-05k),
+    /// for the resolver gate. Walks the bindings for the `ExternalText` whose key
+    /// matches and reads its Label handle directly.
+    #[cfg(test)]
+    fn external_text_for(&self, key: &str) -> Option<alloc::string::String> {
+        use alloc::string::ToString;
+        self.bindings.iter().find_map(|b| match b {
+            Binding::ExternalText(t) if t.key == key => Some(t.label.borrow().text().to_string()),
+            _ => None,
+        })
     }
 }
 
@@ -581,6 +621,41 @@ mod pixel_gate {
         assert!(
             region_diff(&fb1, &fb2, sb) > 0,
             "tapping shuffle must swap its icon — the QT-05j tap wiring is inert"
+        );
+    }
+
+    /// QT-05k gate: the source-caption Label (`textSource`, whose QML `text:` is
+    /// `audioPlayer.currentPlayUrlFileName` — an external object, not machine
+    /// state) shows the value supplied by the consumer-owned resolver. This
+    /// proves the full external-text round-trip: the emitter derived the key into
+    /// a `Binding::ExternalText`, and `apply_external_text` wrote the resolver's
+    /// value onto the Label. The emitter must NOT bake the value — it is
+    /// app-owned (authority: derive).
+    #[test]
+    fn external_text_caption_resolves_from_consumer() {
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 720,
+            height: 480,
+        };
+        let skin = MediaPlayerSkin::new(bounds);
+
+        // The emitter surfaced the (tag, key) pair on the app-agnostic table.
+        assert!(
+            media_player_gen::EXTERNAL_TEXT_BINDINGS
+                .iter()
+                .any(|(tag, key)| *tag == "textSource"
+                    && *key == "audioPlayer.currentPlayUrlFileName"),
+            "EXTERNAL_TEXT_BINDINGS must surface the source-caption (tag, key)"
+        );
+
+        // The consumer resolver's value landed on the Label via apply_external_text.
+        assert_eq!(
+            skin.external_text_for("audioPlayer.currentPlayUrlFileName")
+                .as_deref(),
+            Some("Bolero - Ravel.mp3"),
+            "the source caption must show the consumer-resolved external value"
         );
     }
 }

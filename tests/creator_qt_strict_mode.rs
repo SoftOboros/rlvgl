@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// QT-10 §5: the canonical chapter file set under `docs/qt-support/`.
-/// 28 entries (incl. `10-release.md` and the QT-05g/05h/05i/05j binding chapters).
+/// 29 entries (incl. `10-release.md` and the QT-05g/05h/05i/05j/05k binding chapters).
 const QT_CHAPTERS: &[&str] = &[
     "00-concepts.md",
     "02-ir-schema.md",
@@ -44,6 +44,7 @@ const QT_CHAPTERS: &[&str] = &[
     "05h-visibility-bindings.md",
     "05i-chained-predicate-bindings.md",
     "05j-button-event-bindings.md",
+    "05k-external-text-bindings.md",
     "06-theme-tokens.md",
     "07-asset-handoff.md",
     "08-multi-file-cli.md",
@@ -219,7 +220,7 @@ fn qt10_strict_version_const_pinned_in_source() {
     // even when the constant name is unchanged).
     for (name, expected) in [
         ("QT_IR_VERSION", 2),
-        ("QT_EMIT_VERSION_RLVGL", 21),
+        ("QT_EMIT_VERSION_RLVGL", 22),
         ("QT_EMIT_VERSION_DATA", 1),
     ] {
         let needle = format!("pub const {name}: u32 = {expected}");
