@@ -45,7 +45,7 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 18;
+pub const QT_EMIT_VERSION: u32 = 19;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
@@ -127,13 +127,29 @@ impl PredicateBinding {
     }
 }
 
-/// QT-05g §3 — sealed enum over the binding sources reactive
-/// `refresh_bindings` knows how to drive. `Label` reads from
-/// `ScreenState`; `Predicate` swaps `Image` artwork via
-/// `Machine::is_active`.
+/// QT-05h §3 — reactive `Image`-visibility binding driven by
+/// `Machine::is_active`. `state_id` is the QML predicate passed
+/// through verbatim (authority: derive).
+pub struct VisibilityBinding {
+    pub image: Rc<RefCell<Image<'static>>>,
+    pub state_id: &'static str,
+}
+
+impl VisibilityBinding {
+    /// Hide the Image when the bound state is inactive, else show it.
+    pub fn refresh(&self, machine: &Machine) {
+        self.image
+            .borrow_mut()
+            .set_hidden(!machine.is_active(self.state_id));
+    }
+}
+
+/// QT-05g §3 / QT-05h §3 — sealed enum over the binding sources
+/// reactive `refresh_bindings` knows how to drive.
 pub enum Binding {
     Label(LabelBinding),
     Predicate(PredicateBinding),
+    Visibility(VisibilityBinding),
 }
 
 /// Build the screen widget tree at `bounds` and return it
@@ -166,8 +182,8 @@ pub fn build_screen(
     (node, state, machine, bindings)
 }
 
-/// Re-apply every QT-04e / QT-05g binding from the current
-/// state and machine. Idempotent; safe to call after any
+/// Re-apply every QT-04e / QT-05g / QT-05h binding from the
+/// current state and machine. Idempotent; safe to call after any
 /// `machine.step(…)`. No-op when `bindings` is empty.
 #[rustfmt::skip]
 pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<Machine>>, bindings: &[Binding]) {
@@ -175,9 +191,10 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<M
     let m = machine.borrow();
     for b in bindings {
         match b {
-            Binding::Label(lb) => lb.refresh(&s),
-            Binding::Predicate(pb) => pb.refresh(&m),
-        }
+                         Binding::Label(lb) => lb.refresh(&s),
+                         Binding::Predicate(pb) => pb.refresh(&m),
+                         Binding::Visibility(vb) => vb.refresh(&m),
+    }
     }
 }
 
@@ -283,6 +300,32 @@ fn qt_predicate_image(
     let image = Rc::new(RefCell::new(img));
     let widget: Rc<RefCell<dyn Widget>> = image.clone();
     (widget, Binding::Predicate(PredicateBinding { image, state_id, on, off }))
+}
+
+/// QT-05h: build a visibility-bound Image. Decodes the source, builds
+/// the Image (initially hidden iff the bound state is inactive), and
+/// returns it as a `dyn Widget` plus its `Binding::Visibility`.
+#[rustfmt::skip]
+fn qt_visibility_image(
+    bounds: Rect,
+    rle: &'static [u8],
+    state_id: &'static str,
+    visible: bool,
+) -> (Rc<RefCell<dyn Widget>>, Binding) {
+    let art = qt_image_art(rle);
+    let mut img = Image::new(bounds, art.width, art.height, art.pixels);
+    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+    let scale_x = if art.width > 0 {
+        ((bounds.width.max(0) as i64 * 256 / art.width as i64).clamp(1, 0xffff)) as u16
+    } else { 256 };
+    let scale_y = if art.height > 0 {
+        ((bounds.height.max(0) as i64 * 256 / art.height as i64).clamp(1, 0xffff)) as u16
+    } else { 256 };
+    let mut img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
+    img.set_hidden(!visible);
+    let image = Rc::new(RefCell::new(img));
+    let widget: Rc<RefCell<dyn Widget>> = image.clone();
+    (widget, Binding::Visibility(VisibilityBinding { image, state_id }))
 }
 
 /// Construct a `Label` with a transparent background (QML text has
@@ -510,8 +553,11 @@ fn build_imgMute(
     machine: Rc<RefCell<Machine>>,
     bindings: &mut Vec<Binding>,
 ) -> WidgetNode {
-    // QT-IMG: Image source → qt_assets::IMG_IMGMUTE (Images/ImgMute.png)
-    let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGMUTE);
+    // QT-05h visibility-bound: visible → scxmlBolero.muteOn (source IMG_IMGMUTE)
+    let visible = machine.borrow().is_active("muteOn");
+    let (widget, __vb): (Rc<RefCell<dyn Widget>>, Binding) =
+        qt_visibility_image(bounds, qt_assets::IMG_IMGMUTE, "muteOn", visible);
+    bindings.push(__vb);
     let node = WidgetNode {
         widget,
         children: Vec::new(),

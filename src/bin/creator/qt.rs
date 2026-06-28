@@ -2071,7 +2071,7 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// `Image.Stretch` scaling (source→dest). Without this the emitted
 /// tree rendered all-white on real hardware (opaque structural
 /// containers buried the artwork; 1:1 blit never filled the slots).
-pub const QT_EMIT_VERSION_RLVGL: u32 = 18;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 19;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
@@ -2534,6 +2534,18 @@ fn parse_predicate_source(expr: &str, ctx: &str) -> Option<(String, String, Stri
     ))
 }
 
+/// QT-05h: parse a bare visibility predicate `<ctx>.<state>` into `state_id`
+/// for the declared context `ctx`. Returns `None` for a non-matching context
+/// or a non-bare-predicate expression (negation / boolean / literal), which
+/// are deferred (QT-05h §5).
+fn parse_visible_predicate(expr: &str, ctx: &str) -> Option<String> {
+    let state = expr.trim().strip_prefix(ctx)?.strip_prefix('.')?.trim();
+    if state.is_empty() || !state.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    Some(state.to_string())
+}
+
 /// Render a [`UiModule`] as the canonical QT-03 Rust emit-shape.
 ///
 /// Public so the schema-drift / golden-file tests can compare without
@@ -2770,6 +2782,7 @@ fn render_rlvgl_with_resolver(
     let root_body = ctx.emit_helper(&module.root, &root_fn, true);
     let has_sm = sm_id.is_some();
     let used_predicate = ctx.used_predicate;
+    let used_visibility = ctx.used_visibility;
     let used_dm_fields = ctx.used_dm_fields.clone();
     let used_assets = ctx.used_assets.clone();
     let has_images = !used_assets.is_empty();
@@ -2911,8 +2924,16 @@ fn render_rlvgl_with_resolver(
     emit_label_binding_struct(&mut out);
     if has_sm {
         if v2 {
-            emit_predicate_binding_struct(&mut out);
-            emit_binding_enum_v2(&mut out);
+            if used_predicate || used_visibility {
+                emit_image_art_struct(&mut out);
+            }
+            if used_predicate {
+                emit_predicate_binding_struct(&mut out);
+            }
+            if used_visibility {
+                emit_visibility_binding_struct(&mut out);
+            }
+            emit_binding_enum_v2(&mut out, used_predicate, used_visibility);
         } else {
             emit_machine_binding_struct(&mut out);
             emit_binding_enum(&mut out);
@@ -2983,7 +3004,7 @@ fn render_rlvgl_with_resolver(
              (node, state, label_bindings)\n}}\n\n"
         ));
     }
-    emit_refresh_bindings_fn(&mut out, has_sm, v2);
+    emit_refresh_bindings_fn(&mut out, has_sm, v2, used_predicate, used_visibility);
     // QT-05c §6: per-field `format_dm_<field>` free functions —
     // one per used DM field, emitted in first-use order. The
     // `f64::to_string()` representation is chosen for determinism;
@@ -3000,8 +3021,14 @@ fn render_rlvgl_with_resolver(
     if has_images {
         emit_qt_image_helper(&used_assets, &mut out);
     }
+    if used_predicate || used_visibility {
+        emit_qt_image_art_helper(&mut out);
+    }
     if used_predicate {
         emit_qt_predicate_image_helper(&mut out);
+    }
+    if used_visibility {
+        emit_qt_visibility_image_helper(&mut out);
     }
     if root_body.contains("qt_label(") {
         // QML `Text`/`Label` items have no background; emit a constructor that
@@ -3082,12 +3109,9 @@ fn emit_qt_image_helper(used_assets: &[AssetRef], out: &mut String) {
     );
 }
 
-/// QT-05g: emit the `qt_image_art` decoder + `qt_predicate_image` constructor.
-/// `qt_image_art` decodes one RLE asset to a leaked `ImageArt`; the predicate
-/// constructor decodes both branches once, builds the concrete
-/// `Rc<RefCell<Image>>` initialised to the machine-driven branch, and returns
-/// it as a `dyn Widget` alongside the `Binding::Predicate` that swaps it.
-fn emit_qt_predicate_image_helper(out: &mut String) {
+/// QT-05g: emit the shared `qt_image_art` RLE decoder (one asset → leaked
+/// `ImageArt`). Emitted when any predicate or visibility binding is present.
+fn emit_qt_image_art_helper(out: &mut String) {
     out.push_str(
         "/// QT-05g: decode one vendored RLE asset into a leaked `ImageArt`\n\
          /// (magenta-keyed → transparent, RGB565 has no alpha).\n\
@@ -3113,6 +3137,12 @@ fn emit_qt_predicate_image_helper(out: &mut String) {
              let pixels: &'static [Color] = Vec::leak(pixels);\n    \
              ImageArt { width: w as i32, height: h as i32, pixels }\n}\n\n",
     );
+}
+
+/// QT-05g: build a predicate-bound Image — decodes both branches, builds the
+/// concrete `Rc<RefCell<Image>>` at the machine-driven branch, and returns it
+/// as a `dyn Widget` alongside the `Binding::Predicate` that swaps it.
+fn emit_qt_predicate_image_helper(out: &mut String) {
     out.push_str(
         "/// QT-05g: build a predicate-bound Image. Decodes both branches, builds\n\
          /// the Image at the machine-driven branch, and returns it as a\n\
@@ -3137,6 +3167,36 @@ fn emit_qt_predicate_image_helper(out: &mut String) {
              let image = Rc::new(RefCell::new(img));\n    \
              let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
              (widget, Binding::Predicate(PredicateBinding { image, state_id, on, off }))\n}\n\n",
+    );
+}
+
+/// QT-05h: build a visibility-bound Image — decodes the single source asset,
+/// builds the concrete `Rc<RefCell<Image>>` initialised hidden-or-shown from
+/// the machine, and returns it as a `dyn Widget` plus the `Binding::Visibility`
+/// that drives its visibility on refresh.
+fn emit_qt_visibility_image_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05h: build a visibility-bound Image. Decodes the source, builds\n\
+         /// the Image (initially hidden iff the bound state is inactive), and\n\
+         /// returns it as a `dyn Widget` plus its `Binding::Visibility`.\n\
+         #[rustfmt::skip]\n\
+         fn qt_visibility_image(\n    \
+             bounds: Rect,\n    rle: &'static [u8],\n    \
+             state_id: &'static str,\n    visible: bool,\n) -> (Rc<RefCell<dyn Widget>>, Binding) {\n    \
+             let art = qt_image_art(rle);\n    \
+             let mut img = Image::new(bounds, art.width, art.height, art.pixels);\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             let scale_x = if art.width > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / art.width as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if art.height > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / art.height as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let mut img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             img.set_hidden(!visible);\n    \
+             let image = Rc::new(RefCell::new(img));\n    \
+             let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
+             (widget, Binding::Visibility(VisibilityBinding { image, state_id }))\n}\n\n",
     );
 }
 
@@ -3183,6 +3243,9 @@ struct RlvglEmitCtx {
     /// QT-05g: set once at least one `Binding::Predicate` is emitted, so the
     /// `qt_image_art` / `qt_predicate_image` helpers are emitted at the tail.
     used_predicate: bool,
+    /// QT-05h: set once at least one `Binding::Visibility` is emitted, so the
+    /// `qt_visibility_image` helper + `VisibilityBinding` type are emitted.
+    used_visibility: bool,
 }
 
 /// One image asset referenced by the emitted widget tree.
@@ -3208,6 +3271,7 @@ impl RlvglEmitCtx {
             linkage_v2: false,
             sm_context: None,
             used_predicate: false,
+            used_visibility: false,
         }
     }
 
@@ -3320,6 +3384,7 @@ impl RlvglEmitCtx {
             self.sm_context.as_deref(),
             self.linkage_v2,
             &mut self.used_predicate,
+            &mut self.used_visibility,
             &mut out,
         );
         emit_skipped_summary(item, is_root, &self.state_fields, &mut out);
@@ -3454,6 +3519,7 @@ fn emit_widget_construction(
     sm_context: Option<&str>,
     v2: bool,
     used_predicate: &mut bool,
+    used_visibility: &mut bool,
     out: &mut String,
 ) {
     match kind {
@@ -3675,6 +3741,38 @@ fn emit_widget_construction(
                     state_lit = rust_str_lit(&state),
                     on_sym = on.symbol,
                     off_sym = off.symbol,
+                ));
+                return;
+            }
+            // QT-05h: an `Image` with a literal `source:` and a predicate
+            // `visible: <ctx>.<state>` lowers to a `Binding::Visibility` that
+            // hides/shows the artwork from `machine.is_active("<state>")`.
+            let visible_state = if v2 {
+                sm_context
+                    .zip(lookup_assignment(item, "visible"))
+                    .and_then(|(ctx, raw)| parse_visible_predicate(raw, ctx))
+            } else {
+                None
+            };
+            if let Some(state) = visible_state
+                && let Some(asset) = pick_image_source(item)
+            {
+                if !used_assets.iter().any(|a| a.symbol == asset.symbol) {
+                    used_assets.push(asset.clone());
+                }
+                *used_visibility = true;
+                out.push_str(&format!(
+                    "    // QT-05h visibility-bound: visible → {ctx}.{state} (source {sym})\n",
+                    ctx = sm_context.unwrap_or(""),
+                    sym = asset.symbol,
+                ));
+                out.push_str(&format!(
+                    "    let visible = machine.borrow().is_active({state_lit});\n    \
+                     let (widget, __vb): (Rc<RefCell<dyn Widget>>, Binding) =\n        \
+                         qt_visibility_image(bounds, qt_assets::{sym}, {state_lit}, visible);\n    \
+                     bindings.push(__vb);\n",
+                    state_lit = rust_str_lit(&state),
+                    sym = asset.symbol,
                 ));
                 return;
             }
@@ -5236,7 +5334,9 @@ fn emit_binding_enum(out: &mut String) {
 /// a reactive `Image`-artwork binding driven by `machine.is_active(state_id)`
 /// (istate linkage v2). Both branches' pixels are decoded once at build time;
 /// `refresh` is a pointer swap.
-fn emit_predicate_binding_struct(out: &mut String) {
+/// QT-05g §3 — the shared decoded-artwork record. Emitted on linkage-v2
+/// modules that have any predicate or visibility binding.
+fn emit_image_art_struct(out: &mut String) {
     out.push_str(
         "/// QT-05g §3 — a decoded, magenta-keyed, `'static`-leaked artwork\n\
          /// buffer plus its natural dimensions.\n\
@@ -5244,8 +5344,13 @@ fn emit_predicate_binding_struct(out: &mut String) {
          pub struct ImageArt {\n    \
              pub width: i32,\n    \
              pub height: i32,\n    \
-             pub pixels: &'static [Color],\n}\n\n\
-         /// QT-05g §3 — reactive `Image`-source binding. Shows `on` when the\n\
+             pub pixels: &'static [Color],\n}\n\n",
+    );
+}
+
+fn emit_predicate_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05g §3 — reactive `Image`-source binding. Shows `on` when the\n\
          /// bound state is active, else `off`. `state_id` is the QML predicate\n\
          /// passed through verbatim to `Machine::is_active` (authority: derive).\n\
          pub struct PredicateBinding {\n    \
@@ -5268,42 +5373,84 @@ fn emit_predicate_binding_struct(out: &mut String) {
     );
 }
 
-/// QT-05g §3 — sealed binding enum for linkage-v2 modules: `Label`
-/// (ScreenState text) + `Predicate` (state-driven Image artwork).
-fn emit_binding_enum_v2(out: &mut String) {
+/// QT-05h §3 — reactive `Image`-visibility binding. Hides the Image when the
+/// bound state is inactive, shows it when active.
+fn emit_visibility_binding_struct(out: &mut String) {
     out.push_str(
-        "/// QT-05g §3 — sealed enum over the binding sources reactive\n\
-         /// `refresh_bindings` knows how to drive. `Label` reads from\n\
-         /// `ScreenState`; `Predicate` swaps `Image` artwork via\n\
-         /// `Machine::is_active`.\n\
-         pub enum Binding {\n    \
-             Label(LabelBinding),\n    \
-             Predicate(PredicateBinding),\n}\n\n",
+        "/// QT-05h §3 — reactive `Image`-visibility binding driven by\n\
+         /// `Machine::is_active`. `state_id` is the QML predicate passed\n\
+         /// through verbatim (authority: derive).\n\
+         pub struct VisibilityBinding {\n    \
+             pub image: Rc<RefCell<Image<'static>>>,\n    \
+             pub state_id: &'static str,\n}\n\n\
+         impl VisibilityBinding {\n    \
+             /// Hide the Image when the bound state is inactive, else show it.\n    \
+             pub fn refresh(&self, machine: &Machine) {\n        \
+                 self.image\n            \
+                     .borrow_mut()\n            \
+                     .set_hidden(!machine.is_active(self.state_id));\n    \
+             }\n}\n\n",
     );
 }
 
-/// Emit the QT-04e §7 / QT-05c §7 / QT-05g §7 `pub fn refresh_bindings`
-/// free function. Signature varies by SM presence + linkage version;
-/// single-line per branch to stay rustfmt-idempotent.
-fn emit_refresh_bindings_fn(out: &mut String, has_sm: bool, v2: bool) {
+/// QT-05g §3 / QT-05h §3 — sealed binding enum for linkage-v2 modules:
+/// `Label` always; `Predicate` (state-driven artwork) and `Visibility`
+/// (state-driven hide/show) when those bindings are present.
+fn emit_binding_enum_v2(out: &mut String, used_predicate: bool, used_visibility: bool) {
+    out.push_str(
+        "/// QT-05g §3 / QT-05h §3 — sealed enum over the binding sources\n\
+         /// reactive `refresh_bindings` knows how to drive.\n\
+         pub enum Binding {\n    \
+             Label(LabelBinding),\n",
+    );
+    if used_predicate {
+        out.push_str("    Predicate(PredicateBinding),\n");
+    }
+    if used_visibility {
+        out.push_str("    Visibility(VisibilityBinding),\n");
+    }
+    out.push_str("}\n\n");
+}
+
+/// Emit the QT-04e §7 / QT-05c §7 / QT-05g §7 / QT-05h §7 `pub fn
+/// refresh_bindings` free function. Signature varies by SM presence + linkage
+/// version; the v2 match arms track the emitted `Binding` variants.
+fn emit_refresh_bindings_fn(
+    out: &mut String,
+    has_sm: bool,
+    v2: bool,
+    used_predicate: bool,
+    used_visibility: bool,
+) {
     if has_sm && v2 {
-        out.push_str(
-            "/// Re-apply every QT-04e / QT-05g binding from the current\n\
-             /// state and machine. Idempotent; safe to call after any\n\
+        let mut arms =
+            String::from("                         Binding::Label(lb) => lb.refresh(&s),\n");
+        if used_predicate {
+            arms.push_str("                         Binding::Predicate(pb) => pb.refresh(&m),\n");
+        }
+        if used_visibility {
+            arms.push_str("                         Binding::Visibility(vb) => vb.refresh(&m),\n");
+        }
+        out.push_str(&format!(
+            "/// Re-apply every QT-04e / QT-05g / QT-05h binding from the\n\
+             /// current state and machine. Idempotent; safe to call after any\n\
              /// `machine.step(…)`. No-op when `bindings` is empty.\n\
              #[rustfmt::skip]\n\
-             pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<Machine>>, bindings: &[Binding]) {\n    \
+             pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<Machine>>, bindings: &[Binding]) {{\n    \
                  let s = state.borrow();\n    \
                  let m = machine.borrow();\n    \
-                 for b in bindings {\n        \
-                     match b {\n            \
-                         Binding::Label(lb) => lb.refresh(&s),\n            \
-                         Binding::Predicate(pb) => pb.refresh(&m),\n        \
-                     }\n    \
-                 }\n}\n\n",
-        );
-    } else if has_sm {
-        // `#[rustfmt::skip]` on the SM-attached form because the
+                 for b in bindings {{\n        \
+                     match b {{\n\
+{arms}    \
+                     }}\n    \
+                 }}\n}}\n\n"
+        ));
+        return;
+    }
+    if has_sm {
+        // Linkage v1 (`<sm>_gen`): `Machine`/`MachineBinding` read DM via
+        // `m.dm`. `#[rustfmt::skip]` because the signature exceeds rustfmt's
+        // wrap threshold; one line keeps the output byte-stable.
         // signature exceeds rustfmt's wrap threshold; keeping the
         // emit on one line keeps the output byte-stable across
         // `cargo fmt` runs.

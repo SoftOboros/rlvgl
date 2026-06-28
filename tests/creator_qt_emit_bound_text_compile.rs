@@ -28,7 +28,7 @@ fn generated_bound_text_lowers_initial_value_binding() {
         height: 80,
     };
     let (node, state, bindings) = generated_bound_text::build_screen(bounds);
-    assert_eq!(generated_bound_text::QT_EMIT_VERSION, 18);
+    assert_eq!(generated_bound_text::QT_EMIT_VERSION, 19);
 
     // QT-04c §5 — initial-value read at construction:
     assert_eq!(state.borrow().title, "Greetings");
