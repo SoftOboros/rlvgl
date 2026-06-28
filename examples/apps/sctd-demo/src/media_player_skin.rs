@@ -127,6 +127,23 @@ impl MediaPlayerSkin {
     fn play_bounds(&self) -> Option<Rect> {
         self.play_bounds
     }
+
+    /// Bounds of a tagged node in the emitted tree (for the pixel gate).
+    #[cfg(test)]
+    fn tagged_bounds(&self, tag: &str) -> Option<Rect> {
+        find_bounds_by_tag(&self.node.borrow(), tag)
+    }
+
+    /// Step the machine with a raw event and re-apply the bindings — used by
+    /// the pixel gate to exercise display-only states (e.g. mute) that have no
+    /// on-screen tap target. Mirrors `toggle_play_pause`'s mechanism.
+    #[cfg(test)]
+    fn test_step(&self, event: &str) {
+        self.machine
+            .borrow_mut()
+            .step(event, media_player::Value::Undefined);
+        media_player_gen::refresh_bindings(&self.state, &self.machine, &self.bindings);
+    }
 }
 
 impl Widget for MediaPlayerSkin {
@@ -352,6 +369,54 @@ mod pixel_gate {
         assert!(
             region_diff(&fb2, &fb3, pb) > 0,
             "second tap (Pause→Play) must change the Play-button artwork again"
+        );
+    }
+
+    /// QT-05h reactive gate: the mute icon is hidden at rest (muteOff) and
+    /// shown after the machine enters muteOn — so the icon's region changes
+    /// when mute toggles, and the two hidden renders are identical (a complete
+    /// hide, not a partial one). `imgMute` sits alone in the header strip, so
+    /// the only thing changing in its region between renders is the icon.
+    #[test]
+    fn mute_icon_hidden_at_rest_shown_when_muted() {
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: 720,
+            height: 480,
+        };
+        let mut skin = MediaPlayerSkin::new(bounds);
+        skin.set_visible(true);
+        let mb = skin
+            .tagged_bounds("imgMute")
+            .expect("imgMute must be present in the emitted tree");
+
+        // At rest: muteOff → imgMute hidden (region = background only).
+        let mut fb_off = Framebuffer::new(720, 480);
+        skin.draw(&mut fb_off);
+
+        // Toggle mute → muteOn → imgMute shown: the region must change.
+        skin.test_step("Inp.Media.Mute");
+        let mut fb_on = Framebuffer::new(720, 480);
+        skin.draw(&mut fb_on);
+        assert!(
+            region_diff(&fb_off, &fb_on, mb) > 0,
+            "muting must show imgMute — the visibility binding is inert"
+        );
+
+        // Toggle back → muteOff → hidden again, identical to the first hidden
+        // render (complete hide).
+        skin.test_step("Inp.Media.Mute");
+        let mut fb_off2 = Framebuffer::new(720, 480);
+        skin.draw(&mut fb_off2);
+        assert!(
+            region_diff(&fb_on, &fb_off2, mb) > 0,
+            "un-muting must hide imgMute again"
+        );
+        assert_eq!(
+            region_diff(&fb_off, &fb_off2, mb),
+            0,
+            "the two muteOff renders must be identical in the imgMute region (complete hide)"
         );
     }
 }
