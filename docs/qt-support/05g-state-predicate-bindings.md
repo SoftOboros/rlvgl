@@ -325,12 +325,14 @@ mock-`stopwatch_gen` path keeps `= 1`.
 
 ## §9 — Non-Goals
 
-- **No event dispatch from the emitted tree.** Lowering
-  `<ctx>.submitBtnSetupEvent(...)` into `machine.step(...)` is the
-  consumer's concern for QT-05g; the skin forwards taps. A later
-  letter may lower it once the button-event → machine-event vocabulary
-  map is specified. (The repeated `submitBtnSetupEvent` handler is
-  QT-04-skipped, as today.)
+- **No event dispatch from the emitted tree.** The emitted `WidgetNode`
+  tree never itself calls `machine.step(...)`; the consumer forwards
+  taps. *(Amended by [QT-05j](./05j-button-event-bindings.md): the
+  `<ctx>.submitBtnSetupEvent("MediaFunc.X")` handler is now lowered to an
+  emitted `BUTTON_TAP_EVENTS` tap-target **table** — `(tag, raw QML
+  event)` — that the consumer routes; the structural property here (no
+  in-tree `machine.step`) is preserved, and the QML→machine vocabulary
+  map is specified as consumer-owned. See §15 / QT-05j §10.)*
 - **No `visible:` / `color:` bindings.** Deferred to QT-05h /
   colour-deferral.
 - **No external-media-object text** (`audioPlayer.currentPlayUrlFileName`,
@@ -435,6 +437,7 @@ Ratifying QT-05g unblocks:
 
 | Date | Change |
 | ---- | ------ |
+| 2026-06-28 | **§9 amendment (button-event lowering) — resolved by [QT-05j](./05j-button-event-bindings.md).** The §9 non-goal "No event dispatch from the emitted tree" is narrowed to its structural intent (the emitted `WidgetNode` tree never itself calls `machine.step`) and the deferred wiring is shipped: `<ctx>.submitBtnSetupEvent("MediaFunc.X")` button handlers lower to an emitted `BUTTON_TAP_EVENTS` table of `(node tag, raw QML "MediaFunc.*" event)` that the consumer routes on a tap. The QML→machine **vocabulary map** is specified as **consumer-owned** (the role Bolero's C++ `submitBtnSetupEvent` plays), NOT emitted — the general emitter stays app-agnostic. No `Binding` variant or in-tree dispatch is added, so QT-05g's structural property holds. See QT-05j §0/§10/§15. |
 | 2026-06-27 | QT-05g ratified (concepts). New emitted `Binding::Predicate(PredicateBinding)` variant on QT-05c's sealed `Binding` enum; new `PredicateBinding { image: Rc<RefCell<Image>>, state_id: &'static str, on: ImageArt, off: ImageArt }` and `ImageArt { width, height, pixels: &'static [Color] }`. `source: <ctx>.<state> ? "A" : "B"` Image grammar lowers to a `Binding::Predicate` driven by `machine.is_active("<state>")` under a `// QT-05g predicate-bound:` marker; chained-predicate (repeat-mode) form reserved. New `--scxml-context <ctx>=<crate>` CLI flag declares the externally-injected SCXML context object (`scxmlBolero`) → `<crate>::Machine` linkage and marks the module SM-attached on the istate M1P6 **linkage-v2** surface (`step(&str,Value)`/`is_active(&str)`/`get_var(&str)`/`Value`), added to QT-05 §6 under Standards Action in a separate amendment landing first. `Image::set_pixels(width,height,pixels)` to be added to `widgets/src/image.rs`. `expand_one_repeater` to preserve the ternary (stop the `.last()` else-branch collapse). `refresh_bindings` gains a `Binding::Predicate` arm; `MachineBinding::refresh` reads via `get_var` on v2 modules. Ratified decisions: PCDN-05g-1 (every UI predicate is a real `is_active` state; the SCXML re-models mute/shuffle/repeat as real parallel regions without cross-region `In()` guards) and PCDN-05g-2 (Play/Pause ships first — `mediaPlaying` is already a real state, so the first slice needs no remodel). `QT_EMIT_VERSION_RLVGL` 17→18 and `ISTATE_LINKAGE_VERSION` 1→2 (v2 modules) reserved; the emit changes and version bumps land in the implementation commits per §11. Visibility (`visible: <ctx>.<state>`), colour, and external-media text deferred to QT-05h / later letters. |
 
 ---

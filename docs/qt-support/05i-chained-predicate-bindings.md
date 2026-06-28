@@ -4,7 +4,7 @@ Image-source bindings (`<ctx>.<s1> ? A : <ctx>.<s2> ? B : C` → first-active wi
 plus the shuffle/repeat parallel-region remodel.
 -->
 
-**[← Prev](05h-visibility-bindings.md) · [Index](README.md) · [Next →](#)**
+**[← Prev](05h-visibility-bindings.md) · [Index](README.md) · [Next →](05j-button-event-bindings.md)**
 
 # Chapter QT-05i — Chained-Predicate Bindings (multi-state `source:` ↔ `is_active`)
 
@@ -357,7 +357,9 @@ Ratifying QT-05i unblocks:
   follow-up — `audioPlayer.*`, not the SM).
 - Theme/gradient colour fills (`AppConsts.cl_*`) and chained `color:` (the
   QT-04e colour-deferral trajectory).
-- A synthetic-tag or upstream-`id:` affordance to wire the shuffle tap.
+- A synthetic-tag or upstream-`id:` affordance to wire the shuffle tap —
+  shipped as **[QT-05j](./05j-button-event-bindings.md)** (`submitBtnSetupEvent`
+  lowering; the skin's `TAP_CONTROLS` hand-table is retired there).
 
 ## §14 — Files Cited
 
