@@ -320,6 +320,49 @@ surface), `event_from_name` (free function, internal), `effect_t<i>`
 / `guard_t<i>` / `on_entry_<id>` / `on_exit_<id>` (free functions,
 internal). rlvgl-emitted code **MUST NOT** call these directly.
 
+### Linkage v2 — istate M1P6 dynamic-string surface (Standards Action, 2026-06-27)
+
+Linkage v1 (above) targets the older Jinja `lib.rs.jinja2` template:
+an `Event`/`State` enum surface with an `f64`-only `DataModel` and
+`dispatch(Event)`. The istate generator the SCTD demo actually runs —
+the **M1P6 IR emitter** (`backend/istate/codegen/rust_ir_emitter.py`,
+fed by `scjson.exec_ir.lower_document`) — emits a different, richer
+surface that v1 cannot describe. **Linkage v2** freezes that surface
+so QT-05g (and successors) can bind against it. Both profiles coexist;
+the emitter selects v2 when a context object is linked via
+`--scxml-context` (QT-05g §3). Registration policy: **Standards
+Action** (same as v1).
+
+| Symbol | Shape | How rlvgl-emitted code uses it |
+| ------ | ----- | ------------------------------ |
+| `<crate>::Machine` | `pub struct Machine { scope, active: Vec<String>, queue, ir, child_machines, timers, … }` | Owned via `Rc<RefCell<Machine>>` next to `ScreenState` (QT-05b 4-tuple, reused). |
+| `Machine::new()` / `start(&mut self)` | `pub fn` | Construct + enter the initial configuration in `build_screen`. |
+| `Machine::step(&mut self, event_name: &str, event_data: Value) -> Vec<String>` | `pub fn` | The mutation entry point. Events are **dynamic strings** (e.g. `"Inp.Media.PlayPause"`), not enum variants — no `Event` type. |
+| `Machine::current_state(&self) -> &str` | `pub fn` | First active leaf-state id. |
+| `Machine::active_states(&self) -> &[String]` | `pub fn` | Full active configuration (one entry per `<parallel>` region). |
+| `Machine::is_active(&self, state_id: &str) -> bool` | `pub fn` | **The predicate primitive** QT-05g binds against. True when `state_id` is in the active configuration (leaf or ancestor). |
+| `Machine::get_var(&self, name: &str) -> Value` | `pub fn` | Read a datamodel variable by name. Replaces v1's `dm.<field>` struct access. |
+| `<crate>::Value` | `pub enum Value { Number(f64), Int(i64), Str(String), Bool(bool), Array(Vec<Value>), Map(BTreeMap<String,Value>), Undefined }` + `is_truthy()` / `to_f64()` / `to_display_string()` | Constructed at `step` call sites (`Value::Undefined` for a bare event); read from `get_var`. Replaces v1's `f64`-only `DataModel`. |
+
+**v2 profile**: `std`-or-`alloc` (the M1P6 emitter is `alloc`-clean —
+it is what the no_std SCTD demo links). There is **no** `Event` enum,
+`State` enum, `DataModel` struct, or `Externals` trait on this
+surface; event/state/var names are dynamic strings, which is what
+makes `is_active("<qml-state-id>")` a verbatim pass-through of the QML
+predicate (QT-05g §0 `derive`). v1's `// QT-05b dispatch:` enum
+lowering does **not** apply to v2; v2 dispatch is `step("<name>", …)`.
+
+`ISTATE_LINKAGE_VERSION = 2` **MUST** be emitted as the `pub const`
+on every v2-attached module (v1 modules keep `= 1`). The two values
+denote *which surface the module was built against*, not a strict
+ordering — a consumer may host both a v1 and a v2 module.
+
+**Out of scope for v2** (istate-internal, MUST NOT be called by
+emitted code): `Machine::run`, `scope`, `queue`, `ir`,
+`child_machines`, `current_state_variant`, `MachineState`,
+`get_child_var` / `get_child_state` (the inline-child surface), and
+the `build_machine_ir()` constructor.
+
 ## §7 — Frozen Decision: File Layout
 
 | Concern                                  | Path (relative to consumer crate root)              |
@@ -352,7 +395,7 @@ applied once at fixture-creation time.
 | `QT_IR_VERSION`                | 1            | 2 (adds `state_machine` field on `UiModule`) | QT-05a (adds nested IR), QT-02 (next freeze) |
 | `QT_EMIT_VERSION_RLVGL`        | 11           | unchanged (concepts only — emit changes happen in QT-05b/c/e) | QT-05b → 12 |
 | `QT_EMIT_VERSION_DATA`         | 1            | unchanged                  | future amendment |
-| `ISTATE_LINKAGE_VERSION`       | (new)        | 1                          | upstream istate template change |
+| `ISTATE_LINKAGE_VERSION`       | (new)        | 1 (v1); 2 reserved for the M1P6 surface | upstream istate template change; v2 added 2026-06-27 (QT-05g) |
 
 `QT_IR_VERSION` bumps once and only once at QT-05 — the IR shape
 gains `state_machine: Option<UiStateMachine>` as a single additive
@@ -473,6 +516,7 @@ Ratifying QT-05 unblocks:
 
 | Date       | Change                                                                          |
 | ---------- | ------------------------------------------------------------------------------- |
+| 2026-06-27 | **§6 amendment (Standards Action): linkage v2 frozen.** Added the istate **M1P6 dynamic-string machine surface** (`backend/istate/codegen/rust_ir_emitter.py`, fed by `scjson.exec_ir.lower_document`) as a second linkage profile alongside v1: `Machine::new`/`start`, `step(&str, Value) -> Vec<String>`, `current_state() -> &str`, `active_states() -> &[String]`, `is_active(&str) -> bool`, `get_var(&str) -> Value`, and the `Value` enum (`Number`/`Int`/`Str`/`Bool`/`Array`/`Map`/`Undefined`). No `Event`/`State`/`DataModel`/`Externals` types — event/state/var names are dynamic strings, so `is_active("<qml-state-id>")` passes the QML predicate through verbatim. `ISTATE_LINKAGE_VERSION = 2` emitted on v2-attached modules (v1 modules keep `= 1`); the two values denote which surface a module was built against, not an ordering. §8 version table updated. Motivated by QT-05g (state-predicate → Image bindings), its first consumer; the SCTD media player runs the M1P6 machine, which v1's `dispatch(Event)`/`state == State::X`/`dm.<f64>` surface could not describe. v2 selected per-invocation via QT-05g's `--scxml-context <ctx>=<crate>` flag. v1 unchanged; the `stopwatch_gen` mock path stays v1. No emit/version changes ship in this amendment (the v2 emit lands in QT-05g's implementation commits). |
 | 2026-04-29 | §3 amendment (same-day): `UiAction` enum definition added (was referenced by `UiState.on_entry` / `UiState.on_exit` / `UiTransition.actions` but never defined inline). Variants: `Assign`/`Raise`/`Script`. Promoted from implicit to explicit; no implementation impact since QT-05a-e are unimplemented. `UiStateMachine.source` typed as `String` on the wire (was `PathBuf` in the §3 sketch) to keep `schemars::JsonSchema` derive trivial. |
 | 2026-04-29 | QT-05 ratified (concepts only). `vendor/scjson/` submodule added (`https://github.com/SoftOboros/scjson.git`, BSD-1-Clause, reference-only — not a Cargo dep). 6-symbol istate linkage surface frozen under Standards Action: `Machine`, `Machine::new`/`with_options`, `Machine::dispatch`, `Event`, `State`, `DataModel`, `Externals`+`DefaultExternals`. `ISTATE_LINKAGE_VERSION = 1` introduced and pinned to istate's std-profile Rust template (`backend/templates/codegen/rust/src/lib.rs.jinja2`); `no_std` linkage reserved for v2 once an upstream `no_std` SM profile lands. scjson element subset frozen under Specification Required: `<scxml>`, `<state>`, `<transition>`, `<datamodel>`, `<data>`, `<onentry>`, `<onexit>`, `<assign>`, `<raise>`, `<script>`. IR types added: `UiStateMachine`, `UiState`, `UiTransition`, `UiDmField`, `UiScript`, `UiScriptOrigin`. `UiModule` gains `state_machine: Option<UiStateMachine>` as an additive field. `QT_IR_VERSION` bumped `1 → 2`. `QT_EMIT_VERSION_RLVGL` unchanged (concepts only — emit bumps to 12 land in QT-05b). `QT_EMIT_VERSION_DATA` unchanged. `// QT-05a/b/c/d/e` marker prefixes reserved. File layout frozen: `<screen>.scjson` side-files, `crates/<sm>_gen/` istate output, `src/<screen>_externals.rs` for QT-05e stubs. Hand-rolled scjson subset lives at `src/bin/creator/qt_scjson.rs`. QT-05a-e remain to be ratified in their own chapters; their dependency on this chapter is recorded in their §10 reconciliation tables when they land. |
 
