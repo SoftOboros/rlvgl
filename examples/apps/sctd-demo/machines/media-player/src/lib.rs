@@ -989,12 +989,22 @@ pub enum MachineState {
     mediaPlayerSourceSelect,
     /// State `mediaPlayerTransport`.
     mediaPlayerTransport,
+    /// State `transportActive`.
+    transportActive,
+    /// State `playbackRegion`.
+    playbackRegion,
     /// State `mediaStopped`.
     mediaStopped,
     /// State `mediaPlaying`.
     mediaPlaying,
     /// State `mediaPaused`.
     mediaPaused,
+    /// State `muteRegion`.
+    muteRegion,
+    /// State `muteOff`.
+    muteOff,
+    /// State `muteOn`.
+    muteOn,
     /// State `mediaPlayerError`.
     mediaPlayerError,
     /// Unknown / initial sentinel.
@@ -1009,9 +1019,14 @@ impl MachineState {
             MachineState::mediaPlayerRun => "mediaPlayerRun",
             MachineState::mediaPlayerSourceSelect => "mediaPlayerSourceSelect",
             MachineState::mediaPlayerTransport => "mediaPlayerTransport",
+            MachineState::transportActive => "transportActive",
+            MachineState::playbackRegion => "playbackRegion",
             MachineState::mediaStopped => "mediaStopped",
             MachineState::mediaPlaying => "mediaPlaying",
             MachineState::mediaPaused => "mediaPaused",
+            MachineState::muteRegion => "muteRegion",
+            MachineState::muteOff => "muteOff",
+            MachineState::muteOn => "muteOn",
             MachineState::mediaPlayerError => "mediaPlayerError",
             MachineState::Unknown => "Unknown",
         }
@@ -1024,9 +1039,14 @@ impl MachineState {
             "mediaPlayerRun" => MachineState::mediaPlayerRun,
             "mediaPlayerSourceSelect" => MachineState::mediaPlayerSourceSelect,
             "mediaPlayerTransport" => MachineState::mediaPlayerTransport,
+            "transportActive" => MachineState::transportActive,
+            "playbackRegion" => MachineState::playbackRegion,
             "mediaStopped" => MachineState::mediaStopped,
             "mediaPlaying" => MachineState::mediaPlaying,
             "mediaPaused" => MachineState::mediaPaused,
+            "muteRegion" => MachineState::muteRegion,
+            "muteOff" => MachineState::muteOff,
+            "muteOn" => MachineState::muteOn,
             "mediaPlayerError" => MachineState::mediaPlayerError,
             _ => MachineState::Unknown,
         }
@@ -2228,7 +2248,7 @@ fn build_machine_ir() -> MachineIrData {
                     },
                     StateNodeIr::State {
                         id: "mediaPlayerTransport".to_string(),
-                        initial: Some("mediaStopped".to_string()),
+                        initial: Some("transportActive".to_string()),
                         datamodel: vec![],
                         onentry: vec![],
                         onexit: vec![],
@@ -2307,19 +2327,6 @@ fn build_machine_ir() -> MachineIrData {
                                         loc: "s_source".to_string(),
                                         key_expr: None,
                                         expr: ExprIr::StringLiteral("AUX".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                            },
-                            TransitionIr {
-                                event: Some("Inp.Media.Mute".to_string()),
-                                targets: vec![],
-                                guard: None,
-                                actions: vec![
-                                    ActionIr::Assign {
-                                        loc: "s_mute".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::UnaryOp("not".to_string(), Box::new(ExprIr::VarRead("s_mute".to_string()))),
                                         op: "set".to_string(),
                                     },
                                 ],
@@ -2404,243 +2411,323 @@ fn build_machine_ir() -> MachineIrData {
                             },
                         ],
                         children: vec![
-                            StateNodeIr::State {
-                                id: "mediaStopped".to_string(),
-                                initial: None,
+                            StateNodeIr::Parallel {
+                                id: "transportActive".to_string(),
                                 datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::If {
-                                        branches: vec![
-                                            IfBranchIr {
-                                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::VarRead("s_repeat".to_string())), Box::new(ExprIr::StringLiteral("track".to_string())))),
-                                                body: vec![
-                                                    ActionIr::Send {
-                                                        event: Some("Out.Media.Play".to_string()),
-                                                        eventexpr: None,
-                                                        target: None,
-                                                        targetexpr: None,
-                                                        delay: Some("0s".to_string()),
-                                                        delayexpr: None,
-                                                        send_id: None,
-                                                        content_expr: None,
-                                                        params: vec![],
+                                onentry: vec![],
+                                onexit: vec![],
+                                transitions: vec![],
+                                children: vec![
+                                    StateNodeIr::State {
+                                        id: "playbackRegion".to_string(),
+                                        initial: Some("mediaStopped".to_string()),
+                                        datamodel: vec![],
+                                        onentry: vec![],
+                                        onexit: vec![],
+                                        transitions: vec![],
+                                        children: vec![
+                                            StateNodeIr::State {
+                                                id: "mediaStopped".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![
+                                                    ActionIr::If {
+                                                        branches: vec![
+                                                            IfBranchIr {
+                                                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::VarRead("s_repeat".to_string())), Box::new(ExprIr::StringLiteral("track".to_string())))),
+                                                                body: vec![
+                                                                    ActionIr::Send {
+                                                                        event: Some("Out.Media.Play".to_string()),
+                                                                        eventexpr: None,
+                                                                        target: None,
+                                                                        targetexpr: None,
+                                                                        delay: Some("0s".to_string()),
+                                                                        delayexpr: None,
+                                                                        send_id: None,
+                                                                        content_expr: None,
+                                                                        params: vec![],
+                                                                    },
+                                                                    ActionIr::Send {
+                                                                        event: Some("Out.Media.Track.Next".to_string()),
+                                                                        eventexpr: None,
+                                                                        target: None,
+                                                                        targetexpr: None,
+                                                                        delay: Some("0s".to_string()),
+                                                                        delayexpr: None,
+                                                                        send_id: None,
+                                                                        content_expr: None,
+                                                                        params: vec![],
+                                                                    },
+                                                                ],
+                                                            },
+                                                            IfBranchIr {
+                                                                guard: None,
+                                                                body: vec![],
+                                                            },
+                                                        ],
                                                     },
-                                                    ActionIr::Send {
-                                                        event: Some("Out.Media.Track.Next".to_string()),
-                                                        eventexpr: None,
-                                                        target: None,
-                                                        targetexpr: None,
-                                                        delay: Some("0s".to_string()),
-                                                        delayexpr: None,
-                                                        send_id: None,
-                                                        content_expr: None,
-                                                        params: vec![],
+                                                    ActionIr::Assign {
+                                                        loc: "i_player_state".to_string(),
+                                                        key_expr: None,
+                                                        expr: ExprIr::IntLiteral(0_i64),
+                                                        op: "set".to_string(),
                                                     },
                                                 ],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Play".to_string()),
+                                                        targets: vec!["mediaPlaying".to_string()],
+                                                        guard: Some(ExprIr::UnaryOp("not".to_string(), Box::new(ExprIr::VarRead("s_mute".to_string())))),
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Play".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Play".to_string()),
+                                                        targets: vec!["mediaPaused".to_string()],
+                                                        guard: Some(ExprIr::VarRead("s_mute".to_string())),
+                                                        actions: vec![],
+                                                    },
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.PlayPause".to_string()),
+                                                        targets: vec!["mediaPlaying".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Play".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
                                             },
-                                            IfBranchIr {
-                                                guard: None,
-                                                body: vec![],
+                                            StateNodeIr::State {
+                                                id: "mediaPlaying".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![
+                                                    ActionIr::Assign {
+                                                        loc: "i_player_state".to_string(),
+                                                        key_expr: None,
+                                                        expr: ExprIr::IntLiteral(1_i64),
+                                                        op: "set".to_string(),
+                                                    },
+                                                ],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Pause".to_string()),
+                                                        targets: vec!["mediaPaused".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Pause".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.PlayPause".to_string()),
+                                                        targets: vec!["mediaPaused".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Pause".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Stop".to_string()),
+                                                        targets: vec!["mediaStopped".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Stop".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                            StateNodeIr::State {
+                                                id: "mediaPaused".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![
+                                                    ActionIr::Assign {
+                                                        loc: "i_player_state".to_string(),
+                                                        key_expr: None,
+                                                        expr: ExprIr::IntLiteral(2_i64),
+                                                        op: "set".to_string(),
+                                                    },
+                                                ],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Play".to_string()),
+                                                        targets: vec!["mediaPlaying".to_string()],
+                                                        guard: Some(ExprIr::UnaryOp("not".to_string(), Box::new(ExprIr::VarRead("s_mute".to_string())))),
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Play".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.PlayPause".to_string()),
+                                                        targets: vec!["mediaPlaying".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Play".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Stop".to_string()),
+                                                        targets: vec!["mediaStopped".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Send {
+                                                                event: Some("Out.Media.Stop".to_string()),
+                                                                eventexpr: None,
+                                                                target: None,
+                                                                targetexpr: None,
+                                                                delay: Some("0s".to_string()),
+                                                                delayexpr: None,
+                                                                send_id: None,
+                                                                content_expr: None,
+                                                                params: vec![],
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
                                             },
                                         ],
+                                        invokes: vec![],
                                     },
-                                    ActionIr::Assign {
-                                        loc: "i_player_state".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
-                                        op: "set".to_string(),
+                                    StateNodeIr::State {
+                                        id: "muteRegion".to_string(),
+                                        initial: Some("muteOff".to_string()),
+                                        datamodel: vec![],
+                                        onentry: vec![],
+                                        onexit: vec![],
+                                        transitions: vec![],
+                                        children: vec![
+                                            StateNodeIr::State {
+                                                id: "muteOff".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Mute".to_string()),
+                                                        targets: vec!["muteOn".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Assign {
+                                                                loc: "s_mute".to_string(),
+                                                                key_expr: None,
+                                                                expr: ExprIr::BoolLiteral(true),
+                                                                op: "set".to_string(),
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                            StateNodeIr::State {
+                                                id: "muteOn".to_string(),
+                                                initial: None,
+                                                datamodel: vec![],
+                                                onentry: vec![],
+                                                onexit: vec![],
+                                                transitions: vec![
+                                                    TransitionIr {
+                                                        event: Some("Inp.Media.Mute".to_string()),
+                                                        targets: vec!["muteOff".to_string()],
+                                                        guard: None,
+                                                        actions: vec![
+                                                            ActionIr::Assign {
+                                                                loc: "s_mute".to_string(),
+                                                                key_expr: None,
+                                                                expr: ExprIr::BoolLiteral(false),
+                                                                op: "set".to_string(),
+                                                            },
+                                                        ],
+                                                    },
+                                                ],
+                                                children: vec![],
+                                                invokes: vec![],
+                                            },
+                                        ],
+                                        invokes: vec![],
                                     },
                                 ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("Inp.Media.Play".to_string()),
-                                        targets: vec!["mediaPlaying".to_string()],
-                                        guard: Some(ExprIr::UnaryOp("not".to_string(), Box::new(ExprIr::VarRead("s_mute".to_string())))),
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Play".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("Inp.Media.Play".to_string()),
-                                        targets: vec!["mediaPaused".to_string()],
-                                        guard: Some(ExprIr::VarRead("s_mute".to_string())),
-                                        actions: vec![],
-                                    },
-                                    TransitionIr {
-                                        event: Some("Inp.Media.PlayPause".to_string()),
-                                        targets: vec!["mediaPlaying".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Play".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "mediaPlaying".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "i_player_state".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(1_i64),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("Inp.Media.Pause".to_string()),
-                                        targets: vec!["mediaPaused".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Pause".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("Inp.Media.PlayPause".to_string()),
-                                        targets: vec!["mediaPaused".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Pause".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("Inp.Media.Stop".to_string()),
-                                        targets: vec!["mediaStopped".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Stop".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "mediaPaused".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "i_player_state".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(2_i64),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("Inp.Media.Play".to_string()),
-                                        targets: vec!["mediaPlaying".to_string()],
-                                        guard: Some(ExprIr::UnaryOp("not".to_string(), Box::new(ExprIr::VarRead("s_mute".to_string())))),
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Play".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("Inp.Media.PlayPause".to_string()),
-                                        targets: vec!["mediaPlaying".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Play".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("Inp.Media.Stop".to_string()),
-                                        targets: vec!["mediaStopped".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Send {
-                                                event: Some("Out.Media.Stop".to_string()),
-                                                eventexpr: None,
-                                                target: None,
-                                                targetexpr: None,
-                                                delay: Some("0s".to_string()),
-                                                delayexpr: None,
-                                                send_id: None,
-                                                content_expr: None,
-                                                params: vec![],
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
                                 invokes: vec![],
                             },
                         ],

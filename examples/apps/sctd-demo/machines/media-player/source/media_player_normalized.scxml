@@ -96,7 +96,7 @@
     <!-- ================================================================
          Transport: stopped / playing / paused
          ================================================================ -->
-    <state id="mediaPlayerTransport" initial="mediaStopped">
+    <state id="mediaPlayerTransport" initial="transportActive">
       <transition event="Inp.Media.Error" target="mediaPlayerError"/>
 
       <!-- Source change while playing: update and reload -->
@@ -111,11 +111,6 @@
       <transition event="Inp.Media.Source.AUX">
         <assign location="s_source" expr="&quot;AUX&quot;"/>
         <send event="Out.Media.Source.New"/>
-      </transition>
-
-      <!-- Mute toggle -->
-      <transition event="Inp.Media.Mute">
-        <assign location="s_mute" expr="!s_mute"/>
       </transition>
 
       <!-- Repeat mode cycle: none -> track -> folder -> none -->
@@ -137,62 +132,89 @@
         <send event="Out.Media.Track.Prev"/>
       </transition>
 
-      <!-- ---- Stopped ---- -->
-      <state id="mediaStopped">
-        <onentry>
-          <assign location="i_player_state" expr="0"/>
-          <!-- Normalized: explicit s_repeat check replaces In("mediaRepeatTrack") -->
-          <if cond="s_repeat === &quot;track&quot;">
-            <send event="Out.Media.Play"/>
-            <else/>
-            <send event="Out.Media.Track.Next"/>
-          </if>
-        </onentry>
-        <transition event="Inp.Media.Play" cond="!s_mute" target="mediaPlaying">
-          <send event="Out.Media.Play"/>
-        </transition>
-        <transition event="Inp.Media.Play" cond="s_mute" target="mediaPaused"/>
-        <!-- QT-05g: single toggle event so the UI Play button maps 1:1; the
-             machine owns the play/pause decision (not glue). From stopped a
-             toggle starts playback. -->
-        <transition event="Inp.Media.PlayPause" target="mediaPlaying">
-          <send event="Out.Media.Play"/>
-        </transition>
-      </state>
+      <!-- QT-05h (PCDN-05g-1): the UI-readable mute state is a REAL parallel
+           region (`muteOn`/`muteOff`) the UI reads via `is_active("muteOn")`,
+           NOT a datamodel var alone. The playback states run concurrently in a
+           sibling region. No cross-region In() guards are introduced — the
+           transport guards still read the `s_mute` datamodel var, kept in sync
+           by the mute region's own transitions. -->
+      <parallel id="transportActive">
 
-      <!-- ---- Playing ---- -->
-      <state id="mediaPlaying">
-        <onentry>
-          <assign location="i_player_state" expr="1"/>
-        </onentry>
-        <transition event="Inp.Media.Pause" target="mediaPaused">
-          <send event="Out.Media.Pause"/>
-        </transition>
-        <!-- QT-05g: toggle while playing → pause. -->
-        <transition event="Inp.Media.PlayPause" target="mediaPaused">
-          <send event="Out.Media.Pause"/>
-        </transition>
-        <transition event="Inp.Media.Stop" target="mediaStopped">
-          <send event="Out.Media.Stop"/>
-        </transition>
-      </state>
+        <!-- ---- Playback region: stopped / playing / paused ---- -->
+        <state id="playbackRegion" initial="mediaStopped">
 
-      <!-- ---- Paused ---- -->
-      <state id="mediaPaused">
-        <onentry>
-          <assign location="i_player_state" expr="2"/>
-        </onentry>
-        <transition event="Inp.Media.Play" cond="!s_mute" target="mediaPlaying">
-          <send event="Out.Media.Play"/>
-        </transition>
-        <!-- QT-05g: toggle while paused → resume playback. -->
-        <transition event="Inp.Media.PlayPause" target="mediaPlaying">
-          <send event="Out.Media.Play"/>
-        </transition>
-        <transition event="Inp.Media.Stop" target="mediaStopped">
-          <send event="Out.Media.Stop"/>
-        </transition>
-      </state>
+          <!-- ---- Stopped ---- -->
+          <state id="mediaStopped">
+            <onentry>
+              <assign location="i_player_state" expr="0"/>
+              <!-- Normalized: explicit s_repeat check replaces In("mediaRepeatTrack") -->
+              <if cond="s_repeat === &quot;track&quot;">
+                <send event="Out.Media.Play"/>
+                <else/>
+                <send event="Out.Media.Track.Next"/>
+              </if>
+            </onentry>
+            <transition event="Inp.Media.Play" cond="!s_mute" target="mediaPlaying">
+              <send event="Out.Media.Play"/>
+            </transition>
+            <transition event="Inp.Media.Play" cond="s_mute" target="mediaPaused"/>
+            <!-- QT-05g: single toggle event so the UI Play button maps 1:1; the
+                 machine owns the play/pause decision (not glue). From stopped a
+                 toggle starts playback. -->
+            <transition event="Inp.Media.PlayPause" target="mediaPlaying">
+              <send event="Out.Media.Play"/>
+            </transition>
+          </state>
+
+          <!-- ---- Playing ---- -->
+          <state id="mediaPlaying">
+            <onentry>
+              <assign location="i_player_state" expr="1"/>
+            </onentry>
+            <transition event="Inp.Media.Pause" target="mediaPaused">
+              <send event="Out.Media.Pause"/>
+            </transition>
+            <!-- QT-05g: toggle while playing → pause. -->
+            <transition event="Inp.Media.PlayPause" target="mediaPaused">
+              <send event="Out.Media.Pause"/>
+            </transition>
+            <transition event="Inp.Media.Stop" target="mediaStopped">
+              <send event="Out.Media.Stop"/>
+            </transition>
+          </state>
+
+          <!-- ---- Paused ---- -->
+          <state id="mediaPaused">
+            <onentry>
+              <assign location="i_player_state" expr="2"/>
+            </onentry>
+            <transition event="Inp.Media.Play" cond="!s_mute" target="mediaPlaying">
+              <send event="Out.Media.Play"/>
+            </transition>
+            <!-- QT-05g: toggle while paused → resume playback. -->
+            <transition event="Inp.Media.PlayPause" target="mediaPlaying">
+              <send event="Out.Media.Play"/>
+            </transition>
+            <transition event="Inp.Media.Stop" target="mediaStopped">
+              <send event="Out.Media.Stop"/>
+            </transition>
+          </state>
+        </state>
+
+        <!-- ---- Mute region: muteOff / muteOn (QT-05h) ---- -->
+        <state id="muteRegion" initial="muteOff">
+          <state id="muteOff">
+            <transition event="Inp.Media.Mute" target="muteOn">
+              <assign location="s_mute" expr="true"/>
+            </transition>
+          </state>
+          <state id="muteOn">
+            <transition event="Inp.Media.Mute" target="muteOff">
+              <assign location="s_mute" expr="false"/>
+            </transition>
+          </state>
+        </state>
+      </parallel>
     </state>
 
     <!-- Error recovery -->
