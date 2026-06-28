@@ -7,6 +7,48 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## v0.2.5
+
+Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.5.md).
+
+### Added - reactive Qt emitter (QT-03c, QT-05g…05k)
+- `qt emit --target rlvgl --scxml-context <ctx>=<crate>` links the emitted
+  widget tree to an iState-generated state-machine crate and emits typed
+  `Binding`s. Five kinds: state-predicate artwork swap (QT-05g), visibility
+  (QT-05h), chained-predicate first-active-wins ladder (QT-05i), button-event
+  taps → machine events (QT-05j), and external-text consumer-resolved labels
+  (QT-05k). One caller-driven `refresh_bindings(...)` pump. Emitter output
+  version `14` → `22`; istate linkage v2 (`step`/`is_active`/`get_var`/`Value`).
+- Sibling-anchor solver + component instantiation (QT-03c).
+
+### Added - widgets
+- `Image::set_pixels` (runtime artwork swap) and `Image::set_hidden`
+  (hidden image draws as a no-op).
+
+### Added - asset pipeline
+- `rlvgl-creator compress --transparent-key`: magenta (`#FF00FF`) sentinel for
+  1-bit transparency in RGB565 RLE blobs.
+
+### Added - SCTD demo (SCTD-00…03)
+- `examples/apps/sctd-demo`: SCXML Tutorial Demo — Dining Philosophers (faithful
+  + interactive, true-parallel codegen) and the Škoda Bolero media player under a
+  screen-selector shell. Mounted on disco-sim (`rlvgl-sctd-sim`), bare-metal
+  STM32H747I-DISCO, UEFI, and the FireBeetle-2 ESP32-P4 ESP-IDF hybrid.
+- Two generated machine crates (media-player normalized from `bolero.scxml`;
+  interactive dining philosophers), with SCXML `In()` predicates normalized to
+  datamodel variables.
+
+### Added - docs
+- `docs/sctd-tutorial/` — five-chapter state-chart-to-reactive-UI tutorial.
+- `docs/qt-support/` QT-05g…05k binding chapters + media-player retrospective.
+
+### WIP - ESP32-P4 (BEETLE-IDF)
+- `dfr0550` raw-PAC `clk_init` + `regi2c` bring-up; software star crawl.
+
+### Attribution
+- SCTD charts + artwork derived from Alexander Zhornyak's SCXML Tutorial
+  (BSD 3-Clause, © 2017); vendored assets keep their upstream license.
+
 ## v0.2.4
 
 LPAR parity substrate and widget-family release.

@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-widgets"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
