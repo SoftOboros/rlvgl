@@ -1,0 +1,54 @@
+# pins.local.tcl.template - board-specific Quartus pin assignments.
+#
+# Copy this file to pins.local.tcl, replace every PIN_* placeholder, and keep
+# pins.local.tcl uncommitted if it is specific to one bench board.
+
+# Clock, reset, and button input.
+set_location_assignment PIN_CLK_12MHZ -to clk_12mhz
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk_12mhz
+
+set_location_assignment PIN_RESET -to rst
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to rst
+
+set_location_assignment PIN_BUTTON -to button_raw
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to button_raw
+
+# Philosopher 1 RGB.
+set_location_assignment PIN_P1_R -to p1_r
+set_location_assignment PIN_P1_G -to p1_g
+set_location_assignment PIN_P1_B -to p1_b
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p1_r
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p1_g
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p1_b
+
+# Philosopher 2 RGB.
+set_location_assignment PIN_P2_R -to p2_r
+set_location_assignment PIN_P2_G -to p2_g
+set_location_assignment PIN_P2_B -to p2_b
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p2_r
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p2_g
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p2_b
+
+# Philosopher 3 RGB.
+set_location_assignment PIN_P3_R -to p3_r
+set_location_assignment PIN_P3_G -to p3_g
+set_location_assignment PIN_P3_B -to p3_b
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p3_r
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p3_g
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p3_b
+
+# Philosopher 4 RGB.
+set_location_assignment PIN_P4_R -to p4_r
+set_location_assignment PIN_P4_G -to p4_g
+set_location_assignment PIN_P4_B -to p4_b
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p4_r
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p4_g
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p4_b
+
+# Philosopher 5 RGB.
+set_location_assignment PIN_P5_R -to p5_r
+set_location_assignment PIN_P5_G -to p5_g
+set_location_assignment PIN_P5_B -to p5_b
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p5_r
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p5_g
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to p5_b

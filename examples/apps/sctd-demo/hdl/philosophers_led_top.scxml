@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  philosophers_led_top.scxml - HDL-targeted Dining Philosophers LED projection.
+
+  Provenance:
+    Derived from the SCTD interactive Dining Philosophers machine at
+    examples/apps/sctd-demo/machines/dining-philosophers-interactive/source/
+    dining_philosophers_interactive.scxml.
+
+  Purpose:
+    Exercise the iState MCP Verilog/VHDL generators on a chart that describes
+    the desired FPGA top behavior: 12 MHz timer handling, raw-button debounce,
+    and five RGB philosopher outputs. This chart is intentionally flat because
+    the current HDL template context walks only root-level states.
+
+  Known generator pressure points under test:
+    - physical input ports are represented semantically as events;
+    - LED outputs are represented as numeric datamodel fields;
+    - multiple tick transitions from one state rely on SCXML transition order;
+    - timer constants remain below the current 32-bit 16.16 HDL datamodel limit.
+-->
+<scxml datamodel="ecmascript" initial="IdleReleased"
+       name="SctdPhilosophersLedTop" version="1.0"
+       xmlns="http://www.w3.org/2005/07/scxml">
+  <datamodel>
+    <!-- 12 MHz / 12000 = 1 kHz millisecond sample tick. -->
+    <data id="timer_count" expr="0"/>
+    <data id="phase_ms" expr="0"/>
+    <data id="debounce_ms" expr="0"/>
+
+    <!-- Logical outputs, intended as one-bit LED signals. -->
+    <data id="p1_r" expr="0"/><data id="p1_g" expr="0"/><data id="p1_b" expr="1"/>
+    <data id="p2_r" expr="0"/><data id="p2_g" expr="0"/><data id="p2_b" expr="1"/>
+    <data id="p3_r" expr="0"/><data id="p3_g" expr="0"/><data id="p3_b" expr="1"/>
+    <data id="p4_r" expr="0"/><data id="p4_g" expr="0"/><data id="p4_b" expr="1"/>
+    <data id="p5_r" expr="0"/><data id="p5_g" expr="0"/><data id="p5_b" expr="1"/>
+  </datamodel>
+
+  <state id="IdleReleased">
+    <transition event="button_high" target="DebouncePress">
+      <assign location="debounce_ms" expr="0"/>
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+    </transition>
+  </state>
+
+  <state id="DebouncePress">
+    <transition event="button_low" target="IdleReleased">
+      <assign location="debounce_ms" expr="0"/>
+      <assign location="timer_count" expr="0"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="DebouncePress">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; debounce_ms &lt; 9" target="DebouncePress">
+      <assign location="timer_count" expr="0"/>
+      <assign location="debounce_ms" expr="debounce_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; debounce_ms &gt;= 9" target="ThinkAll">
+      <assign location="timer_count" expr="0"/>
+      <assign location="debounce_ms" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p1_r" expr="0"/><assign location="p1_g" expr="0"/><assign location="p1_b" expr="1"/>
+      <assign location="p2_r" expr="0"/><assign location="p2_g" expr="0"/><assign location="p2_b" expr="1"/>
+      <assign location="p3_r" expr="0"/><assign location="p3_g" expr="0"/><assign location="p3_b" expr="1"/>
+      <assign location="p4_r" expr="0"/><assign location="p4_g" expr="0"/><assign location="p4_b" expr="1"/>
+      <assign location="p5_r" expr="0"/><assign location="p5_g" expr="0"/><assign location="p5_b" expr="1"/>
+    </transition>
+  </state>
+
+  <state id="DebounceRelease">
+    <transition event="button_high" target="ThinkAll">
+      <assign location="debounce_ms" expr="0"/>
+      <assign location="timer_count" expr="0"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="DebounceRelease">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; debounce_ms &lt; 9" target="DebounceRelease">
+      <assign location="timer_count" expr="0"/>
+      <assign location="debounce_ms" expr="debounce_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; debounce_ms &gt;= 9" target="IdleReleased">
+      <assign location="timer_count" expr="0"/>
+      <assign location="debounce_ms" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p1_r" expr="0"/><assign location="p1_g" expr="0"/><assign location="p1_b" expr="1"/>
+      <assign location="p2_r" expr="0"/><assign location="p2_g" expr="0"/><assign location="p2_b" expr="1"/>
+      <assign location="p3_r" expr="0"/><assign location="p3_g" expr="0"/><assign location="p3_b" expr="1"/>
+      <assign location="p4_r" expr="0"/><assign location="p4_g" expr="0"/><assign location="p4_b" expr="1"/>
+      <assign location="p5_r" expr="0"/><assign location="p5_g" expr="0"/><assign location="p5_b" expr="1"/>
+    </transition>
+  </state>
+
+  <state id="ThinkAll">
+    <transition event="button_low" target="DebounceRelease">
+      <assign location="debounce_ms" expr="0"/>
+      <assign location="timer_count" expr="0"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="ThinkAll">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="ThinkAll">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="HungryOdd">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p1_r" expr="1"/><assign location="p1_g" expr="0"/><assign location="p1_b" expr="0"/>
+      <assign location="p2_r" expr="0"/><assign location="p2_g" expr="0"/><assign location="p2_b" expr="1"/>
+      <assign location="p3_r" expr="1"/><assign location="p3_g" expr="0"/><assign location="p3_b" expr="0"/>
+      <assign location="p4_r" expr="0"/><assign location="p4_g" expr="0"/><assign location="p4_b" expr="1"/>
+      <assign location="p5_r" expr="0"/><assign location="p5_g" expr="0"/><assign location="p5_b" expr="1"/>
+    </transition>
+  </state>
+
+  <state id="HungryOdd">
+    <transition event="button_low" target="DebounceRelease"><assign location="debounce_ms" expr="0"/><assign location="timer_count" expr="0"/></transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="HungryOdd">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="HungryOdd">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="EatOdd">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p1_r" expr="0"/><assign location="p1_g" expr="1"/><assign location="p1_b" expr="0"/>
+      <assign location="p3_r" expr="0"/><assign location="p3_g" expr="1"/><assign location="p3_b" expr="0"/>
+    </transition>
+  </state>
+
+  <state id="EatOdd">
+    <transition event="button_low" target="DebounceRelease"><assign location="debounce_ms" expr="0"/><assign location="timer_count" expr="0"/></transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="EatOdd">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="EatOdd">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="HungryEven">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p1_r" expr="0"/><assign location="p1_g" expr="0"/><assign location="p1_b" expr="1"/>
+      <assign location="p2_r" expr="1"/><assign location="p2_g" expr="0"/><assign location="p2_b" expr="0"/>
+      <assign location="p3_r" expr="0"/><assign location="p3_g" expr="0"/><assign location="p3_b" expr="1"/>
+      <assign location="p4_r" expr="1"/><assign location="p4_g" expr="0"/><assign location="p4_b" expr="0"/>
+    </transition>
+  </state>
+
+  <state id="HungryEven">
+    <transition event="button_low" target="DebounceRelease"><assign location="debounce_ms" expr="0"/><assign location="timer_count" expr="0"/></transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="HungryEven">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="HungryEven">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="EatEven">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p2_r" expr="0"/><assign location="p2_g" expr="1"/><assign location="p2_b" expr="0"/>
+      <assign location="p4_r" expr="0"/><assign location="p4_g" expr="1"/><assign location="p4_b" expr="0"/>
+    </transition>
+  </state>
+
+  <state id="EatEven">
+    <transition event="button_low" target="DebounceRelease"><assign location="debounce_ms" expr="0"/><assign location="timer_count" expr="0"/></transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="EatEven">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="EatEven">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="HungryFive">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p2_r" expr="0"/><assign location="p2_g" expr="0"/><assign location="p2_b" expr="1"/>
+      <assign location="p4_r" expr="0"/><assign location="p4_g" expr="0"/><assign location="p4_b" expr="1"/>
+      <assign location="p5_r" expr="1"/><assign location="p5_g" expr="0"/><assign location="p5_b" expr="0"/>
+    </transition>
+  </state>
+
+  <state id="HungryFive">
+    <transition event="button_low" target="DebounceRelease"><assign location="debounce_ms" expr="0"/><assign location="timer_count" expr="0"/></transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="HungryFive">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="HungryFive">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="EatFive">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p5_r" expr="0"/><assign location="p5_g" expr="1"/><assign location="p5_b" expr="0"/>
+    </transition>
+  </state>
+
+  <state id="EatFive">
+    <transition event="button_low" target="DebounceRelease"><assign location="debounce_ms" expr="0"/><assign location="timer_count" expr="0"/></transition>
+    <transition event="tick_12mhz" cond="timer_count &lt; 11999" target="EatFive">
+      <assign location="timer_count" expr="timer_count + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &lt; 499" target="EatFive">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="phase_ms + 1"/>
+    </transition>
+    <transition event="tick_12mhz" cond="timer_count &gt;= 11999 &amp;&amp; phase_ms &gt;= 499" target="ThinkAll">
+      <assign location="timer_count" expr="0"/>
+      <assign location="phase_ms" expr="0"/>
+      <assign location="p1_r" expr="0"/><assign location="p1_g" expr="0"/><assign location="p1_b" expr="1"/>
+      <assign location="p2_r" expr="0"/><assign location="p2_g" expr="0"/><assign location="p2_b" expr="1"/>
+      <assign location="p3_r" expr="0"/><assign location="p3_g" expr="0"/><assign location="p3_b" expr="1"/>
+      <assign location="p4_r" expr="0"/><assign location="p4_g" expr="0"/><assign location="p4_b" expr="1"/>
+      <assign location="p5_r" expr="0"/><assign location="p5_g" expr="0"/><assign location="p5_b" expr="1"/>
+    </transition>
+  </state>
+</scxml>
