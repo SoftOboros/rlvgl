@@ -141,7 +141,7 @@ touch IC at 0x38; "bridge" is the load-bearing consumer for v0/v1).
 - [BEETLE-03 §10](BEETLE-03-I2C-BRIDGE.md#10-reconciliation-vs-adjacent-repo-primitives)
   references this entry to explain why the yaml story is closed.
 - Project memory
-  [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md)
+  `project_dfr1237_dfr0550v2.md`
   carries an inline note about the swap that is now stale — the
   memory entry pre-dates `41c9e16` and reads as if the yaml is
   still wrong. Memory will be patched on the next session-end memory

@@ -2,7 +2,7 @@
 name = "rlvgl-app-sctd-demo"
 version = "0.2.5"
 edition = "2024"
-license = "MIT"
+license = "MIT AND BSD-3-Clause"
 description = "SCXML Tutorial Demo App — right-edge machine selector + Machine Panel for iState-generated tutorial state machines."
 repository = "https://github.com/softoboros/rlvgl"
 homepage = "https://github.com/softoboros/rlvgl"

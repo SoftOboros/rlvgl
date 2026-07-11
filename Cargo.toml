@@ -511,7 +511,8 @@ members = [
 ]
 # UEFI example is excluded from workspace — it conflicts with std on host targets.
 # Build it explicitly: cargo build -p rlvgl-example-uefi-disco --target aarch64-unknown-uefi
-# vendor/scjson is a reference-only submodule (BSD-1-Clause); never linked into our build.
+# vendor/scjson is a reference-only submodule: scjson code is BSD-1-Clause;
+# the SCXML Tutorial subtree/assets are BSD-3-Clause. Never linked into our build.
 # disco-demo-states is the APP-04b vendored SM crate (mcp-statechart output);
 # excluded so its non-idiomatic codegen variant naming doesn't fail workspace clippy.
 # It is built/tested separately by tests/creator_app_round_trip_disco_sm.rs.

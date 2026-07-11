@@ -11,7 +11,9 @@ By the end of this chapter you will have a generated Rust module that
 constructs the Bolero media-player screen as a live widget tree — every
 rectangle, label, and image from the QML source, positioned and ready to
 draw. The tool that does this is the `qt emit` subcommand of
-`rlvgl-creator`.
+`rlvgl-creator`. This chapter uses plain Qt emission; Chapter 4 re-emits
+the same screen with `--scxml-context` to add the state-machine handle and
+reactive bindings.
 
 ## What `qt emit` does
 
@@ -138,7 +140,7 @@ The central product of the generated module is:
 ```rust
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>)
+) -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>)
 ```
 
 Pass in the `Rect` you want the screen to occupy — the content area of
@@ -149,15 +151,13 @@ your display — and you get back:
 - **`Rc<RefCell<ScreenState>>`** — a handle carrying the root-level QML
   property values (spacing constants, panel heights, per-button state
   flags). Most consumers do not need to touch this directly.
-- **`Rc<RefCell<Machine>>`** — the istate state machine for this screen,
-  already started. This is the "brain" from Chapter 1, instantiated and
-  wired into the tree. Chapter 4 explains how to drive it.
-- **`Vec<Binding>`** — the reactive binding list. Again, Chapter 4 is
-  where this matters; for now, note that it exists.
+- **`Vec<LabelBinding>`** — static property/text bindings that can be
+  refreshed after you mutate the generated `ScreenState`.
 
 The tree is fully self-contained: `build_screen` allocates every widget,
-resolves every anchor, decodes every image asset, and constructs the
-machine — all in one call.
+resolves every anchor, and decodes every image asset in one call. It does
+not construct the SCXML machine yet; that four-value return shape appears
+only after Chapter 4 adds `--scxml-context`.
 
 ### Image assets in the generated code
 
@@ -202,10 +202,10 @@ use rlvgl_core::widget::Rect;
 
 let content_area = Rect { x: 0, y: 0, width: 720, height: 480 };
 
-// Build the widget tree. The four return values are the tree,
-// the property-state handle, the state machine, and the binding list.
+// Build the widget tree. The three return values are the tree,
+// the property-state handle, and the label-binding list.
 // For a static first look, only the tree matters.
-let (node, _state, _machine, _bindings) = media_player_gen::build_screen(content_area);
+let (node, _state, _label_bindings) = media_player_gen::build_screen(content_area);
 
 // Draw it — this paints every widget to your renderer.
 node.draw(&mut renderer);
@@ -215,22 +215,21 @@ That is enough to put the Bolero screen on your display. The background
 photo appears, the transport buttons are in place, labels are positioned,
 and the icons are decoded and drawn.
 
-In the reference demo, the `MediaPlayerSkin` wrapper in
-`examples/apps/sctd-demo/src/media_player_skin.rs` does exactly this —
-calls `build_screen`, stores the returned node, and calls `node.draw` on
-each frame. Chapter 4 shows the rest of what that wrapper does: wiring
-the machine to the bindings so the play icon flips to pause when you tap,
-the mute icon appears and disappears, and the repeat button cycles through
-its three states.
+The reference demo's `MediaPlayerSkin` wrapper in
+`examples/apps/sctd-demo/src/media_player_skin.rs` uses the Chapter 4
+variant of the generated module. It still calls `build_screen`, stores the
+returned node, and calls `node.draw` on each frame, but it also keeps the
+returned machine and reactive bindings so the play icon flips to pause
+when you tap, the mute icon appears and disappears, and the repeat button
+cycles through its three states.
 
 ## Where things stand
 
-Right now, the screen is static. You can see the whole layout — the
+At this point, the screen is static. You can see the whole layout — the
 transport row, the mute icon in the header, the repeat and shuffle
 buttons, the source-caption label, the album art placeholder — but nothing
 changes. Tapping the play button does not swap the icon. The state machine
-is running inside `_machine`, but nothing is listening to it or driving it
-with events.
+from Chapter 1 is not part of this generated module yet.
 
 That is the one remaining piece: connecting the machine's output (which
 states are active?) to the widget tree's appearance (which artwork should

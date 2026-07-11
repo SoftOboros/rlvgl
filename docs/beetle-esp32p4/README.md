@@ -165,7 +165,7 @@ page numbers across revisions.
 
 External authority for IDF reference call shapes: the in-tree IDF
 sources at `~/esp/esp-idf/components/` per
-[`reference_esp_idf_local.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/reference_esp_idf_local.md).
+`reference_esp_idf_local.md`.
 IDF is consulted as a working reference, not a library dependency.
 
 External authority for the Pi-7″-Atmel-bridge protocol: the Linux

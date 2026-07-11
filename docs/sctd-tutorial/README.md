@@ -14,11 +14,12 @@ chart and a Qt/QML screen** into **a reactive embedded UI in Rust** —
 and runs the result on a microcontroller. You build it the way the
 finished demo was actually built, one stage at a time.
 
-The worked example is the **SCTD demo**: two screens — the classic
-**Dining Philosophers** concurrency puzzle and a **car-radio media
-player** modelled on the Škoda *Bolero* infotainment example — sharing
-one screen-selector shell, running live on an **ESP32-P4** panel (and on
-your desktop in a simulator).
+The worked example is the **SCTD demo**: a Setup selector shell with two
+runnable screens — the classic **Dining Philosophers** concurrency puzzle
+and a **car-radio media player** modelled on the Škoda *Bolero*
+infotainment example. The reference app runs on your desktop in a
+simulator and on embedded hosts; this tutorial's hardware path uses an
+**ESP32-P4** panel.
 
 You will use two public tools and nothing else:
 
@@ -96,9 +97,10 @@ repeat / shuffle / mute / source icon are derived from that tutorial and
 remain under its BSD 3-Clause terms.
 
 **If you reuse these assets, keep the copyright notice.** Chapter 2
-shows exactly which files are involved and reproduces the license text
-in full. rlvgl itself is MIT-licensed (Copyright © 2025 SoftOboros); the
-vendored tutorial assets keep their upstream BSD 3-Clause license.
+shows exactly which files are involved and points at the redistributable
+BSD 3-Clause license file shipped with the reference demo. rlvgl itself
+is MIT-licensed (Copyright © 2025 SoftOboros); the vendored tutorial
+assets keep their upstream BSD 3-Clause license.
 
 ## Prerequisites
 
@@ -130,9 +132,10 @@ implementation lives in this repo at
 [`examples/apps/sctd-demo/`](../../examples/apps/sctd-demo/) (the
 shared, no-std UI controller) and
 [`examples/beetle-esp32p4-idf/`](../../examples/beetle-esp32p4-idf/) (the
-ESP32-P4 firmware that hosts it). The crate is at version **0.2.5** —
-the first release able to produce this demo end-to-end. Compare your work
-against it as you go.
+ESP32-P4 firmware that hosts it). The same SCTD payload also has simulator,
+STM32H747I-DISCO, and UEFI host wrappers. The crate is at version
+**0.2.5** — the first release able to produce this demo end-to-end.
+Compare your work against it as you go.
 
 ## Chapters
 

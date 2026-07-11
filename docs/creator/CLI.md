@@ -451,7 +451,7 @@ The default icon set after running `make import-icons`:
 
 | Settings | File | Trash | Folder Open | Close |
 |:--------:|:----:|:-----:|:-----------:|:-----:|
-| ![settings](icons/settings_96dpi.png) | ![file](icons/file_96dpi.png) | ![trash](icons/trash_96dpi.png) | ![folder-open](icons/folder-open_96dpi.png) | ![close](icons/close_96dpi.png) |
+| ![settings](../icons/settings_96dpi.png) | ![file](../icons/file_96dpi.png) | ![trash](../icons/trash_96dpi.png) | ![folder-open](../icons/folder-open_96dpi.png) | ![close](../icons/close_96dpi.png) |
 | 414 B | 241 B | 276 B | 255 B | 188 B |
 
 Sizes shown are RLEC blob sizes. All icons are 24x24 pixels at 96 DPI.

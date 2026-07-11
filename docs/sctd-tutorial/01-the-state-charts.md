@@ -7,7 +7,7 @@ and the In() normalization pattern.
 
 # Chapter 1 — The state charts
 
-**←** [Index](README.md) **·** [Index](README.md) **·** [Chapter 2 — Converting the media assets](02-media-assets.md) **→**
+**←** [Index](README.md) **·** [Chapter 2 — Converting the media assets](02-media-assets.md) **→**
 
 ---
 
@@ -18,9 +18,10 @@ any Rust by hand; the tool writes it for you.
 
 ## The two state charts
 
-The demo has two screens.  Each screen is driven by a separate state machine,
-and the machines have nothing to do with each other except that both live
-in the same embedded binary.
+The demo has two runnable machine screens behind the Setup selector shell.
+Each runnable screen is driven by a separate state machine, and the machines
+have nothing to do with each other except that both live in the same embedded
+binary.
 
 ### Dining Philosophers
 
@@ -260,4 +261,4 @@ Chapter 2 converts the Bolero artwork — the play/pause, mute, repeat, shuffle,
 and source icons — from PNG files into compact RLE blobs you can embed
 directly in firmware.
 
-**←** [Index](README.md) **·** [Index](README.md) **·** [Chapter 2 — Converting the media assets](02-media-assets.md) **→**
+**←** [Index](README.md) **·** [Chapter 2 — Converting the media assets](02-media-assets.md) **→**

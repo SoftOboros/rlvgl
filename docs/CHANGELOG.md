@@ -30,10 +30,11 @@ Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.
   1-bit transparency in RGB565 RLE blobs.
 
 ### Added - SCTD demo (SCTD-00…03)
-- `examples/apps/sctd-demo`: SCXML Tutorial Demo — Dining Philosophers (faithful
-  + interactive, true-parallel codegen) and the Škoda Bolero media player under a
-  screen-selector shell. Mounted on disco-sim (`rlvgl-sctd-sim`), bare-metal
-  STM32H747I-DISCO, UEFI, and the FireBeetle-2 ESP32-P4 ESP-IDF hybrid.
+- `examples/apps/sctd-demo`: SCXML Tutorial Demo — Setup + Dining Philosophers
+  + the Škoda Bolero media player under a right-edge selector shell. DP uses the
+  interactive true-parallel machine with Auto mode. Mounted on disco-sim
+  (`rlvgl-sctd-sim`), bare-metal STM32H747I-DISCO, UEFI, and the FireBeetle-2
+  ESP32-P4 ESP-IDF hybrid.
 - Two generated machine crates (media-player normalized from `bolero.scxml`;
   interactive dining philosophers), with SCXML `In()` predicates normalized to
   datamodel variables.

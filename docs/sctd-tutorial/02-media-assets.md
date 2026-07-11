@@ -35,8 +35,9 @@ are all derived from that tutorial.
   from this work without prior written permission.
 
 The BSD 3-Clause license text ships alongside the tutorial assets in the
-reference demo at `examples/apps/sctd-demo/`. Look for the `LICENSE` file
-there and carry it with any bundle you distribute.
+reference demo at
+`examples/apps/sctd-demo/LICENSES/SCXML-TUTORIAL-BSD-3-Clause.txt`; carry that
+file with any bundle you distribute.
 
 rlvgl itself is MIT-licensed (Copyright © 2025 SoftOboros). The vendored
 tutorial artwork keeps its upstream BSD 3-Clause terms — the two licenses

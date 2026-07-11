@@ -3,7 +3,7 @@ name = "dining-philosophers-interactive"
 version = "0.1.0"
 edition = "2021"
 description = "Generated SCXML state machine crate (Interactive Dining Philosophers, SCTD-02)"
-license = "BSD-1-Clause"
+license = "BSD-3-Clause"
 # Never published: demo fixture path-dep of the sctd-demo app, not a release
 # artifact. `publish = false` keeps it out of CRATES-CI-01's publishable-crate
 # matrix (tests/publish_changed_matrix.rs) — workspace.exclude does not suffice

@@ -555,7 +555,7 @@ independently conformant; FONT-01 is the prerequisite for the rest.
   and added a §10 reconciliation row: v1 keeps `WidgetFont`/`set_font` as the
   sole selection channel and must NOT wire widgets to `font_id`; the two
   channels reconcile when the deferred theming registry lands. No change to the
-  frozen v1 mechanism. (Also: the stale `[FontId](…)` intra-doc link in
+  frozen v1 mechanism. (Also: the stale `FontId` intra-doc link in
   `widgets/src/label.rs` was repointed to the real mechanism, trimming one of
   the rustdoc-warning-debt links the LPAR retrospective flagged.)
 - **2026-06-14** — §12 sequencing refinement during FONT-01. `ArcLabel`'s

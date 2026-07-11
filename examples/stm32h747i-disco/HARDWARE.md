@@ -53,7 +53,7 @@ recommended for data transfers.
 - **PG3 is shared** between the NT35510 panel and the FT5336 touch controller.
   Under Zephyr adapted command mode, the panel driver is disabled and PG3 must
   be pulsed by a `SYS_INIT` hook before the FT5336 driver probes (see
-  [Vol V Ch 2](disco-zephyr-guide/02-c-shell-and-ffi.md)).
+  [Vol V Ch 2](../../docs/disco-zephyr-guide/02-c-shell-and-ffi.md)).
 
 ## Platform Integration
 
@@ -62,9 +62,9 @@ task model and display driver strategy:
 
 | Platform | Guide | Key differences |
 |----------|-------|-----------------|
-| Bare-metal | [Vol II](disco-platform-guide/README.md) | Cooperative loop, Compositor dirty-rect double-buffer, TIM6 touch ISR |
-| FreeRTOS | [Vol IV](disco-freertos-guide/README.md) | Preemptive tasks, interrupt-driven I2C4 touch, single-buffer 32 ms holdoff |
-| Zephyr | [Vol V](disco-zephyr-guide/README.md) | C+Rust hybrid, Zephyr drivers (video) or Rust raw init (ACM), k_sleep pacing |
+| Bare-metal | [Vol II](../../docs/disco-platform-guide/README.md) | Cooperative loop, Compositor dirty-rect double-buffer, TIM6 touch ISR |
+| FreeRTOS | [Vol IV](../../docs/disco-freertos-guide/README.md) | Preemptive tasks, interrupt-driven I2C4 touch, single-buffer 32 ms holdoff |
+| Zephyr | [Vol V](../../docs/disco-zephyr-guide/README.md) | C+Rust hybrid, Zephyr drivers (video) or Rust raw init (ACM), k_sleep pacing |
 
 All three share the same `display_init.rs`, `touch_i2c.rs`, `dma2d.rs`, and
 `DiscoController` widget tree from `rlvgl-app-disco-demo`.

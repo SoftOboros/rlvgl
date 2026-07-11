@@ -75,7 +75,7 @@ encodes the working ordering implicitly through call sequence in
    path is gated by an experimental sdkconfig flag in IDF, by an
    MSPI/APS6408L init sequence in raw-PAC. Reference: ESP-IDF
    `bootloader_init_spiram`; the working sdkconfig is documented in
-   [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md).
+   `project_dfr1237_dfr0550v2.md`.
    Anchor: `dfr0550/psram.rs:40` (`init() -> None`, stub).
 
 2. **DPHY rail undervolt.**
@@ -93,7 +93,7 @@ encodes the working ordering implicitly through call sequence in
    framebuffer, the bridge loses sync and the panel goes white after
    a few seconds of valid black scanout. Anchor: pending in
    `dfr0550/dpi_panel.rs`; documented in
-   [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md)
+   `project_dfr1237_dfr0550v2.md`
    "Failed configurations to remember".
 
 4. **DSI PHY lock vs lane stop-state ordering.**
@@ -684,7 +684,7 @@ A conforming **v2 deployment** additionally satisfies BEETLE-01a:
   schematics — doc 427 carries the U2 ESP32-P4_L symbol with
   unambiguous `8/SCL` + `7/SDA` labels per ERRATA-001 cross-check),
   537–539 (DFR0550-V2 + DFR1237 wikis)
-- Project memory: [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md)
+- Project memory: `project_dfr1237_dfr0550v2.md`
 
 ## §14 Unblocks
 
@@ -713,7 +713,7 @@ Once this chapter is ratified and the per-phase chapters land:
   request. Created from a recap of the in-progress
   `examples/beetle-esp32p4/src/dfr0550/` tree. Frozen decisions
   match the verified IDF first-light config captured in
-  [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md);
+  `project_dfr1237_dfr0550v2.md`;
   invariants 1–8 are first ratification. The `phy_hs_freq_sel`
   table in `dfr0550/dsi_host.rs:156-178` is trimmed to 200–1050 Mbps
   vs IDF's full 80–1500 Mbps; INV-BEETLE-00-1 fixes 750 Mbps, so the

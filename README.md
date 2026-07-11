@@ -48,15 +48,16 @@ Package: `rlvgl`
 - [docs/disco-test-and-debug](./docs/disco-test-and-debug/README.md) – Volume III: how to test and debug across the host simulator, UEFI/QEMU, and hardware, including playit automation and VS Code + probe-rs + GDB
 - [docs/disco-freertos-guide](./docs/disco-freertos-guide/README.md) – Volume IV: FreeRTOS preemptive tasks, interrupt-driven I2C4 touch, single-buffer rendering, joystick navigation
 - [docs/disco-zephyr-guide](./docs/disco-zephyr-guide/README.md) – Volume V: Zephyr C+Rust hybrid, video mode vs adapted command mode, DMA2D pipeline, CSleep/LPENR fix
+- [docs/sctd-tutorial](./docs/sctd-tutorial/README.md) – State Chart Tutorial Demo guide: SCXML machines, Qt media-player graphics, and reactive bindings
 - [lvgl](https://github.com/lvgl/lvgl) – upstream C library (vendored as a git submodule under `lvgl/`; not mirrored on the site)
 
 ## Building Binary Targets
 
-The workspace currently ships six user-facing binaries. Their package names,
+The workspace ships several user-facing binaries. Their package names,
 required targets, and applicable feature flags differ enough that it is best to
-treat them individually instead of relying on `cargo build --workspace`. Every
-binary has a top-level `make` target — run `make help` to see them all, or
-`make build-all-bins` to build every binary in one command.
+treat them individually instead of relying on `cargo build --workspace`. Common
+binaries have top-level `make` targets — run `make help` to see them all, or
+`make build-all-bins` to build the main binary set in one command.
 
 ### Host tools and simulators
 
@@ -65,7 +66,9 @@ binary has a top-level `make` target — run `make help` to see them all, or
 | `rlvgl-creator` | `rlvgl` | `make build-creator` | `cargo build -p rlvgl --bin rlvgl-creator --features creator` |
 | `rlvgl-sim` | `rlvgl-example-sim` | `make build-sim` | `cargo build -p rlvgl-example-sim --bin rlvgl-sim --features png,jpeg,gif,qrcode,fontdue` |
 | `rlvgl-disco-sim` | `rlvgl-example-disco-sim` | `make build-disco-sim` | `cargo build -p rlvgl-example-disco-sim --bin rlvgl-disco-sim` |
+| `rlvgl-sctd-sim` | `rlvgl-example-disco-sim` | n/a | `cargo build -p rlvgl-example-disco-sim --bin rlvgl-sctd-sim` |
 | `rlvgl-uefi-disco` | `rlvgl-example-uefi-disco` | `make build-uefi-disco` | `cargo build --manifest-path examples/uefi-disco/Cargo.toml --target aarch64-unknown-uefi --bin rlvgl-uefi-disco` |
+| `rlvgl-uefi-sctd` | `rlvgl-example-uefi-disco` | n/a | `cargo build -p rlvgl-example-uefi-disco --bin rlvgl-uefi-sctd --target aarch64-unknown-uefi` |
 
 Notes: `rlvgl-creator` is gated behind the `creator` feature; add `creator_ui`
 for the desktop UI. `rlvgl-sim` accepts `--no-default-features` for a lean
@@ -73,12 +76,13 @@ build. `rlvgl-uefi-disco` is intentionally excluded from the workspace.
 
 ### STM32H747I-DISCO firmware
 
-The firmware package is `rlvgl-example-disco` and it produces two binaries from
+The firmware package is `rlvgl-example-disco` and it produces three binaries from
 the same crate:
 
 | Binary | Required target | Required feature | Make target | Cargo command |
 | --- | --- | --- | --- | --- |
 | `rlvgl-stm32h747i-disco` | `thumbv7em-none-eabihf` | `cm7` | `make build-disco` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco --features cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio` |
+| `rlvgl-stm32h747i-sctd` | `thumbv7em-none-eabihf` | `cm7,sctd` | n/a | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-sctd --features cm7,sctd,dma2d` |
 | `rlvgl-stm32h747i-disco-cm4` | `thumbv7em-none-eabihf` | `cm4` | `make build-disco-cm4` | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-disco-cm4 --features cm4` |
 
 `make build-disco{,-release}` also runs `rust-objcopy` to emit `.hex` and
@@ -121,12 +125,12 @@ use the crate-local file for the package you are building:
 - [examples/uefi-disco/OPTIONS.md](./examples/uefi-disco/OPTIONS.md)
 - [src/bin/creator/README.md](./src/bin/creator/README.md) for CLI and UI workflow details
 
-## What's New in 0.1.9
+## What's New in 0.2.5
 
-- `rlvgl-creator` now covers vendor import, board IR generation, and Rust BSP rendering with bundled alternate-function databases.
-- STM32H747I-DISCO moved from bring-up into a flagship demo path with dual-core startup, DSI display, touch, storage, audio, and richer UI flows.
-- The rendering stack gained `EventWindow`, compositor/save-under behavior, motion helpers, DMA2D acceleration, and display-pipeline fixes for smoother presentation.
-- The workspace now includes first-class i18n, API, chip database, and generated BSP crates alongside the core UI crates.
+- `rlvgl-creator qt emit --target rlvgl --scxml-context` now emits reactive bindings from Qt/QML screens to iState-generated machines.
+- The SCTD demo brings SCXML Tutorial state machines and Bolero media-player graphics into a shared `no_std` app with Setup, DP, and Media Player slots.
+- The SCTD payload mounts on host simulator, STM32H747I-DISCO bare-metal, UEFI, and the FireBeetle-2 ESP32-P4 ESP-IDF hybrid.
+- RGB565 RLE assets now support transparent-key conversion for Qt-derived icon artwork.
 
 ## Vendor chip databases
 
@@ -239,16 +243,15 @@ MiniJinja templates can use the following filters:
 Users may supply custom templates by pointing `--templates` at any
 directory; the filters above are always available.
 
-See `docs/TODO-CREATOR-BSP.md` for remaining work.
+See [`docs/creator/BSP-STATUS.md`](./docs/creator/BSP-STATUS.md) for remaining work.
 
 ## Status
 
 As-built. See [docs](./docs/README.md) for component-by-component progress and outstanding tasks.
 
-`v0.1.9` shifts rlvgl from a core-library-first workspace toward a fuller
-embedded UI product stack. The main areas of growth are the creator/BSP
-pipeline, the STM32H747I-DISCO showcase target, and the runtime pieces needed
-for more polished embedded applications.
+`v0.2.5` extends the embedded UI product stack with reactive Qt/QML emission,
+SCXML Tutorial Demo payloads, and the release documentation needed to build the
+same SCTD app across simulator, STM32H747I-DISCO, UEFI, and ESP32-P4 hosts.
 
 ## Quick Example
 
@@ -314,7 +317,7 @@ cargo add rlvgl
 ```
 Or add the following line to your Cargo.toml:
 ```toml
-rlvgl = "0.1.9"
+rlvgl = "0.2.5"
 ```
 
 ## Community

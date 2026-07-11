@@ -32,7 +32,7 @@ cited by SPRU\* / SLA\* / SWRU\* part number rather than re-derived.
 | MSPM0 family TRM                                | TI SLAU893 (MSPM0 G-series TRM) / SLAU847 (MSPM0 L-series TRM). **Out of scope** for CHIPS-TI-01 — see §11                  |
 | svd2rust-shaped TI PAC crates                   | `cc26x0`, `cc26x2`, `cc3200` (or successor) crates on crates.io; vendored where required                                    |
 | chipdb crate API (`chip_yaml` / `board_yaml`)   | `chipdb/rlvgl-chips-ti/src/lib.rs`                                                                                          |
-| BSP generator IR / templates                    | `src/bin/creator/bsp/ti.rs` (current YAML→IR pass) and the per-vendor template tree pattern in `src/bin/creator/bsp/espressif/templates/` |
+| BSP generator IR / templates                    | `src/bin/creator/bsp/ti/mod.rs` (YAML→IR entry point) and the per-vendor template tree pattern in `src/bin/creator/bsp/espressif/templates/` |
 | Chip / board YAML shape across the chipdb       | `chipdb/rlvgl-chips-esp/db/{chips,boards}/*.yaml` (the reference shape)                                                     |
 | Existing hand-written TI bring-up               | `examples/beaglebone-black/src/bsp/` (Linux / bare-metal AM335x prong)                                                      |
 
@@ -47,8 +47,8 @@ the table above), the modification ratifies in a §15 amendment
 `chip_yaml` / `board_yaml` accessors and two placeholder YAML files
 (`AM335x.yaml`, `MSP432P401R.yaml`), but no per-chip inventory data,
 no per-board pin tables, and no BSP-generator templates. The current
-TI adapter in `src/bin/creator/bsp/ti.rs` is a single `serde_yaml`
-pass into the generic `Ir`, with no rendering pipeline behind it.
+TI adapter originally lived in `src/bin/creator/bsp/ti.rs` as a single
+`serde_yaml` pass into the generic `Ir`, with no rendering pipeline behind it.
 
 The CHIPS-TI initiative brings the TI tree to **parity** with the
 five vendor pipelines that already render: Espressif, Nordic, NXP,
@@ -119,7 +119,7 @@ publicly available on crates.io.
 Evidence that the TI chipdb is *not* at parity with the other
 vendor trees, pinned to code paths:
 
-- **Stub adapter.** `src/bin/creator/bsp/ti.rs` is a 17-line
+- **Initial stub adapter.** `src/bin/creator/bsp/ti.rs` was a 17-line
   pass-through that calls `serde_yaml::from_str` against the
   generic `Ir` and returns it directly. There is no TI-specific
   IR (compare `EspIr`, `NrfIr`, `NxpIr`, `RpIr`, `RenesasIr`).
@@ -170,7 +170,7 @@ CLAUDE.md §"Definitions — reference vs. restatement".
 - **`TiIr`** — *Owned by this chapter; does not exist in repo yet.*
   The TI-specific IR struct that replaces the
   pass-through `serde_yaml::from_str(text)` in
-  `src/bin/creator/bsp/ti.rs`. Holds parsed chip + board YAML plus
+  `src/bin/creator/bsp/ti/mod.rs`. Holds parsed chip + board YAML plus
   a derived peripheral-use set (per the `peripherals_used` pattern
   in `templates/peripherals.rs.jinja`).
 - **SimpleLink Cortex-M4F family** — *Owned by this chapter;
@@ -741,8 +741,8 @@ acceptance gates from this chapter beyond ratification.
   — reference shape for §5.1 chip-IR required field set.
 - [`chipdb/rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml`](../../rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml)
   — reference shape for §5.2 board-IR required field set.
-- [`src/bin/creator/bsp/ti.rs`](../../../src/bin/creator/bsp/ti.rs)
-  — current TI adapter; cited by §2.
+- [`src/bin/creator/bsp/ti/mod.rs`](../../../src/bin/creator/bsp/ti/mod.rs)
+  — current TI adapter entry point; cited by §2.
 - [`src/bin/creator/bsp/espressif/templates/`](../../../src/bin/creator/bsp/espressif/templates/)
   — reference template tree; cited by §3 and §7.
 - [`examples/beaglebone-black/src/bsp/`](../../../examples/beaglebone-black/src/bsp/)

@@ -22,8 +22,8 @@
 //! ```
 //! The tutorial source is read-only; only transcoded copies live here.
 
-/// Selector icon for the Dining Philosophers machines (faithful + interactive):
-/// the tutorial table illustration scaled to the 60 px selector strip.
+/// Selector icon for the current Dining Philosophers run view: the tutorial
+/// table illustration scaled to the 60 px selector strip.
 pub static ICON_DP: &[u8] = include_bytes!("../assets/icons/dp_table_60.rle");
 
 /// Backdrop for the live Philosophers Table: the tutorial table illustration

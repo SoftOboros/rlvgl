@@ -145,9 +145,11 @@ the app remains portable.
 2. **Selector position.** The Machine Selector MUST use the same
    right-edge screen position as the disco demo's icon strip. Exact icon
    artwork may differ.
-3. **Selector contents.** The required initial selector entries are:
-   Dining Philosophers and Media Player. A third Info/About entry MAY be
-   present if needed for discoverability or diagnostics.
+3. **Selector contents.** The SCTD-00 initial selector entries were:
+   Dining Philosophers and Media Player. A third Info/About entry was allowed
+   if needed for discoverability or diagnostics. **SCTD-03
+   amendment (2026-06-21):** the current selector is `[Setup, DP, MP]`
+   with boot default = DP; Setup configures the two runnable screens.
 4. **Tutorial assets first.** Machine-specific visuals MUST prefer
    Tutorial Assets when the tutorial provides a suitable image or UI
    resource. Known initial candidates include Dining Philosophers SVGs
@@ -301,8 +303,11 @@ SCTD-01 implementation is complete when:
   Tutorial Demo App crate.
 - **SCTD-02:** Wire the Tutorial Demo App into simulator and supported
   target wrappers.
-- **SCTD-03:** Add stretch tutorial machines such as StopWatch or Morse
-  after the initial machines meet vector and build gates.
+- **SCTD-03:** Replace the earlier multi-DP selector with `[Setup, DP,
+  MP]`, fold DP classic behavior into Auto mode, and add Setup-owned DP/MP
+  configuration.
+- **SCTD-04+:** Add stretch tutorial machines such as StopWatch or Morse
+  after the SCTD-03 model meets vector and build gates.
 
 ## 15. Change Log
 

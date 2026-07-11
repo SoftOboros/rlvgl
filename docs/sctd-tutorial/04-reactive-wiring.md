@@ -332,7 +332,7 @@ emitter know the screen structure; only the consumer knows the app.
 ## 4.6 Putting it together
 
 Here is the complete wiring sequence, drawn directly from
-[`examples/apps/sctd-demo/src/media_player_skin.rs`](../../../../examples/apps/sctd-demo/src/media_player_skin.rs):
+[`examples/apps/sctd-demo/src/media_player_skin.rs`](../../examples/apps/sctd-demo/src/media_player_skin.rs):
 
 ```rust
 pub fn new(bounds: Rect) -> Self {

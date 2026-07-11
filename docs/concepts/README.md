@@ -181,6 +181,10 @@ disco-analyzer subrepo's first concepts doc).
     compose-then-flip / decoupled-logical-tick cadence (INV-SCTD02-1/-2).
     **Ratified 2026-06-20** (amends SCTD-00 §5/§7 — see SCTD-00 §15).
     SCTD-02 execution unblocked.
+  - [SCTD-03-SETUP-AND-AUTO-MODE.md](SCTD-03-SETUP-AND-AUTO-MODE.md)
+    — Setup screen, selector recomposition to `[Setup, DP, MP]`, DP Auto
+    mode, Media Player source / Auto-Ready configuration, and touch-oriented
+    footer text. **Ratified 2026-06-21.**
 
 ### Wave-2 UI/runtime initiatives (2026-06-11)
 

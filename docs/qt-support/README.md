@@ -223,7 +223,7 @@ the items above are placeholders until those checklists are ratified.
 | Asset pipeline (raw RGBA / fonts / Lottie)      | Qt-referenced assets flow into the existing dual-mode assets crate; no new asset crate type. | `QT-07`            |
 | BSP YAML / chipdb generator                     | Orthogonal. Qt produces UI; BSP produces hardware glue. They meet only at the workspace scaffold. | n/a (no overlap)   |
 | `rlvgl-ui` (Chakra-inspired components)         | Qt emitter MUST target `rlvgl-ui` widgets, not raw `rlvgl-core` primitives.                 | `QT-03`            |
-| MicroPython integration ([`MICROPYTHON-INTEGRATION.md`](MICROPYTHON-INTEGRATION.md)) | Orthogonal. MicroPython is a runtime API surface; Qt is a compile-time authoring surface. | n/a (no overlap)   |
+| MicroPython integration ([`MICROPYTHON-INTEGRATION.md`](../future/MICROPYTHON-INTEGRATION.md)) | Orthogonal. MicroPython is a runtime API surface; Qt is a compile-time authoring surface. | n/a (no overlap)   |
 
 ---
 
