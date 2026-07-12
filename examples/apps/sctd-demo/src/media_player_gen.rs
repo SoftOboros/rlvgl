@@ -45,12 +45,13 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 22;
+pub const QT_EMIT_VERSION: u32 = 23;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
+#[rustfmt::skip]
 pub const QT_SOURCE: &str = "vendor/scjson/tutorial/Examples/Qt/SkodaBoleroInfotainment/Qml/Media/FrameMedia.qml";
 
 /// QT-05 §6 linkage version. v2 is the istate M1P6 dynamic-string
@@ -88,22 +89,22 @@ pub const EXTERNAL_TEXT_BINDINGS: &[(&str, &str)] = &[
 #[rustfmt::skip]
 #[derive(Debug, Clone)]
 pub struct ScreenState {
-    pub i_ROW_SPACING: i32,
-    pub panelHeight: i32,
-    pub repeatBtn_itemSelected: bool,
-    pub repeatBtn_topBorderVisible: bool,
-    pub repeatBtn_highlightBackgroundWhenSelected: bool,
-    pub repeatBtn_gradientColor: String,
-    pub __btn_mediafunc_scan_itemSelected: bool,
-    pub __btn_mediafunc_scan_topBorderVisible: bool,
-    pub __btn_mediafunc_scan_highlightBackgroundWhenSelected: bool,
-    pub __btn_mediafunc_scan_gradientColor: String,
-    pub shapePath_iOffset: i32,
-    pub __btn_mediafunc_shuffle_itemSelected: bool,
-    pub __btn_mediafunc_shuffle_topBorderVisible: bool,
-    pub __btn_mediafunc_shuffle_highlightBackgroundWhenSelected: bool,
-    pub __btn_mediafunc_shuffle_gradientColor: String,
-    pub warningPanel_code: i32,
+    pub i_row_spacing: i32,
+    pub panel_height: i32,
+    pub repeat_btn_item_selected: bool,
+    pub repeat_btn_top_border_visible: bool,
+    pub repeat_btn_highlight_background_when_selected: bool,
+    pub repeat_btn_gradient_color: String,
+    pub btn_mediafunc_scan_item_selected: bool,
+    pub btn_mediafunc_scan_top_border_visible: bool,
+    pub btn_mediafunc_scan_highlight_background_when_selected: bool,
+    pub btn_mediafunc_scan_gradient_color: String,
+    pub shape_path_i_offset: i32,
+    pub btn_mediafunc_shuffle_item_selected: bool,
+    pub btn_mediafunc_shuffle_top_border_visible: bool,
+    pub btn_mediafunc_shuffle_highlight_background_when_selected: bool,
+    pub btn_mediafunc_shuffle_gradient_color: String,
+    pub warning_panel_code: i32,
 }
 
 /// Reactive Label-text binding emitted by QT-04e §3. Each
@@ -226,6 +227,30 @@ pub enum Binding {
     ExternalText(ExternalTextBinding),
 }
 
+struct BindingSink<'a, T> {
+    values: &'a mut Vec<T>,
+}
+
+impl<'a, T> BindingSink<'a, T> {
+    fn new(values: &'a mut Vec<T>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, value: T) {
+        self.values.push(value);
+    }
+}
+
+/// Widget tree, screen state, state machine, and reactive bindings
+/// returned by [`build_screen`].
+#[rustfmt::skip]
+pub type BuiltScreen = (
+    WidgetNode,
+    Rc<RefCell<ScreenState>>,
+    Rc<RefCell<Machine>>,
+    Vec<Binding>,
+);
+
 /// Build the screen widget tree at `bounds` and return it
 /// alongside the `ScreenState` handle (QT-04b §3), the
 /// `Rc<RefCell<Machine>>` istate (linkage v2) handle, and the
@@ -236,33 +261,34 @@ pub enum Binding {
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {
+) -> BuiltScreen {
     let state = Rc::new(RefCell::new(ScreenState {
-        i_ROW_SPACING: 3,
+        i_row_spacing: 3,
         // QT-04b: non-literal default for `panelHeight`: height / 6 - AppConsts.i_DISPLAY_PADDING
-        panelHeight: 0,
-        repeatBtn_itemSelected: false,
-        repeatBtn_topBorderVisible: true,
-        repeatBtn_highlightBackgroundWhenSelected: false,
+        panel_height: 0,
+        repeat_btn_item_selected: false,
+        repeat_btn_top_border_visible: true,
+        repeat_btn_highlight_background_when_selected: false,
         // QT-04b: non-literal default for `gradientColor`: AppConsts.cl_ITEM_COLOR
-        repeatBtn_gradientColor: String::new(),
-        __btn_mediafunc_scan_itemSelected: false,
-        __btn_mediafunc_scan_topBorderVisible: true,
-        __btn_mediafunc_scan_highlightBackgroundWhenSelected: false,
+        repeat_btn_gradient_color: String::new(),
+        btn_mediafunc_scan_item_selected: false,
+        btn_mediafunc_scan_top_border_visible: true,
+        btn_mediafunc_scan_highlight_background_when_selected: false,
         // QT-04b: non-literal default for `gradientColor`: AppConsts.cl_ITEM_COLOR
-        __btn_mediafunc_scan_gradientColor: String::new(),
-        shapePath_iOffset: 7,
-        __btn_mediafunc_shuffle_itemSelected: false,
-        __btn_mediafunc_shuffle_topBorderVisible: true,
-        __btn_mediafunc_shuffle_highlightBackgroundWhenSelected: false,
+        btn_mediafunc_scan_gradient_color: String::new(),
+        shape_path_i_offset: 7,
+        btn_mediafunc_shuffle_item_selected: false,
+        btn_mediafunc_shuffle_top_border_visible: true,
+        btn_mediafunc_shuffle_highlight_background_when_selected: false,
         // QT-04b: non-literal default for `gradientColor`: AppConsts.cl_ITEM_COLOR
-        __btn_mediafunc_shuffle_gradientColor: String::new(),
+        btn_mediafunc_shuffle_gradient_color: String::new(),
         // QT-04b: non-literal default for `code`: getCode()
-        warningPanel_code: 0,
+        warning_panel_code: 0,
     }));
     let machine = Rc::new(RefCell::new({ let mut m = Machine::new(); m.start(); m }));
     let mut bindings: Vec<Binding> = Vec::new();
-    let node = build_pane(bounds, Rc::clone(&state), Rc::clone(&machine), &mut bindings);
+    let mut binding_sink = BindingSink::new(&mut bindings);
+    let node = build_pane(bounds, Rc::clone(&state), Rc::clone(&machine), &mut binding_sink);
     (node, state, machine, bindings)
 }
 
@@ -482,7 +508,7 @@ fn build_pane(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGBOLEROBACKGROUND (Images/ImgBoleroBackground.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGBOLEROBACKGROUND);
@@ -493,19 +519,19 @@ fn build_pane(
         tag: Some("pane"),
     };
     let child_bounds = bounds;
-    node.children.push(build_paneMouseArea(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_pane_mouse_area(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `MouseArea` (id: `paneMouseArea`)
 #[rustfmt::skip]
-fn build_paneMouseArea(
+fn build_pane_mouse_area(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
-    let mut click_area = ClickArea::new(bounds);
+    let click_area = ClickArea::new(bounds);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(click_area));
     // emitter-skipped (QT-04+): 1 signal handler(s)
     let mut node = WidgetNode {
@@ -514,36 +540,36 @@ fn build_paneMouseArea(
         tag: Some("paneMouseArea"),
     };
     let cb_2 = Rect {
-        x: (bounds.x + 8),
-        y: ((((bounds.y + bounds.height) - 8)) - ((((bounds.height / 6) - 8)))),
-        width: ((((bounds.x + bounds.width) - 8)) - ((bounds.x + 8))),
-        height: (((bounds.height / 6) - 8)),
+        x: bounds.x + 8,
+        y: bounds.y + bounds.height - 8 - (bounds.height / 6 - 8),
+        width: bounds.x + bounds.width - 8 - (bounds.x + 8),
+        height: bounds.height / 6 - 8,
     };
     let cb_0 = Rect {
-        x: (bounds.x + 8),
-        y: (bounds.y + 8),
-        width: ((((bounds.x + bounds.width) - 8)) - ((bounds.x + 8))),
-        height: ((cb_2.y) - ((bounds.y + 8))),
+        x: bounds.x + 8,
+        y: bounds.y + 8,
+        width: bounds.x + bounds.width - 8 - (bounds.x + 8),
+        height: cb_2.y - (bounds.y + 8),
     };
     let cb_1 = Rect {
         x: bounds.x,
         y: bounds.y,
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        width: bounds.x + bounds.width - bounds.x,
+        height: bounds.y + bounds.height - bounds.y,
     };
-    node.children.push(build_contentPaddingItem(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_content_padding_item(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
     node.children.push(build_node_3(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_bottomPanel(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_bottom_panel(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `Item` (id: `contentPaddingItem`)
 #[rustfmt::skip]
-fn build_contentPaddingItem(
+fn build_content_padding_item(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -556,55 +582,55 @@ fn build_contentPaddingItem(
     let cb_0 = Rect {
         x: bounds.x,
         y: bounds.y,
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
+        width: bounds.x + bounds.width - bounds.x,
         height: 36,
     };
     let cb_1 = Rect {
         x: bounds.x,
-        y: ((((bounds.y + bounds.height) - 10)) - ((((bounds.height / 6) - 8)))),
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: (((bounds.height / 6) - 8)),
+        y: bounds.y + bounds.height - 10 - (bounds.height / 6 - 8),
+        width: bounds.x + bounds.width - bounds.x,
+        height: bounds.height / 6 - 8,
     };
     let cb_3 = Rect {
-        x: (((bounds.x + bounds.width)) - (160)),
-        y: (cb_0.y + cb_0.height),
+        x: bounds.x + bounds.width - 160,
+        y: cb_0.y + cb_0.height,
         width: 160,
         height: 160,
     };
     let cb_2 = Rect {
         x: bounds.x,
-        y: (cb_3.y + cb_3.height),
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
-        height: ((cb_1.y) - ((cb_3.y + cb_3.height))),
+        y: cb_3.y + cb_3.height,
+        width: bounds.x + bounds.width - bounds.x,
+        height: cb_1.y - (cb_3.y + cb_3.height),
     };
     let cb_4 = Rect {
-        x: (bounds.x + 10),
+        x: bounds.x + 10,
         y: cb_3.y,
-        width: (((cb_3.x - 10)) - ((bounds.x + 10))),
-        height: (((cb_3.y + cb_3.height)) - (cb_3.y)),
+        width: cb_3.x - 10 - (bounds.x + 10),
+        height: cb_3.y + cb_3.height - cb_3.y,
     };
     let cb_5 = Rect {
         x: bounds.x,
-        y: (cb_0.y + cb_0.height),
-        width: ((cb_3.x) - (bounds.x)),
-        height: ((cb_2.y) - ((cb_0.y + cb_0.height))),
+        y: cb_0.y + cb_0.height,
+        width: cb_3.x - bounds.x,
+        height: cb_2.y - (cb_0.y + cb_0.height),
     };
-    node.children.push(build_headerPanel(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_functionKeys(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_header_panel(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_function_keys(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
     node.children.push(build_timeline(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_imageSource(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_textSource(cb_4, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_warningPanel(cb_5, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_image_source(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_source(cb_4, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_warning_panel(cb_5, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `Item` (id: `headerPanel`)
 #[rustfmt::skip]
-fn build_headerPanel(
+fn build_header_panel(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -615,53 +641,52 @@ fn build_headerPanel(
         tag: Some("headerPanel"),
     };
     let cb_0 = Rect {
-        x: (((bounds.x + bounds.width / 2)) - (bounds.width) / 2),
-        y: (((bounds.y + bounds.height / 2)) - (bounds.height) / 2),
+        x: bounds.x + bounds.width / 2 - bounds.width / 2,
+        y: bounds.y + bounds.height / 2 - bounds.height / 2,
         width: bounds.width,
         height: bounds.height,
     };
     let cb_1 = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
     let cb_2 = Rect {
-        x: ((cb_0.x) - (32)),
-        y: (((bounds.y + bounds.height / 2)) - (32) / 2),
+        x: cb_0.x - 32,
+        y: bounds.y + bounds.height / 2 - 32 / 2,
         width: 32,
         height: 32,
     };
     let cb_3 = Rect {
-        x: (((bounds.x + bounds.width)) - (bounds.width)),
-        y: (((bounds.y + bounds.height / 2)) - (bounds.height) / 2),
+        x: bounds.x + bounds.width - bounds.width,
+        y: bounds.y + bounds.height / 2 - bounds.height / 2,
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_textTime(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_time(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
     node.children.push(build_timer(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_imgMute(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_textTemperature(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_img_mute(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_temperature(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `Text` (id: `textTime`)
 #[rustfmt::skip]
-fn build_textTime(
+fn build_text_time(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textTime"),
-    };
-    node
+    }
 }
 
 // QML type: `Timer` (id: `timer`)
@@ -670,67 +695,64 @@ fn build_timer(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Timer`
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("timer"),
-    };
-    node
+    }
 }
 
 // QML type: `Image` (id: `imgMute`)
 #[rustfmt::skip]
-fn build_imgMute(
+fn build_img_mute(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-05h visibility-bound: visible → scxmlBolero.muteOn (source IMG_IMGMUTE)
     let visible = machine.borrow().is_active("muteOn");
     let (widget, __vb): (Rc<RefCell<dyn Widget>>, Binding) =
         qt_visibility_image(bounds, qt_assets::IMG_IMGMUTE, "muteOn", visible);
     bindings.push(__vb);
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("imgMute"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `textTemperature`)
 #[rustfmt::skip]
-fn build_textTemperature(
+fn build_text_temperature(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("15 °C", bounds)));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textTemperature"),
-    };
-    node
+    }
 }
 
 // QML type: `Item` (id: `functionKeys`)
 #[rustfmt::skip]
-fn build_functionKeys(
+fn build_function_keys(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -741,43 +763,43 @@ fn build_functionKeys(
         tag: Some("functionKeys"),
     };
     let cb_0 = Rect {
-        x: (((bounds.x + bounds.width / 2)) - (300) / 2),
+        x: bounds.x + bounds.width / 2 - 300 / 2,
         y: bounds.y,
         width: 300,
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        height: bounds.y + bounds.height - bounds.y,
     };
     let cb_1 = Rect {
         x: bounds.x,
         y: bounds.y,
         width: 65,
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        height: bounds.y + bounds.height - bounds.y,
     };
     let cb_2 = Rect {
-        x: ((cb_1.x + cb_1.width) + 3),
+        x: cb_1.x + cb_1.width + 3,
         y: bounds.y,
         width: 65,
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        height: bounds.y + bounds.height - bounds.y,
     };
     let cb_3 = Rect {
-        x: (((bounds.x + bounds.width)) - (65)),
+        x: bounds.x + bounds.width - 65,
         y: bounds.y,
         width: 65,
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        height: bounds.y + bounds.height - bounds.y,
     };
-    node.children.push(build_rowButtons(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_repeatBtn(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build___btn_mediafunc_scan(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build___btn_mediafunc_shuffle(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_row_buttons(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_repeat_btn(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_btn_mediafunc_scan(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_btn_mediafunc_shuffle(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `RowLayout` (id: `rowButtons`)
 #[rustfmt::skip]
-fn build_rowButtons(
+fn build_row_buttons(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `RowLayout`
     let mut w = Container::new(bounds);
@@ -789,22 +811,22 @@ fn build_rowButtons(
         tag: Some("rowButtons"),
     };
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_repeaterButtons(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_repeater_buttons(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `Repeater` (id: `repeaterButtons`)
 #[rustfmt::skip]
-fn build_repeaterButtons(
+fn build_repeater_buttons(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Repeater`
     let mut w = Container::new(bounds);
@@ -816,55 +838,54 @@ fn build_repeaterButtons(
         tag: Some("repeaterButtons"),
     };
     let cb_0 = Rect {
-        x: (bounds.x + 75),
-        y: (((bounds.y + bounds.height / 2)) - (48) / 2),
+        x: bounds.x + 75,
+        y: bounds.y + bounds.height / 2 - 48 / 2,
         width: 48,
         height: 48,
     };
     let cb_1 = Rect {
-        x: ((cb_0.x + cb_0.width) + 3),
-        y: (((bounds.y + bounds.height / 2)) - (48) / 2),
+        x: cb_0.x + cb_0.width + 3,
+        y: bounds.y + bounds.height / 2 - 48 / 2,
         width: 48,
         height: 48,
     };
     let cb_2 = Rect {
-        x: ((cb_1.x + cb_1.width) + 3),
-        y: (((bounds.y + bounds.height / 2)) - (48) / 2),
+        x: cb_1.x + cb_1.width + 3,
+        y: bounds.y + bounds.height / 2 - 48 / 2,
         width: 48,
         height: 48,
     };
-    node.children.push(build___rep_btn_0(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build___rep_btn_1(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build___rep_btn_2(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_rep_btn_0(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_rep_btn_1(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_rep_btn_2(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `Image` (id: `__rep_btn_0`)
 #[rustfmt::skip]
-fn build___rep_btn_0(
+fn build_rep_btn_0(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGREWINDBACK_48 (Qml/Images/ImgRewindBack_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDBACK_48);
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("__rep_btn_0"),
-    };
-    node
+    }
 }
 
 // QML type: `Image` (id: `__rep_btn_1`)
 #[rustfmt::skip]
-fn build___rep_btn_1(
+fn build_rep_btn_1(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-05g predicate-bound: source → scxmlBolero.mediaPlaying ? on=IMG_IMGPAUSE_48 : off=IMG_IMGPLAY_48
     let active = machine.borrow().is_active("mediaPlaying");
@@ -872,40 +893,38 @@ fn build___rep_btn_1(
         qt_predicate_image(bounds, qt_assets::IMG_IMGPAUSE_48, qt_assets::IMG_IMGPLAY_48, "mediaPlaying", active);
     bindings.push(__pb);
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("__rep_btn_1"),
-    };
-    node
+    }
 }
 
 // QML type: `Image` (id: `__rep_btn_2`)
 #[rustfmt::skip]
-fn build___rep_btn_2(
+fn build_rep_btn_2(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image source → qt_assets::IMG_IMGREWINDFORWARD_48 (Qml/Images/ImgRewindForward_48.png)
     let widget: Rc<RefCell<dyn Widget>> = qt_image(bounds, qt_assets::IMG_IMGREWINDFORWARD_48);
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("__rep_btn_2"),
-    };
-    node
+    }
 }
 
 // QML type: `Button` (id: `repeatBtn`)
 #[rustfmt::skip]
-fn build_repeatBtn(
+fn build_repeat_btn(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
@@ -919,8 +938,8 @@ fn build_repeatBtn(
     };
     // QT-03c centerIn: parent (no explicit size — defaulted to parent bounds)
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
@@ -934,7 +953,7 @@ fn build_node_23(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-05i predicate-chain-bound: source → scxmlBolero chain [mediaRepeatTrack→IMG_IMGMEDIATRACKREPEAT_48, mediaRepeatFolder→IMG_IMGMEDIAFOLDERREPEAT_48] default=IMG_IMGMEDIANOREPEAT_48
     let __arms: &[(&'static [u8], &'static str)] = &[
@@ -944,21 +963,20 @@ fn build_node_23(
     let (widget, __pcb): (Rc<RefCell<dyn Widget>>, Binding) =
         qt_predicate_chain_image(bounds, __arms, qt_assets::IMG_IMGMEDIANOREPEAT_48, &machine.borrow());
     bindings.push(__pcb);
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `Button` (id: `__btn_mediafunc_scan`)
 #[rustfmt::skip]
-fn build___btn_mediafunc_scan(
+fn build_btn_mediafunc_scan(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
@@ -983,7 +1001,7 @@ fn build_shape(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Shape`
     let mut w = Container::new(bounds);
@@ -995,22 +1013,22 @@ fn build_shape(
         tag: Some("shape"),
     };
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_shapePath(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_shape_path(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `ShapePath` (id: `shapePath`)
 #[rustfmt::skip]
-fn build_shapePath(
+fn build_shape_path(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `ShapePath`
     let mut w = Container::new(bounds);
@@ -1022,8 +1040,8 @@ fn build_shapePath(
         tag: Some("shapePath"),
     };
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
@@ -1037,18 +1055,17 @@ fn build_node_27(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `PathLine`
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `Text`
@@ -1057,26 +1074,25 @@ fn build_node_25(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `Button` (id: `__btn_mediafunc_shuffle`)
 #[rustfmt::skip]
-fn build___btn_mediafunc_shuffle(
+fn build_btn_mediafunc_shuffle(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let mut button = Button::new("", bounds);
@@ -1090,8 +1106,8 @@ fn build___btn_mediafunc_shuffle(
     };
     // QT-03c centerIn: parent (no explicit size — defaulted to parent bounds)
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
@@ -1105,19 +1121,18 @@ fn build_node_28(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-05g predicate-bound: source → scxmlBolero.mediaPlayMixModeOn ? on=IMG_IMGSHUFFLEON_48 : off=IMG_IMGSHUFFLEOFF_48
     let active = machine.borrow().is_active("mediaPlayMixModeOn");
     let (widget, __pb): (Rc<RefCell<dyn Widget>>, Binding) =
         qt_predicate_image(bounds, qt_assets::IMG_IMGSHUFFLEON_48, qt_assets::IMG_IMGSHUFFLEOFF_48, "mediaPlayMixModeOn", active);
     bindings.push(__pb);
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `Item` (id: `timeline`)
@@ -1126,7 +1141,7 @@ fn build_timeline(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -1138,33 +1153,33 @@ fn build_timeline(
         tag: Some("timeline"),
     };
     let cb_0 = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
     let cb_1 = Rect {
-        x: (((bounds.x + bounds.width / 2)) - ((bounds.width * 1)) / 2),
+        x: bounds.x + bounds.width / 2 - bounds.width / 2,
         y: bounds.y,
-        width: (bounds.width * 1),
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        width: bounds.width,
+        height: bounds.y + bounds.height - bounds.y,
     };
     let cb_2 = Rect {
         x: bounds.x,
         y: bounds.y,
-        width: (((cb_1.x - 5)) - (bounds.x)),
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        width: cb_1.x - 5 - bounds.x,
+        height: bounds.y + bounds.height - bounds.y,
     };
     let cb_3 = Rect {
-        x: ((cb_1.x + cb_1.width) + 5),
+        x: cb_1.x + cb_1.width + 5,
         y: bounds.y,
-        width: (((bounds.x + bounds.width)) - (((cb_1.x + cb_1.width) + 5))),
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        width: bounds.x + bounds.width - (cb_1.x + cb_1.width + 5),
+        height: bounds.y + bounds.height - bounds.y,
     };
     node.children.push(build_node_29(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_timeSlider(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_textPosition(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_textElapsed(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_time_slider(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_position(cb_2, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_elapsed(cb_3, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -1174,88 +1189,84 @@ fn build_node_29(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Connections`
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `Slider` (id: `timeSlider`)
 #[rustfmt::skip]
-fn build_timeSlider(
+fn build_time_slider(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Slider`
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("timeSlider"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `textPosition`)
 #[rustfmt::skip]
-fn build_textPosition(
+fn build_text_position(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textPosition"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `textElapsed`)
 #[rustfmt::skip]
-fn build_textElapsed(
+fn build_text_elapsed(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textElapsed"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle` (id: `imageSource`)
 #[rustfmt::skip]
-fn build_imageSource(
+fn build_image_source(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -1270,8 +1281,8 @@ fn build_imageSource(
     // emitter-skipped (QT-03c+): anchors.right: parent.right
     // emitter-skipped (QT-03c+): anchors.bottom: parent.bottom
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
@@ -1282,12 +1293,12 @@ fn build_imageSource(
     // emitter-skipped (QT-03c+): anchors.bottom: parent.bottom
     // emitter-skipped (QT-03c+): anchors.bottomMargin: 4
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_textCaption(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_caption(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -1297,48 +1308,46 @@ fn build_image(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-IMG: Image with no resolvable source literal; emitting an empty transparent container
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("image"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `textCaption`)
 #[rustfmt::skip]
-fn build_textCaption(
+fn build_text_caption(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textCaption"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `textSource`)
 #[rustfmt::skip]
-fn build_textSource(
+fn build_text_source(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-05k external-text: text → audioPlayer.currentPlayUrlFileName (consumer-resolved, tag `textSource`)
     let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
@@ -1349,21 +1358,20 @@ fn build_textSource(
         label: Rc::clone(&label_handle),
         key: "audioPlayer.currentPlayUrlFileName",
     }));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textSource"),
-    };
-    node
+    }
 }
 
 // QML type: `Item` (id: `warningPanel`)
 #[rustfmt::skip]
-fn build_warningPanel(
+fn build_warning_panel(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -1378,56 +1386,54 @@ fn build_warningPanel(
         x: bounds.x,
         y: bounds.y,
         width: 100,
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        height: bounds.y + bounds.height - bounds.y,
     };
     let cb_1 = Rect {
-        x: ((cb_0.x + cb_0.width) + 20),
+        x: cb_0.x + cb_0.width + 20,
         y: bounds.y,
-        width: ((((bounds.x + bounds.width) - 10)) - (((cb_0.x + cb_0.width) + 20))),
-        height: (((bounds.y + bounds.height)) - (bounds.y)),
+        width: bounds.x + bounds.width - 10 - (cb_0.x + cb_0.width + 20),
+        height: bounds.y + bounds.height - bounds.y,
     };
-    node.children.push(build_busyIndicator(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
-    node.children.push(build_textWarning(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_busy_indicator(cb_0, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_text_warning(cb_1, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `BusyIndicator` (id: `busyIndicator`)
 #[rustfmt::skip]
-fn build_busyIndicator(
+fn build_busy_indicator(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `BusyIndicator`
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("busyIndicator"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `textWarning`)
 #[rustfmt::skip]
-fn build_textWarning(
+fn build_text_warning(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("textWarning"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle`
@@ -1436,7 +1442,7 @@ fn build_node_3(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     // TODO QT-04e: bind color (non-literal QML expression)
@@ -1458,7 +1464,7 @@ fn build_node_37(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut click_area = ClickArea::new(bounds);
     // QT-04 body: scxmlBolero.submitEvent("Inp.App.Media.ModalOverlay.Clicked")
@@ -1466,21 +1472,20 @@ fn build_node_37(
         // TODO QT-04e: lower QML expression to Rust.
     });
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(click_area));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `Item` (id: `bottomPanel`)
 #[rustfmt::skip]
-fn build_bottomPanel(
+fn build_bottom_panel(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -1491,17 +1496,17 @@ fn build_bottomPanel(
         tag: Some("bottomPanel"),
     };
     let child_bounds = bounds;
-    node.children.push(build_rowButtons_38(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_row_buttons_38(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `RowLayout` (id: `rowButtons`)
 #[rustfmt::skip]
-fn build_rowButtons_38(
+fn build_row_buttons_38(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `RowLayout`
     let mut w = Container::new(bounds);
@@ -1513,32 +1518,31 @@ fn build_rowButtons_38(
         tag: Some("rowButtons"),
     };
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
-    node.children.push(build_repeaterButtons_39(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_repeater_buttons_39(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
 // QML type: `Repeater` (id: `repeaterButtons`)
 #[rustfmt::skip]
-fn build_repeaterButtons_39(
+fn build_repeater_buttons_39(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // emitter-fallback (QT-03b): unmapped QML type `Repeater`
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("repeaterButtons"),
-    };
-    node
+    }
 }

@@ -185,6 +185,13 @@ disco-analyzer subrepo's first concepts doc).
     — Setup screen, selector recomposition to `[Setup, DP, MP]`, DP Auto
     mode, Media Player source / Auto-Ready configuration, and touch-oriented
     footer text. **Ratified 2026-06-21.**
+  - [SCTD-04-RATATUI-RLVGL-INTEGRATION.md](SCTD-04-RATATUI-RLVGL-INTEGRATION.md)
+    — proposed two-way Ratatui ↔ rlvgl bridge: an upstream-shaped
+    `ratatui-rlvgl` backend, an additional full-screen hybrid Dining
+    Philosophers popup launched from the unchanged native DP screen (rlvgl
+    rounded chrome/buttons around Ratatui-rendered table content), host
+    simulator capture, and a flashable STM32H747I-DISCO bare-metal “Rust all
+    the way down” proof. **Ratified 2026-07-12; SCTD-04 execution unblocked.**
 
 ### Wave-2 UI/runtime initiatives (2026-06-11)
 

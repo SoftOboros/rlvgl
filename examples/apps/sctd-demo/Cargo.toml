@@ -20,6 +20,8 @@ rlvgl-platform = { path = "../../../platform", version = "0.2.4", default-featur
 rlvgl-decomp = { path = "../../../rlvgl-decomp", version = "0.2.3" }
 media-player = { path = "machines/media-player", default-features = false, features = [] }
 dining-philosophers-interactive = { path = "machines/dining-philosophers-interactive", default-features = false, features = [] }
+ratatui = { path = "../../../vendor/ratatui/ratatui", default-features = false }
+ratatui-rlvgl = { path = "../../../vendor/ratatui/ratatui-rlvgl", default-features = false }
 
 [features]
 default = []

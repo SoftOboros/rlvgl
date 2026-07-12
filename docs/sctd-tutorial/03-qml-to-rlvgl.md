@@ -103,7 +103,7 @@ list construction — no longer apply.
 Three provenance constants follow the header:
 
 ```rust
-pub const QT_EMIT_VERSION: u32 = 22;
+pub const QT_EMIT_VERSION: u32 = 23;
 pub const QT_IR_VERSION: u32 = 2;
 pub const QT_SOURCE: &str = "vendor/scjson/tutorial/.../FrameMedia.qml";
 ```
@@ -112,7 +112,10 @@ pub const QT_SOURCE: &str = "vendor/scjson/tutorial/.../FrameMedia.qml";
 changes the generated API in a way that requires consumer updates, this
 number increments so you can grep for it. `QT_SOURCE` records which file
 was the input, so you always know where to look when the generated code
-needs to change.
+needs to change. Version 23 also makes emitted Rust strict-Clippy clean:
+helpers use snake-case Rust symbols while preserving QML tags, leaf builders
+return directly, binding writes pass through a private sink, and
+`build_screen` exposes a documented `BuiltScreen` tuple alias.
 
 ### How QML elements map to Rust widgets
 

@@ -383,6 +383,88 @@ mod touch_isr {
 ))]
 use touch_isr::touch_ring_pop;
 
+/// Pointer tracking for raw FT5336 samples in the SCTD payload loop.
+#[cfg(all(
+    feature = "sctd",
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct SctdTouchState {
+    last: Option<(u16, u16)>,
+    last_count: u8,
+    display_width: u16,
+}
+
+/// Convert the panel's portrait touch coordinates into landscape UI events.
+#[cfg(all(
+    feature = "sctd",
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn sctd_touch_event(
+    state: &mut SctdTouchState,
+    sample: touch_isr::RawTouchSample,
+) -> Option<rlvgl_core::event::Event> {
+    use rlvgl_core::event::{Event, MAX_TOUCH_POINTS, TouchPoint, TouchState};
+
+    let display_width = state.display_width as i32;
+    let count = sample.count;
+    if count >= 2 {
+        let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
+        for (index, &(id, flag, x, y)) in sample.points[..count as usize].iter().enumerate() {
+            points[index] = TouchPoint {
+                id,
+                x: y as i32,
+                y: display_width - 1 - x as i32,
+                state: match flag {
+                    0 => TouchState::Down,
+                    1 => TouchState::Up,
+                    _ => TouchState::Contact,
+                },
+            };
+        }
+        let (_, _, x, y) = sample.points[0];
+        state.last = Some((x, y));
+        state.last_count = count;
+        return Some(Event::Touch { count, points });
+    }
+
+    let touch = (count == 1).then(|| {
+        let (_, _, x, y) = sample.points[0];
+        (x, y)
+    });
+    let was_multi = state.last_count >= 2;
+    state.last_count = count;
+    let landscape = |x: u16, y: u16| (y as i32, display_width - 1 - x as i32);
+    match (touch, state.last) {
+        (Some((x, y)), Some((last_x, last_y))) => {
+            state.last = Some((x, y));
+            if was_multi {
+                let (x, y) = landscape(x, y);
+                Some(Event::PointerDown { x, y })
+            } else if (x, y) != (last_x, last_y) {
+                let (x, y) = landscape(x, y);
+                Some(Event::PointerMove { x, y })
+            } else {
+                None
+            }
+        }
+        (Some((x, y)), None) => {
+            state.last = Some((x, y));
+            let (x, y) = landscape(x, y);
+            Some(Event::PointerDown { x, y })
+        }
+        (None, Some((x, y))) => {
+            state.last = None;
+            let (x, y) = landscape(x, y);
+            Some(Event::PointerUp { x, y })
+        }
+        (None, None) => None,
+    }
+}
+
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
 /// In FreeRTOS builds, this runs from TIM6 enable until start()
 /// disables it; touch_task takes over I2C reads after that.
@@ -522,6 +604,35 @@ mod _dsi_isr {
 ))]
 pub(crate) fn take_erif() -> bool {
     ERIF_FLAG.swap(false, core::sync::atomic::Ordering::AcqRel)
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    not(feature = "freertos"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+unsafe fn enable_dsi_erif_irq(nvic: &mut cortex_m::peripheral::NVIC) {
+    unsafe {
+        // Wrapper ERIF is the sole DSI interrupt source used by the render
+        // pipeline. The ISR clears LTDCEN at scan completion and latches the
+        // timestamp consumed by the phase-locked presenter.
+        (0x5000_00C4u32 as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5000_00C8u32 as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5000_0408u32 as *mut u32).write_volatile(1 << 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let isr0 = (0x5000_00BCu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        if isr0 != 0 {
+            (0x5000_00D8u32 as *mut u32).write_volatile(isr0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
+        let isr1 = (0x5000_00C0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        if isr1 != 0 {
+            (0x5000_00DCu32 as *mut u32).write_volatile(isr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
+        cortex_m::peripheral::NVIC::unpend(stm32h7::stm32h747cm7::Interrupt::DSI);
+        cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
+        nvic.set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 1);
+    }
 }
 
 /// Cycles elapsed since last ERIF (T=0 for all scheduling decisions).
@@ -795,6 +906,7 @@ struct SdramFbReader {
     width: u32,
     height: u32,
     present_count: u32,
+    rotated_landscape: bool,
 }
 
 #[cfg(all(
@@ -805,10 +917,20 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
     fn read_pixel(&self, x: i32, y: i32) -> u32 {
         let ux = x as u32;
         let uy = y as u32;
-        if ux >= self.width || uy >= self.height {
+        let (logical_width, logical_height) = if self.rotated_landscape {
+            (self.height, self.width)
+        } else {
+            (self.width, self.height)
+        };
+        if ux >= logical_width || uy >= logical_height {
             return 0;
         }
-        let offset = ((uy * self.width + ux) * 4) as usize;
+        let (physical_x, physical_y) = if self.rotated_landscape {
+            (self.width - 1 - uy, ux)
+        } else {
+            (ux, uy)
+        };
+        let offset = ((physical_y * self.width + physical_x) * 4) as usize;
         let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe { ptr.read_volatile() }
     }
@@ -816,16 +938,24 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
     fn read_row(&self, x: i32, y: i32, width: u16, out: &mut [u32]) -> usize {
         let ux = x.max(0) as u32;
         let uy = y.max(0) as u32;
-        if uy >= self.height || ux >= self.width {
+        let logical_width = if self.rotated_landscape {
+            self.height
+        } else {
+            self.width
+        };
+        let logical_height = if self.rotated_landscape {
+            self.width
+        } else {
+            self.height
+        };
+        if uy >= logical_height || ux >= logical_width {
             return 0;
         }
-        let available = ((self.width - ux) as usize)
+        let available = ((logical_width - ux) as usize)
             .min(width as usize)
             .min(out.len());
-        for i in 0..available {
-            let offset = ((uy * self.width + ux + i as u32) * 4) as usize;
-            let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            out[i] = unsafe { ptr.read_volatile() };
+        for (index, pixel) in out[..available].iter_mut().enumerate() {
+            *pixel = self.read_pixel(x + index as i32, y);
         }
         available
     }
@@ -979,7 +1109,107 @@ fn serial_hex_u32(v: u32) {
     runtime_serial::write_bytes(&out);
 }
 
+/// Two-stage allocator used by the SCTD payload.
+///
+/// Early board bring-up allocates from DTCM. Once the display has initialized
+/// SDRAM, new allocations switch to a larger arena while deallocation remains
+/// routed to the heap that owns each pointer.
+#[cfg(feature = "sctd")]
+struct SwitchingHeap {
+    primary: Heap,
+    secondary: Heap,
+    secondary_start: core::sync::atomic::AtomicUsize,
+    secondary_end: core::sync::atomic::AtomicUsize,
+    secondary_active: core::sync::atomic::AtomicBool,
+}
+
+#[cfg(feature = "sctd")]
+impl SwitchingHeap {
+    const fn empty() -> Self {
+        Self {
+            primary: Heap::empty(),
+            secondary: Heap::empty(),
+            secondary_start: core::sync::atomic::AtomicUsize::new(0),
+            secondary_end: core::sync::atomic::AtomicUsize::new(0),
+            secondary_active: core::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    unsafe fn init_primary(&self, start: usize, size: usize) {
+        unsafe { self.primary.init(start, size) };
+    }
+
+    unsafe fn init_secondary(&self, start: usize, size: usize) {
+        unsafe { self.secondary.init(start, size) };
+        self.secondary_start
+            .store(start, core::sync::atomic::Ordering::Relaxed);
+        self.secondary_end.store(
+            start.saturating_add(size),
+            core::sync::atomic::Ordering::Relaxed,
+        );
+        self.secondary_active
+            .store(true, core::sync::atomic::Ordering::Release);
+    }
+
+    fn used(&self) -> usize {
+        if self
+            .secondary_active
+            .load(core::sync::atomic::Ordering::Acquire)
+        {
+            self.secondary.used()
+        } else {
+            self.primary.used()
+        }
+    }
+
+    fn free(&self) -> usize {
+        if self
+            .secondary_active
+            .load(core::sync::atomic::Ordering::Acquire)
+        {
+            self.secondary.free()
+        } else {
+            self.primary.free()
+        }
+    }
+}
+
+#[cfg(feature = "sctd")]
+unsafe impl core::alloc::GlobalAlloc for SwitchingHeap {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        if self
+            .secondary_active
+            .load(core::sync::atomic::Ordering::Acquire)
+        {
+            unsafe { core::alloc::GlobalAlloc::alloc(&self.secondary, layout) }
+        } else {
+            unsafe { core::alloc::GlobalAlloc::alloc(&self.primary, layout) }
+        }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        let address = ptr as usize;
+        let start = self
+            .secondary_start
+            .load(core::sync::atomic::Ordering::Relaxed);
+        let end = self
+            .secondary_end
+            .load(core::sync::atomic::Ordering::Relaxed);
+        if address >= start && address < end {
+            unsafe { core::alloc::GlobalAlloc::dealloc(&self.secondary, ptr, layout) };
+        } else {
+            unsafe { core::alloc::GlobalAlloc::dealloc(&self.primary, ptr, layout) };
+        }
+    }
+}
+
+/// Global allocator backed by DTCM during boot and SDRAM for SCTD runtime data.
+#[cfg(feature = "sctd")]
+#[global_allocator]
+static ALLOC: SwitchingHeap = SwitchingHeap::empty();
+
 /// Global allocator backed by a fixed-size heap in RAM.
+#[cfg(not(feature = "sctd"))]
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
@@ -1464,6 +1694,9 @@ fn main() -> ! {
     // Heap must be ready before any Rust allocation (including rlvgl_app_main).
     unsafe {
         let start = addr_of_mut!(HEAP_MEM) as usize;
+        #[cfg(feature = "sctd")]
+        ALLOC.init_primary(start, HEAP_SIZE);
+        #[cfg(not(feature = "sctd"))]
         ALLOC.init(start, HEAP_SIZE);
     }
 
@@ -2013,6 +2246,18 @@ fn main() -> ! {
             #[cfg(feature = "splash")]
             Some(SPLASH_RLE),
         );
+        #[cfg(feature = "sctd")]
+        {
+            // Ratatui keeps current and previous cell grids so it can publish
+            // only changed cells. Reserve that long-lived arena after the
+            // display has initialized SDRAM and claimed both framebuffer banks.
+            const SCTD_SDRAM_HEAP_SIZE: usize = 8 * 1024 * 1024;
+            let arena = rlvgl_platform::reserve_sdram_arena(SCTD_SDRAM_HEAP_SIZE, 32)
+                .expect("SCTD SDRAM heap reservation");
+            unsafe {
+                ALLOC.init_secondary(arena as usize, SCTD_SDRAM_HEAP_SIZE);
+            }
+        }
         unsafe {
             (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-display::new
@@ -2345,6 +2590,185 @@ fn main() -> ! {
             HalInputPin(gpiok.pk5.into_pull_up_input()),
             HalInputPin(gpiok.pk6.into_pull_up_input()),
         );
+
+        // SCTD-04 payload swap: all board bring-up above is shared with the
+        // normal DISCO demo. Only the application/controller and render loop
+        // differ, preserving the Rust PAC/HAL, ISR, DSI, LTDC and DMA2D path.
+        #[cfg(feature = "sctd")]
+        {
+            use rlvgl_core::widget::Color;
+            use rlvgl_platform::{
+                BlitRect, Blitter, BlitterRenderer, CpuBlitter, Dma2dBlitter, PixelFmt, Surface,
+                hwcore::dca::{DcaCache, DcaCacheCtx},
+            };
+
+            serial_puts("SCTD:RUST-ALL-THE-WAY-DOWN\r\n");
+            let mut controller = rlvgl_app_sctd_demo::SctdController::new(
+                rlvgl_platform::Screen::landscape(800, 480),
+            );
+            let root = controller.root();
+            let mut tap = rlvgl_platform::gesture::TapRecognizer::new(FRAME_HZ);
+            let mut touch = SctdTouchState {
+                last: None,
+                last_count: 0,
+                display_width: display.dimensions().0 as u16,
+            };
+            let mut playit: alloc::boxed::Box<rlvgl_playit::PlayitExecutor<UsartTransport, 32>> =
+                alloc::boxed::Box::new(rlvgl_playit::PlayitExecutor::new(UsartTransport));
+            let (physical_width, physical_height) = display.dimensions();
+            let mut fb_reader = SdramFbReader {
+                fb_addr: display.front_phys().raw(),
+                width: physical_width,
+                height: physical_height,
+                present_count: 0,
+                rotated_landscape: true,
+            };
+            let mut tick_count = 0u32;
+            let mut present_count = 0u32;
+            let mut dirty_frames = 2u8;
+            let mut first_present = true;
+
+            // SCTD enters before the general demo's render pipeline setup, so
+            // explicitly join the same proven ERIF/TE state machine here.
+            unsafe { enable_dsi_erif_irq(&mut cp.NVIC) };
+            ERIF_FLAG.store(false, core::sync::atomic::Ordering::Release);
+
+            loop {
+                while let Some(sample) = unsafe { touch_ring_pop() } {
+                    if let Some(raw_event) = sctd_touch_event(&mut touch, sample) {
+                        if let Some(event) = tap.process(&raw_event) {
+                            controller.dispatch_event(&event);
+                            dirty_frames = 2;
+                        }
+                    }
+                }
+
+                if cp.SYST.has_wrapped() {
+                    tick_count = tick_count.wrapping_add(1);
+                    if let Some(event) = tap.tick() {
+                        controller.dispatch_event(&event);
+                        dirty_frames = 2;
+                    }
+                    if dirty_frames == 0 {
+                        let hero_generation = controller.hero_generation();
+                        let native_generation = controller.native_generation();
+                        controller.dispatch_event(&Event::Tick);
+                        let view_changed = controller.hero_generation() != hero_generation
+                            || controller.native_generation() != native_generation;
+                        if view_changed {
+                            dirty_frames = 2;
+                        }
+                    }
+                }
+
+                if let Some(event) = button_input.poll() {
+                    controller.dispatch_event(&event);
+                    dirty_frames = 2;
+                }
+                if let Some(event) = joystick.poll() {
+                    controller.dispatch_event(&event);
+                    dirty_frames = 2;
+                }
+
+                fb_reader.fb_addr = display.front_phys().raw();
+                fb_reader.present_count = present_count;
+                let status = rlvgl_playit::StatusData {
+                    tick_count,
+                    present_count,
+                };
+                let mut playit_dispatched = false;
+                playit.poll_with_callback(
+                    &mut root.borrow_mut(),
+                    &status,
+                    Some(&fb_reader),
+                    &mut rlvgl_playit::executor::NullPipeline,
+                    |_| {},
+                    |event| {
+                        controller.handle_event(event);
+                        playit_dispatched = true;
+                    },
+                );
+                if playit_dispatched {
+                    dirty_frames = 2;
+                }
+
+                if dirty_frames > 0 {
+                    if !first_present {
+                        // The DSI ISR clears LTDCEN and latches ERIF only after
+                        // the current scan has stopped reading the front bank.
+                        while !ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire) {
+                            cortex_m::asm::wfi();
+                        }
+                    }
+                    let back = display.back_phys().raw();
+                    let framebuffer_bytes = (physical_width * physical_height * 4) as usize;
+                    let stride = (physical_width * 4) as usize;
+                    let framebuffer = unsafe {
+                        core::slice::from_raw_parts_mut(back as *mut u8, framebuffer_bytes)
+                    };
+                    let mut surface = Surface::new(
+                        framebuffer,
+                        stride,
+                        PixelFmt::Argb8888,
+                        physical_width,
+                        physical_height,
+                    );
+                    let raw_dma2d = display.take_dma2d_raw().expect("DMA2D ownership");
+                    let mut dma2d = Dma2dBlitter::new(raw_dma2d);
+                    dma2d.fill(
+                        &mut surface,
+                        BlitRect {
+                            x: 0,
+                            y: 0,
+                            w: physical_width,
+                            h: physical_height,
+                        },
+                        Color(13, 19, 30, 255).to_argb8888(),
+                    );
+                    display.return_dma2d_raw(dma2d.into_inner());
+                    {
+                        // DMA2D updated cacheable WT SDRAM behind the CPU's
+                        // cache. Drop stale lines before alpha/blend code reads
+                        // destination pixels from the freshly cleared buffer.
+                        let mut cache_ctx = DcaCacheCtx::new(&mut cp.SCB);
+                        cache_ctx.cache_mut().barrier();
+                        cache_ctx
+                            .cache_mut()
+                            .invalidate(back as usize, framebuffer_bytes);
+                    }
+                    {
+                        // Small cell and bitmap-glyph spans are substantially
+                        // faster as direct CPU writes than as one blocking
+                        // DMA2D transaction per span. DMA2D owns the large
+                        // frame clear above; Rust rasterization owns the tree.
+                        let mut cpu = CpuBlitter;
+                        let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 64> =
+                            BlitterRenderer::new(&mut cpu, surface);
+                        let mut renderer = rlvgl_platform::blit::RotatedRenderer::new(
+                            &mut blit_renderer,
+                            physical_width,
+                        );
+                        root.borrow().draw(&mut renderer);
+                    }
+                    if !first_present {
+                        const PRESENT_HOLDOFF: u32 = 6_000_000;
+                        while cycles_since_erif() < PRESENT_HOLDOFF {
+                            core::hint::spin_loop();
+                        }
+                        if !take_erif() {
+                            continue;
+                        }
+                    }
+                    display.present();
+                    ERIF_FLAG.store(false, core::sync::atomic::Ordering::Release);
+                    first_present = false;
+                    present_count = present_count.wrapping_add(1);
+                    dirty_frames -= 1;
+                } else {
+                    cortex_m::asm::wfi();
+                }
+            }
+        }
 
         serial_puts("PRE-TREE\r\n");
         // Build a minimal root widget tree. The demo app tree has a white
@@ -3229,6 +3653,7 @@ fn main() -> ! {
             width: display.dimensions().0,
             height: display.dimensions().1,
             present_count: 0,
+            rotated_landscape: false,
         };
         let mut present_count: u32 = 0;
 

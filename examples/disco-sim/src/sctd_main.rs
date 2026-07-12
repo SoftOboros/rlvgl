@@ -13,7 +13,9 @@ use rlvgl_core::{WidgetNode, event::Event};
 use rlvgl_platform::{
     BlitRect, BlitterRenderer, CpuBlitter, InputEvent, PixelFmt, Screen, Surface, WgpuDisplay,
 };
-use rlvgl_playit::{FramebufferReader, PlayitExecutor, PlayitTransport, StatusData, TcpServerTransport};
+use rlvgl_playit::{
+    FramebufferReader, PlayitExecutor, PlayitTransport, StatusData, TcpServerTransport,
+};
 use std::{
     cell::RefCell,
     env, fs,
@@ -114,7 +116,9 @@ impl FramebufferReader for FrameMirror {
 struct NullTransport;
 
 impl PlayitTransport for NullTransport {
-    fn read_byte(&mut self) -> Option<u8> { None }
+    fn read_byte(&mut self) -> Option<u8> {
+        None
+    }
     fn write_bytes(&mut self, _bytes: &[u8]) {}
 }
 
@@ -221,10 +225,14 @@ impl SctdRuntime {
         let root = self.root.clone();
         let mut root_ref = root.borrow_mut();
         let controller = &mut self.controller;
-        self.playit
-            .dispatch_event(event, &mut root_ref, &mut rlvgl_playit::executor::NullPipeline, |dispatched| {
+        self.playit.dispatch_event(
+            event,
+            &mut root_ref,
+            &mut rlvgl_playit::executor::NullPipeline,
+            |dispatched| {
                 controller.handle_event(dispatched);
-            });
+            },
+        );
     }
 
     fn render_frame(&mut self) {
@@ -358,12 +366,7 @@ fn render_ascii(runtime: &Rc<RefCell<SctdRuntime>>, path: &str) {
     fs::write(Path::new(path), ascii).expect("failed to write headless output");
 }
 
-fn render_png(
-    runtime: &Rc<RefCell<SctdRuntime>>,
-    width: usize,
-    height: usize,
-    path: &str,
-) {
+fn render_png(runtime: &Rc<RefCell<SctdRuntime>>, width: usize, height: usize, path: &str) {
     use rlvgl_platform::ColorFormat;
     let runtime = runtime.clone();
     WgpuDisplay::headless_with_color_format(

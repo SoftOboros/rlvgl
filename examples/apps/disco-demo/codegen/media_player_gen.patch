@@ -1,0 +1,459 @@
+--- a/media_player_gen.rs
++++ b/media_player_gen.rs
+@@ -33,14 +33,12 @@
+ use alloc::vec::Vec;
+ use core::cell::RefCell;
+ 
+-use media_player::Machine;
++use crate::media_player::Machine;
+ use rlvgl_core::WidgetNode;
+-use rlvgl_core::image::BlitOpts;
+ use rlvgl_core::widget::{Color, Rect, Widget};
+ use rlvgl_widgets::button::Button;
+ use rlvgl_widgets::click_area::ClickArea;
+ use rlvgl_widgets::container::Container;
+-use rlvgl_widgets::image::Image;
+ use rlvgl_widgets::label::Label;
+ 
+ /// rlvgl-target emit-shape version. Bumping is Specification-Required
+@@ -129,14 +127,14 @@
+ pub struct ImageArt {
+     pub width: i32,
+     pub height: i32,
+-    pub pixels: &'static [Color],
++    pub rle: &'static [u8],
+ }
+ 
+ /// QT-05g §3 — reactive `Image`-source binding. Shows `on` when the
+ /// bound state is active, else `off`. `state_id` is the QML predicate
+ /// passed through verbatim to `Machine::is_active` (authority: derive).
+ pub struct PredicateBinding {
+-    pub image: Rc<RefCell<Image<'static>>>,
++    pub image: Rc<RefCell<RleImage>>,
+     pub state_id: &'static str,
+     pub on: ImageArt,
+     pub off: ImageArt,
+@@ -150,9 +148,7 @@
+         } else {
+             &self.off
+         };
+-        self.image
+-            .borrow_mut()
+-            .set_pixels(art.width, art.height, art.pixels);
++        self.image.borrow_mut().set_art(*art);
+     }
+ }
+ 
+@@ -160,7 +156,7 @@
+ /// `Machine::is_active`. `state_id` is the QML predicate passed
+ /// through verbatim (authority: derive).
+ pub struct VisibilityBinding {
+-    pub image: Rc<RefCell<Image<'static>>>,
++    pub image: Rc<RefCell<RleImage>>,
+     pub state_id: &'static str,
+ }
+ 
+@@ -185,7 +181,7 @@
+ /// resting else). Each `state_id` is the QML predicate passed through
+ /// verbatim (authority: derive).
+ pub struct PredicateChainBinding {
+-    pub image: Rc<RefCell<Image<'static>>>,
++    pub image: Rc<RefCell<RleImage>>,
+     pub arms: Vec<PredicateArm>,
+     pub default: ImageArt,
+ }
+@@ -200,9 +196,7 @@
+             .find(|a| machine.is_active(a.state_id))
+             .map(|a| &a.art)
+             .unwrap_or(&self.default);
+-        self.image
+-            .borrow_mut()
+-            .set_pixels(art.width, art.height, art.pixels);
++        self.image.borrow_mut().set_art(*art);
+     }
+ }
+ 
+@@ -338,69 +332,274 @@
+ //   qt_assets::IMG_IMGMEDIANOREPEAT_48  ←  Qml/Images/ImgMediaNoRepeat_48.png
+ //   qt_assets::IMG_IMGSHUFFLEON_48  ←  Qml/Images/ImgShuffleOn_48.png
+ //   qt_assets::IMG_IMGSHUFFLEOFF_48  ←  Qml/Images/ImgShuffleOff_48.png
+-/// Decode a vendored RLE asset into an owned, leaked pixel buffer and
+-/// wrap it in an `Image` widget (see emit-time docs above).
++const RLE_ROW_PIXELS: usize = 800;
++
++/// No-heap RLE image widget for embedded targets.
++///
++/// The first port of the generated media player expanded each RLE asset into a
++/// leaked `Vec<Color>`. That is fine on the simulator and ESP32-P4, but the
++/// STM32H747I-DISCO firmware has a 64 KiB Rust heap; the Bolero background
++/// alone expands to more than 800 KiB. This widget keeps the generated shape
++/// intact while streaming one decoded row at a time through the renderer.
++pub struct RleImage {
++    bounds: Rect,
++    art: ImageArt,
++    hidden: bool,
++}
++
++impl RleImage {
++    fn new(bounds: Rect, art: ImageArt) -> Self {
++        Self {
++            bounds,
++            art,
++            hidden: false,
++        }
++    }
++
++    fn set_art(&mut self, art: ImageArt) {
++        self.art = art;
++    }
++
++    fn set_hidden(&mut self, hidden: bool) {
++        self.hidden = hidden;
++    }
++}
++
++impl Widget for RleImage {
++    fn bounds(&self) -> Rect {
++        self.bounds
++    }
++
++    fn draw(&self, renderer: &mut dyn rlvgl_core::renderer::Renderer) {
++        if self.hidden || self.bounds.width <= 0 || self.bounds.height <= 0 {
++            return;
++        }
++        let Ok((w, h, palette_bytes, stream)) = rlvgl_decomp::parse_rle_blob(self.art.rle) else {
++            return;
++        };
++        let src_w = w as usize;
++        let src_h = h as usize;
++        if src_w == 0 || src_h == 0 || src_w > RLE_ROW_PIXELS {
++            return;
++        }
++        let dest_w = self.bounds.width as usize;
++        if dest_w == 0 || dest_w > RLE_ROW_PIXELS {
++            return;
++        }
++        let palette_len = palette_bytes.len() / 2;
++        if palette_len > rlvgl_decomp::consts::MAX_PALETTE {
++            return;
++        }
++        let mut palette = [0u16; rlvgl_decomp::consts::MAX_PALETTE];
++        for i in 0..palette_len {
++            palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);
++        }
++
++        let mut row = [Color(0, 0, 0, 0); RLE_ROW_PIXELS];
++        let mut stream_i = 0usize;
++        let mut src_x = 0usize;
++        let mut src_y = 0usize;
++        let mut recent_idx = 0usize;
++
++        while stream_i < stream.len() && src_y < src_h {
++            let b = stream[stream_i];
++            stream_i += 1;
++            match b {
++                rlvgl_decomp::consts::ENCODE_KEY_SINGLE_INLINE_PIXEL => {
++                    if stream_i + 1 >= stream.len() {
++                        return;
++                    }
++                    let c = ((stream[stream_i] as u16) << 8) | stream[stream_i + 1] as u16;
++                    stream_i += 2;
++                    emit_rle_pixel(
++                        rgb565_color(c),
++                        renderer,
++                        self.bounds,
++                        src_w,
++                        src_h,
++                        &mut row,
++                        &mut src_x,
++                        &mut src_y,
++                    );
++                }
++                rlvgl_decomp::consts::ENCODE_KEY_DOUBLE_INLINE_PIXEL => {
++                    if stream_i + 1 >= stream.len() {
++                        return;
++                    }
++                    let c = ((stream[stream_i] as u16) << 8) | stream[stream_i + 1] as u16;
++                    stream_i += 2;
++                    emit_rle_run(
++                        rgb565_color(c),
++                        2,
++                        renderer,
++                        self.bounds,
++                        src_w,
++                        src_h,
++                        &mut row,
++                        &mut src_x,
++                        &mut src_y,
++                    );
++                }
++                rlvgl_decomp::consts::ENCODE_KEY_LONG_REPEAT => {
++                    if stream_i >= stream.len() || recent_idx >= palette_len {
++                        return;
++                    }
++                    let count = rlvgl_decomp::consts::SHORT_REPEAT_MAX as usize
++                        + 1
++                        + stream[stream_i] as usize;
++                    stream_i += 1;
++                    emit_rle_run(
++                        rgb565_color(palette[recent_idx]),
++                        count,
++                        renderer,
++                        self.bounds,
++                        src_w,
++                        src_h,
++                        &mut row,
++                        &mut src_x,
++                        &mut src_y,
++                    );
++                }
++                data => {
++                    let data = data as usize;
++                    if data < palette_len {
++                        recent_idx = data;
++                        emit_rle_pixel(
++                            rgb565_color(palette[data]),
++                            renderer,
++                            self.bounds,
++                            src_w,
++                            src_h,
++                            &mut row,
++                            &mut src_x,
++                            &mut src_y,
++                        );
++                    } else {
++                        if recent_idx >= palette_len {
++                            return;
++                        }
++                        let count = data.saturating_sub(palette_len).saturating_add(1);
++                        emit_rle_run(
++                            rgb565_color(palette[recent_idx]),
++                            count,
++                            renderer,
++                            self.bounds,
++                            src_w,
++                            src_h,
++                            &mut row,
++                            &mut src_x,
++                            &mut src_y,
++                        );
++                    }
++                }
++            }
++        }
++    }
++
++    fn handle_event(&mut self, _event: &rlvgl_core::event::Event) -> bool {
++        false
++    }
++}
++
++fn rgb565_color(c: u16) -> Color {
++    let r5 = ((c >> 11) & 0x1F) as u8;
++    let g6 = ((c >> 5) & 0x3F) as u8;
++    let b5 = (c & 0x1F) as u8;
++    let r = (r5 << 3) | (r5 >> 2);
++    let g = (g6 << 2) | (g6 >> 4);
++    let b = (b5 << 3) | (b5 >> 2);
++    if r == 0xFF && g == 0x00 && b == 0xFF {
++        Color(0x00, 0x00, 0x00, 0x00)
++    } else {
++        Color(r, g, b, 0xFF)
++    }
++}
++
++#[allow(clippy::too_many_arguments)]
++fn emit_rle_run(
++    color: Color,
++    count: usize,
++    renderer: &mut dyn rlvgl_core::renderer::Renderer,
++    bounds: Rect,
++    src_w: usize,
++    src_h: usize,
++    row: &mut [Color; RLE_ROW_PIXELS],
++    src_x: &mut usize,
++    src_y: &mut usize,
++) {
++    for _ in 0..count {
++        emit_rle_pixel(color, renderer, bounds, src_w, src_h, row, src_x, src_y);
++        if *src_y >= src_h {
++            return;
++        }
++    }
++}
++
++#[allow(clippy::too_many_arguments)]
++fn emit_rle_pixel(
++    color: Color,
++    renderer: &mut dyn rlvgl_core::renderer::Renderer,
++    bounds: Rect,
++    src_w: usize,
++    src_h: usize,
++    row: &mut [Color; RLE_ROW_PIXELS],
++    src_x: &mut usize,
++    src_y: &mut usize,
++) {
++    if *src_y >= src_h || *src_x >= src_w {
++        return;
++    }
++    row[*src_x] = color;
++    *src_x += 1;
++    if *src_x == src_w {
++        draw_scaled_rle_row(renderer, bounds, src_w, src_h, *src_y, row);
++        *src_y += 1;
++        *src_x = 0;
++    }
++}
++
++fn draw_scaled_rle_row(
++    renderer: &mut dyn rlvgl_core::renderer::Renderer,
++    bounds: Rect,
++    src_w: usize,
++    src_h: usize,
++    src_y: usize,
++    row: &mut [Color; RLE_ROW_PIXELS],
++) {
++    let dest_w = bounds.width as usize;
++    let dest_h = bounds.height as usize;
++    if dest_w == 0 || dest_h == 0 {
++        return;
++    }
++    for dx in (0..dest_w).rev() {
++        let sx = dx * src_w / dest_w;
++        row[dx] = row[sx];
++    }
++    let y0 = (src_y * dest_h).div_ceil(src_h);
++    let y1 = ((src_y + 1) * dest_h).div_ceil(src_h);
++    for dy in y0..y1 {
++        renderer.draw_pixels(
++            (bounds.x, bounds.y + dy as i32),
++            &row[..dest_w],
++            dest_w as u32,
++            1,
++        );
++    }
++}
++
++/// Wrap one vendored RLE asset in a no-heap `Image`-compatible widget.
+ #[rustfmt::skip]
+ fn qt_image(bounds: Rect, rle: &'static [u8]) -> Rc<RefCell<dyn Widget>> {
+-    let (w, h, palette_bytes, stream) =
+-        rlvgl_decomp::parse_rle_blob(rle).expect("qt_image: malformed RLE asset");
+-    let palette_len = palette_bytes.len() / 2;
+-    let mut palette = alloc::vec![0u16; palette_len];
+-    for i in 0..palette_len {
+-        palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);
+-    }
+-    let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
+-        .expect("qt_image: RLE decode failed");
+-    let pixels: Vec<Color> = rgba
+-        .chunks_exact(4)
+-        .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {
+-            Color(0x00, 0x00, 0x00, 0x00) // magenta sentinel → transparent (RGB565 has no alpha)
+-        } else {
+-            Color(c[0], c[1], c[2], c[3])
+-        })
+-        .collect();
+-    let pixels: &'static [Color] = Vec::leak(pixels);
+-    let mut img = Image::new(bounds, w as i32, h as i32, pixels);
+-    // An Image paints its own pixels; the widget background MUST be
+-    // transparent so the default opaque-white `Style` does not bury
+-    // the artwork (and content drawn behind it).
+-    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+-    // QML's default `fillMode` is `Image.Stretch`: scale the source to
+-    // fill the destination bounds. `scale` is 8.8 fixed-point, so 256 =
+-    // 1:1; dest/src * 256 stretches source pixels across `bounds`.
+-    let scale_x = if w > 0 {
+-        ((bounds.width.max(0) as i64 * 256 / w as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let scale_y = if h > 0 {
+-        ((bounds.height.max(0) as i64 * 256 / h as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
+-    Rc::new(RefCell::new(img))
++    let art = qt_image_art(rle);
++    Rc::new(RefCell::new(RleImage::new(bounds, art)))
+ }
+ 
+-/// QT-05g: decode one vendored RLE asset into a leaked `ImageArt`
+-/// (magenta-keyed → transparent, RGB565 has no alpha).
++/// QT-05g: record one vendored RLE asset as `ImageArt`.
+ #[rustfmt::skip]
+ fn qt_image_art(rle: &'static [u8]) -> ImageArt {
+-    let (w, h, palette_bytes, stream) =
++    let (w, h, _, _) =
+         rlvgl_decomp::parse_rle_blob(rle).expect("qt_image_art: malformed RLE asset");
+-    let palette_len = palette_bytes.len() / 2;
+-    let mut palette = alloc::vec![0u16; palette_len];
+-    for i in 0..palette_len {
+-        palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);
+-    }
+-    let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
+-        .expect("qt_image_art: RLE decode failed");
+-    let pixels: Vec<Color> = rgba
+-        .chunks_exact(4)
+-        .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {
+-            Color(0x00, 0x00, 0x00, 0x00)
+-        } else {
+-            Color(c[0], c[1], c[2], c[3])
+-        })
+-        .collect();
+-    let pixels: &'static [Color] = Vec::leak(pixels);
+-    ImageArt { width: w as i32, height: h as i32, pixels }
++    ImageArt { width: w as i32, height: h as i32, rle }
+ }
+ 
+ /// QT-05g: build a predicate-bound Image. Decodes both branches, builds
+@@ -417,16 +616,7 @@
+     let on = qt_image_art(on_rle);
+     let off = qt_image_art(off_rle);
+     let cur = if active { on } else { off };
+-    let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);
+-    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+-    // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).
+-    let scale_x = if cur.width > 0 {
+-        ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let scale_y = if cur.height > 0 {
+-        ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
++    let img = RleImage::new(bounds, cur);
+     let image = Rc::new(RefCell::new(img));
+     let widget: Rc<RefCell<dyn Widget>> = image.clone();
+     (widget, Binding::Predicate(PredicateBinding { image, state_id, on, off }))
+@@ -443,15 +633,7 @@
+     visible: bool,
+ ) -> (Rc<RefCell<dyn Widget>>, Binding) {
+     let art = qt_image_art(rle);
+-    let mut img = Image::new(bounds, art.width, art.height, art.pixels);
+-    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+-    let scale_x = if art.width > 0 {
+-        ((bounds.width.max(0) as i64 * 256 / art.width as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let scale_y = if art.height > 0 {
+-        ((bounds.height.max(0) as i64 * 256 / art.height as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let mut img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
++    let mut img = RleImage::new(bounds, art);
+     img.set_hidden(!visible);
+     let image = Rc::new(RefCell::new(img));
+     let widget: Rc<RefCell<dyn Widget>> = image.clone();
+@@ -479,16 +661,7 @@
+         .find(|a| machine.is_active(a.state_id))
+         .map(|a| a.art)
+         .unwrap_or(default);
+-    let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);
+-    img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
+-    // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).
+-    let scale_x = if cur.width > 0 {
+-        ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let scale_y = if cur.height > 0 {
+-        ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16
+-    } else { 256 };
+-    let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });
++    let img = RleImage::new(bounds, cur);
+     let image = Rc::new(RefCell::new(img));
+     let widget: Rc<RefCell<dyn Widget>> = image.clone();
+     (widget, Binding::Chain(PredicateChainBinding { image, arms: decoded, default }))

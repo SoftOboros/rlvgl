@@ -47,6 +47,7 @@ mod media_player_skin;
 mod philosophers;
 /// Vendored Bolero artwork (RLE) referenced by [`media_player_gen`].
 mod qt_assets;
+mod ratatui_hero;
 mod selector;
 mod setup_screen;
 
@@ -62,6 +63,7 @@ use core::cell::RefCell;
 use machine_panel::MachinePanel;
 use media_player_skin::MediaPlayerSkin;
 use philosophers::{PhilosophersTable, SeatState};
+use ratatui_hero::{HeroButton, HeroContent, HeroFrame, HeroSeat, HeroSnapshot};
 #[cfg(test)]
 use selector::SLOT_MP;
 use selector::{MachineSelector, SLOT_DP, SLOT_SETUP};
@@ -399,6 +401,27 @@ impl InteractiveDiningPhilosophersAdapter {
     fn seated_count(&self) -> usize {
         (1..=5).filter(|&k| self.seated(k)).count()
     }
+
+    fn hero_snapshot(&self, events: &[String]) -> HeroSnapshot {
+        HeroSnapshot {
+            seats: core::array::from_fn(|index| {
+                let number = index as i64 + 1;
+                let left_fork = number;
+                let right_fork = if number == 1 { 5 } else { number - 1 };
+                HeroSeat {
+                    number: number as u8,
+                    state: self.seat_states().unwrap_or([SeatState::Empty; 5])[index],
+                    left_fork_owner: self.seat_int("t_FORKS", left_fork),
+                    right_fork_owner: self.seat_int("t_FORKS", right_fork),
+                    depart_pending: self.seat_int("t_DEPART_REQ", number) != 0,
+                }
+            }),
+            auto: self.auto,
+            paused: self.paused,
+            speed: IDP_SPEED_LABELS[self.speed_idx],
+            events: events.to_vec(),
+        }
+    }
 }
 
 impl Default for InteractiveDiningPhilosophersAdapter {
@@ -576,6 +599,9 @@ struct ControllerState {
     skin: Rc<RefCell<MediaPlayerSkin>>,
     subtitle: Rc<RefCell<Label>>,
     footer: Rc<RefCell<Label>>,
+    hero: HeroWidgets,
+    hero_open: bool,
+    hero_events: Vec<String>,
     /// DP machine adapter (concrete type — no unsafe downcast needed).
     dp: InteractiveDiningPhilosophersAdapter,
     /// MP machine adapter (concrete type).
@@ -587,16 +613,46 @@ struct ControllerState {
     commands: Vec<SctdCommand>,
 }
 
+struct HeroWidgets {
+    frame: Rc<RefCell<HeroFrame>>,
+    content: Rc<RefCell<HeroContent>>,
+    launcher: Rc<RefCell<HeroButton>>,
+    controls: Vec<Rc<RefCell<HeroButton>>>,
+}
+
+impl HeroWidgets {
+    fn set_modal_visible(&self, visible: bool) {
+        self.frame.borrow_mut().set_visible(visible);
+        self.content.borrow_mut().set_visible(visible);
+        for control in &self.controls {
+            control.borrow_mut().set_visible(visible);
+        }
+    }
+}
+
+struct ControllerParts {
+    selector: Rc<RefCell<MachineSelector>>,
+    panel: Rc<RefCell<MachinePanel>>,
+    setup: Rc<RefCell<SetupScreen>>,
+    table: Rc<RefCell<PhilosophersTable>>,
+    skin: Rc<RefCell<MediaPlayerSkin>>,
+    subtitle: Rc<RefCell<Label>>,
+    footer: Rc<RefCell<Label>>,
+    hero: HeroWidgets,
+}
+
 impl ControllerState {
-    fn new(
-        selector: Rc<RefCell<MachineSelector>>,
-        panel: Rc<RefCell<MachinePanel>>,
-        setup: Rc<RefCell<SetupScreen>>,
-        table: Rc<RefCell<PhilosophersTable>>,
-        skin: Rc<RefCell<MediaPlayerSkin>>,
-        subtitle: Rc<RefCell<Label>>,
-        footer: Rc<RefCell<Label>>,
-    ) -> Self {
+    fn new(parts: ControllerParts) -> Self {
+        let ControllerParts {
+            selector,
+            panel,
+            setup,
+            table,
+            skin,
+            subtitle,
+            footer,
+            hero,
+        } = parts;
         let mut this = Self {
             selector,
             panel,
@@ -605,6 +661,9 @@ impl ControllerState {
             skin,
             subtitle,
             footer,
+            hero,
+            hero_open: false,
+            hero_events: alloc::vec!["Native DP view ready".to_string()],
             dp: InteractiveDiningPhilosophersAdapter::new(),
             mp: MediaPlayerAdapter::new(),
             selected: SLOT_DP, // SCTD-03 §5: boot default = slot 1 (DP)
@@ -654,6 +713,27 @@ impl ControllerState {
     /// * **DP run view** (slot 1): MachinePanel visible; table visible; SetupScreen hidden; skin hidden.
     /// * **MP run view** (slot 2): media-player skin visible; MachinePanel hidden; table hidden; SetupScreen hidden.
     fn sync_visibility(&mut self) {
+        if self.hero_open {
+            self.panel.borrow_mut().set_visible(false);
+            self.setup.borrow_mut().set_visible(false);
+            self.skin.borrow_mut().set_visible(false);
+            self.table.borrow_mut().set_states(None);
+            if let Ok(mut selector) = self.selector.try_borrow_mut() {
+                selector.set_visible(false);
+            }
+            self.hero.launcher.borrow_mut().set_visible(false);
+            self.hero.set_modal_visible(true);
+            return;
+        }
+
+        if let Ok(mut selector) = self.selector.try_borrow_mut() {
+            selector.set_visible(true);
+        }
+        self.hero.set_modal_visible(false);
+        self.hero
+            .launcher
+            .borrow_mut()
+            .set_visible(self.current_view() == SlotView::Dp);
         match self.current_view() {
             SlotView::Setup => {
                 self.panel.borrow_mut().set_visible(false);
@@ -680,7 +760,7 @@ impl ControllerState {
 
     /// Push the selected machine's live seat states to the Philosophers Table.
     fn sync_table(&mut self) {
-        let states = if self.current_view() == SlotView::Dp {
+        let states = if self.current_view() == SlotView::Dp && !self.hero_open {
             self.dp.seat_states()
         } else {
             None // Hide table for MP and Setup views.
@@ -714,6 +794,7 @@ impl ControllerState {
 
     fn select_machine(&mut self, index: usize) {
         if index < selector::MACHINE_COUNT {
+            self.hero_open = false;
             self.selected = index;
             self.event_focus = 0;
             // Use try_borrow_mut: when this is reached from a selector TAP, the
@@ -763,6 +844,7 @@ impl ControllerState {
                 machine: name,
                 event: event_name,
             });
+            self.push_hero_event(format!("keyboard: {event_name}"));
         }
     }
 
@@ -787,7 +869,37 @@ impl ControllerState {
                 machine: name,
                 event: event_name,
             });
+            self.push_hero_event(format!("manual: {event_name}"));
             self.sync_table();
+        }
+    }
+
+    fn push_hero_event(&mut self, event: String) {
+        const MAX_HERO_EVENTS: usize = 12;
+        if self.hero_events.len() == MAX_HERO_EVENTS {
+            self.hero_events.remove(0);
+        }
+        self.hero_events.push(event);
+    }
+
+    fn open_hero(&mut self) {
+        if self.current_view() == SlotView::Dp {
+            self.hero_open = true;
+            self.push_hero_event("opened Ratatui hero".to_string());
+        }
+    }
+
+    fn close_hero(&mut self) {
+        if self.hero_open {
+            self.hero_open = false;
+            self.push_hero_event("closed Ratatui hero".to_string());
+        }
+    }
+
+    fn sync_hero(&mut self) {
+        if self.hero_open {
+            let snapshot = self.dp.hero_snapshot(&self.hero_events);
+            self.hero.content.borrow_mut().update(snapshot);
         }
     }
 
@@ -804,6 +916,12 @@ impl ControllerState {
     }
 
     fn handle_key(&mut self, key: &Key) {
+        if self.hero_open {
+            if matches!(key, Key::Escape) {
+                self.close_hero();
+            }
+            return;
+        }
         match key {
             Key::ArrowUp => self.cycle_event_focus(-1),
             Key::ArrowDown => self.cycle_event_focus(1),
@@ -834,6 +952,8 @@ impl ControllerState {
             self.sync_table();
             self.sync_panel();
         }
+        self.sync_visibility();
+        self.sync_hero();
     }
 }
 
@@ -984,15 +1104,92 @@ impl SctdController {
                 .build(),
         ));
 
-        let state = Rc::new(RefCell::new(ControllerState::new(
-            selector.clone(),
-            panel.clone(),
-            setup.clone(),
-            table.clone(),
-            skin.clone(),
-            subtitle.clone(),
-            footer.clone(),
+        // SCTD-04: additive near-full-screen hybrid hero. Native rlvgl owns
+        // the popup frame and graphical buttons; Ratatui owns `hero_content`.
+        let screen_rect = Rect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        };
+        let popup = Rect {
+            x: 8,
+            y: 8,
+            width: (width - 16).max(1),
+            height: (height - 16).max(1),
+        };
+        let action_y = popup.y + popup.height - 52;
+        let hero_content_bounds = Rect {
+            x: popup.x + 12,
+            y: popup.y + 46,
+            width: (popup.width - 24).max(12),
+            height: (action_y - popup.y - 54).max(20),
+        };
+        let hero_frame = Rc::new(RefCell::new(HeroFrame::new(screen_rect, popup)));
+        let hero_content = Rc::new(RefCell::new(HeroContent::new(hero_content_bounds)));
+        let hero_launcher = Rc::new(RefCell::new(HeroButton::new(
+            Rect {
+                x: (width - STRIP_X_OFFSET - 142).max(PANEL_X),
+                y: (height - 72).max(PANEL_Y),
+                width: 132,
+                height: 38,
+            },
+            "Ratatui",
+            true,
         )));
+
+        let close = Rc::new(RefCell::new(HeroButton::new(
+            Rect {
+                x: popup.x + popup.width - 60,
+                y: popup.y + 10,
+                width: 48,
+                height: 32,
+            },
+            "X",
+            false,
+        )));
+        close.borrow_mut().set_press_behavior(Rect {
+            x: popup.x + popup.width - 92,
+            y: 0,
+            width: 100,
+            height: 70,
+        });
+        let action_labels = ["Arrive", "Depart", "Panic", "Reset", "Pause", "Speed"];
+        let action_gap = 6;
+        let action_width = ((popup.width - 24 - action_gap * 5) / 6).max(48);
+        let mut hero_controls: Vec<Rc<RefCell<HeroButton>>> = alloc::vec![close];
+        for (index, label) in action_labels.iter().enumerate() {
+            let bounds = Rect {
+                x: popup.x + 12 + index as i32 * (action_width + action_gap),
+                y: action_y,
+                width: action_width,
+                height: 38,
+            };
+            let mut control = HeroButton::new(bounds, label, index == 0);
+            control.set_press_behavior(Rect {
+                x: bounds.x,
+                y: bounds.y - 10,
+                width: bounds.width,
+                height: bounds.height + 20,
+            });
+            hero_controls.push(Rc::new(RefCell::new(control)));
+        }
+
+        let state = Rc::new(RefCell::new(ControllerState::new(ControllerParts {
+            selector: selector.clone(),
+            panel: panel.clone(),
+            setup: setup.clone(),
+            table: table.clone(),
+            skin: skin.clone(),
+            subtitle: subtitle.clone(),
+            footer: footer.clone(),
+            hero: HeroWidgets {
+                frame: hero_frame.clone(),
+                content: hero_content.clone(),
+                launcher: hero_launcher.clone(),
+                controls: hero_controls.clone(),
+            },
+        })));
 
         // Wire selector tap callbacks (slots 0, 1, 2 → Setup, DP, MP).
         {
@@ -1041,6 +1238,23 @@ impl SctdController {
                         s.mp_adapter_mut().apply_new_config(src, on);
                     })),
                 });
+            }
+
+            let state_open = state.clone();
+            hero_launcher
+                .borrow_mut()
+                .set_on_tap(Box::new(move || state_open.borrow_mut().open_hero()));
+
+            let state_close = state.clone();
+            hero_controls[0]
+                .borrow_mut()
+                .set_on_tap(Box::new(move || state_close.borrow_mut().close_hero()));
+
+            for (event_index, button) in hero_controls.iter().skip(1).enumerate() {
+                let state_action = state.clone();
+                button.borrow_mut().set_on_tap(Box::new(move || {
+                    state_action.borrow_mut().dispatch_event_index(event_index);
+                }));
             }
         }
 
@@ -1091,6 +1305,37 @@ impl SctdController {
                 children: Vec::new(),
                 tag: Some("sctd.events"),
             });
+            r.children.push(WidgetNode {
+                widget: hero_launcher,
+                children: Vec::new(),
+                tag: Some("sctd.hero.launch"),
+            });
+            r.children.push(WidgetNode {
+                widget: hero_frame,
+                children: Vec::new(),
+                tag: Some("sctd.hero.window"),
+            });
+            r.children.push(WidgetNode {
+                widget: hero_content,
+                children: Vec::new(),
+                tag: Some("sctd.hero.content"),
+            });
+            let control_tags = [
+                "sctd.hero.close",
+                "sctd.hero.arrive",
+                "sctd.hero.depart",
+                "sctd.hero.panic",
+                "sctd.hero.reset",
+                "sctd.hero.pause",
+                "sctd.hero.speed",
+            ];
+            for (control, tag) in hero_controls.into_iter().zip(control_tags) {
+                r.children.push(WidgetNode {
+                    widget: control,
+                    children: Vec::new(),
+                    tag: Some(tag),
+                });
+            }
         }
 
         // Set selector highlight to boot-default slot 1 (DP).
@@ -1119,6 +1364,9 @@ impl SctdController {
             Event::KeyDown { key } => state.handle_key(key),
             _ => {}
         }
+        state.sync_visibility();
+        state.sync_table();
+        state.sync_hero();
     }
 
     /// Drain platform commands since the last call.
@@ -1145,6 +1393,21 @@ impl SctdController {
         } else {
             String::new()
         }
+    }
+
+    /// Whether the additive SCTD-04 Ratatui hero window is open.
+    pub fn hero_is_open(&self) -> bool {
+        self.state.borrow().hero_open
+    }
+
+    /// Monotonic Ratatui frame generation for change-driven platform redraws.
+    pub fn hero_generation(&self) -> u64 {
+        self.state.borrow().hero.content.borrow().generation()
+    }
+
+    /// Monotonic native-table generation for change-driven platform redraws.
+    pub fn native_generation(&self) -> u64 {
+        self.state.borrow().table.borrow().generation()
     }
 }
 
@@ -1365,6 +1628,44 @@ mod tests {
         assert!(ctrl.current_state_summary().contains("PAUSED"));
     }
 
+    /// SCTD-04 §8 — the Ratatui hero is additive to the existing native DP
+    /// screen and shares its machine state.
+    #[test]
+    fn ratatui_hero_opens_from_native_dp_and_preserves_state() {
+        let mut ctrl = make_controller();
+        ctrl.state.borrow_mut().dp_adapter_mut().set_auto(false);
+
+        assert!(!ctrl.hero_is_open());
+        assert!(ctrl.state.borrow().table.borrow().is_visible());
+        assert!(ctrl.state.borrow().hero.launcher.borrow().is_visible());
+        assert!(find_node(&ctrl.root.borrow(), "sctd.hero.content").is_some());
+
+        // Native graphical launcher.
+        ctrl.dispatch_event(&Event::PressRelease { x: 610, y: 420 });
+        assert!(ctrl.hero_is_open());
+        assert!(!ctrl.state.borrow().table.borrow().is_visible());
+        assert!(ctrl.state.borrow().hero.content.borrow().is_visible());
+        let generation = ctrl.state.borrow().hero.content.borrow().generation();
+        assert!(generation > 0);
+
+        // Native graphical Arrive button updates the shared machine and the
+        // Ratatui table snapshot.
+        ctrl.dispatch_event(&Event::PressDown { x: 40, y: 435 });
+        assert!(ctrl.current_state_summary().contains("1:thk"));
+        assert!(ctrl.state.borrow().hero.content.borrow().generation() > generation);
+
+        ctrl.dispatch_event(&Event::PressDown { x: 715, y: 435 });
+        assert!(ctrl.current_state_summary().contains("speed x2"));
+        ctrl.dispatch_event(&Event::PressDown { x: 588, y: 435 });
+        assert!(ctrl.current_state_summary().contains("PAUSED"));
+
+        // Native title-bar close reveals the original DP table at the same state.
+        ctrl.dispatch_event(&Event::PressDown { x: 760, y: 24 });
+        assert!(!ctrl.hero_is_open());
+        assert!(ctrl.state.borrow().table.borrow().is_visible());
+        assert!(ctrl.current_state_summary().contains("1:thk"));
+    }
+
     /// SCTD-03 §6 — toggling Auto off stops auto-populate; manual Arrive still works.
     #[test]
     fn auto_mode_off_stops_auto_populate_manual_still_works() {
@@ -1410,6 +1711,23 @@ mod tests {
             "with Auto on, seats should populate over ticks: {:?}",
             s
         );
+    }
+
+    #[test]
+    fn native_generation_changes_only_when_table_state_changes() {
+        let mut controller = SctdController::new(rlvgl_platform::Screen::landscape(800, 480));
+        let initial = controller.native_generation();
+
+        controller.dispatch_event(&Event::Tick);
+        assert_eq!(controller.native_generation(), initial);
+
+        for _ in 0..20 {
+            controller.dispatch_event(&Event::Tick);
+            if controller.native_generation() != initial {
+                return;
+            }
+        }
+        panic!("auto timer should eventually change the native table generation");
     }
 
     /// SCTD-03 §7 — Setup screen tab switch DP↔MP changes the active tab.

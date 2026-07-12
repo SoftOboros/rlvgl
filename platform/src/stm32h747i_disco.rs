@@ -80,10 +80,23 @@ mod sdram_alloc {
         Some(aligned)
     }
 
-    #[cfg(feature = "dma2d")]
     pub fn alloc_bytes(size: usize, align: usize) -> Option<*mut u8> {
         alloc(size, align).map(|addr| addr as *mut u8)
     }
+}
+
+/// Reserve a uniquely owned, aligned arena from the board's SDRAM pool.
+///
+/// The display driver initializes this pool and permanently reserves the two
+/// framebuffer banks before this function can return memory. The returned
+/// pointer remains valid for the rest of the boot and is intended for a
+/// secondary allocator or another long-lived application arena.
+#[cfg(all(
+    feature = "stm32h747i_disco",
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+pub fn reserve_sdram_arena(size: usize, align: usize) -> Option<*mut u8> {
+    sdram_alloc::alloc_bytes(size, align)
 }
 
 /// Display driver for the STM32H747I-DISCO board.

@@ -1,0 +1,4 @@
+# .gitattributes - Repository-specific Git path attributes.
+
+# Unified diffs encode an empty context line as one prefix space.
+examples/apps/disco-demo/codegen/*.patch whitespace=-blank-at-eol

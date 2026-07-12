@@ -2071,14 +2071,14 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// `Image.Stretch` scaling (source→dest). Without this the emitted
 /// tree rendered all-white on real hardware (opaque structural
 /// containers buried the artwork; 1:1 blit never filled the slots).
-pub const QT_EMIT_VERSION_RLVGL: u32 = 22;
+pub const QT_EMIT_VERSION_RLVGL: u32 = 23;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
 /// version-constant snapshot (QT-10 §6) changes. The strict-mode
 /// meta-test (`tests/creator_qt_strict_mode.rs`) asserts this
 /// constant matches the expected generation.
-pub const QT_FAMILY_STRICT_VERSION: u32 = 1;
+pub const QT_FAMILY_STRICT_VERSION: u32 = 2;
 
 /// Backward-compat alias for the data-target version constant.
 /// Removed when QT-04 ships per QT-03b §11.
@@ -2519,7 +2519,7 @@ fn synthesize_button_tap_tags(item: &mut UiItem) {
     {
         item.id = Some(format!(
             "__btn_{}",
-            sanitize_ident(&ev.to_ascii_lowercase())
+            rust_snake_ident(&ev.to_ascii_lowercase())
         ));
     }
     for child in &mut item.children {
@@ -3018,6 +3018,7 @@ fn render_rlvgl_with_resolver(
     ));
     out.push_str(&format!(
         "/// Source `.qml` file path as recorded at emit time.\n\
+         #[rustfmt::skip]\n\
          pub const QT_SOURCE: &str = {};\n\n",
         rust_str_lit(&module.source)
     ));
@@ -3123,6 +3124,8 @@ fn render_rlvgl_with_resolver(
             emit_binding_enum(&mut out);
         }
     }
+    emit_binding_sink_struct(&mut out);
+    emit_built_screen_alias(&mut out, has_sm);
 
     if has_sm {
         if v2 {
@@ -3137,7 +3140,7 @@ fn render_rlvgl_with_resolver(
                  #[rustfmt::skip]\n\
                  pub fn build_screen(\n    \
                      bounds: Rect,\n) \
-                 -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {\n",
+                 -> BuiltScreen {\n",
             );
         } else {
             out.push_str(
@@ -3151,7 +3154,7 @@ fn render_rlvgl_with_resolver(
                  #[rustfmt::skip]\n\
                  pub fn build_screen(\n    \
                      bounds: Rect,\n) \
-                 -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {\n",
+                 -> BuiltScreen {\n",
             );
         }
         emit_screen_state_init(&state_fields, &mut out);
@@ -3165,8 +3168,9 @@ fn render_rlvgl_with_resolver(
             out.push_str("    let machine = Rc::new(RefCell::new(Machine::new()));\n");
         }
         out.push_str("    let mut bindings: Vec<Binding> = Vec::new();\n");
+        out.push_str("    let mut binding_sink = BindingSink::new(&mut bindings);\n");
         out.push_str(&format!(
-            "    let node = {root_fn}(bounds, Rc::clone(&state), Rc::clone(&machine), &mut bindings);\n    \
+            "    let node = {root_fn}(bounds, Rc::clone(&state), Rc::clone(&machine), &mut binding_sink);\n    \
              (node, state, machine, bindings)\n}}\n\n"
         ));
     } else {
@@ -3179,12 +3183,13 @@ fn render_rlvgl_with_resolver(
              #[rustfmt::skip]\n\
              pub fn build_screen(\n    \
                  bounds: Rect,\n) \
-             -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {\n",
+             -> BuiltScreen {\n",
         );
         emit_screen_state_init(&state_fields, &mut out);
         out.push_str("    let mut label_bindings: Vec<LabelBinding> = Vec::new();\n");
+        out.push_str("    let mut binding_sink = BindingSink::new(&mut label_bindings);\n");
         out.push_str(&format!(
-            "    let node = {root_fn}(bounds, Rc::clone(&state), &mut label_bindings);\n    \
+            "    let node = {root_fn}(bounds, Rc::clone(&state), &mut binding_sink);\n    \
              (node, state, label_bindings)\n}}\n\n"
         ));
     }
@@ -3565,7 +3570,7 @@ impl RlvglEmitCtx {
         let idx = self.node_index;
         self.node_index += 1;
         let base = match &item.id {
-            Some(id) => format!("build_{}", sanitize_ident(id)),
+            Some(id) => format!("build_{}", rust_snake_ident(id)),
             // Index-keyed names are already unique.
             None => return format!("build_node_{idx}"),
         };
@@ -3598,7 +3603,6 @@ impl RlvglEmitCtx {
         }
 
         let has_children = !child_fns.is_empty();
-        let mut_kw = if has_children { "mut " } else { "" };
 
         let mut out = String::new();
         out.push_str(&format!(
@@ -3621,12 +3625,12 @@ impl RlvglEmitCtx {
             out.push_str(&format!(
                 "fn {fn_name}(\n    bounds: Rect,\n    state: Rc<RefCell<ScreenState>>,\n    \
                  machine: Rc<RefCell<Machine>>,\n    \
-                 bindings: &mut Vec<Binding>,\n) -> WidgetNode {{\n"
+                 bindings: &mut BindingSink<'_, Binding>,\n) -> WidgetNode {{\n"
             ));
         } else {
             out.push_str(&format!(
                 "fn {fn_name}(\n    bounds: Rect,\n    state: Rc<RefCell<ScreenState>>,\n    \
-                 label_bindings: &mut Vec<LabelBinding>,\n) -> WidgetNode {{\n"
+                 label_bindings: &mut BindingSink<'_, LabelBinding>,\n) -> WidgetNode {{\n"
             ));
         }
 
@@ -3662,10 +3666,18 @@ impl RlvglEmitCtx {
         {
             self.button_tap_events.push((id.clone(), ev));
         }
-        out.push_str(&format!(
-            "    let {mut_kw}node = WidgetNode {{\n        \
-             widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }};\n"
-        ));
+        if has_children {
+            out.push_str(&format!(
+                "    let mut node = WidgetNode {{\n        \
+                 widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }};\n"
+            ));
+        } else {
+            out.push_str(&format!(
+                "    WidgetNode {{\n        \
+                 widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }}\n}}\n\n"
+            ));
+            return out;
+        }
 
         // QT-03c sibling-relative extension: if any child anchors to a
         // sibling (`<id>.<edge>`), switch to the layout-solver path — resolve
@@ -3983,8 +3995,17 @@ fn emit_widget_construction(
             );
         }
         WidgetKind::ClickArea => {
-            out.push_str("    let mut click_area = ClickArea::new(bounds);\n");
-            for handler in item.handlers.iter().filter(|h| h.signal == "onClicked") {
+            let click_handlers: Vec<_> = item
+                .handlers
+                .iter()
+                .filter(|handler| handler.signal == "onClicked")
+                .collect();
+            if click_handlers.is_empty() {
+                out.push_str("    let click_area = ClickArea::new(bounds);\n");
+            } else {
+                out.push_str("    let mut click_area = ClickArea::new(bounds);\n");
+            }
+            for handler in click_handlers {
                 emit_qt04b_or_qt04_handler_for(
                     "click_area",
                     &handler.body,
@@ -4268,13 +4289,122 @@ fn emit_skipped_summary(
     }
 }
 
-/// Resolved child geometry as Rust expression strings (absolute, i.e. each
-/// already includes the parent's `bounds.x`/`bounds.y` offset).
+/// A small Rust integer-expression tree used by QML dimension lowering.
+///
+/// Keeping precedence in the tree lets the emitter preserve QML's integer
+/// evaluation order without wrapping every intermediate expression in another
+/// pair of parentheses. The constructors also remove only semantics-preserving
+/// identity operations (`+ 0`, `- 0`, `* 1`, `/ 1`).
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum RustExpr {
+    Int(i64),
+    Atom(String),
+    Binary {
+        op: RustBinOp,
+        left: Box<RustExpr>,
+        right: Box<RustExpr>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum RustBinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+impl RustBinOp {
+    fn symbol(self) -> &'static str {
+        match self {
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+        }
+    }
+
+    fn precedence(self) -> u8 {
+        match self {
+            Self::Add | Self::Sub => 1,
+            Self::Mul | Self::Div => 2,
+        }
+    }
+}
+
+impl RustExpr {
+    fn atom(value: impl Into<String>) -> Self {
+        Self::Atom(value.into())
+    }
+
+    fn binary(op: RustBinOp, left: Self, right: Self) -> Self {
+        match (&op, &left, &right) {
+            (RustBinOp::Add, _, Self::Int(0)) | (RustBinOp::Sub, _, Self::Int(0)) => left,
+            (RustBinOp::Add, Self::Int(0), _) => right,
+            (RustBinOp::Mul, _, Self::Int(1)) | (RustBinOp::Div, _, Self::Int(1)) => left,
+            (RustBinOp::Mul, Self::Int(1), _) => right,
+            _ => Self::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            },
+        }
+    }
+
+    fn add(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Add, left, right)
+    }
+
+    fn sub(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Sub, left, right)
+    }
+
+    fn mul(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Mul, left, right)
+    }
+
+    fn div(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Div, left, right)
+    }
+
+    fn precedence(&self) -> u8 {
+        match self {
+            Self::Int(_) | Self::Atom(_) => 3,
+            Self::Binary { op, .. } => op.precedence(),
+        }
+    }
+
+    fn render(&self) -> String {
+        self.render_child(0, false)
+    }
+
+    fn render_child(&self, parent_precedence: u8, right_child: bool) -> String {
+        let rendered = match self {
+            Self::Int(value) => value.to_string(),
+            Self::Atom(value) => value.clone(),
+            Self::Binary { op, left, right } => format!(
+                "{} {} {}",
+                left.render_child(op.precedence(), false),
+                op.symbol(),
+                right.render_child(op.precedence(), true)
+            ),
+        };
+        let precedence = self.precedence();
+        if precedence < parent_precedence || (right_child && precedence == parent_precedence) {
+            format!("({rendered})")
+        } else {
+            rendered
+        }
+    }
+}
+
+/// Resolved child geometry as Rust expressions (absolute, i.e. each already
+/// includes the parent's `bounds.x`/`bounds.y` offset).
 struct ResolvedBounds {
-    x: String,
-    y: String,
-    w: String,
-    h: String,
+    x: RustExpr,
+    y: RustExpr,
+    w: RustExpr,
+    h: RustExpr,
 }
 
 /// An anchor value of the form `<obj>.<edge>` where `<obj>` is a sibling id
@@ -4367,7 +4497,7 @@ fn child_anchor_deps(child: &UiItem) -> Vec<String> {
 /// absolute Rust expression. `base_of` maps a sibling id to its emitted Rect
 /// variable name; `parent` maps to `bounds`. Returns `None` for unresolvable
 /// references (unknown sibling), so the caller can fall back.
-fn anchor_edge_expr(value: &str, base_of: &dyn Fn(&str) -> Option<String>) -> Option<String> {
+fn anchor_edge_expr(value: &str, base_of: &dyn Fn(&str) -> Option<String>) -> Option<RustExpr> {
     let v = value.trim();
     let (obj, edge) = v.split_once('.')?;
     let base = if obj == "parent" {
@@ -4376,12 +4506,24 @@ fn anchor_edge_expr(value: &str, base_of: &dyn Fn(&str) -> Option<String>) -> Op
         base_of(obj)?
     };
     let expr = match edge {
-        "left" => format!("{base}.x"),
-        "right" => format!("({base}.x + {base}.width)"),
-        "top" => format!("{base}.y"),
-        "bottom" => format!("({base}.y + {base}.height)"),
-        "horizontalCenter" => format!("({base}.x + {base}.width / 2)"),
-        "verticalCenter" => format!("({base}.y + {base}.height / 2)"),
+        "left" => RustExpr::atom(format!("{base}.x")),
+        "right" => RustExpr::add(
+            RustExpr::atom(format!("{base}.x")),
+            RustExpr::atom(format!("{base}.width")),
+        ),
+        "top" => RustExpr::atom(format!("{base}.y")),
+        "bottom" => RustExpr::add(
+            RustExpr::atom(format!("{base}.y")),
+            RustExpr::atom(format!("{base}.height")),
+        ),
+        "horizontalCenter" => RustExpr::add(
+            RustExpr::atom(format!("{base}.x")),
+            RustExpr::div(RustExpr::atom(format!("{base}.width")), RustExpr::Int(2)),
+        ),
+        "verticalCenter" => RustExpr::add(
+            RustExpr::atom(format!("{base}.y")),
+            RustExpr::div(RustExpr::atom(format!("{base}.height")), RustExpr::Int(2)),
+        ),
         _ => return None,
     };
     Some(expr)
@@ -4471,6 +4613,13 @@ impl DimResolver {
     /// Resolve a width/height expression into a Rust `i32` expression in terms
     /// of `bounds`, or `None` if any term is unresolvable.
     fn resolve_dim(&self, expr: &str) -> Option<String> {
+        self.resolve_dim_expr(expr)
+            .map(|resolved| resolved.render())
+    }
+
+    /// Parse a width/height expression while retaining its precedence tree for
+    /// callers that need to compose it with anchor arithmetic.
+    fn resolve_dim_expr(&self, expr: &str) -> Option<RustExpr> {
         let toks = tokenize_expr(expr)?;
         let mut p = ExprParser {
             toks: &toks,
@@ -4524,39 +4673,47 @@ impl ExprParser<'_> {
         }
         t
     }
-    fn parse_expr(&mut self) -> Option<String> {
+    fn parse_expr(&mut self) -> Option<RustExpr> {
         let mut lhs = self.parse_term()?;
         while let Some(op) = self.peek()
             && (op == "+" || op == "-")
         {
             let op = self.bump().unwrap();
             let rhs = self.parse_term()?;
-            lhs = format!("({lhs} {op} {rhs})");
+            lhs = match op.as_str() {
+                "+" => RustExpr::add(lhs, rhs),
+                "-" => RustExpr::sub(lhs, rhs),
+                _ => return None,
+            };
         }
         Some(lhs)
     }
-    fn parse_term(&mut self) -> Option<String> {
+    fn parse_term(&mut self) -> Option<RustExpr> {
         let mut lhs = self.parse_factor()?;
         while let Some(op) = self.peek()
             && (op == "*" || op == "/")
         {
             let op = self.bump().unwrap();
             let rhs = self.parse_factor()?;
-            lhs = format!("({lhs} {op} {rhs})");
+            lhs = match op.as_str() {
+                "*" => RustExpr::mul(lhs, rhs),
+                "/" => RustExpr::div(lhs, rhs),
+                _ => return None,
+            };
         }
         Some(lhs)
     }
-    fn parse_factor(&mut self) -> Option<String> {
+    fn parse_factor(&mut self) -> Option<RustExpr> {
         let t = self.bump()?;
         if t == "(" {
             let e = self.parse_expr()?;
             if self.bump().as_deref() != Some(")") {
                 return None;
             }
-            return Some(format!("({e})"));
+            return Some(e);
         }
         if let Ok(n) = t.parse::<f64>() {
-            return Some(format!("{}", n.round() as i64));
+            return Some(RustExpr::Int(n.round() as i64));
         }
         // Identifier, optionally `<a>.<b>`.
         let (head, member) = if self.peek() == Some(".") {
@@ -4568,11 +4725,11 @@ impl ExprParser<'_> {
         };
         self.resolve_ident(&head, member.as_deref())
     }
-    fn resolve_ident(&mut self, head: &str, member: Option<&str>) -> Option<String> {
+    fn resolve_ident(&mut self, head: &str, member: Option<&str>) -> Option<RustExpr> {
         match (head, member) {
             // `parent.width` / `parent.height` → local bounds.
-            ("parent", Some("width")) => Some("bounds.width".to_string()),
-            ("parent", Some("height")) => Some("bounds.height".to_string()),
+            ("parent", Some("width")) => Some(RustExpr::atom("bounds.width")),
+            ("parent", Some("height")) => Some(RustExpr::atom("bounds.height")),
             // `<rootId>.<prop>` (e.g. `pane.panelHeight`) → recurse the root
             // property's default expression, same as the bare form. NOTE: the
             // expression evaluates against the *local* `bounds` at the use site,
@@ -4591,15 +4748,15 @@ impl ExprParser<'_> {
                 .res
                 .consts
                 .get(name)
-                .map(|v| format!("{}", v.round() as i64)),
+                .map(|v| RustExpr::Int(v.round() as i64)),
             // Bare `width` / `height` (appear inside a root-property default,
             // referring to the root's own extent → local bounds at the use site).
-            ("width", None) => Some("bounds.width".to_string()),
-            ("height", None) => Some("bounds.height".to_string()),
+            ("width", None) => Some(RustExpr::atom("bounds.width")),
+            ("height", None) => Some(RustExpr::atom("bounds.height")),
             // Bare identifier: a JS constant, or a root property to recurse into.
             (id, None) => {
                 if let Some(v) = self.res.consts.get(id) {
-                    return Some(format!("{}", v.round() as i64));
+                    return Some(RustExpr::Int(v.round() as i64));
                 }
                 self.recurse_root_prop(id)
             }
@@ -4607,8 +4764,8 @@ impl ExprParser<'_> {
     }
 
     /// Resolve a root property name by evaluating its default expression
-    /// (recursion-guarded). Returns a parenthesised Rust expression.
-    fn recurse_root_prop(&self, name: &str) -> Option<String> {
+    /// (recursion-guarded).
+    fn recurse_root_prop(&self, name: &str) -> Option<RustExpr> {
         if self.depth >= 8 {
             return None;
         }
@@ -4622,7 +4779,7 @@ impl ExprParser<'_> {
         };
         let out = sub.parse_expr()?;
         if sub.pos == sub.toks.len() {
-            Some(format!("({out})"))
+            Some(out)
         } else {
             None
         }
@@ -4681,7 +4838,7 @@ fn eval_const_int_rust(s: &str) -> Option<i32> {
         res: &empty,
         depth: 0,
     };
-    let folded = p.parse_expr()?;
+    let folded = p.parse_expr()?.render();
     if p.pos != p.toks.len() || folded.contains("bounds") {
         return None;
     }
@@ -4885,20 +5042,8 @@ fn solve_child_bounds(
     let tm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.topMargin", resolver));
     let bm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.bottomMargin", resolver));
 
-    let add_margin = |expr: String, m: i32| -> String {
-        if m == 0 {
-            expr
-        } else {
-            format!("({expr} + {m})")
-        }
-    };
-    let sub_margin = |expr: String, m: i32| -> String {
-        if m == 0 {
-            expr
-        } else {
-            format!("({expr} - {m})")
-        }
-    };
+    let add_margin = |expr: RustExpr, m: i32| RustExpr::add(expr, RustExpr::Int(m.into()));
+    let sub_margin = |expr: RustExpr, m: i32| RustExpr::sub(expr, RustExpr::Int(m.into()));
     // Non-literal `width:` / `height:` (e.g. `height: panelHeight`,
     // `parent.width / 2 - AppConsts.i_DISPLAY_PADDING`) resolve through the
     // DimResolver into a Rust expression over `bounds`; an `Image` with no
@@ -4913,18 +5058,18 @@ fn solve_child_bounds(
         None
     };
     let default_w = || match w_lit {
-        Some(n) => format!("{n}"),
+        Some(n) => RustExpr::Int(n.into()),
         None => w_expr
-            .and_then(|e| resolver.resolve_dim(e.trim()))
-            .or_else(|| img_natural.map(|(w, _)| format!("{w}")))
-            .unwrap_or_else(|| "bounds.width".to_string()),
+            .and_then(|e| resolver.resolve_dim_expr(e.trim()))
+            .or_else(|| img_natural.map(|(w, _)| RustExpr::Int(w.into())))
+            .unwrap_or_else(|| RustExpr::atom("bounds.width")),
     };
     let default_h = || match h_lit {
-        Some(n) => format!("{n}"),
+        Some(n) => RustExpr::Int(n.into()),
         None => h_expr
-            .and_then(|e| resolver.resolve_dim(e.trim()))
-            .or_else(|| img_natural.map(|(_, h)| format!("{h}")))
-            .unwrap_or_else(|| "bounds.height".to_string()),
+            .and_then(|e| resolver.resolve_dim_expr(e.trim()))
+            .or_else(|| img_natural.map(|(_, h)| RustExpr::Int(h.into())))
+            .unwrap_or_else(|| RustExpr::atom("bounds.height")),
     };
 
     // ---- X axis ----
@@ -4942,19 +5087,28 @@ fn solve_child_bounds(
 
     let (x, w) = match (left_e, right_e, hcenter_e) {
         (Some(l), Some(r), _) => {
-            let w = format!("(({r}) - ({l}))");
+            let w = RustExpr::sub(r, l.clone());
             (l, w)
         }
         (Some(l), None, _) => (l, default_w()),
         (None, Some(r), _) => {
             let w = default_w();
-            (format!("(({r}) - ({w}))"), w)
+            (RustExpr::sub(r, w.clone()), w)
         }
         (None, None, Some(c)) => {
             let w = default_w();
-            (format!("(({c}) - ({w}) / 2)"), w)
+            (
+                RustExpr::sub(c, RustExpr::div(w.clone(), RustExpr::Int(2))),
+                w,
+            )
         }
-        (None, None, None) => (format!("bounds.x + {}", x_lit.unwrap_or(0)), default_w()),
+        (None, None, None) => (
+            RustExpr::add(
+                RustExpr::atom("bounds.x"),
+                RustExpr::Int(x_lit.unwrap_or(0).into()),
+            ),
+            default_w(),
+        ),
     };
 
     // ---- Y axis ----
@@ -4972,19 +5126,28 @@ fn solve_child_bounds(
 
     let (y, h) = match (top_e, bottom_e, vcenter_e) {
         (Some(t), Some(b), _) => {
-            let h = format!("(({b}) - ({t}))");
+            let h = RustExpr::sub(b, t.clone());
             (t, h)
         }
         (Some(t), None, _) => (t, default_h()),
         (None, Some(b), _) => {
             let h = default_h();
-            (format!("(({b}) - ({h}))"), h)
+            (RustExpr::sub(b, h.clone()), h)
         }
         (None, None, Some(c)) => {
             let h = default_h();
-            (format!("(({c}) - ({h}) / 2)"), h)
+            (
+                RustExpr::sub(c, RustExpr::div(h.clone(), RustExpr::Int(2))),
+                h,
+            )
         }
-        (None, None, None) => (format!("bounds.y + {}", y_lit.unwrap_or(0)), default_h()),
+        (None, None, None) => (
+            RustExpr::add(
+                RustExpr::atom("bounds.y"),
+                RustExpr::Int(y_lit.unwrap_or(0).into()),
+            ),
+            default_h(),
+        ),
     };
 
     ResolvedBounds { x, y, w, h }
@@ -5048,7 +5211,10 @@ fn emit_solved_child_bounds(
         out.push_str(&format!(
             "    let cb_{i} = Rect {{\n        x: {},\n        y: {},\n        \
              width: {},\n        height: {},\n    }};\n",
-            rb.x, rb.y, rb.w, rb.h
+            rb.x.render(),
+            rb.y.render(),
+            rb.w.render(),
+            rb.h.render()
         ));
     }
 }
@@ -5118,7 +5284,7 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
         if center_in {
             out.push_str("    // QT-03c override: anchors.fill supersedes anchors.centerIn\n");
         }
-        if let Some(m) = margins {
+        if let Some(m) = margins.filter(|m| *m != 0) {
             out.push_str(&format!(
                 "    let child_bounds = Rect {{\n        \
                  x: bounds.x + {m},\n        y: bounds.y + {m},\n        \
@@ -5215,6 +5381,8 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
     // parent-inherited).
     let x = x_lit.unwrap_or(0);
     let y = y_lit.unwrap_or(0);
+    let x_expr = parent_offset_expr("bounds.x", x);
+    let y_expr = parent_offset_expr("bounds.y", y);
     let width = match w_lit {
         Some(n) => format!("{n}"),
         None => "bounds.width".to_string(),
@@ -5226,9 +5394,19 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
 
     out.push_str(&format!(
         "    let child_bounds = Rect {{\n        \
-         x: bounds.x + {x},\n        y: bounds.y + {y},\n        \
+         x: {x_expr},\n        y: {y_expr},\n        \
          width: {width},\n        height: {height},\n    }};\n"
     ));
+}
+
+/// Compose an absolute parent coordinate with a literal offset without
+/// emitting the Clippy-triggering identity form `parent + 0`.
+fn parent_offset_expr(parent: &str, offset: i32) -> String {
+    if offset == 0 {
+        parent.to_string()
+    } else {
+        format!("{parent} + {offset}")
+    }
 }
 
 /// Try to lower a single edge anchor per the QT-03c §5 amendment
@@ -5262,10 +5440,11 @@ fn lower_single_edge_anchor(
             return false;
         }
         let y = y_lit.unwrap_or(0);
+        let y_expr = parent_offset_expr("bounds.y", y);
         out.push_str("    // QT-03c edge: anchors.left: parent.left\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x,\n        y: bounds.y + {y},\n        \
+             x: bounds.x,\n        y: {y_expr},\n        \
              width: {width_expr},\n        height: {height_expr},\n    }};\n"
         ));
         return true;
@@ -5282,10 +5461,11 @@ fn lower_single_edge_anchor(
             return false;
         };
         let y = y_lit.unwrap_or(0);
+        let y_expr = parent_offset_expr("bounds.y", y);
         out.push_str("    // QT-03c edge: anchors.right: parent.right\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x + bounds.width - {w},\n        y: bounds.y + {y},\n        \
+             x: bounds.x + bounds.width - {w},\n        y: {y_expr},\n        \
              width: {w},\n        height: {height_expr},\n    }};\n"
         ));
         return true;
@@ -5295,10 +5475,11 @@ fn lower_single_edge_anchor(
             return false;
         }
         let x = x_lit.unwrap_or(0);
+        let x_expr = parent_offset_expr("bounds.x", x);
         out.push_str("    // QT-03c edge: anchors.top: parent.top\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x + {x},\n        y: bounds.y,\n        \
+             x: {x_expr},\n        y: bounds.y,\n        \
              width: {width_expr},\n        height: {height_expr},\n    }};\n"
         ));
         return true;
@@ -5314,10 +5495,11 @@ fn lower_single_edge_anchor(
             return false;
         };
         let x = x_lit.unwrap_or(0);
+        let x_expr = parent_offset_expr("bounds.x", x);
         out.push_str("    // QT-03c edge: anchors.bottom: parent.bottom\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x + {x},\n        y: bounds.y + bounds.height - {h},\n        \
+             x: {x_expr},\n        y: bounds.y + bounds.height - {h},\n        \
              width: {width_expr},\n        height: {h},\n    }};\n"
         ));
         return true;
@@ -5559,15 +5741,15 @@ fn collect_state_fields_walk(
         if !is_root && owner_id.is_none() {
             continue;
         }
-        let field_name = match &owner_id {
-            None => prop.name.clone(),
-            Some(id) => format!("{}_{}", sanitize_ident(id), prop.name),
+        let base_field_name = match &owner_id {
+            None => rust_snake_ident(&prop.name),
+            Some(id) => rust_snake_ident(&format!("{id}_{}", prop.name)),
         };
-        if seen.contains(&field_name) {
-            // §5 collision rule: rare; emit a comment-bearing
-            // placeholder rather than aborting the build, but keep
-            // the field collision visible.
-            continue;
+        let mut field_name = base_field_name.clone();
+        let mut suffix = 2usize;
+        while seen.contains(&field_name) {
+            field_name = format!("{base_field_name}_{suffix}");
+            suffix += 1;
         }
         seen.push(field_name.clone());
         let (init_expr, init_comment) = lower_property_default(prop, ty);
@@ -5676,6 +5858,54 @@ fn emit_screen_state_init(fields: &[StateField], out: &mut String) {
         out.push_str(&format!("        {}: {},\n", f.name, f.init_expr));
     }
     out.push_str("    }));\n");
+}
+
+/// Emit the private binding accumulator passed through generated helpers.
+/// This preserves `Vec::push` for binding-producing leaves without exposing
+/// `&mut Vec<_>` in every helper signature (which triggers `clippy::ptr_arg`
+/// for leaves that do not append a binding themselves).
+fn emit_binding_sink_struct(out: &mut String) {
+    out.push_str(
+        "struct BindingSink<'a, T> {\n    \
+             values: &'a mut Vec<T>,\n}\n\n\
+         impl<'a, T> BindingSink<'a, T> {\n    \
+             fn new(values: &'a mut Vec<T>) -> Self {\n        \
+                 Self { values }\n    \
+             }\n\n    \
+             fn push(&mut self, value: T) {\n        \
+                 self.values.push(value);\n    \
+             }\n}\n\n",
+    );
+}
+
+/// Emit a named alias for the public `build_screen` result. Tuple
+/// destructuring remains source-compatible while the signature no longer
+/// triggers `clippy::type_complexity` on state-machine-linked screens.
+fn emit_built_screen_alias(out: &mut String, has_sm: bool) {
+    if has_sm {
+        out.push_str(
+            "/// Widget tree, screen state, state machine, and reactive bindings\n\
+             /// returned by [`build_screen`].\n\
+             #[rustfmt::skip]\n\
+             pub type BuiltScreen = (\n    \
+                 WidgetNode,\n    \
+                 Rc<RefCell<ScreenState>>,\n    \
+                 Rc<RefCell<Machine>>,\n    \
+                 Vec<Binding>,\n\
+             );\n\n",
+        );
+    } else {
+        out.push_str(
+            "/// Widget tree, screen state, and reactive label bindings returned\n\
+             /// by [`build_screen`].\n\
+             #[rustfmt::skip]\n\
+             pub type BuiltScreen = (\n    \
+                 WidgetNode,\n    \
+                 Rc<RefCell<ScreenState>>,\n    \
+                 Vec<LabelBinding>,\n\
+             );\n\n",
+        );
+    }
 }
 
 /// Emit the QT-04e `pub struct LabelBinding` + `impl LabelBinding`
@@ -6420,16 +6650,117 @@ fn parse_dm_text_ref(expr: &str) -> Option<String> {
     Some(after.to_string())
 }
 
-fn sanitize_ident(s: &str) -> String {
-    s.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' {
-                c
-            } else {
-                '_'
+/// Convert a QML identifier to a deterministic Rust snake-case identifier.
+/// Original QML IDs remain untouched in `WidgetNode::tag` and resolution
+/// metadata; this function is only for emitted Rust symbols.
+fn rust_snake_ident(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut previous_source: Option<char> = None;
+
+    for (index, ch) in chars.iter().copied().enumerate() {
+        if !ch.is_ascii_alphanumeric() {
+            if !out.ends_with('_') {
+                out.push('_');
             }
-        })
-        .collect()
+            previous_source = Some(ch);
+            continue;
+        }
+
+        if ch.is_ascii_uppercase() {
+            let next_is_lower = chars
+                .get(index + 1)
+                .is_some_and(|next| next.is_ascii_lowercase());
+            let boundary = previous_source.is_some_and(|previous| {
+                previous.is_ascii_lowercase()
+                    || previous.is_ascii_digit()
+                    || (previous.is_ascii_uppercase() && next_is_lower)
+            });
+            if boundary && !out.ends_with('_') {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+        previous_source = Some(ch);
+    }
+
+    while out.ends_with('_') {
+        out.pop();
+    }
+    while out.starts_with('_') {
+        out.remove(0);
+    }
+    if out.is_empty() {
+        out.push_str("generated");
+    }
+    if out.as_bytes()[0].is_ascii_digit() {
+        out.insert_str(0, "n_");
+    }
+    if is_rust_keyword(&out) {
+        out.push('_');
+    }
+    out
+}
+
+fn is_rust_keyword(ident: &str) -> bool {
+    matches!(
+        ident,
+        "abstract"
+            | "as"
+            | "async"
+            | "await"
+            | "become"
+            | "box"
+            | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "dyn"
+            | "do"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "final"
+            | "fn"
+            | "for"
+            | "gen"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "macro"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "override"
+            | "priv"
+            | "pub"
+            | "ref"
+            | "return"
+            | "self"
+            | "Self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "try"
+            | "type"
+            | "typeof"
+            | "union"
+            | "unsafe"
+            | "unsized"
+            | "use"
+            | "virtual"
+            | "where"
+            | "while"
+            | "yield"
+    )
 }
 
 /// Parse a `.qml` file and write `qt-ir.json` into `out/`.
@@ -7651,6 +7982,139 @@ mod tests {
         let json = serde_json::to_string(&m).unwrap();
         let m2: UiModule = serde_json::from_str(&json).unwrap();
         assert_eq!(m, m2);
+    }
+
+    #[test]
+    fn dimension_expressions_preserve_precedence_and_remove_identities() {
+        let resolver = DimResolver::default();
+        assert_eq!(
+            resolver.resolve_dim("parent.width + 0").as_deref(),
+            Some("bounds.width")
+        );
+        assert_eq!(
+            resolver
+                .resolve_dim("parent.width / (2 + 3) * 4")
+                .as_deref(),
+            Some("bounds.width / (2 + 3) * 4")
+        );
+        assert_eq!(
+            resolver.resolve_dim("parent.width - (8 - 3)").as_deref(),
+            Some("bounds.width - (8 - 3)")
+        );
+        assert_eq!(
+            resolver.resolve_dim("parent.width / (8 / 2)").as_deref(),
+            Some("bounds.width / (8 / 2)")
+        );
+        assert_eq!(
+            resolver.resolve_dim("(parent.width + 8) / 2").as_deref(),
+            Some("(bounds.width + 8) / 2")
+        );
+    }
+
+    #[test]
+    fn solved_bounds_omit_zero_offsets() {
+        let module = parse(
+            r#"
+            Item {
+                Rectangle { x: 0; y: 0; width: 10; height: 20 }
+            }
+            "#,
+        );
+        let bounds =
+            solve_child_bounds(&module.root.children[0], &|_| None, &DimResolver::default());
+        assert_eq!(bounds.x.render(), "bounds.x");
+        assert_eq!(bounds.y.render(), "bounds.y");
+        assert_eq!(bounds.w.render(), "10");
+        assert_eq!(bounds.h.render(), "20");
+    }
+
+    #[test]
+    fn generated_helpers_distinguish_leaf_and_parent_nodes() {
+        let leaf = render_rlvgl(&parse("Item { id: leafNode }"));
+        assert!(leaf.contains("fn build_leaf_node("));
+        assert!(leaf.contains("    WidgetNode {\n        widget,"));
+        assert!(!leaf.contains("let node = WidgetNode"));
+
+        let parent = render_rlvgl(&parse(
+            r#"
+            Item {
+                id: parentNode
+                Rectangle { id: childNode }
+            }
+            "#,
+        ));
+        assert!(parent.contains("fn build_parent_node("));
+        assert!(parent.contains("let mut node = WidgetNode"));
+        assert!(parent.contains("node.children.push(build_child_node"));
+    }
+
+    #[test]
+    fn generated_binding_leaves_use_binding_sink() {
+        let generated = render_rlvgl(&parse(
+            r#"
+            Item {
+                id: root
+                property string title: "Hello"
+                Text { id: titleLabel; text: root.title }
+            }
+            "#,
+        ));
+        assert!(generated.contains("struct BindingSink<'a, T>"));
+        assert!(generated.contains("label_bindings: &mut BindingSink<'_, LabelBinding>"));
+        assert!(generated.contains("label_bindings.push(LabelBinding"));
+        assert!(generated.contains("fn build_title_label("));
+    }
+
+    #[test]
+    fn generated_rust_identifiers_are_snake_case_and_collision_safe() {
+        let generated = render_rlvgl(&parse(
+            r#"
+            Item {
+                id: root
+                property int i_ROW_SPACING: 1
+                property int fooBar: 2
+                property int foo_bar: 3
+                Item {
+                    id: paneMouseArea
+                    property bool itemSelected: false
+                }
+                Item { id: __buttonTarget }
+            }
+            "#,
+        ));
+        assert!(generated.contains("pub i_row_spacing: i32"));
+        assert!(generated.contains("pub foo_bar: i32"));
+        assert!(generated.contains("pub foo_bar_2: i32"));
+        assert!(generated.contains("pub pane_mouse_area_item_selected: bool"));
+        assert!(generated.contains("fn build_pane_mouse_area("));
+        assert!(generated.contains("tag: Some(\"paneMouseArea\")"));
+        assert!(generated.contains("fn build_button_target("));
+        assert!(generated.contains("tag: Some(\"__buttonTarget\")"));
+    }
+
+    #[test]
+    fn generated_rust_identifiers_escape_reserved_keywords() {
+        for keyword in ["abstract", "become", "box", "do", "gen", "match", "try"] {
+            assert_eq!(rust_snake_ident(keyword), format!("{keyword}_"));
+        }
+    }
+
+    #[test]
+    fn click_area_is_mutable_only_when_a_handler_is_lowered() {
+        let immutable = render_rlvgl(&parse("MouseArea { id: target }"));
+        assert!(immutable.contains("let click_area = ClickArea::new(bounds);"));
+        assert!(!immutable.contains("let mut click_area = ClickArea::new(bounds);"));
+
+        let mutable = render_rlvgl(&parse(
+            r#"
+            MouseArea {
+                id: target
+                property int taps: 0
+                onClicked: taps += 1
+            }
+            "#,
+        ));
+        assert!(mutable.contains("let mut click_area = ClickArea::new(bounds);"));
     }
 
     /// QT-02 schema-drift gate: regenerate `qt-ir.schema.json` and

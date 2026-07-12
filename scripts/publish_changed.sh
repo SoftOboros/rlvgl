@@ -178,6 +178,13 @@ HEAD_SHA=$(git rev-parse HEAD)
 BASE_DESC=$(git describe --tags --always "$BASE_SHA" 2>/dev/null || echo "$BASE_SHA")
 HEAD_DESC=$(git describe --tags --always "$HEAD_SHA" 2>/dev/null || echo "$HEAD_SHA")
 DIFF_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+if [[ "$DRY_RUN" == "1" ]]; then
+  WORKTREE_FILES=$(
+    git diff --name-only "$HEAD_SHA"
+    git ls-files --others --exclude-standard
+  )
+  DIFF_FILES=$(printf '%s\n%s\n' "$DIFF_FILES" "$WORKTREE_FILES" | sed '/^$/d' | sort -u)
+fi
 
 cargo metadata --no-deps --format-version 1 >"$METADATA_JSON"
 python3 - "$METADATA_JSON" >"$VERSIONS_TSV" <<'PY'
@@ -194,6 +201,9 @@ PY
 echo "Publish diff:"
 echo "  base: $BASE_SHA ($BASE_DESC)"
 echo "  head: $HEAD_SHA ($HEAD_DESC)"
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "  worktree: staged, unstaged, and untracked files included"
+fi
 
 if [[ -z "$DIFF_FILES" ]]; then
   echo "No files changed between base and head."

@@ -18,7 +18,7 @@ fn generated_corners_module_anchors_each_corner_correctly() {
         height: 200,
     };
     let (node, _state, _bindings) = generated_corners::build_screen(bounds);
-    assert_eq!(generated_corners::QT_EMIT_VERSION, 22);
+    assert_eq!(generated_corners::QT_EMIT_VERSION, 23);
     assert_eq!(node.children.len(), 4);
 
     let tl = find_tagged(&node, "tlBadge");

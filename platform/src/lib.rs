@@ -252,7 +252,7 @@ pub use st7789::St7789Display;
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")
 ))]
-pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput};
+pub use stm32h747i_disco::{Stm32h747iDiscoDisplay, Stm32h747iDiscoInput, reserve_sdram_arena};
 #[cfg(all(
     feature = "stm32h747i_disco",
     any(target_arch = "arm", target_os = "none")

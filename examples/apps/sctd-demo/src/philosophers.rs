@@ -69,6 +69,7 @@ pub struct PhilosophersTable {
     backdrop: &'static [u8],
     states: [SeatState; 5],
     visible: bool,
+    generation: u64,
     decoded: RefCell<Option<Decoded>>,
 }
 
@@ -81,6 +82,7 @@ impl PhilosophersTable {
             backdrop,
             states: [SeatState::Thinking; 5],
             visible: false,
+            generation: 0,
             decoded: RefCell::new(None),
         }
     }
@@ -90,11 +92,24 @@ impl PhilosophersTable {
     pub fn set_states(&mut self, states: Option<[SeatState; 5]>) {
         match states {
             Some(s) => {
+                if !self.visible || self.states != s {
+                    self.generation = self.generation.wrapping_add(1);
+                }
                 self.states = s;
                 self.visible = true;
             }
-            None => self.visible = false,
+            None => {
+                if self.visible {
+                    self.generation = self.generation.wrapping_add(1);
+                }
+                self.visible = false;
+            }
         }
+    }
+
+    /// Monotonic revision incremented only when visible table state changes.
+    pub const fn generation(&self) -> u64 {
+        self.generation
     }
 
     /// Whether the table is currently shown.
