@@ -56,6 +56,7 @@ pub struct MachineSelector {
     margin_top: i32,
     gap: i32,
     selected: usize,
+    visible: bool,
     icons: [&'static [u8]; MACHINE_COUNT],
     on_tap: [TapCb; MACHINE_COUNT],
     decoded: RefCell<[Option<DecodedIcon>; MACHINE_COUNT]>,
@@ -70,6 +71,7 @@ impl MachineSelector {
             margin_top,
             gap,
             selected: 0,
+            visible: true,
             // Slot 0 = ⚙ Setup (ICON_SETUP placeholder), slot 1 = DP (ICON_DP),
             // slot 2 = MP (ICON_MEDIA) — SCTD-03 §5 composition.
             icons: [ICON_SETUP, ICON_DP, ICON_MEDIA],
@@ -83,6 +85,11 @@ impl MachineSelector {
         if index < MACHINE_COUNT {
             self.selected = index;
         }
+    }
+
+    /// Show or hide the selector strip.
+    pub fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
     }
 
     /// Return the currently selected slot index.
@@ -136,6 +143,9 @@ impl Widget for MachineSelector {
     }
 
     fn draw(&self, renderer: &mut dyn Renderer) {
+        if !self.visible {
+            return;
+        }
         let mut decoded = self.decoded.borrow_mut();
         for (index, &rle) in self.icons.iter().enumerate() {
             if decoded[index].is_none() {
@@ -162,6 +172,9 @@ impl Widget for MachineSelector {
     }
 
     fn handle_event(&mut self, event: &Event) -> bool {
+        if !self.visible {
+            return false;
+        }
         if let Event::PressRelease { x, y } = event {
             let step = self.icon_size + self.gap;
             for index in 0..MACHINE_COUNT {

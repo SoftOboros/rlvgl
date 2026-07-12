@@ -25,8 +25,8 @@ required-features = ["cm7"]
 #     --features cm7,sctd,dma2d
 [[bin]]
 name = "rlvgl-stm32h747i-sctd"
-path = "src/sctd_main.rs"
-required-features = ["cm7", "sctd"]
+path = "src/main.rs"
+required-features = ["cm7", "sctd", "dma2d"]
 
 [[bin]]
 name = "rlvgl-stm32h747i-disco-cm4"

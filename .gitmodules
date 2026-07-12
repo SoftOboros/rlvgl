@@ -7,3 +7,6 @@
 [submodule "vendor/scjson"]
 	path = vendor/scjson
 	url = https://github.com/SoftOboros/scjson.git
+[submodule "vendor/ratatui"]
+	path = vendor/ratatui
+	url = https://github.com/SoftOboros/ratatui.git

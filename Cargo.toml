@@ -494,6 +494,9 @@ objc2 = "0.6.2"
 objc2-foundation = "0.3.1"
 objc2-app-kit = "0.3.1"
 
+[patch.crates-io]
+rlvgl-core = { path = "core" }
+
 [workspace]
 members = [
     "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
@@ -520,6 +523,7 @@ exclude = [
     "examples/uefi-disco",
     "examples/beetle-avr",
     "vendor/scjson",
+    "vendor/ratatui",
     "examples/stm32h747i-disco/disco-demo-states",
     # media-player is an iState-MCP-generated crate with non-idiomatic codegen
     # style; excluded from workspace clippy per SCTD-00 §9.4. Run tests via
