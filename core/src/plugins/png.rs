@@ -18,12 +18,12 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
     let mut pixels = Vec::with_capacity(info.width as usize * info.height as usize);
     match info.color_type {
         ColorType::Rgb => {
-            for chunk in pixels_raw.chunks_exact(3) {
+            for chunk in pixels_raw.as_chunks::<3>().0 {
                 pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
             }
         }
         ColorType::Rgba => {
-            for chunk in pixels_raw.chunks_exact(4) {
+            for chunk in pixels_raw.as_chunks::<4>().0 {
                 let a = chunk[3] as u32;
                 let r = (chunk[0] as u32 * a + 127) / 255;
                 let g = (chunk[1] as u32 * a + 127) / 255;
@@ -37,7 +37,7 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u32, u32), DecodingError> {
             }
         }
         ColorType::GrayscaleAlpha => {
-            for chunk in pixels_raw.chunks_exact(2) {
+            for chunk in pixels_raw.as_chunks::<2>().0 {
                 let v = chunk[0] as u32;
                 let a = chunk[1] as u32;
                 let c = (v * a + 127) / 255;

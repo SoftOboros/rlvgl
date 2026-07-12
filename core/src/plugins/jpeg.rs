@@ -20,19 +20,19 @@ pub fn decode(data: &[u8]) -> Result<(Vec<Color>, u16, u16), Error> {
             }
         }
         PixelFormat::L16 => {
-            for chunk in pixels_raw.chunks_exact(2) {
+            for chunk in pixels_raw.as_chunks::<2>().0 {
                 let val = u16::from_be_bytes([chunk[0], chunk[1]]);
                 let v = (val / 257) as u8;
                 pixels.push(Color(v, v, v, 255));
             }
         }
         PixelFormat::RGB24 => {
-            for chunk in pixels_raw.chunks_exact(3) {
+            for chunk in pixels_raw.as_chunks::<3>().0 {
                 pixels.push(Color(chunk[0], chunk[1], chunk[2], 255));
             }
         }
         PixelFormat::CMYK32 => {
-            for chunk in pixels_raw.chunks_exact(4) {
+            for chunk in pixels_raw.as_chunks::<4>().0 {
                 let c = chunk[0] as f32 / 255.0;
                 let m = chunk[1] as f32 / 255.0;
                 let y = chunk[2] as f32 / 255.0;

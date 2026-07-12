@@ -77,6 +77,9 @@ the start of this release line).
 - Documentation changes bump `rlvgl-chips-silabs` and `rlvgl-chips-ti` to
   `0.2.1`. `rlvgl-ui` moves to `0.2.6` because `0.2.5` is already published
   and the current package raises its `rlvgl-widgets` minimum to `0.2.5`.
+- `rlvgl-core` moves to `0.2.5`; its image decoders use fixed-size slice
+  chunks, clearing the refreshed nightly Clippy gate without changing decode
+  behavior.
 
 ### WIP - ESP32-P4 (BEETLE-IDF)
 - `dfr0550` raw-PAC `clk_init` + `regi2c` bring-up; software star crawl.
