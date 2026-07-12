@@ -121,7 +121,7 @@ After ratification, execution SHALL use two coordinated branches:
 | Repository | Branch | Purpose |
 |---|---|---|
 | `SoftOboros/rlvgl` | `codex/sctd04-ratatui-integration` | gitlink, local patch, SCTD app, host, and DISCO mount |
-| `SoftOboros/ratatui` | `codex/ratatui-rlvgl-backend` | upstreamable `ratatui-rlvgl` crate and its tests/docs |
+| `SoftOboros/ratatui` | `dev/ratatui-rlvgl-backend` | upstreamable `ratatui-rlvgl` crate and its tests/docs |
 
 - rlvgl SHALL add `https://github.com/SoftOboros/ratatui.git` as the
   `vendor/ratatui` submodule and pin the Ratatui baseline. The outer commit
@@ -386,6 +386,11 @@ the bench record.
 - No publication or upstream PR until host and `no_std` gates pass. Publication
   itself is a separate owner-authorized action.
 
+The owner authorized release preparation on 2026-07-12. The initial
+`ratatui-rlvgl` crates.io publish SHALL be part of rlvgl's dependency-ordered
+publish chain immediately after `rlvgl-core`. A Ratatui upstream PR follows as
+a separate action after the rlvgl release; it is not part of this release gate.
+
 ## §12 Acceptance checklist (normative)
 
 A conforming SCTD-04 implementation MUST satisfy all of the following:
@@ -601,6 +606,9 @@ Owner ratification unblocks the following ordered execution phases:
   seats occupied. Visual QA confirms native full → Depart → Arrive followed by
   Ratatui inherited-full → Depart → Arrive, with seat 5 visibly empty only in
   the two Depart frames.
+- 2026-07-12 — Owner authorized release preparation. The first
+  `ratatui-rlvgl` publish is assigned to rlvgl's Gate P/publish chain after
+  `rlvgl-core`; the Ratatui upstream PR remains a subsequent action.
 - Workspace-wide validation retains the repository's existing generated-code
   rustfmt drift and two unrelated `platform/src/bdma.rs` discipline-test
   baseline violations; scoped formatting, strict platform clippy, docs,

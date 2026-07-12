@@ -24,6 +24,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 STAGE_DIR="${STAGE_DIR:-$REPO_ROOT/target/crates-ci}"
 
+debug_binary() {
+  root="$1"
+  name="$2"
+  host="$(rustc -vV | awk '/^host:/ { print $2; exit }')"
+  if [ -x "$root/target/debug/$name" ]; then
+    printf '%s\n' "$root/target/debug/$name"
+  elif [ -n "$host" ] && [ -x "$root/target/$host/debug/$name" ]; then
+    printf '%s\n' "$root/target/$host/debug/$name"
+  else
+    return 1
+  fi
+}
+
 # --- 1. Locate the staged root-crate package ---------------------------------
 VERSIONS_TSV="$STAGE_DIR/versions.tsv"
 if [ ! -f "$VERSIONS_TSV" ]; then
@@ -68,9 +81,8 @@ echo "smoke.sh: wrote $PKG/.cargo/config.toml (rlvgl self-patch filtered)"
 # (P-INCLUDE: disco-demo icons referenced outside its crate root, so the
 # packaged crate could never compile). Keep it covered from packaged crates.
 (cd "$PKG" && cargo build --lib --features simulator)
-BIN="$PKG/target/debug/rlvgl-creator"
-if [ ! -x "$BIN" ]; then
-  echo "smoke.sh: built binary not found at $BIN" >&2
+if ! BIN="$(debug_binary "$PKG" rlvgl-creator)"; then
+  echo "smoke.sh: built rlvgl-creator binary not found under $PKG/target" >&2
   exit 1
 fi
 
@@ -159,9 +171,8 @@ echo "smoke.sh: PASS — creator CLI round-trip from packaged crates"
 echo "smoke.sh: Layer W — building rlvgl-creator with creator_ui_automation"
 (cd "$PKG" && cargo build --bin rlvgl-creator \
   --features creator,creator_ui,creator_ui_automation)
-UI_BIN="$PKG/target/debug/rlvgl-creator"
-if [ ! -x "$UI_BIN" ]; then
-  echo "smoke.sh: FAIL — automation binary not found at $UI_BIN" >&2
+if ! UI_BIN="$(debug_binary "$PKG" rlvgl-creator)"; then
+  echo "smoke.sh: FAIL — automation binary not found under $PKG/target" >&2
   exit 1
 fi
 

@@ -11,6 +11,22 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.5.md).
 
+Release comparison: `refs/tags/v0.2.4..v0.2.5` (the GitHub `main` baseline at
+the start of this release line).
+
+### Added - Ratatui ↔ rlvgl, Rust all the way down (SCTD-04)
+- First release of `ratatui-rlvgl` `0.1.0`: a `no_std + alloc` Ratatui backend
+  backed by a retained cell surface, plus `RatatuiView` for hosting that
+  surface as a native rlvgl widget. The bridge uses `ratatui-core` and
+  `rlvgl-core` directly—no C LVGL, FFI, embedded-graphics, or C toolchain.
+- The Dining Philosophers demo gains an additional near-full-screen hybrid
+  window: native rounded chrome, title and graphical buttons surround a
+  Ratatui-rendered spatial table. Native and Ratatui views share the same
+  generated state machine and preserve state across open/close transitions.
+- Host simulator and STM32H747I-DISCO mounts exercise the same integration.
+  The checked-in promotional GIF shows native full → Depart → Arrive, followed
+  by the corresponding Ratatui transitions.
+
 ### Added - reactive Qt emitter (QT-03c, QT-05g…05k)
 - `qt emit --target rlvgl --scxml-context <ctx>=<crate>` links the emitted
   widget tree to an iState-generated state-machine crate and emits typed
@@ -46,6 +62,21 @@ Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.
 ### Added - docs
 - `docs/sctd-tutorial/` — five-chapter state-chart-to-reactive-UI tutorial.
 - `docs/qt-support/` QT-05g…05k binding chapters + media-player retrospective.
+- SCTD-04 architecture/execution record, deterministic capture tooling, and
+  the first Ratatui/rlvgl integration artifact.
+
+### Added - state-chart HDL handoff
+- Dining Philosophers gains generated Verilog/VHDL previews plus a Quartus
+  project handoff for the five-seat LED demonstration.
+
+### Release and publishing
+- Publish order now includes the first `ratatui-rlvgl` crate immediately after
+  `rlvgl-core`; Gate P packages the excluded submodule crate by manifest path.
+- Changed publishable crates selected from `refs/tags/v0.2.4` are released in
+  dependency order. A Ratatui upstream PR follows this rlvgl release.
+- Documentation changes bump `rlvgl-chips-silabs` and `rlvgl-chips-ti` to
+  `0.2.1`. `rlvgl-ui` moves to `0.2.6` because `0.2.5` is already published
+  and the current package raises its `rlvgl-widgets` minimum to `0.2.5`.
 
 ### WIP - ESP32-P4 (BEETLE-IDF)
 - `dfr0550` raw-PAC `clk_init` + `regi2c` bring-up; software star crawl.

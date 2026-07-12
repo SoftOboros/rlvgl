@@ -30,6 +30,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Prepare build environment
         run: bash scripts/setup-ci-env.sh
       - name: Stage publishable crates

@@ -25,6 +25,19 @@ cd "$SCRIPT_DIR"
 STAGE_DIR="${STAGE_DIR:-$SCRIPT_DIR/../../target/crates-ci}"
 GATE="${GATE:-p}"
 
+debug_binary() {
+  root="$1"
+  name="$2"
+  host="$(rustc -vV | awk '/^host:/ { print $2; exit }')"
+  if [ -x "$root/target/debug/$name" ]; then
+    printf '%s\n' "$root/target/debug/$name"
+  elif [ -n "$host" ] && [ -x "$root/target/$host/debug/$name" ]; then
+    printf '%s\n' "$root/target/$host/debug/$name"
+  else
+    return 1
+  fi
+}
+
 if [ "$GATE" = "r" ]; then
   # Gate R: registry truth — no patch table may shadow crates.io.
   if [ -f "$SCRIPT_DIR/.cargo/config.toml" ]; then
@@ -72,9 +85,8 @@ if [ "$GATE" != "r" ]; then
   echo "gate_p.sh: staged-source assertion passed (no registry rlvgl-* crates)"
 fi
 
-BIN="$SCRIPT_DIR/target/debug/crates-ci-user-sim"
-if [ ! -x "$BIN" ]; then
-  echo "gate_p.sh: FAIL — built binary not found at $BIN" >&2
+if ! BIN="$(debug_binary "$SCRIPT_DIR" crates-ci-user-sim)"; then
+  echo "gate_p.sh: FAIL — built binary not found under $SCRIPT_DIR/target" >&2
   exit 1
 fi
 
