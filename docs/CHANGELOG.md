@@ -18,8 +18,12 @@ Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.
   (QT-05h), chained-predicate first-active-wins ladder (QT-05i), button-event
   taps → machine events (QT-05j), and external-text consumer-resolved labels
   (QT-05k). One caller-driven `refresh_bindings(...)` pump. Emitter output
-  version `14` → `22`; istate linkage v2 (`step`/`is_active`/`get_var`/`Value`).
+  version `14` → `23`; istate linkage v2 (`step`/`is_active`/`get_var`/`Value`).
 - Sibling-anchor solver + component instantiation (QT-03c).
+- Emitter v23 produces strict-Clippy-clean Rust: precedence-aware bounds,
+  snake-case Rust identifiers with original QML tags, private binding sinks,
+  direct leaf returns, conditional widget mutability, and a documented
+  `BuiltScreen` result alias.
 
 ### Added - widgets
 - `Image::set_pixels` (runtime artwork swap) and `Image::set_hidden`

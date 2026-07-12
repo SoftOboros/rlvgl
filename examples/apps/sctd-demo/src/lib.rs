@@ -630,17 +630,29 @@ impl HeroWidgets {
     }
 }
 
+struct ControllerParts {
+    selector: Rc<RefCell<MachineSelector>>,
+    panel: Rc<RefCell<MachinePanel>>,
+    setup: Rc<RefCell<SetupScreen>>,
+    table: Rc<RefCell<PhilosophersTable>>,
+    skin: Rc<RefCell<MediaPlayerSkin>>,
+    subtitle: Rc<RefCell<Label>>,
+    footer: Rc<RefCell<Label>>,
+    hero: HeroWidgets,
+}
+
 impl ControllerState {
-    fn new(
-        selector: Rc<RefCell<MachineSelector>>,
-        panel: Rc<RefCell<MachinePanel>>,
-        setup: Rc<RefCell<SetupScreen>>,
-        table: Rc<RefCell<PhilosophersTable>>,
-        skin: Rc<RefCell<MediaPlayerSkin>>,
-        subtitle: Rc<RefCell<Label>>,
-        footer: Rc<RefCell<Label>>,
-        hero: HeroWidgets,
-    ) -> Self {
+    fn new(parts: ControllerParts) -> Self {
+        let ControllerParts {
+            selector,
+            panel,
+            setup,
+            table,
+            skin,
+            subtitle,
+            footer,
+            hero,
+        } = parts;
         let mut this = Self {
             selector,
             panel,
@@ -1163,21 +1175,21 @@ impl SctdController {
             hero_controls.push(Rc::new(RefCell::new(control)));
         }
 
-        let state = Rc::new(RefCell::new(ControllerState::new(
-            selector.clone(),
-            panel.clone(),
-            setup.clone(),
-            table.clone(),
-            skin.clone(),
-            subtitle.clone(),
-            footer.clone(),
-            HeroWidgets {
+        let state = Rc::new(RefCell::new(ControllerState::new(ControllerParts {
+            selector: selector.clone(),
+            panel: panel.clone(),
+            setup: setup.clone(),
+            table: table.clone(),
+            skin: skin.clone(),
+            subtitle: subtitle.clone(),
+            footer: footer.clone(),
+            hero: HeroWidgets {
                 frame: hero_frame.clone(),
                 content: hero_content.clone(),
                 launcher: hero_launcher.clone(),
                 controls: hero_controls.clone(),
             },
-        )));
+        })));
 
         // Wire selector tap callbacks (slots 0, 1, 2 → Setup, DP, MP).
         {

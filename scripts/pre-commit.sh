@@ -30,7 +30,17 @@ echo "[phase 4.5] disco demo + simulator automation tests"
 RUSTFLAGS="" cargo test -p rlvgl-app-disco-demo
 RUSTFLAGS="" cargo build -p rlvgl-example-disco-sim
 RUSTFLAGS="" cargo test -p rlvgl-example-disco-sim
-(cd playit/node && RLVGL_DISCO_SIM_BIN="$PWD/../../target/debug/rlvgl-disco-sim" node --test)
+TARGET_DIR=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')
+HOST_TRIPLE=$(rustc -vV | sed -n 's/^host: //p')
+DISCO_SIM_BIN="$TARGET_DIR/debug/rlvgl-disco-sim"
+if [[ ! -x "$DISCO_SIM_BIN" ]]; then
+    DISCO_SIM_BIN="$TARGET_DIR/$HOST_TRIPLE/debug/rlvgl-disco-sim"
+fi
+if [[ ! -x "$DISCO_SIM_BIN" ]]; then
+    echo "disco simulator binary not found under $TARGET_DIR" >&2
+    exit 1
+fi
+(cd playit/node && RLVGL_DISCO_SIM_BIN="$DISCO_SIM_BIN" node --test)
 
 echo "[phase 5] docs"
 RUSTFLAGS="" cargo doc --workspace --no-deps

@@ -41,12 +41,13 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 22;
+pub const QT_EMIT_VERSION: u32 = 23;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
+#[rustfmt::skip]
 pub const QT_SOURCE: &str = "tests/fixtures/qt/hello.qml";
 
 /// State threaded through every helper. One field per
@@ -77,6 +78,29 @@ impl LabelBinding {
     }
 }
 
+struct BindingSink<'a, T> {
+    values: &'a mut Vec<T>,
+}
+
+impl<'a, T> BindingSink<'a, T> {
+    fn new(values: &'a mut Vec<T>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, value: T) {
+        self.values.push(value);
+    }
+}
+
+/// Widget tree, screen state, and reactive label bindings returned
+/// by [`build_screen`].
+#[rustfmt::skip]
+pub type BuiltScreen = (
+    WidgetNode,
+    Rc<RefCell<ScreenState>>,
+    Vec<LabelBinding>,
+);
+
 /// Build the screen widget tree at `bounds` and return it
 /// alongside the `ScreenState` handle (QT-04b) and the
 /// `Vec<LabelBinding>` of reactive bindings (QT-04e §3).
@@ -85,14 +109,15 @@ impl LabelBinding {
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {
+) -> BuiltScreen {
     let state = Rc::new(RefCell::new(ScreenState {
         title: String::from("Hello"),
         count: 0,
         ratio: 1.5,
     }));
     let mut label_bindings: Vec<LabelBinding> = Vec::new();
-    let node = build_root(bounds, Rc::clone(&state), &mut label_bindings);
+    let mut binding_sink = BindingSink::new(&mut label_bindings);
+    let node = build_root(bounds, Rc::clone(&state), &mut binding_sink);
     (node, state, label_bindings)
 }
 
@@ -119,7 +144,7 @@ fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
 fn build_root(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -134,8 +159,8 @@ fn build_root(
     node.children.push(build_bg(child_bounds, Rc::clone(&state), label_bindings));
     // QT-03c centerIn: parent (no explicit size — defaulted to parent bounds)
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: bounds.width,
         height: bounds.height,
     };
@@ -150,17 +175,16 @@ fn build_root(
 fn build_bg(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x1e, 0x1e, 0x2e, 0xff);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("bg"),
-    };
-    node
+    }
 }
 
 // QML type: `QC.Label`
@@ -168,7 +192,7 @@ fn build_bg(
 fn build_node_2(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     // QT-04c bound: text → state.title
     let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
@@ -180,12 +204,11 @@ fn build_node_2(
         label: Rc::clone(&label_handle),
         accessor: |s| s.title.clone(),
     });
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }
 
 // QML type: `MouseArea`
@@ -193,7 +216,7 @@ fn build_node_2(
 fn build_node_3(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut click_area = ClickArea::new(bounds);
     {
@@ -206,10 +229,9 @@ fn build_node_3(
     }
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(click_area));
     // emitter-skipped (QT-04+): 1 signal handler(s)
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: None,
-    };
-    node
+    }
 }

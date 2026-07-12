@@ -263,6 +263,7 @@ Ratifying QT-04f unblocks:
 | Date       | Change                                                                          |
 | ---------- | ------------------------------------------------------------------------------- |
 | 2026-04-29 | Ratified and shipped. State-field namespacing for non-root id'd items (§5), resolution walk extended to non-root scopes (§3 / §7), shared `resolve_state_field_ref` helper used by both QT-04b and QT-04c sites, `QT_EMIT_VERSION_RLVGL` bumped `6 → 7`. New `nested.qml` fixture + 3 goldens + 3 drift gates + synthetic-click compile-as-mod gate that asserts `state.bg_alpha == 90` after firing `Event::PressRelease`. All existing rlvgl-target goldens regenerated; compile-as-mod gates' version assertions bumped. QT-04b §8 amended via this chapter. |
+| 2026-07-12 | §5/§7 conformance amendment. QML IDs and property names now convert to deterministic Rust snake case for helper functions and `ScreenState` fields, including camel-case boundaries, acronym runs, punctuation, leading digits, and Rust keywords. Original QML IDs remain unchanged in `WidgetNode::tag`, owner metadata, and external tables. Snake-case collisions receive stable numeric suffixes instead of silently dropping the later state field. `QT_EMIT_VERSION_RLVGL` advances `22 → 23` with the shared emitted-source conformance change. |
 
 ---
 

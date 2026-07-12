@@ -15,14 +15,22 @@
 //! `// BLOCKED: <diagnostic>` comments and safe placeholders.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-// Machine-generated source: blanket-allow lints inherent to emitted code
-// rather than hand-written style (see rust_ir_emitter._emit_no_std_preamble).
+// Machine-generated source: blanket-allow lints inherent to emitted
+// code rather than hand-written style. `dead_code` covers helpers a
+// given machine shape never calls (e.g. run_epsilon_transitions on a
+// machine with no eventless transitions); `unused_variables` covers
+// diagnostic bindings that compile out under the no_std no-op
+// `eprintln!`; `clippy::all` covers codegen-shaped expressions
+// (single-arm matches, manual strips, large IR enums). Do not hand
+// edit — regenerate via `rust_ir_emitter`.
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(clippy::all)]
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+#[cfg(feature = "std")]
+use std::boxed::Box;
 #[cfg(feature = "std")]
 use std::collections::{BTreeMap, VecDeque};
 #[cfg(feature = "std")]
@@ -31,13 +39,13 @@ use std::format;
 use std::string::{String, ToString};
 #[cfg(feature = "std")]
 use std::vec::Vec;
-#[cfg(feature = "std")]
-use std::boxed::Box;
 // Pull the vec! macro into scope unconditionally under std.
 #[cfg(feature = "std")]
 #[allow(unused_imports)]
 use std::vec;
 
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 #[cfg(not(feature = "std"))]
 use alloc::collections::{BTreeMap, VecDeque};
 #[cfg(not(feature = "std"))]
@@ -46,8 +54,6 @@ use alloc::format;
 use alloc::string::{String, ToString};
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
 // Pull the vec! macro into scope under no_std.
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -59,7 +65,9 @@ use alloc::vec;
 // resolution (no re-export needed).
 #[cfg(not(feature = "std"))]
 macro_rules! eprintln {
-    ($($arg:tt)*) => { () };
+    ($($arg:tt)*) => {
+        ()
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -93,15 +101,16 @@ pub enum Value {
 #[inline]
 fn f64_is_nan(x: f64) -> bool {
     let bits = x.to_bits();
-    (bits & 0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000
-        && (bits & 0x000F_FFFF_FFFF_FFFF) != 0
+    (bits & 0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000 && (bits & 0x000F_FFFF_FFFF_FFFF) != 0
 }
 
 /// Return true if x has no fractional part (no_std-safe).
 /// Treats NaN and infinity as "has fractional part".
 #[inline]
 fn f64_is_integer(x: f64) -> bool {
-    if f64_is_nan(x) { return false; }
+    if f64_is_nan(x) {
+        return false;
+    }
     // Cast to i64 and back: if equal, it is an integer
     let as_i64 = x as i64;
     (as_i64 as f64) == x
@@ -166,7 +175,13 @@ impl Value {
                 }
             }
             Value::Int(i) => format!("{}", i),
-            Value::Bool(b) => if *b { "true".to_string() } else { "false".to_string() },
+            Value::Bool(b) => {
+                if *b {
+                    "true".to_string()
+                } else {
+                    "false".to_string()
+                }
+            }
             Value::Array(_) => "[Array]".to_string(),
             Value::Map(_) => "[Object]".to_string(),
             Value::Undefined => "undefined".to_string(),
@@ -199,7 +214,9 @@ pub struct Scope {
 impl Scope {
     /// Create an empty scope.
     pub fn new() -> Self {
-        Self { vars: BTreeMap::new() }
+        Self {
+            vars: BTreeMap::new(),
+        }
     }
 
     /// Read a variable by name.  Returns ``Value::Undefined`` when absent.
@@ -222,9 +239,10 @@ impl Scope {
 
     /// Write a nested map key.
     pub fn set_map_key(&mut self, var: &str, key: String, val: Value) {
-        let entry = self.vars.entry(var.to_string()).or_insert_with(|| {
-            Value::Map(BTreeMap::new())
-        });
+        let entry = self
+            .vars
+            .entry(var.to_string())
+            .or_insert_with(|| Value::Map(BTreeMap::new()));
         if let Value::Map(ref mut m) = entry {
             m.insert(key, val);
         }
@@ -247,7 +265,10 @@ pub struct EventCtx {
 impl EventCtx {
     /// Create an event context.
     pub fn new(name: impl Into<String>, data: Value) -> Self {
-        Self { name: name.into(), data }
+        Self {
+            name: name.into(),
+            data,
+        }
     }
 }
 
@@ -355,7 +376,10 @@ pub enum ActionIr {
         body: Vec<ActionIr>,
     },
     /// Blocked / capability call -- logs the diagnostic and raises error event.
-    Blocked { diagnostic: String, error_event: String },
+    Blocked {
+        diagnostic: String,
+        error_event: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -577,9 +601,7 @@ pub fn eval_expr(expr: &ExprIr, scope: &Scope, event: &EventCtx) -> Value {
             eval_index(obj_val, idx_val)
         }
 
-        ExprIr::BinOp(op, lhs, rhs) => {
-            eval_binop(op, lhs, rhs, scope, event)
-        }
+        ExprIr::BinOp(op, lhs, rhs) => eval_binop(op, lhs, rhs, scope, event),
 
         ExprIr::UnaryOp(op, operand) => {
             let val = eval_expr(operand, scope, event);
@@ -595,9 +617,7 @@ pub fn eval_expr(expr: &ExprIr, scope: &Scope, event: &EventCtx) -> Value {
         }
 
         ExprIr::ArrayLiteral(items) => {
-            let vals: Vec<Value> = items.iter()
-                .map(|e| eval_expr(e, scope, event))
-                .collect();
+            let vals: Vec<Value> = items.iter().map(|e| eval_expr(e, scope, event)).collect();
             Value::Array(vals)
         }
 
@@ -656,13 +676,17 @@ fn eval_binop(op: &str, lhs: &ExprIr, rhs: &ExprIr, scope: &Scope, event: &Event
     match op {
         "&&" => {
             let l = eval_expr(lhs, scope, event);
-            if !l.is_truthy() { return Value::Bool(false); }
+            if !l.is_truthy() {
+                return Value::Bool(false);
+            }
             let r = eval_expr(rhs, scope, event);
             return Value::Bool(r.is_truthy());
         }
         "||" => {
             let l = eval_expr(lhs, scope, event);
-            if l.is_truthy() { return Value::Bool(true); }
+            if l.is_truthy() {
+                return Value::Bool(true);
+            }
             let r = eval_expr(rhs, scope, event);
             return Value::Bool(r.is_truthy());
         }
@@ -676,7 +700,11 @@ fn eval_binop(op: &str, lhs: &ExprIr, rhs: &ExprIr, scope: &Scope, event: &Event
         "+" => {
             // String concatenation if either operand is a string
             if matches!(lv, Value::Str(_)) || matches!(rv, Value::Str(_)) {
-                Value::Str(format!("{}{}", lv.to_display_string(), rv.to_display_string()))
+                Value::Str(format!(
+                    "{}{}",
+                    lv.to_display_string(),
+                    rv.to_display_string()
+                ))
             } else {
                 let ln = lv.to_f64();
                 let rn = rv.to_f64();
@@ -690,20 +718,28 @@ fn eval_binop(op: &str, lhs: &ExprIr, rhs: &ExprIr, scope: &Scope, event: &Event
         }
         "-" => {
             let result = lv.to_f64() - rv.to_f64();
-            if f64_is_integer(result) { Value::Int(result as i64) } else { Value::Number(result) }
+            if f64_is_integer(result) {
+                Value::Int(result as i64)
+            } else {
+                Value::Number(result)
+            }
         }
         "*" => {
             let result = lv.to_f64() * rv.to_f64();
-            if f64_is_integer(result) { Value::Int(result as i64) } else { Value::Number(result) }
+            if f64_is_integer(result) {
+                Value::Int(result as i64)
+            } else {
+                Value::Number(result)
+            }
         }
         "/" => Value::Number(lv.to_f64() / rv.to_f64()),
         "|" => Value::Int(lv.to_i64() | rv.to_i64()),
         "&" => Value::Int(lv.to_i64() & rv.to_i64()),
         "==" => Value::Bool(values_equal(&lv, &rv)),
         "!=" => Value::Bool(!values_equal(&lv, &rv)),
-        "<"  => Value::Bool(lv.to_f64() < rv.to_f64()),
+        "<" => Value::Bool(lv.to_f64() < rv.to_f64()),
         "<=" => Value::Bool(lv.to_f64() <= rv.to_f64()),
-        ">"  => Value::Bool(lv.to_f64() > rv.to_f64()),
+        ">" => Value::Bool(lv.to_f64() > rv.to_f64()),
         ">=" => Value::Bool(lv.to_f64() >= rv.to_f64()),
         _ => {
             eprintln!("BLOCKED: unknown binop {:?}", op);
@@ -734,22 +770,39 @@ fn eval_call(
 ) -> Value {
     match func {
         "int" | "parseInt" => {
-            let arg = args.first().map(|e| eval_expr(e, scope, event)).unwrap_or(Value::Undefined);
+            let arg = args
+                .first()
+                .map(|e| eval_expr(e, scope, event))
+                .unwrap_or(Value::Undefined);
             Value::Int(arg.to_i64())
         }
         "float" | "Number" | "parseFloat" => {
-            let arg = args.first().map(|e| eval_expr(e, scope, event)).unwrap_or(Value::Undefined);
+            let arg = args
+                .first()
+                .map(|e| eval_expr(e, scope, event))
+                .unwrap_or(Value::Undefined);
             Value::Number(arg.to_f64())
         }
         "str" | "String" => {
-            let arg = args.first().map(|e| eval_expr(e, scope, event)).unwrap_or(Value::Undefined);
+            let arg = args
+                .first()
+                .map(|e| eval_expr(e, scope, event))
+                .unwrap_or(Value::Undefined);
             Value::Str(arg.to_display_string())
         }
         "replace" => {
             // receiver.replace(from, to)
-            let recv_val = receiver.map(|e| eval_expr(e, scope, event)).unwrap_or(Value::Undefined);
-            let from = args.first().map(|e| eval_expr(e, scope, event)).unwrap_or(Value::Undefined);
-            let to = args.get(1).map(|e| eval_expr(e, scope, event)).unwrap_or(Value::Undefined);
+            let recv_val = receiver
+                .map(|e| eval_expr(e, scope, event))
+                .unwrap_or(Value::Undefined);
+            let from = args
+                .first()
+                .map(|e| eval_expr(e, scope, event))
+                .unwrap_or(Value::Undefined);
+            let to = args
+                .get(1)
+                .map(|e| eval_expr(e, scope, event))
+                .unwrap_or(Value::Undefined);
             if let Value::Str(s) = recv_val {
                 Value::Str(s.replace(&from.to_display_string(), &to.to_display_string()))
             } else {
@@ -790,7 +843,12 @@ fn exec_action(
     event: &EventCtx,
 ) {
     match action {
-        ActionIr::Assign { loc, key_expr, expr, op } => {
+        ActionIr::Assign {
+            loc,
+            key_expr,
+            expr,
+            op,
+        } => {
             let new_val = eval_expr(expr, scope, event);
             // Detect map[key] pattern in loc
             if let Some(bracket_pos) = loc.find('[') {
@@ -835,7 +893,17 @@ fn exec_action(
             queue.push_back(ev.clone());
         }
 
-        ActionIr::Send { event: ev, eventexpr, target, targetexpr, delay, delayexpr, send_id, content_expr, .. } => {
+        ActionIr::Send {
+            event: ev,
+            eventexpr,
+            target,
+            targetexpr,
+            delay,
+            delayexpr,
+            send_id,
+            content_expr,
+            ..
+        } => {
             // Resolve event name (static or dynamic).
             let resolved_event = if let Some(expr) = eventexpr {
                 eval_expr(expr, scope, event).to_display_string()
@@ -857,7 +925,8 @@ fn exec_action(
                 delay.as_deref().unwrap_or("").to_string()
             };
             let delay_ms = parse_delay_ms(&delay_str);
-            let resolved_content = content_expr.as_ref()
+            let resolved_content = content_expr
+                .as_ref()
                 .map(|e| eval_expr(e, scope, event))
                 .unwrap_or(Value::Undefined);
             let content_str = resolved_content.to_display_string();
@@ -915,7 +984,12 @@ fn exec_action(
             }
         }
 
-        ActionIr::Foreach { array_expr, item, index, body } => {
+        ActionIr::Foreach {
+            array_expr,
+            item,
+            index,
+            body,
+        } => {
             let arr = eval_expr(array_expr, scope, event);
             if let Value::Array(items) = arr {
                 for (i, val) in items.into_iter().enumerate() {
@@ -928,7 +1002,10 @@ fn exec_action(
             }
         }
 
-        ActionIr::Blocked { diagnostic, error_event } => {
+        ActionIr::Blocked {
+            diagnostic,
+            error_event,
+        } => {
             eprintln!("BLOCKED: {}", diagnostic);
             if !error_event.is_empty() {
                 queue.push_back(error_event.clone());
@@ -941,15 +1018,27 @@ fn apply_op(op: &str, current: Value, new_val: Value) -> Value {
     match op {
         "add" => {
             let result = current.to_f64() + new_val.to_f64();
-            if f64_is_integer(result) { Value::Int(result as i64) } else { Value::Number(result) }
+            if f64_is_integer(result) {
+                Value::Int(result as i64)
+            } else {
+                Value::Number(result)
+            }
         }
         "sub" => {
             let result = current.to_f64() - new_val.to_f64();
-            if f64_is_integer(result) { Value::Int(result as i64) } else { Value::Number(result) }
+            if f64_is_integer(result) {
+                Value::Int(result as i64)
+            } else {
+                Value::Number(result)
+            }
         }
         "mul" => {
             let result = current.to_f64() * new_val.to_f64();
-            if f64_is_integer(result) { Value::Int(result as i64) } else { Value::Number(result) }
+            if f64_is_integer(result) {
+                Value::Int(result as i64)
+            } else {
+                Value::Number(result)
+            }
         }
         "div" => Value::Number(current.to_f64() / new_val.to_f64()),
         _ => new_val, // "set" and anything else
@@ -961,9 +1050,15 @@ fn apply_op(op: &str, current: Value, new_val: Value) -> Value {
 /// Returns 0 for empty, ``"0ms"``, ``"0s"``, or ``"0"`` strings.
 fn parse_delay_ms(s: &str) -> u64 {
     let s = s.trim();
-    if s.is_empty() || s == "0ms" || s == "0s" || s == "0" { return 0; }
-    if let Some(ms) = s.strip_suffix("ms") { return ms.trim().parse::<u64>().unwrap_or(0); }
-    if let Some(ss) = s.strip_suffix('s') { return ss.trim().parse::<u64>().unwrap_or(0) * 1000; }
+    if s.is_empty() || s == "0ms" || s == "0s" || s == "0" {
+        return 0;
+    }
+    if let Some(ms) = s.strip_suffix("ms") {
+        return ms.trim().parse::<u64>().unwrap_or(0);
+    }
+    if let Some(ss) = s.strip_suffix('s') {
+        return ss.trim().parse::<u64>().unwrap_or(0) * 1000;
+    }
     s.parse::<u64>().unwrap_or(0)
 }
 
@@ -1232,7 +1327,9 @@ impl ChildMachine {
         let mut parent_events: Vec<String> = Vec::new();
         let mut safety = 0usize;
         while let Some(ev) = self.queue.pop_front() {
-            if safety > 1000 { break; }
+            if safety > 1000 {
+                break;
+            }
             safety += 1;
             if let Some(rest) = ev.strip_prefix("__parent__:") {
                 // Format: "<event_name><content>".
@@ -1303,9 +1400,9 @@ impl ChildMachine {
             if let Some(node) = self.find_state(state_id) {
                 let onentry = node.onentry().to_vec();
                 match node {
-                    StateNodeIr::State { datamodel, initial, .. } => {
-                        (onentry, datamodel.to_vec(), initial.clone())
-                    }
+                    StateNodeIr::State {
+                        datamodel, initial, ..
+                    } => (onentry, datamodel.to_vec(), initial.clone()),
                     _ => (onentry, vec![], None),
                 }
             } else {
@@ -1327,7 +1424,8 @@ impl ChildMachine {
     }
 
     fn exit_state(&mut self, state_id: &str) {
-        let onexit: Vec<ActionIr> = self.find_state(state_id)
+        let onexit: Vec<ActionIr> = self
+            .find_state(state_id)
             .map(|n| n.onexit().to_vec())
             .unwrap_or_default();
         let ev = self.event_ctx.clone();
@@ -1345,7 +1443,8 @@ impl ChildMachine {
     }
 
     fn try_transitions_in(&mut self, state_id: &str, event_name: &str) -> bool {
-        let transitions: Vec<TransitionIr> = self.find_state(state_id)
+        let transitions: Vec<TransitionIr> = self
+            .find_state(state_id)
             .map(|n| n.transitions().to_vec())
             .unwrap_or_default();
         for t in &transitions {
@@ -1353,12 +1452,16 @@ impl ChildMachine {
                 None => false,
                 Some(pattern) => event_matches_pattern(event_name, pattern),
             };
-            if !event_matches { continue; }
+            if !event_matches {
+                continue;
+            }
             let guard_ok = match &t.guard {
                 None => true,
                 Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
             };
-            if !guard_ok { continue; }
+            if !guard_ok {
+                continue;
+            }
             self.fire_transition(t.clone());
             return true;
         }
@@ -1368,17 +1471,22 @@ impl ChildMachine {
     fn run_epsilon_transitions(&mut self) {
         let mut safety = 0usize;
         loop {
-            if safety > 100 { break; }
+            if safety > 100 {
+                break;
+            }
             safety += 1;
             let active = self.active_state.clone();
             let ancestors = self.get_ancestors(&active);
             let mut candidate: Option<TransitionIr> = None;
             'outer: for state_id in &ancestors {
-                let transitions: Vec<TransitionIr> = self.find_state(state_id)
+                let transitions: Vec<TransitionIr> = self
+                    .find_state(state_id)
                     .map(|n| n.transitions().to_vec())
                     .unwrap_or_default();
                 for t in transitions {
-                    if t.event.is_some() { continue; }
+                    if t.event.is_some() {
+                        continue;
+                    }
                     let guard_ok = match &t.guard {
                         None => true,
                         Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
@@ -1413,17 +1521,20 @@ impl ChildMachine {
             // (present in target's chain but not old state's chain).
             // We need to run onentry for these in top-down order.
             // target_ancs is [leaf, parent, grandparent, ...]; reverse for top-down.
-            let mut new_ancs: Vec<String> = target_ancs.iter()
+            let mut new_ancs: Vec<String> = target_ancs
+                .iter()
                 .filter(|a| *a != &target_clone && !old_ancs.contains(*a))
                 .cloned()
                 .collect();
             new_ancs.reverse(); // now top-down (outermost first)
-            // Execute onentry for each newly-entered ancestor.
+                                // Execute onentry for each newly-entered ancestor.
             for anc_id in &new_ancs {
-                let anc_onentry: Vec<ActionIr> = self.find_state(anc_id)
+                let anc_onentry: Vec<ActionIr> = self
+                    .find_state(anc_id)
                     .map(|n| n.onentry().to_vec())
                     .unwrap_or_default();
-                let anc_dm: Vec<DataSlotIr> = self.find_state(anc_id)
+                let anc_dm: Vec<DataSlotIr> = self
+                    .find_state(anc_id)
                     .and_then(|n| match n {
                         StateNodeIr::State { datamodel, .. }
                         | StateNodeIr::Parallel { datamodel, .. } => Some(datamodel.to_vec()),
@@ -1527,7 +1638,11 @@ impl Machine {
     /// Initialize the machine: enter the initial state and run onentry actions.
     pub fn start(&mut self) {
         // Use explicit initial list; fall back to first top-level child if empty.
-        let initial_id = self.ir.initial.first().cloned()
+        let initial_id = self
+            .ir
+            .initial
+            .first()
+            .cloned()
             .filter(|s| !s.is_empty())
             .or_else(|| self.ir.children.first().map(|n| n.id().to_string()))
             .unwrap_or_default();
@@ -1551,7 +1666,10 @@ impl Machine {
                 // Child-to-parent event: process immediately so the parent
                 // transitions on spawn-time events (think.N, etc.).
                 let (ev_name, content_val) = if let Some(sep) = rest.find('') {
-                    (rest[..sep].to_string(), Self::parse_content_str(&rest[sep + 1..]))
+                    (
+                        rest[..sep].to_string(),
+                        Self::parse_content_str(&rest[sep + 1..]),
+                    )
                 } else {
                     (rest.to_string(), Value::Undefined)
                 };
@@ -1575,14 +1693,18 @@ impl Machine {
         // processed normally.
         let mut safety = 0usize;
         while let Some(internal_ev) = self.queue.pop_front() {
-            if safety > 1000 { break; }
+            if safety > 1000 {
+                break;
+            }
             safety += 1;
             if let Some(rest) = internal_ev.strip_prefix("__child__") {
                 // Format: "__child__<invoke_id>:<event_name>"
                 if let Some(colon) = rest.find(':') {
                     let child_id = &rest[..colon];
                     let child_ev = rest[colon + 1..].to_string();
-                    if let Some(child) = self.child_machines.iter_mut()
+                    if let Some(child) = self
+                        .child_machines
+                        .iter_mut()
                         .find(|c| c.invoke_id == child_id)
                     {
                         let parent_bound2 = child.deliver(&child_ev, event_data.clone());
@@ -1602,7 +1724,11 @@ impl Machine {
                     let content_str = if parts.len() >= 5 { parts[4] } else { "" };
                     let content = Self::parse_content_str(content_str);
                     let fire_time = self.logical_clock_ms + delay_ms;
-                    let send_id = if send_id_str.is_empty() { None } else { Some(send_id_str.to_string()) };
+                    let send_id = if send_id_str.is_empty() {
+                        None
+                    } else {
+                        Some(send_id_str.to_string())
+                    };
                     let machine_id = if target.starts_with("#_") {
                         target[2..].to_string()
                     } else {
@@ -1610,8 +1736,17 @@ impl Machine {
                     };
                     let seq = self.timer_seq;
                     self.timer_seq += 1;
-                    self.timers.push(PendingTimer { fire_time_ms: fire_time, seq, machine_id, event_name, content, send_id });
-                    self.timers.sort_by(|a, b| a.fire_time_ms.cmp(&b.fire_time_ms).then(a.seq.cmp(&b.seq)));
+                    self.timers.push(PendingTimer {
+                        fire_time_ms: fire_time,
+                        seq,
+                        machine_id,
+                        event_name,
+                        content,
+                        send_id,
+                    });
+                    self.timers.sort_by(|a, b| {
+                        a.fire_time_ms.cmp(&b.fire_time_ms).then(a.seq.cmp(&b.seq))
+                    });
                 }
             } else if let Some(rest) = internal_ev.strip_prefix("__cancel__") {
                 let cid = rest.to_string();
@@ -1653,9 +1788,9 @@ impl Machine {
     /// Return true if `state_id` is in the active configuration
     /// (an active leaf or an ancestor of one).
     pub fn is_active(&self, state_id: &str) -> bool {
-        self.active.iter().any(|leaf| {
-            leaf == state_id || self.get_ancestors(leaf).iter().any(|a| a == state_id)
-        })
+        self.active
+            .iter()
+            .any(|leaf| leaf == state_id || self.get_ancestors(leaf).iter().any(|a| a == state_id))
     }
 
     /// Return the current active state as a MachineState enum variant.
@@ -1680,14 +1815,16 @@ impl Machine {
 
     /// Get a variable from a child machine identified by invoke_id.
     pub fn get_child_var(&self, invoke_id: &str, name: &str) -> Option<Value> {
-        self.child_machines.iter()
+        self.child_machines
+            .iter()
             .find(|c| c.invoke_id == invoke_id)
             .map(|c| c.get_var(name))
     }
 
     /// Get the active state of a child machine identified by invoke_id.
     pub fn get_child_state(&self, invoke_id: &str) -> Option<String> {
-        self.child_machines.iter()
+        self.child_machines
+            .iter()
             .find(|c| c.invoke_id == invoke_id)
             .map(|c| c.current_state().to_string())
     }
@@ -1698,13 +1835,35 @@ impl Machine {
             if let Some(node) = self.find_state(state_id) {
                 let onentry = node.onentry().to_vec();
                 match node {
-                    StateNodeIr::State { datamodel, initial, invokes, .. } => {
-                        (onentry, datamodel.to_vec(), initial.clone(), vec![], false, invokes.to_vec())
-                    }
-                    StateNodeIr::Parallel { datamodel, children, invokes, .. } => {
-                        let child_ids: Vec<String> = children.iter()
-                            .map(|c| c.id().to_string()).collect();
-                        (onentry, datamodel.to_vec(), None, child_ids, true, invokes.to_vec())
+                    StateNodeIr::State {
+                        datamodel,
+                        initial,
+                        invokes,
+                        ..
+                    } => (
+                        onentry,
+                        datamodel.to_vec(),
+                        initial.clone(),
+                        vec![],
+                        false,
+                        invokes.to_vec(),
+                    ),
+                    StateNodeIr::Parallel {
+                        datamodel,
+                        children,
+                        invokes,
+                        ..
+                    } => {
+                        let child_ids: Vec<String> =
+                            children.iter().map(|c| c.id().to_string()).collect();
+                        (
+                            onentry,
+                            datamodel.to_vec(),
+                            None,
+                            child_ids,
+                            true,
+                            invokes.to_vec(),
+                        )
                     }
                     _ => (onentry, vec![], None, vec![], false, vec![]),
                 }
@@ -1724,10 +1883,14 @@ impl Machine {
         // Spawn inline child machines from invokes
         for inv in invokes {
             if let Some(child_ir) = inv.child_machine {
-                let invoke_id = inv.invoke_id.clone()
+                let invoke_id = inv
+                    .invoke_id
+                    .clone()
                     .unwrap_or_else(|| format!("_invoke_{}", self.child_machines.len()));
                 // Collect param values from parent scope
-                let params: Vec<(String, Value)> = inv.params.iter()
+                let params: Vec<(String, Value)> = inv
+                    .params
+                    .iter()
                     .map(|p| {
                         let val = eval_expr(&p.expr, &self.scope, &self.event_ctx);
                         (p.name.clone(), val)
@@ -1748,10 +1911,14 @@ impl Machine {
                         let parts: Vec<&str> = rest.splitn(5, ':').collect();
                         if parts.len() >= 4 && parts[2].is_empty() {
                             // Empty target: re-tag to this child's invoke_id.
-                            let tagged = format!("__delayed__{}:{}:#_{}:{}:{}",
-                                parts[0], parts[1], invoke_id,
+                            let tagged = format!(
+                                "__delayed__{}:{}:#_{}:{}:{}",
+                                parts[0],
+                                parts[1],
+                                invoke_id,
                                 parts[3],
-                                if parts.len() >= 5 { parts[4] } else { "" });
+                                if parts.len() >= 5 { parts[4] } else { "" }
+                            );
                             self.queue.push_back(tagged);
                             continue;
                         }
@@ -1782,7 +1949,8 @@ impl Machine {
 
     fn exit_state(&mut self, state_id: &str) {
         // Remove any child machines spawned by invokes on this state
-        let invokes: Vec<InvokeIr> = self.find_state(state_id)
+        let invokes: Vec<InvokeIr> = self
+            .find_state(state_id)
             .and_then(|n| match n {
                 StateNodeIr::State { invokes, .. } => Some(invokes.to_vec()),
                 StateNodeIr::Parallel { invokes, .. } => Some(invokes.to_vec()),
@@ -1797,7 +1965,8 @@ impl Machine {
             }
         }
         // Clone onexit before any mutable borrow
-        let onexit: Vec<ActionIr> = self.find_state(state_id)
+        let onexit: Vec<ActionIr> = self
+            .find_state(state_id)
             .map(|n| n.onexit().to_vec())
             .unwrap_or_default();
         let ev = self.event_ctx.clone();
@@ -1812,7 +1981,9 @@ impl Machine {
         // this microstep is skipped.
         let leaves = self.active.clone();
         for leaf in &leaves {
-            if !self.active.iter().any(|s| s == leaf) { continue; }
+            if !self.active.iter().any(|s| s == leaf) {
+                continue;
+            }
             let ancestors = self.get_ancestors(leaf);
             if let Some((t, src)) = self.find_enabled(&ancestors, Some(&event_name)) {
                 self.fire_transition(t, &src);
@@ -1831,7 +2002,8 @@ impl Machine {
         event: Option<&str>,
     ) -> Option<(TransitionIr, String)> {
         for state_id in ancestors {
-            let transitions: Vec<TransitionIr> = self.find_state(state_id)
+            let transitions: Vec<TransitionIr> = self
+                .find_state(state_id)
                 .map(|n| n.transitions().to_vec())
                 .unwrap_or_default();
             for t in transitions {
@@ -1840,12 +2012,16 @@ impl Machine {
                     (Some(p), Some(name)) => event_matches_pattern(name, p),
                     _ => false,
                 };
-                if !matches { continue; }
+                if !matches {
+                    continue;
+                }
                 let guard_ok = match &t.guard {
                     None => true,
                     Some(g) => eval_expr(g, &self.scope, &self.event_ctx).is_truthy(),
                 };
-                if !guard_ok { continue; }
+                if !guard_ok {
+                    continue;
+                }
                 return Some((t, state_id.clone()));
             }
         }
@@ -1856,12 +2032,16 @@ impl Machine {
     fn macrostep(&mut self) {
         let mut safety = 0usize;
         loop {
-            if safety > 200 { break; }
+            if safety > 200 {
+                break;
+            }
             safety += 1;
             let leaves = self.active.clone();
             let mut fired = false;
             for leaf in &leaves {
-                if !self.active.iter().any(|s| s == leaf) { continue; }
+                if !self.active.iter().any(|s| s == leaf) {
+                    continue;
+                }
                 let ancestors = self.get_ancestors(leaf);
                 if let Some((t, src)) = self.find_enabled(&ancestors, None) {
                     self.fire_transition(t, &src);
@@ -1869,7 +2049,9 @@ impl Machine {
                     break; // configuration changed; rescan from scratch
                 }
             }
-            if !fired { break; }
+            if !fired {
+                break;
+            }
         }
     }
 
@@ -1893,10 +2075,13 @@ impl Machine {
         // (region-local exit); other regions are untouched. An empty
         // domain is the implicit document root, an ancestor of every
         // leaf, so all active leaves qualify.
-        let exit_leaves: Vec<String> = self.active.iter()
-            .filter(|l| l.as_str() != domain.as_str()
-                && (domain.is_empty()
-                    || self.get_ancestors(l).iter().any(|a| a == &domain)))
+        let exit_leaves: Vec<String> = self
+            .active
+            .iter()
+            .filter(|l| {
+                l.as_str() != domain.as_str()
+                    && (domain.is_empty() || self.get_ancestors(l).iter().any(|a| a == &domain))
+            })
             .cloned()
             .collect();
         for leaf in &exit_leaves {
@@ -1930,7 +2115,9 @@ impl Machine {
     /// running onexit for each, then remove the leaf from the active set.
     fn exit_to_domain(&mut self, leaf: &str, domain: &str) {
         for s in self.get_ancestors(leaf) {
-            if s == domain { break; }
+            if s == domain {
+                break;
+            }
             self.exit_state(&s);
         }
         self.active.retain(|l| l != leaf);
@@ -1942,8 +2129,12 @@ impl Machine {
     fn enter_to(&mut self, target: &str, domain: &str) {
         let mut path: Vec<String> = Vec::new();
         for s in self.get_ancestors(target) {
-            if s == domain { break; }
-            if s != target { path.push(s); }
+            if s == domain {
+                break;
+            }
+            if s != target {
+                path.push(s);
+            }
         }
         path.reverse(); // outermost first
         for s in &path {
@@ -2023,22 +2214,38 @@ impl Machine {
     pub fn run(&mut self, max_steps: usize) -> Vec<String> {
         let mut trace: Vec<String> = Vec::new();
         for _ in 0..max_steps {
-            if self.timers.is_empty() { break; }
-            let earliest = self.timers.iter().map(|t| t.fire_time_ms).min().unwrap_or(0);
+            if self.timers.is_empty() {
+                break;
+            }
+            let earliest = self
+                .timers
+                .iter()
+                .map(|t| t.fire_time_ms)
+                .min()
+                .unwrap_or(0);
             self.logical_clock_ms = earliest;
             let mut fired: Vec<PendingTimer> = Vec::new();
             let mut remaining: Vec<PendingTimer> = Vec::new();
             for t in self.timers.drain(..) {
-                if t.fire_time_ms <= self.logical_clock_ms { fired.push(t); }
-                else { remaining.push(t); }
+                if t.fire_time_ms <= self.logical_clock_ms {
+                    fired.push(t);
+                } else {
+                    remaining.push(t);
+                }
             }
             fired.sort_by(|a, b| a.seq.cmp(&b.seq));
             self.timers = remaining;
             for timer in fired {
                 trace.push(format!(
                     "TIMER t={}ms seq={} event={} machine={} content={}",
-                    timer.fire_time_ms, timer.seq, timer.event_name,
-                    if timer.machine_id.is_empty() { "parent".to_string() } else { timer.machine_id.clone() },
+                    timer.fire_time_ms,
+                    timer.seq,
+                    timer.event_name,
+                    if timer.machine_id.is_empty() {
+                        "parent".to_string()
+                    } else {
+                        timer.machine_id.clone()
+                    },
                     timer.content.to_display_string()
                 ));
                 if timer.machine_id.is_empty() {
@@ -2047,7 +2254,9 @@ impl Machine {
                 } else {
                     // Timer targets a specific child machine by invoke id.
                     let child_evts: Vec<String> = {
-                        if let Some(child) = self.child_machines.iter_mut()
+                        if let Some(child) = self
+                            .child_machines
+                            .iter_mut()
                             .find(|c| c.invoke_id == timer.machine_id)
                         {
                             child.step(&timer.event_name, timer.content.clone())
@@ -2062,7 +2271,10 @@ impl Machine {
                             // Child-to-parent event with content.
                             // Format: "<event_name>\x01<content_str>".
                             let (ev_name, content_val) = if let Some(sep) = rest.find('') {
-                                (rest[..sep].to_string(), Self::parse_content_str(&rest[sep + 1..]))
+                                (
+                                    rest[..sep].to_string(),
+                                    Self::parse_content_str(&rest[sep + 1..]),
+                                )
                             } else {
                                 (rest.to_string(), Value::Undefined)
                             };
@@ -2108,7 +2320,11 @@ impl Machine {
             let content_str = if parts.len() >= 5 { parts[4] } else { "" };
             let content = Self::parse_content_str(content_str);
             let fire_time = self.logical_clock_ms + delay_ms;
-            let send_id = if send_id_str.is_empty() { None } else { Some(send_id_str.to_string()) };
+            let send_id = if send_id_str.is_empty() {
+                None
+            } else {
+                Some(send_id_str.to_string())
+            };
             let machine_id = if target.starts_with("#_") {
                 target[2..].to_string()
             } else {
@@ -2116,26 +2332,48 @@ impl Machine {
             };
             let seq = self.timer_seq;
             self.timer_seq += 1;
-            self.timers.push(PendingTimer { fire_time_ms: fire_time, seq, machine_id, event_name, content, send_id });
-            self.timers.sort_by(|a, b| a.fire_time_ms.cmp(&b.fire_time_ms).then(a.seq.cmp(&b.seq)));
+            self.timers.push(PendingTimer {
+                fire_time_ms: fire_time,
+                seq,
+                machine_id,
+                event_name,
+                content,
+                send_id,
+            });
+            self.timers
+                .sort_by(|a, b| a.fire_time_ms.cmp(&b.fire_time_ms).then(a.seq.cmp(&b.seq)));
         }
     }
 
     /// Parse a content string carried inside a ``__delayed__`` token back to a ``Value``.
     fn parse_content_str(s: &str) -> Value {
-        if s.is_empty() || s == "undefined" { return Value::Undefined; }
-        if s == "true" { return Value::Bool(true); }
-        if s == "false" { return Value::Bool(false); }
-        if let Ok(n) = s.parse::<i64>() { return Value::Int(n); }
-        if let Ok(f) = s.parse::<f64>() { return Value::Number(f); }
+        if s.is_empty() || s == "undefined" {
+            return Value::Undefined;
+        }
+        if s == "true" {
+            return Value::Bool(true);
+        }
+        if s == "false" {
+            return Value::Bool(false);
+        }
+        if let Ok(n) = s.parse::<i64>() {
+            return Value::Int(n);
+        }
+        if let Ok(f) = s.parse::<f64>() {
+            return Value::Number(f);
+        }
         Value::Str(s.to_string())
     }
 
     /// Return the number of pending timers in the logical-time queue.
-    pub fn timer_count(&self) -> usize { self.timers.len() }
+    pub fn timer_count(&self) -> usize {
+        self.timers.len()
+    }
 
     /// Return the current logical clock value in milliseconds.
-    pub fn logical_time_ms(&self) -> u64 { self.logical_clock_ms }
+    pub fn logical_time_ms(&self) -> u64 {
+        self.logical_clock_ms
+    }
 }
 
 impl Default for Machine {
@@ -2187,1700 +2425,1910 @@ fn build_machine_ir() -> MachineIrData {
     MachineIrData {
         name: Some("ScxmlInteractiveDiningPhilosophers".to_string()),
         initial: vec![],
-        datamodel: vec![
-        ],
-        children: vec![
-            StateNodeIr::Parallel {
-                id: "InteractiveDiningPhilosophers".to_string(),
-                datamodel: vec![DataSlotIr { id: "t_FORKS".to_string(), initial_value: Some({ let mut _m = BTreeMap::new(); _m.insert("1".to_string(), Value::Int(0_i64)); _m.insert("2".to_string(), Value::Int(0_i64)); _m.insert("3".to_string(), Value::Int(0_i64)); _m.insert("4".to_string(), Value::Int(0_i64)); _m.insert("5".to_string(), Value::Int(0_i64)); Value::Map(_m)} ) }, DataSlotIr { id: "t_SEATED".to_string(), initial_value: Some({ let mut _m = BTreeMap::new(); _m.insert("1".to_string(), Value::Int(0_i64)); _m.insert("2".to_string(), Value::Int(0_i64)); _m.insert("3".to_string(), Value::Int(0_i64)); _m.insert("4".to_string(), Value::Int(0_i64)); _m.insert("5".to_string(), Value::Int(0_i64)); Value::Map(_m)} ) }, DataSlotIr { id: "t_DEPART_REQ".to_string(), initial_value: Some({ let mut _m = BTreeMap::new(); _m.insert("1".to_string(), Value::Int(0_i64)); _m.insert("2".to_string(), Value::Int(0_i64)); _m.insert("3".to_string(), Value::Int(0_i64)); _m.insert("4".to_string(), Value::Int(0_i64)); _m.insert("5".to_string(), Value::Int(0_i64)); Value::Map(_m)} ) }, DataSlotIr { id: "t_PHASE".to_string(), initial_value: Some({ let mut _m = BTreeMap::new(); _m.insert("1".to_string(), Value::Str("empty".to_string())); _m.insert("2".to_string(), Value::Str("empty".to_string())); _m.insert("3".to_string(), Value::Str("empty".to_string())); _m.insert("4".to_string(), Value::Str("empty".to_string())); _m.insert("5".to_string(), Value::Str("empty".to_string())); Value::Map(_m)} ) }, DataSlotIr { id: "i_DELAY".to_string(), initial_value: Some(Value::Int(1000_i64)) }],
-                onentry: vec![],
-                onexit: vec![],
-                transitions: vec![],
-                children: vec![
-                    StateNodeIr::State {
-                        id: "P1".to_string(),
-                        initial: Some("P1_Empty".to_string()),
-                        datamodel: vec![],
-                        onentry: vec![],
-                        onexit: vec![],
-                        transitions: vec![
-                            TransitionIr {
-                                event: Some("break.1".to_string()),
-                                targets: vec!["P1_Recover".to_string()],
-                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_SEATED".to_string())), Box::new(ExprIr::StringLiteral("1".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
-                                actions: vec![],
-                            },
-                        ],
-                        children: vec![
-                            StateNodeIr::State {
-                                id: "P1_Empty".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['1']".to_string(),
+        datamodel: vec![],
+        children: vec![StateNodeIr::Parallel {
+            id: "InteractiveDiningPhilosophers".to_string(),
+            datamodel: vec![
+                DataSlotIr {
+                    id: "t_FORKS".to_string(),
+                    initial_value: Some({
+                        let mut _m = BTreeMap::new();
+                        _m.insert("1".to_string(), Value::Int(0_i64));
+                        _m.insert("2".to_string(), Value::Int(0_i64));
+                        _m.insert("3".to_string(), Value::Int(0_i64));
+                        _m.insert("4".to_string(), Value::Int(0_i64));
+                        _m.insert("5".to_string(), Value::Int(0_i64));
+                        Value::Map(_m)
+                    }),
+                },
+                DataSlotIr {
+                    id: "t_SEATED".to_string(),
+                    initial_value: Some({
+                        let mut _m = BTreeMap::new();
+                        _m.insert("1".to_string(), Value::Int(0_i64));
+                        _m.insert("2".to_string(), Value::Int(0_i64));
+                        _m.insert("3".to_string(), Value::Int(0_i64));
+                        _m.insert("4".to_string(), Value::Int(0_i64));
+                        _m.insert("5".to_string(), Value::Int(0_i64));
+                        Value::Map(_m)
+                    }),
+                },
+                DataSlotIr {
+                    id: "t_DEPART_REQ".to_string(),
+                    initial_value: Some({
+                        let mut _m = BTreeMap::new();
+                        _m.insert("1".to_string(), Value::Int(0_i64));
+                        _m.insert("2".to_string(), Value::Int(0_i64));
+                        _m.insert("3".to_string(), Value::Int(0_i64));
+                        _m.insert("4".to_string(), Value::Int(0_i64));
+                        _m.insert("5".to_string(), Value::Int(0_i64));
+                        Value::Map(_m)
+                    }),
+                },
+                DataSlotIr {
+                    id: "t_PHASE".to_string(),
+                    initial_value: Some({
+                        let mut _m = BTreeMap::new();
+                        _m.insert("1".to_string(), Value::Str("empty".to_string()));
+                        _m.insert("2".to_string(), Value::Str("empty".to_string()));
+                        _m.insert("3".to_string(), Value::Str("empty".to_string()));
+                        _m.insert("4".to_string(), Value::Str("empty".to_string()));
+                        _m.insert("5".to_string(), Value::Str("empty".to_string()));
+                        Value::Map(_m)
+                    }),
+                },
+                DataSlotIr {
+                    id: "i_DELAY".to_string(),
+                    initial_value: Some(Value::Int(1000_i64)),
+                },
+            ],
+            onentry: vec![],
+            onexit: vec![],
+            transitions: vec![],
+            children: vec![
+                StateNodeIr::State {
+                    id: "P1".to_string(),
+                    initial: Some("P1_Empty".to_string()),
+                    datamodel: vec![],
+                    onentry: vec![],
+                    onexit: vec![],
+                    transitions: vec![TransitionIr {
+                        event: Some("break.1".to_string()),
+                        targets: vec!["P1_Recover".to_string()],
+                        guard: Some(ExprIr::BinOp(
+                            "==".to_string(),
+                            Box::new(ExprIr::IndexAccess(
+                                Box::new(ExprIr::VarRead("t_SEATED".to_string())),
+                                Box::new(ExprIr::StringLiteral("1".to_string())),
+                            )),
+                            Box::new(ExprIr::IntLiteral(1_i64)),
+                        )),
+                        actions: vec![],
+                    }],
+                    children: vec![
+                        StateNodeIr::State {
+                            id: "P1_Empty".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['1']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("empty".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: Some("arrive.1".to_string()),
+                                targets: vec!["P1_Thinking".to_string()],
+                                guard: None,
+                                actions: vec![ActionIr::Assign {
+                                    loc: "t_SEATED['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(1_i64),
+                                    op: "set".to_string(),
+                                }],
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P1_Thinking".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("hungry.1".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrH1".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![ActionIr::Cancel {
+                                sendid: Some("tmrH1".to_string()),
+                            }],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.1".to_string()),
+                                    targets: vec!["P1_Empty".to_string()],
+                                    guard: None,
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['1']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['1']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P1_Empty".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())),
+                                            Box::new(ExprIr::StringLiteral("1".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(1_i64)),
+                                    )),
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['1']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['1']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: Some("hungry.1".to_string()),
+                                    targets: vec!["P1_Hungry".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P1_Hungry".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['1']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("hungry".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.1".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['1']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::StringLiteral("empty".to_string()),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("arrive.1".to_string()),
-                                        targets: vec!["P1_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P1_Thinking".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("hungry.1".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrH1".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['1']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Cancel { sendid: Some("tmrH1".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.1".to_string()),
-                                        targets: vec!["P1_Empty".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P1_Empty".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())), Box::new(ExprIr::StringLiteral("1".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("hungry.1".to_string()),
-                                        targets: vec!["P1_Hungry".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P1_Hungry".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['1']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("hungry".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.1".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P1_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("1".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.1".to_string()),
-                                        targets: vec!["P1_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("1".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P1_HasLeft".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['1']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("waiting".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.1".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P1_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("5".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.1".to_string()),
-                                        targets: vec!["P1_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("5".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P1_Eating".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("full.1".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrE1".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['1']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("eating".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P1_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("1".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['1']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_FORKS['5']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Cancel { sendid: Some("tmrE1".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.1".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("full.1".to_string()),
-                                        targets: vec!["P1_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P1_Recover".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['1']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.1".to_string()),
+                                    targets: vec!["P1_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("1".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['1']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P1_HasLeft".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['1']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("waiting".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.1".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['1']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P1_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("5".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['5']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P1_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                        ],
-                        invokes: vec![],
-                    },
-                    StateNodeIr::State {
-                        id: "P2".to_string(),
-                        initial: Some("P2_Empty".to_string()),
-                        datamodel: vec![],
-                        onentry: vec![],
-                        onexit: vec![],
-                        transitions: vec![
-                            TransitionIr {
-                                event: Some("break.2".to_string()),
-                                targets: vec!["P2_Recover".to_string()],
-                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_SEATED".to_string())), Box::new(ExprIr::StringLiteral("2".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.1".to_string()),
+                                    targets: vec!["P1_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("5".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_FORKS['5']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P1_Eating".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("full.1".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrE1".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("eating".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Cancel {
+                                    sendid: Some("tmrE1".to_string()),
+                                },
+                            ],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.1".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['1']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("full.1".to_string()),
+                                    targets: vec!["P1_Thinking".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P1_Recover".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: None,
+                                targets: vec!["P1_Thinking".to_string()],
+                                guard: None,
                                 actions: vec![],
-                            },
-                        ],
-                        children: vec![
-                            StateNodeIr::State {
-                                id: "P2_Empty".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['2']".to_string(),
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                    ],
+                    invokes: vec![],
+                },
+                StateNodeIr::State {
+                    id: "P2".to_string(),
+                    initial: Some("P2_Empty".to_string()),
+                    datamodel: vec![],
+                    onentry: vec![],
+                    onexit: vec![],
+                    transitions: vec![TransitionIr {
+                        event: Some("break.2".to_string()),
+                        targets: vec!["P2_Recover".to_string()],
+                        guard: Some(ExprIr::BinOp(
+                            "==".to_string(),
+                            Box::new(ExprIr::IndexAccess(
+                                Box::new(ExprIr::VarRead("t_SEATED".to_string())),
+                                Box::new(ExprIr::StringLiteral("2".to_string())),
+                            )),
+                            Box::new(ExprIr::IntLiteral(1_i64)),
+                        )),
+                        actions: vec![],
+                    }],
+                    children: vec![
+                        StateNodeIr::State {
+                            id: "P2_Empty".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['2']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("empty".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: Some("arrive.2".to_string()),
+                                targets: vec!["P2_Thinking".to_string()],
+                                guard: None,
+                                actions: vec![ActionIr::Assign {
+                                    loc: "t_SEATED['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(1_i64),
+                                    op: "set".to_string(),
+                                }],
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P2_Thinking".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("hungry.2".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrH2".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![ActionIr::Cancel {
+                                sendid: Some("tmrH2".to_string()),
+                            }],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.2".to_string()),
+                                    targets: vec!["P2_Empty".to_string()],
+                                    guard: None,
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['2']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['2']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P2_Empty".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())),
+                                            Box::new(ExprIr::StringLiteral("2".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(1_i64)),
+                                    )),
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['2']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['2']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: Some("hungry.2".to_string()),
+                                    targets: vec!["P2_Hungry".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P2_Hungry".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['2']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("hungry".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.2".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['2']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::StringLiteral("empty".to_string()),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("arrive.2".to_string()),
-                                        targets: vec!["P2_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P2_Thinking".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("hungry.2".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrH2".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['2']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Cancel { sendid: Some("tmrH2".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.2".to_string()),
-                                        targets: vec!["P2_Empty".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P2_Empty".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())), Box::new(ExprIr::StringLiteral("2".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("hungry.2".to_string()),
-                                        targets: vec!["P2_Hungry".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P2_Hungry".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['2']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("hungry".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.2".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P2_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("2".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(2_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.2".to_string()),
-                                        targets: vec!["P2_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("2".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(2_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P2_HasLeft".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['2']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("waiting".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.2".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P2_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("1".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(2_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.2".to_string()),
-                                        targets: vec!["P2_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("1".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['1']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(2_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P2_Eating".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("full.2".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrE2".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['2']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("eating".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P2_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("2".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['2']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(2_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.2".to_string()),
+                                    targets: vec!["P2_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("2".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_FORKS['2']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(2_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P2_HasLeft".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['2']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("waiting".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.2".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['2']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P2_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("1".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['1']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(2_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Cancel { sendid: Some("tmrE2".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.2".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("full.2".to_string()),
-                                        targets: vec!["P2_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P2_Recover".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['2']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_FORKS['2']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.2".to_string()),
+                                    targets: vec!["P2_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("1".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['1']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(2_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P2_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                        ],
-                        invokes: vec![],
-                    },
-                    StateNodeIr::State {
-                        id: "P3".to_string(),
-                        initial: Some("P3_Empty".to_string()),
-                        datamodel: vec![],
-                        onentry: vec![],
-                        onexit: vec![],
-                        transitions: vec![
-                            TransitionIr {
-                                event: Some("break.3".to_string()),
-                                targets: vec!["P3_Recover".to_string()],
-                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_SEATED".to_string())), Box::new(ExprIr::StringLiteral("3".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P2_Eating".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("full.2".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrE2".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("eating".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Cancel {
+                                    sendid: Some("tmrE2".to_string()),
+                                },
+                            ],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.2".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['2']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("full.2".to_string()),
+                                    targets: vec!["P2_Thinking".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P2_Recover".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['1']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: None,
+                                targets: vec!["P2_Thinking".to_string()],
+                                guard: None,
                                 actions: vec![],
-                            },
-                        ],
-                        children: vec![
-                            StateNodeIr::State {
-                                id: "P3_Empty".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['3']".to_string(),
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                    ],
+                    invokes: vec![],
+                },
+                StateNodeIr::State {
+                    id: "P3".to_string(),
+                    initial: Some("P3_Empty".to_string()),
+                    datamodel: vec![],
+                    onentry: vec![],
+                    onexit: vec![],
+                    transitions: vec![TransitionIr {
+                        event: Some("break.3".to_string()),
+                        targets: vec!["P3_Recover".to_string()],
+                        guard: Some(ExprIr::BinOp(
+                            "==".to_string(),
+                            Box::new(ExprIr::IndexAccess(
+                                Box::new(ExprIr::VarRead("t_SEATED".to_string())),
+                                Box::new(ExprIr::StringLiteral("3".to_string())),
+                            )),
+                            Box::new(ExprIr::IntLiteral(1_i64)),
+                        )),
+                        actions: vec![],
+                    }],
+                    children: vec![
+                        StateNodeIr::State {
+                            id: "P3_Empty".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['3']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("empty".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: Some("arrive.3".to_string()),
+                                targets: vec!["P3_Thinking".to_string()],
+                                guard: None,
+                                actions: vec![ActionIr::Assign {
+                                    loc: "t_SEATED['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(1_i64),
+                                    op: "set".to_string(),
+                                }],
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P3_Thinking".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("hungry.3".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrH3".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![ActionIr::Cancel {
+                                sendid: Some("tmrH3".to_string()),
+                            }],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.3".to_string()),
+                                    targets: vec!["P3_Empty".to_string()],
+                                    guard: None,
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['3']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['3']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P3_Empty".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())),
+                                            Box::new(ExprIr::StringLiteral("3".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(1_i64)),
+                                    )),
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['3']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['3']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: Some("hungry.3".to_string()),
+                                    targets: vec!["P3_Hungry".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P3_Hungry".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['3']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("hungry".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.3".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['3']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::StringLiteral("empty".to_string()),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("arrive.3".to_string()),
-                                        targets: vec!["P3_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P3_Thinking".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("hungry.3".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrH3".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['3']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Cancel { sendid: Some("tmrH3".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.3".to_string()),
-                                        targets: vec!["P3_Empty".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P3_Empty".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())), Box::new(ExprIr::StringLiteral("3".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("hungry.3".to_string()),
-                                        targets: vec!["P3_Hungry".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P3_Hungry".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['3']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("hungry".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.3".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P3_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("3".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(3_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.3".to_string()),
-                                        targets: vec!["P3_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("3".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(3_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P3_HasLeft".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['3']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("waiting".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.3".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P3_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("2".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(3_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.3".to_string()),
-                                        targets: vec!["P3_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("2".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['2']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(3_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P3_Eating".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("full.3".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrE3".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['3']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("eating".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P3_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("3".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['3']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(3_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.3".to_string()),
+                                    targets: vec!["P3_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("3".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_FORKS['3']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(3_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P3_HasLeft".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['3']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("waiting".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.3".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['3']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P3_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("2".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['2']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(3_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Cancel { sendid: Some("tmrE3".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.3".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("full.3".to_string()),
-                                        targets: vec!["P3_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P3_Recover".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['3']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_FORKS['3']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.3".to_string()),
+                                    targets: vec!["P3_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("2".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['2']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(3_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P3_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                        ],
-                        invokes: vec![],
-                    },
-                    StateNodeIr::State {
-                        id: "P4".to_string(),
-                        initial: Some("P4_Empty".to_string()),
-                        datamodel: vec![],
-                        onentry: vec![],
-                        onexit: vec![],
-                        transitions: vec![
-                            TransitionIr {
-                                event: Some("break.4".to_string()),
-                                targets: vec!["P4_Recover".to_string()],
-                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_SEATED".to_string())), Box::new(ExprIr::StringLiteral("4".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P3_Eating".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("full.3".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrE3".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("eating".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Cancel {
+                                    sendid: Some("tmrE3".to_string()),
+                                },
+                            ],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.3".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['3']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("full.3".to_string()),
+                                    targets: vec!["P3_Thinking".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P3_Recover".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['2']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: None,
+                                targets: vec!["P3_Thinking".to_string()],
+                                guard: None,
                                 actions: vec![],
-                            },
-                        ],
-                        children: vec![
-                            StateNodeIr::State {
-                                id: "P4_Empty".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['4']".to_string(),
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                    ],
+                    invokes: vec![],
+                },
+                StateNodeIr::State {
+                    id: "P4".to_string(),
+                    initial: Some("P4_Empty".to_string()),
+                    datamodel: vec![],
+                    onentry: vec![],
+                    onexit: vec![],
+                    transitions: vec![TransitionIr {
+                        event: Some("break.4".to_string()),
+                        targets: vec!["P4_Recover".to_string()],
+                        guard: Some(ExprIr::BinOp(
+                            "==".to_string(),
+                            Box::new(ExprIr::IndexAccess(
+                                Box::new(ExprIr::VarRead("t_SEATED".to_string())),
+                                Box::new(ExprIr::StringLiteral("4".to_string())),
+                            )),
+                            Box::new(ExprIr::IntLiteral(1_i64)),
+                        )),
+                        actions: vec![],
+                    }],
+                    children: vec![
+                        StateNodeIr::State {
+                            id: "P4_Empty".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['4']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("empty".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: Some("arrive.4".to_string()),
+                                targets: vec!["P4_Thinking".to_string()],
+                                guard: None,
+                                actions: vec![ActionIr::Assign {
+                                    loc: "t_SEATED['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(1_i64),
+                                    op: "set".to_string(),
+                                }],
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P4_Thinking".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("hungry.4".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrH4".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![ActionIr::Cancel {
+                                sendid: Some("tmrH4".to_string()),
+                            }],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.4".to_string()),
+                                    targets: vec!["P4_Empty".to_string()],
+                                    guard: None,
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['4']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['4']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P4_Empty".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())),
+                                            Box::new(ExprIr::StringLiteral("4".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(1_i64)),
+                                    )),
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['4']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['4']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: Some("hungry.4".to_string()),
+                                    targets: vec!["P4_Hungry".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P4_Hungry".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['4']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("hungry".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.4".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['4']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::StringLiteral("empty".to_string()),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("arrive.4".to_string()),
-                                        targets: vec!["P4_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P4_Thinking".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("hungry.4".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrH4".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Cancel { sendid: Some("tmrH4".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.4".to_string()),
-                                        targets: vec!["P4_Empty".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P4_Empty".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())), Box::new(ExprIr::StringLiteral("4".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("hungry.4".to_string()),
-                                        targets: vec!["P4_Hungry".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P4_Hungry".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("hungry".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.4".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P4_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("4".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(4_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.4".to_string()),
-                                        targets: vec!["P4_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("4".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(4_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P4_HasLeft".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("waiting".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.4".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P4_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("3".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(4_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.4".to_string()),
-                                        targets: vec!["P4_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("3".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['3']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(4_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P4_Eating".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("full.4".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrE4".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("eating".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P4_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("4".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['4']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(4_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.4".to_string()),
+                                    targets: vec!["P4_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("4".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_FORKS['4']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(4_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P4_HasLeft".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['4']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("waiting".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.4".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['4']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P4_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("3".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['3']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(4_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Cancel { sendid: Some("tmrE4".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.4".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("full.4".to_string()),
-                                        targets: vec!["P4_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P4_Recover".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_FORKS['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.4".to_string()),
+                                    targets: vec!["P4_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("3".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['3']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(4_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P4_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                        ],
-                        invokes: vec![],
-                    },
-                    StateNodeIr::State {
-                        id: "P5".to_string(),
-                        initial: Some("P5_Empty".to_string()),
-                        datamodel: vec![],
-                        onentry: vec![],
-                        onexit: vec![],
-                        transitions: vec![
-                            TransitionIr {
-                                event: Some("break.5".to_string()),
-                                targets: vec!["P5_Recover".to_string()],
-                                guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_SEATED".to_string())), Box::new(ExprIr::StringLiteral("5".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P4_Eating".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("full.4".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrE4".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("eating".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Cancel {
+                                    sendid: Some("tmrE4".to_string()),
+                                },
+                            ],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.4".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['4']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("full.4".to_string()),
+                                    targets: vec!["P4_Thinking".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P4_Recover".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['3']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: None,
+                                targets: vec!["P4_Thinking".to_string()],
+                                guard: None,
                                 actions: vec![],
-                            },
-                        ],
-                        children: vec![
-                            StateNodeIr::State {
-                                id: "P5_Empty".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['5']".to_string(),
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                    ],
+                    invokes: vec![],
+                },
+                StateNodeIr::State {
+                    id: "P5".to_string(),
+                    initial: Some("P5_Empty".to_string()),
+                    datamodel: vec![],
+                    onentry: vec![],
+                    onexit: vec![],
+                    transitions: vec![TransitionIr {
+                        event: Some("break.5".to_string()),
+                        targets: vec!["P5_Recover".to_string()],
+                        guard: Some(ExprIr::BinOp(
+                            "==".to_string(),
+                            Box::new(ExprIr::IndexAccess(
+                                Box::new(ExprIr::VarRead("t_SEATED".to_string())),
+                                Box::new(ExprIr::StringLiteral("5".to_string())),
+                            )),
+                            Box::new(ExprIr::IntLiteral(1_i64)),
+                        )),
+                        actions: vec![],
+                    }],
+                    children: vec![
+                        StateNodeIr::State {
+                            id: "P5_Empty".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['5']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("empty".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: Some("arrive.5".to_string()),
+                                targets: vec!["P5_Thinking".to_string()],
+                                guard: None,
+                                actions: vec![ActionIr::Assign {
+                                    loc: "t_SEATED['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(1_i64),
+                                    op: "set".to_string(),
+                                }],
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P5_Thinking".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("hungry.5".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrH5".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![ActionIr::Cancel {
+                                sendid: Some("tmrH5".to_string()),
+                            }],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.5".to_string()),
+                                    targets: vec!["P5_Empty".to_string()],
+                                    guard: None,
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['5']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['5']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P5_Empty".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())),
+                                            Box::new(ExprIr::StringLiteral("5".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(1_i64)),
+                                    )),
+                                    actions: vec![
+                                        ActionIr::Assign {
+                                            loc: "t_SEATED['5']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                        ActionIr::Assign {
+                                            loc: "t_DEPART_REQ['5']".to_string(),
+                                            key_expr: None,
+                                            expr: ExprIr::IntLiteral(0_i64),
+                                            op: "set".to_string(),
+                                        },
+                                    ],
+                                },
+                                TransitionIr {
+                                    event: Some("hungry.5".to_string()),
+                                    targets: vec!["P5_Hungry".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P5_Hungry".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['5']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("hungry".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.5".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['5']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::StringLiteral("empty".to_string()),
+                                        expr: ExprIr::IntLiteral(1_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("arrive.5".to_string()),
-                                        targets: vec!["P5_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P5_Thinking".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("hungry.5".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrH5".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['5']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Cancel { sendid: Some("tmrH5".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.5".to_string()),
-                                        targets: vec!["P5_Empty".to_string()],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P5_Empty".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_DEPART_REQ".to_string())), Box::new(ExprIr::StringLiteral("5".to_string())))), Box::new(ExprIr::IntLiteral(1_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_SEATED['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(0_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("hungry.5".to_string()),
-                                        targets: vec!["P5_Hungry".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P5_Hungry".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['5']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("hungry".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.5".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P5_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("5".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(5_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.5".to_string()),
-                                        targets: vec!["P5_HasLeft".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("5".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(5_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P5_HasLeft".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['5']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("waiting".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.5".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P5_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("4".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(5_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("poke.5".to_string()),
-                                        targets: vec!["P5_Eating".to_string()],
-                                        guard: Some(ExprIr::BinOp("==".to_string(), Box::new(ExprIr::IndexAccess(Box::new(ExprIr::VarRead("t_FORKS".to_string())), Box::new(ExprIr::StringLiteral("4".to_string())))), Box::new(ExprIr::IntLiteral(0_i64)))),
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_FORKS['4']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(5_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P5_Eating".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Send {
-                                        event: Some("full.5".to_string()),
-                                        eventexpr: None,
-                                        target: None,
-                                        targetexpr: None,
-                                        delay: Some("0s".to_string()),
-                                        delayexpr: Some(ExprIr::BinOp("+".to_string(), Box::new(ExprIr::Call("str".to_string(), vec![ExprIr::VarRead("i_DELAY".to_string())], None)), Box::new(ExprIr::StringLiteral("ms".to_string())))),
-                                        send_id: Some("tmrE5".to_string()),
-                                        content_expr: None,
-                                        params: vec![],
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['5']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("eating".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P5_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("5".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['5']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(5_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
-                                        loc: "t_FORKS['4']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Cancel { sendid: Some("tmrE5".to_string()) },
-                                ],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: Some("depart.5".to_string()),
-                                        targets: vec![],
-                                        guard: None,
-                                        actions: vec![
-                                            ActionIr::Assign {
-                                                loc: "t_DEPART_REQ['5']".to_string(),
-                                                key_expr: None,
-                                                expr: ExprIr::IntLiteral(1_i64),
-                                                op: "set".to_string(),
-                                            },
-                                        ],
-                                    },
-                                    TransitionIr {
-                                        event: Some("full.5".to_string()),
-                                        targets: vec!["P5_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                            StateNodeIr::State {
-                                id: "P5_Recover".to_string(),
-                                initial: None,
-                                datamodel: vec![],
-                                onentry: vec![
-                                    ActionIr::Assign {
-                                        loc: "t_PHASE['5']".to_string(),
-                                        key_expr: None,
-                                        expr: ExprIr::StringLiteral("thinking".to_string()),
-                                        op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.5".to_string()),
+                                    targets: vec!["P5_HasLeft".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("5".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['5']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(5_i64),
                                         op: "set".to_string(),
-                                    },
-                                    ActionIr::Assign {
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P5_HasLeft".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![ActionIr::Assign {
+                                loc: "t_PHASE['5']".to_string(),
+                                key_expr: None,
+                                expr: ExprIr::StringLiteral("waiting".to_string()),
+                                op: "set".to_string(),
+                            }],
+                            onexit: vec![],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.5".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['5']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: None,
+                                    targets: vec!["P5_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("4".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
                                         loc: "t_FORKS['4']".to_string(),
                                         key_expr: None,
-                                        expr: ExprIr::IntLiteral(0_i64),
+                                        expr: ExprIr::IntLiteral(5_i64),
                                         op: "set".to_string(),
-                                    },
-                                ],
-                                onexit: vec![],
-                                transitions: vec![
-                                    TransitionIr {
-                                        event: None,
-                                        targets: vec!["P5_Thinking".to_string()],
-                                        guard: None,
-                                        actions: vec![],
-                                    },
-                                ],
-                                children: vec![],
-                                invokes: vec![],
-                            },
-                        ],
-                        invokes: vec![],
-                    },
-                ],
-                invokes: vec![],
-            },
-        ],
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("poke.5".to_string()),
+                                    targets: vec!["P5_Eating".to_string()],
+                                    guard: Some(ExprIr::BinOp(
+                                        "==".to_string(),
+                                        Box::new(ExprIr::IndexAccess(
+                                            Box::new(ExprIr::VarRead("t_FORKS".to_string())),
+                                            Box::new(ExprIr::StringLiteral("4".to_string())),
+                                        )),
+                                        Box::new(ExprIr::IntLiteral(0_i64)),
+                                    )),
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_FORKS['4']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(5_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P5_Eating".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Send {
+                                    event: Some("full.5".to_string()),
+                                    eventexpr: None,
+                                    target: None,
+                                    targetexpr: None,
+                                    delay: Some("0s".to_string()),
+                                    delayexpr: Some(ExprIr::BinOp(
+                                        "+".to_string(),
+                                        Box::new(ExprIr::Call(
+                                            "str".to_string(),
+                                            vec![ExprIr::VarRead("i_DELAY".to_string())],
+                                            None,
+                                        )),
+                                        Box::new(ExprIr::StringLiteral("ms".to_string())),
+                                    )),
+                                    send_id: Some("tmrE5".to_string()),
+                                    content_expr: None,
+                                    params: vec![],
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("eating".to_string()),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Cancel {
+                                    sendid: Some("tmrE5".to_string()),
+                                },
+                            ],
+                            transitions: vec![
+                                TransitionIr {
+                                    event: Some("depart.5".to_string()),
+                                    targets: vec![],
+                                    guard: None,
+                                    actions: vec![ActionIr::Assign {
+                                        loc: "t_DEPART_REQ['5']".to_string(),
+                                        key_expr: None,
+                                        expr: ExprIr::IntLiteral(1_i64),
+                                        op: "set".to_string(),
+                                    }],
+                                },
+                                TransitionIr {
+                                    event: Some("full.5".to_string()),
+                                    targets: vec!["P5_Thinking".to_string()],
+                                    guard: None,
+                                    actions: vec![],
+                                },
+                            ],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                        StateNodeIr::State {
+                            id: "P5_Recover".to_string(),
+                            initial: None,
+                            datamodel: vec![],
+                            onentry: vec![
+                                ActionIr::Assign {
+                                    loc: "t_PHASE['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::StringLiteral("thinking".to_string()),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['5']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                                ActionIr::Assign {
+                                    loc: "t_FORKS['4']".to_string(),
+                                    key_expr: None,
+                                    expr: ExprIr::IntLiteral(0_i64),
+                                    op: "set".to_string(),
+                                },
+                            ],
+                            onexit: vec![],
+                            transitions: vec![TransitionIr {
+                                event: None,
+                                targets: vec!["P5_Thinking".to_string()],
+                                guard: None,
+                                actions: vec![],
+                            }],
+                            children: vec![],
+                            invokes: vec![],
+                        },
+                    ],
+                    invokes: vec![],
+                },
+            ],
+            invokes: vec![],
+        }],
     }
 }
 
@@ -3905,7 +4353,10 @@ mod tests {
         m.start();
         // After start the machine must be in a valid, non-empty state.
         let state = m.current_state();
-        assert!(!state.is_empty(), "Machine state must be non-empty after start");
+        assert!(
+            !state.is_empty(),
+            "Machine state must be non-empty after start"
+        );
         eprintln!("Initial state: {}", state);
     }
 
@@ -3923,8 +4374,14 @@ mod tests {
         // Generic pattern-matching rules that every generated machine relies on.
         assert!(event_matches_pattern("foo.bar", "foo.bar"), "exact match");
         assert!(event_matches_pattern("foo.bar", "foo.*"), "prefix wildcard");
-        assert!(event_matches_pattern("any.event", "*"), "catch-all wildcard");
-        assert!(!event_matches_pattern("foo.bar", "baz.*"), "no spurious match");
+        assert!(
+            event_matches_pattern("any.event", "*"),
+            "catch-all wildcard"
+        );
+        assert!(
+            !event_matches_pattern("foo.bar", "baz.*"),
+            "no spurious match"
+        );
         // Machine-specific: first real event in the vocabulary must match itself.
         assert!(
             event_matches_pattern("break.1", "break.1"),
@@ -4006,9 +4463,14 @@ mod tests {
         let count = m.child_count();
         eprintln!("Child machine count: {}", count);
         let none_state = m.get_child_state("__nonexistent__");
-        assert!(none_state.is_none(), "Unknown child id must return None for state");
+        assert!(
+            none_state.is_none(),
+            "Unknown child id must return None for state"
+        );
         let none_var = m.get_child_var("__nonexistent__", "x");
-        assert!(none_var.is_none(), "Unknown child id must return None for var");
+        assert!(
+            none_var.is_none(),
+            "Unknown child id must return None for var"
+        );
     }
-
 }

@@ -41,12 +41,13 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 22;
+pub const QT_EMIT_VERSION: u32 = 23;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
+#[rustfmt::skip]
 pub const QT_SOURCE: &str = "tests/fixtures/qt/edges.qml";
 
 /// State threaded through every helper. One field per
@@ -75,6 +76,29 @@ impl LabelBinding {
     }
 }
 
+struct BindingSink<'a, T> {
+    values: &'a mut Vec<T>,
+}
+
+impl<'a, T> BindingSink<'a, T> {
+    fn new(values: &'a mut Vec<T>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, value: T) {
+        self.values.push(value);
+    }
+}
+
+/// Widget tree, screen state, and reactive label bindings returned
+/// by [`build_screen`].
+#[rustfmt::skip]
+pub type BuiltScreen = (
+    WidgetNode,
+    Rc<RefCell<ScreenState>>,
+    Vec<LabelBinding>,
+);
+
 /// Build the screen widget tree at `bounds` and return it
 /// alongside the `ScreenState` handle (QT-04b) and the
 /// `Vec<LabelBinding>` of reactive bindings (QT-04e §3).
@@ -83,10 +107,11 @@ impl LabelBinding {
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {
+) -> BuiltScreen {
     let state = Rc::new(RefCell::new(ScreenState {}));
     let mut label_bindings: Vec<LabelBinding> = Vec::new();
-    let node = build_root(bounds, Rc::clone(&state), &mut label_bindings);
+    let mut binding_sink = BindingSink::new(&mut label_bindings);
+    let node = build_root(bounds, Rc::clone(&state), &mut binding_sink);
     (node, state, label_bindings)
 }
 
@@ -105,7 +130,7 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, bindings: &[LabelBindi
 fn build_root(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -118,106 +143,102 @@ fn build_root(
     // QT-03c edge: anchors.left: parent.left
     let child_bounds = Rect {
         x: bounds.x,
-        y: bounds.y + 0,
+        y: bounds.y,
         width: bounds.width,
         height: 30,
     };
-    node.children.push(build_leftBar(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_left_bar(child_bounds, Rc::clone(&state), label_bindings));
     // QT-03c edge: anchors.right: parent.right
     let child_bounds = Rect {
         x: bounds.x + bounds.width - 40,
-        y: bounds.y + 0,
+        y: bounds.y,
         width: 40,
         height: 30,
     };
-    node.children.push(build_rightBar(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_right_bar(child_bounds, Rc::clone(&state), label_bindings));
     // QT-03c edge: anchors.top: parent.top
     let child_bounds = Rect {
-        x: bounds.x + 0,
+        x: bounds.x,
         y: bounds.y,
         width: 50,
         height: bounds.height,
     };
-    node.children.push(build_topBar(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_top_bar(child_bounds, Rc::clone(&state), label_bindings));
     // QT-03c edge: anchors.bottom: parent.bottom
     let child_bounds = Rect {
-        x: bounds.x + 0,
+        x: bounds.x,
         y: bounds.y + bounds.height - 35,
         width: 60,
         height: 35,
     };
-    node.children.push(build_bottomBar(child_bounds, Rc::clone(&state), label_bindings));
+    node.children.push(build_bottom_bar(child_bounds, Rc::clone(&state), label_bindings));
     node
 }
 
 // QML type: `Rectangle` (id: `leftBar`)
 #[rustfmt::skip]
-fn build_leftBar(
+fn build_left_bar(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0xff, 0x00, 0x00, 0xff);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("leftBar"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle` (id: `rightBar`)
 #[rustfmt::skip]
-fn build_rightBar(
+fn build_right_bar(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0xff, 0x00, 0xff);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("rightBar"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle` (id: `topBar`)
 #[rustfmt::skip]
-fn build_topBar(
+fn build_top_bar(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0xff, 0xff);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("topBar"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle` (id: `bottomBar`)
 #[rustfmt::skip]
-fn build_bottomBar(
+fn build_bottom_bar(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0xff, 0xff, 0x00, 0xff);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("bottomBar"),
-    };
-    node
+    }
 }

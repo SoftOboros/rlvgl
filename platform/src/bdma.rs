@@ -122,8 +122,7 @@ impl BdmaSai4Rx {
             let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() & !CCR_EN);
             let mut guard = BDMA_DISABLE_TIMEOUT;
-            while (ccr as *const u32).read_volatile() & CCR_EN != 0 && guard > 0 {
-                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            while ccr.cast_const().read_volatile() & CCR_EN != 0 && guard > 0 {
                 guard -= 1;
             }
 
@@ -173,8 +172,7 @@ impl BdmaSai4Rx {
             let ccr = CH1_CCR as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
             ccr.write_volatile(ccr.read_volatile() & !CCR_EN);
             let mut guard = BDMA_DISABLE_TIMEOUT;
-            while (ccr as *const u32).read_volatile() & CCR_EN != 0 && guard > 0 {
-                // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+            while ccr.cast_const().read_volatile() & CCR_EN != 0 && guard > 0 {
                 guard -= 1;
             }
             (BDMA_IFCR as *mut u32).write_volatile(IFCR_ALL_CH1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)

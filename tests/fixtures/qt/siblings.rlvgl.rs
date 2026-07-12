@@ -41,12 +41,13 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 22;
+pub const QT_EMIT_VERSION: u32 = 23;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
+#[rustfmt::skip]
 pub const QT_SOURCE: &str = "tests/fixtures/qt/siblings.qml";
 
 /// State threaded through every helper. One field per
@@ -75,6 +76,29 @@ impl LabelBinding {
     }
 }
 
+struct BindingSink<'a, T> {
+    values: &'a mut Vec<T>,
+}
+
+impl<'a, T> BindingSink<'a, T> {
+    fn new(values: &'a mut Vec<T>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, value: T) {
+        self.values.push(value);
+    }
+}
+
+/// Widget tree, screen state, and reactive label bindings returned
+/// by [`build_screen`].
+#[rustfmt::skip]
+pub type BuiltScreen = (
+    WidgetNode,
+    Rc<RefCell<ScreenState>>,
+    Vec<LabelBinding>,
+);
+
 /// Build the screen widget tree at `bounds` and return it
 /// alongside the `ScreenState` handle (QT-04b) and the
 /// `Vec<LabelBinding>` of reactive bindings (QT-04e §3).
@@ -83,10 +107,11 @@ impl LabelBinding {
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {
+) -> BuiltScreen {
     let state = Rc::new(RefCell::new(ScreenState {}));
     let mut label_bindings: Vec<LabelBinding> = Vec::new();
-    let node = build_node_0(bounds, Rc::clone(&state), &mut label_bindings);
+    let mut binding_sink = BindingSink::new(&mut label_bindings);
+    let node = build_node_0(bounds, Rc::clone(&state), &mut binding_sink);
     (node, state, label_bindings)
 }
 
@@ -113,7 +138,7 @@ fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {
 fn build_node_0(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -126,25 +151,25 @@ fn build_node_0(
     let cb_0 = Rect {
         x: bounds.x,
         y: bounds.y,
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
+        width: bounds.x + bounds.width - bounds.x,
         height: 60,
     };
     let cb_1 = Rect {
-        x: (((bounds.x + bounds.width)) - (160)),
-        y: (cb_0.y + cb_0.height),
+        x: bounds.x + bounds.width - 160,
+        y: cb_0.y + cb_0.height,
         width: 160,
         height: 160,
     };
     let cb_2 = Rect {
         x: bounds.x,
         y: cb_1.y,
-        width: ((cb_1.x) - (bounds.x)),
-        height: (((cb_1.y + cb_1.height)) - (cb_1.y)),
+        width: cb_1.x - bounds.x,
+        height: cb_1.y + cb_1.height - cb_1.y,
     };
     let cb_3 = Rect {
         x: bounds.x,
-        y: (((bounds.y + bounds.height)) - (48)),
-        width: (((bounds.x + bounds.width)) - (bounds.x)),
+        y: bounds.y + bounds.height - 48,
+        width: bounds.x + bounds.width - bounds.x,
         height: 48,
     };
     node.children.push(build_header(cb_0, Rc::clone(&state), label_bindings));
@@ -159,17 +184,16 @@ fn build_node_0(
 fn build_header(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("header"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle` (id: `art`)
@@ -177,17 +201,16 @@ fn build_header(
 fn build_art(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("art"),
-    };
-    node
+    }
 }
 
 // QML type: `Text` (id: `title`)
@@ -195,17 +218,16 @@ fn build_art(
 fn build_title(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     // TODO QT-04e: reactive bind text (non-literal QML expression)
     let widget: Rc<RefCell<dyn Widget>> =
         Rc::new(RefCell::new(qt_label("", bounds)));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("title"),
-    };
-    node
+    }
 }
 
 // QML type: `Rectangle` (id: `footer`)
@@ -213,15 +235,14 @@ fn build_title(
 fn build_footer(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("footer"),
-    };
-    node
+    }
 }

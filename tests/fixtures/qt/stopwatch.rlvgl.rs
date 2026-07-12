@@ -42,12 +42,13 @@ use stopwatch_gen::{DataModel, Event, Machine};
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 22;
+pub const QT_EMIT_VERSION: u32 = 23;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
+#[rustfmt::skip]
 pub const QT_SOURCE: &str = "tests/fixtures/qt/stopwatch.qml";
 
 /// QT-05 §6 linkage version. v1 pins the istate Rust
@@ -107,6 +108,30 @@ pub enum Binding {
     Machine(MachineBinding),
 }
 
+struct BindingSink<'a, T> {
+    values: &'a mut Vec<T>,
+}
+
+impl<'a, T> BindingSink<'a, T> {
+    fn new(values: &'a mut Vec<T>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, value: T) {
+        self.values.push(value);
+    }
+}
+
+/// Widget tree, screen state, state machine, and reactive bindings
+/// returned by [`build_screen`].
+#[rustfmt::skip]
+pub type BuiltScreen = (
+    WidgetNode,
+    Rc<RefCell<ScreenState>>,
+    Rc<RefCell<Machine>>,
+    Vec<Binding>,
+);
+
 /// Build the screen widget tree at `bounds` and return it
 /// alongside the `ScreenState` handle (QT-04b §3), the
 /// `Rc<RefCell<Machine>>` istate-codegen handle (QT-05b §3),
@@ -117,13 +142,14 @@ pub enum Binding {
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {
+) -> BuiltScreen {
     let state = Rc::new(RefCell::new(ScreenState {
         title: String::from("Stopwatch"),
     }));
     let machine = Rc::new(RefCell::new(Machine::new()));
     let mut bindings: Vec<Binding> = Vec::new();
-    let node = build_root(bounds, Rc::clone(&state), Rc::clone(&machine), &mut bindings);
+    let mut binding_sink = BindingSink::new(&mut bindings);
+    let node = build_root(bounds, Rc::clone(&state), Rc::clone(&machine), &mut binding_sink);
     (node, state, machine, bindings)
 }
 
@@ -163,7 +189,7 @@ fn build_root(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut w = Container::new(bounds);
     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -174,40 +200,40 @@ fn build_root(
         tag: Some("root"),
     };
     let child_bounds = Rect {
-        x: bounds.x + 0,
-        y: bounds.y + 0,
+        x: bounds.x,
+        y: bounds.y,
         width: 320,
         height: 60,
     };
     node.children.push(build_display(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     let child_bounds = Rect {
-        x: bounds.x + 0,
+        x: bounds.x,
         y: bounds.y + 60,
         width: 320,
         height: 30,
     };
     node.children.push(build_counter(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     let child_bounds = Rect {
-        x: bounds.x + 0,
+        x: bounds.x,
         y: bounds.y + 100,
         width: 100,
         height: 60,
     };
-    node.children.push(build_startBtn(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_start_btn(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     let child_bounds = Rect {
         x: bounds.x + 110,
         y: bounds.y + 100,
         width: 100,
         height: 60,
     };
-    node.children.push(build_stopBtn(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_stop_btn(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     let child_bounds = Rect {
         x: bounds.x + 220,
         y: bounds.y + 100,
         width: 100,
         height: 60,
     };
-    node.children.push(build_resetBtn(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
+    node.children.push(build_reset_btn(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));
     node
 }
 
@@ -217,7 +243,7 @@ fn build_display(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-04c bound: text → state.title
     let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
@@ -229,12 +255,11 @@ fn build_display(
         label: Rc::clone(&label_handle),
         accessor: |s| s.title.clone(),
     }));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("display"),
-    };
-    node
+    }
 }
 
 // QML type: `Label` (id: `counter`)
@@ -243,7 +268,7 @@ fn build_counter(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     // QT-05c machine-bound: text → sm.dm.elapsed
     let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(
@@ -257,21 +282,20 @@ fn build_counter(
         label: Rc::clone(&label_handle),
         accessor: format_dm_elapsed,
     }));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("counter"),
-    };
-    node
+    }
 }
 
 // QML type: `Button` (id: `startBtn`)
 #[rustfmt::skip]
-fn build_startBtn(
+fn build_start_btn(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut button = Button::new("Start", bounds);
     button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -284,21 +308,20 @@ fn build_startBtn(
         });
     }
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("startBtn"),
-    };
-    node
+    }
 }
 
 // QML type: `Button` (id: `stopBtn`)
 #[rustfmt::skip]
-fn build_stopBtn(
+fn build_stop_btn(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut button = Button::new("Stop", bounds);
     button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -311,21 +334,20 @@ fn build_stopBtn(
         });
     }
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("stopBtn"),
-    };
-    node
+    }
 }
 
 // QML type: `Button` (id: `resetBtn`)
 #[rustfmt::skip]
-fn build_resetBtn(
+fn build_reset_btn(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
     machine: Rc<RefCell<Machine>>,
-    bindings: &mut Vec<Binding>,
+    bindings: &mut BindingSink<'_, Binding>,
 ) -> WidgetNode {
     let mut button = Button::new("Reset", bounds);
     button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
@@ -338,10 +360,9 @@ fn build_resetBtn(
         });
     }
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("resetBtn"),
-    };
-    node
+    }
 }
