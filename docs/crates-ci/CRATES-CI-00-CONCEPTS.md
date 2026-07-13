@@ -170,6 +170,12 @@ upstream — the standard pre-publish mechanism.)*
    package loop, so the deferral does not weaken publish-order or packaged-core
    verification. Gate P restores the submodule `Cargo.lock` after packaging so
    validation leaves the pinned gitlink clean.
+   After installing the completed patch table, every Gate P Consumer Project
+   MUST discard any `Cargo.lock` embedded by `cargo package` and resolve a fresh
+   lock before building. Otherwise Cargo can retain an older registry version
+   that still satisfies a caret requirement and mark the newer staged patch
+   unused. Gate R retains registry-native lock behavior because it has no staged
+   patch table.
 2. The extracted package directories are NOT the workspace: they contain
    the normalized Cargo.toml and the packaged file set, so P-INCLUDE,
    P-META, and P-RESOLVE failures manifest exactly as they would for a
@@ -478,3 +484,8 @@ upstream — the standard pre-publish mechanism.)*
   layout or `target/<rustc-host>/debug` when a repository/user Cargo config
   sets `build.target`. This makes local macOS release validation exercise the
   same staged consumers as Linux CI without changing CI's artifact path.
+- **2026-07-12** — Gate P packaged-lock amendment: every Gate P consumer now
+  discards its pre-patch lockfile before resolution. The creator consumer had
+  retained registry `rlvgl-core 0.2.4` from the root package lock even after
+  staged `rlvgl-core 0.2.5` was installed in `[patch.crates-io]`; Cargo therefore
+  compiled the registry crate and correctly failed the provenance assertion.

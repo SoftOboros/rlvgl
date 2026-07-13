@@ -69,6 +69,10 @@ fi
 mkdir -p "$PKG/.cargo"
 grep -v '^rlvgl = ' "$PATCH_CONFIG" >"$PKG/.cargo/config.toml"
 echo "smoke.sh: wrote $PKG/.cargo/config.toml (rlvgl self-patch filtered)"
+# `cargo package` embeds a lock resolved before the completed Gate P patch
+# table exists. Re-resolve after installing the table so an older registry
+# version cannot keep a newer staged patch in [[patch.unused]].
+rm -f "$PKG/Cargo.lock"
 
 # --- 3. Build the creator binary from the packaged file set -------------------
 # Bin name + required-features per the root Cargo.toml [[bin]] section
@@ -99,7 +103,14 @@ if awk '
   echo "smoke.sh: staged-source assertion passed (no registry rlvgl-* crates)"
 else
   echo "smoke.sh: FAIL — an rlvgl-* crate resolved from the registry:" >&2
-  grep -B1 'source = "registry' "$PKG/Cargo.lock" | grep 'name = "rlvgl' >&2
+  awk '
+    /^\[\[package\]\]/ { name = ""; version = "" }
+    /^name = / { name = $0 }
+    /^version = / { version = $0 }
+    /^source = "registry/ && name ~ /^name = "rlvgl/ {
+      print "  " name ", " version
+    }
+  ' "$PKG/Cargo.lock" >&2
   exit 1
 fi
 

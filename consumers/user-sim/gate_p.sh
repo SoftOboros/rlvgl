@@ -79,7 +79,14 @@ if [ "$GATE" != "r" ]; then
     :
   else
     echo "gate_p.sh: FAIL — an rlvgl-* crate resolved from the registry under GATE=p:" >&2
-    grep -B1 'source = "registry' "$SCRIPT_DIR/Cargo.lock" | grep 'name = "rlvgl' >&2
+    awk '
+      /^\[\[package\]\]/ { name = ""; version = "" }
+      /^name = / { name = $0 }
+      /^version = / { version = $0 }
+      /^source = "registry/ && name ~ /^name = "rlvgl/ {
+        print "  " name ", " version
+      }
+    ' "$SCRIPT_DIR/Cargo.lock" >&2
     exit 1
   fi
   echo "gate_p.sh: staged-source assertion passed (no registry rlvgl-* crates)"
