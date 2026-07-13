@@ -135,7 +135,9 @@ impl PhilosophersTable {
         let rgba =
             rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
         let pixels = rgba
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|c| Color(c[0], c[1], c[2], c[3]))
             .collect();
         Some(Decoded {

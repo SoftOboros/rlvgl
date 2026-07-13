@@ -3285,7 +3285,7 @@ fn emit_qt_image_helper(used_assets: &[AssetRef], out: &mut String) {
              let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)\n        \
                  .expect(\"qt_image: RLE decode failed\");\n    \
              let pixels: Vec<Color> = rgba\n        \
-                 .chunks_exact(4)\n        \
+                 .as_chunks::<4>().0.iter()\n        \
                  .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {\n            \
                      Color(0x00, 0x00, 0x00, 0x00) // magenta sentinel → transparent (RGB565 has no alpha)\n        \
                  } else {\n            \
@@ -3330,7 +3330,7 @@ fn emit_qt_image_art_helper(out: &mut String) {
              let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)\n        \
                  .expect(\"qt_image_art: RLE decode failed\");\n    \
              let pixels: Vec<Color> = rgba\n        \
-                 .chunks_exact(4)\n        \
+                 .as_chunks::<4>().0.iter()\n        \
                  .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {\n            \
                      Color(0x00, 0x00, 0x00, 0x00)\n        \
                  } else {\n            \

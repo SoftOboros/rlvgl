@@ -124,7 +124,12 @@ impl MachineSelector {
         }
         let rgba =
             rlvgl_decomp::decode_rgba(width as usize, height as usize, &palette, stream).ok()?;
-        buf.extend(rgba.chunks_exact(4).map(|c| Color(c[0], c[1], c[2], c[3])));
+        buf.extend(
+            rgba.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|c| Color(c[0], c[1], c[2], c[3])),
+        );
         Some((width as u32, height as u32))
     }
 }

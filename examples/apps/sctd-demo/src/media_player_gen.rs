@@ -352,7 +352,7 @@ fn qt_image(bounds: Rect, rle: &'static [u8]) -> Rc<RefCell<dyn Widget>> {
     let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
         .expect("qt_image: RLE decode failed");
     let pixels: Vec<Color> = rgba
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {
             Color(0x00, 0x00, 0x00, 0x00) // magenta sentinel → transparent (RGB565 has no alpha)
         } else {
@@ -392,7 +392,7 @@ fn qt_image_art(rle: &'static [u8]) -> ImageArt {
     let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)
         .expect("qt_image_art: RLE decode failed");
     let pixels: Vec<Color> = rgba
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {
             Color(0x00, 0x00, 0x00, 0x00)
         } else {

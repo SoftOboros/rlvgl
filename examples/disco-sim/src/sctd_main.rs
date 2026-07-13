@@ -236,7 +236,7 @@ impl SctdRuntime {
     }
 
     fn render_frame(&mut self) {
-        for pixel in self.frame.buf.chunks_exact_mut(4) {
+        for pixel in self.frame.buf.as_chunks_mut::<4>().0 {
             pixel.copy_from_slice(&WINDOW_BG_ARGB8888.to_le_bytes());
         }
         {
